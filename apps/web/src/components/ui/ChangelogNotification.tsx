@@ -4,6 +4,7 @@ import { useVersionCheck } from '../../hooks/useVersionCheck';
 import { Modal } from './Modal';
 import { cn } from '../../lib/utils';
 import type { ChangelogEntry } from '../../config/versionConfig';
+import { spring } from '../../lib/motion';
 
 /**
  * Changelog notification component
@@ -48,7 +49,7 @@ export function ChangelogNotification() {
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            transition={spring.snappy}
             className={cn(
               'fixed z-[60] flex items-center gap-3 px-4 py-3 rounded-xl border max-w-[90vw] md:max-w-md',
               'bottom-4 left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:bottom-8 md:right-8',

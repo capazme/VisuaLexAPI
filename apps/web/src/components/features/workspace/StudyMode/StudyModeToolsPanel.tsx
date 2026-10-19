@@ -7,6 +7,7 @@ import type { StudyModeTheme } from './StudyMode';
 import { HIGHLIGHT_STYLES, parseInlineStyle } from '../../../../utils/highlightColors';
 import { revealAnnotation } from '../../../../utils/revealAnnotation';
 import { StudyModeSummary } from './StudyModeSummary';
+import { spring } from '../../../../lib/motion';
 
 interface StudyModeToolsPanelProps {
   visible: boolean;
@@ -148,7 +149,7 @@ export function StudyModeToolsPanel({
           initial={{ x: '-100%', opacity: 0.8 }}
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: '-100%', opacity: 0.8 }}
-          transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+          transition={spring.snappy}
           onMouseEnter={onMouseEnter}
           onMouseLeave={onMouseLeave}
           style={{ touchAction: 'pan-y' }}
@@ -256,7 +257,7 @@ export function StudyModeToolsPanel({
                       </p>
                       <button
                         onClick={() => onRemoveAnnotation(note.id)}
-                        className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-600 transition-all"
+                        className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-600 transition-[color,background-color,border-color,opacity]"
                       >
                         <X size={14} />
                       </button>
@@ -293,7 +294,7 @@ export function StudyModeToolsPanel({
                         </p>
                         <button
                           onClick={() => onRemoveHighlight(h.id)}
-                          className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-600 transition-all"
+                          className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-600 transition-[color,background-color,border-color,opacity]"
                         >
                           <X size={14} />
                         </button>

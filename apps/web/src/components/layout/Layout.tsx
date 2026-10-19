@@ -23,6 +23,7 @@ import { useConsentIfProvided } from '../../features/merlt/consent/useConsent';
 import { useAuth } from '../../hooks/useAuth';
 import { ServiceHealthBanner } from '../ui/ServiceHealthBanner';
 import { PluginSlot } from '../../plugins/PluginSlot';
+import { spring } from '../../lib/motion';
 
 export function Layout() {
   const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel, openCommandPalette } = useAppStore(useShallow(s => ({
@@ -174,7 +175,7 @@ export function Layout() {
           width: sidebarVisible && !settings.focusMode ? 64 : 0,
           opacity: sidebarVisible && !settings.focusMode ? 1 : 0,
         }}
-        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        transition={spring.snappy}
         className="hidden lg:block flex-shrink-0 h-full"
       >
         {sidebarVisible && !settings.focusMode && (
@@ -204,7 +205,8 @@ export function Layout() {
       )}
 
       <main
-        className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative"
+        // `vlx-page`: the one part a section change animates (index.css, spec §6.3.2); the sidebar stays still.
+        className="vlx-page flex-1 flex flex-col min-w-0 h-full overflow-hidden relative"
         // The practice's columns (`h-app-row`) are the viewport less this bar.
         style={showSearchBar ? { ['--search-bar-height' as string]: SEARCH_BAR_HEIGHT } : undefined}
       >
@@ -215,11 +217,11 @@ export function Layout() {
           onClick={() => updateSettings({ focusMode: !settings.focusMode })}
           id="tour-focus-toggle"
           className={cn(
-            'hidden md:block fixed top-4 right-4 z-50 p-2.5 rounded-xl transition-all duration-200',
-            'backdrop-blur-xl shadow-lg border',
+            'hidden md:block fixed top-4 right-4 z-50 p-2.5 rounded-xl transition-colors',
+            'shadow-sm border',
             settings.focusMode
-              ? 'bg-primary-600/90 text-white border-transparent hover:bg-primary-500/90'
-              : 'bg-white/80 dark:bg-slate-900/80 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700'
+              ? 'bg-primary-600 text-white border-transparent hover:bg-primary-700'
+              : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 hover:text-slate-800 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700'
           )}
           title={settings.focusMode ? 'Esci da Focus Mode (Cmd+Space)' : 'Focus Mode (Cmd+Space)'}
         >

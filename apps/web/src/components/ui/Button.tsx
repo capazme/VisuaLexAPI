@@ -1,100 +1,97 @@
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { AlertCircle, Check } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { ACTIVE, DISABLED, FOCUS_RING, TRANSITION } from '../../constants/interactions';
+
+export type ButtonVariant = 'primary' | 'secondary' | 'quiet' | 'danger';
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'glass' | 'outline';
+  /** `ghost` and `outline` are the earlier names of `quiet` and `secondary`. */
+  variant?: ButtonVariant | 'ghost' | 'outline';
   size?: 'sm' | 'md' | 'lg';
   icon?: ReactNode;
+  /** Disables the button and puts a spinner in the icon's place; the label stays, so the width does not jump. */
   loading?: boolean;
+  /** The outcome of the last press, shown until the caller clears it: a red ring and an alert sign, or a check. */
+  status?: 'error' | 'success';
   children: ReactNode;
 }
 
+const VARIANT_ALIASES: Record<NonNullable<ButtonProps['variant']>, ButtonVariant> = {
+  primary: 'primary',
+  secondary: 'secondary',
+  quiet: 'quiet',
+  danger: 'danger',
+  ghost: 'quiet',
+  outline: 'secondary',
+};
+
+// Spec 2026-10-18-redesign-inchiostro §5.1: one accent, no gradient, no glow.
+const variantStyles: Record<ButtonVariant, string> = {
+  primary: cn(
+    'border border-transparent bg-toga-600 text-white',
+    'hover:bg-toga-700 active:bg-toga-800',
+    'dark:bg-toga-400 dark:text-ink-950 dark:hover:bg-toga-300 dark:active:bg-toga-200'
+  ),
+  secondary: cn(
+    'border border-ink-200 bg-card text-ink-800',
+    'hover:border-ink-300 hover:bg-ink-50 hover:text-ink-900 active:bg-ink-100',
+    'dark:border-ink-800 dark:text-ink-100 dark:hover:border-ink-700 dark:hover:bg-ink-800 dark:hover:text-ink-50'
+  ),
+  quiet: cn(
+    'border border-transparent bg-transparent text-ink-600',
+    'hover:bg-ink-100 hover:text-ink-900 active:bg-ink-200',
+    'dark:text-ink-300 dark:hover:bg-ink-800 dark:hover:text-ink-50 dark:active:bg-ink-700'
+  ),
+  danger: cn(
+    'border border-transparent bg-red-600 text-white',
+    'hover:bg-red-700 active:bg-red-800'
+  ),
+};
+
+// 36 px on a desktop, 44 px on a phone (the touch target); `min-h` so a long label wraps instead of clipping.
+// The line height rides on the size (`text-sm/5`): tailwind-merge drops a separate `leading-*` written
+// before a font size.
+const sizeStyles = {
+  sm: 'min-h-11 md:min-h-8 px-3 text-xs/5',
+  md: 'min-h-11 md:min-h-9 px-4 text-sm/5',
+  lg: 'min-h-11 px-5 text-base/5',
+};
+
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ variant = 'primary', size = 'md', icon, loading, children, className, disabled, ...props }, ref) => {
-    const baseStyles = cn(
-      'inline-flex items-center justify-center gap-2 font-medium',
-      'transition-all duration-200 ease-smooth-out',
-      'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary/50',
-      'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none',
-      'active:scale-[0.98]'
+  ({ variant = 'primary', size = 'md', icon, loading, status, children, className, disabled, ...props }, ref) => {
+    const look = VARIANT_ALIASES[variant];
+    const sign = loading ? (
+      <span className="size-4 rounded-full border-2 border-current border-t-transparent animate-spin" aria-hidden="true" />
+    ) : status === 'error' ? (
+      <AlertCircle size={16} aria-hidden="true" />
+    ) : status === 'success' ? (
+      <Check size={16} aria-hidden="true" />
+    ) : (
+      icon
     );
-
-    const variantStyles = {
-      primary: cn(
-        'bg-primary-600 hover:bg-primary-700 active:bg-primary-800',
-        'text-white',
-        'shadow-md hover:shadow-lg hover:shadow-primary/20',
-        'border border-transparent',
-        'hover:-translate-y-0.5'
-      ),
-      secondary: cn(
-        'bg-white dark:bg-slate-800',
-        'text-slate-700 dark:text-slate-200',
-        'border border-slate-200 dark:border-slate-700',
-        'hover:bg-slate-50 dark:hover:bg-slate-700',
-        'hover:text-slate-900 dark:hover:text-white',
-        'shadow-sm hover:shadow-md hover:border-slate-300 dark:hover:border-slate-600'
-      ),
-      outline: cn(
-        'bg-transparent',
-        'text-slate-600 dark:text-slate-300',
-        'border border-slate-200 dark:border-slate-700',
-        'hover:bg-slate-50 dark:hover:bg-slate-800',
-        'hover:text-slate-900 dark:hover:text-white',
-        'hover:border-slate-300 dark:hover:border-slate-600'
-      ),
-      ghost: cn(
-        'bg-transparent',
-        'text-slate-600 dark:text-slate-400',
-        'hover:bg-slate-100 dark:hover:bg-slate-800',
-        'hover:text-slate-900 dark:hover:text-slate-100'
-      ),
-      danger: cn(
-        'bg-red-600 hover:bg-red-700',
-        'text-white',
-        'shadow-sm hover:shadow-md hover:shadow-red-500/20',
-        'hover:-translate-y-0.5'
-      ),
-      glass: cn(
-        'bg-white/60 dark:bg-slate-800/60',
-        'backdrop-blur-md',
-        'border border-white/20 dark:border-white/5',
-        'text-slate-700 dark:text-slate-200',
-        'hover:bg-white/80 dark:hover:bg-slate-700/80',
-        'shadow-sm hover:shadow-md',
-        'hover:-translate-y-0.5'
-      ),
-    };
-
-    const sizeStyles = {
-      sm: 'px-3 py-1.5 text-xs rounded-lg',
-      md: 'px-4 py-2 text-sm rounded-lg',
-      lg: 'px-6 py-3 text-base rounded-lg',
-    };
 
     return (
       <button
         ref={ref}
         className={cn(
-          baseStyles,
-          variantStyles[variant],
+          'inline-flex items-center justify-center gap-2 rounded-md py-1.5 text-center font-medium',
+          TRANSITION,
+          FOCUS_RING,
+          DISABLED,
+          ACTIVE,
+          variantStyles[look],
           sizeStyles[size],
+          status === 'error' && 'ring-2 ring-red-500 ring-offset-2 ring-offset-background',
           className
         )}
         disabled={disabled || loading}
+        aria-busy={loading || undefined}
+        data-status={status}
         {...props}
       >
-        {loading ? (
-          <>
-            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-            <span>Caricamento...</span>
-          </>
-        ) : (
-          <>
-            {icon && <span className="shrink-0">{icon}</span>}
-            {children}
-          </>
-        )}
+        {sign && <span className="inline-flex shrink-0">{sign}</span>}
+        {children}
       </button>
     );
   }

@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Book } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { spring } from '../../lib/motion';
 
 interface BrocardiDrawerProps {
   isOpen: boolean;
@@ -59,11 +60,7 @@ export function BrocardiDrawer({ isOpen, onClose, children, title = "Approfondim
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
-            transition={{
-              type: 'spring',
-              damping: 30,
-              stiffness: 300
-            }}
+            transition={spring.snappy}
             className={cn(
               "fixed right-0 top-0 bottom-0 z-50",
               "w-full sm:w-[500px] md:w-[600px] lg:w-[700px]",

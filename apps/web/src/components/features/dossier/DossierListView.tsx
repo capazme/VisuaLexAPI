@@ -241,9 +241,9 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
   };
 
   return (
-    <div className="animate-in fade-in duration-300">
+    <div className="animate-in fade-in duration-200">
       <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 mb-6">
-        <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white">{sectionKind ? `I tuoi ${kindLabel(sectionKind).toLowerCase()}` : 'I tuoi Dossier'}</h2>
+        <h2 className="font-serif text-3xl font-medium tracking-tight text-slate-900 dark:text-slate-50">{sectionKind ? `I tuoi ${kindLabel(sectionKind).toLowerCase()}` : 'I tuoi Dossier'}</h2>
         <div className="flex gap-2">
           {trashCount > 0 && onOpenTrash && (
             <button
@@ -399,11 +399,11 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                     onSelect(dossier.id);
                   }
                 }}
-                className="dossier-card bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 md:p-5 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all cursor-pointer group relative active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+                className="dossier-card bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 md:p-5 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-[color,background-color,border-color,box-shadow,scale] cursor-pointer group relative active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
               >
                 <div className="flex justify-between items-start mb-3 md:mb-4 gap-2">
                   <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <Folder className="text-blue-500 group-hover:scale-110 transition-transform" size={28} />
+                    <Folder className="text-blue-500" size={28} />
                     {dossier.isPinned && (
                       <Star size={14} className="text-yellow-500 fill-yellow-500" aria-label="Preferito" />
                     )}
@@ -448,7 +448,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                  <h3 className="font-bold text-base md:text-lg text-slate-900 dark:text-white group-hover:text-blue-600 transition-colors line-clamp-2">
+                  <h3 className="font-serif text-lg md:text-xl font-medium leading-snug tracking-tight text-slate-900 dark:text-slate-50 group-hover:text-primary-700 dark:group-hover:text-primary-300 transition-colors line-clamp-2">
                     {dossier.title}
                   </h3>
                   {dossier.sourceSuggestionId && (
@@ -469,9 +469,12 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                     )}
                   </div>
                 )}
-                <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 line-clamp-2 min-h-[2.5em]">
-                  {dossier.description || 'Nessuna descrizione'}
-                </p>
+                {/* No placeholder for a missing description: an empty line says nothing (spec §5.3.3). */}
+                {dossier.description && (
+                  <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 line-clamp-2">
+                    {dossier.description}
+                  </p>
+                )}
                 {dossier.tags && dossier.tags.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-2 md:mt-3">
                     {dossier.tags.slice(0, 3).map((tag) => (
@@ -488,9 +491,11 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                   <p className="mt-2 md:mt-3 text-sm text-slate-700 dark:text-slate-300 line-clamp-2">{acts}</p>
                 )}
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                  <span>
-                    {counts.note} {counts.note === 1 ? 'nota' : 'note'}
-                  </span>
+                  {counts.note > 0 && (
+                    <span>
+                      {counts.note} {counts.note === 1 ? 'nota' : 'note'}
+                    </span>
+                  )}
                   {counts.sentenze > 0 && (
                     <span>{counts.sentenze} {counts.sentenze === 1 ? 'sentenza' : 'sentenze'}</span>
                   )}
@@ -503,7 +508,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                 </p>
                 <div className="mt-3 md:mt-4 pt-3 md:pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center">
                   <span className="text-xs text-slate-400">{formatTimestampLong(dossier.createdAt)}</span>
-                  <ChevronRight size={18} className="text-slate-400 group-hover:text-blue-500 group-hover:translate-x-1 transition-all flex-shrink-0" />
+                  <ChevronRight size={18} className="text-slate-400 group-hover:text-blue-500 transition-colors flex-shrink-0" />
                 </div>
               </div>
             );

@@ -3,6 +3,7 @@ import { X, ChevronLeft, ChevronRight, Settings, Zap, Sun, Moon, BookOpen, Maxim
 import { cn } from '../../../../lib/utils';
 import type { ArticleData } from '../../../../types';
 import type { StudyModeTheme } from './StudyMode';
+import { spring } from '../../../../lib/motion';
 
 interface StudyModeHeaderProps {
   visible: boolean;
@@ -80,7 +81,7 @@ export function StudyModeHeader({
           initial={{ y: '-100%', opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: '-100%', opacity: 0 }}
-          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+          transition={spring.snappy}
           className={cn(
             "absolute top-0 left-0 right-0 z-20 border-b",
             styles.bg,
@@ -201,7 +202,7 @@ export function StudyModeHeader({
                 <button
                   onClick={() => onThemeChange('light')}
                   className={cn(
-                    "p-1 rounded-md transition-all",
+                    "p-1 rounded-md transition-[color,background-color,border-color,box-shadow]",
                     theme === 'light' ? 'bg-white shadow-sm text-yellow-500' : 'text-slate-400 hover:text-slate-500'
                   )}
                   title="Tema chiaro (1)"
@@ -211,7 +212,7 @@ export function StudyModeHeader({
                 <button
                   onClick={() => onThemeChange('sepia')}
                   className={cn(
-                    "p-1 rounded-md transition-all",
+                    "p-1 rounded-md transition-[color,background-color,border-color,box-shadow]",
                     theme === 'sepia' ? 'bg-white shadow-sm text-amber-600' : 'text-slate-400 hover:text-slate-500'
                   )}
                   title="Tema seppia (2)"
@@ -221,7 +222,7 @@ export function StudyModeHeader({
                 <button
                   onClick={() => onThemeChange('dark')}
                   className={cn(
-                    "p-1 rounded-md transition-all",
+                    "p-1 rounded-md transition-[color,background-color,border-color,box-shadow]",
                     theme === 'dark' ? 'bg-slate-700 shadow-sm text-blue-400' : 'text-slate-400 hover:text-slate-500'
                   )}
                   title="Tema scuro (3)"

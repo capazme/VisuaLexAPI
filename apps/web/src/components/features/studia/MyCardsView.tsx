@@ -276,7 +276,7 @@ export function MyCardsView() {
       )}
 
       {id ? (
-        <div className={cn('min-w-0 pt-2 md:pt-3', desktop && 'sticky top-0 max-h-screen overflow-y-auto pb-4')}>
+        <div className={cn('min-w-0 pt-2 md:pt-3', desktop && 'sticky top-0 max-h-dvh overflow-y-auto pb-4')}>
           {selected ? (
             <DetailOf
               // Its confirmations and pending request belong to this card: another one starts clean.

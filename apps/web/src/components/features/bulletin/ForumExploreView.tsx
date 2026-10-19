@@ -5,6 +5,7 @@ import { EmptyState } from '../../ui/EmptyState';
 import { StudyPacksBand } from './StudyPacksBand';
 import { FORUM_CATEGORIES } from '../../../utils/forumCategories';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
+import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import type { SharedEnvironment, EnvironmentCategory, StudyImportReport } from '../../../types';
 
 export type SortOption = 'newest' | 'popular' | 'mostDownloaded';
@@ -174,7 +175,8 @@ export function ForumExploreView({
         <button
           onClick={onRefresh}
           disabled={loading}
-          className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+          aria-label="Aggiorna l'elenco"
+          className="flex min-h-[44px] min-w-[44px] items-center justify-center p-2.5 md:min-h-0 md:min-w-0 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
         >
           <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
         </button>
@@ -238,7 +240,7 @@ export function ForumExploreView({
             action={
               <button
                 onClick={onResetFilters}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg transition-colors"
+                className={`inline-flex ${TOUCH_TARGET_RESPONSIVE} items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg transition-colors`}
               >
                 <XIcon size={16} />
                 Azzera filtri
@@ -253,7 +255,7 @@ export function ForumExploreView({
             action={
               <button
                 onClick={onPublishClick}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                className={`inline-flex ${TOUCH_TARGET_RESPONSIVE} items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors`}
               >
                 <Upload size={16} />
                 Pubblica un dossier

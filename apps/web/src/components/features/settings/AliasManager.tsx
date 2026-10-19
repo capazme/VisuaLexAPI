@@ -326,7 +326,7 @@ export function AliasManager() {
                             type="submit"
                             disabled={!canSubmit}
                             className={cn(
-                                "w-full py-2.5 px-4 rounded-lg text-sm font-medium transition-all",
+                                "w-full py-2.5 px-4 rounded-lg text-sm font-medium transition-colors",
                                 "flex items-center justify-center gap-2",
                                 canSubmit
                                     ? "bg-indigo-600 text-white hover:bg-indigo-700"

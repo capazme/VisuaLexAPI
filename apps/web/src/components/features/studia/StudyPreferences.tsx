@@ -209,7 +209,7 @@ export function StudyPreferences({ onChanged }: StudyPreferencesProps) {
                           aria-hidden
                           className={cn('relative inline-block h-5 w-9 shrink-0 rounded-full transition-colors motion-reduce:transition-none', on ? 'bg-primary-600' : 'bg-slate-300 dark:bg-slate-600')}
                         >
-                          <span className={cn('absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all motion-reduce:transition-none', on ? 'left-[1.125rem]' : 'left-0.5')} />
+                          <span className={cn('absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform motion-reduce:transition-none', on && 'translate-x-4')} />
                         </span>
                       </button>
                     </li>
