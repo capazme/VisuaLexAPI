@@ -18,8 +18,12 @@ export const SECTIONS: readonly Section[] = [
   { id: 'opus', name: 'Opus', line: 'Dossier di lavoro e strumenti per la professione', icon: Briefcase, home: '/dossier' },
   { id: 'gymnasium', name: 'Gymnasium', line: 'Schede, ripasso, esami e concorsi', icon: GraduationCap, home: '/studia/ripasso' },
   { id: 'academia', name: 'Academia', line: 'Grafo, feedback e validazione', icon: Landmark, home: '/merlt' },
-  { id: 'forum', name: 'Forum', line: 'Glosse e dossier condivisi', icon: Users, home: '/forum' },
+  { id: 'forum', name: 'Forum', line: 'Dossier pubblici e community', icon: Users, home: '/forum' },
 ];
+
+/** The Forum's title with its phrase, as Gymnasium's (the Community page's `h1`). Proposed, not yet confirmed by
+ *  the owner: the one place to change it. */
+export const FORUM_TITLE = 'Forum: la tua piazza giuridica';
 
 const under = (pathname: string, root: string) => pathname === root || pathname.startsWith(`${root}/`);
 

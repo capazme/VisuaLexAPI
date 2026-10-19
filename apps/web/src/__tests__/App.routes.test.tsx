@@ -95,6 +95,22 @@ describe('App routing', () => {
     expect(window.location.search).toBe('?import=abc');
   });
 
+  // The Forum's two areas (F1): «Dossier pubblici» keeps /forum, «Community» is a placeholder beside it.
+  it('keeps /forum on «Dossier pubblici»', async () => {
+    renderAt('/forum');
+    expect(await screen.findByTestId('forum')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/forum');
+  });
+
+  it('opens the Community placeholder at /forum/community, with the Forum\'s title and a way to the public dossiers', async () => {
+    renderAt('/forum/community');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Forum: la tua piazza giuridica' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Community' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Apri i dossier pubblici' })).toHaveAttribute('href', '/forum');
+    expect(screen.queryByText('Pagina non trovata')).toBeNull();
+    expect(screen.getByTestId('layout')).toBeInTheDocument();
+  });
+
   it('renders the global 404 page inside the layout for unknown paths', async () => {
     renderAt('/percorso-inesistente');
     expect(await screen.findByText('Pagina non trovata')).toBeInTheDocument();
