@@ -243,6 +243,21 @@ describe('ConnectAiAppPage — mcp-legal-it', () => {
     }
   });
 
+  it('keeps every link of the page 44 px tall at every width, as the buttons', async () => {
+    render(<ConnectAiAppPage />);
+    await screen.findByRole('region', { name: /come collegare la tua app/i });
+    const links = screen.getAllByRole('link');
+    // The two anchors at the top, the release link in the Desktop card and the README link at the end.
+    expect(links.length).toBeGreaterThanOrEqual(4);
+    for (const link of links) {
+      expect(link).toHaveClass('min-h-[44px]');
+      // No breakpoint may lower it again (226x20 and 223x20 seen at 1366 px wide).
+      expect([...link.classList].filter((name) => /^(sm|md|lg|xl|2xl):(min-h|h|py)-/.test(name))).toEqual([]);
+    }
+    expect(screen.getByRole('link', { name: /apri l’ultima versione su github/i })).toHaveClass('min-h-[44px]');
+    expect(screen.getByRole('link', { name: /apri il readme di mcp-legal-it/i })).toHaveClass('min-h-[44px]');
+  });
+
   it('is there while the address loads and when it cannot be read', async () => {
     getConnectionInfo.mockRejectedValue({ status: 500, message: 'Errore del server' });
     vi.spyOn(console, 'error').mockImplementation(() => undefined);

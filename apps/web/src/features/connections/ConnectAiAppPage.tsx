@@ -30,7 +30,7 @@ const anchorTarget = 'scroll-mt-20';
 const partTitle = 'font-serif text-2xl font-medium tracking-tight text-slate-900 dark:text-slate-50';
 const focusRing = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
 
-/** A page outside VisuaLex, in a new tab, said so to a screen reader; 44 px high on a phone. */
+/** A page outside VisuaLex, in a new tab, said so to a screen reader; 44 px high at every width. */
 function ExternalAnchor({ href, children }: { href: string; children: string }) {
   return (
     <a
@@ -38,7 +38,7 @@ function ExternalAnchor({ href, children }: { href: string; children: string }) 
       target="_blank"
       rel="noopener noreferrer"
       className={cn(
-        'inline-flex min-h-[44px] items-center gap-1 rounded font-medium text-primary-700 underline underline-offset-2 hover:text-primary-800 md:min-h-0 dark:text-primary-300 dark:hover:text-primary-200',
+        'inline-flex min-h-[44px] items-center gap-1 rounded font-medium text-primary-700 underline underline-offset-2 hover:text-primary-800 dark:text-primary-300 dark:hover:text-primary-200',
         focusRing,
       )}
     >
