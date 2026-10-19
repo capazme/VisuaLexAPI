@@ -11,7 +11,7 @@ vi.mock('../../hooks/useForumNotifications', () => ({
   useForumNotifications: () => ({ count: { total: 3, normaChanges: notices.normaChanges }, markRead: vi.fn(), refetch: vi.fn() }),
 }));
 
-import { Sidebar, SIDEBAR_SMALL_TEXT } from './Sidebar';
+import { Sidebar, SIDEBAR_SMALL_TEXT, SIDEBAR_TOGGLE_TEXT } from './Sidebar';
 import { appStore } from '../../store/useAppStore';
 import { subscribeSearchField } from '../../utils/searchFieldControl';
 import { sectionStore } from '../../features/sections/useSection';
@@ -576,6 +576,8 @@ describe('Sidebar — the words', () => {
   it('offers the toggle that narrows or widens the bar only when the layout gives one, never in the drawer', () => {
     const toggle = vi.fn();
     renderLayout('wide', '/', toggle);
+    // In the entries' words' colour, never fainter (theme.test.ts measures it).
+    expect(screen.getByRole('button', { name: 'Riduci la barra laterale' })).toHaveClass(...SIDEBAR_TOGGLE_TEXT.split(' '));
     fireEvent.click(screen.getByRole('button', { name: 'Riduci la barra laterale' }));
     expect(toggle).toHaveBeenCalledTimes(1);
     cleanup();

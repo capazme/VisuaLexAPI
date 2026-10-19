@@ -165,6 +165,9 @@ describe('the Inchiostro palette', () => {
     const dark = [linear('ink-950'), backdrop(linear('ink-950'))].map((under) => over(linear('ink-900'), 0.8, under));
     for (const bg of light) expect(ratio(linear('ink-600'), bg)).toBeGreaterThanOrEqual(4.5);
     for (const bg of dark) expect(ratio(linear('ink-400'), bg)).toBeGreaterThanOrEqual(4.5);
+    // `SIDEBAR_TOGGLE_TEXT`, the narrow/widen control (desktop only, so over the page): the entries' words' colour.
+    expect(ratio(linear('ink-700'), light[0])).toBeGreaterThanOrEqual(7);
+    expect(ratio(linear('ink-300'), dark[0])).toBeGreaterThanOrEqual(7);
   });
 });
 

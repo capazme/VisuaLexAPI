@@ -49,6 +49,13 @@ interface NavItemProps {
  */
 export const SIDEBAR_SMALL_TEXT = 'text-slate-600 dark:text-slate-400';
 
+/**
+ * The narrow/widen control's colour: the entries' words', slate 700 / dark slate 300 (10:1 and 12:1 on the
+ * bar, `theme.test.ts`). It was slate 500 / dark slate 400 — AA on paper (4.7:1, 6.9:1) but fainter than every
+ * word beside it, and read as faint in dark mode on the owner's pass.
+ */
+export const SIDEBAR_TOGGLE_TEXT = 'text-slate-700 dark:text-slate-300';
+
 /** The palette's shortcut as this keyboard writes it. */
 const PALETTE_SHORTCUT = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform) ? '⌘K' : 'Ctrl K';
 
@@ -277,8 +284,9 @@ function WidthToggle({ layout, onToggle }: { layout: SidebarLayout; onToggle: ()
       }}
       {...(wide ? {} : handlers)}
       className={cn(
-        "flex h-11 shrink-0 items-center rounded-xl text-slate-500 dark:text-slate-400 transition-colors duration-200",
-        "hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200",
+        "flex h-11 shrink-0 items-center rounded-xl transition-colors duration-200",
+        SIDEBAR_TOGGLE_TEXT,
+        "hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
         wide ? "w-full overflow-hidden" : "w-11",
       )}
