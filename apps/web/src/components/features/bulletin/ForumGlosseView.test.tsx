@@ -81,6 +81,35 @@ describe('ForumGlosseView', () => {
     await waitFor(() => expect(feedMock).toHaveBeenLastCalledWith({ sort: 'unanswered', page: 1, kind: 'decision' }));
   });
 
+  it('narrows to a court’s decisions, and back to the articles without a court', async () => {
+    feedMock.mockResolvedValue(answer([item()]));
+    renderView();
+    await screen.findByText('Sul danno ingiusto');
+
+    fireEvent.change(screen.getByLabelText('Corte'), { target: { value: 'cassazione:civile' } });
+    await waitFor(() => expect(feedMock).toHaveBeenLastCalledWith({ sort: 'recent', page: 1, kind: 'decision', court: 'cassazione:civile' }));
+    expect(screen.getByLabelText('Mostra')).toHaveValue('decision');
+
+    // the server refuses a court with the articles: choosing them drops the court
+    fireEvent.change(screen.getByLabelText('Mostra'), { target: { value: 'article' } });
+    await waitFor(() => expect(feedMock).toHaveBeenLastCalledWith({ sort: 'recent', page: 1, kind: 'article' }));
+    expect(screen.getByLabelText('Corte')).toHaveValue('');
+    expect(feedMock.mock.lastCall?.[0]?.court).toBeUndefined();
+  });
+
+  it('asks for the reader’s own glosse only while «Solo le mie glosse» is ticked', async () => {
+    feedMock.mockResolvedValue(answer([item({ isOwner: true })], 1, 2));
+    renderView();
+    fireEvent.click(await screen.findByRole('button', { name: 'Successive' }));
+    await waitFor(() => expect(feedMock).toHaveBeenLastCalledWith({ sort: 'recent', page: 2 }));
+
+    fireEvent.click(screen.getByLabelText('Solo le mie glosse'));
+    // a new filter starts again from the first page
+    await waitFor(() => expect(feedMock).toHaveBeenLastCalledWith({ sort: 'recent', page: 1, mine: true }));
+    fireEvent.click(screen.getByLabelText('Solo le mie glosse'));
+    await waitFor(() => expect(feedMock.mock.lastCall?.[0]?.mine).toBeUndefined());
+  });
+
   it('says a decision’s quotation is withheld', async () => {
     feedMock.mockResolvedValue(answer([item({
       target: { kind: 'decision', key: 'cassazione:civile:31310:2024' }, articleUrn: null, decisionLabel: 'Cass. civ., n. 31310/2024',

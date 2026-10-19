@@ -282,6 +282,13 @@ export const listPassages = async (req: Request, res: Response) => {
 // article and decision, without the comments' bodies. It shows no more than the per-article list.
 const FEED_SORTS = ['recent', 'popular', 'active', 'unanswered'] as const;
 
+// The decision key space (`norms/decisionKey.ts`), then up to two more segments: the archive, or a
+// TAR's seat and kind. No number or year: the filter names a court, `normaKey` names one decision.
+const COURT_PREFIX = /^(?:cassazione|corte_costituzionale|corte_giustizia_ue|tribunale_ue|consiglio_di_stato|cgars|tar)(?::[a-z-]{1,20}){0,2}$/;
+
+/** A LIKE prefix as Prisma sends it: `_` is a wildcard there, so it is escaped. */
+const likePrefix = (prefix: string) => prefix.replace(/_/g, '\\_');
+
 const feedSchema = z.object({
   sort: z.enum(FEED_SORTS, { message: 'L’ordinamento deve essere «recent», «popular», «active» o «unanswered»' }).default('recent'),
   kind: z.enum(['article', 'decision'], { message: 'Il tipo deve essere «article» o «decision»' }).optional(),
@@ -289,12 +296,22 @@ const feedSchema = z.object({
   act: z.string({ message: 'L’atto non è valido' }).regex(/^[a-z0-9_-]{1,300}$/, 'L’atto non è valido').optional(),
   // One article's key (the web's `buildItemKey`) or one decision's key.
   normaKey: z.string({ message: 'La chiave non è valida' }).min(1, 'La chiave non è valida').max(500, 'La chiave non è valida').optional(),
+  // A court, or a court's segment, as a decision key begins: «cassazione», «cassazione:penale», «tar:roma».
+  court: z.string({ message: 'La corte non è valida' }).regex(COURT_PREFIX, 'La corte non è valida').optional(),
+  // «le mie glosse»: the reader's own, never another user's.
+  mine: z.enum(['true', 'false'], { message: '«mine» deve essere «true» o «false»' }).optional(),
 }).superRefine((q, ctx) => {
   if (q.act !== undefined && q.normaKey !== undefined) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Indica l’atto o la chiave, non entrambi' });
   }
   if (q.act !== undefined && q.kind === 'decision') {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Un atto ha glosse sugli articoli, non sulle decisioni' });
+  }
+  if (q.court !== undefined && (q.act !== undefined || q.normaKey !== undefined)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Indica la corte, l’atto o la chiave: uno solo' });
+  }
+  if (q.court !== undefined && q.kind === 'article') {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Una corte ha glosse sulle decisioni, non sugli articoli' });
   }
 });
 
@@ -390,9 +407,12 @@ export const listFeed = async (req: Request, res: Response) => {
     ...(query.kind ? { targetKind: query.kind } : {}),
     // the act's key and then «--»: «legge--241--…» is not an article of «legge--24». The key's
     // segments are not typed, so an act named without its date also reads the dated acts of
-    // that number (the web always sends the date it has). Prisma passes `_` to LIKE unescaped.
-    ...(query.act ? { targetKind: 'article', normaKey: { startsWith: `${query.act.replace(/_/g, '\\_')}--` } } : {}),
+    // that number (the web always sends the date it has).
+    ...(query.act ? { targetKind: 'article', normaKey: { startsWith: `${likePrefix(query.act)}--` } } : {}),
+    // the court's prefix and then «:», as for an act: «tar:rom» is not «tar:roma».
+    ...(query.court ? { targetKind: 'decision', decisionKey: { startsWith: `${likePrefix(query.court)}:` } } : {}),
     ...(query.normaKey ? { normaKey: query.normaKey } : {}),
+    ...(query.mine === 'true' ? { userId: viewer.id } : {}),
     ...(query.sort === 'unanswered' ? { comments: { none: { isHidden: false } } } : {}),
   };
   const orderBy: Prisma.ArticleThreadOrderByWithRelationInput[] = query.sort === 'popular'

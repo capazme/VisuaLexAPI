@@ -37,7 +37,12 @@ export const articleDiscussionService = {
   },
   /** Every visible glossa, of every article and decision: the Forum's «Glosse». */
   async feed(query: {
-    sort?: GlossaFeedSort; kind?: 'article' | 'decision'; act?: string; normaKey?: string; page?: number; limit?: number;
+    sort?: GlossaFeedSort; kind?: 'article' | 'decision'; act?: string; normaKey?: string;
+    /** A prefix of the decision's key: «cassazione», «cassazione:civile». */
+    court?: string;
+    /** Only the signed-in user's glosse. */
+    mine?: boolean;
+    page?: number; limit?: number;
   } = {}): Promise<GlossaFeedResponse> {
     const response = await apiClient.get('/article-discussions/feed', { params: query });
     return response.data;

@@ -22,6 +22,20 @@ const KINDS: { value: 'all' | 'article' | 'decision'; label: string }[] = [
   { value: 'decision', label: 'Sulle decisioni' },
 ];
 
+// A court is a prefix of the decision's key (the server's `court`): the whole court, or one archive.
+const COURTS: { value: string; label: string }[] = [
+  { value: '', label: 'Tutte le corti' },
+  { value: 'cassazione', label: 'Cassazione' },
+  { value: 'cassazione:civile', label: 'Cassazione civile' },
+  { value: 'cassazione:penale', label: 'Cassazione penale' },
+  { value: 'corte_costituzionale', label: 'Corte costituzionale' },
+  { value: 'corte_giustizia_ue', label: 'Corte di giustizia UE' },
+  { value: 'tribunale_ue', label: 'Tribunale UE' },
+  { value: 'consiglio_di_stato', label: 'Consiglio di Stato' },
+  { value: 'cgars', label: 'C.G.A.R.S.' },
+  { value: 'tar', label: 'TAR' },
+];
+
 type FeedAnswer =
   | { key: string; status: 'error'; message: string }
   | { key: string; status: 'success'; items: GlossaFeedItem[]; page: number; pages: number; total: number };
@@ -29,6 +43,8 @@ type FeedAnswer =
 export function ForumGlosseView() {
   const [sort, setSort] = useState<GlossaFeedSort>('recent');
   const [kind, setKind] = useState<'all' | 'article' | 'decision'>('all');
+  const [court, setCourt] = useState('');
+  const [mine, setMine] = useState(false);
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);
   const [answer, setAnswer] = useState<FeedAnswer | null>(null);
@@ -37,10 +53,12 @@ export function ForumGlosseView() {
 
   // The answer is kept with the query it answers: until the current one's arrives the view is
   // loading, and an answer to an older query never shows.
-  const key = `${sort}|${kind}|${page}|${attempt}`;
+  const key = `${sort}|${kind}|${court}|${mine}|${page}|${attempt}`;
   useEffect(() => {
     let live = true;
-    articleDiscussionService.feed({ sort, page, kind: kind === 'all' ? undefined : kind })
+    articleDiscussionService.feed({
+      sort, page, kind: kind === 'all' ? undefined : kind, court: court || undefined, mine: mine || undefined,
+    })
       .then((res) => {
         if (live) setAnswer({ key, status: 'success', items: res.data, page: res.pagination.page, pages: res.pagination.pages, total: res.pagination.total });
       })
@@ -49,7 +67,7 @@ export function ForumGlosseView() {
         if (live) setAnswer({ key, status: 'error', message: error instanceof Error ? error.message : 'Errore nel caricamento delle glosse' });
       });
     return () => { live = false; };
-  }, [key, sort, kind, page]);
+  }, [key, sort, kind, court, mine, page]);
   const state = answer && answer.key === key ? answer : { status: 'loading' as const };
 
   const open = (item: GlossaFeedItem) => {
@@ -75,9 +93,37 @@ export function ForumGlosseView() {
         </label>
         <label className="flex items-center gap-2 text-sm">
           Mostra
-          <select value={kind} onChange={(e) => { setKind(e.target.value as typeof kind); setPage(1); }} className="min-h-[44px] rounded border px-2 md:min-h-0">
+          <select
+            value={kind}
+            onChange={(e) => {
+              const next = e.target.value as typeof kind;
+              setKind(next);
+              // a court has glosse on decisions only: the server refuses the two together
+              if (next === 'article') setCourt('');
+              setPage(1);
+            }}
+            className="min-h-[44px] rounded border px-2 md:min-h-0"
+          >
             {KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
           </select>
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          Corte
+          <select
+            value={court}
+            onChange={(e) => {
+              setCourt(e.target.value);
+              if (e.target.value) setKind('decision');
+              setPage(1);
+            }}
+            className="min-h-[44px] rounded border px-2 md:min-h-0"
+          >
+            {COURTS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+          </select>
+        </label>
+        <label className="flex min-h-[44px] items-center gap-2 text-sm md:min-h-0">
+          <input type="checkbox" checked={mine} onChange={(e) => { setMine(e.target.checked); setPage(1); }} />
+          Solo le mie glosse
         </label>
       </div>
 

@@ -127,6 +127,47 @@ describe('the Forum feed of glosse', () => {
     expect(ids(await feed(bob, { act: 'regolamento_ue--2016--679' }))).toEqual([mine.id]);
   });
 
+  it('filters by court, by a court’s archive or seat, and never reads a longer court name', async () => {
+    const civil = await decisionThread(alice);
+    const penal = await decisionThread(alice, { decisionKey: 'cassazione:penale:1200:2023', normaKey: 'cassazione:penale:1200:2023' });
+    const constitutional = await decisionThread(alice, { decisionKey: 'corte_costituzionale:242:2019', normaKey: 'corte_costituzionale:242:2019' });
+    const tarRome = await decisionThread(alice, { decisionKey: 'tar:roma:sent:1234:2024', normaKey: 'tar:roma:sent:1234:2024' });
+    const tarLatina = await decisionThread(alice, { decisionKey: 'tar:latina:sent:55:2024', normaKey: 'tar:latina:sent:55:2024' });
+    await seed(alice);
+
+    expect(ids(await feed(bob, { court: 'cassazione' }))).toEqual([penal.id, civil.id]);
+    expect(ids(await feed(bob, { court: 'cassazione:civile' }))).toEqual([civil.id]);
+    expect(ids(await feed(bob, { court: 'corte_costituzionale', kind: 'decision' }))).toEqual([constitutional.id]);
+    expect(ids(await feed(bob, { court: 'tar' }))).toEqual([tarLatina.id, tarRome.id]);
+    expect(ids(await feed(bob, { court: 'tar:roma' }))).toEqual([tarRome.id]);
+    expect(ids(await feed(bob, { court: 'tar:roma:sent' }))).toEqual([tarRome.id]);
+    expect(ids(await feed(bob, { court: 'tar:rom' }))).toEqual([]);
+    expect(ids(await feed(bob, { court: 'cgars' }))).toEqual([]);
+  });
+
+  it('reads an underscore in a court as itself, not as any character', async () => {
+    const mine = await decisionThread(alice, { decisionKey: 'corte_costituzionale:242:2019', normaKey: 'corte_costituzionale:242:2019' });
+    // not a key the routes accept, written straight to the table to show what an unescaped `_` would match
+    await decisionThread(alice, { decisionKey: 'cortexcostituzionale:1:2019', normaKey: 'cortexcostituzionale:1:2019' });
+    expect(ids(await feed(bob, { court: 'corte_costituzionale' }))).toEqual([mine.id]);
+  });
+
+  it('keeps the reader’s own glosse with «mine», whatever else is asked', async () => {
+    const aliceArticle = await seed(alice);
+    await seed(bob);
+    const aliceDecision = await decisionThread(alice);
+    await decisionThread(bob);
+
+    const own = await feed(alice, { mine: 'true' });
+    expect(ids(own)).toEqual([aliceDecision.id, aliceArticle.id]);
+    expect(own.body.pagination.total).toBe(2);
+    expect(own.body.data.every((t: { isOwner: boolean }) => t.isOwner)).toBe(true);
+    expect(ids(await feed(alice, { mine: 'true', kind: 'article' }))).toEqual([aliceArticle.id]);
+    expect(ids(await feed(alice, { mine: 'true', court: 'cassazione' }))).toEqual([aliceDecision.id]);
+    expect(ids(await feed(alice, { mine: 'false' }))).toHaveLength(4);
+    expect(ids(await feed(admin, { mine: 'true' }))).toEqual([]);
+  });
+
   it('pages through the feed', async () => {
     const made = [];
     for (let i = 0; i < 5; i += 1) made.push(await seed(alice));
@@ -144,6 +185,15 @@ describe('the Forum feed of glosse', () => {
       [{ act: 'codice-civile', kind: 'decision' }, 'Un atto ha glosse sugli articoli, non sulle decisioni'],
       [{ page: 'abc' }, 'La pagina non è valida'],
       [{ limit: 51 }, 'Al massimo 50 risultati per pagina'],
+      [{ court: 'Cassazione' }, 'La corte non è valida'],
+      [{ court: 'consiglio' }, 'La corte non è valida'],
+      [{ court: 'cassazione:civile:31310' }, 'La corte non è valida'],
+      [{ court: 'cassazione:' }, 'La corte non è valida'],
+      [{ court: 'cassazione', kind: 'article' }, 'Una corte ha glosse sulle decisioni, non sugli articoli'],
+      [{ court: 'cassazione', act: 'codice-civile' }, 'Indica la corte, l’atto o la chiave: uno solo'],
+      [{ court: 'cassazione', normaKey: DECISION }, 'Indica la corte, l’atto o la chiave: uno solo'],
+      [{ mine: '1' }, '«mine» deve essere «true» o «false»'],
+      [{ mine: 'TRUE' }, '«mine» deve essere «true» o «false»'],
     ];
     for (const [query, message] of cases) {
       const res = await feed(bob, query);
