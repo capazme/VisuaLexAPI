@@ -1562,6 +1562,22 @@ meant to stay split; add new features as new files, not inside the shells:
     are different tokens** — `bg-primary` (213 uses) comes from the first and
     must keep working. Everything else the config declares — `font-sans`,
     `shadow-glow`, `animate-shimmer` — is still inert.
+    The entrance classes of `tailwindcss-animate` (`animate-in`, `fade-in`,
+    `zoom-in-95`, `slide-in-from-*`; 33 uses in 25 files) were inert the same
+    way — no plugin was ever installed — until 18 October 2026: they are now
+    `@utility` rules at the end of `index.css` that move with the individual
+    `translate` and `scale` properties, so they compose with floating-ui's
+    positioning `transform` instead of replacing it (gotcha 10), last at
+    most 200 ms and fill `backwards` only: a `both` fill keeps the element a
+    containing block and a stacking context after the entrance (gotcha 22). `theme.test.ts` checks they generate CSS. The palette is the
+    «Inchiostro» one (spec `2026-10-18-redesign-inchiostro`): `slate`, `gray`,
+    `zinc`, `neutral` are aliases of `ink`, `blue`, `indigo`, `primary-<n>` of
+    `toga`; motion curves for Framer Motion live in `lib/motion.ts`.
+    A `dark:` variant `@apply`'d inside a pseudo-element's rule is just as silent:
+    it compiles to `::-webkit-scrollbar-thumb:where(.dark, .dark *)`, which the
+    browser drops (until 19 October 2026 every dark scrollbar kept its light
+    thumb). Write the dark scope before the pseudo-element,
+    `:where(.dark, .dark *)::…`, as `index.css` does; `theme.test.ts` checks it.
 
 30. **A bare `fetch` to a scraping route works in development and answers 401 in
     production.** Vite proxies those routes to the Python API with no login; the ingress

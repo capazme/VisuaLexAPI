@@ -28,7 +28,10 @@ export function SectionSwitcher({ forumCount, onChoose }: { forumCount: number; 
         },
       }))}
     >
-      <active.icon aria-hidden className="w-7 h-7 text-primary-600 dark:text-primary-400" />
+      {/* The section's own hue lives only here and on page headers' hairline (spec 2026-10-18-redesign-inchiostro §4.1). */}
+      <span aria-hidden data-section={section} className="vlx-section-mark grid h-9 w-9 place-items-center rounded-[10px] text-white transition-colors">
+        <active.icon className="h-5 w-5" strokeWidth={1.75} />
+      </span>
       {forumDot && (
         <span aria-hidden data-testid="forum-dot" className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-white dark:ring-slate-900" />
       )}

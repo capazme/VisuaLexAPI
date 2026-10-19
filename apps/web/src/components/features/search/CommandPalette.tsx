@@ -351,21 +351,14 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   return (
     // Covers the workspace: Cmd/Ctrl+F is left to the browser (`isWorkspaceCovered`).
     <div data-find-overlay="" className={cn('fixed inset-0 p-4 sm:p-6 md:p-20 overflow-y-auto custom-scrollbar', Z_INDEX.commandPalette)}>
-      {/* Premium Backdrop */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+      {/* No open or close animation: ⌘K is opened dozens of times a day, and motion on a keyboard
+          action makes it feel slow (spec 2026-10-18-redesign-inchiostro §6.1). */}
+      <div
         className="fixed inset-0 bg-slate-950/40 backdrop-blur-md"
         onClick={onClose}
       />
 
-      {/* Command Palette - Glass Overlay */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: -20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: -20 }}
-        transition={{ type: "spring", damping: 25, stiffness: 300 }}
+      <div
         className="relative mx-auto w-full max-w-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl rounded-3xl shadow-glass border border-white dark:border-slate-800 overflow-hidden"
       >
         <Command
@@ -978,7 +971,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
             </div>
           </div>
         </Command>
-      </motion.div>
+      </div>
     </div>
   );
 }

@@ -29,8 +29,30 @@ describe('LoginForm', () => {
       </MemoryRouter>,
     );
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'a@b.it' } });
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'secret' } });
+    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: 'secret' } });
     fireEvent.submit(screen.getByLabelText(/email/i).closest('form')!);
-    await waitFor(() => expect(screen.getByTestId('landed')).toHaveTextContent('/connect?request=req-1'));
+    await waitFor(() => expect(screen.getByTestId('landed')).toHaveTextContent('/connect?request=req-1'), { timeout: 2000 });
+  });
+
+  it('shows the book tracing itself between a successful sign-in and the app', async () => {
+    render(
+      <MemoryRouter initialEntries={['/login']}>
+        <Routes>
+          <Route path="/login" element={<LoginForm />} />
+          <Route path="/" element={<Landed />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'a@b.it' } });
+    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: 'secret' } });
+    fireEvent.submit(screen.getByLabelText(/email/i).closest('form')!);
+    expect(await screen.findByRole('status', { name: 'Accesso a VisuaLex' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('landed')).toHaveTextContent('/'), { timeout: 2000 });
+  });
+
+  it('names only the sources VisuaLex still reads: Brocardi is no longer one', () => {
+    render(<MemoryRouter><LoginForm /></MemoryRouter>);
+    expect(screen.getByText('Normattiva · EUR-Lex')).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent(/brocardi/i);
   });
 });

@@ -88,3 +88,71 @@ describe('the practice row\'s columns', () => {
     expect(css).toMatch(/\.h-app-row\s*\{\s*height:\s*calc\(100vh - 4rem - var\(--search-bar-height, 0px\)\);\s*height:\s*calc\(100dvh - 4rem - var\(--search-bar-height, 0px\)\);?\s*\}/);
   }, 30000);
 });
+
+describe('the Inchiostro palette', () => {
+  it('aliases the Tailwind scales the app writes to ink and toga', async () => {
+    const css = await compile(['bg-ink-500', 'bg-toga-600', 'text-slate-500', 'bg-blue-600', 'ring-indigo-500', 'bg-primary-600']);
+    expect(css).toContain('.bg-ink-500');
+    expect(css).toContain('.bg-toga-600');
+    expect(css).toMatch(/--color-slate-500:\s*var\(--color-ink-500\)/);
+    expect(css).toMatch(/--color-blue-600:\s*var\(--color-toga-600\)/);
+    expect(css).toMatch(/--color-indigo-500:\s*var\(--color-toga-500\)/);
+    expect(css).toMatch(/--color-primary-600:\s*var\(--color-toga-600\)/);
+  }, 30000);
+
+  it('keeps the contrast of the pairs the app relies on (WCAG 2, from the values in index.css)', () => {
+    const source = readFileSync(CSS_PATH, 'utf8');
+    const rgb = (name: string): number[] => {
+      const m = source.match(new RegExp(`--color-${name}:\\s*oklch\\(([\\d.]+)%\\s+([\\d.]+)\\s+([\\d.]+)\\)`));
+      if (!m) throw new Error(`--color-${name} not found`);
+      const [L, C, H] = [Number(m[1]) / 100, Number(m[2]), (Number(m[3]) * Math.PI) / 180];
+      const a = C * Math.cos(H), b = C * Math.sin(H);
+      const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+      const mm = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+      const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+      return [
+        4.0767416621 * l - 3.3077115913 * mm + 0.2309699292 * s,
+        -1.2684380046 * l + 2.6097574011 * mm - 0.3413193965 * s,
+        -0.0041960863 * l - 0.7034186147 * mm + 1.707614701 * s,
+      ].map((v) => Math.min(1, Math.max(0, v)));
+    };
+    // linear-light sRGB is what OKLab gives back, so luminance needs no gamma step
+    const lum = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    const ratio = (x: number[], y: number[]) => {
+      const [hi, lo] = [lum(x), lum(y)].sort((p, q) => q - p);
+      return (hi + 0.05) / (lo + 0.05);
+    };
+    const white = [1, 1, 1];
+    expect(ratio(rgb('ink-900'), rgb('ink-50'))).toBeGreaterThanOrEqual(15);
+    expect(ratio(rgb('ink-600'), rgb('ink-50'))).toBeGreaterThanOrEqual(6.5);
+    expect(ratio(rgb('ink-500'), rgb('ink-50'))).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(rgb('toga-600'), rgb('ink-50'))).toBeGreaterThanOrEqual(6);
+    expect(ratio(white, rgb('toga-600'))).toBeGreaterThanOrEqual(6);
+    expect(ratio(rgb('ink-400'), rgb('ink-950'))).toBeGreaterThanOrEqual(7);
+    expect(ratio(rgb('toga-400'), rgb('ink-950'))).toBeGreaterThanOrEqual(6.5);
+  });
+});
+
+describe('the entrance utilities', () => {
+  it('turn animate-in, fade-in, zoom-in-N and slide-in-from-* into real rules', async () => {
+    const css = await compile(['animate-in', 'fade-in', 'fade-in-0', 'zoom-in-95', 'slide-in-from-bottom', 'slide-in-from-top-2', 'slide-in-from-right-10']);
+    expect(css).toMatch(/\.animate-in\s*\{[^}]*animation-name:/);
+    // A finished entrance leaves nothing applied (gotcha 22): no «both» fill.
+    expect(css).toMatch(/\.animate-in\s*\{[^}]*animation-fill-mode:\s*backwards/);
+    expect(css).toMatch(/\.fade-in\s*\{[^}]*--vlx-fade:\s*vlx-enter-fade/);
+    expect(css).toMatch(/\.zoom-in-95\s*\{[^}]*--vlx-enter-scale:\s*calc\(95 \* 1%\)/);
+    expect(css).toContain('.slide-in-from-bottom');
+    expect(css).toContain('.slide-in-from-top-2');
+    expect(css).toContain('.slide-in-from-right-10');
+  }, 30000);
+});
+
+describe('the scrollbars in dark mode', () => {
+  it('give the thumb its dark colour through a selector the browser keeps', async () => {
+    const css = await compile([]);
+    // `dark:` inside a pseudo-element's rule nests `&:where(.dark, .dark *)` after it, which is invalid.
+    expect(css).not.toMatch(/::-webkit-scrollbar[\w-]*(:hover)?\s*\{[^}]*&:where/);
+    expect(css).toMatch(/:where\(\.dark, \.dark \*\)::-webkit-scrollbar-thumb\s*\{[^}]*var\(--color-slate-700\)/);
+    expect(css).toMatch(/:where\(\.dark, \.dark \*\)::-webkit-scrollbar-thumb:hover\s*\{[^}]*var\(--color-slate-600\)/);
+  }, 30000);
+});

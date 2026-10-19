@@ -22,7 +22,7 @@ export const TOUCH_TARGET = 'min-h-[44px] min-w-[44px]';
 export const TOUCH_TARGET_RESPONSIVE = 'min-h-[44px] md:min-h-0';
 
 /** Standard transition for smooth state changes */
-export const TRANSITION = 'transition-all duration-200 ease-out';
+export const TRANSITION = 'transition-[color,background-color,border-color,box-shadow,transform,opacity] duration-200 ease-out';
 
 /** Combined base interactive styles for buttons */
 export const INTERACTIVE_BASE = `${TRANSITION} ${FOCUS_RING} ${DISABLED} ${ACTIVE}`;

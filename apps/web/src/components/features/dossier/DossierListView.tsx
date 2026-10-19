@@ -243,7 +243,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
   return (
     <div className="animate-in fade-in duration-300">
       <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 mb-6">
-        <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white">{sectionKind ? `I tuoi ${kindLabel(sectionKind).toLowerCase()}` : 'I tuoi Dossier'}</h2>
+        <h2 className="font-serif text-3xl font-medium tracking-tight text-slate-900 dark:text-slate-50">{sectionKind ? `I tuoi ${kindLabel(sectionKind).toLowerCase()}` : 'I tuoi Dossier'}</h2>
         <div className="flex gap-2">
           {trashCount > 0 && onOpenTrash && (
             <button
@@ -448,7 +448,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                  <h3 className="font-bold text-base md:text-lg text-slate-900 dark:text-white group-hover:text-blue-600 transition-colors line-clamp-2">
+                  <h3 className="font-serif text-lg md:text-xl font-medium leading-snug tracking-tight text-slate-900 dark:text-slate-50 group-hover:text-primary-700 dark:group-hover:text-primary-300 transition-colors line-clamp-2">
                     {dossier.title}
                   </h3>
                   {dossier.sourceSuggestionId && (
@@ -469,9 +469,12 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                     )}
                   </div>
                 )}
-                <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 line-clamp-2 min-h-[2.5em]">
-                  {dossier.description || 'Nessuna descrizione'}
-                </p>
+                {/* No placeholder for a missing description: an empty line says nothing (spec §5.3.3). */}
+                {dossier.description && (
+                  <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 line-clamp-2">
+                    {dossier.description}
+                  </p>
+                )}
                 {dossier.tags && dossier.tags.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-2 md:mt-3">
                     {dossier.tags.slice(0, 3).map((tag) => (
@@ -488,9 +491,11 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                   <p className="mt-2 md:mt-3 text-sm text-slate-700 dark:text-slate-300 line-clamp-2">{acts}</p>
                 )}
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                  <span>
-                    {counts.note} {counts.note === 1 ? 'nota' : 'note'}
-                  </span>
+                  {counts.note > 0 && (
+                    <span>
+                      {counts.note} {counts.note === 1 ? 'nota' : 'note'}
+                    </span>
+                  )}
                   {counts.sentenze > 0 && (
                     <span>{counts.sentenze} {counts.sentenze === 1 ? 'sentenza' : 'sentenze'}</span>
                   )}

@@ -179,7 +179,7 @@ export function StudyModeBrocardiPopover({
             // Mobile: nearly full width, centered
             "left-4 right-4 top-auto bottom-4 max-h-[70vh]",
             // Desktop: fixed position and width
-            "sm:left-auto sm:right-4 sm:top-14 sm:bottom-auto sm:w-80 sm:max-h-[calc(100vh-100px)]",
+            "sm:left-auto sm:right-4 sm:top-14 sm:bottom-auto sm:w-80 sm:max-h-[calc(100dvh-100px)]",
             styles.bg,
             styles.border
           )}
