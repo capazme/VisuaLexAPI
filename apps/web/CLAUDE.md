@@ -76,8 +76,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (`credits.test.ts` holds each; never restyle one, as for root rule 23); `uses` and `terms` come only
   from the conditions read on each source's page and the owners' table, and a source enters only once
   its conditions are clear (today group A: Normattiva, EUR-Lex, Corte costituzionale, Cassazione,
-  giustizia amministrativa, Senato, CONSOB, CeRDEF; and Newsreader and Geist, OFL-1.1 as their
-  `@fontsource-variable` packages say — the test reads the packages). Normattiva carries the site's
+  giustizia amministrativa, Senato, CONSOB, CeRDEF; and Newsreader and Geist — Geist Mono in Geist's
+  entry —, OFL-1.1 as their `@fontsource-variable` packages say: the test reads the packages, and fails
+  when `main.tsx` loads a typeface no entry covers). Normattiva carries the site's
   conditions, never the open data's CC BY 4.0; the Corte costituzionale «CC BY-SA 3.0» with no version.
   `/crediti` is `pages/CreditsPage`: public (outside `ProtectedRoute`), one column, a section per group
   (`CREDIT_GROUPS`), an `article` per entry whose `id` is the anchor — the page scrolls to the address's

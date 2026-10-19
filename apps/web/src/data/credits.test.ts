@@ -18,7 +18,11 @@ const APPROVED_SOURCES: Record<string, string> = {
   'giustizia-amministrativa': 'Fonte: Giustizia amministrativa.',
 };
 
-const FONTS = { newsreader: '@fontsource-variable/newsreader', geist: '@fontsource-variable/geist' } as const;
+/** Each typeface entry and the packages it covers (Geist Mono is Geist's monospaced cut, same authors and licence). */
+const FONTS = {
+  newsreader: ['@fontsource-variable/newsreader'],
+  geist: ['@fontsource-variable/geist', '@fontsource-variable/geist-mono'],
+} as const;
 
 const entry = (id: CreditId) => getCredit(id);
 const textOf = (id: CreditId) => JSON.stringify(entry(id));
@@ -67,10 +71,23 @@ describe('credits.ts', () => {
     expect(entry('senato').licenceUrl).toBe('https://creativecommons.org/licenses/by/3.0/');
   });
 
-  it('writes the purposes CONSOB allows', () => {
+  it('writes the purposes CONSOB allows, and its condition as a condition', () => {
     expect(entry('consob').terms).toContain(
       'per finalità di studio, ricerca, informazione e documentazione, con obbligo di citarne la fonte',
     );
+    expect(entry('consob').terms).toContain(
+      'a condizione che il riutilizzo non ne alteri significato, contesto, completezza o aggiornamento',
+    );
+  });
+
+  it('covers every typeface the app loads', () => {
+    const main = readFileSync(resolve(__dirname, '../main.tsx'), 'utf8');
+    const loaded = [...main.matchAll(/'(@fontsource-variable\/[a-z-]+)/g)].map((m) => m[1]);
+    expect(new Set(loaded)).toEqual(new Set(Object.values(FONTS).flat()));
+  });
+
+  it('never says the institutions approved the lines', () => {
+    for (const credit of CREDITS) expect(credit.verified).not.toMatch(/titolar/i);
   });
 
   it.each(['cassazione', 'giustizia-amministrativa'] as const)('writes only the indication of the source for %s', (id) => {
@@ -78,11 +95,13 @@ describe('credits.ts', () => {
     expect(textOf(id)).not.toMatch(/intelligenza|massiv|commercial|uso proprio|vietat/i);
   });
 
-  it.each(Object.entries(FONTS))('writes %s as OFL-1.1, as its package says', (id, pkg) => {
-    const dir = resolve(__dirname, '../../node_modules', pkg);
-    const manifest = JSON.parse(readFileSync(resolve(dir, 'package.json'), 'utf8')) as { license: string };
-    expect(manifest.license).toBe('OFL-1.1');
-    expect(readFileSync(resolve(dir, 'LICENSE'), 'utf8')).toContain('SIL Open Font License, Version 1.1');
+  it.each(Object.entries(FONTS))('writes %s as OFL-1.1, as its packages say', (id, pkgs) => {
+    for (const pkg of pkgs) {
+      const dir = resolve(__dirname, '../../node_modules', pkg);
+      const manifest = JSON.parse(readFileSync(resolve(dir, 'package.json'), 'utf8')) as { license: string };
+      expect(manifest.license).toBe('OFL-1.1');
+      expect(readFileSync(resolve(dir, 'LICENSE'), 'utf8')).toContain('SIL Open Font License, Version 1.1');
+    }
     const font = entry(id as CreditId);
     expect(font.group).toBe('software');
     expect(font.terms).toContain('OFL-1.1');

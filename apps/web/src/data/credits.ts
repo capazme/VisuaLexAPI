@@ -40,7 +40,7 @@ export const CREDIT_GROUPS: readonly { id: CreditGroup; title: string }[] = [
   { id: 'software', title: 'Software e caratteri' },
 ];
 
-const SOURCES_VERIFIED = '19/10/2026: condizioni lette sulle pagine ufficiali; righe approvate dai titolari il 19/10/2026';
+const SOURCES_VERIFIED = '19/10/2026: condizioni lette sulle pagine ufficiali; righe approvate il 19/10/2026';
 
 const ENTRIES = [
   {
@@ -121,7 +121,7 @@ const ENTRIES = [
     holder: 'Commissione Nazionale per le Società e la Borsa',
     uses: 'Le delibere e i provvedimenti.',
     terms:
-      'Consultazione, stampa, download e riutilizzo sono consentiti «per finalità di studio, ricerca, informazione e documentazione, con obbligo di citarne la fonte»; il riutilizzo non ne altera significato, contesto, completezza o aggiornamento.',
+      'Consultazione, stampa, download e riutilizzo sono consentiti «per finalità di studio, ricerca, informazione e documentazione, con obbligo di citarne la fonte», a condizione che il riutilizzo non ne alteri significato, contesto, completezza o aggiornamento.',
     attribution: 'Fonte: CONSOB.',
     sourceUrl: 'https://www.consob.it/',
     verified: SOURCES_VERIFIED,
@@ -130,7 +130,7 @@ const ENTRIES = [
     id: 'cerdef',
     group: 'autorita',
     name: 'CeRDEF',
-    holder: 'Ministero dell’economia e delle finanze, Dipartimento delle Finanze',
+    holder: "Ministero dell'economia e delle finanze, Dipartimento delle Finanze",
     uses: 'Le sentenze tributarie.',
     terms:
       'Testi disponibili gratuitamente, al solo scopo informativo e senza carattere di ufficialità; la riproduzione è consentita «purché vengano indicate la fonte, la gratuità e la non ufficialità degli stessi».',
@@ -154,15 +154,15 @@ const ENTRIES = [
   {
     id: 'geist',
     group: 'software',
-    name: 'Geist',
+    name: 'Geist e Geist Mono',
     holder: 'The Geist Project Authors',
-    uses: "Il carattere dell'interfaccia.",
+    uses: "Il carattere dell'interfaccia e, in Geist Mono, quello a spaziatura fissa.",
     terms:
       'SIL Open Font License 1.1 (OFL-1.1): il carattere si può usare, studiare, modificare e ridistribuire liberamente, purché non sia venduto da solo.',
-    attribution: 'Geist, Copyright 2024 The Geist Project Authors. SIL Open Font License 1.1.',
+    attribution: 'Geist e Geist Mono, Copyright 2024 The Geist Project Authors. SIL Open Font License 1.1.',
     sourceUrl: 'https://github.com/vercel/geist-font',
     licenceUrl: 'https://scripts.sil.org/OFL',
-    verified: '19/10/2026: campo license e file LICENSE di @fontsource-variable/geist 5.3.0',
+    verified: '19/10/2026: campo license e file LICENSE di @fontsource-variable/geist e @fontsource-variable/geist-mono 5.3.0',
   },
 ] as const satisfies readonly Credit[];
 

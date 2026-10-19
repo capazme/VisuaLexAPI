@@ -8,6 +8,7 @@ import { BookOpen, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { BookMark } from '../ui/BookMark';
 import { getErrorMessage } from '../../utils/errors';
 import { locationToPath, takeReturnTo } from '../../utils/returnTo';
+import { FOCUS_RING } from '../../constants/interactions';
 
 // Entering the app (spec §6.3.1): once per session the book traces itself, then the app comes in.
 const ENTRY_MS = 720;
@@ -172,7 +173,7 @@ export function LoginForm() {
       <footer className="mx-auto mt-10 w-full max-w-5xl text-sm text-slate-600 dark:text-slate-400">
         <Link
           to="/crediti"
-          className="-ml-2 inline-flex min-h-[44px] items-center rounded-md px-2 hover:text-slate-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:text-slate-100"
+          className={`-ml-2 inline-flex min-h-[44px] items-center rounded-md px-2 hover:text-slate-900 hover:underline dark:hover:text-slate-100 ${FOCUS_RING}`}
         >
           Crediti
         </Link>
