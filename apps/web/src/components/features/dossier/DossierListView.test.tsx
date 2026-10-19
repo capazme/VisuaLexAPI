@@ -243,9 +243,22 @@ describe('DossierListView — the category menu (D1)', () => {
 
   it('offers only the categories of the dossiers the section lists', () => {
     appStore.setState({ dossiers: [...listed, tagged('s', 'Diritto penale', ['penale'], 'studio')] });
+    const values = () => Array.from((screen.getByRole('combobox', { name: 'Filtra per categoria' }) as HTMLSelectElement).options).map((o) => o.value);
+    const { unmount } = renderList();
+    expect(values()).not.toContain('penale');
+    unmount();
+    sectionStore.setState({ section: 'gymnasium', dossierKind: 'studio' });
     renderList();
-    const options = Array.from((screen.getByRole('combobox', { name: 'Filtra per categoria' }) as HTMLSelectElement).options).map((o) => o.value);
-    expect(options).not.toContain('penale');
+    expect(values()).toEqual(['', 'penale']);
+  });
+
+  it('gives both menus the same look, 44 px and half the row each on a phone', () => {
+    appStore.setState({ dossiers: listed });
+    renderList();
+    for (const name of ['Ordina i dossier', 'Filtra per categoria']) {
+      expect(screen.getByRole('combobox', { name }).className).toEqual(expect.stringContaining('flex-1 min-w-0'));
+      expect(screen.getByRole('combobox', { name }).className).toEqual(expect.stringContaining('min-h-[44px] md:min-h-0'));
+    }
   });
 
   it('has no menu when no dossier has a category, and the order menu stays', () => {
@@ -263,6 +276,10 @@ describe('DossierListView — the category menu (D1)', () => {
     act(() => { appStore.setState({ dossiers: listed.filter((d) => d.id !== 'b') }); });
     expect(menu.value).toBe('');
     expect(titles()).toHaveLength(3);
+    // The category back (an undone deletion) does not filter again on its own.
+    act(() => { appStore.setState({ dossiers: listed }); });
+    expect(menu.value).toBe('');
+    expect(titles()).toHaveLength(4);
   });
 
   it('says «Cerca nei dossier…» without the shortcut, which still puts the cursor there', () => {

@@ -16,12 +16,6 @@ describe('tagLabel', () => {
     expect(tagLabel('231/2001')).toBe('231/2001');
     expect(tagLabel('«appello»')).toBe('«appello»');
   });
-
-  it('never changes the value it is given', () => {
-    const tag = 'cancellazione';
-    tagLabel(tag);
-    expect(tag).toBe('cancellazione');
-  });
 });
 
 describe('tagCategories', () => {

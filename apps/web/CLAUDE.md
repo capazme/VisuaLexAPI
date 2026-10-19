@@ -1358,9 +1358,10 @@ meant to stay split; add new features as new files, not inside the shells:
 
 - `features/dossier/` — `DossierPage.tsx` is a thin shell routing list/detail via
   `?dossier=<id>`; `DossierListView.tsx` (grid, context menu, shortcuts `n` `/`
-  `i`; the search, then two menus — the order and «Filtra per categoria», one category at a time, the
-  categories of the section's dossiers, absent when there are none — on one row on a computer, the
-  menus half and half under the search on a phone), `DossierDetailView.tsx` (sections and header), `DossierActBlock.tsx`
+  `i`; the search, then two menus — the order and «Filtra per categoria», one
+  category at a time, the categories of the section's dossiers, absent when
+  there are none — on one row on a computer, half and half under the search on
+  a phone), `DossierDetailView.tsx` (sections and header), `DossierActBlock.tsx`
   (an act and its rows), `DossierArticleRow.tsx` (row + star + expand),
   `DossierNotesSection.tsx`, `DossierItemReader.tsx` (in-place article),
   `AddToDossierPopover.tsx`, one file per modal, shared helpers in

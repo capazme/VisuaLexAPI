@@ -472,7 +472,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
             {dossier.tags && dossier.tags.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-2">
                 {dossier.tags.map((tag) => (
-                  <span key={tagLabel(tag)} className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full">
+                  <span key={tag} className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full">
                     {tagLabel(tag)}
                   </span>
                 ))}

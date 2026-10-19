@@ -55,7 +55,7 @@ export function ImportDossierModal({ dossier, discarded, onClose, onConfirm }: P
           {dossier.tags && dossier.tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-3">
               {dossier.tags.map((tag) => (
-                <span key={tagLabel(tag)} className="px-2 py-0.5 bg-slate-200 dark:bg-slate-600 rounded text-xs text-slate-600 dark:text-slate-300">
+                <span key={tag} className="px-2 py-0.5 bg-slate-200 dark:bg-slate-600 rounded text-xs text-slate-600 dark:text-slate-300">
                   {tagLabel(tag)}
                 </span>
               ))}

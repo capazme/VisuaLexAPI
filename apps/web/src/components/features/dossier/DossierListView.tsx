@@ -77,8 +77,10 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
       .filter((d) => !sectionKind || (d.kind ?? 'lavoro') === sectionKind)
       .flatMap((d) => d.tags ?? []),
   ), [dossiers, sectionKind]);
-  // A category whose last dossier went (deleted, retagged) filters nothing any more: the menu shows «Tutte».
+  // A category whose last dossier went (deleted, retagged, another section) is dropped, so the menu shows
+  // «Tutte le categorie» and the filter does not come back on its own with the category.
   const selectedCategory = categories.find((c) => c.key === selectedTag) ?? null;
+  if (selectedTag !== null && selectedCategory === null) setSelectedTag(null);
 
   const filteredDossiers = useMemo(() => {
     let result = [...dossiers];
@@ -294,7 +296,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
       {/* The search, then the two menus: one row on a computer; on a phone the search on its own row and the
           menus side by side under it, half each (D1). */}
       <div className="mb-6 flex flex-col md:flex-row gap-3 md:gap-4">
-        <div id="tour-dossier-search" className="relative flex-1 min-w-0">
+        <div id="tour-dossier-search" className="relative flex-1 min-w-0 md:min-w-[14rem]">
           <Search size={18} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             ref={searchInputRef}
@@ -470,7 +472,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                 {dossier.tags && dossier.tags.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-2 md:mt-3">
                     {dossier.tags.slice(0, 3).map((tag) => (
-                      <span key={tagLabel(tag)} className="text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded truncate max-w-[100px]">
+                      <span key={tag} className="text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded truncate max-w-[100px]">
                         {tagLabel(tag)}
                       </span>
                     ))}
