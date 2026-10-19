@@ -157,19 +157,19 @@ export const DOSSIER_STEPS: DriveStep[] = [
         }
     },
     {
-        element: '#tour-dossier-filters',
-        popover: {
-            title: 'Filtri per Tag',
-            description: 'Clicca sui tag per filtrare i dossier. Puoi combinare più tag per ricerche precise.',
-            side: 'bottom',
-            align: 'start',
-        }
-    },
-    {
         element: '#tour-dossier-sort',
         popover: {
             title: 'Ordinamento',
             description: 'Ordina per data, nome o numero di elementi per trovare subito ciò che cerchi.',
+            side: 'bottom',
+            align: 'end',
+        }
+    },
+    {
+        element: '#tour-dossier-filters',
+        popover: {
+            title: 'Filtra per categoria',
+            description: 'Scegli una categoria dal menu per vedere solo i dossier che la portano; «Tutte le categorie» li mostra di nuovo tutti.',
             side: 'bottom',
             align: 'end',
         }
