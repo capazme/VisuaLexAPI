@@ -70,7 +70,8 @@ async function stateDueOn(user: TestUser, cardId: string, dueDay: string, lastRe
   });
 }
 
-const session = (who: Record<string, string>, materia?: string) => request(app).get(SESSION).query(materia ? { materia } : {}).set(who);
+const session = (who: Record<string, string>, materia?: string, istituto?: string) =>
+  request(app).get(SESSION).query({ ...(materia ? { materia } : {}), ...(istituto ? { istituto } : {}) }).set(who);
 const grade = (who: Record<string, string>, body: unknown) => request(app).post(GRADE).set(who).send(body as object);
 const idsOf = (response: { body: { cards: { id: string }[] } }) => response.body.cards.map((c) => c.id);
 
@@ -221,6 +222,89 @@ describe('the review routes', () => {
       expect(response.body.conteggi).toEqual({ dovute: 1, nuove: 1 });
       expect(idsOf(response)).toEqual([civileDue.id, civileNew.id]);
       expect((await session(a, 'DIRITTO_ALIENO')).status).toBe(400);
+    });
+
+    describe('narrowed to one institute', () => {
+      it('keeps the due and the new cards of that institute, own and community alike', async () => {
+        setClock(MONDAY_MORNING);
+        await request(app).put(PREFS).set(a).send({ materieComunita: ['DIRITTO_CIVILE'] });
+        const dueOwn = await card(alice, 'BOZZA_PERSONALE', { istituto: 'Contratto' });
+        const newOwn = await card(alice, 'BOZZA_PERSONALE', { istituto: 'Contratto' });
+        const newCommunity = await card(bob, 'VALIDATA', { istituto: 'Contratto' });
+        const dueOther = await card(alice, 'BOZZA_PERSONALE', { istituto: 'Proprietà' });
+        await card(alice, 'BOZZA_PERSONALE', { istituto: 'Proprietà' });
+        await card(bob, 'VALIDATA', { istituto: 'Proprietà' });
+        await stateDueOn(alice, dueOwn.id, '2026-10-18', new Date('2026-10-10T08:00:00Z'));
+        await stateDueOn(alice, dueOther.id, '2026-10-18', new Date('2026-10-10T08:00:00Z'));
+
+        const response = await session(a, 'DIRITTO_CIVILE', 'Contratto');
+
+        expect(response.status).toBe(200);
+        expect(response.body.conteggi).toEqual({ dovute: 1, nuove: 2 });
+        expect(idsOf(response)).toEqual([dueOwn.id, newOwn.id, newCommunity.id]);
+        expect(response.body.cards.map((c: { comunita: boolean }) => c.comunita)).toEqual([false, false, true]);
+      });
+
+      it('does not match an institute of another subject, nor a different spelling', async () => {
+        setClock(MONDAY_MORNING);
+        await card(alice, 'BOZZA_PERSONALE', { materia: 'DIRITTO_PENALE', istituto: 'Dolo' });
+        const mine = await card(alice, 'BOZZA_PERSONALE', { materia: 'DIRITTO_CIVILE', istituto: 'Dolo' });
+
+        expect(idsOf(await session(a, 'DIRITTO_CIVILE', 'Dolo'))).toEqual([mine.id]);
+        expect(idsOf(await session(a, 'DIRITTO_CIVILE', 'dolo'))).toEqual([]);
+        expect(idsOf(await session(a, 'DIRITTO_AMMINISTRATIVO', 'Dolo'))).toEqual([]);
+      });
+
+      it('keeps the daily goal of new cards, counted across institutes: one introduced in B leaves one slot in A', async () => {
+        setClock(MONDAY_MORNING);
+        await request(app).put(PREFS).set(a).send({ nuoveAlGiorno: 2 });
+        const first = await card(alice, 'BOZZA_PERSONALE', { istituto: 'A' });
+        await card(alice, 'BOZZA_PERSONALE', { istituto: 'A' });
+        const seen = await card(alice, 'BOZZA_PERSONALE', { istituto: 'B' });
+        await prisma.lingoStatoRipasso.create({
+          data: { utenteId: alice.id, cardId: seen.id, stability: 2.4, difficulty: 4.9, dueAt: startOfRomeDay('2026-10-21'), lastReviewAt: new Date('2026-10-19T07:00:00Z'), reps: 1 },
+        });
+
+        const response = await session(a, 'DIRITTO_CIVILE', 'A');
+
+        expect(response.body.conteggi).toEqual({ dovute: 0, nuove: 1 });
+        expect(idsOf(response)).toEqual([first.id]);
+      });
+
+      it('answers 400 without the subject, or with an empty or NUL-bearing institute', async () => {
+        expect((await session(a, undefined, 'Contratto')).status).toBe(400);
+        expect((await request(app).get(SESSION).query({ materia: 'DIRITTO_CIVILE', istituto: '   ' }).set(a)).status).toBe(400);
+        expect((await session(a, 'DIRITTO_CIVILE', 'Con\u0000tratto')).status).toBe(400);
+        expect((await session(a, 'DIRITTO_CIVILE', 'x'.repeat(201))).status).toBe(400);
+      });
+
+      it('explains in Italian an empty, over-long or repeated institute', async () => {
+        const empty = await request(app).get(SESSION).query({ materia: 'DIRITTO_CIVILE', istituto: '  ' }).set(a);
+        expect(JSON.stringify(empty.body)).toContain('L’istituto non può essere vuoto.');
+        const long = await session(a, 'DIRITTO_CIVILE', 'x'.repeat(201));
+        expect(JSON.stringify(long.body)).toContain('L’istituto è troppo lungo (al massimo 200 caratteri).');
+        const repeated = await request(app).get(`${SESSION}?materia=DIRITTO_CIVILE&istituto=a&istituto=b`).set(a);
+        expect(JSON.stringify(repeated.body)).toContain('Istituto non valido.');
+      });
+
+      it('trims the institute it is given', async () => {
+        setClock(MONDAY_MORNING);
+        const c = await card(alice, 'BOZZA_PERSONALE', { istituto: 'Contratto' });
+        expect(idsOf(await session(a, 'DIRITTO_CIVILE', '  Contratto '))).toEqual([c.id]);
+      });
+
+      it('never marks the day’s queue finished, though the whole queue is', async () => {
+        setClock(MONDAY_MORNING);
+        const c = await card(alice, 'BOZZA_PERSONALE', { istituto: 'Contratto' });
+        await stateDueOn(alice, c.id, '2026-10-25', new Date('2026-10-19T07:00:00Z'));
+
+        const filtered = await session(a, 'DIRITTO_CIVILE', 'Contratto');
+        expect(filtered.body.conteggi).toEqual({ dovute: 0, nuove: 0 });
+        expect(await prisma.lingoGiornataStudio.count()).toBe(0);
+
+        await session(a); // the unfiltered read does mark it: the guard is the filter's
+        expect(await prisma.lingoGiornataStudio.count()).toBe(1);
+      });
     });
 
     it('gives each card the four intervals the engine would give, from its state', async () => {
