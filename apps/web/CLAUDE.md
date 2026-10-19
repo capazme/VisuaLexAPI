@@ -473,7 +473,8 @@ Browser floor: the Highlight API (Chrome/Edge 105, Safari 17.2, Firefox 140). `a
 The «?» dialog lists Cmd/Ctrl+F as «Cerca nel testo».
 
 **Card review** (`/studia/ripasso`, `ReviewHome` with `StudyPreferences`; the session is
-`/studia/ripasso/sessione?materia=`, `ReviewSession`): the server builds the day's queue and decides
+`/studia/ripasso/sessione?materia=&istituto=`, `ReviewSession`; `istituto` is read only with a known `materia`, as the
+server refuses one alone, and passed back as the road spelt it): the server builds the day's queue and decides
 what «today» is (Studia spec decision 18), so the web app never computes a due date; the one exception,
 `nextReviewLabel`'s «Da ripassare oggi», is a display label. `useReviewSession` holds the queue: a card's
 first grade is posted, «Di nuovo» puts it back at the end, and its later passes that day are practice,
@@ -544,10 +545,21 @@ heading and its rule are the column's width), in the order the owner fixed:
 4. «Cosa ripassi», `SubjectChips` (the subject narrows the first mission's action, the session it starts and «Il tuo
    mese», kept in `localStorage` under `visualex.studia.ripasso.materia`); `SubjectRoad`, «Il percorso», one stop per
    subject joined by a line, free (no locks, no number, no imposed order): the three states as a bar and in words
-   (`stopStates`), the reviews of 30 days, «Ripassa» for a session narrowed to it (none for a subject with no card);
-   ordered by `orderStops`, new plus in learning first, then by name — the read has no cards due per subject
-   (`Progressi.materie`), so no «N da ripassare» until the institute read of G5; the stops enter with a 40 ms stagger
-   once per mount (`motion-safe:` only).
+   (`stopStates`), «N da ripassare», the reviews of 30 days, «Ripassa» for a session narrowed to it (none for a subject
+   with no card); ordered by `orderStops`, new plus in learning first, then by name — kept so when the institute read
+   answers, which would otherwise move the stops under the reader's hand; the stops enter with a 40 ms stagger
+   once per mount (`motion-safe:` only). **The institutes (G5):** `progress/usePercorso` reads `GET /lingo/srs/percorso`
+   once for every subject, on its own (the missions and «Inizia» never wait on it or fail with it; the missions'
+   «Riprova» and a changed setting read it again). A subject's «N da ripassare» is the sum of its institutes' `dovute`
+   (`dueBySubject`); while the read travels the line holds its place, and a failed read leaves it out. «Istituti (N)», an
+   `aria-expanded` disclosure on each subject with cards (open at mount on the subject the chips chose), opens
+   `progress/InstituteStops` inside the stop: one stop per institute joined by a thinner line (none for one institute),
+   free, ordered by `orderInstitutes` (most due, then by name in Italian), each one button of 44 px that starts the
+   session narrowed to it (`instituteSessionPath`: the label goes back verbatim, never trimmed or rewritten — it is the
+   card's content, root rule 23), its name wrapping whole (never cut), its three states as a bar and in words, «N da
+   ripassare». The first `INSTITUTES_SHOWN` (8) show, the rest behind «Mostra tutti gli istituti (N)»; only those first 8
+   enter with the stagger. Its states: places held while the read travels, «Non riesco a leggere gli istituti di questa
+   materia.» with «Riprova» (no alert), the stops read before kept when a new read fails, a subject with none.
 
 One type language: block headings in Newsreader (`BLOCK_HEADING`), labels in Geist; no small capitals and no double
 rule. «Le mie schede» and «Da validare» show the strip (`progress/StudyStrip`, `dense`: the streak's count without its

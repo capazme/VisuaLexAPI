@@ -2,16 +2,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Outlet, Route, Routes, useLocation } from 'react-router-dom';
-import type { Progressi } from '../../../types/studia';
+import type { Progressi, TappaIstituto } from '../../../types/studia';
 
 vi.mock('../../../services/studiaService', () => ({
-  studiaService: { progress: vi.fn(), preferences: vi.fn(), savePreferences: vi.fn() },
+  studiaService: { progress: vi.fn(), percorso: vi.fn(), preferences: vi.fn(), savePreferences: vi.fn() },
 }));
 
 import { studiaService } from '../../../services/studiaService';
 import { ReviewHome } from './ReviewHome';
 
 const progress = vi.mocked(studiaService.progress);
+const percorso = vi.mocked(studiaService.percorso);
 const preferences = vi.mocked(studiaService.preferences);
 const savePreferences = vi.mocked(studiaService.savePreferences);
 
@@ -59,6 +60,9 @@ function renderHome() {
 
 beforeEach(() => {
   progress.mockReset();
+  percorso.mockReset();
+  // The road's read by institute (G5) answers on its own: nothing by default.
+  percorso.mockResolvedValue([]);
   preferences.mockReset();
   savePreferences.mockReset();
   preferences.mockResolvedValue({ nuoveAlGiorno: 20, ripassiAlGiorno: 10, materieComunita: [] });
@@ -492,6 +496,118 @@ describe('ReviewHome', () => {
       }
       // One type language: no small capitals in the headings.
       for (const heading of headings) expect(heading.className).not.toMatch(/small-caps/);
+    });
+  });
+
+  describe('the institutes on the road (Gymnasium spec §5.2, G5)', () => {
+    const tappa = (materia: TappaIstituto['materia'], istituto: string, dovute: number): TappaIstituto => ({
+      materia, istituto, nuove: 1, apprendimento: dovute, consolidate: 0, dovute,
+    });
+    const road = () => screen.findByRole('list', { name: 'Il percorso' });
+    const stopOf = async (label: string) =>
+      within(await road()).getAllByRole('listitem').find((li) => li.querySelector('p')?.textContent === label)!;
+
+    it('reads the road by institute once, for every subject, and says each subject’s cards due', async () => {
+      progress.mockResolvedValue(answer(7, 0));
+      percorso.mockResolvedValue([
+        tappa('DIRITTO_CIVILE', 'Risoluzione per inadempimento', 3),
+        tappa('DIRITTO_CIVILE', 'Mora del debitore', 4),
+        tappa('DIRITTO_PENALE', 'Furto', 0),
+      ]);
+      renderHome();
+      const civile = await stopOf('Diritto civile');
+      expect(await within(civile).findByText('7 da ripassare')).toBeInTheDocument();
+      expect(await stopOf('Diritto penale')).toHaveTextContent('Niente da ripassare');
+      expect(percorso).toHaveBeenCalledTimes(1);
+      expect(percorso).toHaveBeenCalledWith();
+    });
+
+    it('opens a subject on its institutes, and a tap starts the session narrowed to one', async () => {
+      progress.mockResolvedValue(answer(7, 0));
+      percorso.mockResolvedValue([
+        tappa('DIRITTO_CIVILE', 'Risoluzione per inadempimento', 3),
+        tappa('DIRITTO_CIVILE', 'Mora del debitore', 4),
+        tappa('DIRITTO_PENALE', 'Furto', 2),
+      ]);
+      renderHome();
+      const civile = await stopOf('Diritto civile');
+      const toggle = await within(civile).findByRole('button', { name: 'Istituti di Diritto civile (2)' });
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.queryByRole('list', { name: 'Istituti di Diritto civile' })).toBeNull();
+      const user = userEvent.setup();
+      await user.click(toggle);
+      expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      const institutes = screen.getByRole('list', { name: 'Istituti di Diritto civile' });
+      expect(document.getElementById(toggle.getAttribute('aria-controls')!)).toContainElement(institutes);
+      expect(within(institutes).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual([
+        'Ripassa Mora del debitore: 4 da ripassare',
+        'Ripassa Risoluzione per inadempimento: 3 da ripassare',
+      ]);
+      await user.click(within(institutes).getByRole('button', { name: /Risoluzione per inadempimento/ }));
+      expect(screen.getByTestId('where')).toHaveTextContent('/studia/ripasso/sessione?materia=DIRITTO_CIVILE&istituto=Risoluzione+per+inadempimento');
+    });
+
+    it('opens the subject the chips chose on its institutes', async () => {
+      localStorage.setItem(STORAGE_KEY, 'DIRITTO_PENALE');
+      progress.mockResolvedValue(answer(2, 0));
+      percorso.mockResolvedValue([tappa('DIRITTO_PENALE', 'Furto', 2), tappa('DIRITTO_CIVILE', 'Mora del debitore', 1)]);
+      renderHome();
+      expect(await screen.findByRole('list', { name: 'Istituti di Diritto penale' })).toBeInTheDocument();
+      expect(screen.queryByRole('list', { name: 'Istituti di Diritto civile' })).toBeNull();
+    });
+
+    it('holds the cards due in place while the read travels, and the missions do not wait on it', async () => {
+      progress.mockResolvedValue(answer(3, 0));
+      percorso.mockReturnValue(new Promise(() => {}));
+      renderHome();
+      expect(await screen.findByRole('button', { name: 'Inizia' })).toBeEnabled();
+      const stops = await road();
+      expect(stops.querySelectorAll('.motion-safe\\:animate-pulse').length).toBeGreaterThan(0);
+      expect(within(stops).queryByText(/da ripassare$/)).toBeNull();
+    });
+
+    it('keeps «Inizia» and the subjects when the read fails, and reads it again on request', async () => {
+      progress.mockResolvedValue(answer(3, 0));
+      percorso.mockRejectedValueOnce(new Error('down'));
+      renderHome();
+      const civile = await stopOf('Diritto civile');
+      expect(screen.getByRole('button', { name: 'Inizia' })).toBeEnabled();
+      expect(within(civile).getByRole('button', { name: 'Ripassa Diritto civile' })).toBeEnabled();
+      // No alert of its own: the line of the cards due is left out, and the institutes say it when opened.
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(civile).not.toHaveTextContent('da ripassare');
+      const user = userEvent.setup();
+      await user.click(within(civile).getByRole('button', { name: 'Istituti di Diritto civile' }));
+      expect(screen.getByText('Non riesco a leggere gli istituti di questa materia.')).toBeInTheDocument();
+      percorso.mockResolvedValue([tappa('DIRITTO_CIVILE', 'Mora del debitore', 1)]);
+      await user.click(screen.getByRole('button', { name: 'Riprova' }));
+      expect(await screen.findByRole('button', { name: 'Ripassa Mora del debitore: 1 da ripassare' })).toBeInTheDocument();
+      expect(percorso).toHaveBeenCalledTimes(2);
+    });
+
+    it('reads the institutes again with the missions’ «Riprova» and after a setting changed', async () => {
+      progress.mockRejectedValueOnce(new Error('down'));
+      renderHome();
+      const alert = await screen.findByRole('alert');
+      progress.mockResolvedValue(answer(3, 0));
+      const user = userEvent.setup();
+      await user.click(within(alert).getByRole('button', { name: 'Riprova' }));
+      await road();
+      expect(percorso).toHaveBeenCalledTimes(2);
+      await user.click(screen.getByRole('button', { name: 'Impostazioni dello studio' }));
+      savePreferences.mockResolvedValue({ nuoveAlGiorno: 20, ripassiAlGiorno: 10, materieComunita: ['DIRITTO_CIVILE'] });
+      await user.click(await screen.findByRole('switch', { name: 'Diritto civile' }));
+      await waitFor(() => expect(percorso).toHaveBeenCalledTimes(3));
+    });
+
+    it('offers no institutes for a subject with no card', async () => {
+      const data = answer(0, 0);
+      data.materie[2] = { materia: 'DIRITTO_AMMINISTRATIVO', nuove: 0, apprendimento: 0, consolidate: 0, ripassi30: 0 };
+      progress.mockResolvedValue(data);
+      renderHome();
+      const amministrativo = await stopOf('Diritto amministrativo');
+      expect(amministrativo).toHaveTextContent('Nessuna scheda, per ora.');
+      expect(within(amministrativo).queryByRole('button')).toBeNull();
     });
   });
 
