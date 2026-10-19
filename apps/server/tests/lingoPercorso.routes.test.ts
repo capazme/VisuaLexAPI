@@ -78,7 +78,9 @@ describe('the read by institute', () => {
 
   it('needs a session and refuses an unknown subject', async () => {
     expect((await request(app).get(PERCORSO)).status).toBe(401);
-    expect((await percorso('DIRITTO_INVENTATO')).status).toBe(400);
+    const unknown = await percorso('DIRITTO_INVENTATO');
+    expect(unknown.status).toBe(400);
+    expect(JSON.stringify(unknown.body)).toContain('Materia non valida.');
   });
 
   it('splits an institute into new, learning, consolidated and due', async () => {
