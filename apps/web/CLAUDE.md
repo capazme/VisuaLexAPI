@@ -701,7 +701,9 @@ the load keys on the anchor's fields, so an inline object does not refetch)
 is admin-only, `PATCH /admin/article-discussions/:id`). A new discussion can also
 start from a selection via the "Discuti" button in `SelectionPopup`, which opens
 the panel composer with a draft passage block and makes the title optional (the
-quotation stands in for it). Every new discussion records the `textHash` (SHA-256
+quotation stands in for it). The composer says, before posting, «Le glosse sono pubbliche nel
+Forum: per un appunto privato usa una nota» (the Forum lists every glossa); the title and the body
+name it with `aria-describedby`. Every new discussion records the `textHash` (SHA-256
 fingerprint) of the text on screen, and an article's also its `articleUrn` (a decision
 records no URN: the server refuses one). The article and a found
 decision's surface mount the panel (the decision's anchor is `articleId: ''`, with its own heading and notice). The panel is mounted
@@ -1325,8 +1327,16 @@ meant to stay split; add new features as new files, not inside the shells:
 - `features/bulletin/` — the Forum: «I dossier di studio pubblicati dalla comunità» (spec
   `docs/superpowers/specs/2026-10-13-environments-into-forum-design.md`; it absorbed «Ambienti»). Folder and
   component names stay `bulletin` and `SharedEnvironment*` because they match the backend model; the route is
-  `/forum`. `BulletinBoardPage.tsx` is a shell over three dumb views, the tabs «Esplora · I miei pubblicati ·
-  Suggerimenti» (`ForumExploreView`, `ForumMyEnvironmentsView`, `ForumSuggestionsView`). «Pubblica un dossier»
+  `/forum`. `BulletinBoardPage.tsx` is a shell over four views, the tabs «Esplora · Glosse · I miei pubblicati ·
+  Suggerimenti» (`ForumExploreView`, `ForumGlosseView`, `ForumMyEnvironmentsView`, `ForumSuggestionsView`).
+  «Glosse» is a skeleton, unstyled on purpose (spec `docs/superpowers/specs/2026-10-19-glosse-forum-design.md`;
+  the experience is Inchiostro's): the server's feed with its orders and kinds, a «Corte» select (the server's
+  `court`, a decision-key prefix: the whole Cassazione or one archive, each court; choosing a court shows the
+  decisions, choosing the articles drops the court, since the server refuses the two together) and «Solo le mie
+  glosse» (`mine`), and «Apri nel testo» through
+  `glossaLinks.ts` (`glossaDestination`: an article from its recorded URN through `triggerSearch`, a decision by
+  its address; `glossaTargetLabel`: the convention's label). It shows a decision's quotation only when the
+  server sends it (`passage.quote`). «Pubblica un dossier»
   is `PublishDossierPicker` (the user's dossiers not yet in the Forum, then the dossier's own
   `PublishDossierDialog`; the Forum never publishes a workspace); «Modifica» on a published dossier
   (`EditSharedEnvironmentModal`) edits its name, description, category and tags only — what it holds changes

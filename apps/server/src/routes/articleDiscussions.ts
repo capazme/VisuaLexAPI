@@ -8,6 +8,8 @@ router.use(authenticate);
 
 router.get('/article-discussions', controller.listThreads);
 router.get('/article-discussions/passages', controller.listPassages);
+router.get('/article-discussions/feed', controller.listFeed);
+router.get('/article-discussions/:threadId', controller.getThread);
 router.post('/article-discussions', controller.createThread);
 router.post('/article-discussions/:threadId/comments', controller.createComment);
 router.post('/article-discussions/:threadId/vote', controller.toggleThreadVote);

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { AlertTriangle, ChevronDown, ChevronUp, LocateFixed, MessageCircle, Plus, Send, ThumbsUp, X } from 'lucide-react';
@@ -95,6 +95,8 @@ export function ArticleDiscussionPanel({
   const [notice, setNotice] = useState<string | null>(null);
   const [sort, setSort] = useState<'recent' | 'active' | 'popular'>('recent');
   const [composerOpen, setComposerOpen] = useState(false);
+  // the panel can be mounted twice (phone view and desktop): the notice's id must be its own
+  const publicNoticeId = useId();
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
@@ -338,6 +340,10 @@ export function ArticleDiscussionPanel({
 
       {composerOpen && (
         <form onSubmit={createThread} className="mb-4 rounded-xl border border-primary-200 dark:border-primary-900/50 bg-primary-50/50 dark:bg-primary-950/20 p-4 space-y-3">
+          {/* The Forum lists every glossa (spec 2026-10-19-glosse-forum): said before posting, and read with each field. */}
+          <p id={publicNoticeId} className="text-xs text-slate-600 dark:text-slate-300">
+            Le glosse sono pubbliche nel Forum: per un appunto privato usa una nota.
+          </p>
           {draft && (
             <div className="rounded-lg border border-primary-300 dark:border-primary-800 bg-white/70 dark:bg-slate-900/70 p-2.5">
               <span className="text-[11px] font-bold uppercase tracking-wider text-primary-600 dark:text-primary-400">
@@ -356,6 +362,7 @@ export function ArticleDiscussionPanel({
             maxLength={200}
             placeholder={draft ? "Titolo (facoltativo)" : "Titolo della glossa"}
             aria-label={draft ? "Titolo (facoltativo)" : "Titolo della glossa"}
+            aria-describedby={publicNoticeId}
             className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
           />
           <textarea
@@ -366,6 +373,7 @@ export function ArticleDiscussionPanel({
             maxLength={10000}
             placeholder="Condividi una domanda o un'osservazione..."
             aria-label="Testo della glossa"
+            aria-describedby={publicNoticeId}
             rows={4}
             className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm"
           />

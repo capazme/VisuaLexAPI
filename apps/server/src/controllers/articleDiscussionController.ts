@@ -1,8 +1,10 @@
 import { Request, Response } from 'express';
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { inDecisionKeySpace, readDecisionKey } from '../norms/decisionKey';
+import { shortDecision } from '../norms/decisionCitation';
 
 const anchorSchema = z.object({
   normaKey: z.string({ message: 'La norma o la decisione è obbligatoria' }).min(1, 'La norma o la decisione è obbligatoria')
@@ -171,6 +173,18 @@ function threadView(thread: {
   };
 }
 
+const pagingSchema = z.object({
+  page: z.coerce.number({ message: 'La pagina non è valida' }).int('La pagina non è valida').min(1, 'La pagina non è valida')
+    .max(10_000, 'La pagina non è valida').default(1),
+  limit: z.coerce.number({ message: 'Il numero di risultati non è valido' }).int('Il numero di risultati non è valido')
+    .min(1, 'Il numero di risultati non è valido').max(50, 'Al massimo 50 risultati per pagina').default(20),
+});
+
+/** `page` and `limit` of a list query; a value that is not a number is a 400, not a database error. */
+function parsePaging(query: Request['query']) {
+  return parseItalian(pagingSchema, { page: query.page, limit: query.limit });
+}
+
 /** The list queries: a decision's articleId is '' and may be left out. */
 function parseListAnchor(query: unknown) {
   const { normaKey, articleId } = parseItalian(
@@ -186,8 +200,7 @@ function parseListAnchor(query: unknown) {
 export const listThreads = async (req: Request, res: Response) => {
   const { normaKey, articleId } = parseListAnchor(req.query);
   const sort = req.query.sort === 'popular' ? 'popular' : req.query.sort === 'active' ? 'active' : 'recent';
-  const page = Math.max(1, Number(req.query.page ?? 1));
-  const limit = Math.min(50, Math.max(1, Number(req.query.limit ?? 20)));
+  const { page, limit } = parsePaging(req.query);
 
   const where = { normaKey, articleId, isHidden: false };
   const [total, threads] = await Promise.all([
@@ -262,6 +275,195 @@ export const listPassages = async (req: Request, res: Response) => {
       createdAt: thread.createdAt,
       user: userView(thread.user),
     })),
+  });
+};
+
+// The Forum's feed of glosse (spec 2026-10-19-glosse-forum): every visible thread, of every
+// article and decision, without the comments' bodies. It shows no more than the per-article list.
+const FEED_SORTS = ['recent', 'popular', 'active', 'unanswered'] as const;
+
+// The decision key space (`norms/decisionKey.ts`), then up to two more segments: the archive, or a
+// TAR's seat and kind. No number or year: the filter names a court, `normaKey` names one decision.
+const COURT_PREFIX = /^(?:cassazione|corte_costituzionale|corte_giustizia_ue|tribunale_ue|consiglio_di_stato|cgars|tar)(?::[a-z-]{1,20}){0,2}$/;
+
+/** A LIKE prefix as Prisma sends it: `_` is a wildcard there, so it is escaped. */
+const likePrefix = (prefix: string) => prefix.replace(/_/g, '\\_');
+
+const feedSchema = z.object({
+  sort: z.enum(FEED_SORTS, { message: 'L’ordinamento deve essere «recent», «popular», «active» o «unanswered»' }).default('recent'),
+  kind: z.enum(['article', 'decision'], { message: 'Il tipo deve essere «article» o «decision»' }).optional(),
+  // An act's key (the web's `buildNormaKey`): the glosse on any of its articles.
+  act: z.string({ message: 'L’atto non è valido' }).regex(/^[a-z0-9_-]{1,300}$/, 'L’atto non è valido').optional(),
+  // One article's key (the web's `buildItemKey`) or one decision's key.
+  normaKey: z.string({ message: 'La chiave non è valida' }).min(1, 'La chiave non è valida').max(500, 'La chiave non è valida').optional(),
+  // A court, or a court's segment, as a decision key begins: «cassazione», «cassazione:penale», «tar:roma».
+  court: z.string({ message: 'La corte non è valida' }).regex(COURT_PREFIX, 'La corte non è valida').optional(),
+  // «le mie glosse»: the reader's own, never another user's.
+  mine: z.enum(['true', 'false'], { message: '«mine» deve essere «true» o «false»' }).optional(),
+}).superRefine((q, ctx) => {
+  if (q.act !== undefined && q.normaKey !== undefined) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Indica l’atto o la chiave, non entrambi' });
+  }
+  if (q.act !== undefined && q.kind === 'decision') {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Un atto ha glosse sugli articoli, non sulle decisioni' });
+  }
+  if (q.court !== undefined && (q.act !== undefined || q.normaKey !== undefined)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Indica la corte, l’atto o la chiave: uno solo' });
+  }
+  if (q.court !== undefined && q.kind === 'article') {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Una corte ha glosse sulle decisioni, non sugli articoli' });
+  }
+});
+
+const FEED_EXCERPT = 280;
+
+/** The first words of a body, for a list; the whole body is on the glossa's own route. */
+function excerpt(body: string): string {
+  if (body.length <= FEED_EXCERPT) return body;
+  const cut = body.slice(0, FEED_EXCERPT);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > FEED_EXCERPT / 2 ? cut.slice(0, space) : cut).trimEnd()}…`;
+}
+
+/** «Cass. civ., n. 31310/2024»: a decision named from its key; null for an article's thread. */
+function decisionLabel(thread: { targetKind: string; decisionKey: string | null }): string | null {
+  if (thread.targetKind !== 'decision' || !thread.decisionKey) return null;
+  const identity = readDecisionKey(thread.decisionKey);
+  return identity ? shortDecision(identity) : null;
+}
+
+/**
+ * The quotation as a view away from the text shows it. A decision's quotation may be words the
+ * court has since withdrawn; the reader's panel decides that against the text it holds and fails
+ * closed (apps/web/CLAUDE.md, «Passage discussions»). A list holds no text, so a decision's
+ * quotation is withheld here unless an admin released it, or the reader wrote it or is an admin.
+ */
+function feedPassage(
+  thread: { targetKind: string; passageQuote: string | null; passageReleasedAt: Date | null; userId: string },
+  viewer: { id: string; isAdmin: boolean },
+) {
+  if (thread.passageQuote === null) return null;
+  const withheld = thread.targetKind === 'decision' && thread.passageReleasedAt === null
+    && thread.userId !== viewer.id && !viewer.isAdmin;
+  return { quote: withheld ? null : thread.passageQuote, withheld };
+}
+
+const feedSelect = (viewerId: string) => ({
+  id: true,
+  normaKey: true,
+  articleId: true,
+  articleLabel: true,
+  version: true,
+  articleUrn: true,
+  targetKind: true,
+  decisionKey: true,
+  passageQuote: true,
+  passageReleasedAt: true,
+  title: true,
+  body: true,
+  userId: true,
+  createdAt: true,
+  updatedAt: true,
+  user: { select: { id: true, username: true } },
+  votes: { where: { userId: viewerId }, select: { id: true } },
+  _count: { select: { votes: true, comments: { where: { isHidden: false } } } },
+}) satisfies Prisma.ArticleThreadSelect;
+
+type FeedRow = Prisma.ArticleThreadGetPayload<{ select: ReturnType<typeof feedSelect> }>;
+
+function feedItemView(thread: FeedRow, viewer: { id: string; isAdmin: boolean }) {
+  return {
+    id: thread.id,
+    title: thread.title,
+    excerpt: excerpt(thread.body),
+    normaKey: thread.normaKey,
+    articleId: thread.articleId,
+    articleLabel: thread.articleLabel,
+    version: thread.version,
+    articleUrn: thread.articleUrn,
+    target: thread.targetKind === 'decision' && thread.decisionKey
+      ? { kind: 'decision' as const, key: thread.decisionKey }
+      : { kind: 'article' as const },
+    decisionLabel: decisionLabel(thread),
+    passage: feedPassage(thread, viewer),
+    user: userView(thread.user),
+    voteCount: thread._count.votes,
+    userVoted: thread.votes.length > 0,
+    commentCount: thread._count.comments,
+    createdAt: thread.createdAt,
+    // a reply sets it (`createComment`); moderation keeps it (`moderateThread`)
+    lastActivityAt: thread.updatedAt,
+    isOwner: thread.userId === viewer.id,
+  };
+}
+
+export const listFeed = async (req: Request, res: Response) => {
+  const query = parseItalian(feedSchema, req.query);
+  const { page, limit } = parsePaging(req.query);
+  const viewer = { id: req.user!.id, isAdmin: Boolean(req.user!.isAdmin) };
+
+  const where: Prisma.ArticleThreadWhereInput = {
+    isHidden: false,
+    ...(query.kind ? { targetKind: query.kind } : {}),
+    // the act's key and then «--»: «legge--241--…» is not an article of «legge--24». The key's
+    // segments are not typed, so an act named without its date also reads the dated acts of
+    // that number (the web always sends the date it has).
+    ...(query.act ? { targetKind: 'article', normaKey: { startsWith: `${likePrefix(query.act)}--` } } : {}),
+    // the court's prefix and then «:», as for an act: «tar:rom» is not «tar:roma».
+    ...(query.court ? { targetKind: 'decision', decisionKey: { startsWith: `${likePrefix(query.court)}:` } } : {}),
+    ...(query.normaKey ? { normaKey: query.normaKey } : {}),
+    ...(query.mine === 'true' ? { userId: viewer.id } : {}),
+    ...(query.sort === 'unanswered' ? { comments: { none: { isHidden: false } } } : {}),
+  };
+  const orderBy: Prisma.ArticleThreadOrderByWithRelationInput[] = query.sort === 'popular'
+    ? [{ votes: { _count: 'desc' } }, { createdAt: 'desc' }, { id: 'desc' }]
+    : query.sort === 'active'
+      ? [{ updatedAt: 'desc' }, { id: 'desc' }]
+      : [{ createdAt: 'desc' }, { id: 'desc' }];
+
+  const [total, threads] = await Promise.all([
+    prisma.articleThread.count({ where }),
+    prisma.articleThread.findMany({
+      where,
+      select: feedSelect(viewer.id),
+      orderBy,
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+  ]);
+
+  res.json({
+    data: threads.map(thread => feedItemView(thread, viewer)),
+    pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+  });
+};
+
+/** One glossa with its replies, for its page in the Forum: the feed's fields plus the thread's own. */
+export const getThread = async (req: Request, res: Response) => {
+  const viewer = { id: req.user!.id, isAdmin: Boolean(req.user!.isAdmin) };
+  const thread = await prisma.articleThread.findUnique({
+    where: { id: req.params.threadId },
+    include: {
+      user: { select: { id: true, username: true } },
+      comments: {
+        where: { isHidden: false },
+        orderBy: { createdAt: 'asc' },
+        include: { user: { select: { id: true, username: true } }, votes: true },
+      },
+      votes: true,
+    },
+  });
+  if (!thread || thread.isHidden) throw new AppError(404, 'Glossa non trovata');
+  const view = threadView(thread, viewer.id);
+  const passage = feedPassage(thread, viewer);
+  res.json({
+    ...view,
+    // the context around the words could hold what was withdrawn: the passage goes whole
+    passage: passage?.withheld ? null : view.passage,
+    passageWithheld: passage?.withheld ?? false,
+    decisionLabel: decisionLabel(thread),
+    commentCount: thread.comments.length,
+    lastActivityAt: thread.updatedAt,
   });
 };
 
@@ -377,6 +579,17 @@ export const moderateThread = async (req: Request, res: Response) => {
     data.passageReleasedAt = body.passageReleased ? new Date() : null;
     data.passageReleasedById = body.passageReleased ? req.user!.id : null;
   }
-  const thread = await prisma.articleThread.update({ where: { id: req.params.threadId }, data });
+  // `updatedAt` is the thread's last activity (the feed's «active»): moderation is not activity.
+  // Written only if no reply moved it since it was read, else read again, so a reply is never undone.
+  let updatedAt = existing.updatedAt;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const { count } = await prisma.articleThread.updateMany({ where: { id: existing.id, updatedAt }, data: { ...data, updatedAt } });
+    if (count === 1) break;
+    const current = await prisma.articleThread.findUnique({ where: { id: existing.id }, select: { updatedAt: true } });
+    if (!current) throw new AppError(404, 'Glossa non trovata');
+    if (attempt === 2) throw new AppError(409, 'La glossa è cambiata: riprova');
+    updatedAt = current.updatedAt;
+  }
+  const thread = await prisma.articleThread.findUniqueOrThrow({ where: { id: existing.id } });
   res.json({ id: thread.id, isHidden: thread.isHidden, passageReleased: thread.passageReleasedAt !== null });
 };

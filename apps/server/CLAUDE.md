@@ -359,7 +359,26 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   sets `passage_released_by` null and keeps the release (the CHECK allows it).
   Every discussion route answers its 400s and 404s in Italian (`parseItalian`,
   not the global handler's English prefix); moderation on a missing thread is a
-  404 «Discussione non trovata».
+  404 «Glossa non trovata».
+  **The Forum's feed** (spec `docs/superpowers/specs/2026-10-19-glosse-forum-design.md`):
+  `GET /article-discussions/feed` lists every visible thread of every article and decision,
+  paginated (`page`, `limit` ≤ 50), `sort=recent|popular|active|unanswered` (unanswered: no
+  visible reply), filtered by `kind`, `act` (the web's `buildNormaKey`: the threads whose key
+  starts with it and «--»), `court` (a prefix of the decision key: a court of the key space, then
+  at most two segments — `cassazione:civile`, `tar:roma`, `tar:roma:sent` — matched with «:» after
+  it, so `tar:rom` is not `tar:roma`) or `normaKey` (one article or decision); one of `act`,
+  `court`, `normaKey` at most, `court` only with the decisions; `_` is escaped for LIKE in both
+  prefixes. `mine=true` keeps the signed-in user's threads only (`userId`, never another user's),
+  with any other filter. A malformed value is an Italian 400. An item carries no replies
+  and no body, only an `excerpt`, plus `decisionLabel` (`shortDecision` of the key),
+  `commentCount`, `voteCount`, `userVoted` and `lastActivityAt` (`updatedAt`: a reply sets it,
+  moderation keeps it). `GET /article-discussions/:threadId` is one glossa with its visible
+  replies (hidden or missing: 404). Both withhold a **decision's** quotation (the feed's
+  `quote: null` with `withheld`; the glossa's `passage: null`, context included, with
+  `passageWithheld`) unless an admin released it or the reader wrote it or is an
+  admin: they hold no text to tell whether the words are still there, so they fail closed as the
+  reader's panel does. The per-article list and `passages` still return it. A `page` or `limit`
+  that is not a number is an Italian 400 on every list.
 - **LingoLex trace bank** (first slice of the study layer; plan in
   `docs/superpowers/plans/2026-09-30-lingolex-foundation.md`): `LingoTraccia`
   (`lingo_tracce`) holds exam traces and references no other model. Nothing
