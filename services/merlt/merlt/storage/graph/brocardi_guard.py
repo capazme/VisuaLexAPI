@@ -46,10 +46,14 @@ BROCARDI_TOOLS: frozenset[str] = frozenset({
 BROCARDI_HOST = "brocardi.it"
 # Only Brocardi ever wrote these Qdrant source types: the Brocardi ingestion,
 # the Libro IV seed (its Dottrina nodes) and live sources from the Brocardi
-# tools (provisional_writer). A `massima` is Brocardi too unless it is a live
-# point (`live:…`), which `cerca_giurisprudenza` writes.
+# tools (provisional_writer). A `massima` without a `fonte` is Brocardi's only
+# when it is keyed by a norm (the Brocardi ingestion keyed its massime by the
+# article they comment); a live one (`cerca_giurisprudenza`) is keyed by its
+# own source URL or by `live:…`, and the seed's by `massima_…`.
 BROCARDI_SOURCE_TYPES: frozenset[str] = frozenset({"ratio", "spiegazione", "dottrina"})
 
+# How a norm's key starts: the graph's full Normattiva URL, or a bare URN.
+_NORM_KEYS = ("https://www.normattiva.it/", "http://www.normattiva.it/", "urn:nir:")
 _ID_KEYS = ("node_id", "URN", "urn", "article_urn", "id", "source_id", "chunk_urn")
 _URL_KEYS = ("source_url", "url", "link")
 # Every property under which a writer stored a passage of text.
@@ -105,7 +109,7 @@ def _marked(m: Mapping[str, Any]) -> bool:
     if source_type in BROCARDI_SOURCE_TYPES:
         return True
     article_urn = _lower(m.get("article_urn"))
-    if source_type == "massima" and article_urn and not article_urn.startswith("live:"):
+    if source_type == "massima" and article_urn.startswith(_NORM_KEYS):
         return True
     return False
 
@@ -146,7 +150,12 @@ def redact(value: Any, _bridge: Optional[str] = None) -> Any:
     Walks dicts and lists; the input is never modified (tool results are cached
     and shared). A Brocardi item keeps its identity (ids, URNs, `estremi`,
     scores, links to other nodes) and, under `text`, only its decision's
-    `estremi` or an empty string."""
+    `estremi` or an empty string.
+
+    A plain string passes unchanged: it carries no mark to read. That is the
+    shape of every mcp-legal-it answer (markdown), which is why no tool that
+    reads Brocardi may be granted (`BROCARDI_TOOLS`, pinned by a test) and why
+    `redact_tool_result` drops such a tool's answer whole if one ever is."""
     if isinstance(value, Mapping):
         if is_brocardi(value):
             bridge = decision_bridge(value) if _bridge is None else _bridge

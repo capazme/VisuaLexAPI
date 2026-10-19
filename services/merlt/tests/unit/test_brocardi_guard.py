@@ -79,6 +79,9 @@ def test_brocardi_content_is_recognised(item):
     {"URN": CC, "testo": OUR_TEXT, "fonte": "Normattiva"},
     {"node_id": "massimario:1", "massima": MASSIMARIO, "fonte": "Ufficio del Massimario"},
     {"article_urn": "live:abc", "source_type": "massima", "text": "Una massima di Italgiure."},
+    # a live decision saved by provisional_writer: article_urn is its source URL
+    {"article_urn": "https://www.italgiure.giustizia.it/xway/application/nif/clean/hc.dll?verbo=attach&db=snciv&id=./x.pdf",
+     "source_type": "massima", "text": "Una sentenza vera, salvata dal vivo."},
     {"article_urn": CC, "source_type": "rassegna", "text": MASSIMARIO},
     {"node_id": "dottrina:una_tesi", "fonte": "community", "descrizione": "Una tesi della comunità."},
     # a community entity written before entities carried a `fonte`
@@ -400,3 +403,80 @@ def test_the_dashboard_lists_no_brocardi_source():
 
     dashboard = importlib.import_module("merlt.api.dashboard_router")
     assert "brocardi" not in inspect.getsource(dashboard).lower()
+
+
+# --- The validation queue and the per-user export ------------------------------
+
+
+class _Scripted:
+    """A session answering get_pending's three queries in order."""
+
+    def __init__(self, entities, relations, names):
+        self._answers = [entities, relations, names]
+
+    async def execute(self, statement):
+        rows = self._answers.pop(0)
+        return SimpleNamespace(scalars=lambda: SimpleNamespace(all=lambda: rows), all=lambda: rows)
+
+
+def _entity(entity_id, text, fonte, descrizione):
+    return SimpleNamespace(
+        entity_id=entity_id, entity_text=text, entity_type="concetto", descrizione=descrizione,
+        article_urn=CC, ambito="civile", fonte=fonte, source_reference=None, llm_confidence=0.9,
+        approval_score=0.0, rejection_score=0.0, votes_count=0, contributed_by="u-1",
+        contributor_authority=0.5, created_at=None,
+    )
+
+
+def _relation(relation_id, source, target, fonte="llm_extraction"):
+    return SimpleNamespace(
+        relation_id=relation_id, source_node_urn=source, target_entity_id=target,
+        relation_type="INTERPRETA", fonte=fonte, source_reference=None, source_type="article",
+        article_urn=CC, llm_confidence=0.9, relation_description="", approval_score=0.0,
+        rejection_score=0.0, votes_count=0, contributed_by="u-1", contributor_authority=0.5, created_at=None,
+    )
+
+
+async def test_the_validation_queue_hides_what_is_still_marked_as_brocardis():
+    import importlib
+
+    from merlt.api.models.enrichment_models import PendingQueueRequest
+
+    enrichment_router = importlib.import_module("merlt.api.enrichment_router")
+    session = _Scripted(
+        entities=[
+            _entity("e-brocardi", "Una massima estratta", "brocardi_massime", SECRET),
+            _entity("e-nostra", "buona fede", "llm_extraction", "Un concetto nostro."),
+        ],
+        relations=[
+            _relation("r-1", CC, "e-brocardi"),
+            _relation("r-2", CC, "massima_cass._civ._1_2020"),
+            _relation("r-3", CC, "e-nostra", fonte="brocardi"),
+            _relation("r-4", CC, "e-nostra"),
+        ],
+        names=[("e-brocardi", "Una massima estratta", "brocardi_massime", None),
+               ("e-nostra", "buona fede", "llm_extraction", None)],
+    )
+    response = await enrichment_router.get_pending(
+        request=PendingQueueRequest(user_id="u-2"), session=session, api_key=None,
+    )
+    assert SECRET not in response.model_dump_json()
+    assert [e.id for e in response.pending_entities] == ["e-nostra"]
+    assert [r.id for r in response.pending_relations] == ["r-4"]
+
+
+def test_the_per_user_export_strips_brocardi_from_old_turns():
+    from merlt.privacy.user_data import _strip_brocardi_from_turn
+
+    row = {
+        "trace_id": "trace_x",
+        "sources": json.dumps([
+            {"article_urn": str(uuid4()), "expert": "precedent", "relevance": 0.9, "excerpt": SECRET},
+            {"article_urn": CC, "expert": "literal", "relevance": 0.9, "excerpt": OUR_TEXT},
+        ]),
+        "full_trace": json.dumps({"stages": {}}),
+        "synthesis_text": "Sintesi.",
+    }
+    _strip_brocardi_from_turn(row)
+    assert SECRET not in _dump(row)
+    assert row["sources"][1]["excerpt"] == OUR_TEXT

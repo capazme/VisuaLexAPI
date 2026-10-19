@@ -683,9 +683,12 @@ async def build_and_persist_query_response(
                 served_keys.add(key)
     if served_keys:
         full_trace_data["coevo_served_keys"] = sorted(served_keys)
-    # Everything in it passed the Brocardi guard at the tools (D-078). Marked
-    # even when empty, or /history would read the turn as one from before.
-    full_trace_data = mark_trace_guarded(full_trace_data)
+    # The engine says its experts read only guarded sources (D-078). Marked
+    # even when the trace is otherwise empty, or /history would read the turn
+    # as one from before the guard.
+    if (getattr(result, "metadata", None) or {}).get(TRACE_GUARD_KEY):
+        mark_trace_guarded(full_trace_data)
+    full_trace_data = full_trace_data or None
 
     # Extract routing metadata for new fields
     routing_method = None
@@ -2077,8 +2080,11 @@ async def submit_refine_feedback(
             sources=[s.model_dump() for s in sources],
             execution_time_ms=execution_time_ms,
             # No pipeline trace is kept for a follow-up; the mark says its
-            # sources passed the Brocardi guard (D-078).
-            full_trace=mark_trace_guarded({}),
+            # sources passed the Brocardi guard (D-078), when the engine says so.
+            full_trace=(
+                mark_trace_guarded({})
+                if (getattr(result, "metadata", None) or {}).get(TRACE_GUARD_KEY) else None
+            ),
             consent_level=original_trace.consent_level,
             confidence=result.confidence,
         )

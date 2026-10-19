@@ -351,5 +351,9 @@ that stack's own database, and the tests write rows. The Dockerfile copies
   returns, on the provisional-review rows, on the validation queue, and on the
   stored turns `/experts/history` and `/experts/trace` read back (a turn stored
   before the guard has no `brocardi_guard` mark in `full_trace`, and its retrieval
-  summaries and non-norm excerpts are emptied). A new path that hands graph or
-  vector text to a user or to an LLM goes through it.
+  summaries and non-norm excerpts are emptied), and on the turns the per-user
+  export returns. A new path that hands graph or vector text to a user or to an
+  LLM goes through it. **Accepted limit:** an answer the LLM wrote before the
+  guard (`synthesis_text`, the experts' theses) may quote Brocardi verbatim, and
+  `/experts/history`, `/experts/trace` and the export serve it as it was written;
+  it leaves with the assistant retention (`MERLT_ASSISTANT_RETENTION_DAYS`).
