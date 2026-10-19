@@ -12,6 +12,8 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-10-19
+
 ### Licence
 
 - The whole repository is under the Mozilla Public License 2.0 (MPL-2.0),
@@ -22,13 +24,25 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 Everything since v1.7.8: the first release of the unified repository, which
 brings in the MERL-T line merged on 27 September 2026.
 
+### Sections
+
+- VisuaLex is divided into sections: Opus (work dossiers), Gymnasium (study),
+  Academia (the graph and the assistant, in development mode only) and Forum.
+  A switcher at the top of the sidebar moves between them, and each section
+  has its own sidebar; search and reading stay in every section.
+- The section is read from the address, otherwise remembered in the browser.
+- Dossiers per section: Opus lists the work dossiers, Gymnasium the study
+  ones, and a new dossier takes the kind of its section.
+- «Studia» is called Gymnasium in the interface and in what a connected AI
+  application reads; the discussions on a passage are called «glosse».
+
 ### Reading norms
 
 - The text as at a date: the server states which version of an article it
   returns, the reader shows it, and a dossier keeps the version it saved and
   tells two versions apart.
-- «Giurisprudenza» under an article: the massime as links, the Cassazione's
-  decisions that mention the article, one row and one year control per
+- «Giurisprudenza» under an article: the Cassazione's decisions that mention
+  the article, one row and one year control per
   source, and the Court of Justice under an article of the Union.
 - The Massimario's annual reviews: the paragraphs that cite an article, read
   by year.
@@ -37,6 +51,9 @@ brings in the MERL-T line merged on 27 September 2026.
   starts with its citation.
 - Discussions on passages of the text, with their loading and error states.
 - «Importa articoli da norma» offers Regolamento UE and Direttiva UE, by year.
+- «Confronta articoli» sets two articles side by side, comma facing comma.
+- Brocardi is no longer a source: VisuaLex stops asking it for anything and
+  shows none of its text (D-078).
 
 ### Court decisions
 
@@ -51,6 +68,7 @@ brings in the MERL-T line merged on 27 September 2026.
   longer land listed rather than dropped; discussions on decisions.
 - Decisions cited in a decision or an article become links that open beside
   it, and a Corte costituzionale decision's own precedents too.
+- A decision's key passages, found by rules; the preview shows the first.
 
 ### Search and find
 
@@ -83,14 +101,30 @@ brings in the MERL-T line merged on 27 September 2026.
   what a connected application removed, restorable from the dossier.
 - The dossier page shows what a connected application adds without a reload;
   the share link carries any character and still reads the old links.
+- Entries removed on the web go to the trash, with «Annulla».
+- The PDF holds the dossier's decisions and can print only the marked
+  passages.
+- Dossiers of work and of study.
 
-### Studia (study cards)
+### Forum
+
+- «Pubblica nel Forum» from a dossier, with a preview, the notes chosen one
+  by one and a warning on personal data; the server filters what is published
+  and imported.
+- The Forum absorbs «Ambienti»: «Ai miei dossier», ready-made study dossiers,
+  old environments kept read-only and old links brought to the Forum.
+
+### Gymnasium (study cards)
 
 - Study cards written, edited, listed and found under their article, anchored
   by the official URN.
 - Reviewed with FSRS v4, with a daily goal and community subjects.
 - Proposed to the community and validated by named validators; a card the
   community took up outlives its author's account.
+- The study days stored, the streak and a progress dashboard, with a
+  celebration of the daily goal.
+- The validation thresholds (approvals, «errata» votes) set by an
+  administrator, with a preview of what changes.
 
 ### Connected AI applications (MCP)
 
@@ -114,6 +148,12 @@ brings in the MERL-T line merged on 27 September 2026.
   on the existing node, enters as a stub, and fails with a reason.
 - The doctrine layer is «Dottrina», with its source credited; bulk ingestion
   runs on its own queue.
+- Personal data: consent under a versioned notice at first entry, export and
+  erasure of one's MERL-T data, «Dati MERL-T» in the settings; questions and
+  judgements expire after 24 months, tracking events after 12; stored events
+  never keep a note's text; dead letters without personal data.
+- MERL-T no longer fetches Brocardi and never shows a user its text; the data
+  already in the graph stays as an internal signal (D-078).
 
 ### Fixed
 
@@ -127,6 +167,8 @@ brings in the MERL-T line merged on 27 September 2026.
 - The articles of one EU act are told apart in a dossier, and an act's title
   stays in its block.
 - A database hiccup no longer logs users out; no duplicate requests.
+- Touch targets of 44 px on a phone (the Modal's close button, the services
+  pill, the Forum card's menu); a range whose index cannot be read says so.
 
 ### Security
 

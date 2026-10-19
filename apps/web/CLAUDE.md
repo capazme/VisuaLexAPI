@@ -1585,8 +1585,9 @@ meant to stay split; add new features as new files, not inside the shells:
     way — no plugin was ever installed — until 18 October 2026: they are now
     `@utility` rules at the end of `index.css` that move with the individual
     `translate` and `scale` properties, so they compose with floating-ui's
-    positioning `transform` instead of replacing it (gotcha 10), and last at
-    most 200 ms. `theme.test.ts` checks they generate CSS. The palette is the
+    positioning `transform` instead of replacing it (gotcha 10), last at
+    most 200 ms and fill `backwards` only: a `both` fill keeps the element a
+    containing block and a stacking context after the entrance (gotcha 22). `theme.test.ts` checks they generate CSS. The palette is the
     «Inchiostro» one (spec `2026-10-18-redesign-inchiostro`): `slate`, `gray`,
     `zinc`, `neutral` are aliases of `ink`, `blue`, `indigo`, `primary-<n>` of
     `toga`; motion curves for Framer Motion live in `lib/motion.ts`.
