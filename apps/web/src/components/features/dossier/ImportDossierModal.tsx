@@ -1,6 +1,7 @@
 import { FolderInput } from 'lucide-react';
 import type { Dossier } from '../../../types';
 import { computeItemCounts } from './dossierUtils';
+import { tagLabel } from '../../../utils/tagLabel';
 
 interface Props {
   dossier: Dossier;
@@ -55,7 +56,7 @@ export function ImportDossierModal({ dossier, discarded, onClose, onConfirm }: P
             <div className="flex flex-wrap gap-1 mt-3">
               {dossier.tags.map((tag) => (
                 <span key={tag} className="px-2 py-0.5 bg-slate-200 dark:bg-slate-600 rounded text-xs text-slate-600 dark:text-slate-300">
-                  {tag}
+                  {tagLabel(tag)}
                 </span>
               ))}
             </div>

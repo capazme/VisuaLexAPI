@@ -4,7 +4,6 @@ import {
   FolderPlus,
   ChevronRight,
   Search,
-  Tag,
   Star,
   MoreHorizontal,
   Edit2,
@@ -34,6 +33,8 @@ import { useDossierKind } from '../../../features/sections/useSection';
 import { kindLabel } from './dossierKinds';
 import { actsSummary, layoutDossier } from './dossierLayout';
 import { deleteDossierMessage, deleteDossierWithUndo } from './deleteDossierWithUndo';
+import { hasTagCategory, tagCategories, tagLabel } from '../../../utils/tagLabel';
+import { useIsDesktop } from '../../../hooks/useIsDesktop';
 
 type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -49,15 +50,22 @@ interface Props {
 
 type SortBy = 'date' | 'name' | 'items';
 
+// The list's two menus (order, category): one look, 44 px on a phone, where they share a row half and half.
+const LIST_MENU = 'flex-1 min-w-0 px-3 md:px-4 py-3 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500';
+
 export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTrash, onTrashChanged }: Props) {
   const { dossiers, updateDossier, triggerSearch, triggerMultiSearch, importDossier } = useAppStore();
   const navigate = useNavigate();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  // The category chosen in the menu: its key (the tag folded to lower case), one at a time.
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   // The section's kind (sections spec S7): Opus lists the dossiers di lavoro, Gymnasium those di studio.
   const sectionKind = useDossierKind();
+  // An option's text has no breakpoint: on a phone the half-width menu says «Tutte», which
+  // «Tutte le categorie» did not fit beside the arrow at 390 px.
+  const isDesktop = useIsDesktop();
   const [sortBy, setSortBy] = useState<SortBy>('date');
 
   const [editingDossier, setEditingDossier] = useState<Dossier | null>(null);
@@ -67,11 +75,16 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const allTags = useMemo(() => {
-    const tags = new Set<string>();
-    dossiers.forEach((d) => d.tags?.forEach((t) => tags.add(t)));
-    return Array.from(tags).sort();
-  }, [dossiers]);
+  // The categories of the dossiers this section lists, so none of them filters to an empty list.
+  const categories = useMemo(() => tagCategories(
+    dossiers
+      .filter((d) => !sectionKind || (d.kind ?? 'lavoro') === sectionKind)
+      .flatMap((d) => d.tags ?? []),
+  ), [dossiers, sectionKind]);
+  // A category whose last dossier went (deleted, retagged, another section) is dropped, so the menu shows
+  // «Tutte le categorie» and the filter does not come back on its own with the category.
+  const selectedCategory = categories.find((c) => c.key === selectedTag) ?? null;
+  if (selectedTag !== null && selectedCategory === null) setSelectedTag(null);
 
   const filteredDossiers = useMemo(() => {
     let result = [...dossiers];
@@ -92,8 +105,8 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
       );
     }
 
-    if (selectedTag) {
-      result = result.filter((d) => d.tags?.includes(selectedTag));
+    if (selectedCategory) {
+      result = result.filter((d) => hasTagCategory(d.tags, selectedCategory));
     }
 
     if (sectionKind) {
@@ -115,7 +128,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
     });
 
     return result;
-  }, [dossiers, searchQuery, selectedTag, sectionKind, sortBy]);
+  }, [dossiers, searchQuery, selectedCategory, sectionKind, sortBy]);
 
   // Open-on-dashboard: 0 norms → noop, 1 norm → direct, >1 → picker modal.
   const handleQuickOpen = (dossier: Dossier) => {
@@ -284,64 +297,49 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
         aria-hidden
       />
 
-      <div className="mb-6 space-y-4">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div id="tour-dossier-search" className="relative flex-1">
-            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              ref={searchInputRef}
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cerca nei dossier... (/)"
-              aria-keyshortcuts="/"
-              className="w-full pl-10 pr-4 py-3 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-            />
-          </div>
+      {/* The search, then the two menus: one row on a computer; on a phone the search on its own row and the
+          menus side by side under it, half each (D1). */}
+      <div className="mb-6 flex flex-col md:flex-row gap-3 md:gap-4">
+        <div id="tour-dossier-search" className="relative flex-1 min-w-0 md:min-w-[14rem]">
+          <Search size={18} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Cerca nei dossier…"
+            aria-label="Cerca nei dossier"
+            aria-keyshortcuts="/"
+            className="w-full pl-10 pr-4 py-3 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          />
+        </div>
+        <div className="flex gap-3 md:gap-4">
           <select
             id="tour-dossier-sort"
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as SortBy)}
-            className="px-4 py-3 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            aria-label="Ordina i dossier"
+            className={cn(LIST_MENU, 'md:flex-none')}
           >
             <option value="date">Ordina per data</option>
             <option value="name">Ordina per nome</option>
             <option value="items">Ordina per elementi</option>
           </select>
-        </div>
-
-        {allTags.length > 0 && (
-          <div id="tour-dossier-filters" className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
-            <button
-              onClick={() => setSelectedTag(null)}
-              aria-pressed={!selectedTag}
-              className={cn(
-                'px-4 py-2 md:px-3 md:py-1 rounded-full text-sm transition-colors whitespace-nowrap min-h-[44px] md:min-h-0 flex items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
-                !selectedTag
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700',
-              )}
+          {categories.length > 0 && (
+            <select
+              id="tour-dossier-filters"
+              value={selectedCategory?.key ?? ''}
+              onChange={(e) => setSelectedTag(e.target.value || null)}
+              aria-label="Filtra per categoria"
+              className={cn(LIST_MENU, 'md:flex-none md:max-w-[16rem]')}
             >
-              Tutti
-            </button>
-            {allTags.map((tag) => (
-              <button
-                key={tag}
-                onClick={() => setSelectedTag(tag === selectedTag ? null : tag)}
-                aria-pressed={selectedTag === tag}
-                className={cn(
-                  'px-4 py-2 md:px-3 md:py-1 rounded-full text-sm transition-colors flex items-center gap-1 whitespace-nowrap min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
-                  selectedTag === tag
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700',
-                )}
-              >
-                <Tag size={14} />
-                {tag}
-              </button>
-            ))}
-          </div>
-        )}
+              <option value="">{isDesktop ? 'Tutte le categorie' : 'Tutte'}</option>
+              {categories.map((category) => (
+                <option key={category.key} value={category.key}>{category.label}</option>
+              ))}
+            </select>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
@@ -349,14 +347,14 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
           <div className="col-span-full">
             <EmptyState
               variant="dossier"
-              title={searchQuery || selectedTag ? 'Nessun risultato' : sectionKind ? `Nessun ${kindLabel(sectionKind).toLowerCase()}` : 'Nessun dossier creato'}
+              title={searchQuery || selectedCategory ? 'Nessun risultato' : sectionKind ? `Nessun ${kindLabel(sectionKind).toLowerCase()}` : 'Nessun dossier creato'}
               description={
-                searchQuery || selectedTag
+                searchQuery || selectedCategory
                   ? 'Prova a modificare i filtri di ricerca.'
                   : 'I dossier ti permettono di organizzare articoli per tema, progetto o caso. Crea il tuo primo dossier, o parti da un dossier di studio pronto.'
               }
               action={
-                !(searchQuery || selectedTag) && (
+                !(searchQuery || selectedCategory) && (
                   <div className="flex flex-col items-center gap-2 sm:flex-row">
                     <button
                       onClick={() => setIsModalOpen(true)}
@@ -479,7 +477,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                   <div className="flex flex-wrap gap-1 mt-2 md:mt-3">
                     {dossier.tags.slice(0, 3).map((tag) => (
                       <span key={tag} className="text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded truncate max-w-[100px]">
-                        {tag}
+                        {tagLabel(tag)}
                       </span>
                     ))}
                     {dossier.tags.length > 3 && (

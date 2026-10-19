@@ -1258,6 +1258,13 @@ Duplicating any of these is a defect, not a shortcut.
 - `components/features/dossier/dossierLayout.ts` — `layoutDossier`, `actKeyOf`,
   `codeName`, `compareArticles`, `articleLabel`, `foldedArticleList`,
   `dossierItemOrder`, `actsSummary`: the dossier by act.
+- `utils/tagLabel.ts` — `tagLabel(tag)`: a dossier's tag as shown, its first letter capitalised and
+  the rest as typed («accesso» → «Accesso», «DPO» stays). Display only — the stored tag never changes,
+  every filter compares stored values, and the PDF and the editors show the tag as typed. The list's
+  card, the dossier's header, the import dialog and the Forum's card go through it.
+  `tagCategories(tags)` makes the dossier list's category menu (Italian alphabetical order, case and
+  accents ignored; values that differ only by case are one category filtering all of them, labelled by
+  the spelling with the most capitals) and `hasTagCategory` filters by it.
 - `utils/actRubriche.ts` — `matchRubrichePart`, `rubricheFor`, `abrogatiFor`:
   which article titles belong to the articles in view. An act in parts gets the
   part matched by article numbers (on a tie, the one of the annex's size; still
@@ -1379,7 +1386,10 @@ meant to stay split; add new features as new files, not inside the shells:
 
 - `features/dossier/` — `DossierPage.tsx` is a thin shell routing list/detail via
   `?dossier=<id>`; `DossierListView.tsx` (grid, context menu, shortcuts `n` `/`
-  `i`), `DossierDetailView.tsx` (sections and header), `DossierActBlock.tsx`
+  `i`; the search, then two menus — the order and «Filtra per categoria», one
+  category at a time, «Tutte le categorie» first («Tutte» on a phone, by `useIsDesktop`), the categories of the section's dossiers, absent when
+  there are none — on one row on a computer, half and half under the search on
+  a phone), `DossierDetailView.tsx` (sections and header), `DossierActBlock.tsx`
   (an act and its rows), `DossierArticleRow.tsx` (row + star + expand),
   `DossierNotesSection.tsx`, `DossierItemReader.tsx` (in-place article),
   `AddToDossierPopover.tsx`, one file per modal, shared helpers in

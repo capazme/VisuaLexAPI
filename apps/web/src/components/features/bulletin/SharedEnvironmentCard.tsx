@@ -4,6 +4,7 @@ import type { SharedEnvironment, EnvironmentCategory } from '../../../types';
 import { formatDistanceToNow } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { FORUM_CATEGORIES } from '../../../utils/forumCategories';
+import { tagLabel } from '../../../utils/tagLabel';
 
 interface SharedEnvironmentCardProps {
   environment: SharedEnvironment;
@@ -284,7 +285,7 @@ export function SharedEnvironmentCard({
                 key={idx}
                 className="px-2 py-0.5 text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 rounded-full"
               >
-                {tag}
+                {tagLabel(tag)}
               </span>
             ))}
             {environment.tags.length > 3 && (
