@@ -60,7 +60,7 @@ export const WELCOME_STEPS: DriveStep[] = [
         element: '#tour-sidebar',
         popover: {
             title: 'Navigazione Principale',
-            description: 'In ogni sezione trovi in cima la Ricerca e l\'analisi di un documento; sotto, gli strumenti della sezione, come i Dossier in Opus o il Ripasso in Gymnasium. La Cronologia è nel menu del tuo profilo, in basso.',
+            description: 'In ogni sezione trovi in cima la Ricerca e l\'analisi di un documento; sotto, gli strumenti della sezione, come i Dossier in Opus o Oggi e Le mie schede in Gymnasium. La Cronologia è nel menu del tuo profilo, in basso.',
             side: 'right',
             align: 'center',
         }
