@@ -411,6 +411,15 @@ describe('ReviewHome', () => {
       expect(screen.queryByRole('dialog')).toBeNull();
     });
 
+    it('says «Oggi» once over the action: no label above the sentence that starts with it', async () => {
+      progress.mockResolvedValue(answer(12, 8));
+      renderHome();
+      const card = await screen.findByRole('region', { name: 'Da fare oggi' });
+      expect(within(card).getByText('Oggi: 12 da ripassare, 8 nuove')).toBeInTheDocument();
+      expect(within(card).queryByRole('heading')).toBeNull();
+      expect(within(card).queryByText(/^oggi$/i)).toBeNull();
+    });
+
     it('draws the strip: the streak and the goal, small', async () => {
       progress.mockResolvedValue(answer(3, 0));
       renderHome();
