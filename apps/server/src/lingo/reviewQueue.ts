@@ -15,7 +15,7 @@ export const REVIEWABLE_OWN_STATES: LingoCardStato[] = ['BOZZA_PERSONALE', 'PROP
 /**
  * The cards a user may review (spec decision 8): their own that are drafts,
  * proposed or validated, and the community's validated ones in the subjects
- * they switched on, optionally narrowed to one subject. Never «da rivedere»
+ * they switched on, optionally narrowed to one subject and, within it, to one institute. Never «da rivedere»
  * or archived.
  *
  * The community branch does not say `autoreId != me`: in SQL that drops a card
@@ -23,14 +23,16 @@ export const REVIEWABLE_OWN_STATES: LingoCardStato[] = ['BOZZA_PERSONALE', 'PROP
  * A card of one's own that is validated is matched by the first branch already.
  * With no subjects on, `in: []` matches nothing.
  */
-export function reviewScope(userId: string, materieComunita: LingoMateria[], materia?: LingoMateria): Prisma.LingoCardWhereInput {
+export function reviewScope(userId: string, materieComunita: LingoMateria[], materia?: LingoMateria, istituto?: string): Prisma.LingoCardWhereInput {
   const scope: Prisma.LingoCardWhereInput = {
     OR: [
       { autoreId: userId, stato: { in: REVIEWABLE_OWN_STATES } },
       { stato: 'VALIDATA', materia: { in: materieComunita } },
     ],
   };
-  return materia ? { AND: [scope, { materia }] } : scope;
+  if (!materia) return scope;
+  // An institute only exists within a subject, and is matched exactly as `/percorso` returns it.
+  return { AND: [scope, { materia }, ...(istituto === undefined ? [] : [{ istituto }])] };
 }
 
 /** The days to the next review that each grade would give: what the four buttons show. `state` is null for a new card. */
