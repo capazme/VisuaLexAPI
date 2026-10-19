@@ -29,11 +29,13 @@ from typing import Any, Mapping, Optional
 # How Brocardi content is recognised (inventory of 19 October 2026). Every
 # writer that stored it left one of these marks.
 BROCARDI_FONTI: frozenset[str] = frozenset({"brocardi.it", "brocardi", "brocardi_massime"})
+# Not `dottrina:`: the enrichment writer gives its Brocardi `dottrina:` nodes
+# `fonte="brocardi"`, and a community entity written before it carried a
+# `fonte` shares the prefix.
 BROCARDI_ID_PREFIXES: tuple[str, ...] = (
     "massima_",
     "dottrina_brocardi_",
     "dottrina_relazione_",
-    "dottrina:",
 )
 # The mcp-legal-it tools that read Brocardi whatever their arguments: the first
 # three in vendor/mcp-legal-it, `mappa_orientamento` (its «Ancoraggio Brocardi»
@@ -94,8 +96,7 @@ def _marked(m: Mapping[str, Any]) -> bool:
         if BROCARDI_HOST in _lower(m.get(key)):
             return True
     if fonte:
-        # Another source named itself: a community `dottrina:<slug>` entity
-        # shares the seed's id prefix, and is not Brocardi.
+        # Another source named itself.
         return False
     for key in _ID_KEYS:
         if _lower(m.get(key)).startswith(BROCARDI_ID_PREFIXES):
@@ -179,7 +180,14 @@ def _strip(m: Mapping[str, Any], bridge: str) -> dict:
 
 def redact_tool_result(result: Any) -> Any:
     """The same `ToolResult` with Brocardi text taken out of its data and its
-    metadata. A result with nothing to redact is returned as it is."""
+    metadata. A result with nothing to redact is returned as it is. A Brocardi
+    tool's answer is plain markdown: it is dropped whole (no expert is granted
+    one; this holds if one ever is)."""
+    if _lower(result.tool_name) in BROCARDI_TOOLS and isinstance(result.data, str):
+        return type(result)(
+            success=result.success, data="", error=result.error,
+            metadata=redact(result.metadata), tool_name=result.tool_name,
+        )
     data = redact(result.data)
     metadata = redact(result.metadata)
     if data == result.data and metadata == result.metadata:

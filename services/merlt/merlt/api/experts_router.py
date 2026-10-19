@@ -683,10 +683,9 @@ async def build_and_persist_query_response(
                 served_keys.add(key)
     if served_keys:
         full_trace_data["coevo_served_keys"] = sorted(served_keys)
-    if full_trace_data:
-        # Everything in it passed the Brocardi guard at the tools (D-078).
-        mark_trace_guarded(full_trace_data)
-    full_trace_data = full_trace_data or None
+    # Everything in it passed the Brocardi guard at the tools (D-078). Marked
+    # even when empty, or /history would read the turn as one from before.
+    full_trace_data = mark_trace_guarded(full_trace_data)
 
     # Extract routing metadata for new fields
     routing_method = None

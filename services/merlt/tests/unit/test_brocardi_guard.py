@@ -81,6 +81,8 @@ def test_brocardi_content_is_recognised(item):
     {"article_urn": "live:abc", "source_type": "massima", "text": "Una massima di Italgiure."},
     {"article_urn": CC, "source_type": "rassegna", "text": MASSIMARIO},
     {"node_id": "dottrina:una_tesi", "fonte": "community", "descrizione": "Una tesi della comunità."},
+    # a community entity written before entities carried a `fonte`
+    {"node_id": "dottrina:una_tesi", "community_validated": True, "descrizione": "Una tesi della comunità."},
     {"source_type": "massima", "text": "Senza article_urn: non si presume Brocardi."},
 ])
 def test_other_content_is_not(item):
@@ -135,6 +137,17 @@ async def test_every_tool_result_is_redacted_before_it_is_returned_or_traced():
     assert OUR_TEXT in _dump(result.data)
     assert SECRET not in _dump(tool._tool_call_traces)
     assert data["results"][0]["text"] == SECRET  # a cached result stays as it was
+
+
+class _MarkdownTool(_FixedTool):
+    name = "mappa_orientamento"
+
+
+async def test_a_brocardi_tools_markdown_answer_is_dropped_whole():
+    tool = _MarkdownTool("**Ancoraggio Brocardi**\n" + SECRET)
+    result = await tool()
+    assert result.data == ""
+    assert SECRET not in _dump(tool._tool_call_traces)
 
 
 class _Retriever:
@@ -367,6 +380,18 @@ async def test_history_and_trace_routes_serve_no_brocardi_text():
     trace = await experts_router.get_trace("trace_x", caller_consent=None, session=_Session([turn]), api_key=None)
     assert SECRET[:40] not in _dump(trace) and TRACE_GUARD_KEY not in trace
     assert turn.full_trace["stages"]["expert_executions"][0]["tool_calls"][1]["result_summary"] == SECRET
+
+
+async def test_a_new_turn_without_a_pipeline_trace_keeps_its_excerpts():
+    import importlib
+
+    experts_router = importlib.import_module("merlt.api.experts_router")
+    turn = _stored_turn()
+    turn.sources = [{"article_urn": "live:abc", "expert": "precedent", "relevance": 0.9,
+                     "excerpt": "Una massima di Italgiure."}]
+    turn.full_trace = {TRACE_GUARD_KEY: 1}
+    history = await experts_router.list_history(user_id="u-1", limit=20, session=_Session([turn]), api_key=None)
+    assert history[0].sources[0].excerpt == "Una massima di Italgiure."
 
 
 def test_the_dashboard_lists_no_brocardi_source():
