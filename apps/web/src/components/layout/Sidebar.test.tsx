@@ -103,7 +103,7 @@ describe('Sidebar — accessible names', () => {
   it('folds the notification count into the link name', () => {
     renderSidebar('/forum');
     // A badge announced on its own says "3" without saying 3 of what.
-    expect(screen.getByRole('link', { name: /Forum, 3 notifiche/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Dossier pubblici, 3 notifiche/ })).toBeInTheDocument();
   });
 
   it('has the section switcher and the user menu as its only buttons, with no system buttons beside them', () => {
@@ -186,9 +186,21 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     expect(screen.getByRole('group', { name: 'Gymnasium' })).toBeInTheDocument();
   });
 
-  it('Forum: the Forum, with its count', () => {
+  it('Forum: «Dossier pubblici» with its count, and «Community»; «Forum» is the group, written once', () => {
     renderSidebar('/forum');
-    expect(hrefs()).toEqual(['/', '/documents', '/forum']);
+    expect(hrefs()).toEqual(['/', '/documents', '/forum', '/forum/community']);
+    const forum = screen.getByRole('group', { name: 'Forum' });
+    expect(within(forum).getAllByRole('link').map((a) => a.getAttribute('aria-label'))).toEqual(['Dossier pubblici, 3 notifiche', 'Community']);
+    expect(screen.queryByRole('link', { name: /^Forum/ })).toBeNull();
+    expect(screen.getByRole('link', { name: /^Dossier pubblici/ })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Community' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('marks only «Community» on its page: «Dossier pubblici» is active on its own address, not under it', () => {
+    renderSidebar('/forum/community');
+    expect(screen.getByRole('group', { name: 'Forum' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Community' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: /^Dossier pubblici/ })).not.toHaveAttribute('aria-current');
   });
 
   it('Academia: «Assistente» and «Grafo», with the development mode only (S12)', () => {
@@ -230,7 +242,7 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     fireEvent.click(screen.getByRole('menuitemradio', { name: /Forum/ }));
     expect(screen.getByTestId('where')).toHaveTextContent('/forum');
     expect(handlers.closeMobile).toHaveBeenCalled();
-    expect(hrefs()).toEqual(['/', '/documents', '/forum']);
+    expect(hrefs()).toEqual(['/', '/documents', '/forum', '/forum/community']);
   });
 });
 
@@ -512,8 +524,9 @@ describe('Sidebar — the words', () => {
     }
     expect(document.getElementById('tour-nav-search')).toBe(screen.getByRole('link', { name: 'Ricerca' }));
     // The count rides the name and sits at the end of the row.
-    const forum = screen.getByRole('link', { name: 'Forum, 3 notifiche' });
-    expect(forum).toHaveTextContent(/^Forum3$/);
+    const forum = screen.getByRole('link', { name: 'Dossier pubblici, 3 notifiche' });
+    expect(forum).toHaveTextContent(/^Dossier pubblici3$/);
+    expect(screen.getByRole('link', { name: 'Community' })).toHaveTextContent(/^Community$/);
     // The section is named beside its mark; the button keeps its name.
     expect(screen.getByRole('button', { name: /^Sezione: Forum/ })).toHaveTextContent('Forum');
     // The username is shown, so the name carries it (label in name).
@@ -532,6 +545,23 @@ describe('Sidebar — the words', () => {
     renderLayout('rail', '/studia/ripasso');
     expect(screen.queryByText('Studia')).toBeNull();
     expect(screen.getByRole('link', { name: 'Oggi' }).textContent).toBe('');
+  });
+
+  it('labels the Forum\'s two areas in the rail, on hover and on keyboard focus', () => {
+    renderLayout('rail', '/forum');
+    const shared = screen.getByRole('link', { name: 'Dossier pubblici, 3 notifiche' });
+    expect(shared.textContent).toBe('3');
+    pointerOver(shared, MOUSE);
+    expect(label()).toHaveTextContent('Dossier pubblici');
+    cleanup();
+    renderLayout('rail', '/forum');
+    const realMatches = Element.prototype.matches;
+    const matches = vi.spyOn(Element.prototype, 'matches').mockImplementation(function (this: Element, selector: string) {
+      return selector === ':focus-visible' ? true : realMatches.call(this, selector);
+    });
+    fireEvent.focus(screen.getByRole('link', { name: 'Community' }));
+    expect(label()).toHaveTextContent('Community');
+    matches.mockRestore();
   });
 
   it('draws its 11 px texts, the headings and the shortcut, in the colour that keeps AA (theme.test.ts)', () => {

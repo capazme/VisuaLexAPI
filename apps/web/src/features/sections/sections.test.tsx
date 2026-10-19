@@ -25,6 +25,7 @@ describe('sectionForPath (spec S1)', () => {
     ['/studia', 'gymnasium'],
     ['/studia/ripasso/sessione', 'gymnasium'],
     ['/forum', 'forum'],
+    ['/forum/community', 'forum'],
     ['/merlt', 'academia'],
     ['/merlt/valida', 'academia'],
     ['/grafo', 'academia'],

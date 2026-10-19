@@ -43,7 +43,7 @@ describe('SectionSwitcher (spec S3)', () => {
     expect(items.map((i) => i.textContent)).toEqual([
       'VisuaLex OpusDossier di lavoro e strumenti per la professione',
       'VisuaLex GymnasiumSchede, ripasso, esami e concorsi',
-      'VisuaLex ForumGlosse e dossier condivisi',
+      'VisuaLex ForumDossier pubblici e community',
     ]);
     expect(items[0]).toHaveAttribute('aria-checked', 'true');
     expect(items[1]).toHaveAttribute('aria-checked', 'false');
