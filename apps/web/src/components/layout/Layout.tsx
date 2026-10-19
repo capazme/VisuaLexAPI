@@ -22,7 +22,9 @@ const CompareView = lazy(() => import('../features/compare/CompareView').then(m 
 import { useTour } from '../../hooks/useTour';
 import { useConsentIfProvided } from '../../features/merlt/consent/useConsent';
 import { useAuth } from '../../hooks/useAuth';
-import { ServiceHealthBanner } from '../ui/ServiceHealthBanner';
+import { useServiceHealth } from '../../hooks/useServiceHealth';
+import { ServiceHealthDot } from '../ui/ServiceHealthMenuEntry';
+import { serviceHealthLabel, serviceHealthNeedsNotice } from '../../utils/serviceHealth';
 import { PluginSlot } from '../../plugins/PluginSlot';
 import { spring } from '../../lib/motion';
 
@@ -42,15 +44,15 @@ export function Layout() {
   // From `xl` the desktop column shows its words unless the user narrowed it (remembered in the browser).
   const desktopSidebar = useDesktopSidebar();
   const reduceMotion = useReducedMotion();
-  // The desktop column's width as it is drawn (0 when hidden or in Focus mode): what floats at the
-  // bottom left from `lg` (the services pill) starts after it, never under it.
+  // The desktop column's width as it is drawn (0 when hidden or in Focus mode), set as `--sidebar-width` for
+  // what would float beside it from `lg`; nothing does since the services pill went into the user menu (S1).
   const desktopSidebarWidth = sidebarVisible && !settings.focusMode ? desktopSidebar.width : 0;
   const navigate = useNavigate();
   // The find window searches the workspace, which is drawn only on the search page (spec §13.1).
   const { pathname } = useLocation();
   const onSearchPage = pathname === '/';
   // The review's grade bar and the validators' vote bar are pinned to the bottom edge on a phone,
-  // where the feedback button and the services pill would cover them.
+  // where the feedback button would cover them.
   const inReviewSession = pathname.startsWith('/studia/ripasso/sessione');
   const onValidationQueue = pathname === '/studia/valida' || pathname.startsWith('/studia/valida/');
   const barPinnedAtBottom = inReviewSession || onValidationQueue;
@@ -60,6 +62,11 @@ export function Layout() {
   // Below lg the menu button floats at the top left over the content: every page starts under it,
   // except the search page, whose field sits beside it.
   const headerBesideMenuButton = onSearchPage;
+  // The services' probe, once for both copies of the sidebar and running with the menu closed (S1): its
+  // status is the user menu's «Stato dei servizi», and a fault is a dot on the user button and, on a
+  // phone, on the button that opens the drawer, whose names say it.
+  const serviceHealth = useServiceHealth();
+  const servicesNotice = serviceHealthNeedsNotice(serviceHealth.snapshot.overall);
 
   // Leaving the search page closes the window: its matches are in practices no longer on screen.
   useEffect(() => {
@@ -198,6 +205,7 @@ export function Layout() {
             closeMobile={() => { }}
             openSettings={() => setSettingsOpen(true)}
             openKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
+            serviceHealth={serviceHealth}
           />
         )}
       </motion.div>
@@ -213,6 +221,7 @@ export function Layout() {
             closeMobile={() => setSidebarOpen(false)}
             openSettings={() => setSettingsOpen(true)}
             openKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
+            serviceHealth={serviceHealth}
           />
         </div>
       )}
@@ -247,7 +256,7 @@ export function Layout() {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            aria-label={sidebarOpen ? 'Chiudi il menu' : 'Apri il menu'}
+            aria-label={`${sidebarOpen ? 'Chiudi il menu' : 'Apri il menu'}${servicesNotice ? `, ${serviceHealthLabel(serviceHealth.snapshot.overall).toLowerCase()}` : ''}`}
             aria-expanded={sidebarOpen}
             className="lg:hidden fixed top-4 left-4 z-50 p-2.5 rounded-xl backdrop-blur-xl shadow-lg bg-white/80 dark:bg-slate-900/80 text-slate-600 dark:text-slate-300 border border-slate-200/50 dark:border-slate-700/50"
           >
@@ -256,6 +265,7 @@ export function Layout() {
               <line x1="3" y1="6" x2="21" y2="6" />
               <line x1="3" y1="18" x2="21" y2="18" />
             </svg>
+            {servicesNotice && <ServiceHealthDot className="absolute right-1.5 top-1.5" />}
           </motion.button>
         )}
 
@@ -307,8 +317,6 @@ export function Layout() {
 
       {/* Global sync error toast (highlights / annotations save/load) */}
       <SyncErrorToast />
-
-      <ServiceHealthBanner className={barPinnedAtBottom ? 'max-md:hidden' : undefined} />
 
       {/* The palette (⌘K) and the managers it opens, on every page */}
       <GlobalSearch />
