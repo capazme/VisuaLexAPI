@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
 vi.mock('../../../services/studiaService', () => ({
-  studiaService: { session: vi.fn(), review: vi.fn(), progress: vi.fn() },
+  studiaService: { session: vi.fn(), review: vi.fn(), progress: vi.fn(), percorso: vi.fn() },
 }));
 
 // The reader is tested with the dossier; here it is a stand-in that shows which article it was given.
@@ -28,6 +28,7 @@ import { ReviewSession } from './ReviewSession';
 const session = vi.mocked(studiaService.session);
 const review = vi.mocked(studiaService.review);
 const progress = vi.mocked(studiaService.progress);
+const percorso = vi.mocked(studiaService.percorso);
 
 const CELEBRATED_KEY = 'visualex.studia.festeggiato';
 
@@ -87,6 +88,8 @@ beforeEach(() => {
   review.mockResolvedValue({ registrata: true, prossimoRipasso: '2026-10-12', scheduledDays: 1 });
   progress.mockReset();
   progress.mockResolvedValue(progressAnswer(3, false, 2));
+  percorso.mockReset();
+  percorso.mockResolvedValue([]);
   localStorage.removeItem(CELEBRATED_KEY);
   appStore.setState({ searchTrigger: null });
 });
@@ -98,6 +101,19 @@ describe('the review session', () => {
     renderSession([card('a')], '/studia/ripasso/sessione?materia=DIRITTO_PENALE');
     await screen.findByText('Domanda a?');
     expect(session).toHaveBeenCalledWith('DIRITTO_PENALE');
+  });
+
+  it('asks for the session of one institute of the subject, spelt as the road gave it (G5)', async () => {
+    const istituto = 'Risoluzione per inadempimento (art. 1453 c.c.) & 50% «diffida»';
+    renderSession([card('a')], `/studia/ripasso/sessione?${new URLSearchParams({ materia: 'DIRITTO_CIVILE', istituto })}`);
+    await screen.findByText('Domanda a?');
+    expect(session).toHaveBeenCalledWith('DIRITTO_CIVILE', istituto);
+  });
+
+  it('ignores an institute without its subject, which the server would refuse', async () => {
+    renderSession([card('a')], '/studia/ripasso/sessione?istituto=Mora');
+    await screen.findByText('Domanda a?');
+    expect(session).toHaveBeenCalledWith(undefined);
   });
 
   it('ignores a subject it does not know', async () => {
@@ -799,6 +815,33 @@ describe('the lesson (Gymnasium spec §5.4)', () => {
       // A new lesson: its bar starts again.
       expect(bar()).toHaveAttribute('aria-valuenow', '0');
       expect(bar()).toHaveAttribute('aria-valuemax', '1');
+    });
+
+    it('counts what is left in the institute of a session narrowed to one, not in its whole subject (G5)', async () => {
+      const path = `/studia/ripasso/sessione?${new URLSearchParams({ materia: 'DIRITTO_CIVILE', istituto: 'Mora' })}`;
+      // The subject still has cards, in another institute; «Mora» has none.
+      progress.mockResolvedValue({ ...progressAnswer(3, false, 2), oggi: { ...progressAnswer(3, false, 2).oggi, dovute: 6, nuove: 2 } });
+      percorso.mockResolvedValue([
+        { materia: 'DIRITTO_CIVILE', istituto: 'Mora', nuove: 0, apprendimento: 1, consolidate: 0, dovute: 0 },
+        { materia: 'DIRITTO_CIVILE', istituto: 'Risoluzione per inadempimento', nuove: 2, apprendimento: 6, consolidate: 0, dovute: 6 },
+      ]);
+      renderSession([card('a')], path);
+      await show();
+      await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
+      await screen.findByRole('img', { name: /Obiettivo di oggi/ });
+      await waitFor(() => expect(percorso).toHaveBeenCalled());
+      expect(screen.queryByRole('button', { name: 'Continua' })).not.toBeInTheDocument();
+    });
+
+    it('offers «Continua» when the institute itself still has cards due, and reads its session again', async () => {
+      const path = `/studia/ripasso/sessione?${new URLSearchParams({ materia: 'DIRITTO_CIVILE', istituto: 'Mora' })}`;
+      percorso.mockResolvedValue([{ materia: 'DIRITTO_CIVILE', istituto: 'Mora', nuove: 0, apprendimento: 3, consolidate: 0, dovute: 3 }]);
+      renderSession([card('a')], path);
+      await show();
+      await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
+      await userEvent.setup().click(await screen.findByRole('button', { name: 'Continua' }));
+      await waitFor(() => expect(session).toHaveBeenCalledTimes(2));
+      expect(session).toHaveBeenLastCalledWith('DIRITTO_CIVILE', 'Mora');
     });
 
     it('counts what is left in the subject of a narrowed session', async () => {

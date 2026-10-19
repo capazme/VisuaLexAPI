@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Progressi } from '../../../../types/studia';
-import { cardsLeft, nextDueDay, orderStops, stopStates, todayState } from './today';
+import type { Progressi, TappaIstituto } from '../../../../types/studia';
+import { cardsLeft, dueBySubject, dueLabel, instituteCardsLeft, instituteSessionPath, nextDueDay, orderInstitutes, orderStops, stopStates, todayState } from './today';
 
 type Stop = Progressi['materie'][number];
 const stop = (materia: Stop['materia'], nuove: number, apprendimento: number, consolidate = 0): Stop => ({ materia, nuove, apprendimento, consolidate, ripassi30: 0 });
@@ -27,6 +27,50 @@ describe('the road\'s order (Gymnasium spec §5.2, as corrected)', () => {
   it('says the three states in words, singular and plural', () => {
     expect(stopStates(stop('DIRITTO_CIVILE', 1, 5, 1))).toBe('1 nuova · 5 in apprendimento · 1 consolidata');
     expect(stopStates(stop('DIRITTO_CIVILE', 300, 0, 412))).toBe('300 nuove · 0 in apprendimento · 412 consolidate');
+  });
+});
+
+const tappa = (materia: TappaIstituto['materia'], istituto: string, dovute: number, over: Partial<TappaIstituto> = {}): TappaIstituto => ({
+  materia, istituto, nuove: 0, apprendimento: dovute, consolidate: 0, dovute, ...over,
+});
+
+describe('the institutes of a subject (Gymnasium spec §5.2, G5)', () => {
+  it('keeps the subject asked, the most cards due first, then by name as an Italian reader sorts it', () => {
+    const order = orderInstitutes([
+      tappa('DIRITTO_CIVILE', 'Usucapione', 0),
+      tappa('DIRITTO_PENALE', 'Furto', 9),
+      tappa('DIRITTO_CIVILE', 'Risoluzione per inadempimento', 4),
+      tappa('DIRITTO_CIVILE', 'éviction', 0),
+      tappa('DIRITTO_CIVILE', 'Mora del debitore', 4),
+      tappa('DIRITTO_CIVILE', 'Azione revocatoria', 0),
+    ], 'DIRITTO_CIVILE').map((stop) => stop.istituto);
+    expect(order).toEqual(['Mora del debitore', 'Risoluzione per inadempimento', 'Azione revocatoria', 'éviction', 'Usucapione']);
+  });
+
+  it('leaves the read as it came', () => {
+    const stops = [tappa('DIRITTO_CIVILE', 'B', 0), tappa('DIRITTO_CIVILE', 'A', 3)];
+    orderInstitutes(stops, 'DIRITTO_CIVILE');
+    expect(stops.map((stop) => stop.istituto)).toEqual(['B', 'A']);
+  });
+
+  it('sums the cards due by subject, with the subjects that have none left out', () => {
+    const due = dueBySubject([tappa('DIRITTO_CIVILE', 'A', 3), tappa('DIRITTO_CIVILE', 'B', 0), tappa('DIRITTO_PENALE', 'C', 2), tappa('DIRITTO_CIVILE', 'D', 4)]);
+    expect(Object.fromEntries(due)).toEqual({ DIRITTO_CIVILE: 7, DIRITTO_PENALE: 2 });
+  });
+
+  it('says the cards due in words', () => {
+    expect(dueLabel(0)).toBe('Niente da ripassare');
+    expect(dueLabel(1)).toBe('1 da ripassare');
+    expect(dueLabel(412)).toBe('412 da ripassare');
+  });
+
+  it('carries the institute to the session verbatim, whatever it holds', () => {
+    const istituto = 'Contratto a favore del terzo (artt. 1411-1413) & 100% «patto»';
+    const path = instituteSessionPath('DIRITTO_CIVILE', istituto);
+    expect(path.startsWith('/studia/ripasso/sessione?')).toBe(true);
+    const params = new URLSearchParams(path.split('?')[1]);
+    expect(params.get('materia')).toBe('DIRITTO_CIVILE');
+    expect(params.get('istituto')).toBe(istituto);
   });
 });
 
@@ -75,5 +119,22 @@ describe('the cards left at the lesson\'s end (Gymnasium spec §5.4)', () => {
     expect(cardsLeft(answer())).toBe(0);
     expect(cardsLeft(answer({ dovute: 4, nuove: 2 }))).toBe(6);
     expect(cardsLeft(answer({ ripassi: 30 }, [12, 8]))).toBe(0);
+  });
+});
+
+describe('the cards left in one institute at the lesson\'s end (G5)', () => {
+  const tappa = (istituto: string, dovute: number, nuove: number): TappaIstituto => ({ materia: 'DIRITTO_CIVILE', istituto, nuove, apprendimento: dovute, consolidate: 0, dovute });
+
+  it('counts the institute\'s due cards and its new ones up to what today still allows in the subject', () => {
+    const stops = [tappa('Mora', 2, 7), tappa('Risoluzione', 9, 9)];
+    expect(instituteCardsLeft(stops, 'DIRITTO_CIVILE', 'Mora', answer({ nuove: 3 }))).toBe(5);
+    expect(instituteCardsLeft(stops, 'DIRITTO_CIVILE', 'Mora', answer({ nuove: 0 }))).toBe(2);
+  });
+
+  it('never counts the subject\'s other institutes, another subject\'s, or an institute the read does not list', () => {
+    const stops = [tappa('Mora', 0, 0), tappa('Risoluzione', 9, 9)];
+    expect(instituteCardsLeft(stops, 'DIRITTO_CIVILE', 'Mora', answer({ dovute: 9, nuove: 5 }))).toBe(0);
+    expect(instituteCardsLeft(stops, 'DIRITTO_PENALE', 'Risoluzione', answer({ nuove: 5 }))).toBe(0);
+    expect(instituteCardsLeft(stops, 'DIRITTO_CIVILE', 'Usucapione', answer({ nuove: 5 }))).toBe(0);
   });
 });

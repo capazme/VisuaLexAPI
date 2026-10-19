@@ -13,6 +13,7 @@ import { StudySettingsSheet } from './progress/StudySettings';
 import { SubjectChips } from './progress/SubjectChips';
 import { SubjectRoad, SubjectRoadSkeleton, SubjectRoadUnread } from './progress/SubjectRoad';
 import { useCelebratedToday } from './progress/useCelebratedToday';
+import { usePercorso } from './progress/usePercorso';
 import { useProgress } from './progress/useProgress';
 import { BLOCK_HEADING, subjectHue } from './progress/tokens';
 
@@ -43,7 +44,9 @@ function rememberMateria(materia: Materia | undefined): void {
  * «Inizia»), the statistics (streak, goal, the current week, the cards by state; «Il tuo mese» in a sheet), the full
  * list of missions, then «Cosa ripassi» (the subject chips) and the road. The missions and the statistics are the
  * whole day's (`useProgress(undefined)`); a subject chosen narrows the first mission's action, the session it starts
- * and «Il tuo mese», through a second read made only while one is chosen. The server decides what «today» is.
+ * and «Il tuo mese», through a second read made only while one is chosen. The road's institutes and the cards due by
+ * subject come from a third, `usePercorso` (G5), on which nothing above the road waits. The server decides what
+ * «today» is.
  */
 export function ReviewHome() {
   const navigate = useNavigate();
@@ -51,6 +54,7 @@ export function ReviewHome() {
   const [materia, setMateria] = useState<Materia | undefined>(rememberedMateria);
   const day = useProgress(undefined);
   const narrowed = useProgress(materia, materia !== undefined);
+  const percorso = usePercorso();
   const action = materia ? narrowed : day;
   const data = day.data;
   const [sheet, setSheet] = useState<'settings' | 'month' | null>(null);
@@ -70,6 +74,7 @@ export function ReviewHome() {
   const reload = () => {
     day.reload();
     narrowed.reload();
+    percorso.reload();
   };
   const start = () => navigate(materia ? `/studia/ripasso/sessione?materia=${materia}` : '/studia/ripasso/sessione');
   const loading = day.status === 'loading';
@@ -119,7 +124,13 @@ export function ReviewHome() {
       </section>
 
       <div className={cn('transition-opacity', loading && data !== null && 'opacity-60')} aria-busy={loading}>
-        {data ? <SubjectRoad materie={data.materie} selected={materia} /> : loading ? <SubjectRoadSkeleton /> : <SubjectRoadUnread />}
+        {data ? (
+          <SubjectRoad materie={data.materie} selected={materia} percorso={percorso} onRetryPercorso={percorso.reload} />
+        ) : loading ? (
+          <SubjectRoadSkeleton />
+        ) : (
+          <SubjectRoadUnread />
+        )}
       </div>
 
       {sheet === 'settings' && <StudySettingsSheet onClose={() => setSheet(null)} onChanged={reload} />}

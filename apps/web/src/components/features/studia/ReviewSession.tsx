@@ -5,7 +5,7 @@ import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { useAppStore } from '../../../store/useAppStore';
-import type { AncoraScheda, Materia } from '../../../types/studia';
+import type { AncoraScheda, Materia, Progressi } from '../../../types/studia';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { Toast } from '../../ui/Toast';
 import { DossierItemReader } from '../dossier/DossierItemReader';
@@ -17,7 +17,8 @@ import { Sheet } from '../../ui/Sheet';
 import { MATERIA_LABEL, anchorLabel, normaFromAnchor, searchParamsFromAnchor } from './studiaLabels';
 import { SessionCelebration } from './progress/Celebration';
 import { SessionEndProgress } from './progress/SessionEndProgress';
-import { cardsLeft } from './progress/today';
+import { cardsLeft, instituteCardsLeft } from './progress/today';
+import { usePercorso } from './progress/usePercorso';
 import { FOCUS_RING, INK_BG } from './progress/tokens';
 import { useCelebratedToday } from './progress/useCelebratedToday';
 import { useProgress } from './progress/useProgress';
@@ -111,6 +112,8 @@ function ArticlePanel({ anchor, desktop, onClose, onOpenInReader, showToast }: A
 interface SessionEndProps {
   summary: ReviewSummary;
   materia: Materia | undefined;
+  /** One institute of `materia` (G5): what is left is counted in it, not in the whole subject. */
+  istituto: string | undefined;
   onHome: () => void;
   onContinue: () => void;
 }
@@ -118,13 +121,47 @@ interface SessionEndProps {
 /**
  * The lesson's end (Gymnasium spec §5.4): the sentence, the ring and the streak as they now stand, and in the bar
  * «Torna a Oggi» and — when the read of the session's scope still counts cards for today — «Continua», a new
- * session of the same scope. Focus goes to the sentence, so a screen reader hears how it went.
+ * session of the same scope. The scope is the day, the subject, or one institute of it (G5), whose count comes from
+ * the road's read (`usePercorso`). Focus goes to the sentence, so a screen reader hears how it went.
  */
-function SessionEnd({ summary, materia, onHome, onContinue }: SessionEndProps) {
+function SessionEnd({ summary, materia, istituto, onHome, onContinue }: SessionEndProps) {
   const day = useProgress(undefined);
   const subject = useProgress(materia, materia !== undefined);
+  const dayData = day.status === 'ready' ? day.data : null;
+  if (materia !== undefined && istituto !== undefined) {
+    return <InstituteEnd summary={summary} materia={materia} istituto={istituto} subject={subject.status === 'ready' ? subject.data : null} day={dayData} onHome={onHome} onContinue={onContinue} />;
+  }
   const scope = materia === undefined ? day : subject;
   const more = scope.status === 'ready' && cardsLeft(scope.data) > 0;
+  return <EndScreen summary={summary} day={dayData} more={more} onHome={onHome} onContinue={onContinue} />;
+}
+
+interface InstituteEndProps {
+  summary: ReviewSummary;
+  materia: Materia;
+  istituto: string;
+  subject: Progressi | null;
+  day: Progressi | null;
+  onHome: () => void;
+  onContinue: () => void;
+}
+
+/** The end of a session narrowed to one institute: «Continua» from the institute's own count. */
+function InstituteEnd({ summary, materia, istituto, subject, day, onHome, onContinue }: InstituteEndProps) {
+  const percorso = usePercorso();
+  const more = percorso.status === 'ready' && subject !== null && instituteCardsLeft(percorso.data, materia, istituto, subject) > 0;
+  return <EndScreen summary={summary} day={day} more={more} onHome={onHome} onContinue={onContinue} />;
+}
+
+interface EndScreenProps {
+  summary: ReviewSummary;
+  day: Progressi | null;
+  more: boolean;
+  onHome: () => void;
+  onContinue: () => void;
+}
+
+function EndScreen({ summary, day, more, onHome, onContinue }: EndScreenProps) {
   const sentence = useRef<HTMLParagraphElement>(null);
   useEffect(() => {
     sentence.current?.focus({ preventScroll: true });
@@ -137,7 +174,7 @@ function SessionEnd({ summary, materia, onHome, onContinue }: SessionEndProps) {
           <p ref={sentence} tabIndex={-1} className="max-w-[60ch] font-serif text-2xl leading-snug text-slate-900 focus:outline-none md:text-3xl dark:text-slate-50">
             {endSentence(summary)}
           </p>
-          <SessionEndProgress data={day.status === 'ready' ? day.data : null} />
+          <SessionEndProgress data={day} />
         </div>
       </div>
       <LessonBar>
@@ -157,7 +194,7 @@ function SessionEnd({ summary, materia, onHome, onContinue }: SessionEndProps) {
 }
 
 /**
- * A review session (`/studia/ripasso/sessione?materia=`), drawn as the lesson (Gymnasium spec §5.4): at the top the
+ * A review session (`/studia/ripasso/sessione?materia=&istituto=`), drawn as the lesson (Gymnasium spec §5.4): at the top the
  * close button and the progress bar, in the middle the card, at the foot the bar with the one action available. The
  * queue lives in `useReviewSession`, so opening and closing an anchor's article leaves it as it was. While a card is
  * on screen, closing (the button or Esc) asks before leaving — what was graded is already recorded; with no card
@@ -172,6 +209,8 @@ export function ReviewSession() {
 
   const requested = params.get('materia');
   const materia = requested && Object.keys(MATERIA_LABEL).includes(requested) ? (requested as Materia) : undefined;
+  // An institute only within a subject (the server refuses one alone), passed back as the road spelt it.
+  const istituto = (materia && params.get('istituto')) || undefined;
 
   const [confirmStop, setConfirmStop] = useState(false);
   const [panel, setPanel] = useState<{ step: number; anchor: AncoraScheda } | null>(null);
@@ -188,7 +227,7 @@ export function ReviewSession() {
   }, [navigate]);
 
   const { current, revealed, reveal, grade, remaining, done, summary, practice, step, loading, loadError, saveError, skipped, saving, reload, goalMet } =
-    useReviewSession(materia, { paused: confirmStop, onEscape: handleEscape });
+    useReviewSession(materia, { istituto, paused: confirmStop, onEscape: handleEscape });
   const { note, noteKey, recordGrade } = useGradeNote({ step, current, revealed, practice, saving, skipped, paused: confirmStop });
   // The grade that made the day count plays the celebration, once a day for this browser (spec decision 10).
   const { celebratedBefore, markCelebrated } = useCelebratedToday();
@@ -263,7 +302,7 @@ export function ReviewSession() {
     middle = (
       <>
         {skipped && <div className={cn(COLUMN, 'px-4 pt-4')}>{skippedLine}</div>}
-        <SessionEnd summary={summary} materia={materia} onHome={() => navigate(HOME_PATH)} onContinue={() => void reload()} />
+        <SessionEnd summary={summary} materia={materia} istituto={istituto} onHome={() => navigate(HOME_PATH)} onContinue={() => void reload()} />
       </>
     );
   } else {

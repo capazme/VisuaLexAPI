@@ -180,6 +180,10 @@ institutes is imposed (that would be a decision about content, not about layout)
 - **Later, with the server read of G5:** «N da ripassare» per subject and per institute; inside a subject,
   one stop per **institute** («Risoluzione per inadempimento»), with the same bar and «N da ripassare»,
   sorted by the cards due first.
+  *Built on 19 October (G5):* the subjects keep their order (by cards open, then name) when the read by
+  institute answers, so the stops do not move under the reader's hand; a subject's institutes open in place
+  under it, from a disclosure «Istituti (N)», the first eight shown and the rest on request; a tap on an
+  institute starts the session narrowed to it (`GET /lingo/srs/sessione?materia=&istituto=`).
 
 The road is drawn as a vertical path of stops joined by a line in the section hue; on a computer it may
 sit beside the action card. Stops are buttons (`aria-pressed` where they filter), the state is also
