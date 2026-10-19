@@ -6,6 +6,7 @@ import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { hasNoNul } from '../lingo/noNul';
 import { readProgress } from '../lingo/progress';
+import { readPercorso } from '../lingo/percorso';
 import { previewIntervals, reviewScope } from '../lingo/reviewQueue';
 import { serialize } from '../lingo/serializeCard';
 import { computeStreak } from '../lingo/streak';
@@ -169,6 +170,15 @@ router.post('/revisioni', async (req, res) => {
 router.get('/progressi', async (req, res) => {
   const { materia } = sessionSchema.parse(req.query);
   res.json(await readProgress(req.user!.id, materia));
+});
+
+// The user's review scope counted by institute, for the road of a subject (Gymnasium restyle spec §6, G5).
+// Each stop: `nuove` never reviewed, `apprendimento` / `consolidate` reviewed with an interval under / at least
+// `CONSOLIDATED_DAYS`, `dovute` reviewed and due by the end of today in Rome (a subset of the last two).
+// Same scope as the session, `?materia=` optional. Definitions: `lingo/percorso.ts`.
+router.get('/percorso', async (req, res) => {
+  const { materia } = sessionSchema.parse(req.query);
+  res.json(await readPercorso(req.user!.id, materia));
 });
 
 router.get('/preferenze', async (req, res) => {
