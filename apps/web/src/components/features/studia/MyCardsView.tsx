@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
@@ -8,13 +8,15 @@ import { useAppStore } from '../../../store/useAppStore';
 import { invalidateArticleCards } from '../../../utils/articleCardsCache';
 import type { AncoraScheda, Scheda } from '../../../types/studia';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
-import { EmptyState } from '../../ui/EmptyState';
 import { Toast } from '../../ui/Toast';
 import { CardDetail, type CardDetailProps } from './CardDetail';
 import { CardFilters } from './CardFilters';
 import { CardGroups } from './CardGroups';
+import type { CardFormMode } from './CardForm';
 import { CardFormDialog } from './CardFormDialog';
+import { BLOCK_HEADING, FOCUS_RING, INK_BUTTON, INK_TEXT, MUTED_TEXT, QUIET_BUTTON, SECONDARY_BUTTON, TILE } from './progress/tokens';
 import { anchorActLabel, searchParamsFromAnchor } from './studiaLabels';
+import { useCardSources } from './useCardSources';
 import { NO_FILTERS, useMyCards, type ActOption, type CardQuery, type FilterState } from './useMyCards';
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -72,6 +74,40 @@ function useCardDetail(card: Scheda): { card: Scheda; failed: boolean; retry: ()
   return { card: shown, failed: needsDetail && failedFor === asked, retry };
 }
 
+/**
+ * The list with no card yet: how to begin. From here with «+ Nuova scheda» when the sources answer (the
+ * form checks every anchor against them); from an article, or through Claude, in any case.
+ */
+function NoCardsYet({ canWrite, onNew }: { canWrite: boolean; onNew: () => void }) {
+  const search = (
+    <Link to="/" className={cn('font-medium underline underline-offset-2', FOCUS_RING)}>
+      Ricerca
+    </Link>
+  );
+  return (
+    <div className={cn(TILE, 'grid justify-items-stretch gap-3 p-5 md:justify-items-start md:p-6')}>
+      <p className={cn('font-serif text-xl leading-snug md:text-2xl', INK_TEXT)}>Non hai ancora schede.</p>
+      {canWrite ? (
+        <>
+          <p className="max-w-prose text-sm text-slate-700 dark:text-slate-200">
+            Scrivi la prima da qui: indica l’articolo su cui poggia, ad esempio «art. 1455 c.c.», poi la domanda e la risposta.
+          </p>
+          <button type="button" aria-haspopup="dialog" onClick={onNew} className={cn(INK_BUTTON, 'w-full px-6 md:w-auto')}>
+            + Nuova scheda
+          </button>
+          <p className="max-w-prose text-sm text-slate-700 dark:text-slate-200">
+            Puoi anche aprire un articolo dalla {search} e scegliere «+ Nuova scheda» sotto il testo, o chiedere a Claude di scriverne.
+          </p>
+        </>
+      ) : (
+        <p className="max-w-prose text-sm text-slate-700 dark:text-slate-200">
+          Per cominciare, apri un articolo dalla {search} e scegli «+ Nuova scheda» sotto il testo, o chiedi a Claude di scriverne.
+        </p>
+      )}
+    </div>
+  );
+}
+
 /** The detail of a card, completed with what its own address carries (`useCardDetail`). */
 function DetailOf({ card, ...rest }: CardDetailProps) {
   const full = useCardDetail(card);
@@ -107,13 +143,15 @@ function withActsOf(
 /**
  * «Le mie schede»: the user's cards by subject and institute, behind a sticky filter row, with
  * the selected card beside the list (a phone shows one or the other). The selection is the route:
- * `/studia/schede/:id`.
+ * `/studia/schede/:id`. «+ Nuova scheda», in the heading and in the empty list, opens the form with no
+ * article — only while the sources answer (`useCardSources`).
  */
 export function MyCardsView() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const desktop = useIsDesktop();
   const triggerSearch = useAppStore((s) => s.triggerSearch);
+  const canWrite = useCardSources() === true;
 
   const [filterState, setFilterState] = useState<FilterState>(NO_FILTERS);
   const [search, setSearch] = useState('');
@@ -170,7 +208,8 @@ export function MyCardsView() {
   // undefined: still being read; null: it is not there.
   const selected = listed ?? (fetched && fetched.id === id ? fetched.card : undefined);
 
-  const [edit, setEdit] = useState<{ card: Scheda; open: boolean } | null>(null);
+  const [form, setForm] = useState<{ mode: CardFormMode; open: boolean } | null>(null);
+  const openNew = () => setForm({ mode: { kind: 'create' }, open: true });
   const [toDelete, setToDelete] = useState<Scheda | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
 
@@ -233,82 +272,91 @@ export function MyCardsView() {
   const showList = desktop || !id;
 
   return (
-    <section className="md:grid md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] md:items-start md:gap-6">
-      <h2 className="sr-only">Le mie schede</h2>
+    <section className="space-y-4 pb-8">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className={BLOCK_HEADING}>Le mie schede</h2>
+        {canWrite && (
+          <button type="button" aria-haspopup="dialog" onClick={openNew} className={SECONDARY_BUTTON}>
+            + Nuova scheda
+          </button>
+        )}
+      </header>
 
-      {showList && (
-        <div className="min-w-0">
-          <CardFilters value={filterState} onChange={setFilterState} search={search} onSearchChange={setSearch} acts={actOptions} />
-          <div className="pt-4">
-            {error && (
-              <div role="alert" className="mb-3 flex flex-wrap items-center gap-3 text-sm text-red-600 dark:text-red-400">
-                {error}
-                <button type="button" onClick={() => void refresh()} className="min-h-[44px] rounded px-2 font-medium underline md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
-                  Riprova
-                </button>
-              </div>
-            )}
-            {loading && cards.length === 0 && !error && <p className="text-sm text-slate-500 dark:text-slate-400">Carico le schede…</p>}
-            {!loading && !error && cards.length === 0 &&
-              (filtered ? (
-                <div className="space-y-2 py-8 text-center text-sm text-slate-600 dark:text-slate-300">
-                  <p>Nessuna scheda con questi filtri.</p>
-                  <button type="button" onClick={resetFilters} className="min-h-[44px] rounded px-2 font-medium text-primary-700 underline md:min-h-0 dark:text-primary-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
-                    Azzera i filtri
+      <div className="md:grid md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] md:items-start md:gap-6">
+        {showList && (
+          <div className="min-w-0">
+            <CardFilters value={filterState} onChange={setFilterState} search={search} onSearchChange={setSearch} acts={actOptions} />
+            <div className="pt-4">
+              {error && (
+                <div role="alert" className="mb-3 flex flex-wrap items-center gap-x-3 text-sm text-red-700 dark:text-red-400">
+                  {error}
+                  <button type="button" onClick={() => void refresh()} className={cn('min-h-[44px] rounded px-1 font-medium underline', FOCUS_RING)}>
+                    Riprova
                   </button>
                 </div>
-              ) : (
-                <EmptyState variant="generic" title="Nessuna scheda ancora. Aprine una da un articolo con “+ Nuova scheda”, o chiedi a Claude di scriverne." />
-              ))}
-            <CardGroups groups={groups} selectedId={id} folded={folded} onToggleFold={toggleFold} />
-            {hasMore && (
-              <button
-                type="button"
-                onClick={loadMore}
-                disabled={loading}
-                className="mt-4 min-h-[44px] w-full rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-60 md:min-h-0 md:py-1.5 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-              >
-                Mostra altre schede
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {id ? (
-        <div className={cn('min-w-0 pt-2 md:pt-3', desktop && 'sticky top-0 max-h-dvh overflow-y-auto pb-4')}>
-          {selected ? (
-            <DetailOf
-              // Its confirmations and pending request belong to this card: another one starts clean.
-              key={selected.id}
-              card={selected}
-              onBack={desktop ? undefined : () => navigate(LIST_PATH)}
-              onEdit={() => setEdit({ card: selected, open: true })}
-              onDelete={() => setToDelete(selected)}
-              onOpenAnchor={openAnchor}
-              onChanged={handleChanged}
-            />
-          ) : (
-            <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
-              <p>{selected === null ? 'Questa scheda non c’è più.' : 'Carico la scheda…'}</p>
-              {!desktop && (
-                <button type="button" onClick={() => navigate(LIST_PATH)} className="min-h-[44px] rounded px-2 font-medium text-primary-700 underline dark:text-primary-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
-                  Indietro
+              )}
+              {loading && cards.length === 0 && !error && <p className={cn('text-sm', MUTED_TEXT)}>Carico le schede…</p>}
+              {!loading && !error && cards.length === 0 &&
+                (filtered ? (
+                  <div className="grid justify-items-center gap-1 rounded-2xl border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200">
+                    <p>Nessuna scheda con questi filtri.</p>
+                    <button type="button" onClick={resetFilters} className={cn(QUIET_BUTTON, 'mx-0 justify-self-center underline')}>
+                      Azzera i filtri
+                    </button>
+                  </div>
+                ) : (
+                  <NoCardsYet canWrite={canWrite} onNew={openNew} />
+                ))}
+              <CardGroups groups={groups} selectedId={id} folded={folded} onToggleFold={toggleFold} />
+              {hasMore && (
+                <button type="button" onClick={loadMore} disabled={loading} className={cn(SECONDARY_BUTTON, 'mt-4 w-full disabled:opacity-60')}>
+                  Mostra altre schede
                 </button>
               )}
             </div>
-          )}
-        </div>
-      ) : (
-        desktop && cards.length > 0 && <p className="pt-4 text-sm text-slate-500 dark:text-slate-400">Scegli una scheda dall’elenco per leggerla.</p>
-      )}
+          </div>
+        )}
+
+        {id ? (
+          <div className={cn('min-w-0 pt-2 md:pt-0', desktop && 'sticky top-0 max-h-dvh overflow-y-auto pb-4')}>
+            {selected ? (
+              <DetailOf
+                // Its confirmations and pending request belong to this card: another one starts clean.
+                key={selected.id}
+                card={selected}
+                onBack={desktop ? undefined : () => navigate(LIST_PATH)}
+                onEdit={() => setForm({ mode: { kind: 'edit', card: selected }, open: true })}
+                onDelete={() => setToDelete(selected)}
+                onOpenAnchor={openAnchor}
+                onChanged={handleChanged}
+              />
+            ) : (
+              <div className="grid justify-items-start gap-2 text-sm text-slate-700 dark:text-slate-200">
+                <p>{selected === null ? 'Questa scheda non c’è più.' : 'Carico la scheda…'}</p>
+                {!desktop && (
+                  <button type="button" onClick={() => navigate(LIST_PATH)} className={QUIET_BUTTON}>
+                    Indietro
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          desktop &&
+          cards.length > 0 && (
+            <p className={cn('rounded-2xl border border-dashed border-slate-300 px-6 py-10 text-center text-sm dark:border-slate-700', MUTED_TEXT)}>
+              Scegli una scheda dall’elenco per leggerla.
+            </p>
+          )
+        )}
+      </div>
 
       {/* Kept mounted: its «Scheda salvata» toast outlives the dialog. */}
-      {edit && (
+      {form && (
         <CardFormDialog
-          open={edit.open}
-          mode={{ kind: 'edit', card: edit.card }}
-          onClose={() => setEdit((current) => current && { ...current, open: false })}
+          open={form.open}
+          mode={form.mode}
+          onClose={() => setForm((current) => current && { ...current, open: false })}
           onSaved={handleSaved}
         />
       )}
