@@ -49,6 +49,19 @@ describe('StudiaPage', () => {
     expect(screen.getByRole('button', { name: 'Impostazioni dello studio' })).toBeInTheDocument();
   });
 
+  it('centres «Oggi» as one column, the heading and its rule at the column\'s width; the other views keep theirs', () => {
+    const { container, unmount } = at('/studia/ripasso');
+    const page = container.firstElementChild as HTMLElement;
+    expect(page).toHaveClass('mx-auto', 'max-w-3xl');
+    expect(page).toContainElement(screen.getByRole('heading', { level: 1, name: 'VisuaLex Gymnasium' }));
+    unmount();
+    for (const path of ['/studia/schede', '/studia/ripasso/sessione']) {
+      const view = at(path);
+      expect(view.container.firstElementChild).toHaveClass('mx-auto', 'max-w-6xl');
+      view.unmount();
+    }
+  });
+
   it.each(['/studia/ripasso', '/studia/ripasso/sessione'])('leaves %s alone: «Oggi» draws its own strip, the session is a lesson', (path) => {
     at(path);
     expect(screen.queryByRole('button', { name: 'Impostazioni dello studio' })).toBeNull();

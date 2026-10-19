@@ -474,7 +474,8 @@ shared with `CardFormDialog`, marked `data-find-overlay`); the panel closes when
 `docs/superpowers/specs/2026-10-19-gymnasium-restyle-design.md` §5.1–5.2, over the progress spec
 `docs/superpowers/specs/2026-10-13-studia-progress-design.md`, direction D «Registro vivo»): one read,
 `useProgress` over `GET /lingo/srs/progressi` (the last answer stays on screen, dimmed, while a new one travels;
-an older answer never overwrites a newer one), drawn by `studia/progress/` in one column, top to bottom:
+an older answer never overwrites a newer one), drawn by `studia/progress/` in one column, top to bottom (768 px, centred at every width: on this page `StudiaPage`
+narrows to it too, so the area's heading and its rule are the column's width; the calendar scales to it):
 `StudyStrip` (`StreakBadge compact` — the «§», the count, «Il primo giorno comincia oggi» or «giorni di fila ·
 record N», no week of boxes — and `GoalRing compact`, 40 px with «5 di 10» beside it; at its end the gear,
 «Impostazioni dello studio», which opens `StudyPreferences open` — the same content, no disclosure — in a

@@ -1,4 +1,5 @@
 import { Outlet, useLocation } from 'react-router-dom';
+import { cn } from '../../../lib/utils';
 import { useAuth } from '../../../hooks/useAuth';
 import { StudyStrip } from './progress/StudyStrip';
 import { useProgress } from './progress/useProgress';
@@ -10,6 +11,9 @@ export interface StudiaOutletContext {
 
 /** The views that show the smaller strip over them: «Oggi» draws its own, the session is a lesson of its own (G2). */
 const underStrip = (pathname: string) => /^\/studia\/(schede|valida)(\/|$)/.test(pathname);
+
+/** «Oggi» is one column (Gymnasium spec §5.1): on its page the heading and its rule take the column's width, centred. */
+const isHome = (pathname: string) => /^\/studia\/ripasso\/?$/.test(pathname);
 
 /** The streak and the goal over «Le mie schede» and «Da validare» (Gymnasium spec §5.1): the reward stays in sight. */
 function AreaStrip() {
@@ -27,7 +31,7 @@ export function StudiaPage() {
   const { isValidator, loading } = useAuth();
   const { pathname } = useLocation();
   return (
-    <div className="mx-auto flex h-full w-full max-w-6xl flex-col gap-4">
+    <div className={cn('mx-auto flex h-full w-full flex-col gap-4', isHome(pathname) ? 'max-w-3xl' : 'max-w-6xl')}>
       <header className="border-b border-slate-200 pb-3 dark:border-slate-800">
         <h1 className="font-serif text-3xl font-medium tracking-tight text-slate-900 dark:text-slate-50">VisuaLex Gymnasium</h1>
       </header>

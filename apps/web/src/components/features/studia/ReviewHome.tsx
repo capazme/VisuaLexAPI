@@ -64,12 +64,12 @@ export function ReviewHome() {
   const loading = progress.status === 'loading';
 
   return (
-    // One column, at a reading measure; the progress at the bottom takes the width its calendar wants.
-    <section className="max-w-5xl space-y-6 pb-8">
+    // One column at a reading measure, centred with the area's heading (`StudiaPage`); the calendar scales to it.
+    <section className="space-y-6 pb-8">
       <h2 className="sr-only">Oggi</h2>
       {/* The confetti start from the ring and fall over the strip and the action, never over the rest. */}
       {/* A grid, not `space-y`: the burst mounted after the card would give it a margin and move the page. */}
-      <div className="relative grid max-w-3xl gap-4">
+      <div className="relative grid gap-4">
         <StudyStrip data={data} loading={loading && data === null} onSettingsChanged={progress.reload} ringRef={ringRef} celebrate={celebrate} />
         <TodayCard data={data} failed={progress.status === 'error'} onRetry={progress.reload} subject={materia && MATERIA_LABEL[materia]} onAllSubjects={() => choose(undefined)} onStart={start} celebrate={celebrate} />
         {celebrate && data && (
@@ -77,7 +77,7 @@ export function ReviewHome() {
         )}
       </div>
 
-      <section aria-labelledby="studia-cosa" className="max-w-3xl space-y-3">
+      <section aria-labelledby="studia-cosa" className="space-y-3">
         <h3 id="studia-cosa" className={PANEL_HEADING}>
           Cosa ripassi
         </h3>
@@ -85,9 +85,7 @@ export function ReviewHome() {
       </section>
 
       <div className={cn('space-y-6 transition-opacity', loading && data !== null && 'opacity-60')} aria-busy={loading}>
-        <div className="max-w-3xl">
-          {data ? <SubjectRoad materie={data.materie} selected={materia} /> : <SubjectRoadSkeleton pulsing={loading} />}
-        </div>
+        {data ? <SubjectRoad materie={data.materie} selected={materia} /> : <SubjectRoadSkeleton pulsing={loading} />}
 
         <section aria-labelledby="studia-progressi" className="space-y-4 border-t border-slate-200 pt-6 dark:border-slate-800">
           <h3 id="studia-progressi" className="font-serif text-xl text-slate-900 dark:text-slate-50">
