@@ -40,8 +40,8 @@ BROCARDI_ID_PREFIXES: tuple[str, ...] = (
 # The mcp-legal-it tools that read Brocardi whatever their arguments, as the
 # vendored release binds them in `source_bindings.py` (`mappa_orientamento` for
 # its «Ancoraggio Brocardi» block). No expert may be granted one;
-# `test_guard_lists_every_vendored_tool_bound_to_brocardi` checks it when the
-# submodule is checked out (locally; CI does not check it out).
+# `test_guard_lists_every_vendored_tool_bound_to_brocardi` checks it
+# wherever the submodule is checked out, CI included.
 BROCARDI_TOOLS: frozenset[str] = frozenset({
     "cerca_brocardi", "fetch_law_annotations", "giurisprudenza_articolo", "mappa_orientamento",
 })

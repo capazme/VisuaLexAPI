@@ -141,8 +141,8 @@ def test_guard_lists_every_vendored_tool_bound_to_brocardi():
     # `source_bindings.py` of the vendored mcp-legal-it names, tool by tool, the
     # sources it consults. A release that binds a new tool to Brocardi must be
     # added to the guard (or withheld by an argument, as `cite_law`) before the
-    # submodule moves. Skipped where the submodule is not checked out: CI does
-    # not check it out today, so run the suite locally when bumping it.
+    # submodule moves. CI checks the submodule out; skipped only where it is not
+    # (the merlt image mounts services/merlt alone).
     import re
     from pathlib import Path
 
@@ -155,8 +155,12 @@ def test_guard_lists_every_vendored_tool_bound_to_brocardi():
         None,
     )
     if bindings is None:
+        import os
+
         import pytest
 
+        if os.environ.get("CI"):
+            pytest.fail("CI must check out vendor/mcp-legal-it (submodules: true)")
         pytest.skip("vendor/mcp-legal-it is not checked out")
     bound = set(re.findall(r'^\s*"(\w+)":\s*\([^)]*"brocardi"', bindings.read_text(), re.M))
     assert bound, "the parser found no tool bound to Brocardi: the file's shape changed"
