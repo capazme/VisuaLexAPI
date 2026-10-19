@@ -169,6 +169,44 @@ describe('the Inchiostro palette', () => {
     expect(ratio(linear('ink-700'), light[0])).toBeGreaterThanOrEqual(7);
     expect(ratio(linear('ink-300'), dark[0])).toBeGreaterThanOrEqual(7);
   });
+
+  it('keeps the user menu\'s services status at AA, and its dot at 3:1 on the bar (ServiceHealthMenuEntry)', () => {
+    // Amber and emerald are Tailwind's own scales, read from its theme; the menu is white (dark: slate 800), the
+    // bar white/80 over the page (dark: slate-900/80 over slate-950). The dot's white (dark: slate 900) ring
+    // keeps it apart from the avatar.
+    const source = readFileSync(CSS_PATH, 'utf8') + readFileSync(resolve(process.cwd(), 'node_modules/tailwindcss/theme.css'), 'utf8');
+    const linear = (name: string): number[] => {
+      const m = source.match(new RegExp(`--color-${name}:\\s*oklch\\(([\\d.]+)%\\s+([\\d.]+)\\s+([\\d.]+)\\)`));
+      if (!m) throw new Error(`--color-${name} not found`);
+      const [L, C, H] = [Number(m[1]) / 100, Number(m[2]), (Number(m[3]) * Math.PI) / 180];
+      const a = C * Math.cos(H), b = C * Math.sin(H);
+      const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+      const mm = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+      const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+      return [
+        4.0767416621 * l - 3.3077115913 * mm + 0.2309699292 * s,
+        -1.2684380046 * l + 2.6097574011 * mm - 0.3413193965 * s,
+        -0.0041960863 * l - 0.7034186147 * mm + 1.707614701 * s,
+      ].map((v) => Math.min(1, Math.max(0, v)));
+    };
+    const gamma = (v: number) => (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
+    const unGamma = (v: number) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+    const over = (fg: number[], alpha: number, bg: number[]) => fg.map((c, i) => unGamma(alpha * gamma(c) + (1 - alpha) * gamma(bg[i])));
+    const lum = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    const ratio = (x: number[], y: number[]) => {
+      const [hi, lo] = [lum(x), lum(y)].sort((p, q) => q - p);
+      return (hi + 0.05) / (lo + 0.05);
+    };
+    const white = [1, 1, 1];
+    const menuDark = linear('ink-800');
+    // A service's state: OK, Degradato or Offline, Controllo; its name; «Ricontrolla».
+    for (const fg of ['emerald-700', 'amber-700', 'ink-500', 'ink-600', 'toga-700']) expect(ratio(linear(fg), white), fg).toBeGreaterThanOrEqual(4.5);
+    for (const fg of ['emerald-400', 'amber-400', 'ink-400', 'ink-300', 'toga-300']) expect(ratio(linear(fg), menuDark), fg).toBeGreaterThanOrEqual(4.5);
+    // The entry's icon beside its phrase, and the dot on the user button.
+    for (const fg of ['emerald-600', 'amber-600']) expect(ratio(linear(fg), white), fg).toBeGreaterThanOrEqual(3);
+    expect(ratio(linear('amber-600'), over(white, 0.8, linear('ink-50')))).toBeGreaterThanOrEqual(3);
+    expect(ratio(linear('amber-400'), over(linear('ink-900'), 0.8, linear('ink-950')))).toBeGreaterThanOrEqual(3);
+  });
 });
 
 describe('the entrance utilities', () => {
@@ -236,7 +274,8 @@ describe('the interaction constants', () => {
   }, 30000);
 });
 
-describe('the services pill beside the sidebar', () => {
+// The services pill, which started after the sidebar, went into the user menu (S1); `Layout` still sets the width.
+describe('what would float beside the sidebar', () => {
   it('reads the sidebar\'s drawn width from `--sidebar-width`, 64 px by default', async () => {
     const css = await compile(['lg:left-[calc(var(--sidebar-width,64px)+2rem)]']);
     expect(css).toMatch(/left:\s*calc\(var\(--sidebar-width,\s*64px\) \+ 2rem\)/);

@@ -13,8 +13,8 @@ const coveredByOverlay = () => document.querySelector('[aria-modal="true"], [dat
 
 /**
  * The lesson's frame (Gymnasium spec §5.4): the review session as a screen of its own, over the shell.
- * The shell's Focus mode is a saved setting that leaves its own button, the feedback button and the
- * services pill on screen, so the frame does not use it: it is portalled to the body (a fixed layer
+ * The shell's Focus mode is a saved setting that leaves its own button and the feedback button on
+ * screen, so the frame does not use it: it is portalled to the body (a fixed layer
  * inside the page would be held by `<main>`'s stacking context, gotchas 22 and 26) in the `lesson`
  * band, over the sidebar and the floating buttons, under the overlay band. `Layout` is not touched.
  *

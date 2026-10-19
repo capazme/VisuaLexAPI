@@ -40,6 +40,7 @@ function renderSidebar(path = '/merlt') {
         closeMobile={vi.fn()}
         openSettings={vi.fn()}
         openKeyboardShortcuts={vi.fn()}
+        serviceHealth={{ snapshot: { overall: 'online', services: [], checkedAt: '' }, refresh: vi.fn() }}
       />
     </MemoryRouter>,
   );

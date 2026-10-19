@@ -12,6 +12,9 @@ import { useAppStore } from '../../store/useAppStore';
 import { focusSearchField } from '../../utils/searchFieldControl';
 import { useAuth } from '../../hooks/useAuth';
 import { useForumNotifications } from '../../hooks/useForumNotifications';
+import type { ServiceHealthReading } from '../../hooks/useServiceHealth';
+import { ServiceHealthDot, ServiceHealthMenuEntry } from '../ui/ServiceHealthMenuEntry';
+import { serviceHealthLabel, serviceHealthNeedsNotice } from '../../utils/serviceHealth';
 import { Z_INDEX } from '../../constants/zIndex';
 import { spring } from '../../lib/motion';
 import type { SidebarLayout } from './sidebarWidth';
@@ -28,6 +31,8 @@ interface SidebarProps {
   layout?: SidebarLayout;
   /** Narrows or widens the desktop bar; given only where the words fit (`xl`). */
   onToggleWide?: () => void;
+  /** `Layout`'s one probe of the services: the user menu's «Stato dei servizi» and the dot on the user button. */
+  serviceHealth: ServiceHealthReading;
 }
 
 interface NavItemProps {
@@ -305,7 +310,7 @@ function WidthToggle({ layout, onToggle }: { layout: SidebarLayout; onToggle: ()
   );
 }
 
-export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings, openKeyboardShortcuts, layout = 'rail', onToggleWide }: SidebarProps) {
+export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings, openKeyboardShortcuts, layout = 'rail', onToggleWide, serviceHealth }: SidebarProps) {
   const navigate = useNavigate();
   const quickNorms = useAppStore((s) => s.quickNorms);
   const { user, isAdmin, isValidator, logout } = useAuth();
@@ -314,24 +319,27 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
   // Cronologia lives in the user menu (the owner, 13 Oct 2026); the saved norms that changed are
   // counted on the avatar and beside the entry («ok come raccomandi»).
   const normaChanges = forumNotifications.normaChanges ?? 0;
+  // The services pill is gone (S1): a fault shows as a dot on the user button, and its name says it.
+  const servicesNotice = serviceHealthNeedsNotice(serviceHealth.snapshot.overall);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userButtonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const [menuPosition, setMenuPosition] = useState({ bottom: 0, left: 0 });
+  const [menuPosition, setMenuPosition] = useState({ bottom: 0, left: 0, maxHeight: 0 });
 
   const words = layout !== 'rail';
 
-  // Calculate menu position when showing
-  useEffect(() => {
-    if (showUserMenu && userButtonRef.current) {
-      const rect = userButtonRef.current.getBoundingClientRect();
-      // Beside the rail's avatar, aligned to its bottom; over the wider button of the bar with words
-      // (on a phone a menu beside it would leave the screen).
-      setMenuPosition(words
-        ? { bottom: window.innerHeight - rect.top + 8, left: rect.left }
-        : { bottom: window.innerHeight - rect.bottom, left: rect.right + 8 });
-    }
-  }, [showUserMenu, words]);
+  // Placed when it opens, in the same update, so its first paint has its height bounded before an entry takes
+  // focus (opened on «Esci» in a low window, the focused entry would otherwise end up out of view).
+  const placeMenu = () => {
+    if (!userButtonRef.current) return;
+    const rect = userButtonRef.current.getBoundingClientRect();
+    // Beside the rail's avatar, aligned to its bottom; over the wider button of the bar with words
+    // (on a phone a menu beside it would leave the screen). It grows upwards, «Stato dei servizi» open
+    // included, and scrolls rather than leave the top of a low window.
+    setMenuPosition(words
+      ? { bottom: window.innerHeight - rect.top + 8, left: rect.left, maxHeight: rect.top - 16 }
+      : { bottom: window.innerHeight - rect.bottom, left: rect.right + 8, maxHeight: rect.bottom - 8 });
+  };
 
   // «Ricerca» is the search page with the cursor in its field, no window over it (the owner, 13 Oct
   // 2026: «ok come raccomandi»); ⌘K is the palette. The link itself navigates.
@@ -353,6 +361,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
   const [openAt, setOpenAt] = useState<'first' | 'last'>('first');
   const menuItems = () => [...(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])];
   const openMenu = (at: 'first' | 'last') => {
+    placeMenu();
     setOpenAt(at);
     setShowUserMenu(true);
   };
@@ -497,7 +506,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         <button
           ref={userButtonRef}
           // With words the button shows the username, so its name says it too (label in name, WCAG 2.5.3).
-          aria-label={`Menu utente${words && user?.username ? ` di ${user.username}` : ''}${normaChanges > 0 ? `, ${normaChangesLabel(normaChanges)}` : ''}`}
+          aria-label={`Menu utente${words && user?.username ? ` di ${user.username}` : ''}${normaChanges > 0 ? `, ${normaChangesLabel(normaChanges)}` : ''}${servicesNotice ? `, ${serviceHealthLabel(serviceHealth.snapshot.overall).toLowerCase()}` : ''}`}
           aria-haspopup="menu"
           aria-expanded={showUserMenu}
           onClick={() => (showUserMenu ? closeMenu(false) : openMenu('first'))}
@@ -515,7 +524,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
             whileTap={{ scale: 0.95 }}
             transition={spring.snappy}
             className={cn(
-              "shrink-0 rounded-lg flex items-center justify-center text-sm font-semibold",
+              "relative shrink-0 rounded-lg flex items-center justify-center text-sm font-semibold",
               "w-9 h-9 md:w-8 md:h-8",
               isAdmin
                 ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
@@ -523,6 +532,8 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
             )}
           >
             {user?.username?.charAt(0).toUpperCase() || 'U'}
+            {/* At the avatar's foot, clear of the count of changed norms (its top corner in the rail). */}
+            {servicesNotice && <ServiceHealthDot className="absolute -bottom-0.5 -right-0.5" />}
           </motion.div>
           {words && (
             <span aria-hidden className="min-w-0 flex-1 truncate whitespace-nowrap text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -549,8 +560,8 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
               role="menu"
               aria-label="Menu utente"
               onKeyDown={onMenuKeyDown}
-              style={{ bottom: menuPosition.bottom, left: menuPosition.left }}
-              className={cn("fixed w-56 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 animate-in fade-in zoom-in-95 duration-150", Z_INDEX.menuPanel)}
+              style={{ bottom: menuPosition.bottom, left: menuPosition.left, maxHeight: menuPosition.maxHeight > 0 ? menuPosition.maxHeight : undefined }}
+              className={cn("fixed w-56 overflow-y-auto overscroll-contain bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 animate-in fade-in zoom-in-95 duration-150", Z_INDEX.menuPanel)}
             >
               {/* User Info */}
               <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
@@ -588,13 +599,14 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
                   <Bot size={16} />
                   Collega un'app AI
                 </button>
+                <ServiceHealthMenuEntry health={serviceHealth} itemClassName={menuItemClass} />
                 <button type="button" role="menuitem" tabIndex={-1} onClick={fromMenu(toggleTheme)} className={menuItemClass}>
                   {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
                   {theme === 'dark' ? 'Tema chiaro' : 'Tema scuro'}
                 </button>
                 <button type="button" role="menuitem" tabIndex={-1} onClick={fromMenu(openKeyboardShortcuts)} className={menuItemClass}>
                   <Keyboard size={16} />
-                  Scorciatoie (?)
+                  Scorciatoie
                 </button>
                 {isAdmin && (
                   <button

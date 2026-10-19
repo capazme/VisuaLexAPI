@@ -28,8 +28,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   card read-only (`ArticleReadOnly`: the reader's text, copy only, no marks; on a phone a collapsed «Testo
   dell'articolo»); `VoteBar` sends Approvata at once and asks a reason for Migliorabile and Errata, and sits
   `sticky bottom-0` at every width (the keyboard moves to the next card's heading after a vote, back to the
-  verdict after «Annulla»; `Layout` hides the floating feedback button and the services pill
-  (`ServiceHealthBanner`) below `md` on this route, as in a review session, where they would cover the verdicts); the subject is remembered in `localStorage`; a vote that outlives a subject
+  verdict after «Annulla»; `Layout` hides the floating feedback button below `md` on this route, as in a review
+  session, where it would cover the verdicts); the subject is remembered in `localStorage`; a vote that outlives a subject
   change only marks its card handled, and a 403 stops the queue with «Non sei più tra i validatori»),
   `/history`, `/forum` («Dossier pubblici»; `/environments`, the page «Ambienti» was, redirects there keeping an old
   share link's `?import=`), `/forum/community` («Community», `ForumCommunityPage`: an honest placeholder — the
@@ -101,13 +101,23 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   motion) and the words are clipped as it moves. With words the user menu opens over its button, not beside,
   and the button's name carries the username it shows («Menu utente di …», label in name).
   `Layout` sets the column's drawn width on its root as `--sidebar-width` (224, 64, or 0 hidden or in Focus
-  mode); the services pill (`ServiceHealthBanner`) starts 2 rem after it from `lg`, so it is never under the bar.
+  mode), for what would float beside it from `lg`: nothing does since the services pill went into the user menu (S1).
   The bar's 11 px texts (headings, shortcut) are `SIDEBAR_SMALL_TEXT`, slate 600 / dark slate 400: AA for small
   text on the glass over the page and over the phone's backdrop; `theme.test.ts` composites and checks it.
   The narrow/widen control is `SIDEBAR_TOGGLE_TEXT`, the entries' words' colour (slate 700 / dark slate 300). At the bottom only the user menu, whose dropdown holds Impostazioni,
   Cronologia (moved there by the owner, 13 Oct 2026; the saved norms that changed are counted on the avatar
   and beside the entry, and both names say it in words: «Menu utente, 2 norme salvate cambiate»),
-  «Collega un'app AI», the theme, «Scorciatoie (?)», «Pannello Admin» (admins) and «Esci». The dropdown is a portalled WAI-ARIA
+  «Collega un'app AI», the services' status, the theme, «Scorciatoie» (no «(?)» since S1: the `?` key still opens it),
+  «Pannello Admin» (admins) and «Esci». **The services' status** (S1, 19 Oct 2026; it was a pill fixed at the bottom left,
+  over the foot of the page on a phone) is `ui/ServiceHealthMenuEntry`: the status icon and phrase («Servizi operativi»,
+  «Alcune fonti non disponibili», «Servizio non raggiungibile», «Controllo servizi…», `utils/serviceHealth`; a screen
+  reader hears «Stato dei servizi:» first); a tap opens, inside the menu, each service with its state and latency
+  (`menuitem`s that do nothing, so the arrows read them, named «Backend dati utente: OK, 12 ms»; not `aria-disabled`,
+  read as "unavailable") and «Ricontrolla», which keeps the menu open; it opens folded each time. `Layout` runs the one `useServiceHealth` and
+  hands the reading to both copies of the sidebar; when it is degraded or offline (not while checking) an amber dot
+  (`ServiceHealthDot`) sits at the foot of the avatar — clear of the count of changed norms — and, below `lg`, on the
+  floating menu button, and both names end with the phrase («Menu utente di …, alcune fonti non disponibili»). The menu
+  grows upwards and scrolls rather than leave a low window. The dropdown is a portalled WAI-ARIA
   menu (`role="menu"`/`menuitem`): focus goes to the first entry on open (ArrowUp opens on the last), the arrows,
   Home and End move, Esc closes and returns focus to the avatar, Tab closes and goes on from the avatar, the
   backdrop closes; entries are 44 px high on a phone. Below `lg` the menu opens from a floating button
@@ -487,7 +497,7 @@ goes back to Oggi, as the header's button does); listed in the «?» dialog's «
 **The lesson** (Gymnasium spec `docs/superpowers/specs/2026-10-19-gymnasium-restyle-design.md` §5.4; the Studia screens
 spec §6 as rewritten for G2): the session is a screen of its own. `StudiaPage` draws it, with no heading of the area,
 in `LessonFrame`: portalled to the body in the `lesson` band (`z-[70]`, over the sidebar, the floating buttons, the
-feedback button, the services pill and the plain toasts; under the overlay band, so the article's sheet, the
+feedback button and the plain toasts — the services' state is the user menu's since S1, out of reach until the lesson is left —; under the overlay band, so the article's sheet, the
 confirmation and the toast — at the top, off the bar — cover it), with Tab fenced off from the shell (`#root`)
 and the body: a dialog over it, or a popover the article portals to the body (a note being typed), keeps its own.
 The shell is not `inert` — the command palette is drawn inside it — so a screen reader's browse mode can still reach
@@ -1343,7 +1353,7 @@ Duplicating any of these is a defect, not a shortcut.
   identity).
 - `hooks/useForumNotifications.ts` — the one 30s poller behind the sidebar's
   counts (the Forum's `total`; `normaChanges` on the avatar and the menu's Cronologia).
-- `hooks/useServiceHealth.ts` + `ui/ServiceHealthBanner` — probes
+- `hooks/useServiceHealth.ts` + `ui/ServiceHealthMenuEntry` (the user menu's status; one call, in `Layout`) — probes
   `/api/health/detailed` (Node, a `SELECT 1`) and `/health/detailed` (Python, which reaches
   Normattiva, EUR-Lex and Brocardi for real). Once on mount, then every
   **5 minutes** per visible tab, plus "Ricontrolla"; the Python answer is
