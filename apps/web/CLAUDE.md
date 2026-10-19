@@ -15,7 +15,16 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   the selected card is the route `/studia/schede/:id`, an anchor opens its article through
   `triggerSearch` as the dossier's rows do; the act filter offers the acts of the cards listed,
   keeping what a narrowed list hid until a deletion starts it over; each row shows the next review,
-  `nextReviewLabel`, and «Da ripassare oggi» filters with `dovuteOggi`; the detail proposes a draft
+  `nextReviewLabel`, and «Da ripassare oggi» filters with `dovuteOggi`; «+ Nuova scheda», in the page's
+  heading and as the empty list's action, opens `CardFormDialog` with `{ kind: 'create' }` and no article (no
+  fixed anchor, the reference field open, the anchors typed as «art. 1455 c.c.», which `POST /lingo/cards`
+  resolves; saved with no anchor, the reference field stays open and takes the focus; the field has «Aggiungi»
+  only — Esc or an empty «Aggiungi» closes it — so the dialog's «Annulla» is the one; the form's body goes back
+  to the top once the dialog's first focus lands, which had left «Materia» scrolled out; a 502/503/504 says the
+  service is not available at the moment, only a call with no answer asks to check the connection), and is drawn only while
+  Normattiva answers (`useCardSources` over `cardSourcesAnswer`, the cached `/health/detailed`, read once per
+  mount; until it answers the empty list says only «Non hai ancora schede.», with the sources down it points to an
+  article and promises nothing; after the first card is saved the heading's button takes the focus); the detail proposes a draft
   («Proponi alla comunità» asks for the notice through `AcceptTextDialog`, the one place a text to
   accept is drawn — every word from the server's version, the body as `TextParagraphs` plain text) and
   withdraws a proposal, and reads a card past the drafts again by its id for `approvazioni` and the
@@ -558,7 +567,7 @@ heading and its rule are the column's width), in the order the owner fixed:
    subject, «Niente da ripassare in questa materia» and «Ripassa tutte le materie». The other two open the study
    settings («Cambia le nuove al giorno», «Accendi le schede della comunità» when no new card can be had, «Cambia
    l'obiettivo»); the goal's row takes the stamp once met, and the celebration's confetti start from it. With no card at all, how to start from an article (Ricerca,
-   «+ Nuova scheda» under the text — Le mie schede has no way to write one until G4) or the community's cards; a failed
+   «+ Nuova scheda» under the text — Le mie schede has its own «+ Nuova scheda» since G4, not named here) or the community's cards; a failed
    first read says «Non riesco a leggere i tuoi progressi.» with «Riprova» and keeps «Inizia» (the session reads its own
    cards); `todayState` and `nextDueDay` decide it, pure, in `progress/today.ts`.
 2. **«I tuoi progressi»** (`progress/StatsBand`), one band: `StreakBadge compact` (the «§», the count, «Il primo giorno
@@ -598,7 +607,13 @@ heading and its rule are the column's width), in the order the owner fixed:
 
 One type language: block headings in Newsreader (`BLOCK_HEADING`), labels in Geist; no small capitals and no double
 rule. «Le mie schede» and «Da validare» show the strip (`progress/StudyStrip`, `dense`: the streak's count without its
-line, the ring, the gear) over them (`StudiaPage`); the session shows none. While the first read travels the missions,
+line, the ring, the gear) over them (`StudiaPage`); the session shows none. «Contribuisci» (G4, spec §5.5) draws them in
+the same tokens: each page's `h2` in `BLOCK_HEADING` with its action beside it, a `TILE` per subject (its hue's dot) and
+per card, a selected row or a pressed filter marked by an ink edge as well as a tint, `INK_BUTTON` for the one action of
+a block, the three verdicts alike in `SECONDARY_BUTTON`; every control of `MyCardsView`, `CardGroups`, `CardFilters`,
+`CardDetail`, `ValidationQueueView`, `VoteBar` and the reader's row and peek keeps 44 px at every width
+(`contribuisci.test.ts` fails on an `md:` height or minimum size other than 44 px, or text under 11 px). The card
+form itself (`CardForm`, shared with the reader) still drops to the desktop's sizes from `md`. While the first read travels the missions,
 the band, the list and the road keep their places at their final size; a failed first read stops the pulse, and the road
 says it could not be read under its heading (no second alert: the missions' «Riprova» reads it again). Colours are the app's tokens through `progress/tokens.ts` (ink is the
 primary scale's deep end, the stamp the one red, a subject's hue the category palette's CSS variable); the charts are
@@ -1400,7 +1415,8 @@ Duplicating any of these is a defect, not a shortcut.
   Normattiva, EUR-Lex and Brocardi for real). Once on mount, then every
   **5 minutes** per visible tab, plus "Ricontrolla"; the Python answer is
   cached server-side for `HEALTH_DETAILED_TTL`. Do not tighten either loop —
-  the first version polled every 60s per tab.
+  the first version polled every 60s per tab. `cardSourcesAnswer` (`healthService.ts`) reads the same Python
+  probe once, for «Le mie schede»'s «+ Nuova scheda» (true only when Normattiva says ok); it never polls.
 
 ## UI Conventions
 
