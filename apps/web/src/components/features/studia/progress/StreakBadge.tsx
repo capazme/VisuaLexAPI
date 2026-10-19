@@ -4,7 +4,7 @@ import { Check } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import type { StatoGiorno } from '../../../../types/studia';
 import { formatDayLong } from './layout';
-import { INK_BG, INK_BORDER, INK_TEXT, MUTED_TEXT, ON_INK } from './tokens';
+import { DAY_STATE_LABEL, INK_BG, INK_BORDER, INK_TEXT, MUTED_TEXT, ON_INK } from './tokens';
 import { spring } from '../../../../lib/motion';
 
 export interface StreakBadgeProps {
@@ -19,19 +19,12 @@ export interface StreakBadgeProps {
   dense?: boolean;
 }
 
-const DAY_STATE_LABEL: Record<StatoGiorno, string> = {
-  fatto: 'obiettivo raggiunto',
-  riposo: 'giorno di riposo, la serie regge',
-  saltato: 'non fatto',
-  oggi: 'oggi, da fare',
-};
-
 /**
  * The streak (Studia progress spec §6.1): a round ink badge with «§» that breathes slowly, the count in
  * large serif, the record, and the last seven days as the boxes of a register: ticked for a day that
  * counted, dashed for a rest, empty for a missed day, outlined for today. The count pops when it grows;
- * under reduced motion nothing moves. `compact` is the strip's: still, and without the week (the
- * calendar under «I tuoi progressi» holds the days).
+ * under reduced motion nothing moves. `compact` is the strip's and the statistics band's: still, and without
+ * the week (the band draws the current week itself, `StatsBand`).
  */
 export function StreakBadge({ attuale, record, ultimiGiorni, pop = false, compact = false, dense = false }: StreakBadgeProps) {
   const reduce = useReducedMotion();

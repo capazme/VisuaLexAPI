@@ -1,17 +1,20 @@
 import { useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import { cn } from '../../../lib/utils';
 import type { Materia } from '../../../types/studia';
 import { MATERIA_LABEL } from './studiaLabels';
+import type { StudiaOutletContext } from './StudiaPage';
+import { MissionList } from './missions/MissionList';
+import { TodayMissions } from './missions/TodayMissions';
 import { ConfettiBurst } from './progress/Celebration';
-import { ProgressPanels, ProgressPanelsSkeleton } from './progress/ProgressPanels';
-import { StudyStrip } from './progress/StudyStrip';
+import { MonthSheet } from './progress/MonthSheet';
+import { StatsBand } from './progress/StatsBand';
+import { StudySettingsSheet } from './progress/StudySettings';
 import { SubjectChips } from './progress/SubjectChips';
-import { SubjectRoad, SubjectRoadSkeleton } from './progress/SubjectRoad';
-import { TodayCard } from './progress/TodayCard';
+import { SubjectRoad, SubjectRoadSkeleton, SubjectRoadUnread } from './progress/SubjectRoad';
 import { useCelebratedToday } from './progress/useCelebratedToday';
 import { useProgress } from './progress/useProgress';
-import { PANEL_HEADING } from './progress/tokens';
+import { BLOCK_HEADING, subjectHue } from './progress/tokens';
 
 const STORAGE_KEY = 'visualex.studia.ripasso.materia';
 const MATERIE = Object.keys(MATERIA_LABEL) as Materia[];
@@ -36,18 +39,22 @@ function rememberMateria(materia: Materia | undefined): void {
 }
 
 /**
- * «Oggi», Gymnasium's home (Gymnasium spec §5.1): the strip (streak, goal, the gear of the study
- * settings), the action (what is on today, what it costs, «Inizia»), «Cosa ripassi» (the subject chips,
- * which narrow the page and the session it starts), the road of subjects, and the progress at the
- * bottom («I tuoi progressi», until it has a page of its own). Everything comes from one read
- * (`useProgress`); the server decides what «today» is.
+ * «Oggi», Gymnasium's home (Gymnasium spec §5.1), in the order the owner fixed: today's missions (the first carries
+ * «Inizia»), the statistics (streak, goal, the current week, the cards by state; «Il tuo mese» in a sheet), the full
+ * list of missions, then «Cosa ripassi» (the subject chips) and the road. The missions and the statistics are the
+ * whole day's (`useProgress(undefined)`); a subject chosen narrows the first mission's action, the session it starts
+ * and «Il tuo mese», through a second read made only while one is chosen. The server decides what «today» is.
  */
 export function ReviewHome() {
   const navigate = useNavigate();
+  const validator = useOutletContext<StudiaOutletContext | undefined>()?.validator === true;
   const [materia, setMateria] = useState<Materia | undefined>(rememberedMateria);
-  const progress = useProgress(materia);
-  const data = progress.data;
-  const ringRef = useRef<HTMLDivElement>(null);
+  const day = useProgress(undefined);
+  const narrowed = useProgress(materia, materia !== undefined);
+  const action = materia ? narrowed : day;
+  const data = day.data;
+  const [sheet, setSheet] = useState<'settings' | 'month' | null>(null);
+  const stampRef = useRef<HTMLDivElement>(null);
   const { celebratedBefore, markCelebrated } = useCelebratedToday();
   // The day whose burst has run its course on this page.
   const [burstDone, setBurstDone] = useState<string | null>(null);
@@ -60,40 +67,71 @@ export function ReviewHome() {
     setMateria(next);
     rememberMateria(next);
   };
+  const reload = () => {
+    day.reload();
+    narrowed.reload();
+  };
   const start = () => navigate(materia ? `/studia/ripasso/sessione?materia=${materia}` : '/studia/ripasso/sessione');
-  const loading = progress.status === 'loading';
+  const loading = day.status === 'loading';
+  const subject = materia && MATERIA_LABEL[materia];
 
   return (
-    // One column at a reading measure, centred with the area's heading (`StudiaPage`); the calendar scales to it.
-    <section className="space-y-6 pb-8">
+    // One column at a reading measure, centred with the area's heading (`StudiaPage`).
+    <section className="space-y-8 pb-8">
       <h2 className="sr-only">Oggi</h2>
-      {/* The confetti start from the ring and fall over the strip and the action, never over the rest. */}
-      {/* A grid, not `space-y`: the burst mounted after the card would give it a margin and move the page. */}
+      {/* The confetti start from the stamp, in the goal's row, and fall over the missions and the statistics, never further. */}
+      {/* A grid, not `space-y`: the burst mounted after the band would give it a margin and move the page. */}
       <div className="relative grid gap-4">
-        <StudyStrip data={data} loading={loading && data === null} onSettingsChanged={progress.reload} ringRef={ringRef} celebrate={celebrate} />
-        <TodayCard data={data} failed={progress.status === 'error'} onRetry={progress.reload} subject={materia && MATERIA_LABEL[materia]} onAllSubjects={() => choose(undefined)} onStart={start} celebrate={celebrate} />
+        <TodayMissions
+          day={data}
+          dayFailed={day.status === 'error'}
+          action={action.data}
+          actionFailed={action.status === 'error'}
+          onRetry={reload}
+          subject={subject}
+          onAllSubjects={() => choose(undefined)}
+          onStart={start}
+          onOpenSettings={() => setSheet('settings')}
+          celebrate={celebrate}
+          stampRef={stampRef}
+        />
+        <StatsBand
+          data={data}
+          loading={loading && data === null}
+          settingsOpen={sheet === 'settings'}
+          onOpenSettings={() => setSheet('settings')}
+          monthOpen={sheet === 'month'}
+          onOpenMonth={() => setSheet('month')}
+          celebrate={celebrate}
+        />
         {celebrate && data && (
-          <ConfettiBurst originRef={ringRef} onStart={() => markCelebrated(data.oggi.giorno)} onDone={() => setBurstDone(data.oggi.giorno)} />
+          <ConfettiBurst originRef={stampRef} onStart={() => markCelebrated(data.oggi.giorno)} onDone={() => setBurstDone(data.oggi.giorno)} />
         )}
       </div>
 
+      <MissionList data={data} loading={loading && data === null} validator={validator} />
+
       <section aria-labelledby="studia-cosa" className="space-y-3">
-        <h3 id="studia-cosa" className={PANEL_HEADING}>
+        <h3 id="studia-cosa" className={BLOCK_HEADING}>
           Cosa ripassi
         </h3>
         <SubjectChips selected={materia} onSelect={choose} />
       </section>
 
-      <div className={cn('space-y-6 transition-opacity', loading && data !== null && 'opacity-60')} aria-busy={loading}>
-        {data ? <SubjectRoad materie={data.materie} selected={materia} /> : <SubjectRoadSkeleton pulsing={loading} />}
-
-        <section aria-labelledby="studia-progressi" className="space-y-4 border-t border-slate-200 pt-6 dark:border-slate-800">
-          <h3 id="studia-progressi" className="font-serif text-xl text-slate-900 dark:text-slate-50">
-            I tuoi progressi
-          </h3>
-          {data ? <ProgressPanels data={data} materia={materia} onSelectMateria={choose} /> : <ProgressPanelsSkeleton pulsing={loading} />}
-        </section>
+      <div className={cn('transition-opacity', loading && data !== null && 'opacity-60')} aria-busy={loading}>
+        {data ? <SubjectRoad materie={data.materie} selected={materia} /> : loading ? <SubjectRoadSkeleton /> : <SubjectRoadUnread />}
       </div>
+
+      {sheet === 'settings' && <StudySettingsSheet onClose={() => setSheet(null)} onChanged={reload} />}
+      {/* The subject's read, once it has answered; the day's until then. */}
+      {sheet === 'month' && (action.data ?? data) && (
+        <MonthSheet
+          data={(action.data ?? data)!}
+          subject={action.data ? subject : undefined}
+          hue={materia && action.data ? subjectHue(materia) : undefined}
+          onClose={() => setSheet(null)}
+        />
+      )}
     </section>
   );
 }

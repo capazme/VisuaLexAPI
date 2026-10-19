@@ -37,7 +37,7 @@ describe('StudiaPage', () => {
       </MemoryRouter>,
     );
     // The layout starts the page under its menu button: the heading needs no step aside.
-    expect(screen.getByRole('heading', { level: 1, name: 'VisuaLex Gymnasium' }).className).not.toMatch(/\bpl-/);
+    expect(screen.getByRole('heading', { level: 1, name: 'Gymnasium: la tua palestra giuridica' }).className).not.toMatch(/\bpl-/);
     expect(container.firstElementChild?.className).not.toMatch(/\bp[xy]?-\d|md:p-\d/);
     // Ripasso, Le mie schede and Da validare are the sidebar's entries now (sections spec S6).
     expect(screen.queryAllByRole('link')).toEqual([]);
@@ -53,7 +53,7 @@ describe('StudiaPage', () => {
     const { container, unmount } = at('/studia/ripasso');
     const page = container.firstElementChild as HTMLElement;
     expect(page).toHaveClass('mx-auto', 'max-w-3xl');
-    expect(page).toContainElement(screen.getByRole('heading', { level: 1, name: 'VisuaLex Gymnasium' }));
+    expect(page).toContainElement(screen.getByRole('heading', { level: 1, name: 'Gymnasium: la tua palestra giuridica' }));
     unmount();
     for (const path of ['/studia/schede', '/studia/ripasso/sessione']) {
       const view = at(path);

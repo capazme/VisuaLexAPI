@@ -4,7 +4,7 @@ import type { Materia, Progressi } from '../../../../types/studia';
 import { MATERIA_LABEL } from '../studiaLabels';
 import { totalCards } from './layout';
 import { orderStops, stopStates } from './today';
-import { CARD_STATES, FOCUS_RING, INK_BG, INK_BORDER, MUTED_TEXT, PANEL_HEADING, TILE } from './tokens';
+import { BLOCK_HEADING, CARD_STATES, INK_BG, INK_BORDER, MUTED_TEXT, SECONDARY_BUTTON, TILE } from './tokens';
 
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -27,7 +27,7 @@ export function SubjectRoad({ materie, selected }: SubjectRoadProps) {
   const stops = orderStops(materie);
   return (
     <section aria-labelledby="studia-percorso" className="space-y-3">
-      <h3 id="studia-percorso" className={PANEL_HEADING}>
+      <h3 id="studia-percorso" className={BLOCK_HEADING}>
         Il percorso
       </h3>
       {/* The line that joins the stops, behind their marks: a pseudo-element, so the list holds only its items. */}
@@ -79,12 +79,7 @@ export function SubjectRoad({ materie, selected }: SubjectRoadProps) {
                     type="button"
                     aria-label={`Ripassa ${label}`}
                     onClick={() => navigate(`/studia/ripasso/sessione?materia=${stop.materia}`)}
-                    className={cn(
-                      'min-h-[44px] rounded-xl border px-4 text-sm font-semibold transition-[background-color,scale] active:scale-[0.97]',
-                      INK_BORDER,
-                      'text-primary-900 hover:bg-primary-50 dark:text-primary-200 dark:hover:bg-primary-900/30',
-                      FOCUS_RING,
-                    )}
+                    className={SECONDARY_BUTTON}
                   >
                     Ripassa
                   </button>
@@ -99,13 +94,28 @@ export function SubjectRoad({ materie, selected }: SubjectRoadProps) {
 }
 
 /** The road's place at its final size while the first read travels. */
-export function SubjectRoadSkeleton({ pulsing }: { pulsing: boolean }) {
+export function SubjectRoadSkeleton() {
   return (
     <div aria-hidden className="space-y-3">
       <div className="h-6 w-32 rounded bg-slate-100 dark:bg-slate-800/60" />
       {Array.from({ length: 5 }, (_, index) => (
-        <div key={index} className={cn('ml-11 h-40 rounded-2xl bg-slate-100 md:h-[92px] dark:bg-slate-800/60', pulsing && 'motion-safe:animate-pulse')} />
+        <div key={index} className="ml-11 h-40 rounded-2xl bg-slate-100 motion-safe:animate-pulse md:h-[92px] dark:bg-slate-800/60" />
       ))}
     </div>
+  );
+}
+
+/**
+ * The road when the first read failed: its heading and what is missing, not empty blocks. No alert: the missions
+ * above say it once, with «Riprova», which reads the road again too.
+ */
+export function SubjectRoadUnread() {
+  return (
+    <section aria-labelledby="studia-percorso" className="space-y-3">
+      <h3 id="studia-percorso" className={BLOCK_HEADING}>
+        Il percorso
+      </h3>
+      <p className={cn('text-sm', MUTED_TEXT)}>Non riesco a leggere il tuo percorso: le materie tornano appena riesco a leggerle.</p>
+    </section>
   );
 }

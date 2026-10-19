@@ -109,32 +109,60 @@ default. The accessible names, the tours' ids and the badges stay. In Gymnasium 
 «Studia», after Oggi.
 
 «Impostazioni di studio» (`StudyPreferences`, unchanged in content) leave the bottom of the home and open
-from a gear in the header of **Oggi**, in a `ui/Sheet`.
+from a gear in the header of **Oggi** — since G1b, in its statistics band (§5.1) — in a `ui/Sheet`.
 
 ## 5. The screens
 
 Each screen is a free hand inside §3: the component names below are where the work lands, not a design
 brief to copy. The look is Inchiostro (paper, ink, toga) with the Gymnasium hue.
 
-### 5.1 Oggi (`ReviewHome`, `ProgressBand`)
+### 5.1 Oggi (`ReviewHome`)
 
-From top to bottom, one column on a phone:
+*Rewritten on 19 October for G1b.* G1 built Oggi as a strip, one action card, the chips, the road and the
+progress panels at the bottom. The front-end owner then fixed the order of the page — «1. prossime
+missioni; 2. Stats; 3. elenco completo delle missioni» — and asked for the progress to be drawn again from
+scratch, in one type language with the rest of Inchiostro. From top to bottom, one column at every width:
 
-1. **A slim strip**, always the same: the streak (the § badge and the count) and the goal (a small ring,
-   «5 di 10»). It is also what the other views of the area show above their content (a compact version),
-   so the reward is never out of sight. The gear is at its end.
-2. **The action**: a large card, «Oggi: 18 da ripassare, 8 nuove» and what it costs, «circa N minuti»
-   (an estimate, `N = ceil(cards × 20 s / 60)`, a single constant in `studiaLabels.ts`, never a
-   promise), and **«Inizia»**, the page's one primary button, 44 px, full width on a phone. When the goal
-   is already met: the stamp of the day and «Continua» (more cards if any are left), else «Hai finito per
-   oggi» with the next due day.
-3. **«Cosa ripassi»**: the subject chips (`SubjectChips`), unchanged in behaviour (they narrow the session
-   and, now, the road).
-4. **The road** (§5.2).
+0. **The heading** of the area: «Gymnasium: la tua palestra giuridica» (the short name «Gymnasium» stays
+   in the section switcher).
+1. **Today's missions**, «Le missioni di oggi», one under the other, each with its mark (done or not),
+   its progress («8 di 18») and an action, and a summary «2 di 3». The first, «Ripassa le schede
+   dovute», carries what is on today («Oggi: 18 da ripassare, 8 nuove»), what it costs («circa N
+   minuti», `N = ceil(cards × 20 s / 60)`, a single constant in `studiaLabels.ts`, never a promise) and
+   **«Inizia»**, the page's one primary button, 44 px, full width on a phone («Continua» once the goal is
+   met; «Hai finito per oggi» with the next due day when nothing is left). The other two open the study
+   settings that set their target. The missions are **computed by the web** from what the progress read
+   already carries — a pure function in `studia/missions/`, so that only its source changes when the
+   server records missions:
+   - «Ripassa le schede dovute»: the due cards reviewed today (today's reviews less today's first
+     reviews, from the calendar's row of today) of those plus the ones still due (`oggi.dovute`);
+   - «Impara 5 schede nuove»: today's first reviews, of five — or of what today allows, when the daily
+     quota of new cards or the cards left make five impossible;
+   - «Raggiungi l'obiettivo di oggi»: `oggi.ripassi` of `oggi.obiettivo`, done when the server says the
+     day counts (`raggiunto`).
 
-States as in the progress spec §6.2: a skeleton at the final size while reading; a failed read says «Non
-riesco a leggere i tuoi progressi.» with «Riprova» and keeps «Inizia» usable; a first-time user sees the
-ring at zero, the streak at 0 with «Il primo giorno comincia oggi», and a road with nothing started.
+   A mission with nothing to do today (no card due, no new card) says so and leaves the summary. The
+   missions are the whole day's, whatever subject is chosen below: the subject narrows only the action of
+   the first («Oggi in Diritto penale: …»), the session it starts and «Il tuo mese». A count past its target
+   stops at it («5 di 5»).
+2. **The statistics**, one band under the heading «I tuoi progressi»: the streak (the § badge, the count,
+   the record), the goal (a small ring, «5 di 10»), the gear of the study settings, **the current week**
+   (seven boxes, Monday to Sunday, each with its letter: done, a rest, missed, today, or still to come),
+   and under them three large numbers in Newsreader — new, in learning, consolidated — with their bar.
+   The long calendar and «Prossimi 14 giorni» leave the page: a button «Il tuo mese» opens them in a
+   sheet (until G3 gives them `/studia/progressi`).
+3. **The full list of missions**, «Tutte le missioni»: daily, weekly and long-term. Those the web can count
+   show their state; those that need the server to record them (a subject left for seven days, writing a
+   card, validating, a case, a week of streak) are listed with «In arrivo» and cannot be ticked. **No experience points and no level**
+   are shown until the server keeps them: a count in the browser would be lost on another device and could
+   be forged.
+4. **«Cosa ripassi»** (the subject chips, unchanged in behaviour) and **the road** (§5.2), as G1 left them.
+
+One type language: block headings in Newsreader, labels in Geist; no small capitals and no double rule.
+The empty states are drawn, not left as empty grids: a first-time user reads «Il primo giorno comincia
+oggi» in the band and a week with nothing missed; a user with no card is told how to begin from an
+article; a failed read says «Non riesco a leggere i tuoi progressi.» with «Riprova» and keeps «Inizia»
+usable; while the first read travels everything holds its final size.
 
 ### 5.2 The road
 
@@ -159,8 +187,9 @@ written in words, never by colour alone.
 
 ### 5.3 Progressi
 
-A page of its own, `/studia/progressi`, holding what the home no longer shows: the activity calendar, the
-cards by state and the coming days, and the full progress by subject. The components exist
+A page of its own, `/studia/progressi`, holding what the home no longer shows: the activity calendar and the
+coming days (in the «Il tuo mese» sheet until then), the cards by state in full (the home keeps three numbers),
+and the full progress by subject. The components exist
 (`ActivityCalendar`, `CardStatesBar`, `DueForecast`, `SubjectProgress`) and keep their behaviour,
 interaction and accessibility (progress spec §6.3, §6.5); they are restyled, not rewritten.
 
@@ -204,7 +233,7 @@ branch from `develop` side by side; G2–G4 follow in this order; G5 waits for a
 | # | Phase | Main files |
 | --- | --- | --- |
 | G0 | The sidebar's words (§4): the wide bar from `xl`, the rail between `lg` and `xl`, the drawer's rows, the narrow/widen control; Gymnasium's two groups | `Sidebar.tsx`, `Layout.tsx`, `SectionSwitcher.tsx` |
-| G1 | **Oggi** (strip, action card, subject chips, subject stops by the three states — no «N da ripassare» per subject until G5); the settings in a sheet; the empty and failed states; the progress panels kept at the bottom under «I tuoi progressi» until G3 gives them their page | `ReviewHome.tsx`, `progress/ProgressBand.tsx`, `progress/SubjectChips.tsx`, `progress/SubjectProgress.tsx`, `StudyPreferences.tsx`, `StudiaPage.tsx` |
+| G1 | **Oggi** (strip, action card, subject chips, subject stops by the three states — no «N da ripassare» per subject until G5); the settings in a sheet; the empty and failed states; the progress panels kept at the bottom under «I tuoi progressi» until G3 gives them their page. **G1b**, stacked on G1, sets the order the owner fixed (§5.1): the heading with its phrase; today's missions, computed in the web, «Inizia» on the first; the statistics band (streak, goal, the current week, three numbers) with «Il tuo mese» in a sheet; the full list, «In arrivo» where the server must record; then the chips and the road; no points or levels until the server keeps them | `ReviewHome.tsx`, `missions/*`, `progress/StatsBand.tsx`, `progress/MonthSheet.tsx`, `progress/SubjectChips.tsx`, `progress/SubjectRoad.tsx`, `StudyPreferences.tsx`, `StudiaPage.tsx` |
 | G2 | **Lezione**: the frame, the progress bar, the bottom bar, the note after a grade, the end screen; the same PR rewrites §6 of the Studia screens spec and the review-card sentence of `apps/web/CLAUDE.md` | `ReviewSession.tsx`, `ReviewCard.tsx`, `GradeBar.tsx`, `progress/SessionEndProgress.tsx`, `useReviewSession.ts` (read only unless a test says otherwise) |
 | G3 | **Progressi**: the page and the restyle of its four components | `progress/*` |
 | G4 | **Contribuisci**: Le mie schede, Da validare, the reader's row; a «+ Nuova scheda» inside Le mie schede and in its empty state (§5.5) | `MyCardsView.tsx`, `CardGroups.tsx`, `CardFilters.tsx`, `CardDetail.tsx`, `ValidationQueueView.tsx`, `VoteBar.tsx`, `ArticleCardsRow.tsx`, `ArticleCardsPeek.tsx` |

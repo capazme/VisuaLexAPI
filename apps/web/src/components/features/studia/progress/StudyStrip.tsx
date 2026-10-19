@@ -1,12 +1,10 @@
-import { useState, type RefObject } from 'react';
-import { Settings2 } from 'lucide-react';
-import { Sheet } from '../../../ui/Sheet';
+import { useState } from 'react';
 import { cn } from '../../../../lib/utils';
 import type { Progressi } from '../../../../types/studia';
-import { StudyPreferences } from '../StudyPreferences';
 import { GoalRing } from './GoalRing';
 import { StreakBadge } from './StreakBadge';
-import { FOCUS_RING, TILE } from './tokens';
+import { SettingsGear, StudySettingsSheet } from './StudySettings';
+import { TILE } from './tokens';
 
 export interface StudyStripProps {
   /** The last answer; null before the first one, or when it could not be read. */
@@ -15,28 +13,25 @@ export interface StudyStripProps {
   loading: boolean;
   /** Called after a setting reached the server: the day's counts may have moved. */
   onSettingsChanged: () => void;
-  /** The smaller strip over the area's other views. */
+  /** The smaller strip: the streak's count without its line. */
   dense?: boolean;
-  /** Where the celebration's confetti start: the goal's ring. */
-  ringRef?: RefObject<HTMLDivElement | null>;
-  /** The celebration: the streak's count pops. */
-  celebrate?: boolean;
 }
 
 /**
- * The strip over Gymnasium (spec §5.1): the streak and today's goal, always in view, and at its end the gear
- * that opens the study settings in a sheet. «Oggi» shows it in full; the other views of the area show it
- * smaller (`dense`). A read that failed leaves only the gear: the view under it says nothing of progress.
+ * The strip over «Le mie schede» and «Da validare» (Gymnasium spec §5.1): the streak and today's goal, so the
+ * reward stays in view, and at its end the gear that opens the study settings in a sheet. «Oggi» draws its own
+ * statistics instead (`StatsBand`). A read that failed leaves only the gear: the view under it says nothing of
+ * progress.
  */
-export function StudyStrip({ data, loading, onSettingsChanged, dense = false, ringRef, celebrate = false }: StudyStripProps) {
+export function StudyStrip({ data, loading, onSettingsChanged, dense = false }: StudyStripProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   return (
     <div className={cn(TILE, 'flex min-h-14 items-center gap-x-4 gap-y-2 px-3 md:gap-x-6 md:px-4', dense ? 'py-1' : 'py-2')} aria-busy={loading}>
       {data ? (
         <>
-          <StreakBadge compact dense={dense} attuale={data.serie.attuale} record={data.serie.record} ultimiGiorni={data.serie.ultimiGiorni} pop={celebrate} />
+          <StreakBadge compact dense={dense} attuale={data.serie.attuale} record={data.serie.record} ultimiGiorni={data.serie.ultimiGiorni} />
           {/* The ring's «5 di 10» never wraps: the streak's line gives way first. */}
-          <div ref={ringRef} className="shrink-0">
+          <div className="shrink-0">
             <GoalRing compact ripassi={data.oggi.ripassi} obiettivo={data.oggi.obiettivo} raggiunto={data.oggi.raggiunto} />
           </div>
         </>
@@ -48,26 +43,8 @@ export function StudyStrip({ data, loading, onSettingsChanged, dense = false, ri
           </>
         )
       )}
-      <button
-        type="button"
-        aria-label="Impostazioni dello studio"
-        aria-haspopup="dialog"
-        aria-expanded={settingsOpen}
-        onClick={() => setSettingsOpen(true)}
-        className={cn(
-          'ml-auto grid h-11 w-11 shrink-0 place-items-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100',
-          FOCUS_RING,
-        )}
-      >
-        <Settings2 size={20} aria-hidden />
-      </button>
-      {settingsOpen && (
-        <Sheet title="Impostazioni dello studio" onClose={() => setSettingsOpen(false)} className="md:mx-auto md:max-w-lg">
-          <div className="overflow-y-auto overscroll-contain px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-3">
-            <StudyPreferences open onChanged={onSettingsChanged} />
-          </div>
-        </Sheet>
-      )}
+      <SettingsGear open={settingsOpen} onOpen={() => setSettingsOpen(true)} />
+      {settingsOpen && <StudySettingsSheet onClose={() => setSettingsOpen(false)} onChanged={onSettingsChanged} />}
     </div>
   );
 }

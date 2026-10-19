@@ -20,6 +20,9 @@ const PITCH = CELL + GAP;
 const ROW_LABELS: Record<number, string> = { 0: 'L', 2: 'M', 4: 'V', 6: 'D' };
 const HUE_OPACITY = [0, 0.35, 0.55, 0.78, 1] as const;
 
+/** A point of the drawing as a share of its box, for the labels laid over it. */
+const share = (value: number, of: number) => `${(value / of) * 100}%`;
+
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /**
@@ -73,45 +76,51 @@ export function ActivityCalendar({ calendario, today, weeks, hue }: ActivityCale
         onKeyDown={move}
         className={cn('rounded-md', FOCUS_RING)}
       >
-        <svg viewBox={`0 0 ${width} ${height}`} className="block h-auto w-full max-w-[56rem]" aria-hidden>
-          {Object.entries(ROW_LABELS).map(([row, label]) => (
-            <text key={row} x={0} y={TOP + Number(row) * PITCH + 10} className="fill-slate-500 text-[9px] dark:fill-slate-400">
-              {label}
-            </text>
-          ))}
-          {grid.months.map((month) => (
-            <text key={`${month.column}-${month.label}`} x={LEFT + month.column * PITCH} y={10} className="fill-slate-500 text-[9px] dark:fill-slate-400">
-              {month.label}
-            </text>
-          ))}
-          {grid.cells.map((cell, index) => {
-            const x = LEFT + cell.column * PITCH;
-            const y = TOP + cell.row * PITCH;
-            const level = heatLevel(cell.day?.ripassi ?? 0, grid.max);
-            const tinted = hue !== undefined && level > 0;
-            return (
-              <g key={cell.giorno} data-day={cell.giorno} onPointerEnter={() => setSelected(index)} onClick={() => setSelected(index)} className="cursor-pointer">
-                {/* The whole pitch answers, gaps included: on a phone a cell is about 20 px. */}
-                <rect x={x - GAP / 2} y={y - GAP / 2} width={PITCH} height={PITCH} fill="transparent" />
-                <rect
-                  x={x}
-                  y={y}
-                  width={CELL}
-                  height={CELL}
-                  rx={3}
-                  className={cn(!tinted && HEAT_FILL[level], selected === index && 'stroke-slate-900 dark:stroke-white')}
-                  style={tinted ? { fill: hue, fillOpacity: HUE_OPACITY[level] } : undefined}
-                  strokeWidth={selected === index ? 1.5 : 0}
-                />
-                {cell.day?.riposo && (
-                  <rect x={x + 0.75} y={y + 0.75} width={CELL - 1.5} height={CELL - 1.5} rx={2.5} fill="none" strokeWidth={1.2} strokeDasharray="2 1.5" className={cn('stroke-current', INK_TEXT)} />
-                )}
-                {/* In ink on the pale steps, in the ground's colour on the dark ones: readable on every cell. */}
-                {cell.day?.valido && <circle cx={x + CELL / 2} cy={y + CELL / 2} r={1.8} className={level >= 3 && !tinted ? 'fill-white dark:fill-slate-900' : 'fill-primary-900 dark:fill-primary-300'} />}
-              </g>
-            );
-          })}
-        </svg>
+        {/* The labels are the interface's text laid over the drawing, not SVG text: a drawing scaled to its width
+            would scale them too, under 11 px on a narrow one (Gymnasium spec §5.1, one type language). */}
+        <div className="relative max-w-[56rem]">
+          <div aria-hidden className={cn('pointer-events-none absolute inset-0 whitespace-nowrap text-xs leading-none', MUTED_TEXT)}>
+            {Object.entries(ROW_LABELS).map(([row, label]) => (
+              <span key={row} className="absolute left-0 -translate-y-1/2" style={{ top: share(TOP + Number(row) * PITCH + CELL / 2, height) }}>
+                {label}
+              </span>
+            ))}
+            {grid.months.map((month) => (
+              <span key={`${month.column}-${month.label}`} className="absolute top-0" style={{ left: share(LEFT + month.column * PITCH, width) }}>
+                {month.label}
+              </span>
+            ))}
+          </div>
+          <svg viewBox={`0 0 ${width} ${height}`} className="block h-auto w-full" aria-hidden>
+            {grid.cells.map((cell, index) => {
+              const x = LEFT + cell.column * PITCH;
+              const y = TOP + cell.row * PITCH;
+              const level = heatLevel(cell.day?.ripassi ?? 0, grid.max);
+              const tinted = hue !== undefined && level > 0;
+              return (
+                <g key={cell.giorno} data-day={cell.giorno} onPointerEnter={() => setSelected(index)} onClick={() => setSelected(index)} className="cursor-pointer">
+                  {/* The whole pitch answers, gaps included: on a phone a cell is about 20 px. */}
+                  <rect x={x - GAP / 2} y={y - GAP / 2} width={PITCH} height={PITCH} fill="transparent" />
+                  <rect
+                    x={x}
+                    y={y}
+                    width={CELL}
+                    height={CELL}
+                    rx={3}
+                    className={cn(!tinted && HEAT_FILL[level], selected === index && 'stroke-slate-900 dark:stroke-white')}
+                    style={tinted ? { fill: hue, fillOpacity: HUE_OPACITY[level] } : undefined}
+                    strokeWidth={selected === index ? 1.5 : 0}
+                  />
+                  {cell.day?.riposo && (
+                    <rect x={x + 0.75} y={y + 0.75} width={CELL - 1.5} height={CELL - 1.5} rx={2.5} fill="none" strokeWidth={1.2} strokeDasharray="2 1.5" className={cn('stroke-current', INK_TEXT)} />
+                  )}
+                  {/* In ink on the pale steps, in the ground's colour on the dark ones: readable on every cell. */}
+                  {cell.day?.valido && <circle cx={x + CELL / 2} cy={y + CELL / 2} r={1.8} className={level >= 3 && !tinted ? 'fill-white dark:fill-slate-900' : 'fill-primary-900 dark:fill-primary-300'} />}
+                </g>
+              );
+            })}
+          </svg>
+        </div>
       </div>
       <div aria-hidden className={cn('flex flex-wrap items-center gap-x-4 gap-y-1 text-xs', MUTED_TEXT)}>
         <span className="flex items-center gap-1">

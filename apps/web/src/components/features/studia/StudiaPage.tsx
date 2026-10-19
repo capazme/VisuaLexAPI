@@ -22,7 +22,8 @@ function AreaStrip() {
 }
 
 /**
- * VisuaLex Gymnasium (the code keeps the name `studia`): the area's heading and the view. Its views —
+ * Gymnasium (the code keeps the name `studia`): the area's heading — «Gymnasium: la tua palestra giuridica»; the
+ * section switcher keeps the short name — and the view. Its views —
  * Oggi, Le mie schede, Da validare for validators — are the sidebar's entries in this section
  * (sections spec S6, Gymnasium spec §4). The layout pads the page and, below `lg`, starts it under its
  * floating menu button.
@@ -33,7 +34,7 @@ export function StudiaPage() {
   return (
     <div className={cn('mx-auto flex h-full w-full flex-col gap-4', isHome(pathname) ? 'max-w-3xl' : 'max-w-6xl')}>
       <header className="border-b border-slate-200 pb-3 dark:border-slate-800">
-        <h1 className="font-serif text-3xl font-medium tracking-tight text-slate-900 dark:text-slate-50">VisuaLex Gymnasium</h1>
+        <h1 className="font-serif text-2xl font-medium tracking-tight text-slate-900 md:text-3xl dark:text-slate-50">Gymnasium: la tua palestra giuridica</h1>
       </header>
       {underStrip(pathname) && <AreaStrip />}
       <Outlet context={{ validator: loading ? undefined : isValidator } satisfies StudiaOutletContext} />
