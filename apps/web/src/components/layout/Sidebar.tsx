@@ -42,6 +42,9 @@ interface NavItemProps {
   layout: SidebarLayout;
 }
 
+/** The palette's shortcut as this keyboard writes it. */
+const PALETTE_SHORTCUT = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform) ? '⌘K' : 'Ctrl K';
+
 const menuItemClass = "w-full flex items-center gap-3 px-4 py-2.5 min-h-[44px] md:min-h-0 text-sm focus-visible:outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer";
 
 /** The unread "a saved norm changed" notifications, as words: the avatar's name and the menu's entry carry them. */
@@ -419,7 +422,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         id="tour-sidebar"
         className="min-h-0 flex-1 flex flex-col items-start overflow-y-auto overflow-x-hidden overscroll-contain px-2.5 py-4 gap-3 md:gap-2 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1"
       >
-        <NavItem to="/" icon={Search} label="Ricerca" hint="⌘K" id="tour-nav-search" onClick={handleSearchClick} layout={layout} />
+        <NavItem to="/" icon={Search} label="Ricerca" hint={PALETTE_SHORTCUT} id="tour-nav-search" onClick={handleSearchClick} layout={layout} />
         {quickNorms.length > 0 && (
           <div className="-mt-1 ml-3 w-5 h-1 rounded-full bg-amber-500/60" title={`${quickNorms.length} preferiti`} />
         )}
@@ -469,7 +472,8 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
       )}>
         <button
           ref={userButtonRef}
-          aria-label={normaChanges > 0 ? `Menu utente, ${normaChangesLabel(normaChanges)}` : 'Menu utente'}
+          // With words the button shows the username, so its name says it too (label in name, WCAG 2.5.3).
+          aria-label={`Menu utente${words && user?.username ? ` di ${user.username}` : ''}${normaChanges > 0 ? `, ${normaChangesLabel(normaChanges)}` : ''}`}
           aria-haspopup="menu"
           aria-expanded={showUserMenu}
           onClick={() => (showUserMenu ? closeMenu(false) : openMenu('first'))}
@@ -477,7 +481,8 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
           className={cn(
             "relative flex shrink-0 items-center rounded-xl transition-colors duration-200",
             "hover:bg-slate-100 dark:hover:bg-slate-800",
-            words ? "w-full h-11 gap-2.5 overflow-hidden px-1 text-left" : "justify-center w-11 h-11",
+            // The avatar is 36 px below `md` and 32 px from it: inset as in the rail, so widening moves it not.
+            words ? "w-full h-11 gap-2.5 overflow-hidden px-1 md:px-1.5 text-left" : "justify-center w-11 h-11",
             showUserMenu && "bg-primary-50 dark:bg-primary-900/10"
           )}
         >

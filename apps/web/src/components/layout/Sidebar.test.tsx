@@ -516,7 +516,8 @@ describe('Sidebar — the words', () => {
     expect(forum).toHaveTextContent(/^Forum3$/);
     // The section is named beside its mark; the button keeps its name.
     expect(screen.getByRole('button', { name: /^Sezione: Forum/ })).toHaveTextContent('Forum');
-    expect(screen.getByRole('button', { name: 'Menu utente' })).toHaveTextContent('tester');
+    // The username is shown, so the name carries it (label in name).
+    expect(screen.getByRole('button', { name: 'Menu utente di tester' })).toHaveTextContent('tester');
   });
 
   it('writes the group headings: the section, or Gymnasium\'s «Studia» and «Contribuisci»', () => {
@@ -539,9 +540,10 @@ describe('Sidebar — the words', () => {
     expect(label()).toBeNull();
   });
 
-  it('shows ⌘K beside «Ricerca» on the desktop, not in the phone\'s drawer', () => {
+  it('shows the palette\'s shortcut beside «Ricerca» on the desktop, as the keyboard writes it, not in the phone\'s drawer', () => {
     renderLayout('wide');
-    expect(screen.getByRole('link', { name: 'Ricerca' })).toHaveTextContent('Ricerca⌘K');
+    // Read once when the module loads, from `navigator.platform`: «⌘K» on a Mac, «Ctrl K» elsewhere.
+    expect(screen.getByRole('link', { name: 'Ricerca' })).toHaveTextContent(/^Ricerca(⌘K|Ctrl K)$/);
     cleanup();
     renderLayout('drawer');
     expect(screen.getByRole('link', { name: 'Ricerca' })).toHaveTextContent(/^Ricerca$/);
@@ -551,12 +553,12 @@ describe('Sidebar — the words', () => {
     renderLayout('drawer');
     for (const link of screen.getAllByRole('link')) expect(link).toHaveClass('h-11', 'w-full');
     expect(screen.getByRole('complementary')).toHaveClass('w-[17rem]');
-    expect(screen.getByRole('button', { name: 'Menu utente' }).parentElement).toHaveClass('pb-[max(1rem,env(safe-area-inset-bottom))]');
+    expect(screen.getByRole('button', { name: 'Menu utente di tester' }).parentElement).toHaveClass('pb-[max(1rem,env(safe-area-inset-bottom))]');
   });
 
   it('opens the user menu over the wide button, not beside it', () => {
     renderLayout('drawer');
-    const button = screen.getByRole('button', { name: 'Menu utente' });
+    const button = screen.getByRole('button', { name: 'Menu utente di tester' });
     vi.spyOn(button, 'getBoundingClientRect').mockReturnValue({ top: 700, bottom: 744, left: 10, right: 262 } as DOMRect);
     openUserMenu();
     const menu = screen.getByRole('menu', { name: 'Menu utente' });

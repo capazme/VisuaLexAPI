@@ -14,7 +14,10 @@ function stubViewport(wide: boolean) {
     expect(query).toBe('(min-width: 1280px)');
     return mql as unknown as MediaQueryList;
   });
-  return (matches: boolean) => listeners.forEach((fn) => fn({ matches } as MediaQueryListEvent));
+  return (matches: boolean) => {
+    mql.matches = matches;
+    listeners.forEach((fn) => fn({ matches } as MediaQueryListEvent));
+  };
 }
 
 beforeEach(() => {
@@ -32,7 +35,8 @@ describe('the desktop sidebar\'s width (Gymnasium spec §4)', () => {
     expect(result.current.toggle).toBeTypeOf('function');
   });
 
-  it('is the icon rail below xl, with no toggle, whatever the stored choice', () => {
+  it.each([false, true])('is the icon rail below xl, with no toggle, whatever the stored choice (narrowed: %s)', (collapsed) => {
+    sidebarWidthStore.setState({ collapsed });
     stubViewport(false);
     const { result } = renderHook(() => useDesktopSidebar());
     expect(result.current).toMatchObject({ layout: 'rail', width: SIDEBAR_RAIL_WIDTH, toggle: undefined });

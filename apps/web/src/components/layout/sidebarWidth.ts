@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { guardedStorage } from '../../utils/guardedStorage';
+import { useMediaQuery } from '../../hooks/useIsDesktop';
 
 /** How the sidebar draws its entries: icons with a label on hover and focus, icons and words, or the phone's drawer. */
 export type SidebarLayout = 'rail' | 'wide' | 'drawer';
@@ -34,29 +34,12 @@ export const sidebarWidthStore = create<{ collapsed: boolean; toggle: () => void
   ),
 );
 
-function matchesWide(): boolean {
-  return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(WIDE_QUERY).matches;
-}
-
-/** Whether the viewport is `xl` or wider, following resizes. */
-function useWideViewport(): boolean {
-  const [wide, setWide] = useState(matchesWide);
-  useEffect(() => {
-    if (typeof window.matchMedia !== 'function') return;
-    const mql = window.matchMedia(WIDE_QUERY);
-    const onChange = (e: MediaQueryListEvent) => setWide(e.matches);
-    mql.addEventListener('change', onChange);
-    return () => mql.removeEventListener('change', onChange);
-  }, []);
-  return wide;
-}
-
 /**
  * The desktop column's layout: from `xl` the bar with words unless the user narrowed it; between `lg`
  * and `xl` the icon rail, with no toggle (there is no room for words beside a reading row).
  */
 export function useDesktopSidebar() {
-  const roomForWords = useWideViewport();
+  const roomForWords = useMediaQuery(WIDE_QUERY);
   const collapsed = sidebarWidthStore((s) => s.collapsed);
   const toggle = sidebarWidthStore((s) => s.toggle);
   const layout: SidebarLayout = roomForWords && !collapsed ? 'wide' : 'rail';

@@ -85,13 +85,14 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (Oggi, the home `/studia/ripasso`, and Dossier) and «Contribuisci» (Le mie schede, Da validare for validators);
   Academia, Assistente and Grafo (`VITE_FEATURE_MERLT*`); Forum, the Forum with its count.
   **Words, not only icons** (`layout`, `sidebarWidth.ts`): from `xl` the desktop column is a 224 px bar with
-  icon and word and the groups' headings (the section's name, or «Studia» and «Contribuisci»), ⌘K beside
-  «Ricerca»; between `lg` and `xl` the 64 px rail of icons, each labelled on hover and keyboard focus; below
+  icon and word and the groups' headings (the section's name, or «Studia» and «Contribuisci»), the palette's
+  shortcut beside «Ricerca» (⌘K on a Mac, Ctrl K elsewhere); between `lg` and `xl` the 64 px rail of icons, each labelled on hover and keyboard focus; below
   `lg` the drawer, icon and word in rows of 44 px, its foot clear of the home indicator. From `xl` a control
   at the foot narrows the bar to the rail and widens it again, remembered in the browser under
   `visualex-sidebar` (`guardedStorage`); wide by default. Every column keeps 10 px of side padding and every
   icon a 44 px box, so widening moves no icon: `Layout` animates the column's width (instantly under reduced
-  motion) and the words are clipped as it moves. With words the user menu opens over its button, not beside. At the bottom only the user menu, whose dropdown holds Impostazioni,
+  motion) and the words are clipped as it moves. With words the user menu opens over its button, not beside,
+  and the button's name carries the username it shows («Menu utente di …», label in name). At the bottom only the user menu, whose dropdown holds Impostazioni,
   Cronologia (moved there by the owner, 13 Oct 2026; the saved norms that changed are counted on the avatar
   and beside the entry, and both names say it in words: «Menu utente, 2 norme salvate cambiate»),
   «Collega un'app AI», the theme, «Scorciatoie (?)», «Pannello Admin» (admins) and «Esci». The dropdown is a portalled WAI-ARIA
@@ -1101,7 +1102,8 @@ Duplicating any of these is a defect, not a shortcut.
   Reach for these before writing a second comparison of two articles.
 - `hooks/useIsDesktop.ts` — viewport check for components that must render
   *structurally* different markup per breakpoint (portal vs. inline). It existed
-  as two private copies before round 2a; do not make a third. For anything a CSS
+  as two private copies before round 2a; do not make a third. `useMediaQuery(query)`, beside it, is
+  the same check for another breakpoint (the sidebar's `xl`). For anything a CSS
   breakpoint can express, use the CSS breakpoint.
 - `utils/articleSuffixes.ts` — `ARTICLE_ORDINAL_SUFFIXES` and
   `ARTICLE_SUFFIX_ALTERNATION`, the one ordinal table behind every article-number
