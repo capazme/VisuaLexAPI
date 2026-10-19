@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../../../../lib/utils';
 import { STUDY_MODE_SHORTCUTS } from './hooks/useStudyModeShortcuts';
 import type { StudyModeTheme } from './StudyMode';
+import { spring } from '../../../../lib/motion';
 
 interface StudyModeFooterProps {
   visible: boolean;
@@ -39,7 +40,7 @@ export function StudyModeFooter({ visible, theme }: StudyModeFooterProps) {
           initial={{ y: '100%', opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: '100%', opacity: 0 }}
-          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+          transition={spring.snappy}
           className={cn(
             "absolute bottom-0 left-0 right-0 z-20 border-t",
             styles.bg,

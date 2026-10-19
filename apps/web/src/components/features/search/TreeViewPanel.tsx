@@ -11,6 +11,7 @@ import type { RubrichePart } from '../../../hooks/useAnnexNavigation';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { cleanSectionTitle } from '../../../utils/sectionTitle';
 import { abrogatiFor, rubricheFor } from '../../../utils/actRubriche';
+import { spring } from '../../../lib/motion';
 
 /** Window geometry, also used to keep the parked position inside the viewport. */
 const WINDOW_WIDTH = 420;
@@ -520,7 +521,7 @@ export function TreeViewPanel({
                 </div>
                 <button
                   onClick={onClose}
-                  className="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-all border border-transparent hover:border-slate-200 dark:hover:border-slate-700 shadow-sm"
+                  className="p-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700 shadow-sm"
                 >
                   <X size={20} />
                 </button>
@@ -563,7 +564,6 @@ export function TreeViewPanel({
                       <motion.button
                         key={annex.number || 'main'}
                         onClick={() => handleAnnexTabClick(annex.number)}
-                        whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         // No `layout`. The annex list is static — nothing ever
                         // enters, leaves or reorders — so a layout animation has
@@ -572,9 +572,9 @@ export function TreeViewPanel({
                         // rubriche landing seconds after the tree added exactly
                         // such a re-render: the section moved on its own while
                         // the reader was looking at it, and a chip mid-animation
-                        // rendered blank. `whileHover`/`whileTap` stay: a scale
-                        // transform does not affect layout, so siblings hold
-                        // still.
+                        // rendered blank. `whileTap` stays: a scale transform does
+                        // not affect layout, so siblings hold still. No hover
+                        // scale: a row of chips takes the colour change only.
                         className={cn(
                           "relative px-3 py-2 text-xs font-semibold rounded-xl transition-colors border overflow-hidden",
                           isActive
@@ -587,7 +587,7 @@ export function TreeViewPanel({
                           <motion.div
                             layoutId="annexActiveGlow"
                             className="absolute inset-0 bg-gradient-to-br from-primary-400/20 to-transparent"
-                            transition={{ type: 'spring', damping: 30, stiffness: 400 }}
+                            transition={spring.snappy}
                           />
                         )}
                         <span className="relative block truncate max-w-[140px]">{annex.label}</span>
@@ -785,7 +785,7 @@ export function TreeViewPanel({
             initial={{ x: '100%', opacity: 0.9 }}
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: '100%', opacity: 0.9 }}
-            transition={{ type: 'spring', damping: 35, stiffness: 400 }}
+            transition={spring.snappy}
             className="fixed right-0 top-0 bottom-0 w-full sm:w-[450px] bg-white dark:bg-slate-900 shadow-2xl z-[100] flex flex-col border-l border-slate-200 dark:border-slate-800"
           >
             {panelBody}

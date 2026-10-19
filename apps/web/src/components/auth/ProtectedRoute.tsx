@@ -2,9 +2,8 @@
  * Protected route wrapper that requires authentication
  */
 import { Navigate, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { BookOpen } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { BookMark } from '../ui/BookMark';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -14,28 +13,12 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { isAuthenticated, loading } = useAuth();
   const location = useLocation();
 
-  // Show premium branded loading state while checking authentication
+  // While the session is checked: the book of the splash in index.html, at the same place and size, so
+  // the hand-over from the splash to the app does not jump; it breathes instead of tracing again.
   if (loading) {
     return (
-      <div className="fixed inset-0 flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 z-50">
-        {/* Pulsing Logo with Blur Effect */}
-        <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ repeat: Infinity, duration: 1.5, repeatType: 'reverse' }}
-          className="mb-6 relative"
-        >
-          {/* Blur Background */}
-          <div className="absolute inset-0 bg-blue-500 blur-xl opacity-20 rounded-full" />
-          {/* Icon */}
-          <BookOpen className="w-16 h-16 text-blue-600 relative z-10" />
-        </motion.div>
-
-        {/* Branded Text */}
-        <div className="space-y-2 text-center">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">VisuaLex API</h3>
-          <p className="text-sm text-slate-500 animate-pulse">Caricamento delle risorse in corso...</p>
-        </div>
+      <div role="status" aria-label="Caricamento di VisuaLex" className="fixed inset-0 z-50 grid place-items-center bg-slate-50 text-primary-600 dark:bg-slate-950 dark:text-primary-400">
+        <BookMark size={56} breathe />
       </div>
     );
   }

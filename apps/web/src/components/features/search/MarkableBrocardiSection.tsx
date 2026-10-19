@@ -118,7 +118,7 @@ export function MarkableBrocardiSection({
   }
 
   return (
-    <div className="card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm rounded-xl mb-3 overflow-hidden transition-all hover:shadow-md">
+    <div className="card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm rounded-xl mb-3 overflow-hidden transition-[color,background-color,border-color,box-shadow] hover:shadow-md">
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex items-center justify-between px-4 py-3 bg-slate-50/50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors text-left"

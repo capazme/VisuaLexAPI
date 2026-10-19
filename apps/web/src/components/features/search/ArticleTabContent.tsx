@@ -824,7 +824,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     ) : null;
 
     return (
-        <div className="animate-in fade-in duration-300 relative">
+        <div className="animate-in fade-in duration-200 relative">
             <ReadingToolbar
                 normaData={norma_data}
                 versionChip={display.chip}

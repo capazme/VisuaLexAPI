@@ -80,7 +80,7 @@ export function ConnectAiAppPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-8 pb-12">
       <header>
-        <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900 dark:text-white">
+        <h1 className="flex items-center gap-2 font-serif text-3xl font-medium tracking-tight text-slate-900 dark:text-slate-50">
           <Bot className="text-primary-500" size={24} aria-hidden /> Collega un’app AI
         </h1>
         <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">

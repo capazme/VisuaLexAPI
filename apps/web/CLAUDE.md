@@ -150,8 +150,26 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (transformed, stacked) is not confined to it; each open `Modal` is on a module-level
   stack and only the top-most handles Tab (the focus trap) and Esc, so a dialog opened
   from a dialog keeps the keyboard.
+  `Button` has four variants (spec `2026-10-18-redesign-inchiostro` §5.1): `primary` (toga-600, white),
+  `secondary` (paper with an ink-200 hairline), `quiet` (text only) and `danger` (red-600) — `ghost` and
+  `outline` are the earlier names of `quiet` and `secondary` —, no gradient, glow or hover lift, a minimum
+  height of 36 px on a desktop and 44 px on a phone; `loading` keeps the label and puts a spinner in the
+  icon's place (`aria-busy`), `status="error" | "success"` shows the outcome of the last press. `Modal`
+  enters in `dur.panel` on `ease.drawer`, growing from 0.97, and `Sheet` rises from its edge on the same
+  timing; both only fade under reduced motion (`useReducedMotion`). `Toast` takes `spring.snappy`, rises
+  from the edge it lives on and pauses its time while `document.hidden`; the undo toast's countdown lives
+  in `useUndoableAction` and does not pause. `Tooltip` waits 500 ms under a pointer, opens at once and
+  without motion within 300 ms of another closing, and at once on keyboard focus.
   Interaction tokens live in `constants/interactions.ts`, stacking bands in
-  `constants/zIndex.ts`. Compose these rather than hand-rolling Tailwind.
+  `constants/zIndex.ts`. Compose these rather than hand-rolling Tailwind: `TRANSITION` names the
+  properties it moves (never `all`; `scale` and `translate` included, `box-shadow` left out so the focus
+  ring — `FOCUS_RING`, toga-500 on a paper offset — appears at once), `ACTIVE` presses to 0.97 on buttons
+  only, `HOVER_LIFT` lifts 1 px for a fine pointer and goes on nothing that is a row or a list item.
+  **Motion** comes from `lib/motion.ts` (`ease`, `dur`, `spring.snappy` for panels and rows,
+  `spring.gentle` for rare moments): no component types a spring or a curve, and a transition names what
+  changes. `lib/motion.guard.test.ts` fails on a `transition-all` or a hand-typed spring; the Gymnasium
+  celebration's stamp is the one exception. A row or a list item takes a colour change on hover, never a
+  scale or a lift.
 
 ## Frontend State
 
@@ -1562,6 +1580,22 @@ meant to stay split; add new features as new files, not inside the shells:
     are different tokens** — `bg-primary` (213 uses) comes from the first and
     must keep working. Everything else the config declares — `font-sans`,
     `shadow-glow`, `animate-shimmer` — is still inert.
+    The entrance classes of `tailwindcss-animate` (`animate-in`, `fade-in`,
+    `zoom-in-95`, `slide-in-from-*`; 33 uses in 25 files) were inert the same
+    way — no plugin was ever installed — until 18 October 2026: they are now
+    `@utility` rules at the end of `index.css` that move with the individual
+    `translate` and `scale` properties, so they compose with floating-ui's
+    positioning `transform` instead of replacing it (gotcha 10), last at
+    most 200 ms and fill `backwards` only: a `both` fill keeps the element a
+    containing block and a stacking context after the entrance (gotcha 22). `theme.test.ts` checks they generate CSS. The palette is the
+    «Inchiostro» one (spec `2026-10-18-redesign-inchiostro`): `slate`, `gray`,
+    `zinc`, `neutral` are aliases of `ink`, `blue`, `indigo`, `primary-<n>` of
+    `toga`; motion curves for Framer Motion live in `lib/motion.ts`.
+    A `dark:` variant `@apply`'d inside a pseudo-element's rule is just as silent:
+    it compiles to `::-webkit-scrollbar-thumb:where(.dark, .dark *)`, which the
+    browser drops (until 19 October 2026 every dark scrollbar kept its light
+    thumb). Write the dark scope before the pseudo-element,
+    `:where(.dark, .dark *)::…`, as `index.css` does; `theme.test.ts` checks it.
 
 30. **A bare `fetch` to a scraping route works in development and answers 401 in
     production.** Vite proxies those routes to the Python API with no login; the ingress
@@ -1599,3 +1633,12 @@ meant to stay split; add new features as new files, not inside the shells:
     surface (a practice's row, a dossier row, the comparison) names its version
     (`versionTabSuffix`, `historicalItemLabel`); the banner and the chip sit
     beside the text, never in it (root rule 23).
+
+33. **Tailwind v4's `scale-*` and `translate-*` are not `transform`.** They write the
+    individual `scale` and `translate` properties, so a `transition-[…,transform,…]` list
+    leaves `active:scale-[0.97]` or a `-translate-y-px` lift snapping, with no warning;
+    name `scale` and `translate` (as `TRANSITION` does) or use `transition-transform`, which
+    lists all four. The same split is what lets the entrance utilities (gotcha 29) compose with
+    floating-ui's positioning `transform`, and what breaks them on an element that also writes
+    a translate or scale class of its own (the keyframe replaces it while it runs): none does
+    today. `theme.test.ts` compiles `TRANSITION` and checks its rule.

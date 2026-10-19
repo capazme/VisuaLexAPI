@@ -16,7 +16,7 @@ export function StudiaPage() {
   return (
     <div className="mx-auto flex h-full w-full max-w-6xl flex-col gap-4">
       <header className="border-b border-slate-200 pb-3 dark:border-slate-800">
-        <h1 className="text-xl font-bold text-slate-900 md:text-2xl dark:text-white">VisuaLex Gymnasium</h1>
+        <h1 className="font-serif text-3xl font-medium tracking-tight text-slate-900 dark:text-slate-50">VisuaLex Gymnasium</h1>
       </header>
       <Outlet context={{ validator: loading ? undefined : isValidator } satisfies StudiaOutletContext} />
     </div>

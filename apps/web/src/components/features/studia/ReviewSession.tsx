@@ -61,7 +61,7 @@ function ArticlePanel({ anchor, desktop, onClose, onOpenInReader, showToast }: A
   return (
     <aside
       aria-label="Articolo"
-      className="min-w-0 rounded-lg border border-slate-200 p-4 md:sticky md:top-0 md:max-h-screen md:overflow-y-auto dark:border-slate-800"
+      className="min-w-0 rounded-lg border border-slate-200 p-4 md:sticky md:top-0 md:max-h-dvh md:overflow-y-auto dark:border-slate-800"
     >
       <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">{label}</h2>

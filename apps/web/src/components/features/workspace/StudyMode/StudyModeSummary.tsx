@@ -166,7 +166,7 @@ export function StudyModeSummary({
               onClick={() => setColorFilter(active ? 'all' : c)}
               aria-pressed={active}
               className={cn(
-                'flex items-center justify-center w-5 h-5 rounded-full transition-all',
+                'flex items-center justify-center w-5 h-5 rounded-full transition-[color,background-color,border-color,opacity,scale]',
                 active
                   ? 'outline outline-2 outline-offset-2 outline-current scale-110'
                   : 'opacity-50 hover:opacity-100',

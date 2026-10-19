@@ -184,7 +184,7 @@ function App() {
           path="/admin/*"
           element={
             <AdminRoute>
-              <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Caricamento...</div>}>
+              <Suspense fallback={<div className="flex items-center justify-center min-h-svh">Caricamento...</div>}>
                 <AdminPage />
               </Suspense>
             </AdminRoute>
