@@ -6,6 +6,13 @@ import { DossierListView } from './DossierListView';
 import { sectionStore } from '../../../features/sections/useSection';
 import type { Dossier, NormaVisitata } from '../../../types';
 
+// The list's viewport (`useIsDesktop`): a phone, as jsdom's matchMedia shim says, unless a test says otherwise.
+const viewport = vi.hoisted(() => ({ desktop: false }));
+vi.mock('../../../hooks/useIsDesktop', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../hooks/useIsDesktop')>()),
+  useIsDesktop: () => viewport.desktop,
+}));
+
 const CIVIL: NormaVisitata = { tipo_atto: 'codice civile', numero_atto: '262', data: '1942-03-16', numero_articolo: '1284' };
 const PENAL: NormaVisitata = { tipo_atto: 'codice penale', numero_atto: '1398', data: '1930-10-19', numero_articolo: '575' };
 const PAST: NormaVisitata = { ...CIVIL, versione: 'vigente', data_versione: '2007-12-29' };
@@ -22,6 +29,7 @@ function open(items: NormaVisitata[]) {
 }
 
 beforeEach(() => {
+  viewport.desktop = false;
   appStore.setState({ practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [] });
   sectionStore.setState({ section: 'opus', dossierKind: 'lavoro' });
 });
@@ -209,6 +217,7 @@ describe('DossierListView — the category menu (D1)', () => {
   const renderList = () => render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
 
   it('lists the categories capitalised and in alphabetical order, «Tutte le categorie» first, one for «gdpr» and «GDPR»', () => {
+    viewport.desktop = true;
     appStore.setState({ dossiers: listed });
     renderList();
     const menu = screen.getByRole('combobox', { name: 'Filtra per categoria' });
@@ -217,6 +226,14 @@ describe('DossierListView — the category menu (D1)', () => {
     expect(options).toEqual(['Tutte le categorie', 'Accesso', 'Appello', 'Cancellazione', 'DPO', 'GDPR']);
     // The chips are gone.
     expect(screen.queryByRole('button', { name: 'Tutti' })).toBeNull();
+  });
+
+  it('says «Tutte» on a phone, where the half-width menu has no room for «Tutte le categorie»', () => {
+    appStore.setState({ dossiers: listed });
+    renderList();
+    const menu = screen.getByRole('combobox', { name: 'Filtra per categoria' }) as HTMLSelectElement;
+    expect(Array.from(menu.options).map((o) => o.textContent)).toEqual(['Tutte', 'Accesso', 'Appello', 'Cancellazione', 'DPO', 'GDPR']);
+    expect(menu.value).toBe('');
   });
 
   it('filters by the category chosen, and «Tutte le categorie» brings the list back', () => {

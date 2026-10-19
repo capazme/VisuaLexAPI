@@ -34,6 +34,7 @@ import { kindLabel } from './dossierKinds';
 import { actsSummary, layoutDossier } from './dossierLayout';
 import { deleteDossierMessage, deleteDossierWithUndo } from './deleteDossierWithUndo';
 import { hasTagCategory, tagCategories, tagLabel } from '../../../utils/tagLabel';
+import { useIsDesktop } from '../../../hooks/useIsDesktop';
 
 type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -62,6 +63,9 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   // The section's kind (sections spec S7): Opus lists the dossiers di lavoro, Gymnasium those di studio.
   const sectionKind = useDossierKind();
+  // An option's text has no breakpoint: on a phone the half-width menu says «Tutte», which
+  // «Tutte le categorie» did not fit beside the arrow at 390 px.
+  const isDesktop = useIsDesktop();
   const [sortBy, setSortBy] = useState<SortBy>('date');
 
   const [editingDossier, setEditingDossier] = useState<Dossier | null>(null);
@@ -329,7 +333,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
               aria-label="Filtra per categoria"
               className={cn(LIST_MENU, 'md:flex-none md:max-w-[16rem]')}
             >
-              <option value="">Tutte le categorie</option>
+              <option value="">{isDesktop ? 'Tutte le categorie' : 'Tutte'}</option>
               {categories.map((category) => (
                 <option key={category.key} value={category.key}>{category.label}</option>
               ))}
