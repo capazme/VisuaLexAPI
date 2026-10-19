@@ -125,6 +125,16 @@ def test_no_expert_is_granted_cerca_brocardi():
         assert "cerca_brocardi" not in tools, expert_type
 
 
+def test_no_curated_live_tool_is_one_that_reads_brocardi():
+    # The mcp-legal-it tools that call Brocardi whatever their arguments (read in
+    # vendor/mcp-legal-it, v2.3.3). `cite_law` reaches it only through
+    # `include_annotations`, which the adapter withholds (tests below).
+    brocardi_tools = {"cerca_brocardi", "fetch_law_annotations", "giurisprudenza_articolo"}
+    assert brocardi_tools.isdisjoint(BaseExpert.LIVE_LEGAL_TOOLS)
+    for tools in MultiExpertOrchestrator.EXPERT_MCP_TOOLS.values():
+        assert brocardi_tools.isdisjoint(tools)
+
+
 def test_cerca_brocardi_keeps_its_slot_in_the_tool_vocabulary():
     # Append-only: removing or moving it would break saved tool-gating checkpoints.
     assert TOOL_VOCAB.index("cerca_brocardi") == 2
