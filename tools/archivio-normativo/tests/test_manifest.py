@@ -44,17 +44,17 @@ class TestLoading:
 
     def test_act_inherits_default_enrich_and_can_override(self, tmp_path):
         data = minimal()
-        data["defaults"] = {"enrich": ["brocardi"]}
+        data["defaults"] = {"enrich": ["cassazione"]}
         data["acts"].append({
             "id": "gdpr", "area": "ue", "label": "GDPR", "source": "eurlex",
             "act_type": "regolamento ue", "date": "2016", "act_number": "679",
             "celex": "32016R0679", "cite": "GDPR", "units": ["articles", "recitals"],
-            "enrich": ["annotazioni", "giurisprudenza"],
+            "enrich": ["attuazione", "giurisprudenza"],
         })
         m = load_manifest(write(tmp_path, data))
-        assert m.act("cc").enrich == ("brocardi",)
+        assert m.act("cc").enrich == ("cassazione",)
         assert m.act("gdpr").enrich == (
-            "brocardi", "cassazione", "amministrativa", "tributaria", "cgue", "costituzionale",
+            "attuazione", "cassazione", "amministrativa", "tributaria", "cgue", "costituzionale",
         )
         assert m.act("gdpr").wants_recitals() is True
         assert m.act("gdpr").is_eu() is True
@@ -164,10 +164,17 @@ class TestKinds:
         assert KINDS["base_ue"].level == "act"
         assert KINDS["brocardi"].level == "unit"
 
-    def test_expand_resolves_aliases_and_groups_in_order(self):
-        assert expand_kinds(["annotazioni", "giurisprudenza", "cassazione"]) == (
-            "brocardi", "cassazione", "amministrativa", "tributaria", "cgue", "costituzionale",
+    def test_expand_resolves_groups_in_order(self):
+        assert expand_kinds(["attuazione", "giurisprudenza", "cassazione"]) == (
+            "attuazione", "cassazione", "amministrativa", "tributaria", "cgue", "costituzionale",
         )
+
+    @pytest.mark.parametrize("name", ["brocardi", "annotazioni", "Brocardi"])
+    def test_brocardi_is_refused_by_name_and_alias(self, name):
+        # Brocardi is no longer a source (D-078): the kind would refetch every
+        # article on every run and store nothing.
+        with pytest.raises(ManifestError, match="D-078"):
+            expand_kinds([name])
 
     def test_expand_rejects_unknown(self):
         with pytest.raises(ManifestError, match="oracolo"):

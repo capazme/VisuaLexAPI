@@ -149,8 +149,8 @@ async def run_build(args, manifest: Manifest) -> int:
         status = "done"
         pipeline = None
         try:
-            # One NDJSON line carries an article and its Brocardi annotations;
-            # aiohttp's default line limit (LineTooLong) is too small for the long ones.
+            # One NDJSON line carries a whole article (long ones exceed
+            # aiohttp's default line limit, LineTooLong).
             async with aiohttp.ClientSession(read_bufsize=2**20) as session:
                 visualex = VisuaLexClient(base_url, session, throttle, on_retry=on_retry)
                 if not args.dry_run and _needs_legalit(specs, override):

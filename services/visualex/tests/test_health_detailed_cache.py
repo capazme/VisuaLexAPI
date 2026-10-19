@@ -37,7 +37,6 @@ def _patch_probes(fn):
     return (
         patch.object(app_module.normattiva_scraper, 'request_document', fn),
         patch.object(app_module.eurlex_scraper, 'request_document', fn),
-        patch.object(app_module.brocardi_scraper, 'request_document', fn),
     )
 
 
@@ -45,8 +44,8 @@ def _patch_probes(fn):
 async def test_two_back_to_back_calls_share_one_probe(client, monkeypatch):
     monkeypatch.setenv('HEALTH_DETAILED_TTL', '120')
     probe = AsyncMock(return_value='<html>ok</html>')
-    p1, p2, p3 = _patch_probes(probe)
-    with p1, p2, p3:
+    p1, p2 = _patch_probes(probe)
+    with p1, p2:
         first = await client.get('/health/detailed')
         second = await client.get('/health/detailed')
 
@@ -60,34 +59,36 @@ async def test_two_back_to_back_calls_share_one_probe(client, monkeypatch):
     assert second_body['cached'] is True
     assert second_body['status'] == first_body['status']
 
-    # One probe = one request_document call per source (normattiva, eurlex,
-    # brocardi), not one per HTTP call into /health/detailed.
-    assert probe.call_count == 3
+    # One probe = one request_document call per source (normattiva, eurlex),
+    # not one per HTTP call into /health/detailed. Brocardi is no longer a
+    # source (D-078), so it is not probed.
+    assert probe.call_count == 2
+    assert 'brocardi' not in first_body['services']
 
 
 @pytest.mark.asyncio
 async def test_cache_expiry_triggers_a_second_probe(client, monkeypatch):
     monkeypatch.setenv('HEALTH_DETAILED_TTL', '0.05')
     probe = AsyncMock(return_value='<html>ok</html>')
-    p1, p2, p3 = _patch_probes(probe)
-    with p1, p2, p3:
+    p1, p2 = _patch_probes(probe)
+    with p1, p2:
         first = await client.get('/health/detailed')
         assert (await first.get_json())['cached'] is False
-        assert probe.call_count == 3
+        assert probe.call_count == 2
 
         await asyncio.sleep(0.1)
 
         second = await client.get('/health/detailed')
         assert (await second.get_json())['cached'] is False
-        assert probe.call_count == 6
+        assert probe.call_count == 4
 
 
 @pytest.mark.asyncio
 async def test_a_failing_probe_is_cached_too(client, monkeypatch):
     monkeypatch.setenv('HEALTH_DETAILED_TTL', '120')
     probe = AsyncMock(side_effect=RuntimeError('source is down'))
-    p1, p2, p3 = _patch_probes(probe)
-    with p1, p2, p3:
+    p1, p2 = _patch_probes(probe)
+    with p1, p2:
         first = await client.get('/health/detailed')
         second = await client.get('/health/detailed')
 
@@ -102,7 +103,7 @@ async def test_a_failing_probe_is_cached_too(client, monkeypatch):
     assert second_body['cached'] is True
 
     # A flapping source must not get hammered by every caller either.
-    assert probe.call_count == 3
+    assert probe.call_count == 2
 
 
 @pytest.mark.asyncio
@@ -114,8 +115,8 @@ async def test_concurrent_cold_calls_run_a_single_probe(client, monkeypatch):
         return '<html>ok</html>'
 
     probe = AsyncMock(side_effect=slow_probe)
-    p1, p2, p3 = _patch_probes(probe)
-    with p1, p2, p3:
+    p1, p2 = _patch_probes(probe)
+    with p1, p2:
         results = await asyncio.gather(
             client.get('/health/detailed'),
             client.get('/health/detailed'),
@@ -125,6 +126,6 @@ async def test_concurrent_cold_calls_run_a_single_probe(client, monkeypatch):
     for response in results:
         assert response.status_code == 200
 
-    # The lock serialises the cold callers onto a single probe (3 calls: one
-    # per source), not 3 probes (9 calls) for 3 concurrent requests.
-    assert probe.call_count == 3
+    # The lock serialises the cold callers onto a single probe (2 calls: one
+    # per source), not 3 probes (6 calls) for 3 concurrent requests.
+    assert probe.call_count == 2

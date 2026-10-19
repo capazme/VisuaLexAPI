@@ -23,14 +23,12 @@ from visualex_api.tools.config import (
 from visualex_api.tools.history_manager import history_manager
 from visualex_api.tools.dossier_manager import dossier_manager
 from visualex_api.tools.norma import Norma, NormaVisitata
-from visualex_api.services.brocardi_scraper import BrocardiScraper
 from visualex_api.services.normattiva_scraper import NormattivaScraper
 from visualex_api.services.eurlex_scraper import EurlexScraper
 from visualex_api.services.pdfextractor import extract_pdf, cleanup_browser_pool, is_allowed_pdf_urn
 from visualex_api.services.akn_parser import normalize_article_key
 from visualex_api.services import act_dates, massimario_portal
 from visualex_api.services.normattiva_validity import (
-    is_historical_request,
     read_validity,
     reject_future_version_date,
 )
@@ -120,7 +118,6 @@ def add_to_history(data: dict):
 
 
 # Inizializzazione degli scraper
-brocardi_scraper = BrocardiScraper()
 normattiva_scraper = NormattivaScraper()
 eurlex_scraper = EurlexScraper()
 
@@ -242,7 +239,8 @@ class NormaController:
         """
         Endpoint che invia in streaming i risultati della ricerca degli articoli.
         I risultati vengono inviati man mano che vengono trovati.
-        Supporta anche info Brocardi in parallelo.
+        Brocardi is no longer a source (D-078): a `show_brocardi_info` flag
+        from an older client is ignored and no line carries Brocardi fields.
         """
         data = await request.get_json()
         if not data:
@@ -258,7 +256,6 @@ class NormaController:
             normavisitate = await self.create_norma_visitata_from_data(data)
         except Exception as exc:
             return self._error_response(exc, 'stream_article_text')
-        show_brocardi = data.get('show_brocardi_info', False)
         log.info("NormaVisitata instances created", normavisitate=[nv.to_dict() for nv in normavisitate])
 
         async def result_generator():
@@ -270,52 +267,15 @@ class NormaController:
                     continue
 
                 try:
-                    # Fetch article text and Brocardi info in parallel if requested
-                    tasks = [scraper.get_document(nv)]
-                    # Brocardi is current doctrine with no date: never asked for a past text.
-                    if (
-                        show_brocardi
-                        and isinstance(scraper, NormattivaScraper)
-                        and not is_historical_request(nv.versione, nv.data_versione)
-                    ):
-                        tasks.append(brocardi_scraper.get_info(nv))
-
-                    results = await asyncio.gather(*tasks, return_exceptions=True)
-
-                    # Process article text
-                    if isinstance(results[0], Exception):
-                        result = {'error': str(results[0]), 'norma_data': nv.to_dict()}
-                    else:
-                        article_text, url = results[0]
-                        result = {
-                            'article_text': article_text,
-                            'norma_data': nv.to_dict(),
-                            'url': url
-                        }
-                        validity = await self._validity_for(scraper, nv, url)
-                        if validity:
-                            result['validity'] = validity
-
-                        # Add Brocardi info if available
-                        if show_brocardi and len(results) > 1:
-                            if isinstance(results[1], Exception):
-                                result['brocardi_error'] = str(results[1])
-                            else:
-                                brocardi_info = results[1]
-                                result['brocardi_info'] = {
-                                    'position': brocardi_info[0] if brocardi_info[0] else None,
-                                    'link': brocardi_info[2],
-                                    'Brocardi': brocardi_info[1].get('Brocardi') if brocardi_info[1] and 'Brocardi' in brocardi_info[1] else None,
-                                    'Ratio': brocardi_info[1].get('Ratio') if brocardi_info[1] and 'Ratio' in brocardi_info[1] else None,
-                                    'Spiegazione': brocardi_info[1].get('Spiegazione') if brocardi_info[1] and 'Spiegazione' in brocardi_info[1] else None,
-                                    'Massime': brocardi_info[1].get('Massime') if brocardi_info[1] and 'Massime' in brocardi_info[1] else None,
-                                    'Relazioni': brocardi_info[1].get('Relazioni') if brocardi_info[1] and 'Relazioni' in brocardi_info[1] else None,
-                                    'RelazioneCostituzione': brocardi_info[1].get('RelazioneCostituzione') if brocardi_info[1] and 'RelazioneCostituzione' in brocardi_info[1] else None,
-                                    'Footnotes': brocardi_info[1].get('Footnotes') if brocardi_info[1] and 'Footnotes' in brocardi_info[1] else None,
-                                    'RelatedArticles': brocardi_info[1].get('RelatedArticles') if brocardi_info[1] and 'RelatedArticles' in brocardi_info[1] else None,
-                                    'CrossReferences': brocardi_info[1].get('CrossReferences') if brocardi_info[1] and 'CrossReferences' in brocardi_info[1] else None,
-                                    'Glossario': brocardi_info[1].get('Glossario') if brocardi_info[1] and 'Glossario' in brocardi_info[1] else None
-                                }
+                    article_text, url = await scraper.get_document(nv)
+                    result = {
+                        'article_text': article_text,
+                        'norma_data': nv.to_dict(),
+                        'url': url
+                    }
+                    validity = await self._validity_for(scraper, nv, url)
+                    if validity:
+                        result['validity'] = validity
 
                 except Exception as exc:
                     result = {'error': str(exc), 'norma_data': nv.to_dict()}
@@ -1347,55 +1307,9 @@ class NormaController:
             return self._error_response(e, 'fetch_alias_catalog')
 
     async def fetch_brocardi_info(self):
-        try:
-            data = await request.get_json()
-            if not data:
-                return jsonify({'error': 'Request body required'}), 400
-            log.info("Received data for fetch_brocardi_info", data=data)
-
-            normavisitate = await self.create_norma_visitata_from_data(data)
-
-            async def fetch_info(nv):
-                act_type_normalized = nv.norma.tipo_atto.lower()
-                if act_type_normalized in ['tue', 'tfue', 'cdfue', 'regolamento ue', 'direttiva ue']:
-                    return {'norma_data': nv.to_dict(), 'brocardi_info': None}
-                # Brocardi is current doctrine with no date: never asked for a past text.
-                if is_historical_request(nv.versione, nv.data_versione):
-                    return {'norma_data': nv.to_dict(), 'brocardi_info': None}
-
-                try:
-                    brocardi_info = await brocardi_scraper.get_info(nv)
-                    return {
-                        'norma_data': nv.to_dict(),
-                        'brocardi_info': {
-                            'position': brocardi_info[0] if brocardi_info[0] else None,
-                            'link': brocardi_info[2],
-                            'Brocardi': brocardi_info[1].get('Brocardi') if brocardi_info[1] and 'Brocardi' in brocardi_info[1] else None,
-                            'Ratio': brocardi_info[1].get('Ratio') if brocardi_info[1] and 'Ratio' in brocardi_info[1] else None,
-                            'Spiegazione': brocardi_info[1].get('Spiegazione') if brocardi_info[1] and 'Spiegazione' in brocardi_info[1] else None,
-                            'Massime': brocardi_info[1].get('Massime') if brocardi_info[1] and 'Massime' in brocardi_info[1] else None,
-                            'Relazioni': brocardi_info[1].get('Relazioni') if brocardi_info[1] and 'Relazioni' in brocardi_info[1] else None,
-                            'RelazioneCostituzione': brocardi_info[1].get('RelazioneCostituzione') if brocardi_info[1] and 'RelazioneCostituzione' in brocardi_info[1] else None,
-                            'Footnotes': brocardi_info[1].get('Footnotes') if brocardi_info[1] and 'Footnotes' in brocardi_info[1] else None,
-                            'RelatedArticles': brocardi_info[1].get('RelatedArticles') if brocardi_info[1] and 'RelatedArticles' in brocardi_info[1] else None,
-                            'CrossReferences': brocardi_info[1].get('CrossReferences') if brocardi_info[1] and 'CrossReferences' in brocardi_info[1] else None,
-                            'Glossario': brocardi_info[1].get('Glossario') if brocardi_info[1] and 'Glossario' in brocardi_info[1] else None
-                        }
-                    }
-                except Exception as exc:
-                    log.error("Error fetching Brocardi info", error=str(exc))
-                    return {'error': str(exc), 'norma_data': nv.to_dict()}
-
-            results = await asyncio.gather(*(fetch_info(nv) for nv in normavisitate), return_exceptions=True)
-            processed_results = []
-            for result in results:
-                if isinstance(result, Exception):
-                    processed_results.append({'error': str(result)})
-                else:
-                    processed_results.append(result)
-            return jsonify(processed_results)
-        except Exception as e:
-            return self._error_response(e, 'fetch_brocardi_info')
+        # Brocardi is no longer a source (D-078). The route stays only to tell
+        # an older client so, until the proxies drop it.
+        return jsonify({'error': 'Le annotazioni di Brocardi non sono più disponibili.'}), 410
 
     async def fetch_all_data(self):
         try:
@@ -1407,11 +1321,6 @@ class NormaController:
 
             normavisitate = await self.create_norma_visitata_from_data(data)
 
-            # Check if user explicitly requested dispositivo (annex='')
-            # If so, skip Brocardi for codici with allegati since Brocardi content is for the allegato
-            annex_value = data.get('annex')
-            explicit_dispositivo = isinstance(annex_value, str) and annex_value.strip() == ''
-
             async def fetch_data(nv):
                 scraper = self.get_scraper_for_norma(nv)
                 if scraper is None:
@@ -1421,48 +1330,10 @@ class NormaController:
                 try:
                     article_text, url = await scraper.get_document(nv)
                     validity = await self._validity_for(scraper, nv, url)
-                    brocardi_info = None
-                    if scraper == normattiva_scraper:
-                        # Skip Brocardi for dispositivo articles of codes that have their content in allegati
-                        # Brocardi.it only has content for the actual code (allegato), not the dispositivo
-                        # Brocardi is current doctrine with no date: never asked for a past text.
-                        should_fetch_brocardi = not is_historical_request(nv.versione, nv.data_versione)
-                        if should_fetch_brocardi and explicit_dispositivo and nv.allegato is None:
-                            # Check if this is a codice with a default allegato
-                            normalized_type = normalize_act_type(nv.norma.tipo_atto)
-                            codice_fragment = codice_urn(normalized_type)
-                            if codice_fragment:
-                                # Codes with allegati have patterns like ":1" or ":2" at the end
-                                if re.search(r';\d+:\d+$', codice_fragment):
-                                    should_fetch_brocardi = False
-                                    log.info("Skipping Brocardi for dispositivo of codice with allegato",
-                                             act_type=normalized_type, article=nv.numero_articolo)
-
-                        if should_fetch_brocardi:
-                            try:
-                                b_info = await brocardi_scraper.get_info(nv)
-                                brocardi_info = {
-                                    'position': b_info[0] if b_info[0] else None,
-                                    'link': b_info[2],
-                                    'Brocardi': b_info[1].get('Brocardi') if b_info[1] and 'Brocardi' in b_info[1] else None,
-                                    'Ratio': b_info[1].get('Ratio') if b_info[1] and 'Ratio' in b_info[1] else None,
-                                    'Spiegazione': b_info[1].get('Spiegazione') if b_info[1] and 'Spiegazione' in b_info[1] else None,
-                                    'Massime': b_info[1].get('Massime') if b_info[1] and 'Massime' in b_info[1] else None,
-                                    'Relazioni': b_info[1].get('Relazioni') if b_info[1] and 'Relazioni' in b_info[1] else None,
-                                    'RelazioneCostituzione': b_info[1].get('RelazioneCostituzione') if b_info[1] and 'RelazioneCostituzione' in b_info[1] else None,
-                                    'Footnotes': b_info[1].get('Footnotes') if b_info[1] and 'Footnotes' in b_info[1] else None,
-                                    'RelatedArticles': b_info[1].get('RelatedArticles') if b_info[1] and 'RelatedArticles' in b_info[1] else None,
-                                    'CrossReferences': b_info[1].get('CrossReferences') if b_info[1] and 'CrossReferences' in b_info[1] else None,
-                                    'Glossario': b_info[1].get('Glossario') if b_info[1] and 'Glossario' in b_info[1] else None
-                                }
-                            except Exception as exc:
-                                log.error("Error fetching Brocardi info", error=str(exc))
-                                brocardi_info = {'error': str(exc)}
                     result = {
                         'article_text': article_text,
                         'url': url,
                         'norma_data': nv.to_dict(),
-                        'brocardi_info': brocardi_info
                     }
                     if validity:
                         result['validity'] = validity
@@ -1718,28 +1589,12 @@ class NormaController:
                 }
                 results['status'] = 'degraded'
 
-            # Test Brocardi (fetch homepage with timeout)
-            try:
-                start = time_module.time()
-                await brocardi_scraper.request_document("https://www.brocardi.it", source="health_check")
-                latency = time_module.time() - start
-                results['services']['brocardi'] = {
-                    'status': 'ok',
-                    'latency_ms': round(latency * 1000, 2)
-                }
-            except Exception as e:
-                results['services']['brocardi'] = {
-                    'status': 'error',
-                    'error': str(e)
-                }
-                results['status'] = 'degraded'
-
             status_code = 200 if results['status'] == 'ok' else 503
 
             _health_detailed_cache['response'] = results
             _health_detailed_cache['status_code'] = status_code
             # From the end of the probe: measured from its start, a slow probe
-            # (up to ~30 s across three sources) ate into the TTL.
+            # (several seconds per source) ate into the TTL.
             _health_detailed_cache['expires_at'] = time_module.time() + max(ttl, 0)
 
             payload = dict(results)

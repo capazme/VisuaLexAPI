@@ -23,7 +23,6 @@ from visualex_api.tools.exceptions import (
     VisuaLexError, ValidationError, ResourceNotFoundError, 
     RateLimitExceededError, get_exception_for_status
 )
-from visualex_api.services.brocardi_scraper import BrocardiScraper
 from visualex_api.services.normattiva_scraper import NormattivaScraper
 from visualex_api.services.eurlex_scraper import EurlexScraper
 from visualex_api.services.pdfextractor import PDFExtractor, cleanup_browser_pool, is_allowed_pdf_urn
@@ -86,7 +85,6 @@ class NormaController:
     def _init_services(self):
         """Initialize all required services."""
         logger.info("Initializing services")
-        self.brocardi_scraper = BrocardiScraper()
         self.normattiva_scraper = NormattivaScraper()
         self.eurlex_scraper = EurlexScraper()
         self.driver_manager = WebDriverManager()
@@ -620,10 +618,10 @@ class NormaController:
     async def stream_article_text(self):
         """
         Stream article text results as they become available.
-        Now supports Brocardi info in parallel streaming!
+        Brocardi is no longer a source (D-078): `show_brocardi_info` is ignored.
 
         Returns:
-            Streaming response with article text and optional Brocardi info
+            Streaming response with article text
         """
         try:
             data = await request.get_json()
@@ -631,7 +629,6 @@ class NormaController:
             logger.info("Received data for stream_article_text", extra={"data": data})
 
             normavisitate = await self.create_norma_visitata_from_data(data)
-            show_brocardi = data.get('show_brocardi_info', False)
 
             async def result_generator():
                 """Generator function for streaming results."""
@@ -640,44 +637,12 @@ class NormaController:
 
                     try:
                         breaker = get_breaker(source)
-                        # Fetch article text and Brocardi info in parallel if requested
-                        tasks = [breaker.call(scraper.get_document, nv)]
-                        if show_brocardi and isinstance(scraper, NormattivaScraper):
-                            brocardi_breaker = get_breaker("brocardi")
-                            tasks.append(brocardi_breaker.call(self.brocardi_scraper.get_info, nv))
-
-                        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-                        # Process article text
-                        if isinstance(results[0], Exception):
-                            result = {'error': str(results[0]), 'norma_data': nv.to_dict()}
-                        else:
-                            article_text, url = results[0]
-                            result = {
-                                'article_text': article_text,
-                                'norma_data': nv.to_dict(),
-                                'url': url
-                            }
-
-                            # Add Brocardi info if available
-                            if show_brocardi and len(results) > 1:
-                                if isinstance(results[1], Exception):
-                                    result['brocardi_error'] = str(results[1])
-                                else:
-                                    brocardi_info = results[1]
-                                    result['brocardi_info'] = {
-                                        'position': brocardi_info[0] if brocardi_info[0] else None,
-                                        'link': brocardi_info[2],
-                                        'Brocardi': brocardi_info[1].get('Brocardi') if brocardi_info[1] and 'Brocardi' in brocardi_info[1] else None,
-                                        'Ratio': brocardi_info[1].get('Ratio') if brocardi_info[1] and 'Ratio' in brocardi_info[1] else None,
-                                        'Spiegazione': brocardi_info[1].get('Spiegazione') if brocardi_info[1] and 'Spiegazione' in brocardi_info[1] else None,
-                                        'Massime': brocardi_info[1].get('Massime') if brocardi_info[1] and 'Massime' in brocardi_info[1] else None,
-                                        'Relazioni': brocardi_info[1].get('Relazioni') if brocardi_info[1] and 'Relazioni' in brocardi_info[1] else None,
-                                        'RelazioneCostituzione': brocardi_info[1].get('RelazioneCostituzione') if brocardi_info[1] and 'RelazioneCostituzione' in brocardi_info[1] else None,
-                                        'Footnotes': brocardi_info[1].get('Footnotes') if brocardi_info[1] and 'Footnotes' in brocardi_info[1] else None,
-                                        'RelatedArticles': brocardi_info[1].get('RelatedArticles') if brocardi_info[1] and 'RelatedArticles' in brocardi_info[1] else None,
-                                        'CrossReferences': brocardi_info[1].get('CrossReferences') if brocardi_info[1] and 'CrossReferences' in brocardi_info[1] else None
-                                    }
+                        article_text, url = await breaker.call(scraper.get_document, nv)
+                        result = {
+                            'article_text': article_text,
+                            'norma_data': nv.to_dict(),
+                            'url': url
+                        }
 
                     except Exception as exc:
                         result = {'error': str(exc), 'norma_data': nv.to_dict()}
@@ -700,71 +665,12 @@ class NormaController:
             return jsonify({'error': str(e)}), 500
     
     async def fetch_brocardi_info(self):
-        """
-        Fetch Brocardi information for norms.
-        
-        Returns:
-            JSON response with Brocardi information
-        """
-        try:
-            data = await request.get_json()
-            data = self._resolve_nl_query(data)
-            logger.info("Received data for fetch_brocardi_info", extra={"data": data})
+        """Brocardi is no longer a source (D-078): always 410 Gone."""
+        return jsonify({'error': 'Le annotazioni di Brocardi non sono più disponibili.'}), 410
 
-            normavisitate = await self.create_norma_visitata_from_data(data)
-
-            async def fetch_info(nv):
-                """Helper function to fetch Brocardi info for a single norm."""
-                act_type_normalized = nv.norma.tipo_atto.lower()
-                if act_type_normalized in ['tue', 'tfue', 'cdfue', 'regolamento ue', 'direttiva ue']:
-                    return {'norma_data': nv.to_dict(), 'brocardi_info': None}
-
-                try:
-                    brocardi_breaker = get_breaker("brocardi")
-                    brocardi_info = await brocardi_breaker.call(self.brocardi_scraper.get_info, nv)
-                    return {
-                        'norma_data': nv.to_dict(),
-                        'brocardi_info': {
-                            'position': brocardi_info[0] if brocardi_info[0] else None,
-                            'link': brocardi_info[2],
-                            'Brocardi': brocardi_info[1].get('Brocardi') if brocardi_info[1] and 'Brocardi' in brocardi_info[1] else None,
-                            'Ratio': brocardi_info[1].get('Ratio') if brocardi_info[1] and 'Ratio' in brocardi_info[1] else None,
-                            'Spiegazione': brocardi_info[1].get('Spiegazione') if brocardi_info[1] and 'Spiegazione' in brocardi_info[1] else None,
-                            'Massime': brocardi_info[1].get('Massime') if brocardi_info[1] and 'Massime' in brocardi_info[1] else None,
-                            'Relazioni': brocardi_info[1].get('Relazioni') if brocardi_info[1] and 'Relazioni' in brocardi_info[1] else None,
-                            'RelazioneCostituzione': brocardi_info[1].get('RelazioneCostituzione') if brocardi_info[1] and 'RelazioneCostituzione' in brocardi_info[1] else None,
-                            'Footnotes': brocardi_info[1].get('Footnotes') if brocardi_info[1] and 'Footnotes' in brocardi_info[1] else None,
-                            'RelatedArticles': brocardi_info[1].get('RelatedArticles') if brocardi_info[1] and 'RelatedArticles' in brocardi_info[1] else None,
-                            'CrossReferences': brocardi_info[1].get('CrossReferences') if brocardi_info[1] and 'CrossReferences' in brocardi_info[1] else None
-                        }
-                    }
-                except CircuitOpenError as exc:
-                    return {'error': str(exc), 'norma_data': nv.to_dict()}
-                except Exception as exc:
-                    logger.error("Error fetching Brocardi info", extra={"error": str(exc)})
-                    return {'error': str(exc), 'norma_data': nv.to_dict()}
-
-            # Fetch all Brocardi info in parallel
-            results = await asyncio.gather(*(fetch_info(nv) for nv in normavisitate), return_exceptions=True)
-            
-            # Process results
-            processed_results = []
-            for result in results:
-                if isinstance(result, Exception):
-                    processed_results.append({'error': str(result)})
-                else:
-                    processed_results.append(result)
-            
-            return jsonify(processed_results)
-        except ValidationError as e:
-            return jsonify({'error': str(e)}), 400
-        except Exception as e:
-            logger.error("Error in fetch_brocardi_info", extra={"error": str(e)})
-            return jsonify({'error': str(e)}), 500
-    
     async def fetch_all_data(self):
         """
-        Fetch both article text and Brocardi information.
+        Fetch the article text and the act's data.
         
         Returns:
             JSON response with combined data
@@ -784,31 +690,10 @@ class NormaController:
                     breaker = get_breaker(source)
                     article_text, url = await breaker.call(scraper.get_document, nv)
 
-                    # Fetch Brocardi info if appropriate
-                    brocardi_info = None
-                    if scraper == self.normattiva_scraper:
-                        try:
-                            brocardi_breaker = get_breaker("brocardi")
-                            b_info = await brocardi_breaker.call(self.brocardi_scraper.get_info, nv)
-                            brocardi_info = {
-                                'position': b_info[0] if b_info[0] else None,
-                                'link': b_info[2],
-                                'Brocardi': b_info[1].get('Brocardi') if b_info[1] and 'Brocardi' in b_info[1] else None,
-                                'Ratio': b_info[1].get('Ratio') if b_info[1] and 'Ratio' in b_info[1] else None,
-                                'Spiegazione': b_info[1].get('Spiegazione') if b_info[1] and 'Spiegazione' in b_info[1] else None,
-                                'Massime': b_info[1].get('Massime') if b_info[1] and 'Massime' in b_info[1] else None
-                            }
-                        except CircuitOpenError:
-                            brocardi_info = {'error': 'Brocardi non disponibile al momento'}
-                        except Exception as exc:
-                            logger.error("Error fetching Brocardi info", extra={"error": str(exc)})
-                            brocardi_info = {'error': str(exc)}
-
                     return {
                         'article_text': article_text,
                         'url': url,
                         'norma_data': nv.to_dict(),
-                        'brocardi_info': brocardi_info
                     }
                 except CircuitOpenError as exc:
                     return {'error': str(exc), 'norma_data': nv.to_dict()}

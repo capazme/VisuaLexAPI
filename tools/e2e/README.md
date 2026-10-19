@@ -76,7 +76,7 @@ E2E_ADMIN_PASSWORD='...' python3 -m e2e.stress --users 10 --duration 60
 E2E_ADMIN_PASSWORD='...' python3 -m e2e.stress --users 10 --duration 60 --include-search-cached
 ```
 
-**Regola d'oro: gli scraper esterni (Normattiva, EUR-Lex, Brocardi) non si
+**Regola d'oro: gli scraper esterni (Normattiva, EUR-Lex, Italgiure…) non si
 stressano MAI.** Sono siti terzi: il rate limit interno di :5000 non protegge
 loro, e il rischio concreto e' il ban dell'IP. Lo stress colpisce solo endpoint
 locali (eventi MERL-T, letture grafo, CRUD Prisma). Con `--include-search-cached`
@@ -90,7 +90,7 @@ grafo < 1500ms, CRUD < 800ms — sforate ⇒ exit ≠ 0. Report: `tools/e2e/out/
 | Flow | Cosa prova | Tag | Costo |
 |---|---|---|---|
 | `flow_auth` | login admin, creazione utenti attivi, contratto register→inattivo | — | — |
-| `flow_search` | ricerca :5000 (norma, testo, stream, albero, PDF) | `external_scraper`, `slow` | ~6 hit Normattiva/Brocardi — max 1 run |
+| `flow_search` | ricerca :5000 (norma, testo, stream senza Brocardi, albero, PDF) | `external_scraper`, `slow` | ~5 hit Normattiva — max 1 run |
 | `flow_dossier` | CRUD dossier/item/note/evidenze/quick-norm/alias + IDOR | — | — |
 | `flow_forum` | pubblica ambiente, like, download, suggerimenti take/decline | — | — |
 | `flow_consent` | ciclo consenso none→basic→full→revoke→full | — | — |
