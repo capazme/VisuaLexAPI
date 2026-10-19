@@ -173,10 +173,12 @@ describe('App routing — Studia', () => {
     expect(window.location.pathname).toBe('/studia/ripasso');
   });
 
-  it('opens a session at /studia/ripasso/sessione, inside the area', async () => {
+  it('opens a session at /studia/ripasso/sessione, inside the area, as the lesson in its frame (Gymnasium spec §5.4)', async () => {
     renderAt('/studia/ripasso/sessione?materia=DIRITTO_CIVILE');
-    expect(await screen.findByRole('heading', { name: 'Sessione di ripasso' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 1, name: 'Gymnasium: la tua palestra giuridica' })).toBeInTheDocument();
+    const session = await screen.findByRole('heading', { name: 'Sessione di ripasso' });
+    expect(screen.getByTestId('lesson-frame')).toContainElement(session);
+    // The lesson is a screen of its own: the area's heading is not drawn over it.
+    expect(screen.queryByRole('heading', { level: 1, name: 'Gymnasium: la tua palestra giuridica' })).toBeNull();
   });
 
   it('keeps a card’s address inside the Studia area', async () => {
