@@ -51,9 +51,27 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   development mode (below) the address redirects to `/`. `VITE_FEATURE_MERLT`
   and `VITE_FEATURE_MERLT_GRAPH` decide the Sidebar's «Assistente» and «Grafo»
   entries and whether a page says it is unavailable. Outside the layout:
-  `/login`, `/register`, `/connect` (the consent page an MCP client's
+  `/login`, `/register`, `/crediti` (public, below), `/connect` (the consent page an MCP client's
   authorization request lands on: signed in, the user approves or refuses) and
   `/admin/*` (admins only).
+- **The credits** (C1, 19 Oct 2026): `data/credits.ts` is the one source of truth for a source's
+  licence, its conditions and its line of attribution — one typed entry per source (`id`, `group`,
+  `name`, `holder`, `uses`, `terms`, `attribution`, `sourceUrl`, `licenceUrl?`, `verified`), read by id
+  with `getCredit` and linked with `creditHref` (`/crediti#<id>`). **No screen writes a licence or an
+  attribution by hand**: a new one reads its entry. Two predate the file and move to it in C2: the Corte
+  costituzionale's line in `decisionPdf.ts` (`LICENCE_URIS`, `licenceLine`) and, once the maxims are
+  shown, the line under them. The `attribution` lines are legal text the owners approved, copied verbatim
+  (`credits.test.ts` holds each; never restyle one, as for root rule 23); `uses` and `terms` come only
+  from the conditions read on each source's page and the owners' table, and a source enters only once
+  its conditions are clear (today group A: Normattiva, EUR-Lex, Corte costituzionale, Cassazione,
+  giustizia amministrativa, Senato, CONSOB, CeRDEF; and Newsreader and Geist, OFL-1.1 as their
+  `@fontsource-variable` packages say — the test reads the packages). Normattiva carries the site's
+  conditions, never the open data's CC BY 4.0; the Corte costituzionale «CC BY-SA 3.0» with no version.
+  `/crediti` is `pages/CreditsPage`: public (outside `ProtectedRoute`), one column, a section per group
+  (`CREDIT_GROUPS`), an `article` per entry whose `id` is the anchor — the page scrolls to the address's
+  fragment and focuses the entry, since the router renders after the browser looked for it —, external
+  links in a new tab with `rel="noopener noreferrer"`, every text breaking anywhere rather than widen a
+  phone's page. Reached from the login's foot and the user menu's «Crediti».
 - `store/useAppStore.ts` — Zustand + Immer, the single global store.
 - `types/index.ts` — shared types. `services/` — one file per backend entity.
 - `components/features/` — `search`, `workspace`, `dossier`,
@@ -107,7 +125,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   The narrow/widen control is `SIDEBAR_TOGGLE_TEXT`, the entries' words' colour (slate 700 / dark slate 300). At the bottom only the user menu, whose dropdown holds Impostazioni,
   Cronologia (moved there by the owner, 13 Oct 2026; the saved norms that changed are counted on the avatar
   and beside the entry, and both names say it in words: «Menu utente, 2 norme salvate cambiate»),
-  «Collega un'app AI», the services' status, the theme, «Scorciatoie» (no «(?)» since S1: the `?` key still opens it),
+  «Collega un'app AI», «Crediti» (`/crediti`), the services' status, the theme, «Scorciatoie» (no «(?)» since S1: the `?` key still opens it),
   «Pannello Admin» (admins) and «Esci». **The services' status** (S1, 19 Oct 2026; it was a pill fixed at the bottom left,
   over the foot of the page on a phone) is `ui/ServiceHealthMenuEntry`: the status icon and phrase («Servizi operativi»,
   «Alcune fonti non disponibili», «Servizio non raggiungibile», «Controllo servizi…», `utils/serviceHealth`; a screen

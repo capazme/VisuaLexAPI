@@ -75,8 +75,8 @@ export function LoginForm() {
   }
 
   return (
-    <div className="min-h-dvh bg-slate-50 dark:bg-slate-950 flex items-center px-4 py-10 md:px-10">
-      <div className="mx-auto grid w-full max-w-5xl items-center gap-12 md:grid-cols-[minmax(0,1fr)_420px] md:gap-16">
+    <div className="min-h-dvh bg-slate-50 dark:bg-slate-950 flex flex-col px-4 py-10 md:px-10">
+      <div className="mx-auto my-auto grid w-full max-w-5xl items-center gap-12 md:grid-cols-[minmax(0,1fr)_420px] md:gap-16">
         <header className="space-y-5">
           <BookOpen aria-hidden="true" size={44} strokeWidth={1.5} className="text-primary-600 dark:text-primary-400" />
           <h1 className="font-serif text-5xl font-medium tracking-tight text-slate-900 dark:text-slate-50 md:text-6xl">
@@ -167,6 +167,16 @@ export function LoginForm() {
           </p>
         </main>
       </div>
+
+      {/* The sources' attributions, readable before signing in. */}
+      <footer className="mx-auto mt-10 w-full max-w-5xl text-sm text-slate-600 dark:text-slate-400">
+        <Link
+          to="/crediti"
+          className="-ml-2 inline-flex min-h-[44px] items-center rounded-md px-2 hover:text-slate-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:text-slate-100"
+        >
+          Crediti
+        </Link>
+      </footer>
     </div>
   );
 }
