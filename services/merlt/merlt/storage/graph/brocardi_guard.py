@@ -35,8 +35,12 @@ BROCARDI_ID_PREFIXES: tuple[str, ...] = (
     "dottrina_relazione_",
     "dottrina:",
 )
-# The mcp-legal-it tools that read Brocardi (vendor/mcp-legal-it).
-BROCARDI_TOOLS: frozenset[str] = frozenset({"cerca_brocardi", "fetch_law_annotations", "giurisprudenza_articolo"})
+# The mcp-legal-it tools that read Brocardi whatever their arguments: the first
+# three in vendor/mcp-legal-it, `mappa_orientamento` (its «Ancoraggio Brocardi»
+# block) in the release the stack runs. No expert may be granted one.
+BROCARDI_TOOLS: frozenset[str] = frozenset({
+    "cerca_brocardi", "fetch_law_annotations", "giurisprudenza_articolo", "mappa_orientamento",
+})
 BROCARDI_HOST = "brocardi.it"
 # Only Brocardi ever wrote these Qdrant source types: the Brocardi ingestion,
 # the Libro IV seed (its Dottrina nodes) and live sources from the Brocardi

@@ -126,10 +126,12 @@ def test_no_expert_is_granted_cerca_brocardi():
 
 
 def test_no_curated_live_tool_is_one_that_reads_brocardi():
-    # The mcp-legal-it tools that call Brocardi whatever their arguments (read in
-    # vendor/mcp-legal-it, v2.3.3). `cite_law` reaches it only through
-    # `include_annotations`, which the adapter withholds (tests below).
-    brocardi_tools = {"cerca_brocardi", "fetch_law_annotations", "giurisprudenza_articolo"}
+    # The mcp-legal-it tools that call Brocardi whatever their arguments, as the
+    # guard lists them. `cite_law` reaches it only through `include_annotations`,
+    # which the adapter withholds (tests below).
+    from merlt.storage.graph.brocardi_guard import BROCARDI_TOOLS as brocardi_tools
+
+    assert {"cerca_brocardi", "fetch_law_annotations", "giurisprudenza_articolo", "mappa_orientamento"} <= brocardi_tools
     assert brocardi_tools.isdisjoint(BaseExpert.LIVE_LEGAL_TOOLS)
     for tools in MultiExpertOrchestrator.EXPERT_MCP_TOOLS.values():
         assert brocardi_tools.isdisjoint(tools)
