@@ -22,8 +22,9 @@ const SOURCES = [
 describe('the targets and the type of «Contribuisci»', () => {
   it.each(SOURCES)('%s keeps its targets at 44 px from `md` up', (file) => {
     const source = readFileSync(join(DIR, file), 'utf8');
-    // `md:min-h-0` and its kin are how a target used to drop its 44 px on a computer (a layout's `min-h-0` is not a target).
-    expect(source).not.toMatch(/\bmd:min-[hw]-(?:[0-9]|10)\b/);
+    // `md:min-h-0` and its kin are how a target used to drop its 44 px on a computer (a layout's `min-h-0` is not a
+    // target): any `md:` minimum or height but 44 px, from a step to an arbitrary value or `auto`.
+    expect(source).not.toMatch(/\bmd:(?:min-h|min-w|h)-(?!\[44px\])/);
   });
 
   it.each(SOURCES)('%s writes no text size under 11 px', (file) => {

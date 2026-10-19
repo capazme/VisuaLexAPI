@@ -18,9 +18,10 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `nextReviewLabel`, and «Da ripassare oggi» filters with `dovuteOggi`; «+ Nuova scheda», in the page's
   heading and as the empty list's action, opens `CardFormDialog` with `{ kind: 'create' }` and no article (no
   fixed anchor, the reference field open, the anchors typed as «art. 1455 c.c.», which `POST /lingo/cards`
-  resolves), and is drawn only while Normattiva answers (`useCardSources` over `cardSourcesAnswer`, the cached
-  `/health/detailed`, read once per mount; with the sources down the empty list points to an article and
-  promises nothing); the detail proposes a draft
+  resolves; saved with no anchor, the reference field stays open and takes the focus), and is drawn only while
+  Normattiva answers (`useCardSources` over `cardSourcesAnswer`, the cached `/health/detailed`, read once per
+  mount; until it answers the empty list says only «Non hai ancora schede.», with the sources down it points to an
+  article and promises nothing; after the first card is saved the heading's button takes the focus); the detail proposes a draft
   («Proponi alla comunità» asks for the notice through `AcceptTextDialog`, the one place a text to
   accept is drawn — every word from the server's version, the body as `TextParagraphs` plain text) and
   withdraws a proposal, and reads a card past the drafts again by its id for `approvazioni` and the
@@ -561,7 +562,8 @@ the same tokens: each page's `h2` in `BLOCK_HEADING` with its action beside it, 
 per card, a selected row or a pressed filter marked by an ink edge as well as a tint, `INK_BUTTON` for the one action of
 a block, the three verdicts alike in `SECONDARY_BUTTON`; every control of `MyCardsView`, `CardGroups`, `CardFilters`,
 `CardDetail`, `ValidationQueueView`, `VoteBar` and the reader's row and peek keeps 44 px at every width
-(`contribuisci.test.ts` fails on an `md:min-h-*` override or text under 11 px). While the first read travels the missions,
+(`contribuisci.test.ts` fails on an `md:` height or minimum size other than 44 px, or text under 11 px). The card
+form itself (`CardForm`, shared with the reader) still drops to the desktop's sizes from `md`. While the first read travels the missions,
 the band, the list and the road keep their places at their final size; a failed first read stops the pulse, and the road
 says it could not be read under its heading (no second alert: the missions' «Riprova» reads it again). Colours are the app's tokens through `progress/tokens.ts` (ink is the
 primary scale's deep end, the stamp the one red, a subject's hue the category palette's CSS variable); the charts are

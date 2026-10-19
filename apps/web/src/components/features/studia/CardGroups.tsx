@@ -39,7 +39,8 @@ function CardRow({ card, selected }: { card: Scheda; selected: boolean }) {
         )}
       >
         <span className="line-clamp-2 break-words font-serif text-base leading-snug text-slate-900 dark:text-slate-50">{card.domanda}</span>
-        <span className={cn('flex flex-wrap items-center gap-x-2 gap-y-1 text-xs', MUTED_TEXT)}>
+        {/* Slate 600 on the selected row's tint: 500 falls under AA there. */}
+        <span className={cn('flex flex-wrap items-center gap-x-2 gap-y-1 text-xs', selected ? 'text-slate-600 dark:text-slate-300' : MUTED_TEXT)}>
           <span className="min-w-0 break-words">{citation ? `${TIPO_LABEL[card.tipo]} · ${citation}` : TIPO_LABEL[card.tipo]}</span>
           <StateChip stato={card.stato} />
           <ClaudeMark createdBy={card.origine} compact />

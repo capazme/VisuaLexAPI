@@ -69,7 +69,8 @@ export async function cardSourcesAnswer(signal: AbortSignal): Promise<boolean> {
     const payload = await response.json().catch(() => ({})) as { services?: Record<string, { status?: string }> };
     return payload.services?.normattiva?.status === 'ok';
   } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') throw error;
+    // An abort is a `DOMException`, which is not an `Error` in every engine: read its name.
+    if ((error as { name?: unknown } | null)?.name === 'AbortError') throw error;
     return false;
   }
 }

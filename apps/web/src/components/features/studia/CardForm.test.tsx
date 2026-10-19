@@ -329,14 +329,20 @@ describe('CardForm, opened with no article (Le mie schede)', () => {
     expect(onSaved).toHaveBeenCalledWith('new-9');
   });
 
-  it('asks for an anchor when none is typed, and sends nothing', async () => {
+  it('asks for an anchor when none is typed, keeps the reference field open and puts the focus there', async () => {
     const user = userEvent.setup();
     renderForm({ kind: 'create' });
     await user.selectOptions(screen.getByLabelText('Materia'), 'DIRITTO_CIVILE');
     await fillRequired(user);
     await user.click(screen.getByRole('button', { name: 'Salva' }));
-    expect(screen.getByText('Aggiungi almeno un’ancora')).toBeInTheDocument();
     expect(create).not.toHaveBeenCalled();
+    const field = screen.getByLabelText('Riferimento dell’ancora');
+    expect(field).toHaveFocus();
+    expect(field).toHaveAttribute('aria-invalid', 'true');
+    expect(field).toHaveAccessibleDescription('Aggiungi almeno un’ancora');
+    // An anchor added clears the complaint.
+    await user.type(field, 'art. 1455 c.c.{Enter}');
+    expect(screen.queryByText('Aggiungi almeno un’ancora')).not.toBeInTheDocument();
   });
 
   it('marks a reference the parser does not read with the example to follow, and every typed anchor can be taken out', async () => {

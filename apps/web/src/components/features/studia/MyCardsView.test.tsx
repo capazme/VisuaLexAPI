@@ -126,6 +126,16 @@ describe('«Le mie schede», the list', () => {
     expect(screen.queryByText(/Scrivi la prima da qui/)).toBeNull();
   });
 
+  it('says only that there is no card while the sources have not answered: the way to begin is not said twice', async () => {
+    sources.mockReturnValue(new Promise(() => {}));
+    list.mockResolvedValue(page([]));
+    renderView();
+    expect(await screen.findByText('Non hai ancora schede.')).toBeInTheDocument();
+    expect(screen.queryByText(/Per cominciare/)).toBeNull();
+    expect(screen.queryByText(/Scrivi la prima da qui/)).toBeNull();
+    expect(screen.queryByRole('button', { name: '+ Nuova scheda' })).toBeNull();
+  });
+
   it('offers no «+ Nuova scheda» while the sources have not answered yet', async () => {
     sources.mockReturnValue(new Promise(() => {}));
     renderView();
@@ -527,13 +537,24 @@ describe('«Le mie schede», a new card', () => {
     expect(await screen.findByText('Scheda salvata')).toBeInTheDocument();
   });
 
-  it('opens the same form from the empty list', async () => {
+  it('opens the same form from the empty list, and gives the focus to the heading’s button once the first card is saved', async () => {
+    const user = userEvent.setup();
+    vi.mocked(studiaService.create).mockResolvedValue({ outcome: 'created', id: 'n1' });
     list.mockResolvedValue(page([]));
     renderView();
     await screen.findByText('Non hai ancora schede.');
-    const [, fromEmpty] = screen.getAllByRole('button', { name: '+ Nuova scheda' });
-    await userEvent.setup().click(fromEmpty);
-    expect(await screen.findByRole('dialog', { name: 'Nuova scheda' })).toBeInTheDocument();
+    const [fromHeading, fromEmpty] = screen.getAllByRole('button', { name: '+ Nuova scheda' });
+    await user.click(fromEmpty);
+    const dialog = await screen.findByRole('dialog', { name: 'Nuova scheda' });
+    await user.selectOptions(within(dialog).getByLabelText('Materia'), 'DIRITTO_CIVILE');
+    await user.type(within(dialog).getByLabelText('Istituto'), 'Risoluzione');
+    await user.type(within(dialog).getByLabelText('Domanda'), 'Quando?');
+    await user.type(within(dialog).getByLabelText('Risposta'), 'Se inadempiente.');
+    await user.type(within(dialog).getByLabelText('Riferimento dell’ancora'), 'art. 1455 c.c.');
+    list.mockResolvedValue(page([card('n1')]));
+    await user.click(within(dialog).getByRole('button', { name: 'Salva' }));
+    await waitFor(() => expect(screen.queryByText('Non hai ancora schede.')).toBeNull());
+    expect(fromHeading).toHaveFocus();
   });
 });
 

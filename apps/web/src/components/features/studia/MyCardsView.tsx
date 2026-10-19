@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
@@ -76,9 +76,10 @@ function useCardDetail(card: Scheda): { card: Scheda; failed: boolean; retry: ()
 
 /**
  * The list with no card yet: how to begin. From here with «+ Nuova scheda» when the sources answer (the
- * form checks every anchor against them); from an article, or through Claude, in any case.
+ * form checks every anchor against them); from an article, or through Claude, in any case. While the
+ * sources have not answered, only the first line: the way to begin is not said twice in two ways.
  */
-function NoCardsYet({ canWrite, onNew }: { canWrite: boolean; onNew: () => void }) {
+function NoCardsYet({ sources, onNew }: { sources: boolean | undefined; onNew: () => void }) {
   const search = (
     <Link to="/" className={cn('font-medium underline underline-offset-2', FOCUS_RING)}>
       Ricerca
@@ -87,7 +88,7 @@ function NoCardsYet({ canWrite, onNew }: { canWrite: boolean; onNew: () => void 
   return (
     <div className={cn(TILE, 'grid justify-items-stretch gap-3 p-5 md:justify-items-start md:p-6')}>
       <p className={cn('font-serif text-xl leading-snug md:text-2xl', INK_TEXT)}>Non hai ancora schede.</p>
-      {canWrite ? (
+      {sources === undefined ? null : sources ? (
         <>
           <p className="max-w-prose text-sm text-slate-700 dark:text-slate-200">
             Scrivi la prima da qui: indica l’articolo su cui poggia, ad esempio «art. 1455 c.c.», poi la domanda e la risposta.
@@ -151,7 +152,12 @@ export function MyCardsView() {
   const navigate = useNavigate();
   const desktop = useIsDesktop();
   const triggerSearch = useAppStore((s) => s.triggerSearch);
-  const canWrite = useCardSources() === true;
+  const sources = useCardSources();
+  const canWrite = sources === true;
+  // After a card is created the dialog gives the focus back to the button that opened it, which may be the
+  // empty list's and go with it: the heading's button takes it instead.
+  const newCardButton = useRef<HTMLButtonElement>(null);
+  const focusAfterCreate = useRef(false);
 
   const [filterState, setFilterState] = useState<FilterState>(NO_FILTERS);
   const [search, setSearch] = useState('');
@@ -210,6 +216,12 @@ export function MyCardsView() {
 
   const [form, setForm] = useState<{ mode: CardFormMode; open: boolean } | null>(null);
   const openNew = () => setForm({ mode: { kind: 'create' }, open: true });
+  const formOpen = form?.open === true;
+  useEffect(() => {
+    if (formOpen || !focusAfterCreate.current) return;
+    focusAfterCreate.current = false;
+    newCardButton.current?.focus();
+  }, [formOpen]);
   const [toDelete, setToDelete] = useState<Scheda | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
 
@@ -221,6 +233,7 @@ export function MyCardsView() {
   };
 
   const handleSaved = (savedId: string) => {
+    if (form?.mode.kind === 'create') focusAfterCreate.current = true;
     setFetched(null);
     void refresh();
     navigate(`${LIST_PATH}/${encodeURIComponent(savedId)}`);
@@ -276,7 +289,7 @@ export function MyCardsView() {
       <header className="flex flex-wrap items-center justify-between gap-3">
         <h2 className={BLOCK_HEADING}>Le mie schede</h2>
         {canWrite && (
-          <button type="button" aria-haspopup="dialog" onClick={openNew} className={SECONDARY_BUTTON}>
+          <button ref={newCardButton} type="button" aria-haspopup="dialog" onClick={openNew} className={SECONDARY_BUTTON}>
             + Nuova scheda
           </button>
         )}
@@ -305,7 +318,7 @@ export function MyCardsView() {
                     </button>
                   </div>
                 ) : (
-                  <NoCardsYet canWrite={canWrite} onNew={openNew} />
+                  <NoCardsYet sources={sources} onNew={openNew} />
                 ))}
               <CardGroups groups={groups} selectedId={id} folded={folded} onToggleFold={toggleFold} />
               {hasMore && (

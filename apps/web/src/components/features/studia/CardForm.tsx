@@ -218,6 +218,7 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
     setPending('');
     setPendingError(null);
     setAdding(false);
+    setErrors((e) => ({ ...e, ancore: undefined }));
   };
 
   const closeAdding = () => {
@@ -281,7 +282,8 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
     setAnchors(list);
     setPending('');
     setPendingError(null);
-    setAdding(false);
+    // With no anchor the reference field stays open: it is where the missing anchor goes, and takes the focus.
+    setAdding(list.length === 0);
     setErrors(found);
     setFormError(null);
     if (Object.keys(found).length > 0) {
@@ -483,6 +485,8 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
                   }
                 }}
                 error={pendingError ?? undefined}
+                aria-invalid={pendingError || errors.ancore ? true : undefined}
+                aria-describedby={errors.ancore ? fieldId('ancore-error') : undefined}
                 placeholder="es. art. 2043 c.c."
                 autoComplete="off"
               />
@@ -507,7 +511,7 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
             </Button>
           )}
           {atAnchorLimit && <p className="ml-1 text-xs text-slate-500 dark:text-slate-400">Al massimo {MAX_ANCHORS} ancore per scheda.</p>}
-          {errors.ancore && <p className="ml-1 text-xs font-medium text-red-500 dark:text-red-400">{errors.ancore}</p>}
+          {errors.ancore && <p id={fieldId('ancore-error')} className="ml-1 text-xs font-medium text-red-500 dark:text-red-400">{errors.ancore}</p>}
         </div>
 
         {formError && (

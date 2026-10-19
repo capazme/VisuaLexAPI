@@ -57,4 +57,9 @@ describe('cardSourcesAnswer', () => {
     vi.mocked(legalFetch).mockRejectedValue(new TypeError('Failed to fetch'));
     expect(await cardSourcesAnswer(new AbortController().signal)).toBe(false);
   });
+
+  it('passes an abort on, so a view gone before the answer sets nothing', async () => {
+    vi.mocked(legalFetch).mockRejectedValue(new DOMException('aborted', 'AbortError'));
+    await expect(cardSourcesAnswer(new AbortController().signal)).rejects.toMatchObject({ name: 'AbortError' });
+  });
 });
