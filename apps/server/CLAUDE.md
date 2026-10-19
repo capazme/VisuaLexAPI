@@ -591,6 +591,15 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `docs/merlt/claude-notes.md`). Reached from the Settings modal. The export's
   history rows include `decisionKey` (raw Prisma fields, as the rest of the export); its
   discussion threads keep a release's time but not the releasing admin's id.
+  The export holds only what the user wrote or what is about them, never another
+  person's id, name or text (G-306): under a thread the others' replies are a
+  count, `repliesFromOthers` (the user's own replies are in `data.comments`); a
+  note, highlight, dossier, quick norm or alias taken from someone else carries
+  `fromAnotherUser: true` instead of `originalAuthorId`, and an archived
+  environment's content has its `originalAuthor`/`originalAuthorId` keys turned
+  into the same flag. An archived environment's `author` travels only when it is
+  the user's own username (a Forum download stored its publisher's), else `null`.
+  `tests/accountData.test.ts`.
 - **`GET /api/health/detailed`** — a `SELECT 1`, for the frontend's health
   banner. The Python `/health/detailed` is the one that probes the sources
   (see Key API Endpoints).
