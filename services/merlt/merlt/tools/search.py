@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from merlt.storage.graph.schema import (
     EXPERT_SOURCE_TYPES, canonical_urn, cypher_labels, cypher_rel_names, node_type_from_labels,
 )
+from merlt.storage.graph.brocardi_guard import brocardi_label, is_brocardi
 from merlt.tools.base import BaseTool, ToolResult, ToolParameter, ParameterType, bounded_int
 
 log = structlog.get_logger()
@@ -89,6 +90,9 @@ def _readable_source_label(result: Dict[str, Any]) -> str:
     opaque id (e.g. a provisional ``live:<hash>`` that resolves to nothing).
     Prefers a normative reference (art. N + act), then a case-law / text snippet
     — always something the jurist can recognize to give meaningful feedback."""
+    if is_brocardi(result):
+        # Never a snippet of Brocardi's text (D-078): its decision, or its kind.
+        return brocardi_label(result)
     meta = result.get("metadata") or {}
     art = str(meta.get("numero_articolo") or "").strip()
     tipo = str(meta.get("tipo_atto") or "").strip()

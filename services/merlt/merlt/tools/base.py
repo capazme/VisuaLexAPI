@@ -27,6 +27,8 @@ from typing import Dict, Any, Optional, List, Sequence, Tuple
 from enum import Enum
 from datetime import datetime
 
+from merlt.storage.graph.brocardi_guard import redact_tool_result
+
 log = structlog.get_logger()
 
 
@@ -305,6 +307,9 @@ class BaseTool(ABC):
 
         try:
             result = await self.execute(**kwargs)
+            # Brocardi text leaves here, before an expert reads, prompts or
+            # traces it (D-078): one point every tool result passes.
+            result = redact_tool_result(result)
             duration_ms = (_time.perf_counter() - t0) * 1000
 
             result_count = None

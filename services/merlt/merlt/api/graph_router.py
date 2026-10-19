@@ -34,6 +34,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from merlt.api.auth import verify_api_key
 from merlt.experts.models import ApiKey
+from merlt.storage.graph.brocardi_guard import redact
 from merlt.storage.graph.client import FalkorDBClient
 from merlt.storage.graph.schema import node_type_cypher, node_type_from_labels, resolve_rel, resolve_rels
 from merlt.storage.enrichment import get_db_session_dependency, PendingEntity
@@ -2115,7 +2116,9 @@ async def search_graph(
 def _parse_graph_node_v2(node_data: Dict[str, Any], include_metadata: bool) -> SubgraphNode:
     """Parse FalkorDB node data (with properties/labels structure) into SubgraphNode."""
     # FalkorDB returns: {properties: {...}, labels: [...], id: int}
-    props = node_data.get("properties", node_data)
+    # Brocardi's text never reaches the graph view (D-078): a massima keeps
+    # its decision's estremi, doctrine its identity.
+    props = redact(node_data.get("properties", node_data))
     labels = node_data.get("labels", [])
 
     # Get node ID

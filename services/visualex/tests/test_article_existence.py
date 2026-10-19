@@ -264,7 +264,6 @@ class TestHttpStatusAndBody:
     @pytest.mark.parametrize("endpoint", [
         "/fetch_norma_data",
         "/fetch_article_text",
-        "/fetch_brocardi_info",
         "/fetch_all_data",
         "/stream_article_text",
     ])
@@ -277,7 +276,6 @@ class TestHttpStatusAndBody:
     @pytest.mark.parametrize("endpoint", [
         "/fetch_norma_data",
         "/fetch_article_text",
-        "/fetch_brocardi_info",
         "/fetch_all_data",
         "/stream_article_text",
     ])

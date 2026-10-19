@@ -646,12 +646,15 @@ CHECKLIST:
     # are intentionally excluded — only these carry citable legal sources. Which
     # of these is actually registered for THIS expert is decided by the per-expert
     # map in MultiExpertOrchestrator._init_experts (B4).
+    # `cerca_brocardi` is left out on purpose: Brocardi is no longer a source
+    # (D-078). It must stay out of this list, not only out of EXPERT_MCP_TOOLS:
+    # the per-expert filter passes a registered tool that no expert lists to
+    # EVERY expert.
     LIVE_LEGAL_TOOLS = (
         "cerca_giurisprudenza",
         "cerca_giurisprudenza_cgue",
         "giurisprudenza_su_norma",
         "leggi_sentenza",
-        "cerca_brocardi",
         "cite_law",
         "fetch_law_article",
     )

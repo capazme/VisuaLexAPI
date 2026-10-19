@@ -37,6 +37,7 @@ from datetime import datetime
 from merlt.experts.base import BaseExpert, ExpertContext, ExpertResponse, FeedbackHook
 from merlt.experts.router import ExpertRouter, RoutingDecision
 from merlt.experts.synthesizer import AdaptiveSynthesizer, SynthesisConfig, SynthesisResult, SynthesisMode
+from merlt.storage.graph.brocardi_guard import TRACE_GUARD_KEY
 from merlt.experts.circuit_breaker import (
     CircuitBreakerRegistry,
     CircuitOpenError,
@@ -251,8 +252,11 @@ class MultiExpertOrchestrator:
     # canon (art. 12 preleggi). Core retrieval tools (semantic_search,
     # graph_search) and any other shared tool go to EVERY expert unchanged; only
     # the curated live legal tools are restricted per canon — precedent gets case
-    # law (its unique value), principles gets doctrine, literal/systemic get norm
-    # text. Tools not listed here (e.g. the ~180 calculators) reach no expert.
+    # law (its unique value), principles gets the norm text it reasons on (its
+    # doctrine tool, cerca_brocardi, is gone: Brocardi is no longer a source,
+    # D-078), literal/systemic get norm text. Tools not listed here (e.g. the
+    # ~180 calculators) reach no expert, because BaseExpert.LIVE_LEGAL_TOOLS keeps
+    # them out of the registry.
     # fetch_law_article is the structured-param SIBLING of cite_law (both fetch
     # the authoritative norm text; fetch_law_article also resolves NUMBERED acts,
     # legge 241/1990 etc., that cite_law's NL resolver rejects). Any expert granted
@@ -262,7 +266,7 @@ class MultiExpertOrchestrator:
     EXPERT_MCP_TOOLS: Dict[str, set] = {
         "literal": {"cite_law", "fetch_law_article"},
         "systemic": {"cite_law", "fetch_law_article"},
-        "principles": {"cerca_brocardi", "cite_law", "fetch_law_article"},
+        "principles": {"cite_law", "fetch_law_article"},
         "precedent": {
             "cerca_giurisprudenza",
             "cerca_giurisprudenza_cgue",
@@ -1233,6 +1237,9 @@ class MultiExpertOrchestrator:
         # routing/tool actions (must run before to_dict()).
         self._merge_expert_traversal_actions(trace, responses, experts)
         synthesis_result.metadata["execution_trace"] = trace.to_dict()
+        # Every source the experts read came through BaseTool.__call__, which
+        # takes Brocardi's text out (D-078): the answer and its trace say so.
+        synthesis_result.metadata[TRACE_GUARD_KEY] = 1
 
         # Loop β C.2: sediment this query's LIVE retrievals into the graph —
         # provisional, NON-BLOCKING, failure-isolated. Collect the live_unconfirmed

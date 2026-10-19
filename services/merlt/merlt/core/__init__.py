@@ -18,7 +18,6 @@ Vision:
     result = await kg.ingest_norm(
         tipo_atto="codice penale",
         articolo="1",
-        include_brocardi=True,
         include_multivigenza=True,
     )
 """
