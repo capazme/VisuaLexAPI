@@ -17,12 +17,6 @@ Usage:
         article="1453"
     )
 
-    # Fetch Brocardi info (like BrocardiScraper.get_info)
-    brocardi = await client.fetch_brocardi_info(
-        act_type="codice civile",
-        article="1453"
-    )
-
 Environment Variables:
     VISUALEX_API_URL: Base URL of visualex-api (default: http://localhost:5100)
     VISUALEX_API_TIMEOUT: Request timeout in seconds (default: 30)
@@ -42,6 +36,17 @@ log = structlog.get_logger()
 # Configuration from environment
 VISUALEX_API_URL = os.getenv("VISUALEX_API_URL", "http://localhost:5100")
 VISUALEX_API_TIMEOUT = int(os.getenv("VISUALEX_API_TIMEOUT", "30"))
+
+# Brocardi is no longer a source (D-078): fields VisuaLex may still send for it.
+_BROCARDI_FIELDS = ("brocardi_info", "brocardi_error")
+
+
+def _without_brocardi(item: Any) -> Any:
+    """Drop the Brocardi fields from one `/fetch_all_data` item."""
+    if isinstance(item, dict):
+        return {k: v for k, v in item.items() if k not in _BROCARDI_FIELDS}
+    return item
+
 
 # Singleton client instance
 _client_instance: Optional["VisuaLexClient"] = None
@@ -337,64 +342,11 @@ class VisuaLexClient:
         date: Optional[str] = None,
     ) -> List[BrocardiResult]:
         """
-        Fetch Brocardi enrichment info.
-
-        This is equivalent to BrocardiScraper.get_info().
-
-        Args:
-            act_type: Type of legal act
-            article: Article number
-            act_number: Act number
-            date: Date of the act
-
-        Returns:
-            List of BrocardiResult with enrichment data
+        Brocardi is no longer a source (D-078): this never calls VisuaLex and
+        always returns an empty list, so every caller sees "no enrichment".
+        Kept, with its signature, until the Brocardi code is removed.
         """
-        client = await self._get_client()
-
-        payload = {
-            "act_type": act_type,
-            "article": article,
-        }
-        if act_number:
-            payload["act_number"] = act_number
-        if date:
-            payload["date"] = date
-
-        try:
-            response = await client.post("/fetch_brocardi_info", json=payload)
-            response.raise_for_status()
-            data = response.json()
-
-            results = []
-            for item in data:
-                if "error" in item:
-                    results.append(BrocardiResult(
-                        position=None,
-                        link=None,
-                        brocardi=None,
-                        ratio=None,
-                        spiegazione=None,
-                        massime=None,
-                        relazioni=None,
-                        error=item["error"]
-                    ))
-                else:
-                    bi = item.get("brocardi_info", {}) or {}
-                    results.append(BrocardiResult(
-                        position=bi.get("position"),
-                        link=bi.get("link"),
-                        brocardi=bi.get("Brocardi"),
-                        ratio=bi.get("Ratio"),
-                        spiegazione=bi.get("Spiegazione"),
-                        massime=bi.get("Massime"),
-                        relazioni=bi.get("Relazioni"),
-                    ))
-            return results
-
-        except Exception as e:
-            log.error("fetch_brocardi_info failed", error=str(e), payload=payload)
-            raise
+        return []
 
     async def fetch_all_data(
         self,
@@ -407,7 +359,10 @@ class VisuaLexClient:
         annex: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
-        Fetch both article text and Brocardi info in one call.
+        Fetch the article text and the act's data in one call.
+
+        Brocardi is no longer a source (D-078): any ``brocardi_info`` or
+        ``brocardi_error`` an older VisuaLex API still sends is dropped here.
 
         Args:
             act_type: Type of legal act
@@ -419,7 +374,7 @@ class VisuaLexClient:
             annex: Annex number
 
         Returns:
-            List of combined results with article_text, norma_data, and brocardi_info
+            List of combined results with article_text and norma_data
         """
         client = await self._get_client()
 
@@ -441,7 +396,10 @@ class VisuaLexClient:
         try:
             response = await client.post("/fetch_all_data", json=payload)
             response.raise_for_status()
-            return response.json()
+            data = response.json()
+            if isinstance(data, list):
+                return [_without_brocardi(item) for item in data]
+            return _without_brocardi(data)
 
         except Exception as e:
             log.error("fetch_all_data failed", error=str(e), payload=payload)

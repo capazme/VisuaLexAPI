@@ -31,7 +31,6 @@ Usage:
     result = await kg.ingest_norm(
         tipo_atto="codice penale",
         articolo="1",
-        include_brocardi=True,
         include_embeddings=True,
         include_bridge=True,
         include_multivigenza=True,
@@ -453,7 +452,7 @@ class LegalKnowledgeGraph:
         self,
         tipo_atto: str,
         articolo: str,
-        include_brocardi: bool = True,
+        include_brocardi: bool = False,
         include_embeddings: bool = True,
         include_bridge: bool = True,
         include_multivigenza: bool = True,
@@ -472,7 +471,9 @@ class LegalKnowledgeGraph:
         Args:
             tipo_atto: Type of act (e.g., "codice penale", "codice civile")
             articolo: Article number (e.g., "1", "52", "81 bis")
-            include_brocardi: Whether to fetch Brocardi enrichment
+            include_brocardi: Brocardi is no longer a source (D-078): the VisuaLex
+                client returns nothing for it, so this stays False until the
+                code is removed
             include_embeddings: Whether to generate and store embeddings
             include_bridge: Whether to update bridge table
             include_multivigenza: Whether to track amendments
@@ -1148,7 +1149,7 @@ class LegalKnowledgeGraph:
         article_range: Tuple[int, int],
         batch_size: int = 10,
         max_concurrent_fetches: int = 5,
-        include_brocardi: bool = True,
+        include_brocardi: bool = False,
         include_multivigenza: bool = True,
     ) -> "BatchIngestionResult":
         """
@@ -1166,7 +1167,7 @@ class LegalKnowledgeGraph:
             article_range: Range articoli (start, end) inclusi
             batch_size: Articoli per batch (default: 10)
             max_concurrent_fetches: Max fetch HTTP paralleli (default: 5)
-            include_brocardi: Include enrichment Brocardi
+            include_brocardi: off, see ``ingest_norm`` (D-078)
             include_multivigenza: Include tracking modifiche
 
         Returns:

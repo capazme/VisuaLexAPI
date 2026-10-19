@@ -100,7 +100,7 @@ flowchart TB
 | Layer | Responsabilità | Componenti chiave | Stato (per doc ALIS) |
 |---|---|---|---|
 | Preprocessing | NER, intent, dominio; arricchimento KG della query | `query_understanding_module`, `kg_enrichment_service` | 📦 100% |
-| Sources | scraping fonti ufficiali | `NormattivaScraper`, `BrocardiScraper`, `EurlexScraper` (stub) | 📦 (EUR-Lex 🧪) |
+| Sources | scraping fonti ufficiali | `NormattivaScraper`, `EurlexScraper` (stub); `BrocardiScraper` spento (D-078: il client non chiama più Brocardi) | 📦 (EUR-Lex 🧪) |
 | Ingestion | doc → parse → chunk → embed → nodi + bridge | `IngestionPipelineV2`, `StructuralChunker`, `EnrichmentPipeline` | 📦 100% |
 | Orchestration | routing query → esperti; pesi iniziali | `RouterV2`, `ExpertGatingNetwork` (θ_gating) | 📦 router; gating 📐/🧪 |
 | Reasoning / Esperti | 4 esperti percorrono il grafo e interpretano | `Literal/Systemic/Principles/PrecedentExpert`, `AdaptiveSynthesizer` | 📦 v1 (autonomous `ExpertWithTools` 📐 0%) |

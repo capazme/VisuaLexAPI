@@ -3,7 +3,7 @@ MCP Legal-IT Tool Adapter
 =========================
 
 Bridges the remote `mcp-legal-it` FastMCP server (Italian legal tools:
-case law, Brocardi massime, legislation, calculations) into MERL-T's
+case law, legislation, calculations) into MERL-T's
 `BaseTool` interface so the experts can invoke them through the standard
 tool registry.
 
@@ -41,6 +41,22 @@ from merlt.tools.base import BaseTool, ParameterType, ToolParameter, ToolResult
 log = structlog.get_logger()
 
 DEFAULT_MCP_LEGAL_IT_URL = "http://mcp-legal-it:8011/mcp"
+
+# Brocardi is no longer a source (D-078). A granted tool can still reach it
+# through an argument: `cite_law(include_annotations=True)` appends Brocardi's
+# annotations. Such an argument is hidden from the LLM and always sent as False
+# when the remote tool declares it, so no expert can switch it on.
+_BROCARDI_ARGUMENTS: Dict[str, Dict[str, Any]] = {
+    "cite_law": {"include_annotations": False},
+}
+
+
+def _without_brocardi_lines(description: str) -> str:
+    """Drop the description lines that point the LLM to Brocardi (D-078)."""
+    return "\n".join(
+        line for line in description.splitlines() if "brocardi" not in line.lower()
+    )
+
 
 # JSON-Schema primitive -> MERL-T ParameterType. Anything unmapped (or absent)
 # degrades to STRING, which is the safest default for LLM function calling.
@@ -200,6 +216,7 @@ class McpLegalToolAdapter(BaseTool):
         description: str,
         parameters: List[ToolParameter],
         server_url: str,
+        forced_arguments: Optional[Dict[str, Any]] = None,
     ):
         # BaseTool reads `self.name`/`self.description` from class attrs by
         # default; set them as instance attrs before super().__init__ runs its
@@ -208,6 +225,9 @@ class McpLegalToolAdapter(BaseTool):
         self.description = description or tool_name
         self._parameters = parameters
         self._server_url = server_url
+        # Arguments this adapter always sends with a fixed value, whatever the
+        # caller passes (see _BROCARDI_ARGUMENTS).
+        self._forced_arguments = dict(forced_arguments or {})
         super().__init__()
 
     @property
@@ -223,6 +243,7 @@ class McpLegalToolAdapter(BaseTool):
         """
         # Drop None-valued kwargs so optional params fall back to remote defaults.
         arguments = {k: v for k, v in kwargs.items() if v is not None}
+        arguments.update(self._forced_arguments)
         result, transient = await self._attempt(arguments)
         for attempt in range(1, _MCP_MAX_ATTEMPTS):
             if not transient:
@@ -339,12 +360,17 @@ async def build_mcp_legal_tools(url: Optional[str] = None) -> List[BaseTool]:
 
     tools: List[BaseTool] = []
     for remote in remote_tools:
+        parameters = _json_schema_to_parameters(remote.inputSchema)
+        withheld = _BROCARDI_ARGUMENTS.get(remote.name, {})
+        declared = {p.name for p in parameters}
         tools.append(
             McpLegalToolAdapter(
                 tool_name=remote.name,
-                description=remote.description or remote.name,
-                parameters=_json_schema_to_parameters(remote.inputSchema),
+                description=_without_brocardi_lines(remote.description or "") or remote.name,
+                parameters=[p for p in parameters if p.name not in withheld],
                 server_url=server_url,
+                # Only what the remote declares: an undeclared argument fails the call.
+                forced_arguments={k: v for k, v in withheld.items() if k in declared},
             )
         )
 

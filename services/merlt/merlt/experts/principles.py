@@ -287,7 +287,7 @@ class PrinciplesExpert(BaseExpert, ReActMixin):
             extracted_urns=len(self._extracted_urns)
         )
 
-        # Loop β A.3: augment with live doctrine (Brocardi) from mcp-legal-it (failure-isolated)
+        # Loop β A.3: augment with the live norm text from mcp-legal-it (failure-isolated)
         sources.extend(await self._retrieve_live_legal_sources(context))
 
         return sources
