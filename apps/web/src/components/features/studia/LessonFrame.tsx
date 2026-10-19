@@ -1,7 +1,10 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
+import { X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
+import { FOCUS_RING } from './progress/tokens';
 
 const TABBABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -16,8 +19,9 @@ const coveredByOverlay = () => document.querySelector('[aria-modal="true"], [dat
  * band, over the sidebar and the floating buttons, under the overlay band. `Layout` is not touched.
  *
  * The shell behind stays in the document, so Tab is kept inside the frame: past its last control it
- * comes back to the first, before the first to the last, and a Tab from outside (the body, after a click
- * on nothing) enters it. A dialog or sheet open over it keeps its own focus.
+ * comes back to the first, before the first to the last, and a Tab from the shell (`#root`) or the body
+ * enters it. A dialog or sheet open over it, and a popover portalled to the body, keep their own focus.
+ * The shell is not made `inert`: the command palette (⌘K) is drawn inside it, and would be dead.
  */
 export function LessonFrame({ children }: { children: ReactNode }) {
   const frame = useRef<HTMLDivElement>(null);
@@ -32,6 +36,11 @@ export function LessonFrame({ children }: { children: ReactNode }) {
       const last = tabbable[tabbable.length - 1];
       const active = document.activeElement;
       const inside = active instanceof Node && root.contains(active);
+      // Only the shell behind is fenced off: a popover the article portals to the body (a note being typed)
+      // keeps its own Tab, or its composer would close on the focus leaving it.
+      const shell = document.getElementById('root');
+      const inShell = active === null || active === document.body || (shell !== null && active instanceof Node && shell.contains(active));
+      if (!inside && !inShell) return;
       if (!inside || (event.shiftKey ? active === first : active === last)) {
         event.preventDefault();
         (event.shiftKey ? last : first).focus();
@@ -50,5 +59,36 @@ export function LessonFrame({ children }: { children: ReactNode }) {
       {children}
     </div>,
     document.body,
+  );
+}
+
+/**
+ * What the frame shows while the session's code loads (the route is lazy): the close button and the card's
+ * place, so the screen is never blank with no way out. Esc leaves too.
+ */
+export function LessonLoading() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') navigate('/studia/ripasso');
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [navigate]);
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
+        <button
+          type="button"
+          onClick={() => navigate('/studia/ripasso')}
+          aria-label="Chiudi"
+          className={cn('inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-slate-600 hover:bg-slate-200/60 dark:text-slate-300 dark:hover:bg-slate-800', FOCUS_RING)}
+        >
+          <X size={20} aria-hidden />
+        </button>
+        <div aria-hidden className="h-3 flex-1 rounded-full bg-slate-200 dark:bg-slate-800" />
+      </div>
+      <p className="sr-only">Carico il ripasso…</p>
+    </div>
   );
 }

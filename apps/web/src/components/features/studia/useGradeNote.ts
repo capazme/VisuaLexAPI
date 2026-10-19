@@ -66,10 +66,11 @@ export function useGradeNote({ step, current, revealed, practice, saving, skippe
     [current, revealed, step, practice],
   );
 
-  // The grade has landed (the step moved on), failed (saving is over), or was a practice pass, which posts nothing.
+  // The grade has landed (the step moved on), failed (saving is over), was a practice pass, which posts nothing,
+  // or was never taken by the session (a key stopped on its way): a render with nothing on its way frees the guard.
   useEffect(() => {
     if (!saving) inFlight.current = false;
-  }, [step, saving]);
+  }, [step, saving, intent]);
 
   useEffect(() => {
     if (paused) return;
@@ -84,12 +85,11 @@ export function useGradeNote({ step, current, revealed, practice, saving, skippe
     return () => window.removeEventListener('keydown', onKeyDown, true);
   }, [paused, recordGrade]);
 
+  // A move with no grade behind it (a skipped card, a new read after «Continua») takes the last note away with it.
   if (step !== seenStep) {
     setSeenStep(step);
-    if (intent) {
-      setIntent(null);
-      if (intent.step === seenStep && !skipped) setNote({ key: step, text: gradeNote(intent.rating, intent.days, intent.practice) });
-    }
+    if (intent) setIntent(null);
+    setNote(intent && intent.step === seenStep && !skipped ? { key: step, text: gradeNote(intent.rating, intent.days, intent.practice) } : null);
   }
 
   useEffect(() => {

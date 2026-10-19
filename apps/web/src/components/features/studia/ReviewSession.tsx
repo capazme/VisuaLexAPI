@@ -26,7 +26,7 @@ import { useReviewSession, type ReviewSummary } from './useReviewSession';
 
 const HOME_PATH = '/studia/ripasso';
 
-/** The lesson's column: the card, the header's row and the bar's actions share its width. */
+/** The lesson's column: the card and the header's row share its width (the bar's actions sit in a narrower one). */
 const COLUMN = 'mx-auto w-full max-w-3xl';
 
 type ToastState = { message: string; type: 'success' | 'error' | 'info' } | null;
@@ -268,10 +268,11 @@ export function ReviewSession() {
     middle = (
       <>
         <div className="flex min-h-0 flex-1">
-          <div className="min-w-0 flex-1 overflow-y-auto">
+          {/* Keyed by step, so each card starts at the top of its own scroll, however far the last answer was read. */}
+          <div key={step} className="min-w-0 flex-1 overflow-y-auto">
             <div className={cn(COLUMN, 'px-4 pb-8 pt-2 md:pt-8')}>
               {skippedLine}
-              <ReviewCard key={step} card={current} revealed={revealed} focusKey={step} onOpenAnchor={(anchor) => setPanel({ step, anchor })} />
+              <ReviewCard card={current} revealed={revealed} focusKey={step} onOpenAnchor={(anchor) => setPanel({ step, anchor })} />
             </div>
           </div>
           {openAnchor && (
@@ -348,7 +349,8 @@ export function ReviewSession() {
         onCancel={() => setConfirmStop(false)}
       />
       <div className={cn('fixed left-0 top-0', Z_INDEX.toast)}>
-        <Toast message={toast?.message ?? ''} type={toast?.type ?? 'info'} isVisible={toast !== null} onClose={() => setToast(null)} />
+        {/* At the top: the bar at the foot holds the grades on every width. */}
+        <Toast position="top" message={toast?.message ?? ''} type={toast?.type ?? 'info'} isVisible={toast !== null} onClose={() => setToast(null)} />
       </div>
     </section>
   );

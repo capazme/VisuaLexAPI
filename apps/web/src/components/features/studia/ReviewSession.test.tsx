@@ -696,6 +696,42 @@ describe('the lesson (Gymnasium spec §5.4)', () => {
       await screen.findByText('Domanda b?');
       expect(screen.getByTestId('grade-note')).toHaveTextContent('Torna tra 3 giorni');
     });
+
+    it('never carries the last note of a lesson into the next one', async () => {
+      progress.mockResolvedValue({ ...progressAnswer(3, false, 2), oggi: { ...progressAnswer(3, false, 2).oggi, dovute: 4 } });
+      const user = userEvent.setup();
+      renderSession([card('a')]);
+      await show();
+      await user.click(screen.getByRole('button', { name: /Bene/ }));
+      session.mockResolvedValue({ conteggi: { dovute: 1, nuove: 0 }, cards: [card('e')] });
+      await user.click(await screen.findByRole('button', { name: 'Continua' }));
+      await screen.findByText('Domanda e?');
+      expect(screen.queryByTestId('grade-note')).not.toBeInTheDocument();
+    });
+
+    it('frees itself when a key never reaches the session, and the next grade says its own interval', async () => {
+      renderSession([card('a'), card('b')]);
+      await show();
+      // A handler in the page stops the key before the document hears it.
+      const stop = (event: KeyboardEvent) => event.stopPropagation();
+      document.body.addEventListener('keydown', stop);
+      fireEvent.keyDown(document.body, { key: '4' });
+      document.body.removeEventListener('keydown', stop);
+      expect(review).not.toHaveBeenCalled();
+      await userEvent.setup().click(screen.getByRole('button', { name: /Difficile/ }));
+      await screen.findByText('Domanda b?');
+      expect(screen.getByTestId('grade-note')).toHaveTextContent('Torna tra 3 giorni');
+    });
+  });
+
+  it('starts each card at the top of a scroll of its own', async () => {
+    renderSession([card('a'), card('b')]);
+    const before = (await screen.findByRole('heading', { name: 'Domanda a?' })).closest('.overflow-y-auto');
+    await show();
+    await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
+    const after = (await screen.findByRole('heading', { name: 'Domanda b?' })).closest('.overflow-y-auto');
+    expect(after).not.toBeNull();
+    expect(after).not.toBe(before);
   });
 
   describe('closing', () => {

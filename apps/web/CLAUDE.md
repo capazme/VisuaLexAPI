@@ -488,13 +488,16 @@ goes back to Oggi, as the header's button does); listed in the «?» dialog's «
 spec §6 as rewritten for G2): the session is a screen of its own. `StudiaPage` draws it, with no heading of the area,
 in `LessonFrame`: portalled to the body in the `lesson` band (`z-[70]`, over the sidebar, the floating buttons, the
 feedback button, the services pill and the plain toasts; under the overlay band, so the article's sheet, the
-confirmation and the toast cover it), with Tab kept inside it (a dialog over it keeps its own). The shell's Focus mode
+confirmation and the toast — at the top, off the bar — cover it), with Tab fenced off from the shell (`#root`)
+and the body: a dialog over it, or a popover the article portals to the body (a note being typed), keeps its own.
+The shell is not `inert` — the command palette is drawn inside it — so a screen reader's browse mode can still reach
+it. While the route's code loads, `LessonLoading` (`App.tsx`'s fallback) gives the frame its close button and Esc. The shell's Focus mode
 is not used — it is a saved setting and leaves its own button on screen — and `Layout` is untouched. Three rows: the
 header (the close button, «Interrompi», 44 px, and the progress bar, `role="progressbar"`, done of done and remaining,
 where done are the cards out of the queue — a «Di nuovo» holds it still —, easing under `motion-safe:` only; «Restano N»
 stays as screen-reader text), the card scrolling in the middle (beside it on desktop the article, `DossierItemReader`,
 in a column of its own that scrolls apart; on a phone `ui/Sheet`, marked `data-find-overlay`; the panel closes when the
-card changes), and `LessonBar` at the foot on every width (above the phone's safe edge, in the `pinnedBar` band inside
+card changes; the scroll is keyed by step, so each card starts at its top), and `LessonBar` at the foot on every width (above the phone's safe edge, in the `pinnedBar` band inside
 the frame), holding the one action: «Mostra risposta» (`LESSON_PRIMARY`, the ink key of «Inizia») before the reveal,
 the four grades after it — the interval the large text and the grade the small one, every button neutral but
 «Di nuovo» (warning tone), 56 px, pressed with `active:scale-[0.97]`. The bar's line above the action says, in this
@@ -503,7 +506,8 @@ grade (`useGradeNote`: «Torna tra 3 giorni» from `anteprima`, «Torna domani»
 per oggi» for a practice pass that takes the card out; one second, `motion-safe:animate-vlx-note`, said politely to a
 screen reader, never focused). `useReviewSession` does not say which grade moved the queue and is read only, so
 `useGradeNote` reads the grade where it is given — `recordGrade` on a click, a key 1–4 on the window's capture phase,
-with the session's own filters and nothing taken while a grade travels; keep its filters in step with the hook's.
+with the session's own filters and nothing taken while a grade travels; a move with no grade behind it (a skip, a
+new read) clears the note; keep its filters in step with the hook's.
 The card (`ReviewCard`) is the area's tile — a sheet on the paper, no shadow or gradient — and comes in with each card
 (the session keys it by step: opacity and a few pixels, 180 ms, `motion-safe:` only): the anchor's citation small in
 slate sans above, question and answer in the reader's serif at a 60ch measure, the question a step larger; the reveal
