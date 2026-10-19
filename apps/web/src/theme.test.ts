@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import postcss from 'postcss';
 import tailwind from '@tailwindcss/postcss';
-import { ACTIVE, FOCUS_RING, HOVER_LIFT, TRANSITION } from './constants/interactions';
+import { ACTIVE, FOCUS_RING, HIDDEN_SCROLLBAR, HOVER_LIFT, TRANSITION } from './constants/interactions';
 
 /**
  * Tailwind failures are silent: a class whose token the theme never declares
@@ -225,5 +225,11 @@ describe('the scrollbars in dark mode', () => {
     expect(css).not.toMatch(/::-webkit-scrollbar[\w-]*(:hover)?\s*\{[^}]*&:where/);
     expect(css).toMatch(/:where\(\.dark, \.dark \*\)::-webkit-scrollbar-thumb\s*\{[^}]*var\(--color-slate-700\)/);
     expect(css).toMatch(/:where\(\.dark, \.dark \*\)::-webkit-scrollbar-thumb:hover\s*\{[^}]*var\(--color-slate-600\)/);
+  }, 30000);
+
+  it('draws no bar where HIDDEN_SCROLLBAR says so, in both engines (the subject chips\' row)', async () => {
+    const css = await compile(HIDDEN_SCROLLBAR.split(' '));
+    expect(css).toMatch(/\.\\\[scrollbar-width\\:none\\\]\s*\{\s*scrollbar-width:\s*none/);
+    expect(css).toMatch(/\.\\\[\\&\\:\\:-webkit-scrollbar\\\]\\:hidden\s*\{\s*&::-webkit-scrollbar\s*\{\s*display:\s*none/);
   }, 30000);
 });

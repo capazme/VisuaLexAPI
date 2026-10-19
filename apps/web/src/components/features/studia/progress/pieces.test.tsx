@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { HIDDEN_SCROLLBAR } from '../../../../constants/interactions';
 import { render, screen, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { GiornoAttivita, Progressi } from '../../../../types/studia';
@@ -163,6 +164,8 @@ describe('the subject filter', () => {
     render(<SubjectChips selected="DIRITTO_PENALE" onSelect={onSelect} />);
     const group = screen.getByRole('group', { name: 'Materia' });
     expect(within(group).getAllByRole('button')).toHaveLength(6);
+    // A phone's sideways row with no bar drawn: in dark mode it showed light (theme.test.ts checks the CSS).
+    expect(group).toHaveClass(...HIDDEN_SCROLLBAR.split(' '));
     expect(within(group).getByRole('button', { name: 'Diritto penale' })).toHaveAttribute('aria-pressed', 'true');
     expect(within(group).getByRole('button', { name: 'Tutte le materie' })).toHaveAttribute('aria-pressed', 'false');
     await userEvent.setup().click(within(group).getByRole('button', { name: 'Tutte le materie' }));

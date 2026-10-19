@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MATERIA_LABEL, STATO_LABEL, TIPO_LABEL, anchorActLabel, anchorLabel, cardTitle, nextReviewLabel, normaFromAnchor, searchParamsFromAnchor } from './studiaLabels';
+import { MATERIA_LABEL, SECONDS_PER_CARD, STATO_LABEL, TIPO_LABEL, anchorActLabel, estimateLabel, estimatedMinutes, anchorLabel, cardTitle, nextReviewLabel, normaFromAnchor, searchParamsFromAnchor } from './studiaLabels';
 import type { Scheda } from '../../../types/studia';
 
 const card = (urn: string | null, istituto = 'Risoluzione per inadempimento'): Scheda => ({
@@ -101,5 +101,26 @@ describe('nextReviewLabel', () => {
     expect(nextReviewLabel(null, today)).toBeNull();
     expect(nextReviewLabel(undefined, today)).toBeNull();
     expect(nextReviewLabel('2027-13-40', today)).toBeNull();
+  });
+});
+
+describe('the estimate of «Oggi» (Gymnasium spec §5.1)', () => {
+  it('guesses 20 seconds a card, one constant', () => {
+    expect(SECONDS_PER_CARD).toBe(20);
+  });
+
+  it('rounds up to the next whole minute: ceil(cards × 20 / 60)', () => {
+    expect(estimatedMinutes(0)).toBe(0);
+    expect(estimatedMinutes(1)).toBe(1);
+    expect(estimatedMinutes(3)).toBe(1);
+    expect(estimatedMinutes(4)).toBe(2);
+    expect(estimatedMinutes(26)).toBe(9);
+    expect(estimatedMinutes(600)).toBe(200);
+  });
+
+  it('says «circa», singular and plural, and nothing for no card', () => {
+    expect(estimateLabel(2)).toBe('circa 1 minuto');
+    expect(estimateLabel(26)).toBe('circa 9 minuti');
+    expect(estimateLabel(0)).toBeNull();
   });
 });
