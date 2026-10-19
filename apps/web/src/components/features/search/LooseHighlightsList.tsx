@@ -1,6 +1,7 @@
 import { X } from 'lucide-react';
 import type { Highlight } from '../../../types';
 import { getHighlightSwatch } from '../../../utils/highlightColors';
+import { retiredSectionLabel } from '../../../utils/articleAnnotations';
 
 export interface LooseHighlightsListProps {
     /** `highlightsWithoutSign`: the highlights no block's sign shows. */
@@ -10,16 +11,10 @@ export interface LooseHighlightsListProps {
     onRemove: (id: string) => void;
 }
 
-/**
- * "Non più nel testo" for the article's own; "Sezione non più disponibile · Ratio" for a sub-section
- * (`<article>/brocardi/ratio`: the Brocardi sections are no longer shown, D-078, and what was marked
- * on them stays the reader's, to read and remove here).
- */
+/** "Non più nel testo" for the article's own; "Sezione non più disponibile · Ratio" for a retired section's. */
 function originLabel(highlight: Highlight, articleId: string): string {
     if (highlight.articleId === articleId) return 'Non più nel testo';
-    const section = highlight.articleId.split('/').pop() ?? '';
-    const name = section ? section[0].toUpperCase() + section.slice(1) : '';
-    return name ? `Sezione non più disponibile · ${name}` : 'Sezione non più disponibile';
+    return retiredSectionLabel(highlight.articleId) ?? 'Non più nel testo';
 }
 
 /**

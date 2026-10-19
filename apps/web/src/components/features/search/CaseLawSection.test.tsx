@@ -156,11 +156,30 @@ describe('CaseLawSection — «Cerca sentenze sul tema dell’articolo»', () =>
   const RUBRIC = 'Risarcimento per fatto illecito';
   const topicLink = () => screen.queryByRole('button', { name: /Cerca sentenze sul tema dell’articolo/ });
   const openTopicSearch = vi.fn(() => 'w');
-  const original = appStore.getState().openTopicSearch;
+  const pushReadingBack = vi.fn();
+  const original = { openTopicSearch: appStore.getState().openTopicSearch, pushReadingBack: appStore.getState().pushReadingBack };
   beforeEach(() => {
     openTopicSearch.mockClear();
-    appStore.setState({ openTopicSearch });
-    return () => appStore.setState({ openTopicSearch: original });
+    pushReadingBack.mockClear();
+    appStore.setState({ openTopicSearch, pushReadingBack });
+    return () => appStore.setState(original);
+  });
+
+  it('records the way back to the article before it opens, as a decision\'s link does', async () => {
+    const backEntry = { tabId: 'tab-1', blockId: 'b', articleId: '2043', label: 'art. 2043 c.c.' };
+    show({ topic: RUBRIC, backEntry });
+    await userEvent.click(toggle());
+    await userEvent.click(topicLink()!);
+    expect(pushReadingBack).toHaveBeenCalledExactlyOnceWith(backEntry);
+    expect(pushReadingBack.mock.invocationCallOrder[0]).toBeLessThan(openTopicSearch.mock.invocationCallOrder[0]);
+  });
+
+  it('records no way back when the article has none to give (a preview)', async () => {
+    show({ topic: RUBRIC });
+    await userEvent.click(toggle());
+    await userEvent.click(topicLink()!);
+    expect(pushReadingBack).not.toHaveBeenCalled();
+    expect(openTopicSearch).toHaveBeenCalledTimes(1);
   });
 
   it('names the rubric it searches and opens a topic search of the Cassazione beside the article', async () => {

@@ -259,8 +259,13 @@ describe('ArticleTabContent — «Cerca sentenze sul tema dell’articolo»', ()
     expect(openTopicSearch).toHaveBeenCalledExactlyOnceWith({ tema: rubric }, `Tema: ${rubric}`, undefined);
   });
 
-  it('takes no notice the source served in place of a rubric for one', () => {
-    show(article(undefined, {}, { article_text: 'Art. 155-ter\n((ARTICOLO ABROGATO DAL D.LGS. 10 OTTOBRE 2022, N. 149))' }));
+  it.each([
+    '((ARTICOLO ABROGATO DAL D.LGS. 10 OTTOBRE 2022, N. 149))',
+    '((ARTICOLO SOPPRESSO DALLA L. 28 DICEMBRE 2005, N. 262))',
+    '((COMMA SOSTITUITO DAL D.L. 24 GENNAIO 2012, N. 1))',
+    '((OMISSIS))',
+  ])('takes no notice the source served in place of a rubric for one, with no validity to go by: %s', (notice) => {
+    show(article(undefined, {}, { article_text: `Art. 155-ter\n${notice}` }));
     fireEvent.click(screen.getByRole('button', { name: 'Giurisprudenza' }));
     expect(topicLink()).toBeNull();
   });

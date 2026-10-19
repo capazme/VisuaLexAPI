@@ -344,8 +344,10 @@ in whitespace, so those older highlights show again.
 `backEntry`), the Cassazione's decisions that mention the article, searched
 only when the reader presses the button (`DecisionResultList`; not offered on an act of the Union,
 `isEuropeanAct`), and «Cerca sentenze sul tema dell’articolo»: a topic search of the Cassazione by the
-article's rubric (`topic`, `getRubricText`; no rubric, no link; not on an act of the Union), which opens
-beside the article — the decisions on its subject, whether or not they cite it. It took the place of the
+article's rubric (`topic`, `getRubricText`; no rubric, no link; not on an act of the Union, nor when the
+«rubric» is a notice the source wrote in its place, `isNotice`, or the text is repealed or not yet in force),
+which records the way back (`backEntry`, as a decision's link does) and opens beside the article — the
+decisions on its subject, whether or not they cite it. It took the place of the
 Brocardi glossary's «Sentenze su questo tema»: Brocardi is no longer a source (D-078), and its massime,
 commentary, footnotes, glossary and credits are gone from every surface. On a past text the section stays. A click on a decision's estremi
 opens its preview, whose «Apri accanto» opens it beside the article with the way back. Every block draws its rows with the one `CaseLawRow`
@@ -423,7 +425,8 @@ Tab cycles inside and Esc returns to the sign. The "Evidenziazioni" box under
 the article now lists only what no sign can reach (`LooseHighlightsList`,
 desktop): highlights made in the Brocardi sections (`<article>/brocardi/ratio|spiegazione`, still
 loaded by the prefix queries and labelled «Sezione non più disponibile · Ratio» since the sections went,
-D-078) and highlights whose text changed — without it they could no longer be removed.
+D-078 — `retiredSectionLabel`, which also heads such a note in `NoteCard`, so its quote is not taken for
+the article's words) and highlights whose text changed — without it they could no longer be removed.
 
 **Find in the text** («Cerca nel testo», spec §13): one floating `FindWindow` (`features/search/`,
 mounted once in `Layout`, portalled, z-index `findWindow`) opened by Cmd/Ctrl+F (`Layout.tsx`: opens,

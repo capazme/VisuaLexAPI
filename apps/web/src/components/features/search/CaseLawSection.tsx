@@ -74,6 +74,7 @@ export function CaseLawSection({ norma, topic, articleUrn, tabId, backEntry, isH
   const [searched, setSearched] = useState(false);
   const desktop = useIsDesktop();
   const openTopicSearch = useAppStore((s) => s.openTopicSearch);
+  const pushReadingBack = useAppStore((s) => s.pushReadingBack);
   const [filters, setFilters] = useState<CaseLawFilters>(NO_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
   // the years of the rows each block has loaded, for the chips
@@ -196,7 +197,12 @@ export function CaseLawSection({ norma, topic, articleUrn, tabId, backEntry, isH
             {offersCassazione && tema && (
               <button
                 type="button"
-                onClick={() => openTopicSearch({ tema }, `Tema: ${tema}`, tabId ? { besideId: tabId } : undefined)}
+                onClick={() => {
+                  // the way back to the article first, as a decision's link records it (on a phone the
+                  // topic search takes the full-screen reader's place)
+                  if (backEntry) pushReadingBack(backEntry);
+                  openTopicSearch({ tema }, `Tema: ${tema}`, tabId ? { besideId: tabId } : undefined);
+                }}
                 className="group -mx-1 flex min-h-[44px] items-start gap-2 rounded-lg px-1 py-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
               >
                 <Search size={14} aria-hidden="true" className="mt-1 shrink-0 text-primary-700 dark:text-primary-300" />

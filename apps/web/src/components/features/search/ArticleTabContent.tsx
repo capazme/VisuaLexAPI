@@ -35,7 +35,7 @@ import { UpdateNotePopover } from './UpdateNotePopover';
 import { BlockAnnotationsPopover } from './BlockAnnotationsPopover';
 import { LooseHighlightsList } from './LooseHighlightsList';
 import { useArticleTextInteractions } from '../../../hooks/useArticleTextInteractions';
-import { getRubricText, getUpdateNoteParagraphs, parseArticleStructure } from '../../../utils/articleStructure';
+import { getRubricText, getUpdateNoteParagraphs, isNotice, parseArticleStructure } from '../../../utils/articleStructure';
 import { PluginSlot } from '../../../plugins/PluginSlot';
 import { MERLT_EVENT_TYPES, publishMerltEvent } from '../../../features/merlt/merltEventBus';
 import { useMerltFeatures } from '../../../features/merlt/useMerltFeatures';
@@ -775,11 +775,12 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     });
 
     // «Cerca sentenze sul tema dell'articolo» searches the Cassazione by the rubric, when the text has one:
-    // not a notice the source served in its place (an article that did not exist yet, one repealed).
+    // not a notice the source served in its place (an article that did not exist yet, one repealed or
+    // suppressed, an omission), whether or not the source's page said what the text is (`validity`).
     const rubric = useMemo(() => {
         if (!display.textVisible || data.validity?.state === 'abrogated') return null;
         const text = getRubricText(article_text || '', structure);
-        return text && !/^ARTICOLO (ABROGATO|SOPPRESSO)\b/i.test(text) ? text : null;
+        return text && !isNotice(text) ? text : null;
     }, [display.textVisible, data.validity?.state, article_text, structure]);
 
     return (
