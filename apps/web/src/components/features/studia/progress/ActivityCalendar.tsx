@@ -200,13 +200,17 @@ export function ActivityCalendar({ calendario, today, weeks, hue, narrowed = fal
       </div>
       <ul aria-label="Legenda del calendario" className={cn('flex flex-wrap items-center gap-x-4 gap-y-2 text-xs', MUTED_TEXT)}>
         <li className="flex items-center gap-1">
-          meno
-          {HEAT_FILL.map((fill) => (
-            <svg key={fill} aria-hidden viewBox="0 0 10 10" className="h-3 w-3">
-              <rect width="10" height="10" rx="2" className={fill} />
-            </svg>
-          ))}
-          più ripassi
+          {/* Drawn as «meno ▢▢▢▢▢ più ripassi»; said as one sentence. */}
+          <span aria-hidden className="flex items-center gap-1">
+            meno
+            {HEAT_FILL.map((fill) => (
+              <svg key={fill} viewBox="0 0 10 10" className="h-3 w-3">
+                <rect width="10" height="10" rx="2" className={fill} />
+              </svg>
+            ))}
+            più ripassi
+          </span>
+          <span className="sr-only">Più scuro il colore, più ripassi</span>
         </li>
         <li className="flex items-center gap-1.5">
           <Swatch>
@@ -249,7 +253,7 @@ export function ActivityCalendar({ calendario, today, weeks, hue, narrowed = fal
       {/* Room for its longest day («Oggi, mercoledì 30 settembre: 9999 ripassi, 200 nuove, 1450 sbagliate, obiettivo
           raggiunto»): three lines on a phone, two from `md`, so choosing a day never moves the page. */}
       <p id={readoutId} aria-live="polite" className={cn('min-h-[3.75rem] text-sm tabular-nums md:min-h-10', chosen ? 'text-slate-800 dark:text-slate-100' : MUTED_TEXT)}>
-        {chosen ? describeDay(chosen, today, firstDay, narrowed) : 'Passa sopra un giorno, o toccalo, per i dettagli.'}
+        {chosen ? describeDay(chosen, today, firstDay, narrowed) : 'Passa sopra un giorno o toccalo per i dettagli; con la tastiera, le frecce ti spostano tra i giorni.'}
       </p>
     </div>
   );

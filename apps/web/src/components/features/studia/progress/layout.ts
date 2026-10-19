@@ -150,7 +150,7 @@ const plural = (n: number, one: string, many: string) => `${formatCount(n)} ${n 
 /**
  * What the line under the calendar says of a day, read aloud as it is (Gymnasium spec §5.3): «lunedì 12 ottobre: 14
  * ripassi, obiettivo raggiunto». A past day after `firstDay` that did not count says so; a day before it never does.
- * `narrowed`: the counts are one subject's, so a day that counted with none of its reviews says so.
+ * `narrowed`: the counts are one subject's, so a day with none of its reviews says «nessun ripasso in questa materia».
  */
 export function describeDay(cell: CalendarCell, today: string, firstDay?: string, narrowed = false): string {
   const name = cell.giorno === today ? `Oggi, ${formatDayLong(cell.giorno)}` : formatDayLong(cell.giorno);
@@ -158,7 +158,8 @@ export function describeDay(cell: CalendarCell, today: string, firstDay?: string
   const missed = calendarDayState(cell, today, firstDay) === 'saltato';
   if (!day || (day.ripassi === 0 && !day.valido)) {
     if (day?.riposo) return `${name}: giorno di riposo, la serie regge`;
-    return missed ? `${name}: nessun ripasso, giorno saltato` : `${name}: nessun ripasso`;
+    const nothing = narrowed ? 'nessun ripasso in questa materia' : 'nessun ripasso';
+    return missed ? `${name}: ${nothing}, giorno saltato` : `${name}: ${nothing}`;
   }
   // A day with nothing to do that counted: the queue was empty when the user looked — or, on a subject's calendar, the
   // day counted with other subjects (`narrowed`).
@@ -189,6 +190,30 @@ export function niceMax(values: number[]): number {
 /** A whole percentage of `part` in `total` (0 when the total is). */
 export function percent(part: number, total: number): number {
   return total > 0 ? Math.round((100 * part) / total) : 0;
+}
+
+/**
+ * Whole percentages of `parts` that add up to 100 (largest remainder: each share rounded down, the points left over
+ * to the largest fractions, the first part on a tie); all 0 when the total is.
+ */
+export function shares(parts: readonly number[]): number[] {
+  const total = parts.reduce((n, part) => n + part, 0);
+  if (total <= 0) return parts.map(() => 0);
+  const result = parts.map((part) => Math.floor((100 * part) / total));
+  let left = 100 - result.reduce((n, share) => n + share, 0);
+  // The remainders in whole numbers (of `total`), so a tie is a tie and not a matter of floating point.
+  const order = parts.map((part, index) => ({ index, rest: 100 * part - result[index] * total })).sort((a, b) => b.rest - a.rest || a.index - b.index);
+  for (const { index } of order) {
+    if (left <= 0) break;
+    result[index] += 1;
+    left -= 1;
+  }
+  return result;
+}
+
+/** A share as written: «<1%» for a part above zero that rounds to none, so it never reads as nothing. */
+export function shareLabel(share: number, part: number): string {
+  return part > 0 && share === 0 ? '<1%' : `${share}%`;
 }
 
 export function totalCards(stati: ConteggiStati): number {

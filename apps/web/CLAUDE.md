@@ -638,7 +638,8 @@ of the last 30 days in a large number, `recentReviews`: the sum of `materie[].ri
 the streak and the goal are); **the subject chips** (`SubjectChips`, the subject «Oggi» remembers, and a line saying
 what it narrows); **«Il tuo calendario»** (`ActivityCalendar`, 26 weeks on a computer and 12 on a phone by
 `useIsDesktop`); **«Le schede per stato»** (`CardStatesBar`: the bar's segments are buttons as before, and under it the
-three states by name, count and share); **«I prossimi 14 giorni»** (`DueForecast`); **«Per materia»**
+three states by name, count and share — `shares` rounds by the largest remainder so the three add up to 100, and a state
+with cards that rounds to none reads «<1%», never «0%»); **«I prossimi 14 giorni»** (`DueForecast`); **«Per materia»**
 (`SubjectProgress`: the five subjects in the road's order, `orderStops`, each an `aria-pressed` button that narrows the
 page — pressed again it clears —, its share consolidated, a bar of the three states and the states in words,
 `stopStates`, and the reviews of 30 days; no «N da ripassare», which the progress read does not carry by subject). The
@@ -648,12 +649,13 @@ a dashed outline on a rest, a dash on a past day that did not count (`saltato`),
 dotted (`calendarGrid`'s `future`, never chosen, so End stops at today), and no mark on a day before the first one the
 calendar holds (`vuoto`): a newcomer's calendar says nothing is missed, not even in its legend. On a subject's calendar
 the flags are the whole day's, as the server sends them: a mark on the subject's hue sits on a rim of the tile's ground
-(`data-halo`), since no single colour reads on all five hues in both themes, and a day that counted with none of the
-subject's reviews reads «nessun ripasso in questa materia» (`describeDay`'s `narrowed`). The day chosen is kept by its
+(`data-halo`), since no single colour reads on all five hues in both themes, and a day with none of the subject's
+reviews reads «nessun ripasso in questa materia», counted or missed (`describeDay`'s `narrowed`). The day chosen is kept by its
 date, so a grid that changes width keeps it. The calendar is one tab stop (arrows by day and week, Home and End, a live readout; the
 whole pitch of a cell hit-testable). Labels on both charts (weekdays, months, the scale, the days) are the interface's
 text at `text-xs` placed by percentages over or beside the drawing, never SVG `<text>`: a drawing scaled to its width
-scaled them under 11 px. The legend under it says each in words; the line under it (`describeDay`, «lunedì 12
+scaled them under 11 px. The legend under it says each in words (the heat scale, drawn «meno ▢▢▢▢▢ più ripassi», is
+said as one sentence); before a day is chosen the line says how to choose one, by pointer or by the arrows; the line under it (`describeDay`, «lunedì 12
 ottobre: 14 ripassi, obiettivo raggiunto», commas, read aloud as written) is the day's name for a screen reader, with
 the arrows as before. The coming days' scale is the interface's text in a column beside the drawing, on whole-number
 lines (`scaleLines`), the days in a row under it; today's column is tinted and its label set apart; a day with nothing

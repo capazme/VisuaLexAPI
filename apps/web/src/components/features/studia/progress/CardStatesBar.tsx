@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { cn } from '../../../../lib/utils';
 import type { ConteggiStati } from '../../../../types/studia';
-import { formatCount, percent, totalCards } from './layout';
+import { formatCount, shareLabel, shares, totalCards } from './layout';
 import { CARD_STATES, FOCUS_RING, INK_TEXT, MUTED_TEXT } from './tokens';
 
 export interface CardStatesBarProps {
@@ -15,12 +15,15 @@ const cards = (n: number) => `${formatCount(n)} ${n === 1 ? 'scheda' : 'schede'}
 /**
  * The cards by state (Studia progress spec §4.2; Gymnasium spec §5.3): one stacked bar, new, learning and consolidated
  * (an interval of 21 days or more), and under it each state by name, count and share, so the bar is never read by its
- * colours alone. Each segment is a button: hover, tap or focus says its count and share.
+ * colours alone. The shares add up to 100 (`shares`), and a state with cards never reads «0%». Each segment is a button: hover, tap or focus says its count and share.
  */
 export function CardStatesBar({ stati }: CardStatesBarProps) {
   const [chosen, setChosen] = useState<StateKey | null>(null);
   const total = totalCards(stati);
   const shown = chosen ? CARD_STATES.find((s) => s.key === chosen)! : null;
+  // The three shares add up to 100; a state with cards that rounds to none reads «<1%».
+  const rounded = shares(CARD_STATES.map((state) => stati[state.key]));
+  const share = (key: StateKey) => shareLabel(rounded[CARD_STATES.findIndex((state) => state.key === key)], stati[key]);
 
   return (
     <div className="grid gap-4">
@@ -32,7 +35,7 @@ export function CardStatesBar({ stati }: CardStatesBarProps) {
             <button
               key={state.key}
               type="button"
-              aria-label={`${state.label}: ${cards(stati[state.key])} (${percent(stati[state.key], total)}%)`}
+              aria-label={`${state.label}: ${cards(stati[state.key])} (${share(state.key)})`}
               onPointerEnter={() => setChosen(state.key)}
               onFocus={() => setChosen(state.key)}
               onClick={() => setChosen(state.key)}
@@ -53,7 +56,7 @@ export function CardStatesBar({ stati }: CardStatesBarProps) {
             </dt>
             <dd className="flex flex-wrap items-baseline gap-x-1.5">
               <span className={cn('font-serif text-2xl font-medium leading-none tabular-nums md:text-3xl', INK_TEXT)}>{formatCount(stati[state.key])}</span>
-              <span className={cn('text-xs tabular-nums', MUTED_TEXT)}>{percent(stati[state.key], total)}%</span>
+              <span className={cn('text-xs tabular-nums', MUTED_TEXT)}>{share(state.key)}</span>
             </dd>
           </div>
         ))}
@@ -62,8 +65,8 @@ export function CardStatesBar({ stati }: CardStatesBarProps) {
         {total === 0
           ? 'Nessuna scheda da studiare, per ora.'
           : shown
-            ? `${shown.label}: ${cards(stati[shown.key])} (${percent(stati[shown.key], total)}%)`
-            : `${cards(total)} · ${percent(stati.consolidate, total)}% consolidate`}
+            ? `${shown.label}: ${cards(stati[shown.key])} (${share(shown.key)})`
+            : `${cards(total)} · ${share('consolidate')} consolidate`}
       </p>
     </div>
   );

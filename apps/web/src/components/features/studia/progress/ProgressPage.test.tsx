@@ -237,7 +237,7 @@ describe('ProgressPage (Gymnasium spec §5.3)', () => {
       expect(summary).toHaveTextContent('27.000ripassi negli ultimi 30 giorni');
       expect(calendar()).toHaveAccessibleName(/: 10\.499 ripassi in 2 giorni$/);
       const states = screen.getByRole('region', { name: 'Le schede per stato' });
-      expect(within(states).getAllByRole('definition').map((dd) => dd.textContent)).toEqual(['12.34555%', '10%', '999945%']);
+      expect(within(states).getAllByRole('definition').map((dd) => dd.textContent)).toEqual(['12.34555%', '1<1%', '999945%']);
       expect(within(states).getByText('22.345 schede · 45% consolidate')).toBeInTheDocument();
       expect(screen.getByRole('group', { name: 'Schede da ripassare nei prossimi 14 giorni: 10.035 schede, 9999 schede oggi' })).toBeInTheDocument();
       const subjects = within(screen.getByRole('region', { name: 'Per materia' })).getAllByRole('button');
@@ -245,7 +245,7 @@ describe('ProgressPage (Gymnasium spec §5.3)', () => {
       expect(subjects.at(-1)).toHaveTextContent(/^Diritto penaleNessuna schedaNessun ripasso negli ultimi 30 giorni$/);
       expect(document.body.textContent).not.toMatch(/NaN|undefined|Infinity/);
       // A segment of one card among 22.345 is still there to press.
-      expect(within(states).getByRole('button', { name: 'In apprendimento: 1 scheda (0%)' })).toHaveClass('min-w-3');
+      expect(within(states).getByRole('button', { name: 'In apprendimento: 1 scheda (<1%)' })).toHaveClass('min-w-3');
       expect(container.querySelectorAll('[data-empty]')).toHaveLength(1);
     });
 
