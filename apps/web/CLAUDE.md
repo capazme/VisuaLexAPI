@@ -10,7 +10,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `/studia` (VisuaLex Gymnasium, the study cards; the code keeps the name `studia`: `StudiaPage` with its views under
   `components/features/studia/`, `studiaService`; behind `VITE_FEATURE_STUDIA`, default on
   (`features/studia/featureFlag.ts`; in production a build argument of the ingress image, key only
-  in `infra/compose.app.yml`), which also takes Gymnasium out of the section switcher; `/studia` redirects to `ripasso` (see «Card review» below); «Le mie schede» is
+  in `infra/compose.app.yml`), which also takes Gymnasium out of the section switcher; `/studia` redirects to `ripasso` (see «Card review» below); `/studia/progressi` is «Progressi», the page of the data (see «Progressi» below); «Le mie schede» is
   `MyCardsView` — `useMyCards` pages through `ordine=materia` and groups subject → institute,
   the selected card is the route `/studia/schede/:id`, an anchor opens its article through
   `triggerSearch` as the dossier's rows do; the act filter offers the acts of the cards listed,
@@ -84,7 +84,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   the owner, 13 Oct 2026; its hover label carries ⌘K, the palette; the quick norms' dot sits under it;
   `#tour-nav-search` is what the welcome and search tours point at) and «Analizza documento» —, then the active
   section's, in a group named after it: Opus, Dossier; Gymnasium in two groups (Gymnasium spec §4), «Studia»
-  (Oggi, the home `/studia/ripasso`, and Dossier) and «Contribuisci» (Le mie schede, Da validare for validators);
+  (Oggi, the home `/studia/ripasso`, Progressi, `/studia/progressi`, and Dossier) and «Contribuisci» (Le mie schede, Da validare for validators);
   Academia, Assistente and Grafo (`VITE_FEATURE_MERLT*`); Forum, «Dossier pubblici» (`/forum`, with the Forum's count;
   `end`, so it is not active under `/forum/community`) and «Community» — the section keeps its name and its areas are
   named apart, so «Forum» is never written twice. The section's line is «Dossier pubblici e community»; its title
@@ -537,8 +537,7 @@ palestra giuridica» — the section switcher keeps «Gymnasium»; spec
 `docs/superpowers/specs/2026-10-13-studia-progress-design.md`, direction D «Registro vivo»). Reads: `useProgress` over
 `GET /lingo/srs/progressi` (the last answer of the same subject stays on screen while a new one travels — dimmed
 under the road only —, an answer is never shown for another subject, and an older one never overwrites a newer one) — once for the whole day, which draws the missions, the statistics and the road, and once more
-for the subject chosen, made only while one is (`useProgress(materia, enabled)`), which draws the first mission's action
-and «Il tuo mese». One column, 768 px, centred at every width (on this page `StudiaPage` narrows to it too, so the
+for the subject chosen, made only while one is (`useProgress(materia, enabled)`), which draws the first mission's action. One column, 768 px, centred at every width (on this page `StudiaPage` narrows to it too, so the
 heading and its rule are the column's width), in the order the owner fixed:
 1. **«Le missioni di oggi»** (`missions/TodayMissions`): the day's three missions, one under the other, each with its
    mark (drawn, never pressed), «8 di 18» and a thin bar, and the summary «2 di 3» over those with something to do
@@ -569,19 +568,17 @@ heading and its rule are the column's width), in the order the owner fixed:
    to Sunday from the server's today and `serie.ultimiGiorni`, seven boxes with «LMMGVSD», a day to come dotted, and the
    days before the first one the calendar holds `vuoto`, never missed; each state in words for a screen reader,
    `DAY_STATE_LABEL`), then the cards by state as three numbers in Newsreader with their names in Geist (a `dl`) and the
-   bar. «Il tuo mese» opens `progress/MonthSheet`: `ActivityCalendar` (26 weeks on a computer, 12 on a phone, by
-   `useIsDesktop`; one tab stop with arrow keys and a live readout, a legend under it, the whole pitch of a cell
-   hit-testable) and `DueForecast`, the chosen subject's with its hue; it holds nothing typed, so Esc and the backdrop
-   close it. Their labels (weekdays, months, the scale, the days) are the interface's text at `text-xs` laid over the
-   drawing by percentages, never SVG `<text>`: a drawing scaled to its width scaled them under 11 px. **No text on «Oggi»
-   is under 11 px** (the stamp's date included; the compact stamp is the session's): `typeScale.test.tsx` reads the
-   files of `missions/` and `progress/` and fails on a `text-[Npx]` under 11 or an SVG `<text>`. They leave it for `/studia/progressi` in G3, with `CardStatesBar` and `SubjectProgress` (no longer drawn on
-   the home; `CARD_STATES`, in `tokens.ts`, are the band's and the road's).
+   bar. «Tutti i progressi», a link (44 px, full width on a phone), leads to `/studia/progressi`: the long calendar, the
+   coming days and the subjects live there alone (G3 removed the «Il tuo mese» sheet, so no chart is drawn twice).
+   **No text on «Oggi» or «Progressi» is under 11 px** (the stamp's date included; the compact stamp is the session's):
+   `typeScale.test.tsx` reads the files of `missions/` and `progress/` and fails on a `text-[Npx]` under 11 or an SVG
+   `<text>`. `CARD_STATES`, in `tokens.ts`, are the band's, the road's and the page's.
 3. **«Tutte le missioni»** (`missions/MissionList`): daily, weekly, long-term. What the web counts shows its state;
    what the server must record (a subject left for 7 days, writing a card, validating two — a validator's only, from the
    outlet's `validator` —, a short case, a week of streak) is listed with «In arrivo», with no count and nothing to tick.
-4. «Cosa ripassi», `SubjectChips` (the subject narrows the first mission's action, the session it starts and «Il tuo
-   mese», kept in `localStorage` under `visualex.studia.ripasso.materia`); `SubjectRoad`, «Il percorso», one stop per
+4. «Cosa ripassi», `SubjectChips` (the subject narrows the first mission's action and the session it starts, kept in
+   `localStorage` under `visualex.studia.ripasso.materia` by `progress/rememberedSubject.ts`, which «Progressi» shares:
+   one choice for the area); `SubjectRoad`, «Il percorso», one stop per
    subject joined by a line, free (no locks, no number, no imposed order): the three states as a bar and in words
    (`stopStates`), «N da ripassare», the reviews of 30 days, «Ripassa» for a session narrowed to it (none for a subject
    with no card); ordered by `orderStops`, new plus in learning first, then by name — kept so when the institute read
@@ -616,6 +613,37 @@ or the grades; 1.5 s; no focus, no pointer, the keys untouched; an `aria-live`
 line says it to a screen reader). The confetti step by elapsed time (`confetti.ts`
 `stepsAt`), so they last 1.5 s on any screen. Under reduced motion nothing moves: no canvas, the end state only. The session's end screen adds the ring and the streak
 (`SessionEndProgress`, the same read).
+
+**«Progressi», the page of the data** (`progress/ProgressPage`, `/studia/progressi`, the sidebar's «Progressi» in
+«Studia» after Oggi; Gymnasium spec §5.3, G3). The same read as «Oggi» — `useProgress(undefined)` for the whole day and
+`useProgress(materia, enabled)` while a subject is chosen —, no route of its own on the server. Under the area's heading
+(`StudiaPage` narrows it to the same 768 px column as «Oggi», and draws no strip over it) the page heading «I tuoi
+progressi», then, one column at every width: **the summary** (`StreakBadge compact`, `GoalRing compact` and the reviews
+of the last 30 days in a large number, `recentReviews`: the sum of `materie[].ripassi30`; always the whole day's, as
+the streak and the goal are); **the subject chips** (`SubjectChips`, the subject «Oggi» remembers, and a line saying
+what it narrows); **«Il tuo calendario»** (`ActivityCalendar`, 26 weeks on a computer and 12 on a phone by
+`useIsDesktop`); **«Le schede per stato»** (`CardStatesBar`: the bar's segments are buttons as before, and under it the
+three states by name, count and share); **«I prossimi 14 giorni»** (`DueForecast`); **«Per materia»**
+(`SubjectProgress`: the five subjects in the road's order, `orderStops`, each an `aria-pressed` button that narrows the
+page — pressed again it clears —, its share consolidated, a bar of the three states and the states in words,
+`stopStates`, and the reviews of 30 days; no «N da ripassare», which the progress read does not carry by subject). The
+calendar, the states and the coming days are the chosen subject's read; the summary and «Per materia» stay the whole
+day's. The calendar's cells carry a state (`layout.ts` `calendarDayState`, `data-stato`): a dot on a day that counted,
+a dashed outline on a rest, a dash on a past day that did not count (`saltato`), a ring on today, the rest of this week
+dotted (`calendarGrid`'s `future`, never chosen, so End stops at today), and no mark on a day before the first one the
+calendar holds (`vuoto`): a newcomer's calendar says nothing is missed. On a subject's calendar the flags are the whole
+day's, as the server sends them. The calendar is one tab stop (arrows by day and week, Home and End, a live readout; the
+whole pitch of a cell hit-testable). Labels on both charts (weekdays, months, the scale, the days) are the interface's
+text at `text-xs` placed by percentages over or beside the drawing, never SVG `<text>`: a drawing scaled to its width
+scaled them under 11 px. The legend under it says each in words; the line under it (`describeDay`, «lunedì 12
+ottobre: 14 ripassi, obiettivo raggiunto», commas, read aloud as written) is the day's name for a screen reader, with
+the arrows as before. The coming days' scale is the interface's text in a column beside the drawing, on whole-number
+lines (`scaleLines`), the days in a row under it; today's column is tinted and its label set apart; a day with nothing
+due is a hollow mark on the base. Counts go through `formatCount` (`Intl.NumberFormat('it-IT')`: «12.345», four
+digits whole as Italian writes them). States: while the first read travels every block holds its final size
+(`ActivityCalendarSkeleton`, `DueForecastSkeleton`, `CardStatesBarSkeleton`); a failed read says «Non riesco a leggere i
+tuoi progressi.» with «Riprova» (44 px, no alert) and keeps what was on screen; a new read of the same subject leaves
+the last answer, dimmed. No points and no level.
 
 **Study cards under the article** (`studia/ArticleCardsRow`, behind `VITE_FEATURE_STUDIA`): one quiet
 row after the discussion panel and «Chiedi su questo articolo», outside `ArticleBody` and its text root
