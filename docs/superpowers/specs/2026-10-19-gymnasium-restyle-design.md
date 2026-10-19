@@ -16,8 +16,9 @@ not. The pieces of that kind of app are already here: a daily goal ring, a strea
 celebration once a day (progress spec, direction D «Registro vivo»). What is missing is the **order in
 which they are given**.
 
-What the code and the two specs say today (read on 19 October at `origin/develop`; **no screen was looked
-at for this section**, see §9):
+What the code, the two specs and the running screens say today (read on 19 October at `origin/develop`;
+the screens were looked at on a local stack at 1366 and 390 px, see §9 for what that does and does not
+cover):
 
 - The home of the area, `/studia/ripasso`, is a dashboard of six panels: the band (ring, streak, today's
   sentence, «Inizia il ripasso»), the subject chips, the activity calendar, the cards by state and the
@@ -30,6 +31,26 @@ at for this section**, see §9):
   challenges were left out of the first round on purpose (progress spec §2).
 - The review session shows the card, «Restano N» and «Interrompi», with the grade buttons pinned at the
   bottom on a phone; it has no progress bar and no frame of its own.
+
+Seen on the screens:
+
+- **The navigation is a rail of icons with no visible words.** At 1366 px the sidebar is a narrow strip:
+  Ricerca, Analizza documento, Ripasso, Le mie schede, Dossier, each only an icon (the names are only
+  accessible names). The two Gymnasium entries sit among the app-wide ones. This stack serves an older
+  branch than `develop` (the sections work), so the rail must be checked again on `develop`.
+- **With data, the home's first screen is the calendar.** The band (ring, streak, «Oggi: 12 da ripassare ·
+  8 nuove», «Inizia il ripasso») is good and clear, but the 26-week calendar fills the rest of the first
+  screen; cards by state, coming days, progress by subject and the settings are below it.
+- **A new user meets a dead page**: a disabled button, «Non hai ancora schede da ripassare», and an empty
+  calendar grid as large as a full one. The way out it points to, «Le mie schede», says «Nessuna scheda
+  ancora. Aprine una da un articolo con «+ Nuova scheda»…» (the wording «Aprine» also reads oddly): **there
+  is no way to write a card from inside the area**, only from an article in the reader or through Claude.
+- **The lesson is bare.** On a computer: the page heading «VisuaLex Gymnasium» stays, then a small grey
+  «Restano 3» and a text link «Interrompi», the question in serif, and a half-width «Mostra risposta
+  Spazio» button; after the reveal the answer, a «Spiegazione» label and four small outlined grade tiles
+  left-aligned under the text. The rest of the page is empty, the sidebar stays, there is no progress bar,
+  and the grades are not pinned. On a phone the action bar is pinned at the foot, which works, with the
+  menu button above the heading.
 
 ## 2. Direction
 
@@ -77,6 +98,10 @@ views do not move.
 | Studia | **Progressi** | `/studia/progressi` (new, web only) | calendar, cards by state, coming days, progress by subject (§5.3) |
 | Contribuisci | **Le mie schede** | `/studia/schede` (as today) | write and manage your cards |
 | Contribuisci | **Da validare** | `/studia/valida` (as today), validators only | the validation queue |
+
+The entries carry visible words, not only icons: on the stack that was looked at, the rail shows icons
+alone (§1). If that is the sections spec's design, G1 proposes labels (or a wider rail on large screens)
+and the front-end owner decides; it is a change to the shell, so `Sidebar.tsx` is reserved first.
 
 «Impostazioni di studio» (`StudyPreferences`, unchanged in content) leave the bottom of the home and open
 from a gear in the header of **Oggi**, in a `ui/Sheet`.
@@ -155,7 +180,10 @@ The session becomes a screen of its own:
 ### 5.5 Contribuisci: Le mie schede, Da validare, the reader's row
 
 Same logic, same routes, restyled with the shared tokens and the Gymnasium hue; their copy and states do
-not change. The row «Schede su questo articolo (n) · + Nuova scheda» in the reader and its peek follow the
+not change, except one addition and one correction. **Addition:** a «+ Nuova scheda» in the page header of
+Le mie schede and as the action of its empty state, opening the existing card form with the anchors typed
+as references («art. 1455 c.c.»), as the form's «+ Ancora» already allows; today a card can only start from
+an article or from Claude (see §8, point 5). **Correction:** the empty state's sentence is rewritten. The row «Schede su questo articolo (n) · + Nuova scheda» in the reader and its peek follow the
 reader's quieter look. The validation vote bar keeps its three votes and the required reason.
 
 ## 6. Phases
@@ -168,7 +196,7 @@ this order; G5 waits for a decision.
 | G1 | The sidebar's two groups; **Oggi** (strip, action card, subject chips, subject stops); the settings in a sheet; the empty and failed states | `features/sections/sections.ts`, `ReviewHome.tsx`, `progress/ProgressBand.tsx`, `progress/SubjectChips.tsx`, `progress/SubjectProgress.tsx`, `StudyPreferences.tsx`, `StudiaPage.tsx`, `App.tsx` (the new route) |
 | G2 | **Lezione**: the frame, the progress bar, the bottom bar, the note after a grade, the end screen; the same PR rewrites §6 of the Studia screens spec and the review-card sentence of `apps/web/CLAUDE.md` | `ReviewSession.tsx`, `ReviewCard.tsx`, `GradeBar.tsx`, `progress/SessionEndProgress.tsx`, `useReviewSession.ts` (read only unless a test says otherwise) |
 | G3 | **Progressi**: the page and the restyle of its four components | `progress/*` |
-| G4 | **Contribuisci**: Le mie schede, Da validare, the reader's row | `MyCardsView.tsx`, `CardGroups.tsx`, `CardFilters.tsx`, `CardDetail.tsx`, `ValidationQueueView.tsx`, `VoteBar.tsx`, `ArticleCardsRow.tsx`, `ArticleCardsPeek.tsx` |
+| G4 | **Contribuisci**: Le mie schede, Da validare, the reader's row; a «+ Nuova scheda» inside Le mie schede and in its empty state (§5.5) | `MyCardsView.tsx`, `CardGroups.tsx`, `CardFilters.tsx`, `CardDetail.tsx`, `ValidationQueueView.tsx`, `VoteBar.tsx`, `ArticleCardsRow.tsx`, `ArticleCardsPeek.tsx` |
 | G5 | **Institute stops** (needs a server read, below) | `ReviewHome.tsx`, a new `progress/InstituteStops.tsx`, the server |
 
 **G5, the one server change.** The progress read carries counts by subject, not by institute, and the
@@ -197,14 +225,29 @@ subject.
    the rule that nothing is added between a grade and the next card stay as they are. If wanted, it is a
    separate decision.
 4. «Contribuisci» as the group's name; alternatives «Scrivi e valida», «Comunità».
+5. A way to write a card from inside the area. The Studia screens spec (decision 4) describes the form
+   as opened from an article, with the article as primary anchor. Opening it from Le mie schede with a
+   typed anchor needs the server to accept a card whose only anchor was typed (the form's «+ Ancora»
+   suggests it does); the executor checks that the route allows it before building the button, and says so
+   in the PR. If it does not, the empty state says how to start from an article and nothing else changes.
 
-## 9. What was not verified
+## 9. What was verified, and what was not
 
-This was written from the specs, the types (`types/studia.ts`) and the component sources, not from the
-running screens. Before G1 starts, the front-end owner's session checks at 1366 and 390 px, light and
-dark: how the home reads today (the length of the page, what sits above the fold), how the session looks
-on a phone, what the Gymnasium sidebar holds, and what the focus mode hides; and corrects this spec where
-it is wrong.
+**Looked at (19 October):** the home with and without data, «Le mie schede» empty, the lesson up to the
+grades, at 1366 px, and the lesson on a phone at 390 px, on a local development stack in light mode.
+
+**Limits of that look.**
+- The stack serves the sections branch, older than `develop`; the sidebar in particular may differ.
+- The test account has no cards and the card sources were unreachable, so no card could be created. The
+  screens with data (home, lesson) were drawn from **simulated answers of the three study routes**, held
+  in the browser only; nothing was written to the database. Real data may lay out differently (long
+  questions, many anchors, long institute names).
+- Not seen: dark mode, the lesson's end screen and celebration, «Da validare», the card form and detail,
+  the settings, the reader's row, a long list of cards, 390 px for the home.
+- No anchor line was seen above the question in the lesson; the simulated cards may be the reason.
+
+Before G1 starts, the front-end owner's session repeats the look on `develop` with real cards, covers the
+points above, and corrects this spec where it is wrong.
 
 ## 10. Testing
 
