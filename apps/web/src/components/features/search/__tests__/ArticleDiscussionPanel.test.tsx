@@ -194,6 +194,28 @@ describe('ArticleDiscussionPanel', () => {
     expect(onFocusThread).toHaveBeenCalledWith('thread-created-draft');
   });
 
+  it('says, before posting, that a glossa is public in the Forum, and reads it with each field', async () => {
+    render(<ArticleDiscussionPanel anchor={dummyAnchor} isOpen={true} onClose={vi.fn()} draft={{ passage: passageSample }} />);
+    await screen.findByText('Titolo discussione');
+
+    // in the composer, beside what is being written (the panel fades in, so not `toBeVisible`)
+    const notice = 'Le glosse sono pubbliche nel Forum: per un appunto privato usa una nota.';
+    const form = screen.getByRole('button', { name: /pubblica/i }).closest('form')!;
+    expect(within(form).getByText(notice)).toBeInTheDocument();
+    expect(within(form).getByRole('textbox', { name: 'Testo della glossa' })).toHaveAccessibleDescription(notice);
+    expect(within(form).getByRole('textbox', { name: 'Titolo (facoltativo)' })).toHaveAccessibleDescription(notice);
+    expect(articleDiscussionService.create).not.toHaveBeenCalled();
+  });
+
+  it('shows the notice only while the composer is open', async () => {
+    render(<ArticleDiscussionPanel anchor={dummyAnchor} isOpen={true} onClose={vi.fn()} />);
+    await screen.findByText('Titolo discussione');
+    expect(screen.queryByText(/Le glosse sono pubbliche nel Forum/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /nuova glossa/i }));
+    expect(screen.getByRole('textbox', { name: 'Titolo della glossa' }))
+      .toHaveAccessibleDescription('Le glosse sono pubbliche nel Forum: per un appunto privato usa una nota.');
+  });
+
   it('shows passage-load failure separately from an empty discussion result and allows retry', async () => {
     const onRetryPassageLoad = vi.fn();
     vi.mocked(articleDiscussionService.list).mockResolvedValue({
