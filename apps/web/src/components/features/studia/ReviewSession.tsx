@@ -80,7 +80,7 @@ function ArticlePanel({ anchor, desktop, onClose, onOpenInReader, showToast }: A
 }
 
 /**
- * A review session (`/studia/ripasso/sessione?materia=`): one card at a time, the answer on
+ * A review session (`/studia/ripasso/sessione?materia=&istituto=`): one card at a time, the answer on
  * request, four grades. The queue lives in `useReviewSession`, so opening and closing an anchor's
  * article leaves it as it was. Esc asks before leaving; what was graded is already recorded.
  */
@@ -92,6 +92,8 @@ export function ReviewSession() {
 
   const requested = params.get('materia');
   const materia = requested && Object.keys(MATERIA_LABEL).includes(requested) ? (requested as Materia) : undefined;
+  // An institute only within a subject (the server refuses one alone), passed back as the road spelt it.
+  const istituto = (materia && params.get('istituto')) || undefined;
 
   const [confirmStop, setConfirmStop] = useState(false);
   const [panel, setPanel] = useState<{ step: number; anchor: AncoraScheda } | null>(null);
@@ -105,7 +107,7 @@ export function ReviewSession() {
   }, []);
 
   const { current, revealed, reveal, grade, remaining, done, summary, practice, step, loading, loadError, saveError, skipped, saving, reload, goalMet } =
-    useReviewSession(materia, { paused: confirmStop, onEscape: handleEscape });
+    useReviewSession(materia, { istituto, paused: confirmStop, onEscape: handleEscape });
   // The grade that made the day count plays the celebration, once a day for this browser (spec decision 10).
   const { celebratedBefore, markCelebrated } = useCelebratedToday();
   // The day whose notice has run its course here: the notice goes, and a later closing grade (the goal raised) does not bring it back.

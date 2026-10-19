@@ -99,6 +99,19 @@ describe('the review session', () => {
     expect(session).toHaveBeenCalledWith('DIRITTO_PENALE');
   });
 
+  it('asks for the session of one institute of the subject, spelt as the road gave it (G5)', async () => {
+    const istituto = 'Risoluzione per inadempimento (art. 1453 c.c.) & 50% «diffida»';
+    renderSession([card('a')], `/studia/ripasso/sessione?${new URLSearchParams({ materia: 'DIRITTO_CIVILE', istituto })}`);
+    await screen.findByText('Domanda a?');
+    expect(session).toHaveBeenCalledWith('DIRITTO_CIVILE', istituto);
+  });
+
+  it('ignores an institute without its subject, which the server would refuse', async () => {
+    renderSession([card('a')], '/studia/ripasso/sessione?istituto=Mora');
+    await screen.findByText('Domanda a?');
+    expect(session).toHaveBeenCalledWith(undefined);
+  });
+
   it('ignores a subject it does not know', async () => {
     renderSession([card('a')], '/studia/ripasso/sessione?materia=toString');
     await screen.findByText('Domanda a?');
