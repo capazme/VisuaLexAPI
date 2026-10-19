@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
@@ -205,7 +205,9 @@ export function ReviewSession() {
   const showCard = !loadError && !loading && !done && current !== null;
   // An article belongs to the step it was opened at: a card that comes back is a new step.
   const openAnchor = panel && current && panel.step === step ? panel.anchor : null;
-  useEffect(() => {
+  // In the commit, not after it: an Esc pressed as soon as a card is drawn must already find it there, or it would
+  // leave without asking.
+  useLayoutEffect(() => {
     panelOpen.current = openAnchor !== null && desktop;
     cardOnScreen.current = showCard;
   }, [openAnchor, desktop, showCard]);
