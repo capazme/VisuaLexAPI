@@ -145,6 +145,9 @@ jobs:
         working-directory: services/merlt
     steps:
       - uses: actions/checkout@v4
+        with:
+          # test_brocardi_off.py reads the vendored mcp-legal-it's source bindings.
+          submodules: true
       - uses: actions/setup-python@v5
         with:
           # The image is python:3.11-slim (services/merlt/Dockerfile).
