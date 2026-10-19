@@ -1,0 +1,137 @@
+import { Check } from 'lucide-react';
+import { cn } from '../../../../lib/utils';
+import type { ConteggiStati, Progressi } from '../../../../types/studia';
+import { GoalRing } from './GoalRing';
+import { currentWeek, formatDayLong, totalCards, type WeekDay } from './layout';
+import { StreakBadge } from './StreakBadge';
+import { SettingsGear } from './StudySettings';
+import { BLOCK_HEADING, CARD_STATES, DAY_STATE_LABEL, INK_BG, INK_BORDER, INK_TEXT, MUTED_TEXT, ON_INK, SECONDARY_BUTTON, TILE } from './tokens';
+
+export interface StatsBandProps {
+  /** The whole day's answer; null before the first one, or when it could not be read. */
+  data: Progressi | null;
+  /** The first read is travelling: the band holds its places. */
+  loading: boolean;
+  settingsOpen: boolean;
+  onOpenSettings: () => void;
+  monthOpen: boolean;
+  onOpenMonth: () => void;
+  /** The celebration: the streak's count pops. */
+  celebrate?: boolean;
+}
+
+/** A box of the week: ticked for a day that counted, dashed for a rest, empty for a missed one, outlined for today. */
+function boxClass(day: WeekDay, today: boolean): string {
+  return cn(
+    'grid h-8 w-8 place-content-center rounded-md border-[1.5px]',
+    day.stato === 'fatto' && cn(INK_BG, INK_BORDER, ON_INK),
+    day.stato === 'riposo' && cn('border-dashed', INK_BORDER),
+    day.stato === 'saltato' && 'border-slate-300 dark:border-slate-600',
+    day.stato === 'oggi' && INK_BORDER,
+    (day.stato === 'futuro' || day.stato === 'vuoto') && 'border-dotted border-slate-300 dark:border-slate-700',
+    today && 'ring-2 ring-primary-900/40 ring-offset-2 ring-offset-white dark:ring-primary-300/40 dark:ring-offset-slate-900',
+  );
+}
+
+/** The current week, Monday to Sunday, each box with its letter; the states are also words, for a screen reader. */
+function WeekRow({ data }: { data: Progressi }) {
+  // The calendar is sorted by day: its first row is the first day studied in the window, none for a newcomer.
+  const week = currentWeek(data.oggi.giorno, data.serie.ultimiGiorni, data.calendario[0]?.giorno);
+  return (
+    <ol aria-label="Questa settimana" className="grid w-full grid-cols-7 gap-1.5 md:w-auto md:gap-2">
+      {week.map((day) => {
+        const today = day.giorno === data.oggi.giorno;
+        return (
+          <li key={day.giorno} data-stato={day.stato} className="grid justify-items-center gap-1">
+            <span aria-hidden className={cn('text-xs font-medium', today ? INK_TEXT : MUTED_TEXT)}>
+              {day.lettera}
+            </span>
+            <span aria-hidden className={boxClass(day, today)}>
+              {day.stato === 'fatto' && <Check size={15} strokeWidth={3} />}
+            </span>
+            <span className="sr-only">{`${formatDayLong(day.giorno)}: ${DAY_STATE_LABEL[day.stato]}`}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/** The cards by state: three large numbers in the reader's serif, their names in the interface's sans, the bar under. */
+function StateNumbers({ stati }: { stati: ConteggiStati }) {
+  const total = totalCards(stati);
+  return (
+    <div className="grid gap-3">
+      <dl className="grid grid-cols-3 gap-3">
+        {CARD_STATES.map((state) => (
+          // The number above its name: `dt` first in the document, drawn second; packed to the top, so the three
+          // numbers stay on one line when a name takes two.
+          <div key={state.key} className="flex flex-col-reverse justify-end gap-1">
+            <dt className={cn('flex items-center gap-1.5 text-sm leading-tight', MUTED_TEXT)}>
+              <span aria-hidden className={cn('inline-block h-2.5 w-2.5 shrink-0 rounded-sm', state.swatch)} />
+              {state.label}
+            </dt>
+            <dd className={cn('font-serif text-3xl font-medium leading-none tabular-nums md:text-4xl', INK_TEXT)}>{stati[state.key]}</dd>
+          </div>
+        ))}
+      </dl>
+      {/* The numbers say it: the bar is their picture. */}
+      <span aria-hidden className="flex h-2 gap-0.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+        {total > 0 &&
+          CARD_STATES.filter((state) => stati[state.key] > 0).map((state) => (
+            <span key={state.key} className={cn('min-w-1 basis-0', state.swatch)} style={{ flexGrow: stati[state.key] }} />
+          ))}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * «I tuoi progressi», one band (Gymnasium spec §5.1): the streak, today's goal and the gear; the current week as
+ * seven boxes; the cards by state as three numbers with their bar; «Il tuo mese», which opens the long calendar
+ * and the coming days in a sheet. While the first read travels it holds its final size; a failed read leaves the
+ * heading and the gear (the missions say it failed, with «Riprova»).
+ */
+export function StatsBand({ data, loading, settingsOpen, onOpenSettings, monthOpen, onOpenMonth, celebrate = false }: StatsBandProps) {
+  return (
+    <section aria-labelledby="studia-progressi" aria-busy={loading} className={cn(TILE, 'grid gap-5 p-5 md:p-6')}>
+      <div className="flex items-center gap-3">
+        <h3 id="studia-progressi" className={BLOCK_HEADING}>
+          I tuoi progressi
+        </h3>
+        <SettingsGear open={settingsOpen} onOpen={onOpenSettings} />
+      </div>
+
+      {data ? (
+        <>
+          <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
+            <StreakBadge compact attuale={data.serie.attuale} record={data.serie.record} ultimiGiorni={data.serie.ultimiGiorni} pop={celebrate} />
+            <div className="shrink-0">
+              <GoalRing compact ripassi={data.oggi.ripassi} obiettivo={data.oggi.obiettivo} raggiunto={data.oggi.raggiunto} />
+            </div>
+            <div className="w-full md:ml-auto md:w-auto">
+              <WeekRow data={data} />
+            </div>
+          </div>
+          <StateNumbers stati={data.stati} />
+          <button type="button" aria-haspopup="dialog" aria-expanded={monthOpen} onClick={onOpenMonth} className={cn(SECONDARY_BUTTON, 'w-full md:w-auto md:justify-self-start')}>
+            Il tuo mese
+          </button>
+        </>
+      ) : loading ? (
+        // The final size, so nothing jumps when the read answers.
+        <div aria-hidden className="grid gap-5">
+          <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
+            <div className="h-10 w-40 rounded-lg bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
+            <div className="h-10 w-24 rounded-lg bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
+            <div className="h-14 w-full rounded-lg bg-slate-100 motion-safe:animate-pulse md:ml-auto md:w-72 dark:bg-slate-800" />
+          </div>
+          <div className="h-[4.5rem] rounded-lg bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
+          <div className="h-11 w-full rounded-xl bg-slate-100 motion-safe:animate-pulse md:w-36 dark:bg-slate-800" />
+        </div>
+      ) : (
+        <p className={cn('text-sm', MUTED_TEXT)}>I numeri tornano appena riesco a leggerli.</p>
+      )}
+    </section>
+  );
+}

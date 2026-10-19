@@ -10,6 +10,7 @@ import { cn } from '../../../lib/utils';
 import { getActTypesByGroup } from '../../../constants/actTypes';
 import { useTour } from '../../../hooks/useTour';
 import { AttributionChip } from '../bulletin/AttributionChip';
+import { spring } from '../../../lib/motion';
 
 interface QuickNormsManagerProps {
   isOpen: boolean;
@@ -155,7 +156,7 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+        transition={spring.snappy}
         className={cn(
           'relative w-full max-w-2xl max-h-[85vh] overflow-hidden',
           'bg-white/85 dark:bg-slate-900/85 backdrop-blur-2xl',
@@ -174,7 +175,7 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl hover:bg-slate-100/80 dark:hover:bg-slate-800/80 text-slate-500 transition-all"
+            className="p-2 rounded-xl hover:bg-slate-100/80 dark:hover:bg-slate-800/80 text-slate-500 transition-colors"
           >
             <X size={20} />
           </button>
@@ -193,7 +194,7 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
               <button
                 onClick={() => setInputMode('manual')}
                 className={cn(
-                  'flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                  'flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-[color,background-color,border-color,box-shadow]',
                   inputMode === 'manual'
                     ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white'
                     : 'text-slate-600 dark:text-slate-400'
@@ -205,7 +206,7 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
               <button
                 onClick={() => setInputMode('url')}
                 className={cn(
-                  'flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                  'flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-[color,background-color,border-color,box-shadow]',
                   inputMode === 'url'
                     ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white'
                     : 'text-slate-600 dark:text-slate-400'

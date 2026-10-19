@@ -1,7 +1,8 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Sidebar } from './Sidebar';
+import { useDesktopSidebar } from './sidebarWidth';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -23,6 +24,7 @@ import { useConsentIfProvided } from '../../features/merlt/consent/useConsent';
 import { useAuth } from '../../hooks/useAuth';
 import { ServiceHealthBanner } from '../ui/ServiceHealthBanner';
 import { PluginSlot } from '../../plugins/PluginSlot';
+import { spring } from '../../lib/motion';
 
 export function Layout() {
   const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel, openCommandPalette } = useAppStore(useShallow(s => ({
@@ -37,6 +39,12 @@ export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
+  // From `xl` the desktop column shows its words unless the user narrowed it (remembered in the browser).
+  const desktopSidebar = useDesktopSidebar();
+  const reduceMotion = useReducedMotion();
+  // The desktop column's width as it is drawn (0 when hidden or in Focus mode): what floats at the
+  // bottom left from `lg` (the services pill) starts after it, never under it.
+  const desktopSidebarWidth = sidebarVisible && !settings.focusMode ? desktopSidebar.width : 0;
   const navigate = useNavigate();
   // The find window searches the workspace, which is drawn only on the search page (spec §13.1).
   const { pathname } = useLocation();
@@ -155,7 +163,10 @@ export function Layout() {
   }, [navigate, updateSettings, settings.focusMode, toggleSidebar, toggleSearchPanel, openCommandPalette, onSearchPage]);
 
   return (
-    <div className="h-app overflow-hidden flex bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300">
+    <div
+      className="h-app overflow-hidden flex bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300"
+      style={{ ['--sidebar-width' as string]: `${desktopSidebarWidth}px` }}
+    >
       {/* Mobile Overlay */}
       {sidebarOpen && (
         <motion.div
@@ -171,10 +182,10 @@ export function Layout() {
       <motion.div
         initial={false}
         animate={{
-          width: sidebarVisible && !settings.focusMode ? 64 : 0,
+          width: desktopSidebarWidth,
           opacity: sidebarVisible && !settings.focusMode ? 1 : 0,
         }}
-        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        transition={reduceMotion ? { duration: 0 } : spring.snappy}
         className="hidden lg:block flex-shrink-0 h-full"
       >
         {sidebarVisible && !settings.focusMode && (
@@ -182,6 +193,8 @@ export function Layout() {
             theme={settings.theme}
             toggleTheme={toggleTheme}
             isOpen={true}
+            layout={desktopSidebar.layout}
+            onToggleWide={desktopSidebar.toggle}
             closeMobile={() => { }}
             openSettings={() => setSettingsOpen(true)}
             openKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
@@ -196,6 +209,7 @@ export function Layout() {
             theme={settings.theme}
             toggleTheme={toggleTheme}
             isOpen={sidebarOpen}
+            layout="drawer"
             closeMobile={() => setSidebarOpen(false)}
             openSettings={() => setSettingsOpen(true)}
             openKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
@@ -204,7 +218,8 @@ export function Layout() {
       )}
 
       <main
-        className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative"
+        // `vlx-page`: the one part a section change animates (index.css, spec §6.3.2); the sidebar stays still.
+        className="vlx-page flex-1 flex flex-col min-w-0 h-full overflow-hidden relative"
         // The practice's columns (`h-app-row`) are the viewport less this bar.
         style={showSearchBar ? { ['--search-bar-height' as string]: SEARCH_BAR_HEIGHT } : undefined}
       >
@@ -215,11 +230,11 @@ export function Layout() {
           onClick={() => updateSettings({ focusMode: !settings.focusMode })}
           id="tour-focus-toggle"
           className={cn(
-            'hidden md:block fixed top-4 right-4 z-50 p-2.5 rounded-xl transition-all duration-200',
-            'backdrop-blur-xl shadow-lg border',
+            'hidden md:block fixed top-4 right-4 z-50 p-2.5 rounded-xl transition-colors',
+            'shadow-sm border',
             settings.focusMode
-              ? 'bg-primary-600/90 text-white border-transparent hover:bg-primary-500/90'
-              : 'bg-white/80 dark:bg-slate-900/80 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700'
+              ? 'bg-primary-600 text-white border-transparent hover:bg-primary-700'
+              : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 hover:text-slate-800 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700'
           )}
           title={settings.focusMode ? 'Esci da Focus Mode (Cmd+Space)' : 'Focus Mode (Cmd+Space)'}
         >

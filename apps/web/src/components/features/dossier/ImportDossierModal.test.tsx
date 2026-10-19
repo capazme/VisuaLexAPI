@@ -14,6 +14,12 @@ describe('ImportDossierModal', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('1 voce non importabile: sentenza con dati non validi');
   });
 
+  it('shows the tags with a capital letter, as typed past the first (D1)', () => {
+    render(<ImportDossierModal dossier={{ id: 'd', title: 'Da link', createdAt: '', items: [], tags: ['accesso', 'DPO'] }} onClose={vi.fn()} onConfirm={vi.fn()} />);
+    expect(screen.getByText('Accesso')).toBeInTheDocument();
+    expect(screen.getByText('DPO')).toBeInTheDocument();
+  });
+
   it('has no warning when everything can be imported', () => {
     render(<ImportDossierModal dossier={{ id: 'd', title: 'Da link', createdAt: '', items: [] }} onClose={vi.fn()} onConfirm={vi.fn()} />);
     expect(screen.queryByRole('alert')).toBeNull();

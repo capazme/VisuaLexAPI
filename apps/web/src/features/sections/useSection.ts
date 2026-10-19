@@ -1,3 +1,4 @@
+import { flushSync } from 'react-dom';
 import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { create } from 'zustand';
@@ -75,7 +76,13 @@ export function useSection() {
 
   const chooseSection = (id: SectionId) => {
     setSection(id);
-    navigate(SECTIONS.find((s) => s.id === id)!.home);
+    const go = () => navigate(SECTIONS.find((s) => s.id === id)!.home);
+    // A View Transition where the browser has one (index.css animates `vlx-page`, spec §6.3.2). By hand:
+    // the app's BrowserRouter ignores navigate's `viewTransition` option, which needs a data router.
+    const doc = document as Document & { startViewTransition?: (cb: () => void) => unknown };
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (doc.startViewTransition && !reduce) doc.startViewTransition(() => flushSync(go));
+    else go();
   };
 
   return { section, active: SECTIONS.find((s) => s.id === section)!, sections, chooseSection };

@@ -69,6 +69,7 @@ import { searchesIntoOnePractice } from './openInPractice';
 import { AddNoteModal } from './AddNoteModal';
 import { saveBlob } from '../../../utils/saveBlob';
 import { dossierService, type DossierSnapshotApi } from '../../../services/dossierService';
+import { tagLabel } from '../../../utils/tagLabel';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -436,7 +437,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   const hasNormaItems = dossier.items.some((i) => i.type === 'norma');
 
   return (
-    <div className="animate-in slide-in-from-right-10 duration-300">
+    <div className="animate-in slide-in-from-right-10 duration-200">
       <button
         onClick={onBack}
         className="md:hidden mb-4 flex items-center gap-2 px-4 py-3 text-base font-medium text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
@@ -472,7 +473,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
               <div className="flex flex-wrap gap-2 mt-2">
                 {dossier.tags.map((tag) => (
                   <span key={tag} className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full">
-                    {tag}
+                    {tagLabel(tag)}
                   </span>
                 ))}
               </div>

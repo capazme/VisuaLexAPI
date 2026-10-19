@@ -165,7 +165,7 @@ function CheckboxRow({ checked, onChange, disabled = false, label, description }
         />
         <div
           className={cn(
-            'w-5 h-5 rounded border-2 flex items-center justify-center transition-all',
+            'w-5 h-5 rounded border-2 flex items-center justify-center transition-colors',
             checked
               ? 'bg-primary-600 border-primary-600'
               : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600'
@@ -195,7 +195,7 @@ function RadioRow({ name, checked, onChange, label }: RadioRowProps) {
       <input type="radio" name={name} checked={checked} onChange={onChange} className="sr-only" />
       <div
         className={cn(
-          'w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all',
+          'w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors',
           checked ? 'border-primary-600 dark:border-primary-400' : 'border-slate-300 dark:border-slate-600'
         )}
       >

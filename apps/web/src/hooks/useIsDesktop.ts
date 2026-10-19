@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useSyncExternalStore } from 'react';
 
 /** Matches Tailwind's `md` breakpoint, which is where the app splits layouts. */
 const DESKTOP_QUERY = '(min-width: 768px)';
@@ -38,4 +38,23 @@ export function useIsDesktop(): boolean {
   }, []);
 
   return desktop;
+}
+
+/**
+ * Whether `query` matches, following the window: for a breakpoint other than `md` that must change
+ * markup or state, not only classes (the sidebar's words from `xl`). Read through
+ * `useSyncExternalStore`, so a change between the render and the subscription is not missed. Without
+ * `matchMedia` (a test environment) it is false.
+ */
+export function useMediaQuery(query: string): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      if (typeof window.matchMedia !== 'function') return () => {};
+      const mql = window.matchMedia(query);
+      mql.addEventListener('change', onChange);
+      return () => mql.removeEventListener('change', onChange);
+    },
+    () => typeof window.matchMedia === 'function' && window.matchMedia(query).matches,
+    () => false,
+  );
 }

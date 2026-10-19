@@ -417,7 +417,7 @@ export function AdminPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-svh bg-gray-50 dark:bg-gray-900">
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -1454,10 +1454,10 @@ export function AdminPage() {
                 <Trash2 size={24} />
               </div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                Elimina dal Forum
+                Elimina dai dossier pubblici
               </h3>
               <p className="text-gray-500 dark:text-gray-400 mb-6">
-                La copia pubblicata e tutte le sue versioni vengono eliminate dal Forum per sempre. Il dossier del suo autore resta com'è.
+                La copia pubblicata e tutte le sue versioni vengono eliminate per sempre. Il dossier del suo autore resta com'è.
               </p>
               <div className="flex justify-center gap-3">
                 <button

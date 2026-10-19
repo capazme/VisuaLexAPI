@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Upload, Users, Package, Lightbulb } from 'lucide-react';
+import { Search, Upload, FolderOpen, Package, Lightbulb } from 'lucide-react';
 import { AddToMyDossiersDialog } from './AddToMyDossiersDialog';
 import { PublishDossierPicker } from './PublishDossierPicker';
 import { ReportModal } from './ReportModal';
@@ -117,7 +117,7 @@ export function BulletinBoardPage() {
         total: response.pagination.total,
       });
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Errore nel caricamento del Forum';
+      const message = error instanceof Error ? error.message : 'Errore nel caricamento dei dossier pubblici';
       showToast(message, 'error');
     } finally {
       setLoading(false);
@@ -181,7 +181,7 @@ export function BulletinBoardPage() {
       setMyEnvironments(prev =>
         prev.map(e => e.id === env.id ? { ...e, isActive: false } : e)
       );
-      showToast('Dossier ritirato dal Forum', 'success');
+      showToast('Dossier ritirato', 'success');
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Errore';
       showToast(message, 'error');
@@ -226,7 +226,7 @@ export function BulletinBoardPage() {
       await sharedEnvironmentService.delete(deletingEnv.id);
       setMyEnvironments(prev => prev.filter(e => e.id !== deletingEnv.id));
       setDeletingEnv(null);
-      showToast('Dossier eliminato dal Forum', 'success');
+      showToast('Copia pubblicata eliminata', 'success');
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Errore';
       showToast(message, 'error');
@@ -401,9 +401,9 @@ export function BulletinBoardPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <Users className="text-primary-600" size={28} />
-            Forum
+          <h1 className="font-serif text-3xl font-medium tracking-tight text-slate-900 dark:text-slate-50 flex items-center gap-2">
+            <FolderOpen className="text-primary-600 dark:text-primary-400" size={28} aria-hidden />
+            Dossier pubblici
           </h1>
           <p className="text-slate-600 dark:text-slate-400 mt-1">
             I dossier di studio pubblicati dalla comunità
@@ -637,8 +637,8 @@ export function BulletinBoardPage() {
       <ConfirmDialog
         open={deletingEnv !== null}
         variant="danger"
-        title={deletingEnv ? `Eliminare «${deletingEnv.title}» dal Forum?` : 'Eliminare dal Forum?'}
-        message="La copia pubblicata, le sue versioni, i «Mi piace» e le segnalazioni vengono eliminati dal Forum. Il tuo dossier resta com'è; chi l'ha già aggiunto ai suoi dossier ne conserva la copia."
+        title={deletingEnv ? `Eliminare «${deletingEnv.title}» dai dossier pubblici?` : 'Eliminare dai dossier pubblici?'}
+        message="La copia pubblicata, le sue versioni, i «Mi piace» e le segnalazioni vengono eliminati. Il tuo dossier resta com'è; chi l'ha già aggiunto ai suoi dossier ne conserva la copia."
         confirmLabel="Elimina definitivamente"
         onConfirm={handleDeleteConfirm}
         onCancel={() => setDeletingEnv(null)}

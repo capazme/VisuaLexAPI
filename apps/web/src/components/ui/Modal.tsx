@@ -1,9 +1,10 @@
 import { useEffect, useId, useRef, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Z_INDEX } from '../../constants/zIndex';
+import { dur, ease } from '../../lib/motion';
 
 export type ModalVariant = 'default' | 'danger' | 'info' | 'success';
 
@@ -71,6 +72,10 @@ export function Modal({
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const tokenRef = useRef<symbol>(Symbol('modal'));
+  // Spec §6.2: 240 ms on the drawer curve, growing from 0.97 where it stands; under reduced motion a fade.
+  const still = useReducedMotion();
+  const hidden = still ? { opacity: 0 } : { opacity: 0, scale: 0.97 };
+  const panel = { duration: dur.panel, ease: ease.drawer };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -159,8 +164,9 @@ export function Modal({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={panel}
             onClick={closeOnBackdrop ? onClose : undefined}
-            className={cn('fixed inset-0 bg-slate-900/40 backdrop-blur-sm', Z_INDEX.modal)}
+            className={cn('fixed inset-0 bg-ink-950/40', Z_INDEX.modal)}
             aria-hidden="true"
           />
 
@@ -171,15 +177,15 @@ export function Modal({
               aria-modal="true"
               aria-labelledby={titleId}
               aria-describedby={descriptionId}
-              initial={{ opacity: 0, scale: 0.98, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.98, y: 10 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+              initial={hidden}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={hidden}
+              transition={panel}
               onClick={(e) => e.stopPropagation()}
               className={cn(
                 'w-full pointer-events-auto',
                 'bg-white dark:bg-slate-900',
-                'rounded-xl shadow-2xl',
+                'rounded-2xl shadow-2xl',
                 'border border-slate-200 dark:border-slate-800',
                 'max-h-[90vh] flex flex-col',
                 sizeStyles[size],
@@ -235,8 +241,8 @@ export function Modal({
                         'inline-flex min-h-[44px] min-w-[44px] items-center justify-center md:min-h-0 md:min-w-0 p-1.5 rounded-lg ml-auto shrink-0',
                         'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300',
                         'hover:bg-slate-100 dark:hover:bg-slate-800',
-                        'transition-colors duration-200',
-                        'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background'
+                        'transition-colors duration-150',
+                        'focus:outline-none focus-visible:ring-2 focus-visible:ring-toga-500 focus-visible:ring-offset-2 ring-offset-background'
                       )}
                     >
                       <X size={20} />
@@ -256,7 +262,7 @@ export function Modal({
                   className={cn(
                     'flex items-center justify-end gap-3 px-6 py-4 shrink-0',
                     'border-t border-slate-100 dark:border-slate-800',
-                    'bg-slate-50/50 dark:bg-slate-900/50 rounded-b-xl'
+                    'bg-slate-50/50 dark:bg-slate-900/50 rounded-b-2xl'
                   )}
                 >
                   {footer}

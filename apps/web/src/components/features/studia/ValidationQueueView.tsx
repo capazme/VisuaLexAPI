@@ -198,8 +198,8 @@ export function ValidationQueueView() {
               )}
             </div>
             {desktop && (
-              // Scrolls on its own, and is cut to what is left under the page's heading, the filter and the vote bar (about 17rem).
-              <div className="sticky top-0 max-h-[calc(100vh-17rem)] min-w-0 overflow-y-auto pb-4">
+              // Scrolls on its own, and is cut to what is left under the page's heading, the area's strip, the filter and the vote bar (about 21.5rem).
+              <div className="sticky top-0 max-h-[calc(100dvh-21.5rem)] min-w-0 overflow-y-auto pb-4">
                 <AnchoredArticle card={card} showToast={showToast} />
               </div>
             )}

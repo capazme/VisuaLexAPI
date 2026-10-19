@@ -35,7 +35,7 @@ function makeEnv(id: string, title: string, downloadCount: number): SharedEnviro
 
 const noop = () => {};
 
-function renderView() {
+function renderView(overrides: Partial<React.ComponentProps<typeof ForumExploreView>> = {}) {
   return render(
     <ForumExploreView
       environments={[]}
@@ -63,6 +63,7 @@ function renderView() {
       onPacksAdded={noop}
       onPacksError={noop}
       onResetFilters={noop}
+      {...overrides}
     />
   );
 }
@@ -106,5 +107,28 @@ describe('ForumExploreView - «I più aggiunti» widget', () => {
     await waitFor(() => {
       expect(screen.queryByText('I più aggiunti')).not.toBeInTheDocument();
     });
+  });
+});
+
+// 44 px on a phone, the design's own size from `md` (spec 2026-10-18-redesign-inchiostro, §7).
+describe('ForumExploreView - touch targets on a phone', () => {
+  beforeEach(() => {
+    listMock.mockReset();
+    listMock.mockResolvedValue({ data: [], pagination: { page: 1, limit: 3, total: 0, pages: 0 } });
+  });
+
+  it('gives the icon-only refresh button a name and 44 × 44 px', () => {
+    renderView();
+    expect(screen.getByRole('button', { name: "Aggiorna l'elenco" })).toHaveClass('min-h-[44px]', 'min-w-[44px]', 'md:min-h-0', 'md:min-w-0');
+  });
+
+  it('gives «Pubblica un dossier» of the empty Forum 44 px', () => {
+    renderView();
+    expect(screen.getByRole('button', { name: 'Pubblica un dossier' })).toHaveClass('min-h-[44px]', 'md:min-h-0');
+  });
+
+  it('gives «Azzera filtri» of an empty search 44 px', () => {
+    renderView({ searchQuery: 'privacy' });
+    expect(screen.getByRole('button', { name: 'Azzera filtri' })).toHaveClass('min-h-[44px]', 'md:min-h-0');
   });
 });

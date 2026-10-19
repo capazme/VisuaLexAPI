@@ -55,6 +55,8 @@ vi.mock('../services/studiaService', () => ({
     get: vi.fn().mockRejectedValue({ status: 404 }),
     queue: vi.fn().mockResolvedValue({ cards: [] }),
     vote: vi.fn().mockRejectedValue({ status: 404 }),
+    // The strip over Le mie schede and Da validare reads the progress (Gymnasium spec §5.1).
+    progress: vi.fn().mockRejectedValue({ status: 404 }),
   },
 }));
 vi.mock('../components/features/studia/ReviewHome', () => ({ ReviewHome: () => <h2>Ripasso di oggi</h2> }));
@@ -93,6 +95,22 @@ describe('App routing', () => {
     expect(await screen.findByTestId('forum')).toBeInTheDocument();
     expect(window.location.pathname).toBe('/forum');
     expect(window.location.search).toBe('?import=abc');
+  });
+
+  // The Forum's two areas (F1): «Dossier pubblici» keeps /forum, «Community» is a placeholder beside it.
+  it('keeps /forum on «Dossier pubblici»', async () => {
+    renderAt('/forum');
+    expect(await screen.findByTestId('forum')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/forum');
+  });
+
+  it('opens the Community placeholder at /forum/community, with the Forum\'s title and a way to the public dossiers', async () => {
+    renderAt('/forum/community');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Forum: il luogo del dibattito giuridico' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Community' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Apri i dossier pubblici' })).toHaveAttribute('href', '/forum');
+    expect(screen.queryByText('Pagina non trovata')).toBeNull();
+    expect(screen.getByTestId('layout')).toBeInTheDocument();
   });
 
   it('renders the global 404 page inside the layout for unknown paths', async () => {
@@ -158,7 +176,7 @@ describe('App routing — Studia', () => {
   it('opens a session at /studia/ripasso/sessione, inside the area', async () => {
     renderAt('/studia/ripasso/sessione?materia=DIRITTO_CIVILE');
     expect(await screen.findByRole('heading', { name: 'Sessione di ripasso' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 1, name: 'VisuaLex Gymnasium' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Gymnasium: la tua palestra giuridica' })).toBeInTheDocument();
   });
 
   it('keeps a card’s address inside the Studia area', async () => {

@@ -6,6 +6,7 @@ import { SafeHTML } from '../../../../utils/sanitize';
 import type { BrocardiInfo, MassimaStructured, Footnote } from '../../../../types';
 import { DOCTRINE_SOURCE_NAME, LATIN_MAXIMS_LABEL } from '../../../../utils/doctrineLabel';
 import type { StudyModeTheme } from './StudyMode';
+import { spring } from '../../../../lib/motion';
 
 interface StudyModeBrocardiPanelProps {
   visible: boolean;
@@ -238,7 +239,7 @@ export function StudyModeBrocardiPanel({
           initial={{ x: '100%', opacity: 0.8 }}
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: '100%', opacity: 0.8 }}
-          transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+          transition={spring.snappy}
           onMouseEnter={onMouseEnter}
           onMouseLeave={onMouseLeave}
           className={cn(

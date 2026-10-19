@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Minus, Plus, Sun, Moon, BookOpen } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import type { StudyModeTheme } from './StudyMode';
+import { spring } from '../../../../lib/motion';
 
 interface StudyModeSettingsProps {
   isOpen: boolean;
@@ -68,7 +69,7 @@ export function StudyModeSettings({
             initial={{ opacity: 0, scale: 0.95, y: -10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -10 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            transition={spring.snappy}
             className={cn(
               "fixed z-40 rounded-xl shadow-2xl border overflow-hidden",
               // Mobile: nearly full width, centered horizontally
@@ -101,7 +102,7 @@ export function StudyModeSettings({
                   <button
                     onClick={() => onThemeChange('light')}
                     className={cn(
-                      "flex-1 flex flex-col items-center gap-2 p-3 rounded-lg border transition-all",
+                      "flex-1 flex flex-col items-center gap-2 p-3 rounded-lg border transition-[color,background-color,border-color,box-shadow]",
                       theme === 'light'
                         ? 'border-yellow-500 bg-yellow-50 shadow-sm'
                         : cn('border-transparent', styles.button)
@@ -113,7 +114,7 @@ export function StudyModeSettings({
                   <button
                     onClick={() => onThemeChange('sepia')}
                     className={cn(
-                      "flex-1 flex flex-col items-center gap-2 p-3 rounded-lg border transition-all",
+                      "flex-1 flex flex-col items-center gap-2 p-3 rounded-lg border transition-[color,background-color,border-color,box-shadow]",
                       theme === 'sepia'
                         ? 'border-amber-500 bg-amber-50 shadow-sm'
                         : cn('border-transparent', styles.button)
@@ -125,7 +126,7 @@ export function StudyModeSettings({
                   <button
                     onClick={() => onThemeChange('dark')}
                     className={cn(
-                      "flex-1 flex flex-col items-center gap-2 p-3 rounded-lg border transition-all",
+                      "flex-1 flex flex-col items-center gap-2 p-3 rounded-lg border transition-[color,background-color,border-color,box-shadow]",
                       theme === 'dark'
                         ? 'border-blue-500 bg-slate-800 shadow-sm'
                         : cn('border-transparent', styles.button)

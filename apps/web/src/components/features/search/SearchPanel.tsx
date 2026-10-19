@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 const PDFViewer = lazy(() => import('../../ui/PDFViewer').then(m => ({ default: m.PDFViewer })));
 import { AnnexSwitchDialog } from '../../ui/AnnexSwitchDialog';
 import type { SearchParams, ArticleData, Norma } from '../../../types';
-import { SearchX, Search, X, Star, Plus, Sparkles, ChevronRight, Info } from 'lucide-react';
+import { SearchX, X, Info } from 'lucide-react';
 import { addToHistory } from '../../../services/historyService';
 import { isAuthenticated } from '../../../services/authService';
 import { useSearchParams } from 'react-router-dom';
@@ -18,7 +18,8 @@ import { buildNormaKey } from '../../../utils/normaKeys';
 import { ReadingBackControl } from './ReadingBackControl';
 import { matchesSearchFilters } from '../../../utils/searchFilters';
 import { isTypedSearch } from '../../../hooks/useSearchActions';
-import { focusSearchFieldOrPalette } from '../../../utils/searchFieldControl';
+import { Scrivania } from './Scrivania';
+import { BookMark } from '../../ui/BookMark';
 import { deriveVersionInfo, requestIsHistorical } from '../../../utils/versionDisplay';
 import { parseSearchDeepLink, SEARCH_PARAM } from '../../../utils/deepLinks';
 import { legalFetch } from '../../../services/legalFetch';
@@ -30,6 +31,7 @@ import { PracticeNotice, type PracticeStreaming } from '../practice/PracticePart
 import { ReadingRow } from '../practice/ReadingRow';
 import { PracticeBar } from '../practice/PracticeBar';
 import { PracticePhoneView } from '../practice/PracticePhoneView';
+import { dur, ease } from '../../../lib/motion';
 
 /** The practice whose light window or, on a phone, full-screen reader `askerId` names: where a norm
  *  cited in its text is searched and opened. */
@@ -92,20 +94,14 @@ export function SearchPanel() {
   const {
     searchTrigger, clearSearchTrigger,
     searchQueue, drainNextSearch,
-    quickNorms, selectQuickNorm, triggerSearch,
     pendingDecision, drainPendingDecision,
-    openQuickNormsManager,
   } = useAppStore(useShallow(s => ({
     searchTrigger: s.searchTrigger,
     clearSearchTrigger: s.clearSearchTrigger,
     searchQueue: s.searchQueue,
     drainNextSearch: s.drainNextSearch,
-    quickNorms: s.quickNorms,
-    selectQuickNorm: s.selectQuickNorm,
-    triggerSearch: s.triggerSearch,
     pendingDecision: s.pendingDecision,
     drainPendingDecision: s.drainPendingDecision,
-    openQuickNormsManager: s.openQuickNormsManager,
   })));
   const [resultsBuffer, setResultsBuffer] = useState<Record<string, { norma: Norma, articles: ArticleData[], versionDate?: string }>>({});
   const [customTabLabel, setCustomTabLabel] = useState<string | null>(null);
@@ -628,131 +624,8 @@ export function SearchPanel() {
         <PracticePhoneView onViewPdf={handleViewPdf} onCrossReference={handleCrossReferenceNavigate} streaming={practiceStreaming} />
       )}
 
-      {/* Main Content Area - Empty state when no practices */}
-      {!hasTabs && !isLoading && (
-        <div id="tour-main-content" className="w-full h-full flex flex-col items-center justify-center p-8 animate-in fade-in duration-700 bg-slate-50 dark:bg-slate-950">
-          {/* Search Icon */}
-          <div
-            // The picture is not a control: the button under it is (a click on it reached both).
-            className="relative group"
-          >
-            {/* Blur Background */}
-            <div className="absolute inset-0 bg-primary-500/20 rounded-[2.5rem] blur-2xl group-hover:bg-primary-500/30 transition-all duration-700 animate-pulse" />
-
-            {/* Icon Container - Glass Card */}
-            <div className="relative w-32 h-32 sm:w-40 sm:h-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-[2.5rem] shadow-glass-lg flex items-center justify-center border border-white dark:border-slate-800 transition-all duration-500 group-hover:shadow-primary-500/10 group-hover:-translate-y-2">
-              <Search size={64} className="text-primary-500 stroke-[1.2] w-14 h-14 sm:w-16 sm:h-16 group-hover:scale-110 transition-transform duration-500" />
-
-              {/* Keyboard Shortcut Badge */}
-              <div className="absolute -bottom-2 -right-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-[10px] font-black px-3 py-1.5 rounded-full shadow-lg border-4 border-slate-50 dark:border-slate-950 uppercase tracking-widest">
-                ⌘ K
-              </div>
-            </div>
-            <button
-              onClick={() => focusSearchFieldOrPalette()}
-              className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all focus-ring"
-            >
-              <Search size={16} />
-              Inizia una ricerca
-            </button>
-            </div>
-
-          {/* Title and Description */}
-          <div className="text-center mt-10 mb-8 max-w-xl">
-            <h3 className="text-3xl font-black text-slate-900 dark:text-white mb-3 tracking-tight">
-              Ricerca Intelligente
-            </h3>
-            <p className="text-slate-500 dark:text-slate-400 text-lg leading-relaxed font-medium">
-              Scrivi una citazione naturale: non serve compilare tutti i campi.
-            </p>
-            <div className="flex flex-wrap justify-center gap-2 mt-5" aria-label="Esempi di ricerca">
-              {["Art. 2043 c.c.", "Art. 5 GDPR", "Art. 1 Costituzione"].map((example) => (
-                <button
-                  key={example}
-                  // The example goes into the field, ready to search with Enter or to be changed.
-                  onClick={() => focusSearchFieldOrPalette(example)}
-                  className="px-3 py-1.5 rounded-full border border-primary-200 dark:border-primary-800 bg-primary-50/70 dark:bg-primary-950/40 text-primary-700 dark:text-primary-300 text-xs font-semibold hover:bg-primary-100 dark:hover:bg-primary-900/60 transition-colors focus-ring"
-                >
-                  {example}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* QuickNorms Section */}
-          <div id="tour-quick-norms" className="w-full max-w-2xl px-4">
-            <div className="flex items-center justify-between mb-6 px-2">
-              <div className="flex items-center gap-2.5 text-xs font-bold text-slate-400 uppercase tracking-widest">
-                <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-500">
-                  <Star size={14} fill="currentColor" />
-                </div>
-                <span>Ricerche Frequenti</span>
-              </div>
-              <button
-                onClick={openQuickNormsManager}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider",
-                  "bg-slate-200/50 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700",
-                  "text-slate-600 dark:text-slate-300 transition-all shadow-sm active:scale-95 border border-slate-300 dark:border-slate-700"
-                )}
-              >
-                <Plus size={14} />
-                Gestisci
-              </button>
-            </div>
-
-            {quickNorms.length === 0 ? (
-              <div
-                onClick={openQuickNormsManager}
-                className={cn(
-                  "group flex flex-col items-center justify-center py-12 px-8 rounded-3xl cursor-pointer",
-                  "border-2 border-dashed border-slate-200 dark:border-slate-800",
-                  "hover:border-primary-400/50 dark:hover:border-primary-500/50 hover:bg-primary-50/30 dark:hover:bg-primary-900/10",
-                  "transition-all duration-300"
-                )}
-              >
-                <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-900 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                  <Sparkles size={28} className="text-slate-400 dark:text-slate-500 group-hover:text-primary-500 transition-colors" />
-                </div>
-                <p className="text-base text-slate-500 dark:text-slate-400 text-center font-bold">
-                  Velocizza il tuo workflow<br />
-                  <span className="text-xs font-medium text-slate-400 mt-1 block">Aggiungi norme consultate frequentemente</span>
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {quickNorms.slice(0, 6).map((qn) => (
-                  <button
-                    key={qn.id}
-                    onClick={() => {
-                      selectQuickNorm(qn.id);
-                      triggerSearch(qn.searchParams);
-                    }}
-                    className={cn(
-                      "group flex flex-col gap-2 p-4 rounded-2xl text-left",
-                      "bg-white dark:bg-slate-900",
-                      "border border-slate-200 dark:border-slate-800",
-                      "hover:border-primary-300 dark:hover:border-primary-700 hover:shadow-xl hover:shadow-primary-500/5 hover:-translate-y-1",
-                      "transition-all duration-300"
-                    )}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="p-1.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-500">
-                        <Star size={12} fill="currentColor" />
-                      </div>
-                      <ChevronRight size={14} className="text-slate-300 group-hover:text-primary-500 transition-colors" />
-                    </div>
-                    <div>
-                      <span className="text-sm font-bold text-slate-800 dark:text-slate-100 line-clamp-1">{qn.label}</span>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight mt-0.5">{qn.searchParams.act_type}</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* «Scrivania»: the page with no practice open (spec 2026-10-18-redesign-inchiostro §5.3.2). */}
+      {!hasTabs && !isLoading && <Scrivania />}
 
       {/* Loading Skeleton - Shows while search is in progress */}
       {isLoading && !hasTabs && (
@@ -797,13 +670,14 @@ export function SearchPanel() {
             aria-live="polite"
             aria-atomic="true"
           >
-            <div className="bg-white dark:bg-slate-900 border border-primary-200 dark:border-primary-900/30 p-4 rounded-2xl shadow-lg shadow-primary-500/10 flex items-start gap-4">
-              <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center text-primary-500">
-                <div className="w-5 h-5 rounded-full border-2 border-current border-t-transparent animate-spin" />
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-4 rounded-2xl shadow-lg flex items-start gap-4">
+              {/* The book breathes while the texts arrive (spec 2026-10-18-redesign-inchiostro §6.3.1). */}
+              <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center text-primary-600 dark:text-primary-400">
+                <BookMark size={28} breathe />
               </div>
               <div className="flex-1 min-w-0 pt-0.5">
-                <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-1">
-                  Caricamento articoli...
+                <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-1">
+                  Caricamento articoli…
                 </h4>
                 <p className="text-xs font-medium text-slate-500 dark:text-slate-400 leading-relaxed">
                   {loadingProgress.total
@@ -812,12 +686,12 @@ export function SearchPanel() {
                 </p>
                 {/* Progress bar */}
                 {loadingProgress.total && (
-                  <div className="mt-2 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                  <div className="mt-2 h-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                     <motion.div
-                      className="h-full bg-gradient-to-r from-primary-500 to-primary-600"
-                      initial={{ width: 0 }}
-                      animate={{ width: `${(loadingProgress.loaded / loadingProgress.total) * 100}%` }}
-                      transition={{ duration: 0.3 }}
+                      className="h-full origin-left bg-primary-600 dark:bg-primary-400"
+                      initial={{ transform: 'scaleX(0)' }}
+                      animate={{ transform: `scaleX(${loadingProgress.loaded / loadingProgress.total})` }}
+                      transition={{ duration: dur.panel, ease: ease.out }}
                     />
                   </div>
                 )}

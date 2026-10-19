@@ -8,6 +8,8 @@ import { MATERIA_LABEL } from './studiaLabels';
 export interface StudyPreferencesProps {
   /** Called after a change reached the server: the counts of the day may have moved. */
   onChanged: () => void;
+  /** Drawn open, with no disclosure of its own: the sheet the gear opens, in «Oggi»'s band or the strip (Gymnasium spec §4). */
+  open?: boolean;
 }
 
 const MIN_PER_DAY = 1;
@@ -111,9 +113,10 @@ function GoalField({ label, hint, value, saving, onSave }: GoalFieldProps) {
  * daily number of new cards (each saved with its own «Salva») and one switch per subject for the
  * community's validated cards (all off at first; each toggle is sent at once).
  */
-export function StudyPreferences({ onChanged }: StudyPreferencesProps) {
+export function StudyPreferences({ onChanged, open: alwaysOpen = false }: StudyPreferencesProps) {
   const panelId = useId();
-  const [open, setOpen] = useState(false);
+  const [disclosed, setOpen] = useState(false);
+  const open = alwaysOpen || disclosed;
   const [preferences, setPreferences] = useState<PreferenzeStudio | null>(null);
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -158,7 +161,8 @@ export function StudyPreferences({ onChanged }: StudyPreferencesProps) {
   };
 
   return (
-    <section className="border-t border-slate-200 pt-3 dark:border-slate-800">
+    <section className={cn(!alwaysOpen && 'border-t border-slate-200 pt-3 dark:border-slate-800')}>
+      {!alwaysOpen && (
       <h2>
         <button
           type="button"
@@ -171,6 +175,7 @@ export function StudyPreferences({ onChanged }: StudyPreferencesProps) {
           Impostazioni dello studio
         </button>
       </h2>
+      )}
       <div id={panelId} hidden={!open} className="space-y-5 pt-2">
         {problem && (
           <p role="alert" className="text-sm text-red-600 dark:text-red-400">
@@ -209,7 +214,7 @@ export function StudyPreferences({ onChanged }: StudyPreferencesProps) {
                           aria-hidden
                           className={cn('relative inline-block h-5 w-9 shrink-0 rounded-full transition-colors motion-reduce:transition-none', on ? 'bg-primary-600' : 'bg-slate-300 dark:bg-slate-600')}
                         >
-                          <span className={cn('absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all motion-reduce:transition-none', on ? 'left-[1.125rem]' : 'left-0.5')} />
+                          <span className={cn('absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform motion-reduce:transition-none', on && 'translate-x-4')} />
                         </span>
                       </button>
                     </li>

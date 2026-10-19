@@ -138,7 +138,7 @@ export function ContribPage() {
         <Link to="/merlt" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700">
           <ArrowLeft size={14} /> MERL-T
         </Link>
-        <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900 dark:text-white">
+        <h1 className="flex items-center gap-2 font-serif text-3xl font-medium tracking-tight text-slate-900 dark:text-slate-50">
           <UploadCloud className="text-primary-500" />
           Apprendi dai miei appunti
         </h1>

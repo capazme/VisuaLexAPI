@@ -2,19 +2,13 @@ import { useState } from 'react';
 import { cn } from '../../../../lib/utils';
 import type { ConteggiStati } from '../../../../types/studia';
 import { percent, totalCards } from './layout';
-import { FOCUS_RING, MUTED_TEXT } from './tokens';
+import { CARD_STATES, FOCUS_RING, MUTED_TEXT } from './tokens';
 
 export interface CardStatesBarProps {
   stati: ConteggiStati;
 }
 
 type StateKey = keyof ConteggiStati;
-
-const STATES: { key: StateKey; label: string; swatch: string }[] = [
-  { key: 'nuove', label: 'Nuove', swatch: 'bg-amber-500 dark:bg-amber-400' },
-  { key: 'apprendimento', label: 'In apprendimento', swatch: 'bg-primary-500' },
-  { key: 'consolidate', label: 'Consolidate', swatch: 'bg-emerald-600 dark:bg-emerald-500' },
-];
 
 const cards = (n: number) => `${n} ${n === 1 ? 'scheda' : 'schede'}`;
 
@@ -25,7 +19,7 @@ const cards = (n: number) => `${n} ${n === 1 ? 'scheda' : 'schede'}`;
 export function CardStatesBar({ stati }: CardStatesBarProps) {
   const [chosen, setChosen] = useState<StateKey | null>(null);
   const total = totalCards(stati);
-  const shown = chosen ? STATES.find((s) => s.key === chosen)! : null;
+  const shown = chosen ? CARD_STATES.find((s) => s.key === chosen)! : null;
 
   return (
     <div className="space-y-3">
@@ -33,7 +27,7 @@ export function CardStatesBar({ stati }: CardStatesBarProps) {
         <div className="h-7 rounded-md bg-slate-100 dark:bg-slate-800" />
       ) : (
         <div className="flex h-11 gap-0.5 overflow-hidden rounded-md md:h-7">
-          {STATES.filter((s) => stati[s.key] > 0).map((state) => (
+          {CARD_STATES.filter((s) => stati[s.key] > 0).map((state) => (
             <button
               key={state.key}
               type="button"
@@ -48,7 +42,7 @@ export function CardStatesBar({ stati }: CardStatesBarProps) {
         </div>
       )}
       <ul className={cn('flex flex-wrap gap-x-4 gap-y-1 text-xs', MUTED_TEXT)}>
-        {STATES.map((state) => (
+        {CARD_STATES.map((state) => (
           <li key={state.key} className="flex items-center gap-1.5">
             <span aria-hidden className={cn('inline-block h-2.5 w-2.5 rounded-sm', state.swatch)} />
             {state.label}

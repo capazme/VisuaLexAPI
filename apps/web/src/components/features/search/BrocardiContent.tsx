@@ -94,7 +94,7 @@ function BrocardiSection({ title, content, icon, variant }: BrocardiSectionProps
           </div>
         </div>
         <div className={cn(
-          "w-8 h-8 flex items-center justify-center rounded-lg transition-all",
+          "w-8 h-8 flex items-center justify-center rounded-lg transition-colors",
           isOpen ? "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300" : "text-slate-400"
         )}>
           <ChevronDown
@@ -125,7 +125,7 @@ function BrocardiSection({ title, content, icon, variant }: BrocardiSectionProps
                         key={`content-massima-${idx}`}
                         className="flex gap-4 group"
                       >
-                        <div className="shrink-0 w-8 h-8 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-500 group-hover:bg-primary-500 group-hover:text-white transition-all">
+                        <div className="shrink-0 w-8 h-8 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-500 group-hover:bg-primary-500 group-hover:text-white transition-colors">
                           {idx + 1}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -139,7 +139,7 @@ function BrocardiSection({ title, content, icon, variant }: BrocardiSectionProps
                     {Array.isArray(validContent) && validContent.length > 10 && !showAll && (
                       <button
                         onClick={() => setShowAll(true)}
-                        className="mt-6 w-full py-3 px-4 bg-slate-50 dark:bg-slate-800 hover:bg-primary-50 dark:hover:bg-primary-900/20 text-slate-600 dark:text-slate-300 hover:text-primary-600 dark:hover:text-primary-400 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border border-slate-200 dark:border-slate-700 hover:border-primary-200 dark:hover:border-primary-800"
+                        className="mt-6 w-full py-3 px-4 bg-slate-50 dark:bg-slate-800 hover:bg-primary-50 dark:hover:bg-primary-900/20 text-slate-600 dark:text-slate-300 hover:text-primary-600 dark:hover:text-primary-400 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors border border-slate-200 dark:border-slate-700 hover:border-primary-200 dark:hover:border-primary-800"
                       >
                         Mostra altre {validContent.length - 10} massime
                       </button>
@@ -237,7 +237,7 @@ export function BrocardiContent({ info, articleTitle }: BrocardiContentProps) {
             href={info.link}
             target="_blank"
             rel="noopener noreferrer"
-            className="group flex items-center justify-center gap-3 py-3 px-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-primary-400 dark:hover:border-primary-600 rounded-xl transition-all shadow-sm hover:shadow-md active:scale-[0.98]"
+            className="group flex items-center justify-center gap-3 py-3 px-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-primary-400 dark:hover:border-primary-600 rounded-xl transition-[color,background-color,border-color,box-shadow,scale] shadow-sm hover:shadow-md active:scale-[0.98]"
           >
             <div className="w-8 h-8 rounded-lg bg-primary-50 dark:bg-primary-900/30 flex items-center justify-center text-primary-600 dark:text-primary-400 group-hover:scale-110 transition-transform">
               <ExternalLink size={16} />

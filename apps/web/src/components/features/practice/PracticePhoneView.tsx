@@ -29,7 +29,7 @@ const USER_SCROLL = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const;
 
 // 44 px touch targets (apps/web/CLAUDE.md, «Mobile-first»).
 const CHEVRON =
-  'flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl shadow-sm transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
+  'flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl shadow-sm transition-[color,background-color,border-color,scale] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
 const CHEVRON_ON =
   'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700';
 const CHEVRON_OFF = 'bg-slate-50 text-slate-300 dark:bg-slate-900 dark:text-slate-700';
@@ -170,7 +170,7 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming }: Pr
                       <span
                         aria-hidden
                         className={cn(
-                          'block h-1.5 rounded-full transition-all duration-300',
+                          'block h-1.5 rounded-full transition-[width,background-color] duration-300',
                           i === index ? 'w-6 bg-primary-500' : 'w-1.5 bg-slate-300 dark:bg-slate-700',
                         )}
                       />

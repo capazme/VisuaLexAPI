@@ -31,8 +31,10 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   verdict after «Annulla»; `Layout` hides the floating feedback button and the services pill
   (`ServiceHealthBanner`) below `md` on this route, as in a review session, where they would cover the verdicts); the subject is remembered in `localStorage`; a vote that outlives a subject
   change only marks its card handled, and a 403 stops the queue with «Non sei più tra i validatori»),
-  `/history`, `/forum` (`/environments`, the page «Ambienti» was, redirects there keeping an old share link's
-  `?import=`), `/documents`, `/collega-app` («Collega un'app AI»,
+  `/history`, `/forum` («Dossier pubblici»; `/environments`, the page «Ambienti» was, redirects there keeping an old
+  share link's `?import=`), `/forum/community` («Community», `ForumCommunityPage`: an honest placeholder — the
+  Forum's title (`SECTION_TITLES.forum`), «Domande e discussioni tra colleghi, in arrivo», a link to `/forum`; no sample posts, no counts, no
+  server route), `/documents`, `/collega-app` («Collega un'app AI»,
   `features/connections/ConnectAiAppPage`: the MCP address from `GET /api/oauth/connection` with
   «Copia», one card per client that connects today — `aiClients.ts`, the survey of 13 Oct 2026, with
   the clients our server refuses listed apart and why —, the personal-data notice (what a connected app reads: dossier
@@ -81,8 +83,28 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (a link to `/` that puts the cursor in the search page's field, `focusSearchField`, with no window over it —
   the owner, 13 Oct 2026; its hover label carries ⌘K, the palette; the quick norms' dot sits under it;
   `#tour-nav-search` is what the welcome and search tours point at) and «Analizza documento» —, then the active
-  section's, in a group named after it: Opus, Dossier; Gymnasium, Ripasso, Le mie schede, Da validare (validators)
-  and Dossier; Academia, Assistente and Grafo (`VITE_FEATURE_MERLT*`); Forum, the Forum with its count. At the bottom only the user menu, whose dropdown holds Impostazioni,
+  section's, in a group named after it: Opus, Dossier; Gymnasium in two groups (Gymnasium spec §4), «Studia»
+  (Oggi, the home `/studia/ripasso`, and Dossier) and «Contribuisci» (Le mie schede, Da validare for validators);
+  Academia, Assistente and Grafo (`VITE_FEATURE_MERLT*`); Forum, «Dossier pubblici» (`/forum`, with the Forum's count;
+  `end`, so it is not active under `/forum/community`) and «Community» — the section keeps its name and its areas are
+  named apart, so «Forum» is never written twice. The section's line is «Dossier pubblici e community»; its title
+  with a phrase, «Forum: il luogo del dibattito giuridico» (the owner's, 19 Oct 2026), is the Community page's `h1`;
+  the sections' phrases live in `SECTION_TITLES` (`sections.ts`) only, with Opus's «Opus: la tua officina giuridica»
+  not shown yet (its page takes it in its own change).
+  **Words, not only icons** (`layout`, `sidebarWidth.ts`): from `xl` the desktop column is a 224 px bar with
+  icon and word and the groups' headings (the section's name, or «Studia» and «Contribuisci»), the palette's
+  shortcut beside «Ricerca» (⌘K on a Mac, Ctrl K elsewhere); between `lg` and `xl` the 64 px rail of icons, each labelled on hover and keyboard focus; below
+  `lg` the drawer, icon and word in rows of 44 px, its foot clear of the home indicator. From `xl` a control
+  at the foot narrows the bar to the rail and widens it again, remembered in the browser under
+  `visualex-sidebar` (`guardedStorage`); wide by default. Every column keeps 10 px of side padding and every
+  icon a 44 px box, so widening moves no icon: `Layout` animates the column's width (instantly under reduced
+  motion) and the words are clipped as it moves. With words the user menu opens over its button, not beside,
+  and the button's name carries the username it shows («Menu utente di …», label in name).
+  `Layout` sets the column's drawn width on its root as `--sidebar-width` (224, 64, or 0 hidden or in Focus
+  mode); the services pill (`ServiceHealthBanner`) starts 2 rem after it from `lg`, so it is never under the bar.
+  The bar's 11 px texts (headings, shortcut) are `SIDEBAR_SMALL_TEXT`, slate 600 / dark slate 400: AA for small
+  text on the glass over the page and over the phone's backdrop; `theme.test.ts` composites and checks it.
+  The narrow/widen control is `SIDEBAR_TOGGLE_TEXT`, the entries' words' colour (slate 700 / dark slate 300). At the bottom only the user menu, whose dropdown holds Impostazioni,
   Cronologia (moved there by the owner, 13 Oct 2026; the saved norms that changed are counted on the avatar
   and beside the entry, and both names say it in words: «Menu utente, 2 norme salvate cambiate»),
   «Collega un'app AI», the theme, «Scorciatoie (?)», «Pannello Admin» (admins) and «Esci». The dropdown is a portalled WAI-ARIA
@@ -150,8 +172,26 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (transformed, stacked) is not confined to it; each open `Modal` is on a module-level
   stack and only the top-most handles Tab (the focus trap) and Esc, so a dialog opened
   from a dialog keeps the keyboard.
+  `Button` has four variants (spec `2026-10-18-redesign-inchiostro` §5.1): `primary` (toga-600, white),
+  `secondary` (paper with an ink-200 hairline), `quiet` (text only) and `danger` (red-600) — `ghost` and
+  `outline` are the earlier names of `quiet` and `secondary` —, no gradient, glow or hover lift, a minimum
+  height of 36 px on a desktop and 44 px on a phone; `loading` keeps the label and puts a spinner in the
+  icon's place (`aria-busy`), `status="error" | "success"` shows the outcome of the last press. `Modal`
+  enters in `dur.panel` on `ease.drawer`, growing from 0.97, and `Sheet` rises from its edge on the same
+  timing; both only fade under reduced motion (`useReducedMotion`). `Toast` takes `spring.snappy`, rises
+  from the edge it lives on and pauses its time while `document.hidden`; the undo toast's countdown lives
+  in `useUndoableAction` and does not pause. `Tooltip` waits 500 ms under a pointer, opens at once and
+  without motion within 300 ms of another closing, and at once on keyboard focus.
   Interaction tokens live in `constants/interactions.ts`, stacking bands in
-  `constants/zIndex.ts`. Compose these rather than hand-rolling Tailwind.
+  `constants/zIndex.ts`. Compose these rather than hand-rolling Tailwind: `TRANSITION` names the
+  properties it moves (never `all`; `scale` and `translate` included, `box-shadow` left out so the focus
+  ring — `FOCUS_RING`, toga-500 on a paper offset — appears at once), `ACTIVE` presses to 0.97 on buttons
+  only, `HOVER_LIFT` lifts 1 px for a fine pointer and goes on nothing that is a row or a list item.
+  **Motion** comes from `lib/motion.ts` (`ease`, `dur`, `spring.snappy` for panels and rows,
+  `spring.gentle` for rare moments): no component types a spring or a curve, and a transition names what
+  changes. `lib/motion.guard.test.ts` fails on a `transition-all` or a hand-typed spring; the Gymnasium
+  celebration's stamp is the one exception. A row or a list item takes a colour change on hover, never a
+  scale or a lift.
 
 ## Frontend State
 
@@ -452,25 +492,74 @@ menu's backdrop; `Layout` hides the feedback button and the services pill, `Serv
 (`DossierItemReader`) in a side panel on desktop and in `ui/Sheet` on a phone (the bottom sheet
 shared with `CardFormDialog`, marked `data-find-overlay`); the panel closes when the card changes.
 
-**The progress dashboard** (`ReviewHome`, Studia's home; spec
-`docs/superpowers/specs/2026-10-13-studia-progress-design.md`, direction D «Registro vivo»): one read,
-`useProgress` over `GET /lingo/srs/progressi` (the last answer stays on screen, dimmed, while a new one travels;
-an older answer never overwrites a newer one), drawn by `studia/progress/`: `ProgressBand` (`GoalRing`, today's
-reviews against the user's goal `ripassiAlGiorno`, full and green once the day counts; `StreakBadge`, the «§» badge,
-the count and record, the last seven days as register boxes; today's sentence and «Inizia il ripasso»),
-`SubjectChips` (in place of the old `<select>`: the subject narrows the dashboard and the session it starts, kept
-in `localStorage` under `visualex.studia.ripasso.materia`), and `ProgressPanels` (`ActivityCalendar`, 26 weeks on a
-computer and 12 on a phone by `useIsDesktop`, one tab stop with arrow keys and a live readout, a legend under it
-(«meno … più», the counted day's dot, the rest's dashed outline), the whole pitch of a cell hit-testable; `CardStatesBar`;
-`DueForecast`; `SubjectProgress`, whose rows also set the filter); `StudyPreferences` stays closed at the bottom
-and now holds «Ripassi al giorno» too. While the first read travels the band and the panels keep their places
-(`ProgressPanelsSkeleton`); a failed first read stops the pulse and says the progress is not available. Colours are the app's tokens through `progress/tokens.ts` (ink is the
+**«Oggi», the home** (`ReviewHome`, Gymnasium's home at `/studia/ripasso`, under the area's heading «Gymnasium: la tua
+palestra giuridica» — the section switcher keeps «Gymnasium»; spec
+`docs/superpowers/specs/2026-10-19-gymnasium-restyle-design.md` §5.1–5.2, as rewritten for G1b, over the progress spec
+`docs/superpowers/specs/2026-10-13-studia-progress-design.md`, direction D «Registro vivo»). Reads: `useProgress` over
+`GET /lingo/srs/progressi` (the last answer of the same subject stays on screen while a new one travels — dimmed
+under the road only —, an answer is never shown for another subject, and an older one never overwrites a newer one) — once for the whole day, which draws the missions, the statistics and the road, and once more
+for the subject chosen, made only while one is (`useProgress(materia, enabled)`), which draws the first mission's action
+and «Il tuo mese». One column, 768 px, centred at every width (on this page `StudiaPage` narrows to it too, so the
+heading and its rule are the column's width), in the order the owner fixed:
+1. **«Le missioni di oggi»** (`missions/TodayMissions`): the day's three missions, one under the other, each with its
+   mark (drawn, never pressed), «8 di 18» and a thin bar, and the summary «2 di 3» over those with something to do
+   today. They are **computed in the web**, pure, by `missions/missions.ts` (`todayMissions`, `missionSummary`,
+   `allMissions`, `goalLine`) from the whole day's read: «Ripassa le schede dovute», the due cards reviewed today (today's
+   calendar row, reviews less first reviews) of those plus `oggi.dovute`; «Impara 5 schede nuove», today's first reviews
+   of five, or of what today allows (`oggi.nuove`, the quota and the cards left; `NEW_CARDS_TARGET`); «Raggiungi l'obiettivo
+   di oggi», `oggi.ripassi` of `oggi.obiettivo`, done when the server says `raggiunto`, the goal line under it. A mission
+   with nothing to do today says so and leaves the summary; a count past its target stops at it («5 di 5»; the ring keeps
+   the real count), and a goal the server counted with the queue finished under it says why. When the server records
+   missions, only `missions.ts`
+   changes. **No points and no level are shown** until the server keeps them. The first mission carries the action:
+   «Oggi: 18 da ripassare, 8 nuove» (a part that is zero left out; «Oggi in Diritto penale: …» when a subject is chosen),
+   «circa N minuti» (`estimateLabel` in `studiaLabels.ts`, `ceil(cards × SECONDS_PER_CARD / 60)`, 20 s a card, an
+   estimate) and **«Inizia»**, the page's one primary button (44 px, full width on a phone; «Continua» once the goal is
+   met); with nothing left «Hai finito per oggi» and the next day with cards from `prossimi` («domani», a day by name, or
+   none in the fortnight; «domani» while new cards wait, which `prossimi` does not count) and no button — narrowed to a
+   subject, «Niente da ripassare in questa materia» and «Ripassa tutte le materie». The other two open the study
+   settings («Cambia le nuove al giorno», «Accendi le schede della comunità» when no new card can be had, «Cambia
+   l'obiettivo»); the goal's row takes the stamp once met, and the celebration's confetti start from it. With no card at all, how to start from an article (Ricerca,
+   «+ Nuova scheda» under the text — Le mie schede has no way to write one until G4) or the community's cards; a failed
+   first read says «Non riesco a leggere i tuoi progressi.» with «Riprova» and keeps «Inizia» (the session reads its own
+   cards); `todayState` and `nextDueDay` decide it, pure, in `progress/today.ts`.
+2. **«I tuoi progressi»** (`progress/StatsBand`), one band: `StreakBadge compact` (the «§», the count, «Il primo giorno
+   comincia oggi» or «giorni di fila · record N») and `GoalRing compact` (40 px, «5 di 10»), the gear «Impostazioni dello
+   studio» (`progress/StudySettings`: `SettingsGear` and `StudySettingsSheet`, `StudyPreferences open` in a `ui/Sheet`
+   capped at `max-w-lg` from `md`, not closed by Esc or the backdrop), the current week (`layout.ts` `currentWeek`: Monday
+   to Sunday from the server's today and `serie.ultimiGiorni`, seven boxes with «LMMGVSD», a day to come dotted, and the
+   days before the first one the calendar holds `vuoto`, never missed; each state in words for a screen reader,
+   `DAY_STATE_LABEL`), then the cards by state as three numbers in Newsreader with their names in Geist (a `dl`) and the
+   bar. «Il tuo mese» opens `progress/MonthSheet`: `ActivityCalendar` (26 weeks on a computer, 12 on a phone, by
+   `useIsDesktop`; one tab stop with arrow keys and a live readout, a legend under it, the whole pitch of a cell
+   hit-testable) and `DueForecast`, the chosen subject's with its hue; it holds nothing typed, so Esc and the backdrop
+   close it. Their labels (weekdays, months, the scale, the days) are the interface's text at `text-xs` laid over the
+   drawing by percentages, never SVG `<text>`: a drawing scaled to its width scaled them under 11 px. **No text on «Oggi»
+   is under 11 px** (the stamp's date included; the compact stamp is the session's): `typeScale.test.tsx` reads the
+   files of `missions/` and `progress/` and fails on a `text-[Npx]` under 11 or an SVG `<text>`. They leave it for `/studia/progressi` in G3, with `CardStatesBar` and `SubjectProgress` (no longer drawn on
+   the home; `CARD_STATES`, in `tokens.ts`, are the band's and the road's).
+3. **«Tutte le missioni»** (`missions/MissionList`): daily, weekly, long-term. What the web counts shows its state;
+   what the server must record (a subject left for 7 days, writing a card, validating two — a validator's only, from the
+   outlet's `validator` —, a short case, a week of streak) is listed with «In arrivo», with no count and nothing to tick.
+4. «Cosa ripassi», `SubjectChips` (the subject narrows the first mission's action, the session it starts and «Il tuo
+   mese», kept in `localStorage` under `visualex.studia.ripasso.materia`); `SubjectRoad`, «Il percorso», one stop per
+   subject joined by a line, free (no locks, no number, no imposed order): the three states as a bar and in words
+   (`stopStates`), the reviews of 30 days, «Ripassa» for a session narrowed to it (none for a subject with no card);
+   ordered by `orderStops`, new plus in learning first, then by name — the read has no cards due per subject
+   (`Progressi.materie`), so no «N da ripassare» until the institute read of G5; the stops enter with a 40 ms stagger
+   once per mount (`motion-safe:` only).
+
+One type language: block headings in Newsreader (`BLOCK_HEADING`), labels in Geist; no small capitals and no double
+rule. «Le mie schede» and «Da validare» show the strip (`progress/StudyStrip`, `dense`: the streak's count without its
+line, the ring, the gear) over them (`StudiaPage`); the session shows none. While the first read travels the missions,
+the band, the list and the road keep their places at their final size; a failed first read stops the pulse, and the road
+says it could not be read under its heading (no second alert: the missions' «Riprova» reads it again). Colours are the app's tokens through `progress/tokens.ts` (ink is the
 primary scale's deep end, the stamp the one red, a subject's hue the category palette's CSS variable); the charts are
 hand-drawn SVG laid out by the pure `progress/layout.ts`, which walks the server's Rome days in UTC and never reads
 the browser's zone. **The celebration** (`progress/Celebration.tsx`): once a day per browser
 (`useCelebratedToday`, `visualex.studia.festeggiato`, written when a celebration *starts*, so leaving halfway or a new
 read never replays it; a convenience, never the streak's source) — on the home when
-today counts with at least one review (confetti of «§» and «✓» from the ring, `confetti.ts` pure, on a canvas,
+today counts with at least one review (confetti of «§» and «✓» from the stamp in the goal's row over the missions and the band, `confetti.ts` pure, on a canvas,
 and the stamp «Obiettivo raggiunto» pressed in; the stamp stays at rest afterwards), and in the session on the grade
 whose answer says `oggi.appenaRaggiunto` (`SessionCelebration`: a notice placed in the page over the header row «Restano N · Interrompi», so it scrolls away
 with it and never floats over the card or the grades; 1.5 s; no focus, no pointer, the keys untouched; an `aria-live`
@@ -835,10 +924,11 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   the server has the note, so a refused note keeps its text.
 - **«Pubblica nel Forum»** (`DossierForumActions` in the header, spec
   `docs/superpowers/specs/2026-10-13-environments-into-forum-design.md` D3–D7; the owner's answers of
-  14 October 2026): a dossier never published shows «Pubblica nel Forum» (disabled, «Ritirato dal Forum»,
-  when the admin withdrew its copy: `forumBlocked`); a published one a «Forum» menu naming its state
-  («Nel Forum · v N», «Ritirato dal Forum», «Ritirato dall'amministrazione») with «Aggiorna la versione
-  pubblicata», «Ritira» / «Ripubblica», «Apri il Forum» and «Elimina dal Forum» (danger confirmation);
+  14 October 2026): a dossier never published shows «Pubblica nel Forum» (disabled, «Ritirato dai dossier
+  pubblici», when the admin withdrew its copy: `forumBlocked`); a published one a «Forum» menu naming its state
+  («Nel Forum · v N», «Ritirato dai dossier pubblici», «Ritirato dall'amministrazione») with «Aggiorna la versione
+  pubblicata», «Ritira dai dossier pubblici» / «Ripubblica nel Forum», «Apri i dossier pubblici» and «Elimina dai
+  dossier pubblici» (danger confirmation, «Eliminare la copia pubblicata?»);
   each reads the dossier again (`refreshDossier`). `PublishDossierDialog` (a `ui/Modal`) asks title,
   description, category (`utils/forumCategories.ts`, the one list) and tags, reads the marks once, at
   opening, from the server (`publicationMarks.ts`: `loadPdfMarks`, never the browser's partial cache; a
@@ -1074,7 +1164,8 @@ Duplicating any of these is a defect, not a shortcut.
   Reach for these before writing a second comparison of two articles.
 - `hooks/useIsDesktop.ts` — viewport check for components that must render
   *structurally* different markup per breakpoint (portal vs. inline). It existed
-  as two private copies before round 2a; do not make a third. For anything a CSS
+  as two private copies before round 2a; do not make a third. `useMediaQuery(query)`, beside it, is
+  the same check for another breakpoint (the sidebar's `xl`). For anything a CSS
   breakpoint can express, use the CSS breakpoint.
 - `utils/articleSuffixes.ts` — `ARTICLE_ORDINAL_SUFFIXES` and
   `ARTICLE_SUFFIX_ALTERNATION`, the one ordinal table behind every article-number
@@ -1196,6 +1287,13 @@ Duplicating any of these is a defect, not a shortcut.
 - `components/features/dossier/dossierLayout.ts` — `layoutDossier`, `actKeyOf`,
   `codeName`, `compareArticles`, `articleLabel`, `foldedArticleList`,
   `dossierItemOrder`, `actsSummary`: the dossier by act.
+- `utils/tagLabel.ts` — `tagLabel(tag)`: a dossier's tag as shown, its first letter capitalised and
+  the rest as typed («accesso» → «Accesso», «DPO» stays). Display only — the stored tag never changes,
+  every filter compares stored values, and the PDF and the editors show the tag as typed. The list's
+  card, the dossier's header, the import dialog and the Forum's card go through it.
+  `tagCategories(tags)` makes the dossier list's category menu (Italian alphabetical order, case and
+  accents ignored; values that differ only by case are one category filtering all of them, labelled by
+  the spelling with the most capitals) and `hasTagCategory` filters by it.
 - `utils/actRubriche.ts` — `matchRubrichePart`, `rubricheFor`, `abrogatiFor`:
   which article titles belong to the articles in view. An act in parts gets the
   part matched by article numbers (on a tie, the one of the annex's size; still
@@ -1317,15 +1415,20 @@ meant to stay split; add new features as new files, not inside the shells:
 
 - `features/dossier/` — `DossierPage.tsx` is a thin shell routing list/detail via
   `?dossier=<id>`; `DossierListView.tsx` (grid, context menu, shortcuts `n` `/`
-  `i`), `DossierDetailView.tsx` (sections and header), `DossierActBlock.tsx`
+  `i`; the search, then two menus — the order and «Filtra per categoria», one
+  category at a time, «Tutte le categorie» first («Tutte» on a phone, by `useIsDesktop`), the categories of the section's dossiers, absent when
+  there are none — on one row on a computer, half and half under the search on
+  a phone), `DossierDetailView.tsx` (sections and header), `DossierActBlock.tsx`
   (an act and its rows), `DossierArticleRow.tsx` (row + star + expand),
   `DossierNotesSection.tsx`, `DossierItemReader.tsx` (in-place article),
   `AddToDossierPopover.tsx`, one file per modal, shared helpers in
   `dossierUtils.ts`, `dossierLayout.ts`, `dossierPdf.ts`, `pdfExcerpts.ts`, `dossierPdfMarks.ts`, `DossierPdfDialog.tsx`, `useActDetails.ts`.
-- `features/bulletin/` — the Forum: «I dossier di studio pubblicati dalla comunità» (spec
+- `features/bulletin/` — the Forum. Its area «Dossier pubblici»: «I dossier di studio pubblicati dalla comunità» (spec
   `docs/superpowers/specs/2026-10-13-environments-into-forum-design.md`; it absorbed «Ambienti»). Folder and
   component names stay `bulletin` and `SharedEnvironment*` because they match the backend model; the route is
-  `/forum`. `BulletinBoardPage.tsx` is a shell over three dumb views, the tabs «Esplora · I miei pubblicati ·
+  `/forum`, the page's `h1` «Dossier pubblici», and what leaves it says so («Ritira dai dossier pubblici», toast
+  «Dossier ritirato»; in the dossier's header «Copia pubblicata ritirata»), never «dal Forum»: the Forum is the section, which also holds «Community»
+  (`ForumCommunityPage`, `/forum/community`, a placeholder). `BulletinBoardPage.tsx` is a shell over three dumb views, the tabs «Esplora · I miei pubblicati ·
   Suggerimenti» (`ForumExploreView`, `ForumMyEnvironmentsView`, `ForumSuggestionsView`). «Pubblica un dossier»
   is `PublishDossierPicker` (the user's dossiers not yet in the Forum, then the dossier's own
   `PublishDossierDialog`; the Forum never publishes a workspace); «Modifica» on a published dossier
@@ -1562,6 +1665,25 @@ meant to stay split; add new features as new files, not inside the shells:
     are different tokens** — `bg-primary` (213 uses) comes from the first and
     must keep working. Everything else the config declares — `font-sans`,
     `shadow-glow`, `animate-shimmer` — is still inert.
+    The entrance classes of `tailwindcss-animate` (`animate-in`, `fade-in`,
+    `zoom-in-95`, `slide-in-from-*`; 33 uses in 25 files) were inert the same
+    way — no plugin was ever installed — until 18 October 2026: they are now
+    `@utility` rules at the end of `index.css` that move with the individual
+    `translate` and `scale` properties, so they compose with floating-ui's
+    positioning `transform` instead of replacing it (gotcha 10), last at
+    most 200 ms and fill `backwards` only: a `both` fill keeps the element a
+    containing block and a stacking context after the entrance (gotcha 22). `theme.test.ts` checks they generate CSS. The palette is the
+    «Inchiostro» one (spec `2026-10-18-redesign-inchiostro`): `slate`, `gray`,
+    `zinc`, `neutral` are aliases of `ink`, `blue`, `indigo`, `primary-<n>` of
+    `toga`; motion curves for Framer Motion live in `lib/motion.ts`.
+    A `dark:` variant `@apply`'d inside a pseudo-element's rule is just as silent:
+    it compiles to `::-webkit-scrollbar-thumb:where(.dark, .dark *)`, which the
+    browser drops (until 19 October 2026 every dark scrollbar kept its light
+    thumb). Write the dark scope before the pseudo-element,
+    `:where(.dark, .dark *)::…`, as `index.css` does; `theme.test.ts` checks it.
+    A short sideways row of controls on a phone draws no bar at all (`HIDDEN_SCROLLBAR` in
+    `constants/interactions.ts`, both engines; a swipe, the trackpad and focus still scroll it): the
+    subject chips' row still showed a light one in dark mode on the owner's pass, 19 October 2026.
 
 30. **A bare `fetch` to a scraping route works in development and answers 401 in
     production.** Vite proxies those routes to the Python API with no login; the ingress
@@ -1599,3 +1721,12 @@ meant to stay split; add new features as new files, not inside the shells:
     surface (a practice's row, a dossier row, the comparison) names its version
     (`versionTabSuffix`, `historicalItemLabel`); the banner and the chip sit
     beside the text, never in it (root rule 23).
+
+33. **Tailwind v4's `scale-*` and `translate-*` are not `transform`.** They write the
+    individual `scale` and `translate` properties, so a `transition-[…,transform,…]` list
+    leaves `active:scale-[0.97]` or a `-translate-y-px` lift snapping, with no warning;
+    name `scale` and `translate` (as `TRANSITION` does) or use `transition-transform`, which
+    lists all four. The same split is what lets the entrance utilities (gotcha 29) compose with
+    floating-ui's positioning `transform`, and what breaks them on an element that also writes
+    a translate or scale class of its own (the keyframe replaces it while it runs): none does
+    today. `theme.test.ts` compiles `TRANSITION` and checks its rule.
