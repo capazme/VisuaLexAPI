@@ -11,7 +11,7 @@ import { MonthSheet } from './progress/MonthSheet';
 import { StatsBand } from './progress/StatsBand';
 import { StudySettingsSheet } from './progress/StudySettings';
 import { SubjectChips } from './progress/SubjectChips';
-import { SubjectRoad, SubjectRoadSkeleton } from './progress/SubjectRoad';
+import { SubjectRoad, SubjectRoadSkeleton, SubjectRoadUnread } from './progress/SubjectRoad';
 import { useCelebratedToday } from './progress/useCelebratedToday';
 import { useProgress } from './progress/useProgress';
 import { BLOCK_HEADING, subjectHue } from './progress/tokens';
@@ -119,7 +119,7 @@ export function ReviewHome() {
       </section>
 
       <div className={cn('transition-opacity', loading && data !== null && 'opacity-60')} aria-busy={loading}>
-        {data ? <SubjectRoad materie={data.materie} selected={materia} /> : <SubjectRoadSkeleton pulsing={loading} />}
+        {data ? <SubjectRoad materie={data.materie} selected={materia} /> : loading ? <SubjectRoadSkeleton /> : <SubjectRoadUnread />}
       </div>
 
       {sheet === 'settings' && <StudySettingsSheet onClose={() => setSheet(null)} onChanged={reload} />}

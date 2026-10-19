@@ -206,6 +206,21 @@ describe('ReviewHome', () => {
     expect(container.querySelector('[aria-busy="true"]')).toBeNull();
   });
 
+  it('says what the road is missing when the progress cannot be read, and draws it once read again', async () => {
+    progress.mockRejectedValueOnce(new Error('down'));
+    renderHome();
+    const alert = await screen.findByRole('alert');
+    const road = screen.getByRole('region', { name: 'Il percorso' });
+    expect(road).toHaveTextContent('Non riesco a leggere il tuo percorso: le materie tornano appena riesco a leggerle.');
+    expect(within(road).queryByRole('list')).toBeNull();
+    // Said once, by the missions: the road's line is no second alert.
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    progress.mockResolvedValue(answer(1, 0));
+    await userEvent.setup().click(within(alert).getByRole('button', { name: 'Riprova' }));
+    expect(await screen.findByRole('list', { name: 'Il percorso' })).toBeInTheDocument();
+    expect(screen.queryByText(/Non riesco a leggere il tuo percorso/)).toBeNull();
+  });
+
   it('tells someone with no card yet where to begin', async () => {
     const empty = answer(0, 0, { ripassi: 0 }, 0);
     empty.stati = { nuove: 0, apprendimento: 0, consolidate: 0 };

@@ -545,7 +545,8 @@ heading and its rule are the column's width), in the order the owner fixed:
 One type language: block headings in Newsreader (`BLOCK_HEADING`), labels in Geist; no small capitals and no double
 rule. «Le mie schede» and «Da validare» show the strip (`progress/StudyStrip`, `dense`: the streak's count without its
 line, the ring, the gear) over them (`StudiaPage`); the session shows none. While the first read travels the missions,
-the band, the list and the road keep their places at their final size; a failed first read stops the pulse. Colours are the app's tokens through `progress/tokens.ts` (ink is the
+the band, the list and the road keep their places at their final size; a failed first read stops the pulse, and the road
+says it could not be read under its heading (no second alert: the missions' «Riprova» reads it again). Colours are the app's tokens through `progress/tokens.ts` (ink is the
 primary scale's deep end, the stamp the one red, a subject's hue the category palette's CSS variable); the charts are
 hand-drawn SVG laid out by the pure `progress/layout.ts`, which walks the server's Rome days in UTC and never reads
 the browser's zone. **The celebration** (`progress/Celebration.tsx`): once a day per browser

@@ -94,13 +94,28 @@ export function SubjectRoad({ materie, selected }: SubjectRoadProps) {
 }
 
 /** The road's place at its final size while the first read travels. */
-export function SubjectRoadSkeleton({ pulsing }: { pulsing: boolean }) {
+export function SubjectRoadSkeleton() {
   return (
     <div aria-hidden className="space-y-3">
       <div className="h-6 w-32 rounded bg-slate-100 dark:bg-slate-800/60" />
       {Array.from({ length: 5 }, (_, index) => (
-        <div key={index} className={cn('ml-11 h-40 rounded-2xl bg-slate-100 md:h-[92px] dark:bg-slate-800/60', pulsing && 'motion-safe:animate-pulse')} />
+        <div key={index} className="ml-11 h-40 rounded-2xl bg-slate-100 motion-safe:animate-pulse md:h-[92px] dark:bg-slate-800/60" />
       ))}
     </div>
+  );
+}
+
+/**
+ * The road when the first read failed: its heading and what is missing, not empty blocks. No alert: the missions
+ * above say it once, with «Riprova», which reads the road again too.
+ */
+export function SubjectRoadUnread() {
+  return (
+    <section aria-labelledby="studia-percorso" className="space-y-3">
+      <h3 id="studia-percorso" className={BLOCK_HEADING}>
+        Il percorso
+      </h3>
+      <p className={cn('text-sm', MUTED_TEXT)}>Non riesco a leggere il tuo percorso: le materie tornano appena riesco a leggerle.</p>
+    </section>
   );
 }
