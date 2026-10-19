@@ -364,7 +364,12 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `GET /article-discussions/feed` lists every visible thread of every article and decision,
   paginated (`page`, `limit` ≤ 50), `sort=recent|popular|active|unanswered` (unanswered: no
   visible reply), filtered by `kind`, `act` (the web's `buildNormaKey`: the threads whose key
-  starts with it and «--») or `normaKey` (one article or decision). An item carries no replies
+  starts with it and «--»), `court` (a prefix of the decision key: a court of the key space, then
+  at most two segments — `cassazione:civile`, `tar:roma`, `tar:roma:sent` — matched with «:» after
+  it, so `tar:rom` is not `tar:roma`) or `normaKey` (one article or decision); one of `act`,
+  `court`, `normaKey` at most, `court` only with the decisions; `_` is escaped for LIKE in both
+  prefixes. `mine=true` keeps the signed-in user's threads only (`userId`, never another user's),
+  with any other filter. A malformed value is an Italian 400. An item carries no replies
   and no body, only an `excerpt`, plus `decisionLabel` (`shortDecision` of the key),
   `commentCount`, `voteCount`, `userVoted` and `lastActivityAt` (`updatedAt`: a reply sets it,
   moderation keeps it). `GET /article-discussions/:threadId` is one glossa with its visible
