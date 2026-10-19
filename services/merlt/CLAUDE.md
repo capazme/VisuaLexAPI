@@ -254,8 +254,8 @@ Tests marked `integration` need a live FalkorDB: `pyproject.toml` `addopts`
 excludes them from a plain run. Run them with `-m integration` against a
 disposable FalkorDB (`FALKORDB_HOST`, `FALKORDB_PORT`; the client's default
 is `localhost:6380`), never the development graph. CI has only Postgres and
-FalkorDB, so a test that needs another live service (Qdrant, Normattiva,
-Brocardi) needs a marker of its own, kept out of CI.
+FalkorDB, so a test that needs another live service (Qdrant, Normattiva)
+needs a marker of its own, kept out of CI.
 
 Locally, from the venv. The DB-backed tests write rows, so point them at a
 disposable database, never at the dev stack's data:
@@ -335,3 +335,11 @@ that stack's own database, and the tests write rows. The Dockerfile copies
   contract test fails on `labels(x)[0]` in Cypher.
 - Do not change the authority algorithm or the synthesizer's contract without
   the owner's approval.
+- Brocardi is no longer a source (D-078). MERL-T does not fetch from it: the
+  VisuaLex client's `fetch_brocardi_info` returns nothing without a call,
+  `include_brocardi` defaults to False, no expert is granted `cerca_brocardi`
+  (it stays out of `BaseExpert.LIVE_LEGAL_TOOLS`, or the per-expert filter would
+  hand it to every expert), and `cite_law` never gets `include_annotations`
+  (`tools/mcp_legal_adapter._BROCARDI_ARGUMENTS`). Its slot in `TOOL_VOCAB`
+  stays: the vocabulary is append-only. The Brocardi data already in the graph
+  and in Qdrant stays until the owners decide on a purge.

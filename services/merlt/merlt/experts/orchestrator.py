@@ -251,8 +251,11 @@ class MultiExpertOrchestrator:
     # canon (art. 12 preleggi). Core retrieval tools (semantic_search,
     # graph_search) and any other shared tool go to EVERY expert unchanged; only
     # the curated live legal tools are restricted per canon — precedent gets case
-    # law (its unique value), principles gets doctrine, literal/systemic get norm
-    # text. Tools not listed here (e.g. the ~180 calculators) reach no expert.
+    # law (its unique value), principles gets the norm text it reasons on (its
+    # doctrine tool, cerca_brocardi, is gone: Brocardi is no longer a source,
+    # D-078), literal/systemic get norm text. Tools not listed here (e.g. the
+    # ~180 calculators) reach no expert, because BaseExpert.LIVE_LEGAL_TOOLS keeps
+    # them out of the registry.
     # fetch_law_article is the structured-param SIBLING of cite_law (both fetch
     # the authoritative norm text; fetch_law_article also resolves NUMBERED acts,
     # legge 241/1990 etc., that cite_law's NL resolver rejects). Any expert granted
@@ -262,7 +265,7 @@ class MultiExpertOrchestrator:
     EXPERT_MCP_TOOLS: Dict[str, set] = {
         "literal": {"cite_law", "fetch_law_article"},
         "systemic": {"cite_law", "fetch_law_article"},
-        "principles": {"cerca_brocardi", "cite_law", "fetch_law_article"},
+        "principles": {"cite_law", "fetch_law_article"},
         "precedent": {
             "cerca_giurisprudenza",
             "cerca_giurisprudenza_cgue",

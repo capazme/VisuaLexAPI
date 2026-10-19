@@ -808,7 +808,7 @@ async def live_enrich_stream(
     articolo: str,
     user_id: str,
     user_authority: float = 0.5,
-    include_brocardi: bool = True,
+    include_brocardi: bool = False,
     api_key: ApiKey = Depends(verify_api_key),
 ) -> StreamingResponse:
     """
