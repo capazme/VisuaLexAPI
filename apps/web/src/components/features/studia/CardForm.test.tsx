@@ -270,15 +270,38 @@ describe('CardForm, opened from an article', () => {
     expect(screen.queryByText(/Validation failed/)).not.toBeInTheDocument();
   });
 
-  it('says the sources are down on a 503, and keeps what was written', async () => {
+  it('says the service is not available on a 503, and keeps what was written', async () => {
     const user = userEvent.setup();
     create.mockRejectedValue({ status: 503, message: 'Le fonti non rispondono', data: { detail: 'Le fonti non rispondono' } });
     renderForm(fromReader());
     await fillRequired(user);
     await user.click(screen.getByRole('button', { name: 'Salva' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('non riesco a controllare l’articolo in questo momento. Riprova più tardi.');
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('La scheda non è stata salvata: il servizio non è disponibile al momento. Riprova più tardi.');
+    expect(alert).not.toHaveTextContent('connessione');
     expect(screen.getByLabelText('Domanda')).toHaveValue('Quando?');
     expect(screen.getByRole('button', { name: 'Salva' })).toBeEnabled();
+  });
+
+  it.each([
+    ['a bare axios error', { response: { status: 503 } }],
+    ['a gateway before the service', { status: 502 }],
+  ])('says the same for %s', async (_name, error) => {
+    const user = userEvent.setup();
+    create.mockRejectedValue(error);
+    renderForm(fromReader());
+    await fillRequired(user);
+    await user.click(screen.getByRole('button', { name: 'Salva' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('il servizio non è disponibile al momento');
+  });
+
+  it('asks to check the connection only when no answer came', async () => {
+    const user = userEvent.setup();
+    create.mockRejectedValue({ status: undefined, message: 'Network Error' });
+    renderForm(fromReader());
+    await fillRequired(user);
+    await user.click(screen.getByRole('button', { name: 'Salva' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('La scheda non è stata salvata: controlla la connessione e riprova.');
   });
 
   it('keeps the question <img src=x onerror=alert(1)> as literal text', async () => {
@@ -305,6 +328,15 @@ describe('CardForm, opened with no article (Le mie schede)', () => {
     expect(field).not.toHaveFocus();
     expect(focus.current).toBe(screen.getByLabelText('Materia'));
     expect(screen.getByLabelText('Materia')).toHaveValue('');
+  });
+
+  it('has one «Annulla», the dialog’s: the reference field closes with Esc or an empty «Aggiungi»', async () => {
+    const user = userEvent.setup();
+    renderForm({ kind: 'create' });
+    expect(screen.getAllByRole('button', { name: 'Annulla' })).toHaveLength(1);
+    await user.click(screen.getByRole('button', { name: 'Aggiungi' }));
+    expect(screen.queryByLabelText('Riferimento dell’ancora')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '+ Ancora' })).toBeInTheDocument();
   });
 
   it('sends the references typed as anchors, the first one primary', async () => {
@@ -492,6 +524,30 @@ describe('CardFormDialog', () => {
     expect(screen.getByLabelText('Domanda')).toHaveValue('Quando?');
     await user.click(screen.getByRole('button', { name: 'Chiudi' }));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['desktop', true],
+    ['phone', false],
+  ])('opens from the top on %s, whatever scrolled the form before the first field took the focus', async (_name, desktop) => {
+    setDesktop(desktop);
+    render(<CardFormDialog open onClose={vi.fn()} mode={{ kind: 'create' }} onSaved={vi.fn()} />);
+    const body = screen.getByLabelText('Materia').closest('form')!.firstElementChild as HTMLElement;
+    // As a browser pass found it: 105 px down, «Materia» cut off.
+    Object.defineProperty(body, 'scrollTop', { value: 105, writable: true, configurable: true });
+    await waitFor(() => expect(screen.getByLabelText('Materia')).toHaveFocus());
+    await waitFor(() => expect(body.scrollTop).toBe(0));
+  });
+
+  it('leaves the form where it is when the first focus is the person’s own', async () => {
+    const user = userEvent.setup();
+    const focus = { current: null as HTMLElement | null };
+    render(<CardForm mode={{ kind: 'create' }} onSaved={vi.fn()} onCancel={vi.fn()} initialFocusRef={focus} />);
+    const body = screen.getByLabelText('Materia').closest('form')!.firstElementChild as HTMLElement;
+    Object.defineProperty(body, 'scrollTop', { value: 300, writable: true, configurable: true });
+    await user.click(screen.getByLabelText('Riferimento dell’ancora'));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    expect(body.scrollTop).toBe(300);
   });
 
   it('closes the anchor field on Esc, leaving the dialog open', async () => {

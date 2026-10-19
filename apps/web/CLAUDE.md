@@ -18,7 +18,10 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `nextReviewLabel`, and «Da ripassare oggi» filters with `dovuteOggi`; «+ Nuova scheda», in the page's
   heading and as the empty list's action, opens `CardFormDialog` with `{ kind: 'create' }` and no article (no
   fixed anchor, the reference field open, the anchors typed as «art. 1455 c.c.», which `POST /lingo/cards`
-  resolves; saved with no anchor, the reference field stays open and takes the focus), and is drawn only while
+  resolves; saved with no anchor, the reference field stays open and takes the focus; the field has «Aggiungi»
+  only — Esc or an empty «Aggiungi» closes it — so the dialog's «Annulla» is the one; the form's body goes back
+  to the top once the dialog's first focus lands, which had left «Materia» scrolled out; a 502/503/504 says the
+  service is not available at the moment, only a call with no answer asks to check the connection), and is drawn only while
   Normattiva answers (`useCardSources` over `cardSourcesAnswer`, the cached `/health/detailed`, read once per
   mount; until it answers the empty list says only «Non hai ancora schede.», with the sources down it points to an
   article and promises nothing; after the first card is saved the heading's button takes the focus); the detail proposes a draft

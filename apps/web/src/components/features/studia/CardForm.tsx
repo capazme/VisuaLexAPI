@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type FormEvent, type RefObject } from 'react';
+import { useEffect, useId, useRef, useState, type FocusEvent, type FormEvent, type RefObject } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '../../ui/Button';
 import { FormSelect } from '../../ui/FormSelect';
@@ -93,8 +93,11 @@ const unrecognisedAct = (fromReader: boolean): string =>
 
 /** What the failed call says to the person, never the server's raw text (some of it is English). */
 function failureMessage(error: unknown, editing: boolean): string {
-  const status = typeof error === 'object' && error !== null && 'status' in error ? (error as { status?: unknown }).status : undefined;
-  if (status === 503) return 'La scheda non è stata salvata: non riesco a controllare l’articolo in questo momento. Riprova più tardi.';
+  // The apiClient's rejection carries `status`; a bare axios error has it on its response.
+  const rejection = (typeof error === 'object' && error !== null ? error : {}) as { status?: unknown; response?: { status?: unknown } };
+  const status = rejection.status ?? rejection.response?.status;
+  // The service answered that it cannot serve now (the sources down, or a gateway before it): not the person's connection.
+  if (status === 502 || status === 503 || status === 504) return 'La scheda non è stata salvata: il servizio non è disponibile al momento. Riprova più tardi.';
   if (editing && status === 404) return 'La scheda non esiste più: chiudi questa finestra e riapri l’elenco.';
   if (editing && status === 409) return 'La scheda non è più una bozza: non si può modificare.';
   return 'La scheda non è stata salvata: controlla la connessione e riprova.';
@@ -194,6 +197,21 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
 
   const focusFirst = (element: HTMLElement | null) => {
     if (initialFocusRef) initialFocusRef.current = element;
+  };
+
+  // The form opens from its top, «Materia» in view: the dialog's first focus, given while it is still
+  // entering, left the body scrolled. Once that focus lands the body goes back to the top; the field
+  // it lands on is in the first rows, so it stays in view.
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const opened = useRef(false);
+  const startFromTop = (event: FocusEvent<HTMLFormElement>) => {
+    if (opened.current) return;
+    opened.current = true;
+    // A first focus the person gave (a click lower down) keeps its place.
+    if (!initialFocusRef || event.target !== initialFocusRef.current) return;
+    requestAnimationFrame(() => {
+      if (bodyRef.current) bodyRef.current.scrollTop = 0;
+    });
   };
 
   /** The anchors with `reference` added, or as they were when it is empty, already there or too long (with the reason). */
@@ -322,8 +340,8 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
   const atAnchorLimit = anchors.length >= MAX_ANCHORS;
 
   return (
-    <form ref={formRef} onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
-      <div className="flex-1 space-y-5 overflow-y-auto p-4 md:p-6">
+    <form ref={formRef} onSubmit={submit} onFocus={startFromTop} className="flex min-h-0 flex-1 flex-col">
+      <div ref={bodyRef} className="flex-1 space-y-5 overflow-y-auto p-4 md:p-6">
         <div className="grid gap-5 md:grid-cols-2">
           <div className="space-y-1.5 w-full">
             <label htmlFor={fieldId('materia')} className={LABEL}>Materia</label>
@@ -490,10 +508,8 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
                 placeholder="es. art. 2043 c.c."
                 autoComplete="off"
               />
-              <div className="flex gap-2">
-                <Button type="button" variant="secondary" className={TARGET} onClick={addPending}>Aggiungi</Button>
-                <Button type="button" variant="ghost" className={TARGET} onClick={closeAdding}>Annulla</Button>
-              </div>
+              {/* One «Annulla» only, the dialog's: the field closes with Esc, or with «Aggiungi» left empty. */}
+              <Button type="button" variant="secondary" className={cn(TARGET, 'shrink-0 self-start')} onClick={addPending}>Aggiungi</Button>
             </div>
           ) : (
             <Button
