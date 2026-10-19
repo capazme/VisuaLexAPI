@@ -38,7 +38,7 @@ export function InstituteStops({ materia, percorso, onRetry }: InstituteStopsPro
         <div className="grid gap-1">
           <p className={cn('text-sm', MUTED_TEXT)}>Non riesco a leggere gli istituti di questa materia.</p>
           <button type="button" onClick={onRetry} className={QUIET_BUTTON}>
-            Riprova
+            Riprova<span className="sr-only"> gli istituti di {label}</span>
           </button>
         </div>
       );
@@ -65,7 +65,7 @@ export function InstituteStops({ materia, percorso, onRetry }: InstituteStopsPro
         <div className="grid gap-1">
           <p className={cn('text-sm', MUTED_TEXT)}>Non riesco ad aggiornare gli istituti: restano quelli letti prima.</p>
           <button type="button" onClick={onRetry} className={QUIET_BUTTON}>
-            Riprova
+            Riprova<span className="sr-only"> gli istituti di {label}</span>
           </button>
         </div>
       )}

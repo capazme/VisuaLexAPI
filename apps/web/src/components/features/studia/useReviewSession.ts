@@ -94,6 +94,7 @@ export function useReviewSession(materia?: Materia, { istituto, paused = false, 
     setLoading(true);
     setLoadError(false);
     try {
+      // One argument when no institute is asked: the call stays exactly what it was before G5.
       const session = await (istituto === undefined ? studiaService.session(materia) : studiaService.session(materia, istituto));
       if (request !== latest.current) return;
       setQueue(session.cards.map((card) => ({ card, posted: false })));

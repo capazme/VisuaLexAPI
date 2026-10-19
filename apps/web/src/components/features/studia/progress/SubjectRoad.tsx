@@ -17,7 +17,7 @@ const STAGGER_MS = 40;
 
 export interface SubjectRoadProps {
   materie: Progressi['materie'];
-  /** The subject the chips chose: its stop is marked, and opens on its institutes. */
+  /** The subject the chips chose: its stop is marked, and opens on its institutes when chosen. */
   selected: Materia | undefined;
   /** The read by institute (G5): each subject's «N da ripassare» and its institutes' stops. */
   percorso: PercorsoState;
@@ -36,8 +36,14 @@ export function SubjectRoad({ materie, selected, percorso, onRetryPercorso }: Su
   const id = useId();
   const stops = orderStops(materie);
   const due = percorso.data && dueBySubject(percorso.data);
-  // The subject the chips chose opens on its institutes; any other opens on request. Never more than asked.
+  // The subject the chips choose opens on its institutes, at mount and on each new choice; any other opens on
+  // request. Nothing closes but the reader. Derived during render, not in an effect (gotcha 11).
   const [open, setOpen] = useState<ReadonlySet<Materia>>(() => new Set(selected ? [selected] : []));
+  const [opened, setOpened] = useState(selected);
+  if (opened !== selected) {
+    setOpened(selected);
+    if (selected) setOpen((previous) => new Set(previous).add(selected));
+  }
   const toggle = (materia: Materia) =>
     setOpen((previous) => {
       const next = new Set(previous);

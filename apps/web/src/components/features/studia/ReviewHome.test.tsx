@@ -556,6 +556,19 @@ describe('ReviewHome', () => {
       expect(screen.queryByRole('list', { name: 'Istituti di Diritto civile' })).toBeNull();
     });
 
+    it('opens a subject chosen later on its institutes, and leaves open what the reader opened', async () => {
+      progress.mockResolvedValue(answer(3, 0));
+      percorso.mockResolvedValue([tappa('DIRITTO_PENALE', 'Furto', 2), tappa('DIRITTO_CIVILE', 'Mora del debitore', 1)]);
+      renderHome();
+      const civile = await stopOf('Diritto civile');
+      const user = userEvent.setup();
+      await user.click(await within(civile).findByRole('button', { name: /^Istituti di Diritto civile/ }));
+      expect(screen.queryByRole('list', { name: 'Istituti di Diritto penale' })).toBeNull();
+      await user.click(screen.getByRole('button', { name: 'Diritto penale' }));
+      expect(await screen.findByRole('list', { name: 'Istituti di Diritto penale' })).toBeInTheDocument();
+      expect(screen.getByRole('list', { name: 'Istituti di Diritto civile' })).toBeInTheDocument();
+    });
+
     it('holds the cards due in place while the read travels, and the missions do not wait on it', async () => {
       progress.mockResolvedValue(answer(3, 0));
       percorso.mockReturnValue(new Promise(() => {}));
@@ -580,7 +593,7 @@ describe('ReviewHome', () => {
       await user.click(within(civile).getByRole('button', { name: 'Istituti di Diritto civile' }));
       expect(screen.getByText('Non riesco a leggere gli istituti di questa materia.')).toBeInTheDocument();
       percorso.mockResolvedValue([tappa('DIRITTO_CIVILE', 'Mora del debitore', 1)]);
-      await user.click(screen.getByRole('button', { name: 'Riprova' }));
+      await user.click(screen.getByRole('button', { name: 'Riprova gli istituti di Diritto civile' }));
       expect(await screen.findByRole('button', { name: 'Ripassa Mora del debitore: 1 da ripassare' })).toBeInTheDocument();
       expect(percorso).toHaveBeenCalledTimes(2);
     });

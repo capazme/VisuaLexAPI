@@ -552,14 +552,14 @@ heading and its rule are the column's width), in the order the owner fixed:
    once for every subject, on its own (the missions and «Inizia» never wait on it or fail with it; the missions'
    «Riprova» and a changed setting read it again). A subject's «N da ripassare» is the sum of its institutes' `dovute`
    (`dueBySubject`); while the read travels the line holds its place, and a failed read leaves it out. «Istituti (N)», an
-   `aria-expanded` disclosure on each subject with cards (open at mount on the subject the chips chose), opens
+   `aria-expanded` disclosure on each subject with cards (open on the subject the chips choose, at mount and at each new choice; only the reader closes one), opens
    `progress/InstituteStops` inside the stop: one stop per institute joined by a thinner line (none for one institute),
    free, ordered by `orderInstitutes` (most due, then by name in Italian), each one button of 44 px that starts the
    session narrowed to it (`instituteSessionPath`: the label goes back verbatim, never trimmed or rewritten — it is the
    card's content, root rule 23), its name wrapping whole (never cut), its three states as a bar and in words, «N da
    ripassare». The first `INSTITUTES_SHOWN` (8) show, the rest behind «Mostra tutti gli istituti (N)»; only those first 8
    enter with the stagger. Its states: places held while the read travels, «Non riesco a leggere gli istituti di questa
-   materia.» with «Riprova» (no alert), the stops read before kept when a new read fails, a subject with none.
+   materia.» with «Riprova» (no alert; its name says which subject), the stops read before kept when a new read fails, a subject with none.
 
 One type language: block headings in Newsreader (`BLOCK_HEADING`), labels in Geist; no small capitals and no double
 rule. «Le mie schede» and «Da validare» show the strip (`progress/StudyStrip`, `dense`: the streak's count without its

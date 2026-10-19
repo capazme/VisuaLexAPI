@@ -118,7 +118,7 @@ describe('InstituteStops', () => {
     const { onRetry } = renderStops({ status: 'error', data: null });
     expect(screen.getByText('Non riesco a leggere gli istituti di questa materia.')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).toBeNull();
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Riprova' }));
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Riprova gli istituti di Diritto civile' }));
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
@@ -126,7 +126,7 @@ describe('InstituteStops', () => {
     const { onRetry } = renderStops({ status: 'error', data: [tappa('Mora del debitore', 1)] });
     expect(within(list()).getAllByRole('listitem')).toHaveLength(1);
     expect(screen.getByText('Non riesco ad aggiornare gli istituti: restano quelli letti prima.')).toBeInTheDocument();
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Riprova' }));
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Riprova gli istituti di Diritto civile' }));
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
