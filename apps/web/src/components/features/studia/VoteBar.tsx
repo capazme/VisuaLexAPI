@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { cn } from '../../../lib/utils';
 import type { Giudizio } from '../../../types/studia';
+import { FOCUS_RING, INK_BUTTON, MUTED_TEXT, SECONDARY_BUTTON } from './progress/tokens';
 
 /** The server's limit on a reason (`motivazione`). */
 export const REASON_MAX = 2000;
@@ -20,9 +21,9 @@ const VERDICTS: Array<{ giudizio: Giudizio; label: string }> = [
   { giudizio: 'ERRATA', label: 'Errata' },
 ];
 
-const BUTTON =
-  'inline-flex min-h-[44px] items-center justify-center rounded-lg border px-3 text-sm font-medium transition-colors disabled:opacity-60 md:min-h-0 md:py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
-const QUIET = 'border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800';
+/** Every verdict looks the same, an ink outline at 44 px: the choice is the validator's, the interface does not lean. */
+const VERDICT = cn(SECONDARY_BUTTON, 'inline-flex items-center justify-center px-3 disabled:opacity-60');
+const CANCEL = cn('inline-flex min-h-[44px] items-center rounded-xl px-3 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-60 dark:text-slate-200 dark:hover:bg-slate-800', FOCUS_RING);
 
 /**
  * The three verdicts. «Approvata» is sent at once; «Migliorabile» and «Errata» open a required
@@ -58,22 +59,22 @@ export function VoteBar({ cardId, busy, onVote }: VoteBarProps) {
           maxLength={REASON_MAX}
           rows={4}
           autoFocus
-          className="w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 md:text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+          className={cn('w-full resize-y rounded-xl border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 md:text-sm dark:border-slate-600 dark:bg-slate-900 dark:text-slate-50', FOCUS_RING)}
         />
         <div className="flex items-center gap-2">
-          <span className="mr-auto text-xs text-slate-500 dark:text-slate-400">{open.text.length} / {REASON_MAX}</span>
+          <span className={cn('mr-auto text-xs tabular-nums', MUTED_TEXT)}>{open.text.length} / {REASON_MAX}</span>
           <button type="button" onClick={() => {
               backTo.current = open.giudizio;
               setWriting(null);
             }}
-            disabled={busy} className={cn(BUTTON, QUIET)}>
+            disabled={busy} className={CANCEL}>
             Annulla
           </button>
           <button
             type="button"
             onClick={() => onVote(open.giudizio, reason)}
             disabled={busy || reason.length === 0}
-            className={cn(BUTTON, 'border-primary-600 bg-primary-600 text-white hover:bg-primary-700')}
+            className={cn(INK_BUTTON, 'px-5')}
           >
             Invia
           </button>
@@ -93,7 +94,7 @@ export function VoteBar({ cardId, busy, onVote }: VoteBarProps) {
           type="button"
           disabled={busy}
           onClick={() => (giudizio === 'APPROVATA' ? onVote(giudizio) : setWriting({ cardId, giudizio, text: '' }))}
-          className={cn(BUTTON, QUIET)}
+          className={VERDICT}
         >
           {label}
         </button>
