@@ -43,6 +43,13 @@ from merlt.rlcf.buffer_rehydration import build_experience
 from merlt.rlcf.authority import update_track_record, update_authority_score
 from merlt.rlcf.database import get_async_session
 from merlt.rlcf import models as rlcf_models
+from merlt.storage.graph.brocardi_guard import (
+    TRACE_GUARD_KEY,
+    is_trace_guarded,
+    mark_trace_guarded,
+    redact_stored_sources,
+    redact_stored_trace,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -676,6 +683,11 @@ async def build_and_persist_query_response(
                 served_keys.add(key)
     if served_keys:
         full_trace_data["coevo_served_keys"] = sorted(served_keys)
+    # The engine says its experts read only guarded sources (D-078). Marked
+    # even when the trace is otherwise empty, or /history would read the turn
+    # as one from before the guard.
+    if (getattr(result, "metadata", None) or {}).get(TRACE_GUARD_KEY):
+        mark_trace_guarded(full_trace_data)
     full_trace_data = full_trace_data or None
 
     # Extract routing metadata for new fields
@@ -2067,6 +2079,12 @@ async def submit_refine_feedback(
             synthesis_text=result.synthesis,
             sources=[s.model_dump() for s in sources],
             execution_time_ms=execution_time_ms,
+            # No pipeline trace is kept for a follow-up; the mark says its
+            # sources passed the Brocardi guard (D-078), when the engine says so.
+            full_trace=(
+                mark_trace_guarded({})
+                if (getattr(result, "metadata", None) or {}).get(TRACE_GUARD_KEY) else None
+            ),
             consent_level=original_trace.consent_level,
             confidence=result.confidence,
         )
@@ -2158,6 +2176,8 @@ async def list_history(
     items: List[HistoryItem] = []
     for t in result.scalars().all():
         raw_sources = t.sources if isinstance(t.sources, list) else []
+        # A turn stored before the Brocardi guard may cite its text (D-078).
+        raw_sources = redact_stored_sources(raw_sources, guarded=is_trace_guarded(t.full_trace))
         parsed_sources: List[SourceReference] = []
         for s in raw_sources:
             if not isinstance(s, dict):
@@ -2233,6 +2253,9 @@ async def get_trace(
     # nothing else remains, the query ran without include_trace=True.
     full_trace.pop("execution_trace", None)
     full_trace.pop("coevo_served_keys", None)
+    # Brocardi text never goes back to a user, from a turn of any age (D-078).
+    full_trace = redact_stored_trace(full_trace)
+    full_trace.pop(TRACE_GUARD_KEY, None)
     if not full_trace:
         raise HTTPException(
             status_code=404,

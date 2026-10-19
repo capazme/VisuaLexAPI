@@ -113,9 +113,12 @@ async def test_the_principles_expert_walks_its_relations_and_reads_a_principle_f
     assert [p["text"] for p in found if p["source"] == "principle_graph"] == ["Le parti agiscono secondo buona fede."]
 
 
-async def test_the_precedent_expert_reads_the_seeds_massime_walking_toward_the_article():
+async def test_the_precedent_expert_reads_the_graphs_massime_walking_toward_the_article():
+    # A Massimario decision: a Brocardi massima (`massima_…`, fonte Brocardi.it)
+    # would reach the expert without its text (brocardi_guard, D-078).
     graph = _GraphRecorder(rows=[
-        _graph_node("AttoGiudiziario", node_id="massima_cass_1_2020", massima="Massima.", organo_emittente="Cass. civ."),
+        _graph_node("AttoGiudiziario", node_id="massimario:cass_1_2020", massima="Massima.",
+                    organo_emittente="Cass. civ.", fonte="Ufficio del Massimario"),
         _graph_node("Norma", URN=CC, testo="Un articolo non e' giurisprudenza."),
     ])
     expert = PrecedentExpert(tools=[SemanticSearchTool(), GraphSearchTool(graph_db=graph)])
@@ -984,7 +987,8 @@ async def test_concept_definitions_read_a_concept_as_the_seed_stores_it():
 async def test_the_systemic_expansion_reads_a_nodes_text_whichever_writer_stored_it(_static_systemic_floor):
     graph = _GraphRecorder(rows=[
         _graph_node("ConcettoGiuridico", node_id="concetto:buona_fede", descrizione="Un concetto."),
-        _graph_node("AttoGiudiziario", node_id="massima_1", massima="Una massima."),
+        # The Massimario's: a Brocardi `massima_…` reaches the expert without its text.
+        _graph_node("AttoGiudiziario", node_id="massimario:1", massima="Una massima.", fonte="Ufficio del Massimario"),
         _graph_node("Norma", URN=CC, testo_vigente="Un articolo."),
     ])
     expert = SystemicExpert(tools=[GraphSearchTool(graph_db=graph)])

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import type { EuCaseLawAnswer, EuCaseLawDecision } from '../../../types/decisions';
@@ -219,9 +219,10 @@ describe('EuCaseLawBlock — the section\'s controls', () => {
     service.mockResolvedValue(found([judgment, opinion, order, general]));
     show();
     await screen.findByText('Corte giust. UE, C-97/23');
-    expect(reported()).toEqual([{ year: 2024, n: 1 }, { year: 2023, n: 1 }, { year: 2021, n: 1 }]);
+    // The counts reach the chips in an effect after the rows are drawn: wait for them.
+    await waitFor(() => expect(reported()).toEqual([{ year: 2024, n: 1 }, { year: 2023, n: 1 }, { year: 2021, n: 1 }]));
     await userEvent.click(screen.getByRole('button', { name: /Conclusioni dell’Avvocato generale/ }));
-    expect(reported()).toEqual([{ year: 2024, n: 2 }, { year: 2023, n: 1 }, { year: 2021, n: 1 }]);
+    await waitFor(() => expect(reported()).toEqual([{ year: 2024, n: 2 }, { year: 2023, n: 1 }, { year: 2021, n: 1 }]));
     expect(report).toHaveBeenCalledWith('eu', expect.anything());
   });
 

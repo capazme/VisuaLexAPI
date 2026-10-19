@@ -40,19 +40,16 @@ ALLOWED_HOSTS: dict[str, str] = {
     # The administrative courts: the decisions search and the documents (CdS/TAR design note, 2026-10-12).
     "www.giustizia-amministrativa.it": "Giustizia amministrativa — Consiglio di Stato e TAR (ricerca dei provvedimenti)",
     "mdp.giustizia-amministrativa.it": "Giustizia amministrativa — Consiglio di Stato e TAR (testi dei provvedimenti)",
-    # --- Private ---
-    # The only non-institutional source. Brocardi supplies doctrinal notes and
-    # case-law abstracts, never the text of a norm: that always comes from
-    # Normattiva or EUR-Lex. Two spellings are in use across the codebase
-    # (services/brocardi_scraper.py uses the bare form, tools/map.py the www one),
-    # so both are declared.
-    "brocardi.it": "Brocardi.it — annotazioni dottrinali (fonte privata)",
-    "www.brocardi.it": "Brocardi.it — annotazioni dottrinali (fonte privata)",
 }
 
 #: Strings that look like hosts but are never fetched.
 NON_NETWORK_HOSTS: dict[str, str] = {
     "localhost": "default CORS origins and the frontend link in a JSON response",
+    # Brocardi is no longer a source (D-078): no route calls the scraper, and
+    # ThrottledHttpClient refuses these hosts. The scraper and its tables still
+    # name them until they are deleted.
+    "brocardi.it": "the switched-off Brocardi scraper (services/brocardi_scraper.py); never fetched",
+    "www.brocardi.it": "the switched-off Brocardi tables (tools/map.py); never fetched",
     "www.normattiva.it.evil.com": (
         "appears only inside the comment in services/pdfextractor.py explaining "
         "why the SSRF guard compares hosts exactly"

@@ -86,7 +86,7 @@ export function LoginForm() {
             Le norme italiane ed europee, le sentenze che le leggono, e il tuo lavoro sopra: note, evidenziazioni, dossier.
           </p>
           <ul className="space-y-1.5 text-sm text-slate-500 dark:text-slate-400">
-            <li>Normattiva · EUR-Lex · Brocardi</li>
+            <li>Normattiva · EUR-Lex</li>
             <li>Cassazione · Corte costituzionale · Corte di giustizia</li>
             <li>Pratiche, dossier e schede di ripasso</li>
           </ul>

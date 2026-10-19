@@ -632,7 +632,7 @@
               "in": "query",
               "required": false,
               "type": "boolean",
-              "default": true
+              "default": false
             }
           ],
           "responses": {
@@ -6274,8 +6274,8 @@
         },
         "include_brocardi": {
           "type": "boolean",
-          "default": true,
-          "description": "Includere enrichment da Brocardi.it"
+          "default": false,
+          "description": "Ignorato: Brocardi non è più una fonte (D-078)"
         },
         "extract_entities": {
           "type": "boolean",

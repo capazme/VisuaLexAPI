@@ -119,7 +119,7 @@ class BatchIngestionPipeline:
         self,
         tipo_atto: str,
         article_numbers: List[str],
-        include_brocardi: bool = True,
+        include_brocardi: bool = False,
         include_multivigenza: bool = True,
     ) -> BatchIngestionResult:
         """
@@ -128,7 +128,7 @@ class BatchIngestionPipeline:
         Args:
             tipo_atto: Tipo atto (es. "codice civile")
             article_numbers: Lista numeri articoli
-            include_brocardi: Include enrichment Brocardi
+            include_brocardi: off: Brocardi is no longer a source (D-078)
             include_multivigenza: Include tracking modifiche
 
         Returns:

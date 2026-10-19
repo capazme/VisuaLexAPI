@@ -12,6 +12,7 @@ import { focusSearchFieldOrPalette } from '../../../utils/searchFieldControl';
 import { dossierRecency } from '../dossier/dossierUtils';
 import { kindLabel } from '../dossier/dossierKinds';
 import { greeting } from './scrivaniaGreeting';
+import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 
 const EXAMPLES = ['Art. 2043 c.c.', 'Art. 5 GDPR', 'Art. 1 Costituzione'];
 
@@ -65,7 +66,7 @@ export function Scrivania() {
               key={example}
               // The example goes into the field, ready to search with Enter or to be changed.
               onClick={() => focusSearchFieldOrPalette(example)}
-              className="font-serif text-lg text-primary-700 underline decoration-primary-300 decoration-1 underline-offset-4 transition-colors hover:decoration-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-300 dark:decoration-primary-700"
+              className={`${TOUCH_TARGET_RESPONSIVE} font-serif text-lg text-primary-700 underline decoration-primary-300 decoration-1 underline-offset-4 transition-colors hover:decoration-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-300 dark:decoration-primary-700`}
             >
               {example}
             </button>

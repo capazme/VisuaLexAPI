@@ -46,7 +46,9 @@ log = structlog.get_logger()
 # Canonical, ORDER-STABLE tool vocabulary. The index of each tool is the output
 # neuron of the MLP, so a saved checkpoint depends on this order — NEVER reorder
 # or remove an entry (append-only). Mirrors the union of
-# MultiExpertOrchestrator.EXPERT_MCP_TOOLS (kept in sync by the curated set).
+# MultiExpertOrchestrator.EXPERT_MCP_TOOLS (kept in sync by the curated set),
+# except `cerca_brocardi`: no expert is granted it any more (D-078), but its
+# neuron stays so that saved checkpoints still load.
 TOOL_VOCAB: Tuple[str, ...] = (
     "cite_law",
     "fetch_law_article",

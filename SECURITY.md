@@ -15,8 +15,6 @@ is actually enforced today:
 | `dati.cortecostituzionale.it` | Corte costituzionale — dati aperti (CC BY-SA 3.0) |
 | `www.giustizia-amministrativa.it` | Giustizia amministrativa — Consiglio di Stato e TAR (ricerca dei provvedimenti) |
 | `mdp.giustizia-amministrativa.it` | Giustizia amministrativa — Consiglio di Stato e TAR (testi dei provvedimenti) |
-| `brocardi.it` | Brocardi.it — annotazioni dottrinali (fonte privata) |
-| `www.brocardi.it` | Brocardi.it — annotazioni dottrinali (fonte privata) |
 | `www.portaledelmassimario.ipzs.it` | Portale del Massimario — Corte di cassazione (realizzazione Istituto Poligrafico e Zecca dello Stato) |
 
 The list lives as data in `visualex_api/tools/egress.py`.

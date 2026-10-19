@@ -171,3 +171,13 @@ describe('the interaction constants', () => {
     expect(css).toContain('.focus-visible\\:ring-offset-background');
   }, 30000);
 });
+
+describe('the scrollbars in dark mode', () => {
+  it('give the thumb its dark colour through a selector the browser keeps', async () => {
+    const css = await compile([]);
+    // `dark:` inside a pseudo-element's rule nests `&:where(.dark, .dark *)` after it, which is invalid.
+    expect(css).not.toMatch(/::-webkit-scrollbar[\w-]*(:hover)?\s*\{[^}]*&:where/);
+    expect(css).toMatch(/:where\(\.dark, \.dark \*\)::-webkit-scrollbar-thumb\s*\{[^}]*var\(--color-slate-700\)/);
+    expect(css).toMatch(/:where\(\.dark, \.dark \*\)::-webkit-scrollbar-thumb:hover\s*\{[^}]*var\(--color-slate-600\)/);
+  }, 30000);
+});

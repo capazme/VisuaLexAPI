@@ -114,15 +114,15 @@ Stream article results as NDJSON (Newline Delimited JSON). Ideal for large reque
 |-------|------|----------|-------------|
 | `act_type` | string | Yes | Act type |
 | `article` | string | Yes | Article(s) to fetch |
-| `show_brocardi_info` | boolean | No | Include Brocardi annotations (default: false) |
+| `show_brocardi_info` | boolean | No | Ignored: Brocardi is no longer a source (D-078) |
 | *(other fields same as `/fetch_norma_data`)* | | | |
 
 **Response:** `application/x-ndjson`
 
 Each line is a complete JSON object:
 ```
-{"article_text": "...", "norma_data": {...}, "url": "...", "brocardi_info": {...}}
-{"article_text": "...", "norma_data": {...}, "url": "...", "brocardi_info": null}
+{"article_text": "...", "norma_data": {...}, "url": "...", "validity": {...}}
+{"article_text": "...", "norma_data": {...}, "url": "..."}
 ```
 
 **Headers:**
@@ -134,48 +134,15 @@ Each line is a complete JSON object:
 
 ### POST `/fetch_brocardi_info`
 
-Retrieve Brocardi legal annotations (commentary, ratio, case law) for articles. Only available for Italian law sources (Normattiva), not EU sources.
-
-**Request Body:** Same as `/fetch_norma_data`
-
-**Response:**
-```json
-[
-  {
-    "norma_data": { ... },
-    "brocardi_info": {
-      "position": "art. 2043",
-      "link": "https://brocardi.it/codice-civile/libro-quarto/titolo-ix/capo-i/art2043.html",
-      "Brocardi": "Commentary text from Brocardi...",
-      "Ratio": "The underlying principle of this article...",
-      "Spiegazione": "Detailed explanation of the article...",
-      "Massime": [
-        "Cass. civ. n. 12345/2023: Case law summary...",
-        {
-          "title": "Cass. civ. n. 6789/2022",
-          "content": "Structured case law content...",
-          "source": "Cassazione civile"
-        }
-      ],
-      "Relazioni": "Related regulations...",
-      "RelazioneCostituzione": "Constitutional relevance...",
-      "Footnotes": ["[1] Reference note..."],
-      "RelatedArticles": ["2044", "2045", "2046"],
-      "CrossReferences": ["Art. 1218 c.c.", "Art. 1223 c.c."]
-    }
-  }
-]
-```
-
-**Notes:**
-- Returns `null` for `brocardi_info` when source is EUR-Lex or when not available
-- Brocardi data is scraped from brocardi.it
+**410 Gone.** Brocardi is no longer a source (D-078): the route answers
+`{"error": "Le annotazioni di Brocardi non sono più disponibili."}` without
+reading the request, until the proxies drop it.
 
 ---
 
 ### POST `/fetch_all_data`
 
-Combined endpoint returning both article text and Brocardi annotations in a single request. Uses a rate-limited task queue.
+Combined endpoint returning the article text and its `norma_data` in a single request. Uses a rate-limited task queue.
 
 **Request Body:** Same as `/fetch_norma_data`
 
@@ -186,7 +153,6 @@ Combined endpoint returning both article text and Brocardi annotations in a sing
     "article_text": "...",
     "url": "https://...",
     "norma_data": { ... },
-    "brocardi_info": { ... },
     "queue_position": 0
   }
 ]
@@ -899,10 +865,6 @@ Detailed health check with external service latency measurements.
     "eurlex": {
       "status": "ok",
       "latency_ms": 456.2
-    },
-    "brocardi": {
-      "status": "ok",
-      "latency_ms": 123.1
     }
   }
 }
@@ -987,26 +949,6 @@ interface NormaVisitata {
   data_versione: string | null;   // Historical version date
   allegato: string | null;        // Annex identifier
   urn: string;                    // Full URN with article
-}
-```
-
-### BrocardiInfo
-
-Legal annotations from Brocardi.it.
-
-```typescript
-interface BrocardiInfo {
-  position: string;
-  link: string;
-  Brocardi: string | string[];
-  Ratio: string | null;
-  Spiegazione: string | null;
-  Massime: (string | MassimaStructured)[];
-  Relazioni: string | null;
-  RelazioneCostituzione: string | null;
-  Footnotes: string[] | null;
-  RelatedArticles: string[] | null;
-  CrossReferences: string[] | null;
 }
 ```
 
