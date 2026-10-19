@@ -3,6 +3,42 @@
 Spec: `docs/superpowers/specs/2026-10-18-redesign-inchiostro-design.md`. Read it first; this plan does not
 repeat its reasons. Stamped on `origin/develop` at `8c006f41`.
 
+## Status and owners' decisions (19 October 2026)
+
+**Where it stands.** P0 is PR #199 (foundations, first surfaces) and P1 with most of P2 is PR #202, stacked
+on #199; both are open, CI green, and wait for the front-end owner's browser pass. They merge in that
+order. Every later phase branches from `origin/feat/inchiostro-primitivi` until both are merged, then from
+`origin/develop`, and its PR says which it is stacked on.
+
+**Decided by the owners.**
+- «Inchiostro» is the direction for the whole web app; the name of the empty search page is «Scrivania».
+- Section hues as in spec §4.1 (Opus toga, Gymnasium navy with the seal red, Academia bronze, Forum
+  verdigris). The executor has a free hand on buttons, shadows and animation inside the guardrails
+  below; a change to the hue rule of §4.1 (never on buttons, links or text) is named in the PR.
+- **Gymnasium is restyled in full, the review card included.** The clause of the Studia spec §6 that says
+  Studia «keeps its system» is superseded; so is the sentence in `apps/web/CLAUDE.md` that the card is
+  not to be restyled. The PR of the Gymnasium phase updates both in the same change. What does not
+  change is the review logic: the queue, the keys (space, 1–4, Esc), «Di nuovo» sending the card to the
+  back, the practice passes that are not recorded. It has its own tests and they stay green.
+- Defaults kept for the review card unless the front-end owner agrees otherwise in the PR: the card's
+  text in the reader's serif at a 60-character measure; a single motion, the reveal, honouring reduced
+  motion; the interval as the large text on the grade buttons, targets of 44 px.
+
+**Guardrails for every phase.** Root rule 23 (no character of a rendered text changes; `articleRender`
+and `decisionRender` tests unchanged); touch targets of 44 px; the contrast test of P0 green; reduced
+motion honoured; no test skipped or deleted; Italian copy; no server, schema or data change; no names of
+people in the repository; `apps/web/CLAUDE.md` updated wherever a rule or a gotcha changes.
+
+**Loop with the front-end owner.** The executor opens the PR, waits for CI, then writes a register
+entry addressed to the front-end owner's session saying which phase is ready and what to look at. The
+browser pass at 1366 and 390 px, light and dark, is made on the development machine, never on the
+deployment host; the findings come back in the register and the executor fixes them in the same PR. The
+front-end owner's ok comes after that pass. One phase at a time ready for review, so that each
+notification means one thing to look at.
+
+**Order.** #199 and #202 → P3 shell → P4 surfaces 1–6 and 8 → G (Gymnasium) → P5 signature motion → P6 QA.
+G starts only after its spec exists (see below). P3 and P4 may be reordered by the front-end owner.
+
 ## How to run this plan
 
 This plan is written to be executed by a separate Claude Code session with no memory of the session
@@ -25,6 +61,13 @@ that wrote it, possibly on the deployment host.
    attached to the PR; an independent review in a fresh context with every finding fixed.
 6. Do not merge: the front-end owner's ok comes after the browser pass. Merge title:
    `merge: feat/inchiostro-<phase> — <what changes>`.
+
+The executing session installs the design skills at project scope, in its own worktree and never
+committed: the plugins `impeccable`, `taste-skill`, `ui-ux-pro-max` and `superpowers`, and the skills of
+`emilkowalski/skills` and `nutlope/hallmark` named below. Read each one's hooks, scripts and MCP servers
+before installing; skip any that asks for credentials or writes outside the worktree. `impeccable`,
+`taste-skill` and `ui-ux-pro-max` complement the table for P3, P4, G and P5: use them to propose the
+look, then `break-ui` and `review-animations` to check it.
 
 Skills by phase (installed in the owner's Claude Code):
 
@@ -271,9 +314,25 @@ Run `hallmark redesign <surface>` with the spec as the locked system (the spec p
 4. Dossier list and detail.
 5. Academia hub (`/merlt`): rows instead of six cards.
 6. Forum.
-7. Gymnasium — shared tokens and fonts only; `ReviewCard` keeps Studia spec §6 unless both owners
-   decide otherwise (spec §10.2).
+7. Gymnasium — no longer shared tokens only: see phase G below.
 8. driver.js tours — style `.driver-popover` to the paper surface.
+
+## G — Gymnasium restyle (after P4)
+
+Why: both owners want the Studia area more usable and more beautiful, and its present look fits the rest
+of the app poorly. Scope: the whole area (`components/features/studia/` and what it renders: the review,
+`schede`, `valida`, `progress` and the admin texts), the review card included.
+
+1. **Spec first.** Before any code, the front-end owner's session writes
+   `docs/superpowers/specs/2026-10-19-gymnasium-restyle-design.md` from a walk-through of the four
+   screens, at 1366 and 390 px, light and dark. The executor does not start G until that file is on
+   `develop` or on the branch it stacks on, and the front-end owner has said it is approved.
+2. Then one PR per screen, in the order the spec gives, each with `break-ui` and the browser pass.
+3. The review PR rewrites §6 of `docs/superpowers/specs/2026-10-07-studia-cards-screens-design.md` and
+   the review-card sentence of `apps/web/CLAUDE.md`, and leaves the review logic and its tests intact.
+4. Acceptance: the logic tests of `Ripasso` and `GradeBar` pass unchanged; the keys still work with
+   focus on any of the buttons; the grade bar stays pinned at the bottom on a phone, under the mobile
+   menu's backdrop.
 
 ## P5 — Signature motion (one PR each)
 
