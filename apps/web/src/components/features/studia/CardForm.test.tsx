@@ -296,6 +296,62 @@ describe('CardForm, opened from an article', () => {
   });
 });
 
+describe('CardForm, opened with no article (Le mie schede)', () => {
+  it('starts with no anchor, the reference field open, and the focus on the subject', () => {
+    const focus = { current: null as HTMLElement | null };
+    render(<CardForm mode={{ kind: 'create' }} onSaved={vi.fn()} onCancel={vi.fn()} initialFocusRef={focus} />);
+    expect(screen.queryByText('principale')).not.toBeInTheDocument();
+    const field = screen.getByLabelText('Riferimento dell’ancora');
+    expect(field).not.toHaveFocus();
+    expect(focus.current).toBe(screen.getByLabelText('Materia'));
+    expect(screen.getByLabelText('Materia')).toHaveValue('');
+  });
+
+  it('sends the references typed as anchors, the first one primary', async () => {
+    const user = userEvent.setup();
+    create.mockResolvedValue({ outcome: 'created', id: 'new-9' });
+    const { onSaved } = renderForm({ kind: 'create' });
+    await user.selectOptions(screen.getByLabelText('Materia'), 'DIRITTO_CIVILE');
+    await fillRequired(user);
+    await user.type(screen.getByLabelText('Riferimento dell’ancora'), 'art. 1455 c.c.{Enter}');
+    await user.click(screen.getByRole('button', { name: '+ Ancora' }));
+    expect(screen.getByLabelText('Riferimento dell’ancora')).toHaveFocus();
+    // Typed and not added: «Salva» keeps it.
+    await user.type(screen.getByLabelText('Riferimento dell’ancora'), 'art. 1453 c.c.');
+    await user.click(screen.getByRole('button', { name: 'Salva' }));
+    expect(create).toHaveBeenCalledWith({
+      materia: 'DIRITTO_CIVILE', istituto: 'Risoluzione', tipo: 'ISTITUTO_DEFINIZIONE', domanda: 'Quando?', risposta: 'Se inadempiente.',
+      ancore: [
+        { riferimento: 'art. 1455 c.c.', principale: true },
+        { riferimento: 'art. 1453 c.c.', principale: false },
+      ],
+    });
+    expect(onSaved).toHaveBeenCalledWith('new-9');
+  });
+
+  it('asks for an anchor when none is typed, and sends nothing', async () => {
+    const user = userEvent.setup();
+    renderForm({ kind: 'create' });
+    await user.selectOptions(screen.getByLabelText('Materia'), 'DIRITTO_CIVILE');
+    await fillRequired(user);
+    await user.click(screen.getByRole('button', { name: 'Salva' }));
+    expect(screen.getByText('Aggiungi almeno un’ancora')).toBeInTheDocument();
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('marks a reference the parser does not read with the example to follow, and every typed anchor can be taken out', async () => {
+    const user = userEvent.setup();
+    create.mockResolvedValue({ outcome: 'refused', detail: 'x', anchors: [{ reference: 'codice del nulla', outcome: 'not_recognised', detail: 'not recognised' }] });
+    renderForm({ kind: 'create' });
+    await user.selectOptions(screen.getByLabelText('Materia'), 'DIRITTO_CIVILE');
+    await fillRequired(user);
+    await user.type(screen.getByLabelText('Riferimento dell’ancora'), 'codice del nulla');
+    await user.click(screen.getByRole('button', { name: 'Salva' }));
+    expect(await screen.findByText('Atto non riconosciuto: scrivi articolo e atto, ad esempio «art. 1453 c.c.».')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Togli l’ancora codice del nulla' })).toBeInTheDocument();
+  });
+});
+
 describe('CardForm, editing a draft', () => {
   it('opens on the card, with its anchors as chips the person can take out', async () => {
     const user = userEvent.setup();
