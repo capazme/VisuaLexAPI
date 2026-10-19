@@ -4,6 +4,8 @@ import type {
   ArticleDiscussionThread,
   ArticleDiscussionComment,
   ArticleDiscussionPassageSummary,
+  GlossaFeedResponse,
+  GlossaFeedSort,
   ThreadPassage,
 } from '../types';
 
@@ -31,6 +33,13 @@ const passagesKey = (anchor: Pick<DiscussionAnchor, 'normaKey' | 'articleId'>) =
 export const articleDiscussionService = {
   async list(anchor: DiscussionAnchor, sort: 'recent' | 'active' | 'popular' = 'recent'): Promise<ArticleDiscussionResponse> {
     const response = await apiClient.get('/article-discussions', { params: { ...anchor, sort } });
+    return response.data;
+  },
+  /** Every visible glossa, of every article and decision: the Forum's «Glosse». */
+  async feed(query: {
+    sort?: GlossaFeedSort; kind?: 'article' | 'decision'; act?: string; normaKey?: string; page?: number; limit?: number;
+  } = {}): Promise<GlossaFeedResponse> {
+    const response = await apiClient.get('/article-discussions/feed', { params: query });
     return response.data;
   },
   listPassages(anchor: Pick<DiscussionAnchor, 'normaKey' | 'articleId'>): Promise<ArticleDiscussionPassageSummary[]> {

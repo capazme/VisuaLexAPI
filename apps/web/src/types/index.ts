@@ -644,6 +644,41 @@ export interface ArticleDiscussionPassageSummary {
     user: { id: string; username: string };
 }
 
+/** The Forum's orders of the glosse: newest, most voted, latest activity, none answered yet. */
+export type GlossaFeedSort = 'recent' | 'popular' | 'active' | 'unanswered';
+
+/**
+ * One glossa in the Forum's feed (`GET /article-discussions/feed`): no replies, an excerpt of the
+ * body. A decision's quotation is withheld (`quote: null`) unless an admin released it or the
+ * reader wrote it; the feed holds no text to tell whether its words are still there.
+ */
+export interface GlossaFeedItem {
+    id: string;
+    title: string;
+    excerpt: string;
+    normaKey: string;
+    articleId: string;
+    articleLabel: string | null;
+    version: string | null;
+    articleUrn: string | null;
+    target: { kind: 'article' } | { kind: 'decision'; key: string };
+    /** «Cass. civ., n. 31310/2024», from the server; null on an article. */
+    decisionLabel: string | null;
+    passage: { quote: string | null; withheld: boolean } | null;
+    user: { id: string; username: string };
+    voteCount: number;
+    userVoted: boolean;
+    commentCount: number;
+    createdAt: string;
+    lastActivityAt: string;
+    isOwner: boolean;
+}
+
+export interface GlossaFeedResponse {
+    data: GlossaFeedItem[];
+    pagination: { page: number; limit: number; total: number; pages: number };
+}
+
 export interface ArticleDiscussionResponse {
     data: ArticleDiscussionThread[];
     pagination: { page: number; limit: number; total: number; pages: number };

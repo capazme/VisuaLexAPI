@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Upload, Users, Package, Lightbulb } from 'lucide-react';
+import { Search, Upload, Users, Package, Lightbulb, MessageSquare } from 'lucide-react';
 import { AddToMyDossiersDialog } from './AddToMyDossiersDialog';
 import { PublishDossierPicker } from './PublishDossierPicker';
 import { ReportModal } from './ReportModal';
@@ -12,6 +12,7 @@ import { AliasConflictDialog } from './AliasConflictDialog';
 import { ForumExploreView, type SortOption } from './ForumExploreView';
 import { ForumMyEnvironmentsView } from './ForumMyEnvironmentsView';
 import { ForumSuggestionsView } from './ForumSuggestionsView';
+import { ForumGlosseView } from './ForumGlosseView';
 import { ArchivedEnvironmentsSection } from './ArchivedEnvironmentsSection';
 import { SharedLinkImport } from './SharedLinkImport';
 import { Toast } from '../../ui/Toast';
@@ -25,7 +26,7 @@ import { notificationService } from '../../../services/notificationService';
 import { publishMerltEvent, MERLT_EVENT_TYPES } from '../../../features/merlt/merltEventBus';
 import type { SharedEnvironment, EnvironmentCategory, SharedEnvironmentListResponse, EnvironmentSuggestion, StudyImportReport } from '../../../types';
 
-type TabType = 'explore' | 'my' | 'suggestions';
+type TabType = 'explore' | 'glosse' | 'my' | 'suggestions';
 
 export function BulletinBoardPage() {
   // Tab state
@@ -433,6 +434,17 @@ export function BulletinBoardPage() {
           Esplora
         </button>
         <button
+          onClick={() => setActiveTab('glosse')}
+          className={`flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:px-4 md:min-h-0 ${
+            activeTab === 'glosse'
+              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <MessageSquare size={16} className="hidden sm:block" aria-hidden />
+          Glosse
+        </button>
+        <button
           onClick={() => setActiveTab('my')}
           className={`flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:px-4 md:min-h-0 ${
             activeTab === 'my'
@@ -494,6 +506,8 @@ export function BulletinBoardPage() {
           }}
         />
       )}
+
+      {activeTab === 'glosse' && <ForumGlosseView />}
 
       {activeTab === 'my' && (
         <ForumMyEnvironmentsView
