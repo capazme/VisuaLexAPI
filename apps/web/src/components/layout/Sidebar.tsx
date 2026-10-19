@@ -42,6 +42,13 @@ interface NavItemProps {
   layout: SidebarLayout;
 }
 
+/**
+ * The colour of the bar's 11 px texts (the groups' headings, the shortcut): AA for small text, 4.5:1, on
+ * the bar's glass over the page and over the phone's backdrop, light and dark (`theme.test.ts`). Slate 500
+ * and 400 fell short (3.8 and 2.6 on the light drawer, 3.8 for the dark shortcut).
+ */
+export const SIDEBAR_SMALL_TEXT = 'text-slate-600 dark:text-slate-400';
+
 /** The palette's shortcut as this keyboard writes it. */
 const PALETTE_SHORTCUT = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform) ? '⌘K' : 'Ctrl K';
 
@@ -205,7 +212,7 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint, layout 
           )}
           {/* The shortcut, for a keyboard: not in the phone's drawer. */}
           {layout === 'wide' && hint && !showBadge && (
-            <kbd aria-hidden className="ml-2 shrink-0 font-sans text-[11px] text-slate-400 dark:text-slate-500">{hint}</kbd>
+            <kbd aria-hidden className={cn("ml-2 shrink-0 font-sans text-[11px]", SIDEBAR_SMALL_TEXT)}>{hint}</kbd>
           )}
 
           {/* Active indicator dot */}
@@ -243,7 +250,7 @@ function NavGroup({ name, heading, layout, children }: { name: string; heading?:
   return (
     <div role="group" aria-label={name} className="flex w-full flex-col items-start gap-3 md:gap-2">
       {heading && layout !== 'rail' && (
-        <p aria-hidden className="w-full truncate whitespace-nowrap px-3 pt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">
+        <p aria-hidden className={cn("w-full truncate whitespace-nowrap px-3 pt-1 text-[11px] font-semibold uppercase tracking-[0.08em]", SIDEBAR_SMALL_TEXT)}>
           {name}
         </p>
       )}
@@ -444,7 +451,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
             </>
           )}
           {(section === 'opus' || section === 'forum' || (section === 'academia' && showAssistant)) && words && (
-            <p aria-hidden className="w-full truncate whitespace-nowrap px-3 pt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">
+            <p aria-hidden className={cn("w-full truncate whitespace-nowrap px-3 pt-1 text-[11px] font-semibold uppercase tracking-[0.08em]", SIDEBAR_SMALL_TEXT)}>
               {active.name}
             </p>
           )}

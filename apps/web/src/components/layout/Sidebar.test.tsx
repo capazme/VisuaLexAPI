@@ -11,7 +11,7 @@ vi.mock('../../hooks/useForumNotifications', () => ({
   useForumNotifications: () => ({ count: { total: 3, normaChanges: notices.normaChanges }, markRead: vi.fn(), refetch: vi.fn() }),
 }));
 
-import { Sidebar } from './Sidebar';
+import { Sidebar, SIDEBAR_SMALL_TEXT } from './Sidebar';
 import { appStore } from '../../store/useAppStore';
 import { subscribeSearchField } from '../../utils/searchFieldControl';
 import { sectionStore } from '../../features/sections/useSection';
@@ -532,6 +532,13 @@ describe('Sidebar — the words', () => {
     renderLayout('rail', '/studia/ripasso');
     expect(screen.queryByText('Studia')).toBeNull();
     expect(screen.getByRole('link', { name: 'Oggi' }).textContent).toBe('');
+  });
+
+  it('draws its 11 px texts, the headings and the shortcut, in the colour that keeps AA (theme.test.ts)', () => {
+    renderLayout('wide', '/studia/ripasso');
+    expect(within(screen.getByRole('group', { name: 'Studia' })).getByText('Studia')).toHaveClass(...SIDEBAR_SMALL_TEXT.split(' '));
+    const shortcut = screen.getByRole('link', { name: 'Ricerca' }).querySelector('kbd') as HTMLElement;
+    expect(shortcut).toHaveClass('text-[11px]', ...SIDEBAR_SMALL_TEXT.split(' '));
   });
 
   it('shows no hover label where the word is written', () => {

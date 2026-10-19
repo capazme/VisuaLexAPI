@@ -132,6 +132,40 @@ describe('the Inchiostro palette', () => {
     expect(ratio(rgb('ink-400'), rgb('ink-950'))).toBeGreaterThanOrEqual(7);
     expect(ratio(rgb('toga-400'), rgb('ink-950'))).toBeGreaterThanOrEqual(6.5);
   });
+
+  it('keeps the sidebar\'s 11 px texts at AA on its glass, over the page and over the phone\'s backdrop', () => {
+    // `SIDEBAR_SMALL_TEXT` (Sidebar.tsx): slate 600 in light, slate 400 in dark (slate is ink). The aside is
+    // white/80 (dark: slate-900/80) over the page (slate-50 / slate-950) or, as the phone's drawer, over the
+    // backdrop slate-900/50. Browsers composite in gamma sRGB.
+    const source = readFileSync(CSS_PATH, 'utf8');
+    const linear = (name: string): number[] => {
+      const m = source.match(new RegExp(`--color-${name}:\\s*oklch\\(([\\d.]+)%\\s+([\\d.]+)\\s+([\\d.]+)\\)`));
+      if (!m) throw new Error(`--color-${name} not found`);
+      const [L, C, H] = [Number(m[1]) / 100, Number(m[2]), (Number(m[3]) * Math.PI) / 180];
+      const a = C * Math.cos(H), b = C * Math.sin(H);
+      const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+      const mm = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+      const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+      return [
+        4.0767416621 * l - 3.3077115913 * mm + 0.2309699292 * s,
+        -1.2684380046 * l + 2.6097574011 * mm - 0.3413193965 * s,
+        -0.0041960863 * l - 0.7034186147 * mm + 1.707614701 * s,
+      ].map((v) => Math.min(1, Math.max(0, v)));
+    };
+    const gamma = (v: number) => (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
+    const unGamma = (v: number) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+    const over = (fg: number[], alpha: number, bg: number[]) => fg.map((c, i) => unGamma(alpha * gamma(c) + (1 - alpha) * gamma(bg[i])));
+    const lum = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    const ratio = (x: number[], y: number[]) => {
+      const [hi, lo] = [lum(x), lum(y)].sort((p, q) => q - p);
+      return (hi + 0.05) / (lo + 0.05);
+    };
+    const backdrop = (page: number[]) => over(linear('ink-900'), 0.5, page);
+    const light = [linear('ink-50'), backdrop(linear('ink-50'))].map((under) => over([1, 1, 1], 0.8, under));
+    const dark = [linear('ink-950'), backdrop(linear('ink-950'))].map((under) => over(linear('ink-900'), 0.8, under));
+    for (const bg of light) expect(ratio(linear('ink-600'), bg)).toBeGreaterThanOrEqual(4.5);
+    for (const bg of dark) expect(ratio(linear('ink-400'), bg)).toBeGreaterThanOrEqual(4.5);
+  });
 });
 
 describe('the entrance utilities', () => {
