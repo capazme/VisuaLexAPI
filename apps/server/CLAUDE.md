@@ -522,6 +522,16 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   columns are `TIMESTAMP` without a zone holding UTC, and `AT TIME ZONE 'Europe/Rome'` alone
   reads them as Rome time (off by one or two hours). A `DATE` column travels through Prisma as
   UTC midnight: `dayToDate` / `dateToDay`, never `romeDay`.
+- **The read by institute** — `GET /api/lingo/srs/percorso?materia=` (`lingo/percorso.ts`; spec
+  `docs/superpowers/specs/2026-10-19-gymnasium-restyle-design.md` §6, G5). Answers `[{ materia, istituto, nuove, apprendimento, consolidate, dovute }]`, sorted by
+  subject then institute, over exactly the cards the session may offer (`reviewScope`: one's own
+  drafts / proposed / validated cards plus the community's validated ones in the subjects of
+  `materieComunita`; `materia` optional). Same institute name in two subjects = two rows. `nuove`: no review
+  state of the user; `apprendimento` / `consolidate`: reviewed, interval under / at least
+  `CONSOLIDATED_DAYS` (`maturity`, the split of `stati` in the progress read); these three partition the
+  cards. `dovute`: reviewed and `dueAt` before the end of today in Rome (`startOfRomeDay(today, 1)`, overdue
+  included), a **subset** of `apprendimento + consolidate`, not capped by the daily goal. No migration; it
+  counts new cards with a `groupBy` (`newCardsWhere`) and reads only the user's review states, as the progress read does.
 - **`lingo/studyDay.ts`** — what «a day» is (spec decision 18): `romeDay`, `daysBetween`
   and `startOfRomeDay`, on `Intl` alone, the same under any `TZ`. `startOfRomeDay` takes
   Rome's offset at the UTC-midnight guess and subtracts it: exact, because Rome changes
