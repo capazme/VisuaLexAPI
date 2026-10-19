@@ -23,6 +23,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 from merlt.pipeline.provisional_writer import PROVENANCE_LIVE_UNCONFIRMED
+from merlt.storage.graph.brocardi_guard import is_brocardi
 
 log = structlog.get_logger()
 
@@ -38,6 +39,7 @@ async def list_pending_review(graph_client, *, limit: int = 100) -> List[Dict[st
         WHERE n.provenance = $prov AND n.review_status = $status
         RETURN n.node_id AS node_id, n.source_url AS source_url,
                coalesce(n.testo, n.text) AS text,
+               n.source_tool AS source_tool, n.fonte AS fonte,
                n.trust AS trust, n.usage_count AS usage_count,
                n.positive_feedback_count AS positive_feedback_count,
                n.has_confirmed_citation AS has_confirmed_citation,
@@ -57,6 +59,12 @@ async def list_pending_review(graph_client, *, limit: int = 100) -> List[Dict[st
         txt = d.get("text") or ""
         d["text_preview"] = (txt[:280] + "…") if len(txt) > 280 else txt
         d.pop("text", None)
+        # Brocardi's text never reaches a reviewer (D-078). A live source is
+        # labelled Dottrina only when a Brocardi tool wrote it
+        # (provisional_writer._DOTTRINA_TOOL_HINTS), and a node merged later by
+        # URL keeps its first `source_tool`, so the label decides too.
+        if is_brocardi(d) or "Dottrina" in (d.get("labels") or []):
+            d["text_preview"] = ""
         out.append(d)
     return out
 

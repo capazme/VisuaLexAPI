@@ -584,12 +584,6 @@ async def get_architecture_diagram(
             metrics={"description": "Testi ufficiali delle leggi italiane"},
         ),
         ArchitectureNode(
-            id="brocardi",
-            label="Brocardi",
-            type="source",
-            metrics={"description": "Enrichment: spiegazioni, massime, ratio legis"},
-        ),
-        ArchitectureNode(
             id="eurlex",
             label="EUR-Lex",
             type="source",
@@ -681,7 +675,6 @@ async def get_architecture_diagram(
     edges = [
         # Sources -> Pipeline
         ArchitectureEdge(source="normattiva", target="pipeline", animated=True),
-        ArchitectureEdge(source="brocardi", target="pipeline", animated=True),
 
         # Pipeline -> Storage
         ArchitectureEdge(source="pipeline", target="falkordb"),
@@ -812,12 +805,6 @@ async def get_node_details(
             "description": "Fonte ufficiale dei testi legislativi italiani.",
             "config": {},
             "links": {"docs": "https://www.normattiva.it"},
-        },
-        "brocardi": {
-            "label": "Brocardi",
-            "description": "Enrichment con spiegazioni, massime, ratio legis.",
-            "config": {},
-            "links": {"docs": "https://www.brocardi.it"},
         },
         "eurlex": {
             "label": "EUR-Lex",

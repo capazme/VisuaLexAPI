@@ -97,6 +97,7 @@ from merlt.storage.enrichment import (
     # Promotion provenance
     UserDocument,
 )
+from merlt.storage.graph.brocardi_guard import is_brocardi
 from merlt.storage.graph.client import FalkorDBClient
 from merlt.storage.graph.entity_writer import (
     EntityGraphWriter,
@@ -1992,6 +1993,13 @@ async def get_pending(
     # queue (written before the write-site gate existed). The backfill deletes
     # them for good; this protects the read path in the meantime.
     entities = [e for e in entities if is_valid_entity_name(e.entity_text, e.entity_type)]
+    # Brocardi's text never reaches a validator (D-078): an entity still marked
+    # as Brocardi's is left out. One saved with `fonte="llm_extraction"` can no
+    # longer be told apart.
+    entities = [
+        e for e in entities
+        if not is_brocardi({"fonte": e.fonte, "source_url": e.source_reference})
+    ]
 
     # Convert to PendingEntityData
     pending_entities = [

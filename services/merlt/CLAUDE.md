@@ -342,4 +342,14 @@ that stack's own database, and the tests write rows. The Dockerfile copies
   hand it to every expert), and `cite_law` never gets `include_annotations`
   (`tools/mcp_legal_adapter._BROCARDI_ARGUMENTS`). Its slot in `TOOL_VOCAB`
   stays: the vocabulary is append-only. The Brocardi data already in the graph
-  and in Qdrant stays until the owners decide on a purge.
+  and in Qdrant stays (the owners' decision), but **its text never reaches a
+  user**: `storage/graph/brocardi_guard.py` recognises it (its `fonte`, the
+  `massima_`/`dottrina_…` ids, the Brocardi-only source types, a brocardi.it
+  URL) and takes the text out, keeping the ids and, for a massima, its decision's
+  `estremi`. It runs on every tool result in `BaseTool.__call__` (so before any
+  LLM prompt and any trace), on every node `graph_router._parse_graph_node_v2`
+  returns, on the provisional-review rows, on the validation queue, and on the
+  stored turns `/experts/history` and `/experts/trace` read back (a turn stored
+  before the guard has no `brocardi_guard` mark in `full_trace`, and its retrieval
+  summaries and non-norm excerpts are emptied). A new path that hands graph or
+  vector text to a user or to an LLM goes through it.
