@@ -1572,6 +1572,11 @@ meant to stay split; add new features as new files, not inside the shells:
     «Inchiostro» one (spec `2026-10-18-redesign-inchiostro`): `slate`, `gray`,
     `zinc`, `neutral` are aliases of `ink`, `blue`, `indigo`, `primary-<n>` of
     `toga`; motion curves for Framer Motion live in `lib/motion.ts`.
+    A `dark:` variant `@apply`'d inside a pseudo-element's rule is just as silent:
+    it compiles to `::-webkit-scrollbar-thumb:where(.dark, .dark *)`, which the
+    browser drops (until 19 October 2026 every dark scrollbar kept its light
+    thumb). Write the dark scope before the pseudo-element,
+    `:where(.dark, .dark *)::…`, as `index.css` does; `theme.test.ts` checks it.
 
 30. **A bare `fetch` to a scraping route works in development and answers 401 in
     production.** Vite proxies those routes to the Python API with no login; the ingress

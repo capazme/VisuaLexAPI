@@ -409,13 +409,25 @@
   background: transparent;
 }
 
+/* The dark thumb is a rule of its own: `@apply dark:…` here compiles to
+   `::-webkit-scrollbar-thumb:where(.dark, .dark *)`, a pseudo-class after a
+   pseudo-element, which the browser drops, so every dark scrollbar kept the
+   light thumb. The dark scope goes before the pseudo-element instead. */
 ::-webkit-scrollbar-thumb {
-  @apply bg-slate-300 dark:bg-slate-700 rounded-full;
+  @apply bg-slate-300 rounded-full;
   transition: background-color 0.15s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-slate-400 dark:bg-slate-600;
+  @apply bg-slate-400;
+}
+
+:where(.dark, .dark *)::-webkit-scrollbar-thumb {
+  @apply bg-slate-700;
+}
+
+:where(.dark, .dark *)::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-600;
 }
 
 /* The page's height: the dynamic viewport where it is supported (a phone browser's `100vh` is taller
