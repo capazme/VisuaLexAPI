@@ -180,6 +180,10 @@ institutes is imposed (that would be a decision about content, not about layout)
 - **Later, with the server read of G5:** «N da ripassare» per subject and per institute; inside a subject,
   one stop per **institute** («Risoluzione per inadempimento»), with the same bar and «N da ripassare»,
   sorted by the cards due first.
+  *Built on 19 October (G5):* the subjects keep their order (by cards open, then name) when the read by
+  institute answers, so the stops do not move under the reader's hand; a subject's institutes open in place
+  under it, from a disclosure «Istituti (N)», the first eight shown and the rest on request; a tap on an
+  institute starts the session narrowed to it (`GET /lingo/srs/sessione?materia=&istituto=`).
 
 The road is drawn as a vertical path of stops joined by a line in the section hue; on a computer it may
 sit beside the action card. Stops are buttons (`aria-pressed` where they filter), the state is also
@@ -211,7 +215,9 @@ The session becomes a screen of its own:
 - **The lesson frame**: the area's sidebar and its floating buttons are out of the way while the lesson
   runs. The executor uses what the shell already offers (the focus mode) if it does that; otherwise a
   page-level frame inside `StudiaPage`. `Layout.tsx` is not touched without reserving it in the register,
-  and the PR says which way was taken.
+  and the PR says which way was taken. *Taken in G2:* the frame inside `StudiaPage` (`LessonFrame`, portalled
+  over the shell in a band of its own, Tab kept inside it); Focus mode is a saved setting that leaves its own
+  button and the feedback button on screen, and `Layout.tsx` is untouched.
 - **The end**: the sentence («Hai ripassato 23 schede, 4 da rifare. Le prossime: domani.»), the ring and
   the streak as now, and two buttons: «Torna a Oggi» and, if cards are left, «Continua».
 - The celebration (progress spec §6.4) is kept as it is: once a day, 1.5 s, beside the card, never on top.

@@ -52,7 +52,7 @@ export function ReadingFullScreen({ onCrossReference }: ReadingFullScreenProps) 
           {title}
         </h3>
       </header>
-      {/* The back control and the services pill float over the bottom edge: the body keeps clear of them. */}
+      {/* The back control and the feedback button float over the bottom edge: the body keeps clear of them. */}
       <div data-reading-window-body className="min-h-0 flex-1 overflow-y-auto px-3 pb-28 pt-3">
         <ReadingWindowBody practiceId={reader.practiceId} besideRef={reader.ref} subject={subject} onCrossReference={onCrossReference} />
       </div>

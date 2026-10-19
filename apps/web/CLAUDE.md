@@ -37,8 +37,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   card read-only (`ArticleReadOnly`: the reader's text, copy only, no marks; on a phone a collapsed «Testo
   dell'articolo»); `VoteBar` sends Approvata at once and asks a reason for Migliorabile and Errata, and sits
   `sticky bottom-0` at every width (the keyboard moves to the next card's heading after a vote, back to the
-  verdict after «Annulla»; `Layout` hides the floating feedback button and the services pill
-  (`ServiceHealthBanner`) below `md` on this route, as in a review session, where they would cover the verdicts); the subject is remembered in `localStorage`; a vote that outlives a subject
+  verdict after «Annulla»; `Layout` hides the floating feedback button below `md` on this route, as in a review
+  session, where it would cover the verdicts); the subject is remembered in `localStorage`; a vote that outlives a subject
   change only marks its card handled, and a 403 stops the queue with «Non sei più tra i validatori»),
   `/history`, `/forum` («Dossier pubblici»; `/environments`, the page «Ambienti» was, redirects there keeping an old
   share link's `?import=`), `/forum/community` («Community», `ForumCommunityPage`: an honest placeholder — the
@@ -110,13 +110,23 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   motion) and the words are clipped as it moves. With words the user menu opens over its button, not beside,
   and the button's name carries the username it shows («Menu utente di …», label in name).
   `Layout` sets the column's drawn width on its root as `--sidebar-width` (224, 64, or 0 hidden or in Focus
-  mode); the services pill (`ServiceHealthBanner`) starts 2 rem after it from `lg`, so it is never under the bar.
+  mode), for what would float beside it from `lg`: nothing does since the services pill went into the user menu (S1).
   The bar's 11 px texts (headings, shortcut) are `SIDEBAR_SMALL_TEXT`, slate 600 / dark slate 400: AA for small
   text on the glass over the page and over the phone's backdrop; `theme.test.ts` composites and checks it.
   The narrow/widen control is `SIDEBAR_TOGGLE_TEXT`, the entries' words' colour (slate 700 / dark slate 300). At the bottom only the user menu, whose dropdown holds Impostazioni,
   Cronologia (moved there by the owner, 13 Oct 2026; the saved norms that changed are counted on the avatar
   and beside the entry, and both names say it in words: «Menu utente, 2 norme salvate cambiate»),
-  «Collega un'app AI», the theme, «Scorciatoie (?)», «Pannello Admin» (admins) and «Esci». The dropdown is a portalled WAI-ARIA
+  «Collega un'app AI», the services' status, the theme, «Scorciatoie» (no «(?)» since S1: the `?` key still opens it),
+  «Pannello Admin» (admins) and «Esci». **The services' status** (S1, 19 Oct 2026; it was a pill fixed at the bottom left,
+  over the foot of the page on a phone) is `ui/ServiceHealthMenuEntry`: the status icon and phrase («Servizi operativi»,
+  «Alcune fonti non disponibili», «Servizio non raggiungibile», «Controllo servizi…», `utils/serviceHealth`; a screen
+  reader hears «Stato dei servizi:» first); a tap opens, inside the menu, each service with its state and latency
+  (`menuitem`s that do nothing, so the arrows read them, named «Backend dati utente: OK, 12 ms»; not `aria-disabled`,
+  read as "unavailable") and «Ricontrolla», which keeps the menu open; it opens folded each time. `Layout` runs the one `useServiceHealth` and
+  hands the reading to both copies of the sidebar; when it is degraded or offline (not while checking) an amber dot
+  (`ServiceHealthDot`) sits at the foot of the avatar — clear of the count of changed norms — and, below `lg`, on the
+  floating menu button, and both names end with the phrase («Menu utente di …, alcune fonti non disponibili»). The menu
+  grows upwards and scrolls rather than leave a low window. The dropdown is a portalled WAI-ARIA
   menu (`role="menu"`/`menuitem`): focus goes to the first entry on open (ArrowUp opens on the last), the arrows,
   Home and End move, Esc closes and returns focus to the avatar, Tab closes and goes on from the avatar, the
   backdrop closes; entries are 44 px high on a phone. Below `lg` the menu opens from a floating button
@@ -482,7 +492,8 @@ Browser floor: the Highlight API (Chrome/Edge 105, Safari 17.2, Firefox 140). `a
 The «?» dialog lists Cmd/Ctrl+F as «Cerca nel testo».
 
 **Card review** (`/studia/ripasso`, `ReviewHome` with `StudyPreferences`; the session is
-`/studia/ripasso/sessione?materia=`, `ReviewSession`): the server builds the day's queue and decides
+`/studia/ripasso/sessione?materia=&istituto=`, `ReviewSession`; `istituto` is read only with a known `materia`, as the
+server refuses one alone, and passed back as the road spelt it): the server builds the day's queue and decides
 what «today» is (Studia spec decision 18), so the web app never computes a due date; the one exception,
 `nextReviewLabel`'s «Da ripassare oggi», is a display label. `useReviewSession` holds the queue: a card's
 first grade is posted, «Di nuovo» puts it back at the end, and its later passes that day are practice,
@@ -491,15 +502,43 @@ Its key handler reads the queue from refs and every queue update checks the head
 card: a second key pressed between a post resolving and the re-render must not drop the next card.
 Keys: space reveals (ignored on a focused button or link, in a field, under an `aria-modal` dialog or a
 `data-find-overlay` layer), 1–4 grade after the reveal, Esc closes the article first, then asks
-«Interrompere il ripasso?»; listed in the «?» dialog's «Ripasso» group. The visual rule of the review
-card (`ReviewCard`) is the spec's §6 and is not to be restyled: the anchor's citation small in slate sans
-above, question and answer in the reader's serif at a 60ch measure, the question a step larger, no
-shadow or gradient; the reveal is the card's one motion (the dashboard's celebration never touches the card) (a hairline, then the answer, `motion-safe:`
-only); on `GradeBar` the interval is the large text and the grade the small one, every button neutral
-but «Di nuovo» (warning tone), pinned at the bottom on a phone in the `pinnedBar` band (under the mobile
-menu's backdrop; `Layout` hides the feedback button and the services pill, `ServiceHealthBanner`, there on a phone). An anchor opens its article
-(`DossierItemReader`) in a side panel on desktop and in `ui/Sheet` on a phone (the bottom sheet
-shared with `CardFormDialog`, marked `data-find-overlay`); the panel closes when the card changes.
+«Interrompere il ripasso?» while a card is on screen (with no card — the end, a failed read, the read on its way — it
+goes back to Oggi, as the header's button does); listed in the «?» dialog's «Ripasso» group.
+**The lesson** (Gymnasium spec `docs/superpowers/specs/2026-10-19-gymnasium-restyle-design.md` §5.4; the Studia screens
+spec §6 as rewritten for G2): the session is a screen of its own. `StudiaPage` draws it, with no heading of the area,
+in `LessonFrame`: portalled to the body in the `lesson` band (`z-[70]`, over the sidebar, the floating buttons, the
+feedback button and the plain toasts — the services' state is the user menu's since S1, out of reach until the lesson is left —; under the overlay band, so the article's sheet, the
+confirmation and the toast — at the top, off the bar — cover it), with Tab fenced off from the shell (`#root`)
+and the body: a dialog over it, or a popover the article portals to the body (a note being typed), keeps its own.
+The shell is not `inert` — the command palette is drawn inside it — so a screen reader's browse mode can still reach
+it. While the route's code loads, `LessonLoading` (`App.tsx`'s fallback) gives the frame its close button and Esc. The shell's Focus mode
+is not used — it is a saved setting and leaves its own button on screen — and `Layout` is untouched. Three rows: the
+header (the close button, «Interrompi», 44 px, and the progress bar, `role="progressbar"`, done of done and remaining,
+where done are the cards out of the queue — a «Di nuovo» holds it still —, easing under `motion-safe:` only; «Restano N»
+stays as screen-reader text), the card scrolling in the middle (beside it on desktop the article, `DossierItemReader`,
+in a column of its own that scrolls apart; on a phone `ui/Sheet`, marked `data-find-overlay`; the panel closes when the
+card changes; the scroll is keyed by step, so each card starts at its top), and `LessonBar` at the foot on every width (above the phone's safe edge, in the `pinnedBar` band inside
+the frame), holding the one action: «Mostra risposta» (`LESSON_PRIMARY`, the ink key of «Inizia») before the reveal,
+the four grades after it — the interval the large text and the grade the small one, every button neutral but
+«Di nuovo» (warning tone), 56 px, pressed with `active:scale-[0.97]`. The bar's line above the action says, in this
+order, «Non registrato: riprova», «Ripasso di pratica: non registrato» once the answer is shown, or the note after a
+grade (`useGradeNote`: «Torna tra 3 giorni» from `anteprima`, «Torna domani», «Torna in coda» for «Di nuovo», «Fatta
+per oggi» for a practice pass that takes the card out; one second, `motion-safe:animate-vlx-note`, said politely to a
+screen reader, never focused). `useReviewSession` does not say which grade moved the queue and is read only, so
+`useGradeNote` reads the grade where it is given — `recordGrade` on a click, a key 1–4 on the window's capture phase,
+with the session's own filters and nothing taken while a grade travels; a move with no grade behind it (a skip, a
+new read) clears the note; keep its filters in step with the hook's.
+The card (`ReviewCard`) is the area's tile — a sheet on the paper, no shadow or gradient — and comes in with each card
+(the session keys it by step: opacity and a few pixels, 180 ms, `motion-safe:` only): the anchor's citation small in
+slate sans above, question and answer in the reader's serif at a 60ch measure, the question a step larger; the reveal
+is the card's own motion (a hairline, then the answer, `motion-safe:` only; the celebration never touches the card);
+the articles under the answer are 44 px buttons. Nothing else moves between a grade and the next card. The end: the
+sentence («Hai ripassato 23 schede, 4 da rifare. Le prossime: domani.», focused), the ring and the streak
+(`SessionEndProgress`, from the day's read), and in the bar «Torna a Oggi» and, when the read of the session's scope
+still counts cards for today (`cardsLeft`, `progress/today.ts`: due plus the new ones today allows; for a session
+narrowed to one institute, G5, `instituteCardsLeft` over the road's read, `usePercorso`: the institute's due cards and
+its new ones up to what the subject's read allows, never the rest of the subject), «Continua», which reads the same
+session again.
 
 **«Oggi», the home** (`ReviewHome`, Gymnasium's home at `/studia/ripasso`, under the area's heading «Gymnasium: la tua
 palestra giuridica» — the section switcher keeps «Gymnasium»; spec
@@ -553,10 +592,21 @@ heading and its rule are the column's width), in the order the owner fixed:
 4. «Cosa ripassi», `SubjectChips` (the subject narrows the first mission's action, the session it starts and «Il tuo
    mese», kept in `localStorage` under `visualex.studia.ripasso.materia`); `SubjectRoad`, «Il percorso», one stop per
    subject joined by a line, free (no locks, no number, no imposed order): the three states as a bar and in words
-   (`stopStates`), the reviews of 30 days, «Ripassa» for a session narrowed to it (none for a subject with no card);
-   ordered by `orderStops`, new plus in learning first, then by name — the read has no cards due per subject
-   (`Progressi.materie`), so no «N da ripassare» until the institute read of G5; the stops enter with a 40 ms stagger
-   once per mount (`motion-safe:` only).
+   (`stopStates`), «N da ripassare», the reviews of 30 days, «Ripassa» for a session narrowed to it (none for a subject
+   with no card); ordered by `orderStops`, new plus in learning first, then by name — kept so when the institute read
+   answers, which would otherwise move the stops under the reader's hand; the stops enter with a 40 ms stagger
+   once per mount (`motion-safe:` only). **The institutes (G5):** `progress/usePercorso` reads `GET /lingo/srs/percorso`
+   once for every subject, on its own (the missions and «Inizia» never wait on it or fail with it; the missions'
+   «Riprova» and a changed setting read it again). A subject's «N da ripassare» is the sum of its institutes' `dovute`
+   (`dueBySubject`); while the read travels the line holds its place, and a failed read leaves it out. «Istituti (N)», an
+   `aria-expanded` disclosure on each subject with cards (open on the subject the chips choose, at mount and at each new choice; only the reader closes one), opens
+   `progress/InstituteStops` inside the stop: one stop per institute joined by a thinner line (none for one institute),
+   free, ordered by `orderInstitutes` (most due, then by name in Italian), each one button of 44 px that starts the
+   session narrowed to it (`instituteSessionPath`: the label goes back verbatim, never trimmed or rewritten — it is the
+   card's content, root rule 23), its name wrapping whole (never cut), its three states as a bar and in words, «N da
+   ripassare». The first `INSTITUTES_SHOWN` (8) show, the rest behind «Mostra tutti gli istituti (N)»; only those first 8
+   enter with the stagger. Its states: places held while the read travels, «Non riesco a leggere gli istituti di questa
+   materia.» with «Riprova» (no alert; its name says which subject), the stops read before kept when a new read fails, a subject with none.
 
 One type language: block headings in Newsreader (`BLOCK_HEADING`), labels in Geist; no small capitals and no double
 rule. «Le mie schede» and «Da validare» show the strip (`progress/StudyStrip`, `dense`: the streak's count without its
@@ -576,8 +626,8 @@ the browser's zone. **The celebration** (`progress/Celebration.tsx`): once a day
 read never replays it; a convenience, never the streak's source) — on the home when
 today counts with at least one review (confetti of «§» and «✓» from the stamp in the goal's row over the missions and the band, `confetti.ts` pure, on a canvas,
 and the stamp «Obiettivo raggiunto» pressed in; the stamp stays at rest afterwards), and in the session on the grade
-whose answer says `oggi.appenaRaggiunto` (`SessionCelebration`: a notice placed in the page over the header row «Restano N · Interrompi», so it scrolls away
-with it and never floats over the card or the grades; 1.5 s; no focus, no pointer, the keys untouched; an `aria-live`
+whose answer says `oggi.appenaRaggiunto` (`SessionCelebration`: a notice placed over the lesson's header row (the close button and the progress bar), never over the card
+or the grades; 1.5 s; no focus, no pointer, the keys untouched; an `aria-live`
 line says it to a screen reader). The confetti step by elapsed time (`confetti.ts`
 `stepsAt`), so they last 1.5 s on any screen. Under reduced motion nothing moves: no canvas, the end state only. The session's end screen adds the ring and the streak
 (`SessionEndProgress`, the same read).
@@ -1332,7 +1382,7 @@ Duplicating any of these is a defect, not a shortcut.
   identity).
 - `hooks/useForumNotifications.ts` — the one 30s poller behind the sidebar's
   counts (the Forum's `total`; `normaChanges` on the avatar and the menu's Cronologia).
-- `hooks/useServiceHealth.ts` + `ui/ServiceHealthBanner` — probes
+- `hooks/useServiceHealth.ts` + `ui/ServiceHealthMenuEntry` (the user menu's status; one call, in `Layout`) — probes
   `/api/health/detailed` (Node, a `SELECT 1`) and `/health/detailed` (Python, which reaches
   Normattiva, EUR-Lex and Brocardi for real). Once on mount, then every
   **5 minutes** per visible tab, plus "Ricontrolla"; the Python answer is
@@ -1384,7 +1434,7 @@ the row an opaque background matching the panel, bleed it edge-to-edge with
 negative margins matching the parent padding, add `border-b border-current/10`,
 and raise it to `z-20`.
 
-**Stacking** — use the bands in `constants/zIndex.ts` (`pinnedBar` 35, `sidebar` 50, `dock` 80 — the bar of practices —,
+**Stacking** — use the bands in `constants/zIndex.ts` (`pinnedBar` 35, `sidebar` 50, `lesson` 70 — Gymnasium's lesson over the shell —, `dock` 80 — the bar of practices —,
 overlay band 1000+), never a bare literal. See gotcha 22 before assuming a
 z-index will be honoured. An overlay above `findWindow` (110) that covers the
 workspace carries `aria-modal="true"` (a real modal dialog) or `data-find-overlay`,

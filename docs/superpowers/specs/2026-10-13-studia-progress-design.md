@@ -196,7 +196,7 @@ States: while reading, a skeleton of the band and the panels at their final size
 
 ### 6.4 The session
 
-- When a grade's answer says `appenaRaggiunto` and this browser has not celebrated today, the celebration plays in a notice placed in the page over the session's header row («Restano N · Interrompi»), so it scrolls away with that row and never covers the card or the grade bar; 1.5 s (decision 6); no focus, no pointer, the keys keep working. A screen reader hears «Obiettivo di oggi raggiunto · serie di 13 giorni». Under reduced motion the same notice, still: the words and the stamp, no confetti.
+- When a grade's answer says `appenaRaggiunto` and this browser has not celebrated today, the celebration plays in a notice placed over the session's header row (*since G2 of the Gymnasium restyle, 19 October:* the lesson's close button and progress bar), and never covers the card or the grade bar; 1.5 s (decision 6); no focus, no pointer, the keys keep working. A screen reader hears «Obiettivo di oggi raggiunto · serie di 13 giorni». Under reduced motion the same notice, still: the words and the stamp, no confetti.
 - The day is marked celebrated when the celebration starts, not when it ends, so leaving the page halfway or a new read of the dashboard never plays it a second time.
 - The end screen keeps its sentence and adds the ring and the streak as they are now.
 - Back on the home after a celebration, the stamp is there at rest; the home plays the celebration itself only when the goal was met today and this browser has not celebrated today (a `localStorage` key per day: a per-browser convenience, never the source of the streak).

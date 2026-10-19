@@ -16,6 +16,7 @@ import type {
   SchedaDellArticolo,
   SchedaInput,
   SessioneRipasso,
+  TappaIstituto,
   TestoCorrente,
   TestoDaAccettare,
 } from '../types/studia';
@@ -131,9 +132,13 @@ export const studiaService = {
     return response.data.cards;
   },
 
-  /** Today's review: the counts and the cards, due ones first (`GET /lingo/srs/sessione`). */
-  async session(materia?: Materia): Promise<SessioneRipasso> {
-    const response = await apiClient.get('/lingo/srs/sessione', { params: materia ? { materia } : {} });
+  /**
+   * Today's review: the counts and the cards, due ones first (`GET /lingo/srs/sessione`). `istituto`, only with
+   * `materia`, narrows it to one institute, spelt as `percorso` lists it.
+   */
+  async session(materia?: Materia, istituto?: string): Promise<SessioneRipasso> {
+    const params = materia ? { materia, ...(istituto !== undefined ? { istituto } : {}) } : {};
+    const response = await apiClient.get('/lingo/srs/sessione', { params });
     return response.data;
   },
 
@@ -146,6 +151,12 @@ export const studiaService = {
   /** Everything the dashboard draws, narrowed to a subject if asked (`GET /lingo/srs/progressi`). */
   async progress(materia?: Materia): Promise<Progressi> {
     const response = await apiClient.get('/lingo/srs/progressi', { params: materia ? { materia } : {} });
+    return response.data;
+  },
+
+  /** The review scope counted by institute, every subject's or one's (`GET /lingo/srs/percorso`): the road's stops. */
+  async percorso(materia?: Materia): Promise<TappaIstituto[]> {
+    const response = await apiClient.get('/lingo/srs/percorso', { params: materia ? { materia } : {} });
     return response.data;
   },
 
