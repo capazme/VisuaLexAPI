@@ -323,10 +323,11 @@ Why: both owners want the Studia area more usable and more beautiful, and its pr
 of the app poorly. Scope: the whole area (`components/features/studia/` and what it renders: the review,
 `schede`, `valida`, `progress` and the admin texts), the review card included.
 
-1. **Spec first.** Before any code, the front-end owner's session writes
-   `docs/superpowers/specs/2026-10-19-gymnasium-restyle-design.md` from a walk-through of the four
-   screens, at 1366 and 390 px, light and dark. The executor does not start G until that file is on
-   `develop` or on the branch it stacks on, and the front-end owner has said it is approved.
+1. **Spec first.** `docs/superpowers/specs/2026-10-19-gymnasium-restyle-design.md` is the spec; its phases
+   G1–G5 are this phase's PRs. It was written from the sources, not from the screens (its §9): the
+   front-end owner's session walks the four screens at 1366 and 390 px, light and dark, and corrects it.
+   The executor does not start G until that file is on the branch it stacks on and the front-end owner
+   has said it is approved. G5 also waits for the server read it describes.
 2. Then one PR per screen, in the order the spec gives, each with `break-ui` and the browser pass.
 3. The review PR rewrites §6 of `docs/superpowers/specs/2026-10-07-studia-cards-screens-design.md` and
    the review-card sentence of `apps/web/CLAUDE.md`, and leaves the review logic and its tests intact.
