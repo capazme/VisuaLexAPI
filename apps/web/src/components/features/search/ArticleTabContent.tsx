@@ -774,8 +774,13 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         decisions: decisionLinks.links,
     });
 
-    // «Cerca sentenze sul tema dell'articolo» searches the Cassazione by the rubric, when the text has one.
-    const rubric = useMemo(() => getRubricText(article_text || '', structure), [article_text, structure]);
+    // «Cerca sentenze sul tema dell'articolo» searches the Cassazione by the rubric, when the text has one:
+    // not a notice the source served in its place (an article that did not exist yet, one repealed).
+    const rubric = useMemo(() => {
+        if (!display.textVisible || data.validity?.state === 'abrogated') return null;
+        const text = getRubricText(article_text || '', structure);
+        return text && !/^ARTICOLO (ABROGATO|SOPPRESSO)\b/i.test(text) ? text : null;
+    }, [display.textVisible, data.validity?.state, article_text, structure]);
 
     return (
         <div className="animate-in fade-in duration-200 relative">

@@ -223,6 +223,9 @@ describe('CaseLawSection — on a phone', () => {
     for (const control of [screen.getByRole('searchbox'), screen.getByRole('textbox', { name: 'Dall’anno' }), screen.getByRole('textbox', { name: 'All’anno' })]) {
       expect(control).toHaveClass('min-h-[44px]');
     }
+    // a year's chip too, once a block has reported its years (the Massimario's passages: 2024, 2016)
+    await userEvent.click(await screen.findByRole('button', { name: /Nelle rassegne della Cassazione/ }));
+    expect(await screen.findByRole('button', { name: /^2024/ })).toHaveClass('min-h-[44px]');
   });
 
   it('shows the filters in use on the button, and the blocks one under the other with no scrolling box of their own', async () => {

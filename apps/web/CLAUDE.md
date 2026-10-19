@@ -236,7 +236,8 @@ could not reopen are told once (`practiceNotice`). `merge` sanitizes the practic
 (`sanitizePractices`), which also drops `brocardi_info` and `brocardi_error` from every saved article
 (D-078: an article saved before kept showing Brocardi until it was fetched again); the old
 `show_brocardi_info` and `hasBrocardi` in saved searches, quick norms and `?norma=` links are left where
-they are, inert: nothing sends or reads them. `persist` writes through `utils/guardedStorage.ts`: a save the
+they are, inert: no code writes or reads them, a saved quick norm or link still sends its flag as saved,
+and the Python API ignores it. `persist` writes through `utils/guardedStorage.ts`: a save the
 browser refuses (a full `localStorage`) is logged and told once as a sync error, never thrown out of
 `set`. `clearUserData` empties the practices.
 Before the first conversion the raw version-0 value is copied once to `visualex-storage.v0-backup`, so a

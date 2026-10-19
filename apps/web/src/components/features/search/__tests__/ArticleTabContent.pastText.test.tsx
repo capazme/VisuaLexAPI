@@ -48,6 +48,7 @@ import { appStore } from '../../../../store/useAppStore';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../../utils/normaKeys';
 import { fixtureText } from '../../../../utils/__fixtures__/articleTexts';
 import { NOT_YET_REASON, UNRELIABLE_REASON } from '../../../../utils/versionDisplay';
+import { getRubricText, parseArticleStructure } from '../../../../utils/articleStructure';
 
 const TEXT = fixtureText('nrm-cc-1284');
 const NORMA: NormaVisitata = {
@@ -238,6 +239,41 @@ describe('ArticleTabContent — a past text is a reading', () => {
     appStore.setState({ bookmarks: [bookmarked] });
     show(article(CURRENT, { versione: 'vigente', data_versione: '' }));
     await waitFor(() => expect(checkNorma).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe('ArticleTabContent — «Cerca sentenze sul tema dell’articolo»', () => {
+  const openTopicSearch = vi.fn(() => 'w');
+  const topicLink = () => screen.queryByRole('button', { name: /Cerca sentenze sul tema dell’articolo/ });
+  beforeEach(() => {
+    openTopicSearch.mockClear();
+    appStore.setState({ openTopicSearch });
+  });
+
+  it('searches the Cassazione by the article\'s rubric', () => {
+    const rubric = getRubricText(TEXT, parseArticleStructure(TEXT));
+    expect(rubric).toBeTruthy();
+    show(article(CURRENT, { versione: 'vigente', data_versione: '' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Giurisprudenza' }));
+    fireEvent.click(topicLink()!);
+    expect(openTopicSearch).toHaveBeenCalledExactlyOnceWith({ tema: rubric }, `Tema: ${rubric}`, undefined);
+  });
+
+  it('takes no notice the source served in place of a rubric for one', () => {
+    show(article(undefined, {}, { article_text: 'Art. 155-ter\n((ARTICOLO ABROGATO DAL D.LGS. 10 OTTOBRE 2022, N. 149))' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Giurisprudenza' }));
+    expect(topicLink()).toBeNull();
+  });
+
+  it('offers nothing for a repealed article or one that did not exist yet', () => {
+    const abrogated: ArticleValidity = { ...CURRENT, state: 'abrogated' };
+    const first = show(article(abrogated));
+    fireEvent.click(screen.getByRole('button', { name: 'Giurisprudenza' }));
+    expect(topicLink()).toBeNull();
+    first.unmount();
+    show(article(NOT_YET, { versione: 'vigente', data_versione: '2010-01-01' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Giurisprudenza' }));
+    expect(topicLink()).toBeNull();
   });
 });
 

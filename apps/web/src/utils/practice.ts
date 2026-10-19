@@ -383,7 +383,8 @@ export function storedReference(value: unknown): DecisionReference | null {
  * A stored article without what Brocardi gave it (D-078): a browser that saved its practices before
  * would otherwise keep showing the old commentary and massime until the article is fetched again.
  * Nothing is logged: it is not a loss of the reader's own. The other fields stay as saved, the old
- * `show_brocardi_info` and `hasBrocardi` of saved searches included: nothing reads them any more.
+ * `show_brocardi_info` and `hasBrocardi` of saved searches included: no code reads them, and the API
+ * ignores the flag when a saved search still sends it.
  */
 function withoutBrocardi(article: ArticleData): ArticleData {
   if (!('brocardi_info' in article) && !('brocardi_error' in article)) return article;
