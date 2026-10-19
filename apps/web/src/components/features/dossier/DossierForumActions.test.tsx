@@ -43,7 +43,7 @@ describe('DossierForumActions', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Ritira dai dossier pubblici' }));
     await waitFor(() => expect(service.withdraw).toHaveBeenCalledWith('e1'));
     await waitFor(() => expect(refreshDossier).toHaveBeenCalledWith('d'));
-    expect(showToast).toHaveBeenCalledWith('Dossier ritirato', 'success');
+    expect(showToast).toHaveBeenCalledWith('Copia pubblicata ritirata', 'success');
   });
 
   it('republishes a copy its author withdrew, never one the admin withdrew', () => {

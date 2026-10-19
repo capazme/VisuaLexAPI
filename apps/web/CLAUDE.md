@@ -88,8 +88,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   Academia, Assistente and Grafo (`VITE_FEATURE_MERLT*`); Forum, «Dossier pubblici» (`/forum`, with the Forum's count;
   `end`, so it is not active under `/forum/community`) and «Community» — the section keeps its name and its areas are
   named apart, so «Forum» is never written twice. The section's line is «Dossier pubblici e community»; its title
-  with a phrase, «Forum: la tua piazza giuridica» (as Gymnasium's), is `FORUM_TITLE` in `sections.ts`, proposed and
-  not yet confirmed: change it there only.
+  with a phrase, «Forum: la tua piazza giuridica» (the first section with one; the others are to follow), is
+  `FORUM_TITLE` in `sections.ts`, proposed and not yet confirmed: change it there only.
   **Words, not only icons** (`layout`, `sidebarWidth.ts`): from `xl` the desktop column is a 224 px bar with
   icon and word and the groups' headings (the section's name, or «Studia» and «Contribuisci»), the palette's
   shortcut beside «Ricerca» (⌘K on a Mac, Ctrl K elsewhere); between `lg` and `xl` the 64 px rail of icons, each labelled on hover and keyboard focus; below
@@ -1367,7 +1367,7 @@ meant to stay split; add new features as new files, not inside the shells:
   `docs/superpowers/specs/2026-10-13-environments-into-forum-design.md`; it absorbed «Ambienti»). Folder and
   component names stay `bulletin` and `SharedEnvironment*` because they match the backend model; the route is
   `/forum`, the page's `h1` «Dossier pubblici», and what leaves it says so («Ritira dai dossier pubblici», toast
-  «Dossier ritirato»), never «dal Forum»: the Forum is the section, which also holds «Community»
+  «Dossier ritirato»; in the dossier's header «Copia pubblicata ritirata»), never «dal Forum»: the Forum is the section, which also holds «Community»
   (`ForumCommunityPage`, `/forum/community`, a placeholder). `BulletinBoardPage.tsx` is a shell over three dumb views, the tabs «Esplora · I miei pubblicati ·
   Suggerimenti» (`ForumExploreView`, `ForumMyEnvironmentsView`, `ForumSuggestionsView`). «Pubblica un dossier»
   is `PublishDossierPicker` (the user's dossiers not yet in the Forum, then the dossier's own

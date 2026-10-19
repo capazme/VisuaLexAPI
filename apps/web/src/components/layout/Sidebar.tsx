@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, type FocusEvent, type KeyboardEvent, type PointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Search, Folder, FolderOpen, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Scale, Network, Bot, Repeat, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { isMerltEnabled } from '../../features/merlt/featureFlag';
@@ -161,6 +161,8 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint, layout,
   const [linkEl, setLinkEl] = useState<HTMLAnchorElement | null>(null);
   const showBadge = (badgeCount ?? 0) > 0;
   const words = layout !== 'rail';
+  // The active dot slides between neighbouring entries («Dossier pubblici», «Community»): under reduced motion it jumps.
+  const reduceMotion = useReducedMotion();
 
   // In the rail the whole control is an icon, and `label` only ever reached the eye — the
   // tooltip is `hidden md:block` and shows on hover, so a screen reader and a
@@ -193,7 +195,7 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint, layout,
         <>
           {/* A navigation entry is seen tens of times a day: its hover is the colour alone. */}
           <motion.div
-            whileTap={{ scale: 0.95 }}
+            whileTap={reduceMotion ? undefined : { scale: 0.95 }}
             transition={spring.snappy}
             className="grid h-11 w-11 shrink-0 place-items-center"
           >
@@ -230,7 +232,7 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint, layout,
             <motion.span
               layoutId="activeIndicator"
               className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-primary-600 rounded-r-full"
-              transition={spring.snappy}
+              transition={reduceMotion ? { duration: 0 } : spring.snappy}
             />
           )}
 

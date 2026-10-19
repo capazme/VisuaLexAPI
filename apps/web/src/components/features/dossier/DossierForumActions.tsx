@@ -103,7 +103,7 @@ export function DossierForumActions({ dossier, showToast, buttonClassName }: Pro
           published.isActive
             ? {
                 label: 'Ritira dai dossier pubblici', icon: EyeOff, disabled: busy,
-                onSelect: () => void act(() => sharedEnvironmentService.withdraw(published.sharedEnvironmentId), 'Dossier ritirato'),
+                onSelect: () => void act(() => sharedEnvironmentService.withdraw(published.sharedEnvironmentId), 'Copia pubblicata ritirata'),
               }
             : {
                 label: 'Ripubblica nel Forum', icon: Globe, disabled: busy || blocked,

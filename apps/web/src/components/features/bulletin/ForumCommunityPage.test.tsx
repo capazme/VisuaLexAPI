@@ -1,6 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+
+// The Forum's count belongs to «Dossier pubblici»: only that page clears it and starts the Forum's tour.
+const forum = vi.hoisted(() => ({ markRead: vi.fn(), tryStartTour: vi.fn() }));
+vi.mock('../../../services/notificationService', () => ({ notificationService: { markRead: forum.markRead } }));
+vi.mock('../../../hooks/useTour', () => ({ useTour: () => ({ tryStartTour: forum.tryStartTour }) }));
+
 import { ForumCommunityPage } from './ForumCommunityPage';
 import { FORUM_TITLE } from '../../../features/sections/sections';
 
@@ -37,5 +43,11 @@ describe('ForumCommunityPage', () => {
     expect(link).toHaveAttribute('href', '/forum');
     expect(link).toHaveClass('min-h-[44px]', 'focus-visible:ring-2');
     expect(screen.getAllByRole('link')).toHaveLength(1);
+  });
+
+  it('neither clears the Forum\'s count nor starts its tour', () => {
+    renderPage();
+    expect(forum.markRead).not.toHaveBeenCalled();
+    expect(forum.tryStartTour).not.toHaveBeenCalled();
   });
 });

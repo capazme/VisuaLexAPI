@@ -21,8 +21,8 @@ export const SECTIONS: readonly Section[] = [
   { id: 'forum', name: 'Forum', line: 'Dossier pubblici e community', icon: Users, home: '/forum' },
 ];
 
-/** The Forum's title with its phrase, as Gymnasium's (the Community page's `h1`). Proposed, not yet confirmed by
- *  the owner: the one place to change it. */
+/** The Forum's title with its phrase (the Community page's `h1`), the formula the sections are to take («Nome: la
+ *  tua … giuridica»). Proposed, not yet confirmed by the owner: the one place to change it. */
 export const FORUM_TITLE = 'Forum: la tua piazza giuridica';
 
 const under = (pathname: string, root: string) => pathname === root || pathname.startsWith(`${root}/`);

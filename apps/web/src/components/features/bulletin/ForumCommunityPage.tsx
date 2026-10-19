@@ -19,7 +19,7 @@ export function ForumCommunityPage() {
           Community
         </h2>
         <p className="mt-2 text-slate-700 dark:text-slate-300">Domande e discussioni tra colleghi, in arrivo.</p>
-        <p className="mt-1 text-slate-600 dark:text-slate-400">Per ora il Forum raccoglie i dossier pubblicati dai colleghi.</p>
+        <p className="mt-1 text-slate-600 dark:text-slate-400">Per ora il Forum raccoglie i dossier pubblicati dalla comunità.</p>
         <Link
           to="/forum"
           className="mt-3 inline-flex min-h-[44px] items-center gap-2 rounded-lg px-3 -mx-3 font-medium text-primary-700 hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
