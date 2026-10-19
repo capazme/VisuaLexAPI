@@ -81,8 +81,23 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (a link to `/` that puts the cursor in the search page's field, `focusSearchField`, with no window over it —
   the owner, 13 Oct 2026; its hover label carries ⌘K, the palette; the quick norms' dot sits under it;
   `#tour-nav-search` is what the welcome and search tours point at) and «Analizza documento» —, then the active
-  section's, in a group named after it: Opus, Dossier; Gymnasium, Ripasso, Le mie schede, Da validare (validators)
-  and Dossier; Academia, Assistente and Grafo (`VITE_FEATURE_MERLT*`); Forum, the Forum with its count. At the bottom only the user menu, whose dropdown holds Impostazioni,
+  section's, in a group named after it: Opus, Dossier; Gymnasium in two groups (Gymnasium spec §4), «Studia»
+  (Oggi, the home `/studia/ripasso`, and Dossier) and «Contribuisci» (Le mie schede, Da validare for validators);
+  Academia, Assistente and Grafo (`VITE_FEATURE_MERLT*`); Forum, the Forum with its count.
+  **Words, not only icons** (`layout`, `sidebarWidth.ts`): from `xl` the desktop column is a 224 px bar with
+  icon and word and the groups' headings (the section's name, or «Studia» and «Contribuisci»), the palette's
+  shortcut beside «Ricerca» (⌘K on a Mac, Ctrl K elsewhere); between `lg` and `xl` the 64 px rail of icons, each labelled on hover and keyboard focus; below
+  `lg` the drawer, icon and word in rows of 44 px, its foot clear of the home indicator. From `xl` a control
+  at the foot narrows the bar to the rail and widens it again, remembered in the browser under
+  `visualex-sidebar` (`guardedStorage`); wide by default. Every column keeps 10 px of side padding and every
+  icon a 44 px box, so widening moves no icon: `Layout` animates the column's width (instantly under reduced
+  motion) and the words are clipped as it moves. With words the user menu opens over its button, not beside,
+  and the button's name carries the username it shows («Menu utente di …», label in name).
+  `Layout` sets the column's drawn width on its root as `--sidebar-width` (224, 64, or 0 hidden or in Focus
+  mode); the services pill (`ServiceHealthBanner`) starts 2 rem after it from `lg`, so it is never under the bar.
+  The bar's 11 px texts (headings, shortcut) are `SIDEBAR_SMALL_TEXT`, slate 600 / dark slate 400: AA for small
+  text on the glass over the page and over the phone's backdrop; `theme.test.ts` composites and checks it.
+  The narrow/widen control is `SIDEBAR_TOGGLE_TEXT`, the entries' words' colour (slate 700 / dark slate 300). At the bottom only the user menu, whose dropdown holds Impostazioni,
   Cronologia (moved there by the owner, 13 Oct 2026; the saved norms that changed are counted on the avatar
   and beside the entry, and both names say it in words: «Menu utente, 2 norme salvate cambiate»),
   «Collega un'app AI», the theme, «Scorciatoie (?)», «Pannello Admin» (admins) and «Esci». The dropdown is a portalled WAI-ARIA
@@ -1092,7 +1107,8 @@ Duplicating any of these is a defect, not a shortcut.
   Reach for these before writing a second comparison of two articles.
 - `hooks/useIsDesktop.ts` — viewport check for components that must render
   *structurally* different markup per breakpoint (portal vs. inline). It existed
-  as two private copies before round 2a; do not make a third. For anything a CSS
+  as two private copies before round 2a; do not make a third. `useMediaQuery(query)`, beside it, is
+  the same check for another breakpoint (the sidebar's `xl`). For anything a CSS
   breakpoint can express, use the CSS breakpoint.
 - `utils/articleSuffixes.ts` — `ARTICLE_ORDINAL_SUFFIXES` and
   `ARTICLE_SUFFIX_ALTERNATION`, the one ordinal table behind every article-number
