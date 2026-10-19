@@ -174,6 +174,13 @@ describe('the interaction constants', () => {
   }, 30000);
 });
 
+describe('the services pill beside the sidebar', () => {
+  it('reads the sidebar\'s drawn width from `--sidebar-width`, 64 px by default', async () => {
+    const css = await compile(['lg:left-[calc(var(--sidebar-width,64px)+2rem)]']);
+    expect(css).toMatch(/left:\s*calc\(var\(--sidebar-width,\s*64px\) \+ 2rem\)/);
+  }, 30000);
+});
+
 describe('the scrollbars in dark mode', () => {
   it('give the thumb its dark colour through a selector the browser keeps', async () => {
     const css = await compile([]);

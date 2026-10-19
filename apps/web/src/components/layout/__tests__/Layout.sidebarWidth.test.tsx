@@ -35,9 +35,14 @@ function atWidth(xl: boolean) {
     removeEventListener: () => {},
   }) as unknown as MediaQueryList);
   seen.props = [];
-  render(<MemoryRouter initialEntries={['/dossier']}><Layout /></MemoryRouter>);
+  const { container } = render(<MemoryRouter initialEntries={['/dossier']}><Layout /></MemoryRouter>);
   const last = seen.props.slice(-2);
-  return { desktop: last.find((p) => p.layout !== 'drawer'), phone: last.find((p) => p.layout === 'drawer') };
+  const root = container.firstElementChild as HTMLElement;
+  return {
+    desktop: last.find((p) => p.layout !== 'drawer'),
+    phone: last.find((p) => p.layout === 'drawer'),
+    sidebarWidth: root.style.getPropertyValue('--sidebar-width'),
+  };
 }
 
 beforeEach(() => {
@@ -70,5 +75,17 @@ describe('Layout — the sidebar\'s two copies (Gymnasium spec §4)', () => {
     const { desktop } = atWidth(true);
     expect(desktop?.layout).toBe('rail');
     expect(desktop?.onToggleWide).toBeTypeOf('function');
+  });
+
+  // The services pill starts after it (`ServiceHealthBanner`): never half under the bar with words.
+  it('tells what floats beside it the width it is drawn at: 224, 64, or 0 when hidden or in Focus mode', () => {
+    expect(atWidth(true).sidebarWidth).toBe('224px');
+    expect(atWidth(false).sidebarWidth).toBe('64px');
+    sidebarWidthStore.setState({ collapsed: true });
+    expect(atWidth(true).sidebarWidth).toBe('64px');
+    appStore.setState({ sidebarVisible: false });
+    expect(atWidth(true).sidebarWidth).toBe('0px');
+    appStore.setState((s) => ({ sidebarVisible: true, settings: { ...s.settings, focusMode: true } }));
+    expect(atWidth(true).sidebarWidth).toBe('0px');
   });
 });

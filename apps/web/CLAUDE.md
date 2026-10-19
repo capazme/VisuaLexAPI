@@ -92,7 +92,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `visualex-sidebar` (`guardedStorage`); wide by default. Every column keeps 10 px of side padding and every
   icon a 44 px box, so widening moves no icon: `Layout` animates the column's width (instantly under reduced
   motion) and the words are clipped as it moves. With words the user menu opens over its button, not beside,
-  and the button's name carries the username it shows («Menu utente di …», label in name). At the bottom only the user menu, whose dropdown holds Impostazioni,
+  and the button's name carries the username it shows («Menu utente di …», label in name).
+  `Layout` sets the column's drawn width on its root as `--sidebar-width` (224, 64, or 0 hidden or in Focus
+  mode); the services pill (`ServiceHealthBanner`) starts 2 rem after it from `lg`, so it is never under the bar. At the bottom only the user menu, whose dropdown holds Impostazioni,
   Cronologia (moved there by the owner, 13 Oct 2026; the saved norms that changed are counted on the avatar
   and beside the entry, and both names say it in words: «Menu utente, 2 norme salvate cambiate»),
   «Collega un'app AI», the theme, «Scorciatoie (?)», «Pannello Admin» (admins) and «Esci». The dropdown is a portalled WAI-ARIA
