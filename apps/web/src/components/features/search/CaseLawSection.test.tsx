@@ -6,6 +6,13 @@ import type { NormaVisitata } from '../../../types';
 import type { SearchDecisionsAnswer } from '../../../types/decisions';
 
 const { slotCalls } = vi.hoisted(() => ({ slotCalls: [] as Array<{ slot: string; props: Record<string, unknown> }> }));
+vi.mock('../../../services/corteCostMassimeService', () => ({
+  searchCorteCostMassime: vi.fn(async () => ({
+    esito: 'risultati', urn: '', pagina: 1, per_pagina: 20, totale: 0, per_ruolo: { norma: 0, parametro: 0 }, massime: [],
+    fonte: { nome: 'Corte costituzionale — dati aperti', licenza: 'CC BY-SA 3.0', url: 'https://dati.cortecostituzionale.it/' },
+    attribuzione: 'Massime: Corte costituzionale — dati aperti, CC BY-SA 3.0', aggiornato_al: null,
+  })),
+}));
 vi.mock('../../../services/decisionSearchService', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../services/decisionSearchService')>()),
   searchDecisions: vi.fn(),
@@ -130,6 +137,24 @@ describe('CaseLawSection', () => {
     expect(screen.queryByRole('heading', { name: 'Cassazione — menzionano l’articolo' })).toBeNull();
     expect(await screen.findByText('Nessuna decisione indicizzata cita questo articolo.')).toBeInTheDocument();
     expect(eu).toHaveBeenCalledExactlyOnceWith({ celex: '32016R0679', articolo: '6' });
+  });
+
+  it('gives a State act\'s article the Corte costituzionale\'s massime, asked for when the section opens', async () => {
+    const { searchCorteCostMassime } = await import('../../../services/corteCostMassimeService');
+    const cc = vi.mocked(searchCorteCostMassime);
+    cc.mockClear();
+    show();
+    expect(cc).not.toHaveBeenCalled();
+    await userEvent.click(toggle());
+    expect(screen.getByRole('heading', { name: 'Corte costituzionale — massime' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Massime: Corte costituzionale — dati aperti, CC BY-SA 3.0' })).toBeInTheDocument();
+    expect(cc).toHaveBeenCalledExactlyOnceWith(NORMA.urn);
+  });
+
+  it('gives an act of the Union no Corte costituzionale block', async () => {
+    show({ norma: { tipo_atto: 'regolamento ue', data: '2016', numero_atto: '679', numero_articolo: '6' } });
+    await userEvent.click(toggle());
+    expect(screen.queryByRole('heading', { name: 'Corte costituzionale — massime' })).toBeNull();
   });
 
   it('gives no Court of Justice block to a national act', async () => {

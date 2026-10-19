@@ -305,6 +305,13 @@ count, not for the next one if that fails; the range is clamped to 1900 – this
 that answers «none» without a request). On the Cassazione the reversed order applies once every
 decision is loaded; until then the archive's order (newest first) stands and a line says so. Filters reset
 with the article.
+**A State act's article has the Corte costituzionale's massime** (`CorteCostMassimeBlock`, before the Cassazione's
+block; G-281): the Court's open-data massime that name the article, asked of `/search_corte_cost_massime`
+(`services/corteCostMassimeService.ts`) with `norma_data.urn` when the section opens, 20 at a time with «Mostra altre
+massime», each a `CaseLawRow` (the decision as a `DecisionLink`, its kind, «Norma oggetto» or «Parametro», the
+massima's number, the heading chain, the text verbatim), credited with the route's `attribuzione` linked to the
+open-data page. A plain first version: its design is Inchiostro's (Luca), and it does not yet read the section's
+filters (the list is paged by the server, so they would narrow only the page loaded).
 **An act of the Union has the Court of Justice's block** (`EuCaseLawBlock`, in place of the Cassazione's) for a
 regulation or a directive: `utils/euCaseLaw.ts` derives the act's CELEX from the norm
 (`3` + the year + `R`/`L` + the number on four digits, as the API's `sources.eu_identity` does — the norm

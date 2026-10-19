@@ -68,7 +68,10 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     reference, the palette's patterns in Python, pinned to the golden file's `decision_citations`),
     `italgiure.py` (Cassazione, Italgiure's Solr),
     `pdf_text.py` (the Cassazione's text from the court's PDF), `corte_cost.py` (Corte
-    costituzionale open data, range bundles on disk), `curia.py` (the Court of Justice and the
+    costituzionale open data, range bundles on disk), `corte_cost_massime.py` (the Court's massime
+    under each article, behind `POST /search_corte_cost_massime`: the three massime bundles on disk,
+    an index from `norme`/`parametri` to the source convention's article identity in a SQLite file
+    beside them, rebuilt when a bundle changes; G-281), `curia.py` (the Court of Justice and the
     General Court from the Publications Office's repository, CELLAR: a SPARQL query finds the
     case's judgment, joined cases included, then its Italian XHTML or, before about 2009, the
     former HTML; design 2026-10-12 §4), `giustizia_amministrativa.py` and `tar_seats.py` (the
@@ -264,6 +267,23 @@ POST unless noted, JSON bodies.
   an order or an Advocate General's opinion opens on EUR-Lex by its `celex` (decided 13 October 2026).
   Measured on 13 October 2026 for a regulation or a directive: 0.06 to 0.8 s, 35 to 114 decisions
   (5 to 25 KB with `identita`). Design: docs/superpowers/specs/2026-10-12-case-law-section-design.md
+- `/search_corte_cost_massime` — the Corte costituzionale's massime that name an article (G-281):
+  `{urn, pagina?}` (`urn` the article's `norma_data.urn`, read through `normalize_norm_urn`; a State
+  act's article only) → `esito` risultati (a page of 20, newest decision first: per massima its
+  `numero`, `titolo`, `testo` verbatim, `ruoli` — `norma` when the article is a provision at issue,
+  `parametro` when it is what one was measured against — and `pronuncia` with `identita`, `tipo`,
+  dates and the Court's page; `totale`, `per_ruolo`, `fonte`, `attribuzione` «Massime: Corte
+  costituzionale — dati aperti, CC BY-SA 3.0», `aggiornato_al`), richiesta_non_valida 400,
+  fonte_non_raggiungibile 503 (`in_preparazione` while the first index is built: 25 s of waiting,
+  then the build goes on in the background), errore_interno 500. The source is asked in bulk only:
+  three bundles (about 24 MB), the closed ranges kept 30 days and the current one 24 hours, a
+  failed refresh not retried for an hour, and the index on disk (about 110 MB, built in about 2 s)
+  served meanwhile. The mapping (`reference_identity`) reads the codes by name through
+  `codice_urn`, the State acts by type, number and date (a code cited by its enacting decree, the
+  c.p.a. as d.lgs. 104/2010, lands in its annex), and an ordinal suffix from
+  `article_suffixes`; regional acts, statutes, treaties and the repealed codes name nothing.
+  Measured on 19 October 2026: 46,607 massime, 148,158 links to an article or an act, 37,664
+  entries left unmapped. The massime are not anchors (root rule 23 does not bind them yet)
 - `/fetch_decision_pdf` — `{corte: cassazione, archivio, numero, anno}` → the court's original
   PDF of a decision as `application/pdf` bytes (an attachment), the ones a lookup cached or
   fetched once; `non_disponibile` 404, fonte_non_raggiungibile 503, richiesta_non_valida 400.
