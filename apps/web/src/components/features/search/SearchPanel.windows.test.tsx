@@ -219,7 +219,7 @@ describe('SearchPanel with the windows beside (spec §4.5)', () => {
     await waitFor(() => expect(wrapper.style.bottom).toBe('174px'));
   });
 
-  it('on a phone it floats above the services pill and the feedback button, which sit under it', async () => {
+  it('on a phone it floats above the feedback button, which sits under it', async () => {
     env.desktop = false;
     const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
     s().pushReadingBack({ tabId: practiceId, blockId: actId, articleId: '5', label: 'art. 5 l. 24/2017' });

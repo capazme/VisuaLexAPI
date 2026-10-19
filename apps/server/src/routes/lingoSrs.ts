@@ -38,7 +38,13 @@ const subjectQuerySchema = z.object({ materia: z.nativeEnum(LingoMateria).option
 const sessionSchema = z
   .object({
     materia: z.nativeEnum(LingoMateria).optional(),
-    istituto: z.string().trim().min(1).max(200).refine(hasNoNul, { message: 'L’istituto contiene un carattere non valido.' }).optional(),
+    istituto: z
+      .string({ invalid_type_error: 'Istituto non valido.' })
+      .trim()
+      .min(1, 'L’istituto non può essere vuoto.')
+      .max(200, 'L’istituto è troppo lungo (al massimo 200 caratteri).')
+      .refine(hasNoNul, { message: 'L’istituto contiene un carattere non valido.' })
+      .optional(),
   })
   .refine((query) => query.istituto === undefined || query.materia !== undefined, {
     message: 'L’istituto richiede la materia.',

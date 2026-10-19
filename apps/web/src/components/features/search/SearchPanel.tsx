@@ -54,8 +54,8 @@ function openFromAsker(practiceId: string, ref: ReturnType<typeof besideRefFor>,
 interface CreatedRow { practiceId: string; actId: string; articleKey: string }
 /** The bar of practices floats `bottom-6`: 24 px. */
 const BAR_OFFSET = 24;
-/** Where the way back floats on a phone: above the services pill (`bottom-3`, a line tall) and
- *  the feedback button (`bottom-6`, 48 px), which sit under it. */
+/** Where the way back floats on a phone: above the feedback button (`bottom-6`, 48 px), which sits
+ *  under it. (It also cleared the services pill, now in the user menu, S1.) */
 const PHONE_BACK_OFFSET = 80;
 /** On the desktop before the bar is measured: its least height (`--practice-bar-height`'s 3.75rem). */
 const BAR_MIN_HEIGHT = 60;

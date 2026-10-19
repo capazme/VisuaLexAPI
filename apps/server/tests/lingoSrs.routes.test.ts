@@ -278,6 +278,15 @@ describe('the review routes', () => {
         expect((await session(a, 'DIRITTO_CIVILE', 'x'.repeat(201))).status).toBe(400);
       });
 
+      it('explains in Italian an empty, over-long or repeated institute', async () => {
+        const empty = await request(app).get(SESSION).query({ materia: 'DIRITTO_CIVILE', istituto: '  ' }).set(a);
+        expect(JSON.stringify(empty.body)).toContain('L’istituto non può essere vuoto.');
+        const long = await session(a, 'DIRITTO_CIVILE', 'x'.repeat(201));
+        expect(JSON.stringify(long.body)).toContain('L’istituto è troppo lungo (al massimo 200 caratteri).');
+        const repeated = await request(app).get(`${SESSION}?materia=DIRITTO_CIVILE&istituto=a&istituto=b`).set(a);
+        expect(JSON.stringify(repeated.body)).toContain('Istituto non valido.');
+      });
+
       it('trims the institute it is given', async () => {
         setClock(MONDAY_MORNING);
         const c = await card(alice, 'BOZZA_PERSONALE', { istituto: 'Contratto' });
