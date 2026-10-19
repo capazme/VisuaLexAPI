@@ -95,13 +95,18 @@ views do not move.
 | Group | Entry | Route | What it is |
 | --- | --- | --- | --- |
 | Studia | **Oggi** | `/studia/ripasso` (as today) | the home: one action and the road (§5.1) |
-| Studia | **Progressi** | `/studia/progressi` (new, web only) | calendar, cards by state, coming days, progress by subject (§5.3) |
+| Studia | **Progressi** | `/studia/progressi` (new, web only, with G3; no entry until then) | calendar, cards by state, coming days, progress by subject (§5.3) |
 | Contribuisci | **Le mie schede** | `/studia/schede` (as today) | write and manage your cards |
 | Contribuisci | **Da validare** | `/studia/valida` (as today), validators only | the validation queue |
 
-The entries carry visible words, not only icons: on the stack that was looked at, the rail shows icons
-alone (§1). If that is the sections spec's design, G1 proposes labels (or a wider rail on large screens)
-and the front-end owner decides; it is a change to the shell, so `Sidebar.tsx` is reserved first.
+The entries carry visible words, not only icons. *Corrected on 19 October:* `develop` drew the rail as
+icons alone at every width (the label only on hover from `md`, none on a phone), and the front-end owner
+decided for words. They come in a phase of their own before G1, **G0** (§6): from `xl` a wide bar
+(224 px) with icon and word, grouped by section, the groups named; between `lg` and `xl` the 64 px rail of
+icons, labelled on hover and keyboard focus; on a phone the drawer, icon and word in rows of 44 px; from
+`xl` a control narrows the bar to the rail and widens it again, remembered in the browser, wide by
+default. The accessible names, the tours' ids and the badges stay. In Gymnasium the dossiers sit in
+«Studia», after Oggi.
 
 «Impostazioni di studio» (`StudyPreferences`, unchanged in content) leave the bottom of the home and open
 from a gear in the header of **Oggi**, in a `ui/Sheet`.
@@ -137,11 +142,16 @@ ring at zero, the streak at 0 with «Il primo giorno comincia oggi», and a road
 institutes is imposed (that would be a decision about content, not about layout).
 
 - **From the first PR (web only):** one stop per **subject**, from `Progressi.materie` (new, in learning,
-  consolidated, and the reviews of the last 30 days). A stop shows its name, a bar of the three states,
-  «N da ripassare», and a button «Ripassa» that starts a session narrowed to that subject. The stops are
-  ordered by what needs attention first (most due), then by name.
-- **Later, with the server read of G5:** inside a subject, one stop per **institute**
-  («Risoluzione per inadempimento»), with the same bar and «N da ripassare», sorted by the same rule.
+  consolidated, and the reviews of the last 30 days). A stop shows its name, a bar of the three states
+  (also in words), the reviews of the last 30 days, and a button «Ripassa» that starts a session
+  narrowed to that subject. The stops are ordered by the cards still open, new plus in learning, most
+  first, then by name. *Corrected on 19 October:* this section first said each stop shows «N da
+  ripassare» and the stops sort by most due; the progress read cannot give that — `Progressi.materie`
+  (`types/studia.ts`) carries per subject only `nuove`, `apprendimento`, `consolidate` and `ripassi30`,
+  and the cards due exist only as the day's total (`oggi.dovute`).
+- **Later, with the server read of G5:** «N da ripassare» per subject and per institute; inside a subject,
+  one stop per **institute** («Risoluzione per inadempimento»), with the same bar and «N da ripassare»,
+  sorted by the cards due first.
 
 The road is drawn as a vertical path of stops joined by a line in the section hue; on a computer it may
 sit beside the action card. Stops are buttons (`aria-pressed` where they filter), the state is also
@@ -188,12 +198,13 @@ reader's quieter look. The validation vote bar keeps its three votes and the req
 
 ## 6. Phases
 
-Each is one PR into `develop`, web only except G5, behind no flag. The first four stack on each other in
-this order; G5 waits for a decision.
+Each is one PR into `develop`, web only except G5, behind no flag. G0 and G1 touch different files and
+branch from `develop` side by side; G2–G4 follow in this order; G5 waits for a decision.
 
 | # | Phase | Main files |
 | --- | --- | --- |
-| G1 | The sidebar's two groups; **Oggi** (strip, action card, subject chips, subject stops); the settings in a sheet; the empty and failed states | `features/sections/sections.ts`, `ReviewHome.tsx`, `progress/ProgressBand.tsx`, `progress/SubjectChips.tsx`, `progress/SubjectProgress.tsx`, `StudyPreferences.tsx`, `StudiaPage.tsx`, `App.tsx` (the new route) |
+| G0 | The sidebar's words (§4): the wide bar from `xl`, the rail between `lg` and `xl`, the drawer's rows, the narrow/widen control; Gymnasium's two groups | `Sidebar.tsx`, `Layout.tsx`, `SectionSwitcher.tsx` |
+| G1 | **Oggi** (strip, action card, subject chips, subject stops by the three states — no «N da ripassare» per subject until G5); the settings in a sheet; the empty and failed states; the progress panels kept at the bottom under «I tuoi progressi» until G3 gives them their page | `ReviewHome.tsx`, `progress/ProgressBand.tsx`, `progress/SubjectChips.tsx`, `progress/SubjectProgress.tsx`, `StudyPreferences.tsx`, `StudiaPage.tsx` |
 | G2 | **Lezione**: the frame, the progress bar, the bottom bar, the note after a grade, the end screen; the same PR rewrites §6 of the Studia screens spec and the review-card sentence of `apps/web/CLAUDE.md` | `ReviewSession.tsx`, `ReviewCard.tsx`, `GradeBar.tsx`, `progress/SessionEndProgress.tsx`, `useReviewSession.ts` (read only unless a test says otherwise) |
 | G3 | **Progressi**: the page and the restyle of its four components | `progress/*` |
 | G4 | **Contribuisci**: Le mie schede, Da validare, the reader's row; a «+ Nuova scheda» inside Le mie schede and in its empty state (§5.5) | `MyCardsView.tsx`, `CardGroups.tsx`, `CardFilters.tsx`, `CardDetail.tsx`, `ValidationQueueView.tsx`, `VoteBar.tsx`, `ArticleCardsRow.tsx`, `ArticleCardsPeek.tsx` |
