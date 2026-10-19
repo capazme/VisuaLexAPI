@@ -7,6 +7,7 @@ vi.mock('../../../services/studiaService', () => ({
   studiaService: { progress: vi.fn(() => new Promise(() => {})), preferences: vi.fn(() => new Promise(() => {})) },
 }));
 
+import { Z_INDEX } from '../../../constants/zIndex';
 import { StudiaPage } from './StudiaPage';
 
 function at(path: string) {
@@ -55,11 +56,20 @@ describe('StudiaPage', () => {
     expect(page).toHaveClass('mx-auto', 'max-w-3xl');
     expect(page).toContainElement(screen.getByRole('heading', { level: 1, name: 'Gymnasium: la tua palestra giuridica' }));
     unmount();
-    for (const path of ['/studia/schede', '/studia/ripasso/sessione']) {
-      const view = at(path);
-      expect(view.container.firstElementChild).toHaveClass('mx-auto', 'max-w-6xl');
-      view.unmount();
-    }
+    const view = at('/studia/schede');
+    expect(view.container.firstElementChild).toHaveClass('mx-auto', 'max-w-6xl');
+    view.unmount();
+  });
+
+  it('draws the session as the lesson, a screen of its own over the shell, with no heading of the area (Gymnasium spec §5.4)', () => {
+    const { container } = at('/studia/ripasso/sessione');
+    const frame = screen.getByTestId('lesson-frame');
+    // Portalled out of the page, in its own band: over the sidebar and the floating buttons, under the overlays.
+    expect(container).not.toContainElement(frame);
+    expect(frame.parentElement).toBe(document.body);
+    expect(frame).toHaveClass('fixed', 'inset-0', Z_INDEX.lesson);
+    expect(frame).toHaveTextContent('sessione');
+    expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
   });
 
   it.each(['/studia/ripasso', '/studia/ripasso/sessione'])('leaves %s alone: «Oggi» draws its own strip, the session is a lesson', (path) => {

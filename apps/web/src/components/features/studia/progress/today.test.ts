@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Progressi, TappaIstituto } from '../../../../types/studia';
-import { dueBySubject, dueLabel, instituteSessionPath, nextDueDay, orderInstitutes, orderStops, stopStates, todayState } from './today';
+import { cardsLeft, dueBySubject, dueLabel, instituteCardsLeft, instituteSessionPath, nextDueDay, orderInstitutes, orderStops, stopStates, todayState } from './today';
 
 type Stop = Progressi['materie'][number];
 const stop = (materia: Stop['materia'], nuove: number, apprendimento: number, consolidate = 0): Stop => ({ materia, nuove, apprendimento, consolidate, ripassi30: 0 });
@@ -111,5 +111,30 @@ describe('the next day with cards', () => {
 
   it('is tomorrow while new cards wait, which `prossimi` does not count (today\'s quota of them used up)', () => {
     expect(nextDueDay(answer({}, [0, 0, 0, 2], { nuove: 30, apprendimento: 0, consolidate: 0 }))).toBe('domani');
+  });
+});
+
+describe('the cards left at the lesson\'s end (Gymnasium spec §5.4)', () => {
+  it('counts the cards still due and the new ones today still allows, and nothing else', () => {
+    expect(cardsLeft(answer())).toBe(0);
+    expect(cardsLeft(answer({ dovute: 4, nuove: 2 }))).toBe(6);
+    expect(cardsLeft(answer({ ripassi: 30 }, [12, 8]))).toBe(0);
+  });
+});
+
+describe('the cards left in one institute at the lesson\'s end (G5)', () => {
+  const tappa = (istituto: string, dovute: number, nuove: number): TappaIstituto => ({ materia: 'DIRITTO_CIVILE', istituto, nuove, apprendimento: dovute, consolidate: 0, dovute });
+
+  it('counts the institute\'s due cards and its new ones up to what today still allows in the subject', () => {
+    const stops = [tappa('Mora', 2, 7), tappa('Risoluzione', 9, 9)];
+    expect(instituteCardsLeft(stops, 'DIRITTO_CIVILE', 'Mora', answer({ nuove: 3 }))).toBe(5);
+    expect(instituteCardsLeft(stops, 'DIRITTO_CIVILE', 'Mora', answer({ nuove: 0 }))).toBe(2);
+  });
+
+  it('never counts the subject\'s other institutes, another subject\'s, or an institute the read does not list', () => {
+    const stops = [tappa('Mora', 0, 0), tappa('Risoluzione', 9, 9)];
+    expect(instituteCardsLeft(stops, 'DIRITTO_CIVILE', 'Mora', answer({ dovute: 9, nuove: 5 }))).toBe(0);
+    expect(instituteCardsLeft(stops, 'DIRITTO_PENALE', 'Risoluzione', answer({ nuove: 5 }))).toBe(0);
+    expect(instituteCardsLeft(stops, 'DIRITTO_CIVILE', 'Usucapione', answer({ nuove: 5 }))).toBe(0);
   });
 });

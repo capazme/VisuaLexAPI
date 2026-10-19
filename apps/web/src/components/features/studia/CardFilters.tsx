@@ -4,6 +4,7 @@ import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import type { Materia, StatoScheda, TipoScheda } from '../../../types/studia';
 import type { ActOption, FilterState } from './useMyCards';
+import { FOCUS_RING } from './progress/tokens';
 import { MATERIA_LABEL, STATO_LABEL, TIPO_LABEL } from './studiaLabels';
 
 export interface CardFiltersProps {
@@ -16,8 +17,13 @@ export interface CardFiltersProps {
   acts: ActOption[];
 }
 
-const CONTROL =
-  'min-h-[44px] rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 md:min-h-0 md:py-1.5 dark:border-slate-600 dark:bg-slate-800 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
+// 44 px at every width (Gymnasium spec §3): the row is short enough to afford it on a computer too.
+const CONTROL = cn(
+  'min-h-[44px] rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 transition-colors dark:border-slate-600 dark:bg-slate-900 dark:text-slate-50',
+  FOCUS_RING,
+);
+/** A pressed toggle: an ink edge and a tint, and `aria-pressed`, so the state is not told by colour alone. */
+const PRESSED = 'border-primary-900 bg-primary-50 font-medium text-primary-900 dark:border-primary-300 dark:bg-primary-900/30 dark:text-primary-200';
 
 interface FilterSelectProps<T extends string> {
   label: string;
@@ -62,7 +68,7 @@ export function CardFilters({ value, onChange, search, onSearchChange, acts }: C
     >
       <div className="flex gap-2">
         <div className="relative min-w-0 flex-1">
-          <Search size={16} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search size={16} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
           <input
             type="search"
             value={search}
@@ -122,7 +128,7 @@ export function CardFilters({ value, onChange, search, onSearchChange, acts }: C
           className={cn(
             CONTROL,
             'col-span-2 text-left md:col-span-1 md:text-center',
-            value.daRileggere && 'border-primary-500 bg-primary-50 text-primary-700 dark:border-primary-400 dark:bg-primary-900/30 dark:text-primary-300',
+            value.daRileggere && PRESSED,
           )}
         >
           Scritte da Claude, da rileggere
@@ -134,7 +140,7 @@ export function CardFilters({ value, onChange, search, onSearchChange, acts }: C
           className={cn(
             CONTROL,
             'col-span-2 text-left md:col-span-1 md:text-center',
-            value.dovuteOggi && 'border-primary-500 bg-primary-50 text-primary-700 dark:border-primary-400 dark:bg-primary-900/30 dark:text-primary-300',
+            value.dovuteOggi && PRESSED,
           )}
         >
           Da ripassare oggi

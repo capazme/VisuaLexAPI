@@ -148,6 +148,16 @@
     to { opacity: 1; transform: none; }
   }
 
+  /* The note after a grade in Gymnasium's lesson («Torna tra 3 giorni»): it rises in, holds, and fades
+     within its second on screen. Used only as `motion-safe:animate-vlx-note`; still under reduced motion. */
+  --animate-vlx-note: vlx-note 1000ms var(--ease-out) both;
+  @keyframes vlx-note {
+    0% { opacity: 0; translate: 0 4px; }
+    15% { opacity: 1; translate: 0 0; }
+    80% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
   /* Type (spec §4.2): Newsreader to read and for titles, Geist for the interface, Geist Mono for
      identifiers. Self-hosted through @fontsource-variable (imported in main.tsx). */
   --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
