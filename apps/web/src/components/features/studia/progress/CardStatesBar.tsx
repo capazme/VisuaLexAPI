@@ -10,6 +10,9 @@ export interface CardStatesBarProps {
 
 type StateKey = keyof ConteggiStati;
 
+/** The bar's colour inside its 44 px row: the whole row on a phone, 28 px on a computer (the row's height never shrinks). */
+const BAR = 'pointer-events-none absolute inset-x-0 inset-y-0 md:inset-y-2';
+
 const cards = (n: number) => `${formatCount(n)} ${n === 1 ? 'scheda' : 'schede'}`;
 
 /**
@@ -28,10 +31,13 @@ export function CardStatesBar({ stati }: CardStatesBarProps) {
   return (
     <div className="grid gap-4">
       {total === 0 ? (
-        <div className="h-11 rounded-md bg-slate-100 md:h-7 dark:bg-slate-800" />
+        <div className="relative h-11">
+          <span className={cn(BAR, 'rounded-md bg-slate-100 dark:bg-slate-800')} />
+        </div>
       ) : (
-        <div className="flex h-11 gap-0.5 overflow-hidden rounded-md md:h-7">
-          {CARD_STATES.filter((s) => stati[s.key] > 0).map((state) => (
+        // Each segment answers over 44 px at every width; on a computer the colour is drawn 28 px tall inside it.
+        <div className="flex h-11 gap-0.5">
+          {CARD_STATES.filter((s) => stati[s.key] > 0).map((state, index, segments) => (
             <button
               key={state.key}
               type="button"
@@ -40,8 +46,10 @@ export function CardStatesBar({ stati }: CardStatesBarProps) {
               onFocus={() => setChosen(state.key)}
               onClick={() => setChosen(state.key)}
               style={{ flexGrow: stati[state.key] }}
-              className={cn('min-w-3 basis-0 motion-safe:transition-[flex-grow] motion-safe:duration-300', state.swatch, FOCUS_RING, 'focus-visible:ring-offset-0', chosen === state.key && 'opacity-80')}
-            />
+              className={cn('relative h-11 min-w-3 basis-0 rounded-md motion-safe:transition-[flex-grow] motion-safe:duration-300', FOCUS_RING, 'focus-visible:ring-offset-0', chosen === state.key && 'opacity-80')}
+            >
+              <span aria-hidden className={cn(BAR, state.swatch, index === 0 && 'rounded-l-md', index === segments.length - 1 && 'rounded-r-md')} />
+            </button>
           ))}
         </div>
       )}
@@ -76,8 +84,10 @@ export function CardStatesBar({ stati }: CardStatesBarProps) {
 export function CardStatesBarSkeleton() {
   return (
     <div aria-hidden className="grid gap-4">
-      <div className="h-11 rounded-md bg-slate-100 motion-safe:animate-pulse md:h-7 dark:bg-slate-800" />
-      <div className="h-[4.5rem] rounded-lg bg-slate-100 motion-safe:animate-pulse md:h-[3.75rem] dark:bg-slate-800" />
+      <div className="relative h-11">
+        <span className={cn(BAR, 'rounded-md bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800')} />
+      </div>
+      <div className="h-[4.5rem] rounded-lg bg-slate-100 motion-safe:animate-pulse md:max-h-[3.75rem] dark:bg-slate-800" />
       <div className="min-h-5" />
     </div>
   );

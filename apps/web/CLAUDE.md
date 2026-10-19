@@ -635,14 +635,17 @@ line says it to a screen reader). The confetti step by elapsed time (`confetti.t
 (`StudiaPage` narrows it to the same 768 px column as «Oggi», and draws no strip over it) the page heading «I tuoi
 progressi», then, one column at every width: **the summary** (`StreakBadge compact`, `GoalRing compact` and the reviews
 of the last 30 days in a large number, `recentReviews`: the sum of `materie[].ripassi30`; always the whole day's, as
-the streak and the goal are); **the subject chips** (`SubjectChips`, the subject «Oggi» remembers, and a line saying
+the streak and the goal are); **the subject chips** (`SubjectChips`, 44 px at every width — Oggi's too —, the subject «Oggi» remembers, and a line saying
 what it narrows); **«Il tuo calendario»** (`ActivityCalendar`, 26 weeks on a computer and 12 on a phone by
-`useIsDesktop`); **«Le schede per stato»** (`CardStatesBar`: the bar's segments are buttons as before, and under it the
+`useIsDesktop`); **«Le schede per stato»** (`CardStatesBar`: the bar's segments are buttons as before, each a 44 px box at every width with its colour
+drawn 28 px tall inside on a computer, and under it the
 three states by name, count and share — `shares` rounds by the largest remainder so the three add up to 100, and a state
 with cards that rounds to none reads «<1%», never «0%»); **«I prossimi 14 giorni»** (`DueForecast`); **«Per materia»**
 (`SubjectProgress`: the five subjects in the road's order, `orderStops`, each an `aria-pressed` button that narrows the
 page — pressed again it clears —, its share consolidated, a bar of the three states and the states in words,
-`stopStates`, and the reviews of 30 days; no «N da ripassare», which the progress read does not carry by subject). The
+`stopStates`, and the reviews of 30 days; no «N da ripassare», which the progress read does not carry by subject). Every control on the page is 44 px tall at every width
+(`ProgressPage.test.tsx` guards its files against an `md:` height, as `contribuisci.test.ts` does Contribuisci's); the
+calendar's cells and the coming days' columns are the exception the progress spec §6.3 names, reached by the arrows. The
 calendar, the states and the coming days are the chosen subject's read; the summary and «Per materia» stay the whole
 day's. The calendar's cells carry a state (`layout.ts` `calendarDayState`, `data-stato`): a dot on a day that counted,
 a dashed outline on a rest, a dash on a past day that did not count (`saltato`), a ring on today, the rest of this week

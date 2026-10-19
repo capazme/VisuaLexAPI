@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -256,5 +258,12 @@ describe('ProgressPage (Gymnasium spec §5.3)', () => {
       fireEvent.click(container.querySelector('[data-day="2026-10-12"]')!);
       expect(screen.getByText('lunedì 12 ottobre: 9999 ripassi, 200 nuove, 1450 sbagliate, obiettivo raggiunto')).toBeInTheDocument();
     });
+  });
+
+  // Measured at 1366 px: the chips were 34–36 px and the bar's segments 28 px. As «Contribuisci» (`contribuisci.test.ts`),
+  // no `md:` minimum or height but 44 px shrinks a target on a computer, in the files that draw this page's controls.
+  it.each(['ProgressPage.tsx', 'SubjectChips.tsx', 'CardStatesBar.tsx', 'SubjectProgress.tsx'])('%s keeps its targets at 44 px from `md` up', (file) => {
+    const source = readFileSync(join(resolve(process.cwd(), 'src/components/features/studia/progress'), file), 'utf8');
+    expect(source).not.toMatch(/\bmd:(?:min-h|min-w|h)-(?!\[44px\])/);
   });
 });

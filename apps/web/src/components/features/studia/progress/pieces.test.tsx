@@ -186,6 +186,16 @@ describe('CardStatesBar', () => {
     expect(screen.getByText('Nuove: 1 scheda (25%)', { selector: 'p' })).toBeInTheDocument();
   });
 
+  it('gives each segment a 44 px box at every width, the colour drawn inside it', () => {
+    render(<CardStatesBar stati={{ nuove: 15, apprendimento: 30, consolidate: 13 }} />);
+    for (const segment of screen.getAllByRole('button')) {
+      // jsdom measures nothing: the box is h-11 with no `md:` height, the colour an inset span.
+      expect(segment).toHaveClass('h-11');
+      expect(segment.className).not.toMatch(/\bmd:(?:min-h|h)-/);
+      expect(segment.firstElementChild).toHaveClass('absolute', 'md:inset-y-2');
+    }
+  });
+
   it('draws no segment for an empty state, and says when there is nothing', () => {
     const { rerender } = render(<CardStatesBar stati={{ nuove: 0, apprendimento: 3, consolidate: 0 }} />);
     expect(screen.getAllByRole('button')).toHaveLength(1);
@@ -290,6 +300,11 @@ describe('the subject filter', () => {
     render(<SubjectChips selected="DIRITTO_PENALE" onSelect={onSelect} />);
     const group = screen.getByRole('group', { name: 'Materia' });
     expect(within(group).getAllByRole('button')).toHaveLength(6);
+    // 44 px tall at every width, a computer too.
+    for (const chip of within(group).getAllByRole('button')) {
+      expect(chip).toHaveClass('min-h-[44px]');
+      expect(chip.className).not.toMatch(/\bmd:(?:min-h|h|py)-/);
+    }
     // A phone's sideways row with no bar drawn: in dark mode it showed light (theme.test.ts checks the CSS).
     expect(group).toHaveClass(...HIDDEN_SCROLLBAR.split(' '));
     expect(within(group).getByRole('button', { name: 'Diritto penale' })).toHaveAttribute('aria-pressed', 'true');
