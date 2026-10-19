@@ -68,9 +68,10 @@ export function ReviewHome() {
     <section className="max-w-5xl space-y-6 pb-8">
       <h2 className="sr-only">Oggi</h2>
       {/* The confetti start from the ring and fall over the strip and the action, never over the rest. */}
-      <div className="relative max-w-3xl space-y-4">
+      {/* A grid, not `space-y`: the burst mounted after the card would give it a margin and move the page. */}
+      <div className="relative grid max-w-3xl gap-4">
         <StudyStrip data={data} loading={loading && data === null} onSettingsChanged={progress.reload} ringRef={ringRef} celebrate={celebrate} />
-        <TodayCard data={data} failed={progress.status === 'error'} onRetry={progress.reload} filtered={materia !== undefined} onStart={start} celebrate={celebrate} />
+        <TodayCard data={data} failed={progress.status === 'error'} onRetry={progress.reload} subject={materia && MATERIA_LABEL[materia]} onAllSubjects={() => choose(undefined)} onStart={start} celebrate={celebrate} />
         {celebrate && data && (
           <ConfettiBurst originRef={ringRef} onStart={() => markCelebrated(data.oggi.giorno)} onDone={() => setBurstDone(data.oggi.giorno)} />
         )}

@@ -29,9 +29,12 @@ export function stopStates(stop: Stop): string {
 
 /**
  * The next day with cards, from the coming days the server sent (today first): «domani», «martedì 21
- * ottobre», or null when none is due in the fortnight. The web formats the server's days, never computes one.
+ * ottobre», or null when none is due in the fortnight. `prossimi` counts the cards already studied: new
+ * cards still waiting (today's quota of them used up) come tomorrow. The web formats the server's days,
+ * never computes one.
  */
 export function nextDueDay(data: Progressi): string | null {
+  if (data.stati.nuove > 0) return 'domani';
   const next = data.prossimi.find((day) => day.giorno > data.oggi.giorno && day.schede > 0);
   if (!next) return null;
   return next.giorno === addDays(data.oggi.giorno, 1) ? 'domani' : formatDayLong(next.giorno);

@@ -43,7 +43,8 @@ export function StreakBadge({ attuale, record, ultimiGiorni, pop = false, compac
 
   if (compact) {
     return (
-      <div className="flex min-w-0 items-center gap-2" role="group" aria-label={name}>
+      // An image, not a group: every child is hidden, and a group with nothing in it may be skipped.
+      <div className="flex min-w-0 items-center gap-2" role="img" aria-label={name}>
         <span aria-hidden className={cn('grid h-8 w-8 shrink-0 place-content-center rounded-full font-serif text-lg font-bold leading-none', INK_BG, ON_INK)}>
           §
         </span>

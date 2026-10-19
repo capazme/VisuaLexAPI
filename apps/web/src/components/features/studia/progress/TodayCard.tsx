@@ -4,7 +4,7 @@ import type { Progressi } from '../../../../types/studia';
 import { estimateLabel } from '../studiaLabels';
 import { GoalStamp } from './Celebration';
 import { nextDueDay, todayState } from './today';
-import { FOCUS_RING, INK_BG, INK_TEXT, MUTED_TEXT, ON_INK, SUCCESS_TEXT, TILE } from './tokens';
+import { FOCUS_RING, INK_BG, INK_BORDER, INK_TEXT, MUTED_TEXT, ON_INK, SUCCESS_TEXT, TILE } from './tokens';
 
 export interface TodayCardProps {
   /** The last answer; null before the first one. */
@@ -12,8 +12,10 @@ export interface TodayCardProps {
   /** The last read failed (the first, or one after it): the card says so with «Riprova». */
   failed: boolean;
   onRetry: () => void;
-  /** The page is narrowed to one subject: today's counts are that subject's, the goal the whole day's. */
-  filtered: boolean;
+  /** The subject the page is narrowed to, by name: today's counts are that subject's, the goal the whole day's. */
+  subject?: string;
+  /** Back to every subject, offered when the one chosen has nothing left today. */
+  onAllSubjects: () => void;
   /** «Inizia» and «Continua»: they stay usable when the progress cannot be read (the session reads its own cards). */
   onStart: () => void;
   /** The stamp is pressed in now (the celebration, once a day; the caller decides). */
@@ -33,6 +35,15 @@ function goalLine(data: Progressi, filtered: boolean): { text: string; met: bool
   return { text: `Ancora ${plural(missing, 'ripasso', 'ripassi')} ${purpose}.`, met: false };
 }
 
+/** «Oggi: 18 da ripassare, 8 nuove», naming the subject when one is chosen; a part that is zero is left out. */
+function todoSentence(data: Progressi, subject: string | undefined): string {
+  const parts = [
+    data.oggi.dovute > 0 ? `${data.oggi.dovute} da ripassare` : null,
+    data.oggi.nuove > 0 ? plural(data.oggi.nuove, 'nuova', 'nuove') : null,
+  ].filter(Boolean);
+  return `${subject ? `Oggi in ${subject}` : 'Oggi'}: ${parts.join(', ')}`;
+}
+
 /** The page's one primary button: 44 px, full width on a phone; a key that presses into its ink edge. */
 const PRIMARY = cn(
   'min-h-[44px] w-full rounded-xl px-8 text-base font-semibold md:w-auto',
@@ -49,7 +60,8 @@ const PRIMARY = cn(
  * «Hai finito per oggi» and the next day with cards. While the first read travels it holds its final size;
  * a failed read says so with «Riprova» and keeps «Inizia».
  */
-export function TodayCard({ data, failed, onRetry, filtered, onStart, celebrate }: TodayCardProps) {
+export function TodayCard({ data, failed, onRetry, subject, onAllSubjects, onStart, celebrate }: TodayCardProps) {
+  const filtered = subject !== undefined;
   const state = todayState(data, failed, filtered);
   const met = data?.oggi.raggiunto ?? false;
   const cards = data ? data.oggi.dovute + data.oggi.nuove : 0;
@@ -57,14 +69,12 @@ export function TodayCard({ data, failed, onRetry, filtered, onStart, celebrate 
   const next = data && state === 'done' ? nextDueDay(data) : null;
 
   return (
-    <section aria-labelledby="studia-oggi" aria-busy={state === 'loading'} className={cn(TILE, 'relative overflow-hidden p-5 md:p-7')}>
-      <h3 id="studia-oggi" className={cn('font-serif text-sm tracking-wide [font-variant:small-caps]', MUTED_TEXT)}>
-        Oggi
-      </h3>
+    // Its sentence says «Oggi»: no visible heading over it, the page's «Oggi» is the view's own.
+    <section aria-label="Da fare oggi" aria-busy={state === 'loading'} className={cn(TILE, 'relative overflow-hidden p-5 md:p-7')}>
 
       {state === 'loading' && (
         // The final size, so nothing jumps when the read answers.
-        <div className="mt-2 grid gap-3">
+        <div className="grid gap-3">
           <p className="sr-only">Carico i tuoi progressi…</p>
           <div aria-hidden className="h-8 w-3/4 rounded-md bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
           <div aria-hidden className="h-4 w-28 rounded bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
@@ -75,7 +85,7 @@ export function TodayCard({ data, failed, onRetry, filtered, onStart, celebrate 
 
       {state !== 'loading' && (
         // From `md` the stamp sits in the corner: the text keeps clear of it.
-        <div className={cn('mt-2 grid justify-items-stretch gap-3 md:justify-items-start', met && 'md:pr-52')}>
+        <div className={cn('grid justify-items-stretch gap-3 md:justify-items-start', met && 'md:pr-52')}>
           {state === 'unread' ? (
             <p role="alert" className={cn('font-serif text-2xl leading-snug md:text-3xl', INK_TEXT)}>
               Non riesco a leggere i tuoi progressi.{' '}
@@ -87,7 +97,7 @@ export function TodayCard({ data, failed, onRetry, filtered, onStart, celebrate 
           <p className={cn('font-serif text-2xl leading-snug md:text-3xl', INK_TEXT)} aria-live="polite">
             {state === 'empty' && 'Non hai ancora schede da ripassare.'}
             {state === 'done' && (filtered ? 'Niente da ripassare in questa materia, per oggi.' : 'Hai finito per oggi.')}
-            {state === 'todo' && data && `Oggi: ${data.oggi.dovute} da ripassare, ${plural(data.oggi.nuove, 'nuova', 'nuove')}`}
+            {state === 'todo' && data && todoSentence(data, subject)}
           </p>
           )}
           {state === 'unread' && <p className={cn('-mt-1 text-sm', MUTED_TEXT)}>Puoi ripassare lo stesso: il ripasso legge le sue schede.</p>}
@@ -115,13 +125,24 @@ export function TodayCard({ data, failed, onRetry, filtered, onStart, celebrate 
             </p>
           )}
 
+          {state === 'done' && filtered && (
+            <button
+              type="button"
+              onClick={onAllSubjects}
+              className={cn('min-h-[44px] w-full rounded-xl border px-5 text-sm font-semibold transition-[background-color,scale] active:scale-[0.97] md:w-auto', INK_BORDER, 'text-primary-900 hover:bg-primary-50 dark:text-primary-200 dark:hover:bg-primary-900/30', FOCUS_RING)}
+            >
+              Ripassa tutte le materie
+            </button>
+          )}
+
           {(state === 'todo' || state === 'unread') && (
             <button type="button" onClick={onStart} className={PRIMARY}>
               {met ? 'Continua' : 'Inizia'}
             </button>
           )}
 
-          {line && <p className={cn('min-h-5 text-sm font-medium', line.met ? SUCCESS_TEXT : MUTED_TEXT)}>{line.text}</p>}
+          {/* Met, the stamp says it to the eye (it is `aria-hidden`): the line stays for a screen reader. */}
+          {line && <p className={cn('min-h-5 text-sm font-medium', line.met ? cn(SUCCESS_TEXT, 'sr-only') : MUTED_TEXT)}>{line.text}</p>}
         </div>
       )}
 

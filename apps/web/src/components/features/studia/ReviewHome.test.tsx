@@ -78,7 +78,7 @@ describe('ReviewHome', () => {
     expect(await screen.findByText('Oggi: 18 da ripassare, 20 nuove')).toBeInTheDocument();
     expect(progress).toHaveBeenCalledWith(undefined);
     expect(screen.getByRole('img', { name: 'Obiettivo di oggi: 6 di 10 ripassi' })).toBeInTheDocument();
-    expect(screen.getByRole('group', { name: 'Serie: 4 giorni di fila, record 9' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Serie: 4 giorni di fila, record 9' })).toBeInTheDocument();
     expect(screen.getByText('Ancora 4 ripassi per tenere viva la serie.')).toBeInTheDocument();
     const start = screen.getByRole('button', { name: 'Inizia' });
     expect(start).toBeEnabled();
@@ -117,7 +117,7 @@ describe('ReviewHome', () => {
 
     progress.mockResolvedValue(answer(2, 5));
     await userEvent.setup().click(within(chips).getByRole('button', { name: 'Diritto penale' }));
-    expect(await screen.findByText('Oggi: 2 da ripassare, 5 nuove')).toBeInTheDocument();
+    expect(await screen.findByText('Oggi in Diritto penale: 2 da ripassare, 5 nuove')).toBeInTheDocument();
     expect(progress).toHaveBeenLastCalledWith('DIRITTO_PENALE');
     expect(localStorage.getItem(STORAGE_KEY)).toBe('DIRITTO_PENALE');
 
@@ -126,7 +126,7 @@ describe('ReviewHome', () => {
     unmount();
 
     renderHome();
-    await screen.findByText('Oggi: 2 da ripassare, 5 nuove');
+    await screen.findByText('Oggi in Diritto penale: 2 da ripassare, 5 nuove');
     expect(progress).toHaveBeenLastCalledWith('DIRITTO_PENALE');
   });
 
@@ -150,7 +150,7 @@ describe('ReviewHome', () => {
   it('starts with new cards alone', async () => {
     progress.mockResolvedValue(answer(0, 7));
     renderHome();
-    await screen.findByText('Oggi: 0 da ripassare, 7 nuove');
+    await screen.findByText('Oggi: 7 nuove');
     expect(screen.getByRole('button', { name: 'Inizia' })).toBeEnabled();
   });
 
@@ -172,6 +172,11 @@ describe('ReviewHome', () => {
     await userEvent.setup().click(within(screen.getByRole('group', { name: 'Materia' })).getByRole('button', { name: 'Diritto penale' }));
     expect(await screen.findByText('Niente da ripassare in questa materia, per oggi.')).toBeInTheDocument();
     expect(screen.getByText('Ancora 8 ripassi per tenere viva la serie.')).toBeInTheDocument();
+    // The way on: back to every subject.
+    progress.mockResolvedValue(answer(5, 5));
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Ripassa tutte le materie' }));
+    expect(await screen.findByText('Oggi: 5 da ripassare, 5 nuove')).toBeInTheDocument();
+    expect(within(screen.getByRole('group', { name: 'Materia' })).getByRole('button', { name: 'Tutte le materie' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('holds the panels’ places while the first read travels, and stops pulsing when it fails', async () => {
@@ -208,14 +213,14 @@ describe('ReviewHome', () => {
     expect(screen.getByRole('button', { name: 'Inizia' })).toBeEnabled();
     progress.mockResolvedValue(answer(1, 0));
     await userEvent.setup().click(within(alert).getByRole('button', { name: 'Riprova' }));
-    expect(await screen.findByText('Oggi: 1 da ripassare, 0 nuove')).toBeInTheDocument();
+    expect(await screen.findByText('Oggi: 1 da ripassare')).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
   });
 
   it('reads again after a setting changed', async () => {
     progress.mockResolvedValue(answer(3, 0));
     renderHome();
-    await screen.findByText('Oggi: 3 da ripassare, 0 nuove');
+    await screen.findByText('Oggi: 3 da ripassare');
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Impostazioni dello studio' }));
     progress.mockResolvedValue(answer(3, 12));
@@ -239,11 +244,11 @@ describe('ReviewHome', () => {
     expect(pending).toHaveLength(2);
     // The newer request answers first, the older one after.
     pending[1](answer(7, 7));
-    expect(await screen.findByText('Oggi: 7 da ripassare, 7 nuove')).toBeInTheDocument();
+    expect(await screen.findByText('Oggi in Diritto civile: 7 da ripassare, 7 nuove')).toBeInTheDocument();
     pending[0](answer(9, 9));
     await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(screen.getByText('Oggi: 7 da ripassare, 7 nuove')).toBeInTheDocument();
-    expect(screen.queryByText('Oggi: 9 da ripassare, 9 nuove')).not.toBeInTheDocument();
+    expect(screen.getByText('Oggi in Diritto civile: 7 da ripassare, 7 nuove')).toBeInTheDocument();
+    expect(screen.queryByText('Oggi in Diritto civile: 9 da ripassare, 9 nuove')).not.toBeInTheDocument();
   });
 
   describe('the celebration (Studia progress spec §6.4)', () => {
@@ -329,7 +334,7 @@ describe('ReviewHome', () => {
     it('shows no stamp before the goal', async () => {
       progress.mockResolvedValue(answer(3, 0));
       renderHome();
-      await screen.findByText('Oggi: 3 da ripassare, 0 nuove');
+      await screen.findByText('Oggi: 3 da ripassare');
       expect(screen.queryByTestId('goal-stamp')).not.toBeInTheDocument();
     });
   });
@@ -366,12 +371,15 @@ describe('ReviewHome', () => {
 
     it('says the day is done with the next day by name, or that none is coming', async () => {
       const later = answer(0, 0, { raggiunto: true });
+      // No new card waiting: the next day is the first of `prossimi` with cards.
+      later.stati = { nuove: 0, apprendimento: 4, consolidate: 2 };
       later.prossimi = later.prossimi.map((day, i) => ({ ...day, schede: i === 3 ? 6 : 0 }));
       progress.mockResolvedValue(later);
       const { unmount } = renderHome();
       expect(await screen.findByText('Le prossime schede: giovedì 22 ottobre.')).toBeInTheDocument();
       unmount();
       const none = answer(0, 0, { raggiunto: true });
+      none.stati = { nuove: 0, apprendimento: 0, consolidate: 6 };
       none.prossimi = none.prossimi.map((day) => ({ ...day, schede: 0 }));
       progress.mockResolvedValue(none);
       renderHome();
@@ -407,7 +415,7 @@ describe('ReviewHome', () => {
       progress.mockResolvedValue(answer(3, 0));
       renderHome();
       expect(await screen.findByRole('img', { name: 'Obiettivo di oggi: 6 di 10 ripassi' })).toHaveTextContent('6 di 10');
-      expect(screen.getByRole('group', { name: 'Serie: 4 giorni di fila, record 9' })).toHaveTextContent('4');
+      expect(screen.getByRole('img', { name: 'Serie: 4 giorni di fila, record 9' })).toHaveTextContent('4');
     });
 
     it('draws one stop a subject, by the cards still open, and «Ripassa» starts a session on it', async () => {

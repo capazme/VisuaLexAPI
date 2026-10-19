@@ -35,7 +35,8 @@ export function StudyStrip({ data, loading, onSettingsChanged, dense = false, ri
       {data ? (
         <>
           <StreakBadge compact dense={dense} attuale={data.serie.attuale} record={data.serie.record} ultimiGiorni={data.serie.ultimiGiorni} pop={celebrate} />
-          <div ref={ringRef} className="min-w-0">
+          {/* The ring's «5 di 10» never wraps: the streak's line gives way first. */}
+          <div ref={ringRef} className="shrink-0">
             <GoalRing compact ripassi={data.oggi.ripassi} obiettivo={data.oggi.obiettivo} raggiunto={data.oggi.raggiunto} />
           </div>
         </>

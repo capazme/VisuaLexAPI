@@ -30,7 +30,7 @@ describe('the road\'s order (Gymnasium spec §5.2, as corrected)', () => {
   });
 });
 
-function answer(over: Partial<Progressi['oggi']> = {}, prossimi: number[] = [], stati = { nuove: 1, apprendimento: 1, consolidate: 1 }): Progressi {
+function answer(over: Partial<Progressi['oggi']> = {}, prossimi: number[] = [], stati = { nuove: 0, apprendimento: 1, consolidate: 1 }): Progressi {
   return {
     oggi: { giorno: '2026-10-19', ripassi: 0, obiettivo: 10, raggiunto: false, dovute: 0, nuove: 0, ...over },
     serie: { attuale: 0, record: 0, ultimiGiorni: [] },
@@ -63,5 +63,9 @@ describe('the next day with cards', () => {
     expect(nextDueDay(answer({}, [0, 4, 1]))).toBe('domani');
     expect(nextDueDay(answer({}, [3, 0, 0, 2]))).toBe('giovedì 22 ottobre');
     expect(nextDueDay(answer({}, [5, 0, 0]))).toBeNull();
+  });
+
+  it('is tomorrow while new cards wait, which `prossimi` does not count (today\'s quota of them used up)', () => {
+    expect(nextDueDay(answer({}, [0, 0, 0, 2], { nuove: 30, apprendimento: 0, consolidate: 0 }))).toBe('domani');
   });
 });

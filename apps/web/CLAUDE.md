@@ -478,11 +478,13 @@ an older answer never overwrites a newer one), drawn by `studia/progress/` in on
 `StudyStrip` (`StreakBadge compact` — the «§», the count, «Il primo giorno comincia oggi» or «giorni di fila ·
 record N», no week of boxes — and `GoalRing compact`, 40 px with «5 di 10» beside it; at its end the gear,
 «Impostazioni dello studio», which opens `StudyPreferences open` — the same content, no disclosure — in a
-`ui/Sheet`, centred and capped at `max-w-lg` from `md`); `TodayCard`, the action: «Oggi: 18 da ripassare, 8 nuove»,
+`ui/Sheet`, centred and capped at `max-w-lg` from `md`); `TodayCard`, the action: «Oggi: 18 da ripassare, 8 nuove» (a
+part that is zero left out; «Oggi in Diritto penale: …» when a subject is chosen),
 «circa N minuti» (`estimateLabel` in `studiaLabels.ts`, `ceil(cards × SECONDS_PER_CARD / 60)`, 20 s a card, an
 estimate) and **«Inizia»**, the page's one primary button (44 px, full width on a phone); with the goal met, the stamp
 and «Continua» while cards are left; with nothing left «Hai finito per oggi» and the next day with cards from
-`prossimi` («domani», a day by name, or none in the fortnight) and no button; with no card at all, how to start from an
+`prossimi` («domani», a day by name, or none in the fortnight; «domani» while new cards wait, which `prossimi` does not
+count) and no button — narrowed to a subject, «Niente da ripassare in questa materia» and «Ripassa tutte le materie»; with no card at all, how to start from an
 article (Ricerca, «+ Nuova scheda» under the text — Le mie schede has no way to write one until G4) or the community's
 cards behind the gear; a failed first read says «Non riesco a leggere i tuoi progressi.» with «Riprova» and keeps
 «Inizia» (the session reads its own cards); `todayState` and `nextDueDay` decide it, pure, in `progress/today.ts`.

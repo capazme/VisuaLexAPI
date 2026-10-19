@@ -30,9 +30,11 @@ export function SubjectRoad({ materie, selected }: SubjectRoadProps) {
       <h3 id="studia-percorso" className={PANEL_HEADING}>
         Il percorso
       </h3>
-      <ol aria-labelledby="studia-percorso" className="relative space-y-3">
-        {/* The line that joins the stops, behind their marks. */}
-        <span aria-hidden className="absolute bottom-6 left-[15px] top-6 w-0.5 rounded-full bg-primary-900/15 dark:bg-primary-300/25" />
+      {/* The line that joins the stops, behind their marks: a pseudo-element, so the list holds only its items. */}
+      <ol
+        aria-labelledby="studia-percorso"
+        className="relative space-y-3 before:absolute before:bottom-6 before:left-[15px] before:top-6 before:w-0.5 before:rounded-full before:bg-primary-900/15 dark:before:bg-primary-300/25"
+      >
         {stops.map((stop, index) => {
           const total = totalCards(stop);
           const label = MATERIA_LABEL[stop.materia];
@@ -102,7 +104,7 @@ export function SubjectRoadSkeleton({ pulsing }: { pulsing: boolean }) {
     <div aria-hidden className="space-y-3">
       <div className="h-6 w-32 rounded bg-slate-100 dark:bg-slate-800/60" />
       {Array.from({ length: 5 }, (_, index) => (
-        <div key={index} className={cn('ml-11 h-[104px] rounded-2xl bg-slate-100 md:h-[92px] dark:bg-slate-800/60', pulsing && 'motion-safe:animate-pulse')} />
+        <div key={index} className={cn('ml-11 h-40 rounded-2xl bg-slate-100 md:h-[92px] dark:bg-slate-800/60', pulsing && 'motion-safe:animate-pulse')} />
       ))}
     </div>
   );
