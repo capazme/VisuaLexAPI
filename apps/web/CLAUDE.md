@@ -75,7 +75,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (`DecisionView`, the body of a decision wherever it is drawn; `DecisionEntryView`, a practice's
   decision read in its row, its window or the phone's reader, over `useDecisionAnswer` (the fetch, the
   candidates, the notices) and `DecisionAnswerBody`; `DecisionAddress`, the `/sentenze/…` route element;
-  `DecisionLink`, a decision named by other data (the Massimario's chips, Brocardi's massime);
+  `DecisionLink`, a decision named by other data (the Massimario's chips);
   `DecisionPreviewDialog` (with `useListDecisionPreview`, its own file), the preview a list opens on a decision (see «A
   decision in a list opens its preview» below);
   `DecisionTextView`: a court decision's text; `DecisionReadingSurface`: the same text with the
@@ -233,7 +233,10 @@ persist `version` is 1: `migrate` turns a browser's version-0 state into practic
 the sanitized `practices` when it carries `practicesSeeded: true`, else `practicesFromTabs` over its
 `workspaceTabs` — and drops `workspaceTabs`, `highestZIndex` and the marker; the topic searches it
 could not reopen are told once (`practiceNotice`). `merge` sanitizes the practices
-(`sanitizePractices`). `persist` writes through `utils/guardedStorage.ts`: a save the
+(`sanitizePractices`), which also drops `brocardi_info` and `brocardi_error` from every saved article
+(D-078: an article saved before kept showing Brocardi until it was fetched again); the old
+`show_brocardi_info` and `hasBrocardi` in saved searches, quick norms and `?norma=` links are left where
+they are, inert: nothing sends or reads them. `persist` writes through `utils/guardedStorage.ts`: a save the
 browser refuses (a full `localStorage`) is logged and told once as a sync error, never thrown out of
 `set`. `clearUserData` empties the practices.
 Before the first conversion the raw version-0 value is copied once to `visualex-storage.v0-backup`, so a
@@ -323,8 +326,8 @@ label goes in CSS (`content: attr(...)`), never in a text node.
 (`utils/__fixtures__/articleTexts.ts`). The practice's rows and windows, the dossier reader and Study Mode all
 render this way; Study Mode hides the heading and rubric blocks
 (`vlx-hide-header`) instead of cutting them, so its offsets are
-document-relative like everywhere else. The Brocardi sections render flat
-(`structure: null`).
+document-relative like everywhere else. No surface renders flat (`structure: null`) since the
+Brocardi sections went (D-078); the mode stays under its tests.
 
 **Offsets are measured from the text alone.** `SelectionPopup` takes a
 `textRootRef` (the element holding only the article text) and stores the anchor
@@ -334,14 +337,16 @@ per line or comma boundary, which made every cross-comma highlight unmatched.
 The renderer also accepts, at the same offset, a stored text that differs only
 in whitespace, so those older highlights show again.
 
-**«Giurisprudenza» under the article** (`CaseLawSection`, between the text and
-`BrocardiDisplay`): an accordion closed by default (state per host in
-`sessionStorage`) holding Brocardi's massime (`MassimeSection`, only where the
-doctrine is shown — gotcha 32), the Massimario's panel (the plugin slot
+**«Giurisprudenza» under the article** (`CaseLawSection`, after the text): an accordion closed by default (state per host in
+`sessionStorage`) holding the Massimario's panel (the plugin slot
 `article_case_law`, which takes `articleUrn`, `isHistorical`, `besideId`,
-`backEntry`) and the Cassazione's decisions that mention the article, searched
+`backEntry`), the Cassazione's decisions that mention the article, searched
 only when the reader presses the button (`DecisionResultList`; not offered on an act of the Union,
-`isEuropeanAct`). On a past text the section stays; the massime do not. A click on a decision's estremi
+`isEuropeanAct`), and «Cerca sentenze sul tema dell’articolo»: a topic search of the Cassazione by the
+article's rubric (`topic`, `getRubricText`; no rubric, no link; not on an act of the Union), which opens
+beside the article — the decisions on its subject, whether or not they cite it. It took the place of the
+Brocardi glossary's «Sentenze su questo tema»: Brocardi is no longer a source (D-078), and its massime,
+commentary, footnotes, glossary and credits are gone from every surface. On a past text the section stays. A click on a decision's estremi
 opens its preview, whose «Apri accanto» opens it beside the article with the way back. Every block draws its rows with the one `CaseLawRow`
 (`components/features/search/caseLaw/`: the estremi as a `DecisionLink`, the exact date else the year,
 the text cut at three lines with «Mostra tutto», the source as a small label; `authorityColor` is the
@@ -352,7 +357,7 @@ scrolls inside itself. The controls reach them through `CaseLawFiltersContext` (
 the Massimario's panel is a plugin whose slot props are a contract, so it reads the same context) and
 each block reports its years back with `useReportCaseLawYears(source, counts)` — `YearCount[]`, memoised;
 the section adds them up into the chips (`mergeYearCounts`; a year is «circa» when any block's count is
-approximate). What a row answers to is the source's to say (`YearsOf`: Brocardi's `anno`, a passage's
+approximate). What a row answers to is the source's to say (`YearsOf`: a passage's
 cited decisions' years — the review's year is its provenance, a Court of Justice decision's day); a row
 with no year is kept only while no range is set. The year range and the text filter narrow what is
 *loaded* — except for the Cassazione: its block sends the range to the archive (`anno_dal`/`anno_al`,
@@ -382,8 +387,8 @@ its 500 rows.
 A topic opens a topic-search window of the practice (`openTopicSearch`; `ReadingWindow` draws
 `DecisionSearchTabView`: heading «Tema: …», the article when the query has one, «Solo il tema» to
 drop it, the limits line, the list; a decision opened from it sits beside that window, with no way
-back; on a phone it is the full-screen reader's subject): from a Brocardi glossary
-term («Sentenze su questo tema», beside the article's row, with its norm) or from the palette
+back; on a phone it is the full-screen reader's subject): from «Cerca sentenze sul tema dell’articolo» in
+an article's «Giurisprudenza» (its rubric, beside the article's row, without its norm) or from the palette
 (a line «Cerca "…" nelle sentenze della Cassazione», shown only when the box is neither a decision,
 a norm, has at least three characters one of which is a letter or a digit, nor starts with a custom alias, nor while the server is still resolving it as an act, and announced in the palette's status region).
 
@@ -415,8 +420,9 @@ every measurement, because every edit redraws the text. Its focus management
 is modal: with no element in the text for floating-ui to bridge Tab back to,
 Tab cycles inside and Esc returns to the sign. The "Evidenziazioni" box under
 the article now lists only what no sign can reach (`LooseHighlightsList`,
-desktop): highlights made in the Brocardi sections and highlights whose text
-changed — without it they could no longer be removed.
+desktop): highlights made in the Brocardi sections (`<article>/brocardi/ratio|spiegazione`, still
+loaded by the prefix queries and labelled «Sezione non più disponibile · Ratio» since the sections went,
+D-078) and highlights whose text changed — without it they could no longer be removed.
 
 **Find in the text** («Cerca nel testo», spec §13): one floating `FindWindow` (`features/search/`,
 mounted once in `Layout`, portalled, z-index `findWindow`) opened by Cmd/Ctrl+F (`Layout.tsx`: opens,
@@ -452,7 +458,7 @@ place kept in sessionStorage and clamped; on a phone it is a full-width top bar,
 searched in its DOM, any other in its stored projection and only counted), moves the reader only on
 next or previous, and shows an undrawn match through `revealPracticeRow` / `revealPracticeDecision` (the practice made
 active, the row opened). A target whose root does not
-appear within 3 s is given up for that query and leaves the counter. The article searches `ArticleBody`'s text root only (`textRootRef`), not Brocardi nor «Giurisprudenza»; the root holds only the text (the empty-text placeholder is drawn beside it), which the find and `SelectionPopup` both rely on;
+appear within 3 s is given up for that query and leaves the counter. The article searches `ArticleBody`'s text root only (`textRootRef`), not «Giurisprudenza»; the root holds only the text (the empty-text placeholder is drawn beside it), which the find and `SelectionPopup` both rely on;
 a decision only when it has text (`hasDecisionText`). The search reads the text nodes, joined by one virtual space at every block boundary, `<br>` and skipped hidden subtree, and paints with
 the CSS Custom Highlight API (`::highlight(vlx-find)`, `::highlight(vlx-find-current)`); it adds,
 moves and changes nothing in the DOM (gotcha 23), and where the API is missing it only fails to
@@ -616,7 +622,9 @@ a block, the three verdicts alike in `SECONDARY_BUTTON`; every control of `MyCar
 form itself (`CardForm`, shared with the reader) still drops to the desktop's sizes from `md`. While the first read travels the missions,
 the band, the list and the road keep their places at their final size; a failed first read stops the pulse, and the road
 says it could not be read under its heading (no second alert: the missions' «Riprova» reads it again). Colours are the app's tokens through `progress/tokens.ts` (ink is the
-primary scale's deep end, the stamp the one red, a subject's hue the category palette's CSS variable); the charts are
+primary scale's deep end, the stamp the one red, a subject's hue the category palette's CSS variable —
+procedura penale's is `--category-penal-procedure`, the violet it had when it borrowed Brocardi's `--brocardi`, now gone;
+`theme.test.ts` fails when a subject names a variable `index.css` does not declare in both themes); the charts are
 hand-drawn SVG laid out by the pure `progress/layout.ts`, which walks the server's Rome days in UTC and never reads
 the browser's zone. **The celebration** (`progress/Celebration.tsx`): once a day per browser
 (`useCelebratedToday`, `visualex.studia.festeggiato`, written when a celebration *starts*, so leaving halfway or a new
@@ -739,7 +747,7 @@ highlight, a link, a note or a sign, opens `KeyPassagePopover` (fixed-positioned
 still out of view, made the page itself scroll): «Fai tua» is the ordinary `addHighlight` over the passage's words at its
 offset, after which the passage, nested in the highlight, loses its underline and label (they come back while the
 highlights are hidden); «Nascondi i passaggi chiave».
-No MERL-T events, versions, Brocardi or saved-norm watcher. `utils/decisionRender.ts` is the
+No MERL-T events, versions or saved-norm watcher. `utils/decisionRender.ts` is the
 renderer and the one definition of the layout (`decisionProjection`, `layoutDecision`,
 `decisionStructure`, `renderDecisionHtml`, `unmatchedAnchors`); `decisionRender.test.ts` checks
 that the rendered text nodes spell the projection (root rule 23). The .txt export of notes and
@@ -776,12 +784,10 @@ After `wrapCitationsInHtml`, `wrapDecisionCitationsInHtml` (`utils/decisionCitat
 decision a text cites in `span.decision-cite` (`data-decision-path` is the one source of truth, `data-cache-key`
 the same address), per text segment and adding no character (root rule 23: a citation cut by a highlight is
 two spans with one key). It reads the visible text with the tags removed and the entities decoded as the browser does
-(soft hyphens ignored), so a mark in the middle of a number does not cut the citation, and never claims a range a `.citation-hover` span holds. Three surfaces use it:
+(soft hyphens ignored), so a mark in the middle of a number does not cut the citation, and never claims a range a `.citation-hover` span holds. Two surfaces use it:
 `DecisionReadingSurface` (with `within: 'cassazione'` when the decision read is the Cassazione's, and its own
-path as `selfPath`, so a decision never links to itself), `ArticleTabContent` (Normattiva's update notes cite
-the Corte costituzionale) and the Ratio and Spiegazione of Brocardi (`MarkableBrocardiSection`, told where it is
-read through `decisionLinks`; Brocardi's massime already link their decision through `DecisionLink` and are not
-wrapped again). `useCitationLinks` takes a `decisions` option (`DecisionLinksOptions`); `useDecisionLinks`
+path as `selfPath`, so a decision never links to itself) and `ArticleTabContent` (Normattiva's update notes cite
+the Corte costituzionale). `useCitationLinks` takes a `decisions` option (`DecisionLinksOptions`); `useDecisionLinks`
 builds it and the popup's props: a click records the way back from the surface's origin, then
 `openDecision(reference, { fromLink: true, besideId: <host> })` (the reference is rebuilt from the path with
 `decisionReferenceOfPath`; the practice's window rule and the phone's full-screen reader are the store's).
@@ -794,7 +800,7 @@ spaces and named with «· evidenziato automaticamente» (`previewKeyPassage`, `
 else its first lines (`previewLines`): the first lines of a Cassazione decision are its parties.
 **A decision in a list opens its preview** (spec `docs/superpowers/specs/2026-10-13-decision-preview-from-lists-design.md`):
 every list that names a decision our reader opens — «Giurisprudenza» under an article (`CaseLawRow`: the
-Cassazione, Brocardi's massime, the Court of Justice's judgments; never an order or an opinion, which go to
+Cassazione, the Court of Justice's judgments; never an order or an opinion, which go to
 EUR-Lex), the Massimario's chips, a topic search's window, the Cronologia and a dossier's «Giurisprudenza» —
 opens the same body (`DecisionPreviewContent`, the hover popup's) at once on a click or Enter, through
 `useListDecisionPreview` (`useDecisionPreview().openPreview`, no delay; a second click on the estremi closes it)
@@ -829,7 +835,7 @@ al …"), the `VersionBanner`, and what is switched off — and it is tested wit
 a DOM. `versionInfo.isHistorical` is what was ASKED for (a date, or the original
 text), never what came back. On a past text the practice's row, the dossier reader and
 Study Mode take no notes, highlights, discussions or quick-norm (the selection
-popup offers only "Copia"), Brocardi is not shown, and the update notes open;
+popup offers only "Copia"), and the update notes open;
 an article that did not exist yet draws no text, only the way forward. The
 "Testo alla data" dialog (`TextAtDateDialog`) replaces the old "Cerca versione"
 modal; the result opens as a row of its own in the act, labelled with the day asked for (the text in
@@ -1151,7 +1157,7 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   `data_versione`), whichever button added it (`normaForDossier` for the window
   header's), and `dossierContainsArticle` tells two versions of one article apart,
   so both can sit in one dossier. A row shows "Testo al 29/12/2007" for a past
-  text; the reader is read-only on it (gotcha 32) and reopens it without Brocardi.
+  text; the reader is read-only on it (gotcha 32).
   The item key (`buildItemKey`) carries no version, by contract (annotations are
   keyed on it), so whatever caches, groups or compares items by article adds
   `versionKey` (`utils/versionDisplay.ts`): the reader's fetch cache
@@ -1228,8 +1234,7 @@ Duplicating any of these is a defect, not a shortcut.
   names no kind); a reference the words left open is keyed `/sentenze/tar/…?regione=Lazio` and
   `?tipo=ordinanza`, never taken for an identity. Their seats, names and closed values live in
   `utils/adminCourts.ts`, the twin of the server's `norms/adminCourts.ts`, its `SEATS` pinned to
-  `conventions/sources/tar-seats.json`; `brocardiDecisionRef` reads the court a Brocardi
-  massima is headed with. Never write a decision's label inline. The paths
+  `conventions/sources/tar-seats.json`. Never write a decision's label inline. The paths
   `/sentenze/<corte>/<numero>/<anno>` are a contract with LibreLex and the MERL-T graph: never
   rename them (spec `docs/superpowers/specs/2026-10-01-sentenze-design.md`). Its first block is
   shared with the Massimario panel (`linkableDecisionPath`); `httpsUrl` keeps a source link to
@@ -1280,7 +1285,7 @@ Duplicating any of these is a defect, not a shortcut.
   `addDaysToIsoDate`, and `todayInRome` (the day the server compares a
   `version_date` with; the browser's own day can differ).
 - `utils/versionDisplay.ts` — `describeVersion(validity, request)` (chip, banner,
-  what is shown and what is off: `readOnly`, `doctrineVisible`, `textVisible`,
+  what is shown and what is off: `readOnly`, `textVisible`,
   `canCite`, `canCopyOrSave` with its reason `copyBlockedReason`,
   `updateNotesOpen`), `versionKey` (which text a request asks for, as one string),
   `requestedVersion` / `versionLabel` (a request as the original, a day or the text in force, a day winning over
@@ -1400,7 +1405,7 @@ Duplicating any of these is a defect, not a shortcut.
   an optional article to focus, which `SearchPanel` focuses even inside a
   range). `SearchPanel` still reads the older `?share=`.
 - `utils/searchFilters.ts` — `matchesSearchFilters(article, filters)` for the
-  palette's source / Brocardi / historical / year filters, applied
+  palette's source / historical / year filters, applied
   client-side to each streamed result. `SearchPanel` counts what a filter
   drops and, when nothing got through, says so instead of showing an empty
   search.
@@ -1412,7 +1417,7 @@ Duplicating any of these is a defect, not a shortcut.
   counts (the Forum's `total`; `normaChanges` on the avatar and the menu's Cronologia).
 - `hooks/useServiceHealth.ts` + `ui/ServiceHealthMenuEntry` (the user menu's status; one call, in `Layout`) — probes
   `/api/health/detailed` (Node, a `SELECT 1`) and `/health/detailed` (Python, which reaches
-  Normattiva, EUR-Lex and Brocardi for real). Once on mount, then every
+  Normattiva and EUR-Lex for real). Once on mount, then every
   **5 minutes** per visible tab, plus "Ricontrolla"; the Python answer is
   cached server-side for `HEALTH_DETAILED_TTL`. Do not tighten either loop —
   the first version polled every 60s per tab. `cardSourcesAnswer` (`healthService.ts`) reads the same Python
@@ -1595,7 +1600,7 @@ meant to stay split; add new features as new files, not inside the shells:
   width, measured, for that row only) and `ReadingWindow` (the light window: title, «Chiudi», a scrolling body with
   the column's bottom padding, the body by kind; it reads under its own id and passes its practice as
   `findHostId`, and an article as `ArticleTabContent variant="beside"`: the compact `ReadingToolbar`
-  (notes, highlights, discussions, the magnifier and copy), Brocardi in a `ClosedSection`, and no Studio,
+  (notes, highlights, discussions, the magnifier and copy), and no Studio,
   Studia row, MERL-T entry or graph rail; the `row` variant is the table's). «Salva come dossier» and «Aggiungi a un dossier…» (spec §7): `practiceDossierItems`
   (pure: the items in table order, each article from its own `norma_data`, a code's search and index
   copies one item; `dossierHoldsArticle`), `useSavePracticeAsDossier` (create first, add, order once,
@@ -1614,8 +1619,8 @@ meant to stay split; add new features as new files, not inside the shells:
   and, when it is done, for the `practiceAct` tour, which the practice's first `PracticeActBlock` also asks for once the
   table's has been seen (`config/tourConfig.ts`; their targets are `#tour-practice-bar`, `#tour-practice-header`,
   `#tour-practice-save`, `.practice-act`, `.practice-act-head`, `.practice-act-index`, `.practice-row-beside`,
-  `.practice-act-study`, `.practice-act-structure`, plus the reading bar's `.glass-toolbar` and Brocardi's
-  `.brocardi-display`; `tourConfig.practice.test.tsx` fails when one is missing). Tours never overlap: `useTour` keeps one driver on screen
+  `.practice-act-study`, `.practice-act-structure`, plus the reading bar's `.glass-toolbar`;
+  `tourConfig.practice.test.tsx` fails when one is missing, and when a tour points at a Brocardi surface). Tours never overlap: `useTour` keeps one driver on screen
   module-wide, so a tour asked while another shows is not started (it is asked again the next time its
   surface mounts, and a tour not seen stays unseen), and `tryStartTour` looks at «seen» again when its delay ends;
   `practiceAct` is asked only for a practice that has an act. `tourConfig.targets.test.tsx` fails when a tour's
@@ -1806,8 +1811,8 @@ meant to stay split; add new features as new files, not inside the shells:
     whose page could not be read, takes no notes, highlights or discussions:
     `buildItemKey` has no version segment, so anything made on it would appear
     on the text in force, on the wrong words. A new surface that renders
-    article text passes it through `describeVersion` and honours `readOnly`,
-    `doctrineVisible` and `textVisible`, and asks `canCopyOrSave` (showing
+    article text passes it through `describeVersion` and honours `readOnly`
+    and `textVisible`, and asks `canCopyOrSave` (showing
     `copyBlockedReason`) and `canCite` before it copies, exports, saves or
     cites, the way `ArticleTabContent` and `DossierItemReader` do; and anything
     that caches, groups or compares texts by article adds `versionKey` to the
