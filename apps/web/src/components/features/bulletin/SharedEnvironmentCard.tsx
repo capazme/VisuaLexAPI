@@ -159,8 +159,9 @@ export function SharedEnvironmentCard({
             <div className="relative" ref={menuRef}>
               <button
                 id={isFirst ? 'tour-forum-actions' : undefined}
+                aria-label={`Azioni su «${environment.title}»`}
                 onClick={() => setShowMenu(!showMenu)}
-                className="p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center md:min-h-0 md:min-w-0 p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
               >
                 <MoreHorizontal size={16} className="text-slate-500" />
               </button>
