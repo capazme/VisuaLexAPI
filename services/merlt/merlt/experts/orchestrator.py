@@ -37,6 +37,7 @@ from datetime import datetime
 from merlt.experts.base import BaseExpert, ExpertContext, ExpertResponse, FeedbackHook
 from merlt.experts.router import ExpertRouter, RoutingDecision
 from merlt.experts.synthesizer import AdaptiveSynthesizer, SynthesisConfig, SynthesisResult, SynthesisMode
+from merlt.storage.graph.brocardi_guard import TRACE_GUARD_KEY
 from merlt.experts.circuit_breaker import (
     CircuitBreakerRegistry,
     CircuitOpenError,
@@ -1236,6 +1237,9 @@ class MultiExpertOrchestrator:
         # routing/tool actions (must run before to_dict()).
         self._merge_expert_traversal_actions(trace, responses, experts)
         synthesis_result.metadata["execution_trace"] = trace.to_dict()
+        # Every source the experts read came through BaseTool.__call__, which
+        # takes Brocardi's text out (D-078): the answer and its trace say so.
+        synthesis_result.metadata[TRACE_GUARD_KEY] = 1
 
         # Loop β C.2: sediment this query's LIVE retrievals into the graph —
         # provisional, NON-BLOCKING, failure-isolated. Collect the live_unconfirmed

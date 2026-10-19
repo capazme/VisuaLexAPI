@@ -97,6 +97,7 @@ from merlt.storage.enrichment import (
     # Promotion provenance
     UserDocument,
 )
+from merlt.storage.graph.brocardi_guard import is_brocardi
 from merlt.storage.graph.client import FalkorDBClient
 from merlt.storage.graph.entity_writer import (
     EntityGraphWriter,
@@ -1992,6 +1993,13 @@ async def get_pending(
     # queue (written before the write-site gate existed). The backfill deletes
     # them for good; this protects the read path in the meantime.
     entities = [e for e in entities if is_valid_entity_name(e.entity_text, e.entity_type)]
+    # Brocardi's text never reaches a validator (D-078): an entity still marked
+    # as Brocardi's is left out. One saved with `fonte="llm_extraction"` can no
+    # longer be told apart.
+    entities = [
+        e for e in entities
+        if not is_brocardi({"fonte": e.fonte, "source_url": e.source_reference})
+    ]
 
     # Convert to PendingEntityData
     pending_entities = [
@@ -2078,13 +2086,28 @@ async def get_pending(
         v for rel in relations for v in (rel.source_node_urn, rel.target_entity_id) if v
     }
     pending_names: Dict[str, str] = {}
+    brocardi_endpoints: set = set()
     if endpoint_values:
         name_rows = await session.execute(
-            select(PendingEntity.entity_id, PendingEntity.entity_text).where(
-                PendingEntity.entity_id.in_(endpoint_values)
-            )
+            select(
+                PendingEntity.entity_id, PendingEntity.entity_text,
+                PendingEntity.fonte, PendingEntity.source_reference,
+            ).where(PendingEntity.entity_id.in_(endpoint_values))
         )
-        pending_names = {eid: text for eid, text in name_rows.all() if text}
+        for eid, text, fonte, reference in name_rows.all():
+            if is_brocardi({"fonte": fonte, "source_url": reference}):
+                brocardi_endpoints.add(eid)
+            elif text:
+                pending_names[eid] = text
+    # Like the entities above: a relation Brocardi made, or one that names a
+    # Brocardi entity or node, is left out (D-078).
+    relations = [
+        rel for rel in relations
+        if not is_brocardi({"fonte": rel.fonte, "source_url": rel.source_reference})
+        and not brocardi_endpoints.intersection((rel.source_node_urn, rel.target_entity_id))
+        and not is_brocardi({"node_id": rel.source_node_urn})
+        and not is_brocardi({"node_id": rel.target_entity_id})
+    ]
 
     # Convert to PendingRelationData
     pending_relations = []

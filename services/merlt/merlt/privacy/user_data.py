@@ -44,6 +44,7 @@ left, so the caller retries until it reports ``complete``.
 
 from __future__ import annotations
 
+import json
 import os
 import uuid
 from dataclasses import dataclass
@@ -53,6 +54,8 @@ from typing import Any, AsyncContextManager, Callable, Dict, List, Mapping, Opti
 import structlog
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy import text
+
+from merlt.storage.graph.brocardi_guard import is_trace_guarded, redact_stored_sources
 
 log = structlog.get_logger()
 
@@ -168,6 +171,25 @@ def _rows(result) -> List[Dict[str, Any]]:
     return [dict(row) for row in result.mappings().all()]
 
 
+def _json_column(value: Any) -> Any:
+    # A raw `text()` query hands a JSONB column back as its JSON string.
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except ValueError:
+            return value
+    return value
+
+
+def _strip_brocardi_from_turn(row: Dict[str, Any]) -> None:
+    """The cited sources of a stored turn, as /experts/history serves them:
+    Brocardi's text never reaches a user, an export included (D-078). The
+    synthesis the LLM wrote back then is the person's answer and stays."""
+    guarded = is_trace_guarded(_json_column(row.get("full_trace")))
+    if row.get("sources") is not None:
+        row["sources"] = redact_stored_sources(_json_column(row["sources"]), guarded=guarded)
+
+
 # =============================================================================
 # Export
 # =============================================================================
@@ -191,6 +213,8 @@ async def export_user_data(user_id: str, sessions: Optional[Sessions] = None) ->
                 )
                 rows = _rows(result)
                 for row in rows:
+                    if col.table == "qa_traces":
+                        _strip_brocardi_from_turn(row)
                     for excluded in col.export_exclude:
                         row.pop(excluded, None)
                 if rows:

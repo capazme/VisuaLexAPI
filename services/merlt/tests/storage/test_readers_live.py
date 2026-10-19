@@ -124,7 +124,7 @@ async def _seed(client):
         CREATE (k)-[:SPECIES]->(k3)
         CREATE (p:PrincipioGiuridico {node_id: 'principio:buona_fede', nome: 'buona fede', descrizione: 'Le parti agiscono con lealta.', livello: 'generale'})
         CREATE (a1)-[:ESPRIME_PRINCIPIO]->(p)
-        CREATE (att:AttoGiudiziario {node_id: 'massima_1', massima: 'Una massima.', organo_emittente: 'Cass. civ.'})
+        CREATE (att:AttoGiudiziario {node_id: 'massimario:1', massima: 'Una massima.', organo_emittente: 'Cass. civ.', fonte: 'Ufficio del Massimario'})
         CREATE (att)-[:INTERPRETA]->(a1)
         CREATE (dot:Dottrina {node_id: 'dottrina:1', descrizione: 'Una nota di dottrina.'})
         CREATE (dot)-[:COMMENTA]->(a1)
