@@ -137,6 +137,31 @@ def test_no_curated_live_tool_is_one_that_reads_brocardi():
         assert brocardi_tools.isdisjoint(tools)
 
 
+def test_guard_lists_every_vendored_tool_bound_to_brocardi():
+    # `source_bindings.py` of the vendored mcp-legal-it names, tool by tool, the
+    # sources it consults. A release that binds a new tool to Brocardi must be
+    # added to the guard (or withheld by an argument, as `cite_law`) before the
+    # submodule moves. Skipped where the submodule is not checked out.
+    import re
+    from pathlib import Path
+
+    from merlt.storage.graph.brocardi_guard import BROCARDI_TOOLS as brocardi_tools
+
+    bindings = next(
+        (p / "vendor/mcp-legal-it/src/source_bindings.py"
+         for p in Path(__file__).resolve().parents
+         if (p / "vendor/mcp-legal-it/src/source_bindings.py").is_file()),
+        None,
+    )
+    if bindings is None:
+        import pytest
+
+        pytest.skip("vendor/mcp-legal-it is not checked out")
+    bound = set(re.findall(r'^\s*"(\w+)":\s*\([^)]*"brocardi"', bindings.read_text(), re.M))
+    assert bound, "the parser found no tool bound to Brocardi: the file's shape changed"
+    assert bound - {"cite_law"} == set(brocardi_tools)
+
+
 def test_cerca_brocardi_keeps_its_slot_in_the_tool_vocabulary():
     # Append-only: removing or moving it would break saved tool-gating checkpoints.
     assert TOOL_VOCAB.index("cerca_brocardi") == 2
