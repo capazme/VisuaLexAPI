@@ -15,6 +15,8 @@ export interface SheetProps {
   closeOnEscape?: boolean;
   /** A press on the backdrop closes it. Off by default, for the same reason; a preview, which holds nothing typed, turns it on. */
   closeOnBackdrop?: boolean;
+  /** Classes for the sheet (a capped width centred on a computer). */
+  className?: string;
   children: ReactNode;
 }
 
@@ -24,7 +26,7 @@ export interface SheetProps {
  * browser while it covers the workspace. A press outside dismisses it only with `closeOnBackdrop`:
  * otherwise closing is the X (or Esc, when allowed) and what the content offers.
  */
-export function Sheet({ title, onClose, initialFocusRef, closeOnEscape = false, closeOnBackdrop = false, children }: SheetProps) {
+export function Sheet({ title, onClose, initialFocusRef, closeOnEscape = false, closeOnBackdrop = false, className, children }: SheetProps) {
   const { refs, context } = useFloating({ open: true });
   const role = useRole(context, { role: 'dialog' });
   const { getFloatingProps } = useInteractions([role]);
@@ -74,6 +76,7 @@ export function Sheet({ title, onClose, initialFocusRef, closeOnEscape = false, 
             'fixed inset-x-0 bottom-0 flex max-h-[92vh] flex-col rounded-t-2xl border border-b-0',
             'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900',
             Z_INDEX.modal,
+            className,
           )}
         >
           <header className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-2 dark:border-slate-800">

@@ -485,25 +485,45 @@ menu's backdrop; `Layout` hides the feedback button and the services pill, `Serv
 (`DossierItemReader`) in a side panel on desktop and in `ui/Sheet` on a phone (the bottom sheet
 shared with `CardFormDialog`, marked `data-find-overlay`); the panel closes when the card changes.
 
-**The progress dashboard** (`ReviewHome`, Studia's home; spec
+**«Oggi», the home** (`ReviewHome`, Gymnasium's home at `/studia/ripasso`; spec
+`docs/superpowers/specs/2026-10-19-gymnasium-restyle-design.md` §5.1–5.2, over the progress spec
 `docs/superpowers/specs/2026-10-13-studia-progress-design.md`, direction D «Registro vivo»): one read,
 `useProgress` over `GET /lingo/srs/progressi` (the last answer stays on screen, dimmed, while a new one travels;
-an older answer never overwrites a newer one), drawn by `studia/progress/`: `ProgressBand` (`GoalRing`, today's
-reviews against the user's goal `ripassiAlGiorno`, full and green once the day counts; `StreakBadge`, the «§» badge,
-the count and record, the last seven days as register boxes; today's sentence and «Inizia il ripasso»),
-`SubjectChips` (in place of the old `<select>`: the subject narrows the dashboard and the session it starts, kept
-in `localStorage` under `visualex.studia.ripasso.materia`), and `ProgressPanels` (`ActivityCalendar`, 26 weeks on a
+an older answer never overwrites a newer one), drawn by `studia/progress/` in one column, top to bottom (768 px, centred at every width: on this page `StudiaPage`
+narrows to it too, so the area's heading and its rule are the column's width; the calendar scales to it):
+`StudyStrip` (`StreakBadge compact` — the «§», the count, «Il primo giorno comincia oggi» or «giorni di fila ·
+record N», no week of boxes — and `GoalRing compact`, 40 px with «5 di 10» beside it; at its end the gear,
+«Impostazioni dello studio», which opens `StudyPreferences open` — the same content, no disclosure — in a
+`ui/Sheet`, centred and capped at `max-w-lg` from `md`); `TodayCard`, the action: «Oggi: 18 da ripassare, 8 nuove» (a
+part that is zero left out; «Oggi in Diritto penale: …» when a subject is chosen),
+«circa N minuti» (`estimateLabel` in `studiaLabels.ts`, `ceil(cards × SECONDS_PER_CARD / 60)`, 20 s a card, an
+estimate) and **«Inizia»**, the page's one primary button (44 px, full width on a phone); with the goal met, the stamp
+and «Continua» while cards are left; with nothing left «Hai finito per oggi» and the next day with cards from
+`prossimi` («domani», a day by name, or none in the fortnight; «domani» while new cards wait, which `prossimi` does not
+count) and no button — narrowed to a subject, «Niente da ripassare in questa materia» and «Ripassa tutte le materie»; with no card at all, how to start from an
+article (Ricerca, «+ Nuova scheda» under the text — Le mie schede has no way to write one until G4) or the community's
+cards behind the gear; a failed first read says «Non riesco a leggere i tuoi progressi.» with «Riprova» and keeps
+«Inizia» (the session reads its own cards); `todayState` and `nextDueDay` decide it, pure, in `progress/today.ts`.
+Then «Cosa ripassi», `SubjectChips` (the subject narrows the page and the session it starts, kept in `localStorage`
+under `visualex.studia.ripasso.materia`); `SubjectRoad`, «Il percorso», one stop per subject joined by a line, free
+(no locks, no number, no imposed order): the three states as a bar and in words (`stopStates`), the reviews of 30
+days, «Ripassa» for a session narrowed to it (none for a subject with no card); ordered by `orderStops`, new plus in
+learning first, then by name — the read has no cards due per subject (`Progressi.materie`), so no «N da ripassare»
+until the institute read of G5; the stops enter with a 40 ms stagger once per mount (`motion-safe:` only). At the
+bottom, under «I tuoi progressi» until G3 gives them `/studia/progressi`, `ProgressPanels` (`ActivityCalendar`, 26 weeks on a
 computer and 12 on a phone by `useIsDesktop`, one tab stop with arrow keys and a live readout, a legend under it
-(«meno … più», the counted day's dot, the rest's dashed outline), the whole pitch of a cell hit-testable; `CardStatesBar`;
-`DueForecast`; `SubjectProgress`, whose rows also set the filter); `StudyPreferences` stays closed at the bottom
-and now holds «Ripassi al giorno» too. While the first read travels the band and the panels keep their places
-(`ProgressPanelsSkeleton`); a failed first read stops the pulse and says the progress is not available. Colours are the app's tokens through `progress/tokens.ts` (ink is the
+(«meno … più», the counted day's dot, the rest's dashed outline), the whole pitch of a cell hit-testable; `CardStatesBar`
+(its `CARD_STATES`, in `tokens.ts`, are the road's too);
+`DueForecast`; `SubjectProgress`, whose rows also set the filter). «Le mie schede» and «Da validare» show the strip
+smaller over them (`StudiaPage`, `dense`: the count without its line); the session shows none. While the first read
+travels the strip, the card, the road and the panels keep their places at their final size; a failed first read
+stops the pulse. Colours are the app's tokens through `progress/tokens.ts` (ink is the
 primary scale's deep end, the stamp the one red, a subject's hue the category palette's CSS variable); the charts are
 hand-drawn SVG laid out by the pure `progress/layout.ts`, which walks the server's Rome days in UTC and never reads
 the browser's zone. **The celebration** (`progress/Celebration.tsx`): once a day per browser
 (`useCelebratedToday`, `visualex.studia.festeggiato`, written when a celebration *starts*, so leaving halfway or a new
 read never replays it; a convenience, never the streak's source) — on the home when
-today counts with at least one review (confetti of «§» and «✓» from the ring, `confetti.ts` pure, on a canvas,
+today counts with at least one review (confetti of «§» and «✓» from the strip's ring over the strip and the action card, `confetti.ts` pure, on a canvas,
 and the stamp «Obiettivo raggiunto» pressed in; the stamp stays at rest afterwards), and in the session on the grade
 whose answer says `oggi.appenaRaggiunto` (`SessionCelebration`: a notice placed in the page over the header row «Restano N · Interrompi», so it scrolls away
 with it and never floats over the card or the grades; 1.5 s; no focus, no pointer, the keys untouched; an `aria-live`
@@ -1622,6 +1642,9 @@ meant to stay split; add new features as new files, not inside the shells:
     browser drops (until 19 October 2026 every dark scrollbar kept its light
     thumb). Write the dark scope before the pseudo-element,
     `:where(.dark, .dark *)::…`, as `index.css` does; `theme.test.ts` checks it.
+    A short sideways row of controls on a phone draws no bar at all (`HIDDEN_SCROLLBAR` in
+    `constants/interactions.ts`, both engines; a swipe, the trackpad and focus still scroll it): the
+    subject chips' row still showed a light one in dark mode on the owner's pass, 19 October 2026.
 
 30. **A bare `fetch` to a scraping route works in development and answers 401 in
     production.** Vite proxies those routes to the Python API with no login; the ingress

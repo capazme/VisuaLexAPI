@@ -19,6 +19,14 @@ export const ACTIVE = 'active:scale-[0.97]';
  */
 export const HOVER_LIFT = '[@media(hover:hover)_and_(pointer:fine)]:hover:-translate-y-px';
 
+/**
+ * A row that scrolls sideways with no scrollbar drawn: a swipe, the trackpad and the keyboard (focus
+ * brings a control into view) still scroll it. For a short row of controls on a phone, where a bar adds
+ * nothing and in dark mode showed light (the subject chips). Both engines: the standard property, and
+ * WebKit's pseudo-element, which Safari still needs.
+ */
+export const HIDDEN_SCROLLBAR = '[scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
+
 /** Mobile touch target minimum size - use on interactive elements */
 export const TOUCH_TARGET = 'min-h-[44px] min-w-[44px]';
 
