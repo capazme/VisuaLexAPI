@@ -511,7 +511,10 @@ heading and its rule are the column's width), in the order the owner fixed:
    bar. «Il tuo mese» opens `progress/MonthSheet`: `ActivityCalendar` (26 weeks on a computer, 12 on a phone, by
    `useIsDesktop`; one tab stop with arrow keys and a live readout, a legend under it, the whole pitch of a cell
    hit-testable) and `DueForecast`, the chosen subject's with its hue; it holds nothing typed, so Esc and the backdrop
-   close it. They leave it for `/studia/progressi` in G3, with `CardStatesBar` and `SubjectProgress` (no longer drawn on
+   close it. Their labels (weekdays, months, the scale, the days) are the interface's text at `text-xs` laid over the
+   drawing by percentages, never SVG `<text>`: a drawing scaled to its width scaled them under 11 px. **No text on «Oggi»
+   is under 11 px** (the stamp's date included; the compact stamp is the session's): `typeScale.test.tsx` reads the
+   files of `missions/` and `progress/` and fails on a `text-[Npx]` under 11 or an SVG `<text>`. They leave it for `/studia/progressi` in G3, with `CardStatesBar` and `SubjectProgress` (no longer drawn on
    the home; `CARD_STATES`, in `tokens.ts`, are the band's and the road's).
 3. **«Tutte le missioni»** (`missions/MissionList`): daily, weekly, long-term. What the web counts shows its state;
    what the server must record (a subject left for 7 days, writing a card, validating two — a validator's only, from the
