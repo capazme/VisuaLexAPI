@@ -8,7 +8,7 @@ import { MATERIA_LABEL } from './studiaLabels';
 export interface StudyPreferencesProps {
   /** Called after a change reached the server: the counts of the day may have moved. */
   onChanged: () => void;
-  /** Drawn open, with no disclosure of its own: the sheet the strip's gear opens (Gymnasium spec §4). */
+  /** Drawn open, with no disclosure of its own: the sheet the gear opens, in «Oggi»'s band or the strip (Gymnasium spec §4). */
   open?: boolean;
 }
 

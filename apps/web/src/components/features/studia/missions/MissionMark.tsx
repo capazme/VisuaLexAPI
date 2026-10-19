@@ -39,7 +39,8 @@ export interface MissionRowProps {
 /** One mission: its mark, its title and state, «8 di 18» (and the bar), its note, and its action. */
 export function MissionRow({ mission, bar = false, quietNote = false, aside, children }: MissionRowProps) {
   const { progress } = mission;
-  const share = progress && progress.of > 0 ? Math.min(1, progress.done / progress.of) : 0;
+  // A mission done is full, also the goal the server counted with the queue finished under it.
+  const share = mission.status === 'fatta' ? 1 : progress && progress.of > 0 ? Math.min(1, progress.done / progress.of) : 0;
   return (
     <li data-missione={mission.id} className="grid grid-cols-[24px_minmax(0,1fr)] gap-x-3 py-4 first:pt-3 last:pb-0">
       <MissionMark status={mission.status} />

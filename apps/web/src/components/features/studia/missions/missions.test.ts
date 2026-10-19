@@ -42,7 +42,7 @@ describe('todayMissions (Gymnasium spec §5.1)', () => {
     expect(todayMissions(day()).map((m) => m.title)).toEqual([
       'Ripassa le schede dovute',
       'Impara 5 schede nuove',
-      "Raggiungi l'obiettivo di oggi",
+      'Raggiungi l’obiettivo di oggi',
     ]);
     expect(todayMissions(day()).every((m) => m.group === 'giornaliera')).toBe(true);
   });
@@ -59,10 +59,16 @@ describe('todayMissions (Gymnasium spec §5.1)', () => {
   });
 
   it('has nothing to do when no card was due today, and says so', () => {
-    const dovute = byId(todayMissions(day({ dovute: 0, fatti: { ripassi: 3, nuove: 3 } })), 'dovute');
+    const dovute = byId(todayMissions(day({ dovute: 0, nuove: 0, fatti: { ripassi: 3, nuove: 3 } })), 'dovute');
     expect(dovute.status).toBe('vuota');
     expect(dovute.progress).toBeUndefined();
     expect(dovute.note).toBe('Nessuna scheda dovuta oggi.');
+  });
+
+  it('says where «Inizia» leads when no due card is left and new ones wait', () => {
+    expect(byId(todayMissions(day({ dovute: 0, nuove: 4, fatti: { ripassi: 3, nuove: 3 } })), 'dovute').note).toBe('Nessuna scheda dovuta oggi: si parte dalle nuove.');
+    expect(byId(todayMissions(day({ dovute: 0, nuove: 4 })), 'dovute')).toMatchObject({ status: 'fatta', note: 'Le dovute sono fatte: restano le nuove.' });
+    expect(byId(todayMissions(day({ dovute: 0, nuove: 0 })), 'dovute').note).toBeUndefined();
   });
 
   it('reads no row of today as nothing done yet', () => {
@@ -73,7 +79,8 @@ describe('todayMissions (Gymnasium spec §5.1)', () => {
 
   it('counts the first reviews of today against five, done at five or more', () => {
     expect(byId(todayMissions(day()), 'nuove')).toMatchObject({ status: 'aperta', progress: { done: 2, of: 5 } });
-    expect(byId(todayMissions(day({ fatti: { ripassi: 12, nuove: 6 } })), 'nuove')).toMatchObject({ status: 'fatta', progress: { done: 6, of: 5 } });
+    // Past the target the count stops at it: «5 di 5», never «6 di 5».
+    expect(byId(todayMissions(day({ fatti: { ripassi: 12, nuove: 6 } })), 'nuove')).toMatchObject({ status: 'fatta', progress: { done: 5, of: 5 } });
   });
 
   it('asks only what today allows when five new cards cannot be had', () => {
@@ -92,8 +99,13 @@ describe('todayMissions (Gymnasium spec §5.1)', () => {
 
   it('takes the goal from the server: its count, and done when the day counts', () => {
     expect(byId(todayMissions(day({ ripassi: 6 })), 'obiettivo')).toMatchObject({ status: 'aperta', progress: { done: 6, of: 10 } });
+    expect(byId(todayMissions(day({ ripassi: 13, raggiunto: true })), 'obiettivo').progress).toEqual({ done: 10, of: 10 });
     // The day counts with the queue finished under the goal too: the server says so.
-    expect(byId(todayMissions(day({ ripassi: 4, raggiunto: true })), 'obiettivo')).toMatchObject({ status: 'fatta', progress: { done: 4, of: 10 } });
+    expect(byId(todayMissions(day({ ripassi: 4, raggiunto: true, serie: 3 })), 'obiettivo')).toMatchObject({
+      status: 'fatta',
+      progress: { done: 4, of: 10 },
+      note: 'Hai finito le schede del giorno: il giorno conta. Serie: 3 giorni.',
+    });
   });
 
   it('carries the goal line under the goal', () => {
@@ -103,7 +115,7 @@ describe('todayMissions (Gymnasium spec §5.1)', () => {
 
 describe('goalLine', () => {
   it('says the goal is reached, with the streak', () => {
-    expect(goalLine(day({ raggiunto: true, serie: 1 }))).toEqual({ text: 'Obiettivo raggiunto. Serie: 1 giorno.', met: true });
+    expect(goalLine(day({ ripassi: 10, raggiunto: true, serie: 1 }))).toEqual({ text: 'Obiettivo raggiunto. Serie: 1 giorno.', met: true });
   });
 
   it('asks to finish the day when fewer cards are left than the goal wants', () => {

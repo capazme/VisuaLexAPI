@@ -44,7 +44,7 @@ export function formatDate(day: string): string {
 
 /**
  * A box of the current week: what the streak says of a past day or today; `futuro` for a day still to come;
- * `vuoto` for a past day before someone's streak began, which is not a missed one.
+ * `vuoto` for a past day before someone's first day of study, which is not a missed one.
  */
 export interface WeekDay {
   giorno: string;
@@ -57,17 +57,18 @@ const WEEK_LETTERS = ['L', 'M', 'M', 'G', 'V', 'S', 'D'] as const;
 
 /**
  * The current week, Monday to Sunday (Gymnasium spec §5.1), from the server's today and its last seven days
- * (`serie.ultimiGiorni`, which reach back to this week's Monday). A day still to come is `futuro`; a past day of
- * someone whose streak has not begun (`fresh`) is `vuoto`: their week shows nothing missed.
+ * (`serie.ultimiGiorni`, which reach back to this week's Monday). A day still to come is `futuro`; a past day before
+ * `firstDay` — the first day the calendar holds, none for someone who never studied — is `vuoto`: a week that began
+ * before them shows nothing missed.
  */
-export function currentWeek(today: string, ultimiGiorni: { giorno: string; stato: StatoGiorno }[], fresh: boolean): WeekDay[] {
+export function currentWeek(today: string, ultimiGiorni: { giorno: string; stato: StatoGiorno }[], firstDay: string | undefined): WeekDay[] {
   const monday = addDays(today, -weekday(today));
   return WEEK_LETTERS.map((lettera, index) => {
     const giorno = addDays(monday, index);
     if (giorno > today) return { giorno, lettera, stato: 'futuro' };
     const known = ultimiGiorni.find((d) => d.giorno === giorno)?.stato;
     if (giorno === today) return { giorno, lettera, stato: known ?? 'oggi' };
-    if (fresh) return { giorno, lettera, stato: 'vuoto' };
+    if (firstDay === undefined || giorno < firstDay) return { giorno, lettera, stato: 'vuoto' };
     return { giorno, lettera, stato: known ?? 'saltato' };
   });
 }

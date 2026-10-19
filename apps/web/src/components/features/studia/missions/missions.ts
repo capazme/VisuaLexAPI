@@ -52,7 +52,10 @@ function doneToday(data: Progressi): { reviewed: number; learned: number } {
 /** The line under the goal: reached, or what is left to keep (or begin) the streak. */
 export function goalLine(data: Progressi): { text: string; met: boolean } {
   const { oggi, serie } = data;
-  if (oggi.raggiunto) return { text: `Obiettivo raggiunto. Serie: ${plural(serie.attuale, 'giorno', 'giorni')}.`, met: true };
+  const streak = `Serie: ${plural(serie.attuale, 'giorno', 'giorni')}.`;
+  // The server also counts a day whose queue was finished under the goal: say why, the count alone reads short.
+  if (oggi.raggiunto && oggi.ripassi < oggi.obiettivo) return { text: `Hai finito le schede del giorno: il giorno conta. ${streak}`, met: true };
+  if (oggi.raggiunto) return { text: `Obiettivo raggiunto. ${streak}`, met: true };
   const missing = oggi.obiettivo - oggi.ripassi;
   const purpose = serie.attuale === 0 && serie.record === 0 ? 'per il primo giorno della serie' : 'per tenere viva la serie';
   if (oggi.dovute + oggi.nuove < missing) return { text: `Finisci le schede di oggi ${purpose}.`, met: false };
@@ -73,15 +76,24 @@ export function todayMissions(data: Progressi): Mission[] {
   const newTarget = Math.min(NEW_CARDS_TARGET, learned + data.oggi.nuove);
   const goal = goalLine(data);
 
+  // The first mission carries «Inizia»: with no due card left and new ones waiting, its note says where it leads.
+  const newWaiting = data.oggi.nuove > 0;
   const dovute: Mission =
     dueAll === 0
-      ? { id: 'dovute', group: 'giornaliera', title: 'Ripassa le schede dovute', status: 'vuota', note: 'Nessuna scheda dovuta oggi.' }
+      ? {
+          id: 'dovute',
+          group: 'giornaliera',
+          title: 'Ripassa le schede dovute',
+          status: 'vuota',
+          note: newWaiting ? 'Nessuna scheda dovuta oggi: si parte dalle nuove.' : 'Nessuna scheda dovuta oggi.',
+        }
       : {
           id: 'dovute',
           group: 'giornaliera',
           title: 'Ripassa le schede dovute',
           status: data.oggi.dovute === 0 ? 'fatta' : 'aperta',
           progress: { done: dueDone, of: dueAll },
+          ...(data.oggi.dovute === 0 && newWaiting ? { note: 'Le dovute sono fatte: restano le nuove.' } : {}),
         };
 
   const nuove: Mission =
@@ -98,15 +110,15 @@ export function todayMissions(data: Progressi): Mission[] {
           group: 'giornaliera',
           title: `Impara ${plural(newTarget, 'scheda nuova', 'schede nuove')}`,
           status: learned >= newTarget ? 'fatta' : 'aperta',
-          progress: { done: learned, of: newTarget },
+          progress: { done: Math.min(learned, newTarget), of: newTarget },
         };
 
   const obiettivo: Mission = {
     id: 'obiettivo',
     group: 'giornaliera',
-    title: "Raggiungi l'obiettivo di oggi",
+    title: 'Raggiungi l’obiettivo di oggi',
     status: data.oggi.raggiunto ? 'fatta' : 'aperta',
-    progress: { done: data.oggi.ripassi, of: data.oggi.obiettivo },
+    progress: { done: Math.min(data.oggi.ripassi, data.oggi.obiettivo), of: data.oggi.obiettivo },
     note: goal.text,
   };
 

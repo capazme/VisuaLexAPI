@@ -1,4 +1,3 @@
-import type { RefObject } from 'react';
 import { Check } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import type { ConteggiStati, Progressi } from '../../../../types/studia';
@@ -17,8 +16,6 @@ export interface StatsBandProps {
   onOpenSettings: () => void;
   monthOpen: boolean;
   onOpenMonth: () => void;
-  /** Where the celebration's confetti start: the goal's ring. */
-  ringRef?: RefObject<HTMLDivElement | null>;
   /** The celebration: the streak's count pops. */
   celebrate?: boolean;
 }
@@ -38,8 +35,8 @@ function boxClass(day: WeekDay, today: boolean): string {
 
 /** The current week, Monday to Sunday, each box with its letter; the states are also words, for a screen reader. */
 function WeekRow({ data }: { data: Progressi }) {
-  const fresh = data.serie.attuale === 0 && data.serie.record === 0;
-  const week = currentWeek(data.oggi.giorno, data.serie.ultimiGiorni, fresh);
+  // The calendar is sorted by day: its first row is the first day studied in the window, none for a newcomer.
+  const week = currentWeek(data.oggi.giorno, data.serie.ultimiGiorni, data.calendario[0]?.giorno);
   return (
     <ol aria-label="Questa settimana" className="grid w-full grid-cols-7 gap-1.5 md:w-auto md:gap-2">
       {week.map((day) => {
@@ -67,8 +64,9 @@ function StateNumbers({ stati }: { stati: ConteggiStati }) {
     <div className="grid gap-3">
       <dl className="grid grid-cols-3 gap-3">
         {CARD_STATES.map((state) => (
-          // The number above its name: `dt` first in the document, drawn second.
-          <div key={state.key} className="flex flex-col-reverse gap-1">
+          // The number above its name: `dt` first in the document, drawn second; packed to the top, so the three
+          // numbers stay on one line when a name takes two.
+          <div key={state.key} className="flex flex-col-reverse justify-end gap-1">
             <dt className={cn('flex items-center gap-1.5 text-sm leading-tight', MUTED_TEXT)}>
               <span aria-hidden className={cn('inline-block h-2.5 w-2.5 shrink-0 rounded-sm', state.swatch)} />
               {state.label}
@@ -94,7 +92,7 @@ function StateNumbers({ stati }: { stati: ConteggiStati }) {
  * and the coming days in a sheet. While the first read travels it holds its final size; a failed read leaves the
  * heading and the gear (the missions say it failed, with «Riprova»).
  */
-export function StatsBand({ data, loading, settingsOpen, onOpenSettings, monthOpen, onOpenMonth, ringRef, celebrate = false }: StatsBandProps) {
+export function StatsBand({ data, loading, settingsOpen, onOpenSettings, monthOpen, onOpenMonth, celebrate = false }: StatsBandProps) {
   return (
     <section aria-labelledby="studia-progressi" aria-busy={loading} className={cn(TILE, 'grid gap-5 p-5 md:p-6')}>
       <div className="flex items-center gap-3">
@@ -108,7 +106,7 @@ export function StatsBand({ data, loading, settingsOpen, onOpenSettings, monthOp
         <>
           <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
             <StreakBadge compact attuale={data.serie.attuale} record={data.serie.record} ultimiGiorni={data.serie.ultimiGiorni} pop={celebrate} />
-            <div ref={ringRef} className="shrink-0">
+            <div className="shrink-0">
               <GoalRing compact ripassi={data.oggi.ripassi} obiettivo={data.oggi.obiettivo} raggiunto={data.oggi.raggiunto} />
             </div>
             <div className="w-full md:ml-auto md:w-auto">

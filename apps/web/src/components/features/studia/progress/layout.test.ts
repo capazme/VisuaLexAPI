@@ -88,25 +88,26 @@ describe('the progress layout', () => {
 
     it('runs Monday to Sunday with the seven letters; past days from the streak, today, the rest to come', () => {
       // Thursday 22 October 2026.
-      const week = currentWeek('2026-10-22', last7('2026-10-22', ['fatto', 'fatto', 'fatto', 'fatto', 'riposo', 'saltato', 'oggi']), false);
+      const week = currentWeek('2026-10-22', last7('2026-10-22', ['fatto', 'fatto', 'fatto', 'fatto', 'riposo', 'saltato', 'oggi']), '2026-04-27');
       expect(week.map((d) => d.lettera).join('')).toBe('LMMGVSD');
       expect(week.map((d) => d.giorno)).toEqual(['2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-24', '2026-10-25']);
       expect(week.map((d) => d.stato)).toEqual(['fatto', 'riposo', 'saltato', 'oggi', 'futuro', 'futuro', 'futuro']);
     });
 
     it('starts on today when today is Monday, and holds a Sunday whole', () => {
-      expect(currentWeek('2026-10-19', last7('2026-10-19', ['fatto', 'fatto', 'fatto', 'fatto', 'fatto', 'fatto', 'fatto']), false).map((d) => d.stato)).toEqual([
+      expect(currentWeek('2026-10-19', last7('2026-10-19', ['fatto', 'fatto', 'fatto', 'fatto', 'fatto', 'fatto', 'fatto']), '2026-10-01').map((d) => d.stato)).toEqual([
         'fatto', 'futuro', 'futuro', 'futuro', 'futuro', 'futuro', 'futuro',
       ]);
-      expect(currentWeek('2026-10-25', last7('2026-10-25', ['fatto', 'riposo', 'fatto', 'saltato', 'fatto', 'fatto', 'oggi']), false).map((d) => d.stato)).toEqual([
+      expect(currentWeek('2026-10-25', last7('2026-10-25', ['fatto', 'riposo', 'fatto', 'saltato', 'fatto', 'fatto', 'oggi']), '2026-10-01').map((d) => d.stato)).toEqual([
         'fatto', 'riposo', 'fatto', 'saltato', 'fatto', 'fatto', 'oggi',
       ]);
     });
 
-    it('shows nothing missed to someone whose streak has not begun', () => {
-      expect(currentWeek('2026-10-22', last7('2026-10-22', ['saltato', 'saltato', 'saltato', 'saltato', 'saltato', 'saltato', 'oggi']), true).map((d) => d.stato)).toEqual([
-        'vuoto', 'vuoto', 'vuoto', 'oggi', 'futuro', 'futuro', 'futuro',
-      ]);
+    it('shows nothing missed before someone’s first day of study, or to someone who never studied', () => {
+      const missed = last7('2026-10-22', ['saltato', 'saltato', 'saltato', 'saltato', 'saltato', 'saltato', 'oggi']);
+      expect(currentWeek('2026-10-22', missed, undefined).map((d) => d.stato)).toEqual(['vuoto', 'vuoto', 'vuoto', 'oggi', 'futuro', 'futuro', 'futuro']);
+      // Began on Tuesday: Monday was before them, Wednesday was missed.
+      expect(currentWeek('2026-10-22', missed, '2026-10-20').map((d) => d.stato)).toEqual(['vuoto', 'saltato', 'saltato', 'oggi', 'futuro', 'futuro', 'futuro']);
     });
   });
 });

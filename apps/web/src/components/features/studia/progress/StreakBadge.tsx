@@ -23,8 +23,8 @@ export interface StreakBadgeProps {
  * The streak (Studia progress spec §6.1): a round ink badge with «§» that breathes slowly, the count in
  * large serif, the record, and the last seven days as the boxes of a register: ticked for a day that
  * counted, dashed for a rest, empty for a missed day, outlined for today. The count pops when it grows;
- * under reduced motion nothing moves. `compact` is the strip's: still, and without the week (the
- * calendar under «I tuoi progressi» holds the days).
+ * under reduced motion nothing moves. `compact` is the strip's and the statistics band's: still, and without
+ * the week (the band draws the current week itself, `StatsBand`).
  */
 export function StreakBadge({ attuale, record, ultimiGiorni, pop = false, compact = false, dense = false }: StreakBadgeProps) {
   const reduce = useReducedMotion();

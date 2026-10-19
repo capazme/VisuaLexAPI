@@ -497,12 +497,14 @@ describe('ReviewHome', () => {
       expect(rows.map((row) => row.querySelector('p')?.firstChild?.textContent)).toEqual([
         'Ripassa le schede dovute',
         'Impara 5 schede nuove',
-        "Raggiungi l'obiettivo di oggi",
+        'Raggiungi l’obiettivo di oggi',
       ]);
       // 7 due cards reviewed (9 reviews less 2 first ones) of 17; 2 new of 5; the goal met.
       expect(rows[0]).toHaveTextContent('7 di 17');
       expect(rows[1]).toHaveTextContent('2 di 5');
-      expect(rows[2]).toHaveTextContent('11 di 10');
+      // Past the goal the count stops at it; the ring keeps the real count.
+      expect(rows[2]).toHaveTextContent('10 di 10');
+      expect(screen.getByRole('img', { name: 'Obiettivo di oggi: 11 di 10 ripassi, raggiunto' })).toBeInTheDocument();
       expect(rows[2]).toHaveTextContent('compiuta');
       expect(within(card).getByText('1 di 3')).toBeInTheDocument();
       expect(within(rows[0]).getByRole('button', { name: 'Continua' })).toBeInTheDocument();
@@ -533,6 +535,39 @@ describe('ReviewHome', () => {
       expect(within(card).getByText('0 di 2')).toBeInTheDocument();
     });
 
+    it('never shows one subject’s counts under another’s name while the new read travels', async () => {
+      progress.mockResolvedValue(answer(5, 5));
+      renderHome();
+      await screen.findByText('Oggi: 5 da ripassare, 5 nuove');
+      const user = userEvent.setup();
+      const chips = screen.getByRole('group', { name: 'Materia' });
+      progress.mockResolvedValue(answer(2, 3));
+      await user.click(within(chips).getByRole('button', { name: 'Diritto penale' }));
+      await screen.findByText('Oggi in Diritto penale: 2 da ripassare, 3 nuove');
+      await user.click(within(chips).getByRole('button', { name: 'Tutte le materie' }));
+      let answerCivile: (value: Progressi) => void = () => {};
+      progress.mockImplementation(() => new Promise((resolve) => { answerCivile = resolve; }));
+      await user.click(within(chips).getByRole('button', { name: 'Diritto civile' }));
+      // Penale's answer is not drawn under Civile's name: the action waits, «Inizia» with it.
+      expect(screen.queryByText(/^Oggi in Diritto civile/)).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Inizia' })).toBeNull();
+      answerCivile(answer(7, 1));
+      expect(await screen.findByText('Oggi in Diritto civile: 7 da ripassare, 1 nuova')).toBeInTheDocument();
+    });
+
+    it('says so inside the first mission when the subject’s read fails, and keeps «Inizia»', async () => {
+      progress.mockResolvedValue(answer(5, 5));
+      renderHome();
+      await screen.findByText('Oggi: 5 da ripassare, 5 nuove');
+      progress.mockRejectedValue(new Error('down'));
+      await userEvent.setup().click(within(screen.getByRole('group', { name: 'Materia' })).getByRole('button', { name: 'Diritto penale' }));
+      const alert = await screen.findByRole('alert');
+      expect(alert.closest('li')).toHaveAttribute('data-missione', 'dovute');
+      expect(screen.getByRole('button', { name: 'Inizia' })).toBeEnabled();
+      // The missions above are the day's, still drawn.
+      expect(screen.getByRole('list', { name: 'Missioni di oggi' })).toBeInTheDocument();
+    });
+
     it('keeps the missions the whole day’s when a subject narrows the action', async () => {
       progress.mockResolvedValue(midDay());
       renderHome();
@@ -545,6 +580,18 @@ describe('ReviewHome', () => {
   });
 
   describe('the statistics (Gymnasium spec §5.1)', () => {
+    it('opens «Il tuo mese» on the subject chosen', async () => {
+      progress.mockResolvedValue(answer(5, 5));
+      renderHome();
+      await screen.findByText('Oggi: 5 da ripassare, 5 nuove');
+      progress.mockResolvedValue(answer(2, 3));
+      const user = userEvent.setup();
+      await user.click(within(screen.getByRole('group', { name: 'Materia' })).getByRole('button', { name: 'Diritto penale' }));
+      await screen.findByText('Oggi in Diritto penale: 2 da ripassare, 3 nuove');
+      await user.click(screen.getByRole('button', { name: 'Il tuo mese' }));
+      expect(within(screen.getByRole('dialog', { name: 'Il tuo mese' })).getByText('In Diritto penale.')).toBeInTheDocument();
+    });
+
     it('draws the current week, Monday to Sunday, with its seven letters', async () => {
       progress.mockResolvedValue(answer(3, 0));
       renderHome();
@@ -560,6 +607,8 @@ describe('ReviewHome', () => {
       const first = answer(5, 5, { ripassi: 0, giorno: '2026-10-22' }, 0);
       first.serie.record = 0;
       first.serie.ultimiGiorni = ['16', '17', '18', '19', '20', '21', '22'].map((d, i) => ({ giorno: `2026-10-${d}`, stato: i === 6 ? 'oggi' : 'saltato' }));
+      // Never studied: the calendar holds no day.
+      first.calendario = [];
       progress.mockResolvedValue(first);
       renderHome();
       const days = within(await screen.findByRole('list', { name: 'Questa settimana' })).getAllByRole('listitem');

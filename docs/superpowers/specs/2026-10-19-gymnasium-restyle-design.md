@@ -109,7 +109,7 @@ default. The accessible names, the tours' ids and the badges stay. In Gymnasium 
 «Studia», after Oggi.
 
 «Impostazioni di studio» (`StudyPreferences`, unchanged in content) leave the bottom of the home and open
-from a gear in the header of **Oggi**, in a `ui/Sheet`.
+from a gear in the header of **Oggi** — since G1b, in its statistics band (§5.1) — in a `ui/Sheet`.
 
 ## 5. The screens
 
@@ -143,7 +143,8 @@ scratch, in one type language with the rest of Inchiostro. From top to bottom, o
 
    A mission with nothing to do today (no card due, no new card) says so and leaves the summary. The
    missions are the whole day's, whatever subject is chosen below: the subject narrows only the action of
-   the first («Oggi in Diritto penale: …») and the session it starts.
+   the first («Oggi in Diritto penale: …»), the session it starts and «Il tuo mese». A count past its target
+   stops at it («5 di 5»).
 2. **The statistics**, one band under the heading «I tuoi progressi»: the streak (the § badge, the count,
    the record), the goal (a small ring, «5 di 10»), the gear of the study settings, **the current week**
    (seven boxes, Monday to Sunday, each with its letter: done, a rest, missed, today, or still to come),
@@ -151,8 +152,8 @@ scratch, in one type language with the rest of Inchiostro. From top to bottom, o
    The long calendar and «Prossimi 14 giorni» leave the page: a button «Il tuo mese» opens them in a
    sheet (until G3 gives them `/studia/progressi`).
 3. **The full list of missions**, «Tutte le missioni»: daily, weekly and long-term. Those the web can count
-   show their state; those that need the server to record them (writing a card, validating, a case, a
-   week of streak) are listed with «In arrivo» and cannot be ticked. **No experience points and no level**
+   show their state; those that need the server to record them (a subject left for seven days, writing a
+   card, validating, a case, a week of streak) are listed with «In arrivo» and cannot be ticked. **No experience points and no level**
    are shown until the server keeps them: a count in the browser would be lost on another device and could
    be forged.
 4. **«Cosa ripassi»** (the subject chips, unchanged in behaviour) and **the road** (§5.2), as G1 left them.
@@ -186,8 +187,9 @@ written in words, never by colour alone.
 
 ### 5.3 Progressi
 
-A page of its own, `/studia/progressi`, holding what the home no longer shows: the activity calendar, the
-cards by state and the coming days, and the full progress by subject. The components exist
+A page of its own, `/studia/progressi`, holding what the home no longer shows: the activity calendar and the
+coming days (in the «Il tuo mese» sheet until then), the cards by state in full (the home keeps three numbers),
+and the full progress by subject. The components exist
 (`ActivityCalendar`, `CardStatesBar`, `DueForecast`, `SubjectProgress`) and keep their behaviour,
 interaction and accessibility (progress spec §6.3, §6.5); they are restyled, not rewritten.
 

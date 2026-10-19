@@ -1,3 +1,4 @@
+import type { RefObject } from 'react';
 import { Link } from 'react-router-dom';
 import { cn } from '../../../../lib/utils';
 import type { Progressi } from '../../../../types/studia';
@@ -28,6 +29,8 @@ export interface TodayMissionsProps {
   onOpenSettings: () => void;
   /** The stamp is pressed in now (the celebration, once a day; the caller decides). */
   celebrate: boolean;
+  /** Where the celebration's confetti start: the stamp, in the goal's row, so they start where the eye is. */
+  stampRef?: RefObject<HTMLDivElement | null>;
 }
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -139,7 +142,7 @@ function TodayAction({ action, actionFailed, subject, onRetry, onAllSubjects, on
  * While the first read travels the card holds its size; a failed read says so and keeps «Inizia»; with no card
  * at all, how to begin.
  */
-export function TodayMissions({ day, dayFailed, action, actionFailed, onRetry, subject, onAllSubjects, onStart, onOpenSettings, celebrate }: TodayMissionsProps) {
+export function TodayMissions({ day, dayFailed, action, actionFailed, onRetry, subject, onAllSubjects, onStart, onOpenSettings, celebrate, stampRef }: TodayMissionsProps) {
   const state = todayState(day, dayFailed, false);
   const missions = day && (state === 'todo' || state === 'done') ? todayMissions(day) : null;
   const summary = missions ? missionSummary(missions) : null;
@@ -197,9 +200,11 @@ export function TodayMissions({ day, dayFailed, action, actionFailed, onRetry, s
       {missions && (
         <ol aria-label="Missioni di oggi" className="divide-y divide-slate-100 dark:divide-slate-800">
           {missions.map((mission) => (
-            <MissionRow key={mission.id} mission={mission} bar quietNote={mission.id === 'obiettivo' && met}>
+            // Met by the count, the stamp says it to the eye; met with the queue finished under it, the line says why.
+            <MissionRow key={mission.id} mission={mission} bar quietNote={mission.id === 'obiettivo' && met && day !== null && day.oggi.ripassi >= day.oggi.obiettivo}>
               {mission.id === 'dovute' && (
-                <TodayAction action={action} actionFailed={actionFailed} subject={subject} onRetry={onRetry} onAllSubjects={onAllSubjects} onStart={onStart} met={met} />
+                // The day's read failing again is said here too: the missions above are its last answer.
+                <TodayAction action={action} actionFailed={actionFailed || dayFailed} subject={subject} onRetry={onRetry} onAllSubjects={onAllSubjects} onStart={onStart} met={met} />
               )}
               {mission.id === 'nuove' && mission.status !== 'fatta' && (
                 <button type="button" aria-haspopup="dialog" onClick={onOpenSettings} className={QUIET_BUTTON}>
@@ -208,7 +213,9 @@ export function TodayMissions({ day, dayFailed, action, actionFailed, onRetry, s
               )}
               {mission.id === 'obiettivo' &&
                 (met && day ? (
-                  <GoalStamp giorno={day.oggi.giorno} serie={day.serie.attuale} press={celebrate} className="ml-1 mt-1" />
+                  <div ref={stampRef} className="w-max">
+                    <GoalStamp giorno={day.oggi.giorno} serie={day.serie.attuale} press={celebrate} className="ml-1 mt-1" />
+                  </div>
                 ) : (
                   <button type="button" aria-haspopup="dialog" onClick={onOpenSettings} className={QUIET_BUTTON}>
                     Cambia l’obiettivo

@@ -54,7 +54,7 @@ export function ReviewHome() {
   const action = materia ? narrowed : day;
   const data = day.data;
   const [sheet, setSheet] = useState<'settings' | 'month' | null>(null);
-  const ringRef = useRef<HTMLDivElement>(null);
+  const stampRef = useRef<HTMLDivElement>(null);
   const { celebratedBefore, markCelebrated } = useCelebratedToday();
   // The day whose burst has run its course on this page.
   const [burstDone, setBurstDone] = useState<string | null>(null);
@@ -79,7 +79,7 @@ export function ReviewHome() {
     // One column at a reading measure, centred with the area's heading (`StudiaPage`).
     <section className="space-y-8 pb-8">
       <h2 className="sr-only">Oggi</h2>
-      {/* The confetti start from the ring and fall over the missions and the statistics, never over the rest. */}
+      {/* The confetti start from the stamp, in the goal's row, and fall over the missions and the statistics, never further. */}
       {/* A grid, not `space-y`: the burst mounted after the band would give it a margin and move the page. */}
       <div className="relative grid gap-4">
         <TodayMissions
@@ -93,6 +93,7 @@ export function ReviewHome() {
           onStart={start}
           onOpenSettings={() => setSheet('settings')}
           celebrate={celebrate}
+          stampRef={stampRef}
         />
         <StatsBand
           data={data}
@@ -101,11 +102,10 @@ export function ReviewHome() {
           onOpenSettings={() => setSheet('settings')}
           monthOpen={sheet === 'month'}
           onOpenMonth={() => setSheet('month')}
-          ringRef={ringRef}
           celebrate={celebrate}
         />
         {celebrate && data && (
-          <ConfettiBurst originRef={ringRef} onStart={() => markCelebrated(data.oggi.giorno)} onDone={() => setBurstDone(data.oggi.giorno)} />
+          <ConfettiBurst originRef={stampRef} onStart={() => markCelebrated(data.oggi.giorno)} onDone={() => setBurstDone(data.oggi.giorno)} />
         )}
       </div>
 

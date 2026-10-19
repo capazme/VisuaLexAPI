@@ -10,6 +10,9 @@ const GROUPS: { group: MissionGroup; label: string }[] = [
   { group: 'lungo', label: 'A lungo termine' },
 ];
 
+/** The rows of each group, before the read (the validator's mission is not known yet). */
+const SKELETON_ROWS: Record<MissionGroup, number> = { giornaliera: 6, settimanale: 1, lungo: 1 };
+
 export interface MissionListProps {
   /** The whole day's answer; null before the first one, or when it could not be read. */
   data: Progressi | null;
@@ -22,7 +25,8 @@ export interface MissionListProps {
 /** A small label at the end of a mission's line, in place of its count. */
 function Tag({ children }: { children: string }) {
   return (
-    <span className="shrink-0 rounded-full border border-slate-300 px-2 py-0.5 text-xs font-medium text-slate-600 dark:border-slate-600 dark:text-slate-300">
+    // The row's hidden state already says it to a screen reader.
+    <span aria-hidden className="shrink-0 rounded-full border border-slate-300 px-2 py-0.5 text-xs font-medium text-slate-600 dark:border-slate-600 dark:text-slate-300">
       {children}
     </span>
   );
@@ -35,10 +39,21 @@ function Tag({ children }: { children: string }) {
  */
 export function MissionList({ data, loading, validator }: MissionListProps) {
   if (!data) {
+    // The list's shape is known before the read: its places at their final size, so nothing below jumps.
     return loading ? (
       <div aria-hidden className="space-y-3">
         <div className="h-7 w-48 rounded bg-slate-100 dark:bg-slate-800/60" />
-        <div className="h-72 rounded-2xl bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800/60" />
+        <div className="h-5 w-72 max-w-full rounded bg-slate-100 dark:bg-slate-800/60" />
+        <div className={cn(TILE, 'divide-y divide-slate-100 px-5 dark:divide-slate-800 md:px-6')}>
+          {GROUPS.map(({ group }) => (
+            <div key={group} className="space-y-4 py-4">
+              <div className="h-5 w-28 rounded bg-slate-100 dark:bg-slate-800/60" />
+              {Array.from({ length: SKELETON_ROWS[group] }, (_, row) => (
+                <div key={row} className="h-6 rounded-md bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800/60" />
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
     ) : null;
   }
@@ -49,7 +64,7 @@ export function MissionList({ data, loading, validator }: MissionListProps) {
         <h3 id="studia-tutte" className={BLOCK_HEADING}>
           Tutte le missioni
         </h3>
-        <p className={cn('text-sm', MUTED_TEXT)}>Quelle «In arrivo» non si possono ancora compiere: arrivano con un prossimo aggiornamento.</p>
+        <p className={cn('text-sm', MUTED_TEXT)}>Le missioni «In arrivo» non si possono ancora compiere.</p>
       </div>
       <div className={cn(TILE, 'divide-y divide-slate-100 px-5 dark:divide-slate-800 md:px-6')}>
         {GROUPS.map(({ group, label }) => (

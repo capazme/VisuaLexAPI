@@ -474,8 +474,8 @@ shared with `CardFormDialog`, marked `data-find-overlay`); the panel closes when
 palestra giuridica» — the section switcher keeps «Gymnasium»; spec
 `docs/superpowers/specs/2026-10-19-gymnasium-restyle-design.md` §5.1–5.2, as rewritten for G1b, over the progress spec
 `docs/superpowers/specs/2026-10-13-studia-progress-design.md`, direction D «Registro vivo»). Reads: `useProgress` over
-`GET /lingo/srs/progressi` (the last answer stays on screen, dimmed, while a new one travels; an older answer never
-overwrites a newer one) — once for the whole day, which draws the missions, the statistics and the road, and once more
+`GET /lingo/srs/progressi` (the last answer of the same subject stays on screen while a new one travels — dimmed
+under the road only —, an answer is never shown for another subject, and an older one never overwrites a newer one) — once for the whole day, which draws the missions, the statistics and the road, and once more
 for the subject chosen, made only while one is (`useProgress(materia, enabled)`), which draws the first mission's action
 and «Il tuo mese». One column, 768 px, centred at every width (on this page `StudiaPage` narrows to it too, so the
 heading and its rule are the column's width), in the order the owner fixed:
@@ -486,7 +486,9 @@ heading and its rule are the column's width), in the order the owner fixed:
    calendar row, reviews less first reviews) of those plus `oggi.dovute`; «Impara 5 schede nuove», today's first reviews
    of five, or of what today allows (`oggi.nuove`, the quota and the cards left; `NEW_CARDS_TARGET`); «Raggiungi l'obiettivo
    di oggi», `oggi.ripassi` of `oggi.obiettivo`, done when the server says `raggiunto`, the goal line under it. A mission
-   with nothing to do today says so and leaves the summary. When the server records missions, only `missions.ts`
+   with nothing to do today says so and leaves the summary; a count past its target stops at it («5 di 5»; the ring keeps
+   the real count), and a goal the server counted with the queue finished under it says why. When the server records
+   missions, only `missions.ts`
    changes. **No points and no level are shown** until the server keeps them. The first mission carries the action:
    «Oggi: 18 da ripassare, 8 nuove» (a part that is zero left out; «Oggi in Diritto penale: …» when a subject is chosen),
    «circa N minuti» (`estimateLabel` in `studiaLabels.ts`, `ceil(cards × SECONDS_PER_CARD / 60)`, 20 s a card, an
@@ -495,7 +497,7 @@ heading and its rule are the column's width), in the order the owner fixed:
    none in the fortnight; «domani» while new cards wait, which `prossimi` does not count) and no button — narrowed to a
    subject, «Niente da ripassare in questa materia» and «Ripassa tutte le materie». The other two open the study
    settings («Cambia le nuove al giorno», «Accendi le schede della comunità» when no new card can be had, «Cambia
-   l'obiettivo»); the goal's row takes the stamp once met. With no card at all, how to start from an article (Ricerca,
+   l'obiettivo»); the goal's row takes the stamp once met, and the celebration's confetti start from it. With no card at all, how to start from an article (Ricerca,
    «+ Nuova scheda» under the text — Le mie schede has no way to write one until G4) or the community's cards; a failed
    first read says «Non riesco a leggere i tuoi progressi.» with «Riprova» and keeps «Inizia» (the session reads its own
    cards); `todayState` and `nextDueDay` decide it, pure, in `progress/today.ts`.
@@ -503,8 +505,8 @@ heading and its rule are the column's width), in the order the owner fixed:
    comincia oggi» or «giorni di fila · record N») and `GoalRing compact` (40 px, «5 di 10»), the gear «Impostazioni dello
    studio» (`progress/StudySettings`: `SettingsGear` and `StudySettingsSheet`, `StudyPreferences open` in a `ui/Sheet`
    capped at `max-w-lg` from `md`, not closed by Esc or the backdrop), the current week (`layout.ts` `currentWeek`: Monday
-   to Sunday from the server's today and `serie.ultimiGiorni`, seven boxes with «LMMGVSD», a day to come dotted, and for
-   someone whose streak has not begun the past days `vuoto`, never missed; each state in words for a screen reader,
+   to Sunday from the server's today and `serie.ultimiGiorni`, seven boxes with «LMMGVSD», a day to come dotted, and the
+   days before the first one the calendar holds `vuoto`, never missed; each state in words for a screen reader,
    `DAY_STATE_LABEL`), then the cards by state as three numbers in Newsreader with their names in Geist (a `dl`) and the
    bar. «Il tuo mese» opens `progress/MonthSheet`: `ActivityCalendar` (26 weeks on a computer, 12 on a phone, by
    `useIsDesktop`; one tab stop with arrow keys and a live readout, a legend under it, the whole pitch of a cell
@@ -531,7 +533,7 @@ hand-drawn SVG laid out by the pure `progress/layout.ts`, which walks the server
 the browser's zone. **The celebration** (`progress/Celebration.tsx`): once a day per browser
 (`useCelebratedToday`, `visualex.studia.festeggiato`, written when a celebration *starts*, so leaving halfway or a new
 read never replays it; a convenience, never the streak's source) — on the home when
-today counts with at least one review (confetti of «§» and «✓» from the band's ring over the missions and the band, `confetti.ts` pure, on a canvas,
+today counts with at least one review (confetti of «§» and «✓» from the stamp in the goal's row over the missions and the band, `confetti.ts` pure, on a canvas,
 and the stamp «Obiettivo raggiunto» pressed in; the stamp stays at rest afterwards), and in the session on the grade
 whose answer says `oggi.appenaRaggiunto` (`SessionCelebration`: a notice placed in the page over the header row «Restano N · Interrompi», so it scrolls away
 with it and never floats over the card or the grades; 1.5 s; no focus, no pointer, the keys untouched; an `aria-live`
