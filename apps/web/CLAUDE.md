@@ -1615,6 +1615,9 @@ meant to stay split; add new features as new files, not inside the shells:
     browser drops (until 19 October 2026 every dark scrollbar kept its light
     thumb). Write the dark scope before the pseudo-element,
     `:where(.dark, .dark *)::…`, as `index.css` does; `theme.test.ts` checks it.
+    A short sideways row of controls on a phone draws no bar at all (`HIDDEN_SCROLLBAR` in
+    `constants/interactions.ts`, both engines; a swipe, the trackpad and focus still scroll it): the
+    subject chips' row still showed a light one in dark mode on the owner's pass, 19 October 2026.
 
 30. **A bare `fetch` to a scraping route works in development and answers 401 in
     production.** Vite proxies those routes to the Python API with no login; the ingress
