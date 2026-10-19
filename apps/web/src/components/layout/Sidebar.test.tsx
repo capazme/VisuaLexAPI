@@ -143,7 +143,7 @@ describe('Sidebar — accessible names', () => {
     renderSidebar();
     openUserMenu();
     const entries = screen.getAllByRole('menuitem');
-    expect(entries.map((e) => e.textContent?.trim())).toEqual(['Impostazioni', 'Cronologia', "Collega un'app AI", 'Servizi operativi', 'Tema scuro', 'Scorciatoie', 'Esci']);
+    expect(entries.map((e) => e.textContent?.trim())).toEqual(['Impostazioni', 'Cronologia', "Collega un'app AI", 'Stato dei servizi: Servizi operativi', 'Tema scuro', 'Scorciatoie', 'Esci']);
     for (const entry of entries) expect(entry).toHaveAccessibleName();
   });
 
@@ -302,7 +302,7 @@ describe('Sidebar — the user menu (spec D2)', () => {
     renderSidebar();
     openUserMenu();
     expect(screen.getByRole('menu', { name: 'Menu utente' })).toBeInTheDocument();
-    expect(screen.getAllByRole('menuitem').map((e) => e.textContent?.trim())).toEqual(['Impostazioni', 'Cronologia', "Collega un'app AI", 'Servizi operativi', 'Tema scuro', 'Scorciatoie', 'Esci']);
+    expect(screen.getAllByRole('menuitem').map((e) => e.textContent?.trim())).toEqual(['Impostazioni', 'Cronologia', "Collega un'app AI", 'Stato dei servizi: Servizi operativi', 'Tema scuro', 'Scorciatoie', 'Esci']);
     expect(screen.queryByRole('menuitem', { name: /Pannello Admin/ })).toBeNull();
   });
 
@@ -369,7 +369,7 @@ describe('Sidebar — the services\' status in the user menu (S1)', () => {
     serviceHealth.snapshot.overall = state;
     renderSidebar();
     openUserMenu();
-    const entry = screen.getByRole('menuitem', { name: phrase });
+    const entry = screen.getByRole('menuitem', { name: `Stato dei servizi: ${phrase}` });
     expect(entry).toHaveTextContent(phrase);
     const entries = screen.getAllByRole('menuitem');
     expect(entries.indexOf(entry)).toBe(entries.indexOf(screen.getByRole('menuitem', { name: "Collega un'app AI" })) + 1);
@@ -379,7 +379,7 @@ describe('Sidebar — the services\' status in the user menu (S1)', () => {
   it('opens inside the menu with a tap, the services and their latency, and «Ricontrolla» probes again with the menu open', () => {
     renderSidebar();
     openUserMenu();
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Servizi operativi' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Stato dei servizi: Servizi operativi' }));
     const list = within(screen.getByRole('menu', { name: 'Menu utente' })).getByRole('group', { name: 'Stato dei servizi' });
     expect(list).toHaveTextContent('Backend dati utenteOK · 12 ms');
     expect(list).toHaveTextContent('API normativa e fontiDegradato · 340 ms');
@@ -394,7 +394,7 @@ describe('Sidebar — the services\' status in the user menu (S1)', () => {
     openUserMenu();
     const menu = screen.getByRole('menu');
     for (let i = 0; i < 3; i++) fireEvent.keyDown(menu, { key: 'ArrowDown' });
-    const entry = screen.getByRole('menuitem', { name: 'Servizi operativi' });
+    const entry = screen.getByRole('menuitem', { name: 'Stato dei servizi: Servizi operativi' });
     expect(entry).toHaveFocus();
     // Enter on a focused button is its click: the focus stays on the entry.
     fireEvent.click(entry);
@@ -414,10 +414,10 @@ describe('Sidebar — the services\' status in the user menu (S1)', () => {
   it('opens folded every time', () => {
     renderSidebar();
     openUserMenu();
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Servizi operativi' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Stato dei servizi: Servizi operativi' }));
     fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
     openUserMenu();
-    expect(screen.getByRole('menuitem', { name: 'Servizi operativi' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('menuitem', { name: 'Stato dei servizi: Servizi operativi' })).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('group', { name: 'Stato dei servizi' })).toBeNull();
   });
 

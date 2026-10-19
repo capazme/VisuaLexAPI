@@ -32,7 +32,10 @@ describe('ServiceHealthMenuEntry', () => {
   ] as const)('says %s as the pill did: «%s»', (state, phrase) => {
     expect(serviceHealthLabel(state)).toBe(phrase);
     renderEntry(reading(state));
-    expect(screen.getByRole('menuitem', { name: phrase })).toHaveAttribute('aria-expanded', 'false');
+    const entry = screen.getByRole('menuitem', { name: `Stato dei servizi: ${phrase}` });
+    expect(entry).toHaveAttribute('aria-expanded', 'false');
+    // The words «Stato dei servizi» are for a screen reader; the eye reads the phrase beside the icon.
+    expect(entry.querySelector('.sr-only')).toHaveTextContent('Stato dei servizi:');
   });
 
   it('asks for the dot when a source or a service is down, not when all is well nor while checking', () => {
@@ -45,22 +48,23 @@ describe('ServiceHealthMenuEntry', () => {
   it('opens inside the menu: each service with its state and latency, and «Ricontrolla» that probes again', () => {
     const health = reading('degraded');
     renderEntry(health);
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Alcune fonti non disponibili' }));
-    expect(screen.getByRole('menuitem', { name: 'Alcune fonti non disponibili' })).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Stato dei servizi: Alcune fonti non disponibili' }));
+    expect(screen.getByRole('menuitem', { name: 'Stato dei servizi: Alcune fonti non disponibili' })).toHaveAttribute('aria-expanded', 'true');
     const list = screen.getByRole('group', { name: 'Stato dei servizi' });
     expect(list.textContent).toContain('Backend dati utenteOK · 12 ms');
     expect(list.textContent).toContain('API normativa e fontiDegradato · 340 ms');
-    // Read, never acted on: reachable with the arrows, as the menu's entries are.
-    for (const row of screen.getAllByRole('menuitem', { name: /Backend|API/ })) expect(row).toHaveAttribute('aria-disabled', 'true');
+    // Read, never acted on: reachable with the arrows, named in words, and not «unavailable» (no aria-disabled).
+    expect(screen.getByRole('menuitem', { name: 'Backend dati utente: OK, 12 ms' })).not.toHaveAttribute('aria-disabled');
+    expect(screen.getByRole('menuitem', { name: 'API normativa e fonti: Degradato, 340 ms' })).not.toHaveAttribute('aria-disabled');
     fireEvent.click(screen.getByRole('menuitem', { name: 'Ricontrolla' }));
     expect(health.refresh).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Alcune fonti non disponibili' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Stato dei servizi: Alcune fonti non disponibili' }));
     expect(screen.queryByRole('group', { name: 'Stato dei servizi' })).toBeNull();
   });
 
   it('gives every row a 44 px touch target on a phone, and keeps them all out of the tab order', () => {
     renderEntry(reading('online'));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Servizi operativi' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Stato dei servizi: Servizi operativi' }));
     const rows = screen.getAllByRole('menuitem');
     expect(rows).toHaveLength(4);
     for (const row of rows) {
@@ -78,7 +82,7 @@ describe('ServiceHealthMenuEntry', () => {
 
   it('turns and spins only when motion is allowed', () => {
     renderEntry(reading('checking'));
-    const entry = screen.getByRole('menuitem', { name: 'Controllo servizi…' });
+    const entry = screen.getByRole('menuitem', { name: 'Stato dei servizi: Controllo servizi…' });
     const [icon, chevron] = [...entry.querySelectorAll('svg')];
     expect(icon).toHaveClass('motion-safe:animate-spin');
     expect(icon).not.toHaveClass('animate-spin');

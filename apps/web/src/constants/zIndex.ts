@@ -38,8 +38,8 @@ export const Z_INDEX = {
 
   /**
    * A bar pinned to the bottom of a phone's screen (the review's grades). Under the mobile menu's
-   * backdrop (`z-40`), so the open menu covers it; the feedback button and the services pill, which
-   * would sit on it, are hidden on that route on a phone (`Layout`).
+   * backdrop (`z-40`), so the open menu covers it; the feedback button, which would sit on it, is
+   * hidden on that route on a phone (`Layout`).
    */
   pinnedBar: 'z-[35]',
 

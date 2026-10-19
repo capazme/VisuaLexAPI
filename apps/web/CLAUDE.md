@@ -110,9 +110,10 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   «Collega un'app AI», the services' status, the theme, «Scorciatoie» (no «(?)» since S1: the `?` key still opens it),
   «Pannello Admin» (admins) and «Esci». **The services' status** (S1, 19 Oct 2026; it was a pill fixed at the bottom left,
   over the foot of the page on a phone) is `ui/ServiceHealthMenuEntry`: the status icon and phrase («Servizi operativi»,
-  «Alcune fonti non disponibili», «Servizio non raggiungibile», «Controllo servizi…», `utils/serviceHealth`); a tap opens,
-  inside the menu, each service with its state and latency (`menuitem`s with `aria-disabled`, so the arrows read them)
-  and «Ricontrolla», which keeps the menu open; it opens folded each time. `Layout` runs the one `useServiceHealth` and
+  «Alcune fonti non disponibili», «Servizio non raggiungibile», «Controllo servizi…», `utils/serviceHealth`; a screen
+  reader hears «Stato dei servizi:» first); a tap opens, inside the menu, each service with its state and latency
+  (`menuitem`s that do nothing, so the arrows read them, named «Backend dati utente: OK, 12 ms»; not `aria-disabled`,
+  read as "unavailable") and «Ricontrolla», which keeps the menu open; it opens folded each time. `Layout` runs the one `useServiceHealth` and
   hands the reading to both copies of the sidebar; when it is degraded or offline (not while checking) an amber dot
   (`ServiceHealthDot`) sits at the foot of the avatar — clear of the count of changed norms — and, below `lg`, on the
   floating menu button, and both names end with the phrase («Menu utente di …, alcune fonti non disponibili»). The menu

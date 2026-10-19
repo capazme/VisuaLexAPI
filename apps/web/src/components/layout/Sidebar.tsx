@@ -328,18 +328,18 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
 
   const words = layout !== 'rail';
 
-  // Calculate menu position when showing
-  useEffect(() => {
-    if (showUserMenu && userButtonRef.current) {
-      const rect = userButtonRef.current.getBoundingClientRect();
-      // Beside the rail's avatar, aligned to its bottom; over the wider button of the bar with words
-      // (on a phone a menu beside it would leave the screen). It grows upwards, «Stato dei servizi» open
-      // included, and scrolls rather than leave the top of a low window.
-      setMenuPosition(words
-        ? { bottom: window.innerHeight - rect.top + 8, left: rect.left, maxHeight: rect.top - 16 }
-        : { bottom: window.innerHeight - rect.bottom, left: rect.right + 8, maxHeight: rect.bottom - 8 });
-    }
-  }, [showUserMenu, words]);
+  // Placed when it opens, in the same update, so its first paint has its height bounded before an entry takes
+  // focus (opened on «Esci» in a low window, the focused entry would otherwise end up out of view).
+  const placeMenu = () => {
+    if (!userButtonRef.current) return;
+    const rect = userButtonRef.current.getBoundingClientRect();
+    // Beside the rail's avatar, aligned to its bottom; over the wider button of the bar with words
+    // (on a phone a menu beside it would leave the screen). It grows upwards, «Stato dei servizi» open
+    // included, and scrolls rather than leave the top of a low window.
+    setMenuPosition(words
+      ? { bottom: window.innerHeight - rect.top + 8, left: rect.left, maxHeight: rect.top - 16 }
+      : { bottom: window.innerHeight - rect.bottom, left: rect.right + 8, maxHeight: rect.bottom - 8 });
+  };
 
   // «Ricerca» is the search page with the cursor in its field, no window over it (the owner, 13 Oct
   // 2026: «ok come raccomandi»); ⌘K is the palette. The link itself navigates.
@@ -361,6 +361,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
   const [openAt, setOpenAt] = useState<'first' | 'last'>('first');
   const menuItems = () => [...(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])];
   const openMenu = (at: 'first' | 'last') => {
+    placeMenu();
     setOpenAt(at);
     setShowUserMenu(true);
   };

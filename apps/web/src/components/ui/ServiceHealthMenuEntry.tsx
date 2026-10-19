@@ -23,8 +23,10 @@ export function ServiceHealthDot({ className }: { className?: string }) {
 
 /**
  * The user menu's «Stato dei servizi» (it was the pill fixed at the bottom left): an entry with the status icon and
- * phrase that opens, inside the menu, the services with their state and latency and «Ricontrolla». Every row is a
- * `menuitem`, so the menu's arrows reach them; a service row is `aria-disabled`, read and never acted on. The
+ * phrase (a screen reader hears «Stato dei servizi:» first) that opens, inside the menu, the services with their state
+ * and latency and «Ricontrolla». Every row is a `menuitem`, so the menu's arrows reach them; a service row does
+ * nothing and is named in words («Backend dati utente: OK, 12 ms»). Not `aria-disabled`, which a screen reader reads
+ * as "unavailable" — wrong beside «OK». The
  * probe is `Layout`'s (`useServiceHealth`, one for both copies of the sidebar), which keeps running with the
  * menu closed; the menu unmounts when it closes, so it opens again folded.
  */
@@ -38,11 +40,11 @@ export function ServiceHealthMenuEntry({ health, itemClassName }: { health: Serv
   return <>
     <button type="button" role="menuitem" tabIndex={-1} aria-expanded={expanded} aria-controls={expanded ? listId : undefined} onClick={() => setExpanded(value => !value)} className={itemClassName}>
       <Icon size={16} aria-hidden className={cn('shrink-0', snapshot.overall === 'checking' && 'motion-safe:animate-spin', isHealthy ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400')} />
-      <span className="flex-1 text-left">{serviceHealthLabel(snapshot.overall)}</span>
+      <span className="flex-1 text-left"><span className="sr-only">Stato dei servizi: </span>{serviceHealthLabel(snapshot.overall)}</span>
       <ChevronDown size={14} aria-hidden className={cn('shrink-0 text-slate-500 dark:text-slate-400 motion-safe:transition-transform', expanded && 'rotate-180')} />
     </button>
     {expanded && <div id={listId} role="group" aria-label="Stato dei servizi">
-      {snapshot.services.map(service => <div key={service.name} role="menuitem" tabIndex={-1} aria-disabled="true" className="flex min-h-[44px] md:min-h-0 flex-col justify-center py-1.5 pl-11 pr-4 text-xs focus-visible:outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-700">
+      {snapshot.services.map(service => <div key={service.name} role="menuitem" tabIndex={-1} aria-label={`${service.name}: ${SERVICE_STATES[service.state]}${service.latencyMs !== undefined ? `, ${service.latencyMs} ms` : ''}`} className="flex min-h-[44px] md:min-h-0 flex-col justify-center py-1.5 pl-11 pr-4 text-xs focus-visible:outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-700">
         <span className="text-slate-600 dark:text-slate-300">{service.name}</span>
         <span className={cn('font-medium', service.state === 'online' ? 'text-emerald-700 dark:text-emerald-400' : service.state === 'checking' ? 'text-slate-500 dark:text-slate-400' : 'text-amber-700 dark:text-amber-400')}>{SERVICE_STATES[service.state]}{service.latencyMs !== undefined ? ` · ${service.latencyMs} ms` : ''}</span>
       </div>)}

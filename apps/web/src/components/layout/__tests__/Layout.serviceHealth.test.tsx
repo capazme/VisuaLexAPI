@@ -1,4 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ServiceHealthState } from '../../../services/healthService';
@@ -26,7 +28,7 @@ vi.mock('../../ui/FeedbackButton', () => ({ FeedbackButton: () => null }));
 vi.mock('../../ui/ChangelogNotification', () => ({ ChangelogNotification: () => null }));
 vi.mock('../../ui/Toast', () => ({ UndoToastContainer: () => null }));
 vi.mock('../../ui/SyncErrorToast', () => ({ SyncErrorToast: () => null }));
-vi.mock('../../ui/KeyboardShortcutsModal', () => ({ KeyboardShortcutsModal: () => null }));
+vi.mock('../../ui/KeyboardShortcutsModal', () => ({ KeyboardShortcutsModal: ({ isOpen }: { isOpen: boolean }) => (isOpen ? <p>Scorciatoie da Tastiera</p> : null) }));
 vi.mock('../../features/compare/CompareView', () => ({ CompareView: () => null }));
 vi.mock('../../../plugins/PluginSlot', () => ({ PluginSlot: () => null }));
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ isAuthenticated: true }) }));
@@ -55,6 +57,12 @@ describe('Layout — the services\' probe, in one place (S1)', () => {
     expect(phone?.serviceHealth).toBe(desktop?.serviceHealth);
   });
 
+  it('is the only probe: the sidebar takes the reading and never calls the hook itself', () => {
+    // `Sidebar` is mocked in this file; its source is read so a second probe cannot creep in there.
+    const source = readFileSync(resolve(process.cwd(), 'src/components/layout/Sidebar.tsx'), 'utf8');
+    expect(source).not.toMatch(/useServiceHealth\s*\(/);
+  });
+
   it('keeps probing with no sidebar drawn (Focus mode), so the menu need not be open', () => {
     appStore.setState((s) => ({ settings: { ...s.settings, focusMode: true } }));
     at();
@@ -77,5 +85,15 @@ describe('Layout — the services\' probe, in one place (S1)', () => {
     at();
     expect(screen.getByRole('button', { name: 'Apri il menu' })).toBeInTheDocument();
     expect(dot()).toBeNull();
+  });
+});
+
+// «Scorciatoie (?)» became «Scorciatoie» in the user menu (S1): the key itself is unchanged.
+describe('Layout — the ? key', () => {
+  it('still opens the shortcuts, outside a field', () => {
+    at();
+    expect(screen.queryByText('Scorciatoie da Tastiera')).toBeNull();
+    fireEvent.keyDown(window, { key: '?' });
+    expect(screen.getByText('Scorciatoie da Tastiera')).toBeInTheDocument();
   });
 });
