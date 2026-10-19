@@ -75,4 +75,11 @@ describe('the Scrivania with the worst realistic data', () => {
     expect(screen.queryByRole('region', { name: 'Riprendi' })).toBeNull();
     expect(screen.getByText(/aggiungile da «Gestisci»/)).toBeInTheDocument();
   });
+
+  it('gives the three sample searches 44 px on a phone and their text height from md', () => {
+    renderPage();
+    for (const example of ['Art. 2043 c.c.', 'Art. 5 GDPR', 'Art. 1 Costituzione']) {
+      expect(screen.getByRole('button', { name: example })).toHaveClass('min-h-[44px]', 'md:min-h-0');
+    }
+  });
 });
