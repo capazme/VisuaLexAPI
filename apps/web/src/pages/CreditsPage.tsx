@@ -75,7 +75,13 @@ export function CreditsPage() {
   // motion, and an address opened is not an animation.
   useEffect(() => {
     if (!hash) return;
-    const target = document.getElementById(decodeURIComponent(hash.slice(1)));
+    let id: string;
+    try {
+      id = decodeURIComponent(hash.slice(1));
+    } catch {
+      return; // a malformed fragment («#%») names no entry
+    }
+    const target = document.getElementById(id);
     if (!target) return;
     target.scrollIntoView({ block: 'start' });
     target.focus({ preventScroll: true });
@@ -84,20 +90,23 @@ export function CreditsPage() {
   return (
     <div className="min-h-dvh bg-slate-50 px-4 pb-16 pt-6 md:px-10 dark:bg-slate-950">
       <div className="mx-auto w-full max-w-2xl">
-        <Link to="/" className={cn('-ml-2 inline-flex min-h-[44px] items-center gap-2 rounded-md px-2 text-slate-700 dark:text-slate-300', FOCUS_RING)}>
-          <BookOpen aria-hidden size={20} strokeWidth={1.5} className="text-primary-600 dark:text-primary-400" />
-          <span className="font-serif text-lg font-medium">VisuaLex</span>
-        </Link>
-
-        <header className="mt-8 border-b border-slate-200 pb-6 dark:border-slate-800">
-          <h1 className="font-serif text-4xl font-medium tracking-tight text-slate-900 md:text-5xl dark:text-slate-50">Crediti</h1>
-          <p className="mt-4 max-w-prose font-serif text-lg leading-relaxed text-slate-700 dark:text-slate-300">
-            VisuaLex usa i dati pubblici delle fonti elencate qui sotto e le attribuisce in questa pagina: per ciascuna,
-            cosa usiamo, a quali condizioni e come la citiamo. In fondo, i caratteri con cui è scritta.
-          </p>
+        <header>
+          <Link to="/" className={cn('-ml-2 inline-flex min-h-[44px] items-center gap-2 rounded-md px-2 text-slate-700 dark:text-slate-300', FOCUS_RING)}>
+            <BookOpen aria-hidden size={20} strokeWidth={1.5} className="text-primary-600 dark:text-primary-400" />
+            <span className="font-serif text-lg font-medium">VisuaLex</span>
+          </Link>
         </header>
 
         <main>
+          <div className="mt-8 border-b border-slate-200 pb-6 dark:border-slate-800">
+            <h1 className="font-serif text-4xl font-medium tracking-tight text-slate-900 md:text-5xl dark:text-slate-50">Crediti</h1>
+            <p className="mt-4 max-w-prose font-serif text-lg leading-relaxed text-slate-700 dark:text-slate-300">
+              VisuaLex usa i dati pubblici delle fonti elencate qui sotto e in questa pagina ne indica la provenienza:
+              per ciascuna, cosa usiamo, a quali condizioni e come la citiamo. In fondo, i caratteri tipografici
+              dell’interfaccia.
+            </p>
+          </div>
+
           {CREDIT_GROUPS.map((group) => {
             const entries = CREDITS.filter((credit) => credit.group === group.id);
             if (entries.length === 0) return null;

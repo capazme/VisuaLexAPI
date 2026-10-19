@@ -59,10 +59,11 @@ describe('CreditsPage', () => {
     expect(article).toHaveAccessibleName(CREDITS.find((c) => c.id === id)!.name);
   });
 
-  it('moves nothing without an anchor, nor for an anchor that names no entry', () => {
-    renderAt('/crediti');
-    renderAt('/crediti#gazzetta-ufficiale');
+  it.each(['/crediti', '/crediti#gazzetta-ufficiale', '/crediti#%'])('moves nothing and still draws the page at %s', (path) => {
+    renderAt(path);
     expect(scrolled).toEqual([]);
+    expect(screen.getByRole('heading', { level: 1, name: 'Crediti' })).toBeInTheDocument();
+    expect(screen.getByRole('main')).toContainElement(screen.getByRole('heading', { level: 1 }));
   });
 
   it('leads back to VisuaLex', () => {

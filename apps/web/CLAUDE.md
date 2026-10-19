@@ -58,8 +58,11 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   licence, its conditions and its line of attribution — one typed entry per source (`id`, `group`,
   `name`, `holder`, `uses`, `terms`, `attribution`, `sourceUrl`, `licenceUrl?`, `verified`), read by id
   with `getCredit` and linked with `creditHref` (`/crediti#<id>`). **No screen writes a licence or an
-  attribution by hand**: a new one reads its entry. Two predate the file and move to it in C2: the Corte
-  costituzionale's line in `decisionPdf.ts` (`LICENCE_URIS`, `licenceLine`) and, once the maxims are
+  attribution by hand**: a new one reads its entry. Those that predate the file still do, until C2 and
+  after move them to it: the Corte costituzionale's PDF (`decisionPdf.ts`: `LICENCE_URIS`, `licenceLine`,
+  the footer's «Fonte: … · licenza …»), `DecisionView`'s footer, `EuCaseLawBlock`'s «Fonte: EUR-Lex / …»,
+  `CitationPreviewPopup`'s «Fonte: Normattiva», `RassegnaPassage`'s Massimario line and
+  `DOCTRINE_ATTRIBUTION` (`utils/doctrineLabel.ts`, Brocardi, which has no entry); and, once the maxims are
   shown, the line under them. The `attribution` lines are legal text the owners approved, copied verbatim
   (`credits.test.ts` holds each; never restyle one, as for root rule 23); `uses` and `terms` come only
   from the conditions read on each source's page and the owners' table, and a source enters only once
