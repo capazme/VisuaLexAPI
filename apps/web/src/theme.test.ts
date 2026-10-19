@@ -207,6 +207,45 @@ describe('the Inchiostro palette', () => {
     expect(ratio(linear('amber-600'), over(white, 0.8, linear('ink-50')))).toBeGreaterThanOrEqual(3);
     expect(ratio(linear('amber-400'), over(linear('ink-900'), 0.8, linear('ink-950')))).toBeGreaterThanOrEqual(3);
   });
+
+  it('keeps the marks and labels of Gymnasium\'s «Progressi» apart from what they sit on (ActivityCalendar, DueForecast)', () => {
+    const source = readFileSync(CSS_PATH, 'utf8') + readFileSync(resolve(process.cwd(), 'node_modules/tailwindcss/theme.css'), 'utf8');
+    // `primary-*` and `slate-*` are aliases (`var(--color-toga-*)`, `var(--color-ink-*)`): followed to the value.
+    const linear = (name: string): number[] => {
+      const alias = source.match(new RegExp(`--color-${name}:\\s*var\\(--color-([a-z0-9-]+)\\)`));
+      if (alias) return linear(alias[1]);
+      const m = source.match(new RegExp(`--color-${name}:\\s*oklch\\(([\\d.]+)%\\s+([\\d.]+)\\s+([\\d.]+)\\)`));
+      if (!m) throw new Error(`--color-${name} not found`);
+      const [L, C, H] = [Number(m[1]) / 100, Number(m[2]), (Number(m[3]) * Math.PI) / 180];
+      const a = C * Math.cos(H), b = C * Math.sin(H);
+      const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+      const mm = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+      const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+      return [
+        4.0767416621 * l - 3.3077115913 * mm + 0.2309699292 * s,
+        -1.2684380046 * l + 2.6097574011 * mm - 0.3413193965 * s,
+        -0.0041960863 * l - 0.7034186147 * mm + 1.707614701 * s,
+      ].map((v) => Math.min(1, Math.max(0, v)));
+    };
+    const lum = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    const ratio = (x: number[], y: number[]) => {
+      const [hi, lo] = [lum(x), lum(y)].sort((p, q) => q - p);
+      return (hi + 0.05) / (lo + 0.05);
+    };
+    const white = [1, 1, 1];
+    // A day's mark (the dot, the dash) is ink on the calendar's pale steps (HEAT_FILL 0–2) and the ground's colour on
+    // the deep ones (3–4): 3:1, a graphic that carries the day's state (WCAG 1.4.11).
+    for (const step of ['ink-100', 'primary-200', 'primary-400']) expect(ratio(linear('primary-900'), linear(step)), step).toBeGreaterThanOrEqual(3);
+    for (const step of ['primary-600', 'primary-900']) expect(ratio(white, linear(step)), step).toBeGreaterThanOrEqual(3);
+    for (const step of ['ink-800', 'primary-900', 'primary-700']) expect(ratio(linear('primary-300'), linear(step)), step).toBeGreaterThanOrEqual(3);
+    for (const step of ['primary-500', 'primary-300']) expect(ratio(linear('ink-900'), linear(step)), step).toBeGreaterThanOrEqual(3);
+    // The days to come and a day with nothing due, dotted on the tile (white; dark: slate 900).
+    expect(ratio(linear('ink-500'), white)).toBeGreaterThanOrEqual(3);
+    expect(ratio(linear('ink-400'), linear('ink-900'))).toBeGreaterThanOrEqual(3);
+    // «oggi» under the coming days, at 12 px: AA.
+    expect(ratio(linear('amber-800'), white)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(linear('amber-300'), linear('ink-900'))).toBeGreaterThanOrEqual(4.5);
+  });
 });
 
 describe('the entrance utilities', () => {

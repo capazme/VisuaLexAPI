@@ -1,12 +1,12 @@
 import type { ConteggiStati, Materia, Progressi, TappaIstituto } from '../../../../types/studia';
 import { MATERIA_LABEL } from '../studiaLabels';
-import { addDays, formatDayLong } from './layout';
+import { addDays, formatCount, formatDayLong } from './layout';
 
 /** «Oggi»'s pure decisions (Gymnasium spec §5.1, §5.2): what the action card says, and the road's order; and what the lesson's end offers (§5.4). */
 
 type Stop = Progressi['materie'][number];
 
-const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+const count = (n: number, one: string, many: string) => `${formatCount(n)} ${n === 1 ? one : many}`;
 
 /**
  * The order of the road (Gymnasium spec §5.2 as corrected): what still asks for work first — the cards
@@ -18,11 +18,11 @@ export function orderStops(materie: readonly Stop[]): Stop[] {
   return [...materie].sort((a, b) => open(b) - open(a) || MATERIA_LABEL[a.materia].localeCompare(MATERIA_LABEL[b.materia], 'it'));
 }
 
-/** «3 nuove · 5 in apprendimento · 2 consolidate»: the bar's three states in words, never by colour alone. */
+/** «3 nuove · 5 in apprendimento · 2 consolidate»: the bar's three states in words, never by colour alone; «12.345» grouped. */
 export function stopStates(stop: ConteggiStati): string {
   return [
     count(stop.nuove, 'nuova', 'nuove'),
-    `${stop.apprendimento} in apprendimento`,
+    `${formatCount(stop.apprendimento)} in apprendimento`,
     count(stop.consolidate, 'consolidata', 'consolidate'),
   ].join(' · ');
 }

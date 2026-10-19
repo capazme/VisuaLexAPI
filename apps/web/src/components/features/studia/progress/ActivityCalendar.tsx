@@ -1,14 +1,14 @@
-import { useId, useMemo, useState, type KeyboardEvent } from 'react';
+import { useId, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { cn } from '../../../../lib/utils';
 import type { GiornoAttivita } from '../../../../types/studia';
-import { calendarGrid, describeDay, formatDate, heatLevel } from './layout';
+import { calendarDayState, calendarGrid, describeDay, formatCount, formatDate, heatLevel, type CalendarDayState } from './layout';
 import { FOCUS_RING, HEAT_FILL, INK_TEXT, MUTED_TEXT } from './tokens';
 
 export interface ActivityCalendarProps {
   calendario: GiornoAttivita[];
   today: string;
   weeks: number;
-  /** A subject's hue when the dashboard is narrowed to one; the ink scale otherwise. */
+  /** A subject's hue when the page is narrowed to one; the ink scale otherwise. */
   hue?: string;
 }
 
@@ -20,19 +20,53 @@ const PITCH = CELL + GAP;
 const ROW_LABELS: Record<number, string> = { 0: 'L', 2: 'M', 4: 'V', 6: 'D' };
 const HUE_OPACITY = [0, 0.35, 0.55, 0.78, 1] as const;
 
+/** The marks of a day's state, each a shape, never a colour alone (progress spec §6.5). */
+const DOT = 'fill-primary-900 dark:fill-primary-300';
+const DASH = 'stroke-primary-900 dark:stroke-primary-300';
+const RING = cn('stroke-current', INK_TEXT);
+const TO_COME = 'stroke-slate-500 dark:stroke-slate-400';
+
 /** A point of the drawing as a share of its box, for the labels laid over it. */
 const share = (value: number, of: number) => `${(value / of) * 100}%`;
 
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+const plural = (n: number, one: string, many: string) => `${formatCount(n)} ${n === 1 ? one : many}`;
+
+/** The mark a day's state adds over its cell: a dot, a dash, a dashed outline. `dark` is a cell of the deep steps. */
+function StateMark({ state, x, y, dark, riposo }: { state: CalendarDayState; x: number; y: number; dark: boolean; riposo: boolean }) {
+  return (
+    <>
+      {riposo && (
+        <rect x={x + 0.75} y={y + 0.75} width={CELL - 1.5} height={CELL - 1.5} rx={2.5} fill="none" strokeWidth={1.2} strokeDasharray="2 1.5" className={RING} />
+      )}
+      {/* In ink on the pale steps, in the ground's colour on the deep ones: readable on every cell. */}
+      {state === 'fatto' && <circle cx={x + CELL / 2} cy={y + CELL / 2} r={1.8} className={dark ? 'fill-white dark:fill-slate-900' : DOT} />}
+      {state === 'saltato' && (
+        <line x1={x + 3.5} x2={x + CELL - 3.5} y1={y + CELL / 2} y2={y + CELL / 2} strokeWidth={1.5} strokeLinecap="round" className={dark ? 'stroke-white dark:stroke-slate-900' : DASH} />
+      )}
+    </>
+  );
+}
+
+/** A swatch of the legend, a cell of the calendar at its size. */
+function Swatch({ children }: { children: ReactNode }) {
+  return (
+    <svg aria-hidden viewBox={`-2.5 -2.5 ${CELL + 5} ${CELL + 5}`} className="h-4 w-4 shrink-0">
+      {children}
+    </svg>
+  );
+}
 
 /**
- * The review history as an activity calendar (Studia progress spec §4.4, §6.3): one cell per Rome day,
- * Monday on top, the colour the day's reviews, a dot on a day that counted, a dashed outline on a rest.
- * One tab stop: the arrows move by day (up, down) and by week (left, right), Home and End to the ends;
- * hovering or tapping a day does the same. The line under it says the chosen day.
+ * The review history as an activity calendar (Studia progress spec §4.4, §6.3; Gymnasium spec §5.3): one cell per
+ * Rome day, Monday on top, the colour the day's reviews, the month over the column it starts in; a dot on a day that
+ * counted, a dashed outline on a rest, a dash on a missed day, a ring on today, the rest of this week dotted; a day
+ * before the first one studied has no mark, so a newcomer's calendar says nothing is missed. The legend under it says
+ * each in words. One tab stop: the arrows move by day (up, down) and by week (left, right), Home and End to the ends;
+ * hovering or tapping a day does the same. The line under it says the chosen day, as a screen reader hears it.
  */
 export function ActivityCalendar({ calendario, today, weeks, hue }: ActivityCalendarProps) {
   const grid = useMemo(() => calendarGrid(calendario, today, weeks), [calendario, today, weeks]);
+  const firstDay = useMemo(() => calendario.reduce<string | undefined>((first, d) => (first === undefined || d.giorno < first ? d.giorno : first), undefined), [calendario]);
   const [selected, setSelected] = useState<number | null>(null);
   const readoutId = useId();
   const last = grid.cells.length - 1;
@@ -64,10 +98,13 @@ export function ActivityCalendar({ calendario, today, weeks, hue }: ActivityCale
   const width = LEFT + grid.columns * PITCH;
   const height = TOP + 7 * PITCH;
   const first = grid.cells[0]?.giorno ?? today;
-  const summary = `Calendario dei ripassi dal ${formatDate(first)} a oggi: ${plural(totals.reviews, 'ripasso', 'ripassi')} in ${plural(totals.days, 'giorno', 'giorni')}`;
+  const summary =
+    totals.days === 0
+      ? `Calendario dei ripassi dal ${formatDate(first)} a oggi: ancora nessun ripasso`
+      : `Calendario dei ripassi dal ${formatDate(first)} a oggi: ${plural(totals.reviews, 'ripasso', 'ripassi')} in ${plural(totals.days, 'giorno', 'giorni')}`;
 
   return (
-    <div className="space-y-2">
+    <div className="grid gap-3">
       <div
         tabIndex={0}
         role="group"
@@ -78,7 +115,7 @@ export function ActivityCalendar({ calendario, today, weeks, hue }: ActivityCale
       >
         {/* The labels are the interface's text laid over the drawing, not SVG text: a drawing scaled to its width
             would scale them too, under 11 px on a narrow one (Gymnasium spec §5.1, one type language). */}
-        <div className="relative max-w-[56rem]">
+        <div className="relative">
           <div aria-hidden className={cn('pointer-events-none absolute inset-0 whitespace-nowrap text-xs leading-none', MUTED_TEXT)}>
             {Object.entries(ROW_LABELS).map(([row, label]) => (
               <span key={row} className="absolute left-0 -translate-y-1/2" style={{ top: share(TOP + Number(row) * PITCH + CELL / 2, height) }}>
@@ -86,7 +123,7 @@ export function ActivityCalendar({ calendario, today, weeks, hue }: ActivityCale
               </span>
             ))}
             {grid.months.map((month) => (
-              <span key={`${month.column}-${month.label}`} className="absolute top-0" style={{ left: share(LEFT + month.column * PITCH, width) }}>
+              <span key={`${month.column}-${month.label}`} className="absolute top-0 font-medium text-slate-700 dark:text-slate-200" style={{ left: share(LEFT + month.column * PITCH, width) }}>
                 {month.label}
               </span>
             ))}
@@ -97,8 +134,9 @@ export function ActivityCalendar({ calendario, today, weeks, hue }: ActivityCale
               const y = TOP + cell.row * PITCH;
               const level = heatLevel(cell.day?.ripassi ?? 0, grid.max);
               const tinted = hue !== undefined && level > 0;
+              const state = calendarDayState(cell, today, firstDay);
               return (
-                <g key={cell.giorno} data-day={cell.giorno} onPointerEnter={() => setSelected(index)} onClick={() => setSelected(index)} className="cursor-pointer">
+                <g key={cell.giorno} data-day={cell.giorno} data-stato={state} onPointerEnter={() => setSelected(index)} onClick={() => setSelected(index)} className="cursor-pointer">
                   {/* The whole pitch answers, gaps included: on a phone a cell is about 20 px. */}
                   <rect x={x - GAP / 2} y={y - GAP / 2} width={PITCH} height={PITCH} fill="transparent" />
                   <rect
@@ -111,44 +149,92 @@ export function ActivityCalendar({ calendario, today, weeks, hue }: ActivityCale
                     style={tinted ? { fill: hue, fillOpacity: HUE_OPACITY[level] } : undefined}
                     strokeWidth={selected === index ? 1.5 : 0}
                   />
-                  {cell.day?.riposo && (
-                    <rect x={x + 0.75} y={y + 0.75} width={CELL - 1.5} height={CELL - 1.5} rx={2.5} fill="none" strokeWidth={1.2} strokeDasharray="2 1.5" className={cn('stroke-current', INK_TEXT)} />
-                  )}
-                  {/* In ink on the pale steps, in the ground's colour on the dark ones: readable on every cell. */}
-                  {cell.day?.valido && <circle cx={x + CELL / 2} cy={y + CELL / 2} r={1.8} className={level >= 3 && !tinted ? 'fill-white dark:fill-slate-900' : 'fill-primary-900 dark:fill-primary-300'} />}
+                  <StateMark state={state} x={x} y={y} dark={level >= 3 && !tinted} riposo={cell.day?.riposo === true} />
+                  {cell.giorno === today && <rect x={x - 1.5} y={y - 1.5} width={CELL + 3} height={CELL + 3} rx={4} fill="none" strokeWidth={1.5} className={RING} />}
                 </g>
               );
             })}
+            {/* The rest of this week: drawn, so the week reads whole, but never chosen. */}
+            {grid.future.map((cell) => (
+              <rect
+                key={cell.giorno}
+                data-day={cell.giorno}
+                data-stato="futuro"
+                x={LEFT + cell.column * PITCH + 0.5}
+                y={TOP + cell.row * PITCH + 0.5}
+                width={CELL - 1}
+                height={CELL - 1}
+                rx={2.5}
+                fill="none"
+                strokeWidth={1}
+                strokeDasharray="1.5 1.5"
+                className={TO_COME}
+              />
+            ))}
           </svg>
         </div>
       </div>
-      <div aria-hidden className={cn('flex flex-wrap items-center gap-x-4 gap-y-1 text-xs', MUTED_TEXT)}>
-        <span className="flex items-center gap-1">
+      <ul aria-label="Legenda del calendario" className={cn('flex flex-wrap items-center gap-x-4 gap-y-2 text-xs', MUTED_TEXT)}>
+        <li className="flex items-center gap-1">
           meno
           {HEAT_FILL.map((fill) => (
-            <svg key={fill} viewBox="0 0 10 10" className="h-2.5 w-2.5">
+            <svg key={fill} aria-hidden viewBox="0 0 10 10" className="h-3 w-3">
               <rect width="10" height="10" rx="2" className={fill} />
             </svg>
           ))}
-          più
-        </span>
-        <span className="flex items-center gap-1">
-          <svg viewBox="0 0 10 10" className="h-2.5 w-2.5">
-            <rect width="10" height="10" rx="2" className={HEAT_FILL[1]} />
-            <circle cx="5" cy="5" r="1.6" className="fill-primary-900 dark:fill-primary-300" />
-          </svg>
-          obiettivo raggiunto
-        </span>
-        <span className="flex items-center gap-1">
-          <svg viewBox="0 0 10 10" className="h-2.5 w-2.5">
-            <rect x="0.6" y="0.6" width="8.8" height="8.8" rx="2" fill="none" strokeWidth="1.2" strokeDasharray="2 1.5" className={cn('stroke-current', INK_TEXT)} />
-          </svg>
-          giorno di riposo
-        </span>
-      </div>
-      <p id={readoutId} aria-live="polite" className={cn('min-h-5 text-sm tabular-nums', chosen ? 'text-slate-800 dark:text-slate-100' : MUTED_TEXT)}>
-        {chosen ? describeDay(chosen, today) : 'Passa sopra un giorno, o toccalo, per i dettagli.'}
+          più ripassi
+        </li>
+        <li className="flex items-center gap-1.5">
+          <Swatch>
+            <rect width={CELL} height={CELL} rx={3} className={HEAT_FILL[1]} />
+            <StateMark state="fatto" x={0} y={0} dark={false} riposo={false} />
+          </Swatch>
+          giorno fatto
+        </li>
+        <li className="flex items-center gap-1.5">
+          <Swatch>
+            <rect width={CELL} height={CELL} rx={3} className={HEAT_FILL[0]} />
+            <StateMark state="riposo" x={0} y={0} dark={false} riposo />
+          </Swatch>
+          di riposo
+        </li>
+        <li className="flex items-center gap-1.5">
+          <Swatch>
+            <rect width={CELL} height={CELL} rx={3} className={HEAT_FILL[0]} />
+            <StateMark state="saltato" x={0} y={0} dark={false} riposo={false} />
+          </Swatch>
+          saltato
+        </li>
+        <li className="flex items-center gap-1.5">
+          <Swatch>
+            <rect width={CELL} height={CELL} rx={3} className={HEAT_FILL[0]} />
+            <rect x={-1.5} y={-1.5} width={CELL + 3} height={CELL + 3} rx={4} fill="none" strokeWidth={1.5} className={RING} />
+          </Swatch>
+          oggi
+        </li>
+        <li className="flex items-center gap-1.5">
+          <Swatch>
+            <rect x={0.5} y={0.5} width={CELL - 1} height={CELL - 1} rx={2.5} fill="none" strokeWidth={1} strokeDasharray="1.5 1.5" className={TO_COME} />
+          </Swatch>
+          a venire
+        </li>
+      </ul>
+      {/* Room for its longest day («Oggi, mercoledì 30 settembre: 9999 ripassi, 200 nuove, 1450 sbagliate, obiettivo
+          raggiunto»): three lines on a phone, two from `md`, so choosing a day never moves the page. */}
+      <p id={readoutId} aria-live="polite" className={cn('min-h-[3.75rem] text-sm tabular-nums md:min-h-10', chosen ? 'text-slate-800 dark:text-slate-100' : MUTED_TEXT)}>
+        {chosen ? describeDay(chosen, today, firstDay) : 'Passa sopra un giorno, o toccalo, per i dettagli.'}
       </p>
+    </div>
+  );
+}
+
+/** The calendar's place while its read travels: the drawing's own proportions, the legend's and the line's height. */
+export function ActivityCalendarSkeleton({ weeks }: { weeks: number }) {
+  return (
+    <div aria-hidden className="grid gap-3">
+      <div className="w-full rounded-md bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" style={{ aspectRatio: `${LEFT + weeks * PITCH} / ${TOP + 7 * PITCH}` }} />
+      <div className="h-10 md:h-4" />
+      <div className="min-h-[3.75rem] md:min-h-10" />
     </div>
   );
 }

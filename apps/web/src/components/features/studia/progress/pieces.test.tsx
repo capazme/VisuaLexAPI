@@ -63,12 +63,12 @@ describe('ActivityCalendar', () => {
   const calendario = [day('2026-10-14', { ripassi: 40, nuove: 6, sbagliate: 3 }), day('2026-10-15', { ripassi: 0, valido: false, riposo: true }), day('2026-10-20', { ripassi: 4, valido: false })];
 
   it('says each kind of day in words', () => {
-    expect(describeDay({ giorno: '2026-10-14', day: calendario[0], column: 0, row: 0 }, today)).toBe('mercoledì 14 ottobre: 40 ripassi · 6 nuove · 3 sbagliate · obiettivo raggiunto');
+    expect(describeDay({ giorno: '2026-10-14', day: calendario[0], column: 0, row: 0 }, today)).toBe('mercoledì 14 ottobre: 40 ripassi, 6 nuove, 3 sbagliate, obiettivo raggiunto');
     expect(describeDay({ giorno: '2026-10-15', day: calendario[1], column: 0, row: 0 }, today)).toBe('giovedì 15 ottobre: giorno di riposo, la serie regge');
     expect(describeDay({ giorno: '2026-10-16', day: null, column: 0, row: 0 }, today)).toBe('venerdì 16 ottobre: nessun ripasso');
-    expect(describeDay({ giorno: today, day: day(today, { ripassi: 1, nuove: 1, sbagliate: 1, valido: false }), column: 0, row: 0 }, today)).toBe('Oggi, mercoledì 21 ottobre: 1 ripasso · 1 nuova · 1 sbagliata');
+    expect(describeDay({ giorno: today, day: day(today, { ripassi: 1, nuove: 1, sbagliate: 1, valido: false }), column: 0, row: 0 }, today)).toBe('Oggi, mercoledì 21 ottobre: 1 ripasso, 1 nuova, 1 sbagliata');
     // A day with nothing to do that counted (the queue was empty).
-    expect(describeDay({ giorno: '2026-10-17', day: day('2026-10-17', { ripassi: 0 }), column: 0, row: 0 }, today)).toBe('sabato 17 ottobre: niente da ripassare · obiettivo raggiunto');
+    expect(describeDay({ giorno: '2026-10-17', day: day('2026-10-17', { ripassi: 0 }), column: 0, row: 0 }, today)).toBe('sabato 17 ottobre: niente da ripassare, obiettivo raggiunto');
   });
 
   it('is one tab stop that sums up the range, and the arrows walk the days and the weeks', async () => {
@@ -79,11 +79,12 @@ describe('ActivityCalendar', () => {
     const readout = () => document.getElementById(grid.getAttribute('aria-describedby')!)!.textContent;
     expect(readout()).toBe('Passa sopra un giorno, o toccalo, per i dettagli.');
     fireEvent.keyDown(grid, { key: 'ArrowUp' }); // from today, the day before
-    expect(readout()).toBe('martedì 20 ottobre: 4 ripassi');
+    // After the first day studied (14 October), a day that did not count says so.
+    expect(readout()).toBe('martedì 20 ottobre: 4 ripassi, obiettivo non raggiunto');
     fireEvent.keyDown(grid, { key: 'ArrowLeft' }); // a week back
     expect(readout()).toBe('martedì 13 ottobre: nessun ripasso');
     fireEvent.keyDown(grid, { key: 'ArrowDown' });
-    expect(readout()).toBe('mercoledì 14 ottobre: 40 ripassi · 6 nuove · 3 sbagliate · obiettivo raggiunto');
+    expect(readout()).toBe('mercoledì 14 ottobre: 40 ripassi, 6 nuove, 3 sbagliate, obiettivo raggiunto');
     fireEvent.keyDown(grid, { key: 'Home' });
     expect(readout()).toBe('lunedì 3 agosto: nessun ripasso');
     fireEvent.keyDown(grid, { key: 'ArrowUp' }); // held at the first day
@@ -98,6 +99,52 @@ describe('ActivityCalendar', () => {
     expect(screen.getByText('giovedì 15 ottobre: giorno di riposo, la serie regge')).toBeInTheDocument();
     fireEvent.click(container.querySelector('[data-day="2026-10-14"]')!);
     expect(screen.getByText(/mercoledì 14 ottobre: 40 ripassi/)).toBeInTheDocument();
+  });
+  it('marks each day by its state, a shape for each, and says a missed day only after the first one studied', () => {
+    // 2026-10-21 is a Wednesday: Thursday to Sunday are still to come.
+    const { container } = render(<ActivityCalendar calendario={calendario} today={today} weeks={12} />);
+    const state = (giorno: string) => container.querySelector(`[data-day="${giorno}"]`)?.getAttribute('data-stato');
+    expect(state('2026-10-13')).toBe('vuoto'); // before the first day studied
+    expect(state('2026-10-14')).toBe('fatto');
+    expect(state('2026-10-15')).toBe('riposo');
+    expect(state('2026-10-16')).toBe('saltato');
+    expect(state('2026-10-20')).toBe('saltato'); // reviews under the goal
+    expect(state(today)).toBe('oggi');
+    expect(['2026-10-22', '2026-10-25'].map(state)).toEqual(['futuro', 'futuro']);
+    expect(describeDay({ giorno: '2026-10-16', day: null, column: 0, row: 0 }, today, '2026-10-14')).toBe('venerdì 16 ottobre: nessun ripasso, giorno saltato');
+    expect(describeDay({ giorno: '2026-10-13', day: null, column: 0, row: 0 }, today, '2026-10-14')).toBe('martedì 13 ottobre: nessun ripasso');
+  });
+
+  it('writes its legend in words', () => {
+    render(<ActivityCalendar calendario={calendario} today={today} weeks={12} />);
+    const legend = within(screen.getByRole('list', { name: 'Legenda del calendario' })).getAllByRole('listitem');
+    expect(legend.map((item) => item.textContent)).toEqual(['menopiù ripassi', 'giorno fatto', 'di riposo', 'saltato', 'oggi', 'a venire']);
+  });
+
+  it('never chooses a day still to come: End stops at today, and they do not answer a pointer', () => {
+    const { container } = render(<ActivityCalendar calendario={calendario} today={today} weeks={12} />);
+    const grid = screen.getByRole('group', { name: /Calendario dei ripassi/ });
+    fireEvent.pointerEnter(container.querySelector('[data-day="2026-10-24"]')!);
+    expect(screen.getByText('Passa sopra un giorno, o toccalo, per i dettagli.')).toBeInTheDocument();
+    fireEvent.keyDown(grid, { key: 'End' });
+    fireEvent.keyDown(grid, { key: 'ArrowDown' });
+    expect(document.getElementById(grid.getAttribute('aria-describedby')!)!.textContent).toBe('Oggi, mercoledì 21 ottobre: nessun ripasso');
+  });
+
+  it('says nothing is missed for a newcomer, and counts nothing before the first day', () => {
+    const { container } = render(<ActivityCalendar calendario={[]} today={today} weeks={12} />);
+    expect(screen.getByRole('group', { name: 'Calendario dei ripassi dal 3 agosto 2026 a oggi: ancora nessun ripasso' })).toBeInTheDocument();
+    expect(container.querySelectorAll('[data-stato="saltato"]')).toHaveLength(0);
+    fireEvent.click(container.querySelector('[data-day="2026-10-16"]')!);
+    expect(screen.getByText('venerdì 16 ottobre: nessun ripasso')).toBeInTheDocument();
+  });
+
+  it('reads a day of 9999 reviews whole, and a sum of five digits grouped', () => {
+    const busy = [day('2026-10-19', { ripassi: 9999 }), day('2026-10-20', { ripassi: 2346 })];
+    const { container } = render(<ActivityCalendar calendario={busy} today={today} weeks={12} />);
+    expect(screen.getByRole('group', { name: /12\.345 ripassi in 2 giorni$/ })).toBeInTheDocument();
+    fireEvent.click(container.querySelector('[data-day="2026-10-19"]')!);
+    expect(screen.getByText('lunedì 19 ottobre: 9999 ripassi, obiettivo raggiunto')).toBeInTheDocument();
   });
 });
 
@@ -117,6 +164,12 @@ describe('CardStatesBar', () => {
     rerender(<CardStatesBar stati={{ nuove: 0, apprendimento: 0, consolidate: 0 }} />);
     expect(screen.getByText('Nessuna scheda da studiare, per ora.')).toBeInTheDocument();
   });
+
+  it('writes the three states by name, count and share, not by colour alone', () => {
+    render(<CardStatesBar stati={{ nuove: 1, apprendimento: 2, consolidate: 1 }} />);
+    expect(screen.getAllByRole('term').map((dt) => dt.textContent)).toEqual(['Nuove', 'In apprendimento', 'Consolidate']);
+    expect(screen.getAllByRole('definition').map((dd) => dd.textContent)).toEqual(['125%', '250%', '125%']);
+  });
 });
 
 describe('DueForecast', () => {
@@ -131,6 +184,29 @@ describe('DueForecast', () => {
     expect(screen.getByText('Domani: 1 scheda da ripassare')).toBeInTheDocument();
     fireEvent.click(container.querySelector('[data-day="2026-10-21"]')!);
     expect(screen.getByText('mer 21: 5 schede da ripassare')).toBeInTheDocument();
+  });
+
+  it('writes its scale beside the drawing, each label on its own line, and marks today', () => {
+    const { container } = render(<DueForecast prossimi={prossimi} />);
+    // The tallest bar is 30: the scale is 0, 15 and 30, outside the SVG.
+    const scale = [...container.querySelectorAll('.text-right span.absolute')].map((label) => label.textContent);
+    expect(scale).toEqual(['0', '15', '30']);
+    expect(container.querySelector('svg')!.textContent).toBe('');
+    expect(screen.getByText('oggi')).toHaveClass('font-semibold');
+  });
+
+  it('draws a day with nothing due as a hollow mark, not a gap', () => {
+    const empty = prossimi.map((d, i) => ({ ...d, schede: i === 3 ? 0 : d.schede }));
+    const { container } = render(<DueForecast prossimi={empty} />);
+    expect(container.querySelector('[data-day="2026-10-22"] [data-empty]')).not.toBeNull();
+    expect(container.querySelectorAll('[data-empty]')).toHaveLength(1);
+    fireEvent.click(container.querySelector('[data-day="2026-10-22"]')!);
+    expect(screen.getByText('gio 22: 0 schede da ripassare')).toBeInTheDocument();
+  });
+
+  it('keeps a scale of four digits whole', () => {
+    const { container } = render(<DueForecast prossimi={prossimi.map((d, i) => ({ ...d, schede: i === 0 ? 9999 : 0 }))} />);
+    expect([...container.querySelectorAll('.text-right span.absolute')].map((label) => label.textContent)).toEqual(['0', '5000', '10.000']);
   });
 });
 
@@ -154,9 +230,21 @@ describe('the subject filter', () => {
     await userEvent.setup().click(civil);
     expect(onSelect).toHaveBeenLastCalledWith('DIRITTO_CIVILE');
     rerender(<SubjectProgress materie={materie} selected="DIRITTO_CIVILE" onSelect={onSelect} />);
+    expect(screen.getByRole('button', { name: /Diritto penale/ })).not.toHaveClass('opacity-50');
     expect(screen.getByRole('button', { name: /Diritto civile/ })).toHaveAttribute('aria-pressed', 'true');
     await userEvent.setup().click(screen.getByRole('button', { name: /Diritto civile/ }));
     expect(onSelect).toHaveBeenLastCalledWith(undefined);
+  });
+
+  it('orders the subjects as «Oggi»\'s road, each with its three states in words and its reviews of 30 days', () => {
+    render(<SubjectProgress materie={materie} selected={undefined} onSelect={vi.fn()} />);
+    const names = screen.getAllByRole('button').map((b) => b.textContent!.match(/^Diritto [a-z ]+?(?=\d|Nessuna)/)?.[0]);
+    // Open cards (new plus in learning) first, then by name.
+    expect(names).toEqual(['Diritto civile', 'Diritto processuale civile', 'Diritto amministrativo', 'Diritto processuale penale', 'Diritto penale']);
+    const civil = screen.getByRole('button', { name: /Diritto civile/ });
+    expect(civil).toHaveTextContent('20 nuove · 28 in apprendimento · 104 consolidate');
+    expect(screen.getByRole('button', { name: /Diritto penale/ })).toHaveTextContent('Nessun ripasso negli ultimi 30 giorni');
+    expect(screen.queryByText(/da ripassare/)).toBeNull();
   });
 
   it('offers «Tutte le materie» and the five subjects as chips, one pressed', async () => {

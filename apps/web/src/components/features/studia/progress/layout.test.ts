@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { GiornoAttivita } from '../../../../types/studia';
-import { addDays, calendarGrid, currentWeek, formatDayLong, heatLevel, niceMax, percent, weekday } from './layout';
+import { addDays, calendarDayState, calendarGrid, currentWeek, formatCount, formatDayLong, heatLevel, niceMax, percent, recentReviews, scaleLines, weekday } from './layout';
 
 const day = (giorno: string, ripassi: number): GiornoAttivita => ({ giorno, ripassi, nuove: 0, sbagliate: 0, valido: ripassi >= 10, riposo: false });
 
@@ -38,6 +38,39 @@ describe('the progress layout', () => {
     expect(grid.cells.find((c) => c.giorno === '2026-10-20')?.day?.ripassi).toBe(12);
     expect(grid.cells.find((c) => c.giorno === '2026-10-19')?.day).toBeNull();
     expect(grid.max).toBe(40);
+  });
+
+  it('draws the rest of this week as days to come, after today and in its column', () => {
+    const grid = calendarGrid([], '2026-10-21', 12);
+    expect(grid.future.map((c) => [c.giorno, c.column, c.row])).toEqual([
+      ['2026-10-22', 11, 3],
+      ['2026-10-23', 11, 4],
+      ['2026-10-24', 11, 5],
+      ['2026-10-25', 11, 6],
+    ]);
+    expect(calendarGrid([], '2026-10-25', 12).future).toEqual([]);
+  });
+
+  it('names a calendar day’s state: a day before the first one studied is not missed', () => {
+    const at = (giorno: string, d: GiornoAttivita | null = null) => ({ giorno, day: d, column: 0, row: 0 });
+    const today = '2026-10-21';
+    expect(calendarDayState(at('2026-10-22'), today, '2026-10-01')).toBe('futuro');
+    expect(calendarDayState(at('2026-10-20', day('2026-10-20', 12)), today, '2026-10-01')).toBe('fatto');
+    expect(calendarDayState(at('2026-10-20', { ...day('2026-10-20', 0), riposo: true }), today, '2026-10-01')).toBe('riposo');
+    expect(calendarDayState(at(today), today, '2026-10-01')).toBe('oggi');
+    expect(calendarDayState(at(today, day(today, 12)), today, '2026-10-01')).toBe('fatto');
+    expect(calendarDayState(at('2026-10-20', day('2026-10-20', 3)), today, '2026-10-01')).toBe('saltato');
+    expect(calendarDayState(at('2026-10-02'), today, '2026-10-01')).toBe('saltato');
+    expect(calendarDayState(at('2026-09-30'), today, '2026-10-01')).toBe('vuoto');
+    expect(calendarDayState(at('2026-10-20'), today, undefined)).toBe('vuoto');
+  });
+
+  it('writes counts the Italian way, sums the reviews of 30 days, and puts the scale’s lines on whole numbers', () => {
+    expect([formatCount(9999), formatCount(12345)]).toEqual(['9999', '12.345']);
+    expect(recentReviews([{ ripassi30: 310 }, { ripassi30: 0 }, { ripassi30: 2 }])).toBe(312);
+    expect(scaleLines(5)).toEqual([3, 5]);
+    expect(scaleLines(30)).toEqual([15, 30]);
+    expect(scaleLines(10000)).toEqual([5000, 10000]);
   });
 
   it('labels a month over the first column that starts in it', () => {

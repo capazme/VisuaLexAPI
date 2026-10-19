@@ -17,6 +17,7 @@ function at(path: string) {
         <Route path="/studia" element={<StudiaPage />}>
           <Route path="ripasso" element={<p>oggi</p>} />
           <Route path="ripasso/sessione" element={<p>sessione</p>} />
+          <Route path="progressi" element={<p>progressi</p>} />
           <Route path="schede" element={<p>vista</p>} />
           <Route path="schede/:id" element={<p>scheda</p>} />
           <Route path="valida" element={<p>coda</p>} />
@@ -50,8 +51,8 @@ describe('StudiaPage', () => {
     expect(screen.getByRole('button', { name: 'Impostazioni dello studio' })).toBeInTheDocument();
   });
 
-  it('centres «Oggi» as one column, the heading and its rule at the column\'s width; the other views keep theirs', () => {
-    const { container, unmount } = at('/studia/ripasso');
+  it.each(['/studia/ripasso', '/studia/progressi'])('centres %s as one column, the heading and its rule at the column\'s width; the other views keep theirs', (path) => {
+    const { container, unmount } = at(path);
     const page = container.firstElementChild as HTMLElement;
     expect(page).toHaveClass('mx-auto', 'max-w-3xl');
     expect(page).toContainElement(screen.getByRole('heading', { level: 1, name: 'Gymnasium: la tua palestra giuridica' }));
@@ -72,7 +73,7 @@ describe('StudiaPage', () => {
     expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
   });
 
-  it.each(['/studia/ripasso', '/studia/ripasso/sessione'])('leaves %s alone: «Oggi» draws its own strip, the session is a lesson', (path) => {
+  it.each(['/studia/ripasso', '/studia/progressi', '/studia/ripasso/sessione'])('leaves %s alone: «Oggi» and «Progressi» draw their own summary, the session is a lesson', (path) => {
     at(path);
     expect(screen.queryByRole('button', { name: 'Impostazioni dello studio' })).toBeNull();
   });

@@ -181,15 +181,15 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     expect(screen.getByRole('group', { name: 'Opus' })).toContainElement(screen.getByRole('link', { name: 'Dossier' }));
   });
 
-  it('Gymnasium: «Studia» holds Oggi and the dossiers, «Contribuisci» Le mie schede and, for a validator only, «Da validare» (Gymnasium spec §4)', () => {
+  it('Gymnasium: «Studia» holds Oggi, Progressi and the dossiers, «Contribuisci» Le mie schede and, for a validator only, «Da validare» (Gymnasium spec §4)', () => {
     renderSidebar('/studia/schede');
-    expect(hrefs()).toEqual(['/', '/documents', '/studia/ripasso', '/dossier', '/studia/schede']);
+    expect(hrefs()).toEqual(['/', '/documents', '/studia/ripasso', '/studia/progressi', '/dossier', '/studia/schede']);
     expect(screen.getByRole('link', { name: 'Le mie schede' })).toHaveAttribute('aria-current', 'page');
     const study = screen.getByRole('group', { name: 'Studia' });
-    expect(within(study).getAllByRole('link').map((a) => a.getAttribute('aria-label'))).toEqual(['Oggi', 'Dossier']);
+    expect(within(study).getAllByRole('link').map((a) => a.getAttribute('aria-label'))).toEqual(['Oggi', 'Progressi', 'Dossier']);
     expect(screen.getByRole('group', { name: 'Gymnasium' })).toContainElement(study);
     cleanupAndRender('/studia/schede', () => { account.isValidator = true; });
-    expect(hrefs()).toEqual(['/', '/documents', '/studia/ripasso', '/dossier', '/studia/schede', '/studia/valida']);
+    expect(hrefs()).toEqual(['/', '/documents', '/studia/ripasso', '/studia/progressi', '/dossier', '/studia/schede', '/studia/valida']);
     const contribute = screen.getByRole('group', { name: 'Contribuisci' });
     expect(within(contribute).getAllByRole('link').map((a) => a.getAttribute('aria-label'))).toEqual(['Le mie schede', 'Da validare']);
     // The tours still find the dossiers.
