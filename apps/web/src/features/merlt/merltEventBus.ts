@@ -1,0 +1,48 @@
+import type { MerltInteractionEvent } from '../../services/merltService';
+
+type MerltEventListener = (event: MerltInteractionEvent) => void;
+
+const listeners = new Set<MerltEventListener>();
+
+export const MERLT_EVENT_TYPES = {
+    articleViewed: 'article_viewed',
+    scroll: 'scroll',
+    highlightCreated: 'highlight_create',
+    // MERLT-1.7: distinct from `textSelected` because the latter fires on
+    // generic selection (no note saved). `annotationCreated` fires only
+    // when the user persists a note via handleAddNote / InlineNoteComposer.
+    annotationCreated: 'annotation_create',
+    textSelected: 'text_selection',
+    citationDetected: 'citation_detected',
+    searchPerformed: 'search_performed',
+    resultClicked: 'first_result_click',
+    bookmarkCreated: 'bookmark_add',
+    bookmarkDeleted: 'bookmark_delete',
+    // MERLT-1.8: fired by useAppStore.addToDossier when a norma is pushed
+    // into a dossier. Distinct from bookmarkCreated because the dossier
+    // context (id, tags) is structurally different from a flat bookmark.
+    dossierItemAdded: 'dossier_item_add',
+    dossierExportTraining: 'dossier_export_training',
+    citationClicked: 'citation_click',
+    // MERLT-1.10: forum community signals
+    forumLike: 'forum_like',
+    forumDownload: 'forum_download',
+    forumSuggestionAccepted: 'forum_suggestion_accepted',
+    forumSuggestionDeclined: 'forum_suggestion_declined',
+    issueReported: 'issue_reported',
+    issueVoted: 'issue_voted',
+    issueViewed: 'issue_viewed',
+} as const;
+
+export function subscribeMerltEvents(listener: MerltEventListener): () => void {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+}
+
+// Pure pub/sub: subscribers (the Slice 1 tracker hooks) own the BFF talk and
+// gate on the live consent value (useConsent().canTrack). The old direct
+// trackMerltInteraction() call here hit /merlt/feedback/interaction — a route
+// that was never implemented in the BFF, so it 404'd on every published event.
+export function publishMerltEvent(event: MerltInteractionEvent): void {
+    listeners.forEach(listener => listener(event));
+}

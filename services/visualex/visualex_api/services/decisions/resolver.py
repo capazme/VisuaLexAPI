@@ -1,0 +1,470 @@
+"""One reference in, one outcome out (design 2026-10-01 §2-§3).
+
+Lookups are cached per archive, and the answer is composed from them: caching a composed
+answer would hide a homonym deposited later in the other archive. Errors are never cached,
+and a source that cannot be reached is never reported as "not found". A decision found
+without its text, or read from the archive's text field instead of the court's PDF, is kept for
+a day and says so in its notices; why it has none travels in its
+attributes (`testo_assente`), and only when the source said so.
+"""
+from __future__ import annotations
+
+import asyncio
+import base64
+import re
+import zipfile
+import zlib
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
+from datetime import date
+from pathlib import Path
+from typing import Any
+
+import structlog
+
+from ...tools.cache_manager import get_cache_manager
+from ...tools.config import PERSISTENT_CACHE_DIR
+from ...tools.exceptions import DocumentNotFoundError, NetworkError
+from ...tools.tls import IntermediateCertificateMismatch
+from .corte_cost import CorteCostReader
+from .curia import CuriaReader
+from . import giustizia_amministrativa as ga
+from .tar_seats import BY_SLUG, fold, seats_of
+from .italgiure import ItalgiureReader, SourceAnswerError
+from .model import ADMIN_COURTS, EU_COURTS, FAMIGLIE, Decision, Identity, Reference
+from .pdf_text import MAX_BYTES
+
+log = structlog.get_logger()
+
+ITALGIURE_TIMEOUT = 25.0
+CORTE_COST_TIMEOUT = 240.0  # covers the first download of a bundle
+CURIA_TIMEOUT = 45.0  # two requests (the query, the document), a long judgment is over a megabyte
+GA_TIMEOUT = 60.0  # two requests a seat searched (page, search), one for the text; a region has up to two seats
+FOUND_NS, ABSENT_NS, PENDING_NS = "decisions_found", "decisions_absent", "decisions_pending"
+SEARCH_NS = "decisions_search"  # one page of /search_decisions, kept a day
+PDF_NS = "decisions_pdf"  # the court's PDFs, base64, kept 30 days
+DECISION_CACHE_SWEEP_SECONDS = 6 * 3600
+_SOURCE_ERRORS = (NetworkError, DocumentNotFoundError, asyncio.TimeoutError, ValueError,
+                  zipfile.BadZipFile, zlib.error, EOFError, SourceAnswerError,
+                  IntermediateCertificateMismatch, OSError)
+_CITATA = re.compile(r"[\w .\-/]+")
+_CITATA_MAX = 20
+
+
+class SourceUnavailable(Exception):
+    def __init__(self, fonte: str, detail: str = ""):
+        super().__init__(f"{fonte} non raggiungibile: {detail}")
+        self.fonte = fonte
+
+
+@dataclass
+class Outcome:
+    esito: str                                  # trovata | ambigua | non_trovata
+    decisione: Decision | None = None
+    candidati: list[Decision] = field(default_factory=list)
+    avvisi: list[dict[str, str]] = field(default_factory=list)
+    motivo: str | None = None                   # inesistente | fuori_archivio | anno_parziale
+    archivio_dal: str | None = None
+    suggerimento: Identity | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        if self.esito == "trovata":
+            return {"esito": "trovata", **self.decisione.to_dict(), "avvisi": self.avvisi}
+        if self.esito == "ambigua":
+            return {"esito": "ambigua", "candidati": [
+                {"identita": c.identita.to_dict(), "attributi": c.to_dict()["attributi"]}
+                for c in self.candidati]}
+        out: dict[str, Any] = {"esito": "non_trovata", "motivo": self.motivo}
+        if self.archivio_dal:
+            out["archivio_dal"] = self.archivio_dal
+        if self.suggerimento:
+            out["suggerimento"] = self.suggerimento.to_dict()
+        return out
+
+
+def _text_notices(decision: Decision) -> list[dict[str, str]]:
+    """The notices about a decision's text. Without one the page says so instead of showing an
+    empty text, and reads why from `attributi.testo_assente`, set only when the source said so;
+    a text read from the archive's field, not the court's PDF, is declared provisional."""
+    if not decision.testo:
+        return [{"tipo": "testo_non_disponibile"}]
+    return [{"tipo": "testo_da_archivio"}] if decision.testo_origine == "archivio" else []
+
+
+def _cass_key(archivio: str, numero: int, anno: int) -> str:
+    """The cache key of a Cassazione decision's text (see the version note in `_cass`)."""
+    return f"italgiure:v4:{archivio}:{numero}:{anno}"
+
+
+def _citata(raw: str | None) -> str | None:
+    """The section as cited, when it can be echoed in a notice: short, and only the characters
+    a section is written with. The page builds the request from a shareable address, so
+    anything else would let a crafted link put its own text inside a VisuaLex notice."""
+    if raw is not None and len(raw) <= _CITATA_MAX and _CITATA.fullmatch(raw):
+        return raw
+    return None
+
+
+class Resolver:
+    def __init__(self, italgiure, corte_cost, cache=None,
+                 today: Callable[[], date] = date.today, curia=None, admin=None):
+        self.italgiure, self.corte_cost, self.today = italgiure, corte_cost, today
+        self.curia = curia if curia is not None else CuriaReader()
+        self.admin = admin if admin is not None else ga.GiustiziaAmministrativaReader()
+        manager = cache or get_cache_manager()
+        self.found = manager.get_persistent(FOUND_NS)
+        self.absent = manager.get_persistent(ABSENT_NS)
+        self.pending = manager.get_persistent(PENDING_NS)
+        self.pdfs = manager.get_persistent(PDF_NS)
+        self._starts: dict[tuple[str, date], tuple[int, str] | None] = {}
+
+    async def _lookup(self, key: str, fonte: str, timeout: float,
+                      call: Callable[[], Awaitable[Decision | None]],
+                      store: bool = True) -> Decision | None:
+        cached = await self.found.get(key)
+        if cached is None:
+            cached = await self.pending.get(key)
+        if cached is not None:
+            return Decision.from_dict(cached)
+        if await self.absent.get(key) is not None:
+            return None
+        try:
+            decision = await asyncio.wait_for(call(), timeout)
+        except _SOURCE_ERRORS as exc:
+            log.warning("Decision source failed", fonte=fonte, key=key, error=str(exc),
+                        error_type=type(exc).__name__)
+            raise SourceUnavailable(fonte, str(exc)) from exc
+        if decision is None:
+            await self.absent.set(key, True)
+        elif not store:
+            pass  # a record read without its PDF is not the decision's text: never kept
+        elif decision.testo and decision.testo_origine != "archivio":
+            await self.found.set(key, decision.to_dict())
+        else:
+            # found without its text (the source withholds it while personal data are
+            # removed, or the record lacks it), or with the archive's field in place of the
+            # court's PDF: kept for a day, not a month, so the text shows up once the source
+            # releases it and the PDF is read again soon
+            await self.pending.set(key, decision.to_dict())
+        return decision
+
+    async def _cass(self, archivio: str, numero: int, anno: int,
+                    with_pdf: bool = True) -> Decision | None:
+        # v3 since the text comes from the court's original PDF (2026-10-05): the v2 entries hold
+        # the archive's field, cut short in about a third of the records, and are not served
+        # again. v2 since the reader recognises every notice Italgiure gives in place of a text
+        # and restores paragraphs (2026-10-04); a new key never serves the entries cached before
+        # (the sweep deletes them once expired). Raise the version whenever the reader changes the
+        # shape of what it returns — the shape only (blocks, `\n`): a change of characters is refused
+        # by test_decisions_text_frozen.py (design 2026-10-05 §8.5); the last change of characters
+        # was italgiure:v4's (carriage returns normalised, 7 October).
+        pdf: list[bytes] = []
+
+        async def read() -> Decision | None:
+            found = await self.italgiure.lookup_with_pdf(archivio, numero, anno, with_pdf)
+            if found is None:
+                return None
+            decision, data = found
+            if data:
+                pdf.append(data)
+            return decision
+
+        decision = await self._lookup(_cass_key(archivio, numero, anno), "cassazione",
+                                      ITALGIURE_TIMEOUT, read, store=with_pdf)
+        if decision is not None and pdf:
+            # outside the source's limit and errors: a cache that cannot be written is not an
+            # unreachable court, and the text it read stands
+            try:
+                await self.pdfs.set(decision.identita.key(), base64.b64encode(pdf[0]).decode())
+            except Exception as exc:  # noqa: BLE001
+                log.warning("Decision PDF not cached", key=decision.identita.key(),
+                            error_type=type(exc).__name__)
+        return decision
+
+    async def original_pdf(self, identity: Identity) -> bytes | None:
+        """The court's PDF of a Cassazione decision: the bytes a lookup cached, else fetched once
+        (the record, then the PDF) and cached. None if there is none to give. Source errors
+        propagate. Only `%PDF-` bytes within MAX_BYTES are cached or returned."""
+        if identity.corte != "cassazione" or identity.archivio not in ("civile", "penale"):
+            return None
+        key = identity.key()
+        try:
+            cached = await self.pdfs.get(key)
+        except Exception as exc:  # noqa: BLE001 - a broken cache costs a request, not the answer
+            log.warning("Decision PDF cache not read", key=key, error_type=type(exc).__name__)
+            cached = None
+        if cached is not None:
+            # served only while the decision's text is kept too: when the court withholds a
+            # decision (to anonymise it) the text entry goes with its month, and the PDF must
+            # not outlive it. Without the text entry the source is asked again.
+            data = b""
+            try:
+                text_kept = await self.found.get(
+                    _cass_key(identity.archivio, identity.numero, identity.anno)) is not None
+            except Exception:  # noqa: BLE001 - unknown: the source is asked
+                text_kept = False
+            if text_kept:
+                try:
+                    data = base64.b64decode(cached, validate=True) if isinstance(cached, str) else b""
+                except ValueError:
+                    data = b""
+                if data.startswith(b"%PDF-") and len(data) <= MAX_BYTES:
+                    return data
+            try:
+                await self.pdfs.delete(key)  # stale, or not a PDF
+            except Exception as exc:  # noqa: BLE001
+                log.warning("Decision PDF entry not dropped", key=key, error_type=type(exc).__name__)
+        data = await asyncio.wait_for(
+            self.italgiure.original_pdf(identity.archivio, identity.numero, identity.anno),
+            ITALGIURE_TIMEOUT)
+        if not data or not data.startswith(b"%PDF-") or len(data) > MAX_BYTES:
+            return None
+        try:
+            await self.pdfs.set(key, base64.b64encode(data).decode())
+        except Exception as exc:  # noqa: BLE001
+            log.warning("Decision PDF not cached", key=key, error_type=type(exc).__name__)
+        return data
+
+    async def _start(self, archivio: str) -> tuple[int, str] | None:
+        key = (archivio, self.today())
+        if key not in self._starts:
+            try:
+                start = await asyncio.wait_for(
+                    self.italgiure.archive_start(archivio), ITALGIURE_TIMEOUT)
+            except _SOURCE_ERRORS as exc:
+                log.warning("Italgiure archive start unknown", archivio=archivio,
+                            error=str(exc))
+                return None  # not cached: tried again on the next miss
+            if start is None:
+                return None  # unreadable: not kept either
+            self._starts[key] = start
+        return self._starts[key]
+
+    async def archive_start_of(self, archivio: str) -> tuple[int, str] | None:
+        """The archive's first deposit (year, date), as cached for the day; None if unknown."""
+        return await self._start(archivio)
+
+    async def _eu(self, ref: Reference) -> Outcome:
+        """The Court of Justice or the General Court (design 2026-10-12 §4): the case's judgments,
+        cached as one answer per case, since the source answers per case. A judgment on joined
+        cases has the first case's identity: a reference to another of them says so."""
+        # v1: the first shape of curia.py; raise it whenever the reader changes the shape of
+        # what it returns (blocks, `\n`), never for characters (root rule 23).
+        key = f"curia:v1:{ref.corte}:{ref.numero}:{ref.anno}"
+        cached = await self.found.get(key)
+        if cached is None:
+            cached = await self.pending.get(key)
+        if cached is not None:
+            decisions = [Decision.from_dict(d) for d in cached["decisioni"]]
+        elif await self.absent.get(key) is not None:
+            decisions = []
+        else:
+            try:
+                decisions = await asyncio.wait_for(
+                    self.curia.lookup(ref.corte, ref.numero, ref.anno), CURIA_TIMEOUT)
+            except _SOURCE_ERRORS as exc:
+                log.warning("Decision source failed", fonte="curia", key=key, error=str(exc),
+                            error_type=type(exc).__name__)
+                raise SourceUnavailable("curia", str(exc)) from exc
+            if not decisions:
+                await self.absent.set(key, True)
+            elif all(d.testo for d in decisions):
+                await self.found.set(key, {"decisioni": [d.to_dict() for d in decisions]})
+            else:
+                await self.pending.set(key, {"decisioni": [d.to_dict() for d in decisions]})
+        if not decisions:
+            return Outcome("non_trovata", motivo="inesistente")
+        if len(decisions) > 1:
+            return Outcome("ambigua", candidati=decisions)
+        decision = decisions[0]
+        avvisi: list[dict[str, str]] = []
+        if decision.identita.numero != ref.numero or decision.identita.anno != ref.anno:
+            avvisi.append({"tipo": "causa_riunita", "numero": str(decision.identita.numero),
+                           "anno": str(decision.identita.anno)})
+        return Outcome("trovata", decisione=decision, avvisi=avvisi + _text_notices(decision))
+
+    async def _admin_search(self, corte: str, sede: str | None, numero: int, anno: int) -> list[ga.Result]:
+        """What the portal lists for that seat, number and year, kept a day (a later measure of
+        another series can take the number) and an empty answer an hour."""
+        key = f"ga:v1:search:{corte}:{sede or '-'}:{numero}:{anno}"
+        cached = await self.pending.get(key)
+        if cached is not None:
+            return [ga.Result(**row) for row in cached]
+        if await self.absent.get(key) is not None:
+            return []
+        portal = ga.portal_seat(corte, sede)
+        results = await self.admin.search(portal, numero, anno)
+        if any(fold(r.sede) != fold(portal) for r in results):
+            # the portal answered for another seat than the one asked: never labelled as the one asked
+            raise ga.SourceChanged("giustizia-amministrativa: la risposta è di un'altra sede")
+        if results:
+            await self.pending.set(key, [r.__dict__ for r in results])
+        else:
+            await self.absent.set(key, True)
+        return results
+
+    async def _admin_text(self, decision: Decision, result: ga.Result) -> Decision:
+        """The chosen measure with its text, kept 30 days (a day when its text could not be read)."""
+        key = f"ga:v1:{decision.identita.key()}"
+        cached = await self.found.get(key) or await self.pending.get(key)
+        if cached is not None:
+            return Decision.from_dict(cached)
+        testo, published = await self.admin.text(result)
+        whole = ga.to_decision(result, decision.identita.corte, decision.identita.sede, testo, published)
+        await (self.found if whole.testo else self.pending).set(key, whole.to_dict())
+        return whole
+
+    async def _admin(self, ref: Reference) -> Outcome:
+        """The Consiglio di Stato, the C.G.A.R.S. or a TAR (design 2026-10-12-administrative-courts
+        §5): every measure with that number and year at the seat (or at each seat of the region),
+        then the kind the reference names; no kind named is a sentenza (D2)."""
+        if ref.corte != "tar":
+            seats: list[str | None] = [None]
+        elif ref.sede:
+            seats = [ref.sede]
+        else:
+            seats = [s.slug for s in seats_of(ref.regione or "")]
+
+        async def gather() -> list[tuple[str | None, ga.Result]]:
+            found = []
+            for sede in seats:
+                found += [(sede, r) for r in await self._admin_search(ref.corte, sede, ref.numero, ref.anno)]
+            return found
+        try:
+            listed = await asyncio.wait_for(gather(), GA_TIMEOUT)
+            same = [(sede, r) for sede, r in listed if r.anno == ref.anno and r.numero == ref.numero]
+            if any(ga.kind_of(r) is None for _, r in same):
+                # a measure with that number the reader cannot identify could be the one asked for
+                raise ga.SourceChanged("giustizia-amministrativa: un provvedimento senza ECLI leggibile")
+        except _SOURCE_ERRORS as exc:
+            log.warning("Decision source failed", fonte="giustizia_amministrativa", error=str(exc),
+                        error_type=type(exc).__name__)
+            raise SourceUnavailable("giustizia_amministrativa", str(exc)) from exc
+        measures = [(d, r) for sede, r in same if (d := ga.to_decision(r, ref.corte, sede)) is not None]
+        wanted = ((ref.provvedimento,) if ref.provvedimento
+                  else FAMIGLIE.get(ref.tipo or "sentenza", ()))
+        hits = [(d, r) for d, r in measures if d.identita.provvedimento in wanted]
+        # one measure listed twice (the portal repeats a row) is one measure
+        hits = list({d.identita.key(): (d, r) for d, r in hits}.values())
+        if not hits:
+            if measures and not ref.provvedimento and not ref.tipo:
+                # D2: the year holds no sentenza with that number: say what it holds, never pick one
+                return Outcome("ambigua", candidati=list({d.identita.key(): d for d, _ in measures}.values()))
+            return Outcome("non_trovata", motivo="inesistente")
+        if len(hits) > 1:
+            return Outcome("ambigua", candidati=[d for d, _ in hits])
+        decision, result = hits[0]
+        try:
+            decision = await asyncio.wait_for(self._admin_text(decision, result), GA_TIMEOUT)
+        except _SOURCE_ERRORS as exc:
+            log.warning("Decision source failed", fonte="giustizia_amministrativa", error=str(exc),
+                        error_type=type(exc).__name__)
+            raise SourceUnavailable("giustizia_amministrativa", str(exc)) from exc
+        avvisi: list[dict[str, str]] = []
+        if ref.corte == "tar" and not ref.sede and decision.identita.sede:
+            # D3: a TAR named by its region alone
+            avvisi.append({"tipo": "sede_dedotta", "sede": BY_SLUG[decision.identita.sede].sede})
+        return Outcome("trovata", decisione=decision, avvisi=avvisi + _text_notices(decision))
+
+    async def resolve(self, ref: Reference) -> Outcome:
+        if ref.corte in ADMIN_COURTS:
+            return await self._admin(ref)
+        if ref.corte in EU_COURTS:
+            return await self._eu(ref)
+        if ref.corte == "corte_costituzionale":
+            # v2 since the reader splits an epigrafe that holds the reasoning (2026-10-04): the
+            # entries cached before, under "corte_cost:<numero>:<anno>", keep it unsplit for up
+            # to 30 days, and a new key never serves them (the sweep deletes them once expired).
+            # Raise the version whenever the reader changes the shape of what it returns — the
+            # shape only (blocks, `\n`): a change of characters is refused by
+            # test_decisions_text_frozen.py (design 2026-10-05 §8.5).
+            decision = await self._lookup(
+                f"corte_cost:v2:{ref.numero}:{ref.anno}", "corte_costituzionale",
+                CORTE_COST_TIMEOUT, lambda: self.corte_cost.lookup(ref.numero, ref.anno))
+            if decision is None:
+                return Outcome("non_trovata", motivo="inesistente")
+            return Outcome("trovata", decisione=decision, avvisi=_text_notices(decision))
+
+        archivi = [ref.archivio] if ref.archivio else ["civile", "penale"]
+        # one archive after the other: the client throttles anyway, and a failure leaves no
+        # orphan request behind
+        hits = []
+        for archivio in archivi:
+            decision = await self._cass(archivio, ref.numero, ref.anno)
+            if decision:
+                hits.append(decision)
+        avvisi: list[dict[str, str]] = []
+        citata = _citata(ref.sezione.raw)
+        echo = {"citata": citata} if citata is not None else {}
+        if ref.sezione.raw and not ref.sezione.recognised:
+            avvisi.append({"tipo": "sezione_non_riconosciuta", **echo})
+        if len(hits) == 2:
+            matching = [d for d in hits if ref.sezione.code and d.sezione == ref.sezione.code]
+            if len(matching) != 1:
+                return Outcome("ambigua", candidati=hits)
+            chosen = matching[0]
+            avvisi.append({"tipo": "archivio_dedotto", "archivio": chosen.identita.archivio,
+                           "sezione": chosen.sezione})
+            avvisi += _text_notices(chosen)
+            return Outcome("trovata", decisione=chosen, avvisi=avvisi)
+        if len(hits) == 1:
+            decision = hits[0]
+            if ref.sezione.code and decision.sezione and decision.sezione != ref.sezione.code:
+                avvisi.append({"tipo": "sezione_diversa", **echo, "effettiva": decision.sezione})
+            avvisi += _text_notices(decision)
+            return Outcome("trovata", decisione=decision, avvisi=avvisi)
+        return await self._not_found(ref, archivi)
+
+    async def _not_found(self, ref: Reference, archivi: list[str]) -> Outcome:
+        starts = [s for s in [await self._start(a) for a in archivi] if s]
+        if starts:
+            # the later start: before it, at least one searched archive is incomplete
+            year, iso = max(starts, key=lambda s: s[1])
+        else:
+            year, iso = self.today().year - 5, None  # the window, when the probe failed
+        if ref.anno < year:
+            motivo = "fuori_archivio"
+        elif ref.anno == year:
+            motivo = "anno_parziale"
+        else:
+            motivo, iso = "inesistente", None
+        suggestion = None
+        if "penale" in archivi and ref.anno < self.today().year:
+            try:
+                # a penal number belongs to the year of deposit: a December hearing is
+                # deposited the next year
+                hit = await self._cass("penale", ref.numero, ref.anno + 1, with_pdf=False)
+                suggestion = hit.identita if hit else None
+            except SourceUnavailable:
+                suggestion = None  # the answer stands without its suggestion
+        return Outcome("non_trovata", motivo=motivo, archivio_dal=iso, suggerimento=suggestion)
+
+
+async def sweep_decision_caches(manager=None) -> int:
+    """Delete the expired entries of the decision caches and return how many went.
+
+    The filesystem cache deletes an expired entry only when its key is read again: without
+    a sweep, `decisions_found` would keep whole texts (with whatever personal data the source
+    left) and `decisions_absent` a file per number ever missed, on disk for good. A backend
+    without `sweep_expired` (Redis) expires its keys itself. The app runs this at start and
+    every DECISION_CACHE_SWEEP_SECONDS.
+    """
+    manager = manager or get_cache_manager()
+    removed = 0
+    for namespace in (FOUND_NS, ABSENT_NS, PENDING_NS, PDF_NS, SEARCH_NS):
+        sweep = getattr(manager.get_persistent(namespace), "sweep_expired", None)
+        if sweep is not None:
+            removed += await asyncio.to_thread(sweep)
+    log.info("Decision caches swept", removed=removed)
+    return removed
+
+
+_resolver: Resolver | None = None
+
+
+def get_resolver() -> Resolver:
+    global _resolver
+    if _resolver is None:
+        _resolver = Resolver(ItalgiureReader(),
+                             CorteCostReader(Path(PERSISTENT_CACHE_DIR) / "corte_cost"))
+    return _resolver

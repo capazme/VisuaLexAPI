@@ -1,0 +1,485 @@
+{
+  "experiment": {
+    "name": "EXP-024",
+    "description": "Real Expert System Integration",
+    "num_queries": 10,
+    "use_llm": true,
+    "seed": 42,
+    "timestamp": "2025-12-29T14:57:33.574436"
+  },
+  "queries": [
+    {
+      "query_id": "q_0001",
+      "query_text": "Cos'\u00e8 la risoluzione del contratto per inadempimento?",
+      "synthesis": "La risoluzione del contratto per inadempimento, disciplinata principalmente dagli artt. 1453, 1458 e 1564 c.c., rappresenta un rimedio fondamentale nell'ordinamento giuridico italiano per i contratti a prestazioni corrispettive, ovvero quelli in cui le obbligazioni delle parti sono legate da un vincolo di reciprocit\u00e0.\n\n**Natura e Scelta del Rimedio:**\nQuando uno dei contraenti non adempie le proprie obbligazioni, l'altro contraente ha la facolt\u00e0 di scegliere tra due opzioni alternative:\n1.  **Ch",
+      "confidence": 0.8999999999999999,
+      "expert_contributions": {
+        "literal": {
+          "interpretation": "La risoluzione del contratto per inadempimento \u00e8 l'opzione che uno dei contraenti, in un contratto con prestazioni corrispettive, pu\u00f2 scegliere quando l'altro contraente non adempie le sue obbligazioni. Questa scelta \u00e8 alternativa alla richiesta di adempimento e comporta in ogni caso il risarcimento del danno. La risoluzione pu\u00f2 essere domandata anche se inizialmente era stato chiesto l'adempimento, ma non \u00e8 pi\u00f9 possibile chiedere l'adempimento una volta domandata la risoluzione. Dalla data della domanda di risoluzione, l'inadempiente non pu\u00f2 pi\u00f9 adempiere la propria obbligazione. Tale risoluzione ha effetto retroattivo tra le parti, salvo per i contratti ad esecuzione continuata o periodica, per i quali l'effetto non si estende alle prestazioni gi\u00e0 eseguite. Non pregiudica i diritti acquistati dai terzi, salvi gli effetti della trascrizione della domanda di risoluzione. In specifici casi, come nel contratto di somministrazione, la risoluzione pu\u00f2 essere chiesta se l'inadempimento ha notevole importanza e menoma la fiducia nei successivi adempimenti.",
+          "confidence": 0.9,
+          "weight": 0.7499999999999999,
+          "weighted_confidence": 0.6749999999999999
+        },
+        "systemic": {
+          "interpretation": "La risoluzione del contratto per inadempimento \u00e8 un rimedio previsto dall'ordinamento giuridico italiano per i contratti a prestazioni corrispettive, ovvero quei contratti in cui le prestazioni sono legate da un vincolo di reciprocit\u00e0. Quando uno dei contraenti non adempie le proprie obbligazioni, l'altro contraente ha la facolt\u00e0 di scegliere tra chiedere l'adempimento forzato del contratto o la sua risoluzione, fermo restando il diritto al risarcimento del danno in entrambi i casi. La risoluzione ha effetto retroattivo tra le parti, salvo per i contratti ad esecuzione continuata o periodica, per i quali non si estende alle prestazioni gi\u00e0 eseguite. Non pregiudica i diritti acquisiti dai terzi, fatti salvi gli effetti della trascrizione della domanda di risoluzione. In alcuni casi specifici, come nel contratto di somministrazione, l'inadempimento deve avere una notevole importanza e menomare la fiducia nei successivi adempimenti per giustificare la risoluzione.",
+          "confidence": 0.9,
+          "weight": 0.25,
+          "weighted_confidence": 0.225
+        }
+      },
+      "legal_basis": [],
+      "execution_time_ms": 25486.201999999997,
+      "routing_decision": {
+        "query_type": "definitional",
+        "expert_weights": {
+          "literal": 0.6,
+          "systemic": 0.2,
+          "principles": 0.1,
+          "precedent": 0.1
+        },
+        "confidence": 0.4,
+        "reasoning": "Query classificata come 'definitional'. Expert principali: literal (0.60)"
+      },
+      "feedback": 0.042795483521103586,
+      "reward": 0.003851593516899323,
+      "user_id": "user_001",
+      "error": null
+    },
+    {
+      "query_id": "q_0002",
+      "query_text": "Quali sono i presupposti della risoluzione ex art. 1453 c.c.?",
+      "synthesis": "In qualit\u00e0 di giurista esperto, sintetizzo le interpretazioni dei presupposti della risoluzione del contratto per inadempimento ex art. 1453 c.c., integrando le diverse prospettive ermeneutiche.\n\n**Sintesi dei Presupposti della Risoluzione ex art. 1453 c.c.**\n\nL'articolo 1453 del Codice Civile disciplina la risoluzione del contratto a prestazioni corrispettive per inadempimento di una delle parti. I presupposti fondamentali per l'operativit\u00e0 di tale rimedio, come emerge dall'interpretazione sist",
+      "confidence": 0.4865671641791045,
+      "expert_contributions": {
+        "literal": {
+          "interpretation": "Sulla base delle fonti recuperate, non \u00e8 possibile identificare direttamente i presupposti della risoluzione ex art. 1453 c.c. Le fonti menzionano l'art. 1453 c.c. in relazione alla risoluzione per mancanza di qualit\u00e0 promesse o essenziali nel bene, e in riferimento alla risoluzione del contratto in assenza di una clausola risolutiva espressa, ma non ne specificano i presupposti generali. Una fonte fa riferimento all'art. 1455 c.c. per la valutazione della scarsa importanza dell'inadempimento ai fini della risoluzione, ma non \u00e8 l'art. 1453 c.c. stesso.",
+          "confidence": 0.3,
+          "weight": 0.6268656716417911,
+          "weighted_confidence": 0.1880597014925373
+        },
+        "systemic": {
+          "interpretation": "L'articolo 1453 del Codice Civile disciplina la risoluzione del contratto per inadempimento. I presupposti per la risoluzione sono l'inadempimento di una delle parti e la sua non scarsa importanza, valutata dal giudice. La risoluzione pu\u00f2 essere richiesta anche quando \u00e8 stato domandato l'adempimento, ma non viceversa. In caso di clausola risolutiva espressa (art. 1456 c.c.), non \u00e8 richiesta la gravit\u00e0 dell'inadempimento, purch\u00e9 siano specificate le prestazioni la cui mancata esecuzione d\u00e0 luogo alla risoluzione e sia chiara la volont\u00e0 delle parti di far operare la risoluzione senza l'intervento del giudice.",
+          "confidence": 0.8,
+          "weight": 0.373134328358209,
+          "weighted_confidence": 0.2985074626865672
+        }
+      },
+      "legal_basis": [],
+      "execution_time_ms": 17080.113,
+      "routing_decision": {
+        "query_type": "general",
+        "expert_weights": {
+          "literal": 0.35,
+          "systemic": 0.25,
+          "principles": 0.2,
+          "precedent": 0.2
+        },
+        "confidence": 0.5,
+        "reasoning": "Query classificata come 'general'. Expert principali: literal (0.35)"
+      },
+      "feedback": 0.1327096399668481,
+      "reward": 0.009289674797679367,
+      "user_id": "user_009",
+      "error": null
+    },
+    {
+      "query_id": "q_0003",
+      "query_text": "Come funziona la diffida ad adempiere secondo l'art. 1454?",
+      "synthesis": "La diffida ad adempiere, disciplinata dall'art. 1454 del Codice Civile, \u00e8 uno strumento giuridico che consente alla parte non inadempiente di risolvere di diritto un contratto a seguito dell'inadempimento dell'altra parte.\n\n**Natura e Requisiti:**\nSi tratta di un'intimazione scritta, di natura recettizia, rivolta alla parte inadempiente, con la quale le si richiede di adempiere entro un termine congruo. \u00c8 essenziale che la diffida contenga l'espressa dichiarazione che, decorso inutilmente tale t",
+      "confidence": 0.9000000000000001,
+      "expert_contributions": {
+        "literal": {
+          "interpretation": "La diffida ad adempiere \u00e8 un atto mediante il quale la parte non inadempiente pu\u00f2 intimare per iscritto all'altra parte, che \u00e8 inadempiente, di adempiere entro un termine congruo. Questa intimazione deve contenere la dichiarazione che, se il termine decorre inutilmente, il contratto si intender\u00e0 senz'altro risoluto. Il termine per l'adempimento non pu\u00f2 essere inferiore a quindici giorni, a meno che le parti abbiano pattuito diversamente o che, per la natura del contratto o secondo gli usi, un termine minore risulti congruo. Se il termine assegnato decorre senza che il contratto sia stato adempiuto, il contratto \u00e8 risoluto di diritto. Il termine di quindici giorni decorre dal momento in cui la diffida, che \u00e8 un atto recettizio, giunge nella sfera di conoscenza del destinatario.",
+          "confidence": 0.9,
+          "weight": 0.6268656716417911,
+          "weighted_confidence": 0.564179104477612
+        },
+        "systemic": {
+          "interpretation": "La diffida ad adempiere, disciplinata dall'art. 1454 del Codice Civile, \u00e8 uno strumento che consente alla parte non inadempiente di risolvere di diritto un contratto in caso di inadempimento dell'altra parte. Essa consiste in un'intimazione scritta rivolta alla parte inadempiente, con la quale le si chiede di adempiere entro un termine congruo. Contestualmente, deve essere espressamente dichiarato che, decorso inutilmente tale termine, il contratto si intender\u00e0 risolto. Il termine minimo per l'adempimento \u00e8 di quindici giorni, salvo che le parti abbiano pattuito diversamente, o che la natura del contratto o gli usi consentano un termine inferiore. La risoluzione del contratto avviene di diritto una volta che il termine assegnato sia decorso senza che l'adempimento sia avvenuto. La diffida \u00e8 un atto recettizio, pertanto il termine decorre dal momento in cui giunge a conoscenza del destinatario.",
+          "confidence": 0.9,
+          "weight": 0.373134328358209,
+          "weighted_confidence": 0.3358208955223881
+        }
+      },
+      "legal_basis": [],
+      "execution_time_ms": 12351.983,
+      "routing_decision": {
+        "query_type": "general",
+        "expert_weights": {
+          "literal": 0.35,
+          "systemic": 0.25,
+          "principles": 0.2,
+          "precedent": 0.2
+        },
+        "confidence": 0.5,
+        "reasoning": "Query classificata come 'general'. Expert principali: literal (0.35)"
+      },
+      "feedback": 0.34405507107458705,
+      "reward": 0.10322212563542886,
+      "user_id": "user_004",
+      "error": null
+    },
+    {
+      "query_id": "q_0004",
+      "query_text": "Cos'\u00e8 il termine essenziale nell'art. 1457 c.c.?",
+      "synthesis": "Mi scuso, ma non sono in grado di produrre la sintesi richiesta. L'interpretazione \"LITERAL\" ha restituito un errore (\"Errore nell'analisi: [Errno 65] No route to host\") e non ho quindi alcun contenuto da analizzare da quella prospettiva.\n\nPer poter procedere con la sintesi, avrei bisogno di un'interpretazione valida e significativa anche per l'approccio \"LITERAL\", oltre a quelle che eventualmente mi fornirai per gli altri approcci ermeneutici.\n\nSe mi fornirai le interpretazioni complete e valid",
+      "confidence": 0.0,
+      "expert_contributions": {
+        "literal": {
+          "interpretation": "Errore nell'analisi: [Errno 65] No route to host",
+          "confidence": 0.0,
+          "weight": 1.0,
+          "weighted_confidence": 0.0
+        }
+      },
+      "legal_basis": [],
+      "execution_time_ms": 21851.811999999998,
+      "routing_decision": {
+        "query_type": "definitional",
+        "expert_weights": {
+          "literal": 0.6,
+          "systemic": 0.2,
+          "principles": 0.1,
+          "precedent": 0.1
+        },
+        "confidence": 0.4,
+        "reasoning": "Query classificata come 'definitional'. Expert principali: literal (0.60)"
+      },
+      "feedback": 0.3552975587648295,
+      "reward": 0.008882438969120738,
+      "user_id": "user_014",
+      "error": null
+    },
+    {
+      "query_id": "q_0005",
+      "query_text": "Quali sono gli effetti della risoluzione del contratto?",
+      "synthesis": "La risoluzione del contratto comporta lo scioglimento del vincolo contrattuale, producendo effetti sia tra le parti che nei confronti dei terzi.\n\n**Effetti tra le parti:**\nIn generale, la risoluzione ha **efficacia retroattiva**, operando \"ex tunc\" (dal momento della conclusione del contratto), come se il contratto non fosse mai stato stipulato. Ci\u00f2 implica un **effetto restitutorio**: le parti sono tenute a restituire le prestazioni gi\u00e0 eseguite, con gli accessori e gli interessi legali decorre",
+      "confidence": 0.9,
+      "expert_contributions": {
+        "literal": {
+          "interpretation": "Gli effetti della risoluzione del contratto sono principalmente la retroattivit\u00e0 tra le parti, salvo per i contratti ad esecuzione continuata o periodica, per i quali l'effetto non si estende alle prestazioni gi\u00e0 eseguite. La risoluzione non pregiudica i diritti acquistati dai terzi, a meno che non siano fatti salvi gli effetti della trascrizione della domanda di risoluzione. In particolare, in caso di risoluzione, il venditore deve restituire il prezzo e rimborsare al compratore le spese e i pagamenti legittimamente fatti per la vendita, mentre il compratore deve restituire la cosa, a meno che questa non sia perita a causa di vizi.",
+          "confidence": 0.9,
+          "weight": 0.35,
+          "weighted_confidence": 0.315
+        },
+        "systemic": {
+          "interpretation": "La risoluzione del contratto, in generale, produce effetti retroattivi tra le parti, come se il contratto non fosse mai stato concluso. Questo implica l'obbligo di restituire le prestazioni gi\u00e0 eseguite. Tuttavia, per i contratti ad esecuzione continuata o periodica, la retroattivit\u00e0 \u00e8 limitata, e le prestazioni gi\u00e0 eseguite prima della risoluzione rimangono valide. La risoluzione non pregiudica i diritti acquisiti dai terzi, a meno che non siano stati trascritti gli effetti della domanda di risoluzione. Nel contesto specifico della compravendita, in caso di risoluzione per vizi della cosa, il venditore \u00e8 tenuto a restituire il prezzo e rimborsare le spese legittimamente sostenute dal compratore, mentre il compratore deve restituire la cosa, a meno che questa non sia perita a causa dei vizi stessi.",
+          "confidence": 0.9,
+          "weight": 0.25,
+          "weighted_confidence": 0.225
+        },
+        "principles": {
+          "interpretation": "La risoluzione del contratto comporta lo scioglimento del vincolo contrattuale con effetto retroattivo tra le parti, come se il contratto non fosse mai stato stipulato. Le parti sono tenute a restituire le prestazioni ricevute, salvo per i contratti ad esecuzione continuata o periodica, dove l'effetto retroattivo non si estende alle prestazioni gi\u00e0 eseguite. La risoluzione non pregiudica i diritti acquisiti dai terzi, a tutela della sicurezza dei traffici giuridici, fatti salvi gli effetti della trascrizione della domanda di risoluzione. In caso di risoluzione per vizi della cosa venduta, il venditore deve restituire il prezzo e rimborsare le spese legittimamente sostenute dal compratore, il quale deve restituire la cosa se non \u00e8 perita a causa dei vizi stessi.",
+          "confidence": 0.9,
+          "weight": 0.2,
+          "weighted_confidence": 0.18000000000000002
+        },
+        "precedent": {
+          "interpretation": "La risoluzione del contratto produce principalmente due effetti: un effetto liberatorio per le prestazioni non ancora eseguite e un effetto restitutorio per quelle gi\u00e0 eseguite. L'effetto liberatorio opera 'ex nunc' (da ora in poi), mentre l'effetto restitutorio opera retroattivamente, implicando la restituzione delle prestazioni con accessori e interessi legali dalla data del ricevimento. La natura della pronuncia di risoluzione pu\u00f2 essere costitutiva (come nel caso di risoluzione per inadempimento ex art. 1453 c.c., che scioglie il vincolo contrattuale) o meramente dichiarativa (come nelle risoluzioni di diritto ex artt. 1454, 1456 e 1457 c.c., che accertano l'avvenuto scioglimento).",
+          "confidence": 0.9,
+          "weight": 0.2,
+          "weighted_confidence": 0.18000000000000002
+        }
+      },
+      "legal_basis": [],
+      "execution_time_ms": 17913.682999999997,
+      "routing_decision": {
+        "query_type": "general",
+        "expert_weights": {
+          "literal": 0.35,
+          "systemic": 0.25,
+          "principles": 0.2,
+          "precedent": 0.2
+        },
+        "confidence": 0.5,
+        "reasoning": "Query classificata come 'general'. Expert principali: literal (0.35)"
+      },
+      "feedback": 0.27896751162171135,
+      "reward": 0.047203656894256645,
+      "user_id": "user_011",
+      "error": null
+    },
+    {
+      "query_id": "q_0006",
+      "query_text": "Cos'\u00e8 l'eccezione di inadempimento ex art. 1460?",
+      "synthesis": "L'eccezione di inadempimento, disciplinata dall'Art. 1460 del Codice Civile, rappresenta un principio cardine nei contratti a prestazioni corrispettive, consentendo a ciascun contraente di sospendere l'esecuzione della propria obbligazione qualora l'altra parte non adempia o non offra di adempiere contestualmente la propria.\n\n**Natura e Funzione:**\nL'interpretazione letterale (Art. 1460 c.c.) evidenzia la funzione di autotutela che l'eccezione svolge, garantendo un equilibrio sinallagmatico tra ",
+      "confidence": 1.0,
+      "expert_contributions": {
+        "literal": {
+          "interpretation": "L'eccezione di inadempimento, disciplinata dall'Art. 1460 del Codice Civile, \u00e8 un meccanismo che, nei contratti con prestazioni corrispettive, consente a ciascun contraente di rifiutarsi di adempiere la propria obbligazione se l'altro contraente non adempie o non offre di adempiere contemporaneamente la propria. Questa facolt\u00e0 \u00e8 esclusa se le parti hanno stabilito termini diversi per l'adempimento o se tali termini risultano dalla natura del contratto. Non \u00e8, tuttavia, possibile rifiutare l'esecuzione se, in base alle circostanze, il rifiuto \u00e8 contrario alla buona fede. L'eccezione di inadempimento si fonda sull'esistenza dell'inadempimento dell'altra parte e sulla proporzionalit\u00e0 tra i rispettivi inadempimenti, valutata oggettivamente e con riferimento all'equilibrio complessivo del contratto e alla buona fede. Se fondata, impedisce l'operativit\u00e0 di una clausola risolutiva espressa.",
+          "confidence": 1.0,
+          "weight": 1.0,
+          "weighted_confidence": 1.0
+        }
+      },
+      "legal_basis": [],
+      "execution_time_ms": 15722.244,
+      "routing_decision": {
+        "query_type": "definitional",
+        "expert_weights": {
+          "literal": 0.6,
+          "systemic": 0.2,
+          "principles": 0.1,
+          "precedent": 0.1
+        },
+        "confidence": 0.4,
+        "reasoning": "Query classificata come 'definitional'. Expert principali: literal (0.60)"
+      },
+      "feedback": 0.10576684685272335,
+      "reward": 0.020277815758804486,
+      "user_id": "user_003",
+      "error": null
+    },
+    {
+      "query_id": "q_0007",
+      "query_text": "Quando si pu\u00f2 invocare l'eccezione inadimplenti non est adimplendum?",
+      "synthesis": "L'eccezione \"inadimplenti non est adimplendum\" (all'inadempiente non \u00e8 dovuto l'adempimento) rappresenta un principio cardine nei contratti a prestazioni corrispettive, come l'appalto e la compravendita, e consente a una parte di rifiutare l'esecuzione della propria prestazione qualora l'altra parte non abbia adempiuto o abbia adempiuto in modo inesatto alla propria obbligazione.\n\n**Punti chiave e integrazione delle prospettive:**\n\n*   **Applicabilit\u00e0 generale e tutela dell'equilibrio contrattua",
+      "confidence": 0.9,
+      "expert_contributions": {
+        "literal": {
+          "interpretation": "L'eccezione \"inadimplenti non est adimplendum\" pu\u00f2 essere invocata in caso di inadempimento del contratto d'appalto, quando l'opera \u00e8 ultimata, dal committente convenuto per il pagamento, per opporre all'appaltatore le difformit\u00e0 e i vizi dell'opera. Questa eccezione \u00e8 proponibile anche se la domanda di garanzia sarebbe prescritta e indipendentemente dalla proposizione, in via riconvenzionale, di tale domanda. Inoltre, il compratore pu\u00f2 sollevare l'eccezione d'inadempimento per mancanza delle qualit\u00e0 promesse dal venditore, a prescindere dalla responsabilit\u00e0 di quest'ultimo.",
+          "confidence": 0.9,
+          "weight": 0.35,
+          "weighted_confidence": 0.315
+        },
+        "systemic": {
+          "interpretation": "L'eccezione \"inadimplenti non est adimplendum\" pu\u00f2 essere invocata in contesti di contratti a prestazioni corrispettive, come l'appalto e la compravendita, quando una parte non ha adempiuto o ha adempiuto in modo inesatto alla propria obbligazione. Nel contratto d'appalto, il committente pu\u00f2 opporre le difformit\u00e0 e i vizi dell'opera all'appaltatore, anche se la domanda di garanzia \u00e8 prescritta e senza la necessit\u00e0 di proporre una domanda riconvenzionale. Nel contratto di compravendita, il compratore pu\u00f2 sollevare tale eccezione per la mancanza delle qualit\u00e0 promesse dal venditore, a tutela del proprio interesse a non eseguire la prestazione in assenza della controprestazione.",
+          "confidence": 0.9,
+          "weight": 0.25,
+          "weighted_confidence": 0.225
+        },
+        "principles": {
+          "interpretation": "L'eccezione inadimplenti non est adimplendum pu\u00f2 essere invocata quando una parte contrattuale, convenuta per l'adempimento della propria prestazione, oppone all'altra parte l'inadempimento di quest'ultima. Questo principio trova applicazione generale nei contratti a prestazioni corrispettive, come l'appalto e la compravendita, e mira a tutelare l'interesse della parte a non eseguire la propria prestazione in assenza della controprestazione dovuta, garantendo un equilibrio tra le parti e prevenendo situazioni di diseguaglianza. L'eccezione pu\u00f2 essere sollevata anche quando la domanda di garanzia sarebbe prescritta, evidenziando la sua natura di difesa autonoma.",
+          "confidence": 0.9,
+          "weight": 0.2,
+          "weighted_confidence": 0.18000000000000002
+        },
+        "precedent": {
+          "interpretation": "L'eccezione \"inadimplenti non est adimplendum\" (all'inadempiente non \u00e8 dovuto l'adempimento) pu\u00f2 essere invocata in un contratto a prestazioni corrispettive, come l'appalto, quando una parte \u00e8 convenuta per il pagamento e l'altra parte ha omesso di adempiere o ha adempiuto in modo inesatto. Nello specifico, nel contesto del contratto d'appalto, il committente, una volta ultimata l'opera e convenuto per il pagamento, pu\u00f2 opporre all'appaltatore le difformit\u00e0 o i vizi dell'opera. Questa possibilit\u00e0 sussiste anche se la domanda di garanzia sarebbe prescritta e non \u00e8 necessaria la contestuale proposizione di una domanda riconvenzionale. Il principio si ricollega all'art. 1460 c.c. (eccezione d'inadempimento) e alla disposizione specifica dell'art. 1667 c.c. in materia di appalto.",
+          "confidence": 0.9,
+          "weight": 0.2,
+          "weighted_confidence": 0.18000000000000002
+        }
+      },
+      "legal_basis": [],
+      "execution_time_ms": 23080.426,
+      "routing_decision": {
+        "query_type": "general",
+        "expert_weights": {
+          "literal": 0.35,
+          "systemic": 0.25,
+          "principles": 0.2,
+          "precedent": 0.2
+        },
+        "confidence": 0.5,
+        "reasoning": "Query classificata come 'general'. Expert principali: literal (0.35)"
+      },
+      "feedback": 0.33823923161015734,
+      "reward": 0.022188721476609236,
+      "user_id": "user_014",
+      "error": null
+    },
+    {
+      "query_id": "q_0008",
+      "query_text": "Come si applica l'art. 1461 sulla mutatio creditoria?",
+      "synthesis": "Mi dispiace, ma non sono riuscito a elaborare una sintesi delle interpretazioni fornite. Entrambi gli approcci ermeneutici (letterale e sistemico) hanno generato un \"Timeout durante l'analisi\", il che significa che non ho ricevuto alcun contenuto da analizzare per ciascuna prospettiva.\n\nPer poterti fornire una sintesi coerente e completa, avrei bisogno delle interpretazioni effettive generate da ciascun approccio.\n\nSe puoi fornirmi le interpretazioni specifiche per l'approccio letterale e per l'",
+      "confidence": 0.0,
+      "expert_contributions": {
+        "literal": {
+          "interpretation": "Timeout durante l'analisi",
+          "confidence": 0.0,
+          "weight": 0.6268656716417911,
+          "weighted_confidence": 0.0
+        },
+        "systemic": {
+          "interpretation": "Timeout durante l'analisi",
+          "confidence": 0.0,
+          "weight": 0.373134328358209,
+          "weighted_confidence": 0.0
+        }
+      },
+      "legal_basis": [],
+      "execution_time_ms": 36267.433,
+      "routing_decision": {
+        "query_type": "general",
+        "expert_weights": {
+          "literal": 0.35,
+          "systemic": 0.25,
+          "principles": 0.2,
+          "precedent": 0.2
+        },
+        "confidence": 0.5,
+        "reasoning": "Query classificata come 'general'. Expert principali: literal (0.35)"
+      },
+      "feedback": 0.01979875645084954,
+      "reward": 0.00019798756450849542,
+      "user_id": "user_019",
+      "error": null
+    },
+    {
+      "query_id": "q_0009",
+      "query_text": "Cos'\u00e8 la clausola penale secondo il codice civile?",
+      "synthesis": "La clausola penale, disciplinata dall'**Art. 1382 del Codice Civile**, rappresenta una pattuizione contrattuale attraverso la quale le parti convengono che, in caso di inadempimento o di ritardo nell'adempimento di una delle obbligazioni, il contraente inadempiente sia tenuto a una determinata prestazione.\n\n**Funzione e Caratteristiche Essenziali:**\nLa sua funzione \u00e8 duplice e ben definita:\n1.  **Liquidazione anticipata del danno:** Esonera il creditore dall'onere di provare l'ammontare del dann",
+      "confidence": 0.8999999999999999,
+      "expert_contributions": {
+        "literal": {
+          "interpretation": "La clausola penale \u00e8 una pattuizione con cui si conviene che, in caso di inadempimento o di ritardo nell'adempimento, uno dei contraenti \u00e8 tenuto a una determinata prestazione. Essa ha l'effetto di limitare il risarcimento alla prestazione promessa, a meno che non sia stata convenuta la risarcibilit\u00e0 del danno ulteriore. La penale \u00e8 dovuta indipendentemente dalla prova del danno. La sua funzione \u00e8 quella di esonerare il creditore dall'onere di provare il danno da inadempimento, costituendone una liquidazione anticipata, e di incentivare l'adempimento del debitore. Un connotato essenziale della clausola penale \u00e8 la sua connessione con l'inadempimento colpevole di una delle parti; non \u00e8 configurabile se collegata all'avverarsi di un fatto fortuito o non imputabile all'obbligato.",
+          "confidence": 0.9,
+          "weight": 0.7499999999999999,
+          "weighted_confidence": 0.6749999999999999
+        },
+        "systemic": {
+          "interpretation": "La clausola penale, ai sensi dell'articolo 1382 del Codice Civile, \u00e8 una pattuizione contrattuale mediante la quale le parti convengono che, in caso di inadempimento o di ritardo nell'adempimento di una delle obbligazioni, il contraente inadempiente sia tenuto a una determinata prestazione. La sua funzione principale \u00e8 duplice: da un lato, essa esonera il creditore dall'onere di provare l'ammontare del danno subito a causa dell'inadempimento, fungendo da liquidazione anticipata del risarcimento; dall'altro, essa incentiva il debitore all'adempimento, poich\u00e9 questi \u00e8 consapevole fin dall'inizio dell'entit\u00e0 della prestazione cui sar\u00e0 tenuto in caso di inadempienza. Di regola, la clausola penale limita il risarcimento alla prestazione promessa, a meno che non sia stata espressamente convenuta la risarcibilit\u00e0 del danno ulteriore. \u00c8 un connotato essenziale della clausola penale la sua connessione con un inadempimento colpevole di una delle parti; pertanto, non \u00e8 configurabile se collegata a un fatto fortuito o non imputabile all'obbligato. L'irrisoriet\u00e0 del danno pattuito preventivamente tramite clausola penale pu\u00f2 costituire un elemento sintomatico dell'aggiramento del divieto di limitazione di responsabilit\u00e0.",
+          "confidence": 0.9,
+          "weight": 0.25,
+          "weighted_confidence": 0.225
+        }
+      },
+      "legal_basis": [],
+      "execution_time_ms": 12924.956,
+      "routing_decision": {
+        "query_type": "definitional",
+        "expert_weights": {
+          "literal": 0.6,
+          "systemic": 0.2,
+          "principles": 0.1,
+          "precedent": 0.1
+        },
+        "confidence": 0.4,
+        "reasoning": "Query classificata come 'definitional'. Expert principali: literal (0.60)"
+      },
+      "feedback": 0.4589570773782208,
+      "reward": 0.03918356145172262,
+      "user_id": "user_015",
+      "error": null
+    },
+    {
+      "query_id": "q_0010",
+      "query_text": "Quando il giudice pu\u00f2 ridurre la penale ex art. 1384?",
+      "synthesis": "Il potere del giudice di ridurre equamente la penale, ai sensi dell'art. 1384 c.c., \u00e8 un principio consolidato nel nostro ordinamento giuridico, volto a ripristinare l'equilibrio contrattuale e a prevenire abusi.\n\n**Casi di Applicabilit\u00e0 della Riduzione:**\n\nLa riduzione della penale \u00e8 ammessa in due ipotesi principali:\n1.  **Esecuzione parziale dell'obbligazione principale:** Quando il debitore ha adempiuto solo in parte all'obbligazione per la quale era stata prevista la penale.\n2.  **Ammontare",
+      "confidence": 0.9000000000000001,
+      "expert_contributions": {
+        "literal": {
+          "interpretation": "Il giudice pu\u00f2 ridurre equamente la penale in due casi specifici: se l'obbligazione principale \u00e8 stata eseguita in parte, oppure se l'ammontare della penale \u00e8 manifestamente eccessivo. In entrambi i casi, la riduzione deve tenere conto dell'interesse che il creditore aveva all'adempimento. Il potere di riduzione della penale pu\u00f2 essere esercitato d'ufficio dal giudice, anche se la penale \u00e8 prevista a favore della Pubblica Amministrazione, e non \u00e8 limitato alla valutazione dell'interesse del creditore al momento della stipulazione, ma pu\u00f2 considerare anche le circostanze manifestatesi durante lo svolgimento del rapporto. Tale potere non si applica alla caparra confirmatoria.",
+          "confidence": 0.9,
+          "weight": 0.6268656716417911,
+          "weighted_confidence": 0.564179104477612
+        },
+        "systemic": {
+          "interpretation": "Il giudice pu\u00f2 ridurre equamente la penale in due casi principali: se l'obbligazione principale \u00e8 stata eseguita in parte, oppure se l'ammontare della penale \u00e8 manifestamente eccessivo. Questa valutazione deve sempre tenere conto dell'interesse che il creditore aveva all'adempimento. Il potere di riduzione \u00e8 esercitabile d'ufficio dal giudice, anche per tutelare l'equilibrio contrattuale, e non si limita alla valutazione dell'interesse del creditore al momento della stipulazione, ma considera anche le circostanze manifestatesi durante lo svolgimento del rapporto, in ossequio ai principi di solidariet\u00e0, correttezza e buona fede. Tuttavia, questo potere non si estende alla caparra confirmatoria, data la natura eccezionale dell'articolo e le differenze strutturali tra i due istituti.",
+          "confidence": 0.9,
+          "weight": 0.373134328358209,
+          "weighted_confidence": 0.3358208955223881
+        }
+      },
+      "legal_basis": [],
+      "execution_time_ms": 14639.873,
+      "routing_decision": {
+        "query_type": "general",
+        "expert_weights": {
+          "literal": 0.35,
+          "systemic": 0.25,
+          "principles": 0.2,
+          "precedent": 0.2
+        },
+        "confidence": 0.5,
+        "reasoning": "Query classificata come 'general'. Expert principali: literal (0.35)"
+      },
+      "feedback": 0.3419679760102566,
+      "reward": 0.04905880961779477,
+      "user_id": "user_019",
+      "error": null
+    }
+  ],
+  "metrics": {
+    "total_queries": 10,
+    "successful_queries": 10,
+    "success_rate": 1.0,
+    "avg_reward": 0.030335638568282454,
+    "std_reward": 0.02950627049439616,
+    "avg_confidence": 0.6886567164179105,
+    "avg_latency_ms": 19731.8725,
+    "avg_legal_basis": 0.0,
+    "expert_usage": {
+      "literal": 10,
+      "systemic": 8,
+      "principles": 2,
+      "precedent": 2
+    },
+    "community_stats": {
+      "senior_magistrate": {
+        "count": 2,
+        "avg_authority": 0.846972816882567
+      },
+      "strict_expert": {
+        "count": 4,
+        "avg_authority": 0.8108925508807528
+      },
+      "domain_specialist": {
+        "count": 6,
+        "avg_authority": 0.7068899799157434
+      },
+      "lenient_student": {
+        "count": 6,
+        "avg_authority": 0.33623923364518915
+      },
+      "random_noise": {
+        "count": 2,
+        "avg_authority": 0.29973348755675827
+      }
+    }
+  },
+  "authority_evolution": [
+    {
+      "query_num": 5,
+      "snapshot": {
+        "user_000": 0.9,
+        "user_001": 0.7939456337651338,
+        "user_002": 0.85,
+        "user_003": 0.85,
+        "user_004": 0.7885561561500626,
+        "user_005": 0.85,
+        "user_006": 0.7,
+        "user_007": 0.7,
+        "user_008": 0.7,
+        "user_009": 0.7213553339100284,
+        "user_010": 0.7,
+        "user_011": 0.7199845455844323,
+        "user_012": 0.25,
+        "user_013": 0.25,
+        "user_014": 0.47402248847363904,
+        "user_015": 0.25,
+        "user_016": 0.25,
+        "user_017": 0.25,
+        "user_018": 0.1,
+        "user_019": 0.1
+      }
+    },
+    {
+      "query_num": 10,
+      "snapshot": {
+        "user_000": 0.9,
+        "user_001": 0.7939456337651338,
+        "user_002": 0.85,
+        "user_003": 0.7550140473729489,
+        "user_004": 0.7885561561500626,
+        "user_005": 0.85,
+        "user_006": 0.7,
+        "user_007": 0.7,
+        "user_008": 0.7,
+        "user_009": 0.7213553339100284,
+        "user_010": 0.7,
+        "user_011": 0.7199845455844323,
+        "user_012": 0.25,
+        "user_013": 0.25,
+        "user_014": 0.5017159015780468,
+        "user_015": 0.5157195002930882,
+        "user_016": 0.25,
+        "user_017": 0.25,
+        "user_018": 0.1,
+        "user_019": 0.49946697511351656
+      }
+    }
+  ],
+  "errors": []
+}

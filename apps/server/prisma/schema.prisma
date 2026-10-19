@@ -1,0 +1,1474 @@
+// VisuaLex Platform Database Schema
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER MANAGEMENT
+// ============================================
+
+model User {
+  id          String    @id @default(uuid())
+  email       String    @unique
+  username    String    @unique
+  password    String
+  isActive    Boolean   @default(true) @map("is_active")
+  isVerified  Boolean   @default(false) @map("is_verified")
+  isAdmin     Boolean   @default(false) @map("is_admin")
+  loginCount  Int       @default(0) @map("login_count")
+  lastLoginAt DateTime? @map("last_login_at")
+  // Forum-notifications cursor: likes received with createdAt > this are "new".
+  // Suggestions use the existing pending-status count, no cursor needed.
+  notificationLastSeenAt DateTime? @map("notification_last_seen_at")
+  normaWatches           NormaWatch[]
+  normaNotifications    NormaChangeNotification[]
+  articleThreads        ArticleThread[]       @relation("ArticleThreadAuthor")
+  releasedThreadPassages ArticleThread[]      @relation("ArticleThreadPassageReleasedBy")
+  articleComments       ArticleComment[]
+  threadVotes           ArticleThreadVote[]
+  commentVotes          ArticleCommentVote[]
+  threadReports         ArticleThreadReport[]
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Relationships
+  folders       Folder[]
+  bookmarks     Bookmark[]
+  annotations   Annotation[]
+  highlights    Highlight[]
+  dossiers      Dossier[]
+  feedbacks     Feedback[]
+  searchHistory SearchHistory[]
+  merltPreference    MerltUserPreference?
+  merltConsentAudits MerltConsentAudit[]
+  merltAuthorityCache MerltUserAuthorityCache?
+  merltIngestionJobs  MerltIngestionJob[]
+  merltExtractionJobs MerltExtractionJob[]
+  merltQaJobs         MerltQaJob[]
+
+  // Personal Environments (user-owned, not published)
+  environments Environment[]
+
+  // Quick Norms + Custom Aliases (personal, client-created)
+  quickNorms    QuickNorm[]
+  customAliases CustomAlias[]
+
+  // Shared Environments (Bulletin Board)
+  sharedEnvironments       SharedEnvironment[]
+  sharedEnvironmentLikes   SharedEnvironmentLike[]
+  sharedEnvironmentReports SharedEnvironmentReport[]
+  suggestionsMade          EnvironmentSuggestion[]   @relation("SuggestionsMade")
+
+  originalAuthorOfAnnotations Annotation[]  @relation("OriginalAuthorOfAnnotations")
+  originalAuthorOfHighlights  Highlight[]   @relation("OriginalAuthorOfHighlights")
+  originalAuthorOfDossiers    Dossier[]     @relation("OriginalAuthorOfDossiers")
+  originalAuthorOfQuickNorms  QuickNorm[]   @relation("OriginalAuthorOfQuickNorms")
+  originalAuthorOfAliases     CustomAlias[] @relation("OriginalAuthorOfAliases")
+
+  // LingoLex: the study cards this user wrote
+  lingoCards LingoCard[]
+  lingoStatiRipasso     LingoStatoRipasso[]
+  lingoRevisioni        LingoRevisioneSRS[]
+  lingoPreferenzeStudio LingoPreferenzeStudio?
+  lingoGiornateStudio   LingoGiornataStudio[]
+
+  // LingoLex validation: set by an administrator; the votes this user cast (kept,
+  // anonymous, when the account goes), the notice versions they wrote (same) and
+  // the ones they accepted (removed with the account).
+  lingoValidatore       Boolean                  @default(false) @map("lingo_validatore")
+  lingoValidazioni      LingoValidazioneCard[]
+  lingoTestiScritti     LingoTestoVersione[]
+  lingoAccettazioni     LingoAccettazioneTesto[]
+  lingoImpostazioniAggiornate LingoImpostazione[]
+  lingoImpostazioniLog        LingoImpostazioneLog[]
+
+  // Development mode: the administrator allows it (set only on the admin route), the
+  // user then turns it on or off. It only shows or hides surfaces, never a permission.
+  devModeAllowed Boolean @default(false) @map("dev_mode_allowed")
+  devMode        Boolean @default(false) @map("dev_mode")
+
+  // OAuth: the applications this user connected (MCP spike)
+  oauthAuthorizationRequests OAuthAuthorizationRequest[]
+  oauthAuthorizationCodes    OAuthAuthorizationCode[]
+  oauthGrants                OAuthGrant[]
+
+  // What connected applications deleted for this user (MCP second round)
+  trashEntries TrashEntry[]
+
+  @@map("users")
+}
+
+enum MerltConsentLevel {
+  none
+  basic
+  full
+}
+
+model MerltUserPreference {
+  id                  String            @id @default(uuid())
+  userId              String            @unique @map("user_id")
+  consentLevel        MerltConsentLevel @default(none) @map("consent_level")
+  contributionEnabled Boolean           @default(false) @map("contribution_enabled")
+  validationEnabled   Boolean           @default(false) @map("validation_enabled")
+  graphEnabled        Boolean           @default(true) @map("graph_enabled")
+  // The version of the MERL-T notice (`INFORMATIVA_MERLT`) the level was chosen under. A level
+  // given under an older version, or none, collects nothing until the person answers the current one.
+  informativaTestoId  String?           @map("informativa_testo_id")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  informativa LingoTestoVersione? @relation("MerltPreferenceNotice", fields: [informativaTestoId], references: [id], onDelete: Restrict)
+
+  @@index([consentLevel])
+  @@map("merlt_user_preferences")
+}
+
+model MerltConsentAudit {
+  id            String             @id @default(uuid())
+  userId        String             @map("user_id")
+  previousLevel MerltConsentLevel? @map("previous_level")
+  nextLevel     MerltConsentLevel  @map("next_level")
+  source        String             @default("user") @db.VarChar(50)
+  reason        String?            @db.VarChar(500)
+  // The notice version the person had before them when they chose; null for rows from before it existed.
+  informativaTestoId String?       @map("informativa_testo_id")
+  createdAt     DateTime           @default(now()) @map("created_at")
+
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  informativa LingoTestoVersione? @relation("MerltAuditNotice", fields: [informativaTestoId], references: [id], onDelete: Restrict)
+
+  @@index([userId, createdAt])
+  @@map("merlt_consent_audits")
+}
+
+// A person's MERL-T data to erase (an account deleted, or the person asked). No relation to
+// `users`: the account may be gone. The worker (`services/merlt/userData.ts`) sends it to MERL-T
+// until MERL-T answers that every store is done; then once more at `confirmAgainAt` (work in
+// flight at the first pass, such as a deliberation, can still write), then deletes the row, so
+// the id is kept no longer than the erasure takes.
+model MerltErasureRequest {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  reason        String    @db.VarChar(30) // account_deleted | user_request | consent_revoked
+  requestedAt   DateTime  @default(now()) @map("requested_at")
+  attempts      Int       @default(0)
+  nextAttemptAt DateTime  @default(now()) @map("next_attempt_at")
+  lastError     String?   @map("last_error") @db.VarChar(100)
+  // The second confirmation, an hour after the request; null once MERL-T confirmed the first.
+  confirmAgainAt DateTime? @map("confirm_again_at")
+
+  @@index([nextAttemptAt])
+  @@map("merlt_erasure_requests")
+}
+
+// MERL-T user authority cache (synced from MERL-T backend via HTTP).
+// Reduces network round-trips on every event: BFF reads authority
+// locally, MERL-T remains source of truth and the cache is refreshed
+// periodically or on-demand (MERLT-1.5).
+model MerltUserAuthorityCache {
+  userId             String   @id @map("user_id")
+  authorityScore     Float    @map("authority_score")
+  baselineQual       String   @db.VarChar(50) @map("baseline_qual")
+  trackRecord        Float    @default(0) @map("track_record")
+  performance        Float    @default(0)
+  totalContributions Int      @default(0) @map("total_contributions")
+  syncedAt           DateTime @default(now()) @map("synced_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("merlt_user_authority_cache")
+}
+
+enum MerltJobStatus {
+  pending
+  running
+  completed
+  failed
+  timeout
+}
+
+// MERL-T lazy article-ingestion job (Slice 2a).
+// The BFF creates a row, then asks MERL-T to enqueue an RQ task threading the
+// job id through. The worker calls back POST /api/merlt/internal/job-callback
+// (internalAuth-gated) to flip the status. The (article_urn, status) index is a
+// LOOKUP PERFORMANCE HINT for the in-flight-job check — it does NOT enforce
+// uniqueness. True single-execution idempotency is guaranteed DOWNSTREAM by RQ:
+// the MERL-T enqueue uses a deterministic job_id = sha256(urn), so even if two
+// BFF job rows are created in a race, only one ingestion actually runs.
+model MerltIngestionJob {
+  id            String         @id @default(uuid())
+  articleUrn    String         @map("article_urn")
+  userId        String         @map("user_id")
+  status        MerltJobStatus @default(pending)
+  taskId        String?        @map("task_id")
+  nodesCreated  Int?           @map("nodes_created")
+  edgesCreated  Int?           @map("edges_created")
+  errorMessage  String?        @map("error_message")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  startedAt     DateTime?      @map("started_at")
+  completedAt   DateTime?      @map("completed_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([articleUrn, status])
+  @@index([userId])
+  @@map("merlt_ingestion_jobs")
+}
+
+// MERL-T document-extraction job (Slice 2c — "Apprendi dai miei appunti").
+// The BFF creates a row, asks MERL-T to enqueue an async extract-to-staging
+// task on the RQ worker (threading this id through), and the worker calls back
+// POST /api/merlt/internal/job-callback to flip the status. Mirrors
+// MerltIngestionJob; reuses the MerltJobStatus enum (value `completed`).
+model MerltExtractionJob {
+  id                String         @id @default(uuid())
+  documentId        String         @map("document_id")
+  userId            String         @map("user_id")
+  status            MerltJobStatus @default(pending)
+  taskId            String?        @map("task_id")
+  candidatesCreated Int?           @map("candidates_created")
+  errorMessage      String?        @map("error_message")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  startedAt         DateTime?      @map("started_at")
+  completedAt       DateTime?      @map("completed_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([documentId, status])
+  @@index([userId])
+  @@map("merlt_extraction_jobs")
+}
+
+// MERL-T async progressive Q&A job (submit → poll, `qa-async-progressive-contract.md`).
+// The BFF creates a row on submit, best-effort asks MERL-T to run the query in
+// an in-process asyncio task (threading this id through as bff_job_id), and
+// MERL-T calls back POST /api/merlt/internal/qa-callback per-expert (running)
+// and once terminally (completed/failed/timeout). `consentLevel` is captured
+// at submit time (no downgrade post-hoc — matches the sync /experts/query
+// redaction contract). Reuses the MerltJobStatus enum (value `completed`).
+model MerltQaJob {
+  id           String         @id @default(uuid())
+  userId       String         @map("user_id")
+  query        String
+  mode         String
+  consentLevel String         @map("consent_level")
+  status       MerltJobStatus @default(pending)
+  traceId      String?        @map("trace_id")
+  partials     Json?
+  result       Json?
+  errorMessage String?        @map("error_message")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  // Bumped by Prisma on every update() — including each per-expert `running`
+  // callback merge — so the watchdog can sweep on LIVENESS (last activity)
+  // rather than age-since-submit. A heavy ReAct deliberation legitimately
+  // runs up to ~11min; sweeping on createdAt alone would flip a live,
+  // still-progressing query to `timeout` (see jobWatchdog.ts qaStaleAfterMs).
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+  startedAt    DateTime?      @map("started_at")
+  completedAt  DateTime?      @map("completed_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("merlt_qa_jobs")
+}
+
+// ============================================
+// FOLDER HIERARCHY
+// ============================================
+
+model NormaWatch {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  normaKey    String   @map("norma_key")
+  normaData   Json     @map("norma_data")
+  lastSeenAt  DateTime @default(now()) @map("last_seen_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user          User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notifications NormaChangeNotification[]
+
+  @@unique([userId, normaKey])
+  @@index([userId])
+  @@map("norma_watches")
+}
+
+model NormaChangeNotification {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  watchId   String    @map("watch_id")
+  normaKey  String    @map("norma_key")
+  message   String
+  snapshot  Json
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  watch NormaWatch @relation(fields: [watchId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@index([watchId])
+  @@map("norma_change_notifications")
+}
+
+model Folder {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  color       String?
+  icon        String?
+  position    Int      @default(0)
+  parentId    String?  @map("parent_id")
+  userId      String   @map("user_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relationships
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent    Folder?    @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Folder[]   @relation("FolderHierarchy")
+  bookmarks Bookmark[]
+
+  @@index([userId])
+  @@index([parentId])
+  @@map("folders")
+}
+
+// ============================================
+// BOOKMARKS (Saved Articles)
+// ============================================
+
+model Bookmark {
+  id        String   @id @default(uuid())
+  normaKey  String   @map("norma_key") // e.g., "Art. 1414 c.c."
+  normaData Json     @map("norma_data") // Full article data from VisualEx API
+  title     String? // Optional custom title
+  notes     String? // User notes
+  tags      String[] // Array of tags
+  folderId  String?  @map("folder_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relationships
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folder      Folder?      @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  annotations Annotation[]
+  highlights  Highlight[]
+
+  @@index([userId])
+  @@index([folderId])
+  @@index([normaKey])
+  @@map("bookmarks")
+}
+
+// ============================================
+// ANNOTATIONS (Notes on Articles)
+// ============================================
+
+enum AnnotationType {
+  note
+  question
+  important
+  follow_up
+  summary
+}
+
+model Annotation {
+  id             String         @id @default(uuid())
+  normaKey       String         @map("norma_key")
+  content        String
+  annotationType AnnotationType @default(note) @map("annotation_type")
+  textContext    String?        @map("text_context") // Surrounding text for context
+  position       Int? // Position in article
+  bookmarkId     String?        @map("bookmark_id")
+  userId         String         @map("user_id")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  sourceSuggestionId String?                @map("source_suggestion_id")
+  originalAuthorId   String?                @map("original_author_id")
+
+  // Relationships
+  user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookmark         Bookmark?              @relation(fields: [bookmarkId], references: [id], onDelete: Cascade)
+  sourceSuggestion EnvironmentSuggestion? @relation("SuggestionSourcedAnnotations", fields: [sourceSuggestionId], references: [id], onDelete: SetNull)
+  originalAuthor   User?                  @relation("OriginalAuthorOfAnnotations", fields: [originalAuthorId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([bookmarkId])
+  @@index([normaKey])
+  @@map("annotations")
+}
+
+// ============================================
+// HIGHLIGHTS (Text Highlighting)
+// ============================================
+
+model Highlight {
+  id          String   @id @default(uuid())
+  normaKey    String   @map("norma_key")
+  text        String // Highlighted text
+  color       String   @default("yellow") // yellow, green, red, blue
+  startOffset Int      @map("start_offset")
+  endOffset   Int      @map("end_offset")
+  note        String? // Optional note
+  bookmarkId  String?  @map("bookmark_id")
+  userId      String   @map("user_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  sourceSuggestionId String?                @map("source_suggestion_id")
+  originalAuthorId   String?                @map("original_author_id")
+
+  // Relationships
+  user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookmark         Bookmark?              @relation(fields: [bookmarkId], references: [id], onDelete: Cascade)
+  sourceSuggestion EnvironmentSuggestion? @relation("SuggestionSourcedHighlights", fields: [sourceSuggestionId], references: [id], onDelete: SetNull)
+  originalAuthor   User?                  @relation("OriginalAuthorOfHighlights", fields: [originalAuthorId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([bookmarkId])
+  @@index([normaKey])
+  @@map("highlights")
+}
+
+// ============================================
+// DOSSIERS (Work Folders / Projects)
+// ============================================
+
+// A dossier di lavoro holds a practice (it may carry a client's data); a dossier
+// di studio holds a topic studied: the examples, what comes from the Forum.
+enum DossierKind {
+  lavoro
+  studio
+}
+
+model Dossier {
+  id          String      @id @default(uuid())
+  name        String
+  description String?
+  color       String?
+  tags        String[]    @default([])
+  kind        DossierKind @default(lavoro)
+  // Set when the admin withdraws the dossier's copy in the Forum: the dossier cannot be published
+  // again (not even after its owner deletes that copy) until the admin allows it (question 190).
+  forumBlockedAt DateTime? @map("forum_blocked_at")
+  userId      String   @map("user_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  isPinned    Boolean  @default(false) @map("is_pinned")
+
+  // Which connected application created this row (MCP); null = the user.
+  // Set by the server from the delegation, never from a body.
+  createdByClientId   String? @map("created_by_client_id")
+  createdByClientName String? @map("created_by_client_name")
+
+  sourceSuggestionId String?                @map("source_suggestion_id")
+  originalAuthorId   String?                @map("original_author_id")
+
+  // Relationships
+  user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items            DossierItem[]
+  snapshots        DossierSnapshot[]
+  // Its copy in the Forum, if published: seen by its owner only, never in the public content.
+  publishedCopy    SharedEnvironment?     @relation("SharedEnvironmentSourceDossier")
+  sourceSuggestion EnvironmentSuggestion? @relation("SuggestionSourcedDossiers", fields: [sourceSuggestionId], references: [id], onDelete: SetNull)
+  originalAuthor   User?                  @relation("OriginalAuthorOfDossiers", fields: [originalAuthorId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@map("dossiers")
+}
+
+enum DossierItemType {
+  norm
+  note
+  section
+  sentenza
+}
+
+enum DossierItemStatus {
+  unread
+  reading
+  important
+  done
+}
+
+model DossierSnapshot {
+  id          String   @id @default(uuid())
+  dossierId   String   @map("dossier_id")
+  version     Int
+  label       String?
+  content     Json
+  fingerprint String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  dossier Dossier @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+
+  @@unique([dossierId, version])
+  @@index([dossierId, createdAt])
+  @@map("dossier_snapshots")
+}
+
+model DossierItem {
+  id        String            @id @default(uuid())
+  dossierId String            @map("dossier_id")
+  itemType  DossierItemType   @map("item_type")
+  title     String
+  content   Json? // Flexible content (norm data, note text, etc.)
+  position  Int               @default(0)
+  status    DossierItemStatus @default(unread)
+  createdAt DateTime          @default(now()) @map("created_at")
+
+  // Which connected application created this row (MCP); null = the user.
+  // Set by the server from the delegation, never from a body.
+  createdByClientId   String? @map("created_by_client_id")
+  createdByClientName String? @map("created_by_client_name")
+  // A note about another entry of the same dossier (an article), as a whole:
+  // never a passage of its text (root rule 23). No foreign key: the entry may
+  // be in the trash, and the note must survive it and reattach on restore.
+  aboutItemId String? @map("about_item_id")
+
+  // Relationships
+  dossier Dossier @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+
+  @@index([dossierId])
+  @@map("dossier_items")
+}
+
+// ============================================
+// ARTICLE DISCUSSIONS
+// ============================================
+
+model ArticleThread {
+  id          String   @id @default(uuid())
+  normaKey    String   @map("norma_key")
+  articleId   String   @map("article_id")
+  articleLabel String? @map("article_label")
+  version     String?
+  passageQuote  String? @map("passage_quote")
+  passageStart  Int?    @map("passage_start")
+  passagePrefix String? @map("passage_prefix")
+  passageSuffix String? @map("passage_suffix")
+  articleUrn    String? @map("article_urn")
+  textHash      String? @map("text_hash")
+  // What the thread is anchored on. 'decision': normaKey = decisionKey, articleId = '',
+  // no version, no URN (CHECKs in the migration). The release columns lift the panel's hiding of
+  // a withdrawn quotation: a release names its admin only together with its time; the admin may
+  // later be deleted, which leaves the time (the CHECK is one-way).
+  targetKind          String    @default("article") @map("target_kind")
+  decisionKey         String?   @map("decision_key")
+  passageReleasedAt   DateTime? @map("passage_released_at") @db.Timestamptz(6)
+  passageReleasedById String?   @map("passage_released_by")
+  title       String
+  body        String
+  userId      String   @map("user_id")
+  isHidden    Boolean  @default(false) @map("is_hidden")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user       User                 @relation("ArticleThreadAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  passageReleasedBy User?         @relation("ArticleThreadPassageReleasedBy", fields: [passageReleasedById], references: [id], onDelete: SetNull)
+  comments   ArticleComment[]
+  votes      ArticleThreadVote[]
+  reports    ArticleThreadReport[]
+
+  @@index([normaKey, articleId, createdAt])
+  @@index([userId])
+  @@index([passageReleasedById])
+  @@map("article_threads")
+}
+
+model ArticleComment {
+  id        String   @id @default(uuid())
+  threadId  String   @map("thread_id")
+  parentId  String?  @map("parent_id")
+  body      String
+  userId    String   @map("user_id")
+  isHidden  Boolean  @default(false) @map("is_hidden")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  thread   ArticleThread   @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  parent   ArticleComment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  children ArticleComment[] @relation("CommentReplies")
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  votes    ArticleCommentVote[]
+
+  @@index([threadId, createdAt])
+  @@index([parentId])
+  @@map("article_comments")
+}
+
+model ArticleThreadVote {
+  id        String   @id @default(uuid())
+  threadId  String   @map("thread_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  thread ArticleThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([threadId, userId])
+  @@index([userId])
+  @@map("article_thread_votes")
+}
+
+model ArticleCommentVote {
+  id        String   @id @default(uuid())
+  commentId String   @map("comment_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  comment ArticleComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId])
+  @@index([userId])
+  @@map("article_comment_votes")
+}
+
+model ArticleThreadReport {
+  id        String   @id @default(uuid())
+  threadId  String   @map("thread_id")
+  userId    String   @map("user_id")
+  reason    String
+  details   String?
+  status    String   @default("pending")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  thread ArticleThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([threadId, userId])
+  @@index([status])
+  @@map("article_thread_reports")
+}
+
+// ============================================
+// FEEDBACK (Bug Reports & Suggestions)
+// ============================================
+
+enum FeedbackType {
+  bug
+  suggestion
+  other
+}
+
+enum FeedbackStatus {
+  new
+  read
+  resolved
+  dismissed
+}
+
+model Feedback {
+  id        String         @id @default(uuid())
+  type      FeedbackType
+  message   String
+  status    FeedbackStatus @default(new)
+  userId    String         @map("user_id")
+  createdAt DateTime       @default(now()) @map("created_at")
+
+  // Relationships
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([type])
+  @@map("feedbacks")
+}
+
+// ============================================
+// SEARCH HISTORY
+// ============================================
+
+model SearchHistory {
+  id        String   @id @default(uuid())
+  actType   String?  @map("act_type")
+  actNumber String?  @map("act_number")
+  article   String?
+  date      String?
+  version   String?  @default("vigente")
+  // A row is a norm (actType) or a court decision (decisionKey), never both: a CHECK in the
+  // migration (not in Prisma's model) holds it.
+  decisionKey String? @map("decision_key")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relationships
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("search_history")
+}
+
+// ============================================
+// SHARED ENVIRONMENTS (Bulletin Board)
+// ============================================
+
+enum EnvironmentCategory {
+  compliance
+  civil
+  penal
+  administrative
+  eu
+  other
+}
+
+enum ReportReason {
+  spam
+  inappropriate
+  copyright
+  other
+}
+
+enum ReportStatus {
+  pending
+  reviewed
+  dismissed
+}
+
+// ============================================
+// QUICK NORMS (Favorites panel)
+// Lives alongside dossiers/bookmarks as a server-owned asset so the user
+// finds them across devices and survives a browser clear.
+// ============================================
+
+model QuickNorm {
+  id           String    @id @default(uuid())
+  label        String
+  searchParams Json      @map("search_params")
+  sourceUrl    String?   @map("source_url")
+  usageCount   Int       @default(0) @map("usage_count")
+  lastUsedAt   DateTime? @map("last_used_at")
+  userId       String    @map("user_id")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  sourceSuggestionId String?                @map("source_suggestion_id")
+  originalAuthorId   String?                @map("original_author_id")
+
+  user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceSuggestion EnvironmentSuggestion? @relation("SuggestionSourcedQuickNorms", fields: [sourceSuggestionId], references: [id], onDelete: SetNull)
+  originalAuthor   User?                  @relation("OriginalAuthorOfQuickNorms", fields: [originalAuthorId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@map("quick_norms")
+}
+
+// ============================================
+// CUSTOM ALIASES (shortcuts / references the user defines, e.g. "cc" → codice civile)
+// ============================================
+
+enum AliasType {
+  shortcut
+  reference
+}
+
+model CustomAlias {
+  id           String    @id @default(uuid())
+  trigger      String
+  aliasType    AliasType @map("alias_type")
+  expandTo     String    @map("expand_to")
+  // Reference-type aliases carry a prebuilt SearchParams object; shortcut-
+  // type aliases don't. Kept as JSON so the frontend's SearchParams shape
+  // can evolve without a migration.
+  searchParams Json?     @map("search_params")
+  description  String?
+  usageCount   Int       @default(0) @map("usage_count")
+  lastUsedAt   DateTime? @map("last_used_at")
+  userId       String    @map("user_id")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  sourceSuggestionId String?                @map("source_suggestion_id")
+  originalAuthorId   String?                @map("original_author_id")
+
+  user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceSuggestion EnvironmentSuggestion? @relation("SuggestionSourcedAliases", fields: [sourceSuggestionId], references: [id], onDelete: SetNull)
+  originalAuthor   User?                  @relation("OriginalAuthorOfAliases", fields: [originalAuthorId], references: [id], onDelete: SetNull)
+
+  // Trigger must be unique PER USER (same trigger across users is fine).
+  @@unique([userId, trigger])
+  @@index([userId])
+  @@map("custom_aliases")
+}
+
+// ============================================
+// PERSONAL ENVIRONMENTS
+// A user's own workspace snapshot (dossiers + quickNorms + aliases +
+// annotations + highlights). NOT the same as SharedEnvironment, which
+// is the published/community-board entity. A user can promote a personal
+// environment to a SharedEnvironment but the two tables stay distinct.
+// ============================================
+
+model Environment {
+  id          String               @id @default(uuid())
+  name        String
+  description String?
+  author      String?
+  version     String?
+  category    EnvironmentCategory?
+  color       String? // Hex color for UI distinction
+  tags        String[]
+
+  // Full content snapshot — dossiers / quickNorms / customAliases /
+  // annotations / highlights are blobbed as JSON exactly like the
+  // SharedEnvironment.content pattern (querying individual items is
+  // not a use case; we always hydrate the whole environment).
+  content Json
+
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([category])
+  @@index([createdAt])
+  @@map("environments")
+}
+
+model SharedEnvironment {
+  id          String  @id @default(uuid())
+  title       String
+  description String?
+
+  // Environment content (dossiers, quickNorms, annotations, highlights)
+  content Json
+
+  // Sharing options
+  includeNotes      Boolean @default(true) @map("include_notes")
+  includeHighlights Boolean @default(true) @map("include_highlights")
+
+  // Categorization
+  category EnvironmentCategory
+  tags     String[]
+
+  // Metrics
+  viewCount     Int @default(0) @map("view_count")
+  downloadCount Int @default(0) @map("download_count")
+
+  // Versioning
+  currentVersion Int     @default(1) @map("current_version")
+  isActive       Boolean @default(true) @map("is_active")
+  replacedById   String? @map("replaced_by_id")
+  // Set when the admin withdraws it: its author cannot republish it.
+  withdrawnByAdminAt DateTime? @map("withdrawn_by_admin_at")
+
+  // The dossier it was published from (one Forum item per dossier). Owner-only:
+  // never part of the content nor of any answer to someone else.
+  sourceDossierId String?  @unique @map("source_dossier_id")
+  sourceDossier   Dossier? @relation("SharedEnvironmentSourceDossier", fields: [sourceDossierId], references: [id], onDelete: SetNull)
+
+  // Ownership
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relationships
+  user        User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  likes       SharedEnvironmentLike[]
+  reports     SharedEnvironmentReport[]
+  versions    SharedEnvironmentVersion[]
+  suggestions EnvironmentSuggestion[]
+
+  @@index([userId])
+  @@index([category])
+  @@index([createdAt])
+  @@index([isActive])
+  @@map("shared_environments")
+}
+
+model SharedEnvironmentLike {
+  id        String   @id @default(uuid())
+  envId     String   @map("env_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relationships
+  environment SharedEnvironment @relation(fields: [envId], references: [id], onDelete: Cascade)
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([envId, userId])
+  @@index([envId])
+  @@index([userId])
+  @@map("shared_environment_likes")
+}
+
+model SharedEnvironmentReport {
+  id        String       @id @default(uuid())
+  envId     String       @map("env_id")
+  userId    String       @map("user_id")
+  reason    ReportReason
+  details   String?
+  status    ReportStatus @default(pending)
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  // Relationships
+  environment SharedEnvironment @relation(fields: [envId], references: [id], onDelete: Cascade)
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([envId, userId])
+  @@index([envId])
+  @@index([status])
+  @@map("shared_environment_reports")
+}
+
+// ============================================
+// ENVIRONMENT SUGGESTIONS & VERSIONING
+// ============================================
+
+enum SuggestionItemType {
+  annotation
+  highlight
+  dossier
+  quickNorm
+  alias
+}
+
+enum SuggestionItemStatus {
+  pending
+  taken
+  declined
+}
+
+model EnvironmentSuggestion {
+  id                  String @id @default(uuid())
+  sharedEnvironmentId String @map("shared_environment_id")
+  suggesterId         String @map("suggester_id")
+
+  message String? @db.VarChar(1000)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  sharedEnvironment SharedEnvironment @relation(fields: [sharedEnvironmentId], references: [id], onDelete: Cascade)
+  suggester         User              @relation("SuggestionsMade", fields: [suggesterId], references: [id], onDelete: Cascade)
+  items             SuggestionItem[]
+
+  // Attribution inverse relations (rows in the owner's workspace that
+  // originated here via `take`). onDelete: SetNull lives on the child side.
+  sourcedAnnotations Annotation[]  @relation("SuggestionSourcedAnnotations")
+  sourcedHighlights  Highlight[]   @relation("SuggestionSourcedHighlights")
+  sourcedDossiers    Dossier[]     @relation("SuggestionSourcedDossiers")
+  sourcedQuickNorms  QuickNorm[]   @relation("SuggestionSourcedQuickNorms")
+  sourcedAliases     CustomAlias[] @relation("SuggestionSourcedAliases")
+
+  @@index([sharedEnvironmentId])
+  @@index([suggesterId])
+  @@map("environment_suggestions")
+}
+
+model SuggestionItem {
+  id           String               @id @default(uuid())
+  suggestionId String               @map("suggestion_id")
+  itemType     SuggestionItemType   @map("item_type")
+  payload      Json
+  status       SuggestionItemStatus @default(pending)
+  reviewNote   String?              @map("review_note") @db.VarChar(500)
+  reviewedAt   DateTime?            @map("reviewed_at")
+  createdAt    DateTime             @default(now()) @map("created_at")
+
+  suggestion EnvironmentSuggestion @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
+
+  @@index([suggestionId, status])
+  @@map("suggestion_items")
+}
+
+model SharedEnvironmentVersion {
+  id                  String @id @default(uuid())
+  sharedEnvironmentId String @map("shared_environment_id")
+
+  // Version info
+  version   Int // Sequential version number (1, 2, 3...)
+  content   Json // Snapshot of environment content at this version
+  changelog String? // Description of changes
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relationships
+  sharedEnvironment SharedEnvironment @relation(fields: [sharedEnvironmentId], references: [id], onDelete: Cascade)
+
+  @@unique([sharedEnvironmentId, version])
+  @@index([sharedEnvironmentId])
+  @@map("shared_environment_versions")
+}
+
+// ============================================
+// LINGOLEX — exam-trace bank
+// First slice of the study layer (decisions D-035, D-036). `LingoTraccia` is
+// the bank of traces and references no other model; the cards further down are
+// the only part of LingoLex that touches User. `LingoSimulazione` will add its
+// relation to LingoTraccia when it lands.
+// ============================================
+
+enum LingoMateria {
+  DIRITTO_CIVILE
+  DIRITTO_PENALE
+  DIRITTO_AMMINISTRATIVO
+  DIRITTO_PROCESSUALE_CIVILE
+  DIRITTO_PROCESSUALE_PENALE
+}
+
+enum LingoTipoProva {
+  ATTO_GIUDIZIARIO
+  PARERE_MOTIVATO
+}
+
+model LingoTraccia {
+  id                String         @id @default(uuid())
+  materia           LingoMateria
+  tipoProva         LingoTipoProva @default(ATTO_GIUDIZIARIO) @map("tipo_prova")
+  // e.g. "atto_citazione", "comparsa_risposta", "ricorso_700", "appello_penale", "ricorso_tar"
+  sottoTipoAtto     String         @map("sotto_tipo_atto")
+  titolo            String
+  testoTraccia      String         @map("testo_traccia") @db.Text
+  // Expected norms (URNs or key references) and the checkpoints of form and
+  // substance: arrays of strings, empty until a lawyer has written them.
+  normeRiferimento  Json           @map("norme_riferimento")
+  questioniForma    Json           @map("questioni_forma")
+  questioniSostanza Json           @map("questioni_sostanza")
+  // "sessione_<year>" | "scuola_forense" | "creata_validata"
+  fonteTraccia      String         @map("fonte_traccia")
+  attiva            Boolean        @default(true)
+  difficolta        Int            @default(3) // 1..5
+  createdAt         DateTime       @default(now()) @map("created_at")
+
+  @@index([materia, tipoProva, sottoTipoAtto])
+  @@map("lingo_tracce")
+}
+
+// LINGOLEX — study cards and their anchors in the norm text.
+// The card's state follows the lifecycle in `src/lingo/cardStates.ts`. Reviews
+// (`LingoStatoRipasso`, `LingoRevisioneSRS`) are below, after the anchors;
+// validations (`LingoValidazioneCard`) are not here yet: they arrive with the
+// routes that write them.
+
+enum LingoCardStato {
+  BOZZA_PERSONALE
+  PROPOSTA_COMMUNITY
+  VALIDATA
+  DA_RIVEDERE
+  ARCHIVIATA
+}
+
+// More kinds are expected: a new one is an additive ALTER TYPE … ADD VALUE.
+enum LingoCardTipo {
+  ISTITUTO_DEFINIZIONE
+  DISTINZIONE_CONCETTUALE
+  CASO_APPLICATIVO
+  REQUISITO_FORMA_ATTO
+}
+
+model LingoCard {
+  id             String         @id @default(uuid())
+  // Null once the author's account is gone: the card stays, anonymous.
+  autoreId       String?        @map("autore_id")
+  materia        LingoMateria
+  // e.g. "Risoluzione per inadempimento"
+  istituto       String
+  tipo           LingoCardTipo  @default(ISTITUTO_DEFINIZIONE)
+  domanda        String         @db.Text
+  risposta       String         @db.Text
+  spiegazione    String?        @db.Text
+  stato          LingoCardStato @default(BOZZA_PERSONALE)
+  authorityScore Float          @default(0) @map("authority_score")
+  // Set when the validators disagree beyond the threshold, so the minority view is kept.
+  isControversa  Boolean        @default(false) @map("is_controversa")
+  // The connected application that created the card (Claude Code, LibreLex), as on DossierItem.
+  createdByClientId   String?        @map("created_by_client_id")
+  createdByClientName String?        @map("created_by_client_name")
+  // The version of the notice the card was proposed under; null for a draft, cleared on withdrawal.
+  propostaTestoId     String?        @map("proposta_testo_id")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  // SetNull, not Cascade: a card the community has taken up (proposed, validated,
+  // to review) is community property and outlives its author, anonymous. What
+  // belongs to the person alone (drafts, archived) is removed in
+  // `deleteUserAccount`, because only the application knows the card's state.
+  autore        User?                  @relation(fields: [autoreId], references: [id], onDelete: SetNull)
+  ancore        LingoCardAncora[]
+  propostaTesto LingoTestoVersione?    @relation(fields: [propostaTestoId], references: [id], onDelete: Restrict)
+  validazioni   LingoValidazioneCard[]
+  statiRipasso  LingoStatoRipasso[]
+  revisioni     LingoRevisioneSRS[]
+
+  @@index([materia, istituto, stato])
+  @@index([stato])
+  @@index([autoreId])
+  @@map("lingo_cards")
+}
+
+// The norm a card rests on: the article, and the SHA-256 of its text when the
+// card was written. When the text of the article changes, the fingerprint no
+// longer matches and the card goes to review.
+model LingoCardAncora {
+  id             String   @id @default(uuid())
+  cardId         String   @map("card_id")
+  // e.g. "codice_civile"
+  normaKey       String   @map("norma_key")
+  // e.g. "art_1453"
+  articleId      String   @map("article_id")
+  urn            String
+  aknFingerprint String   @map("akn_fingerprint")
+  // False unless said otherwise: a card has exactly one primary anchor, and a writer
+  // that forgets the flag must not become a second one. `createLingoCard` sets it.
+  isPrimary      Boolean  @default(false) @map("is_primary")
+  ultimaVerifica DateTime @default(now()) @map("ultima_verifica")
+
+  card LingoCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([normaKey, articleId, aknFingerprint])
+  @@index([cardId])
+  @@map("lingo_card_ancore")
+}
+
+enum LingoGiudizio {
+  APPROVATA
+  MIGLIORABILE
+  ERRATA
+}
+
+model LingoValidazioneCard {
+  id          String        @id @default(uuid())
+  cardId      String        @map("card_id")
+  // Null once the validator's account is gone: the vote stays (decision 19).
+  utenteId    String?       @map("utente_id")
+  giudizio    LingoGiudizio
+  motivazione String?       @db.Text
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  card   LingoCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  utente User?     @relation(fields: [utenteId], references: [id], onDelete: SetNull)
+
+  @@unique([cardId, utenteId])
+  @@index([utenteId])
+  @@map("lingo_validazioni_card")
+}
+
+enum LingoTestoChiave {
+  PROPOSTA_SCHEDA
+  INFORMATIVA_MERLT
+}
+
+// A text the user must accept (decision 22). Never updated, never deleted: an edit is a new version.
+model LingoTestoVersione {
+  id        String           @id @default(uuid())
+  chiave    LingoTestoChiave
+  versione  Int
+  titolo    String
+  corpo     String           @db.Text
+  conferma  String           // the checkbox, e.g. «Ho letto e accetto»
+  azione    String           // the button, e.g. «Proponi»
+  createdAt DateTime         @default(now()) @map("created_at")
+  // The administrator who wrote it; null for version 1 (written by the migration) or once that account is gone.
+  autoreId  String?          @map("autore_id")
+
+  autore       User?                    @relation(fields: [autoreId], references: [id], onDelete: SetNull)
+  accettazioni LingoAccettazioneTesto[]
+  carte        LingoCard[]
+  merltPreferenze MerltUserPreference[] @relation("MerltPreferenceNotice")
+  merltConsensi   MerltConsentAudit[]   @relation("MerltAuditNotice")
+
+  @@unique([chiave, versione])
+  @@map("lingo_testi_versioni")
+}
+
+model LingoAccettazioneTesto {
+  id         String   @id @default(uuid())
+  utenteId   String   @map("utente_id")
+  testoId    String   @map("testo_id")
+  acceptedAt DateTime @default(now()) @map("accepted_at")
+
+  utente User               @relation(fields: [utenteId], references: [id], onDelete: Cascade)
+  testo  LingoTestoVersione @relation(fields: [testoId], references: [id], onDelete: Restrict)
+
+  @@unique([utenteId, testoId])
+  @@map("lingo_accettazioni_testi")
+}
+
+// LINGOLEX — review (Studia PR C). What the scheduler knows about a card for one
+// user, the append-only log of their grades, and their study preferences.
+// All three are personal: they cascade from the user, and from the card (the
+// reviews of a card that is deleted go with it). Days are Europe/Rome days
+// (`src/lingo/studyDay.ts`).
+
+model LingoStatoRipasso {
+  utenteId     String   @map("utente_id")
+  cardId       String   @map("card_id")
+  stability    Float
+  difficulty   Float
+  dueAt        DateTime @map("due_at")      // the Europe/Rome day the card is due, at 00:00 local
+  lastReviewAt DateTime @map("last_review_at")
+  reps         Int      @default(1)
+  lapses       Int      @default(0)
+
+  utente User      @relation(fields: [utenteId], references: [id], onDelete: Cascade)
+  card   LingoCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@id([utenteId, cardId])
+  @@index([utenteId, dueAt])
+  @@map("lingo_stato_ripasso")
+}
+
+model LingoRevisioneSRS {
+  id            String   @id @default(uuid())
+  utenteId      String   @map("utente_id")
+  cardId        String   @map("card_id")
+  dataRevisione DateTime @default(now()) @map("data_revisione")
+  rating        Int      // 1 = Di nuovo, 2 = Difficile, 3 = Bene, 4 = Facile
+  scheduledDays Int      @map("scheduled_days")
+  stability     Float
+  difficulty    Float
+  durataMs      Int?     @map("durata_ms")
+
+  utente User      @relation(fields: [utenteId], references: [id], onDelete: Cascade)
+  card   LingoCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([utenteId, cardId, dataRevisione])
+  @@index([utenteId, dataRevisione])
+  @@map("lingo_revisioni_srs")
+}
+
+model LingoPreferenzeStudio {
+  utenteId        String         @id @map("utente_id")
+  nuoveAlGiorno   Int            @default(20) @map("nuove_al_giorno")   // 1–200
+  // The reviews that make a day count for the streak (Studia progress spec D7); 1–200, a CHECK in the migration.
+  ripassiAlGiorno Int            @default(10) @map("ripassi_al_giorno")
+  materieComunita LingoMateria[] @default([]) @map("materie_comunita")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  utente User @relation(fields: [utenteId], references: [id], onDelete: Cascade)
+
+  @@map("lingo_preferenze_studio")
+}
+
+// One Europe/Rome day of a user's review (Studia progress spec §5.1): written with each recorded grade
+// (`lingo/studyDays.ts`) and never by the trash, so deleting a card never rewrites a past day. `valido`
+// (the day counts for the streak) is frozen once the day is over: a later change of the goal leaves it.
+model LingoGiornataStudio {
+  utenteId   String   @map("utente_id")
+  giorno     DateTime @db.Date
+  ripassi    Int      @default(0)
+  nuove      Int      @default(0)
+  sbagliate  Int      @default(0)
+  codaFinita Boolean  @default(false) @map("coda_finita")
+  valido     Boolean  @default(false)
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  utente User @relation(fields: [utenteId], references: [id], onDelete: Cascade)
+
+  @@id([utenteId, giorno])
+  @@map("lingo_giornate_studio")
+}
+
+// The thresholds of the community's validation (Studia, spec 2026-10-18). One row per key; the
+// range of each value is a CHECK in the migration (not in this model), and lingo/validationSettings.ts.
+enum LingoImpostazioneChiave {
+  SOGLIA_APPROVAZIONI
+  SOGLIA_ERRATE
+}
+
+model LingoImpostazione {
+  chiave       LingoImpostazioneChiave @id
+  valore       Int
+  aggiornataIl DateTime                @default(now()) @map("aggiornata_il")
+  // The administrator who last changed it; null once that account is gone.
+  aggiornataDa String?                 @map("aggiornata_da")
+
+  autore User? @relation(fields: [aggiornataDa], references: [id], onDelete: SetNull)
+
+  @@map("lingo_impostazioni")
+}
+
+// Every change of a threshold, append-only: who, when, the old and the new value.
+model LingoImpostazioneLog {
+  id               String                 @id @default(uuid())
+  chiave           LingoImpostazioneChiave
+  valorePrecedente Int                    @map("valore_precedente")
+  valoreNuovo      Int                    @map("valore_nuovo")
+  // Null once the administrator's account is gone: the change stays.
+  utenteId         String?                @map("utente_id")
+  createdAt        DateTime               @default(now()) @map("created_at")
+
+  utente User? @relation(fields: [utenteId], references: [id], onDelete: SetNull)
+
+  @@index([chiave, createdAt])
+  @@map("lingo_impostazioni_log")
+}
+
+// ─── OAuth 2.1 authorization server (MCP spike) ─────────────────────────────
+// Spec: docs/superpowers/specs/2026-10-02-mcp-spike-design.md, section 4.
+// Every secret (authorization code, access and refresh token) is stored as the
+// SHA-256 of its value, never the value itself. Every row that belongs to a
+// person cascades from User, so `deleteUserAccount` stays the one deletion path.
+
+// A client registered dynamically (RFC 7591). Always public: no secret is
+// stored, because none is issued. The MCP server's own confidential credential
+// comes from configuration, not from this table.
+model OAuthClient {
+  id           String   @id
+  clientName   String?  @map("client_name")
+  redirectUris String[] @map("redirect_uris")
+  // The registration answer as the client received it (RFC 7591 metadata).
+  metadata     Json
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  authorizationRequests OAuthAuthorizationRequest[]
+  authorizationCodes    OAuthAuthorizationCode[]
+  grants                OAuthGrant[]
+
+  @@index([createdAt])
+  @@map("oauth_clients")
+}
+
+// An authorization request waiting for the user's decision on the consent page.
+// Its id is what the page carries; it lives ten minutes. The first signed-in
+// user who opens it claims it (`userId`); only that user can decide.
+model OAuthAuthorizationRequest {
+  id                  String    @id @default(uuid())
+  clientId            String    @map("client_id")
+  userId              String?   @map("user_id")
+  redirectUri         String    @map("redirect_uri")
+  codeChallenge       String    @map("code_challenge")
+  state               String?
+  scopes              String[]
+  resource            String
+  expiresAt           DateTime  @map("expires_at")
+  decidedAt           DateTime? @map("decided_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user   User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("oauth_authorization_requests")
+}
+
+// A 60-second, single-use authorization code, bound to client, redirect URI,
+// PKCE challenge and resource. `usedAt` stays set after use so that a second
+// presentation is recognised as a replay and the tokens it produced revoked.
+model OAuthAuthorizationCode {
+  id            String    @id @default(uuid())
+  codeHash      String    @unique @map("code_hash")
+  clientId      String    @map("client_id")
+  userId        String    @map("user_id")
+  grantId       String    @map("grant_id")
+  redirectUri   String    @map("redirect_uri")
+  codeChallenge String    @map("code_challenge")
+  resource      String
+  scopes        String[]
+  expiresAt     DateTime  @map("expires_at")
+  usedAt        DateTime? @map("used_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  client OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grant  OAuthGrant  @relation(fields: [grantId], references: [id], onDelete: Cascade)
+
+  @@index([grantId])
+  @@index([userId])
+  @@map("oauth_authorization_codes")
+}
+
+// A connected application: what the user approved for one client. The user
+// sees it in the settings and can revoke it; revocation stops every token of
+// the grant on its next use.
+model OAuthGrant {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  clientId   String    @map("client_id")
+  scopes     String[]
+  resource   String
+  createdAt  DateTime  @default(now()) @map("created_at")
+  lastUsedAt DateTime? @map("last_used_at")
+  revokedAt  DateTime? @map("revoked_at")
+
+  user   User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client OAuthClient              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  codes  OAuthAuthorizationCode[]
+  tokens OAuthToken[]
+
+  @@index([userId])
+  @@index([clientId])
+  @@map("oauth_grants")
+}
+
+enum OAuthTokenKind {
+  ACCESS
+  REFRESH
+}
+
+// An access or refresh token, stored as its SHA-256. `chainId` is the
+// authorization code that started the chain: every token issued from that code
+// and its refreshes carries it, so a replayed code revokes exactly what it
+// produced. `rotatedAt` marks a refresh token already exchanged; presenting it
+// again revokes the grant.
+model OAuthToken {
+  id        String         @id @default(uuid())
+  tokenHash String         @unique @map("token_hash")
+  kind      OAuthTokenKind
+  grantId   String         @map("grant_id")
+  chainId   String         @map("chain_id")
+  scopes    String[]
+  resource  String
+  expiresAt DateTime       @map("expires_at")
+  rotatedAt DateTime?      @map("rotated_at")
+  revokedAt DateTime?      @map("revoked_at")
+  createdAt DateTime       @default(now()) @map("created_at")
+
+  grant OAuthGrant @relation(fields: [grantId], references: [id], onDelete: Cascade)
+
+  @@index([grantId])
+  @@index([chainId])
+  @@map("oauth_tokens")
+}
+
+// ─── The trash (MCP second round) ───────────────────────────────────────────
+// Spec: docs/superpowers/specs/2026-10-04-mcp-second-round-design.md, §4.3.
+// What a connected application deleted: the rows as they were, restorable from
+// the web app for 30 days. A table of its own, so that no query on dossiers or
+// cards needs a "deleted" filter.
+
+enum TrashKind {
+  DOSSIER
+  DOSSIER_ITEMS
+  LINGO_CARDS
+}
+
+model TrashEntry {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  kind       TrashKind
+  // The dossier deleted, or the one the entries came from; no foreign key, it may be gone.
+  dossierId  String?   @map("dossier_id")
+  label      String
+  // What the list shows, written at deletion (itemCount, items or cards).
+  summary    Json
+  // The rows as they were, for the restore.
+  payload    Json
+  // Which connection deleted it: plain columns, the trash outlives the client and the grant.
+  clientId   String?   @map("client_id")
+  clientName String?   @map("client_name")
+  grantId    String?   @map("grant_id")
+  deletedAt  DateTime  @default(now()) @map("deleted_at")
+  expiresAt  DateTime  @map("expires_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, deletedAt])
+  @@index([expiresAt])
+  @@map("trash_entries")
+}

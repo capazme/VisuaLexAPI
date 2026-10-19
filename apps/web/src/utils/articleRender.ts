@@ -1,0 +1,347 @@
+/**
+ * Renders an article's text — its structure, the reader's highlights and
+ * anchored notes, the Cmd+F hits — as HTML for `SafeHTML`.
+ *
+ * The contract (CLAUDE.md gotcha 23): the text nodes of the output spell
+ * `article_text` with its newlines removed, character for character. Stored
+ * anchors are offsets into exactly that projection, so nothing here may add a
+ * visible character (labels come from CSS `content: attr(...)`), drop one, or
+ * let the HTML parser swallow one (the source text is escaped).
+ *
+ * How: every mark — structure decoration, printed enumerator, highlight, note
+ * anchor, thread — is a raw range. The text is cut at every block edge and
+ * every mark edge, and each run is emitted inside the marks that cover it,
+ * opened in a fixed nesting order with a stack that keeps the common prefix
+ * open from one run to the next. The result is always well-formed: a mark that
+ * crosses a block is split per block, two overlapping highlights both show.
+ *
+ * `structure === null` is the flat mode used by the Brocardi sections: no
+ * block wrappers, and every newline is a `<br />`, as before.
+ */
+import type { Annotation, Highlight } from '../types';
+import { HIGHLIGHT_STYLES } from './highlightColors';
+import type { ArticleStructure, DecorationKind, StructureBlock, TextRange } from './articleStructure';
+import {
+  groupAnchorsByBlock,
+  resolveAnchors,
+  signAriaLabel,
+  signColors,
+  type BlockAnnotations,
+  type LocatedThread,
+  type ResolvedAnchor,
+} from './articleAnnotations';
+
+export interface RenderArticleInput {
+  raw: string;
+  /** Parsed structure; null renders flat (Brocardi sections). */
+  structure: ArticleStructure | null;
+  highlights: Highlight[];
+  annotations: Annotation[];
+  /**
+   * Draw each annotated block's sign (round B): the practice's row and the dossier
+   * reader. Study Mode has its own summary and leaves it off; flat mode has
+   * no blocks and ignores it.
+   */
+  signs?: boolean;
+  /** Passage discussions located in this text: counted on the signs. */
+  threads?: readonly LocatedThread[];
+  /** The discussion open in the panel: its words light up (`.vlx-thread-focus`). */
+  focusedThreadId?: string | null;
+  /**
+   * Render only the blocks inside this range of `raw` (the comparison draws a comma at a time).
+   * The range is whole blocks; offsets stay the text's own.
+   */
+  only?: TextRange;
+  /**
+   * Words a comparison marks, as ranges of `raw`: wrapped in `.vlx-del` (deleted) or `.vlx-ins`
+   * (inserted). Elements around existing words, never text of their own.
+   */
+  changes?: ReadonlyArray<TextRange & { kind: 'del' | 'ins' }>;
+}
+
+export type MarkKind = 'marker' | DecorationKind | 'key' | 'key-head' | 'note' | 'highlight' | 'thread' | 'change';
+
+/**
+ * Nesting order, outermost first. The printed enumerator is outermost and so
+ * never split: it is an inline-block with a minimum width (the hanging
+ * number), and two pieces would be two boxes. A ((modification)) that starts
+ * with the number is split around it instead — its dashed line pauses after
+ * the number, which is only cosmetic.
+ */
+const RANK: Record<MarkKind, number> = {
+  marker: 0,
+  ref: 1,
+  'ref-missing': 1,
+  mod: 2,
+  notice: 3,
+  note: 4,
+  highlight: 5,
+  thread: 6,
+  // A decision's key passage (computed, never the reader's): inside the reader's own marks, so CSS
+  // can drop its sign where a highlight covers the same words; its head (the label) inside it.
+  key: 7,
+  'key-head': 7,
+  // A comparison's changed words (an article's, never a decision's: the two never meet).
+  change: 7,
+  'mod-paren': 8,
+  'rubric-paren': 8,
+  hidden: 9,
+};
+
+export interface Mark {
+  start: number;
+  end: number;
+  kind: MarkKind;
+  open: string;
+  close: string;
+  seq: number;
+}
+
+const escapeAttr = (s: string): string =>
+  s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+const NOTE_ANCHOR_STYLE =
+  'text-decoration:underline wavy hsl(var(--hl-yellow-fg));text-decoration-thickness:2px;text-underline-offset:3px;cursor:help;';
+
+function decorationOpen(kind: DecorationKind, noteId?: string): string {
+  switch (kind) {
+    case 'mod':
+      return '<span class="vlx-mod" title="Parte modificata da un atto successivo">';
+    case 'mod-paren':
+    case 'rubric-paren':
+      return '<span class="vlx-paren">';
+    case 'notice':
+      return '<span class="vlx-notice">';
+    case 'hidden':
+      return '<span class="vlx-hidden">';
+    case 'ref': {
+      const id = escapeAttr(noteId ?? '');
+      return `<span class="vlx-ref" role="button" tabindex="0" aria-haspopup="dialog" data-note="${id}" aria-label="Nota di aggiornamento ${id}">`;
+    }
+    case 'ref-missing':
+      return '<span class="vlx-ref-missing" title="Nota non presente nel testo scaricato">';
+  }
+}
+
+export function highlightOpen(h: Highlight): string {
+  const author = h.originalAuthor?.username ?? (h.sourceSuggestionId ? 'utente-rimosso' : null);
+  const title = author ? ` title="${escapeAttr(`Evidenziato da @${author}`)}"` : '';
+  const style = HIGHLIGHT_STYLES[h.color] ?? HIGHLIGHT_STYLES.yellow;
+  return `<mark style="${style}" data-highlight="${escapeAttr(h.id)}" class="highlight-mark"${title}>`;
+}
+
+export const noteOpen = (a: Annotation): string =>
+  `<span class="note-anchor" data-note-id="${escapeAttr(a.id)}" title="${escapeAttr(a.text)}" style="${NOTE_ANCHOR_STYLE}">`;
+
+/** The opening tag of the words of the discussion open in the panel. */
+export const threadFocusOpen = (id: string): string =>
+  `<span class="vlx-thread-focus" data-thread-focus="${escapeAttr(id)}">`;
+
+export function renderArticleHtml(input: RenderArticleInput): string {
+  const raw = input.raw || '';
+  if (!raw) return '';
+
+  // rawAt[p] = raw index of the p-th character of the projection (no '\n').
+  const rawAt: number[] = [];
+  for (let i = 0; i < raw.length; i++) if (raw.charCodeAt(i) !== 10) rawAt.push(i);
+  const plain = raw.replace(/\n/g, '');
+
+  const marks: Mark[] = [];
+  let seq = 0;
+  const pushRaw = (start: number, end: number, kind: MarkKind, open: string, close: string) => {
+    if (end > start) marks.push({ start, end, kind, open, close, seq: seq++ });
+  };
+  const pushPlain = (start: number, end: number, kind: MarkKind, open: string, close: string) => {
+    if (start < 0 || end <= start || end > rawAt.length) return;
+    pushRaw(rawAt[start], rawAt[end - 1] + 1, kind, open, close);
+  };
+
+  // Where each highlight and note renders — decided in articleAnnotations.ts,
+  // which the annotation signs and their popover read too.
+  const anchors = resolveAnchors(plain, input.highlights, input.annotations);
+  for (const anchor of anchors) {
+    if (anchor.kind === 'highlight') pushPlain(anchor.start, anchor.end, 'highlight', highlightOpen(anchor.highlight), '</mark>');
+    else if (anchor.kind === 'note') pushPlain(anchor.start, anchor.end, 'note', noteOpen(anchor.note), '</span>');
+  }
+
+  const threadAnchors: ResolvedAnchor[] = (input.threads ?? []).map((lt) => ({
+    kind: 'thread',
+    thread: lt.thread,
+    start: lt.start,
+    end: lt.end,
+  }));
+
+  if (input.focusedThreadId) {
+    const focused = input.threads?.find((t) => t.thread.id === input.focusedThreadId);
+    if (focused) {
+      pushPlain(
+        focused.start,
+        focused.end,
+        'thread',
+        threadFocusOpen(focused.thread.id),
+        '</span>',
+      );
+    }
+  }
+
+  const structure = input.structure;
+  const changes = input.changes ?? [];
+  for (const c of changes) pushRaw(c.start, c.end, 'change', `<span class="vlx-${c.kind}">`, '</span>');
+  if (!structure) return renderSpan(raw, 0, raw.length, marks, true);
+  if (!coversText(structure, raw.length)) {
+    // A structure parsed from another text (a stale memo, a caller bug) would
+    // drop every character past its last block — and every anchor after them.
+    console.warn('[articleRender] structure does not partition the text; rendering flat', {
+      textLength: raw.length,
+      blocks: structure.blocks.length,
+      lastEnd: structure.blocks[structure.blocks.length - 1]?.end ?? null,
+    });
+    return renderSpan(raw, input.only?.start ?? 0, input.only?.end ?? raw.length, marks, true);
+  }
+
+  for (const d of structure.decorations) pushRaw(d.start, d.end, d.kind, decorationOpen(d.kind, d.noteId), '</span>');
+  const groups = input.signs ? groupAnchorsByBlock(raw, structure, [...anchors, ...threadAnchors]) : null;
+  return renderBlocks(raw, structure, marks, groups, input.only);
+}
+
+function renderBlocks(
+  raw: string,
+  structure: ArticleStructure,
+  marks: Mark[],
+  groups: BlockAnnotations[] | null,
+  only?: TextRange,
+): string {
+  const parts: string[] = [];
+  const tail = structure.updates;
+  let inTail = false;
+  for (const [index, block] of structure.blocks.entries()) {
+    if (only && (block.end <= only.start || block.start >= only.end)) continue;
+    if (tail && !inTail && block.start >= tail.start) {
+      inTail = true;
+      // Folded by CSS through a class on the container (useArticleTextInteractions),
+      // so opening the notes never re-renders this HTML; the toggle's label is
+      // CSS-generated, never a text node.
+      const label = `Note di aggiornamento (${Object.keys(structure.notes).length})`;
+      parts.push(
+        '<div class="vlx-updates">' +
+          `<span class="vlx-updates-toggle" role="button" tabindex="0" aria-expanded="false" aria-label="${label}" data-label="${label}"></span>` +
+          '<div class="vlx-updates-body">',
+      );
+    }
+    const blockMarks = marks.filter((m) => m.start < block.end && m.end > block.start);
+    if (block.marker) {
+      blockMarks.push({
+        start: block.marker.start,
+        end: block.marker.end,
+        kind: 'marker',
+        open: '<span class="vlx-marker">',
+        close: '</span>',
+        seq: -1,
+      });
+    }
+    parts.push(`<div class="${blockClass(block)}"${blockAttributes(block)}>`);
+    parts.push(renderSpan(raw, block.start, block.end, blockMarks, false));
+    // After renderSpan has closed every mark, so a sign is never inside one.
+    if (groups) parts.push(signHtml(index, groups[index]));
+    parts.push('</div>');
+  }
+  if (inTail) parts.push('</div></div>');
+  return parts.join('');
+}
+
+/**
+ * An annotated block's sign: a button without a single text node. The note
+ * icon, the count and the colour dots are drawn by CSS from the data
+ * attributes (index.css, READING SURFACE), so the projection holds
+ * (gotcha 23). useArticleTextInteractions opens it; the popover finds it
+ * again by `data-block`.
+ */
+export function signHtml(index: number, group: BlockAnnotations | undefined): string {
+  const notes = group?.notes.length ?? 0;
+  const highlights = group?.highlights.length ?? 0;
+  const threads = group?.threads.length ?? 0;
+  if (!group || notes + highlights + threads === 0) return '';
+  let html =
+    `<span class="vlx-sign" role="button" tabindex="0" aria-haspopup="dialog" data-block="${index}"` +
+    ` data-notes="${notes}" data-highlights="${highlights}" data-threads="${threads}" aria-label="${signAriaLabel(notes, highlights, threads)}">`;
+  if (notes > 0) html += `<span class="vlx-sign-notes" data-count="${notes}"></span>`;
+  for (const color of signColors(group.highlights)) html += `<span class="vlx-sign-dot" data-color="${color}"></span>`;
+  if (threads > 0) html += `<span class="vlx-sign-threads" data-count="${threads}"></span>`;
+  return `${html}</span>`;
+}
+
+function coversText(structure: ArticleStructure, length: number): boolean {
+  const { blocks } = structure;
+  if (blocks.length === 0 || blocks[0].start !== 0 || blocks[blocks.length - 1].end !== length) return false;
+  return blocks.every((b, i) => b.end > b.start && (i === 0 || b.start === blocks[i - 1].end));
+}
+
+const blockClass = (b: StructureBlock): string => `vlx-b vlx-${b.kind}${b.marker ? ' vlx-has-marker' : ''}`;
+
+const blockAttributes = (b: StructureBlock): string =>
+  (b.level ? ` data-level="${b.level}"` : '') + (b.noteId ? ` data-note-head="${escapeAttr(b.noteId)}"` : '');
+
+const byNesting = (x: Mark, y: Mark): number =>
+  RANK[x.kind] - RANK[y.kind] || x.start - y.start || y.end - x.end || x.seq - y.seq;
+
+/**
+ * Emits raw[start, end) with its marks. In a block (`flat === false`) a
+ * newline renders only between two visible characters; on an edge it is
+ * dropped — the block boundary already breaks the line.
+ */
+export function renderSpan(raw: string, start: number, end: number, marks: Mark[], flat: boolean): string {
+  const local = marks.filter((m) => m.start < end && m.end > start);
+  const cuts = new Set<number>([start, end]);
+  for (const m of local) {
+    cuts.add(Math.max(m.start, start));
+    cuts.add(Math.min(m.end, end));
+  }
+  const points = [...cuts].sort((a, b) => a - b);
+
+  let firstVisible = end;
+  let lastVisible = start - 1;
+  if (!flat) {
+    for (let k = start; k < end; k++) {
+      if (!/\s/.test(raw[k])) {
+        firstVisible = k;
+        break;
+      }
+    }
+    for (let k = end - 1; k >= start; k--) {
+      if (!/\s/.test(raw[k])) {
+        lastVisible = k;
+        break;
+      }
+    }
+  }
+
+  let out = '';
+  const stack: Mark[] = [];
+  for (let p = 0; p + 1 < points.length; p++) {
+    const a = points[p];
+    const b = points[p + 1];
+    let text = '';
+    for (let k = a; k < b; k++) {
+      const c = raw[k];
+      if (c === '\n') {
+        if (flat || (k > firstVisible && k < lastVisible)) text += '<br />';
+      } else if (c === '&') text += '&amp;';
+      else if (c === '<') text += '&lt;';
+      else if (c === '>') text += '&gt;';
+      else text += c;
+    }
+    if (!text) continue;
+    const active = local.filter((m) => m.start <= a && m.end >= b).sort(byNesting);
+    let keep = 0;
+    while (keep < stack.length && keep < active.length && stack[keep] === active[keep]) keep++;
+    for (let q = stack.length - 1; q >= keep; q--) out += stack[q].close;
+    stack.length = keep;
+    for (let q = keep; q < active.length; q++) {
+      out += active[q].open;
+      stack.push(active[q]);
+    }
+    out += text;
+  }
+  for (let q = stack.length - 1; q >= 0; q--) out += stack[q].close;
+  return out;
+}

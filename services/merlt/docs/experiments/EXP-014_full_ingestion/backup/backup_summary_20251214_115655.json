@@ -1,0 +1,35 @@
+{
+  "timestamp": "2025-12-14T11:56:55.490107",
+  "description": "Backup pre-EXP-014 full ingestion",
+  "falkordb": {
+    "node_counts": {
+      "['AttoGiudiziario']": 9827,
+      "['Comma']": 2546,
+      "['Norma']": 1046,
+      "['ConcettoGiuridico']": 191,
+      "['DefinizioneLegale']": 10,
+      "['PrincipioGiuridico']": 7
+    },
+    "rel_counts": {
+      "interpreta": 11223,
+      "contiene": 3549,
+      "DISCIPLINA": 526,
+      "DEFINISCE": 44,
+      "ESPRIME_PRINCIPIO": 21
+    },
+    "norma_count": 887,
+    "comma_count": 2546,
+    "entities": {
+      "ConcettoGiuridico": 191,
+      "PrincipioGiuridico": 7,
+      "DefinizioneLegale": 10
+    }
+  },
+  "qdrant": {
+    "error": "'CollectionInfo' object has no attribute 'vectors_count'"
+  },
+  "bridge": {
+    "error": "password authentication failed for user \"postgres\""
+  },
+  "stats": {}
+}

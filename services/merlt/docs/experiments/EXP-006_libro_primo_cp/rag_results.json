@@ -1,0 +1,293 @@
+{
+  "experiment": "EXP-006",
+  "timestamp": "2025-12-07T01:00:44.014907",
+  "config": {
+    "graph": "merl_t_test",
+    "collection": "merl_t_test_cp",
+    "model": "intfloat/multilingual-e5-large",
+    "top_k": 5,
+    "n_articles": 263
+  },
+  "metrics": {
+    "total_queries": 12,
+    "avg_precision_at_5": "0.200",
+    "avg_recall": "0.528",
+    "mrr": "0.562",
+    "queries": [
+      {
+        "query": "Cos'è il principio di legalità nel diritto penale?",
+        "topic": "Principio di legalità",
+        "expected": [
+          "1",
+          "2"
+        ],
+        "retrieved": [
+          "52",
+          "51",
+          "3",
+          "1",
+          "15"
+        ],
+        "precision_at_5": "0.200",
+        "recall": "0.500",
+        "hits": [
+          "1"
+        ],
+        "misses": [
+          "2"
+        ]
+      },
+      {
+        "query": "Quando un reato può essere punito con l'ergastolo?",
+        "topic": "Ergastolo",
+        "expected": [
+          "17",
+          "22"
+        ],
+        "retrieved": [
+          "72",
+          "22",
+          "38",
+          "67",
+          "73"
+        ],
+        "precision_at_5": "0.200",
+        "recall": "0.500",
+        "hits": [
+          "22"
+        ],
+        "misses": [
+          "17"
+        ]
+      },
+      {
+        "query": "Quali sono le circostanze attenuanti comuni?",
+        "topic": "Attenuanti",
+        "expected": [
+          "62",
+          "62-bis"
+        ],
+        "retrieved": [
+          "68",
+          "69 bis",
+          "118",
+          "114",
+          "59"
+        ],
+        "precision_at_5": "0.000",
+        "recall": "0.000",
+        "hits": [],
+        "misses": [
+          "62",
+          "62-bis"
+        ]
+      },
+      {
+        "query": "Quali sono le circostanze aggravanti comuni?",
+        "topic": "Aggravanti",
+        "expected": [
+          "61"
+        ],
+        "retrieved": [
+          "68",
+          "64",
+          "118",
+          "66",
+          "69"
+        ],
+        "precision_at_5": "0.000",
+        "recall": "0.000",
+        "hits": [],
+        "misses": [
+          "61"
+        ]
+      },
+      {
+        "query": "Cosa si intende per concorso di reati?",
+        "topic": "Concorso reati",
+        "expected": [
+          "81",
+          "71",
+          "72"
+        ],
+        "retrieved": [
+          "41",
+          "81",
+          "110",
+          "73",
+          "113"
+        ],
+        "precision_at_5": "0.200",
+        "recall": "0.333",
+        "hits": [
+          "81"
+        ],
+        "misses": [
+          "71",
+          "72"
+        ]
+      },
+      {
+        "query": "Quando si applica la legittima difesa?",
+        "topic": "Legittima difesa",
+        "expected": [
+          "52",
+          "55"
+        ],
+        "retrieved": [
+          "52",
+          "53",
+          "202",
+          "200",
+          "229"
+        ],
+        "precision_at_5": "0.200",
+        "recall": "0.500",
+        "hits": [
+          "52"
+        ],
+        "misses": [
+          "55"
+        ]
+      },
+      {
+        "query": "Cosa prevede lo stato di necessità?",
+        "topic": "Stato di necessità",
+        "expected": [
+          "54"
+        ],
+        "retrieved": [
+          "54",
+          "3",
+          "199",
+          "44",
+          "53"
+        ],
+        "precision_at_5": "0.200",
+        "recall": "1.000",
+        "hits": [
+          "54"
+        ],
+        "misses": []
+      },
+      {
+        "query": "Come funziona la sospensione condizionale della pena?",
+        "topic": "Sospensione condizionale",
+        "expected": [
+          "163",
+          "164",
+          "165"
+        ],
+        "retrieved": [
+          "166",
+          "163",
+          "164",
+          "168",
+          "165"
+        ],
+        "precision_at_5": "0.600",
+        "recall": "1.000",
+        "hits": [
+          "163",
+          "164",
+          "165"
+        ],
+        "misses": []
+      },
+      {
+        "query": "Quando si applica la confisca?",
+        "topic": "Confisca",
+        "expected": [
+          "240"
+        ],
+        "retrieved": [
+          "240",
+          "239",
+          "236",
+          "200",
+          "211"
+        ],
+        "precision_at_5": "0.200",
+        "recall": "1.000",
+        "hits": [
+          "240"
+        ],
+        "misses": []
+      },
+      {
+        "query": "Quali sono le cause di estinzione del reato?",
+        "topic": "Estinzione reato",
+        "expected": [
+          "150",
+          "151",
+          "152",
+          "157"
+        ],
+        "retrieved": [
+          "170",
+          "182",
+          "210",
+          "106",
+          "167"
+        ],
+        "precision_at_5": "0.000",
+        "recall": "0.000",
+        "hits": [],
+        "misses": [
+          "150",
+          "151",
+          "152",
+          "157"
+        ]
+      },
+      {
+        "query": "Cosa prevede il tentativo di reato?",
+        "topic": "Tentativo",
+        "expected": [
+          "56"
+        ],
+        "retrieved": [
+          "56",
+          "49",
+          "6",
+          "39",
+          "47"
+        ],
+        "precision_at_5": "0.200",
+        "recall": "1.000",
+        "hits": [
+          "56"
+        ],
+        "misses": []
+      },
+      {
+        "query": "Come si determina la pena per il concorso di persone nel reato?",
+        "topic": "Concorso persone",
+        "expected": [
+          "110",
+          "111",
+          "112",
+          "114"
+        ],
+        "retrieved": [
+          "110",
+          "78",
+          "112",
+          "73",
+          "113"
+        ],
+        "precision_at_5": "0.400",
+        "recall": "0.500",
+        "hits": [
+          "110",
+          "112"
+        ],
+        "misses": [
+          "111",
+          "114"
+        ]
+      }
+    ]
+  },
+  "verdict": "ACCEPTABLE"
+}

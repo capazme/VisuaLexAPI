@@ -1,0 +1,16 @@
+{
+ "response": {
+  "numFound": 186255,
+  "start": 0,
+  "docs": [
+   {
+    "datdep": [
+     "20210217"
+    ],
+    "kind": "snciv",
+    "id": "snciv2021104215O",
+    "anno": "2021"
+   }
+  ]
+ }
+}

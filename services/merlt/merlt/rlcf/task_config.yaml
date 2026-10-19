@@ -1,0 +1,136 @@
+task_types:
+  QA:
+    input_data:
+      question: str
+      context: str
+    feedback_data:
+      validated_answer: str
+      position: str
+      reasoning: str
+      source_accuracy: str
+      completeness: str
+    ground_truth_keys: ["validated_answer"]
+
+  STATUTORY_RULE_QA:
+    input_data:
+      question: str
+      rule_id: str
+      context_full: str
+      context_count: int
+      relevant_articles: str
+      category: str
+      tags: str
+      metadata_full: str
+    feedback_data:
+      validated_answer: str
+      position: str
+      reasoning: str
+      legal_accuracy: str
+      citation_quality: str
+      omitted_articles: str
+      citation_corrections: str
+    ground_truth_keys: ["validated_answer"]
+
+  CLASSIFICATION:
+    input_data:
+      text: str
+      unit: str
+    feedback_data:
+      validated_labels: List[str]
+      reasoning: str
+      confidence_per_label: Dict[str, float]
+      missed_labels: str
+    ground_truth_keys: ["validated_labels"]
+
+  SUMMARIZATION:
+    input_data:
+      document: str
+    feedback_data:
+      revised_summary: str
+      rating: str
+      reasoning: str
+      key_points_coverage: str
+      factual_accuracy: str
+    ground_truth_keys: ["revised_summary"]
+
+  PREDICTION:
+    input_data:
+      facts: str
+    feedback_data:
+      chosen_outcome: str
+      reasoning: str
+      confidence: float
+      risk_factors: str
+    ground_truth_keys: ["chosen_outcome"]
+
+  NLI:
+    input_data:
+      premise: str
+      hypothesis: str
+    feedback_data:
+      chosen_label: str
+      reasoning: str
+      confidence: float
+      logical_structure: str
+    ground_truth_keys: ["chosen_label"]
+
+  NER:
+    input_data:
+      tokens: List[str]
+      text: str
+    feedback_data:
+      validated_tags: List[str]
+      reasoning: str
+      entity_corrections: str
+      missed_entities: str
+    ground_truth_keys: ["validated_tags"]
+
+  DRAFTING:
+    input_data:
+      source: str
+      task: str
+      instruction: str
+    feedback_data:
+      revised_target: str
+      rating: str
+      reasoning: str
+      style_improvements: str
+      legal_compliance: str
+    ground_truth_keys: ["revised_target"]
+
+  RISK_SPOTTING:
+    input_data:
+      text: str
+    feedback_data:
+      validated_risk_labels: List[str]
+      validated_severity: int
+      reasoning: str
+      mitigation_suggestions: str
+      regulatory_references: str
+    ground_truth_keys: ["validated_risk_labels", "validated_severity"]
+
+  DOCTRINE_APPLICATION:
+    input_data:
+      facts: str
+      question: str
+    feedback_data:
+      chosen_label: str
+      reasoning: str
+      doctrine_analysis: str
+      precedent_citations: str
+      alternative_interpretations: str
+    ground_truth_keys: ["chosen_label"]
+
+  RETRIEVAL_VALIDATION:
+    input_data:
+      query: str
+      retrieved_items: List[Dict]
+      retrieval_strategy: str
+      agent_type: str
+    feedback_data:
+      validated_items: List[str]
+      irrelevant_items: List[str]
+      missing_items: List[str]
+      reasoning: str
+      retrieval_quality_score: float
+    ground_truth_keys: ["validated_items", "irrelevant_items"]

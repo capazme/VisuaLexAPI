@@ -1,0 +1,671 @@
+# Schema Completo Knowledge Graph Giuridico
+# ==========================================
+# Definizione di tutte le 23 tipologie di nodi e 65+ relazioni
+# per il Knowledge Graph LKIF-compliant di MERL-T.
+#
+# Questo file è la fonte di verità per:
+# - Tipi di entità estraibili
+# - Proprietà di ogni tipo di nodo
+# - Relazioni tra nodi
+# - Query Cypher per creazione/lookup
+
+schema_version: "2.1"
+last_updated: "2025-12-10"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#                              TIPOLOGIE DI NODI (23)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+node_types:
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # BACKBONE (già implementati - non estraibili)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  Norma:
+    description: "Articolo di legge (codice civile, costituzione, etc.)"
+    extractable: false
+    source: "normattiva"
+    properties:
+      URN: {type: string, required: true, unique: true}
+      tipo_atto: {type: string, required: true}
+      numero_articolo: {type: string, required: true}
+      rubrica: {type: string}
+      testo_articolo: {type: string}
+      data_vigenza: {type: date}
+
+  Comma:
+    description: "Comma di un articolo"
+    extractable: false
+    source: "normattiva"
+    properties:
+      comma_id: {type: string, required: true, unique: true}
+      numero: {type: integer, required: true}
+      testo: {type: string, required: true}
+
+  AttoGiudiziario:
+    description: "Sentenza, massima giurisprudenziale"
+    extractable: false
+    source: "brocardi"
+    properties:
+      node_id: {type: string, required: true, unique: true}
+      autorita: {type: string, required: true}
+      numero: {type: string}
+      anno: {type: integer}
+      massima: {type: string}
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # ENTITÀ CORE (priorità alta - da estrarre per primi)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  ConcettoGiuridico:
+    description: "Concetto astratto del diritto (buona fede, dolo, colpa, etc.)"
+    extractable: true
+    priority: 1
+    sources: ["brocardi", "manuale"]
+    properties:
+      node_id: {type: string, required: true, unique: true}
+      nome: {type: string, required: true}
+      nome_normalizzato: {type: string, required: true, indexed: true}
+      descrizione: {type: string}
+      ambito: {type: string}  # diritto_civile, diritto_penale, etc.
+      fonti: {type: array}
+      schema_version: {type: string}
+    examples:
+      - "buona fede oggettiva"
+      - "dolo"
+      - "colpa grave"
+      - "inadempimento"
+      - "mora del debitore"
+      - "diligenza del buon padre di famiglia"
+
+  PrincipioGiuridico:
+    description: "Principio normativo di secondo livello"
+    extractable: true
+    priority: 1
+    sources: ["brocardi", "manuale"]
+    properties:
+      node_id: {type: string, required: true, unique: true}
+      nome: {type: string, required: true}
+      nome_normalizzato: {type: string, required: true, indexed: true}
+      descrizione: {type: string}
+      livello: {type: string}  # costituzionale, codicistico, settoriale
+      fonti: {type: array}
+      schema_version: {type: string}
+    examples:
+      - "principio di buona fede"
+      - "autonomia contrattuale"
+      - "principio consensualistico"
+      - "tutela dell'affidamento"
+
+  DefinizioneLegale:
+    description: "Definizione normativa di un fatto concreto"
+    extractable: true
+    priority: 1
+    sources: ["brocardi", "manuale", "normattiva"]
+    properties:
+      node_id: {type: string, required: true, unique: true}
+      nome: {type: string, required: true}
+      nome_normalizzato: {type: string, required: true, indexed: true}
+      descrizione: {type: string, required: true}
+      tipo_definizione: {type: string}  # legale, dottrinale, giurisprudenziale
+      fonti: {type: array}
+      schema_version: {type: string}
+    examples:
+      - "obbligazione"
+      - "contratto"
+      - "mora"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # ENTITÀ SOGGETTI (priorità 2)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  SoggettoGiuridico:
+    description: "Ruolo/figura soggettiva nel rapporto giuridico"
+    extractable: true
+    priority: 2
+    sources: ["manuale", "brocardi"]
+    properties:
+      node_id: {type: string, required: true, unique: true}
+      nome: {type: string, required: true}
+      nome_normalizzato: {type: string, required: true, indexed: true}
+      descrizione: {type: string}
+      tipo_soggetto: {type: string}  # persona_fisica, persona_giuridica, ruolo
+      fonti: {type: array}
+      schema_version: {type: string}
+    examples:
+      - "debitore"
+      - "creditore"
+      - "fideiussore"
+      - "conduttore"
+      - "locatore"
+      - "venditore"
+      - "compratore"
+
+  Ruolo:
+    description: "Ruolo processuale o sostanziale"
+    extractable: true
+    priority: 2
+    sources: ["manuale"]
+    properties:
+      node_id: {type: string, required: true, unique: true}
+      nome: {type: string, required: true}
+      contesto: {type: string}  # contrattuale, processuale, familiare
+      descrizione: {type: string}
+      fonti: {type: array}
+    examples:
+      - "attore"
+      - "convenuto"
+      - "garante"
+      - "terzo"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # ENTITÀ MODALI (priorità 2)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  ModalitaGiuridica:
+    description: "Obbligo, diritto, potere, facoltà, immunità"
+    extractable: true
+    priority: 2
+    sources: ["manuale", "brocardi"]
+    properties:
+      node_id: {type: string, required: true, unique: true}
+      nome: {type: string, required: true}
+      tipo_modalita: {type: string}  # obbligo, diritto, potere, facolta, immunita
+      descrizione: {type: string}
+      correlativo: {type: string}  # riferimento alla modalità correlativa
+      fonti: {type: array}
+    examples:
+      - "obbligo di prestazione"
+      - "diritto di credito"
+      - "potere di recesso"
+      - "facoltà di scelta"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # ENTITÀ FATTI E ATTI (priorità 3)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  FattoGiuridico:
+    description: "Evento rilevante per il diritto"
+    extractable: true
+    priority: 3
+    sources: ["manuale"]
+    properties:
+      node_id: {type: string, required: true, unique: true}
+      nome: {type: string, required: true}
+      tipo_fatto: {type: string}  # naturale, umano, lecito, illecito
+      descrizione: {type: string}
+      effetti: {type: array}
+      fonti: {type: array}
+    examples:
+      - "nascita"
+      - "morte"
+      - "decorrenza termine"
+      - "impossibilità sopravvenuta"
+
+  AttoGiuridico:
+    description: "Manifestazione di volontà produttiva di effetti"
+    extractable: true
+    priority: 3
+    sources: ["manuale", "brocardi"]
+    properties:
+      node_id: {type: string, required: true, unique: true}
+      nome: {type: string, required: true}
+      tipo_atto: {type: string}  # negoziale, non_negoziale
+      forma: {type: string}  # scritta, orale, per_atti_concludenti
+      descrizione: {type: string}
+      fonti: {type: array}
+    examples:
+      - "proposta contrattuale"
+      - "accettazione"
+      - "recesso"
+      - "diffida"
+      - "messa in mora"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # ENTITÀ PROCEDURALI (priorità 3)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  Procedura:
+    description: "Iter procedurale o sequenza di atti"
+    extractable: true
+    priority: 3
+    sources: ["manuale"]
+    properties:
+      node_id: {type: string, required: true, unique: true}
+      nome: {type: string, required: true}
+      tipo_procedura: {type: string}  # giudiziale, stragiudiziale, amministrativa
+      fasi: {type: array}
+      descrizione: {type: string}
+      fonti: {type: array}
+    examples:
+      - "procedimento esecutivo"
+      - "mediazione"
+      - "arbitrato"
+      - "azione di risoluzione"
+
+  Termine:
+    description: "Termine temporale (prescrizione, decadenza, etc.)"
+    extractable: true
+    priority: 3
+    sources: ["brocardi", "manuale", "normattiva"]
+    properties:
+      node_id: {type: string, required: true, unique: true}
+      nome: {type: string, required: true}
+      tipo_termine: {type: string}  # prescrizione, decadenza, dilatorio, perentorio
+      durata: {type: string}
+      decorrenza: {type: string}
+      descrizione: {type: string}
+      fonti: {type: array}
+    examples:
+      - "prescrizione ordinaria"
+      - "termine decennale"
+      - "termine per l'accettazione"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # ENTITÀ EFFETTI E RESPONSABILITÀ (priorità 3)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  EffettoGiuridico:
+    description: "Conseguenza giuridica di un fatto/atto"
+    extractable: true
+    priority: 3
+    sources: ["manuale"]
+    properties:
+      node_id: {type: string, required: true, unique: true}
+      nome: {type: string, required: true}
+      tipo_effetto: {type: string}  # costitutivo, modificativo, estintivo
+      descrizione: {type: string}
+      fonti: {type: array}
+    examples:
+      - "nullità"
+      - "annullabilità"
+      - "risoluzione"
+      - "rescissione"
+
+  Responsabilita:
+    description: "Tipo di responsabilità giuridica"
+    extractable: true
+    priority: 3
+    sources: ["manuale", "brocardi"]
+    properties:
+      node_id: {type: string, required: true, unique: true}
+      nome: {type: string, required: true}
+      tipo_responsabilita: {type: string}  # contrattuale, extracontrattuale, oggettiva
+      descrizione: {type: string}
+      fonti: {type: array}
+    examples:
+      - "responsabilità contrattuale"
+      - "responsabilità precontrattuale"
+      - "responsabilità aquiliana"
+
+  Sanzione:
+    description: "Conseguenza sanzionatoria"
+    extractable: true
+    priority: 4
+    sources: ["manuale"]
+    properties:
+      node_id: {type: string, required: true, unique: true}
+      nome: {type: string, required: true}
+      tipo_sanzione: {type: string}  # civile, penale, amministrativa
+      descrizione: {type: string}
+      fonti: {type: array}
+    examples:
+      - "risarcimento del danno"
+      - "clausola penale"
+      - "caparra confirmatoria"
+
+  Rimedio:
+    description: "Strumento di tutela"
+    extractable: true
+    priority: 3
+    sources: ["manuale", "brocardi"]
+    properties:
+      node_id: {type: string, required: true, unique: true}
+      nome: {type: string, required: true}
+      tipo_rimedio: {type: string}  # generale, specifico, cautelare
+      descrizione: {type: string}
+      fonti: {type: array}
+    examples:
+      - "azione di adempimento"
+      - "azione di risoluzione"
+      - "eccezione di inadempimento"
+      - "sequestro conservativo"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # ENTITÀ DOCUMENTALI (priorità 4)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  Dottrina:
+    description: "Commento dottrinale strutturato"
+    extractable: false  # Creato automaticamente durante enrichment
+    source: "enrichment_pipeline"
+    properties:
+      node_id: {type: string, required: true, unique: true}
+      tipo: {type: string}  # spiegazione, ratio, commento_manuale
+      testo: {type: string, required: true}
+      autore: {type: string}
+      fonte: {type: string}
+      concetti_trattati: {type: array}
+      principi_trattati: {type: array}
+      schema_version: {type: string}
+
+  Caso:
+    description: "Fattispecie concreta o caso di studio"
+    extractable: true
+    priority: 4
+    sources: ["manuale", "giurisprudenza"]
+    properties:
+      node_id: {type: string, required: true, unique: true}
+      nome: {type: string, required: true}
+      descrizione: {type: string}
+      esito: {type: string}
+      principi_applicati: {type: array}
+      fonti: {type: array}
+    examples:
+      - "caso Fiuggi"
+      - "caso del chirurgo"
+
+  Eccezione:
+    description: "Eccezione a una regola generale"
+    extractable: true
+    priority: 4
+    sources: ["manuale", "brocardi"]
+    properties:
+      node_id: {type: string, required: true, unique: true}
+      nome: {type: string, required: true}
+      regola_generale: {type: string}
+      descrizione: {type: string}
+      fonti: {type: array}
+    examples:
+      - "eccezione di giudicato"
+      - "eccezione di prescrizione"
+
+  Clausola:
+    description: "Clausola contrattuale tipica"
+    extractable: true
+    priority: 4
+    sources: ["manuale"]
+    properties:
+      node_id: {type: string, required: true, unique: true}
+      nome: {type: string, required: true}
+      tipo_clausola: {type: string}  # essenziale, accessoria, vessatoria
+      descrizione: {type: string}
+      fonti: {type: array}
+    examples:
+      - "clausola risolutiva espressa"
+      - "clausola penale"
+      - "patto di non concorrenza"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#                              RELAZIONI (65+)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+relation_types:
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # RELAZIONI STRUTTURALI (backbone)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  CONTIENE:
+    description: "Norma contiene Comma"
+    source: [Norma]
+    target: [Comma]
+
+  MODIFICA:
+    description: "Norma modifica altra Norma"
+    source: [Norma]
+    target: [Norma]
+    properties:
+      tipo_modifica: {type: string}  # sostituzione, abrogazione, integrazione
+
+  CITA:
+    description: "Norma cita altra Norma"
+    source: [Norma]
+    target: [Norma]
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # RELAZIONI SEMANTICHE (Norma → Entità)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  DISCIPLINA:
+    description: "Norma disciplina un Concetto"
+    source: [Norma, Comma]
+    target: [ConcettoGiuridico]
+    extractable: true
+
+  ESPRIME_PRINCIPIO:
+    description: "Norma esprime/fonda un Principio"
+    source: [Norma]
+    target: [PrincipioGiuridico]
+    extractable: true
+
+  DEFINISCE:
+    description: "Norma definisce un termine"
+    source: [Norma]
+    target: [DefinizioneLegale]
+    extractable: true
+
+  PREVEDE:
+    description: "Norma prevede un Effetto/Sanzione"
+    source: [Norma]
+    target: [EffettoGiuridico, Sanzione]
+    extractable: true
+
+  STABILISCE_TERMINE:
+    description: "Norma stabilisce un Termine"
+    source: [Norma]
+    target: [Termine]
+    extractable: true
+
+  REGOLA_PROCEDURA:
+    description: "Norma regola una Procedura"
+    source: [Norma]
+    target: [Procedura]
+    extractable: true
+
+  ATTRIBUISCE:
+    description: "Norma attribuisce Modalità a Soggetto"
+    source: [Norma]
+    target: [ModalitaGiuridica]
+    extractable: true
+    properties:
+      beneficiario: {type: string}  # Riferimento a SoggettoGiuridico
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # RELAZIONI GERARCHICHE (Entità → Entità)
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  SPECIES:
+    description: "Concetto è sottotipo di altro Concetto"
+    source: [ConcettoGiuridico]
+    target: [ConcettoGiuridico]
+    extractable: true
+    # buona fede oggettiva -[:SPECIES]-> buona fede
+
+  GENUS:
+    description: "Concetto è supertipo di altro Concetto"
+    source: [ConcettoGiuridico]
+    target: [ConcettoGiuridico]
+    # Inverso di SPECIES
+
+  IMPLICA:
+    description: "Concetto implica altro Concetto"
+    source: [ConcettoGiuridico, PrincipioGiuridico]
+    target: [ConcettoGiuridico, PrincipioGiuridico]
+    extractable: true
+
+  ESCLUDE:
+    description: "Concetto esclude altro Concetto"
+    source: [ConcettoGiuridico]
+    target: [ConcettoGiuridico]
+    extractable: true
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # RELAZIONI TRA PRINCIPI
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  BILANCIA_CON:
+    description: "Principio in tensione con altro Principio"
+    source: [PrincipioGiuridico]
+    target: [PrincipioGiuridico]
+    extractable: true
+    # autonomia contrattuale -[:BILANCIA_CON]-> tutela parte debole
+
+  DEROGA:
+    description: "Principio deroga altro Principio"
+    source: [PrincipioGiuridico]
+    target: [PrincipioGiuridico]
+
+  SPECIFICA:
+    description: "Principio specifica altro Principio"
+    source: [PrincipioGiuridico]
+    target: [PrincipioGiuridico]
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # RELAZIONI CAUSALI
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  CAUSA:
+    description: "Fatto/Atto causa Effetto"
+    source: [FattoGiuridico, AttoGiuridico]
+    target: [EffettoGiuridico]
+    extractable: true
+
+  PRESUPPONE:
+    description: "Effetto presuppone Fatto"
+    source: [EffettoGiuridico, Responsabilita]
+    target: [FattoGiuridico, ConcettoGiuridico]
+    extractable: true
+
+  GENERA:
+    description: "Responsabilità genera Obbligo di risarcimento"
+    source: [Responsabilita]
+    target: [ModalitaGiuridica, Sanzione]
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # RELAZIONI SOGGETTIVE
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  TITOLARE_DI:
+    description: "Soggetto è titolare di Diritto/Obbligo"
+    source: [SoggettoGiuridico, Ruolo]
+    target: [ModalitaGiuridica]
+    extractable: true
+
+  CONTROPARTE:
+    description: "Soggetto è controparte di altro Soggetto"
+    source: [SoggettoGiuridico]
+    target: [SoggettoGiuridico]
+    # debitore -[:CONTROPARTE]-> creditore
+
+  ASSUME_RUOLO:
+    description: "Soggetto assume Ruolo in contesto"
+    source: [SoggettoGiuridico]
+    target: [Ruolo]
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # RELAZIONI PROCEDURALI
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  FASE_DI:
+    description: "Atto è fase di Procedura"
+    source: [AttoGiuridico]
+    target: [Procedura]
+
+  PRECEDE:
+    description: "Fase precede altra Fase"
+    source: [AttoGiuridico]
+    target: [AttoGiuridico]
+
+  ATTIVA:
+    description: "Fatto attiva Termine"
+    source: [FattoGiuridico]
+    target: [Termine]
+    extractable: true
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # RELAZIONI DOTTRINA/GIURISPRUDENZA
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  COMMENTA:
+    description: "Dottrina commenta Norma"
+    source: [Dottrina]
+    target: [Norma]
+
+  SPIEGA:
+    description: "Dottrina spiega Concetto/Principio"
+    source: [Dottrina]
+    target: [ConcettoGiuridico, PrincipioGiuridico]
+
+  INTERPRETA:
+    description: "AttoGiudiziario interpreta Norma"
+    source: [AttoGiudiziario]
+    target: [Norma]
+
+  APPLICA:
+    description: "AttoGiudiziario applica Principio"
+    source: [AttoGiudiziario, Caso]
+    target: [PrincipioGiuridico]
+    extractable: true
+
+  ILLUSTRA:
+    description: "Caso illustra Concetto"
+    source: [Caso]
+    target: [ConcettoGiuridico]
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # RELAZIONI RIMEDI
+  # ─────────────────────────────────────────────────────────────────────────────
+
+  TUTELA:
+    description: "Rimedio tutela Diritto"
+    source: [Rimedio]
+    target: [ModalitaGiuridica]
+
+  REAGISCE_A:
+    description: "Rimedio reagisce a Violazione"
+    source: [Rimedio]
+    target: [FattoGiuridico, Responsabilita]
+
+  ECCEZIONE_A:
+    description: "Eccezione deroga Regola"
+    source: [Eccezione]
+    target: [ConcettoGiuridico, PrincipioGiuridico, Norma]
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#                         CONFIGURAZIONE ESTRAZIONE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+extraction:
+  # Priorità estrazione (batch per priorità)
+  priority_batches:
+    - priority: 1
+      types: [ConcettoGiuridico, PrincipioGiuridico, DefinizioneLegale]
+      description: "Entità core - estrarre per primi"
+
+    - priority: 2
+      types: [SoggettoGiuridico, Ruolo, ModalitaGiuridica]
+      description: "Soggetti e modalità"
+
+    - priority: 3
+      types: [FattoGiuridico, AttoGiuridico, Procedura, Termine, EffettoGiuridico, Responsabilita, Rimedio]
+      description: "Fatti, atti, effetti"
+
+    - priority: 4
+      types: [Sanzione, Caso, Eccezione, Clausola]
+      description: "Entità avanzate"
+
+  # Relazioni da estrarre automaticamente
+  extractable_relations:
+    - DISCIPLINA
+    - ESPRIME_PRINCIPIO
+    - DEFINISCE
+    - SPECIES
+    - BILANCIA_CON
+    - IMPLICA
+    - CAUSA
+    - PRESUPPONE
+    - TITOLARE_DI
+    - APPLICA
+    - ATTIVA

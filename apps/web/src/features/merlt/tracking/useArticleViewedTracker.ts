@@ -1,0 +1,249 @@
+import { useEffect, useRef } from 'react';
+import { sendArticleViewedEvent } from '../../../services/merltService';
+import { useConsent } from '../consent/useConsent';
+import { publishMerltEvent, MERLT_EVENT_TYPES } from '../merltEventBus';
+
+/**
+ * Hook that emits an `article:viewed` event to the BFF when the article
+ * has been "effectively read":
+ *   viewport-visible ≥ DWELL_THRESHOLD_MS  OR  scroll ≥ SCROLL_THRESHOLD_PCT
+ *
+ * Slice 1 design — see docs/superpowers/specs/2026-05-22-merlt-integration-slice1-design.md
+ * section "Trigger frontend".
+ *
+ * Fire-and-forget: the network call never blocks the UI, errors are
+ * swallowed (BFF logs to dead-letter file).
+ */
+
+const DWELL_THRESHOLD_MS = 3000;
+const SCROLL_THRESHOLD_PCT = 30;
+/** Minimum gap between two progress measurements on a scroll burst. */
+const SCROLL_MEASURE_GAP_MS = 100;
+
+/**
+ * The nearest ancestor that actually scrolls, or null for the window. The
+ * article element itself (contentRef in ArticleTabContent) has no overflow:
+ * the reading column, or the page, scrolls it into view.
+ */
+function findScrollParent(el: HTMLElement): HTMLElement | null {
+  let node = el.parentElement;
+  while (node) {
+    const overflowY = getComputedStyle(node).overflowY;
+    if ((overflowY === 'auto' || overflowY === 'scroll') && node.scrollHeight > node.clientHeight) {
+      return node;
+    }
+    node = node.parentElement;
+  }
+  return null;
+}
+
+/**
+ * ≥50% of the article on screen, OR, for an article taller than twice the
+ * viewport (where 50% can never be visible at once), the visible part fills
+ * at least half of the viewport. Entries from older observers (no
+ * intersectionRect) fall back to the isIntersecting flag.
+ */
+function isEffectivelyVisible(entry: IntersectionObserverEntry): boolean {
+  if (!entry.isIntersecting) return false;
+  const ratio = typeof entry.intersectionRatio === 'number' ? entry.intersectionRatio : 1;
+  if (ratio >= 0.5) return true;
+  const visibleHeight = entry.intersectionRect?.height ?? 0;
+  const rootHeight = entry.rootBounds?.height ?? window.innerHeight;
+  return rootHeight > 0 && visibleHeight >= 0.5 * rootHeight;
+}
+
+export interface UseArticleViewedTrackerOptions {
+  articleUrn: string | undefined;
+  normaVisitataId?: string;
+  /**
+   * Required: a ref to the ARTICLE element (not necessarily scrollable). Read
+   * progress is measured as how far the article has been revealed inside its
+   * nearest scrolling ancestor (or the window); an element that scrolls by
+   * itself keeps the scrollTop ratio.
+   */
+  containerRef: React.RefObject<HTMLElement | null>;
+  /** Optional override for stable session identification. */
+  sessionId?: string;
+  /** Disable tracking entirely (e.g. feature flag off). Default: false. */
+  disabled?: boolean;
+}
+
+function generateSessionId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  // Fallback: should never hit in modern browsers
+  return `sess-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export function useArticleViewedTracker({
+  articleUrn,
+  normaVisitataId,
+  containerRef,
+  sessionId,
+  disabled = false,
+}: UseArticleViewedTrackerOptions): void {
+  const { canTrack } = useConsent();
+  const stateRef = useRef({
+    dwellMs: 0,
+    scrollMaxPct: 0,
+    isVisible: false,
+    lastVisibleAt: 0,
+    emitted: false,
+    sessionId: sessionId ?? generateSessionId(),
+  });
+
+  // Re-use the same session id across re-renders unless override changes
+  useEffect(() => {
+    if (sessionId) stateRef.current.sessionId = sessionId;
+  }, [sessionId]);
+
+  // Keep the latest consent value reachable from the cleanup-path emission,
+  // so revoking consent mid-read suppresses the event instead of dead-lettering.
+  const canTrackRef = useRef(canTrack);
+  useEffect(() => {
+    canTrackRef.current = canTrack;
+  }, [canTrack]);
+
+  useEffect(() => {
+    if (disabled || !articleUrn || !containerRef.current) return;
+    // NOTE: no consent gate here. The observers run for every reader, so a
+    // genuine view is published on the in-page bus (it never leaves the
+    // browser); the consent gate is applied to the BFF POST in the cleanup
+    // path below, the only thing that sends anything.
+
+    const el = containerRef.current;
+    const state = stateRef.current;
+    state.dwellMs = 0;
+    state.scrollMaxPct = 0;
+    state.emitted = false;
+
+    // ---- IntersectionObserver: track viewport visibility (≥50% visible) ----
+    // Two thresholds: 0.5 for the usual case, 0 so a tall article (never 50%
+    // on screen) still reports its visible band, judged by isEffectivelyVisible.
+    let lastEntry: IntersectionObserverEntry | undefined;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        lastEntry = entry;
+        if (isEffectivelyVisible(entry)) {
+          if (!state.isVisible) {
+            state.isVisible = true;
+            state.lastVisibleAt = performance.now();
+          }
+        } else {
+          if (state.isVisible) {
+            state.dwellMs += performance.now() - state.lastVisibleAt;
+            state.isVisible = false;
+          }
+        }
+      },
+      { threshold: [0, 0.5] }
+    );
+    observer.observe(el);
+
+    // ---- Scroll tracking ----
+    // Before this, the listener sat on the article element and read its own
+    // scrollTop; that element never scrolls (ArticleBody has no overflow), so
+    // scroll_max_pct was always 0 and the "scroll ≥ 30%" criterion never fired.
+    // Progress is now "how much of the article's height has been revealed"
+    // inside the scroll ancestor (or the viewport), measured on scroll only:
+    // a short article that fits on screen still needs the dwell to count.
+    const scrollParent = findScrollParent(el);
+    let lastMeasureAt = 0;
+    const measure = (): void => {
+      let pct: number;
+      const maxSelf = el.scrollHeight - el.clientHeight;
+      if (maxSelf > 0) {
+        // The element clips and scrolls its own content (a panel).
+        pct = (el.scrollTop / maxSelf) * 100;
+      } else {
+        const rect = el.getBoundingClientRect();
+        if (!(rect.height > 0)) return;
+        const rootBottom = scrollParent
+          ? scrollParent.getBoundingClientRect().bottom
+          : window.innerHeight;
+        pct = ((rootBottom - rect.top) / rect.height) * 100;
+      }
+      pct = Math.min(100, Math.max(0, pct));
+      if (pct > state.scrollMaxPct) state.scrollMaxPct = pct;
+    };
+    const onScroll = (): void => {
+      const now = performance.now();
+      if (now - lastMeasureAt < SCROLL_MEASURE_GAP_MS && lastMeasureAt !== 0) return;
+      lastMeasureAt = now;
+      measure();
+    };
+    const scrollTargets: (HTMLElement | Window)[] = [el, window];
+    if (scrollParent) scrollTargets.push(scrollParent);
+    for (const target of scrollTargets) {
+      target.addEventListener('scroll', onScroll, { passive: true });
+    }
+
+    // ---- Pause-on-blur (tab hidden) so we don't count time when away ----
+    const onVisibilityChange = (): void => {
+      if (document.hidden && state.isVisible) {
+        state.dwellMs += performance.now() - state.lastVisibleAt;
+        state.isVisible = false;
+      } else if (!document.hidden && lastEntry && isEffectivelyVisible(lastEntry)) {
+        state.isVisible = true;
+        state.lastVisibleAt = performance.now();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    // ---- Cleanup → emit event if threshold met ----
+    return () => {
+      observer.disconnect();
+      for (const target of scrollTargets) {
+        target.removeEventListener('scroll', onScroll);
+      }
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+
+      if (state.isVisible) {
+        state.dwellMs += performance.now() - state.lastVisibleAt;
+        state.isVisible = false;
+      }
+
+      const meetsDwell = state.dwellMs >= DWELL_THRESHOLD_MS;
+      const meetsScroll = state.scrollMaxPct >= SCROLL_THRESHOLD_PCT;
+      if (state.emitted) return;
+      if (!(meetsDwell || meetsScroll)) return;
+
+      // Mark emitted up-front so neither the bus publish nor the POST can fire
+      // twice for the same article view (at-most-once, no mid-scroll spam).
+      state.emitted = true;
+
+      // Publish on the in-page bus regardless of consent (nothing leaves the
+      // browser here; consent-none readers never reach the POST below).
+      // Fire-and-forget, gated only by the genuine-view decision.
+      publishMerltEvent({
+        interaction_type: MERLT_EVENT_TYPES.articleViewed,
+        article_urn: articleUrn,
+        metadata: {
+          dwell_ms: Math.round(state.dwellMs),
+          scroll_max_pct: Math.round(state.scrollMaxPct * 100) / 100,
+        },
+      });
+
+      // Consent may have been revoked mid-read (effect re-ran with canTrack
+      // false → this cleanup): honour the live value, don't dead-letter a 403.
+      // Only the BFF POST is consent-gated — the bus publish above is not.
+      if (!canTrackRef.current) return;
+
+      void sendArticleViewedEvent({
+        articleUrn,
+        normaVisitataId,
+        dwellMs: Math.round(state.dwellMs),
+        scrollMaxPct: Math.round(state.scrollMaxPct * 100) / 100,
+        sessionId: state.sessionId,
+      }).catch((err) => {
+        // Fire-and-forget: BFF dead-letter handles persistence
+        console.warn('[merlt] article:viewed emit failed:', err);
+      });
+    };
+    // canTrack is intentionally NOT a dependency: re-running on revoke would
+    // fire this cleanup while the ref still held the stale (true) value (effect
+    // cleanup runs before the ref-sync effect). Gating on canTrackRef.current
+    // (synced separately) makes unmount/article-change honour the live value.
+  }, [articleUrn, normaVisitataId, containerRef, disabled]);
+}

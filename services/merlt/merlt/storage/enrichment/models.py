@@ -1,0 +1,951 @@
+"""
+SQLAlchemy Models for Live Enrichment
+======================================
+
+Models for persistent storage of:
+- Pending entities & relations (live enrichment)
+- User-uploaded documents
+- Amendments (multivigenza)
+- Community votes & consensus
+- Domain authority tracking
+
+Usage:
+    from merlt.storage.enrichment.models import PendingEntity, EntityVote
+    from merlt.storage.enrichment.database import get_db_session
+
+    async with get_db_session() as session:
+        entity = PendingEntity(
+            entity_id="concetto:legittima_difesa",
+            article_urn="urn:nir:stato:codice.penale:...",
+            entity_type="concetto",
+            entity_text="Legittima difesa",
+            ...
+        )
+        session.add(entity)
+        await session.commit()
+"""
+
+import uuid
+from datetime import datetime, timedelta
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Text,
+    Float,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    CheckConstraint,
+    UniqueConstraint,
+    ARRAY,
+    Date,
+    BigInteger,
+    JSON,
+)
+from sqlalchemy.orm import relationship, declarative_base
+from sqlalchemy.sql import func
+
+Base = declarative_base()
+
+
+# ====================================================
+# 1. PENDING ENTITIES
+# ====================================================
+class PendingEntity(Base):
+    """
+    Pending legal entity awaiting community validation.
+
+    Lifecycle:
+        1. LLM extracts entity from article
+        2. Saved as 'pending'
+        3. Community votes (entity_votes)
+        4. Consensus reached → approved/rejected
+        5. If approved → written to FalkorDB
+    """
+
+    __tablename__ = "pending_entities"
+
+    # Identity
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    entity_id = Column(String(100), unique=True, nullable=False)
+
+    # Source
+    article_urn = Column(String(300), nullable=False, index=True)
+    source_type = Column(String(50), default="article")
+    source_document_id = Column(Integer, ForeignKey("user_documents.id", ondelete="SET NULL"))
+
+    # Entity data
+    entity_type = Column(String(50), nullable=False, index=True)
+    entity_text = Column(Text, nullable=False)
+    descrizione = Column(Text)
+    ambito = Column(String(50))
+    fonte = Column(String(50), default="llm_extraction")  # pipeline tag, never a free-text citation
+    # The contributor's bibliographic citation ("Torrente, p. 123") or the URL
+    # of a confirmed live source. Free text, so it cannot live in `fonte`
+    # (varchar(50) pipeline tag). Migration 007.
+    source_reference = Column(Text)
+
+    # LLM metadata
+    llm_confidence = Column(Float)
+    llm_model = Column(String(100))
+    llm_reasoning = Column(Text)
+
+    # Validation status
+    validation_status = Column(String(20), default="pending", index=True)
+    approval_score = Column(Float, default=0.0)
+    rejection_score = Column(Float, default=0.0)
+    net_score = Column(Float, default=0.0, index=True)  # approval - rejection, can be negative
+    votes_count = Column(Integer, default=0)
+    consensus_reached = Column(Boolean, default=False, index=True)
+    consensus_type = Column(String(20))  # 'approved' (net >= +2.0) or 'rejected' (net <= -2.0)
+
+    # Contributor
+    contributed_by = Column(String(100), index=True)
+    contributor_authority = Column(Float)
+
+    # Deduplication
+    duplicate_check_mechanical = Column(Boolean, default=False)
+    duplicate_check_llm = Column(Boolean, default=False)
+    potential_duplicate_of = Column(String(100))
+
+    # Timestamps
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    approved_at = Column(DateTime)
+    written_to_graph_at = Column(DateTime)
+
+    # Relationships
+    votes = relationship("EntityVote", back_populates="entity", cascade="all, delete-orphan")
+    source_document = relationship("UserDocument", back_populates="extracted_entities")
+
+    __table_args__ = (
+        CheckConstraint("llm_confidence >= 0 AND llm_confidence <= 1", name="check_llm_confidence"),
+    )
+
+    def __repr__(self):
+        return f"<PendingEntity(id={self.entity_id}, type={self.entity_type}, status={self.validation_status})>"
+
+
+# ====================================================
+# 2. ENTITY VOTES
+# ====================================================
+class EntityVote(Base):
+    """Community vote on a pending entity."""
+
+    __tablename__ = "entity_votes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    entity_id = Column(String(100), ForeignKey("pending_entities.entity_id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(String(100), nullable=False, index=True)
+
+    # Vote data
+    vote_value = Column(Integer, nullable=False)  # -1 or 1
+    vote_type = Column(String(20), nullable=False)  # 'accuracy' | 'utility' | 'duplicate'
+
+    # Voter context
+    voter_authority = Column(Float)
+    voter_domain_authority = Column(Float)
+    legal_domain = Column(String(50), index=True)
+
+    # Reasoning
+    comment = Column(Text)
+    suggested_revision = Column(Text)
+    duplicate_of_node_id = Column(String(100))
+
+    # Timestamp
+    created_at = Column(DateTime, default=func.now())
+
+    # Relationships
+    entity = relationship("PendingEntity", back_populates="votes")
+
+    __table_args__ = (
+        CheckConstraint("vote_value IN (-1, 1)", name="check_vote_value"),
+        UniqueConstraint("entity_id", "user_id", "vote_type", name="unique_entity_user_vote"),
+    )
+
+    def __repr__(self):
+        return f"<EntityVote(entity={self.entity_id}, user={self.user_id}, vote={self.vote_value})>"
+
+
+# ====================================================
+# 3. PENDING RELATIONS
+# ====================================================
+class PendingRelation(Base):
+    """Pending semantic relation awaiting validation."""
+
+    __tablename__ = "pending_relations"
+
+    # Identity
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    relation_id = Column(String(150), unique=True, nullable=False)
+
+    # Source
+    article_urn = Column(String(300), nullable=False, index=True)
+    source_type = Column(String(50), default="article")
+    source_document_id = Column(Integer, ForeignKey("user_documents.id", ondelete="SET NULL"))
+
+    # Relation data. Endpoints: a norm URN/URL, a graph node id or a pending
+    # entity id (see storage/graph/relation_endpoints.py). The target is as
+    # wide as the source: a Normattiva URL target overflowed varchar(100).
+    relation_type = Column(String(100), nullable=False, index=True)
+    source_node_urn = Column(String(300), nullable=False, index=True)
+    target_entity_id = Column(String(300), nullable=False, index=True)
+
+    # Target status tracking (for cascade logic)
+    # If target is a pending entity, this is True. When target is rejected,
+    # this relation goes back to pending status.
+    target_is_pending = Column(Boolean, default=False, index=True)
+
+    # Metadata
+    relation_description = Column(Text)
+    certezza = Column(Float)
+    fonte = Column(String(50), default="llm_extraction")  # Source: llm_extraction, community, mechanistic
+    source_reference = Column(Text)  # contributor's citation, see PendingEntity.source_reference
+    llm_confidence = Column(Float)
+    llm_model = Column(String(100))
+    llm_reasoning = Column(Text)
+
+    # Validation
+    validation_status = Column(String(20), default="pending", index=True)
+    approval_score = Column(Float, default=0.0)
+    rejection_score = Column(Float, default=0.0)
+    net_score = Column(Float, default=0.0, index=True)  # approval - rejection, can be negative
+    votes_count = Column(Integer, default=0)
+    consensus_reached = Column(Boolean, default=False)
+    consensus_type = Column(String(20))  # 'approved' (net >= +2.0) or 'rejected' (net <= -2.0)
+
+    # Contributor
+    contributed_by = Column(String(100))
+    contributor_authority = Column(Float)
+
+    # Timestamps
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    approved_at = Column(DateTime)
+    written_to_graph_at = Column(DateTime)
+
+    # Relationships
+    votes = relationship("RelationVote", back_populates="relation", cascade="all, delete-orphan")
+    source_document = relationship("UserDocument", back_populates="extracted_relations")
+
+    __table_args__ = (
+        CheckConstraint("certezza >= 0 AND certezza <= 1", name="check_certezza"),
+    )
+
+    def __repr__(self):
+        return f"<PendingRelation(id={self.relation_id}, type={self.relation_type}, status={self.validation_status})>"
+
+
+# ====================================================
+# 4. RELATION VOTES
+# ====================================================
+class RelationVote(Base):
+    """Community vote on a pending relation."""
+
+    __tablename__ = "relation_votes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    relation_id = Column(String(150), ForeignKey("pending_relations.relation_id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(String(100), nullable=False, index=True)
+
+    vote_value = Column(Integer, nullable=False)
+    vote_type = Column(String(20), nullable=False)
+
+    voter_authority = Column(Float)
+    voter_domain_authority = Column(Float)
+    legal_domain = Column(String(50))
+
+    comment = Column(Text)
+    suggested_revision = Column(Text)
+
+    created_at = Column(DateTime, default=func.now())
+
+    # Relationships
+    relation = relationship("PendingRelation", back_populates="votes")
+
+    __table_args__ = (
+        CheckConstraint("vote_value IN (-1, 1)", name="check_rel_vote_value"),
+        UniqueConstraint("relation_id", "user_id", "vote_type", name="unique_relation_user_vote"),
+    )
+
+    def __repr__(self):
+        return f"<RelationVote(relation={self.relation_id}, user={self.user_id}, vote={self.vote_value})>"
+
+
+# ====================================================
+# 4b. EXTRACTION CANDIDATES (staging — Slice 2c)
+# ====================================================
+class ExtractionCandidate(Base):
+    """
+    Ephemeral staging row for a candidate extracted from a user document
+    (Slice 2c — "Apprendi dai miei appunti").
+
+    The async worker writes candidates here (NOT into pending_*), keeping the
+    raw verbatim excerpt out of the shared proposal pipeline. The user reviews
+    each candidate and, on promotion, the BFF creates a fresh PendingEntity /
+    PendingRelation from the *reformulated* text. Rows are purged after
+    promotion or once `expires_at` passes (the server does not host personal
+    graphs — resource cost).
+    """
+
+    __tablename__ = "extraction_candidates"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    document_id = Column(
+        Integer, ForeignKey("user_documents.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    contributor_id = Column(String(100), nullable=False, index=True)
+    candidate_type = Column(String(20), nullable=False)  # 'entity' | 'relation'
+
+    # Entity fields
+    entity_text = Column(Text)
+    entity_type = Column(String(50))
+
+    # Relation fields. source_node_urn / target_entity_id hold the endpoint
+    # the parser resolved (norm URN, graph Entity id, pending entity id) or,
+    # when resolution failed, the raw name; source_text / target_text always
+    # keep the name the LLM wrote (B1).
+    relation_type = Column(String(100))
+    source_node_urn = Column(String(300))
+    target_entity_id = Column(String(300))
+    source_text = Column(Text)
+    target_text = Column(Text)
+
+    # Common
+    article_urn = Column(String(300))
+    descrizione = Column(Text)  # LLM-suggested description (the user reformulates this)
+    verbatim_excerpt = Column(Text)  # raw context — never copied into pending_*
+    llm_confidence = Column(Float)
+    llm_model = Column(String(100))
+    potential_duplicate_of = Column(String(100))
+
+    status = Column(String(20), default="draft", index=True)  # draft | promoted | expired
+    created_at = Column(DateTime, default=func.now())
+    expires_at = Column(DateTime, index=True)
+
+
+# ====================================================
+# 4c. MERLT INGESTION BATCH (mechanical ingestion governance)
+# ====================================================
+PENDING_REVIEW_TTL_DAYS = 14
+
+
+def _default_batch_id() -> str:
+    return str(uuid.uuid4())
+
+
+def _default_batch_expires_at() -> datetime:
+    return datetime.utcnow() + timedelta(days=PENDING_REVIEW_TTL_DAYS)
+
+
+class MerltIngestionBatch(Base):
+    """
+    Staged batch of deterministic (zero-LLM) graph facts, awaiting admin review.
+
+    Mechanical ingestion (Norma nodes, hierarchy, RINVIA cross-references) is
+    admin-gated *per batch*, unlike the interpretative layer (concepts,
+    principles) which goes through community RLCF quorum on individual
+    pending_* rows. A batch never touches FalkorDB until an admin promotes it
+    (design doc: docs/merlt/slices/ingestion-governance/design.md).
+
+    Lifecycle: parsing -> pending_review -> (promoting -> promoted) | rejected | failed.
+    `nodes`/`edges` carry the seed-JSON shape ({labels, properties} / {start,
+    end, type, properties}) so promotion can reuse the seed loader's
+    idempotent MERGE helpers unmodified. `conflict_report` is computed
+    read-only against the live graph before staging (see
+    pipeline/mechanical_ingestion/conflict_report.py) and re-checked at
+    promote time since the graph may have moved during the review window.
+
+    Sources: `visualex_tree`, `italia_corpus`, `massimario` (the Massimario's
+    annual reviews: one volume per batch, its own report, and `extras` for the
+    paragraphs the vector job writes after promotion).
+    """
+
+    __tablename__ = "merlt_ingestion_batches"
+
+    id = Column(String(36), primary_key=True, default=_default_batch_id)
+
+    source = Column(String(50), nullable=False, index=True)  # visualex_tree | italia_corpus | massimario
+    source_ref = Column(Text, nullable=False)
+    scope_label = Column(String(300), nullable=False)
+
+    status = Column(String(20), nullable=False, default="parsing", index=True)
+
+    nodes = Column(JSON, default=list)
+    edges = Column(JSON, default=list)
+    conflict_report = Column(JSON)
+    stats = Column(JSON)
+    # Massimario batches: {"chunks": [...]} — paragraphs with their payload and
+    # bridge rows, written by the chained vector job after promotion.
+    extras = Column(JSON)
+
+    created_at = Column(DateTime, default=func.now(), index=True)
+    created_by = Column(String(100))
+    reviewed_by = Column(String(100))
+    promoted_at = Column(DateTime)
+    rejected_at = Column(DateTime)
+    error = Column(Text)
+    expires_at = Column(DateTime, default=_default_batch_expires_at, index=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "source IN ('visualex_tree','italia_corpus','massimario')",
+            name="check_batch_source",
+        ),
+        CheckConstraint(
+            "status IN ('pending_review','parsing','promoting','promoted','rejected','failed')",
+            name="check_batch_status",
+        ),
+    )
+
+    def __repr__(self):
+        return f"<MerltIngestionBatch(id={self.id}, source={self.source}, status={self.status})>"
+
+
+# ====================================================
+# 4d. TRACKING EVENTS (RLCF signal persistence — loop-closure A1)
+# ====================================================
+class TrackingEventRecord(Base):
+    """
+    Persisted RLCF interaction signal from the frontend (Slice 1 events:
+    article-viewed, highlight/annotation, dossier-bookmark, citation, forum).
+
+    Previously these lived only in an in-memory ring buffer that evaporated on
+    every API restart, making the whole Slice-1 capture cosmetic. They now land
+    here durably so the feedback loop has a real input substrate to build on.
+    Personal data: the VisuaLex user id in clear (a varchar, never an FK) and,
+    in the payload, what the user did — including a highlight's text and a
+    note's full text. Expires (`merlt.privacy.retention`), exported and erased
+    by user (`merlt.privacy.user_data`).
+    """
+
+    __tablename__ = "tracking_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    event_type = Column(String(100), nullable=False, index=True)
+    user_id = Column(String(100), index=True)  # the VisuaLex user id, lifted from the payload
+    payload = Column(JSON, default=dict)
+    client_ts = Column(BigInteger)  # unix ms from the client
+    created_at = Column(DateTime, default=func.now(), index=True)
+
+    def __repr__(self):
+        return f"<TrackingEventRecord(type={self.event_type}, user={self.user_id})>"
+
+
+# ====================================================
+# 5. USER DOCUMENTS
+# ====================================================
+class UserDocument(Base):
+    """
+    User-uploaded document for enrichment.
+
+    Use cases:
+    - Upload "Manuale Torrente" PDF → extract doctrine
+    - Upload legal commentary → extract interpretations
+    - Upload legislative text → extract amendments
+    """
+
+    __tablename__ = "user_documents"
+    __table_args__ = (
+        # The upload dedup is PER USER: the same file uploaded by two users is
+        # two documents, each owned by its uploader. A global unique on
+        # file_hash handed user B user A's document id (and let B probe which
+        # files A had uploaded); see migrations/005_user_documents_owner_dedup.sql.
+        UniqueConstraint("file_hash", "uploaded_by", name="uq_user_documents_hash_owner"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # File metadata
+    filename = Column(String(500), nullable=False)
+    original_filename = Column(String(500), nullable=False)
+    file_type = Column(String(50), nullable=False)
+    file_size_bytes = Column(BigInteger)
+    file_hash = Column(String(64), index=True)
+
+    # Storage
+    storage_path = Column(Text, nullable=False)
+
+    # Classification
+    document_type = Column(String(100), index=True)  # 'dottrina', 'manuale', 'sentenza', 'altro'
+    legal_domain = Column(String(50))
+    title = Column(Text)
+    author = Column(Text)
+    publication_year = Column(Integer)
+
+    # Processing
+    processing_status = Column(String(50), default="uploaded", index=True)
+    processing_error = Column(Text)
+
+    # Extraction results (cached)
+    entities_extracted = Column(Integer, default=0)
+    relations_extracted = Column(Integer, default=0)
+    amendments_extracted = Column(Integer, default=0)
+
+    # Contributor
+    uploaded_by = Column(String(100), nullable=False, index=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=func.now())
+    processing_started_at = Column(DateTime)
+    processing_completed_at = Column(DateTime)
+
+    # Relationships
+    extracted_entities = relationship("PendingEntity", back_populates="source_document")
+    extracted_relations = relationship("PendingRelation", back_populates="source_document")
+    extracted_amendments = relationship("PendingAmendment", back_populates="source_document")
+
+    def __repr__(self):
+        return f"<UserDocument(id={self.id}, filename={self.filename}, status={self.processing_status})>"
+
+
+# ====================================================
+# 6. PENDING AMENDMENTS (Multivigenza)
+# ====================================================
+class PendingAmendment(Base):
+    """
+    Pending amendment (multivigenza) awaiting validation.
+
+    Represents a modification to an existing article by another act.
+    """
+
+    __tablename__ = "pending_amendments"
+
+    # Identity
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    amendment_id = Column(String(150), unique=True, nullable=False)
+
+    # Target
+    target_article_urn = Column(String(300), nullable=False, index=True)
+
+    # Modifying act
+    atto_modificante_urn = Column(String(300), index=True)
+    atto_modificante_estremi = Column(Text, nullable=False)
+
+    # Parsed atto (from parse_estremi)
+    tipo_atto = Column(String(100))
+    tipo_documento = Column(String(100))
+    data_atto = Column(Date)
+    numero_atto = Column(String(50))
+
+    # Disposizione
+    disposizione = Column(Text, nullable=False)
+
+    # Parsed disposizione (from parse_disposizione)
+    numero_articolo_disposizione = Column(String(50))
+    commi_disposizione = Column(ARRAY(Text))
+    lettere_disposizione = Column(ARRAY(Text))
+    numeri_disposizione = Column(ARRAY(Text))
+
+    # Amendment type
+    tipo_modifica = Column(String(50), nullable=False, index=True)  # 'ABROGA' | 'SOSTITUISCE' | etc.
+
+    # Dates
+    data_pubblicazione_gu = Column(Date)
+    data_efficacia = Column(Date)
+
+    # Source
+    source_type = Column(String(50), default="manual")
+    source_document_id = Column(Integer, ForeignKey("user_documents.id", ondelete="SET NULL"))
+
+    # LLM extraction
+    llm_confidence = Column(Float)
+    llm_model = Column(String(100))
+    llm_reasoning = Column(Text)
+
+    # Validation
+    validation_status = Column(String(20), default="pending", index=True)
+    approval_score = Column(Float, default=0.0)
+    rejection_score = Column(Float, default=0.0)
+    net_score = Column(Float, default=0.0, index=True)  # approval - rejection, can be negative
+    votes_count = Column(Integer, default=0)
+    consensus_reached = Column(Boolean, default=False)
+    consensus_type = Column(String(20))  # 'approved' (net >= +2.0) or 'rejected' (net <= -2.0)
+
+    # Contributor
+    contributed_by = Column(String(100), nullable=False)
+    contributor_authority = Column(Float)
+
+    # Timestamps
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    approved_at = Column(DateTime)
+    written_to_graph_at = Column(DateTime)
+
+    # Relationships
+    votes = relationship("AmendmentVote", back_populates="amendment", cascade="all, delete-orphan")
+    source_document = relationship("UserDocument", back_populates="extracted_amendments")
+
+    def __repr__(self):
+        return f"<PendingAmendment(id={self.amendment_id}, type={self.tipo_modifica}, status={self.validation_status})>"
+
+
+# ====================================================
+# 7. AMENDMENT VOTES
+# ====================================================
+class AmendmentVote(Base):
+    """Community vote on a pending amendment."""
+
+    __tablename__ = "amendment_votes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    amendment_id = Column(String(150), ForeignKey("pending_amendments.amendment_id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(String(100), nullable=False, index=True)
+
+    vote_value = Column(Integer, nullable=False)
+    vote_type = Column(String(20), nullable=False)
+
+    voter_authority = Column(Float)
+    voter_domain_authority = Column(Float)
+    legal_domain = Column(String(50))
+
+    comment = Column(Text)
+    suggested_revision = Column(Text)
+
+    created_at = Column(DateTime, default=func.now())
+
+    # Relationships
+    amendment = relationship("PendingAmendment", back_populates="votes")
+
+    __table_args__ = (
+        CheckConstraint("vote_value IN (-1, 1)", name="check_amend_vote_value"),
+        UniqueConstraint("amendment_id", "user_id", "vote_type", name="unique_amendment_user_vote"),
+    )
+
+    def __repr__(self):
+        return f"<AmendmentVote(amendment={self.amendment_id}, user={self.user_id}, vote={self.vote_value})>"
+
+
+# ====================================================
+# 8. USER DOMAIN AUTHORITY
+# ====================================================
+class UserDomainAuthority(Base):
+    """
+    User's domain-specific authority based on accuracy.
+
+    Authority calculation:
+        domain_authority = correct_feedbacks / total_feedbacks
+        (with peer validation quorum)
+    """
+
+    __tablename__ = "user_domain_authority"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String(100), nullable=False, index=True)
+    legal_domain = Column(String(50), nullable=False, index=True)
+
+    # Accuracy metrics
+    total_feedbacks = Column(Integer, default=0)
+    correct_feedbacks = Column(Integer, default=0)
+    accuracy_score = Column(Float, default=0.0)
+
+    # Authority
+    domain_authority = Column(Float, default=0.5)  # Starts at 0.5
+
+    # Timestamps
+    last_calculated_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime, default=func.now())
+
+    __table_args__ = (UniqueConstraint("user_id", "legal_domain", name="unique_user_domain"),)
+
+    def __repr__(self):
+        return f"<UserDomainAuthority(user={self.user_id}, domain={self.legal_domain}, authority={self.domain_authority:.2f})>"
+
+
+# ====================================================
+# 8b. NER FEEDBACK (Loop β #2 — learned legal-reference NER via RLCF)
+# ====================================================
+class NERFeedback(Base):
+    """Authority-weighted NER correction signal.
+
+    Captures a user's confirmation/correction of an extracted legal reference
+    across four surfaces (article cross-ref, Q&A chip, implicit confirmation,
+    search mining). This is the labeled training set for the learned spaCy NER
+    (Phase 4); a manual admin trigger fine-tunes the model from these rows.
+
+    Privacy: for the Q&A surface only a ±500-char context window around the
+    citation is stored — never the raw user query. ``user_id`` is the VisuaLex
+    id (varchar, never an FK) and is kept for authority weighting.
+    """
+
+    __tablename__ = "ner_feedback"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    feedback_id = Column(String(64), unique=True, nullable=False)
+
+    # Surface + actor
+    source_surface = Column(String(30), nullable=False, index=True)
+    user_id = Column(String(100), nullable=False, index=True)
+
+    # Span / location
+    article_urn = Column(String(300), index=True)
+    selected_text = Column(Text)
+    start_offset = Column(Integer)
+    end_offset = Column(Integer)
+    context_window = Column(Text)  # ±500 char; Q&A: never the raw query
+
+    # Label
+    feedback_type = Column(String(20), nullable=False, index=True)
+    original_parsed = Column(JSON)    # what the extractor produced
+    correct_reference = Column(JSON)  # {tipo_atto, numero, anno, articoli}
+    confidence_before = Column(Float)
+
+    # Authority weighting (computed server-side)
+    user_authority = Column(Float, default=0.5)
+    sample_weight = Column(Float, default=1.0)
+
+    # Training lifecycle
+    used_in_training = Column(Boolean, default=False, index=True)
+
+    created_at = Column(DateTime, default=func.now(), index=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "source_surface IN ('article_xref','qa_chip','implicit','search_mining')",
+            name="check_ner_source_surface",
+        ),
+        CheckConstraint(
+            "feedback_type IN ('confirmation','correction','false_positive','missed')",
+            name="check_ner_feedback_type",
+        ),
+    )
+
+    def __repr__(self):
+        return f"<NERFeedback(id={self.feedback_id}, surface={self.source_surface}, type={self.feedback_type})>"
+
+
+# ====================================================
+# 8c. MERLT USERS (qualification, baseline B_u, notification prefs)
+# ====================================================
+class MerltUser(Base):
+    """
+    Persisted user profile settings (Wave 3 GAP 1).
+
+    Previously `PATCH /profile/qualification` and `PATCH /profile/notifications`
+    computed a response but never persisted anything ("users table not yet
+    implemented"), and `get_full_profile` always used `DEFAULT_BASELINE`. This
+    table closes that gap: one row per VisuaLex user id (a string in clear,
+    never an FK, same convention as everywhere else in this module).
+    """
+
+    __tablename__ = "merlt_users"
+
+    user_id = Column(String(100), primary_key=True)
+    display_name = Column(String(200))
+    qualification = Column(String(50))
+    specializations = Column(JSON)
+    years_experience = Column(Integer)
+    baseline_bu = Column(Float, default=0.3)
+
+    email_on_validation = Column(Boolean, default=True)
+    email_on_authority_change = Column(Boolean, default=True)
+    email_weekly_summary = Column(Boolean, default=False)
+
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    def __repr__(self):
+        return f"<MerltUser(user_id={self.user_id}, qualification={self.qualification})>"
+
+
+# ====================================================
+# 9. ENTITY ISSUE REPORTS (RLCF Feedback Loop)
+# ====================================================
+class EntityIssueReport(Base):
+    """
+    Issue report on an entity (pending or approved) or a graph relation.
+
+    Enables RLCF feedback loop:
+        1. User spots issue in Knowledge Graph (node or relation)
+        2. Creates issue report
+        3. Community votes on issue validity
+        4. If threshold reached → entity returns to 'needs_revision'
+
+    Note:
+        entity_id can be either:
+        - A pending entity ID (e.g., "concetto:legittima_difesa")
+        - A graph node_id (e.g., "urn:nir:stato:codice.penale~art52")
+        - A relation ID (e.g., "rel_{source}_{type}_{target}")
+
+        No FK constraint because relations and graph nodes don't exist in pending_entities.
+    """
+
+    __tablename__ = "entity_issue_reports"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    issue_id = Column(String(100), unique=True, nullable=False, index=True)
+
+    # Target entity or relation (no FK - can be pending entity, graph node, or relation)
+    entity_id = Column(Text, nullable=False, index=True)
+    entity_type = Column(String(50))
+
+    # Reporter
+    reported_by = Column(String(100), nullable=False, index=True)
+    reporter_authority = Column(Float, default=0.0)
+
+    # Issue classification
+    issue_type = Column(String(50), nullable=False, index=True)
+    # Types: factual_error, wrong_relation, wrong_type, duplicate, outdated,
+    #        missing_relation, incomplete, improve_label, other
+    severity = Column(String(20), default="medium")  # low, medium, high
+    description = Column(Text)
+
+    # Voting scores (weighted by authority)
+    upvote_score = Column(Float, default=0.0)
+    downvote_score = Column(Float, default=0.0)
+    votes_count = Column(Integer, default=0)
+
+    # Status
+    status = Column(String(20), default="open", index=True)
+    # Status: open, threshold_reached, dismissed, resolved
+
+    # Resolution
+    resolved_at = Column(DateTime)
+    resolved_by = Column(String(100))
+    resolution_notes = Column(Text)
+
+    # Timestamps
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationships
+    votes = relationship("EntityIssueVote", back_populates="issue", cascade="all, delete-orphan")
+    # Note: No relationship to PendingEntity - entity_id can reference pending entities,
+    # graph nodes, or relations. Use entity_id to look up the target as needed.
+
+    def __repr__(self):
+        return f"<EntityIssueReport(id={self.issue_id}, entity={self.entity_id}, type={self.issue_type}, status={self.status})>"
+
+
+class EntityIssueVote(Base):
+    """Community vote on an entity issue report."""
+
+    __tablename__ = "entity_issue_votes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    issue_id = Column(String(100), ForeignKey("entity_issue_reports.issue_id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(String(100), nullable=False, index=True)
+
+    # Vote: 1 = issue is valid, -1 = issue is not valid
+    vote_value = Column(Integer, nullable=False)
+    voter_authority = Column(Float, default=0.0)
+
+    # Optional comment
+    comment = Column(Text)
+
+    # Timestamp
+    created_at = Column(DateTime, default=func.now())
+
+    # Relationships
+    issue = relationship("EntityIssueReport", back_populates="votes")
+
+    __table_args__ = (
+        CheckConstraint("vote_value IN (-1, 1)", name="check_issue_vote_value"),
+        UniqueConstraint("issue_id", "user_id", name="unique_issue_user_vote"),
+    )
+
+    def __repr__(self):
+        return f"<EntityIssueVote(issue={self.issue_id}, user={self.user_id}, vote={self.vote_value})>"
+
+
+# ====================================================
+# 10. RELATION ISSUE REPORTS (RLCF Feedback Loop)
+# ====================================================
+class RelationIssueReport(Base):
+    """Issue report on a relation (pending or approved)."""
+
+    __tablename__ = "relation_issue_reports"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    issue_id = Column(String(100), unique=True, nullable=False, index=True)
+
+    # Target relation
+    relation_id = Column(String(150), ForeignKey("pending_relations.relation_id", ondelete="CASCADE"), nullable=False, index=True)
+    relation_type = Column(String(100))
+
+    # Reporter
+    reported_by = Column(String(100), nullable=False, index=True)
+    reporter_authority = Column(Float, default=0.0)
+
+    # Issue classification
+    issue_type = Column(String(50), nullable=False, index=True)
+    severity = Column(String(20), default="medium")
+    description = Column(Text)
+
+    # Voting scores
+    upvote_score = Column(Float, default=0.0)
+    downvote_score = Column(Float, default=0.0)
+    votes_count = Column(Integer, default=0)
+
+    # Status
+    status = Column(String(20), default="open", index=True)
+
+    # Resolution
+    resolved_at = Column(DateTime)
+    resolved_by = Column(String(100))
+    resolution_notes = Column(Text)
+
+    # Timestamps
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationships
+    votes = relationship("RelationIssueVote", back_populates="issue", cascade="all, delete-orphan")
+    relation = relationship("PendingRelation", backref="issues")
+
+    def __repr__(self):
+        return f"<RelationIssueReport(id={self.issue_id}, relation={self.relation_id}, type={self.issue_type})>"
+
+
+class RelationIssueVote(Base):
+    """Community vote on a relation issue report."""
+
+    __tablename__ = "relation_issue_votes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    issue_id = Column(String(100), ForeignKey("relation_issue_reports.issue_id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(String(100), nullable=False, index=True)
+
+    vote_value = Column(Integer, nullable=False)
+    voter_authority = Column(Float, default=0.0)
+    comment = Column(Text)
+
+    created_at = Column(DateTime, default=func.now())
+
+    # Relationships
+    issue = relationship("RelationIssueReport", back_populates="votes")
+
+    __table_args__ = (
+        CheckConstraint("vote_value IN (-1, 1)", name="check_rel_issue_vote_value"),
+        UniqueConstraint("issue_id", "user_id", name="unique_rel_issue_user_vote"),
+    )
+
+    def __repr__(self):
+        return f"<RelationIssueVote(issue={self.issue_id}, user={self.user_id}, vote={self.vote_value})>"
+
+
+# ====================================================
+# EXPORTS
+# ====================================================
+__all__ = [
+    "Base",
+    "PendingEntity",
+    "EntityVote",
+    "PendingRelation",
+    "RelationVote",
+    "UserDocument",
+    "PendingAmendment",
+    "AmendmentVote",
+    "UserDomainAuthority",
+    "EntityIssueReport",
+    "EntityIssueVote",
+    "RelationIssueReport",
+    "RelationIssueVote",
+    "ExtractionCandidate",
+    "TrackingEventRecord",
+    "NERFeedback",
+    "MerltIngestionBatch",
+    "MerltUser",
+    "PENDING_REVIEW_TTL_DAYS",
+]

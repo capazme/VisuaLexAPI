@@ -1,0 +1,164 @@
+# Semantic Chunking Configuration
+# ================================
+#
+# Configurazione per le tecniche di chunking semantico.
+# Tutte le strategie e parametri sono esternalizzati qui.
+
+# Strategia di default
+default_strategy: "adaptive"  # proposition_only, semantic_only, proposition_first, semantic_first, adaptive
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PROPOSITION CHUNKER (LLM-based)
+# ═══════════════════════════════════════════════════════════════════════════════
+proposition:
+  # Numero massimo di proposizioni per comma
+  max_propositions_per_comma: 10
+
+  # Soglia minima di confidenza per accettare una proposizione
+  min_confidence: 0.7
+
+  # Temperatura LLM (bassa = deterministico)
+  llm_temperature: 0.1
+
+  # Max tokens per risposta LLM
+  llm_max_tokens: 2000
+
+  # Tipi di proposizione validi
+  valid_types:
+    - regola
+    - definizione
+    - condizione
+    - effetto
+    - eccezione
+    - procedura
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SEMANTIC CHUNKER (Embedding-based)
+# ═══════════════════════════════════════════════════════════════════════════════
+semantic:
+  # Soglia di similarity per split (0-1)
+  # Valori bassi = piu' chunk
+  # Valori alti = meno chunk
+  similarity_threshold: 0.5
+
+  # Minimo frasi per chunk
+  min_chunk_sentences: 1
+
+  # Massimo frasi per chunk (split forzato)
+  max_chunk_sentences: 10
+
+  # Frasi di contesto per smoothing similarity
+  buffer_size: 1
+
+  # Modalita' percentile (alternativa a threshold fisso)
+  use_percentile: false
+  percentile: 25.0  # Split al 25° percentile delle similarity
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LATE CHUNKER (Context-aware embeddings)
+# ═══════════════════════════════════════════════════════════════════════════════
+late:
+  # Dimensione target chunk (caratteri)
+  chunk_size: 500
+
+  # Overlap tra chunk consecutivi (caratteri)
+  overlap: 50
+
+  # Usa token-level embeddings se disponibili
+  # Richiede modello che supporta embed_with_tokens()
+  use_token_level: false
+
+  # Contesto extra per sliding window (caratteri)
+  context_chars: 500
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# HYBRID CHUNKER (Combinazione intelligente)
+# ═══════════════════════════════════════════════════════════════════════════════
+hybrid:
+  # Soglie per scelta strategia adattiva
+  short_text_threshold: 200   # Sotto: preferisci proposizioni
+  long_text_threshold: 2000   # Sopra: semantic + proposizioni
+
+  # Priorita' strategie per fallback
+  fallback_order:
+    - proposition_first
+    - semantic_only
+    - structural  # Chunking comma-level originale
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PROMPTS
+# ═══════════════════════════════════════════════════════════════════════════════
+prompts:
+  proposition_extraction: |
+    Sei un esperto di diritto italiano. Estrai le proposizioni giuridiche atomiche dal seguente testo legale.
+
+    DEFINIZIONE DI PROPOSIZIONE GIURIDICA:
+    Una proposizione giuridica e' un'affermazione autonoma e completa che esprime UN SOLO concetto giuridico. Deve essere comprensibile isolatamente, senza bisogno del contesto originale.
+
+    TIPI DI PROPOSIZIONI:
+    - regola: Norma che prescrive un comportamento o stabilisce un effetto
+    - definizione: Definisce un concetto o istituto giuridico
+    - condizione: Requisito o presupposto per l'applicazione di una regola
+    - effetto: Conseguenza giuridica di un fatto o atto
+    - eccezione: Deroga a una regola generale
+    - procedura: Modalita' o termine per compiere un atto
+
+    REGOLE DI ESTRAZIONE:
+    1. Ogni proposizione deve essere AUTONOMA (comprensibile da sola)
+    2. Sostituisci pronomi e riferimenti con i termini espliciti
+    3. Includi il soggetto della norma se implicito
+    4. Separa condizioni ed effetti in proposizioni distinte
+    5. Mantieni la terminologia giuridica originale
+
+    CONTESTO ARTICOLO:
+    {article_context}
+
+    TESTO DA ANALIZZARE (Comma {comma_number}):
+    {text}
+
+    Rispondi SOLO con un array JSON di proposizioni. Formato:
+    [
+      {
+        "text": "proposizione completa e autonoma",
+        "type": "regola|definizione|condizione|effetto|eccezione|procedura",
+        "entities": ["entita1", "entita2"],
+        "confidence": 0.95
+      }
+    ]
+
+    Se il testo contiene una sola proposizione, restituisci un array con un elemento.
+    Se il testo e' troppo breve o non contiene proposizioni giuridiche, restituisci [].
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MODELLI EMBEDDING RACCOMANDATI
+# ═══════════════════════════════════════════════════════════════════════════════
+embedding_models:
+  # Modelli per semantic chunking (calcolo similarity)
+  semantic:
+    - name: "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+      languages: ["it", "en", "de", "fr", "es"]
+      dim: 768
+      max_tokens: 512
+
+    - name: "intfloat/multilingual-e5-large"
+      languages: ["it", "en", "de", "fr", "es"]
+      dim: 1024
+      max_tokens: 512
+
+  # Modelli per late chunking (long-context)
+  late:
+    - name: "jinaai/jina-embeddings-v2-base-en"
+      max_tokens: 8192
+      dim: 768
+      supports_token_level: true
+
+    - name: "BAAI/bge-m3"
+      max_tokens: 8192
+      dim: 1024
+      supports_token_level: true
+      languages: ["it", "en", "zh"]

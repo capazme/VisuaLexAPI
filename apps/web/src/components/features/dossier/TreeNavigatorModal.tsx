@@ -1,0 +1,297 @@
+import { useEffect, useRef, useState } from 'react';
+import { Search, CheckSquare, Square, Loader2, TreeDeciduous } from 'lucide-react';
+import { parseItalianDate } from '../../../utils/dateUtils';
+import { resolveAct } from '../../../utils/actUrn';
+import { isEuropeanAct } from '../../../utils/versionDisplay';
+import { extractArticleIdsFromTree, type TreeNode } from '../../../utils/treeUtils';
+import { ConfirmDialog } from '../../ui/ConfirmDialog';
+import { legalFetch } from '../../../services/legalFetch';
+
+// Above this threshold we ask for explicit confirmation before importing —
+// selecting "all" on a large code (e.g. CC ~2900 articles) is almost always a
+// misclick and floods the dossier.
+const BULK_IMPORT_CONFIRM_THRESHOLD = 100;
+
+interface ActIdentity { tipo_atto: string; data: string; numero_atto: string }
+
+interface Props {
+  onClose: () => void;
+  onImport: (articles: { numero: string; urn?: string }[], normInfo: ActIdentity) => void;
+  /** Open on this act's index at once ("+ articoli" of a dossier's act block). */
+  initialAct?: ActIdentity;
+}
+
+// The act types the form offers; an act opened from a dossier may be another.
+const ACT_TYPE_OPTIONS: { value: string; label: string }[] = [
+  { value: 'codice civile', label: 'Codice Civile' },
+  { value: 'codice penale', label: 'Codice Penale' },
+  { value: 'codice procedura civile', label: 'Codice Procedura Civile' },
+  { value: 'codice procedura penale', label: 'Codice Procedura Penale' },
+  { value: 'costituzione', label: 'Costituzione' },
+  { value: 'legge', label: 'Legge' },
+  { value: 'decreto legislativo', label: 'Decreto Legislativo' },
+  { value: 'decreto legge', label: 'Decreto Legge' },
+  { value: 'd.p.r.', label: 'D.P.R.' },
+  // The Union's acts by year and number (2016 and 679 for the GDPR), read from EUR-Lex.
+  { value: 'regolamento ue', label: 'Regolamento UE' },
+  { value: 'direttiva ue', label: 'Direttiva UE' },
+];
+
+type TreeEntry = string | Record<string, string>;
+
+export function TreeNavigatorModal({ onClose, onImport, initialAct }: Props) {
+  const [actType, setActType] = useState(initialAct?.tipo_atto ?? 'codice civile');
+  const [actNumber, setActNumber] = useState(initialAct?.numero_atto ?? '');
+  const [actDate, setActDate] = useState(initialAct?.data ?? '');
+  // The act as the source resolved it: its day and number are what the items
+  // store, never the date as typed ("31-12-2012"), or one act becomes two.
+  // The act of the tree on screen, kept as it was searched: editing the form
+  // without searching again must not relabel the articles of the tree shown.
+  const [resolvedAct, setResolvedAct] = useState<ActIdentity | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [tree, setTree] = useState<TreeEntry[]>([]);
+  const [selectedArticles, setSelectedArticles] = useState<Set<string>>(new Set());
+  const [confirmBulkImportOpen, setConfirmBulkImportOpen] = useState(false);
+
+  // Only the latest search may fill the list: an older answer arriving late
+  // would otherwise label one act's articles with another's identity.
+  const searchRef = useRef(0);
+
+  const fetchTree = async () => {
+    const search = ++searchRef.current;
+    setLoading(true);
+    setError(null);
+    // A new search empties the old act's index, so «Importa» never takes its
+    // articles under the new act's identity, even if this search fails.
+    setTree([]);
+    setSelectedArticles(new Set());
+    setResolvedAct(null);
+    try {
+      // Derive the URN the tree endpoint needs, without fetching article text.
+      const { urn: urnToUse, norma } = await resolveAct({
+        act_type: actType,
+        act_number: actNumber || undefined,
+        date: actDate ? parseItalianDate(actDate) : undefined,
+      });
+      const data = norma?.data || parseItalianDate(actDate);
+      const identity = {
+        tipo_atto: actType,
+        // An act of the Union is the year and the number (the source's own answer, and what a
+        // search stores): a full day typed here would make it a second act with other keys.
+        data: isEuropeanAct(actType) ? data.slice(0, 4) : data,
+        numero_atto: norma?.numero_atto || actNumber,
+      };
+
+      const treeRes = await legalFetch('/fetch_tree', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ urn: urnToUse, link: false, details: false }),
+      });
+      const treeResponse = await treeRes.json();
+      if (treeResponse.error) throw new Error(treeResponse.error);
+
+      // /fetch_tree returns { articles: [{allegato, numero}] } (no `tree` key);
+      // flatten to deduped article-id strings via the shared util.
+      const rawTree = Array.isArray(treeResponse) ? treeResponse : (treeResponse.articles ?? []);
+      const treeData = rawTree.filter(
+        (node: unknown): node is TreeNode =>
+          typeof node === 'string' || (typeof node === 'object' && node !== null)
+      );
+      if (search !== searchRef.current) return;
+      // The tree and the act it belongs to arrive together, or not at all.
+      setTree(extractArticleIdsFromTree(treeData));
+      setResolvedAct(identity);
+    } catch (err) {
+      if (search !== searchRef.current) return;
+      setError(err instanceof Error ? err.message : 'Errore nel recupero della struttura');
+    } finally {
+      if (search === searchRef.current) setLoading(false);
+    }
+  };
+
+  // Opened on an act: its index straight away. Once, on mount; the form stays editable.
+  useEffect(() => {
+    if (initialAct) void fetchTree();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const toggleArticle = (articleNum: string) => {
+    setSelectedArticles((prev) => {
+      const next = new Set(prev);
+      if (next.has(articleNum)) next.delete(articleNum);
+      else next.add(articleNum);
+      return next;
+    });
+  };
+
+  const allSelected = tree.length > 0 && selectedArticles.size === tree.length;
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedArticles(new Set());
+      return;
+    }
+    const all = tree.map((item) => (typeof item === 'string' ? item : Object.keys(item)[0]));
+    setSelectedArticles(new Set(all));
+  };
+
+  const runImport = () => {
+    const articles = Array.from(selectedArticles).map((num) => {
+      const entry = tree.find((t) => (typeof t === 'string' ? t === num : Object.keys(t)[0] === num));
+      return {
+        numero: num,
+        urn: typeof entry === 'object' ? Object.values(entry)[0] : undefined,
+      };
+    });
+    if (!resolvedAct) return;
+    onImport(articles, resolvedAct);
+    onClose();
+  };
+
+  const handleImport = () => {
+    if (selectedArticles.size > BULK_IMPORT_CONFIRM_THRESHOLD) {
+      setConfirmBulkImportOpen(true);
+      return;
+    }
+    runImport();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-lg max-h-[85vh] border border-slate-200 dark:border-slate-800 flex flex-col">
+        <div className="p-6 border-b border-slate-200 dark:border-slate-800">
+          <h3 className="font-semibold text-lg text-slate-900 dark:text-white flex items-center gap-2">
+            <TreeDeciduous size={20} className="text-green-600" />
+            Importa articoli da norma
+          </h3>
+        </div>
+
+        <div className="p-6 space-y-4 overflow-y-auto flex-1">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tipo atto</label>
+              <select
+                value={actType}
+                onChange={(e) => setActType(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              >
+                {!ACT_TYPE_OPTIONS.some((o) => o.value === actType) && (
+                  <option value={actType}>{actType}</option>
+                )}
+                {ACT_TYPE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Numero</label>
+              <input
+                value={actNumber}
+                onChange={(e) => setActNumber(e.target.value)}
+                placeholder="241"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Data</label>
+              <input
+                type="text"
+                value={actDate}
+                onChange={(e) => setActDate(e.target.value)}
+                placeholder="aaaa o gg-mm-aaaa"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          <button
+            onClick={fetchTree}
+            disabled={loading}
+            className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+          >
+            {loading ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
+            {loading ? 'Caricamento...' : 'Cerca articoli'}
+          </button>
+
+          {loading && (
+            <p className="text-xs text-slate-500 dark:text-slate-400 text-center animate-pulse">
+              Recupero della struttura della norma — potrebbe richiedere qualche secondo.
+            </p>
+          )}
+
+          {error && (
+            <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
+
+          {tree.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-600 dark:text-slate-400">
+                  {tree.length} articoli trovati • {selectedArticles.size} selezionati
+                </span>
+                <button
+                  onClick={toggleSelectAll}
+                  className="text-sm text-blue-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
+                >
+                  {allSelected ? 'Deseleziona tutti' : 'Seleziona tutti'}
+                </button>
+              </div>
+              <div className="max-h-48 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-100 dark:divide-slate-800">
+                {tree.map((item, idx) => {
+                  const articleNum = typeof item === 'string' ? item : Object.keys(item)[0];
+                  const selected = selectedArticles.has(articleNum);
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => toggleArticle(articleNum)}
+                      aria-pressed={selected}
+                      className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:bg-slate-50 dark:focus-visible:bg-slate-800"
+                    >
+                      {selected ? (
+                        <CheckSquare size={16} className="text-blue-500" />
+                      ) : (
+                        <Square size={16} className="text-slate-400" />
+                      )}
+                      <span className="text-sm">Art. {articleNum}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          >
+            Annulla
+          </button>
+          <button
+            onClick={handleImport}
+            disabled={selectedArticles.size === 0}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2"
+          >
+            Importa {selectedArticles.size > 0 ? `(${selectedArticles.size})` : ''}
+          </button>
+        </div>
+
+        <ConfirmDialog
+          open={confirmBulkImportOpen}
+          title={`Importare ${selectedArticles.size} articoli?`}
+          message="Stai per aggiungere un numero elevato di articoli al dossier. L'operazione è reversibile ma potresti preferire una selezione più mirata."
+          confirmLabel="Importa comunque"
+          onConfirm={() => {
+            setConfirmBulkImportOpen(false);
+            runImport();
+          }}
+          onCancel={() => setConfirmBulkImportOpen(false)}
+        />
+      </div>
+    </div>
+  );
+}

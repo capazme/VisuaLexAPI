@@ -1,0 +1,37 @@
+{
+  "query_id": "q_0009",
+  "query_text": "Cos'\u00e8 la clausola penale secondo il codice civile?",
+  "synthesis": "La clausola penale, disciplinata dall'**Art. 1382 del Codice Civile**, rappresenta una pattuizione contrattuale attraverso la quale le parti convengono che, in caso di inadempimento o di ritardo nell'adempimento di una delle obbligazioni, il contraente inadempiente sia tenuto a una determinata prestazione.\n\n**Funzione e Caratteristiche Essenziali:**\nLa sua funzione \u00e8 duplice e ben definita:\n1.  **Liquidazione anticipata del danno:** Esonera il creditore dall'onere di provare l'ammontare del dann",
+  "confidence": 0.8999999999999999,
+  "expert_contributions": {
+    "literal": {
+      "interpretation": "La clausola penale \u00e8 una pattuizione con cui si conviene che, in caso di inadempimento o di ritardo nell'adempimento, uno dei contraenti \u00e8 tenuto a una determinata prestazione. Essa ha l'effetto di limitare il risarcimento alla prestazione promessa, a meno che non sia stata convenuta la risarcibilit\u00e0 del danno ulteriore. La penale \u00e8 dovuta indipendentemente dalla prova del danno. La sua funzione \u00e8 quella di esonerare il creditore dall'onere di provare il danno da inadempimento, costituendone una liquidazione anticipata, e di incentivare l'adempimento del debitore. Un connotato essenziale della clausola penale \u00e8 la sua connessione con l'inadempimento colpevole di una delle parti; non \u00e8 configurabile se collegata all'avverarsi di un fatto fortuito o non imputabile all'obbligato.",
+      "confidence": 0.9,
+      "weight": 0.7499999999999999,
+      "weighted_confidence": 0.6749999999999999
+    },
+    "systemic": {
+      "interpretation": "La clausola penale, ai sensi dell'articolo 1382 del Codice Civile, \u00e8 una pattuizione contrattuale mediante la quale le parti convengono che, in caso di inadempimento o di ritardo nell'adempimento di una delle obbligazioni, il contraente inadempiente sia tenuto a una determinata prestazione. La sua funzione principale \u00e8 duplice: da un lato, essa esonera il creditore dall'onere di provare l'ammontare del danno subito a causa dell'inadempimento, fungendo da liquidazione anticipata del risarcimento; dall'altro, essa incentiva il debitore all'adempimento, poich\u00e9 questi \u00e8 consapevole fin dall'inizio dell'entit\u00e0 della prestazione cui sar\u00e0 tenuto in caso di inadempienza. Di regola, la clausola penale limita il risarcimento alla prestazione promessa, a meno che non sia stata espressamente convenuta la risarcibilit\u00e0 del danno ulteriore. \u00c8 un connotato essenziale della clausola penale la sua connessione con un inadempimento colpevole di una delle parti; pertanto, non \u00e8 configurabile se collegata a un fatto fortuito o non imputabile all'obbligato. L'irrisoriet\u00e0 del danno pattuito preventivamente tramite clausola penale pu\u00f2 costituire un elemento sintomatico dell'aggiramento del divieto di limitazione di responsabilit\u00e0.",
+      "confidence": 0.9,
+      "weight": 0.25,
+      "weighted_confidence": 0.225
+    }
+  },
+  "legal_basis": [],
+  "execution_time_ms": 12924.956,
+  "routing_decision": {
+    "query_type": "definitional",
+    "expert_weights": {
+      "literal": 0.6,
+      "systemic": 0.2,
+      "principles": 0.1,
+      "precedent": 0.1
+    },
+    "confidence": 0.4,
+    "reasoning": "Query classificata come 'definitional'. Expert principali: literal (0.60)"
+  },
+  "feedback": 0.4589570773782208,
+  "reward": 0.03918356145172262,
+  "user_id": "user_015",
+  "error": null
+}

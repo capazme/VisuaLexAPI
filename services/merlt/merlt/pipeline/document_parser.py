@@ -1,0 +1,762 @@
+"""
+Document Parser Service
+=======================
+
+Parses user-uploaded documents to extract:
+- Legal entities (concepts, principles, definitions)
+- Semantic relations
+- Amendments (multivigenza) for legislative texts
+
+Supports:
+- PDF (via pdfplumber)
+- TXT (plain text)
+- DOCX (via python-docx)
+
+Integration:
+- Creates PendingEntity, PendingRelation, PendingAmendment
+- Uses LLM for extraction
+- Uses MultivigenzaPipeline for amendment parsing
+
+Usage:
+    from merlt.pipeline.document_parser import DocumentParserService
+    from merlt.storage.enrichment import get_db_session
+
+    parser = DocumentParserService()
+
+    async with get_db_session() as session:
+        result = await parser.parse_document(
+            document_path="/path/to/manuale_torrente.pdf",
+            file_type="pdf",
+            document_type="manuale",
+            legal_domain="civile",
+            user_id="user123",
+            session=session,
+        )
+
+        print(f"Extracted {result.entities_count} entities")
+"""
+
+import os
+import re
+import structlog
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import List, Optional, Dict, Any, Tuple
+from dataclasses import dataclass
+from uuid import uuid4
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+# Staging candidates are ephemeral (Slice 2c #3): purged after promotion or TTL.
+STAGING_TTL_HOURS = int(os.getenv("MERLT_STAGING_TTL_HOURS", "48"))
+
+# Width of the relation endpoint columns (source_node_urn / target_entity_id).
+ENDPOINT_MAX_LEN = 300
+
+from merlt.storage.enrichment.models import (
+    PendingEntity,
+    PendingRelation,
+    PendingAmendment,
+    ExtractionCandidate,
+)
+from merlt.storage.enrichment import DuplicateConfidence, EntityDeduplicator
+from merlt.storage.graph.entity_writer import entity_node_id, normalize_entity_name
+from merlt.storage.graph.relation_endpoints import canonical_norm_key, is_norm_reference
+from merlt.pipeline.enrichment.models import EntityType, RelationType
+from merlt.pipeline.multivigenza import parse_estremi, parse_disposizione
+
+log = structlog.get_logger()
+
+
+@dataclass
+class ParseResult:
+    """Result of document parsing."""
+
+    entities_count: int = 0
+    relations_count: int = 0
+    amendments_count: int = 0
+    errors: List[str] = None
+
+    def __post_init__(self):
+        if self.errors is None:
+            self.errors = []
+
+
+class DocumentParserService:
+    """
+    Service for parsing user documents.
+
+    Extraction strategies:
+    1. Text extraction (PDF/DOCX/TXT)
+    2. Chunking by sections/paragraphs
+    3. LLM extraction per chunk
+    4. Deduplication and linking
+    5. Save to pending tables
+    """
+
+    def __init__(self, llm_service=None):
+        """
+        Initialize parser.
+
+        Args:
+            llm_service: Optional LLM service (default: OpenRouterService)
+        """
+        self.llm_service = llm_service
+        if not self.llm_service:
+            try:
+                from merlt.rlcf.ai_service import OpenRouterService
+
+                self.llm_service = OpenRouterService()
+            except ImportError:
+                log.warning("LLM service not available, extraction will be limited")
+
+    async def parse_document(
+        self,
+        document_path: str,
+        file_type: str,
+        document_type: Optional[str],
+        legal_domain: Optional[str],
+        extract_entities: bool,
+        extract_amendments: bool,
+        user_id: str,
+        session: AsyncSession,
+        persist_target: str = "pending",
+        document_id: Optional[int] = None,
+        extract_relations: bool = False,
+    ) -> ParseResult:
+        """
+        Parse document to extract entities and amendments.
+
+        Args:
+            document_path: Path to document file
+            file_type: File type ('pdf', 'txt', 'docx')
+            document_type: Document type ('dottrina', 'manuale', etc.)
+            legal_domain: Legal domain ('civile', 'penale', etc.)
+            extract_entities: Whether to extract entities
+            extract_amendments: Whether to extract amendments
+            user_id: User ID
+            session: DB session
+
+        Returns:
+            ParseResult with counts
+        """
+        log.info("Parsing document", path=document_path, type=file_type)
+
+        result = ParseResult()
+
+        # Step 1: Extract text
+        try:
+            text = await self._extract_text(document_path, file_type)
+        except Exception as e:
+            error_msg = f"Text extraction failed: {e}"
+            log.error(error_msg, exc_info=True)
+            result.errors.append(error_msg)
+            return result
+
+        if not text or len(text.strip()) < 100:
+            result.errors.append("Extracted text too short or empty")
+            return result
+
+        log.info(f"Extracted text", length=len(text))
+
+        # Step 2: Chunk text
+        chunks = self._chunk_text(text, max_chunk_size=2000)
+        log.info(f"Created {len(chunks)} chunks")
+
+        # Step 3: Extract entities (if requested)
+        if extract_entities and self.llm_service:
+            entities_count = await self._extract_entities_from_chunks(
+                chunks=chunks,
+                legal_domain=legal_domain,
+                user_id=user_id,
+                session=session,
+                persist_target=persist_target,
+                document_id=document_id,
+            )
+            result.entities_count = entities_count
+
+        # Step 3b: Extract relations (loop-closure B1, if requested)
+        if extract_relations and self.llm_service:
+            result.relations_count = await self._extract_relations_from_chunks(
+                chunks=chunks,
+                legal_domain=legal_domain,
+                user_id=user_id,
+                session=session,
+                persist_target=persist_target,
+                document_id=document_id,
+            )
+
+        # Step 4: Extract amendments (if requested)
+        if extract_amendments:
+            amendments_count = await self._extract_amendments_from_text(
+                text=text,
+                legal_domain=legal_domain,
+                user_id=user_id,
+                session=session,
+            )
+            result.amendments_count = amendments_count
+
+        log.info("Document parsing complete", **result.__dict__)
+        return result
+
+    async def extract_text(self, document_path: str, file_type: str) -> str:
+        """
+        Public method to extract text from document.
+
+        Args:
+            document_path: Path to document file
+            file_type: File type ('pdf', 'txt', 'docx')
+
+        Returns:
+            Extracted text content
+        """
+        return await self._extract_text(document_path, file_type)
+
+    async def chunk_text(
+        self,
+        text: str,
+        chunk_size: int = 1000,
+        overlap: int = 100
+    ) -> list[str]:
+        """
+        Chunk text into overlapping segments.
+
+        Args:
+            text: Text to chunk
+            chunk_size: Maximum chunk size in characters
+            overlap: Overlap between chunks in characters
+
+        Returns:
+            List of text chunks with overlap
+        """
+        if not text:
+            return []
+
+        chunks = []
+        start = 0
+        text_len = len(text)
+
+        while start < text_len:
+            # Calculate end position
+            end = min(start + chunk_size, text_len)
+
+            # Extract chunk
+            chunk = text[start:end]
+            chunks.append(chunk)
+
+            # Move to next chunk with overlap
+            if end >= text_len:
+                break
+            start = end - overlap
+
+        return chunks
+
+    async def _extract_text(self, document_path: str, file_type: str) -> str:
+        """
+        Extract text from document.
+
+        Args:
+            document_path: Path to file
+            file_type: File type
+
+        Returns:
+            Extracted text
+        """
+        if file_type == "txt":
+            # Plain text
+            with open(document_path, "r", encoding="utf-8") as f:
+                return f.read()
+
+        elif file_type == "pdf":
+            # PDF extraction with pdfplumber
+            try:
+                import pdfplumber
+            except ImportError:
+                raise RuntimeError("pdfplumber not installed. Install with: pip install pdfplumber")
+
+            text_parts = []
+            with pdfplumber.open(document_path) as pdf:
+                for page in pdf.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        text_parts.append(page_text)
+
+            return "\n\n".join(text_parts)
+
+        elif file_type == "docx":
+            # DOCX extraction with python-docx
+            try:
+                from docx import Document
+            except ImportError:
+                raise RuntimeError("python-docx not installed. Install with: pip install python-docx")
+
+            doc = Document(document_path)
+            return "\n\n".join([para.text for para in doc.paragraphs if para.text.strip()])
+
+        else:
+            raise ValueError(f"Unsupported file type: {file_type}")
+
+    def _chunk_text(self, text: str, max_chunk_size: int = 2000) -> List[str]:
+        """
+        Chunk text by paragraphs/sections.
+
+        Args:
+            text: Full text
+            max_chunk_size: Max characters per chunk
+
+        Returns:
+            List of text chunks
+        """
+        # Split by double newlines (paragraphs)
+        paragraphs = re.split(r"\n\n+", text)
+
+        chunks = []
+        current_chunk = []
+        current_size = 0
+
+        for para in paragraphs:
+            para = para.strip()
+            if not para:
+                continue
+
+            para_size = len(para)
+
+            if current_size + para_size > max_chunk_size and current_chunk:
+                # Save current chunk
+                chunks.append("\n\n".join(current_chunk))
+                current_chunk = [para]
+                current_size = para_size
+            else:
+                current_chunk.append(para)
+                current_size += para_size
+
+        # Save last chunk
+        if current_chunk:
+            chunks.append("\n\n".join(current_chunk))
+
+        return chunks
+
+    async def _extract_entities_from_chunks(
+        self,
+        chunks: List[str],
+        legal_domain: Optional[str],
+        user_id: str,
+        session: AsyncSession,
+        persist_target: str = "pending",
+        document_id: Optional[int] = None,
+    ) -> int:
+        """
+        Extract entities from text chunks using LLM.
+
+        persist_target:
+          - "pending"  → create PendingEntity (canonical RLCF queue, legacy path)
+          - "staging"  → create ExtractionCandidate (Slice 2c review buffer; the
+            raw verbatim never enters pending_*).
+
+        Uses the same LLM extractors as enrichment pipeline:
+        - ConceptExtractor for concepts
+        - PrincipleExtractor for principles
+        - DefinitionExtractor for definitions
+
+        Args:
+            chunks: List of text chunks
+            legal_domain: Legal domain
+            user_id: User ID
+            session: DB session
+
+        Returns:
+            Number of entities extracted
+        """
+        if not self.llm_service:
+            log.warning("LLM service not available, skipping entity extraction")
+            return 0
+
+        from merlt.pipeline.enrichment.extractors import create_extractor
+        from merlt.pipeline.enrichment.models import EnrichmentContent, EntityType
+
+        log.info(f"Extracting entities from {len(chunks)} chunks using LLM")
+
+        # Create extractors for main entity types
+        entity_types = [EntityType.PRINCIPIO, EntityType.CONCETTO, EntityType.DEFINIZIONE]
+        extractors = {}
+
+        for entity_type in entity_types:
+            try:
+                extractors[entity_type] = create_extractor(self.llm_service, entity_type)
+            except Exception as e:
+                log.warning(f"Failed to create extractor for {entity_type}: {e}")
+
+        if not extractors:
+            log.error("No extractors available")
+            return 0
+
+        entities_count = 0
+
+        # Process each chunk
+        for chunk_idx, chunk in enumerate(chunks):
+            if not chunk.strip():
+                continue
+
+            log.debug(f"Processing chunk {chunk_idx + 1}/{len(chunks)}")
+
+            # Create EnrichmentContent for this chunk
+            content = EnrichmentContent(
+                id=f"user_doc:chunk{chunk_idx}:{uuid4().hex[:8]}",
+                text=chunk,
+                source="user_document",
+                content_type="documento",
+                article_refs=[],
+            )
+
+            # Extract with each entity type
+            for entity_type, extractor in extractors.items():
+                try:
+                    extracted_entities = await extractor.extract(content)
+
+                    for entity_data in extracted_entities:
+                        # Convert enum to string for database
+                        tipo_str = (
+                            entity_data.tipo.value
+                            if hasattr(entity_data.tipo, "value")
+                            else str(entity_data.tipo)
+                        )
+
+                        entity_id = f"{tipo_str}:{uuid4().hex[:8]}"
+                        snippet = chunk[:500] if len(chunk) > 500 else chunk
+
+                        if persist_target == "staging":
+                            # Slice 2c: land in the review buffer, NOT pending_*.
+                            # The verbatim snippet stays here; promotion creates a
+                            # fresh PendingEntity from the user's reformulated text.
+                            # #4 dedup: flag a likely existing canonical node so the
+                            # review UI can warn before promotion.
+                            potential_dup = None
+                            try:
+                                dres = await EntityDeduplicator(session).find_duplicates(
+                                    entity_data.nome, tipo_str
+                                )
+                                if dres.best_match:
+                                    potential_dup = dres.best_match.entity_id
+                            except Exception as dup_exc:  # dedup is best-effort
+                                log.warning("dedup check failed", entity=entity_data.nome, exc=str(dup_exc))
+                            row = ExtractionCandidate(
+                                document_id=document_id,
+                                contributor_id=user_id,
+                                candidate_type="entity",
+                                entity_text=entity_data.nome,
+                                entity_type=tipo_str,
+                                article_urn="user_document",
+                                descrizione=entity_data.descrizione or "",
+                                verbatim_excerpt=snippet,
+                                llm_confidence=entity_data.confidence or 0.8,
+                                llm_model="google/gemini-2.5-flash",
+                                potential_duplicate_of=potential_dup,
+                                status="draft",
+                                # #3: ephemeral — purged after this TTL if not promoted.
+                                expires_at=datetime.now() + timedelta(hours=STAGING_TTL_HOURS),
+                            )
+                        else:
+                            row = PendingEntity(
+                                entity_id=entity_id,
+                                article_urn="user_document",
+                                source_type="user_document",
+                                entity_type=tipo_str,
+                                entity_text=entity_data.nome,
+                                descrizione=entity_data.descrizione or "",
+                                ambito=legal_domain or "",
+                                fonte="llm_extraction",
+                                llm_confidence=entity_data.confidence or 0.8,
+                                llm_model="google/gemini-2.5-flash",
+                                llm_reasoning=snippet,  # Context snippet
+                                contributed_by=user_id,
+                                contributor_authority=0.5,
+                                validation_status="pending",
+                            )
+
+                        session.add(row)
+                        entities_count += 1
+
+                        log.debug(
+                            f"Extracted entity: {entity_data.nome} ({entity_data.tipo})"
+                        )
+                        log.info(
+                            f"✅ Added to session: {entity_id} - {entity_data.nome}"
+                        )
+
+                except Exception as e:
+                    log.error(
+                        f"❌ Extraction error for {entity_type} in chunk {chunk_idx}: {e}",
+                        exc_info=True,
+                    )
+
+        # Log extraction results (commit will be done by caller)
+        if entities_count > 0:
+            log.info(f"✅ Extracted {entities_count} entities - added to session (waiting for commit)")
+        else:
+            log.warning("⚠️  No entities extracted from document")
+
+        return entities_count
+
+    async def _extract_relations_from_chunks(
+        self,
+        chunks: List[str],
+        legal_domain: Optional[str],
+        user_id: str,
+        session: AsyncSession,
+        persist_target: str = "pending",
+        document_id: Optional[int] = None,
+    ) -> int:
+        """
+        Extract semantic relations from text chunks using the LLM (loop-closure B1).
+
+        persist_target:
+          - "staging" → ExtractionCandidate(candidate_type="relation") — the
+            review buffer; verbatim stays here, never in pending_*.
+          - "pending" → PendingRelation (legacy RLCF queue).
+
+        This closes the gap noted in the design: notes could yield entities but
+        never relations.
+
+        Endpoints (B1). The LLM names each endpoint as a concept
+        ("risoluzione del contratto"); nothing downstream resolves a name, and
+        the consensus writer refuses one. In staging, each name is resolved
+        here, best-effort, to a graph identifier:
+          - a URN/URL the LLM wrote is kept (version marker stripped);
+          - a same-document entity candidate with the same normalized name
+            resolves to the id its Entity node will carry
+            (``entity_writer.entity_node_id``, a forward reference until that
+            entity is promoted and approved);
+          - otherwise an exact/high-confidence ``EntityDeduplicator`` match
+            resolves to that pending entity's id.
+        ``source_node_urn`` / ``target_entity_id`` hold the identifier, or the
+        raw name when nothing matched; ``source_text`` / ``target_text`` always
+        keep the name. The reviewer links an unresolved endpoint before
+        promotion. The legacy "pending" target is unchanged (raw names).
+        """
+        if not self.llm_service:
+            log.warning("LLM service not available, skipping relation extraction")
+            return 0
+
+        from merlt.pipeline.enrichment.extractors.relation import (
+            RelationExtractor,
+            canonical_relation_type,
+        )
+        from merlt.pipeline.enrichment.models import EnrichmentContent
+
+        extractor = RelationExtractor(self.llm_service)
+        relations_count = 0
+
+        siblings: List[Tuple[str, str]] = []
+        resolution_cache: Dict[str, Optional[str]] = {}
+        if persist_target == "staging":
+            siblings = await self._load_sibling_entities(session, document_id)
+
+        for chunk_idx, chunk in enumerate(chunks):
+            if not chunk.strip():
+                continue
+
+            content = EnrichmentContent(
+                id=f"user_doc:relchunk{chunk_idx}:{uuid4().hex[:8]}",
+                text=chunk,
+                source="user_document",
+                content_type="documento",
+                article_refs=[],
+            )
+
+            try:
+                relations = await extractor.extract(content)
+            except Exception as e:
+                log.error(f"Relation extraction error in chunk {chunk_idx}: {e}", exc_info=True)
+                continue
+
+            snippet = chunk[:500] if len(chunk) > 500 else chunk
+
+            for rel in relations:
+                # Normalize the extractor's 9-value free-text vocabulary onto
+                # the canonical RelationType enum here, at creation time, so
+                # both persist targets already carry a promote-safe value
+                # (see relation.py::canonical_relation_type docstring).
+                rel_type = canonical_relation_type(rel.relation_type)
+                if persist_target == "staging":
+                    source_id = await self._resolve_endpoint_name(
+                        rel.source, siblings, session, resolution_cache
+                    )
+                    target_id = await self._resolve_endpoint_name(
+                        rel.target, siblings, session, resolution_cache
+                    )
+                    row = ExtractionCandidate(
+                        document_id=document_id,
+                        contributor_id=user_id,
+                        candidate_type="relation",
+                        relation_type=rel_type,
+                        # varchar(300): a longer raw name is unresolved anyway,
+                        # the full name stays in *_text.
+                        source_node_urn=(source_id or rel.source or "")[:ENDPOINT_MAX_LEN],
+                        target_entity_id=(target_id or rel.target or "")[:ENDPOINT_MAX_LEN],
+                        source_text=rel.source,
+                        target_text=rel.target,
+                        article_urn="user_document",
+                        descrizione=rel.descrizione or "",
+                        verbatim_excerpt=snippet,
+                        llm_confidence=rel.confidence,
+                        llm_model="google/gemini-2.5-flash",
+                        status="draft",
+                        expires_at=datetime.now() + timedelta(hours=STAGING_TTL_HOURS),
+                    )
+                else:
+                    row = PendingRelation(
+                        relation_id=f"{rel_type}:{uuid4().hex[:8]}",
+                        article_urn="user_document",
+                        source_type="user_document",
+                        relation_type=rel_type,
+                        source_node_urn=rel.source,
+                        target_entity_id=rel.target,
+                        relation_description=rel.descrizione or "",
+                        certezza=rel.confidence,
+                        fonte="llm_extraction",
+                        llm_confidence=rel.confidence,
+                        llm_model="google/gemini-2.5-flash",
+                        contributed_by=user_id,
+                        contributor_authority=0.5,
+                        validation_status="pending",
+                    )
+
+                session.add(row)
+                relations_count += 1
+
+        if relations_count > 0:
+            log.info(f"✅ Extracted {relations_count} relations - added to session")
+        else:
+            log.warning("⚠️  No relations extracted from document")
+
+        return relations_count
+
+    async def _load_sibling_entities(
+        self, session: AsyncSession, document_id: Optional[int]
+    ) -> List[Tuple[str, str]]:
+        """(name, type) of the entity candidates staged for the same document.
+
+        Covers both the rows an earlier run persisted and those this run added
+        to the session: the enrichment session does not autoflush, so a query
+        alone would miss the entity pass that just ran. Best-effort.
+        """
+        siblings: List[Tuple[str, str]] = []
+        for obj in list(getattr(session, "new", None) or ()):
+            if (
+                isinstance(obj, ExtractionCandidate)
+                and obj.candidate_type == "entity"
+                and obj.document_id == document_id
+            ):
+                siblings.append((obj.entity_text, obj.entity_type))
+        if document_id is not None:
+            try:
+                rows = (
+                    await session.execute(
+                        select(ExtractionCandidate.entity_text, ExtractionCandidate.entity_type).where(
+                            ExtractionCandidate.document_id == document_id,
+                            ExtractionCandidate.candidate_type == "entity",
+                        )
+                    )
+                ).all()
+                siblings.extend((name, tipo) for name, tipo in rows)
+            except Exception as exc:  # resolution is best-effort
+                log.warning("sibling entity lookup failed", document_id=document_id, exc=str(exc))
+        return [(name, tipo) for name, tipo in siblings if name and tipo]
+
+    async def _resolve_endpoint_name(
+        self,
+        name: Optional[str],
+        siblings: List[Tuple[str, str]],
+        session: AsyncSession,
+        cache: Dict[str, Optional[str]],
+    ) -> Optional[str]:
+        """The graph identifier a relation endpoint named `name` refers to, or
+        None when it cannot be resolved (see _extract_relations_from_chunks)."""
+        raw = (name or "").strip()
+        if not raw:
+            return None
+        if is_norm_reference(raw):
+            return canonical_norm_key(raw)[:ENDPOINT_MAX_LEN]
+
+        slug = normalize_entity_name(raw)
+        if slug in cache:
+            return cache[slug]
+
+        resolved: Optional[str] = None
+        if slug:
+            for text, tipo in siblings:
+                if normalize_entity_name(text) == slug:
+                    resolved = entity_node_id(tipo, text)
+                    break
+
+        if resolved is None:
+            try:
+                dres = await EntityDeduplicator(session).find_duplicates(raw, "", scope="global")
+                strong = [
+                    d
+                    for d in dres.duplicates
+                    if d.confidence in (DuplicateConfidence.EXACT, DuplicateConfidence.HIGH)
+                ]
+                if strong:
+                    # Prefer an entity the community already approved.
+                    strong.sort(
+                        key=lambda d: (d.validation_status == "approved", d.similarity_score),
+                        reverse=True,
+                    )
+                    resolved = strong[0].entity_id
+            except Exception as exc:  # resolution is best-effort
+                log.warning("relation endpoint dedup failed", endpoint=raw, exc=str(exc))
+
+        if resolved is not None and len(resolved) > ENDPOINT_MAX_LEN:
+            resolved = None
+        cache[slug] = resolved
+        return resolved
+
+    async def _extract_amendments_from_text(
+        self,
+        text: str,
+        legal_domain: Optional[str],
+        user_id: str,
+        session: AsyncSession,
+    ) -> int:
+        """
+        Extract amendments from legislative text.
+
+        Uses AmendmentExtractorService for extraction.
+
+        Args:
+            text: Full document text
+            legal_domain: Legal domain
+            user_id: User ID
+            session: DB session
+
+        Returns:
+            Number of amendments extracted
+        """
+        from merlt.pipeline.amendment_extractor import AmendmentExtractorService
+
+        extractor = AmendmentExtractorService()
+
+        result = await extractor.extract_from_document_text(
+            text=text,
+            legal_domain=legal_domain,
+            user_id=user_id,
+            session=session,
+            source_document_id=None,  # Will be set by caller if from document
+            contributor_authority=0.5,
+        )
+
+        if result.errors:
+            log.warning(f"Amendment extraction errors: {result.errors}")
+
+        return result.amendments_count
+
+
+# ====================================================
+# EXPORTS
+# ====================================================
+__all__ = [
+    "DocumentParserService",
+    "ParseResult",
+]

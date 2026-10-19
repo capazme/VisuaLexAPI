@@ -1,0 +1,268 @@
+/**
+ * Type definitions for API requests and responses
+ */
+
+import type { NormaVisitata, OriginalAuthor } from './index';
+
+// ============================================================================
+// Authentication Types
+// ============================================================================
+
+export interface UserRegisterRequest {
+  email: string;
+  username: string;
+  password: string;
+}
+
+export interface UserLoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface TokenResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+}
+
+export interface RegisterResponse {
+  message: string;
+  pending_approval: boolean;
+}
+
+export interface UserResponse {
+  id: string;
+  email: string;
+  username: string;
+  is_active: boolean;
+  is_verified: boolean;
+  is_admin: boolean;
+  /** A validator of VisuaLex Studia's cards (`/auth/me` carries it). */
+  lingo_validatore?: boolean;
+  /** The administrator let this account use the development mode (`/auth/me` carries it). */
+  dev_mode_allowed?: boolean;
+  /** The account's own choice of the development mode; counts only with `dev_mode_allowed`. */
+  dev_mode?: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+// Admin user management types
+export interface AdminUserCreate {
+  email: string;
+  username: string;
+  password: string;
+  isAdmin?: boolean;
+  isActive?: boolean;
+}
+
+export interface AdminUserUpdate {
+  email?: string;
+  username?: string;
+  isAdmin?: boolean;
+  isActive?: boolean;
+  isVerified?: boolean;
+  /** Names the user a validator of VisuaLex Studia's cards. */
+  lingoValidatore?: boolean;
+  /** Lets the user switch the development mode on; revoking it turns their choice off too. */
+  devModeAllowed?: boolean;
+}
+
+export interface AdminUserResponse extends UserResponse {
+  lingo_validatore: boolean;
+  login_count?: number;
+  last_login_at?: string | null;
+  stats?: {
+    bookmarks: number;
+    dossiers: number;
+    annotations: number;
+    highlights: number;
+  };
+}
+
+export interface AdminResetPassword {
+  newPassword: string;
+}
+
+export interface ChangePasswordRequest {
+  current_password: string;
+  new_password: string;
+}
+
+// ============================================================================
+// Folder Types
+// ============================================================================
+
+export interface FolderCreate {
+  name: string;
+  description?: string;
+  color?: string;
+  icon?: string;
+  parent_id?: string;
+  position?: number;
+}
+
+export interface FolderUpdate {
+  name?: string;
+  description?: string;
+  color?: string;
+  icon?: string;
+  parent_id?: string;
+  position?: number;
+}
+
+export interface FolderMove {
+  parent_id?: string;
+  position?: number;
+}
+
+export interface FolderResponse {
+  id: string;
+  name: string;
+  description?: string;
+  color?: string;
+  icon?: string;
+  parent_id?: string;
+  position: number;
+  created_at: string;
+  updated_at?: string;
+  children?: FolderResponse[];
+}
+
+export interface FolderTree {
+  id: string;
+  name: string;
+  description?: string;
+  color?: string;
+  icon?: string;
+  parent_id?: string;
+  position: number;
+  children: FolderTree[];
+  bookmark_count?: number;
+}
+
+export interface FolderBulkDelete {
+  folder_ids: string[];
+}
+
+export interface FolderBulkMove {
+  folder_ids: string[];
+  target_parent_id?: string;
+}
+
+// ============================================================================
+// Bookmark Types (for future implementation)
+// ============================================================================
+
+export interface BookmarkCreate {
+  norma_key: string;
+  norma_data: NormaVisitata; // JSON object
+  folder_id?: string;
+  tags?: string[];
+  notes?: string;
+}
+
+export interface BookmarkUpdate {
+  title?: string;
+  notes?: string;
+  tags?: string[];
+  folder_id?: string;
+}
+
+export interface BookmarkResponse {
+  id: string;
+  normaKey: string;
+  normaData: NormaVisitata;
+  title?: string;
+  folderId?: string;
+  tags: string[];
+  notes?: string;
+  userId: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+// Aliases for camelCase
+export type Bookmark = BookmarkResponse;
+
+// ============================================================================
+// Annotation Types — wire protocol with Node backend (backend uses camelCase
+// via zod validation, Prisma models). Store-side types live in types/index.ts.
+// ============================================================================
+
+export type AnnotationType = 'note' | 'question' | 'important' | 'follow_up' | 'summary';
+
+export interface AnnotationCreate {
+  normaKey: string;
+  content: string;
+  annotationType?: AnnotationType;
+  bookmarkId?: string;
+  textContext?: string;
+  position?: number;
+}
+
+export interface AnnotationUpdate {
+  content?: string;
+  annotationType?: AnnotationType;
+  textContext?: string;
+  position?: number;
+}
+
+export interface AnnotationResponse {
+  id: string;
+  normaKey: string;
+  content: string;
+  annotationType: AnnotationType;
+  bookmarkId?: string;
+  textContext?: string;
+  position?: number;
+  userId: string;
+  createdAt: string;
+  updatedAt?: string;
+  sourceSuggestionId?: string | null;
+  originalAuthor?: OriginalAuthor | null;
+}
+
+// ============================================================================
+// Highlight Types — wire protocol with Node backend.
+// ============================================================================
+
+export interface HighlightCreate {
+  normaKey: string;
+  text: string;
+  color: 'yellow' | 'green' | 'blue' | 'red' | 'purple';
+  startOffset: number;
+  endOffset: number;
+  note?: string;
+  bookmarkId?: string;
+}
+
+export interface HighlightUpdate {
+  color?: 'yellow' | 'green' | 'blue' | 'red' | 'purple';
+  note?: string;
+}
+
+export interface HighlightResponse {
+  id: string;
+  normaKey: string;
+  text: string;
+  color: 'yellow' | 'green' | 'blue' | 'red' | 'purple';
+  startOffset: number;
+  endOffset: number;
+  note?: string;
+  bookmarkId?: string;
+  userId: string;
+  createdAt: string;
+  sourceSuggestionId?: string | null;
+  originalAuthor?: OriginalAuthor | null;
+}
+
+// ============================================================================
+// API Error Types
+// ============================================================================
+
+export interface APIError {
+  status?: number;
+  message: string;
+  data?: unknown;
+}

@@ -1,0 +1,41 @@
+{
+  "experiment": "EXP-011",
+  "description": "Ingestion Costituzione con schema allineato",
+  "timestamp": "2025-12-08T20:58:55.310753",
+  "source": "Costituzione Italiana",
+  "nodes": {
+    "Altro_codice": 1,
+    "Costituzione_titolo": 10,
+    "Costituzione_parte": 2,
+    "Leggi Costituzionali_articolo": 40,
+    "Leggi Costituzionali_legge costituzionale": 19,
+    "Costituzione_articolo": 139
+  },
+  "relationships": {
+    "commenta": 324,
+    "interpreta": 14,
+    "abroga": 6,
+    "modifica": 48,
+    "contiene": 633,
+    "inserisce": 3
+  },
+  "hierarchy": {
+    "parti": 2,
+    "titoli": 10,
+    "articoli_costituzione": 139,
+    "articoli_leggi_cost": 40,
+    "principi_fondamentali": 12
+  },
+  "schema_compliance": {
+    "numero_parte": true,
+    "numero_titolo": true,
+    "numero_articolo": true,
+    "hierarchical_relations": true
+  },
+  "summary": {
+    "total_nodes": 211,
+    "total_relationships": 1028,
+    "completeness": "139/139 articoli (100%)",
+    "status": "SUCCESS"
+  }
+}

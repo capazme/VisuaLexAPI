@@ -1,0 +1,354 @@
+import re
+import datetime
+import asyncio
+from .article_suffixes import ARTICLE_SUFFIX_ALTERNATION
+from .map import NORMATTIVA, NORMATTIVA_SEARCH, BROCARDI_SEARCH
+from .logging_config import log_handlers
+from .treextractor import get_tree
+import logging
+
+# Case-insensitive views of the act-type tables. A handful of keys carry
+# capitals ("codice del Terzo settore", "disposizioni per l'attuazione del
+# Codice civile ...") while normalize_act_type lowercases every lookup, so
+# without these indices those keys are unreachable — the same capital-letter
+# bug that _URN_CODICI_LOWER fixes for the codici URN table. Verified: no two
+# keys that collide when lowered carry different values, so nothing is lost.
+_NORMATTIVA_LOWER = {_k.lower(): _v for _k, _v in NORMATTIVA.items()}
+_NORMATTIVA_SEARCH_LOWER = {_k.lower(): _v for _k, _v in NORMATTIVA_SEARCH.items()}
+_BROCARDI_SEARCH_LOWER = {_k.lower(): _v for _k, _v in BROCARDI_SEARCH.items()}
+
+
+# Configure logging
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s %(levelname)s %(message)s',
+                    handlers=log_handlers("norma.log"))
+
+# The single-article grammar, matched AFTER the range test so "473-bis.1" is
+# one article and "3-5" a range. Normattiva's own index lists every one of
+# these shapes (live trees, 2026-09-19 — 156 numbers in 12 acts):
+#   - an ordinal chain with an optional dotted sub-number: "2-bis",
+#     "25-quinquiesdecies", "135-sex-decies", "270-bis.1", "70.1";
+#   - a slash number: "314/2" … "314/28" (c.c., the repealed adozione speciale).
+# The ordinal tokens are "any alphabetic word" on purpose (see
+# tests/test_article_suffixes.py): the validator never enumerated the table
+# and the compound spellings ("sex decies", "vicies semel") are not in it.
+_SINGLE_ARTICLE_RE = re.compile(r'^\d+(?:-[a-z]+)*(?:\.\d+)?$')
+_SLASH_ARTICLE_RE = re.compile(r'^\d+/\d+$')
+# A suffix of the ordinal table written against its number, as Normattiva's
+# URNs spell it ("~art615bis"): MERL-T's lazy ingestion sent "615bis" on
+# 2026-10-07 and got a 400. Only the table's words are split off, so "5a" or
+# "5bisogna" stay refused.
+_JOINED_SUFFIX_RE = re.compile(
+    r'(?<=\d)(?=(?:' + ARTICLE_SUFFIX_ALTERNATION + r')(?![a-z]))', re.IGNORECASE)
+
+
+def _canonicalise_article_token(part):
+    """Spell one article the way the URN generator and the tree key expect.
+
+    "2 bis" -> "2-bis", "270 bis.1" -> "270-bis.1", "135 sex decies" ->
+    "135-sex-decies", and "171 octies 1" / "171-octies-1" -> "171-octies.1":
+    a bare digit after an ordinal is a dotted sub-number — probed live,
+    ~art171octies1 makes Normattiva answer Art. 1, ~art171octies.1 the real
+    article. Ranges are untouched: "3-5" has no letter before its digit.
+    "615bis" -> "615-bis" and "270bis.1" -> "270-bis.1": a suffix of the
+    ordinal table joined to its number is split off, as a space would be.
+    """
+    part = _JOINED_SUFFIX_RE.sub('-', part)
+    part = re.sub(r'(?<=[0-9a-z])\s+(?=[a-z])', '-', part, flags=re.IGNORECASE)
+    part = re.sub(r'(?<=[a-z])[\s-]+(?=\d+$)', '.', part, flags=re.IGNORECASE)
+    return part
+
+
+def article_input_error(error):
+    """The exception for an error dict of `parse_article_input`: the index unreadable is the source
+    failing (503), an empty range is not found (404), anything else a malformed input (400)."""
+    from .exceptions import IndexUnavailableError, ResourceNotFoundError, ValidationError
+    kind = error.get('kind')
+    if kind == 'source':
+        return IndexUnavailableError(error['error'])
+    if kind == 'not_found':
+        return ResourceNotFoundError(error['error'])
+    return ValidationError(error['error'])
+
+
+# What a reader is told when a range (or a whole act) needs the act's index and it cannot be read.
+INDEX_UNREADABLE = (
+    "Non riesco a leggere ora l'indice di quest'atto, quindi non posso aprire {what}: "
+    "riprova più tardi, oppure indica gli articoli uno per uno (es. «1, 2, 3»)."
+)
+
+
+async def parse_article_input(article_string, normurn):
+    """
+    Pulisce e valida la stringa degli articoli, supporta range e articoli separati da virgole.
+    Supporta estensioni degli articoli (es. 1-bis, 2-ter).
+    Utilizza get_tree per gestire correttamente i range con articoli aggiuntivi solo quando necessario.
+    
+    Arguments:
+    article_string -- Stringa contenente gli articoli (es. "1, 2-bis, 3, 4-6, 7-ter")
+    normurn -- URL dell'atto per estrarre la lista completa degli articoli
+
+    An error comes back as a dict: `{"error": <Italian>, "kind": "source"}` when the act's index
+    could not be read, `"not_found"` for a range with no article in the index, and no kind for a
+    malformed input. The callers turn them into a 503, a 404 and a 400.
+    """
+    logging.info("Parsing article input string")
+    logging.debug(f"Article string: {article_string}")
+    logging.debug(f"Norm URN: {normurn}")
+
+    # Se la stringa degli articoli è vuota, restituisci la lista completa
+    if not article_string.strip():
+        try:
+            all_articles, count = await get_tree(normurn)
+        except Exception as e:
+            logging.error(f"Failed to retrieve articles from norm URN: {normurn}, Error: {str(e)}", exc_info=True)
+            return {"error": INDEX_UNREADABLE.format(what="l'atto intero"), "kind": "source"}
+        # get_tree answers a failure (a blocked page, a timeout) with a message and 0, not an exception.
+        if not isinstance(all_articles, list) or count == 0:
+            logging.error(f"Act index unreadable for {normurn}: {all_articles!r}")
+            return {"error": INDEX_UNREADABLE.format(what="l'atto intero"), "kind": "source"}
+        logging.info("Returning complete list of articles from norm")
+        logging.debug(f"All articles retrieved: {all_articles}")
+        # The tree mixes articles (dicts with `numero`) and section labels (strings): the callers
+        # want article numbers only, canonical as a range gives them.
+        return [_canonicalise_article_token(a['numero']).lower()
+                for a in all_articles if isinstance(a, dict) and a.get('numero')]
+
+    articles = []
+    # Ranges that found no article in the index: an error only when nothing at all is found
+    # (gotcha 24: a request where some articles exist keeps those and drops the rest).
+    empty_ranges = []
+
+    # Rimuovi spazi extra e dividi per virgole
+    parts = article_string.strip().split(',')
+    logging.debug(f"Split article string into parts: {parts}")
+
+    for part in parts:
+        part = part.strip()
+        logging.debug(f"Processing part: {part}")
+
+        # Converti "2 bis" in "2-bis", "135 sex decies" in "135-sex-decies",
+        # "171 octies 1" in "171-octies.1" per gestire correttamente le estensioni
+        part = _canonicalise_article_token(part)
+        logging.debug(f"Normalized part: {part}")
+
+        # Regex per verificare se la parte è un range (numero-numero)
+        range_match = re.match(r'^(\d+)-(\d+)$', part)
+        if range_match:
+            start, end = map(int, range_match.groups())  # Converti start e end in interi
+            logging.debug(f"Found range: start={start}, end={end}")
+
+            # Chiamata a get_tree solo in caso di range
+            try:
+                all_articles, count = await get_tree(normurn)
+                # A failure (EUR-Lex's firewall, a timeout) comes back as a message and 0, not an
+                # exception: read as a list of characters it gave no article and no error, and the
+                # reader saw an empty search. Said as it is instead.
+                if not isinstance(all_articles, list) or count == 0:
+                    logging.error(f"Act index unreadable for {normurn}: {all_articles!r}")
+                    return {"error": INDEX_UNREADABLE.format(what=f"gli artt. {start}-{end}"), "kind": "source"}
+                logging.info("Successfully retrieved article list from norm")
+                logging.debug(f"All articles retrieved: {all_articles}")
+                found_before = len(articles)
+
+                # Aggiungi tutti gli articoli nel range, inclusi quelli con estensioni.
+                # get_tree ora ritorna una lista mista di dict (articoli, con campo
+                # "numero") e stringhe (etichette di sezioni/allegati). Estraiamo il
+                # numero dal dict quando serve; stringhe non-articolo vengono saltate.
+                for article in all_articles:
+                    if isinstance(article, dict):
+                        article_str = article.get('numero')
+                    elif isinstance(article, str):
+                        article_str = article
+                    else:
+                        continue
+                    if not article_str:
+                        continue
+                    article_number_match = re.match(r'^(\d+)', article_str)
+                    if article_number_match:
+                        article_num = int(article_number_match.group(1))
+                        if start <= article_num <= end:
+                            logging.debug(f"Adding article from range: {article_str}")
+                            articles.append(_canonicalise_article_token(article_str).lower())
+                if len(articles) == found_before:
+                    empty_ranges.append(f"{start} e {end}")
+
+            except Exception as e:
+                logging.error(f"Failed to retrieve articles from norm URN: {normurn}, Error: {str(e)}", exc_info=True)
+                return {"error": INDEX_UNREADABLE.format(what=f"gli artt. {start}-{end}"), "kind": "source"}
+
+        else:
+            # Articolo singolo: catena di ordinali con eventuale sotto-numero
+            # (1-bis, 270-bis.1, 135-sex-decies, 70.1) oppure numero con barra
+            # (314/2). I suffissi sono resi minuscoli: la URN è "art2bis".
+            part = part.lower()
+            if _SINGLE_ARTICLE_RE.match(part) or _SLASH_ARTICLE_RE.match(part):
+                logging.debug(f"Found single article: {part}")
+                # Aggiungi l'articolo direttamente senza chiamare get_tree
+                articles.append(part)  # Aggiungiamo l'articolo, supponendo che la validità venga gestita successivamente
+            else:
+                error_message = f"Formato dell'articolo non valido: «{part}»"
+                logging.error(error_message)
+                return {"error": error_message}  # Restituisci un messaggio di errore serializzabile
+
+    # Deduplica mantenendo l'ordine
+    seen = set()
+    unique_articles = []
+    for article in articles:
+        if article not in seen:
+            seen.add(article)
+            unique_articles.append(article)
+        else:
+            logging.warning(f"Duplicate article found and removed: {article}")
+    
+    if not unique_articles and empty_ranges:
+        return {"error": f"Nessun articolo tra {', tra '.join(empty_ranges)} nell'indice di quest'atto.", "kind": "not_found"}
+
+    logging.info("Article parsing completed successfully")
+    logging.debug(f"Parsed articles (before dedup): {articles}")
+    logging.debug(f"Unique articles (after dedup): {unique_articles}")
+    return unique_articles
+
+def nospazi(text):
+    """
+    Removes multiple spaces from a string.
+    
+    Arguments:
+    text -- The input text string
+    
+    Returns:
+    str -- The text with single spaces between words
+    """
+    logging.debug("Removing extra spaces from text")
+    textout = ' '.join(text.split())
+    logging.debug(f"Text after removing spaces: {textout}")
+    return textout
+
+def parse_date(input_date):
+    """
+    Converts a date string in extended format or YYYY-MM-DD to the format YYYY-MM-DD.
+    Supports month names in Italian.
+    
+    Arguments:
+    input_date -- The input date string
+    
+    Returns:
+    str -- The formatted date string in YYYY-MM-DD or raises ValueError if invalid
+    """
+    logging.debug(f"Parsing date: {input_date}")
+    
+    month_map = {
+        "gennaio": "01", "febbraio": "02", "marzo": "03", "aprile": "04",
+        "maggio": "05", "giugno": "06", "luglio": "07", "agosto": "08",
+        "settembre": "09", "ottobre": "10", "novembre": "11", "dicembre": "12"
+    }
+
+    pattern = r"(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})"
+    match = re.search(pattern, input_date)
+    if match:
+        day, month, year = match.groups()
+        month = month_map.get(month.lower())
+        if not month:
+            logging.error("Invalid month found in date string")
+            raise ValueError("Mese non valido")
+        formatted_date = f"{year}-{month}-{day.zfill(2)}"
+        logging.debug(f"Formatted date: {formatted_date}")
+        return formatted_date
+    
+    try:
+        datetime.datetime.strptime(input_date, "%Y-%m-%d")
+        return input_date
+    except ValueError:
+        logging.error("Invalid date format")
+        raise ValueError("Formato data non valido")
+
+def normalize_act_type(input_type, search=False, source='normattiva'):
+    """
+    Normalizes the type of legislative act based on the input.
+    
+    Arguments:
+    input_type -- The input act type string
+    search -- Boolean flag to indicate if the input is for search purposes
+    source -- Source dictionary to use for normalization (default: 'normattiva')
+    
+    Returns:
+    str -- The normalized act type or the original input if not found
+    """
+    logging.debug(f"Normalizing act type: {input_type}, search: {search}, source: {source}")
+    
+    if source == 'normattiva' and search:
+        act_types, act_types_lower = NORMATTIVA_SEARCH, _NORMATTIVA_SEARCH_LOWER
+    else:
+        act_types, act_types_lower = NORMATTIVA, _NORMATTIVA_LOWER
+    if source == 'brocardi':
+        if search:
+            act_types, act_types_lower = BROCARDI_SEARCH, _BROCARDI_SEARCH_LOWER
+        else:
+            act_types, act_types_lower = {}, {}
+
+    if input_type in {"TUE", "TFUE", "CDFUE"}:
+        return input_type
+
+    key = input_type.lower().strip()
+    # The tables hold both spaced keys ("cod. civ.") and spaceless ones ("cc"),
+    # and a few keys carry capitals. Literal first, then the case-insensitive
+    # index, then the spaceless form: each added attempt only ever resolves
+    # more names, it never changes one that already resolved.
+    normalized_type = act_types.get(key)
+    if normalized_type is None:
+        normalized_type = act_types_lower.get(key)
+    if normalized_type is None:
+        normalized_type = act_types.get(key.replace(" ", ""), key)
+
+
+    logging.debug(f"Normalized act type: {normalized_type}")
+    return normalized_type
+
+def estrai_numero_da_estensione(estensione):
+    """
+    Extracts the corresponding number from an extension (e.g., 'bis', 'tris').
+    
+    Arguments:
+    estensione -- The input extension string
+    
+    Returns:
+    int -- The extracted number or 0 if the extension is not found
+    """
+    logging.debug(f"Extracting number from extension: {estensione}")
+    
+    estensioni_numeriche = {
+        None: 0, 'bis': 2, 'tris': 3, 'ter': 3, 'quater': 4, 'quinquies': 5,
+        'quinques': 5, 'sexies': 6, 'septies': 7, 'octies': 8, 'novies': 9, 'decies': 10, 'undecies': 11, 'duodecies': 12, 'terdecies': 13, 'quaterdecies': 14,
+        'quindecies': 15, 'sexdecies': 16, 'septiesdecies': 17, 'duodevicies': 18, 'undevicies': 19,
+        'vices': 20, 'vicessemel': 21, 'vicesbis': 22, 'vicester': 23, 'vicesquater': 24,
+        'vicesquinquies': 25, 'vicessexies': 26, 'vicessepties': 27, 'duodetricies': 28, 'undetricies': 29,
+        'tricies': 30, 'triciessemel': 31, 'triciesbis': 32, 'triciester': 33, 'triciesquater': 34,
+        'triciesquinquies': 35, 'triciessexies': 36, 'triciessepties': 37, 'duodequadragies': 38, 'undequadragies': 39,
+        'quadragies': 40, 'quadragiessemel': 41, 'quadragiesbis': 42, 'quadragiester': 43, 'quadragiesquater': 44,
+        'quadragiesquinquies': 45, 'quadragiessexies': 46, 'quadragiessepties': 47, 'duodequinquagies': 48, 'undequinquagies': 49,
+    }
+    
+    number = estensioni_numeriche.get(estensione, 0)
+    logging.debug(f"Extracted number: {number}")
+    return number
+
+def get_annex_from_urn(urn):
+    """
+    Extracts the annex from a URN.
+    
+    Arguments:
+    urn -- The input URN string
+    
+    Returns:
+    str -- The annex number if found, otherwise None
+    """
+    logging.debug(f"Extracting annex from URN")
+    
+    ann_num = re.search(r":(\d+)(!vig=|@originale)$", urn)
+    if ann_num:
+        annex = ann_num.group(1)
+        logging.debug(f"Extracted annex: {annex}")
+        return annex
+    
+    logging.debug("No annex found in URN")
+    return None

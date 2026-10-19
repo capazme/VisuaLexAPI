@@ -1,0 +1,449 @@
+import { useState, useEffect } from 'react';
+import { Moon, Sun, HelpCircle, Shield, Info, GitBranch, GitCommit, Settings, Type, Palette, Download, Trash2, FlaskConical } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useAppStore } from '../../store/useAppStore';
+import { useAuth } from '../../hooks/useAuth';
+import { cn } from '../../lib/utils';
+import { Modal } from './Modal';
+import { accountService } from '../../services/accountService';
+import { ConnectedAppsSection } from '../../features/connections';
+import { MerltDataSection } from '../../features/merlt/privacy/MerltDataSection';
+
+interface CommitInfo {
+    hash: string;
+    message: string;
+    date: string;
+    author: string;
+}
+
+interface VersionInfo {
+    version: string;
+    git: {
+        branch: string;
+        commit: {
+            hash: string;
+            hash_full: string;
+            message: string;
+            date: string;
+            author: string;
+        };
+    };
+    changelog: CommitInfo[];
+}
+
+interface SettingsModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onRestartTour?: () => void;
+}
+
+export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalProps) {
+    const navigate = useNavigate();
+    const { isAdmin, canUseDevMode, devMode, setDevMode } = useAuth();
+    const { settings, updateSettings } = useAppStore();
+    const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
+    const [versionLoading, setVersionLoading] = useState(false);
+    const [versionError, setVersionError] = useState(false);
+    const [showInfo, setShowInfo] = useState(false);
+    const [accountBusy, setAccountBusy] = useState(false);
+    const [accountMessage, setAccountMessage] = useState<string | null>(null);
+    const [deletePassword, setDeletePassword] = useState('');
+    const [deleteConfirmation, setDeleteConfirmation] = useState('');
+    const [devModeBusy, setDevModeBusy] = useState(false);
+    const [devModeError, setDevModeError] = useState(false);
+
+    useEffect(() => {
+        if (isOpen && !versionInfo && !versionLoading && !versionError) {
+            // Async data-fetch on open: the loading flag gates a one-shot fetch.
+            // (CLAUDE.md gotcha #11)
+            setVersionLoading(true);
+            fetch('/version', { signal: AbortSignal.timeout(5000) })
+                .then(res => {
+                    if (!res.ok) throw new Error('Failed to fetch version');
+                    return res.json();
+                })
+                .then(data => {
+                    setVersionInfo(data);
+                    setVersionError(false);
+                })
+                .catch(() => {
+                    setVersionError(true);
+                    setVersionInfo(null);
+                })
+                .finally(() => setVersionLoading(false));
+        }
+    }, [isOpen, versionInfo, versionLoading, versionError]);
+
+    const formatDate = (dateStr: string) => {
+        if (!dateStr || dateStr === 'unknown') return 'N/D';
+        try {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('it-IT', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        } catch {
+            return dateStr;
+        }
+    };
+
+    const handleExportAccount = async () => {
+        setAccountBusy(true);
+        setAccountMessage(null);
+        try {
+            const data = await accountService.exportData();
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `visualex-dati-${new Date().toISOString().slice(0, 10)}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+            setAccountMessage('Export completato.');
+        } catch {
+            setAccountMessage('Impossibile esportare i dati.');
+        } finally {
+            setAccountBusy(false);
+        }
+    };
+
+    const handleDeleteAccount = async () => {
+        if (deleteConfirmation !== 'ELIMINA ACCOUNT') return;
+        setAccountBusy(true);
+        setAccountMessage(null);
+        try {
+            await accountService.deleteAccount(deletePassword, deleteConfirmation);
+            // Tokens AND the persisted store (the practices, settings): the
+            // next person on this browser must not inherit them.
+            localStorage.clear();
+            window.location.href = '/login?deleted=1';
+        } catch {
+            setAccountMessage('Impossibile eliminare l’account. Verifica la password e la conferma.');
+            setAccountBusy(false);
+        }
+    };
+
+    // The server answers with the user and every mounted `useAuth()` follows: the sidebar and the open
+    // article change under this dialog, no reload. A refusal leaves the mode as it was.
+    const handleToggleDevMode = async () => {
+        setDevModeBusy(true);
+        setDevModeError(false);
+        try {
+            await setDevMode(!devMode);
+        } catch {
+            setDevModeError(true);
+        } finally {
+            setDevModeBusy(false);
+        }
+    };
+
+    const FONT_SIZE_OPTIONS: Array<{ value: 'small' | 'medium' | 'large' | 'xlarge'; label: string; sizeClass: string }> = [
+        { value: 'small', label: 'Piccolo', sizeClass: 'text-[10px]' },
+        { value: 'medium', label: 'Medio', sizeClass: 'text-xs' },
+        { value: 'large', label: 'Grande', sizeClass: 'text-sm' },
+        { value: 'xlarge', label: 'Molto grande', sizeClass: 'text-base' },
+    ];
+
+    const FONT_FAMILY_OPTIONS: Array<{ value: 'sans' | 'serif' | 'mono'; label: string; fontClass: string }> = [
+        { value: 'sans', label: 'Sans', fontClass: 'font-sans' },
+        { value: 'serif', label: 'Serif', fontClass: 'font-serif' },
+        { value: 'mono', label: 'Mono', fontClass: 'font-mono' },
+    ];
+
+    return (
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title="Impostazioni"
+            icon={<Settings size={20} />}
+            size="md"
+        >
+            <div className="space-y-6">
+                {/* Theme - iOS-style Segmented Control */}
+                <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-1.5">
+                        <Palette size={12} aria-hidden /> Tema
+                    </label>
+                    <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-xl grid grid-cols-2 gap-1">
+                        <button
+                            onClick={() => updateSettings({ theme: 'light' })}
+                            aria-pressed={settings.theme === 'light'}
+                            className={cn(
+                                "flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all",
+                                settings.theme === 'light'
+                                    ? "bg-white dark:bg-slate-700 shadow-sm text-primary-600 dark:text-primary-400"
+                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                            )}
+                        >
+                            <Sun size={16} /> Chiaro
+                        </button>
+                        <button
+                            onClick={() => updateSettings({ theme: 'dark' })}
+                            aria-pressed={settings.theme === 'dark'}
+                            className={cn(
+                                "flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all",
+                                settings.theme === 'dark'
+                                    ? "bg-white dark:bg-slate-700 shadow-sm text-primary-600 dark:text-primary-400"
+                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                            )}
+                        >
+                            <Moon size={16} /> Scuro
+                        </button>
+                    </div>
+                </div>
+
+                {/* Typography */}
+                <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-1.5">
+                        <Type size={12} aria-hidden /> Tipografia
+                    </label>
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800 p-2 rounded-lg">
+                            <span className="text-sm text-slate-600 dark:text-slate-400 px-2">Dimensione</span>
+                            <div className="flex gap-1" role="group" aria-label="Dimensione testo">
+                                {FONT_SIZE_OPTIONS.map(({ value, label, sizeClass }) => (
+                                    <button
+                                        key={value}
+                                        onClick={() => updateSettings({ fontSize: value })}
+                                        aria-pressed={settings.fontSize === value}
+                                        title={label}
+                                        className={cn(
+                                            "w-8 h-8 flex items-center justify-center rounded font-bold transition-colors",
+                                            sizeClass,
+                                            settings.fontSize === value
+                                                ? "bg-blue-600 text-white"
+                                                : "hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
+                                        )}
+                                    >
+                                        A
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800 p-2 rounded-lg">
+                            <span className="text-sm text-slate-600 dark:text-slate-400 px-2">Font</span>
+                            <div className="flex gap-1" role="group" aria-label="Famiglia font">
+                                {FONT_FAMILY_OPTIONS.map(({ value, label, fontClass }) => (
+                                    <button
+                                        key={value}
+                                        onClick={() => updateSettings({ fontFamily: value })}
+                                        aria-pressed={settings.fontFamily === value}
+                                        className={cn(
+                                            "px-3 py-1.5 rounded text-xs border transition-colors",
+                                            fontClass,
+                                            settings.fontFamily === value
+                                                ? "border-blue-500 bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400"
+                                                : "border-transparent hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
+                                        )}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Restart Tour */}
+                {onRestartTour && (
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-1.5">
+                            <HelpCircle size={12} aria-hidden /> Aiuto
+                        </label>
+                        <button
+                            onClick={() => {
+                                onClose();
+                                // Small delay to let modal close animation complete
+                                setTimeout(() => onRestartTour(), 200);
+                            }}
+                            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors text-sm font-medium"
+                        >
+                            <HelpCircle size={16} />
+                            Ricomincia il Tour Guidato
+                        </button>
+                    </div>
+                )}
+
+                {/* Development mode - only for accounts the administrator enabled */}
+                {canUseDevMode && (
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-1.5">
+                            <FlaskConical size={12} aria-hidden /> Sviluppo
+                        </label>
+                        <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                            <div className="min-w-0">
+                                <p id="dev-mode-label" className="text-sm font-medium text-slate-700 dark:text-slate-200">Modalità sviluppo</p>
+                                <p className="text-xs text-slate-500">Mostra Assistente, Grafo e gli strumenti MERL-T ancora in prova, in barra laterale e sugli articoli.</p>
+                            </div>
+                            {/* The button is the hit area (44 px on a phone); the track and the thumb are drawn inside it. */}
+                            <button
+                                type="button"
+                                role="switch"
+                                aria-checked={devMode}
+                                aria-labelledby="dev-mode-label"
+                                disabled={devModeBusy}
+                                onClick={() => void handleToggleDevMode()}
+                                className="group inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-full disabled:opacity-50 md:min-h-0 focus-visible:outline-none"
+                            >
+                                <span
+                                    aria-hidden
+                                    className={cn(
+                                        "relative block h-6 w-11 rounded-full transition-colors group-focus-visible:ring-2 group-focus-visible:ring-primary-500 group-focus-visible:ring-offset-2",
+                                        devMode ? "bg-blue-600" : "bg-slate-300 dark:bg-slate-600"
+                                    )}
+                                >
+                                    <span
+                                        className={cn(
+                                            "absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform",
+                                            devMode && "translate-x-5"
+                                        )}
+                                    />
+                                </span>
+                            </button>
+                        </div>
+                        {devModeError && (
+                            <p role="alert" className="mt-2 text-xs text-red-600 dark:text-red-400">Impossibile cambiare la modalità sviluppo. Riprova.</p>
+                        )}
+                    </div>
+                )}
+
+                {/* Admin Panel - only for admins */}
+                {isAdmin && (
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-1.5">
+                            <Shield size={12} aria-hidden /> Amministrazione
+                        </label>
+                        <button
+                            onClick={() => {
+                                onClose();
+                                navigate('/admin');
+                            }}
+                            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors text-sm font-medium"
+                        >
+                            <Shield size={16} />
+                            Pannello Admin
+                        </button>
+                    </div>
+                )}
+
+                <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-1.5"><Shield size={12} aria-hidden /> Dati e privacy</label>
+                    <div className="space-y-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                        <p className="text-xs text-slate-500">Esporta una copia dei tuoi dati oppure elimina definitivamente l’account. Password e token non vengono inclusi nell’export.</p>
+                        <button type="button" onClick={() => void handleExportAccount()} disabled={accountBusy} className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50 dark:bg-blue-950/30 dark:text-blue-300"><Download size={16} /> Esporta i miei dati</button>
+                        <input type="password" value={deletePassword} onChange={event => setDeletePassword(event.target.value)} placeholder="Password corrente" aria-label="Password corrente per eliminare account" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800" />
+                        <input value={deleteConfirmation} onChange={event => setDeleteConfirmation(event.target.value)} placeholder="Scrivi ELIMINA ACCOUNT" aria-label="Conferma eliminazione account" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800" />
+                        <button type="button" onClick={() => void handleDeleteAccount()} disabled={accountBusy || !deletePassword || deleteConfirmation !== 'ELIMINA ACCOUNT'} className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:bg-red-950/30 dark:text-red-300"><Trash2 size={16} /> Elimina definitivamente l’account</button>
+                        {accountMessage && <p role="status" className="text-xs text-slate-500">{accountMessage}</p>}
+                    </div>
+                </div>
+
+                <MerltDataSection />
+
+                <ConnectedAppsSection />
+
+                {/* Version Info */}
+                <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-1.5">
+                        <Info size={12} aria-hidden /> Informazioni
+                    </label>
+                    <button
+                        onClick={() => setShowInfo(!showInfo)}
+                        aria-expanded={showInfo}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-sm font-medium"
+                    >
+                        <Info size={16} />
+                        {showInfo
+                            ? 'Nascondi dettagli'
+                            : versionLoading
+                                ? 'Caricamento...'
+                                : versionError
+                                    ? 'Versione (errore)'
+                                    : `Versione ${versionInfo?.version || '1.0.0'}`
+                        }
+                    </button>
+
+                    {showInfo && versionInfo && (
+                        <div className="mt-3 space-y-3">
+                            {/* Version & Git Info */}
+                            <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl space-y-2 text-xs">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-slate-500">Versione</span>
+                                    <span className="font-mono font-medium text-blue-600 dark:text-blue-400">
+                                        v{versionInfo.version}
+                                    </span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-slate-500 flex items-center gap-1">
+                                        <GitBranch size={12} /> Branch
+                                    </span>
+                                    <span className="font-mono text-slate-700 dark:text-slate-300">
+                                        {versionInfo.git.branch}
+                                    </span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-slate-500 flex items-center gap-1">
+                                        <GitCommit size={12} /> Commit
+                                    </span>
+                                    <span className="font-mono text-slate-700 dark:text-slate-300">
+                                        {versionInfo.git.commit.hash}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Changelog */}
+                            {versionInfo.changelog && versionInfo.changelog.length > 0 && (
+                                <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-xs">
+                                    <p className="text-slate-500 font-medium mb-2 flex items-center gap-1">
+                                        <GitCommit size={12} /> Changelog
+                                    </p>
+                                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                                        {versionInfo.changelog.map((commit, idx) => (
+                                            <div
+                                                key={commit.hash}
+                                                className={cn(
+                                                    "py-1.5",
+                                                    idx !== versionInfo.changelog.length - 1 && "border-b border-slate-200 dark:border-slate-700"
+                                                )}
+                                            >
+                                                <div className="flex items-start gap-2">
+                                                    <span className="font-mono text-blue-500 shrink-0">{commit.hash}</span>
+                                                    <p className="text-slate-700 dark:text-slate-300 line-clamp-2">
+                                                        {commit.message}
+                                                    </p>
+                                                </div>
+                                                <p className="text-slate-400 dark:text-slate-500 mt-0.5 text-[10px]">
+                                                    {commit.author} · {formatDate(commit.date)}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {showInfo && !versionInfo && (
+                        <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-xs text-slate-500 text-center">
+                            {versionLoading ? 'Caricamento...' : versionError ? (
+                                <div className="space-y-2">
+                                    <p className="text-red-500">Impossibile caricare le informazioni</p>
+                                    <button
+                                        onClick={() => setVersionError(false)}
+                                        className="text-blue-500 hover:underline"
+                                    >
+                                        Riprova
+                                    </button>
+                                </div>
+                            ) : 'Caricamento...'}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </Modal>
+    );
+}

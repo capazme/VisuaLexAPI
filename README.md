@@ -3,10 +3,10 @@
 > **Intelligent Legal Visualization and Research**
 
 ![Version](https://img.shields.io/badge/version-0.1.0-blue)
-![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
-![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?logo=node.js&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-24-339933?logo=node.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
-![License](https://img.shields.io/badge/license-MIT-green)
+![License](https://img.shields.io/badge/license-MPL--2.0-orange)
 
 VisuaLex is an advanced web application designed to research, visualize, and study legal texts from **Normattiva**, **EUR-Lex**, and **Brocardi**. It combines a powerful async Python backend with a rich React-based frontend to transform complex regulations into interactive knowledge graphs and structured views.
 
@@ -23,61 +23,22 @@ VisuaLex is an advanced web application designed to research, visualize, and stu
 | **[Frontend Setup](docs/frontend/setup.md)** | Installation & development |
 | **[Component Library](docs/frontend/component_library.md)** | Reusable UI components |
 | **[User Guide](docs/user_guide.md)** | End-user documentation |
-| **[Deployment](docs/deployment.md)** | How `deploy.sh` works, pre-deploy checklist, env vars |
-| **[Git workflow](docs/git-workflow.md)** | Branches, release tags, how the experiment branch absorbs `main`, the monthly sweep |
+| **[Setup](docs/setup.md)** | From clone to a running stack and green suites |
+| **[Git workflow](docs/git-workflow.md)** | `develop` and `main`, pull requests, review, versions and releases, hotfixes |
+| **[Changelog](CHANGELOG.md)** | What changed, release by release |
 
 ---
 
 ## Quick Start
 
-### Prerequisites
-
-- **Python 3.10+**
-- **Node.js 18+**
-- **PostgreSQL** (for user data)
-
-### Installation
-
 ```bash
-# 1. Clone and setup Python API
-cd VisuaLexAPI
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-playwright install chromium  # Required for PDF export
-
-# 2. Setup Node.js Backend
-cd backend
-npm install
-cp .env.example .env        # Configure DATABASE_URL and JWT_SECRET
-npm run prisma:generate
-npm run prisma:migrate
-
-# 3. Setup Frontend
-cd ../frontend
-npm install
-```
-
-### Running
-
-```bash
-# Option 1: Use start script (recommended)
+git clone --recurse-submodules https://github.com/capazme/VisuaLexAPI.git
+cd VisuaLexAPI && git switch develop
 ./start.sh
-
-# Option 2: Manual (3 terminals)
-# Terminal 1: Python API
-source .venv/bin/activate && python app.py      # :5000
-
-# Terminal 2: Node.js Backend
-cd backend && npm run dev                        # :3001
-
-# Terminal 3: Frontend
-cd frontend && npm run dev                       # :5173
 ```
 
-**Access the application at:** http://localhost:5173
-
----
+The one-time setup (Docker, Node, Python, the `.env` files) is in
+[docs/setup.md](docs/setup.md).
 
 ## Core Features
 
@@ -92,45 +53,25 @@ cd frontend && npm run dev                       # :5173
 
 ## Project Structure
 
-```
-VisuaLexAPI/
-├── app.py                    # Python API entry point (Quart)
-├── visualex_api/             # Python API source
-│   ├── services/             # Scrapers (Normattiva, EUR-Lex, Brocardi)
-│   └── tools/                # Utilities (URN, parsing, config)
-├── backend/                  # Node.js platform backend
-│   ├── prisma/               # Database schema
-│   └── src/                  # Express routes, controllers
-├── frontend/                 # React SPA (Vite + TypeScript)
-│   └── src/
-│       ├── components/       # UI & feature components
-│       ├── store/            # Zustand state management
-│       └── services/         # API clients
-├── docs/                     # Documentation
-└── data/                     # Local data storage
-```
+| Path | What |
+|---|---|
+| `apps/web/` | React + Vite web app |
+| `apps/server/` | Express + Prisma: accounts, dossiers, community |
+| `services/visualex/` | Python API (Quart): Normattiva, EUR-Lex, Brocardi |
+| `services/merlt/` | MERL-T knowledge graph and RLCF (MPL-2.0) |
+| `tools/` | archive CLI, end-to-end harness |
+| `infra/` | Docker Compose stack |
+| `scripts/` | data backup and restore |
+| `docs/` | documentation — start from [docs/README.md](docs/README.md) |
 
----
+## Releases
 
-## Deployment
-
-Production ships through one script, run **on the server**:
-
-```bash
-./deploy.sh --patch
-```
-
-It pulls, installs, syncs the Playwright browser, regenerates the Prisma client,
-applies pending migrations, builds both apps and restarts the services. It does
-**not** run any test — see **[Deployment](docs/deployment.md)** for the
-pre-deploy checklist, the environment variables, and the rule that the server
-must be checked out on `main` (never on the `visualex-merlt-main` experiment).
-
----
+There is no public deployment at the moment. Releases are tags on `main`;
+day-to-day work goes to `develop` — see [docs/git-workflow.md](docs/git-workflow.md).
 
 ## Troubleshooting
 
-- **"Playwright: no such driver"**: Run `playwright install chromium`
+- **"Playwright: no such driver"**: Run `services/visualex/.venv/bin/playwright install chromium`
 - **PDF Export Fails**: Ensure Chromium is installed via Playwright
 - **CORS Errors**: Check that all services are running on correct ports
 
@@ -138,12 +79,19 @@ must be checked out on `main` (never on the `visualex-merlt-main` experiment).
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+Mozilla Public License 2.0 (MPL-2.0) — see [LICENSE](LICENSE). The licence
+covers the whole repository, MERL-T included.
+
+Contributions are accepted under the Developer Certificate of Origin: each
+commit carries a `Signed-off-by` line (`git commit -s`). There is no
+Contributor License Agreement.
 
 The licence covers this software only. The legal texts it retrieves come from
-third parties: please respect the Terms of Service of Normattiva, EUR-Lex and
-Brocardi.
+third parties: please respect the Terms of Service of Normattiva, EUR-Lex,
+Brocardi and the Corte di cassazione's SentenzeWeb; the Corte costituzionale's
+open data are licensed CC BY-SA 3.0 and are credited wherever they appear.
 
-Portions of the act-resolution tables and the Akoma Ntoso parser derive from
+Portions of the act-resolution tables, the Akoma Ntoso parser and the Corte
+costituzionale open-data reader derive from
 [mcp-legal-it](https://github.com/capazme/mcp-legal-it), by the same author,
-relicensed MIT by the copyright holder.
+relicensed MIT by the copyright holder; those portions keep the MIT terms.

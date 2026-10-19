@@ -1,0 +1,147 @@
+# The ingress: the one module that faces the network.
+#
+# Phase 1 (private) is plain HTTP on the home network. Phase 2 replaces the global
+# block and the site address with the domain, and Caddy obtains its certificate.
+#
+# It listens on 8080, not 80: a port above 1024 needs no privilege, so the module
+# runs as a normal user with every capability dropped. Publish it wherever you like
+# (Compose: "80:8080" or a LAN address).
+#
+# The upstreams come from the environment, so a module can move to another machine:
+#   SERVER_UPSTREAM     default server:3001
+#   SCRAPERS_UPSTREAM   default scrapers:5000
+#   APP_SUBNET, EDGE_SUBNET   the subnets a forwarded client address is kept from
+#
+# Only the paths below reach the Python API. Its own /history, /dossiers… and
+# circuit-breaker pages stay unrouted: it keeps a global, unauthenticated history
+# and dossier file that were never meant for the outside. The paths that do reach it are
+# behind the login, except /version and /health (see the scrapers block).
+
+{
+	admin off
+	auto_https off
+	servers {
+		# The client's address (X-Forwarded-For) is kept only when the connection comes from
+		# the stack's own subnets: the host's gateway addresses, where a proxy on the host
+		# (the overlay's) arrives through the loopback, and the stack's containers. From
+		# anyone else Caddy writes the address it sees. Docker may route a published port
+		# through either network of the ingress, so both are listed.
+		# Spec: docs/superpowers/specs/2026-10-05-mcp-production-design.md, section 5.
+		trusted_proxies static {$APP_SUBNET:172.29.240.0/24} {$EDGE_SUBNET:172.29.241.0/24}
+	}
+}
+
+:8080 {
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		# Report-only first: the reader emits inline styles and the graph a worker.
+		# Tighten to an enforcing policy once the browser console shows no violation.
+		Content-Security-Policy-Report-Only "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; worker-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		-Server
+	}
+
+	# The server: accounts, dossiers, the MERL-T gateway. The note upload is 50 MB.
+	handle /api/merlt/contrib/* {
+		request_body {
+			max_size 60MB
+		}
+		reverse_proxy {$SERVER_UPSTREAM:server:3001}
+	}
+	handle /api/* {
+		request_body {
+			max_size 10MB
+		}
+		reverse_proxy {$SERVER_UPSTREAM:server:3001}
+	}
+
+	# The OAuth authorization server for MCP clients (apps/server): its metadata, and the
+	# endpoints where a client registers, asks for consent and gets its tokens. Not behind
+	# the login check: a client starts here before anyone has signed in. The consent page
+	# itself (/connect) is the app's, and frame-ancestors 'none' keeps it out of frames.
+	handle /oauth/* {
+		# Introspection answers only to the MCP server's credential, and the MCP calls the
+		# server from inside the stack: it has no reason to be reachable from the network.
+		# Every spelling the server would route there (a trailing slash, another case) is
+		# matched here too: Caddy's path matcher is case-insensitive on the cleaned path.
+		@introspect path /oauth/introspect /oauth/introspect/*
+		respond @introspect 404
+		request_body {
+			max_size 64KB
+		}
+		reverse_proxy {$SERVER_UPSTREAM:server:3001}
+	}
+	handle /.well-known/oauth-authorization-server {
+		request_body {
+			max_size 64KB
+		}
+		reverse_proxy {$SERVER_UPSTREAM:server:3001}
+	}
+	# Any other well-known name is not ours: a 404, never the app's page (a client probing
+	# /.well-known/openid-configuration would read HTML where it expects JSON).
+	handle /.well-known/* {
+		respond 404
+	}
+
+	# The scrapers. The list below is the one Vite proxies to port 5000 in development,
+	# prefix for prefix; infra/ingress/paths.test.mjs keeps the two in step.
+	#
+	# Two of them stay open: /version and /health, exactly. Everything else asks the server
+	# first (forward_auth to GET /api/auth/verify, which answers 2xx for a signed-in user
+	# inside their quota and 401 or 429 otherwise; a non-2xx answer goes back to the caller
+	# as it is). If the server does not answer, the request fails: the gate is closed by default.
+	@open path /version /health
+	handle @open {
+		request_body {
+			max_size 1KB
+		}
+		reverse_proxy {$SCRAPERS_UPSTREAM:scrapers:5000} {
+			header_up -Authorization
+		}
+	}
+	@legal {
+		path /fetch_norma_data* /fetch_article_text* /stream_article_text* /fetch_brocardi_info* /fetch_all_data* /fetch_tree* /fetch_rubriche* /fetch_alias_catalog* /fetch_decision* /fetch_decision_pdf* /search_decisions* /search_eu_case_law* /parse_query* /extract_citations* /export_pdf* /version* /health*
+		not path /version /health
+	}
+	handle @legal {
+		request_body {
+			max_size 1MB
+		}
+		forward_auth {$SERVER_UPSTREAM:server:3001} {
+			uri /api/auth/verify
+			# The login check takes milliseconds. A server that has not answered in ten seconds
+			# fails the request (504) instead of holding it: the gate stays shut, and in time.
+			transport http {
+				response_header_timeout 10s
+			}
+		}
+		# /stream_article_text answers NDJSON, one line per article: no buffering.
+		# The scrapers never see the login token.
+		reverse_proxy {$SCRAPERS_UPSTREAM:scrapers:5000} {
+			flush_interval -1
+			header_up -Authorization
+		}
+	}
+
+	# Hashed assets never change under the same name.
+	handle /assets/* {
+		root * /srv
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	# The app, with the single-page fallback. It takes no body worth reading.
+	handle {
+		request_body {
+			max_size 1MB
+		}
+		root * /srv
+		header Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+}

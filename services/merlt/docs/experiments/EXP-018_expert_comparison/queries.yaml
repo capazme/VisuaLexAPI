@@ -1,0 +1,77 @@
+# EXP-018: Query Dataset per Expert Comparison
+# 50 query distribuite in 5 categorie
+
+definitional:
+  description: "Domande su definizioni e concetti"
+  expected_expert: "literal"
+  queries:
+    - "Cos'è il contratto secondo il codice civile?"
+    - "Cosa si intende per legittima difesa?"
+    - "Definizione di responsabilità civile"
+    - "Cos'è la buona fede contrattuale?"
+    - "Cosa significa capacità giuridica?"
+    - "Nozione di possesso nel diritto civile"
+    - "Cos'è l'obbligazione naturale?"
+    - "Definizione di danno ingiusto"
+    - "Cosa si intende per causa del contratto?"
+    - "Cos'è il dolo nel diritto penale?"
+
+interpretive:
+  description: "Domande su interpretazione di norme"
+  expected_expert: "literal"
+  queries:
+    - "Come interpretare l'art. 2043 del codice civile?"
+    - "Qual è il significato dell'art. 1453 sulla risoluzione?"
+    - "Interpretazione dell'art. 52 c.p. sulla legittima difesa"
+    - "Come si interpreta l'elemento soggettivo nel 2043?"
+    - "Significato di 'fatto doloso o colposo' nel 2043"
+    - "Ambito di applicazione dell'art. 1218 c.c."
+    - "Portata dell'art. 185 c.p. sul risarcimento"
+    - "Come leggere l'art. 2059 sui danni non patrimoniali?"
+    - "Interpretazione sistematica dell'art. 1175 c.c."
+    - "Senso dell'art. 2058 sulla reintegrazione in forma specifica"
+
+procedural:
+  description: "Domande su termini e procedure"
+  expected_expert: "precedent"
+  queries:
+    - "Quali sono i termini per la risoluzione del contratto?"
+    - "Procedura per l'azione di risarcimento danni"
+    - "Termini di prescrizione per l'azione aquiliana"
+    - "Come si esercita il diritto di recesso?"
+    - "Modalità di costituzione in mora del debitore"
+    - "Procedura per la diffida ad adempiere"
+    - "Termini per l'impugnazione del contratto annullabile"
+    - "Come si propone l'eccezione di inadempimento?"
+    - "Termini per l'azione di rescissione"
+    - "Procedura per la risoluzione per eccessiva onerosità"
+
+constitutional:
+  description: "Domande su principi costituzionali"
+  expected_expert: "principles"
+  queries:
+    - "Art. 3 Cost. e principio di uguaglianza sostanziale"
+    - "Diritto alla salute ex art. 32 Cost."
+    - "Tutela della proprietà privata nell'art. 42 Cost."
+    - "Libertà di iniziativa economica ex art. 41 Cost."
+    - "Principi costituzionali sul diritto di difesa"
+    - "Art. 24 Cost. e accesso alla giustizia"
+    - "Bilanciamento tra diritti fondamentali"
+    - "Riserva di legge in materia penale"
+    - "Principio di ragionevolezza nella giurisprudenza costituzionale"
+    - "Art. 2 Cost. e doveri inderogabili di solidarietà"
+
+jurisprudential:
+  description: "Domande su orientamenti giurisprudenziali"
+  expected_expert: "precedent"
+  queries:
+    - "Orientamento della Cassazione sul danno biologico"
+    - "Giurisprudenza sulla responsabilità del medico"
+    - "Come la Cassazione interpreta la buona fede oggettiva?"
+    - "Evoluzione giurisprudenziale sul danno esistenziale"
+    - "Orientamento delle Sezioni Unite sulla causalità"
+    - "Giurisprudenza sulla responsabilità dell'avvocato"
+    - "Come i giudici applicano l'art. 2051 c.c.?"
+    - "Massime della Cassazione sulla responsabilità contrattuale"
+    - "Orientamento sulla prova del danno da perdita di chance"
+    - "Giurisprudenza sulla quantificazione del danno morale"

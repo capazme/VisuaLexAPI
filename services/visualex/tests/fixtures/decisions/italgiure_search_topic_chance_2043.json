@@ -1,0 +1,74 @@
+{
+ "responseHeader": {
+  "status": 0,
+  "QTime": 15,
+  "params": {
+   "hl.fragsize": "200",
+   "sort": "pd desc",
+   "fl": "id,numdec,anno,datdep,szdec,tipoprov,kind",
+   "hl.snippets": "1",
+   "q": "kind:\"snciv\" AND ocr:\"perdita di chance\" AND ocr:\"art. 2043 c.c.\"",
+   "hl.fl": "ocr",
+   "wt": "json",
+   "app.query": "",
+   "hl": "true",
+   "rows": "3"
+  }
+ },
+ "response": {
+  "numFound": 34,
+  "start": 0,
+  "docs": [
+   {
+    "numdec": "24908",
+    "szdec": "L",
+    "datdep": [
+     "20260901"
+    ],
+    "kind": "snciv",
+    "tipoprov": "Ordinanza",
+    "id": "snciv2026L24908O",
+    "anno": "2026"
+   },
+   {
+    "numdec": "22588",
+    "szdec": "1",
+    "datdep": [
+     "20260701"
+    ],
+    "kind": "snciv",
+    "tipoprov": "Ordinanza",
+    "id": "snciv2026122588O",
+    "anno": "2026"
+   },
+   {
+    "numdec": "22192",
+    "szdec": "3",
+    "datdep": [
+     "20260628"
+    ],
+    "kind": "snciv",
+    "tipoprov": "Ordinanza",
+    "id": "snciv2026322192O",
+    "anno": "2026"
+   }
+  ]
+ },
+ "highlighting": {
+  "snciv2026L24908O": {
+   "ocr": [
+    " con il quadro normativo e giurisprudenziale richiamato.7. Col quarto (ed ultimo) motivo si denuncia, ex art. 360 n. 3 c.p.c., laviolazione e/o falsa applicazione della norma di cui <em>all’art</em>. <em>2043</em> <em>c.c</em>. Lericorrenti"
+   ]
+  },
+  "snciv2026122588O": {
+   "ocr": [
+    ". – Con il secondo motivo, si deduce la violazione <em>dell’art</em>. <em>2043</em> <em>c.c</em>.,in quanto la corte territoriale ha ritenuto tale questione assorbita, ma, inipotesi di accoglimento del primo motivo di ricorso, essa merita"
+   ]
+  },
+  "snciv2026322192O": {
+   "ocr": [
+    " latutela risarcitoria extracontrattuale invocata dall’appellante (da ricondurreal paradigma <em>dell’art</em>. <em>2043</em> <em>c.c</em>.) non avendo il danneggiato, gravato delrelativo onere, raggiunto la prova del nesso eziologico"
+   ]
+  }
+ }
+}

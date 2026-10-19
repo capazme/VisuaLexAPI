@@ -1,0 +1,480 @@
+import { Router } from 'express';
+import type { Request, Response, NextFunction } from 'express';
+import { prisma } from '../../lib/prisma';
+import multer from 'multer';
+import { authenticate } from '../../middleware/auth';
+import { internalAuth } from '../../middleware/internalAuth';
+import { contributionGuard } from '../../services/merlt/contributionGuard';
+import { validatePromotionGate } from '../../services/merlt/promotionGate';
+import {
+  promoteRequestSchema,
+  extractionCallbackSchema,
+  RELATION_ENDPOINT_ERROR,
+} from '../../schemas/merlt/contrib';
+import {
+  createContribClient,
+  ContribClient,
+  type ExtractionCandidate,
+} from '../../services/merlt/contribClient';
+import { MerltClientError, MerltBadRequestError } from '../../services/merlt/merltClient';
+
+/**
+ * MERL-T contribution layer BFF routes (Slice 2c — "Apprendi dai miei appunti").
+ *
+ * Mounted at /api/merlt (see routes/merlt/index.ts), per-route middleware (the
+ * internal callback skips JWT, like graph.ts).
+ *
+ *  - POST /contrib/documents/:id/extract        authenticate + contributionGuard (document owner)
+ *  - GET  /contrib/documents/:id/candidates     authenticate + contributionGuard (document owner)
+ *  - GET  /contrib/jobs/:jobId/status           authenticate (owner-scoped)
+ *  - POST /contrib/candidates/:id/promote       authenticate + contributionGuard (document owner + copyright gate)
+ *  - POST /internal/extraction-callback         internalAuth
+ *
+ * Upload (POST /contrib/documents, multipart) is added separately (needs multer).
+ *
+ * Ownership: MERL-T document and candidate ids are sequential integers and
+ * MERL-T scopes neither extract-async nor the candidate reads by user, so the
+ * BFF is the trust boundary. Every document-keyed route asks MERL-T who
+ * uploaded the document (`uploaded_by`) and answers 404 on a mismatch, never
+ * 403, so a caller cannot tell someone else's id from a missing one.
+ */
+
+const router = Router();
+
+const MAX_UPLOAD_BYTES = 50 * 1024 * 1024; // mirror MERL-T MAX_UPLOAD_SIZE_MB=50
+const ALLOWED_EXT = /\.(pdf|txt|docx)$/i;
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_UPLOAD_BYTES },
+  fileFilter: (_req, file, cb) => {
+    if (ALLOWED_EXT.test(file.originalname)) cb(null, true);
+    else cb(new Error('unsupported_file_type'));
+  },
+});
+
+/** Wrap multer so its errors become clean 400/413 instead of the generic handler. */
+function uploadSingle(req: Request, res: Response, next: NextFunction): void {
+  upload.single('file')(req, res, (err: unknown) => {
+    if (err) {
+      if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+        res.status(413).json({ detail: 'file_too_large' });
+        return;
+      }
+      res.status(400).json({
+        detail: 'invalid_file',
+        message: err instanceof Error ? err.message : String(err),
+      });
+      return;
+    }
+    next();
+  });
+}
+
+let cachedContribClient: ContribClient | null = null;
+function contribClient(): ContribClient {
+  if (!cachedContribClient) cachedContribClient = createContribClient();
+  return cachedContribClient;
+}
+export function _resetContribClientForTests(): void {
+  cachedContribClient = null;
+}
+
+function isMerltNotFound(err: unknown): boolean {
+  return err instanceof MerltBadRequestError && err.status === 404;
+}
+
+/**
+ * True when `userId` uploaded MERL-T document `documentId`. A document MERL-T
+ * does not know is "not yours" (false). Any other MERL-T failure throws, so an
+ * outage stays a 503 and is never read as a verdict on ownership.
+ */
+async function ownsDocument(documentId: number, userId: string): Promise<boolean> {
+  try {
+    const doc = await contribClient().getDocument(documentId);
+    return typeof doc?.uploaded_by === 'string' && doc.uploaded_by === userId;
+  } catch (err) {
+    if (isMerltNotFound(err)) return false;
+    throw err;
+  }
+}
+
+/**
+ * POST /api/merlt/contrib/documents (multipart, field `file`)
+ * Validates type/size on the BFF, then forwards to MERL-T /documents/upload
+ * with the VisuaLex user id (string). Returns the MERL-T document id.
+ */
+router.post(
+  '/contrib/documents',
+  authenticate,
+  contributionGuard,
+  uploadSingle,
+  async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ detail: 'Authentication required' });
+      return;
+    }
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ detail: 'file_required' });
+      return;
+    }
+    try {
+      const result = await contribClient().uploadDocument({
+        file: file.buffer,
+        filename: file.originalname,
+        contentType: file.mimetype,
+        userId: req.user.id,
+        documentType: typeof req.body?.documentType === 'string' ? req.body.documentType : undefined,
+        legalDomain: typeof req.body?.legalDomain === 'string' ? req.body.legalDomain : undefined,
+        title: typeof req.body?.title === 'string' ? req.body.title : undefined,
+      });
+      res.status(201).json({ documentId: result.document_id, duplicate: result.duplicate });
+    } catch (err) {
+      if (err instanceof MerltClientError) {
+        res.status(503).json({ detail: 'merlt_unavailable' });
+        return;
+      }
+      throw err;
+    }
+  },
+);
+
+/**
+ * POST /api/merlt/contrib/documents/:id/extract
+ * Check that the caller uploaded the document (404 document_not_found
+ * otherwise; 503 when MERL-T cannot say), then create a pending extraction job
+ * and best-effort ask MERL-T to enqueue the async extract-to-staging task
+ * (threading the job id through). Returns 202.
+ */
+router.post(
+  '/contrib/documents/:id/extract',
+  authenticate,
+  contributionGuard,
+  async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ detail: 'Authentication required' });
+      return;
+    }
+    const documentId = req.params.id;
+    const docIdNum = Number.parseInt(documentId, 10);
+    if (Number.isNaN(docIdNum)) {
+      res.status(400).json({ detail: 'invalid_document_id' });
+      return;
+    }
+
+    // Ownership before any side effect: no job row, no enqueue for a document
+    // someone else uploaded (the worker would otherwise stage their verbatim
+    // excerpts under the caller's contributor id).
+    try {
+      if (!(await ownsDocument(docIdNum, req.user.id))) {
+        res.status(404).json({ detail: 'document_not_found' });
+        return;
+      }
+    } catch (err) {
+      if (err instanceof MerltClientError) {
+        res.status(503).json({ detail: 'merlt_unavailable' });
+        return;
+      }
+      throw err;
+    }
+
+    const job = await prisma.merltExtractionJob.create({
+      data: { documentId, userId: req.user.id, status: 'pending' },
+    });
+
+    // Best-effort enqueue: if MERL-T is down we still keep the job row so the
+    // client can poll / retry later (mirrors graph ingest).
+    try {
+      const { task_id } = await contribClient().extractAsync(docIdNum, req.user.id, job.id);
+      await prisma.merltExtractionJob.update({ where: { id: job.id }, data: { taskId: task_id } });
+    } catch (err) {
+      if (!(err instanceof MerltClientError)) throw err;
+    }
+
+    res.status(202).json({ jobId: job.id, status: 'pending' });
+  },
+);
+
+/**
+ * GET /api/merlt/contrib/documents/:id/candidates
+ * Proxy to MERL-T, scoped to the document's uploader (404 document_not_found
+ * for anyone else) and to the current contributor. 503 on outage.
+ */
+router.get(
+  '/contrib/documents/:id/candidates',
+  authenticate,
+  contributionGuard,
+  async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ detail: 'Authentication required' });
+      return;
+    }
+    const docIdNum = Number.parseInt(req.params.id, 10);
+    if (Number.isNaN(docIdNum)) {
+      res.status(400).json({ detail: 'invalid_document_id' });
+      return;
+    }
+    try {
+      if (!(await ownsDocument(docIdNum, req.user.id))) {
+        res.status(404).json({ detail: 'document_not_found' });
+        return;
+      }
+      const result = await contribClient().listCandidates(docIdNum, req.user.id);
+      res.status(200).json(result);
+    } catch (err) {
+      if (err instanceof MerltClientError) {
+        res.status(503).json({ detail: 'merlt_unavailable' });
+        return;
+      }
+      throw err;
+    }
+  },
+);
+
+/**
+ * GET /api/merlt/contrib/jobs/:jobId/status — owner-scoped (404 otherwise).
+ */
+router.get(
+  '/contrib/jobs/:jobId/status',
+  authenticate,
+  async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ detail: 'Authentication required' });
+      return;
+    }
+    const job = await prisma.merltExtractionJob.findFirst({
+      where: { id: req.params.jobId, userId: req.user.id },
+    });
+    if (!job) {
+      res.status(404).json({ detail: 'job_not_found' });
+      return;
+    }
+    res.status(200).json({
+      jobId: job.id,
+      status: job.status,
+      candidatesCreated: job.candidatesCreated,
+      error: job.errorMessage,
+    });
+  },
+);
+
+/**
+ * GET /api/merlt/contrib/me/jobs
+ * The current user's recent extraction jobs — gives the hub a "I miei contributi"
+ * surface so a refresh doesn't lose the in-progress flow (ContribPage state is
+ * in-memory and was throwing context away on every reload). Owner-scoped.
+ */
+router.get(
+  '/contrib/me/jobs',
+  authenticate,
+  async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ detail: 'Authentication required' });
+      return;
+    }
+    const jobs = await prisma.merltExtractionJob.findMany({
+      where: { userId: req.user.id },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      select: {
+        id: true,
+        documentId: true,
+        status: true,
+        candidatesCreated: true,
+        errorMessage: true,
+        createdAt: true,
+        completedAt: true,
+      },
+    });
+    res.status(200).json({ jobs });
+  },
+);
+
+/**
+ * POST /api/merlt/contrib/candidates/:id/promote
+ * Server-side copyright gate (fonte + reformulation + attestation), then create
+ * the canonical RLCF proposal. The authoritative verbatim is fetched from
+ * MERL-T (the client cannot supply it) and the reformulated text is checked
+ * against it. 422 promotion_rejected on a gate failure.
+ *
+ * Ownership: the candidate must come from a document the caller uploaded
+ * (candidate.document_id → document.uploaded_by), else 404
+ * candidate_not_found, so nobody can file, or consume by marking it promoted,
+ * a candidate staged from someone else's notes. A relation's endpoints must
+ * be resolved identifiers (400 unresolved_endpoint, see the schema).
+ */
+router.post(
+  '/contrib/candidates/:id/promote',
+  authenticate,
+  contributionGuard,
+  async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ detail: 'Authentication required' });
+      return;
+    }
+    const parsed = promoteRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      const unresolvedEndpoint = parsed.error.issues.some((i) => i.message === RELATION_ENDPOINT_ERROR);
+      res.status(400).json({
+        detail: unresolvedEndpoint ? RELATION_ENDPOINT_ERROR : 'invalid_body',
+        issues: parsed.error.flatten(),
+      });
+      return;
+    }
+    const candidateId = Number.parseInt(req.params.id, 10);
+    if (Number.isNaN(candidateId)) {
+      res.status(400).json({ detail: 'invalid_candidate_id' });
+      return;
+    }
+    const body = parsed.data;
+
+    try {
+      let candidate: ExtractionCandidate;
+      try {
+        candidate = await contribClient().getCandidate(candidateId);
+      } catch (err) {
+        if (isMerltNotFound(err)) {
+          res.status(404).json({ detail: 'candidate_not_found' });
+          return;
+        }
+        throw err;
+      }
+      // A candidate carries the document it was extracted from; without one
+      // ownership cannot be proved, so it is refused like a foreign one.
+      if (typeof candidate.document_id !== 'number') {
+        // eslint-disable-next-line no-console
+        console.warn(`merlt contrib promote: candidate ${candidateId} has no document_id, refused`);
+        res.status(404).json({ detail: 'candidate_not_found' });
+        return;
+      }
+      if (
+        (candidate.contributor_id != null && candidate.contributor_id !== req.user.id) ||
+        !(await ownsDocument(candidate.document_id, req.user.id))
+      ) {
+        res.status(404).json({ detail: 'candidate_not_found' });
+        return;
+      }
+
+      const gate = validatePromotionGate({
+        fonte: body.fonte,
+        reformulatedText: body.descrizione,
+        verbatimExcerpt: candidate.verbatim_excerpt ?? '',
+        attested: body.attested,
+      });
+      if (!gate.ok) {
+        res.status(422).json({ detail: 'promotion_rejected', reason: gate.reason });
+        return;
+      }
+
+      // Provenance the proposal carries into pending_*: `fonte` is the pipeline
+      // tag ("community" = a VisuaLex user proposed it), `source_reference` is
+      // the bibliographic citation the copyright gate required, and
+      // `source_document_id` is the MERL-T user_documents row (never the
+      // staging candidate id, which is purged after promotion).
+      const provenance = {
+        fonte: 'community',
+        source_reference: body.fonte.trim().slice(0, 300),
+        source_document_id: candidate.document_id ?? undefined,
+        skip_duplicate_check: body.skipDuplicateCheck || undefined,
+        acknowledged_duplicate_of: body.acknowledgedDuplicateOf,
+      };
+      const proposal =
+        body.candidateType === 'entity'
+          ? await contribClient().proposeEntity({
+              // Stand-alone proposals fall back to the staging placeholder so
+              // free-text notes without a clear norma still create a proposal
+              // (the graph writer never turns the placeholder into a node).
+              article_urn: body.articleUrn?.trim() || 'user_document',
+              nome: body.nome,
+              // The LLM-assigned type on the authoritative candidate wins over
+              // the client's: a principio must not be filed as a concetto
+              // (the graph edge label depends on it).
+              tipo: candidate.entity_type?.trim() || body.tipo,
+              descrizione: body.descrizione,
+              contributed_by: req.user.id,
+              user_id: req.user.id,
+              ...provenance,
+            })
+          : await contribClient().proposeRelation({
+              article_urn: body.articleUrn,
+              source_urn: body.sourceUrn,
+              target_entity_id: body.targetEntityId,
+              tipo_relazione: body.tipoRelazione,
+              descrizione: body.descrizione,
+              contributed_by: req.user.id,
+              user_id: req.user.id,
+              ...provenance,
+            });
+
+      // Entity proposals nest the id under `pending_entity`; relations return a
+      // top-level `relation_id` (two distinct MERL-T response shapes).
+      const pendingId = proposal.pending_entity?.id ?? proposal.relation_id ?? null;
+      // Only mark the candidate promoted if a pending_* row was actually created.
+      // When MERL-T defers on a possible duplicate it returns no id; marking it
+      // promoted then would silently drop the contribution (no proposal exists).
+      if (pendingId) {
+        await contribClient().markPromoted(candidateId);
+      }
+
+      // `created` is what the client must read: a null pendingId with
+      // duplicateActionRequired means "confirm or drop", any other null means
+      // MERL-T refused (invalid name...) and `message` says why.
+      res.status(200).json({
+        pendingId,
+        created: Boolean(pendingId),
+        hasDuplicates: proposal.has_duplicates ?? false,
+        duplicateActionRequired: proposal.duplicate_action_required ?? false,
+        message: proposal.message ?? null,
+        duplicates: (proposal.duplicates ?? []).slice(0, 5).map((d) => ({
+          id: d.entity_id ?? d.relation_id ?? '',
+          text:
+            d.entity_text ??
+            (d.source_text && d.target_text ? `${d.source_text} → ${d.target_text}` : ''),
+        })),
+      });
+    } catch (err) {
+      if (err instanceof MerltClientError) {
+        res.status(503).json({ detail: 'merlt_unavailable' });
+        return;
+      }
+      throw err;
+    }
+  },
+);
+
+/**
+ * POST /api/merlt/internal/extraction-callback — worker → BFF (internalAuth).
+ */
+router.post(
+  '/internal/extraction-callback',
+  internalAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    const parsed = extractionCallbackSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ detail: 'invalid_body', issues: parsed.error.flatten() });
+      return;
+    }
+    const { bffJobId, status, candidatesCreated, error } = parsed.data;
+
+    const job = await prisma.merltExtractionJob.findUnique({ where: { id: bffJobId } });
+    if (!job) {
+      res.status(404).json({ detail: 'job_not_found' });
+      return;
+    }
+    const isTerminal = ['completed', 'failed', 'timeout'].includes(status);
+    await prisma.merltExtractionJob.update({
+      where: { id: bffJobId },
+      data: {
+        status,
+        candidatesCreated: candidatesCreated ?? undefined,
+        errorMessage: error ?? undefined,
+        startedAt: status === 'running' ? new Date() : undefined,
+        completedAt: isTerminal ? new Date() : undefined,
+      },
+    });
+
+    res.status(200).json({ updated: true });
+  },
+);
+
+export default router;

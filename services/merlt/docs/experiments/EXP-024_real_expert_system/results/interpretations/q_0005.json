@@ -1,0 +1,49 @@
+{
+  "query_id": "q_0005",
+  "query_text": "Quali sono gli effetti della risoluzione del contratto?",
+  "synthesis": "La risoluzione del contratto comporta lo scioglimento del vincolo contrattuale, producendo effetti sia tra le parti che nei confronti dei terzi.\n\n**Effetti tra le parti:**\nIn generale, la risoluzione ha **efficacia retroattiva**, operando \"ex tunc\" (dal momento della conclusione del contratto), come se il contratto non fosse mai stato stipulato. Ci\u00f2 implica un **effetto restitutorio**: le parti sono tenute a restituire le prestazioni gi\u00e0 eseguite, con gli accessori e gli interessi legali decorre",
+  "confidence": 0.9,
+  "expert_contributions": {
+    "literal": {
+      "interpretation": "Gli effetti della risoluzione del contratto sono principalmente la retroattivit\u00e0 tra le parti, salvo per i contratti ad esecuzione continuata o periodica, per i quali l'effetto non si estende alle prestazioni gi\u00e0 eseguite. La risoluzione non pregiudica i diritti acquistati dai terzi, a meno che non siano fatti salvi gli effetti della trascrizione della domanda di risoluzione. In particolare, in caso di risoluzione, il venditore deve restituire il prezzo e rimborsare al compratore le spese e i pagamenti legittimamente fatti per la vendita, mentre il compratore deve restituire la cosa, a meno che questa non sia perita a causa di vizi.",
+      "confidence": 0.9,
+      "weight": 0.35,
+      "weighted_confidence": 0.315
+    },
+    "systemic": {
+      "interpretation": "La risoluzione del contratto, in generale, produce effetti retroattivi tra le parti, come se il contratto non fosse mai stato concluso. Questo implica l'obbligo di restituire le prestazioni gi\u00e0 eseguite. Tuttavia, per i contratti ad esecuzione continuata o periodica, la retroattivit\u00e0 \u00e8 limitata, e le prestazioni gi\u00e0 eseguite prima della risoluzione rimangono valide. La risoluzione non pregiudica i diritti acquisiti dai terzi, a meno che non siano stati trascritti gli effetti della domanda di risoluzione. Nel contesto specifico della compravendita, in caso di risoluzione per vizi della cosa, il venditore \u00e8 tenuto a restituire il prezzo e rimborsare le spese legittimamente sostenute dal compratore, mentre il compratore deve restituire la cosa, a meno che questa non sia perita a causa dei vizi stessi.",
+      "confidence": 0.9,
+      "weight": 0.25,
+      "weighted_confidence": 0.225
+    },
+    "principles": {
+      "interpretation": "La risoluzione del contratto comporta lo scioglimento del vincolo contrattuale con effetto retroattivo tra le parti, come se il contratto non fosse mai stato stipulato. Le parti sono tenute a restituire le prestazioni ricevute, salvo per i contratti ad esecuzione continuata o periodica, dove l'effetto retroattivo non si estende alle prestazioni gi\u00e0 eseguite. La risoluzione non pregiudica i diritti acquisiti dai terzi, a tutela della sicurezza dei traffici giuridici, fatti salvi gli effetti della trascrizione della domanda di risoluzione. In caso di risoluzione per vizi della cosa venduta, il venditore deve restituire il prezzo e rimborsare le spese legittimamente sostenute dal compratore, il quale deve restituire la cosa se non \u00e8 perita a causa dei vizi stessi.",
+      "confidence": 0.9,
+      "weight": 0.2,
+      "weighted_confidence": 0.18000000000000002
+    },
+    "precedent": {
+      "interpretation": "La risoluzione del contratto produce principalmente due effetti: un effetto liberatorio per le prestazioni non ancora eseguite e un effetto restitutorio per quelle gi\u00e0 eseguite. L'effetto liberatorio opera 'ex nunc' (da ora in poi), mentre l'effetto restitutorio opera retroattivamente, implicando la restituzione delle prestazioni con accessori e interessi legali dalla data del ricevimento. La natura della pronuncia di risoluzione pu\u00f2 essere costitutiva (come nel caso di risoluzione per inadempimento ex art. 1453 c.c., che scioglie il vincolo contrattuale) o meramente dichiarativa (come nelle risoluzioni di diritto ex artt. 1454, 1456 e 1457 c.c., che accertano l'avvenuto scioglimento).",
+      "confidence": 0.9,
+      "weight": 0.2,
+      "weighted_confidence": 0.18000000000000002
+    }
+  },
+  "legal_basis": [],
+  "execution_time_ms": 17913.682999999997,
+  "routing_decision": {
+    "query_type": "general",
+    "expert_weights": {
+      "literal": 0.35,
+      "systemic": 0.25,
+      "principles": 0.2,
+      "precedent": 0.2
+    },
+    "confidence": 0.5,
+    "reasoning": "Query classificata come 'general'. Expert principali: literal (0.35)"
+  },
+  "feedback": 0.27896751162171135,
+  "reward": 0.047203656894256645,
+  "user_id": "user_011",
+  "error": null
+}

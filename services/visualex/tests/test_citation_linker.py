@@ -1,0 +1,633 @@
+"""Tests for contextual norm linking engine — real legal text samples."""
+
+import pytest
+from visualex_api.tools.citation_linker import extract_citations, Citation
+
+
+class TestExplicitCitations:
+    """AC: Explicit citations detected with full act reference."""
+
+    def test_art_cc(self):
+        text = "Si applica l'art. 2043 c.c."
+        citations = extract_citations(text)
+        assert len(citations) == 1
+        c = citations[0]
+        assert c.article == "2043"
+        assert c.act_type == "codice civile"
+        assert text[c.start:c.end] == "art. 2043 c.c."
+
+    def test_art_cp(self):
+        text = "come previsto dall'art. 575 c.p."
+        citations = extract_citations(text)
+        assert len(citations) == 1
+        assert citations[0].article == "575"
+        assert citations[0].act_type == "codice penale"
+
+    def test_dlgs_with_number_and_article(self):
+        text = "ai sensi dell'art. 7 del d.lgs. 196/2003"
+        citations = extract_citations(text)
+        assert len(citations) == 1
+        c = citations[0]
+        assert c.article == "7"
+        assert c.act_type == "decreto legislativo"
+        assert c.act_number == "196"
+        assert c.date == "2003"
+
+    def test_legge_full_reference(self):
+        text = "in base alla legge 241/1990, art. 1"
+        citations = extract_citations(text)
+        assert len(citations) >= 1
+        # Should find at least the legge reference
+        found = [c for c in citations if c.act_number == "241"]
+        assert len(found) >= 1
+
+    def test_art_cost(self):
+        text = "L'art. 3 Cost. garantisce l'eguaglianza"
+        citations = extract_citations(text)
+        assert len(citations) == 1
+        assert citations[0].article == "3"
+        assert citations[0].act_type == "costituzione"
+
+    def test_art_cpc(self):
+        text = "ai sensi dell'art. 100 c.p.c."
+        citations = extract_citations(text)
+        assert len(citations) == 1
+        assert citations[0].article == "100"
+        assert citations[0].act_type == "codice di procedura civile"
+
+    def test_bis_article(self):
+        text = "Si veda l'art. 2-bis c.c."
+        citations = extract_citations(text)
+        assert len(citations) == 1
+        assert citations[0].article == "2-bis"
+
+    def test_multiple_explicit_citations(self):
+        text = "L'art. 2043 c.c. e l'art. 185 c.p. disciplinano il risarcimento"
+        citations = extract_citations(text)
+        assert len(citations) == 2
+        articles = {c.article for c in citations}
+        assert "2043" in articles
+        assert "185" in articles
+
+    def test_dpr_reference(self):
+        text = "art. 31 d.p.r. 380/2001"
+        citations = extract_citations(text)
+        assert len(citations) == 1
+        assert citations[0].act_type == "decreto del presidente della repubblica"
+        assert citations[0].act_number == "380"
+
+
+class TestContextualCitations:
+    """AC: Contextual citations resolve to current active norm context."""
+
+    def test_bare_article_with_context(self):
+        text = "Il codice civile disciplina i rapporti. L'art. 1 stabilisce le fonti."
+        citations = extract_citations(text, context_act_type="codice civile")
+        found = [c for c in citations if c.article == "1"]
+        assert len(found) == 1
+        assert found[0].act_type == "codice civile"
+
+    def test_bare_article_uses_context(self):
+        text = "L'art. 5 prevede..."
+        citations = extract_citations(text, context_act_type="codice penale")
+        assert len(citations) == 1
+        assert citations[0].article == "5"
+        assert citations[0].act_type == "codice penale"
+
+    def test_explicit_overrides_context(self):
+        text = "L'art. 2043 c.c. disciplina la responsabilità"
+        citations = extract_citations(text, context_act_type="codice penale")
+        assert len(citations) == 1
+        assert citations[0].act_type == "codice civile"  # explicit wins
+
+    def test_no_context_bare_article_still_detected(self):
+        text = "L'art. 5 prevede..."
+        citations = extract_citations(text)
+        assert len(citations) == 1
+        assert citations[0].article == "5"
+        assert citations[0].act_type is None  # no context, no act_type
+
+
+class TestNormContextTracking:
+    """AC: Maintains reference to last mentioned act across text."""
+
+    def test_context_set_by_explicit_citation(self):
+        text = (
+            "L'art. 2043 c.c. prevede il risarcimento. "
+            "L'art. 2059 disciplina il danno non patrimoniale."
+        )
+        citations = extract_citations(text)
+        assert len(citations) == 2
+        # Second article should inherit codice civile context
+        assert citations[1].article == "2059"
+        assert citations[1].act_type == "codice civile"
+
+    def test_context_changes_with_new_act(self):
+        text = (
+            "L'art. 2043 c.c. prevede il risarcimento. "
+            "L'art. 185 c.p. estende la tutela. "
+            "L'art. 186 disciplina la restituzione."
+        )
+        citations = extract_citations(text)
+        assert len(citations) == 3
+        assert citations[0].act_type == "codice civile"
+        assert citations[1].act_type == "codice penale"
+        # Third should follow cp context
+        assert citations[2].act_type == "codice penale"
+
+
+class TestCitationMetadata:
+    """AC: Output includes start/end positions and display text."""
+
+    def test_start_end_positions(self):
+        text = "Si veda l'art. 2043 c.c."
+        citations = extract_citations(text)
+        c = citations[0]
+        assert c.start >= 0
+        assert c.end > c.start
+        assert c.end <= len(text)
+
+    def test_display_text(self):
+        text = "Si veda l'art. 2043 c.c."
+        citations = extract_citations(text)
+        c = citations[0]
+        assert text[c.start:c.end] == c.display_text
+
+    def test_to_dict(self):
+        text = "art. 2043 c.c."
+        citations = extract_citations(text)
+        d = citations[0].to_dict()
+        assert "start" in d
+        assert "end" in d
+        assert "article" in d
+        assert "act_type" in d
+        assert "display_text" in d
+
+    def test_target_params(self):
+        text = "art. 7 d.lgs. 196/2003"
+        citations = extract_citations(text)
+        params = citations[0].target_params()
+        assert params["act_type"] == "decreto legislativo"
+        assert params["article"] == "7"
+        assert params["act_number"] == "196"
+        assert params["date"] == "2003"
+
+
+class TestEdgeCases:
+    """AC: Handles edge cases."""
+
+    def test_empty_text(self):
+        assert extract_citations("") == []
+
+    def test_no_citations(self):
+        assert extract_citations("Questo testo non contiene riferimenti normativi.") == []
+
+    def test_article_range(self):
+        text = "artt. 1 e 2 c.c."
+        citations = extract_citations(text)
+        assert len(citations) >= 1
+
+    def test_comma_article(self):
+        text = "l'art. 2043, comma 1, c.c."
+        citations = extract_citations(text)
+        assert len(citations) == 1
+        assert citations[0].article == "2043"
+
+    def test_multiple_norms_same_paragraph(self):
+        text = (
+            "Il danno è regolato dall'art. 2043 c.c., "
+            "dall'art. 185 c.p. e dall'art. 2059 c.c."
+        )
+        citations = extract_citations(text)
+        assert len(citations) == 3
+
+    def test_act_number_slash_year(self):
+        text = "d.lgs. 196/2003"
+        citations = extract_citations(text)
+        assert len(citations) == 1
+        assert citations[0].act_type == "decreto legislativo"
+        assert citations[0].act_number == "196"
+        assert citations[0].date == "2003"
+        assert citations[0].article is None
+
+
+class TestEuCitations:
+    """EU acts in article text: the official spelling carries the marker in
+    parentheses and the pair year-first. The linker knew none of it."""
+
+    def test_regolamento_ue_with_article_after(self):
+        text = "ai sensi del regolamento (UE) 2016/679, art. 5, il titolare"
+        c = extract_citations(text)
+        assert len(c) == 1
+        assert (c[0].act_type, c[0].act_number, c[0].date, c[0].article) == ("regolamento ue", "679", "2016", "5")
+        assert text[c[0].start:c[0].end] == "regolamento (UE) 2016/679, art. 5"
+
+    def test_cyber_resilience_act_year_first(self):
+        c = extract_citations("il Regolamento (UE) 2024/2847 art. 13 impone")
+        assert (c[0].act_type, c[0].act_number, c[0].date, c[0].article) == ("regolamento ue", "2847", "2024", "13")
+
+    def test_article_before_eu_act(self):
+        text = "l'art. 5 del regolamento (UE) 2016/679 prevede"
+        c = extract_citations(text)
+        assert len(c) == 1
+        assert (c[0].act_type, c[0].act_number, c[0].date, c[0].article) == ("regolamento ue", "679", "2016", "5")
+        assert text[c[0].start:c[0].end] == "art. 5 del regolamento (UE) 2016/679"
+
+    def test_old_directive_trailing_marker(self):
+        c = extract_citations("la direttiva 2002/58/CE, art. 5, dispone")
+        assert (c[0].act_type, c[0].act_number, c[0].date, c[0].article) == ("direttiva ue", "58", "2002", "5")
+
+    def test_implementing_regulation(self):
+        c = extract_citations("regolamento di esecuzione (UE) 2015/2447, art. 3")
+        assert (c[0].act_type, c[0].act_number, c[0].date, c[0].article) == ("regolamento ue", "2447", "2015", "3")
+
+    def test_standalone_eu_act_sets_context_with_number_and_date(self):
+        text = "Il regolamento (UE) 2016/679 si applica. L'art. 5 stabilisce i principi."
+        c = extract_citations(text)
+        assert len(c) == 2
+        assert c[0].article is None
+        assert (c[0].act_type, c[0].act_number, c[0].date) == ("regolamento ue", "679", "2016")
+        assert (c[1].article, c[1].act_type, c[1].act_number, c[1].date) == ("5", "regolamento ue", "679", "2016")
+
+    def test_national_regolamento_without_marker_is_not_eu(self):
+        c = extract_citations("il regolamento n. 5/2020 art. 3 del consiglio comunale")
+        assert all(x.act_type != "regolamento ue" for x in c)
+
+
+class TestContextCarriesNumberAndDate:
+    def test_bare_articles_inherit_the_act_number_and_year(self):
+        text = "Ai sensi del d.lgs. 196/2003, l'art. 7 e l'art. 13 si applicano."
+        arts = [x for x in extract_citations(text) if x.article]
+        assert [(x.article, x.act_type, x.act_number, x.date) for x in arts] == [
+            ("7", "decreto legislativo", "196", "2003"),
+            ("13", "decreto legislativo", "196", "2003"),
+        ]
+
+    def test_a_new_act_resets_number_and_date(self):
+        text = "Il d.lgs. 196/2003 rinvia. L'art. 2043 c.c. si applica. L'art. 2059 pure."
+        last = extract_citations(text)[-1]
+        assert (last.article, last.act_type, last.act_number, last.date) == ("2059", "codice civile", None, None)
+
+
+class TestYearGroupHardening:
+    def test_three_digit_second_half_is_not_a_year(self):
+        c = extract_citations("come da legge 241/456 art. 3")
+        assert not any(x.date for x in c)
+
+
+class TestEuProseForms:
+    """The forms Italian legal prose actually uses around an EU act."""
+
+    def test_list_before_eu_act_belongs_to_that_act(self):
+        text = "Si applica il d.lgs. 196/2003. Vedi anche gli articoli 8 e 9 del regolamento (UE) 2016/679."
+        c = extract_citations(text)
+        eu = {(x.article, x.act_number, x.date) for x in c if x.act_type == "regolamento ue"}
+        assert {("8", "679", "2016"), ("9", "679", "2016")} <= eu
+        assert not any(x.act_type == "decreto legislativo" and x.article in ("8", "9") for x in c)
+
+    def test_list_after_eu_act_emits_one_citation_per_article(self):
+        text = "regolamento (UE) 2016/679, articoli 8 e 9"
+        c = extract_citations(text)
+        arts = sorted((x.article, text[x.start:x.end]) for x in c if x.article)
+        assert [a for a, _ in arts] == ["8", "9"]
+        assert all(span.endswith(a) for a, span in arts)
+        assert all((x.act_type, x.act_number, x.date) == ("regolamento ue", "679", "2016") for x in c)
+
+    def test_comma_clause_closing_comma_before_del(self):
+        text = "Il codice civile rileva. Vedi art. 5, comma 1, del regolamento (UE) 2016/679."
+        art = [x for x in extract_citations(text, context_act_type="codice civile") if x.article == "5"]
+        assert len(art) == 1
+        assert (art[0].act_type, art[0].act_number, art[0].date) == ("regolamento ue", "679", "2016")
+
+    def test_comma_clause_closing_comma_before_del_national(self):
+        c = extract_citations("Vedi art. 5, comma 1, del d.lgs. 196/2003.")
+        assert (c[0].article, c[0].act_type, c[0].act_number, c[0].date) == ("5", "decreto legislativo", "196", "2003")
+
+    def test_comma_clause_closing_comma_before_abbreviation(self):
+        c = extract_citations("l'art. 2, co. 3, c.p.")
+        assert (c[0].article, c[0].act_type) == ("2", "codice penale")
+
+    def test_single_article_keeps_the_whole_span(self):
+        text = "gli articoli 8 e 9 del regolamento (UE) 2016/679 e l'art. 5 del regolamento (UE) 2016/679"
+        five = [x for x in extract_citations(text) if x.article == "5"]
+        assert text[five[0].start:five[0].end] == "art. 5 del regolamento (UE) 2016/679"
+
+
+class TestAbbreviationBoundary:
+    """An act abbreviation is a whole word: "comma" is not "com" (codice
+    dell'ordinamento militare) and "costituzionalmente" is not "cost"."""
+
+    def test_comma_clause_is_not_an_abbreviation(self):
+        c = extract_citations("L'art. 5, comma 1, prevede l'obbligo.")
+        assert [(x.article, x.act_type) for x in c] == [("5", None)]
+
+    def test_comma_and_letter_before_cc(self):
+        c = extract_citations("art. 3, comma 2, lettera a), c.c.")
+        assert (c[0].article, c[0].act_type) == ("3", "codice civile")
+
+    def test_comma_clause_does_not_poison_the_context(self):
+        c = extract_citations("art. 1235, comma 2, e art. 7")
+        assert all(x.act_type is None for x in c)
+
+    def test_comma_letter_then_del(self):
+        c = extract_citations("Vedi art. 5, comma 1, lett. b), del d.lgs. 196/2003.")
+        assert (c[0].article, c[0].act_type, c[0].act_number, c[0].date) == ("5", "decreto legislativo", "196", "2003")
+
+    def test_word_starting_with_an_abbreviation_is_not_the_act(self):
+        c = extract_citations("l'art. 5 costituzionalmente orientato")
+        assert (c[0].article, c[0].act_type) == ("5", None)
+
+    def test_comma_clause_without_commas(self):
+        c = extract_citations("art. 5 comma 1 cc")
+        assert (c[0].article, c[0].act_type) == ("5", "codice civile")
+
+
+class TestArticleRanges:
+    def test_range_before_a_numbered_act(self):
+        text = "Ai sensi del d.lgs. 196/2003, si applicano anche gli artt. 1-10 del d.lgs. 82/2005."
+        ten = [x for x in extract_citations(text) if x.article == "1-10"]
+        assert len(ten) == 1
+        assert (ten[0].act_type, ten[0].act_number, ten[0].date) == ("decreto legislativo", "82", "2005")
+
+    def test_range_after_an_eu_act(self):
+        c = extract_citations("regolamento (UE) 2016/679, artt. 12-14")
+        assert (c[0].article, c[0].act_number) == ("12-14", "679")
+
+
+class TestTrailingMarkerRegulation:
+    def test_regulation_with_trailing_marker_counts_as_marked(self):
+        c = extract_citations("il regolamento 1049/2001/CE, art. 4, prevede")
+        assert (c[0].act_type, c[0].act_number, c[0].date, c[0].article) == ("regolamento ue", "1049", "2001", "4")
+
+
+class TestLongLists:
+    def test_a_long_list_stays_fast(self):
+        import time
+        text = "artt. " + " e ".join(["1"] * 25_000) + " del regolamento (UE) 2016/679"
+        assert len(text) > 100_000
+        started = time.perf_counter()
+        c = extract_citations(text)
+        assert time.perf_counter() - started < 3.0
+        assert len(c) > 1
+
+
+class TestContextNeedsANumber:
+    """An act that needs a number ("legge") but came out without one cannot be
+    opened, so it must not take over the context of the bare articles after it."""
+
+    def test_numberless_act_does_not_take_the_context(self):
+        text = ("Ai sensi dell'art. 2043 c.c. il danno è risarcibile. Come previsto dall'art. 17, "
+                "comma 1, della legge 23 agosto 1988, n. 400, si veda anche l'art. 2059 e l'art. 1218.")
+        c = {x.article: x for x in extract_citations(text)}
+        assert (c["2059"].act_type, c["1218"].act_type) == ("codice civile", "codice civile")
+
+    def test_apostrophe_does_not_end_an_abbreviation(self):
+        c = extract_citations("art. 5 com'era previsto")
+        assert (c[0].article, c[0].act_type) == ("5", None)
+
+
+class TestPluralPrepositions:
+    def test_delle_preleggi(self):
+        c = extract_citations("art. 1 delle preleggi", context_act_type="decreto legislativo")
+        assert (c[0].article, c[0].act_type) == ("1", "preleggi")
+
+    def test_dei_before_a_numbered_act(self):
+        c = extract_citations("art. 7 dei d.lgs. 196/2003")
+        assert (c[0].article, c[0].act_type, c[0].act_number) == ("7", "decreto legislativo", "196")
+
+
+class TestNamesThatPrefixOtherActs:
+    def test_codice_penale_militare_is_not_the_codice_penale(self):
+        c = extract_citations("art. 5 del codice penale militare di pace")
+        assert all(x.act_type != "codice penale" for x in c)
+
+    def test_codice_penale_still_read(self):
+        c = extract_citations("art. 5 del codice penale")
+        assert (c[0].article, c[0].act_type) == ("5", "codice penale")
+
+
+class TestSuffixesPastDecies:
+    """Article numbering does not stop at "decies".
+
+    The catalogue of reati presupposto of d.lgs. 231/2001 runs from 25-bis to
+    25-sexiesdecies and beyond; tests/test_article_existence.py records the
+    spellings captured live from Normattiva's article tree ("25 undecies",
+    "25 quinquiesdecies", "25 septiesdecies", "25 undevicies", "669 terdecies",
+    "2409 octiesdecies"). An alternation that stopped at "decies" matched only
+    the head of the suffix, so "art. 25-terdecies" was linked as art. 25-ter —
+    an article that exists, so the wrong link looked perfectly normal.
+    """
+
+    @pytest.mark.parametrize("suffix", [
+        "undecies", "duodecies", "terdecies", "quaterdecies",
+        "quinquiesdecies", "sexiesdecies", "septiesdecies", "undevicies",
+    ])
+    def test_article_before_the_act(self, suffix):
+        text = f"ai sensi dell'art. 25-{suffix} del d.lgs. 231/2001"
+        citations = extract_citations(text)
+        assert len(citations) == 1
+        c = citations[0]
+        assert c.article == f"25-{suffix}"
+        assert c.act_type == "decreto legislativo"
+        assert c.act_number == "231"
+        assert c.date == "2001"
+
+    def test_act_before_the_article(self):
+        # The act itself also yields an article-less citation; that is the
+        # linker's own contract and predates this fix.
+        citations = extract_citations("il d.lgs. 231/2001, art. 25-quinquiesdecies, prevede")
+        assert [c.article for c in citations if c.article] == ["25-quinquiesdecies"]
+
+    def test_list_keeps_the_long_suffix_of_its_first_item(self):
+        # The server linker emits one citation per list, the client matcher one
+        # per number; what this pins is that the suffix is not cut at "ter".
+        text = "artt. 25-terdecies e 25-undecies del d.lgs. 231/2001"
+        citations = [c for c in extract_citations(text) if c.article]
+        assert [c.article for c in citations] == ["25-terdecies"]
+
+    def test_short_suffix_still_reads_as_itself(self):
+        citations = extract_citations("ai sensi dell'art. 25-ter del d.lgs. 231/2001")
+        assert [c.article for c in citations] == ["25-ter"]
+
+    def test_codice_suffix_past_decies(self):
+        citations = extract_citations("si veda l'art. 2409-octiesdecies c.c.")
+        assert [c.article for c in citations] == ["2409-octiesdecies"]
+
+
+class TestOrdinalSpellings:
+    """«615 bis», «615bis» and «615-bis» are one article, and never art. 615.
+
+    The linker used to read only the hyphen: «art. 615 bis c.p.» came back as
+    art. 615 — an article that exists, so the edge MERL-T drew from it pointed at
+    the wrong norm and nothing looked broken. Court texts write all three forms;
+    the excerpts below are from Cass. pen. 23158/2025 and 10787/2024 as Italgiure
+    serves them (no space after «art.» included)."""
+
+    @pytest.mark.parametrize("text, article, cited", [
+        ("dal reato di cui all'art.615 ter commi 1 e 2 n.1 cod. pen. di cui al capo C)",
+         "615-ter", "art.615 ter commi 1 e 2 n.1 cod. pen."),
+        ("la mancata applicazione della condizione di non punibilità di cui all'art.131 bis cod. pen.",
+         "131-bis", "art.131 bis cod. pen."),
+        ("è configurabile l'aggravante di cui all'art. 615-ter, comma secondo, n. 3, cod. pen. nel caso",
+         "615-ter", None),
+        ("della circostanza di cui all'art. 393-bis cod. pen. che, secondo i principi",
+         "393-bis", "art. 393-bis cod. pen."),
+    ])
+    def test_real_decision_excerpts(self, text, article, cited):
+        citations = [c for c in extract_citations(text) if c.article]
+        assert [c.article for c in citations] == [article]
+        assert citations[0].act_type == "codice penale"
+        if cited:
+            assert text[citations[0].start:citations[0].end] == cited
+
+    def test_an_act_the_text_misspells_leaves_the_article_right(self):
+        # «cod. pen» without its dot (same decision) is no abbreviation the table
+        # knows: the act stays open for the context to fill, the article is right
+        text = "In relazione all'art.615 ter cod. pen di cui al capo A), secondo la difesa"
+        assert [(c.article, c.act_type) for c in extract_citations(text)] == [("615-ter", None)]
+        assert [(c.article, c.act_type) for c in extract_citations(
+            text, context_act_type="codice penale")] == [("615-ter", "codice penale")]
+
+    @pytest.mark.parametrize("written, article", [
+        ("615 bis", "615-bis"), ("615bis", "615-bis"), ("615-bis", "615-bis"),
+        ("615 - bis", "615-bis"), ("615 BIS", "615-bis"),
+        ("21 nonies", "21-nonies"), ("21nonies", "21-nonies"),
+        ("2409 terdecies", "2409-terdecies"), ("25sexiesdecies", "25-sexiesdecies"),
+    ])
+    def test_every_spelling_is_the_hyphenated_article(self, written, article):
+        citations = extract_citations(f"ai sensi dell'art. {written} c.p. e")
+        assert [c.article for c in citations] == [article]
+
+    def test_a_bare_article_reads_the_suffix_too(self):
+        citations = extract_citations("Si veda l'art. 615 bis.", context_act_type="codice penale")
+        assert [c.article for c in citations] == ["615-bis"]
+
+    def test_a_list_reads_its_first_suffix(self):
+        # a national list emits its first article only (as before); that one
+        # must keep its suffix
+        citations = extract_citations("Si vedano gli artt. 615 bis e 615ter c.p.")
+        assert citations[0].article == "615-bis"
+
+    def test_an_ordinary_word_after_the_number_is_not_a_suffix(self):
+        citations = extract_citations("ai sensi dell'art. 5 bisogna guardare il c.c.",
+                                      context_act_type="codice civile")
+        assert [c.article for c in citations] == ["5"]
+
+
+class TestTheParagraphClause:
+    """The paragraph written as a word belongs to the article, never breaks it."""
+
+    # art. 2044 c.c. as Normattiva serves it: the article it cites is the codice
+    # penale's, and the edge MERL-T drew from it pointed at art. 52 c.c.
+    ART_2044_CC = (
+        "Non è responsabile chi cagiona il danno per legittima difesa di sé o di altri. "
+        "((Nei casi di cui all'articolo 52, commi secondo, terzo e quarto, del codice "
+        "penale, la responsabilità di chi ha compiuto il fatto è esclusa. Nel caso di "
+        "cui all'articolo 55, secondo comma, del codice penale, al danneggiato è dovuta "
+        "una indennità"
+    )
+
+    def test_art_2044_cc_cites_the_codice_penale(self):
+        citations = extract_citations(self.ART_2044_CC, context_act_type="codice civile")
+        assert [(c.article, c.act_type) for c in citations] == [
+            ("52", "codice penale"), ("55", "codice penale")]
+        assert self.ART_2044_CC[citations[1].start:citations[1].end] == (
+            "articolo 55, secondo comma, del codice penale")
+
+    @pytest.mark.parametrize("text, cited", [
+        # d.lgs. 231/2001 and l. 241/1990 as Normattiva writes them
+        ("ai sensi dell'articolo 258, comma 4, secondo periodo, c.p. e", "articolo 258, comma 4"),
+        ("l'articolo 19, commi 3 e 6-bis, primo periodo, c.p. e", "articolo 19, commi 3 e 6-bis"),
+        ("l'art. 5, comma 1, secondo la Corte c.p.", "art. 5, comma 1"),
+        ("l'art. 5, comma primo, secondo periodo, c.p.", "art. 5, comma primo"),
+    ])
+    def test_a_sentence_of_the_paragraph_is_not_another_paragraph(self, text, cited):
+        c = extract_citations(text, context_act_type="codice civile")[0]
+        assert text[c.start:c.end] == cited
+
+    @pytest.mark.parametrize("clause", [
+        "comma 3-bis", "comma 3 bis", "commi primo e secondo", "secondo comma",
+        "primo e secondo comma", "comma 2, n. 3", "comma secondo n.3",
+    ])
+    def test_every_paragraph_spelling_keeps_the_act(self, clause):
+        citations = extract_citations(f"ai sensi dell'art. 2 {clause} c.p. e",
+                                      context_act_type="codice civile")
+        assert [(c.article, c.act_type) for c in citations] == [("2", "codice penale")]
+
+
+class TestRunsOfSpaces:
+    def test_long_runs_of_spaces_stay_fast(self):
+        # «\s*,?\s*» over a run of spaces tries every split of the run: 500 KB of
+        # «art. 5» followed by 400 spaces took 83 s before the whitespace became
+        # possessive (2026-10-07), well within what /extract_citations accepts.
+        # CPU time, not the wall clock: a busy machine must not fail it (about 0.9 s).
+        import time
+        text = ("art. 5" + " " * 200 + "- " + " " * 200 + "x ") * 1_200
+        assert len(text) > 400_000
+        started = time.process_time()
+        c = extract_citations(text, context_act_type="codice civile")
+        assert time.process_time() - started < 3.0
+        assert len(c) == 1_200
+
+
+class TestAbbreviationInsideALongerOne:
+    """An act's abbreviation is never read as the head of a longer one."""
+
+    def _read(self, text):
+        return [(text[c.start:c.end], c.act_type, c.article) for c in extract_citations(text)]
+
+    def test_cpa_is_not_the_codice_penale(self):
+        # «c.p.a.» is the codice del processo amministrativo, which the act tables know
+        got = self._read("ai sensi dell'art. 110 c.p.a. il ricorso")
+        assert got and all(act != "codice penale" for _, act, _ in got)
+        assert got[0][1] == "codice del processo amministrativo"
+
+    def test_cp_cpc_cpp_keep_their_own_code(self):
+        assert self._read("art. 110 c.p.") == [("art. 110 c.p.", "codice penale", "110")]
+        assert self._read("art. 360 c.p.c.")[0][1] == "codice di procedura civile"
+        assert self._read("art. 360 c.p.p.")[0][1] == "codice di procedura penale"
+
+    def test_cci_is_not_the_codice_civile(self):
+        assert all(act != "codice civile" for _, act, _ in self._read("art. 5 c.c.i. prevede"))
+
+    def test_final_cp_before_the_next_sentence_still_links(self):
+        assert self._read("previsto dall'art. 110 c.p. Il ricorso è infondato")[0][1] == "codice penale"
+
+    def test_closing_quote_after_the_abbreviation_still_links(self):
+        for text, act in (
+            ("‘art. 2043 c.c.’", "codice civile"),
+            ("'art. 2043 c.c.'", "codice civile"),
+            ("l’art. 3 Cost.’", "costituzione"),
+            ("art. 640 c.p.'", "codice penale"),
+        ):
+            got = self._read(text)
+            assert got and got[0][1] == act, text
+
+    def test_cp_followed_by_a_word_starting_with_c_or_p_stays_penale(self):
+        assert self._read("art. 640 c.p. c'è truffa")[0][1] == "codice penale"
+        assert self._read("art. 640 c.p. c) la frode")[0][1] == "codice penale"
+        assert self._read("art. 2 c.p. p.")[0][1] == "codice penale"
+
+
+class TestConventionShortForms:
+    """The short forms the source convention writes are read in a text too: before 2026-10-09
+    «l. cost.» linked the Costituzione and «d.l.», «r.d.l.», «d.lgs.lgt.» linked nothing."""
+
+    def test_l_cost_is_never_the_costituzione(self):
+        got = extract_citations("ai sensi dell'art. 1 della l. cost. 20 aprile 2012, n. 1")
+        assert got and got[0].act_type == "legge costituzionale"
+
+    def test_dl_with_its_number_takes_the_context(self):
+        c = {x.article: x for x in extract_citations("l'art. 1 d.l. 18/2020 e l'art. 2")}
+        assert (c["1"].act_type, c["1"].act_number, c["1"].date) == ("decreto legge", "18", "2020")
+        assert (c["2"].act_type, c["2"].act_number) == ("decreto legge", "18")
+
+    def test_rdl_and_dlgslgt_are_their_own_types(self):
+        assert extract_citations("art. 2 r.d.l. 15 marzo 1927, n. 436")[0].act_type == "regio decreto legge"
+        assert extract_citations("art. 3 d.lgs.lgt. 10 marzo 1945, n. 2")[0].act_type == \
+            "decreto legislativo luogotenenziale"
+
+    def test_a_numberless_legge_costituzionale_does_not_take_the_context(self):
+        c = {x.article: x for x in extract_citations("art. 2043 c.c. e art. 5 l. cost. e art. 6")}
+        assert c["5"].act_type == "legge costituzionale"
+        assert c["6"].act_type == "codice civile"

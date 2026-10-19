@@ -1,0 +1,401 @@
+"""Asking for an article that does not exist must not return a different one.
+
+Measured on live Normattiva before this change: c.c. art. 99999, art. 7000 and
+art. 2-bis all returned 592 characters of "Art. 1 — È approvato il testo del
+Codice civile", with no error and no warning.
+"""
+from unittest.mock import AsyncMock, patch
+
+import pytest
+
+from app import NormaController
+
+
+def _controller():
+    # Same trick the existing suite uses: skip __init__ so no Quart app, no
+    # routes and no scrapers are built.
+    return NormaController.__new__(NormaController)
+
+
+TREE = (
+    [{"numero": "1", "allegato": None},
+     {"numero": "2", "allegato": None},
+     {"numero": "2-bis", "allegato": None},
+     {"numero": "3", "allegato": None}],
+    4,
+    {},
+)
+
+# Captured from live Normattiva on 2026-08-26 with
+# get_tree(..., return_metadata=True): the tree spells every suffix with a
+# SPACE and goes far past "decies". These are the exact strings returned for
+# c.p.c., c.p., c.c. and d.lgs. 231/2001.
+REAL_SUFFIX_TREE = (
+    [{"numero": "281 undecies", "allegato": None},
+     {"numero": "669 terdecies", "allegato": None},
+     {"numero": "452 quaterdecies", "allegato": None},
+     {"numero": "518 duodevicies", "allegato": None},
+     {"numero": "2409 octiesdecies", "allegato": None},
+     {"numero": "2409 noviesdecies", "allegato": None},
+     {"numero": "25 undecies", "allegato": None},
+     {"numero": "25 quinquiesdecies", "allegato": None},
+     {"numero": "25 septiesdecies", "allegato": None},
+     {"numero": "25 undevicies", "allegato": None},
+     {"numero": "25 bis.1", "allegato": None},
+     {"numero": "2409 duodecies.1", "allegato": None}],
+    12,
+    {},
+)
+
+
+class TestExistenceCheck:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("article", ["1", "2-bis", "3"])
+    async def test_existing_articles_pass(self, article):
+        ctrl = _controller()
+        with patch("app.get_tree", new=AsyncMock(return_value=TREE)):
+            assert await ctrl._article_exists_in_tree("https://x", article, None) is True
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("article", ["99999", "7000", "4"])
+    async def test_missing_articles_are_reported(self, article):
+        ctrl = _controller()
+        with patch("app.get_tree", new=AsyncMock(return_value=TREE)):
+            assert await ctrl._article_exists_in_tree("https://x", article, None) is False
+
+    @pytest.mark.asyncio
+    async def test_bis_spelling_variants_match(self):
+        """The tree API and the scraper disagree on "2-bis" vs "2 bis"."""
+        ctrl = _controller()
+        spaced = ([{"numero": "2 bis", "allegato": None}], 1, {})
+        with patch("app.get_tree", new=AsyncMock(return_value=spaced)):
+            assert await ctrl._article_exists_in_tree("https://x", "2-bis", None) is True
+
+
+class TestSuffixesBeyondDecies:
+    """The normaliser must not enumerate suffixes.
+
+    A hand-maintained list that stopped at "decies" rejected 50 real articles
+    across the four main codici alone — art. 669-terdecies c.p.c. (reclamo
+    cautelare), art. 452-quaterdecies c.p., art. 281-undecies c.p.c., art.
+    2409-octiesdecies c.c. — plus the whole 25-undecies..25-undevicies family
+    of d.lgs. 231/2001, all of which the scraper returned correctly before the
+    existence check existed. A false "non esiste" on an article that exists is
+    worse than the wrong-article bug this check was added to fix.
+    """
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("article", [
+        "281-undecies",
+        "669-terdecies",
+        "452-quaterdecies",
+        "518-duodevicies",
+        "2409-octiesdecies",
+        "2409-noviesdecies",
+        "25-undecies",
+        "25-quinquiesdecies",
+        "25-septiesdecies",
+        "25-undevicies",
+    ])
+    async def test_hyphenated_request_matches_the_spaced_tree_spelling(self, article):
+        ctrl = _controller()
+        with patch("app.get_tree", new=AsyncMock(return_value=REAL_SUFFIX_TREE)):
+            assert await ctrl._article_exists_in_tree("https://x", article, None) is True
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("article", ["25 undecies", "669 terdecies"])
+    async def test_spaced_request_matches_too(self, article):
+        """Both sides are canonicalised, so the request spelling is free."""
+        ctrl = _controller()
+        with patch("app.get_tree", new=AsyncMock(return_value=REAL_SUFFIX_TREE)):
+            assert await ctrl._article_exists_in_tree("https://x", article, None) is True
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("article", ["25-bis.1", "2409-duodecies.1"])
+    async def test_sub_numbered_family_is_pinned_deliberately(self, article):
+        """"25 bis.1" is a real tree entry. It is currently unreachable through
+        parse_article_input, but the normaliser resolves it, so a later change
+        to the input parser does not have to touch this rule."""
+        ctrl = _controller()
+        with patch("app.get_tree", new=AsyncMock(return_value=REAL_SUFFIX_TREE)):
+            assert await ctrl._article_exists_in_tree("https://x", article, None) is True
+
+    @pytest.mark.asyncio
+    async def test_a_genuinely_absent_suffixed_article_is_still_reported(self):
+        """Suffix-agnostic must not mean "matches anything"."""
+        ctrl = _controller()
+        with patch("app.get_tree", new=AsyncMock(return_value=REAL_SUFFIX_TREE)):
+            assert await ctrl._article_exists_in_tree("https://x", "25-vicies", None) is False
+            assert await ctrl._article_exists_in_tree("https://x", "670-terdecies", None) is False
+
+
+class TestFailOpen:
+    """A Normattiva outage must not become "this article does not exist"."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("tree_result", [
+        ("Failed to retrieve the page: boom", 0, {}),
+        ("Empty response from server", 0, {}),
+        ([], 0, {}),
+    ])
+    async def test_unavailable_tree_returns_none(self, tree_result):
+        ctrl = _controller()
+        with patch("app.get_tree", new=AsyncMock(return_value=tree_result)):
+            assert await ctrl._article_exists_in_tree("https://x", "1", None) is None
+
+    @pytest.mark.asyncio
+    async def test_exception_returns_none(self):
+        ctrl = _controller()
+        with patch("app.get_tree", new=AsyncMock(side_effect=RuntimeError("down"))):
+            assert await ctrl._article_exists_in_tree("https://x", "1", None) is None
+
+
+class TestRequestValidation:
+    @pytest.mark.asyncio
+    async def test_missing_act_type_is_rejected(self):
+        from visualex_api.tools.exceptions import ValidationError
+
+        ctrl = _controller()
+        with pytest.raises(ValidationError):
+            await ctrl.create_norma_visitata_from_data({"article": "1"})
+
+    @pytest.mark.asyncio
+    async def test_missing_article_is_rejected(self):
+        from visualex_api.tools.exceptions import ValidationError
+
+        ctrl = _controller()
+        with pytest.raises(ValidationError):
+            await ctrl.create_norma_visitata_from_data({"act_type": "legge"})
+
+    @pytest.mark.asyncio
+    async def test_malformed_article_is_rejected_not_scraped(self):
+        """parse_article_input returns an ERROR DICT rather than raising; the
+        root controller never checked it, so `for article in articles` iterated
+        the dict's keys and produced a URN ending in ~arterror."""
+        from visualex_api.tools.exceptions import ValidationError
+
+        ctrl = _controller()
+        with pytest.raises(ValidationError):
+            await ctrl.create_norma_visitata_from_data(
+                {"act_type": "legge", "date": "1990-08-07",
+                 "act_number": "241", "article": "!!!"}
+            )
+
+
+class TestCachedTreeShape:
+    """get_tree is wrapped in @cached(serializer=JsonSerializer()).
+
+    The serializer round-trips the (articles, count, metadata) TUPLE through
+    JSON, so every call after the first one in a process returns a LIST. A
+    check that only unpacks tuples reads the 3-element envelope as the article
+    list and reports every article of every cached act as missing — measured
+    live on L. 241/1990 art. 3 before this guard was widened.
+    """
+
+    CACHED_TREE = [
+        [{"numero": "1", "allegato": None},
+         {"numero": "2 bis", "allegato": None},
+         {"numero": "3", "allegato": None},
+         {"numero": "25 undecies", "allegato": None},
+         {"numero": "669 terdecies", "allegato": None},
+         {"numero": "2409 octiesdecies", "allegato": None}],
+        6,
+        {},
+    ]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("article", [
+        "1", "2-bis", "3", "25-undecies", "669-terdecies", "2409-octiesdecies",
+    ])
+    async def test_existing_articles_pass_on_a_cache_hit(self, article):
+        ctrl = _controller()
+        with patch("app.get_tree", new=AsyncMock(return_value=self.CACHED_TREE)):
+            assert await ctrl._article_exists_in_tree("https://x", article, None) is True
+
+    @pytest.mark.asyncio
+    async def test_missing_article_still_reported_on_a_cache_hit(self):
+        ctrl = _controller()
+        with patch("app.get_tree", new=AsyncMock(return_value=self.CACHED_TREE)):
+            assert await ctrl._article_exists_in_tree("https://x", "99999", None) is False
+
+
+class TestAnnexScoping:
+    @pytest.mark.asyncio
+    async def test_article_is_matched_within_the_requested_annex(self):
+        """Codici carry a default annex; an article of the dispositivo must not
+        satisfy a request scoped to allegato 2."""
+        ctrl = _controller()
+        tree = (
+            [{"numero": "1", "allegato": None},
+             {"numero": "2043", "allegato": 2}],
+            2,
+            {},
+        )
+        with patch("app.get_tree", new=AsyncMock(return_value=tree)):
+            assert await ctrl._article_exists_in_tree("https://x", "2043", "2") is True
+            assert await ctrl._article_exists_in_tree("https://x", "1", "2") is False
+
+
+@pytest.fixture(scope="module")
+def client():
+    """A real Quart app with the real routes.
+
+    No scraper is reached: every test using it fails before the fan-out.
+    """
+    return NormaController().app.test_client()
+
+
+class TestHttpStatusAndBody:
+    """The two new exceptions must reach the client as a status it can branch
+    on and a body it can read.
+
+    Before this, every failure of the root controller was a 500 with the
+    message in a JSON body — and on /stream_article_text, the endpoint the
+    search box actually calls, nothing caught them at all, so Quart answered
+    with a 500 HTML error page carrying no message whatsoever.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _no_history_writes(self):
+        with patch("app.add_to_history"):
+            yield
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("endpoint", [
+        "/fetch_norma_data",
+        "/fetch_article_text",
+        "/fetch_all_data",
+        "/stream_article_text",
+    ])
+    async def test_missing_act_type_is_a_400_with_a_message(self, client, endpoint):
+        response = await client.post(endpoint, json={"article": "1"})
+        assert response.status_code == 400
+        assert "act_type" in (await response.get_json())["error"]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("endpoint", [
+        "/fetch_norma_data",
+        "/fetch_article_text",
+        "/fetch_all_data",
+        "/stream_article_text",
+    ])
+    async def test_absent_article_is_a_404_with_a_message(self, client, endpoint):
+        from visualex_api.tools.exceptions import ResourceNotFoundError
+
+        boom = AsyncMock(side_effect=ResourceNotFoundError(
+            "Articolo 669-terdecies non presente in codice di procedura civile"
+        ))
+        with patch.object(NormaController, "create_norma_visitata_from_data", boom):
+            response = await client.post(endpoint, json={
+                "act_type": "codice di procedura civile", "article": "669-terdecies",
+            })
+        assert response.status_code == 404
+        assert "non presente" in (await response.get_json())["error"]
+
+    @pytest.mark.asyncio
+    async def test_a_scraper_failure_is_still_a_500(self, client):
+        """Only the documented client-side errors are remapped."""
+        boom = AsyncMock(side_effect=RuntimeError("Normattiva is down"))
+        with patch.object(NormaController, "create_norma_visitata_from_data", boom):
+            response = await client.post("/fetch_article_text", json={
+                "act_type": "legge", "article": "1",
+            })
+        assert response.status_code == 500
+        assert "Normattiva is down" in (await response.get_json())["error"]
+
+
+# D.lgs. 104/2010 as Normattiva's tree gives it: the c.p.a. is its annex 2 (the act calls it
+# «Allegato 1»), the decree's own text has five articles.
+CPA_TREE = (
+    [*({"numero": str(n), "allegato": None} for n in range(1, 6)),
+     *({"numero": str(n), "allegato": 2} for n in range(1, 41))],
+    45,
+    {},
+)
+
+
+class TestWhereElseInTheAct:
+    """An annex named the way the act names it can miss Normattiva's positional number
+    (owner, 11 October 2026: Normattiva's number stays the identity). The refusal then
+    says where the article is, from the tree the existence check has just read."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("article,annex,hint", [
+        ("29", "1", ": su Normattiva l'art. 29 si trova nell'allegato 2"),
+        ("3", "2", ": su Normattiva l'art. 3 si trova nel testo dell'atto"),
+        ("3", "1", ": su Normattiva l'art. 3 si trova nel testo dell'atto e nell'allegato 2"),
+        ("99", "1", ""),
+    ])
+    async def test_the_hint_names_the_other_parts(self, article, annex, hint):
+        with patch("app.get_tree", new=AsyncMock(return_value=CPA_TREE)):
+            assert await _controller()._where_else_in_tree("https://x", article, annex) == hint
+
+    @pytest.mark.asyncio
+    async def test_the_cached_shape_and_string_annexes_read_alike(self):
+        """The tree's annexes are strings (treextractor), and a cache hit gives a list."""
+        cached = [[{"numero": "1", "allegato": None}, {"numero": "29", "allegato": "2"}], 2, {}]
+        with patch("app.get_tree", new=AsyncMock(return_value=cached)):
+            assert await _controller()._where_else_in_tree("https://x", "29", 1) == \
+                ": su Normattiva l'art. 29 si trova nell'allegato 2"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("tree", ["Errore di rete", [], RuntimeError("down")])
+    async def test_an_unreadable_tree_gives_no_hint(self, tree):
+        mock = AsyncMock(side_effect=tree) if isinstance(tree, Exception) else AsyncMock(return_value=tree)
+        with patch("app.get_tree", new=mock):
+            assert await _controller()._where_else_in_tree("https://x", "29", "1") == ""
+
+    @pytest.mark.asyncio
+    async def test_the_refusal_carries_the_hint_for_an_annex_the_caller_named(self):
+        from visualex_api.tools.exceptions import ResourceNotFoundError
+
+        with patch("app.get_tree", new=AsyncMock(return_value=CPA_TREE)), \
+                pytest.raises(ResourceNotFoundError) as refused:
+            await _controller().create_norma_visitata_from_data({
+                "act_type": "decreto legislativo", "act_number": "104", "date": "2010-07-02",
+                "article": "29", "annex": "1"})
+        assert str(refused.value).startswith("Articolo 29 non presente nell'allegato 1 di decreto legislativo")
+        assert str(refused.value).endswith(": su Normattiva l'art. 29 si trova nell'allegato 2")
+
+    @pytest.mark.asyncio
+    async def test_the_dispositivo_asked_explicitly_refuses_an_article_only_in_an_annex(self):
+        """`annex: ""` asks for the decree's own text: art. 29 is only in the c.p.a. (annex 2),
+        and Normattiva would answer the dispositivo's art. 29 with its art. 1."""
+        from visualex_api.tools.exceptions import ResourceNotFoundError
+
+        with patch("app.get_tree", new=AsyncMock(return_value=CPA_TREE)), \
+                pytest.raises(ResourceNotFoundError) as refused:
+            await _controller().create_norma_visitata_from_data({
+                "act_type": "decreto legislativo", "act_number": "104", "date": "2010-07-02",
+                "article": "29", "annex": ""})
+        assert str(refused.value).startswith("Articolo 29 non presente nel testo di decreto legislativo")
+        assert str(refused.value).endswith(": su Normattiva l'art. 29 si trova nell'allegato 2")
+
+    @pytest.mark.asyncio
+    async def test_the_dispositivo_asked_explicitly_keeps_its_own_articles(self):
+        with patch("app.get_tree", new=AsyncMock(return_value=CPA_TREE)):
+            found = await _controller().create_norma_visitata_from_data({
+                "act_type": "decreto legislativo", "act_number": "104", "date": "2010-07-02",
+                "article": "3", "annex": ""})
+        assert [(nv.numero_articolo, nv.allegato) for nv in found] == [("3", None)]
+
+    @pytest.mark.asyncio
+    async def test_no_part_named_still_accepts_an_article_anywhere_in_the_act(self):
+        """Unchanged: with no preference (and no annex metadata to move to) the check reads the whole act."""
+        with patch("app.get_tree", new=AsyncMock(return_value=CPA_TREE)):
+            found = await _controller().create_norma_visitata_from_data({
+                "act_type": "decreto legislativo", "act_number": "104", "date": "2010-07-02",
+                "article": "29"})
+        assert [nv.numero_articolo for nv in found] == ["29"]
+
+    @pytest.mark.asyncio
+    async def test_a_codes_default_annex_gets_no_hint(self):
+        """Another annex of a code is another code: art. 40 of the preleggi is not
+        art. 40 of the codice civile, so its refusal points nowhere."""
+        from visualex_api.tools.exceptions import ResourceNotFoundError
+
+        tree = ([{"numero": "1", "allegato": 1}, *({"numero": str(n), "allegato": 2} for n in range(1, 60))], 60, {})
+        with patch("app.get_tree", new=AsyncMock(return_value=tree)), \
+                pytest.raises(ResourceNotFoundError) as refused:
+            await _controller().create_norma_visitata_from_data({"act_type": "preleggi", "article": "40"})
+        assert "si trova" not in str(refused.value)

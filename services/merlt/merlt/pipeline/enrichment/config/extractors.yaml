@@ -1,0 +1,1198 @@
+# Configurazione Extractors per Pipeline Enrichment
+# =================================================
+# Questo file contiene tutti i prompt e parametri per gli estrattori LLM.
+# Modificare qui per aggiustare il comportamento senza toccare il codice.
+
+# Configurazione globale LLM
+llm:
+  default_model: "google/gemini-2.5-flash"
+  temperature: 0.0  # Deterministico per riproducibilità
+  max_tokens: 2000
+  timeout: 60  # secondi
+
+# Sistema prompt condiviso
+system_prompt: |
+  Sei un esperto di diritto italiano specializzato nell'analisi
+  di testi giuridici. Il tuo compito è estrarre entità giuridiche strutturate
+  da testi di manuali, codici e dottrina.
+
+  REGOLE:
+  1. Estrai SOLO entità esplicitamente menzionate nel testo
+  2. Per ogni entità, fornisci nome preciso e descrizione dal testo
+  3. Identifica gli articoli del codice civile correlati
+  4. Rispondi SEMPRE in formato JSON valido
+  5. Se non trovi entità rilevanti, restituisci {"entities": []}
+
+# Estrattore: Concetti Giuridici
+concetto:
+  description: "Estrae concetti giuridici astratti (buona fede, dolo, etc.)"
+
+  prompt: |
+    Analizza il seguente testo giuridico italiano ed estrai tutti i CONCETTI GIURIDICI menzionati.
+
+    TESTO:
+    {text}
+
+    FONTE: {source}
+    TIPO CONTENUTO: {content_type}
+    ARTICOLI CORRELATI: {article_refs}
+
+    Un concetto giuridico è una nozione astratta fondamentale del diritto, come:
+    - Buona fede (oggettiva/soggettiva)
+    - Dolo, colpa grave, colpa lieve
+    - Diligenza del buon padre di famiglia
+    - Inadempimento
+    - Responsabilità contrattuale/extracontrattuale
+    - Mora del debitore/creditore
+    - Impossibilità sopravvenuta
+    - Causa del contratto
+    - Oggetto del contratto
+    - Interesse legittimo
+    - Onere della prova
+    - Risarcimento del danno
+    - Danno emergente / lucro cessante
+    - Risoluzione del contratto
+    - Rescissione
+    - Annullabilità / nullità
+
+    Per ogni concetto trovato, estrai:
+    1. nome: il nome preciso del concetto (es. "buona fede oggettiva")
+    2. descrizione: come viene definito o spiegato nel testo
+    3. articoli_correlati: articoli del codice civile citati (es. ["1337", "1375"])
+    4. categoria: area del diritto (obbligazioni, contratti, responsabilità, etc.)
+    5. concetti_correlati: altri concetti collegati menzionati
+
+    REGOLE:
+    - Estrai SOLO concetti esplicitamente menzionati nel testo
+    - NON inventare concetti non presenti
+    - Preferisci nomi specifici a generici (es. "buona fede oggettiva" > "buona fede")
+
+    Rispondi in formato JSON:
+
+  validation:
+    min_name_length: 2
+    max_name_length: 100
+    # Termini troppo generici da escludere
+    excluded_terms:
+      - diritto
+      - legge
+      - norma
+      - articolo
+      - codice
+      - contratto  # troppo generico come concetto singolo
+      - obbligazione  # troppo generico come concetto singolo
+
+  response_schema:
+    type: object
+    properties:
+      entities:
+        type: array
+        items:
+          type: object
+          properties:
+            nome:
+              type: string
+              description: "Nome del concetto (es. 'buona fede oggettiva')"
+            descrizione:
+              type: string
+              description: "Definizione o descrizione dal testo"
+            articoli_correlati:
+              type: array
+              items:
+                type: string
+              description: "Articoli del codice civile correlati"
+            categoria:
+              type: string
+              description: "Categoria (obbligazioni, contratti, responsabilità)"
+            concetti_correlati:
+              type: array
+              items:
+                type: string
+              description: "Altri concetti correlati menzionati"
+          required:
+            - nome
+    required:
+      - entities
+
+# Estrattore: Principi Giuridici
+principio:
+  description: "Estrae principi giuridici (buona fede, affidamento, etc.)"
+
+  prompt: |
+    Analizza il seguente testo giuridico italiano ed estrai tutti i PRINCIPI GIURIDICI menzionati.
+
+    TESTO:
+    {text}
+
+    FONTE: {source}
+    TIPO CONTENUTO: {content_type}
+    ARTICOLI CORRELATI: {article_refs}
+
+    Un principio giuridico è una norma di secondo livello che guida l'interpretazione
+    e l'applicazione delle regole. Si riconoscono da espressioni come:
+    - "principio di..."
+    - "in base al principio..."
+    - "secondo il principio..."
+
+    Esempi di principi giuridici:
+    - Principio di buona fede (artt. 1337, 1366, 1375 c.c.)
+    - Principio dell'affidamento
+    - Autonomia contrattuale (art. 1322 c.c.)
+    - Libertà delle forme
+    - Principio consensualistico (art. 1376 c.c.)
+    - Principio di proporzionalità
+    - Tutela della parte debole
+    - Principio di conservazione del contratto
+    - Principio neminem laedere
+    - Principio di correttezza
+    - Divieto di abuso del diritto
+
+    Per ogni principio trovato, estrai:
+    1. nome: nome completo del principio
+    2. descrizione: come viene spiegato o applicato nel testo
+    3. fondamento_normativo: articoli del codice civile che lo fondano
+    4. applicazioni: esempi concreti di applicazione menzionati
+    5. principi_correlati: altri principi che lo bilanciano o completano
+    6. livello: "costituzionale", "codicistico", "settoriale"
+
+    Rispondi in formato JSON:
+
+  validation:
+    min_name_length: 2
+    max_name_length: 100
+    # Termini che non sono principi
+    excluded_terms:
+      - articolo
+      - norma
+      - regola
+      - disposizione
+      - comma
+      - lettera
+      - paragrafo
+
+  response_schema:
+    type: object
+    properties:
+      entities:
+        type: array
+        items:
+          type: object
+          properties:
+            nome:
+              type: string
+            descrizione:
+              type: string
+            fondamento_normativo:
+              type: array
+              items:
+                type: string
+            applicazioni:
+              type: array
+              items:
+                type: string
+            principi_correlati:
+              type: array
+              items:
+                type: string
+            livello:
+              type: string
+          required:
+            - nome
+    required:
+      - entities
+
+# Estrattore: Definizioni Legali
+definizione:
+  description: "Estrae definizioni legali esplicite"
+
+  prompt: |
+    Analizza il seguente testo giuridico italiano ed estrai tutte le DEFINIZIONI LEGALI presenti.
+
+    TESTO:
+    {text}
+
+    FONTE: {source}
+    TIPO CONTENUTO: {content_type}
+    ARTICOLI CORRELATI: {article_refs}
+
+    Una definizione legale è un enunciato che stabilisce il significato preciso
+    di un termine giuridico. Si riconoscono da espressioni come:
+    - "si intende per..."
+    - "è definito come..."
+    - "consiste in..."
+    - "è l'atto con cui..."
+    - "costituisce..."
+    - "per X si intende..."
+
+    Esempi di definizioni legali:
+    - "L'obbligazione è il vincolo giuridico in forza del quale un soggetto..."
+    - "Il contratto è l'accordo di due o più parti per costituire..."
+    - "La mora del debitore si verifica quando il debitore ritarda..."
+
+    Per ogni definizione trovata, estrai:
+    1. nome: il termine definito (es. "obbligazione", "contratto", "mora")
+    2. descrizione: la definizione completa così come appare nel testo
+    3. articolo_fonte: l'articolo che contiene o fonda la definizione (es. "1173")
+    4. tipo_definizione: "legale" (dal codice), "dottrinale" (da manuale), "giurisprudenziale"
+    5. elementi_costitutivi: elementi che compongono la definizione (lista)
+
+    Rispondi in formato JSON:
+
+  validation:
+    min_name_length: 2
+    max_name_length: 50
+    min_description_length: 20  # Definizioni devono essere sostanziali
+
+  response_schema:
+    type: object
+    properties:
+      entities:
+        type: array
+        items:
+          type: object
+          properties:
+            nome:
+              type: string
+            descrizione:
+              type: string
+            articolo_fonte:
+              type: string
+            tipo_definizione:
+              type: string
+            elementi_costitutivi:
+              type: array
+              items:
+                type: string
+          required:
+            - nome
+            - descrizione
+    required:
+      - entities
+
+# Estrattore: Soggetti Giuridici
+soggetto:
+  description: "Estrae soggetti/figure giuridiche (debitore, creditore, etc.)"
+
+  prompt: |
+    Analizza il seguente testo giuridico italiano ed estrai tutti i SOGGETTI GIURIDICI menzionati.
+
+    TESTO:
+    {text}
+
+    FONTE: {source}
+    TIPO CONTENUTO: {content_type}
+    ARTICOLI CORRELATI: {article_refs}
+
+    Un soggetto giuridico è una figura/ruolo soggettiva nel rapporto giuridico, come:
+    - Debitore / Creditore
+    - Fideiussore / Garante
+    - Conduttore / Locatore
+    - Venditore / Compratore
+    - Donante / Donatario
+    - Mandante / Mandatario
+    - Mutuante / Mutuatario
+    - Depositante / Depositario
+    - Appaltatore / Committente
+    - Erede / Legatario
+    - Tutore / Curatore
+
+    Per ogni soggetto trovato, estrai:
+    1. nome: il nome del soggetto (es. "debitore", "creditore")
+    2. descrizione: ruolo e funzione nel rapporto giuridico
+    3. tipo_soggetto: "persona_fisica", "persona_giuridica", "ruolo"
+    4. articoli_correlati: articoli del codice civile correlati
+    5. soggetto_correlativo: eventuale controparte (es. debitore ↔ creditore)
+    6. diritti: diritti tipici di questo soggetto menzionati
+    7. obblighi: obblighi tipici di questo soggetto menzionati
+
+    REGOLE:
+    - Estrai SOLO soggetti esplicitamente menzionati
+    - Escludi riferimenti generici a "persona", "soggetto", "parte"
+    - Privilegia ruoli specifici del rapporto giuridico
+
+    Rispondi in formato JSON:
+
+  validation:
+    min_name_length: 4
+    max_name_length: 50
+    excluded_terms:
+      - persona
+      - soggetto
+      - parte
+      - individuo
+      - uomo
+      - donna
+
+  response_schema:
+    type: object
+    properties:
+      entities:
+        type: array
+        items:
+          type: object
+          properties:
+            nome:
+              type: string
+            descrizione:
+              type: string
+            tipo_soggetto:
+              type: string
+            articoli_correlati:
+              type: array
+              items:
+                type: string
+            soggetto_correlativo:
+              type: string
+            diritti:
+              type: array
+              items:
+                type: string
+            obblighi:
+              type: array
+              items:
+                type: string
+          required:
+            - nome
+    required:
+      - entities
+
+# Estrattore: Ruoli
+ruolo:
+  description: "Estrae ruoli processuali o sostanziali (attore, convenuto, etc.)"
+
+  prompt: |
+    Analizza il seguente testo giuridico italiano ed estrai tutti i RUOLI menzionati.
+
+    TESTO:
+    {text}
+
+    FONTE: {source}
+    TIPO CONTENUTO: {content_type}
+    ARTICOLI CORRELATI: {article_refs}
+
+    Un ruolo è una posizione processuale o sostanziale assunta da un soggetto, come:
+    - Attore / Convenuto (ruolo processuale)
+    - Ricorrente / Resistente
+    - Appellante / Appellato
+    - Garante / Terzo
+    - Rappresentante / Rappresentato
+    - Amministratore
+    - Liquidatore
+    - Esecutore testamentario
+
+    Per ogni ruolo trovato, estrai:
+    1. nome: nome del ruolo
+    2. contesto: "contrattuale", "processuale", "familiare", "societario", "successorio"
+    3. descrizione: funzioni e poteri del ruolo
+    4. articoli_correlati: articoli del codice civile/procedura correlati
+    5. ruolo_correlativo: eventuale controparte processuale
+
+    Rispondi in formato JSON:
+
+  validation:
+    min_name_length: 4
+    max_name_length: 50
+    excluded_terms:
+      - parte
+      - soggetto
+
+  response_schema:
+    type: object
+    properties:
+      entities:
+        type: array
+        items:
+          type: object
+          properties:
+            nome:
+              type: string
+            contesto:
+              type: string
+            descrizione:
+              type: string
+            articoli_correlati:
+              type: array
+              items:
+                type: string
+            ruolo_correlativo:
+              type: string
+          required:
+            - nome
+    required:
+      - entities
+
+# Estrattore: Modalità Giuridiche
+modalita:
+  description: "Estrae modalità giuridiche (obbligo, diritto, potere, facoltà)"
+
+  prompt: |
+    Analizza il seguente testo giuridico italiano ed estrai tutte le MODALITÀ GIURIDICHE menzionate.
+
+    TESTO:
+    {text}
+
+    FONTE: {source}
+    TIPO CONTENUTO: {content_type}
+    ARTICOLI CORRELATI: {article_refs}
+
+    Una modalità giuridica è una qualificazione deontologica di una situazione, come:
+    - OBBLIGO (di prestazione, di custodia, di restituzione, etc.)
+    - DIRITTO (di credito, di proprietà, di usufrutto, etc.)
+    - POTERE (di recesso, di scelta, di rappresentanza, etc.)
+    - FACOLTÀ (di scelta, di opposizione, etc.)
+    - ONERE (della prova, di comunicazione, etc.)
+    - ASPETTATIVA / PRETESA
+
+    Per ogni modalità trovata, estrai:
+    1. nome: nome della modalità (es. "obbligo di prestazione")
+    2. tipo_modalita: "obbligo", "diritto", "potere", "facolta", "onere", "immunita"
+    3. descrizione: contenuto della modalità
+    4. titolare: soggetto titolare (es. "debitore", "creditore")
+    5. correlativo: modalità correlativa (es. obbligo ↔ diritto)
+    6. articoli_correlati: articoli del codice correlati
+
+    REGOLE:
+    - Estrai solo modalità specifiche, non generiche
+    - Indica sempre il tipo di modalità
+    - Collega alla norma che la prevede
+
+    Rispondi in formato JSON:
+
+  validation:
+    min_name_length: 5
+    max_name_length: 80
+    excluded_terms:
+      - diritto
+      - obbligo
+      - dovere
+
+  response_schema:
+    type: object
+    properties:
+      entities:
+        type: array
+        items:
+          type: object
+          properties:
+            nome:
+              type: string
+            tipo_modalita:
+              type: string
+            descrizione:
+              type: string
+            titolare:
+              type: string
+            correlativo:
+              type: string
+            articoli_correlati:
+              type: array
+              items:
+                type: string
+          required:
+            - nome
+            - tipo_modalita
+    required:
+      - entities
+
+# Estrattore: Fatti Giuridici
+fatto:
+  description: "Estrae fatti giuridici rilevanti (nascita, morte, eventi, etc.)"
+
+  prompt: |
+    Analizza il seguente testo giuridico italiano ed estrai tutti i FATTI GIURIDICI menzionati.
+
+    TESTO:
+    {text}
+
+    FONTE: {source}
+    TIPO CONTENUTO: {content_type}
+    ARTICOLI CORRELATI: {article_refs}
+
+    Un fatto giuridico è un evento rilevante per il diritto che produce effetti, come:
+    - Fatti naturali: nascita, morte, decorrenza del tempo, caso fortuito, forza maggiore
+    - Fatti umani involontari: impossibilità sopravvenuta, perdita/deterioramento
+    - Stati di fatto: possesso, detenzione, residenza
+    - Eventi: scadenza termine, prescrizione, decadenza
+
+    Per ogni fatto trovato, estrai:
+    1. nome: nome del fatto (es. "morte", "impossibilità sopravvenuta")
+    2. tipo_fatto: "naturale", "umano", "lecito", "illecito"
+    3. descrizione: come si configura il fatto
+    4. effetti: effetti giuridici prodotti dal fatto
+    5. articoli_correlati: articoli del codice correlati
+
+    REGOLE:
+    - Distingui fatti (eventi) da atti (manifestazioni di volontà)
+    - Estrai solo fatti giuridicamente rilevanti
+
+    Rispondi in formato JSON:
+
+  validation:
+    min_name_length: 4
+    max_name_length: 80
+
+  response_schema:
+    type: object
+    properties:
+      entities:
+        type: array
+        items:
+          type: object
+          properties:
+            nome:
+              type: string
+            tipo_fatto:
+              type: string
+            descrizione:
+              type: string
+            effetti:
+              type: array
+              items:
+                type: string
+            articoli_correlati:
+              type: array
+              items:
+                type: string
+          required:
+            - nome
+    required:
+      - entities
+
+# Estrattore: Atti Giuridici
+atto:
+  description: "Estrae atti giuridici (proposta, accettazione, recesso, etc.)"
+
+  prompt: |
+    Analizza il seguente testo giuridico italiano ed estrai tutti gli ATTI GIURIDICI menzionati.
+
+    TESTO:
+    {text}
+
+    FONTE: {source}
+    TIPO CONTENUTO: {content_type}
+    ARTICOLI CORRELATI: {article_refs}
+
+    Un atto giuridico è una manifestazione di volontà produttiva di effetti, come:
+    - Atti negoziali: proposta, accettazione, contratto, testamento, rinuncia, etc.
+    - Atti unilaterali: recesso, revoca, ratifica, convalida
+    - Atti dichiarativi: diffida, messa in mora, intimazione
+    - Atti processuali: citazione, ricorso, comparsa
+
+    Per ogni atto trovato, estrai:
+    1. nome: nome dell'atto (es. "proposta contrattuale", "recesso", "messa in mora")
+    2. tipo_atto: "negoziale", "non_negoziale", "processuale"
+    3. forma: "scritta", "orale", "per_atti_concludenti", "libera"
+    4. descrizione: contenuto e requisiti dell'atto
+    5. effetti: effetti giuridici prodotti
+    6. articoli_correlati: articoli del codice correlati
+
+    REGOLE:
+    - Distingui atti (volontà) da fatti (eventi)
+    - Specifica la forma richiesta se menzionata
+
+    Rispondi in formato JSON:
+
+  validation:
+    min_name_length: 4
+    max_name_length: 80
+    excluded_terms:
+      - atto
+      - documento
+
+  response_schema:
+    type: object
+    properties:
+      entities:
+        type: array
+        items:
+          type: object
+          properties:
+            nome:
+              type: string
+            tipo_atto:
+              type: string
+            forma:
+              type: string
+            descrizione:
+              type: string
+            effetti:
+              type: array
+              items:
+                type: string
+            articoli_correlati:
+              type: array
+              items:
+                type: string
+          required:
+            - nome
+    required:
+      - entities
+
+# Estrattore: Procedure
+procedura:
+  description: "Estrae procedure/iter procedurali"
+
+  prompt: |
+    Analizza il seguente testo giuridico italiano ed estrai tutte le PROCEDURE menzionate.
+
+    TESTO:
+    {text}
+
+    FONTE: {source}
+    TIPO CONTENUTO: {content_type}
+    ARTICOLI CORRELATI: {article_refs}
+
+    Una procedura è un iter procedurale o sequenza di atti, come:
+    - Procedure giudiziali: procedimento esecutivo, azione di risoluzione, opposizione
+    - Procedure stragiudiziali: mediazione, negoziazione assistita, arbitrato
+    - Procedure amministrative: iscrizione ipoteca, trascrizione
+    - Procedure contrattuali: formazione progressiva del contratto
+
+    Per ogni procedura trovata, estrai:
+    1. nome: nome della procedura
+    2. tipo_procedura: "giudiziale", "stragiudiziale", "amministrativa", "contrattuale"
+    3. fasi: fasi principali della procedura (lista)
+    4. descrizione: come si svolge
+    5. articoli_correlati: articoli del codice correlati
+
+    Rispondi in formato JSON:
+
+  validation:
+    min_name_length: 5
+    max_name_length: 100
+
+  response_schema:
+    type: object
+    properties:
+      entities:
+        type: array
+        items:
+          type: object
+          properties:
+            nome:
+              type: string
+            tipo_procedura:
+              type: string
+            fasi:
+              type: array
+              items:
+                type: string
+            descrizione:
+              type: string
+            articoli_correlati:
+              type: array
+              items:
+                type: string
+          required:
+            - nome
+    required:
+      - entities
+
+# Estrattore: Termini
+termine:
+  description: "Estrae termini temporali (prescrizione, decadenza, etc.)"
+
+  prompt: |
+    Analizza il seguente testo giuridico italiano ed estrai tutti i TERMINI TEMPORALI menzionati.
+
+    TESTO:
+    {text}
+
+    FONTE: {source}
+    TIPO CONTENUTO: {content_type}
+    ARTICOLI CORRELATI: {article_refs}
+
+    Un termine è una scadenza temporale rilevante per il diritto, come:
+    - Prescrizione (ordinaria, breve, presuntiva)
+    - Decadenza
+    - Termini dilatori / perentori
+    - Termini contrattuali (per accettazione, adempimento, etc.)
+
+    Esempi:
+    - Prescrizione ordinaria (10 anni)
+    - Termine per l'accettazione dell'eredità (10 anni)
+    - Prescrizione breve del risarcimento danni (5 anni)
+    - Decadenza dall'azione di annullamento (5 anni)
+
+    Per ogni termine trovato, estrai:
+    1. nome: nome del termine (es. "prescrizione ordinaria", "termine decennale")
+    2. tipo_termine: "prescrizione", "decadenza", "dilatorio", "perentorio"
+    3. durata: durata del termine (es. "10 anni", "5 anni")
+    4. decorrenza: da quando inizia a decorrere
+    5. descrizione: effetti della scadenza
+    6. articoli_correlati: articoli del codice correlati
+
+    Rispondi in formato JSON:
+
+  validation:
+    min_name_length: 5
+    max_name_length: 100
+
+  response_schema:
+    type: object
+    properties:
+      entities:
+        type: array
+        items:
+          type: object
+          properties:
+            nome:
+              type: string
+            tipo_termine:
+              type: string
+            durata:
+              type: string
+            decorrenza:
+              type: string
+            descrizione:
+              type: string
+            articoli_correlati:
+              type: array
+              items:
+                type: string
+          required:
+            - nome
+    required:
+      - entities
+
+# Estrattore: Effetti Giuridici
+effetto:
+  description: "Estrae effetti giuridici (nullità, annullabilità, risoluzione, etc.)"
+
+  prompt: |
+    Analizza il seguente testo giuridico italiano ed estrai tutti gli EFFETTI GIURIDICI menzionati.
+
+    TESTO:
+    {text}
+
+    FONTE: {source}
+    TIPO CONTENUTO: {content_type}
+    ARTICOLI CORRELATI: {article_refs}
+
+    Un effetto giuridico è una conseguenza di un fatto/atto, come:
+    - Effetti invalidanti: nullità, annullabilità, inefficacia
+    - Effetti risolutivi: risoluzione, rescissione
+    - Effetti costitutivi: acquisto proprietà, costituzione diritto
+    - Effetti modificativi: novazione, cessione
+    - Effetti estintivi: estinzione obbligazione, prescrizione
+
+    Per ogni effetto trovato, estrai:
+    1. nome: nome dell'effetto (es. "nullità", "risoluzione del contratto")
+    2. tipo_effetto: "costitutivo", "modificativo", "estintivo", "invalidante"
+    3. descrizione: in cosa consiste l'effetto
+    4. presupposti: fatti/atti che lo causano
+    5. conseguenze: conseguenze dell'effetto
+    6. articoli_correlati: articoli del codice correlati
+
+    Rispondi in formato JSON:
+
+  validation:
+    min_name_length: 5
+    max_name_length: 100
+
+  response_schema:
+    type: object
+    properties:
+      entities:
+        type: array
+        items:
+          type: object
+          properties:
+            nome:
+              type: string
+            tipo_effetto:
+              type: string
+            descrizione:
+              type: string
+            presupposti:
+              type: array
+              items:
+                type: string
+            conseguenze:
+              type: array
+              items:
+                type: string
+            articoli_correlati:
+              type: array
+              items:
+                type: string
+          required:
+            - nome
+    required:
+      - entities
+
+# Estrattore: Responsabilità
+responsabilita:
+  description: "Estrae tipi di responsabilità giuridica"
+
+  prompt: |
+    Analizza il seguente testo giuridico italiano ed estrai tutti i tipi di RESPONSABILITÀ menzionati.
+
+    TESTO:
+    {text}
+
+    FONTE: {source}
+    TIPO CONTENUTO: {content_type}
+    ARTICOLI CORRELATI: {article_refs}
+
+    La responsabilità è l'obbligo di rispondere delle conseguenze di un fatto, come:
+    - Responsabilità contrattuale (inadempimento obbligazioni)
+    - Responsabilità precontrattuale (culpa in contrahendo)
+    - Responsabilità extracontrattuale/aquiliana (fatto illecito)
+    - Responsabilità oggettiva (senza colpa)
+    - Responsabilità per fatto altrui
+    - Responsabilità solidale
+
+    Per ogni tipo di responsabilità trovato, estrai:
+    1. nome: nome del tipo di responsabilità
+    2. tipo_responsabilita: "contrattuale", "extracontrattuale", "oggettiva", "solidale"
+    3. descrizione: presupposti e caratteristiche
+    4. presupposti: fatti costitutivi della responsabilità
+    5. conseguenze: obblighi risarcitori
+    6. articoli_correlati: articoli del codice correlati
+
+    Rispondi in formato JSON:
+
+  validation:
+    min_name_length: 10
+    max_name_length: 100
+
+  response_schema:
+    type: object
+    properties:
+      entities:
+        type: array
+        items:
+          type: object
+          properties:
+            nome:
+              type: string
+            tipo_responsabilita:
+              type: string
+            descrizione:
+              type: string
+            presupposti:
+              type: array
+              items:
+                type: string
+            conseguenze:
+              type: array
+              items:
+                type: string
+            articoli_correlati:
+              type: array
+              items:
+                type: string
+          required:
+            - nome
+    required:
+      - entities
+
+# Estrattore: Rimedi
+rimedio:
+  description: "Estrae rimedi/strumenti di tutela"
+
+  prompt: |
+    Analizza il seguente testo giuridico italiano ed estrai tutti i RIMEDI menzionati.
+
+    TESTO:
+    {text}
+
+    FONTE: {source}
+    TIPO CONTENUTO: {content_type}
+    ARTICOLI CORRELATI: {article_refs}
+
+    Un rimedio è uno strumento di tutela giuridica, come:
+    - Rimedi generali: azione di adempimento, azione di risoluzione, risarcimento danni
+    - Rimedi specifici: eccezione di inadempimento, sospensione prestazione
+    - Rimedi cautelari: sequestro conservativo, sequestro giudiziario
+    - Autotutela: ritenzione, legittima difesa
+
+    Per ogni rimedio trovato, estrai:
+    1. nome: nome del rimedio (es. "azione di risoluzione", "eccezione di inadempimento")
+    2. tipo_rimedio: "generale", "specifico", "cautelare", "autotutela"
+    3. descrizione: contenuto e funzione del rimedio
+    4. presupposti: quando è esperibile
+    5. diritti_tutelati: quali diritti tutela
+    6. articoli_correlati: articoli del codice correlati
+
+    Rispondi in formato JSON:
+
+  validation:
+    min_name_length: 5
+    max_name_length: 100
+
+  response_schema:
+    type: object
+    properties:
+      entities:
+        type: array
+        items:
+          type: object
+          properties:
+            nome:
+              type: string
+            tipo_rimedio:
+              type: string
+            descrizione:
+              type: string
+            presupposti:
+              type: array
+              items:
+                type: string
+            diritti_tutelati:
+              type: array
+              items:
+                type: string
+            articoli_correlati:
+              type: array
+              items:
+                type: string
+          required:
+            - nome
+    required:
+      - entities
+
+# Estrattore: Sanzioni
+sanzione:
+  description: "Estrae sanzioni/conseguenze sanzionatorie"
+
+  prompt: |
+    Analizza il seguente testo giuridico italiano ed estrai tutte le SANZIONI menzionate.
+
+    TESTO:
+    {text}
+
+    FONTE: {source}
+    TIPO CONTENUTO: {content_type}
+    ARTICOLI CORRELATI: {article_refs}
+
+    Una sanzione è una conseguenza sanzionatoria, come:
+    - Sanzioni civili: risarcimento del danno, clausola penale, caparra confirmatoria
+    - Sanzioni restitutorie: restituzione indebito, restituzione arricchimento
+    - Sanzioni invalitarie: nullità, annullamento
+
+    Per ogni sanzione trovata, estrai:
+    1. nome: nome della sanzione
+    2. tipo_sanzione: "civile", "restitutoria", "invalidatoria"
+    3. descrizione: contenuto della sanzione
+    4. presupposti: violazioni che la determinano
+    5. articoli_correlati: articoli del codice correlati
+
+    Rispondi in formato JSON:
+
+  validation:
+    min_name_length: 5
+    max_name_length: 100
+
+  response_schema:
+    type: object
+    properties:
+      entities:
+        type: array
+        items:
+          type: object
+          properties:
+            nome:
+              type: string
+            tipo_sanzione:
+              type: string
+            descrizione:
+              type: string
+            presupposti:
+              type: array
+              items:
+                type: string
+            articoli_correlati:
+              type: array
+              items:
+                type: string
+          required:
+            - nome
+    required:
+      - entities
+
+# Estrattore: Casi
+caso:
+  description: "Estrae casi di studio o fattispecie concrete"
+
+  prompt: |
+    Analizza il seguente testo giuridico italiano ed estrai tutti i CASI menzionati.
+
+    TESTO:
+    {text}
+
+    FONTE: {source}
+    TIPO CONTENUTO: {content_type}
+    ARTICOLI CORRELATI: {article_refs}
+
+    Un caso è una fattispecie concreta o caso di studio, come:
+    - Casi giurisprudenziali famosi (es. "caso Fiuggi")
+    - Esempi pratici nei manuali
+    - Ipotesi concrete di applicazione di norme
+
+    Per ogni caso trovato, estrai:
+    1. nome: nome/descrizione breve del caso
+    2. descrizione: svolgimento della fattispecie
+    3. esito: come è stato risolto
+    4. principi_applicati: principi/norme applicati
+    5. articoli_correlati: articoli del codice correlati
+
+    REGOLE:
+    - Estrai solo casi concreti menzionati esplicitamente
+    - Escludi ipotesi astratte generiche
+
+    Rispondi in formato JSON:
+
+  validation:
+    min_name_length: 5
+    max_name_length: 150
+    min_description_length: 30
+
+  response_schema:
+    type: object
+    properties:
+      entities:
+        type: array
+        items:
+          type: object
+          properties:
+            nome:
+              type: string
+            descrizione:
+              type: string
+            esito:
+              type: string
+            principi_applicati:
+              type: array
+              items:
+                type: string
+            articoli_correlati:
+              type: array
+              items:
+                type: string
+          required:
+            - nome
+            - descrizione
+    required:
+      - entities
+
+# Estrattore: Eccezioni
+eccezione:
+  description: "Estrae eccezioni a regole generali"
+
+  prompt: |
+    Analizza il seguente testo giuridico italiano ed estrai tutte le ECCEZIONI menzionate.
+
+    TESTO:
+    {text}
+
+    FONTE: {source}
+    TIPO CONTENUTO: {content_type}
+    ARTICOLI CORRELATI: {article_refs}
+
+    Un'eccezione è una deroga a una regola generale, come:
+    - Eccezione di inadempimento (deroga al principio pacta sunt servanda)
+    - Eccezione di prescrizione
+    - Eccezione di giudicato
+    - Eccezioni processuali (competenza, nullità, etc.)
+    - Deroghe normative a principi generali
+
+    Per ogni eccezione trovata, estrai:
+    1. nome: nome dell'eccezione
+    2. regola_generale: regola/principio a cui deroga
+    3. descrizione: come opera l'eccezione
+    4. presupposti: quando è applicabile
+    5. articoli_correlati: articoli del codice correlati
+
+    Rispondi in formato JSON:
+
+  validation:
+    min_name_length: 5
+    max_name_length: 100
+
+  response_schema:
+    type: object
+    properties:
+      entities:
+        type: array
+        items:
+          type: object
+          properties:
+            nome:
+              type: string
+            regola_generale:
+              type: string
+            descrizione:
+              type: string
+            presupposti:
+              type: array
+              items:
+                type: string
+            articoli_correlati:
+              type: array
+              items:
+                type: string
+          required:
+            - nome
+    required:
+      - entities
+
+# Estrattore: Clausole
+clausola:
+  description: "Estrae clausole contrattuali tipiche"
+
+  prompt: |
+    Analizza il seguente testo giuridico italiano ed estrai tutte le CLAUSOLE CONTRATTUALI menzionate.
+
+    TESTO:
+    {text}
+
+    FONTE: {source}
+    TIPO CONTENUTO: {content_type}
+    ARTICOLI CORRELATI: {article_refs}
+
+    Una clausola è una disposizione contrattuale tipica, come:
+    - Clausole essenziali: oggetto, corrispettivo
+    - Clausole accessorie: clausola penale, caparra, termine
+    - Clausole risolutive: clausola risolutiva espressa, patto commissorio
+    - Clausole vessatorie (nei contratti con consumatori)
+    - Patti limitativi: patto di non concorrenza, patto di prelazione
+
+    Per ogni clausola trovata, estrai:
+    1. nome: nome della clausola (es. "clausola penale", "patto commissorio")
+    2. tipo_clausola: "essenziale", "accessoria", "vessatoria", "risolutiva"
+    3. descrizione: contenuto e funzione
+    4. validita: eventuali limiti di validità
+    5. articoli_correlati: articoli del codice correlati
+
+    Rispondi in formato JSON:
+
+  validation:
+    min_name_length: 5
+    max_name_length: 100
+
+  response_schema:
+    type: object
+    properties:
+      entities:
+        type: array
+        items:
+          type: object
+          properties:
+            nome:
+              type: string
+            tipo_clausola:
+              type: string
+            descrizione:
+              type: string
+            validita:
+              type: string
+            articoli_correlati:
+              type: array
+              items:
+                type: string
+          required:
+            - nome
+    required:
+      - entities

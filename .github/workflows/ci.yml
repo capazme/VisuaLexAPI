@@ -2,18 +2,16 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
-  # main is included so its state is never unverified between deploys: deploy.sh
-  # runs no tests and has no rollback, so a red main is a production risk.
+    branches: [main, develop]
   push:
-    branches: [main]
+    branches: [main, develop]
 
 permissions:
   contents: read
 
 jobs:
-  python:
-    name: Python tests
+  visualex:
+    name: Python API (${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -23,50 +21,62 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      # requirements-dev.txt pulls requirements.txt, so the runtime deps the
-      # tests import are installed too.
-      - run: pip install -r requirements-dev.txt
-      - run: pytest tests/ -q
+      # requirements-dev.txt pulls requirements.txt.
+      - run: pip install -r services/visualex/requirements-dev.txt
+      - run: python -m pytest tests/ -q
+        working-directory: services/visualex
+      - run: python -m pytest tests/ -q
+        working-directory: tools/archivio-normativo
 
-  frontend:
-    name: Frontend build, test, lint
+  web:
+    name: Web build, test, lint
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          # Must track the npm major that writes the lockfiles (npm 11 here).
-          # npm 10 demands the full platform matrix for optional deps while
-          # npm 11 prunes it, so a lockfile written by 11 fails `npm ci` on 20
-          # with "Missing: @esbuild/... from lock file".
+          # npm 11 writes the lockfiles; npm 10 (Node 20) rejects them.
           node-version: '24'
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: apps/web/package-lock.json
       - run: npm ci
-        working-directory: frontend
       - run: npm run test -- --run
-        working-directory: frontend
-      # `tsc -b` is the real type-check: a bare `tsc --noEmit` does not walk the
-      # project references and reports a false green.
+      # tsc -b is the real type-check: a bare tsc --noEmit reports a false green.
       - run: npm run build
-        working-directory: frontend
       - run: npm run lint
-        working-directory: frontend
 
-  backend:
-    name: Backend tests
+  mcp:
+    name: MCP server build and test
     runs-on: ubuntu-latest
-    # backend/tests/setup.ts runs `prisma migrate reset --force` in beforeAll and
-    # TRUNCATEs every table in beforeEach, both against a live database, so this
-    # job needs a real Postgres or it cannot pass at all.
+    defaults:
+      run:
+        working-directory: apps/mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: apps/mcp/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      # Against stub servers: no database, no other service.
+      - run: npm test
+
+  server:
+    name: Server tests
+    runs-on: ubuntu-latest
+    # The setup runs `prisma migrate reset` and truncates every table: it needs
+    # a real Postgres and a database whose name contains "test".
     services:
       postgres:
         image: postgres:16
         env:
           POSTGRES_USER: visualex
           POSTGRES_PASSWORD: visualex
-          # The name must contain "test": assertTestDatabase() in setup.ts
-          # refuses to run the destructive reset against anything else.
           POSTGRES_DB: visualex_test
         ports:
           - 5432:5432
@@ -76,27 +86,154 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      # `npm run test` is `dotenv -e .env.test -- vitest run`, and dotenv-cli
-      # calls dotenv.config({ override: false }) unless -o is passed, so a
-      # variable already in the environment wins over the file. That is what
-      # lets this URL replace the developer-local one in backend/.env.test
-      # without touching that file. JWT_SECRET and REDIS_ENABLED still come
-      # from .env.test.
+      # Wins over apps/server/.env.test: dotenv-cli does not override.
       DATABASE_URL: postgresql://visualex:visualex@localhost:5432/visualex_test
+    defaults:
+      run:
+        working-directory: apps/server
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          # Must track the npm major that writes the lockfiles (npm 11 here).
-          # npm 10 demands the full platform matrix for optional deps while
-          # npm 11 prunes it, so a lockfile written by 11 fails `npm ci` on 20
-          # with "Missing: @esbuild/... from lock file".
           node-version: '24'
           cache: npm
-          cache-dependency-path: backend/package-lock.json
+          cache-dependency-path: apps/server/package-lock.json
       - run: npm ci
-        working-directory: backend
       - run: npx prisma generate
-        working-directory: backend
+      - run: npm run build
       - run: npm run test
-        working-directory: backend
+
+  merlt:
+    name: MERL-T tests
+    runs-on: ubuntu-latest
+    # The suite runs against this disposable Postgres. Tests marked
+    # `integration` (live FalkorDB) are excluded from that run by pyproject's
+    # addopts, and run next against this disposable FalkorDB.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: merlt
+          POSTGRES_PASSWORD: merlt
+          POSTGRES_DB: merlt
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U merlt -d merlt"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      falkordb:
+        # The image infra/compose.yml pins for the development graph. The host
+        # port is one no client defaults to (Redis, RQ and the worker use 6379,
+        # FalkorDBConfig 6380): only the step that names it reaches the graph.
+        image: falkordb/falkordb@sha256:d6aa9598b79cd54935864d56f971f3916156399a9ca38a5fae6c029ab1f2bce9
+        ports:
+          - 6390:6379
+        options: >-
+          --health-cmd "redis-cli -p 6379 ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      ENRICHMENT_DATABASE_URL: postgresql+asyncpg://merlt:merlt@localhost:5432/merlt
+      RLCF_DATABASE_URL: postgresql://merlt:merlt@localhost:5432/merlt
+      RLCF_ASYNC_DATABASE_URL: postgresql+asyncpg://merlt:merlt@localhost:5432/merlt
+      DATABASE_URL: postgresql://merlt:merlt@localhost:5432/merlt
+    defaults:
+      run:
+        working-directory: services/merlt
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          # The image is python:3.11-slim (services/merlt/Dockerfile).
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: services/merlt/pyproject.toml
+      # CPU wheels first, as the Dockerfile does.
+      - run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+      - run: pip install -e ".[dev]"
+      - run: |
+          python -c "
+          import asyncio
+          from merlt.storage.enrichment.database import init_db, create_tables
+          from merlt.storage.enrichment.schema_additions import ensure_schema_additions
+          async def main():
+              await init_db()
+              await create_tables()
+              await ensure_schema_additions()
+          asyncio.run(main())
+          "
+      - run: python -m pytest tests/ -q -p no:cacheprovider
+      # FalkorDBConfig reads its host and port from these, set for this step only.
+      - name: Integration tests (live FalkorDB)
+        run: python -m pytest tests/ -q -p no:cacheprovider -m integration
+        env:
+          FALKORDB_HOST: localhost
+          FALKORDB_PORT: '6390'
+
+  data:
+    name: Data backup and restore
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pytest
+      # The roundtrip starts a throwaway stack from infra/compose.yml.
+      - run: python -m pytest scripts/datakit/tests -q
+        env:
+          DATAKIT_DOCKER_TESTS: '1'
+
+  tooling:
+    name: Repository tooling
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      # A directory argument fails on Node 26: the glob names the test files.
+      - run: node --test '.claude/hooks/*.test.mjs'
+      - run: sh scripts/ci/tests/test_checks.sh
+      - run: sh scripts/tests/test_release_notes.sh
+
+  deploy:
+    name: Production deploy scripts and stack
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      # start.sh and scripts/prod against a stub docker; /bin/sh is dash here, as on the host.
+      - run: sh scripts/prod/tests/test_deploy.sh
+      # The Compose files rendered and checked for what the design promises (no container runs).
+      - run: sh scripts/prod/tests/test_compose.sh
+      # The ingress: its routes against the web app's proxy list, then the real Caddyfile in
+      # front of stand-in upstreams (the login gate, the OAuth routes, the forwarded address).
+      - run: node --test infra/ingress/paths.test.mjs
+      - run: sh infra/ingress/checks/gate.sh
+
+  release-source:
+    name: Release source
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Through env, never inline: a branch name is attacker-controlled text.
+      - run: sh scripts/ci/check_release_source.sh "$HEAD_REF"
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+
+  main-in-develop:
+    name: main inside develop
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/develop') || (github.event_name == 'pull_request' && github.base_ref == 'develop')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: sh scripts/ci/check_main_in_develop.sh origin/main HEAD

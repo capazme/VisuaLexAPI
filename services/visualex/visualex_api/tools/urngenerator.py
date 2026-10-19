@@ -1,0 +1,253 @@
+import os
+import re
+import logging
+from .logging_config import log_handlers
+from .text_op import normalize_act_type, parse_date
+from .map import EURLEX, codice_urn
+from .exceptions import ValidationError
+from ..services.eurlex_scraper import EurlexScraper
+from ..services.act_dates import complete_year
+
+# Configure logging
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s %(levelname)s %(message)s',
+                    handlers=log_handlers("norma.log"))
+
+# The types whose request may spell its full date in words ("7 agosto 1990"): read
+# into ISO before the Norma is built, as the date lookup they once shared did.
+_SPELLED_DATE_TYPES = ('legge', 'decreto legge', 'decreto legislativo', 'd.p.r.', 'regio decreto')
+
+
+async def complete_request_date(act_type, date, act_number):
+    """The date a request names, as the Norma takes it.
+
+    A year with a number is completed through Normattiva's resolver and the act's own
+    title (`act_dates.complete_year`); when that cannot tell the act for certain, the
+    year stands, never another act's date. A full date is read into ISO for the types
+    above and passed on unchanged for the others; no date stays no date.
+    """
+    if date is None or str(date).strip() == '':
+        return None
+    date = str(date).strip()
+    if re.fullmatch(r"\d{4}", date):
+        if not act_number:
+            return date
+        return await complete_year(act_type, date, act_number)
+    if act_type in _SPELLED_DATE_TYPES:
+        try:
+            return parse_date(date)
+        except ValueError:
+            raise ValidationError(f"Data non valida: {date}")
+    return date
+
+
+def generate_urn(act_type, date=None, act_number=None, article=None, annex=None, version=None,
+                 version_date=None, urn_flag=True, celex_consolidated=None):
+    """
+    Generates the URN for a legal norm.
+
+    Arguments:
+    act_type -- Type of the legal act
+    date -- Date of the act
+    act_number -- Number of the act
+    article -- Article number (optional)
+    annex -- Annex to the law (optional)
+    version -- Version of the act (optional)
+    version_date -- Date of the version (optional)
+    urn_flag -- Boolean flag to include full URN or not
+    celex_consolidated -- Sector-0 CELEX of a consolidated EU version (optional, EU acts only)
+
+    Returns:
+    str -- The generated URN
+    """
+    logging.info(f"Generating URN for act_type: {act_type}, date: {date}, act_number: {act_number}, article: {article}, annex: {annex}, version: {version}, version_date: {version_date}, urn_flag: {urn_flag}")
+    base_url = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:"
+    normalized_act_type = normalize_act_type(act_type)
+    
+    # Check if 'article' is a valid string before attempting to split it.
+    # Every token after the number is the extension, joined: "270-bis.1" ->
+    # "270" + "bis.1" (~art270bis.1) and "135-sex-decies" -> "135" +
+    # "sexdecies" (~art135sexdecies). Unpacking parts[1] alone broke on the
+    # compound ordinals. "314/2" has no dash and stays whole (~art314/2).
+    extension = None
+    if article and '-' in article:
+        parts = article.split('-')
+        article = parts[0]
+        extension = ''.join(parts[1:]) or None
+    
+    # Handle EURLEX cases (check before replacing spaces with dots)
+    if normalized_act_type.lower() in EURLEX:
+        eurlex_scraper = EurlexScraper()
+        return eurlex_scraper.get_uri(act_type=normalized_act_type.lower(), year=date, num=act_number,
+                                      celex_consolidated=celex_consolidated)
+
+    # Handle special codes (codice civile, codice penale, etc.)
+    # IMPORTANT: Check BEFORE replacing spaces with dots, as the codici table uses spaces
+    codice_fragment = codice_urn(normalized_act_type)
+    if codice_fragment:
+        urn = codice_fragment
+        logging.info(f"URN found in the codici table: {urn}")
+
+        # IMPORTANT: The URN from the codici table may already contain an allegato suffix (e.g., ":1")
+        # Pattern: "regio.decreto:1930-10-19;1398:1" where the final ":1" is the allegato
+        # We need to strip this default allegato so we can control it via the `annex` parameter
+        # This allows requesting dispositivo (annex=None) even for codici that default to an allegato
+        allegato_match = re.match(r'^(.+;\d+):(\d+)$', urn)
+        if allegato_match:
+            base_urn = allegato_match.group(1)  # URN without allegato
+            default_allegato = allegato_match.group(2)  # The default allegato from the map
+            logging.info(f"Stripped default allegato {default_allegato} from codice URN, base: {base_urn}")
+
+            # If annex is explicitly None, use the base URN (dispositivo)
+            # If annex is provided, it will be added later in the code
+            # If annex is None but we want the default, the caller should pass the allegato explicitly
+            urn = base_urn
+    else:
+        # For regular act types, replace spaces with dots for NIR URN format
+        # (e.g., "regio decreto" -> "regio.decreto")
+        normalized_act_type_urn = normalized_act_type.replace(' ', '.')
+        try:
+            formatted_date = complete_date_or_parse(date, act_type, act_number)
+            # An act with no number (a d.p.c.m.) has no ";": never ";None".
+            urn = f"{normalized_act_type_urn}:{formatted_date}" + (f";{act_number}" if act_number else "")
+            logging.info(f"Generated base URN: {urn}")
+        except Exception as e:
+            logging.error(f"Error generating URN: {e}", exc_info=True)
+            return None
+    
+    if annex:
+        urn = urn + f':{annex.strip()}'
+    
+    # Assuming these functions are defined elsewhere
+    urn = append_article_info(urn, article, extension)  
+    urn = append_version_info(urn, version, version_date)
+
+    final_urn = base_url + urn
+    result = final_urn if urn_flag else final_urn.split("~")[0]
+    logging.info(f"Final URN: {result}")
+    
+    return result
+
+def complete_date_or_parse(date, act_type, act_number):
+    """
+    Parses the date synchronously. For year-only dates, converts to YYYY-01-01.
+    complete_request_date is where a request's year is completed from Normattiva.
+
+    Arguments:
+    date -- Date of the act
+    act_type -- Type of the legal act
+    act_number -- Number of the act
+
+    Returns:
+    str -- Formatted date (YYYY-MM-DD)
+    """
+    # Handle None or empty date for special codes (e.g., codice civile)
+    if date is None or date == '':
+        return None
+    # For year-only, default to January 1st (sync fallback, URN will still work)
+    if re.match(r"^\d{4}$", date):
+        return f"{date}-01-01"
+    return parse_date(date)
+
+
+def append_article_info(urn, article, extension):
+    """
+    Appends article information to the URN.
+
+    Arguments:
+    urn -- The base URN
+    article -- Article number (optional)
+    extension -- Article extension (optional)
+
+    Returns:
+    str -- The URN with article information appended
+    """
+    if article:
+        if "-" in article:
+            parts = article.split("-")
+            article, extension = parts[0], ''.join(parts[1:]) or extension
+        article = re.sub(r'\b[Aa]rticoli?\b|\b[Aa]rt\.?\b', "", article).strip()
+        urn += f"~art{article}"
+        if extension:
+            urn += extension
+        logging.info(f"Appended article info to URN: {urn}")
+    return urn
+
+def append_version_info(urn, version, version_date):
+    """
+    Appends version information to the URN.
+
+    Arguments:
+    urn -- The base URN with article information
+    version -- Version of the act (optional)
+    version_date -- Date of the version (optional)
+
+    Returns:
+    str -- The URN with version information appended
+    """
+    if isinstance(version, str):
+        # Read the word the way is_historical_request does: stripped, lower-cased.
+        version = version.strip().lower()
+    if version == "originale":
+        urn += "@originale"
+    elif version == "vigente":
+        urn += "!vig="
+        if version_date:
+            formatted_version_date = parse_date(version_date)
+            urn += formatted_version_date
+        logging.info(f"Appended version info to URN: {urn}")
+    return urn
+
+_UNSAFE_IN_FILENAME = re.compile(r"[^A-Za-z0-9._-]")
+_MAX_FILENAME = 150
+
+
+def _safe_filename(name):
+    """
+    Makes `name` a file name and nothing else: no directory part, no separator, not hidden.
+
+    The URN a name is built from is written by the caller. The guard on /export_pdf
+    only checks the host, so `;../../x` used to become a directory part of the path the
+    PDF is read from and copied to.
+    """
+    safe = _UNSAFE_IN_FILENAME.sub("_", name).lstrip(".")
+    if len(safe) > _MAX_FILENAME:
+        safe = safe[:_MAX_FILENAME - len(".pdf")] + ".pdf"
+    return safe or "document.pdf"
+
+
+def urn_to_filename(urn):
+    """
+    Converts a URN to a filename.
+
+    Arguments:
+    urn -- The URN string
+
+    Returns:
+    str -- The generated filename: always a bare file name, safe to join to a directory
+    """
+    logging.info(f"Converting URN to filename: {urn}")
+    try:
+        act_type_section = urn.split('stato:')[1].split('~')[0]
+    except IndexError:
+        logging.error("Invalid URN format")
+        raise ValueError("Invalid URN format")
+    
+    if ':' in act_type_section and ';' in act_type_section:
+        type_and_date, number = act_type_section.split(';')
+        year = type_and_date.split(':')[1].split('-')[0]
+        filename = _safe_filename(f"{number}_{year}.pdf")
+        logging.info(f"Generated filename: {filename}")
+        return filename
+
+    act_type = act_type_section.split('/')[-1]
+    filename = _safe_filename(f"{act_type.capitalize()}.pdf")
+    logging.info(f"Generated filename: {filename}")
+    return filename
+
+
+def pdf_cache_path(urn, directory):
+    """
+    Where the exported PDF of `urn` is cached: a file directly inside `directory`.
+    """
+    return os.path.join(directory, urn_to_filename(urn))

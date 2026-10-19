@@ -1,0 +1,22 @@
+{
+  "senior_magistrate": {
+    "count": 2,
+    "avg_authority": 0.9313833440415655
+  },
+  "strict_expert": {
+    "count": 4,
+    "avg_authority": 0.889931189490429
+  },
+  "domain_specialist": {
+    "count": 6,
+    "avg_authority": 0.8307917980623459
+  },
+  "lenient_student": {
+    "count": 6,
+    "avg_authority": 0.5658598909157623
+  },
+  "random_noise": {
+    "count": 2,
+    "avg_authority": 0.4867870130246003
+  }
+}

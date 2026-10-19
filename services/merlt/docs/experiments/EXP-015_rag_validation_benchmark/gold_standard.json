@@ -1,0 +1,674 @@
+{
+  "metadata": {
+    "name": "MERL-T Libro IV RAG Benchmark",
+    "version": "1.0",
+    "author": "EXP-015",
+    "created_at": "2025-12-15T18:22:25.872995",
+    "description": "Gold standard per RAG benchmark"
+  },
+  "queries": [
+    {
+      "id": "Q001",
+      "text": "Cos'è l'obbligazione naturale?",
+      "category": "concettuale",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2034",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2034",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2035"
+      ],
+      "source": "manual",
+      "difficulty": "medium",
+      "metadata": {}
+    },
+    {
+      "id": "Q002",
+      "text": "Definizione di contratto",
+      "category": "concettuale",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1321",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1321",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1322",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1323"
+      ],
+      "source": "manual",
+      "difficulty": "easy",
+      "metadata": {}
+    },
+    {
+      "id": "Q003",
+      "text": "Cosa sono le fonti delle obbligazioni?",
+      "category": "concettuale",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1173",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1173"
+      ],
+      "source": "manual",
+      "difficulty": "easy",
+      "metadata": {}
+    },
+    {
+      "id": "Q004",
+      "text": "Cos'è la risoluzione per inadempimento?",
+      "category": "concettuale",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1454",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1455"
+      ],
+      "source": "manual",
+      "difficulty": "medium",
+      "metadata": {}
+    },
+    {
+      "id": "Q005",
+      "text": "Definizione di locazione",
+      "category": "concettuale",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1571",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1571",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1572"
+      ],
+      "source": "manual",
+      "difficulty": "easy",
+      "metadata": {}
+    },
+    {
+      "id": "Q006",
+      "text": "Cos'è l'adempimento dell'obbligazione?",
+      "category": "concettuale",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1176",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1176",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1177",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1178"
+      ],
+      "source": "manual",
+      "difficulty": "medium",
+      "metadata": {}
+    },
+    {
+      "id": "Q007",
+      "text": "Cosa si intende per mora del debitore?",
+      "category": "concettuale",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1219",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1219",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1220",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1221"
+      ],
+      "source": "manual",
+      "difficulty": "medium",
+      "metadata": {}
+    },
+    {
+      "id": "Q008",
+      "text": "Definizione di compravendita",
+      "category": "concettuale",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1470",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1470",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1471"
+      ],
+      "source": "manual",
+      "difficulty": "easy",
+      "metadata": {}
+    },
+    {
+      "id": "Q009",
+      "text": "Cos'è il mandato?",
+      "category": "concettuale",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1703",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1703",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1704"
+      ],
+      "source": "manual",
+      "difficulty": "easy",
+      "metadata": {}
+    },
+    {
+      "id": "Q010",
+      "text": "Cosa sono i vizi della cosa venduta?",
+      "category": "concettuale",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1490",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1490",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1491",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1492"
+      ],
+      "source": "manual",
+      "difficulty": "medium",
+      "metadata": {}
+    },
+    {
+      "id": "Q011",
+      "text": "Cos'è la novazione?",
+      "category": "concettuale",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1230",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1230",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1231",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1232"
+      ],
+      "source": "manual",
+      "difficulty": "hard",
+      "metadata": {}
+    },
+    {
+      "id": "Q012",
+      "text": "Definizione di appalto",
+      "category": "concettuale",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1655",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1655",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1656"
+      ],
+      "source": "manual",
+      "difficulty": "easy",
+      "metadata": {}
+    },
+    {
+      "id": "Q013",
+      "text": "Cos'è la fideiussione?",
+      "category": "concettuale",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1936",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1936",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1937"
+      ],
+      "source": "manual",
+      "difficulty": "medium",
+      "metadata": {}
+    },
+    {
+      "id": "Q014",
+      "text": "Cosa si intende per surrogazione?",
+      "category": "concettuale",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1201",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1201",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1202",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1203"
+      ],
+      "source": "manual",
+      "difficulty": "hard",
+      "metadata": {}
+    },
+    {
+      "id": "Q015",
+      "text": "Cos'è l'arricchimento senza causa?",
+      "category": "concettuale",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2041",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2041",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2042"
+      ],
+      "source": "manual",
+      "difficulty": "medium",
+      "metadata": {}
+    },
+    {
+      "id": "Q016",
+      "text": "Art. 1453 codice civile",
+      "category": "normativa",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453"
+      ],
+      "source": "manual",
+      "difficulty": "easy",
+      "metadata": {}
+    },
+    {
+      "id": "Q017",
+      "text": "Articolo 1321 del codice civile",
+      "category": "normativa",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1321",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1321"
+      ],
+      "source": "manual",
+      "difficulty": "easy",
+      "metadata": {}
+    },
+    {
+      "id": "Q018",
+      "text": "Art. 2043 responsabilità extracontrattuale",
+      "category": "normativa",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2044"
+      ],
+      "source": "manual",
+      "difficulty": "easy",
+      "metadata": {}
+    },
+    {
+      "id": "Q019",
+      "text": "Articolo 1218 cc inadempimento",
+      "category": "normativa",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1218",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1218"
+      ],
+      "source": "manual",
+      "difficulty": "easy",
+      "metadata": {}
+    },
+    {
+      "id": "Q020",
+      "text": "Art. 1372 efficacia del contratto",
+      "category": "normativa",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1372",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1372",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1373"
+      ],
+      "source": "manual",
+      "difficulty": "easy",
+      "metadata": {}
+    },
+    {
+      "id": "Q021",
+      "text": "Articoli sulla compravendita immobiliare",
+      "category": "normativa",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1470",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1470",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1498",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1523"
+      ],
+      "source": "manual",
+      "difficulty": "medium",
+      "metadata": {}
+    },
+    {
+      "id": "Q022",
+      "text": "Art. 1341 condizioni generali di contratto",
+      "category": "normativa",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1341",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1341",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1342"
+      ],
+      "source": "manual",
+      "difficulty": "easy",
+      "metadata": {}
+    },
+    {
+      "id": "Q023",
+      "text": "Articolo 1175 buona fede",
+      "category": "normativa",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1175",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1175"
+      ],
+      "source": "manual",
+      "difficulty": "easy",
+      "metadata": {}
+    },
+    {
+      "id": "Q024",
+      "text": "Art. 2059 danni non patrimoniali",
+      "category": "normativa",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2059",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2059"
+      ],
+      "source": "manual",
+      "difficulty": "easy",
+      "metadata": {}
+    },
+    {
+      "id": "Q025",
+      "text": "Articolo sulla prelazione ereditaria",
+      "category": "normativa",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art732",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art732"
+      ],
+      "source": "manual",
+      "difficulty": "hard",
+      "metadata": {}
+    },
+    {
+      "id": "Q026",
+      "text": "Art. 1284 interessi legali",
+      "category": "normativa",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1284",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1284",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1285"
+      ],
+      "source": "manual",
+      "difficulty": "easy",
+      "metadata": {}
+    },
+    {
+      "id": "Q027",
+      "text": "Articoli sul pegno",
+      "category": "normativa",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2784",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2784",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2785",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2786"
+      ],
+      "source": "manual",
+      "difficulty": "medium",
+      "metadata": {}
+    },
+    {
+      "id": "Q028",
+      "text": "Art. 1469 bis clausole vessatorie",
+      "category": "normativa",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1469bis",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1469bis"
+      ],
+      "source": "manual",
+      "difficulty": "medium",
+      "metadata": {}
+    },
+    {
+      "id": "Q029",
+      "text": "Articolo 1901 assicurazione",
+      "category": "normativa",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1901",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1901",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1902"
+      ],
+      "source": "manual",
+      "difficulty": "medium",
+      "metadata": {}
+    },
+    {
+      "id": "Q030",
+      "text": "Art. 2049 responsabilità dei padroni",
+      "category": "normativa",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2049",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2049"
+      ],
+      "source": "manual",
+      "difficulty": "easy",
+      "metadata": {}
+    },
+    {
+      "id": "Q031",
+      "text": "Giurisprudenza sulla risoluzione del contratto",
+      "category": "giurisprudenziale",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1454",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1455"
+      ],
+      "source": "manual",
+      "difficulty": "medium",
+      "metadata": {}
+    },
+    {
+      "id": "Q032",
+      "text": "Sentenze sul danno biologico",
+      "category": "giurisprudenziale",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2059",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2059",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043"
+      ],
+      "source": "manual",
+      "difficulty": "medium",
+      "metadata": {}
+    },
+    {
+      "id": "Q033",
+      "text": "Cassazione sulla buona fede contrattuale",
+      "category": "giurisprudenziale",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1175",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1175",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1375"
+      ],
+      "source": "manual",
+      "difficulty": "hard",
+      "metadata": {}
+    },
+    {
+      "id": "Q034",
+      "text": "Giurisprudenza sui vizi della cosa venduta",
+      "category": "giurisprudenziale",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1490",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1490",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1491",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1492",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1495"
+      ],
+      "source": "manual",
+      "difficulty": "medium",
+      "metadata": {}
+    },
+    {
+      "id": "Q035",
+      "text": "Sentenze sulla responsabilità del costruttore",
+      "category": "giurisprudenziale",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1669",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1669",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2053"
+      ],
+      "source": "manual",
+      "difficulty": "hard",
+      "metadata": {}
+    },
+    {
+      "id": "Q036",
+      "text": "Cassazione sul preliminare di vendita",
+      "category": "giurisprudenziale",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1351",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1351",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2932"
+      ],
+      "source": "manual",
+      "difficulty": "hard",
+      "metadata": {}
+    },
+    {
+      "id": "Q037",
+      "text": "Giurisprudenza sull'inadempimento contrattuale",
+      "category": "giurisprudenziale",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1218",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1218",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1223",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1227"
+      ],
+      "source": "manual",
+      "difficulty": "medium",
+      "metadata": {}
+    },
+    {
+      "id": "Q038",
+      "text": "Sentenze sulla mora del debitore",
+      "category": "giurisprudenziale",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1219",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1219",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1220",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1224"
+      ],
+      "source": "manual",
+      "difficulty": "medium",
+      "metadata": {}
+    },
+    {
+      "id": "Q039",
+      "text": "Cassazione sul danno da circolazione",
+      "category": "giurisprudenziale",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2054",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2054"
+      ],
+      "source": "manual",
+      "difficulty": "medium",
+      "metadata": {}
+    },
+    {
+      "id": "Q040",
+      "text": "Giurisprudenza sulla responsabilità medica",
+      "category": "giurisprudenziale",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2236",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2236",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1218",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043"
+      ],
+      "source": "manual",
+      "difficulty": "hard",
+      "metadata": {}
+    },
+    {
+      "id": "Q041",
+      "text": "Come risolvere un contratto per inadempimento?",
+      "category": "pratica",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1454",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1455",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1456"
+      ],
+      "source": "manual",
+      "difficulty": "medium",
+      "metadata": {}
+    },
+    {
+      "id": "Q042",
+      "text": "Come chiedere il risarcimento danni?",
+      "category": "pratica",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2056",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2059"
+      ],
+      "source": "manual",
+      "difficulty": "medium",
+      "metadata": {}
+    },
+    {
+      "id": "Q043",
+      "text": "Come contestare un prodotto difettoso?",
+      "category": "pratica",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1490",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1490",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1492",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1495"
+      ],
+      "source": "manual",
+      "difficulty": "medium",
+      "metadata": {}
+    },
+    {
+      "id": "Q044",
+      "text": "Come recedere da un contratto?",
+      "category": "pratica",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1373",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1373",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1385",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1386"
+      ],
+      "source": "manual",
+      "difficulty": "medium",
+      "metadata": {}
+    },
+    {
+      "id": "Q045",
+      "text": "Come costituire in mora il debitore?",
+      "category": "pratica",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1219",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1219",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1220"
+      ],
+      "source": "manual",
+      "difficulty": "medium",
+      "metadata": {}
+    },
+    {
+      "id": "Q046",
+      "text": "Come far valere la garanzia per vizi?",
+      "category": "pratica",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1495",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1495",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1490",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1492"
+      ],
+      "source": "manual",
+      "difficulty": "medium",
+      "metadata": {}
+    },
+    {
+      "id": "Q047",
+      "text": "Come calcolare il danno da ritardato pagamento?",
+      "category": "pratica",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1224",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1224",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1284"
+      ],
+      "source": "manual",
+      "difficulty": "hard",
+      "metadata": {}
+    },
+    {
+      "id": "Q048",
+      "text": "Come impugnare un contratto per errore?",
+      "category": "pratica",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1428",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1428",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1429",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1431",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art1433"
+      ],
+      "source": "manual",
+      "difficulty": "hard",
+      "metadata": {}
+    },
+    {
+      "id": "Q049",
+      "text": "Come agire per esecuzione specifica?",
+      "category": "pratica",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2932",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2932"
+      ],
+      "source": "manual",
+      "difficulty": "hard",
+      "metadata": {}
+    },
+    {
+      "id": "Q050",
+      "text": "Come tutelare un credito con ipoteca?",
+      "category": "pratica",
+      "expected_article": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2808",
+      "relevant_urns": [
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2808",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2809",
+        "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2810"
+      ],
+      "source": "manual",
+      "difficulty": "hard",
+      "metadata": {}
+    }
+  ]
+}

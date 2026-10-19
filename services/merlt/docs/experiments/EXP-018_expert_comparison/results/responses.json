@@ -1,0 +1,1498 @@
+[
+  {
+    "query": "Cos'è il contratto secondo il codice civile?",
+    "category": "definitional",
+    "expected_expert": "literal",
+    "routing": {
+      "query_type": "definitional",
+      "expert_weights": {
+        "literal": 0.6,
+        "systemic": 0.2,
+        "principles": 0.1,
+        "precedent": 0.1
+      },
+      "confidence": 0.4
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Literal (peso: 0.60, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.20, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.10, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Precedent (peso: 0.10, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "literal",
+        "systemic",
+        "principles",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.5540847778320312,
+    "timestamp": "2025-12-20T19:01:24.349848"
+  },
+  {
+    "query": "Cosa si intende per legittima difesa?",
+    "category": "definitional",
+    "expected_expert": "literal",
+    "routing": {
+      "query_type": "definitional",
+      "expert_weights": {
+        "literal": 0.6,
+        "systemic": 0.2,
+        "principles": 0.1,
+        "precedent": 0.1
+      },
+      "confidence": 0.4
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Literal (peso: 0.60, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.20, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.10, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Precedent (peso: 0.10, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "literal",
+        "systemic",
+        "principles",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.4000663757324219,
+    "timestamp": "2025-12-20T19:01:24.350256"
+  },
+  {
+    "query": "Definizione di responsabilità civile",
+    "category": "definitional",
+    "expected_expert": "literal",
+    "routing": {
+      "query_type": "definitional",
+      "expert_weights": {
+        "literal": 0.6,
+        "systemic": 0.2,
+        "principles": 0.1,
+        "precedent": 0.1
+      },
+      "confidence": 0.4
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Literal (peso: 0.60, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.20, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.10, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Precedent (peso: 0.10, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "literal",
+        "systemic",
+        "principles",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.5109310150146484,
+    "timestamp": "2025-12-20T19:01:24.350778"
+  },
+  {
+    "query": "Cos'è la buona fede contrattuale?",
+    "category": "definitional",
+    "expected_expert": "literal",
+    "routing": {
+      "query_type": "definitional",
+      "expert_weights": {
+        "literal": 0.6,
+        "systemic": 0.2,
+        "principles": 0.1,
+        "precedent": 0.1
+      },
+      "confidence": 0.4
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Literal (peso: 0.60, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.20, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.10, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Precedent (peso: 0.10, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "literal",
+        "systemic",
+        "principles",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.4317760467529297,
+    "timestamp": "2025-12-20T19:01:24.351218"
+  },
+  {
+    "query": "Cosa significa capacità giuridica?",
+    "category": "definitional",
+    "expected_expert": "literal",
+    "routing": {
+      "query_type": "general",
+      "expert_weights": {
+        "literal": 0.35,
+        "systemic": 0.25,
+        "principles": 0.2,
+        "precedent": 0.2
+      },
+      "confidence": 0.5
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Literal (peso: 0.35, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.25, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.20, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Precedent (peso: 0.20, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "literal",
+        "systemic",
+        "principles",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.3819465637207031,
+    "timestamp": "2025-12-20T19:01:24.351606"
+  },
+  {
+    "query": "Nozione di possesso nel diritto civile",
+    "category": "definitional",
+    "expected_expert": "literal",
+    "routing": {
+      "query_type": "definitional",
+      "expert_weights": {
+        "literal": 0.6,
+        "systemic": 0.2,
+        "principles": 0.1,
+        "precedent": 0.1
+      },
+      "confidence": 0.4
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Literal (peso: 0.60, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.20, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.10, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Precedent (peso: 0.10, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "literal",
+        "systemic",
+        "principles",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.3867149353027344,
+    "timestamp": "2025-12-20T19:01:24.351998"
+  },
+  {
+    "query": "Cos'è l'obbligazione naturale?",
+    "category": "definitional",
+    "expected_expert": "literal",
+    "routing": {
+      "query_type": "definitional",
+      "expert_weights": {
+        "literal": 0.6,
+        "systemic": 0.2,
+        "principles": 0.1,
+        "precedent": 0.1
+      },
+      "confidence": 0.4
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Literal (peso: 0.60, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.20, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.10, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Precedent (peso: 0.10, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "literal",
+        "systemic",
+        "principles",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.36406517028808594,
+    "timestamp": "2025-12-20T19:01:24.352366"
+  },
+  {
+    "query": "Definizione di danno ingiusto",
+    "category": "definitional",
+    "expected_expert": "literal",
+    "routing": {
+      "query_type": "definitional",
+      "expert_weights": {
+        "literal": 0.6,
+        "systemic": 0.2,
+        "principles": 0.1,
+        "precedent": 0.1
+      },
+      "confidence": 0.4
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Literal (peso: 0.60, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.20, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.10, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Precedent (peso: 0.10, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "literal",
+        "systemic",
+        "principles",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.3509521484375,
+    "timestamp": "2025-12-20T19:01:24.352721"
+  },
+  {
+    "query": "Cosa si intende per causa del contratto?",
+    "category": "definitional",
+    "expected_expert": "literal",
+    "routing": {
+      "query_type": "definitional",
+      "expert_weights": {
+        "literal": 0.6,
+        "systemic": 0.2,
+        "principles": 0.1,
+        "precedent": 0.1
+      },
+      "confidence": 0.4
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Literal (peso: 0.60, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.20, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.10, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Precedent (peso: 0.10, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "literal",
+        "systemic",
+        "principles",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.3669261932373047,
+    "timestamp": "2025-12-20T19:01:24.353092"
+  },
+  {
+    "query": "Cos'è il dolo nel diritto penale?",
+    "category": "definitional",
+    "expected_expert": "literal",
+    "routing": {
+      "query_type": "definitional",
+      "expert_weights": {
+        "literal": 0.6,
+        "systemic": 0.2,
+        "principles": 0.1,
+        "precedent": 0.1
+      },
+      "confidence": 0.4
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Literal (peso: 0.60, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.20, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.10, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Precedent (peso: 0.10, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "literal",
+        "systemic",
+        "principles",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.3590583801269531,
+    "timestamp": "2025-12-20T19:01:24.353456"
+  },
+  {
+    "query": "Come interpretare l'art. 2043 del codice civile?",
+    "category": "interpretive",
+    "expected_expert": "literal",
+    "routing": {
+      "query_type": "interpretive",
+      "expert_weights": {
+        "literal": 0.3,
+        "systemic": 0.25,
+        "principles": 0.25,
+        "precedent": 0.2
+      },
+      "confidence": 0.4
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Literal (peso: 0.30, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.25, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.25, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Precedent (peso: 0.20, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "literal",
+        "systemic",
+        "principles",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.3681182861328125,
+    "timestamp": "2025-12-20T19:01:24.353830"
+  },
+  {
+    "query": "Qual è il significato dell'art. 1453 sulla risoluzione?",
+    "category": "interpretive",
+    "expected_expert": "literal",
+    "routing": {
+      "query_type": "general",
+      "expert_weights": {
+        "literal": 0.35,
+        "systemic": 0.25,
+        "principles": 0.2,
+        "precedent": 0.2
+      },
+      "confidence": 0.5
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Literal (peso: 0.35, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.25, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.20, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Precedent (peso: 0.20, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "literal",
+        "systemic",
+        "principles",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.37598609924316406,
+    "timestamp": "2025-12-20T19:01:24.354210"
+  },
+  {
+    "query": "Interpretazione dell'art. 52 c.p. sulla legittima difesa",
+    "category": "interpretive",
+    "expected_expert": "literal",
+    "routing": {
+      "query_type": "general",
+      "expert_weights": {
+        "literal": 0.35,
+        "systemic": 0.25,
+        "principles": 0.2,
+        "precedent": 0.2
+      },
+      "confidence": 0.5
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Literal (peso: 0.35, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.25, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.20, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Precedent (peso: 0.20, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "literal",
+        "systemic",
+        "principles",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.37670135498046875,
+    "timestamp": "2025-12-20T19:01:24.354591"
+  },
+  {
+    "query": "Come si interpreta l'elemento soggettivo nel 2043?",
+    "category": "interpretive",
+    "expected_expert": "literal",
+    "routing": {
+      "query_type": "interpretive",
+      "expert_weights": {
+        "literal": 0.3,
+        "systemic": 0.25,
+        "principles": 0.25,
+        "precedent": 0.2
+      },
+      "confidence": 0.4
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Literal (peso: 0.30, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.25, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.25, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Precedent (peso: 0.20, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "literal",
+        "systemic",
+        "principles",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.36787986755371094,
+    "timestamp": "2025-12-20T19:01:24.354963"
+  },
+  {
+    "query": "Significato di 'fatto doloso o colposo' nel 2043",
+    "category": "interpretive",
+    "expected_expert": "literal",
+    "routing": {
+      "query_type": "definitional",
+      "expert_weights": {
+        "literal": 0.6,
+        "systemic": 0.2,
+        "principles": 0.1,
+        "precedent": 0.1
+      },
+      "confidence": 0.4
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Literal (peso: 0.60, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.20, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.10, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Precedent (peso: 0.10, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "literal",
+        "systemic",
+        "principles",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.3597736358642578,
+    "timestamp": "2025-12-20T19:01:24.355329"
+  },
+  {
+    "query": "Ambito di applicazione dell'art. 1218 c.c.",
+    "category": "interpretive",
+    "expected_expert": "literal",
+    "routing": {
+      "query_type": "interpretive",
+      "expert_weights": {
+        "literal": 0.2830188679245283,
+        "systemic": 0.23584905660377356,
+        "principles": 0.23584905660377356,
+        "precedent": 0.24528301886792453
+      },
+      "confidence": 0.4
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Literal (peso: 0.28, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Precedent (peso: 0.25, confidenza: 0.30)\nFonti giurisprudenziali recuperate (ordinate per autorità):\n\n\n[Nota: Analisi giurisprudenziale completa richiede servizio AI]\n\n## Systemic (peso: 0.24, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.24, ",
+      "confidence": 0.29999999999999993,
+      "expert_contributions": [
+        "literal",
+        "precedent",
+        "systemic",
+        "principles"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.35691261291503906,
+    "timestamp": "2025-12-20T19:01:24.355690"
+  },
+  {
+    "query": "Portata dell'art. 185 c.p. sul risarcimento",
+    "category": "interpretive",
+    "expected_expert": "literal",
+    "routing": {
+      "query_type": "general",
+      "expert_weights": {
+        "literal": 0.35,
+        "systemic": 0.25,
+        "principles": 0.2,
+        "precedent": 0.2
+      },
+      "confidence": 0.5
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Literal (peso: 0.35, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.25, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.20, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Precedent (peso: 0.20, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "literal",
+        "systemic",
+        "principles",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.33092498779296875,
+    "timestamp": "2025-12-20T19:01:24.356025"
+  },
+  {
+    "query": "Come leggere l'art. 2059 sui danni non patrimoniali?",
+    "category": "interpretive",
+    "expected_expert": "literal",
+    "routing": {
+      "query_type": "general",
+      "expert_weights": {
+        "literal": 0.35,
+        "systemic": 0.25,
+        "principles": 0.2,
+        "precedent": 0.2
+      },
+      "confidence": 0.5
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Literal (peso: 0.35, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.25, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.20, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Precedent (peso: 0.20, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "literal",
+        "systemic",
+        "principles",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.4379749298095703,
+    "timestamp": "2025-12-20T19:01:24.356468"
+  },
+  {
+    "query": "Interpretazione sistematica dell'art. 1175 c.c.",
+    "category": "interpretive",
+    "expected_expert": "literal",
+    "routing": {
+      "query_type": "systemic",
+      "expert_weights": {
+        "literal": 0.2,
+        "systemic": 0.5,
+        "principles": 0.15,
+        "precedent": 0.15
+      },
+      "confidence": 0.4
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Systemic (peso: 0.50, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Literal (peso: 0.20, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Principles (peso: 0.15, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Precedent (peso: 0.15, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "systemic",
+        "literal",
+        "principles",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.37789344787597656,
+    "timestamp": "2025-12-20T19:01:24.356852"
+  },
+  {
+    "query": "Senso dell'art. 2058 sulla reintegrazione in forma specifica",
+    "category": "interpretive",
+    "expected_expert": "literal",
+    "routing": {
+      "query_type": "general",
+      "expert_weights": {
+        "literal": 0.35,
+        "systemic": 0.25,
+        "principles": 0.2,
+        "precedent": 0.2
+      },
+      "confidence": 0.5
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Literal (peso: 0.35, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.25, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.20, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Precedent (peso: 0.20, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "literal",
+        "systemic",
+        "principles",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.3719329833984375,
+    "timestamp": "2025-12-20T19:01:24.357229"
+  },
+  {
+    "query": "Quali sono i termini per la risoluzione del contratto?",
+    "category": "procedural",
+    "expected_expert": "precedent",
+    "routing": {
+      "query_type": "procedural",
+      "expert_weights": {
+        "literal": 0.4,
+        "systemic": 0.2,
+        "principles": 0.1,
+        "precedent": 0.3
+      },
+      "confidence": 0.4
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Literal (peso: 0.40, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Precedent (peso: 0.30, confidenza: 0.30)\nFonti giurisprudenziali recuperate (ordinate per autorità):\n\n\n[Nota: Analisi giurisprudenziale completa richiede servizio AI]\n\n## Systemic (peso: 0.20, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.10, ",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "literal",
+        "precedent",
+        "systemic",
+        "principles"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.3662109375,
+    "timestamp": "2025-12-20T19:01:24.357601"
+  },
+  {
+    "query": "Procedura per l'azione di risarcimento danni",
+    "category": "procedural",
+    "expected_expert": "precedent",
+    "routing": {
+      "query_type": "procedural",
+      "expert_weights": {
+        "literal": 0.4,
+        "systemic": 0.2,
+        "principles": 0.1,
+        "precedent": 0.3
+      },
+      "confidence": 0.4
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Literal (peso: 0.40, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Precedent (peso: 0.30, confidenza: 0.30)\nFonti giurisprudenziali recuperate (ordinate per autorità):\n\n\n[Nota: Analisi giurisprudenziale completa richiede servizio AI]\n\n## Systemic (peso: 0.20, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.10, ",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "literal",
+        "precedent",
+        "systemic",
+        "principles"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.35691261291503906,
+    "timestamp": "2025-12-20T19:01:24.357962"
+  },
+  {
+    "query": "Termini di prescrizione per l'azione aquiliana",
+    "category": "procedural",
+    "expected_expert": "precedent",
+    "routing": {
+      "query_type": "general",
+      "expert_weights": {
+        "literal": 0.35,
+        "systemic": 0.25,
+        "principles": 0.2,
+        "precedent": 0.2
+      },
+      "confidence": 0.5
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Literal (peso: 0.35, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.25, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.20, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Precedent (peso: 0.20, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "literal",
+        "systemic",
+        "principles",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.37980079650878906,
+    "timestamp": "2025-12-20T19:01:24.358348"
+  },
+  {
+    "query": "Come si esercita il diritto di recesso?",
+    "category": "procedural",
+    "expected_expert": "precedent",
+    "routing": {
+      "query_type": "general",
+      "expert_weights": {
+        "literal": 0.35,
+        "systemic": 0.25,
+        "principles": 0.2,
+        "precedent": 0.2
+      },
+      "confidence": 0.5
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Literal (peso: 0.35, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.25, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.20, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Precedent (peso: 0.20, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "literal",
+        "systemic",
+        "principles",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.37384033203125,
+    "timestamp": "2025-12-20T19:01:24.358728"
+  },
+  {
+    "query": "Modalità di costituzione in mora del debitore",
+    "category": "procedural",
+    "expected_expert": "precedent",
+    "routing": {
+      "query_type": "procedural",
+      "expert_weights": {
+        "literal": 0.4,
+        "systemic": 0.2,
+        "principles": 0.1,
+        "precedent": 0.3
+      },
+      "confidence": 0.4
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Literal (peso: 0.40, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Precedent (peso: 0.30, confidenza: 0.30)\nFonti giurisprudenziali recuperate (ordinate per autorità):\n\n\n[Nota: Analisi giurisprudenziale completa richiede servizio AI]\n\n## Systemic (peso: 0.20, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.10, ",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "literal",
+        "precedent",
+        "systemic",
+        "principles"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.3578662872314453,
+    "timestamp": "2025-12-20T19:01:24.359091"
+  },
+  {
+    "query": "Procedura per la diffida ad adempiere",
+    "category": "procedural",
+    "expected_expert": "precedent",
+    "routing": {
+      "query_type": "procedural",
+      "expert_weights": {
+        "literal": 0.4,
+        "systemic": 0.2,
+        "principles": 0.1,
+        "precedent": 0.3
+      },
+      "confidence": 0.4
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Literal (peso: 0.40, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Precedent (peso: 0.30, confidenza: 0.30)\nFonti giurisprudenziali recuperate (ordinate per autorità):\n\n\n[Nota: Analisi giurisprudenziale completa richiede servizio AI]\n\n## Systemic (peso: 0.20, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.10, ",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "literal",
+        "precedent",
+        "systemic",
+        "principles"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.3609657287597656,
+    "timestamp": "2025-12-20T19:01:24.359456"
+  },
+  {
+    "query": "Termini per l'impugnazione del contratto annullabile",
+    "category": "procedural",
+    "expected_expert": "precedent",
+    "routing": {
+      "query_type": "procedural",
+      "expert_weights": {
+        "literal": 0.4,
+        "systemic": 0.2,
+        "principles": 0.1,
+        "precedent": 0.3
+      },
+      "confidence": 0.4
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Literal (peso: 0.40, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Precedent (peso: 0.30, confidenza: 0.30)\nFonti giurisprudenziali recuperate (ordinate per autorità):\n\n\n[Nota: Analisi giurisprudenziale completa richiede servizio AI]\n\n## Systemic (peso: 0.20, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.10, ",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "literal",
+        "precedent",
+        "systemic",
+        "principles"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.37670135498046875,
+    "timestamp": "2025-12-20T19:01:24.359842"
+  },
+  {
+    "query": "Come si propone l'eccezione di inadempimento?",
+    "category": "procedural",
+    "expected_expert": "precedent",
+    "routing": {
+      "query_type": "general",
+      "expert_weights": {
+        "literal": 0.35,
+        "systemic": 0.25,
+        "principles": 0.2,
+        "precedent": 0.2
+      },
+      "confidence": 0.5
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Literal (peso: 0.35, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.25, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.20, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Precedent (peso: 0.20, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "literal",
+        "systemic",
+        "principles",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.3666877746582031,
+    "timestamp": "2025-12-20T19:01:24.360213"
+  },
+  {
+    "query": "Termini per l'azione di rescissione",
+    "category": "procedural",
+    "expected_expert": "precedent",
+    "routing": {
+      "query_type": "procedural",
+      "expert_weights": {
+        "literal": 0.4,
+        "systemic": 0.2,
+        "principles": 0.1,
+        "precedent": 0.3
+      },
+      "confidence": 0.4
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Literal (peso: 0.40, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Precedent (peso: 0.30, confidenza: 0.30)\nFonti giurisprudenziali recuperate (ordinate per autorità):\n\n\n[Nota: Analisi giurisprudenziale completa richiede servizio AI]\n\n## Systemic (peso: 0.20, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.10, ",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "literal",
+        "precedent",
+        "systemic",
+        "principles"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.34308433532714844,
+    "timestamp": "2025-12-20T19:01:24.360561"
+  },
+  {
+    "query": "Procedura per la risoluzione per eccessiva onerosità",
+    "category": "procedural",
+    "expected_expert": "precedent",
+    "routing": {
+      "query_type": "procedural",
+      "expert_weights": {
+        "literal": 0.4,
+        "systemic": 0.2,
+        "principles": 0.1,
+        "precedent": 0.3
+      },
+      "confidence": 0.4
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Literal (peso: 0.40, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Precedent (peso: 0.30, confidenza: 0.30)\nFonti giurisprudenziali recuperate (ordinate per autorità):\n\n\n[Nota: Analisi giurisprudenziale completa richiede servizio AI]\n\n## Systemic (peso: 0.20, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.10, ",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "literal",
+        "precedent",
+        "systemic",
+        "principles"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.3578662872314453,
+    "timestamp": "2025-12-20T19:01:24.360924"
+  },
+  {
+    "query": "Art. 3 Cost. e principio di uguaglianza sostanziale",
+    "category": "constitutional",
+    "expected_expert": "principles",
+    "routing": {
+      "query_type": "constitutional",
+      "expert_weights": {
+        "literal": 0.2,
+        "systemic": 0.2,
+        "principles": 0.5,
+        "precedent": 0.1
+      },
+      "confidence": 0.4
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Principles (peso: 0.50, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Literal (peso: 0.20, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.20, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Precedent (peso: 0.10, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "principles",
+        "literal",
+        "systemic",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.3628730773925781,
+    "timestamp": "2025-12-20T19:01:24.361292"
+  },
+  {
+    "query": "Diritto alla salute ex art. 32 Cost.",
+    "category": "constitutional",
+    "expected_expert": "principles",
+    "routing": {
+      "query_type": "constitutional",
+      "expert_weights": {
+        "literal": 0.2,
+        "systemic": 0.2,
+        "principles": 0.5,
+        "precedent": 0.1
+      },
+      "confidence": 0.4
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Principles (peso: 0.50, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Literal (peso: 0.20, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.20, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Precedent (peso: 0.10, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "principles",
+        "literal",
+        "systemic",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.35119056701660156,
+    "timestamp": "2025-12-20T19:01:24.361647"
+  },
+  {
+    "query": "Tutela della proprietà privata nell'art. 42 Cost.",
+    "category": "constitutional",
+    "expected_expert": "principles",
+    "routing": {
+      "query_type": "constitutional",
+      "expert_weights": {
+        "literal": 0.2,
+        "systemic": 0.2,
+        "principles": 0.5,
+        "precedent": 0.1
+      },
+      "confidence": 0.4
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Principles (peso: 0.50, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Literal (peso: 0.20, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.20, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Precedent (peso: 0.10, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "principles",
+        "literal",
+        "systemic",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.347137451171875,
+    "timestamp": "2025-12-20T19:01:24.361998"
+  },
+  {
+    "query": "Libertà di iniziativa economica ex art. 41 Cost.",
+    "category": "constitutional",
+    "expected_expert": "principles",
+    "routing": {
+      "query_type": "constitutional",
+      "expert_weights": {
+        "literal": 0.2,
+        "systemic": 0.2,
+        "principles": 0.5,
+        "precedent": 0.1
+      },
+      "confidence": 0.8
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Principles (peso: 0.50, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Literal (peso: 0.20, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.20, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Precedent (peso: 0.10, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "principles",
+        "literal",
+        "systemic",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.347137451171875,
+    "timestamp": "2025-12-20T19:01:24.362349"
+  },
+  {
+    "query": "Principi costituzionali sul diritto di difesa",
+    "category": "constitutional",
+    "expected_expert": "principles",
+    "routing": {
+      "query_type": "constitutional",
+      "expert_weights": {
+        "literal": 0.2,
+        "systemic": 0.2,
+        "principles": 0.5,
+        "precedent": 0.1
+      },
+      "confidence": 0.8
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Principles (peso: 0.50, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Literal (peso: 0.20, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.20, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Precedent (peso: 0.10, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "principles",
+        "literal",
+        "systemic",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.3516674041748047,
+    "timestamp": "2025-12-20T19:01:24.362705"
+  },
+  {
+    "query": "Art. 24 Cost. e accesso alla giustizia",
+    "category": "constitutional",
+    "expected_expert": "principles",
+    "routing": {
+      "query_type": "constitutional",
+      "expert_weights": {
+        "literal": 0.2,
+        "systemic": 0.2,
+        "principles": 0.5,
+        "precedent": 0.1
+      },
+      "confidence": 0.4
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Principles (peso: 0.50, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Literal (peso: 0.20, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.20, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Precedent (peso: 0.10, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "principles",
+        "literal",
+        "systemic",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.34999847412109375,
+    "timestamp": "2025-12-20T19:01:24.363059"
+  },
+  {
+    "query": "Bilanciamento tra diritti fondamentali",
+    "category": "constitutional",
+    "expected_expert": "principles",
+    "routing": {
+      "query_type": "constitutional",
+      "expert_weights": {
+        "literal": 0.2,
+        "systemic": 0.2,
+        "principles": 0.5,
+        "precedent": 0.1
+      },
+      "confidence": 0.4
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Principles (peso: 0.50, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Literal (peso: 0.20, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.20, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Precedent (peso: 0.10, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "principles",
+        "literal",
+        "systemic",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.3390312194824219,
+    "timestamp": "2025-12-20T19:01:24.363402"
+  },
+  {
+    "query": "Riserva di legge in materia penale",
+    "category": "constitutional",
+    "expected_expert": "principles",
+    "routing": {
+      "query_type": "general",
+      "expert_weights": {
+        "literal": 0.35,
+        "systemic": 0.25,
+        "principles": 0.2,
+        "precedent": 0.2
+      },
+      "confidence": 0.5
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Literal (peso: 0.35, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.25, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.20, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Precedent (peso: 0.20, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "literal",
+        "systemic",
+        "principles",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.35190582275390625,
+    "timestamp": "2025-12-20T19:01:24.363759"
+  },
+  {
+    "query": "Principio di ragionevolezza nella giurisprudenza costituzionale",
+    "category": "constitutional",
+    "expected_expert": "principles",
+    "routing": {
+      "query_type": "constitutional",
+      "expert_weights": {
+        "literal": 0.1941747572815534,
+        "systemic": 0.1941747572815534,
+        "principles": 0.4854368932038835,
+        "precedent": 0.1262135922330097
+      },
+      "confidence": 0.4
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Principles (peso: 0.49, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Literal (peso: 0.19, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.19, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Precedent (peso: 0.13, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "principles",
+        "literal",
+        "systemic",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.3540515899658203,
+    "timestamp": "2025-12-20T19:01:24.364118"
+  },
+  {
+    "query": "Art. 2 Cost. e doveri inderogabili di solidarietà",
+    "category": "constitutional",
+    "expected_expert": "principles",
+    "routing": {
+      "query_type": "constitutional",
+      "expert_weights": {
+        "literal": 0.2,
+        "systemic": 0.2,
+        "principles": 0.5,
+        "precedent": 0.1
+      },
+      "confidence": 0.4
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Principles (peso: 0.50, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Literal (peso: 0.20, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.20, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Precedent (peso: 0.10, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "principles",
+        "literal",
+        "systemic",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.354766845703125,
+    "timestamp": "2025-12-20T19:01:24.364477"
+  },
+  {
+    "query": "Orientamento della Cassazione sul danno biologico",
+    "category": "jurisprudential",
+    "expected_expert": "precedent",
+    "routing": {
+      "query_type": "jurisprudential",
+      "expert_weights": {
+        "literal": 0.15,
+        "systemic": 0.15,
+        "principles": 0.1,
+        "precedent": 0.6
+      },
+      "confidence": 0.6666666666666666
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Precedent (peso: 0.60, confidenza: 0.30)\nFonti giurisprudenziali recuperate (ordinate per autorità):\n\n\n[Nota: Analisi giurisprudenziale completa richiede servizio AI]\n\n## Literal (peso: 0.15, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.15, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.10, ",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "precedent",
+        "literal",
+        "systemic",
+        "principles"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.41103363037109375,
+    "timestamp": "2025-12-20T19:01:24.364893"
+  },
+  {
+    "query": "Giurisprudenza sulla responsabilità del medico",
+    "category": "jurisprudential",
+    "expected_expert": "precedent",
+    "routing": {
+      "query_type": "jurisprudential",
+      "expert_weights": {
+        "literal": 0.1271186440677966,
+        "systemic": 0.1271186440677966,
+        "principles": 0.08474576271186442,
+        "precedent": 0.6610169491525424
+      },
+      "confidence": 0.3333333333333333
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Precedent (peso: 0.72, confidenza: 0.30)\nFonti giurisprudenziali recuperate (ordinate per autorità):\n\n\n[Nota: Analisi giurisprudenziale completa richiede servizio AI]\n\n## Literal (peso: 0.14, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.14, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n\n*Nota: Sintesi generata se",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "precedent",
+        "literal",
+        "systemic"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.3578662872314453,
+    "timestamp": "2025-12-20T19:01:24.365256"
+  },
+  {
+    "query": "Come la Cassazione interpreta la buona fede oggettiva?",
+    "category": "jurisprudential",
+    "expected_expert": "precedent",
+    "routing": {
+      "query_type": "jurisprudential",
+      "expert_weights": {
+        "literal": 0.15,
+        "systemic": 0.15,
+        "principles": 0.1,
+        "precedent": 0.6
+      },
+      "confidence": 0.3333333333333333
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Precedent (peso: 0.60, confidenza: 0.30)\nFonti giurisprudenziali recuperate (ordinate per autorità):\n\n\n[Nota: Analisi giurisprudenziale completa richiede servizio AI]\n\n## Literal (peso: 0.15, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.15, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.10, ",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "precedent",
+        "literal",
+        "systemic",
+        "principles"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.3898143768310547,
+    "timestamp": "2025-12-20T19:01:24.365651"
+  },
+  {
+    "query": "Evoluzione giurisprudenziale sul danno esistenziale",
+    "category": "jurisprudential",
+    "expected_expert": "precedent",
+    "routing": {
+      "query_type": "jurisprudential",
+      "expert_weights": {
+        "literal": 0.14354066985645933,
+        "systemic": 0.18660287081339716,
+        "principles": 0.09569377990430623,
+        "precedent": 0.5741626794258373
+      },
+      "confidence": 0.3333333333333333
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Precedent (peso: 0.63, confidenza: 0.30)\nFonti giurisprudenziali recuperate (ordinate per autorità):\n\n\n[Nota: Analisi giurisprudenziale completa richiede servizio AI]\n\n## Systemic (peso: 0.21, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Literal (peso: 0.16, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n\n*Nota: Sintesi generata se",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "precedent",
+        "systemic",
+        "literal"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.3399848937988281,
+    "timestamp": "2025-12-20T19:01:24.365995"
+  },
+  {
+    "query": "Orientamento delle Sezioni Unite sulla causalità",
+    "category": "jurisprudential",
+    "expected_expert": "precedent",
+    "routing": {
+      "query_type": "jurisprudential",
+      "expert_weights": {
+        "literal": 0.15,
+        "systemic": 0.15,
+        "principles": 0.1,
+        "precedent": 0.6
+      },
+      "confidence": 0.3333333333333333
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Precedent (peso: 0.60, confidenza: 0.30)\nFonti giurisprudenziali recuperate (ordinate per autorità):\n\n\n[Nota: Analisi giurisprudenziale completa richiede servizio AI]\n\n## Literal (peso: 0.15, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.15, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.10, ",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "precedent",
+        "literal",
+        "systemic",
+        "principles"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.3688335418701172,
+    "timestamp": "2025-12-20T19:01:24.366368"
+  },
+  {
+    "query": "Giurisprudenza sulla responsabilità dell'avvocato",
+    "category": "jurisprudential",
+    "expected_expert": "precedent",
+    "routing": {
+      "query_type": "jurisprudential",
+      "expert_weights": {
+        "literal": 0.1271186440677966,
+        "systemic": 0.1271186440677966,
+        "principles": 0.08474576271186442,
+        "precedent": 0.6610169491525424
+      },
+      "confidence": 0.3333333333333333
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Precedent (peso: 0.72, confidenza: 0.30)\nFonti giurisprudenziali recuperate (ordinate per autorità):\n\n\n[Nota: Analisi giurisprudenziale completa richiede servizio AI]\n\n## Literal (peso: 0.14, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.14, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n\n*Nota: Sintesi generata se",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "precedent",
+        "literal",
+        "systemic"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.335693359375,
+    "timestamp": "2025-12-20T19:01:24.366708"
+  },
+  {
+    "query": "Come i giudici applicano l'art. 2051 c.c.?",
+    "category": "jurisprudential",
+    "expected_expert": "precedent",
+    "routing": {
+      "query_type": "general",
+      "expert_weights": {
+        "literal": 0.35,
+        "systemic": 0.25,
+        "principles": 0.2,
+        "precedent": 0.2
+      },
+      "confidence": 0.5
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Literal (peso: 0.35, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.25, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.20, confidenza: 0.30)\nFonti e principi recuperati per analisi teleologica:\n\n\n[Nota: Analisi teleologica completa richiede servizio AI]\n\n## Precedent (peso: 0.20, confidenza: 0",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "literal",
+        "systemic",
+        "principles",
+        "precedent"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.3638267517089844,
+    "timestamp": "2025-12-20T19:01:24.367076"
+  },
+  {
+    "query": "Massime della Cassazione sulla responsabilità contrattuale",
+    "category": "jurisprudential",
+    "expected_expert": "precedent",
+    "routing": {
+      "query_type": "jurisprudential",
+      "expert_weights": {
+        "literal": 0.15,
+        "systemic": 0.15,
+        "principles": 0.1,
+        "precedent": 0.6
+      },
+      "confidence": 0.6666666666666666
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Precedent (peso: 0.60, confidenza: 0.30)\nFonti giurisprudenziali recuperate (ordinate per autorità):\n\n\n[Nota: Analisi giurisprudenziale completa richiede servizio AI]\n\n## Literal (peso: 0.15, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.15, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.10, ",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "precedent",
+        "literal",
+        "systemic",
+        "principles"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.37288665771484375,
+    "timestamp": "2025-12-20T19:01:24.367453"
+  },
+  {
+    "query": "Orientamento sulla prova del danno da perdita di chance",
+    "category": "jurisprudential",
+    "expected_expert": "precedent",
+    "routing": {
+      "query_type": "jurisprudential",
+      "expert_weights": {
+        "literal": 0.15,
+        "systemic": 0.15,
+        "principles": 0.1,
+        "precedent": 0.6
+      },
+      "confidence": 0.3333333333333333
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Precedent (peso: 0.60, confidenza: 0.30)\nFonti giurisprudenziali recuperate (ordinate per autorità):\n\n\n[Nota: Analisi giurisprudenziale completa richiede servizio AI]\n\n## Literal (peso: 0.15, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.15, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n## Principles (peso: 0.10, ",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "precedent",
+        "literal",
+        "systemic",
+        "principles"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.3600120544433594,
+    "timestamp": "2025-12-20T19:01:24.367817"
+  },
+  {
+    "query": "Giurisprudenza sulla quantificazione del danno morale",
+    "category": "jurisprudential",
+    "expected_expert": "precedent",
+    "routing": {
+      "query_type": "jurisprudential",
+      "expert_weights": {
+        "literal": 0.1271186440677966,
+        "systemic": 0.1271186440677966,
+        "principles": 0.08474576271186442,
+        "precedent": 0.6610169491525424
+      },
+      "confidence": 0.3333333333333333
+    },
+    "response": {
+      "synthesis": "# Sintesi Multi-Expert\n\n## Precedent (peso: 0.72, confidenza: 0.30)\nFonti giurisprudenziali recuperate (ordinate per autorità):\n\n\n[Nota: Analisi giurisprudenziale completa richiede servizio AI]\n\n## Literal (peso: 0.14, confidenza: 0.30)\nFonti recuperate per la query:\n\n\n[Nota: Interpretazione completa richiede servizio AI]\n\n## Systemic (peso: 0.14, confidenza: 0.30)\nAnalisi sistematica delle fonti recuperate:\n\n\n[Nota: Analisi sistematica completa richiede servizio AI]\n\n\n*Nota: Sintesi generata se",
+      "confidence": 0.3,
+      "expert_contributions": [
+        "precedent",
+        "literal",
+        "systemic"
+      ],
+      "aggregation_method": "weighted_average",
+      "source_count": 0,
+      "conflicts": []
+    },
+    "execution_time_ms": 0.32806396484375,
+    "timestamp": "2025-12-20T19:01:24.368150"
+  }
+]

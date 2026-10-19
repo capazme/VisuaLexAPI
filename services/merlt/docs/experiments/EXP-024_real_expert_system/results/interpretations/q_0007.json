@@ -1,0 +1,49 @@
+{
+  "query_id": "q_0007",
+  "query_text": "Quando si pu\u00f2 invocare l'eccezione inadimplenti non est adimplendum?",
+  "synthesis": "L'eccezione \"inadimplenti non est adimplendum\" (all'inadempiente non \u00e8 dovuto l'adempimento) rappresenta un principio cardine nei contratti a prestazioni corrispettive, come l'appalto e la compravendita, e consente a una parte di rifiutare l'esecuzione della propria prestazione qualora l'altra parte non abbia adempiuto o abbia adempiuto in modo inesatto alla propria obbligazione.\n\n**Punti chiave e integrazione delle prospettive:**\n\n*   **Applicabilit\u00e0 generale e tutela dell'equilibrio contrattua",
+  "confidence": 0.9,
+  "expert_contributions": {
+    "literal": {
+      "interpretation": "L'eccezione \"inadimplenti non est adimplendum\" pu\u00f2 essere invocata in caso di inadempimento del contratto d'appalto, quando l'opera \u00e8 ultimata, dal committente convenuto per il pagamento, per opporre all'appaltatore le difformit\u00e0 e i vizi dell'opera. Questa eccezione \u00e8 proponibile anche se la domanda di garanzia sarebbe prescritta e indipendentemente dalla proposizione, in via riconvenzionale, di tale domanda. Inoltre, il compratore pu\u00f2 sollevare l'eccezione d'inadempimento per mancanza delle qualit\u00e0 promesse dal venditore, a prescindere dalla responsabilit\u00e0 di quest'ultimo.",
+      "confidence": 0.9,
+      "weight": 0.35,
+      "weighted_confidence": 0.315
+    },
+    "systemic": {
+      "interpretation": "L'eccezione \"inadimplenti non est adimplendum\" pu\u00f2 essere invocata in contesti di contratti a prestazioni corrispettive, come l'appalto e la compravendita, quando una parte non ha adempiuto o ha adempiuto in modo inesatto alla propria obbligazione. Nel contratto d'appalto, il committente pu\u00f2 opporre le difformit\u00e0 e i vizi dell'opera all'appaltatore, anche se la domanda di garanzia \u00e8 prescritta e senza la necessit\u00e0 di proporre una domanda riconvenzionale. Nel contratto di compravendita, il compratore pu\u00f2 sollevare tale eccezione per la mancanza delle qualit\u00e0 promesse dal venditore, a tutela del proprio interesse a non eseguire la prestazione in assenza della controprestazione.",
+      "confidence": 0.9,
+      "weight": 0.25,
+      "weighted_confidence": 0.225
+    },
+    "principles": {
+      "interpretation": "L'eccezione inadimplenti non est adimplendum pu\u00f2 essere invocata quando una parte contrattuale, convenuta per l'adempimento della propria prestazione, oppone all'altra parte l'inadempimento di quest'ultima. Questo principio trova applicazione generale nei contratti a prestazioni corrispettive, come l'appalto e la compravendita, e mira a tutelare l'interesse della parte a non eseguire la propria prestazione in assenza della controprestazione dovuta, garantendo un equilibrio tra le parti e prevenendo situazioni di diseguaglianza. L'eccezione pu\u00f2 essere sollevata anche quando la domanda di garanzia sarebbe prescritta, evidenziando la sua natura di difesa autonoma.",
+      "confidence": 0.9,
+      "weight": 0.2,
+      "weighted_confidence": 0.18000000000000002
+    },
+    "precedent": {
+      "interpretation": "L'eccezione \"inadimplenti non est adimplendum\" (all'inadempiente non \u00e8 dovuto l'adempimento) pu\u00f2 essere invocata in un contratto a prestazioni corrispettive, come l'appalto, quando una parte \u00e8 convenuta per il pagamento e l'altra parte ha omesso di adempiere o ha adempiuto in modo inesatto. Nello specifico, nel contesto del contratto d'appalto, il committente, una volta ultimata l'opera e convenuto per il pagamento, pu\u00f2 opporre all'appaltatore le difformit\u00e0 o i vizi dell'opera. Questa possibilit\u00e0 sussiste anche se la domanda di garanzia sarebbe prescritta e non \u00e8 necessaria la contestuale proposizione di una domanda riconvenzionale. Il principio si ricollega all'art. 1460 c.c. (eccezione d'inadempimento) e alla disposizione specifica dell'art. 1667 c.c. in materia di appalto.",
+      "confidence": 0.9,
+      "weight": 0.2,
+      "weighted_confidence": 0.18000000000000002
+    }
+  },
+  "legal_basis": [],
+  "execution_time_ms": 23080.426,
+  "routing_decision": {
+    "query_type": "general",
+    "expert_weights": {
+      "literal": 0.35,
+      "systemic": 0.25,
+      "principles": 0.2,
+      "precedent": 0.2
+    },
+    "confidence": 0.5,
+    "reasoning": "Query classificata come 'general'. Expert principali: literal (0.35)"
+  },
+  "feedback": 0.33823923161015734,
+  "reward": 0.022188721476609236,
+  "user_id": "user_014",
+  "error": null
+}

@@ -1,0 +1,58 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, renderHook, waitFor } from '@testing-library/react';
+
+vi.mock('../services/authService', () => ({
+  isAuthenticated: () => false,
+  logout: vi.fn(),
+  getCurrentUser: vi.fn(),
+}));
+vi.mock('../services/decisionService', () => ({ fetchDecision: vi.fn() }));
+vi.mock('../services/studiaService', () => ({ studiaService: { forArticle: vi.fn() } }));
+
+import { fetchDecision } from '../services/decisionService';
+import { studiaService } from '../services/studiaService';
+import { useArticleCards } from '../components/features/studia/useArticleCards';
+import { fetchDecisionCached } from '../utils/decisionFetchCache';
+import { appStore } from '../store/useAppStore';
+import { useAuth } from './useAuth';
+
+const REF = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 99999, anno: 2024 };
+
+beforeEach(() => vi.mocked(fetchDecision).mockReset());
+
+// The next reader of this browser starts with nothing of the last one's (user isolation).
+describe('useAuth — logout', () => {
+  it('drops the decision the last reader asked for, the focus request, the typed citation and the cached answers', async () => {
+    vi.mocked(fetchDecision).mockResolvedValue({ esito: 'non_trovata' } as never);
+    await fetchDecisionCached(REF);
+    appStore.setState({ pendingDecision: REF, decisionFocusRequest: 'tab', commandPaletteQuery: 'Cass. civ., n. 1/2024' });
+    const { result } = renderHook(() => useAuth());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    act(() => { result.current.logout(); });
+
+    const s = appStore.getState();
+    expect(s.pendingDecision).toBeNull();
+    expect(s.decisionFocusRequest).toBeNull();
+    expect(s.commandPaletteQuery).toBeNull();
+    await fetchDecisionCached(REF);
+    expect(fetchDecision).toHaveBeenCalledTimes(2);
+  });
+
+  it('forgets the cards read on an article, which are the last reader’s', async () => {
+    const urn = 'urn:nir:stato:legge:1990-08-07;241~art2';
+    vi.mocked(studiaService.forArticle).mockResolvedValue([]);
+    const cards = renderHook(() => useArticleCards(urn));
+    await waitFor(() => expect(cards.result.current.status).toBe('ready'));
+    cards.unmount();
+    const { result } = renderHook(() => useAuth());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    act(() => { result.current.logout(); });
+
+    const next = renderHook(() => useArticleCards(urn));
+    expect(next.result.current.status).toBe('loading');
+    await waitFor(() => expect(next.result.current.status).toBe('ready'));
+    expect(studiaService.forArticle).toHaveBeenCalledTimes(2);
+  });
+});

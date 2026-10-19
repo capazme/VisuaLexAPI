@@ -1,0 +1,227 @@
+# VisuaLex development stack.
+#
+#   default profile   postgres, redis, falkordb, qdrant — the stores
+#   profile "merlt"   mcp-legal-it, merlt-api, merlt-worker
+#
+# The Python API, the server and the web app run on the host (./start.sh).
+# The project name is fixed (name: below), so containers and volumes keep
+# their names wherever this file is run from. A throwaway stack sets
+# VISUALEX_STACK and its own ports. Variables: infra/.env (from .env.example).
+# Data moves by export and import only: scripts/backup.sh, scripts/restore.sh.
+
+name: ${VISUALEX_STACK:-visualex}
+
+x-merlt-env: &merlt-env
+  DATABASE_URL: "postgresql://merlt:${MERLT_DB_PASSWORD:-merlt}@postgres:5432/merlt"
+  ENRICHMENT_DATABASE_URL: "postgresql+asyncpg://merlt:${MERLT_DB_PASSWORD:-merlt}@postgres:5432/merlt"
+  ENRICHMENT_DB_HOST: "postgres"
+  ENRICHMENT_DB_PORT: "5432"
+  ENRICHMENT_DB_NAME: "merlt"
+  ENRICHMENT_DB_USER: "merlt"
+  ENRICHMENT_DB_PASSWORD: "${MERLT_DB_PASSWORD:-merlt}"
+  RLCF_DATABASE_URL: "postgresql://merlt:${MERLT_DB_PASSWORD:-merlt}@postgres:5432/merlt"
+  RLCF_ASYNC_DATABASE_URL: "postgresql+asyncpg://merlt:${MERLT_DB_PASSWORD:-merlt}@postgres:5432/merlt"
+  REDIS_URL: "redis://redis:6379/0"
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  # RQ queues on Redis DB 1: the api enqueues, the worker consumes.
+  RQ_REDIS_URL: "redis://redis:6379/1"
+  FALKORDB_HOST: "falkordb"
+  FALKORDB_PORT: "6379"
+  FALKORDB_GRAPH_NAME: "${MERLT_GRAPH_NAME:-merl_t_legal}"
+  QDRANT_HOST: "qdrant"
+  QDRANT_PORT: "6333"
+  QDRANT_COLLECTION: "${MERLT_QDRANT_COLLECTION:-merl_t_legal_chunks}"
+  # The Python API runs on the host. host.docker.internal reaches it from a
+  # container (extra_hosts maps it on Linux, where it does not exist).
+  VISUALEX_API_URL: "${VISUALEX_API_URL:-http://host.docker.internal:5000}"
+  MERLT_INTERNAL_SECRET: "${MERLT_INTERNAL_SECRET:-dev-internal-secret}"
+  OPENROUTER_API_KEY: "${OPENROUTER_API_KEY:-}"
+  MERLT_NEURAL_TRAVERSAL_ENABLED: "${MERLT_NEURAL_TRAVERSAL_ENABLED:-true}"
+  MERLT_REACT_ENABLED: "${MERLT_REACT_ENABLED:-true}"
+  MERLT_SEMANTIC_SEARCH_ENABLED: "${MERLT_SEMANTIC_SEARCH_ENABLED:-true}"
+  MERLT_ADVANCED_ROUTING_ENABLED: "${MERLT_ADVANCED_ROUTING_ENABLED:-true}"
+  MERLT_DATA_DIR: "/app/data"
+
+x-merlt-volumes: &merlt-volumes
+  - ../services/merlt/data:/app/data:ro
+  # api receives uploads, worker extracts them: one volume for both.
+  - merlt_uploads:/app/uploads
+  - merlt_hf_cache:/home/appuser/.cache/huggingface
+  - merlt_checkpoints:/app/checkpoints
+  - merlt_ner_models:/app/models
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ${VISUALEX_STACK:-visualex}-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      # Read by init/01-databases.sh on the first start of an empty volume.
+      PLATFORM_DB_PASSWORD: ${PLATFORM_DB_PASSWORD:-visualex}
+      MERLT_DB_PASSWORD: ${MERLT_DB_PASSWORD:-merlt}
+    ports:
+      - "127.0.0.1:${VISUALEX_PG_PORT:-5436}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      # A first start on an empty volume runs initdb and init/01-databases.sh, which on a host
+      # busy building images took longer than five failed checks (measured on the first
+      # production deploy). Failures inside this window do not count; a passing check
+      # still reports healthy at once, so a warm start waits no longer than before.
+      start_period: 60s
+
+  redis:
+    image: redis:7-alpine
+    container_name: ${VISUALEX_STACK:-visualex}-redis
+    ports:
+      - "127.0.0.1:${VISUALEX_REDIS_PORT:-6381}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  falkordb:
+    # Pinned to the image that wrote the development graph: a newer one might
+    # not read a saved snapshot.
+    image: falkordb/falkordb@sha256:d6aa9598b79cd54935864d56f971f3916156399a9ca38a5fae6c029ab1f2bce9
+    container_name: ${VISUALEX_STACK:-visualex}-falkordb
+    restart: unless-stopped
+    environment:
+      # scripts/restore.sh overrides this for one start to load a snapshot.
+      FALKORDB_ARGS: "${FALKORDB_ARGS:---save 60 1 --appendonly yes --appendfsync everysec}"
+    ports:
+      - "127.0.0.1:${VISUALEX_FALKOR_PORT:-6382}:6379"
+    volumes:
+      # The image writes here, not to /data.
+      - falkordb_data:/var/lib/falkordb/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6379", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  qdrant:
+    image: qdrant/qdrant:v1.17.1
+    container_name: ${VISUALEX_STACK:-visualex}-qdrant
+    ports:
+      - "127.0.0.1:${VISUALEX_QDRANT_PORT:-6343}:6333"
+      - "127.0.0.1:${VISUALEX_QDRANT_GRPC_PORT:-6344}:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/6333'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mcp-legal-it:
+    build:
+      context: ../vendor/mcp-legal-it
+      dockerfile: Dockerfile
+    container_name: ${VISUALEX_STACK:-visualex}-mcp-legal-it
+    profiles: ["merlt"]
+    environment:
+      MCP_TRANSPORT: "http"
+      MCP_HOST: "0.0.0.0"
+      MCP_PORT: "8011"
+      MCP_PATH: "/mcp"
+      LEGAL_PROFILE: "full"
+    ports:
+      - "127.0.0.1:${MCP_LEGAL_IT_PORT:-8011}:8011"
+    healthcheck:
+      # No curl in the image, and /mcp needs a handshake: a TCP connect is enough.
+      test: ["CMD-SHELL", "python3 -c \"import socket; socket.create_connection(('localhost',8011),2).close()\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  merlt-api:
+    build:
+      context: ../services/merlt
+      dockerfile: Dockerfile
+    container_name: ${VISUALEX_STACK:-visualex}-merlt-api
+    profiles: ["merlt"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      falkordb: {condition: service_healthy}
+      qdrant: {condition: service_healthy}
+      mcp-legal-it: {condition: service_started}
+    environment:
+      <<: *merlt-env
+      # Below the server's extraction watchdog, or jobs flip to timeout early.
+      MERLT_EXTRACT_JOB_TIMEOUT: "${MERLT_EXTRACT_JOB_TIMEOUT:-1800}"
+      MERLT_NER_LEARNED_ENABLED: "false"
+      MERLT_RLCF_BUFFER_PATH: "/app/checkpoints/rlcf/replay_buffer.json"
+      MCP_LEGAL_IT_URL: "http://mcp-legal-it:8011/mcp"
+      BFF_QA_CALLBACK_URL: "${MERLT_BFF_QA_CALLBACK_URL:-http://host.docker.internal:3001/api/merlt/internal/qa-callback}"
+      MERLT_ADMIN_API_KEY: "${MERLT_API_KEY:-}"
+      MERLT_SKIP_SEED: "${MERLT_SKIP_SEED:-false}"
+      MERLT_SKIP_EMBEDDINGS: "${MERLT_SKIP_EMBEDDINGS:-true}"
+      MERLT_HYGIENE_INTERVAL_HOURS: "${MERLT_HYGIENE_INTERVAL_HOURS:-24}"
+      # Activity events expire (merlt/privacy/retention.py); the purge always runs.
+      MERLT_TRACKING_RETENTION_DAYS: "${MERLT_TRACKING_RETENTION_DAYS:-365}"
+    volumes: *merlt-volumes
+    ports:
+      - "127.0.0.1:${MERLT_API_PORT:-8000}:8000"
+    command: ["uvicorn", "merlt.app:app", "--host", "0.0.0.0", "--port", "8000"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 300s
+
+  merlt-worker:
+    build:
+      context: ../services/merlt
+      dockerfile: Dockerfile
+    container_name: ${VISUALEX_STACK:-visualex}-merlt-worker
+    profiles: ["merlt"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      falkordb: {condition: service_healthy}
+      qdrant: {condition: service_healthy}
+    environment:
+      <<: *merlt-env
+      BFF_CALLBACK_URL: "${MERLT_BFF_CALLBACK_URL:-http://host.docker.internal:3001/api/merlt/internal/job-callback}"
+      BFF_EXTRACTION_CALLBACK_URL: "${MERLT_BFF_EXTRACTION_CALLBACK_URL:-http://host.docker.internal:3001/api/merlt/internal/extraction-callback}"
+      # Only the api seeds the graph at boot.
+      MERLT_SKIP_SEED: "true"
+      # Bulk ingestion waits on the sources far longer than the api's hot path
+      # (30 s, the client default): a code's chunk measured ~6 s idle and past
+      # 30 s under load, and a request the client abandons keeps the scrapers
+      # busy, so every later chunk timed out too.
+      VISUALEX_API_TIMEOUT: "${MERLT_WORKER_VISUALEX_TIMEOUT:-120}"
+    volumes: *merlt-volumes
+    command: ["rq", "worker", "merlt_ingest", "merlt_extract", "merlt_ner_train", "merlt_bulk", "--url", "redis://redis:6379/1"]
+    healthcheck:
+      # Not an HTTP server: alive = it reaches its queue.
+      test: ["CMD-SHELL", "python -c \"import os,redis; redis.from_url(os.environ['RQ_REDIS_URL']).ping()\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  postgres_data: {name: "${VISUALEX_STACK:-visualex}_postgres_data"}
+  falkordb_data: {name: "${VISUALEX_STACK:-visualex}_falkordb_data"}
+  qdrant_data: {name: "${VISUALEX_STACK:-visualex}_qdrant_data"}
+  merlt_uploads: {name: "${VISUALEX_STACK:-visualex}_merlt_uploads"}
+  merlt_hf_cache: {name: "${VISUALEX_STACK:-visualex}_merlt_hf_cache"}
+  merlt_checkpoints: {name: "${VISUALEX_STACK:-visualex}_merlt_checkpoints"}
+  merlt_ner_models: {name: "${VISUALEX_STACK:-visualex}_merlt_ner_models"}

@@ -1,0 +1,186 @@
+/**
+ * Centralized API client using axios with interceptors for authentication and error handling.
+ */
+import axios from 'axios';
+import type { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { isAccessTokenExpired } from './authService';
+import { stashReturnTo } from '../utils/returnTo';
+
+// API base URL - uses relative path to leverage Vite proxy in development
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+
+// Create axios instance with default config.
+//
+// NOTE: do NOT set a default `Content-Type` here. Axios 1.x already
+// auto-detects per request (plain objects → application/json, FormData →
+// multipart/form-data with the browser-generated boundary, URLSearchParams →
+// x-www-form-urlencoded). A hardcoded default wins over `postForm()` and the
+// FormData auto-detection on some builds, leaving the browser unable to send
+// the body (surfaces as ERR_TIMED_OUT on uploads).
+const apiClient: AxiosInstance = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 30000, // 30 seconds
+});
+
+/**
+ * Single in-flight refresh promise. Multiple concurrent expired-token
+ * requests piggyback on the same `/auth/refresh` call instead of each
+ * firing their own (which produced N duplicate refreshes per article
+ * mount before). Cleared once settled so the next genuine refresh goes
+ * through.
+ */
+let refreshInFlight: Promise<string> | null = null;
+
+export function handleUnauthenticated(): void {
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('refresh_token');
+  stashReturnTo(`${window.location.pathname}${window.location.search}${window.location.hash}`);
+  window.location.href = '/login';
+}
+
+export async function refreshAccessToken(): Promise<string> {
+  if (refreshInFlight) return refreshInFlight;
+
+  const refreshToken = localStorage.getItem('refresh_token');
+  if (!refreshToken) {
+    throw new Error('No refresh token');
+  }
+
+  refreshInFlight = axios
+    .post(`${API_BASE_URL}/auth/refresh`, { refresh_token: refreshToken })
+    .then((response) => {
+      const { access_token, refresh_token: nextRefresh } = response.data as {
+        access_token: string;
+        refresh_token: string;
+      };
+      localStorage.setItem('access_token', access_token);
+      localStorage.setItem('refresh_token', nextRefresh);
+      return access_token;
+    })
+    .finally(() => {
+      refreshInFlight = null;
+    });
+
+  return refreshInFlight;
+}
+
+/**
+ * The access token to send now, for a request that does not go through axios (the
+ * scraping calls use fetch: see legalFetch.ts). A token past its expiry is refreshed
+ * first, through the same single in-flight promise as every other refresh; when the
+ * refresh fails the stale token is returned, and the 401 that follows decides.
+ */
+export async function getFreshAccessToken(): Promise<string | null> {
+  const token = localStorage.getItem('access_token');
+  if (token && isAccessTokenExpired() && localStorage.getItem('refresh_token')) {
+    try {
+      return await refreshAccessToken();
+    } catch {
+      // Fall through with the stale token.
+    }
+  }
+  return token;
+}
+
+/**
+ * Request interceptor: attach access token. If the token is expired and
+ * a refresh_token is present, refresh *before* sending so the request
+ * doesn't hit the server just to bounce back with 401.
+ */
+apiClient.interceptors.request.use(
+  async (config: InternalAxiosRequestConfig) => {
+    // A stale token still goes out when the refresh fails: the response
+    // interceptor catches the resulting 401 and performs the final redirect.
+    const token = await getFreshAccessToken();
+
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+/**
+ * Response interceptor to handle token refresh on 401 errors
+ */
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error: AxiosError) => {
+    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+
+    // If error is 401 and we haven't retried yet, try to refresh token
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      try {
+        const access_token = await refreshAccessToken();
+
+        if (originalRequest.headers) {
+          originalRequest.headers.Authorization = `Bearer ${access_token}`;
+        }
+
+        return apiClient(originalRequest);
+      } catch (refreshError) {
+        // Refresh failed, clear tokens and redirect to login
+        handleUnauthenticated();
+        return Promise.reject(refreshError);
+      }
+    }
+
+    // For other errors, reject with formatted error
+    const responseData = error.response?.data as { detail?: string } | undefined;
+    return Promise.reject({
+      status: error.response?.status,
+      message: responseData?.detail || error.message || 'An error occurred',
+      data: responseData,
+    });
+  }
+);
+
+/**
+ * Generic GET request
+ */
+export const get = async <T = unknown>(url: string, params?: Record<string, unknown>): Promise<T> => {
+  const response = await apiClient.get<T>(url, { params });
+  return response.data;
+};
+
+/**
+ * Generic POST request
+ */
+export const post = async <T = unknown>(url: string, data?: unknown): Promise<T> => {
+  const response = await apiClient.post<T>(url, data);
+  return response.data;
+};
+
+/**
+ * Generic PUT request
+ */
+export const put = async <T = unknown>(url: string, data?: unknown): Promise<T> => {
+  const response = await apiClient.put<T>(url, data);
+  return response.data;
+};
+
+/**
+ * Generic PATCH request
+ */
+export const patch = async <T = unknown>(url: string, data?: unknown): Promise<T> => {
+  const response = await apiClient.patch<T>(url, data);
+  return response.data;
+};
+
+/**
+ * Generic DELETE request
+ */
+export const del = async <T = unknown>(url: string): Promise<T> => {
+  const response = await apiClient.delete<T>(url);
+  return response.data;
+};
+
+// Export as both named and default for flexibility
+export { apiClient };
+export default apiClient;

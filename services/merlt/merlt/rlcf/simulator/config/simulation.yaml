@@ -1,0 +1,109 @@
+# RLCF Simulator Configuration
+# =============================
+# Configurazione per l'esperimento EXP-021: Validazione RLCF Loop
+#
+# Variabili d'ambiente supportate:
+#   - RLCF_JUDGE_MODEL: Modello LLM per valutazione (default: gemini-2.5-flash)
+#   - OPENROUTER_API_KEY: API key per OpenRouter
+#
+# Uso: python scripts/run_rlcf_simulation.py --config simulation.yaml
+
+experiment:
+  name: "EXP-021_RLCF_Simulation"
+  random_seed: 42
+
+# Configurazione delle 3 fasi dell'esperimento
+phases:
+  baseline:
+    queries: 10              # Query iniziali senza feedback
+    collect_feedback: false
+
+  training:
+    iterations: 5            # Numero di cicli di training
+    queries_per_iteration: 20
+    collect_feedback: true   # Feedback attivo → aggiorna pesi
+
+  post_training:
+    queries: 10              # Stesse query del baseline per confronto
+    collect_feedback: false
+
+# Pool di utenti sintetici
+users:
+  pool_size: 20
+  distribution:
+    strict_expert: 3       # 15% - Professori, valutazione rigorosa
+    domain_specialist: 5   # 25% - Avvocati, precisi sul dominio
+    lenient_student: 8     # 40% - Studenti, tendono a sovrastimare
+    random_noise: 4        # 20% - Utenti casuali, feedback inaffidabile
+
+# Modello evoluzione authority utenti
+# Formula: A = w_b*Baseline + w_t*TrackRecord + w_q*QualityScore
+authority_model:
+  # Exponential smoothing per track record (più alto = più reattivo)
+  lambda_factor: 0.15           # Default: 0.15 (era 0.05 - troppo conservativo)
+
+  # Pesi formula authority (devono sommare a 1.0)
+  weight_baseline: 0.40         # 40% - Peso credenziali iniziali
+  weight_track_record: 0.35     # 35% - Peso storico performance
+  weight_quality: 0.25          # 25% - Peso qualità feedback recente
+
+# Configurazione valutazione
+evaluation:
+  llm_judge:
+    # Modello configurabile via env var
+    model: "${RLCF_JUDGE_MODEL:-google/gemini-2.5-flash}"
+    temperature: 0.1       # Bassa per consistenza
+    enabled: true
+    provider: "openrouter"
+
+  # Pesi per combinazione metriche
+  objective:
+    weight: 0.4            # 40% metriche automatiche (SG, HR, etc.)
+
+  subjective:
+    weight: 0.6            # 60% valutazione LLM (accuracy, clarity, etc.)
+
+# Parametri statistici
+statistics:
+  confidence_level: 0.95   # 95% confidence intervals
+  min_effect_size: 0.3     # Cohen's d minimo per significatività pratica
+  bootstrap_samples: 1000  # Campioni per bootstrap CI
+  use_bonferroni: true     # Correzione per test multipli
+
+# Output
+outputs:
+  output_dir: "docs/experiments/EXP-021_rlcf_loop_validation/results"
+  formats:
+    - json                 # Trace completo per riproducibilità
+    - csv                  # Per analisi statistica esterna
+    - pdf                  # Figure per tesi
+    - tex                  # Tabelle LaTeX
+    - md                   # Report markdown
+  streamlit_dashboard: true
+  save_intermediate: true  # Salva risultati dopo ogni fase
+
+# Soglie per le ipotesi
+hypotheses:
+  h1_persistence:
+    target: 1.0            # 100% feedback salvati
+    critical: 0.95         # Soglia critica 95%
+
+  h2_authority:
+    target: 0.20           # +20% authority
+    critical: 0.10         # Soglia critica +10%
+
+  h3_convergence:
+    target: 0.5            # WDC < 0.5
+    critical: 1.0          # Soglia critica WDC < 1.0
+
+  h4_improvement:
+    target: 0.10           # +10% quality
+    critical: 0.05         # Soglia critica +5%
+
+# Modelli disponibili per LLM Judge (via OpenRouter)
+# Imposta RLCF_JUDGE_MODEL per cambiare
+# Opzioni comuni:
+#   - google/gemini-2.5-flash (default, economico)
+#   - google/gemini-2.5-pro (più accurato)
+#   - anthropic/claude-3.5-sonnet (alternativa)
+#   - openai/gpt-4o-mini (alternativa economica)

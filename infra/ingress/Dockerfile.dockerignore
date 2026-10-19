@@ -1,0 +1,11 @@
+# The build context is the repository root and almost none of it is needed.
+*
+!apps/web
+!infra/ingress/Caddyfile
+
+apps/web/node_modules
+apps/web/dist
+apps/web/coverage
+**/.env*
+**/*.log
+**/.DS_Store

@@ -1,0 +1,391 @@
+import { useEffect, useState } from 'react';
+import { Search, Upload, Filter, ChevronDown, RefreshCw, Users, TrendingUp, Clock, Download, Trophy, X as XIcon } from 'lucide-react';
+import { SharedEnvironmentCard } from './SharedEnvironmentCard';
+import { EmptyState } from '../../ui/EmptyState';
+import { StudyPacksBand } from './StudyPacksBand';
+import { FORUM_CATEGORIES } from '../../../utils/forumCategories';
+import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
+import type { SharedEnvironment, EnvironmentCategory, StudyImportReport } from '../../../types';
+
+export type SortOption = 'newest' | 'popular' | 'mostDownloaded';
+
+const SORT_OPTIONS: { value: SortOption; label: string; icon: React.ReactNode }[] = [
+  { value: 'newest', label: 'Più recenti', icon: <Clock size={14} /> },
+  { value: 'popular', label: 'Più popolari', icon: <TrendingUp size={14} /> },
+  { value: 'mostDownloaded', label: 'Più aggiunti', icon: <Users size={14} /> },
+];
+
+const CATEGORY_OPTIONS: ReadonlyArray<{ value: EnvironmentCategory | 'all'; label: string }> = [
+  { value: 'all', label: 'Tutte le categorie' },
+  ...FORUM_CATEGORIES,
+];
+
+interface ForumExploreViewProps {
+  environments: SharedEnvironment[];
+  pagination: { page: number; pages: number; total: number };
+  loading: boolean;
+  likingIds: Set<string>;
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
+  category: EnvironmentCategory | 'all';
+  setCategory: (category: EnvironmentCategory | 'all') => void;
+  sort: SortOption;
+  setSort: (sort: SortOption) => void;
+  showCategoryDropdown: boolean;
+  setShowCategoryDropdown: (show: boolean) => void;
+  showSortDropdown: boolean;
+  setShowSortDropdown: (show: boolean) => void;
+  onSearchSubmit: (e: React.FormEvent) => void;
+  onRefresh: () => void;
+  onPaginate: (page: number) => void;
+  onLike: (id: string) => void;
+  onImport: (env: SharedEnvironment) => void;
+  onReport: (id: string) => void;
+  onSuggest: (env: SharedEnvironment) => void;
+  onPublishClick: () => void;
+  onPacksAdded: (report: StudyImportReport) => void;
+  onPacksError: (message: string) => void;
+  onResetFilters: () => void;
+}
+
+export function ForumExploreView({
+  environments,
+  pagination,
+  loading,
+  likingIds,
+  searchQuery,
+  setSearchQuery,
+  category,
+  setCategory,
+  sort,
+  setSort,
+  showCategoryDropdown,
+  setShowCategoryDropdown,
+  showSortDropdown,
+  setShowSortDropdown,
+  onSearchSubmit,
+  onRefresh,
+  onPaginate,
+  onLike,
+  onImport,
+  onReport,
+  onSuggest,
+  onPublishClick,
+  onPacksAdded,
+  onPacksError,
+  onResetFilters,
+}: ForumExploreViewProps) {
+  const selectedSort = SORT_OPTIONS.find(o => o.value === sort)!;
+  const selectedCategory = CATEGORY_OPTIONS.find(o => o.value === category)!;
+  const hasFilter = Boolean(searchQuery) || category !== 'all';
+
+  return (
+    <>
+      {/* Filters */}
+      <div id="tour-forum-filters" className="flex flex-col sm:flex-row gap-3">
+        {/* Search */}
+        <form onSubmit={onSearchSubmit} className="flex-1 relative">
+          <Search
+            size={18}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+          />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Cerca nel Forum…"
+            aria-label="Cerca nel Forum"
+            className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          />
+        </form>
+
+        {/* Category Filter */}
+        <div className="relative">
+          <button
+            onClick={() => {
+              setShowCategoryDropdown(!showCategoryDropdown);
+              setShowSortDropdown(false);
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors min-w-[180px]"
+          >
+            <Filter size={16} />
+            <span className="flex-1 text-left">{selectedCategory.label}</span>
+            <ChevronDown size={16} />
+          </button>
+          {showCategoryDropdown && (
+            <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 py-1 z-20">
+              {CATEGORY_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => {
+                    setCategory(option.value);
+                    setShowCategoryDropdown(false);
+                  }}
+                  className={`w-full px-4 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-700 ${
+                    category === option.value
+                      ? 'text-primary-600 dark:text-primary-400 font-medium'
+                      : 'text-slate-700 dark:text-slate-300'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Sort */}
+        <div className="relative">
+          <button
+            onClick={() => {
+              setShowSortDropdown(!showSortDropdown);
+              setShowCategoryDropdown(false);
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors min-w-[160px]"
+          >
+            {selectedSort.icon}
+            <span className="flex-1 text-left">{selectedSort.label}</span>
+            <ChevronDown size={16} />
+          </button>
+          {showSortDropdown && (
+            <div className="absolute top-full right-0 mt-1 w-full bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 py-1 z-20">
+              {SORT_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => {
+                    setSort(option.value);
+                    setShowSortDropdown(false);
+                  }}
+                  className={`w-full px-4 py-2 text-left text-sm flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 ${
+                    sort === option.value
+                      ? 'text-primary-600 dark:text-primary-400 font-medium'
+                      : 'text-slate-700 dark:text-slate-300'
+                  }`}
+                >
+                  {option.icon}
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Refresh */}
+        <button
+          onClick={onRefresh}
+          disabled={loading}
+          className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+        >
+          <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+        </button>
+      </div>
+
+      {/* Close dropdowns on outside click */}
+      {(showCategoryDropdown || showSortDropdown) && (
+        <div
+          className="fixed inset-0 z-10"
+          onClick={() => {
+            setShowCategoryDropdown(false);
+            setShowSortDropdown(false);
+          }}
+        />
+      )}
+
+      {/* Ready-made study dossiers, then the community's most added */}
+      <StudyPacksBand category={category} onAdded={onPacksAdded} onError={onPacksError} />
+      <TopEnvironmentsWidget onImport={onImport} />
+
+      {/* Results count */}
+      {!loading && (
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          {pagination.total} {pagination.total === 1 ? 'dossier pubblicato' : 'dossier pubblicati'}
+        </p>
+      )}
+
+      {/* Grid */}
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[...Array(6)].map((_, i) => (
+            <div
+              key={i}
+              className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden animate-pulse"
+            >
+              <div className="h-10 bg-slate-100 dark:bg-slate-700" />
+              <div className="p-4 space-y-3">
+                <div className="h-5 bg-slate-100 dark:bg-slate-700 rounded w-3/4" />
+                <div className="h-4 bg-slate-100 dark:bg-slate-700 rounded w-full" />
+                <div className="h-4 bg-slate-100 dark:bg-slate-700 rounded w-1/2" />
+                <div className="flex gap-2 mt-4">
+                  <div className="h-10 bg-slate-100 dark:bg-slate-700 rounded flex-1" />
+                  <div className="h-10 bg-slate-100 dark:bg-slate-700 rounded flex-1" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : environments.length === 0 ? (
+        hasFilter ? (
+          <EmptyState
+            variant="search"
+            title="Nessun dossier pubblicato corrisponde ai filtri"
+            description={
+              searchQuery && category !== 'all'
+                ? `Nessun risultato per "${searchQuery}" nella categoria ${selectedCategory.label.toLowerCase()}.`
+                : searchQuery
+                ? `Nessun risultato per "${searchQuery}".`
+                : `Nessun dossier pubblicato nella categoria "${selectedCategory.label}".`
+            }
+            action={
+              <button
+                onClick={onResetFilters}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg transition-colors"
+              >
+                <XIcon size={16} />
+                Azzera filtri
+              </button>
+            }
+          />
+        ) : (
+          <EmptyState
+            variant="generic"
+            title="Ancora nessun dossier nel Forum"
+            description="Pubblica un tuo dossier di studio: gli altri lo aggiungono ai loro dossier."
+            action={
+              <button
+                onClick={onPublishClick}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+              >
+                <Upload size={16} />
+                Pubblica un dossier
+              </button>
+            }
+          />
+        )
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {environments.map((env, idx) => (
+            <SharedEnvironmentCard
+              key={env.id}
+              environment={env}
+              onLike={onLike}
+              onImport={onImport}
+              onReport={onReport}
+              onSuggest={onSuggest}
+              isLiking={likingIds.has(env.id)}
+              isFirst={idx === 0}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {pagination.pages > 1 && (
+        <div className="flex justify-center gap-2">
+          <button
+            onClick={() => onPaginate(pagination.page - 1)}
+            disabled={pagination.page <= 1 || loading}
+            className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Precedente
+          </button>
+          <span className="px-4 py-2 text-slate-600 dark:text-slate-400">
+            Pagina {pagination.page} di {pagination.pages}
+          </span>
+          <button
+            onClick={() => onPaginate(pagination.page + 1)}
+            disabled={pagination.page >= pagination.pages || loading}
+            className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Successivo
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+
+type TopState =
+  | { status: 'loading' }
+  | { status: 'success'; items: SharedEnvironment[] }
+  | { status: 'error' };
+
+interface TopEnvironmentsWidgetProps {
+  onImport: (env: SharedEnvironment) => void;
+}
+
+// Small social-proof block listing the 3 most-added published
+// dossiers. Self-contained: fetches once on mount via the existing
+// `sort=mostDownloaded&limit=3` list endpoint (no backend changes). Renders
+// nothing on error or when there is no download history yet.
+function TopEnvironmentsWidget({ onImport }: TopEnvironmentsWidgetProps) {
+  const [state, setState] = useState<TopState>({ status: 'loading' });
+
+  useEffect(() => {
+    let active = true;
+    sharedEnvironmentService
+      .list({ sort: 'mostDownloaded', limit: 3 })
+      .then((res) => {
+        if (!active) return;
+        setState({ status: 'success', items: res.data });
+      })
+      .catch((err) => {
+        console.error('TopEnvironmentsWidget: failed to load the most-added dossiers:', err);
+        if (!active) return;
+        setState({ status: 'error' });
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (state.status === 'error') return null;
+
+  if (state.status === 'loading') {
+    return (
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Trophy size={16} className="text-amber-500" />
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">I più aggiunti</h3>
+        </div>
+        <div className="space-y-2">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-9 bg-slate-100 dark:bg-slate-700 rounded animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Only dossiers someone actually added are worth surfacing.
+  const items = state.items.filter((env) => env.downloadCount > 0);
+  if (items.length === 0) return null;
+
+  return (
+    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <Trophy size={16} className="text-amber-500" />
+        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">I più aggiunti</h3>
+      </div>
+      <ul className="space-y-1">
+        {items.map((env, idx) => (
+          <li key={env.id}>
+            <button
+              type="button"
+              onClick={() => onImport(env)}
+              className="w-full flex items-center gap-3 px-2 py-1.5 rounded-lg text-left hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-800"
+            >
+              <span className="w-5 shrink-0 text-sm font-bold text-amber-500 text-center">{idx + 1}</span>
+              <span className="flex-1 min-w-0 truncate text-sm font-medium text-slate-800 dark:text-slate-200">
+                {env.title}
+              </span>
+              <span className="flex items-center gap-1 shrink-0 text-xs text-slate-500 dark:text-slate-400">
+                <Download size={12} />
+                {env.downloadCount}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}

@@ -1,0 +1,38 @@
+{
+  "total_queries": 10,
+  "successful_queries": 10,
+  "success_rate": 1.0,
+  "avg_reward": 0.030335638568282454,
+  "std_reward": 0.02950627049439616,
+  "avg_confidence": 0.6886567164179105,
+  "avg_latency_ms": 19731.8725,
+  "avg_legal_basis": 0.0,
+  "expert_usage": {
+    "literal": 10,
+    "systemic": 8,
+    "principles": 2,
+    "precedent": 2
+  },
+  "community_stats": {
+    "senior_magistrate": {
+      "count": 2,
+      "avg_authority": 0.846972816882567
+    },
+    "strict_expert": {
+      "count": 4,
+      "avg_authority": 0.8108925508807528
+    },
+    "domain_specialist": {
+      "count": 6,
+      "avg_authority": 0.7068899799157434
+    },
+    "lenient_student": {
+      "count": 6,
+      "avg_authority": 0.33623923364518915
+    },
+    "random_noise": {
+      "count": 2,
+      "avg_authority": 0.29973348755675827
+    }
+  }
+}

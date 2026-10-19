@@ -4,6 +4,15 @@ Round opened 2026-08-29. Owner asked for every jurisdictional body carried by
 `mcp-legal-it`, linked to the norm being read, searchable and readable one by
 one.
 
+> **Amended on 2026-10-01** by `2026-10-01-sentenze-design.md`:
+> - D3 is exercised for the Corte costituzionale.
+> - D8's first build becomes the direct lookup for the Cassazione and the Corte
+>   costituzionale.
+> - D9 is superseded.
+>
+> The code built from this design on 2026-08-29 was reverted the same day for
+> other priorities, not for a defect.
+
 ## Context
 
 VisuaLex reads norms. It fetches them live from Normattiva, EUR-Lex and Brocardi

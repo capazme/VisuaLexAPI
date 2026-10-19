@@ -1,272 +1,183 @@
-# Deployment
+# Running VisuaLex on the deployment host
 
-Everything ships through one script, `deploy.sh`, run **on the server**. It is a
-batch job, not a pipeline: there is no CI, nothing validates a push, and nothing
-rolls back. What the script does is the whole of what happens at deploy time, so
-the script has to be kept in step with the codebase by hand. This document is
-the record of that contract.
+The runbook for the production stack (`./start.sh --prod`) on a Linux machine.
+The design behind it: `docs/superpowers/specs/2026-09-29-modular-deployment-design.md`
+(the stack) and `docs/superpowers/specs/2026-10-05-mcp-production-design.md` (the MCP
+server). Commands run in the checkout on the host unless they say otherwise. Never run
+`./start.sh --dev` on this machine: both modes share the stack name and its volumes.
 
----
+## 1. Preparing the host (once)
 
-## The two-branch model, and why it matters here
+- **Docker Engine** 28 or newer, with the **Compose v2 plugin**, 2.24 or newer.
+  - Check with `docker version` and `docker compose version`.
+  - A distribution's Docker package may lack the plugin; install `docker-compose-plugin`
+    from Docker's repository.
+  - On an Engine older than 28 with `userland-proxy: false`, other devices on the network
+    could reach ports published on `127.0.0.1`: upgrade first.
+- **The deploying user in the `docker` group:** `sudo usermod -aG docker <user>`, then log
+  in again.
+- **`git`, `python3`** (the backup tool), **`curl`**.
+- **Docker enabled at boot:** `sudo systemctl enable docker`.
+- **A free port for the ingress.** The default is 8080. If another program on the machine
+  holds it, set `INGRESS_PORT` in `infra/.env`, e.g. 8090. The deploy checks the ports
+  before it builds and names the key to change.
 
-| Branch | What it is |
-|---|---|
-| `main` | Visualex "vanilla" — the product in production |
-| `visualex-merlt-main` | The AI-powered experiment. **Never deployed.** |
+## 2. The first deploy
 
-The pull at step 1 is:
-
-```bash
-git pull -r origin "$(git branch --show-current)"
+```sh
+git clone <repository> && cd VisuaLexAPI
+./start.sh --prod --branch develop      # or main, once a release carries --prod
 ```
 
-It follows **whatever branch the server happens to be on**. If a debugging
-session ever left the server checked out on `visualex-merlt-main`, this would
-ship the experiment — including a Python sidecar and a Docker stack production
-has no configuration for.
+What happens:
+1. **The checkout** is fast-forwarded to origin's branch.
+2. **`infra/.env` and `apps/server/.env`** are created with generated secrets, mode 600.
+   The first admin's password is `ADMIN_PASSWORD` in `apps/server/.env`. Sign in, change
+   it, delete that line, and deploy again.
+3. **The preflight** refuses development values. Env files left by an old `--dev` run on
+   this machine are refused: move them aside (`mv infra/.env infra/.env.dev-old`, the
+   same for `apps/server/.env`) and run again, so new ones are generated.
+4. **The build** runs, the migrations are applied, and every module must report healthy.
+   The first build takes several minutes.
 
-Step 0 therefore refuses to run from anything but `main`, detached HEAD
-included:
+**Not generated, to copy in by hand:** `OPENROUTER_API_KEY` in `infra/.env`, the key of
+MERL-T's experts. The preflight warns while it is empty.
 
-```
-✗ Refusing to deploy from branch 'visualex-merlt-main' — expected 'main'.
-  Switch with: git checkout main
-  Or, if this is deliberate, re-run with --allow-branch
-```
+## 3. Serving it on the private network (Tailscale)
 
-`--allow-branch` downgrades it to a warning, for the deliberate case of
-deploying a hotfix branch.
+The stack publishes only on the host's loopback. The overlay network's HTTPS proxy
+publishes it:
 
-Work flows one way, `main` → `merlt`. Vanilla fixes are committed on `main`
-through short-lived branches; `merlt` absorbs them by merging each release
-tag (`git merge v1.7.6`), never `main` itself. Nothing is ever cherry-picked
-back. The full model — topic branches, tags, the merlt merge checklist, where
-session branches strand — is in `docs/git-workflow.md`.
+1. **The tailnet's administrator enables HTTPS certificates** for the tailnet, in the
+   Tailscale admin console.
+2. **In `infra/.env`**, `PUBLIC_ORIGIN=https://<host>.ts.net`. This is one origin, with no
+   trailing slash: it is the OAuth issuer.
+3. **The app:** `tailscale serve --bg http://127.0.0.1:<INGRESS_PORT>`.
+4. **Deploy again** so the server and the app take the origin:
+   `./start.sh --prod --branch develop`.
 
----
+**The MCP server, for Claude Code** (optional):
+1. In `infra/.env`, `MCP_PUBLIC_URL=https://<host>.ts.net:8443/mcp`. It must be the same
+   host as `PUBLIC_ORIGIN` and end in `/mcp`.
+2. Deploy again. The deploy generates `MCP_CLIENT_SECRET` and `OAUTH_DELEGATION_SECRET`,
+   starts the `mcp` module on `127.0.0.1:8091` (`MCP_PORT`), and prints the line to give
+   people.
+3. `tailscale serve --bg --https=8443 http://127.0.0.1:8091`.
+4. On another device of the tailnet:
+   `claude mcp add --transport http visualex https://<host>.ts.net:8443/mcp`, then sign in
+   with a VisuaLex account.
 
-## What `deploy.sh` does
+**Check once that a client cannot forge its address.** The login limit counts each
+device at its own address. From another device, send six logins with a wrong password
+and an invented address. Then send a seventh with another invented address. The seventh
+must be refused too (429):
 
-```bash
-./deploy.sh --patch     # build, bump 1.0.0 -> 1.0.1, restart
-./deploy.sh             # build and restart, no version bump
-./deploy.sh --no-pull   # build what is already checked out
-./deploy.sh --no-restart
-```
-
-The steps, and what each one is there to prevent. Most were added after their
-absence broke a deploy, which is why they read as a list of scars:
-
-| # | Step | Why it is there |
-|---|---|---|
-| 0 | Branch guard | Refuses to deploy from anything but `main`. See above. |
-| 1 | `git pull -r` on the current branch | Rebases onto the remote. Discards lockfile churn if it finds any — with `npm ci` there should be none, so this is now a net for a hand-run `npm install` — and **refuses to continue** if anything else in the tree is dirty: `git pull -r` cannot rebase over unstaged changes, and a deploy must not silently discard work it did not create. |
-| 2 | `pip install -r requirements.txt` | Runtime deps only. `requirements-dev.txt` (pytest) is deliberately **not** installed in production. Now includes `lxml` (the Akoma Ntoso parser): it ships a `cp314` wheel, so the server needs no compiler — check that before pinning a version that has none. |
-| 2b | `playwright install chromium` | `pip install` does not fetch browser binaries. Without this, PDF export and date completion break at runtime, not at build time. |
-| 3 | `npm ci` in `backend/` | Installs exactly the committed lockfile and never rewrites it. If it fails with EUSAGE the lockfile and `package.json` have drifted — commit an updated lockfile, do not fall back to `npm install`. |
-| 3b | `npx prisma generate` | A schema change pulled from git leaves `node_modules/@prisma/client` stale, and the backend build then fails on missing models. |
-| 3c | `npx prisma migrate deploy` | Idempotent. Without it a schema change ships with no matching column and the API fails on the first query that touches it. |
-| 4 | `npm ci` in `frontend/` | |
-| 5 | `npm run build` (frontend) | `tsc -b && vite build`. **This is the real type-check** — it walks the project references, which a bare `tsc --noEmit` does not. |
-| 6 | `npm run build` (backend) | pm2 runs `node dist/index.js`, so skipping this leaves the service on a stale `dist/`. `tsc` type-checks as it emits and fails before writing. |
-| 7 | Version bump + commit + tag + push | Only when `--major/--minor/--patch` is passed. Writes `version.txt`, commits, tags the commit `vX.Y.Z` and pushes `HEAD` plus the tag. The tag is the record of what production ran; a failed push is a warning, not a failed deploy — push by hand. |
-| 8 | Restart | `pm2 restart all`, else `systemctl restart visualex-backend`. The backend stops gracefully on the signal (pm2 sends SIGINT): in-flight requests finish and its one Prisma pool is closed before it exits (`backend/src/index.ts`). pm2 SIGKILLs whatever is still alive after its `kill_timeout`, 1.6 s by default — which is why the shutdown drops each keep-alive socket as soon as it goes idle instead of waiting out the keep-alive timeout. |
-
----
-
-## Before you run it
-
-The script builds but **never runs a test**, and it still has no rollback. Since
-the transfusion round there is CI (`.github/workflows/ci.yml`) on every PR into
-`main` and on `main` itself — Python tests on 3.12 and 3.14, the three frontend
-gates, backend tests, plus a weekly `pip-audit` / `npm audit` — so a red `main`
-is now visible before a deploy rather than after it. It is a signal, not a gate:
-`deploy.sh` does not consult it and will happily ship a red commit. Run the
-suites first, from the repo root:
-
-```bash
-.venv/bin/python -m pytest tests/ -q
+```sh
+for i in 1 2 3 4 5 6; do curl -s -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: application/json' -H 'X-Forwarded-For: 203.0.113.9' -d '{"email":"prova@example.invalid","password":"sbagliata"}' https://<host>.ts.net/api/auth/login; done
+curl -s -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: application/json' -H 'X-Forwarded-For: 203.0.113.10' -d '{"email":"prova@example.invalid","password":"sbagliata"}' https://<host>.ts.net/api/auth/login
 ```
 
-```bash
-cd backend && npm test
+If the last one is 401, the proxy passed the header through: delete the
+`trusted_proxies` line in `infra/ingress/Caddyfile` and deploy again. That device's
+logins stay blocked for 15 minutes after the check.
+
+## 4. Updating, and going back
+
+- **Update:** `./start.sh --prod --branch develop` (or `main`). A backup of the running
+  stack is taken first, then the new version is built, migrated and started. Once a
+  release carries `--prod` (v1.8.0), the host runs the latest release, `--branch main`, and
+  a `preview/…` branch only when the owner asks (`docs/git-workflow.md`, "Deploy"). Switch
+  to `main` right after a release, while it equals `develop`: a host ahead of `main` by a
+  migration is refused.
+- **Going back to an older version.** Migrations do not walk backwards, so the way back
+  for the data is the backup taken before the update:
+  1. Check out the older version (`git switch --detach <tag or commit>`).
+  2. Deploy it with `./start.sh --prod --no-pull --allow-branch`.
+  3. If its schema is older than the data, restore the backup taken before the update
+     (section 5).
+
+  `--branch` refuses to move to a version that lacks a migration the checkout already
+  has; with `--no-pull` that check is yours.
+- **Stop:** `./start.sh --prod --stop`. The containers and volumes stay.
+
+## 5. Backups
+
+- **Before each deploy of an existing stack** (not the first; `--no-backup` skips it),
+  automatically, into `~/visualex-backups/<stack>-<UTC time>/`
+  (folders readable by their owner only).
+- **Daily**, once it is switched on:
+
+  ```sh
+  sh scripts/prod/backup-timer.sh install    # daily at 03:30; the newest 7 folders are kept
+  sudo loginctl enable-linger <user>         # once: the timer runs while nobody is logged in
+  sh scripts/prod/backup-timer.sh status     # next run, newest backup
+  sh scripts/prod/backup-timer.sh remove     # stop it (the backups stay)
+  ```
+
+  The seven kept are the newest complete backups of the stack, whoever took them: the
+  deploys' backups count too. A folder left half-written by a failure is removed once a
+  newer complete backup exists. The user must already be in the `docker` group when the
+  timer starts; if it was added later, log out and in again (or reboot) first. `BACKUP_KEEP` changes the number for a manual run of
+  `scripts/prod/backup-daily.sh`.
+- **Restore:** `scripts/restore.sh ~/visualex-backups/<folder>` into the stack of
+  `infra/.env`, with only the stores running. Read `scripts/datakit/README.md` first. A
+  restore is rehearsed once on a throwaway stack before it is needed.
+- **Off the machine.** The backups hold personal data and stay on this disk for now. A
+  copy elsewhere (encrypted) is a later step of the deployment design (section 8).
+
+## 6. Keeping the containers off the private networks (H1)
+
+The scrapers render third-party pages. If one were compromised, it could otherwise open
+connections to the other devices of the home network and of the tailnet. `firewall.sh`
+stops that: new connections from the stack's `app` subnet to private ranges outside it
+(`10/8`, `172.16/12`, `192.168/16`, `169.254/16`, Tailscale's `100.64/10`) are dropped,
+in Docker's `DOCKER-USER` chain only. The internet stays reachable. So do replies on the
+published ports and the private DNS resolvers Docker forwards to.
+
+**Every rule matches only traffic whose source is the stack's own `app` subnet**
+(`-s $APP_SUBNET`). Other programs' containers on the same machine, on their own Docker
+networks, are never matched: neither their outgoing traffic nor their replies. The one
+effect on them is the intended one: VisuaLex's containers cannot open connections to them.
+
+**This is the last step, and on a shared machine it needs the machine owner's agreement.**
+
+```sh
+sudo sh scripts/prod/firewall.sh apply --dry-run   # what it would add
+sudo sh scripts/prod/firewall.sh install           # apply now, and whenever Docker starts
+sudo sh scripts/prod/firewall.sh status            # its rules, and a live check from a scraper
+sudo sh scripts/prod/firewall.sh uninstall         # everything it added, gone
 ```
 
-```bash
-cd frontend && npm run build && npx vitest run
-```
+- **`install`** copies the script to `/usr/local/lib/visualex-h1-<stack>`, owned by root.
+  It writes the stack's name and subnet into the unit, so the boot never runs a file the
+  deploying user can edit.
+- **After a change of `APP_SUBNET`**, run `install` again.
+- **`status` must say both:**
+  - "a scraper resolves names: yes";
+  - "the home network from a scraper (…): blocked".
 
-Expected today: 984 Python (6 deselected — the `live` marker), 67 backend, 490 frontend.
+  If names stop resolving, `uninstall` and report it.
 
-The backend suite needs `backend/.env.test` pointing at a **separate** database
-(`visualex_test`, not `visualex_platform`) — it runs `prisma migrate reset` on
-whatever `DATABASE_URL` it is given. There is a guard against resetting a
-non-test database, but check the file rather than trusting it.
+**What it does not cover:**
+- A container reaching the host itself: its addresses, SSH, other programs listening on
+  it. That is the host's own firewall (H4).
+- IPv6, which the stack's networks do not use.
+- Docker's experimental nftables backend: it has no `DOCKER-USER` chain, and the script
+  refuses to run there.
+- At boot the containers start a few seconds before the rules are back.
 
-There are no end-to-end tests on `main`. Builds and unit tests do not catch a
-visual or interaction regression, so after a deploy that touched the frontend,
-open the app and walk the main flows: search, dossier, workspace.
+## 7. When a module is unhealthy
 
----
-
-## Environment variables
-
-Not in git. They live in `.env` on the server, and a missing one either falls
-back silently or stops the boot.
-
-**Backend** (`backend/.env`) — `DATABASE_URL` and `JWT_SECRET` are validated at
-startup and the process refuses to boot without them. See
-`backend/.env.example`.
-
-| Variable | Note |
-|---|---|
-| `DATABASE_URL` | Required |
-| `JWT_SECRET` | Required. Generate with `openssl rand -base64 32` |
-| `JWT_ACCESS_EXPIRY` / `JWT_REFRESH_EXPIRY` | Default `30m` / `7d` |
-| `ALLOWED_ORIGINS` | Comma-separated. Must list the production origin |
-| `PORT` / `NODE_ENV` | |
-| `REDIS_ENABLED` / `REDIS_URL` | With Redis off the rate limiter falls back to per-instance memory and logs a warning |
-| `NORMA_WATCH_ENABLED` | Default enabled; `"false"` or `"0"` turns the saved-norm background watcher off |
-| `NORMA_WATCH_INTERVAL_MS` | Default `21600000` (6 h), floored at `60000` (1 min) |
-| `LEGAL_API_URL` | Default `http://localhost:5000`. The Python API's **base** URL: the watcher appends `/fetch_article_text` itself |
-
-**Python API** — all optional, all with defaults:
-
-| Variable | Default | Note |
-|---|---|---|
-| `ALLOWED_ORIGINS` | localhost only | **Set this in production**, or CORS silently allows only localhost |
-| `RATE_LIMIT` / `RATE_LIMIT_WINDOW` | `1000` / `600` | Per-IP counter |
-| `REDIS_ENABLED` / `REDIS_URL` / `REDIS_CACHE_PREFIX` | off | Falls back to a filesystem cache |
-| `PERSISTENT_CACHE_TTL` | `86400` | |
-| `HTTP_MAX_CONCURRENCY`, `HTTP_TIMEOUT`, `HTTP_MAX_RETRIES`, `HTTP_BACKOFF_FACTOR`, `HTTP_INITIAL_BACKOFF`, `HTTP_MIN_INTERVAL`, `HTTP_JITTER` | see `tools/config.py` | Scraper tuning |
-| `FETCH_QUEUE_WORKERS` / `FETCH_QUEUE_DELAY` | | |
-| `AKN_ENABLED` | `true` | Kill switch for the Akoma Ntoso path (article index + last-resort text fallback). Read at call time, so flipping it needs no code change |
-| `AKN_CACHE_MAX_ACTS` | `40` | Article indexes held in memory, a few tens of KB each. Texts are never cached |
-| `HEALTH_DETAILED_TTL` | `120` | Seconds `/health/detailed` caches its three live-source probes; concurrent cold callers share one probe via a lock. Read at call time |
-
----
-
-## Maintaining the batch
-
-`deploy.sh` encodes assumptions about the project. When one of these changes,
-the script changes with it — otherwise the deploy fails on the server, where
-finding out is most expensive.
-
-- **New runtime dependency** → make sure it is in `requirements.txt` or the
-  right `package.json`. Test-only deps belong in `requirements-dev.txt` or
-  `devDependencies`, which production never installs.
-- **Prisma schema change** → nothing to do; steps 3b and 3c cover it. But the
-  migration must be **committed**. A schema edit without a migration file passes
-  the build and breaks at runtime.
-- **New service or process** → step 8 must learn to restart it, and the pm2
-  definition must exist on the server (see the gap below).
-- **New required env var** → add it to `backend/.env.example`, add it to the
-  table above, and set it on the server *before* deploying. A backend var that
-  is validated at boot will take the service down.
-- **Build command or output path change** → steps 5, 6 and the pm2 `start`
-  script must agree on where the artefacts land.
-
----
-
-## Node runtime
-
-The box runs **Node 24 (NodeSource) / npm 11**, matching both CI and the npm
-that writes the committed lockfiles. That alignment is what lets steps 3 and 4
-use `npm ci`; it was Node 20 / npm 10 until 29 August 2026, and the mismatch
-rewrote the lockfiles on every deploy.
-
-Upgrading is an apt operation, because Node comes from NodeSource:
-
-```bash
-sudo sed -i 's|node_20.x|node_24.x|' /etc/apt/sources.list.d/nodesource.list
-sudo apt-get update && sudo apt-get install -y nodejs
-pm2 update            # restarts the pm2 daemon under the new Node
-```
-
-`pm2` lives in `/usr/lib/node_modules`, which the nodejs package does not own,
-so it survives the upgrade — but `pm2 update` is required, or the daemon keeps
-running on the old binary. Run `pm2 save` first.
-
-To roll back, restore `/etc/apt/sources.list.d/nodesource.list.bak-node20` and
-`sudo apt-get install -y nodejs=20.19.6-1nodesource1`, then reinstall
-`node_modules` in both `backend/` and `frontend/`.
-
-Keep this in step with `.github/workflows/ci.yml`, which pins Node 24. If the
-two drift again, the lockfile churn comes back.
-
-## nginx routes the Python API by prefix, and the list is hand-maintained
-
-`/etc/nginx/sites-enabled/visualex` proxies to the Quart app only for paths
-matching one regex:
-
-```
-location ~ ^/(fetch_|search_|stream_|export_|history|version|health|dossiers|parse_query)
-```
-
-Anything else is served as frontend. **A new endpoint whose path does not start
-with one of those prefixes is invisible in production** — nginx answers with the
-SPA and the client sees a 405 or an HTML page, while every local test passes.
-
-This has cost two incidents in one day: `/parse_query` and `/search_case_law`.
-When adding an endpoint, either name it with an existing prefix or add the new
-one here, and verify against production with `curl` after deploying — the deploy
-script does not check.
-
-Config changes are made with `sudo`, after `sudo nginx -t` and with a timestamped
-backup beside the file.
-
-## The shared HTTP client binds to the first event loop that used it
-
-`visualex_api/services/http_client.py` keeps one module-level `ThrottledHttpClient`
-whose `aiohttp.ClientSession` is created lazily and then memoised. It binds to
-whatever event loop was running at that moment.
-
-pytest-asyncio gives each test its own loop, so the **second** live test in a
-single process fails with "Event loop is closed" — and that surfaces as the
-adapter reporting the source unreachable, which is the worst possible disguise:
-it looks exactly like the remote site being down.
-
-Today only one test carries the `live` marker, so the bug is dormant. The moment
-a second one is added, reset the client between tests (replace the instance's
-`__dict__` in an autouse fixture) rather than spending an afternoon believing
-Normattiva is down.
-
-## Known gaps
-
-Recorded rather than fixed, so nobody rediscovers them during an incident.
-
-- **CI does not gate the deploy.** `.github/workflows/ci.yml` runs the Python
-  suite on 3.12 and 3.14, the three frontend gates and the backend tests on
-  every push to `main` — but `deploy.sh` consults nothing and runs no tests, so
-  a red `main` still deploys. Read the run on GitHub before deploying; the
-  pre-deploy checklist above is still run by hand or not at all.
-- **The `systemctl` path only restarts the backend.** `pm2 restart all` covers
-  every registered process, but the `systemctl` fallback restarts
-  `visualex-backend` alone — the Python API on :5000 keeps running the old code.
-- **The pm2 process definitions are not in the repo.** There is no
-  `ecosystem.config.js`. What pm2 runs, with which env and which working
-  directory, exists only on the server; if that machine is lost, so is the
-  knowledge. `start.sh` is a *development* launcher (`npm run dev`,
-  `python app.py &`) and is not what production runs.
-- **The push at step 7 is best-effort.** If the server cannot reach GitHub,
-  the bump commit and the `vX.Y.Z` tag stay local to it; the server's `main`
-  then sits ahead of `origin/main`, the laptop never sees the tag, and the
-  merlt merge in `docs/git-workflow.md` has nothing to merge. The script warns
-  with the exact command to run; run it.
-- **Releases before 19 September 2026 have no tag.** The tags start at
-  `v1.7.5`, added retroactively; `git describe` on anything older says so.
-- **`requirements.txt` has no version pins.** Builds are not reproducible, and a
-  compromised or breaking upstream release lands in production on the next
-  deploy without anyone choosing it.
-- **No rollback.** Recovery means checking out the previous `vX.Y.Z` tag and
-  re-running the script — and `prisma migrate deploy` does not walk migrations backwards.
-- **A deploy that pulls a new `deploy.sh` finishes on the OLD one.** Bash
-  reads the script as it runs, so the text step 1 pulls in is not what steps
-  2-8 execute. The v1.7.6 deploy (25 September 2026) pulled the tag-and-push
-  version of step 7 and ran the previous one: the bump commit was neither
-  tagged nor pushed, and `v1.7.6` was tagged afterwards from a laptop, on the
-  server's own commit, and pushed on its own — which is why that tag sits
-  beside `main` rather than on it. Until the script re-executes itself from a
-  copy (an `exec` on a temp file at the top), after any deploy that changed
-  `deploy.sh` check `git tag -l 'v*'` on the server and finish step 7 by hand.
+- **What runs, and its state:** `docker compose -f infra/compose.yml -f infra/compose.app.yml
+  -f infra/compose.scrapers.yml -f infra/compose.prod.yml ps`. The deploy prints the exact
+  file list, profiles included.
+- **The logs of one module:** the same command with `logs <module>`.
+- **Postgres unhealthy on a first start:** it has a minute's margin. If the host is still
+  building, run the deploy again.
+- **The scrapers killed:** Chromium was over its memory ceiling (`SCRAPERS_MEM_LIMIT`,
+  default 2g).
+- **The MCP answers 503 to every call:** it cannot reach the server for introspection.
+  Check that `server` is healthy.
+- **The MCP answers 401 to a signed-in client:** `MCP_PUBLIC_URL` differs from what the
+  client typed. The address must be the same, character for character, and the client
+  must sign in again after it changes.

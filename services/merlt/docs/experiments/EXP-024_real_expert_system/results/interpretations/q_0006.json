@@ -1,0 +1,31 @@
+{
+  "query_id": "q_0006",
+  "query_text": "Cos'\u00e8 l'eccezione di inadempimento ex art. 1460?",
+  "synthesis": "L'eccezione di inadempimento, disciplinata dall'Art. 1460 del Codice Civile, rappresenta un principio cardine nei contratti a prestazioni corrispettive, consentendo a ciascun contraente di sospendere l'esecuzione della propria obbligazione qualora l'altra parte non adempia o non offra di adempiere contestualmente la propria.\n\n**Natura e Funzione:**\nL'interpretazione letterale (Art. 1460 c.c.) evidenzia la funzione di autotutela che l'eccezione svolge, garantendo un equilibrio sinallagmatico tra ",
+  "confidence": 1.0,
+  "expert_contributions": {
+    "literal": {
+      "interpretation": "L'eccezione di inadempimento, disciplinata dall'Art. 1460 del Codice Civile, \u00e8 un meccanismo che, nei contratti con prestazioni corrispettive, consente a ciascun contraente di rifiutarsi di adempiere la propria obbligazione se l'altro contraente non adempie o non offre di adempiere contemporaneamente la propria. Questa facolt\u00e0 \u00e8 esclusa se le parti hanno stabilito termini diversi per l'adempimento o se tali termini risultano dalla natura del contratto. Non \u00e8, tuttavia, possibile rifiutare l'esecuzione se, in base alle circostanze, il rifiuto \u00e8 contrario alla buona fede. L'eccezione di inadempimento si fonda sull'esistenza dell'inadempimento dell'altra parte e sulla proporzionalit\u00e0 tra i rispettivi inadempimenti, valutata oggettivamente e con riferimento all'equilibrio complessivo del contratto e alla buona fede. Se fondata, impedisce l'operativit\u00e0 di una clausola risolutiva espressa.",
+      "confidence": 1.0,
+      "weight": 1.0,
+      "weighted_confidence": 1.0
+    }
+  },
+  "legal_basis": [],
+  "execution_time_ms": 15722.244,
+  "routing_decision": {
+    "query_type": "definitional",
+    "expert_weights": {
+      "literal": 0.6,
+      "systemic": 0.2,
+      "principles": 0.1,
+      "precedent": 0.1
+    },
+    "confidence": 0.4,
+    "reasoning": "Query classificata come 'definitional'. Expert principali: literal (0.60)"
+  },
+  "feedback": 0.10576684685272335,
+  "reward": 0.020277815758804486,
+  "user_id": "user_003",
+  "error": null
+}

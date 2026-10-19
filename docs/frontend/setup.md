@@ -16,7 +16,7 @@ The frontend is a modern React 19 Single Page Application built with TypeScript 
 ## Installation
 
 ```bash
-cd frontend
+cd apps/web
 npm install
 ```
 
@@ -94,7 +94,7 @@ See `vite.config.ts` for the complete proxy configuration.
 ## Project Structure
 
 ```
-frontend/src/
+apps/web/src/
 ├── App.tsx                    # Main app with routing
 ├── main.tsx                   # Entry point
 │
@@ -109,11 +109,11 @@ frontend/src/
 │   │
 │   ├── features/              # Feature-specific components
 │   │   ├── search/            # Search form, results, article display
-│   │   ├── workspace/         # Multi-tab workspace environment
+│   │   ├── workspace/         # Study Mode, article navigation (the reading tables are in features/practice/)
 │   │   │   └── StudyMode/     # Distraction-free study mode
 │   │   ├── history/           # Search history
-│   │   ├── dossier/           # Research collections
-│   │   └── environments/      # Environment snapshots
+│   │   ├── dossier/           # Research collections (di lavoro, di studio)
+│   │   └── bulletin/          # The Forum: published dossiers, ready-made study dossiers, the environments' archive
 │   │
 │   ├── layout/                # Layout components
 │   │   ├── Layout.tsx         # Main layout wrapper
@@ -227,7 +227,8 @@ frontend/src/
 │   ├── / (index)        → SearchPage
 │   ├── /dossier         → DossierPage
 │   ├── /history         → HistoryView
-│   └── /environments    → EnvironmentPage
+│   ├── /forum           → BulletinBoardPage
+│   └── /environments    → redirects to /forum (keeps ?import=)
 
 /login                   → LoginPage (public)
 /register                → RegisterPage (public)
@@ -252,14 +253,14 @@ dossiers: Dossier[]
 annotations: Annotation[]
 highlights: Highlight[]
 quickNorms: QuickNorm[]
-environments: Environment[]
+environments: Environment[]   // read-only: the Forum's archive
 
 // UI State
 sidebarVisible: boolean
 commandPaletteOpen: boolean
 searchPanelState: { isCollapsed, position, zIndex }
-workspaceTabs: WorkspaceTab[]
-highestZIndex: number
+practices: Practice[]          // the tables of the questions (persisted)
+activePracticeId: string | null
 
 // Search
 searchTrigger: SearchParams | null
@@ -273,11 +274,12 @@ toggleSidebar()
 openCommandPalette()
 updateSettings(settings)
 
-// Workspace
-addWorkspaceTab(tab)
-removeTab(tabId)
-updateTab(tabId, updates)
-bringTabToFront(tabId)
+// Practices
+createPractice(label)
+setActivePractice(id)
+addArticlesToPractice(practiceId, norma, articles)
+closeBeside(practiceId, refId)
+closePractice(id)
 
 // Data
 addBookmark(bookmark)

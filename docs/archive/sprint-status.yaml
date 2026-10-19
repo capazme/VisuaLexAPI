@@ -1,0 +1,251 @@
+# BMAD Sprint Status
+# Note: Sprint MERLT-1a/1b inserted 2026-05-22 as Sprint 2-3 (dedicated MERL-T integration).
+# Original PRD Sprints 2-8 shifted to Sprint 4-10. Goals and committed_points preserved.
+
+version: "6.0.0"
+project_name: "Visualex Platform"
+project_level: 3
+current_sprint: 2
+sprint_plan_path: "docs/sprint-plan-visualex-platform-2026-03-12.md"
+merlt_sprint_plan_path: "docs/merlt/slices/slice1/sprint-plan.md"
+
+sprints:
+  - sprint_number: 1
+    goal: "Infrastructure foundation (Redis, rate limiting, circuit breakers) + search intelligence backend (NL parser, aliases, citation linker)"
+    capacity_points: 30
+    committed_points: 29
+    completed_points: 29
+    status: "completed"
+    completed_on: "2026-04-22"
+    stories:
+      - story_id: "STORY-001"
+        title: "Redis cache layer for Python API"
+        points: 5
+        status: "completed"
+        note: "Module path is visualex_api/tools/redis_cache.py (sprint-plan referenced visualex_api/cache/redis_client.py — path updated informally)."
+      - story_id: "STORY-042"
+        title: "Redis-based rate limiting upgrade"
+        points: 3
+        status: "completed"
+      - story_id: "STORY-044"
+        title: "Circuit breaker for scrapers"
+        points: 3
+        status: "completed"
+        note: "Technical note downgraded 2026-04-22: state is in-memory per-instance, not Redis. Acceptable for current single-instance Lightsail deployment. Redis-backed shared state tracked as tech debt."
+      - story_id: "STORY-002"
+        title: "Natural language input parser"
+        points: 5
+        status: "completed"
+      - story_id: "STORY-003"
+        title: "Smart preset alias library"
+        points: 5
+        status: "completed"
+      - story_id: "STORY-004"
+        title: "Contextual norm linking engine"
+        points: 8
+        status: "completed"
+
+  - sprint_number: 2
+    sprint_id: "MERLT-1a"
+    goal: "MERL-T integration Slice 1a — Fondamenta + vertical slice article:viewed"
+    sprint_plan_ref: "docs/merlt/slices/slice1/sprint-plan.md"
+    capacity_points: 30
+    committed_points: 25
+    completed_points: 25
+    status: "completed"
+    started_on: "2026-05-22"
+    completed_on: "2026-05-22"
+    stories:
+      - story_id: "MERLT-1.0"
+        title: "Runtime baseline & MERL-T copy"
+        points: 5
+        priority: "P0"
+        status: "completed"
+        completed_on: "2026-05-22"
+        depends_on: []
+        notes: "Selective copy (5.8 MB vs 2.3 GB) + 5 services in docker-compose + MERLT_API_IN_DOCKER flag + health gate. All containers healthy. 4 fixes applied during smoke: missing tiktoken (resolved via docker profile), 3 sub-packages erroneously excluded by rsync (recovered), DB env vars not passed to container (added ENRICHMENT_*+RLCF_DATABASE_URL)."
+      - story_id: "MERLT-1.1"
+        title: "Cleanup commit 81be277"
+        points: 2
+        priority: "P0"
+        status: "completed"
+        completed_on: "2026-05-22"
+        depends_on: ["MERLT-1.0"]
+        notes: "Deleted routes/merlt.ts (~696 lines stub); archived merlt.test.ts as .bak; removed import+mount from app.ts. Frontend now sees 404 instead of 500 until MERLT-1.4/1.5 reintroduce new routes."
+      - story_id: "MERLT-1.2"
+        title: "Prisma schema + migration (MerltUserAuthorityCache added)"
+        points: 3
+        priority: "P0"
+        status: "completed"
+        completed_on: "2026-05-22"
+        depends_on: ["MERLT-1.0"]
+        notes: "MerltUserPreference + MerltConsentAudit already existed from commit 81be277 (with MerltConsentLevel enum — cleaner than design doc's two booleans). Story scope reduced to ADD only MerltUserAuthorityCache (missing). Migration 20260522172933_add_merlt_authority_cache applied. Design doc §5.3 should be updated post-Slice to reflect the actual schema."
+      - story_id: "MERLT-1.3"
+        title: "Zod schemas + eventMapper + merltClient"
+        points: 5
+        priority: "P0"
+        status: "completed"
+        completed_on: "2026-05-22"
+        depends_on: ["MERLT-1.0", "MERLT-1.2"]
+        notes: "TDD-driven. 4 test files, 76 tests verdi, coverage 94.59% stmt / 90.9% funcs / 98.5% lines on services+schemas/merlt/. New deps: nock, @vitest/coverage-v8. URN normalization (-bis/-ter/etc.) anti-regression gotcha #9 covered."
+      - story_id: "MERLT-1.4"
+        title: "Consent API + consentGuard middleware"
+        points: 5
+        priority: "P0"
+        status: "completed"
+        completed_on: "2026-05-22"
+        depends_on: ["MERLT-1.2", "MERLT-1.3"]
+        notes: "GET/POST/DELETE /api/merlt/consent + consentGuard middleware (ready for use by /events in MERLT-1.5). Audit trail on every transition. 12 integration tests verdi, 107 tests total verdi. Frontend /api/merlt/consent ora ritorna 200 invece di 404."
+      - story_id: "MERLT-1.5"
+        title: "Vertical slice article:viewed end-to-end"
+        points: 5
+        priority: "P0"
+        status: "completed"
+        completed_on: "2026-05-22"
+        depends_on: ["MERLT-1.3", "MERLT-1.4"]
+        gate: "STRONG — code review + smoke E2E manuale (pending user execution)"
+        notes: "Backend: events.ts route + health.ts + profile.ts + authorityCache.ts + deadLetterLog.ts. 14 integration tests verdi. Express routing bug fixed (mount order matters: merltRoutes ora montato prima dei router auth catch-all su /api/merlt prefix). Frontend: useArticleViewedTracker hook (IntersectionObserver + dwell + scroll), sendArticleViewedEvent service, 8 unit tests verdi. Hook integrato in ArticleTabContent.tsx (refactor in plugin slot in MERLT-1.6). 121 backend tests verdi totali."
+
+  - sprint_number: 3
+    sprint_id: "MERLT-1b"
+    goal: "MERL-T integration Slice 1b — Plugin host + replica 4 eventi + closure"
+    sprint_plan_ref: "docs/merlt/slices/slice1/sprint-plan.md"
+    capacity_points: 30
+    committed_points: 17
+    completed_points: 17
+    status: "completed"
+    started_on: "2026-05-23"
+    completed_on: "2026-05-23"
+    stories:
+      - story_id: "MERLT-1.6"
+        title: "Plugin host minimo"
+        points: 3
+        priority: "P1"
+        status: "completed"
+        completed_on: "2026-05-23"
+        depends_on: ["MERLT-1.5"]
+        notes: "Registry refactor: feature flag VITE_FEATURE_MERLT integrato (default ON, explicit 'false'/'0'/'' disable). ArticleMerltSlot riscritto come mount minimal (host-side hook useArticleViewedTracker, NO UI — la UI Q&A legacy del commit 81be277 rimossa: usava endpoint inesistenti, sarà reintrodotta in Slice 3). ArticleTabContent ora usa <PluginSlot> invece di import diretto hook. 9 unit tests registry.test.tsx verdi (flag toggle + slot mounting). 36 frontend tests verdi totali."
+      - story_id: "MERLT-1.7"
+        title: "Event highlight + annotation"
+        points: 3
+        priority: "P1"
+        status: "completed"
+        completed_on: "2026-05-23"
+        depends_on: ["MERLT-1.5", "MERLT-1.6"]
+        driver: "ralph-loop"
+        notes: "Backend: POST /api/merlt/events/highlight-annotation with kind discriminator. Frontend: useHighlightAnnotationTracker subscribes to existing merltEventBus (no changes to call-sites), maps legacy events to BFF payload. ArticleTabContent extended metadata with anchor_text + note_text. New MERLT_EVENT_TYPES.annotationCreated distinguishes save-note from generic text-selection. 5 backend integration tests + 7 frontend hook tests verdi. 128 backend tests / 43 frontend tests total."
+      - story_id: "MERLT-1.8"
+        title: "Event dossier + bookmark"
+        points: 3
+        priority: "P1"
+        status: "completed"
+        completed_on: "2026-05-23"
+        depends_on: ["MERLT-1.5", "MERLT-1.6"]
+        driver: "ralph-loop"
+        notes: "Backend POST /events/dossier-bookmark with kind discriminator. Frontend useDossierBookmarkTracker subscribes to bus. Store emissions added in addBookmark (bookmark_add) and addToDossier (dossier_item_add). 4 backend integration tests + 5 frontend hook tests verdi."
+      - story_id: "MERLT-1.9"
+        title: "Event citation:clicked"
+        points: 2
+        priority: "P1"
+        status: "completed"
+        completed_on: "2026-05-23"
+        depends_on: ["MERLT-1.5", "MERLT-1.6"]
+        driver: "ralph-loop"
+        notes: "Backend POST /events/citation-clicked. Frontend useCitationTracker subscribes to bus (new event type citationClicked, distinct from existing citationDetected). ArticleTabContent.handleOpenCitationInTab changed to emit citationClicked with source_urn + target_urn (null at click time) + citation_text. 4 backend integration tests + 6 frontend hook tests verdi."
+      - story_id: "MERLT-1.10"
+        title: "Event forum (like / download / suggestion_decided)"
+        points: 3
+        priority: "P1"
+        status: "completed"
+        completed_on: "2026-05-23"
+        depends_on: ["MERLT-1.5", "MERLT-1.6"]
+        note: "Attribution decision (option B per docs/merlt/decisions/forum-authoring.md): target_author_id = suggester for suggestion_*, env owner for like/download. New plugin slot 'global' mounted in Layout for cross-route bus subscribers (useForumSignalTracker). 5 backend integration tests + 8 frontend hook tests. Emissions added to BulletinBoardPage (handleLike/handleTakeItem/handleDeclineItem) and ImportEnvironmentModal (handleImport)."
+      - story_id: "MERLT-1.11"
+        title: "Doc finali + smoke E2E completo"
+        points: 2
+        priority: "P0"
+        status: "completed"
+        completed_on: "2026-05-23"
+        depends_on: ["MERLT-1.7", "MERLT-1.8", "MERLT-1.9", "MERLT-1.10"]
+        notes: "Smoke checklist estesa con tutti 5 eventi (article:viewed, highlight+annotation, dossier+bookmark, citation, forum). CLAUDE.md sezione MERL-T integration aggiunta con entry points + gotchas + file rules. docs/merlt/decisions/forum-authoring.md creato in MERLT-1.10."
+      - story_id: "MERLT-1.12"
+        title: "PR ready + solutioning gate finale"
+        points: 1
+        priority: "P0"
+        status: "completed"
+        completed_on: "2026-05-23"
+        depends_on: ["MERLT-1.11"]
+        notes: "Sprint MERLT-1b completed 17/17pt. Slice 1 completed 42/42pt. Build verde + 143 backend + 63 frontend tests verdi. PR pronto verso main (non auto-pushed per CLAUDE.md global)."
+
+  - sprint_number: 4
+    sprint_id: "PRD-Sprint-2"
+    goal: "Search & article experience redesign + onboarding flow"
+    capacity_points: 30
+    committed_points: 28
+    status: "not_started"
+    shifted_from: 2
+    shifted_on: "2026-05-22"
+    shifted_reason: "MERLT-1a/1b inserted ahead"
+
+  - sprint_number: 5
+    sprint_id: "PRD-Sprint-3"
+    goal: "Workspace & reading experience overhaul + knowledge management start"
+    capacity_points: 30
+    committed_points: 29
+    status: "not_started"
+    shifted_from: 3
+    shifted_on: "2026-05-22"
+
+  - sprint_number: 6
+    sprint_id: "PRD-Sprint-4"
+    goal: "Knowledge management + environments redesign + GDPR compliance"
+    capacity_points: 30
+    committed_points: 29
+    status: "not_started"
+    shifted_from: 4
+    shifted_on: "2026-05-22"
+
+  - sprint_number: 7
+    sprint_id: "PRD-Sprint-5"
+    goal: "Disputatio Fori backend (schema, APIs, moderation)"
+    capacity_points: 30
+    committed_points: 26
+    status: "not_started"
+    shifted_from: 5
+    shifted_on: "2026-05-22"
+
+  - sprint_number: 8
+    sprint_id: "PRD-Sprint-6"
+    goal: "Disputatio Fori frontend + social schema"
+    capacity_points: 30
+    committed_points: 27
+    status: "not_started"
+    shifted_from: 6
+    shifted_on: "2026-05-22"
+
+  - sprint_number: 9
+    sprint_id: "PRD-Sprint-7"
+    goal: "Social layer backend + environment comments"
+    capacity_points: 30
+    committed_points: 29
+    status: "not_started"
+    shifted_from: 7
+    shifted_on: "2026-05-22"
+
+  - sprint_number: 10
+    sprint_id: "PRD-Sprint-8"
+    goal: "Social frontend + responsive audit + global UI polish"
+    capacity_points: 30
+    committed_points: 26
+    status: "not_started"
+    shifted_from: 8
+    shifted_on: "2026-05-22"
+
+velocity:
+  sprint_1: 29
+  rolling_average: 29
+
+team:
+  size: 1
+  sprint_length_weeks: 2
+  capacity_per_sprint: 30

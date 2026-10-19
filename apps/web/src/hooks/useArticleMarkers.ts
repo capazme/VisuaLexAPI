@@ -1,0 +1,57 @@
+import { useMemo } from 'react';
+import type { Annotation, Highlight } from '../types';
+import type { ArticleStructure } from '../utils/articleStructure';
+import type { LocatedThread } from '../utils/articleAnnotations';
+import { renderArticleHtml } from '../utils/articleRender';
+
+interface UseArticleMarkersInput {
+  rawText: string;
+  highlights: Highlight[];
+  annotations: Annotation[];
+  /**
+   * The parsed structure of `rawText` (`parseArticleStructure`, memoised by
+   * the caller). Omitted or null renders flat — the Brocardi sections, which
+   * have no commi to divide.
+   */
+  structure?: ArticleStructure | null;
+  /** The annotation signs of the practice's row and the dossier reader; see RenderArticleInput. */
+  signs?: boolean;
+  /** Passage discussions located in this text: counted on the signs. */
+  threads?: readonly LocatedThread[];
+  /** The discussion open in the panel: its words light up (`.vlx-thread-focus`). */
+  focusedThreadId?: string | null;
+}
+
+/**
+ * The HTML of an article's text with the reader's highlights, anchored notes
+ * and annotation signs applied, ready for `SafeHTML`. The rendering itself
+ * lives in `utils/articleRender.ts`. Finding in the text draws nothing here:
+ * it uses the CSS Custom Highlight API (`utils/findHighlights.ts`).
+ *
+ * All offsets are plain-text offsets (`article_text` without newlines).
+ * Citation wrapping is not applied here — it is article-specific and belongs
+ * to the consumer (ArticleTabContent).
+ */
+export function useArticleMarkers({
+  rawText,
+  highlights,
+  annotations,
+  structure = null,
+  signs = false,
+  threads,
+  focusedThreadId,
+}: UseArticleMarkersInput): string {
+  return useMemo(
+    () =>
+      renderArticleHtml({
+        raw: rawText || '',
+        structure,
+        highlights,
+        annotations,
+        signs,
+        threads,
+        focusedThreadId,
+      }),
+    [rawText, structure, highlights, annotations, signs, threads, focusedThreadId],
+  );
+}

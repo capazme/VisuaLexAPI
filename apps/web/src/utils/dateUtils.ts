@@ -1,0 +1,211 @@
+/**
+ * Date parsing utilities for Italian legal document dates.
+ * Converts various Italian date formats to YYYY-MM-DD for API compatibility.
+ */
+
+const ITALIAN_MONTHS: Record<string, string> = {
+  'gennaio': '01',
+  'febbraio': '02',
+  'marzo': '03',
+  'aprile': '04',
+  'maggio': '05',
+  'giugno': '06',
+  'luglio': '07',
+  'agosto': '08',
+  'settembre': '09',
+  'ottobre': '10',
+  'novembre': '11',
+  'dicembre': '12',
+};
+
+/**
+ * Parses various date formats and returns YYYY-MM-DD.
+ *
+ * Supported formats:
+ * - "1990" → "1990" (year only, sent as-is for backend to complete via Normattiva lookup)
+ * - "2024-08-07" → "2024-08-07" (already correct)
+ * - "07-08-1990" or "07/08/1990" → "1990-08-07" (DD-MM-YYYY to YYYY-MM-DD)
+ * - "7 agosto 1990" → "1990-08-07" (Italian text date)
+ * - "7-8-1990" → "1990-08-07" (D-M-YYYY)
+ *
+ * @param input - The date string in any supported format
+ * @returns The date in YYYY-MM-DD format (or year-only for backend lookup), or empty string if invalid
+ */
+export function parseItalianDate(input: string): string {
+  if (!input) return '';
+
+  const trimmed = input.trim();
+
+  // Already YYYY-MM-DD format
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  // Year only (4 digits) - keep as-is, backend will complete via Normattiva lookup
+  if (/^\d{4}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  // DD-MM-YYYY or DD/MM/YYYY format (with 1 or 2 digit day/month)
+  const ddmmyyyyMatch = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if (ddmmyyyyMatch) {
+    const [, day, month, year] = ddmmyyyyMatch;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+
+  // Italian text format: "7 agosto 1990" or "07 agosto 1990"
+  const italianMatch = trimmed.toLowerCase().match(/^(\d{1,2})\s+([a-z]+)\s+(\d{4})$/);
+  if (italianMatch) {
+    const [, day, monthName, year] = italianMatch;
+    const month = ITALIAN_MONTHS[monthName];
+    if (month) {
+      return `${year}-${month}-${day.padStart(2, '0')}`;
+    }
+  }
+
+  // If no pattern matches, return as-is (let backend handle/reject)
+  return trimmed;
+}
+
+/**
+ * Expand a two-digit year the way the backend does (`_expand_year` in
+ * `nl_parser.py`): up to 30 is 20xx, above is 19xx. "90" → 1990, "23" → 2023,
+ * "35" → 1935 (the regi decreti of the thirties are still cited). The client
+ * once carried two private copies of this with a different pivot, so a
+ * citation typed in the palette and the same one hovered in a text could
+ * resolve to years a century apart. Anything but two digits is returned as is.
+ */
+export function expandTwoDigitYear(year: string): string {
+  if (!/^\d{2}$/.test(year)) return year;
+  return parseInt(year, 10) <= 30 ? `20${year}` : `19${year}`;
+}
+
+/**
+ * Formats a date for display in Italian format.
+ *
+ * @param isoDate - Date in YYYY-MM-DD format
+ * @returns Date in DD/MM/YYYY format
+ */
+export function formatDateForDisplay(isoDate: string): string {
+  if (!isoDate) return '';
+
+  // If just year, return as-is
+  if (/^\d{4}$/.test(isoDate)) {
+    return isoDate;
+  }
+
+  const match = isoDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match) {
+    const [, year, month, day] = match;
+    return `${day}/${month}/${year}`;
+  }
+
+  return isoDate;
+}
+
+const ITALIAN_MONTHS_DISPLAY = [
+  'gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno',
+  'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'
+];
+
+/**
+ * Formats a date in extended Italian format (e.g., "7 agosto 1990").
+ *
+ * @param isoDate - Date in YYYY-MM-DD format
+ * @returns Date in extended Italian format
+ */
+export function formatDateItalianLong(isoDate: string): string {
+  if (!isoDate) return '';
+
+  // If just year, return as-is
+  if (/^\d{4}$/.test(isoDate)) {
+    return isoDate;
+  }
+
+  const match = isoDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match) {
+    const [, year, month, day] = match;
+    const monthNum = parseInt(month, 10);
+    const dayNum = parseInt(day, 10);
+
+    // A month outside 1-12 indexes past the end of the array and renders
+    // "1 undefined 2025" in the UI. Return the input untouched instead: a
+    // string we cannot read is better shown as it came than as a broken
+    // sentence.
+    if (monthNum < 1 || monthNum > 12) return isoDate;
+
+    const monthName = ITALIAN_MONTHS_DISPLAY[monthNum - 1];
+    return `${dayNum} ${monthName} ${year}`;
+  }
+
+  return isoDate;
+}
+
+const ISO_DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+function isRealDay(year: number, month: number, day: number): boolean {
+  const moved = new Date(Date.UTC(year, month - 1, day));
+  return moved.getUTCFullYear() === year && moved.getUTCMonth() === month - 1 && moved.getUTCDate() === day;
+}
+
+/**
+ * A day the way Normattiva writes it, padded: "2007-12-29" → "29-12-2007". Used
+ * on chips, where `7 agosto 1990` is too long. Anything else comes back as it
+ * came.
+ */
+export function formatDateDashed(isoDate: string): string {
+  const match = ISO_DAY.exec(isoDate || '');
+  return match ? `${match[3]}-${match[2]}-${match[1]}` : (isoDate || '');
+}
+
+/**
+ * A day as a lawyer cites it: "29 dicembre 2007", and "1° ottobre 2026" for the
+ * first of the month. `formatDateItalianLong` stays as it is (the rest of the
+ * interface prints "1 ottobre"); citations and the version banners are the
+ * places the ordinal is expected.
+ */
+export function formatDateForCitation(isoDate: string): string {
+  const match = ISO_DAY.exec(isoDate || '');
+  if (!match) return isoDate || '';
+  const long = formatDateItalianLong(isoDate);
+  return match[3] === '01' ? long.replace(/^1 /, '1° ') : long;
+}
+
+const ELIDED_PREPOSITION = { il: "l'", del: "dell'", dal: "dall'", al: "all'", nel: "nell'" } as const;
+
+/**
+ * A preposition and the date it governs, the way Italian writes them: the article or
+ * preposition elides before a day that starts with a vowel sound, which among the days of
+ * a month are 8 (otto) and 11 (undici): "dall'11 giugno 1970", "all'8 settembre 2014",
+ * "consultato l'8 ottobre 2026". The 1st ("dal 1° gennaio"), 18, 28 and 31 do not elide.
+ * `formattedDate` is the spelled-out date ("11 giugno 1970"); a string that does not start
+ * with a day gets the plain preposition.
+ */
+export function withPreposition(preposition: keyof typeof ELIDED_PREPOSITION, formattedDate: string): string {
+  return /^(8|11)(?!\d)/.test(formattedDate)
+    ? `${ELIDED_PREPOSITION[preposition]}${formattedDate}`
+    : `${preposition} ${formattedDate}`;
+}
+
+/** The ISO day `days` after `isoDate` (negative for before); the input unchanged when it is not a real day. */
+export function addDaysToIsoDate(isoDate: string, days: number): string {
+  const match = ISO_DAY.exec(isoDate || '');
+  if (!match) return isoDate;
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  if (!isRealDay(year, month, day)) return isoDate;
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
+
+/**
+ * Today's ISO day in Rome, which is the day the server compares a
+ * `version_date` with (a date after it is refused). The browser's own day can
+ * differ for a reader in another time zone.
+ */
+export function todayInRome(now: Date = new Date()): string {
+  // From the parts, not from a locale's pattern: no locale is trusted to write YYYY-MM-DD.
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(now);
+  const part = (type: 'year' | 'month' | 'day') => parts.find((p) => p.type === type)?.value ?? '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}

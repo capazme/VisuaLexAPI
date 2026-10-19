@@ -1,0 +1,23 @@
+{
+  "test_name": "test_1",
+  "timestamp": "2025-12-13T20:42:13.282278",
+  "duration_seconds": 47.875869,
+  "max_chunks": 10,
+  "entity_types": [
+    "concetto",
+    "principio",
+    "definizione"
+  ],
+  "contents_processed": 10,
+  "contents_skipped": 0,
+  "stats": {
+    "total_created": 65,
+    "total_merged": 26,
+    "concepts": 63,
+    "principles": 1,
+    "definitions": 1,
+    "relations": 0
+  },
+  "errors": 0,
+  "success": true
+}

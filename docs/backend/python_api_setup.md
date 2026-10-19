@@ -12,7 +12,7 @@ The Python API is an async web application built with Quart that fetches and pro
 ### 1. Clone and Create Virtual Environment
 
 ```bash
-cd VisuaLexAPI
+cd VisuaLexAPI/services/visualex
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 ```
@@ -84,6 +84,7 @@ All environment variables are optional and have sensible defaults.
 ### Development (Main Server)
 
 ```bash
+cd services/visualex
 source .venv/bin/activate
 python app.py
 ```
@@ -118,7 +119,7 @@ This starts:
 
 | File | Description |
 |------|-------------|
-| `visualex_api/tools/config.py` | Environment variable defaults and configuration |
+| `services/visualex/visualex_api/tools/config.py` | Environment variable defaults and configuration |
 | `data/history.json` | Search history persistence (auto-created) |
 | `data/dossiers.json` | Dossier persistence (auto-created) |
 | `download/cache/` | Persistent cache directory (auto-created) |

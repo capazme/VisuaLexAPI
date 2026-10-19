@@ -1,0 +1,123 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, cleanup } from '@testing-library/react';
+
+/**
+ * The registry reads import.meta.env at module load time. To toggle the
+ * VITE_FEATURE_MERLT flag between tests we use vi.stubEnv() — vitest's
+ * built-in mechanism for swapping env values without re-importing the
+ * module. Each test stubs the desired value, then asserts against
+ * getSlotComponents/PluginSlot.
+ *
+ * The ArticleMerltSlot dependency is mocked to a benign null-renderer so
+ * we don't actually wire up IntersectionObserver / consent / fetch here.
+ */
+
+vi.mock('../../features/merlt/ArticleMerltSlot', () => ({
+  ArticleMerltSlot: () => null,
+}));
+vi.mock('../../features/merlt/graph/side-rail/ArticleGraphSideRail', () => ({
+  ArticleGraphSideRail: () => null,
+}));
+vi.mock('../../features/merlt/rassegne/RassegnePanel', () => ({
+  RassegnePanel: () => null,
+}));
+
+import { getSlotComponents } from '../registry';
+import { PluginSlot } from '../PluginSlot';
+
+beforeEach(() => {
+  vi.unstubAllEnvs();
+});
+
+afterEach(() => {
+  cleanup();
+});
+
+describe('getSlotComponents', () => {
+  it('returns the tracker after the article and the reviews panel in the case-law slot (flag unset)', () => {
+    const components = getSlotComponents('article_content_after');
+    expect(components.map((c) => c.id)).toEqual(['merlt-article-tracker']);
+    expect(components[0].pluginId).toBe('visualex-merlt');
+    expect(components[0].requiredFlag).toBe('VITE_FEATURE_MERLT');
+    const caseLaw = getSlotComponents('article_case_law');
+    expect(caseLaw.map((c) => c.id)).toEqual(['merlt-article-rassegne']);
+    expect(caseLaw[0].requiredFlag).toBe('VITE_FEATURE_MERLT');
+  });
+
+  it('includes the entries when VITE_FEATURE_MERLT=true', () => {
+    vi.stubEnv('VITE_FEATURE_MERLT', 'true');
+    expect(getSlotComponents('article_content_after')).toHaveLength(1);
+    expect(getSlotComponents('article_case_law')).toHaveLength(1);
+  });
+
+  it('excludes the entry when VITE_FEATURE_MERLT=false', () => {
+    vi.stubEnv('VITE_FEATURE_MERLT', 'false');
+    expect(getSlotComponents('article_content_after')).toHaveLength(0);
+    expect(getSlotComponents('article_case_law')).toHaveLength(0);
+  });
+
+  it('excludes the entry when VITE_FEATURE_MERLT=0', () => {
+    vi.stubEnv('VITE_FEATURE_MERLT', '0');
+    expect(getSlotComponents('article_content_after')).toHaveLength(0);
+  });
+
+  it('excludes the entry when VITE_FEATURE_MERLT="" (empty string)', () => {
+    vi.stubEnv('VITE_FEATURE_MERLT', '');
+    expect(getSlotComponents('article_content_after')).toHaveLength(0);
+  });
+
+  it('hides the graph side rail with MERL-T off, even with its own flag on', () => {
+    vi.stubEnv('VITE_FEATURE_MERLT_GRAPH', 'true');
+    expect(getSlotComponents('article_sidebar')).toHaveLength(1);
+    vi.stubEnv('VITE_FEATURE_MERLT', 'false');
+    expect(getSlotComponents('article_sidebar')).toHaveLength(0);
+  });
+
+  it('isMerltGraphEnabled follows the master switch', async () => {
+    const { isMerltGraphEnabled } = await import('../../features/merlt/graph/featureFlag');
+    expect(isMerltGraphEnabled()).toBe(true);
+    vi.stubEnv('VITE_FEATURE_MERLT', 'false');
+    expect(isMerltGraphEnabled()).toBe(false);
+  });
+
+  it('registers the graph side rail on article_sidebar gated by VITE_FEATURE_MERLT_GRAPH', () => {
+    const components = getSlotComponents('article_sidebar');
+    expect(components).toHaveLength(1);
+    expect(components[0].id).toBe('merlt-article-graph-side-rail');
+    expect(components[0].requiredFlag).toBe('VITE_FEATURE_MERLT_GRAPH');
+  });
+
+  it('excludes the side rail when VITE_FEATURE_MERLT_GRAPH=false', () => {
+    vi.stubEnv('VITE_FEATURE_MERLT_GRAPH', 'false');
+    expect(getSlotComponents('article_sidebar')).toHaveLength(0);
+  });
+});
+
+describe('PluginSlot', () => {
+  it('renders nothing when feature flag is off', () => {
+    vi.stubEnv('VITE_FEATURE_MERLT', 'false');
+    const { container } = render(
+      <PluginSlot
+        slot="article_content_after"
+        props={{ articleUrn: 'urn:test', containerRef: { current: null } }}
+      />
+    );
+    expect(container.innerHTML).toBe('');
+  });
+
+  it('renders the registered component when feature flag is on', () => {
+    vi.stubEnv('VITE_FEATURE_MERLT', 'true');
+    // ArticleMerltSlot is mocked to render null — the slot still resolves,
+    // we just check it didn't throw and that getSlotComponents agrees.
+    const components = getSlotComponents('article_content_after');
+    expect(components).toHaveLength(1);
+    const { container } = render(
+      <PluginSlot
+        slot="article_content_after"
+        props={{ articleUrn: 'urn:test', containerRef: { current: null } }}
+      />
+    );
+    // Mocked component renders null — innerHTML stays empty BUT no error.
+    expect(container.innerHTML).toBe('');
+  });
+});

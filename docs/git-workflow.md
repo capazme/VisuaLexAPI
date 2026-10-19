@@ -1,254 +1,173 @@
 # Git workflow
 
-How work moves through this repository: two long-lived branches, short-lived
-topic branches, and tags that name what is in production. Everything here is
-meant to be true of the repository as it stands — if you find a rule the
-history contradicts, fix the rule in the same change that taught you.
-
-Decided 19 September 2026, after the second cleanup in a month found a
-production fix stranded on a session branch and the experiment three months
-behind `main`. Read `docs/deployment.md` for what the deploy script does; this
-file is about what happens *before* it runs. `visualex-merlt-main` is written
-`merlt` below.
-
-Two incidents shaped these rules, and the text refers to both: in June 2026,
-32 vanilla commits (four of them security fixes) were made *on* `merlt` and
-sat there for ten weeks while production ran without them; and between June
-and September 2026, `merlt` stopped absorbing `main` and fell 177 commits
-behind. The same neglect, in both directions.
+How work moves through this repository. Everything here is meant to be true of
+the repository as it stands — if the history contradicts a rule, fix the rule
+in the same change that taught you. Decided on 27 September 2026, when vanilla
+and the MERL-T line became one product and a second developer joined; the
+history at the end says what it replaced and why.
 
 ## The shape
 
 | Ref | What it is | Lifetime |
 |---|---|---|
-| `main` | Visualex "vanilla", the product. Every commit here was verified locally before its merge and by CI on push; any of them could be deployed. | Permanent |
-| `vX.Y.Z` tags | What *was* deployed. Created by `deploy.sh --patch/--minor/--major` on the server, together with the version-bump commit. | Permanent |
-| `visualex-merlt-main` | The AI experiment. Never deployed. Absorbs `main` **by tag**, never the other way. | Permanent, until MERL-T ships or is dropped |
-| `fix/…`, `feature/…`, `refactor/…`, `chore/…` | One piece of work each, branched from `main`, merged back with `--no-ff`, deleted. | Days; a large feature (the 2026 auth round, planned as ten tasks) stays on its branch until complete, and rebases on `main` as it goes |
+| `main` | The released version: what testers get. Changes only through pull requests from `develop` (releases) and `hotfix/…`. | Permanent |
+| `develop` | Where work integrates. GitHub's default branch. | Permanent |
+| `vX.Y.Z` tags | One per release, on `main`. `v1.7.8` is the last release of the old line, `v1.8.0` the first of the unified repository. | Permanent |
+| `feat/`, `fix/`, `refactor/`, `chore/`, `docs/` | One piece of work each, from `develop`, back into `develop` by pull request, deleted on merge. | Days |
+| `hotfix/…` | An urgent fix to the released version, from `main`, back into `main`. | Hours |
+| `preview/…` | Unreleased work run on the deployment host, only when the owner asks for it (see "Deploy"). Never merged. | Until the next release |
 
-```
-main      ──●──●──●──●──●──●──●──●──●──●──●──●──●──●──►
-              │      ▲       ▲          │      ▲
-   fix/x  ────┴──●───┘       │  feature/y──●──●┘
-                        v1.7.5 ┐                    v1.7.6 ┐
-merlt     ─────────────────────●─────────────────────────●──►
-                          merge v1.7.5                merge v1.7.6
-```
+No other long-lived branch. Experimental work sits behind flags (MERL-T's
+`MERLT_ENABLED` and its per-area flags). A research branch is opened only if
+unavoidable, and it never holds a security fix.
 
-Each tag sits on the `chore: bump version to X.Y.Z` commit the server creates
-and pushes at deploy time, so after a release the laptop's `main` is one commit
-behind `origin` until the next `git pull` — pull before you branch.
+## Day to day
 
-`main` is the integration line. The release is not a merge, it is the deploy,
-and the tag is its name. That is the whole model: what a `main`/`dev` pair
-expresses with two branches, this repository expresses with one branch and
-tags, because the deploy is a deliberate manual step and not every green
-commit is shipped the moment it lands.
+1. `git switch develop && git pull --ff-only`, then `git switch -c feat/thing`.
+2. Work, and commit often with Conventional Commits (`feat(scope): …`).
+3. Before pushing, run the suites of the areas you touched (root `CLAUDE.md`,
+   "Commands"). A branch rebases on `develop` when `develop` moves; it does not
+   merge `develop` in.
+4. `git push -u origin feat/thing`, then a pull request into `develop`.
+5. CI must be green: GitHub refuses the merge until every CI job has
+   passed. On the paths in "Review" below, GitHub asks the other developer
+   for a review; it does not wait for it.
+6. Merge it yourself with a merge commit titled `merge: feat/thing — what it
+   changes`. The branch is deleted automatically. The title is what the
+   changelog is written from, so it says what changes for the reader, not
+   how.
 
-## Why there is no `dev` branch
+Nothing is pushed to `develop` or `main` directly, nobody force-pushes them,
+nobody deletes them: GitHub's rulesets refuse it, and the shared Claude Code
+hook refuses it first.
 
-Recorded so it is not re-proposed without new information.
+## Review
 
-- **It already died once.** `origin/dev` stopped on 30 December 2025, and every
-  merge in its history goes *from* `main` *into* `dev` ("Merge branch 'main'
-  into dev"). Work was going straight to `main`; `dev` was an echo, not an
-  integration branch. That is the natural end state with one developer.
-- **`merlt` makes a third long-lived branch, and three branches mean two
-  synchronisation directions** (`dev → main`, `main → merlt`) plus the third
-  that git-flow needs for hotfixes (`main → dev`). Each is a place where the
-  one-way valve can invert without anyone noticing — which is exactly how
-  the June 2026 stranding happened.
-- **A `dev` nobody deploys is a queue, not a test bed.** There is one server
-  and no staging environment. Topic branches already hold work that is not
-  ready, one piece at a time, and they cannot drift as a group.
+Each developer manages their own code: a pull request is reviewed by the
+other when they can, and it never waits for that review. The owners decided
+so on 4 October 2026.
 
-Also rejected, when the two-branch model was decided on 24 August 2026:
-merging `merlt` into `main` behind feature flags (it drags the MERL-T Python
-service and Docker stack into the production deploy).
+- `.github/CODEOWNERS` asks for the other developer's review on the paths
+  where one person's mistake costs everyone: authentication and tokens, the
+  Prisma schema and migrations, the licences, `.github/`, `infra/` and the data
+  scripts, the shared Claude Code rules, and the Normattiva text extraction
+  (its output is the offset space of every stored highlight and note). The
+  ruleset does not require that review: the author merges at green CI.
+- A review that arrives after the merge is answered by a new pull request.
+- The licence, copyright assignment and contribution terms are decided by
+  both owners together. A pull request that changes `LICENSE`, `NOTICE`, the
+  SPDX headers or the contribution terms is merged only with both owners'
+  agreement written on it.
 
-## Day to day on `main`
+## Shared files and migrations
 
-1. **Branch from `main`**, named for the kind of change: `fix/`, `feature/`,
-   `refactor/`, `chore/`. One piece of work per branch.
-2. **Verify before merging.** `npm run test` and `npm run build` in
-   `frontend/` (the build is the real type-check — a bare `tsc --noEmit`
-   reports a false green), `npm test` in `backend/`, and
-   `.venv/bin/python -m pytest tests/ -q` from the repo root. CI runs the same
-   gates on every push to `main` and every PR into it; a local red is cheaper
-   than a remote one.
-3. **Merge with a merge commit**, so the branch stays legible in history:
+Both developers' sessions work in parallel, so two things are reserved before
+anyone touches them, in the owners' shared coordination register:
 
-   ```
-   git checkout main
-   git merge --no-ff fix/thing -F msg.txt     # "merge: fix/thing — what it fixes"
-   git branch -d fix/thing
-   git push origin main
-   ```
+- **a migration**: its timestamp (Prisma's `YYYYMMDDHHMMSS_name`) and the
+  tables it changes, so two branches never write the same timestamp or the
+  same table;
+- **a shared file** that several areas edit — the root `CLAUDE.md`,
+  `.claude/settings.json`, `.github/`, `infra/`, `start.sh` — for the time a
+  branch holds it.
 
-   The first line of the message is `merge: <what was merged> — <what
-   changed>`; the tag merge into `merlt` (below) follows the same shape with
-   the tag in place of the branch. Put the verification you ran in the body.
-   If the branch was pushed to GitHub, a PR does the same job and leaves the
-   review on the record — give the PR's merge commit the same first line
-   instead of GitHub's default. A PR is not mandatory for a solo change.
-4. **Long features rebase, they do not merge `main` in.** A branch with a
-   handful of unpushed commits is rebased onto `main` when `main` moves
-   (`git rebase main`); its history stays linear and the eventual merge commit
-   is the only knot. The limit is other people, not the push itself: a branch
-   someone else has based work on is not rebased any more. This is a
-   single-developer repository, and a session branch (`origin/claude/…`) is
-   yours alone, so those are rebased freely.
-5. **Read the CI run before deploying.** `deploy.sh` consults nothing.
+The reservation is released when the branch merges or is abandoned. A
+conflict found in a pull request is settled between the two developers, not by
+whoever merges first.
 
-## Release = deploy + tag
+## Versions
 
-On the server:
+`X.Y.Z`, read from `version.txt`:
 
-```
-./deploy.sh --patch      # 1.7.5 → 1.7.6
-```
+- **Y**, the minor number, goes up with each batch of features: roughly every
+  one to two weeks (1.8, 1.9…).
+- **Z**, the patch number, goes up with a hotfix (1.8.1).
+- **X** moves only by the owners' decision.
 
-Step 7 of the script writes `version.txt`, commits `chore: bump version to
-1.7.6`, tags that commit `v1.7.6`, and pushes commit and tag to `origin`. The
-tag is the only durable record of what production ran and when. On the
-laptop, `git pull` brings the bump commit and its tag; `git describe --tags
---match 'v*'` on any commit then says how far it is from the last release
-(the `--match` keeps the experiment's own tags out of the answer). A rollback
-is `git checkout v1.7.5` plus a re-run with `--allow-branch`, because a tag
-checkout is a detached HEAD and the step-0 guard refuses it (the known gaps
-in `docs/deployment.md` still apply — migrations do not walk backwards).
+Each release has a section in `CHANGELOG.md`, in English, written from the
+merge titles (`sh scripts/release-notes.sh vPREVIOUS origin/develop` lists
+them, after a `git fetch`),
+and a short note in Italian for the people who use VisuaLex: what changed in
+the parts they use, by area, without technical terms. The note goes in the
+GitHub release.
 
-One tag breaks the "sits on `main`" rule: `v1.7.6` names the server's own
-bump commit, tagged by hand after the script that should have tagged it ran
-its previous version (the known gap in `docs/deployment.md`). `git describe`
-on `main` skips it and answers from `v1.7.7`.
+## Release
 
-Deploys without a bump (`./deploy.sh` alone) are re-deploys of the current
-version and leave no tag. Use them for a restart, not for shipping a change —
-the `--allow-branch` emergency under Hotfixes is the one exception, and it is
-followed by a tagged deploy the same day.
+A release is cut when the owners say so. The checklist, in order:
 
-## `visualex-merlt-main` follows the tags
+1. **Suites.** `develop` is green in CI, and every suite in the root
+   `CLAUDE.md` ("Commands") passes on a checkout of it — MERL-T's in CI or
+   against a disposable database.
+2. **Browser.** A pass on `http://localhost:5173` through the main flows:
+   login; search a norm, read it, change its date; open a decision; add both
+   to a dossier and export its PDF; the find window; a study card; «Collega
+   un'app AI». Anything broken is fixed on `develop` first.
+3. **Changelog.** On `chore/release-X.Y.Z` from `develop`: bring
+   `[Unreleased]` in `CHANGELOG.md` up to date from `release-notes.sh` (pull
+   requests do not edit it, so they never conflict on it), rename it to
+   `[X.Y.Z] - YYYY-MM-DD`, and open a new empty `[Unreleased]` above it; set `version.txt` to `X.Y.Z`; write the
+   Italian note. Pull request into `develop`, merge.
+4. **Pull request `develop → main`**, titled `merge: develop — release X.Y.Z`.
+   The check "Release source" accepts only `develop` and `hotfix/…` as the
+   source of a pull request into `main`. Merge it with a merge commit.
+5. **Tag**, on `main`:
+   `git tag -a vX.Y.Z -m "Release X.Y.Z" && git push origin vX.Y.Z`, then the
+   GitHub release from the tag, with the changelog section and the Italian
+   note: `gh release create vX.Y.Z --title "VisuaLex X.Y.Z" --notes-file <note>`.
+6. **Deploy** (below), and record it in the coordination register.
 
-The experiment lives in **its own checkout**, a permanent worktree beside the
-repository:
+## Deploy
 
-```
-git worktree add ../VisuaLexAPI-merlt visualex-merlt-main   # once
-```
+The deployment host runs the latest release: `./start.sh --prod --branch
+main`. A preview of unreleased work runs there only when the owner asks for
+it explicitly, recorded in the coordination register: a `preview/…` branch
+deployed with `./start.sh --prod --no-pull --allow-branch`, back to the latest
+release when the next one is cut. The preview branch is then deleted. A
+preview carries no migration that `develop` lacks: the deploy refuses to move
+the host to a version without a migration it already applied, so such a
+preview could not go back to the release.
 
-Two directories, one branch each: `VisuaLexAPI/` never leaves `main` (or a
-topic branch off it), `VisuaLexAPI-merlt/` never leaves `merlt`. They keep
-separate `node_modules` — the lockfiles differ — and only the second has the
-Docker stack; and a branch switch in the deployable checkout is one slip
-away from a wrong commit or a wrong deploy, so there is none to make.
+## Hotfix
 
-The experiment absorbs vanilla **after every release**, by merging the tag:
+1. `git switch -c hotfix/thing origin/main`, fix, raise the patch number in
+   `version.txt` and add its section to `CHANGELOG.md`; pull request into
+   `main`.
+2. Merge it, then tag and release on `main` as in "Release", steps 5 and 6.
+3. Right after, a pull request `main → develop`.
 
-```
-cd ../VisuaLexAPI-merlt
-git merge v1.7.6 -F msg.txt     # "merge: v1.7.6 — vanilla 1.7.6 into merlt"
-# resolve, run every suite, commit
-```
+Until the second one lands, the check "main inside develop" is red on
+`develop`: it fails whenever `main` holds a change `develop` lacks (release
+merges do not count). A forgotten hotfix becomes a red check, not a fix
+stranded for weeks.
 
-Merging a tag rather than `main` means the sync points have names, the
-experiment never carries an unreleased state of vanilla, and "how far behind
-is merlt" is one `git log --oneline v1.7.6..main` away.
+## Where work strands
 
-The cost of skipping this compounds. The June-to-September gap of 2026 was
-177 commits and 34 conflicted files: two lockfiles, the store, the admin page,
-the dossier controller, the scraper, and MERL-T instrumentation attached to
-two components `main` had deleted in the meantime — a full day's work that
-would have been an hour a month.
+- **Claude Code web sessions** push `claude/…` branches: within days, open them
+  as a pull request into `develop`, or delete them.
+- **Desktop sessions** leave worktrees under `.claude/worktrees/`: remove them
+  once their work has landed, after checking for untracked files.
+- **Remote branches** are deleted by GitHub when their pull request merges.
+  A branch whose pull request was closed without merging is deleted by its
+  author.
+- Once a month: `git fetch --prune`, `git branch -r | grep origin/claude/`,
+  `git branch --merged develop`, `git worktree list`.
 
-**Checklist for the merge**, learned from that dry-run:
+## History
 
-- **Lockfiles are regenerated, never hand-merged.** Resolve
-  `frontend/package.json` and `backend/package.json` by hand, take either
-  side of each lockfile whole (`git checkout --theirs frontend/package-lock.json`
-  — `npm` cannot parse conflict markers), then `npm install` in each directory
-  rewrites the lock from the resolved manifest. Stage the result.
-- **`normattiva_scraper._estrai_testo_*` is `main`'s, always.** Its output is
-  the offset space every stored highlight and note is anchored to (gotcha 23
-  in `CLAUDE.md`). A one-space change deletes every anchor after it, for every
-  user, silently.
-- **A file `main` deleted stays deleted.** Take the deletion, then re-home
-  whatever MERL-T added (a `publishMerltEvent`, a hook) in the component that
-  replaced it. Do not resurrect the file.
-- **`deploy.sh` keeps `main`'s branch guard** (step 0). Whatever the
-  experiment adds to the script sits after it.
-- **`backend/src/index.ts` keeps `main`'s shutdown**, and it stops both
-  timers: `main`'s `normaWatcherInterval` and the experiment's
-  `watchdogInterval`. The experiment's own shutdown lacks the idle-socket
-  sweep, without which a request in flight at pm2's SIGINT holds the process
-  ~6 s, past pm2's 1.6 s SIGKILL, and the Prisma pool is never released.
-- **`CLAUDE.md` is `main`'s text plus the MERL-T sections**, not a choice
-  between the two.
-- **Run all of it afterwards**: the three vanilla suites above, plus the
-  experiment's own (BFF, MERL-T Python) — the merge is not done until they are
-  green on `merlt`.
-- **Nothing goes back.** No cherry-pick from `merlt` to `main`, ever. If you
-  are fixing something vanilla while on `merlt`, stop, do it on a topic branch
-  off `main`, release it, and let the next tag merge bring it over.
+Until 26 September 2026 there were two lines: `main` ("vanilla"), deployed to a
+production server and tagged at each deploy, and `visualex-merlt-main`, the
+MERL-T experiment, which absorbed `main` one way, by tag. That rule came from
+two incidents: in June 2026, 32 vanilla commits (four of them security fixes)
+sat on the experiment for ten weeks; between June and September the experiment
+fell 177 commits behind. On 26 September the owners unified the two lines, the
+production server was decommissioned, and a second developer joined. The
+experiment's last state is the tag `archive/visualex-merlt-main`; the old
+deploy is described in `docs/archive/deployment-lightsail.md`.
 
-If MERL-T ever needs releases of its own, it gets its own tag namespace
-(`merlt-vX.Y`, the existing `merlt-baseline-from-alis-core` is the precedent)
-and its own deploy — never a merge into `main`. If it ever *replaces* vanilla,
-the move is "merlt becomes `main`", which the one-way flow makes possible.
-
-## Where work strands, and the monthly sweep
-
-Two places accumulate branches without anyone deciding to create them:
-
-- **Claude Code web sessions** push their result as
-  `origin/claude/<adjective>-<name>-<id>`. One such branch held a real fix for
-  three days while a narrower fix for the same regexes landed on `main`, and
-  the two conflicted on rebase. Rule: within days of a web session ending, its
-  branch is either merged into `main` or deleted; the choice is whether you
-  still want the change, and "not sure" means read the diff now, not later.
-  To merge: `git fetch`, `git checkout -b fix/<what-it-does>
-  origin/claude/<name>`, `git rebase main`, run the suites, `--no-ff` merge
-  into `main` under the new name, push `main`, then
-  `git push origin --delete claude/<name>`. Nothing lives on `claude/*`.
-- **Claude Code desktop sessions** leave worktrees under `.claude/worktrees/`,
-  often on a detached HEAD, sometimes holding an uncommitted file. Remove them
-  when the session's work has landed; check for untracked files first.
-
-Once a month, or before assuming every fix has reached `main`:
-
-```
-git fetch --prune
-git branch -r | grep origin/claude/          # session branches: merge or delete
-git branch --merged main                     # local branches to delete
-git worktree list                            # anything but VisuaLexAPI/ and VisuaLexAPI-merlt/?
-git log --oneline $(git describe --tags --abbrev=0 --match 'v*' visualex-merlt-main)..main | wc -l
-                                             # how far behind is merlt (--match: ignore merlt-* tags)
-```
-
-## Hotfixes
-
-A hotfix is a `fix/` branch like any other: branch from `main`, verify, merge,
-push, deploy with a bump. That path is minutes, not hours, and it is the
-default even under pressure.
-
-`deploy.sh --allow-branch` exists for the emergency where the fix must be live
-before the merge. It is the one deploy that ships a change without a bump —
-and therefore without a tag: push the branch, on the server `git checkout
-fix/thing`, `./deploy.sh --allow-branch` (no `--patch`). Then, the same day:
-merge into `main`, push, on the server `git checkout main` and
-`./deploy.sh --patch`. Until that second deploy runs, production has no tag
-naming what it runs and the server is on a branch the step-0 guard would
-refuse — do not leave it there overnight.
-
-## Quick reference
-
-| I want to… | Do |
-|---|---|
-| Start a change | `git checkout -b fix/thing main` |
-| Land it | verify · `git merge --no-ff` into `main` · delete branch · push |
-| Ship it | on the server, `./deploy.sh --patch` |
-| Work on the experiment | `cd ../VisuaLexAPI-merlt` (its own checkout, never a branch switch) |
-| Bring vanilla into the experiment | in `../VisuaLexAPI-merlt`: `git merge vX.Y.Z` |
-| See what is in production | `git tag -l 'v*' --sort=-v:refname \| head -1` |
-| See what merlt is missing | `git log --oneline vX.Y.Z..main` |
-| Close a web session's branch | `git checkout -b fix/… origin/claude/…` → `git rebase main` → suites → `--no-ff` merge → `git push origin --delete claude/…` |
+A `dev` branch had been rejected in September 2026 for three reasons, each
+answered by the new situation. It had died once as an echo of `main`, with one
+developer: now there are two, and `develop → main` is a real step, the release.
+Three long-lived branches meant two synchronisation directions: the
+experiment's branch is gone, and the one way back — a hotfix — is checked
+automatically. A `dev` nobody deploys is a queue: still true while there is no
+test environment, so release small and often.

@@ -1,0 +1,110 @@
+{
+  "experiment": "EXP-016",
+  "timestamp": "2025-12-15T18:51:22.939510",
+  "config": {
+    "graph_name": "merl_t_dev",
+    "qdrant_collection": "merl_t_dev_chunks",
+    "top_k": 10
+  },
+  "semantic_benchmark": {
+    "graded_metrics": {
+      "mean_relevance_at_5": 1.3133,
+      "mean_relevance_at_10": 0.92,
+      "ndcg_at_5": 0.8686,
+      "ndcg_at_10": 1.0214,
+      "queries_with_score_3": 0.9333,
+      "queries_with_score_2_plus": 0.9667,
+      "num_queries": 30,
+      "by_category": {
+        "istituto": {
+          "mean_relevance_at_5": 1.64,
+          "mean_relevance_at_10": 1.27,
+          "ndcg_at_5": 1.1358,
+          "ndcg_at_10": 1.4271,
+          "queries_with_score_3": 1.0,
+          "queries_with_score_2_plus": 1.0,
+          "num_queries": 10
+        },
+        "concetto": {
+          "mean_relevance_at_5": 1.02,
+          "mean_relevance_at_10": 0.61,
+          "ndcg_at_5": 0.6014,
+          "ndcg_at_10": 0.6437,
+          "queries_with_score_3": 0.9,
+          "queries_with_score_2_plus": 0.9,
+          "num_queries": 10
+        },
+        "definizione": {
+          "mean_relevance_at_5": 1.28,
+          "mean_relevance_at_10": 0.88,
+          "ndcg_at_5": 0.8687,
+          "ndcg_at_10": 0.9932,
+          "queries_with_score_3": 0.9,
+          "queries_with_score_2_plus": 1.0,
+          "num_queries": 10
+        }
+      }
+    },
+    "traditional_metrics": {
+      "recall_at_1": 0.2139,
+      "recall_at_5": 0.4583,
+      "recall_at_10": 0.5833,
+      "mrr": 0.85,
+      "hit_rate_at_5": 0.9667
+    },
+    "num_queries": 30
+  },
+  "source_comparison": {
+    "norma": {
+      "mean_relevance_at_5": 0.9333,
+      "ndcg_at_5": 0.6502,
+      "queries_with_score_3": 0.8667,
+      "recall_at_5": 0.5167,
+      "mrr": 0.8944
+    },
+    "spiegazione": {
+      "mean_relevance_at_5": 0.7267,
+      "ndcg_at_5": 0.4813,
+      "queries_with_score_3": 0.6333,
+      "recall_at_5": 0.4139,
+      "mrr": 0.7648
+    },
+    "ratio": {
+      "mean_relevance_at_5": 0.64,
+      "ndcg_at_5": 0.4411,
+      "queries_with_score_3": 0.6,
+      "recall_at_5": 0.3444,
+      "mrr": 0.65
+    },
+    "massima": {
+      "mean_relevance_at_5": 0.7133,
+      "ndcg_at_5": 0.4018,
+      "queries_with_score_3": 0.5667,
+      "recall_at_5": 0.3306,
+      "mrr": 0.4986
+    }
+  },
+  "latency": {
+    "query_embedding": {
+      "operation": "query_embedding",
+      "num_samples": 500,
+      "min_ms": 66.994,
+      "max_ms": 995.354,
+      "mean_ms": 101.657,
+      "median_ms": 92.966,
+      "p90_ms": 121.373,
+      "p99_ms": 297.659
+    },
+    "full_pipeline": {
+      "operation": "full_pipeline",
+      "num_samples": 50,
+      "min_ms": 75.887,
+      "max_ms": 183.546,
+      "mean_ms": 100.923,
+      "median_ms": 97.045,
+      "p90_ms": 114.884,
+      "p99_ms": 183.546
+    }
+  },
+  "duration_seconds": 82.9
+}

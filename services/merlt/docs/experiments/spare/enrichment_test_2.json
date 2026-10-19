@@ -1,0 +1,26 @@
+{
+  "test_name": "test_2",
+  "timestamp": "2025-12-14T11:25:54.783323",
+  "duration_seconds": 141.370066,
+  "max_chunks": 30,
+  "entity_types": [
+    "concetto",
+    "principio",
+    "definizione",
+    "soggetto",
+    "ruolo",
+    "modalita"
+  ],
+  "contents_processed": 28,
+  "contents_skipped": 30,
+  "stats": {
+    "total_created": 192,
+    "total_merged": 47,
+    "concepts": 179,
+    "principles": 5,
+    "definitions": 8,
+    "relations": 0
+  },
+  "errors": 0,
+  "success": true
+}

@@ -1,0 +1,341 @@
+{
+  "timestamp": "2025-12-08T22:22:15.068139",
+  "config": {
+    "collection": "merl_t_dev_chunks",
+    "top_k": 10,
+    "corpus": "costituzione"
+  },
+  "metrics": {
+    "total_queries": 12,
+    "recall_at_1": 0.75,
+    "recall_at_5": 1.0,
+    "recall_at_10": 1.0,
+    "mrr": 0.85,
+    "by_category": {
+      "conceptual": {
+        "total": 6,
+        "recall_at_1": 0.5,
+        "recall_at_5": 1.0,
+        "mrr": 0.7000000000000001
+      },
+      "principle": {
+        "total": 3,
+        "recall_at_1": 1.0,
+        "recall_at_5": 1.0,
+        "mrr": 1.0
+      },
+      "institution": {
+        "total": 3,
+        "recall_at_1": 1.0,
+        "recall_at_5": 1.0,
+        "mrr": 1.0
+      }
+    }
+  },
+  "results": [
+    {
+      "query": "diritti fondamentali dei cittadini",
+      "expected": [
+        "2",
+        "3",
+        "13",
+        "14",
+        "15"
+      ],
+      "retrieved": [
+        "32",
+        "2",
+        "54",
+        "3",
+        "4"
+      ],
+      "scores": [
+        0.85666937,
+        0.856256,
+        0.85139346,
+        0.85008097,
+        0.8471117
+      ],
+      "category": "conceptual",
+      "hit_at_5": true,
+      "reciprocal_rank": 0.5
+    },
+    {
+      "query": "libertà di pensiero e parola",
+      "expected": [
+        "21"
+      ],
+      "retrieved": [
+        "19",
+        "15",
+        "22",
+        "41",
+        "21"
+      ],
+      "scores": [
+        0.82968956,
+        0.8292385,
+        0.8244738,
+        0.82343423,
+        0.82301205
+      ],
+      "category": "conceptual",
+      "hit_at_5": true,
+      "reciprocal_rank": 0.2
+    },
+    {
+      "query": "lavoro e diritti dei lavoratori",
+      "expected": [
+        "1",
+        "4",
+        "35",
+        "36",
+        "37",
+        "38"
+      ],
+      "retrieved": [
+        "46",
+        "36",
+        "4",
+        "37",
+        "35"
+      ],
+      "scores": [
+        0.8682495,
+        0.86356115,
+        0.86291945,
+        0.85658705,
+        0.8527604
+      ],
+      "category": "conceptual",
+      "hit_at_5": true,
+      "reciprocal_rank": 0.5
+    },
+    {
+      "query": "organizzazione del governo",
+      "expected": [
+        "92",
+        "93",
+        "94",
+        "95"
+      ],
+      "retrieved": [
+        "92",
+        "95",
+        "97",
+        "121",
+        "114"
+      ],
+      "scores": [
+        0.8468616,
+        0.83407074,
+        0.8313698,
+        0.8268951,
+        0.82303464
+      ],
+      "category": "conceptual",
+      "hit_at_5": true,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query": "potere legislativo",
+      "expected": [
+        "70",
+        "71",
+        "72",
+        "73"
+      ],
+      "retrieved": [
+        "70",
+        "117",
+        "71",
+        "76",
+        "127"
+      ],
+      "scores": [
+        0.8326767,
+        0.83213085,
+        0.8314883,
+        0.8242931,
+        0.8238072
+      ],
+      "category": "conceptual",
+      "hit_at_5": true,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query": "magistratura e giudici",
+      "expected": [
+        "101",
+        "102",
+        "103",
+        "104"
+      ],
+      "retrieved": [
+        "101",
+        "105",
+        "108",
+        "107",
+        "102"
+      ],
+      "scores": [
+        0.8475603,
+        0.8470876,
+        0.84584916,
+        0.84523857,
+        0.8439004
+      ],
+      "category": "conceptual",
+      "hit_at_5": true,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query": "uguaglianza davanti alla legge",
+      "expected": [
+        "3"
+      ],
+      "retrieved": [
+        "3",
+        "51",
+        "29",
+        "8",
+        "101"
+      ],
+      "scores": [
+        0.856755,
+        0.82459843,
+        0.82168925,
+        0.8212929,
+        0.8153685
+      ],
+      "category": "principle",
+      "hit_at_5": true,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query": "sovranità popolare",
+      "expected": [
+        "1"
+      ],
+      "retrieved": [
+        "1",
+        "47",
+        "2",
+        "101",
+        "22"
+      ],
+      "scores": [
+        0.8547981,
+        0.8104219,
+        0.8071119,
+        0.80225813,
+        0.8008134
+      ],
+      "category": "principle",
+      "hit_at_5": true,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query": "inviolabilità della libertà personale",
+      "expected": [
+        "13"
+      ],
+      "retrieved": [
+        "13",
+        "14",
+        "15",
+        "2",
+        "24"
+      ],
+      "scores": [
+        0.87304944,
+        0.8570991,
+        0.8568034,
+        0.8447623,
+        0.8265648
+      ],
+      "category": "principle",
+      "hit_at_5": true,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query": "presidente della repubblica",
+      "expected": [
+        "83",
+        "84",
+        "85",
+        "86",
+        "87"
+      ],
+      "retrieved": [
+        "84",
+        "91",
+        "86",
+        "87",
+        "85"
+      ],
+      "scores": [
+        0.8459159,
+        0.8390975,
+        0.83677804,
+        0.8341883,
+        0.8341789
+      ],
+      "category": "institution",
+      "hit_at_5": true,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query": "corte costituzionale",
+      "expected": [
+        "134",
+        "135",
+        "136",
+        "137"
+      ],
+      "retrieved": [
+        "134",
+        "135",
+        "137",
+        "136",
+        "127"
+      ],
+      "scores": [
+        0.8734944,
+        0.8515092,
+        0.8506461,
+        0.84679735,
+        0.8441708
+      ],
+      "category": "institution",
+      "hit_at_5": true,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "query": "parlamento italiano",
+      "expected": [
+        "55",
+        "56",
+        "57",
+        "58"
+      ],
+      "retrieved": [
+        "55",
+        "67",
+        "69",
+        "70",
+        "60"
+      ],
+      "scores": [
+        0.8503444,
+        0.84386384,
+        0.83995956,
+        0.83244395,
+        0.8323437
+      ],
+      "category": "institution",
+      "hit_at_5": true,
+      "reciprocal_rank": 1.0
+    }
+  ]
+}

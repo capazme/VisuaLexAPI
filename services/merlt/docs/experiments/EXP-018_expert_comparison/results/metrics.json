@@ -1,0 +1,43 @@
+{
+  "experiment": "EXP-018",
+  "timestamp": "2025-12-20T19:01:24.368199",
+  "total_queries": 50,
+  "successful_queries": 50,
+  "error_count": 0,
+  "routing_accuracy": 0.74,
+  "avg_confidence": 0.3,
+  "avg_execution_time_ms": 0.37216663360595703,
+  "expert_usage": {
+    "literal": 50,
+    "systemic": 50,
+    "principles": 46,
+    "precedent": 50
+  },
+  "category_metrics": {
+    "definitional": {
+      "total": 10,
+      "routing_accuracy": 1.0,
+      "avg_confidence": 0.3
+    },
+    "interpretive": {
+      "total": 10,
+      "routing_accuracy": 0.9,
+      "avg_confidence": 0.3
+    },
+    "procedural": {
+      "total": 10,
+      "routing_accuracy": 0.0,
+      "avg_confidence": 0.3
+    },
+    "constitutional": {
+      "total": 10,
+      "routing_accuracy": 0.9,
+      "avg_confidence": 0.3
+    },
+    "jurisprudential": {
+      "total": 10,
+      "routing_accuracy": 0.9,
+      "avg_confidence": 0.3
+    }
+  }
+}

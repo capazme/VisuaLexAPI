@@ -1,0 +1,53 @@
+{
+  "experiment": "EXP-014",
+  "mode": "full",
+  "test_mode": false,
+  "dry_run": false,
+  "started_at": "2025-12-15T01:00:56.522371",
+  "article_range": [
+    1173,
+    2059
+  ],
+  "backbone": {
+    "start_article": 1173,
+    "end_article": 2059,
+    "total_articles": 887,
+    "ingested": 887,
+    "skipped": 0,
+    "embeddings": 5331,
+    "nodes": 20647,
+    "bridge_mappings": 8093,
+    "duration_seconds": 6386.844091,
+    "errors": []
+  },
+  "enrichment": {
+    "contents_processed": 595,
+    "contents_skipped": 0,
+    "stats": {
+      "total_created": 3049,
+      "total_merged": 2233,
+      "concepts": 2571,
+      "principles": 280,
+      "definitions": 198,
+      "relations": 0
+    },
+    "errors": 0,
+    "success": true
+  },
+  "validation": {
+    "backbone_norme": 1538,
+    "backbone_commi": 1798,
+    "rubrica_bug": 0,
+    "entities_concetto": 2571,
+    "entities_principio": 280,
+    "entities_definizione": 198,
+    "relations_disciplina": 17227,
+    "entities_with_brocardi": 0,
+    "entities_with_torrente": 11872,
+    "entities_multi_source": 0,
+    "rubrica_bug_status": "PASS",
+    "multi_source_dynamics": "NO_MERGE"
+  },
+  "completed_at": "2025-12-15T03:43:59.008231",
+  "duration_seconds": 9782.485866
+}

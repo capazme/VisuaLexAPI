@@ -1,0 +1,448 @@
+"""
+MERL-T FastAPI Application
+===========================
+
+Entry point principale per l'API MERL-T.
+
+Features:
+- Live enrichment con validazione community
+- Document upload & parsing
+- Amendment submission (multivigenza)
+- Multi-expert Q&A system
+- RLCF feedback collection
+
+Usage:
+    # Development
+    uvicorn merlt.app:app --reload --port 8000
+
+    # Production
+    uvicorn merlt.app:app --host 0.0.0.0 --port 8000 --workers 4
+"""
+
+import os
+from typing import Any
+import structlog
+from contextlib import asynccontextmanager
+from pathlib import Path
+from dotenv import load_dotenv
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+# Load environment variables
+env_file = Path(__file__).parent.parent / ".env"
+load_dotenv(env_file)
+log = structlog.get_logger()
+log.info("Environment variables loaded", env_file=str(env_file))
+
+from merlt.storage.enrichment import init_db, close_db, create_tables
+from merlt.api.auth import verify_api_key, optional_api_key
+from merlt.api import (
+    feedback_router,
+    auth_router,
+    experts_router,
+    enrichment_router,
+    document_router,
+    amendments_router,
+    candidates_router,
+    graph_router,
+    pipeline_router,
+    training_router,
+    trace_router,
+    validity_router,
+    citation_router,
+    dashboard_router,
+    profile_router,
+    rlcf_router,
+    expert_metrics_router,
+    ws_router,
+    tracking_router,
+    policy_evolution_router,
+    export_router,
+    devils_advocate_router,
+    audit_router,
+    circuit_breaker_router,
+    regression_router,
+    quarantine_router,
+    api_keys_router,
+    ner_router,
+    ingestion_mechanical_router,
+    rassegne_router,
+    user_data_router,
+)
+from merlt.api.admin_router import router as admin_router
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan context manager for startup/shutdown.
+
+    Startup:
+    - Initialize PostgreSQL connection pool (enrichment DB)
+    - Log application startup
+
+    Shutdown:
+    - Close database connections
+    """
+    # Startup
+    log.info("=" * 60)
+    log.info("MERL-T API Starting...")
+    log.info("=" * 60)
+
+    ai_service = None
+    hygiene_task = None
+    retention_task = None
+    try:
+        # Initialize enrichment database
+        await init_db(echo=False)  # Set echo=True for SQL logging in dev
+        await create_tables()
+        # create_tables() only emits Base.metadata (tables) — the RLCF consensus
+        # PL/pgSQL triggers (vote → net_score → consensus_reached → promotion) live
+        # in migrations and must be (re)installed idempotently on every boot, else
+        # votes never reach consensus and graph promotion never fires.
+        try:
+            from merlt.storage.enrichment.consensus_triggers import ensure_consensus_triggers
+            await ensure_consensus_triggers()
+            log.info("✅ Consensus triggers ensured")
+        except Exception as e:
+            log.error("Failed to install consensus triggers", error=str(e), exc_info=True)
+            log.warning("Community votes will NOT reach consensus until triggers are installed")
+        # Columns added to the ORM after the first boot (create_tables never
+        # alters an existing table, and the stack runs no Alembic): applied
+        # idempotently here so a rebuilt image never selects a missing column.
+        try:
+            from merlt.storage.enrichment.schema_additions import ensure_schema_additions
+            await ensure_schema_additions()
+        except Exception as e:
+            log.error("Failed to apply schema additions", error=str(e), exc_info=True)
+            log.warning("pending_* reads will fail until storage/migrations/003_pending_source_reference.sql is applied")
+        # Admin API key for the ops routes (training, hygiene, ingestion, NER):
+        # seeded from MERLT_ADMIN_API_KEY so the BFF's MERLT_API_KEY works on a
+        # fresh stack without the manual /api-keys/bootstrap call.
+        try:
+            from merlt.api.api_key_seed import ensure_admin_api_key
+            await ensure_admin_api_key()
+        except Exception as e:
+            log.error("Failed to seed the admin API key", error=str(e), exc_info=True)
+        log.info("✅ Enrichment database initialized")
+
+        # Initialize Expert System (MultiExpertOrchestrator)
+        try:
+            from merlt.rlcf.ai_service import OpenRouterService
+            from merlt.api.experts_router import initialize_expert_system
+            from merlt.api.engine_bootstrap import build_orchestrator
+
+            # The engine build lives in engine_bootstrap so the SAME construction
+            # runs at boot AND on the admin "Riavvia motore" reinitialize (it reads
+            # tools/ReAct/routing flags from RuntimeConfig — one source of truth).
+            ai_service = OpenRouterService()
+            orchestrator = await build_orchestrator(ai_service)
+            initialize_expert_system(orchestrator)
+        except Exception as e:
+            log.error("Failed to initialize Expert System", error=str(e), exc_info=True)
+            log.warning("Expert System endpoints will return 503 errors")
+
+        # RLCF replay buffer: when no buffer file was loaded (fresh volume,
+        # unreadable file), rebuild it from the persisted feedback so admin
+        # training does not wait for a new batch after every restart. Bounded
+        # and best-effort: a DB problem never blocks boot. Never trains.
+        try:
+            import asyncio as _asyncio
+            from merlt.rlcf.buffer_rehydration import rehydrate_buffer
+
+            await _asyncio.wait_for(rehydrate_buffer(), timeout=120)
+        except Exception as e:  # noqa: BLE001
+            log.error("RLCF replay buffer rehydration failed (non-fatal)", error=str(e))
+
+        # Seed loader (Slice 2a, MERLT-2a.1) — idempotent, non-fatal.
+        # Loads the Libro IV CC graph (~27.7k nodes) from merlt/data/seeds/
+        # on first boot; subsequent boots short-circuit on the >100-nodes check.
+        if os.getenv("MERLT_SKIP_SEED", "").lower() != "true":
+            try:
+                from merlt.scripts.load_seed_libro_iv import load_seed_libro_iv_from_env
+                seed_result = await load_seed_libro_iv_from_env()
+                if seed_result.skipped:
+                    log.info("✅ Seed loader skipped",
+                             reason=seed_result.reason,
+                             nodes_before=seed_result.integrity.get("nodes_before"))
+                else:
+                    log.info("✅ Seed loader completed",
+                             nodes=seed_result.nodes_merged,
+                             edges=seed_result.edges_merged,
+                             embeddings=seed_result.embeddings_generated,
+                             bridge_rows=seed_result.bridge_restored_rows,
+                             integrity=seed_result.integrity)
+            except Exception as e:
+                # NON-fatal: MERL-T stays usable for Q&A without the seed.
+                # The user can run `python -m merlt.scripts.load_seed_libro_iv` later.
+                log.error("Seed loader failed", error=str(e), exc_info=True)
+                log.warning("Graph features may be limited until seed is loaded manually")
+
+        # Slice C (graph self-correction): periodic hygiene sweep, env-gated.
+        # MERLT_HYGIENE_INTERVAL_HOURS > 0 enables it (default 0 = disabled in
+        # dev); first sweep fires after one interval so a short-lived boot never
+        # sweeps. Fully failure-isolated — a sweep error never crashes the api.
+        try:
+            _hyg_interval = float(os.getenv("MERLT_HYGIENE_INTERVAL_HOURS", "0") or 0)
+        except ValueError:
+            _hyg_interval = 0.0
+        if _hyg_interval > 0:
+            import asyncio as _asyncio
+
+            async def _hygiene_loop(interval_hours: float):
+                from merlt.pipeline.hygiene import run_graph_hygiene
+                while True:
+                    try:
+                        await _asyncio.sleep(interval_hours * 3600)
+                        await run_graph_hygiene()
+                    except _asyncio.CancelledError:
+                        break
+                    except Exception as e:  # noqa: BLE001
+                        log.warning("periodic hygiene sweep failed (non-fatal)", error=str(e))
+
+            hygiene_task = _asyncio.create_task(_hygiene_loop(_hyg_interval))
+            log.info("✅ Graph hygiene loop started", interval_hours=_hyg_interval)
+
+        # Retention: activity events expire (merlt.privacy.retention). Always on:
+        # the period is configurable, the purge is not optional. First pass a few
+        # minutes after boot, so a stack restarted often still purges.
+        import asyncio as _asyncio_ret
+        from merlt.privacy.retention import (
+            FIRST_RUN_DELAY_SECONDS,
+            retention_interval_hours,
+            run_retention,
+        )
+
+        async def _retention_loop(interval_hours: float):
+            delay = FIRST_RUN_DELAY_SECONDS
+            while True:
+                try:
+                    await _asyncio_ret.sleep(delay)
+                    delay = interval_hours * 3600
+                    await run_retention()
+                except _asyncio_ret.CancelledError:
+                    break
+                except Exception as e:  # noqa: BLE001
+                    log.warning("retention pass failed (non-fatal)", error=type(e).__name__)
+
+        retention_task = _asyncio_ret.create_task(_retention_loop(retention_interval_hours()))
+        log.info("✅ Retention loop started", interval_hours=retention_interval_hours())
+
+        log.info("=" * 60)
+        log.info("MERL-T API Ready")
+        log.info("=" * 60)
+
+        yield
+
+    finally:
+        # Shutdown
+        log.info("=" * 60)
+        log.info("MERL-T API Shutting down...")
+        log.info("=" * 60)
+
+        if hygiene_task is not None:
+            import contextlib
+            hygiene_task.cancel()
+            with contextlib.suppress(Exception):
+                await hygiene_task  # let the loop's CancelledError teardown finish
+            log.info("✅ Graph hygiene loop stopped")
+
+        if retention_task is not None:
+            import contextlib
+            retention_task.cancel()
+            with contextlib.suppress(Exception):
+                await retention_task
+            log.info("✅ Retention loop stopped")
+
+        if ai_service is not None:
+            await ai_service.close()
+            log.info("✅ AI service connections closed")
+
+        await close_db()
+        log.info("✅ Database connections closed")
+
+        log.info("=" * 60)
+        log.info("MERL-T API Stopped")
+        log.info("=" * 60)
+
+
+# Create FastAPI app
+app = FastAPI(
+    title="MERL-T API",
+    description="Multi-Expert Reasoning with Legal Texts",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+# CORS middleware (configure for your frontend)
+_cors_origins = os.environ.get("CORS_ORIGINS", "http://localhost:3102,http://localhost:5175").split(",")
+# Frontend sends JWT (not X-API-Key). Make API key auth optional globally;
+# routes using require_role() still enforce auth via null-check in _check_role.
+app.dependency_overrides[verify_api_key] = optional_api_key
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in _cors_origins],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Register routers
+app.include_router(feedback_router, prefix="/api/v1", tags=["feedback"])
+app.include_router(auth_router, prefix="/api/v1", tags=["auth"])
+app.include_router(experts_router, prefix="/api/v1", tags=["experts"])
+app.include_router(admin_router, prefix="/api/v1", tags=["admin"])
+app.include_router(enrichment_router, prefix="/api/v1", tags=["enrichment"])
+app.include_router(document_router, prefix="/api/v1", tags=["documents"])
+app.include_router(amendments_router, prefix="/api/v1", tags=["amendments"])
+app.include_router(candidates_router, prefix="/api/v1", tags=["extraction-candidates"])
+app.include_router(graph_router, prefix="/api/v1", tags=["graph"])
+app.include_router(pipeline_router, prefix="/api/v1", tags=["pipeline"])
+app.include_router(training_router, prefix="/api/v1", tags=["training"])
+app.include_router(trace_router, prefix="/api/v1", tags=["traces"])
+app.include_router(validity_router, prefix="/api/v1", tags=["validity"])
+app.include_router(citation_router, prefix="/api/v1", tags=["citations"])
+app.include_router(dashboard_router, prefix="/api/v1", tags=["dashboard"])
+app.include_router(profile_router, prefix="/api/v1", tags=["profile"])
+app.include_router(rlcf_router, prefix="/api/v1", tags=["rlcf"])
+app.include_router(expert_metrics_router, prefix="/api/v1", tags=["expert-metrics"])
+app.include_router(ws_router, prefix="/api/v1", tags=["websocket"])
+app.include_router(tracking_router, prefix="/api/v1", tags=["tracking"])
+app.include_router(policy_evolution_router, prefix="/api/v1", tags=["policy-evolution"])
+app.include_router(export_router, prefix="/api/v1", tags=["export"])
+app.include_router(devils_advocate_router, prefix="/api/v1", tags=["devils-advocate"])
+app.include_router(audit_router, prefix="/api/v1", tags=["audit"])
+app.include_router(circuit_breaker_router, prefix="/api/v1", tags=["circuit-breaker"])
+app.include_router(regression_router, prefix="/api/v1", tags=["regression"])
+app.include_router(quarantine_router, prefix="/api/v1", tags=["feedback-quarantine"])
+app.include_router(api_keys_router, prefix="/api/v1", tags=["api-keys"])
+app.include_router(ner_router, prefix="/api/v1", tags=["ner"])
+app.include_router(ingestion_mechanical_router, prefix="/api/v1", tags=["ingestion-mechanical"])
+app.include_router(rassegne_router, prefix="/api/v1", tags=["rassegne"])
+app.include_router(user_data_router, prefix="/api/v1", tags=["user-data"])
+
+
+# Health check endpoint
+@app.get("/health", tags=["health"])
+async def health_check():
+    """Health check endpoint with infrastructure dependency checks."""
+    import os
+    from merlt.storage.enrichment import check_db_health
+
+    checks: dict[str, str] = {}
+    graph_nodes: int | None = None
+
+    # PostgreSQL
+    checks["postgresql"] = "healthy" if await check_db_health() else "unhealthy"
+
+    # FalkorDB
+    try:
+        from falkordb import FalkorDB as _FalkorDB
+        fdb = _FalkorDB(
+            host=os.environ.get("FALKORDB_HOST", "localhost"),
+            port=int(os.environ.get("FALKORDB_PORT", "6380")),
+        )
+        fdb.connection.ping()
+        checks["falkordb"] = "healthy"
+        # Cheap count for the VisuaLex hub's graph card (`upstream.graph.nodes`,
+        # which it always read and never received). Guarded: a slow or failed
+        # count leaves the key out and never flips the status.
+        try:
+            import asyncio as _asyncio
+
+            graph_name = os.environ.get("FALKORDB_GRAPH_NAME", "merl_t_legal")
+
+            def _count() -> int:
+                res = fdb.select_graph(graph_name).query("MATCH (n) RETURN count(n)")
+                return int(res.result_set[0][0])
+
+            graph_nodes = await _asyncio.wait_for(_asyncio.to_thread(_count), timeout=2.0)
+        except Exception as e:  # noqa: BLE001
+            log.debug("health_graph_count_failed", error=str(e))
+    except Exception as e:
+        log.debug("health_falkordb_failed", error=str(e))
+        checks["falkordb"] = "unhealthy"
+
+    # Qdrant
+    try:
+        from qdrant_client import QdrantClient as _QdrantClient
+        qc = _QdrantClient(
+            host=os.environ.get("QDRANT_HOST", "localhost"),
+            port=int(os.environ.get("QDRANT_PORT", "6333")),
+            timeout=3,
+        )
+        qc.get_collections()
+        checks["qdrant"] = "healthy"
+    except Exception as e:
+        log.debug("health_qdrant_failed", error=str(e))
+        checks["qdrant"] = "unhealthy"
+
+    # Redis
+    try:
+        import redis.asyncio as aioredis
+        r = aioredis.Redis(
+            host=os.environ.get("REDIS_HOST", "localhost"),
+            port=int(os.environ.get("REDIS_PORT", "6379")),
+            socket_connect_timeout=3,
+        )
+        await r.ping()
+        await r.aclose()
+        checks["redis"] = "healthy"
+    except Exception as e:
+        log.debug("health_redis_failed", error=str(e))
+        checks["redis"] = "unhealthy"
+
+    all_healthy = all(v == "healthy" for v in checks.values())
+
+    payload: dict[str, Any] = {
+        "status": "healthy" if all_healthy else "degraded",
+        "version": "1.0.0",
+        "dependencies": checks,
+    }
+    if graph_nodes is not None:
+        payload["graph"] = {"nodes": graph_nodes}
+    return payload
+
+
+# Root endpoint
+@app.get("/", tags=["root"])
+async def root():
+    """Root endpoint with API information."""
+    return {
+        "name": "MERL-T API",
+        "description": "Multi-Expert Reasoning with Legal Texts",
+        "version": "1.0.0",
+        "docs": "/docs",
+        "health": "/health",
+        "endpoints": {
+            "feedback": "/api/v1/feedback",
+            "auth": "/api/v1/auth",
+            "experts": "/api/v1/experts",
+            "enrichment": "/api/v1/enrichment",
+            "documents": "/api/v1/documents",
+            "amendments": "/api/v1/amendments",
+            "graph": "/api/v1/graph",
+            "pipeline": "/api/v1/pipeline",
+            "training": "/api/v1/training",
+            "traces": "/api/v1/traces",
+            "validity": "/api/v1/validity",
+            "citations": "/api/v1/citations",
+            "dashboard": "/api/v1/dashboard",
+            "profile": "/api/v1/profile",
+            "rlcf": "/api/v1/rlcf",
+            "expert-metrics": "/api/v1/expert-metrics",
+            "policy-evolution": "/api/v1/policy-evolution",
+            "export": "/api/v1/export",
+            "devils-advocate": "/api/v1/devils-advocate",
+            "audit": "/api/v1/audit",
+            "circuit-breaker": "/api/v1/circuit-breaker",
+            "regression": "/api/v1/regression",
+            "feedback-quarantine": "/api/v1/feedback",
+            "api-keys": "/api/v1/api-keys",
+        },
+    }
+
+
+# Export for uvicorn
+__all__ = ["app"]

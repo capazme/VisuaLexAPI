@@ -1,0 +1,31 @@
+{
+ "response": {
+  "numFound": 1,
+  "start": 0,
+  "docs": [
+   {
+    "materia": [
+     "RESPONSABILITA' SANITARIA"
+    ],
+    "numdec": "10787",
+    "szdec": "3",
+    "datdep": [
+     "20240422"
+    ],
+    "kind": "snciv",
+    "ocr": [
+     "CORTE SUPREMA DI CASSAZIONE ITALGIUREWEB La sentenza richiesta è in fase di oscuramento"
+    ],
+    "tipoprov": "Ordinanza",
+    "relatore": [
+     "VINCENTI ENZO"
+    ],
+    "id": "snciv2024310787O",
+    "presidente": [
+     "TRAVAGLINO GIACOMO"
+    ],
+    "anno": "2024"
+   }
+  ]
+ }
+}

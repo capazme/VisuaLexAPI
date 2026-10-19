@@ -1,0 +1,191 @@
+# EXP-023: End-to-End Community Simulation Config
+# ================================================
+
+experiment:
+  name: "EXP-023"
+  description: "E2E RLCF con community simulation"
+  version: "1.0"
+  random_seed: 42
+
+# Fasi esperimento
+phases:
+  baseline:
+    num_queries: 20
+    policy_frozen: true
+    collect_feedback: false
+
+  training:
+    num_iterations: 25
+    queries_per_iteration: 30
+    feedback_rate: 0.85  # 85% query ricevono feedback
+    policy_frozen: false
+    early_stopping:
+      enabled: true
+      patience: 3  # Stop se no improvement per 3 iter
+      min_improvement: 0.01
+
+  evaluation:
+    num_queries: 20  # Stesse query del baseline
+    policy_frozen: true
+    collect_feedback: false
+
+# Community configuration
+community:
+  total_users: 20
+  profiles:
+    senior_magistrate:
+      count: 2
+      baseline_authority: 0.90
+      feedback_bias: -0.05  # Leggermente conservativo
+      noise_std: 0.05
+
+    strict_expert:
+      count: 4
+      baseline_authority: 0.85
+      feedback_bias: 0.0
+      noise_std: 0.08
+
+    domain_specialist:
+      count: 6
+      baseline_authority: 0.70
+      feedback_bias: 0.05
+      noise_std: 0.10
+      domains: ["civile", "penale"]
+
+    lenient_student:
+      count: 6
+      baseline_authority: 0.25
+      feedback_bias: 0.15  # Sovrastima
+      noise_std: 0.15
+
+    random_noise:
+      count: 2
+      baseline_authority: 0.10
+      feedback_bias: 0.0
+      noise_std: 0.30  # Alto noise
+
+# Authority model parameters
+authority_model:
+  lambda_factor: 0.15  # Exponential smoothing
+  weight_baseline: 0.40
+  weight_track_record: 0.35
+  weight_quality: 0.25
+
+# Query configuration
+queries:
+  distribution:
+    civile: 0.50
+    penale: 0.25
+    costituzionale: 0.25
+
+  types:
+    definitional: 0.25
+    interpretive: 0.30
+    procedural: 0.20
+    jurisprudential: 0.25
+
+# Policy configuration
+policy:
+  gating:
+    embedding_dim: 768
+    hidden_dims: [256, 128]
+    num_experts: 4
+    temperature: 1.0
+    learning_rate: 0.001
+
+  traversal:
+    embedding_dim: 768
+    relation_embedding_dim: 64
+    hidden_dims: [128, 64]
+    learning_rate: 0.001
+
+  trainer:
+    gamma: 0.99  # Discount factor
+    baseline_decay: 0.99  # Moving average baseline
+    entropy_coef: 0.01  # Entropy bonus
+    max_grad_norm: 1.0  # Gradient clipping
+
+# Expert system configuration
+expert_system:
+  experts:
+    - literal
+    - systemic
+    - principles
+    - precedent
+
+  source_types:
+    literal: ["norma"]
+    systemic: ["norma", "dottrina"]
+    principles: ["ratio", "spiegazione"]
+    precedent: ["massima", "sentenza"]
+
+# Retriever configuration
+retriever:
+  alpha: 0.7  # similarity vs graph weight
+  over_retrieve_factor: 3
+  max_graph_hops: 3
+  default_graph_score: 0.3
+
+# Evaluation configuration
+evaluation:
+  llm_judge:
+    enabled: true
+    model: "${OPENROUTER_MODEL:-google/gemini-2.5-flash-preview}"
+    dimensions:
+      - accuracy
+      - clarity
+      - utility
+      - reasoning_quality
+
+  objective_metrics:
+    - source_grounding
+    - hallucination_rate
+    - citation_accuracy
+    - coverage_score
+
+  weights:
+    objective: 0.4
+    subjective: 0.6
+
+# Output configuration
+output:
+  directory: "docs/experiments/EXP-023_e2e_community_simulation/results"
+  formats:
+    - json
+    - csv
+    - pdf
+
+  figures:
+    dpi: 300
+    style: "seaborn-v0_8-whitegrid"
+    figsize: [10, 6]
+
+# Statistical tests
+statistics:
+  significance_level: 0.05
+  correction: "bonferroni"
+  tests:
+    - paired_ttest
+    - wilcoxon
+    - effect_size  # Cohen's d
+  bootstrap:
+    n_samples: 1000
+    confidence_level: 0.95
+
+# Database configuration
+database:
+  falkordb:
+    host: "${FALKORDB_HOST:-localhost}"
+    port: ${FALKORDB_PORT:-6380}
+    graph_name: "merl_t_dev"
+
+  qdrant:
+    host: "${QDRANT_HOST:-localhost}"
+    port: ${QDRANT_PORT:-6333}
+    collection: "merl_t_dev_chunks"
+
+# Logging
+logging:
+  level: "INFO"
+  format: "%(asctime)s [%(levelname)s] %(message)s"
+  file: "logs/exp023.log"

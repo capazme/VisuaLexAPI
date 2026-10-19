@@ -1,0 +1,378 @@
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useAppStore } from '../store/useAppStore';
+import { extractArticleIdsFromTree, normalizeArticleId, type TreeNode } from '../utils/treeUtils';
+import { getUniqueArticleId } from '../utils/articleIds';
+import type { Norma, ArticleData, TreeMetadata } from '../types';
+import { legalFetch } from '../services/legalFetch';
+import { fetchActRubriche, fetchActTree, type RubrichePart } from '../utils/actStructureCache';
+
+interface UseAnnexNavigationProps {
+  /** The norma being displayed */
+  norma: Norma;
+  /** Currently loaded articles */
+  articles: ArticleData[];
+  /**
+   * Where a loaded article lands: the practice's act (`addArticlesToPractice`, spec §6.4). The
+   * caller first reveals a row already holding the article (`revealPracticeArticle`) and loads only
+   * when there is none. Without it, a global search is run instead.
+   */
+  addArticles?: (norma: Norma, articles: ArticleData[]) => void;
+  /** Originally searched article (for preserving context on annex switch) */
+  searchedArticle?: string;
+  /** Currently active/selected article (for determining current annex context) */
+  activeArticle?: ArticleData | null;
+}
+
+export type { RubrichePart };
+
+interface UseAnnexNavigationReturn {
+  // Tree state
+  treeData: TreeNode[] | null;
+  treeMetadata: TreeMetadata | null;
+  treeLoading: boolean;
+  treeVisible: boolean;
+  setTreeVisible: (visible: boolean) => void;
+  /**
+   * Article rubriche keyed by article number, merged in after the tree.
+   * Empty until `/fetch_rubriche` answers — and stays empty for acts that have
+   * no rubriche at all (the Costituzione) or whose export could not be read.
+   */
+  rubriche: Record<string, string>;
+  /** Keys of the articles the act declares repealed (dominant part). */
+  abrogati: string[];
+  /**
+   * Per-annex breakdown. Every annex has its own article 1 with its own
+   * rubrica — art. 1 of the codice civile is "Capacità giuridica", art. 1 of
+   * the preleggi is "Indicazione delle fonti" — so a single flat map labels
+   * two of the three with the third's titles. Matched to an annex by article
+   * numbers, not by name.
+   */
+  rubricheParts: RubrichePart[];
+
+  // Annex state
+  currentAnnex: string | null;
+  allArticleIds: string[] | undefined;
+
+  // Loading state
+  loadingArticle: string | null;
+
+  // Actions
+  fetchTree: () => Promise<void>;
+  /** Switches to `annexNumber`, loading `articleNumber` there (default: the searched article, else
+   *  the first loaded, else "1"). */
+  handleAnnexSelect: (annexNumber: string | null, articleNumber?: string) => Promise<string | null>;
+  /** Load an article - targetAnnex allows specifying which annex to load from (null = dispositivo) */
+  handleLoadArticle: (articleNumber: string, targetAnnex?: string | null) => void;
+
+  // Helpers
+  isArticleLoaded: (articleNumber: string) => boolean;
+  loadedArticleIds: string[];
+}
+
+/**
+ * Annex navigation for an act of a practice.
+ * Handles tree fetching, annex selection, and article loading with consistent behavior.
+ */
+export function useAnnexNavigation({
+  norma,
+  articles,
+  addArticles,
+  searchedArticle,
+  activeArticle
+}: UseAnnexNavigationProps): UseAnnexNavigationReturn {
+  const { triggerSearch } = useAppStore();
+
+  // Tree state
+  const [treeData, setTreeData] = useState<TreeNode[] | null>(null);
+  const [treeMetadata, setTreeMetadata] = useState<TreeMetadata | null>(null);
+  const [treeLoading, setTreeLoading] = useState(false);
+  const [treeVisible, setTreeVisible] = useState(false);
+  // Article rubriche, fetched separately from the tree (see fetchTree).
+  const [rubriche, setRubriche] = useState<Record<string, string>>({});
+  const [abrogati, setAbrogati] = useState<string[]>([]);
+  const [rubricheParts, setRubricheParts] = useState<RubrichePart[]>([]);
+
+  // Article loading state (for workspace direct loading)
+  const [loadingArticle, setLoadingArticle] = useState<string | null>(null);
+
+  // Where a loaded article lands: the practice's act, else nowhere (a global search).
+  const land = addArticles ?? null;
+
+  // Derive current annex from active article (if provided) or first loaded article
+  const currentAnnex = activeArticle?.norma_data?.allegato
+    ?? articles[0]?.norma_data?.allegato
+    ?? null;
+
+  // Loaded article unique identifiers — distinguishes between "Art 1"
+  // (main body) and "Art 1" (annex 2). Shared helper keeps the encoding
+  // consistent with the components consuming this hook.
+  const loadedArticleIds = useMemo(
+    () => articles.map(getUniqueArticleId),
+    [articles]
+  );
+
+  // Normalized set for faster lookups (handles "3 bis" vs "3-bis")
+  const loadedArticleIdsNormalized = useMemo(
+    () => new Set(loadedArticleIds.map(normalizeArticleId)),
+    [loadedArticleIds]
+  );
+
+  // Check if an article is already loaded
+  const isArticleLoaded = useCallback(
+    (articleNumber: string) => loadedArticleIdsNormalized.has(normalizeArticleId(articleNumber)),
+    [loadedArticleIdsNormalized]
+  );
+
+  // Compute all article IDs from structure, filtered by current annex
+  const allArticleIds = useMemo(() => {
+    if (treeMetadata?.annexes) {
+      // Find the annex info matching current context
+      const annexInfo = currentAnnex
+        ? treeMetadata.annexes.find(a => a.number === currentAnnex)
+        : treeMetadata.annexes.find(a => a.number === null); // Main text
+
+      if (annexInfo?.article_numbers) {
+        return annexInfo.article_numbers;
+      }
+    }
+    // Fallback to full tree extraction
+    return treeData ? extractArticleIdsFromTree(treeData) : undefined;
+  }, [treeMetadata, treeData, currentAnnex]);
+
+  // Fetch tree structure with metadata
+  const fetchTree = useCallback(async () => {
+    if (!norma.urn || treeData) return; // Don't refetch if already loaded
+
+    const urn = norma.urn;
+
+    try {
+      setTreeLoading(true);
+      // Belt and braces. The `treeData` guard above makes fetchTree a
+      // once-per-hook-instance operation, so this cannot actually fire for a
+      // second act today — tree and rubriche stay in step because neither
+      // refetches. It is here so that relaxing that guard to support act
+      // switching does not silently leave article 3 of the new act wearing
+      // article 3 of the old one's title.
+      setRubriche({});
+      setAbrogati([]);
+      setRubricheParts([]);
+      const payload = await fetchActTree(urn);
+      setTreeData(Array.isArray(payload) ? payload : payload.articles || []);
+
+      if (!Array.isArray(payload) && payload.metadata) {
+        setTreeMetadata(payload.metadata);
+      }
+
+      // Rubriche live behind a separate, much slower endpoint (~5s cold for the
+      // codice civile, 20ms warm) because they come from the Akoma Ntoso export
+      // rather than the HTML tree. Deliberately NOT awaited: the index paints
+      // immediately with bare numbers and the titles merge in when they land.
+      fetchActRubriche(urn)
+        .then(rubrichePayload => {
+          setRubriche(rubrichePayload?.rubriche ?? {});
+          setAbrogati(rubrichePayload?.abrogati ?? []);
+          setRubricheParts(rubrichePayload?.parts ?? []);
+        })
+        .catch(err => {
+          // Never swallowed silently (CLAUDE.md gotcha 18): rubriche are
+          // optional, but a backend that stopped answering must be visible.
+          console.error('Error fetching rubriche for', urn, err);
+        });
+    } catch (e) {
+      console.error('Error fetching tree:', e);
+    } finally {
+      setTreeLoading(false);
+    }
+  }, [norma.urn, treeData]);
+
+  // Auto-fetch tree when norma has URN: once per act. A failed load leaves `treeData` null, and
+  // re-asking on every settle hammered the sources (and the user's scraping quota) in a loop; the
+  // structure button (`fetchTree`) asks again.
+  const autoFetchedUrn = useRef<string | null>(null);
+  useEffect(() => {
+    if (norma.urn && !treeData && !treeLoading && autoFetchedUrn.current !== norma.urn) {
+      autoFetchedUrn.current = norma.urn;
+      fetchTree();
+    }
+  }, [norma.urn, treeData, treeLoading, fetchTree]);
+
+  // Handle annex selection - load into the same act when there is a place to land
+  const handleAnnexSelect = useCallback(async (annexNumber: string | null, articleNumber?: string): Promise<string | null> => {
+    // Use the article asked for > searched article > current article > default "1"
+    const articleToSearch = articleNumber
+      || searchedArticle
+      || articles[0]?.norma_data?.numero_articolo
+      || '1';
+
+    // Check if target article (with correct annex) is already loaded
+    // This handles the case where we switch back to an already loaded annex
+    const existingArticle = articles.find(a =>
+      a.norma_data.numero_articolo === articleToSearch &&
+      (a.norma_data.allegato === annexNumber || (a.norma_data.allegato === null && annexNumber === null))
+    );
+
+    if (existingArticle) {
+      return articleToSearch;
+    }
+
+    // For API: annexNumber === null means explicit dispositivo, pass empty string
+    // This prevents smart lookup from redirecting to an allegato
+    const annexForApi = annexNumber === null ? '' : annexNumber;
+
+    // With a place to land (the practice's act), load directly into it
+    if (land) {
+      setLoadingArticle(annexNumber ? `annex-${annexNumber}` : 'main');
+
+      try {
+        const response = await legalFetch('/fetch_all_data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            act_type: norma.tipo_atto,
+            act_number: norma.numero_atto || '',
+            date: norma.data || '',
+            article: articleToSearch,
+            annex: annexForApi,
+            version: 'vigente',
+            version_date: '',
+            show_brocardi_info: true
+          })
+        });
+
+        if (!response.ok) throw new Error('Errore nel caricamento');
+
+        const data = await response.json();
+        const fetchedArticles = Array.isArray(data) ? data : [data];
+        const validArticles = fetchedArticles.filter((a: ArticleData) => !a.error && a.norma_data);
+
+        if (validArticles.length > 0) {
+          // addArticlesToPractice handles deduplication
+          land(norma, validArticles);
+          return articleToSearch;
+        }
+      } catch (e) {
+        console.error('Error loading annex articles:', e);
+      } finally {
+        setLoadingArticle(null);
+      }
+    } else {
+      // Fallback for cases without a place to land (should be rare/legacy)
+      triggerSearch({
+        act_type: norma.tipo_atto,
+        act_number: norma.numero_atto || '',
+        date: norma.data || '',
+        article: articleToSearch,
+        version: 'vigente',
+        version_date: '',
+        show_brocardi_info: true,
+        annex: annexForApi
+      });
+      return null;
+    }
+    return null;
+  }, [norma, articles, searchedArticle, land, triggerSearch]);
+
+  // Handle loading a new article
+  // targetAnnex: if provided, use it (null = dispositivo); if undefined, use currentAnnex
+  const handleLoadArticle = useCallback(async (articleNumber: string, targetAnnex?: string | null) => {
+    // Determine which annex to use: explicit targetAnnex if provided, otherwise currentAnnex
+    // Note: targetAnnex=null means dispositivo, targetAnnex=undefined means use currentAnnex
+    const isExplicitAnnex = targetAnnex !== undefined;
+    const annexToUse = isExplicitAnnex ? targetAnnex : currentAnnex;
+
+    // For API: when annex is explicitly specified (including null for dispositivo),
+    // pass empty string for dispositivo to bypass smart lookup.
+    // When not explicit, pass current context or undefined.
+    const annexForApi = isExplicitAnnex
+      ? (targetAnnex === null ? '' : targetAnnex)  // Explicit: '' for dispositivo, value for allegato
+      : (currentAnnex || undefined);                // Context-based: current value or undefined
+
+    // Check if already loaded (with the correct annex context)
+    // Build unique ID to check: for dispositivo it's just articleNumber, for annex it's all{annex}:{articleNumber}
+    const uniqueIdToCheck = annexToUse
+      ? `all${annexToUse}:${articleNumber}`
+      : articleNumber;
+
+    if (isArticleLoaded(uniqueIdToCheck)) {
+      return; // Already loaded - caller should handle navigation
+    }
+
+    // With a place to land, load directly into it
+    if (land) {
+      if (loadingArticle) return; // Already loading something
+
+      setLoadingArticle(articleNumber);
+
+      try {
+        const response = await legalFetch('/fetch_all_data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            act_type: norma.tipo_atto,
+            act_number: norma.numero_atto || '',
+            date: norma.data || '',
+            article: articleNumber,
+            annex: annexForApi,
+            version: 'vigente',
+            version_date: '',
+            show_brocardi_info: true
+          })
+        });
+
+        if (!response.ok) throw new Error('Errore nel caricamento');
+
+        const data = await response.json();
+        const fetchedArticles = Array.isArray(data) ? data : [data];
+        const validArticles = fetchedArticles.filter((a: ArticleData) => !a.error && a.norma_data);
+
+        if (validArticles.length > 0) {
+          land(norma, validArticles);
+        }
+      } catch (e) {
+        console.error('Error loading article:', e);
+      } finally {
+        setLoadingArticle(null);
+      }
+    } else {
+      // No place to land - use global search
+      triggerSearch({
+        act_type: norma.tipo_atto,
+        act_number: norma.numero_atto || '',
+        date: norma.data || '',
+        article: articleNumber,
+        version: 'vigente',
+        version_date: '',
+        show_brocardi_info: true,
+        annex: annexForApi
+      });
+    }
+  }, [norma, currentAnnex, land, loadingArticle, isArticleLoaded, triggerSearch]);
+
+  return {
+    // Tree state
+    treeData,
+    treeMetadata,
+    treeLoading,
+    treeVisible,
+    setTreeVisible,
+    rubriche,
+    abrogati,
+    rubricheParts,
+
+    // Annex state
+    currentAnnex,
+    allArticleIds,
+
+    // Loading state
+    loadingArticle,
+
+    // Actions
+    fetchTree,
+    handleAnnexSelect,
+    handleLoadArticle,
+
+    // Helpers
+    isArticleLoaded,
+    loadedArticleIds
+  };
+}

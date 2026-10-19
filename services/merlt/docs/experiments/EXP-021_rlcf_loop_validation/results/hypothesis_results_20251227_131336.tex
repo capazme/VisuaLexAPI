@@ -1,0 +1,19 @@
+\begin{table}[h]
+\centering
+\caption{Risultati Test Ipotesi RLCF Loop}
+\label{tab:rlcf_results}
+\begin{tabular}{lccccl}
+\toprule
+\textbf{Ipotesi} & \textbf{Metrica} & \textbf{Valore} & \textbf{Target} & \textbf{p-value} & \textbf{Esito} \\
+\midrule
+H1: Persistence & FPR & 100.0% & 100% & - & \checkmark \\
+H2: Authority & $\Delta A$ & +183.4% & >20% & < 0.001*** & \checkmark \\
+H3: Convergence & WDC & 0.00 & <0.5 & - & \texttimes \\
+H4: Improvement & $\Delta Q$ & +13.9% & >10% & 0.049* & \texttimes \\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}
+\small
+\item Nota: * p < 0.05, ** p < 0.01, *** p < 0.001. Correzione Bonferroni applicata ($\alpha$ = 0.0125).
+\end{tablenotes}
+\end{table}

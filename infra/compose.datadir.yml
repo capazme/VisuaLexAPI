@@ -1,0 +1,26 @@
+# Bind every persistent store to a directory of your choice — on a server,
+# the disk chosen for the databases. The directories must exist first:
+#   mkdir -p "$VISUALEX_DATA_DIR"/{postgres,falkordb,qdrant,merlt_uploads,merlt_hf_cache,merlt_checkpoints,merlt_ner_models}
+#   docker compose -f infra/compose.yml -f infra/compose.datadir.yml up -d
+volumes:
+  postgres_data:
+    driver: local
+    driver_opts: {type: none, o: bind, device: "${VISUALEX_DATA_DIR:?set VISUALEX_DATA_DIR}/postgres"}
+  falkordb_data:
+    driver: local
+    driver_opts: {type: none, o: bind, device: "${VISUALEX_DATA_DIR:?set VISUALEX_DATA_DIR}/falkordb"}
+  qdrant_data:
+    driver: local
+    driver_opts: {type: none, o: bind, device: "${VISUALEX_DATA_DIR:?set VISUALEX_DATA_DIR}/qdrant"}
+  merlt_uploads:
+    driver: local
+    driver_opts: {type: none, o: bind, device: "${VISUALEX_DATA_DIR:?set VISUALEX_DATA_DIR}/merlt_uploads"}
+  merlt_hf_cache:
+    driver: local
+    driver_opts: {type: none, o: bind, device: "${VISUALEX_DATA_DIR:?set VISUALEX_DATA_DIR}/merlt_hf_cache"}
+  merlt_checkpoints:
+    driver: local
+    driver_opts: {type: none, o: bind, device: "${VISUALEX_DATA_DIR:?set VISUALEX_DATA_DIR}/merlt_checkpoints"}
+  merlt_ner_models:
+    driver: local
+    driver_opts: {type: none, o: bind, device: "${VISUALEX_DATA_DIR:?set VISUALEX_DATA_DIR}/merlt_ner_models"}

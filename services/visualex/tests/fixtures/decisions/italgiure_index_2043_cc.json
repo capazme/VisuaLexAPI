@@ -1,0 +1,317 @@
+{
+ "responseHeader": {
+  "status": 0,
+  "QTime": 16,
+  "params": {
+   "fl": "id,numdec,anno,datdep,kind,tipoprov,szdec,rnc-gen,rnc-art,rnc-sp,rnc-num,rnc-dat",
+   "sort": "pd desc",
+   "q": "kind:\"snciv\" AND rnc-gen:\"CC\" AND rnc-art:\"2043 00\"",
+   "wt": "json",
+   "app.query": "",
+   "rows": "5"
+  }
+ },
+ "response": {
+  "numFound": 3904,
+  "start": 0,
+  "docs": [
+   {
+    "rnc-num": [
+     "0115",
+     "0196"
+    ],
+    "numdec": "26015",
+    "szdec": "3",
+    "datdep": [
+     "20260930"
+    ],
+    "kind": "snciv",
+    "tipoprov": "Ordinanza",
+    "rnc-sp": [
+     "COD",
+     "COD",
+     "COD",
+     "COD",
+     "COD",
+     "COD",
+     "DPR",
+     "DLG"
+    ],
+    "id": "snciv2026326015O",
+    "rnc-dat": [
+     "2002",
+     "2003"
+    ],
+    "rnc-art": [
+     "0391 02",
+     "2043 00",
+     "2051 00",
+     "0369 00",
+     "0395 00",
+     "0013 00",
+     "0052 00"
+    ],
+    "rnc-gen": [
+     "PC",
+     "PC",
+     "CC",
+     "CC",
+     "PC",
+     "PC",
+     "LS",
+     "LS"
+    ],
+    "anno": "2026"
+   },
+   {
+    "rnc-num": [
+     "0546",
+     "0546",
+     "0602"
+    ],
+    "numdec": "26016",
+    "szdec": "3",
+    "datdep": [
+     "20260930"
+    ],
+    "kind": "snciv",
+    "tipoprov": "Ordinanza",
+    "rnc-sp": [
+     "COD",
+     "COD",
+     "COD",
+     "COD",
+     "COD",
+     "DLG",
+     "DLG",
+     "COD",
+     "COD",
+     "DPR",
+     "COD",
+     "COD"
+    ],
+    "id": "snciv2026326016O",
+    "rnc-dat": [
+     "1992",
+     "1992",
+     "1973"
+    ],
+    "rnc-art": [
+     "0096 00",
+     "0001 00",
+     "0360 00",
+     "0360 00",
+     "2043 00",
+     "0002 00",
+     "0019 00",
+     "0374 00",
+     "0096 00",
+     "0077 00",
+     "0091 00",
+     "0336 00"
+    ],
+    "rnc-gen": [
+     "PC",
+     "PC",
+     "PC",
+     "PC",
+     "CC",
+     "LS",
+     "LS",
+     "PC",
+     "PC",
+     "LS",
+     "PC",
+     "PC"
+    ],
+    "anno": "2026"
+   },
+   {
+    "numdec": "25857",
+    "szdec": "3",
+    "datdep": [
+     "20260927"
+    ],
+    "kind": "snciv",
+    "tipoprov": "Ordinanza",
+    "rnc-sp": [
+     "COD",
+     "COD",
+     "COD"
+    ],
+    "id": "snciv2026325857O",
+    "rnc-art": [
+     "0112 00",
+     "2033 00",
+     "2043 00"
+    ],
+    "rnc-gen": [
+     "PC",
+     "CC",
+     "CC"
+    ],
+    "anno": "2026"
+   },
+   {
+    "rnc-num": [
+     "0209",
+     "0115"
+    ],
+    "numdec": "25834",
+    "szdec": "3",
+    "datdep": [
+     "20260926"
+    ],
+    "kind": "snciv",
+    "tipoprov": "Ordinanza",
+    "rnc-sp": [
+     "COD",
+     "COD",
+     "COD",
+     "COD",
+     "COD",
+     "COD",
+     "COD",
+     "COD",
+     "COD",
+     "COD",
+     "COD",
+     "COD",
+     "DLG",
+     "COD",
+     "COD",
+     "COD",
+     "COD",
+     "COD",
+     "COD",
+     "COD",
+     "DPR"
+    ],
+    "id": "snciv2026325834O",
+    "rnc-dat": [
+     "2005",
+     "2002"
+    ],
+    "rnc-art": [
+     "0102 00",
+     "0320 00",
+     "0380 02",
+     "0001 00",
+     "2043 00",
+     "2056 00",
+     "2697 00",
+     "2727 00",
+     "2729 00",
+     "0112 00",
+     "0115 00",
+     "0116 00",
+     "0148 00",
+     "0111 00",
+     "0360 00",
+     "1226 00",
+     "0395 00",
+     "0360 00",
+     "0360 00",
+     "0132 00",
+     "0013 00"
+    ],
+    "rnc-gen": [
+     "PC",
+     "PC",
+     "PC",
+     "PC",
+     "CC",
+     "CC",
+     "CC",
+     "CC",
+     "CC",
+     "PC",
+     "PC",
+     "PC",
+     "LS",
+     "CR",
+     "PC",
+     "CC",
+     "PC",
+     "PC",
+     "PC",
+     "PC",
+     "LS"
+    ],
+    "anno": "2026"
+   },
+   {
+    "rnc-num": [
+     "0318",
+     "0318",
+     "0115"
+    ],
+    "numdec": "25615",
+    "szdec": "2",
+    "datdep": [
+     "20260921"
+    ],
+    "kind": "snciv",
+    "tipoprov": "Ordinanza",
+    "rnc-sp": [
+     "RD",
+     "COD",
+     "COD",
+     "COD",
+     "COD",
+     "COD",
+     "COD",
+     "RD",
+     "COD",
+     "COD",
+     "COD",
+     "COD",
+     "COD",
+     "COD",
+     "DPR"
+    ],
+    "id": "snciv2026225615O",
+    "rnc-dat": [
+     "1942 03 30",
+     "1942 03 30",
+     "2002"
+    ],
+    "rnc-art": [
+     "0067 00",
+     "1137 00",
+     "1136 00",
+     "1129 00",
+     "1362 00",
+     "0348 03",
+     "1117 02",
+     "0067 00",
+     "1139 00",
+     "1105 00",
+     "0092 00",
+     "0100 00",
+     "2043 00",
+     "0092 00",
+     "0013 00"
+    ],
+    "rnc-gen": [
+     "LS",
+     "CC",
+     "CC",
+     "CC",
+     "CC",
+     "PC",
+     "CC",
+     "LS",
+     "CC",
+     "CC",
+     "PC",
+     "PC",
+     "CC",
+     "PC",
+     "LS"
+    ],
+    "anno": "2026"
+   }
+  ]
+ }
+}

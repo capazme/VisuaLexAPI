@@ -1,0 +1,45 @@
+{
+  "experiment": "EXP-006",
+  "description": "Libro Primo Codice Penale Ingestion",
+  "config": {
+    "graph": "merl_t_test",
+    "limit": null,
+    "skip_multivigenza": true,
+    "skip_brocardi": false
+  },
+  "metrics": {
+    "timing": {
+      "start": "2025-12-07T00:24:29.123650",
+      "end": "2025-12-07T00:41:05.053916",
+      "duration_seconds": 995.9214808940887
+    },
+    "articles": {
+      "total": 251,
+      "processed": 251,
+      "failed": 0,
+      "skipped": 0,
+      "success_rate": "100.0%"
+    },
+    "brocardi": {
+      "fetched": 251,
+      "failed": 0
+    },
+    "multivigenza": {
+      "modifiche_totali": 0,
+      "atti_modificanti": 0,
+      "relazioni": 0
+    },
+    "errors": []
+  },
+  "validation": {
+    "total_nodes": 264,
+    "article_nodes": 263,
+    "modifying_act_nodes": 0,
+    "rel_modifica": 0,
+    "rel_inserisce": 0,
+    "rel_abroga": 0,
+    "rel_sostituisce": 0,
+    "rel_contiene": 263,
+    "articles_with_brocardi": 262
+  }
+}

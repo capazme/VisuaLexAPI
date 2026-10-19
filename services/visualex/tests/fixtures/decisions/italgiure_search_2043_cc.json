@@ -1,0 +1,74 @@
+{
+ "responseHeader": {
+  "status": 0,
+  "QTime": 31,
+  "params": {
+   "hl.fragsize": "200",
+   "sort": "pd desc",
+   "fl": "id,numdec,anno,datdep,szdec,tipoprov,kind",
+   "hl.snippets": "1",
+   "q": "kind:\"snciv\" AND (ocr:\"art. 2043 c.c.\" OR ocr:\"art. 2043 cod. civ.\")",
+   "hl.fl": "ocr",
+   "wt": "json",
+   "app.query": "",
+   "hl": "true",
+   "rows": "3"
+  }
+ },
+ "response": {
+  "numFound": 1430,
+  "start": 0,
+  "docs": [
+   {
+    "numdec": "26016",
+    "szdec": "3",
+    "datdep": [
+     "20260930"
+    ],
+    "kind": "snciv",
+    "tipoprov": "Ordinanza",
+    "id": "snciv2026326016O",
+    "anno": "2026"
+   },
+   {
+    "numdec": "25857",
+    "szdec": "3",
+    "datdep": [
+     "20260927"
+    ],
+    "kind": "snciv",
+    "tipoprov": "Ordinanza",
+    "id": "snciv2026325857O",
+    "anno": "2026"
+   },
+   {
+    "numdec": "25615",
+    "szdec": "2",
+    "datdep": [
+     "20260921"
+    ],
+    "kind": "snciv",
+    "tipoprov": "Ordinanza",
+    "id": "snciv2026225615O",
+    "anno": "2026"
+   }
+  ]
+ },
+ "highlighting": {
+  "snciv2026326016O": {
+   "ocr": [
+    " di azioneespropriativa (come detto) e nemmeno di ipoteca giudiziale, legale ovveroa queste assimilabile, nel generale ambito del neminem laedere ex <em>art</em>.<em>2043</em> <em>cod</em>. <em>civ</em>.».La Corte territoriale, nel ricondurre la domanda"
+   ]
+  },
+  "snciv2026325857O": {
+   "ocr": [
+    "/2020, Cass.n.11294/2020, Cass. n.33459/2022 e Cass. n.20014/2025), “laconcorrente responsabilità della Regione si giustifica, ai sensi <em>dell'art</em>.<em>2043</em> <em>cod</em>. <em>civ</em>., nella forma … della \"cooperazione"
+   ]
+  },
+  "snciv2026225615O": {
+   "ocr": [
+    " il ricorrente l’entità delle spese di cui chiede la refusione.5. - Con il quarto motivo si denuncia la violazione e falsa applicazionedell’art. 92 c.p.c. e <em>dell’art</em>. <em>2043</em> <em>c.c</em>., per avere la Corte di appello"
+   ]
+  }
+ }
+}

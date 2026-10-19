@@ -1,0 +1,60 @@
+# RLCF Training Configuration
+# ============================
+#
+# Configurazione per scripts/rlcf_training_batch.py
+#
+# Uso:
+#   python scripts/rlcf_training_batch.py --config config/rlcf_training.yaml
+
+# Training generale
+training:
+  policy_type: gating  # gating, react
+  min_feedback: 10     # Minimo feedback richiesto
+  max_episodes: 1000   # Massimo episodi per sessione
+  batch_size: 32
+  learning_rate: 0.0001
+  entropy_coef: 0.01   # Bonus esplorazione
+  clip_grad_norm: 1.0  # Gradient clipping
+
+# GatingPolicy configuration
+gating_policy:
+  input_dim: 768       # Dimensione embedding (E5-large)
+  hidden_dim: 256      # Hidden layer size
+  num_experts: 4       # literal, systemic, principles, precedent
+
+# ReActPolicy configuration (multi-step)
+react_policy:
+  state_dim: 1024      # Dimensione stato
+  num_actions: 7       # Numero azioni ReAct
+  hidden_dim: 256
+  gamma: 0.99          # Discount factor
+  gae_lambda: 0.95     # GAE lambda
+  clip_ratio: 0.2      # PPO clip
+  num_epochs: 4        # PPO epochs per update
+  step_penalty: -0.05  # Penalità per step (efficienza)
+
+# Curriculum Learning
+curriculum:
+  enabled: true
+  initial_difficulty: 0.3   # Partenza da query semplici
+  target_difficulty: 0.8    # Target difficoltà
+  progression_rate: 0.1     # Velocità progressione
+
+# Evaluation
+evaluation:
+  enabled: true
+  holdout_ratio: 0.2   # 20% per validation
+  min_holdout: 5       # Minimo samples holdout
+
+# Checkpoint management
+checkpoint:
+  directory: models/policies
+  save_frequency: 100  # Ogni N episodi
+  keep_last_n: 5       # Mantieni ultimi N checkpoint
+
+# Database
+database:
+  # URL da env: RLCF_POSTGRES_URL
+  # Default: postgresql+asyncpg://postgres:postgres@localhost:5436/merl_t_rlcf
+  url: null
+  lookback_days: 30    # Considera feedback ultimi N giorni

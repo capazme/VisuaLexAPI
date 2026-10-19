@@ -1,0 +1,8 @@
+skips:
+  - B101  # assert used in tests is fine
+  - B614  # torch.load used for internal checkpoints only
+  - B615  # HuggingFace from_pretrained is expected ML workflow
+exclude_dirs:
+  - tests
+  - _archive
+  - .venv

@@ -1,0 +1,213 @@
+"""
+URN → human label / estremi derivation (data-quality plan A1 + A2).
+
+Single source of truth for turning a Normattiva/NIR URN into a display label
+("art. N") and the ``numero_articolo`` / ``estremi`` pair used to backfill
+Norma stub nodes. Shared by:
+
+- ``api/graph_router.py`` (A1 — node serializer label chain)
+- ``storage/graph/entity_writer.py`` (A2 — ON CREATE stub enrichment)
+- ``pipeline/multivigenza.py`` (A2 — version-node ON CREATE enrichment)
+- ``scripts/backfill_data_quality.py`` (one-time repopulation)
+
+Pure, dependency-free (regex only) so every write path and the backfill can
+import it without pulling FalkorDB / DB clients.
+
+URN article segment form (verified live against the seed graph):
+    ...~art467          -> numero_articolo "467"
+    ...~art30bis        -> numero_articolo "30-bis"   (suffix concatenated)
+    ...~art1980-com3    -> numero_articolo "1980"     (comma suffix ignored)
+    ...!vig=2024-01-15  -> version marker stripped before parsing
+"""
+
+import re
+from typing import Any, Dict, Optional, Tuple
+
+# Recognised ordinal extensions for article suffixes (-bis, -ter, ...), from the one
+# table (a copy of the API's, pinned by tests/unit/test_sources_golden.py). Kept explicit
+# so a stray token after the digits (e.g. "-com3") is not mistaken for a suffix.
+from merlt.utils.article_suffixes import ARTICLE_ORDINAL_SUFFIXES as _ARTICLE_SUFFIXES  # noqa: E402
+
+# ~art<digits><optional-suffix>, anchored so trailing "-com3" / "!vig=" don't
+# bleed into the capture. Suffix is matched only against the known list,
+# LONGEST FIRST and with a right boundary: an ordered "ter|...|terdecies"
+# alternation matched the shortest prefix, so 2409-terdecies (a real Codice
+# civile article) became "2409-ter" and collided with the real 2409-ter in
+# every stub label, estremi and backfill. The boundary sits on the optional
+# group only: a bare (?![a-z]) after it would let \d+ backtrack on
+# "2409xyz" and yield "240".
+_ART_URN_RE = re.compile(
+    r"~art(\d+)(?:("
+    + "|".join(sorted(_ARTICLE_SUFFIXES, key=len, reverse=True))
+    + r")(?![a-z]))?(?![0-9])",
+    re.IGNORECASE,
+)
+
+# Max label length before truncation for free-text fallbacks (testo, etc.).
+_LABEL_MAX_LEN = 55
+
+
+def article_number_from_urn(urn: Optional[str]) -> Optional[str]:
+    """
+    Extract the article number (incl. -bis/-ter) from a URN.
+
+    Args:
+        urn: Full URN or URL carrying a ``~art<n>`` segment.
+
+    Returns:
+        Canonical article number ("467", "30-bis") or ``None`` when the URN
+        has no article segment (act/document-level URN, concept id, etc.).
+
+    Examples:
+        >>> article_number_from_urn("urn:nir:...:262:2~art467")
+        '467'
+        >>> article_number_from_urn("urn:nir:...:262:2~art30bis")
+        '30-bis'
+        >>> article_number_from_urn("urn:nir:...:262:2~art1980-com3")
+        '1980'
+        >>> article_number_from_urn("urn:nir:...:262") is None
+        True
+    """
+    if not urn:
+        return None
+    match = _ART_URN_RE.search(urn)
+    if not match:
+        return None
+    base = match.group(1)
+    suffix = match.group(2)
+    if suffix:
+        return f"{base}-{suffix.lower()}"
+    return base
+
+
+def article_label_from_urn(urn: Optional[str]) -> Optional[str]:
+    """
+    The label of the article a URN keys: its short label ("art. 2043 c.c.",
+    ``utils/sources``), else the bare "art. N".
+
+    Args:
+        urn: Full URN or URL.
+
+    Returns:
+        "art. 2043 c.c." / "art. 30-bis" or ``None`` when no article segment exists.
+    """
+    return derive_article_fields_from_urn(urn)[1]
+
+
+def derive_article_fields_from_urn(urn: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Derive ``(numero_articolo, estremi)`` from a URN for stub enrichment (A2).
+
+    Used on the ON CREATE branch of Norma MERGEs and by the backfill to give
+    empty Norma stubs a minimal, correct identity when the article was never
+    fully ingested.
+
+    Args:
+        urn: Full URN or URL carrying a ``~art<n>`` segment.
+
+    Returns:
+        ``(numero_articolo, estremi)`` — both ``None`` when the URN has no
+        article segment (so the caller can skip the SET without inventing
+        bogus data). ``estremi`` is the norm's short label of the source
+        convention, read from the key (``utils/sources.short_from_urn``: the
+        decree and annex say which code it is, "art. 2043 c.c."), or the bare
+        "art. N" when the key names no act the convention can read.
+
+    Examples:
+        >>> derive_article_fields_from_urn("https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043")
+        ('2043', 'art. 2043 c.c.')
+        >>> derive_article_fields_from_urn("urn:nir:...~art30bis")
+        ('30-bis', 'art. 30-bis')
+        >>> derive_article_fields_from_urn("urn:nir:...:262")
+        (None, None)
+    """
+    numero = article_number_from_urn(urn)
+    if numero is None:
+        return None, None
+    from merlt.utils.sources import short_from_urn  # a leaf importing the labels lazily: no cycle
+
+    return numero, (short_from_urn(urn) or f"art. {numero}")
+
+
+def _truncate(text: str, max_len: int = _LABEL_MAX_LEN) -> str:
+    """Trim and truncate free text, appending an ellipsis when cut."""
+    text = " ".join(text.split())  # collapse internal whitespace/newlines
+    if len(text) <= max_len:
+        return text
+    return text[: max_len - 1].rstrip() + "…"
+
+
+def build_node_label(props: Dict[str, Any], node_id: str) -> str:
+    """
+    Build a human display label for a graph node (A1).
+
+    Priority chain (first non-empty wins):
+        1. nome / estremi / rubrica / titolo  (existing rich fields)
+        2. Norma synth: "{estremi} — {rubrica}" when an article has a rubric
+           ("art. 2043 c.c. — Risarcimento per fatto illecito")
+        3. numero_articolo alone  → "art. {numero_articolo}"
+        4. testo (truncated ~55 chars)         → e.g. Comma nodes
+        5. URN-derived label ("art. 2043 c.c.", else "art. N")
+        6. node_id truncated (last resort, never the raw URL for an article)
+
+    The synth in (2) and the URN fallback in (5) guarantee we never dump the
+    raw Normattiva URL as the label for an article node.
+
+    Args:
+        props: Node property dict (FalkorDB ``properties`` payload).
+        node_id: Resolved node id (URN/urn/node_id/...).
+
+    Returns:
+        A non-empty display label.
+    """
+    def _clean(value: Any) -> Optional[str]:
+        if value is None:
+            return None
+        text = str(value).strip()
+        return text or None
+
+    numero_articolo = _clean(props.get("numero_articolo"))
+    rubrica = _clean(props.get("rubrica"))
+
+    # 1a. An explicit human name always wins (entities carry `nome`; Norma
+    # nodes do not, so this never shadows the synth below in practice).
+    nome = _clean(props.get("nome"))
+    if nome:
+        return nome
+
+    # 2. Norma synthesis: the short label and the rubric, when both are known.
+    if numero_articolo and rubrica:
+        return f"{_clean(props.get('estremi')) or f'art. {numero_articolo}'} — {rubrica}"
+
+    # 1b. Remaining rich fields.
+    for key in ("estremi", "rubrica", "titolo"):
+        value = _clean(props.get(key))
+        if value:
+            return value
+
+    # 3. numero_articolo alone.
+    if numero_articolo:
+        return f"art. {numero_articolo}"
+
+    # 4. Free text (Comma nodes carry only `testo`).
+    testo = _clean(props.get("testo"))
+    if testo:
+        return _truncate(testo)
+
+    # 5. URN-derived label.
+    art_label = article_label_from_urn(node_id) or article_label_from_urn(
+        _clean(props.get("URN")) or _clean(props.get("urn"))
+    )
+    if art_label:
+        return art_label
+
+    # 6. Last resort — truncated id (never the full raw URL).
+    return _truncate(node_id, 50) if node_id else "(senza etichetta)"
+
+
+__all__ = [
+    "article_number_from_urn",
+    "article_label_from_urn",
+    "derive_article_fields_from_urn",
+    "build_node_label",
+]

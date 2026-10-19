@@ -1,972 +1,123 @@
 # CLAUDE.md
 
-Guidance for Claude Code working in this repository. Everything here is meant to
-be true of the code as it stands — if you find a statement that the code
-contradicts, fix the statement in the same change that taught you.
+Guidance for Claude Code in this repository. Everything here is meant to be
+true of the code as it stands — if the code contradicts a statement, fix the
+statement in the same change that taught you.
 
-## Project Overview
+This file is the map and the rules that cross areas. Each area has its own
+`CLAUDE.md`, which Claude Code loads when it works in that folder: read it
+before changing the area.
 
-VisuaLexAPI fetches and displays Italian legal texts from Normattiva, EUR-Lex and
-Brocardi. Three services:
+## What this is
 
-- **Python API** (`/visualex_api`, port 5000) — Quart, async scraping, PDF export
-- **Node backend** (`/backend`, port 3001) — Express + Prisma, auth and user data
-- **Frontend** (`/frontend`, port 5173) — React + TypeScript + Vite
+VisuaLex reads Italian legal texts from Normattiva, EUR-Lex and Brocardi and
+lets a lawyer work on them: dossiers, notes, highlights, discussions, and a
+knowledge graph with interpretive experts (MERL-T). UI copy is Italian; code,
+comments, commits and documentation are English. The people who develop here
+are lawyers first: say plainly when a change carries an architectural or
+security risk.
 
-The user is a practising lawyer, not a developer. UI copy is Italian; code,
-comments and commits are English.
+## Layout
 
-## Branches and Deployment
+| Path | What | Read first |
+| --- | --- | --- |
+| `apps/web/` | React 19 + Vite + TypeScript: reader, workspace, dossier, forum, graph | `apps/web/CLAUDE.md` |
+| `apps/server/` | Express + Prisma: accounts, dossier, community, the MERL-T gateway, the OAuth authorization server for MCP clients | `apps/server/CLAUDE.md` |
+| `apps/mcp/` | the MCP server (Streamable HTTP, :3002): dossier and LingoLex card tools for Claude Code and LibreLex, deletions confirmed by the user into the trash, no database | `apps/mcp/CLAUDE.md` |
+| `services/visualex/` | Quart: sources, reading text, URNs, citations, AKN | `services/visualex/CLAUDE.md` |
+| `services/merlt/` | MERL-T and RLCF — MPL-2.0, as the rest of the repository | `services/merlt/CLAUDE.md` |
+| `tools/archivio-normativo/` | CLI: a local archive of acts | `tools/archivio-normativo/CLAUDE.md` |
+| `tools/e2e/` | end-to-end and stress harness | `tools/e2e/README.md` |
+| `conventions/` | the convention for legal sources: identity and labels of norms and decisions, as one golden file (read today by the web and API suites, by the others as they adopt it) | `conventions/sources/README.md` |
+| `infra/` | the Compose stack: stores and MERL-T, and the production modules (app, scrapers, overlay) | `infra/compose.yml` header |
+| `scripts/` | data backup and restore, smoke tests; `scripts/prod/`: what `./start.sh --prod` runs | `scripts/datakit/README.md` |
+| `vendor/mcp-legal-it/` | git submodule | — |
+| `docs/` | git workflow, setup, MERL-T, specs and plans, archive | `docs/README.md` |
 
-**`main` is the product in production ("vanilla"). `visualex-merlt-main` is the
-AI experiment and is never deployed.**
+MERL-T work that spans the server and the web app: `docs/merlt/claude-notes.md`.
 
-Work flows one way, `main` → `merlt`. Vanilla fixes are committed on `main`
-through short-lived branches (`fix/…`, `feature/…`, merged `--no-ff`); a release
-is a deploy, and `deploy.sh` tags it `vX.Y.Z` at bump time; `merlt` absorbs
-vanilla by merging each release **tag**, never `main` itself. Nothing is
-cherry-picked back. If you find yourself fixing something vanilla while on
-`merlt`, stop and move to `main` — that one-way-valve discipline is what this
-model exists to enforce, after 32 vanilla commits (four of them security fixes)
-sat stranded on the experiment for weeks. There is deliberately no `dev`
-branch. The experiment lives in its own checkout, the permanent worktree
-`../VisuaLexAPI-merlt` — never switch this checkout to it.
-**`docs/git-workflow.md` is the standard** — the merlt merge checklist, the
-monthly sweep, why `dev` was rejected.
-
-Two more places where work strands, both checked before assuming every fix
-has reached `main`: Claude Code web sessions push `origin/claude/<name>-<id>` branches
-(merge into `main` within days or delete — one held a real fix for three days
-while a parallel fix landed), and desktop sessions leave worktrees under
-`.claude/worktrees/`, sometimes with an uncommitted file inside.
-
-When backporting from `merlt`, watch for two things: commits are often mixed
-(a vanilla fix and MERL-T work in one commit), and MERL-T code can ride along —
-`publishMerltEvent` calls and types tied to schema changes `main` does not have.
-
-Deployment is a single batch script run on the server, `deploy.sh`. CI gates
-`main` on GitHub, but the script consults nothing and has no rollback, so a red
-`main` still deploys — read the run before you deploy. **Read
-`docs/deployment.md` before changing anything the script touches** — it records
-what each step exists to prevent and the known gaps.
-
-Two traps worth knowing without opening that file:
-- `npm run build` (`tsc -b`) is the real frontend type-check. A bare
-  `tsc --noEmit` does not walk the project references and reports a false green.
-- Step 1 pulls whatever branch the server is on; only the step-0 guard keeps that
-  honest.
-
-## Development Commands
+## Commands
 
 ```bash
-./start.sh                       # all three services
-
-source .venv/bin/activate        # Python API
-python app.py                    # main server (UI + API)
-python -m visualex_api.app       # alt server with /api/* prefix + Swagger
-
-# The Python suite — always through the project venv, from the repo root.
-# The ambient python3 cannot import quart and fails a batch of tests for that
-# reason alone; those failures are an interpreter mistake, not a regression.
-.venv/bin/python -m pytest tests/ -q
-
-cd backend && npm run dev        # Node backend
-cd backend && npm run prisma:studio
-
-cd frontend && npm run dev       # :5173
-cd frontend && npm run build     # tsc -b && vite build — the real type-check
-cd frontend && npm run lint
-cd frontend && npm run test      # vitest (npm run test:ui for the UI)
+./start.sh [--dev]                           # the development stack (the default); MERLT_ENABLED=true adds MERL-T
+./start.sh --prod --branch main|develop      # the deployment host only: pull that branch, build and run everything as containers
+./start.sh --prod --no-pull [--allow-branch] # the same, with what is checked out; bare --prod asks which
+./start.sh --prod --stop                     # stop that stack (containers and volumes stay)
+sh scripts/prod/tests/test_deploy.sh         # start.sh and scripts/prod, against a stub docker
+npm --prefix apps/web run test -- --run      # web tests
+npm --prefix apps/web run build              # tsc -b + vite: the real type-check
+npm --prefix apps/web run lint
+npm --prefix apps/server run build
+npm --prefix apps/server test                # only this way: the setup refuses a non-test database
+npm --prefix apps/mcp run build && npm --prefix apps/mcp test   # stub servers, no database
+(cd services/visualex && .venv/bin/python -m pytest tests/ -q)
+(cd tools/archivio-normativo && ../../services/visualex/.venv/bin/python -m pytest tests/ -q)
+node --test '.claude/hooks/*.test.mjs'
+scripts/backup.sh / scripts/restore.sh <folder>
 ```
 
-PDF export needs Playwright browsers: `playwright install chromium`.
-
-Backend tests live in `backend/tests` (vitest + supertest). An end-to-end and
-stress harness lives in `e2e/` with its own README. `pytest.ini` sets
-`asyncio_mode = auto` and excludes the `live` marker by default (`-m live` runs
-the tests that hit real sources). `.github/workflows/` gates `main` and every PR
-into it: Python tests on 3.12 and 3.14, the three frontend gates, backend tests,
-plus a weekly `pip-audit` / `npm audit`. That is the only automated check in the
-project: `deploy.sh` consults nothing, runs no test and has no rollback, so a red
-`main` still deploys.
-
-## Archivio normativo (`archivio_normativo/`)
-
-A CLI that builds a local archive of the acts in `archivio_normativo/manifest.yaml`
-through this API: `python -m archivio_normativo build [--dry-run] [--only …]
-[--enrich …]`. One SQLite record per article/recital plus one Markdown per act,
-in `archivio_out/` (gitignored). Update runs refetch only the articles whose AKN
-fingerprint moved. Text and structure come from VisuaLex; case law and authority
-practice from the `legal-it` MCP server (optional, `requirements-archivio.txt`).
-Spec: `docs/superpowers/specs/2026-09-19-archivio-normativo-design.md`; how to
-run: `archivio_normativo/README.md`. Tests: `tests/archivio/`.
-
-## Architecture
-
-### Python API (`/visualex_api`)
-
-- **`app.py`** (root): main server, UI + API. **`visualex_api/app.py`**:
-  alternative server with `/api/*` prefix and Swagger.
-- **`services/`** — `normattiva_scraper.py`, `eurlex_scraper.py`,
-  `brocardi_scraper.py` (annotations), `pdfextractor.py` (Playwright pool),
-  `http_client.py` (the shared throttled aiohttp client — TLS verification on).
-  - `brocardi_scraper.py` also emits `Glossario` (links to Brocardi's legal
-    dictionary, `{termine, url, dizionario_id}`). Any new `brocardi_info` key
-    must be whitelisted in **all three** wire literals in root `app.py`
-    (`stream_article_text`, `fetch_brocardi_info`, `fetch_all_data`) — a key
-    missing from any one of them never reaches the frontend.
-  - `akn_parser.py` / `akn_fetch.py` — Normattiva's Akoma Ntoso export.
-    **Structure and fallback only, never the display text**: the export
-    transliterates every accent ("attivita'", "e'"), and `article_text` is the
-    offset space every stored highlight and note is anchored to. Used to answer
-    "does this article exist" when the HTML tree is unusable
-    (`fetch_act_index`), and as a last-resort article text when HTML extraction
-    fails outright (`fetch_act_article`, from `NormattivaScraper.get_document`).
-    Only the article INDEX is cached — in memory, capped at
-    `AKN_CACHE_MAX_ACTS`, and through the shared cache manager, with an
-    in-flight registry so N concurrent cold requests download the act once.
-    Article texts are never cached. `ParsedPart.dates` carries each article's
-    FRBRWork date (component acts only), and `AktIndex.fingerprints` a sha256
-    per article — both are metadata about the text, not the text. The hash
-    is of the RENDERED AKN text (the markdown `akn_parser` produces,
-    AGGIORNAMENTO blocks included), so a renderer change moves every hash — a
-    harmless full refetch. The top-level map covers the dominant part only;
-    an annex such as the preleggi or the disposizioni di attuazione must be
-    read from `parts_fingerprints` (served as `parts` by
-    `/fetch_act_fingerprints`), which is kept apart from `parts_detail` so
-    the hashes do not ride along on every `/fetch_rubriche` answer. With
-    the fingerprints a codice's in-memory index is a few hundred KB.
-    `AKN_ENABLED=false` disables the whole path and is read at call time.
-    `normalize_article_key` in `akn_parser.py` is the pure canonicaliser for
-    article numbers and needs no network.
-- **`tools/`**:
-  - `norma.py` — core models `Norma` / `NormaVisitata` (both with
-    `to_dict()`/`from_dict()`; `NormaVisitata` implements hash/equality and is
-    the primary container across the API)
-  - `urngenerator.py` — URN generation · `treextractor.py` — article trees
-  - `text_op.py` — text parsing **and** date handling (see Date System)
-  - `article_suffixes.py` — the ordinal table (`bis` … `vicies`) every
-    article-number regex reads, longest-first so a short entry cannot claim the
-    head of a longer one. A leaf module, imported by `nl_parser`,
-    `citation_linker`, `alias_resolver` and `services/akn_parser`; mirrored by
-    `frontend/src/utils/articleSuffixes.ts`. Nine private copies each stopped at
-    `decies`, so "art. 25-terdecies" resolved to art. 25-ter — an article that
-    exists, which is why nothing looked broken
-  - `browser_manager.py` — `PlaywrightManager` singleton (browser pooling)
-  - `config.py` — rate limiting, cache size, Redis (`REDIS_ENABLED`, `REDIS_URL`)
-  - `map.py` — act-type mappings, plus the act tables the resolver reads
-    (`ATTI_NOTI` 64 aliases, `ATTI_DENOMINATI` 202 aliases over 81 acts, built
-    from the reviewable `_ATTI_DENOMINATI_SPEC` rows) and `codice_urn(name)`,
-    the **case-insensitive** lookup into `NORMATTIVA_URN_CODICI` — six keys
-    carry capitals ("codice del Terzo settore"), so a bare `in` test missed
-    them and those codici lost their default annex
-  - `map.py` also holds `BROCARDI_CODICI` (label → page, one row per source at
-    brocardi.it/fonti.html) and `find_brocardi_url(tipo, numero, data)`, which
-    `brocardi_scraper.do_know` asks. The lookup is **by identity**: every label
-    embeds the act's extremes ("Statuto dei lavoratori(L. 20 maggio 1970, n.
-    300)"), `parse_brocardi_estremi()` reads them once into (tipo esteso, anno,
-    numero), and a norma matches only its own triple — the year is what tells
-    D.lgs. 81/2008 from D.lgs. 81/2015, so without one the number must be unique
-    for that tipo. Only the labels without extremes (Costituzione, Preleggi,
-    CCNL) match by name, and they win: Preleggi share the codice civile's R.D.
-    262/1942. Codici go through the extremes of their Normattiva URN, which is
-    how "codice in materia di protezione dei dati personali" reaches the page
-    Brocardi calls "Codice della privacy". **Never match a label as a
-    substring**: `do_know` used to look for "D.lgs. 2001-06-08, n. 231" inside
-    "(D.lgs. 8 giugno 2001, n. 231)", so no act outside the codici ever got its
-    dottrina and massime (69 of 100 sources). An act that is not on Brocardi
-    returns `None`, never the nearest label.
-  - `act_resolver.py` — `resolve_atto(name)` maps an act named the way a lawyer
-    writes it ("statuto dei lavoratori", "TUSL", "del D.Lgs. 231/2001") to
-    `{tipo_atto, data, numero_atto}`, over the `ATTI_NOTI` / `ATTI_DENOMINATI`
-    tables in `map.py`. It **never guesses**: an unrecognised name returns `None`
-    and `suggest_acts()` offers near misses. Chained after the exact-match paths
-    in `alias_resolver` and `nl_parser`, so nothing that resolved before changes.
-  - `egress.py` — `ALLOWED_HOSTS` plus `is_allowed(url)`, checked in
-    `ThrottledHttpClient.request`. `tests/test_egress_allowlist.py` fails the
-    build when a URL literal names an undeclared host. The runtime check covers
-    the shared HTTP client only — `SECURITY.md` lists the three paths it does
-    not cover (treextractor's own session, Playwright, redirect targets).
-  - `nl_parser.py` — natural-language query parser ("art. 3 cc" → params),
-    exposed at `POST /parse_query`
-  - `alias_resolver.py` + `preset_aliases.yaml` — preset aliases (`gdpr` →
-    Regolamento UE 2016/679); runs before the NL parser
-  - `citation_linker.py` — citation detection in article text, emits
-    `{start, end, display_text, article, act_type, date, act_number}`; exposed at
-    `POST /extract_citations`. EU acts ("regolamento (UE) 2016/679, art. 5",
-    "art. 5 del regolamento (UE) 2016/679", "direttiva 2002/58/CE") go
-    through `nl_parser`'s shared pattern, with the marker mandatory for
-    regulations — a bare "regolamento n. 5/2020" in a text is a national
-    one. A bare "art. 7" after a numbered act inherits its number and year,
-    not only its type
-  - `circuit_breaker.py` — per-source breaker. **State is in-memory
-    per-instance** — single-instance deployment only. Status at
-    `GET /api/circuit-breakers`
-  - `redis_cache.py` + `cache_manager.py` — Redis cache with automatic
-    filesystem fallback; startup warns when Redis is disabled or missing
-
-### Node backend (`/backend`)
-
-Express + Prisma. Auth, and the persistence for every user-owned slice.
-
-- `src/lib/prisma.ts` — the one `PrismaClient`; every module under `src/`
-  imports `prisma` from it. Each client owns a connection pool (physical CPUs
-  × 2 + 1 connections by default in Prisma 5; a flat 10 from Prisma 7), and
-  until September 2026 the server loaded eighteen, one per module — eighteen
-  pools against Postgres' `max_connections`. `tests/prismaClient.test.ts`
-  fails when a module under `src/` constructs another; the test harness
-  (`tests/setup.ts`, `tests/helpers.ts`) keeps its own clients on purpose.
-- `src/index.ts` — graceful shutdown on SIGTERM/SIGINT (pm2 restarts with
-  SIGINT): clear the saved-norm watcher's interval, `server.close()`, drop each
-  keep-alive socket as soon as it goes idle, `prisma.$disconnect()`, exit; a
-  forced exit after 10 s. The idle sweep is load-bearing: a socket that was
-  mid-request otherwise holds `close()` open for the whole keep-alive timeout
-  (~6 s, measured), past the 1.6 s pm2 waits by default before its SIGKILL.
-- `src/middleware/rateLimiter.ts` — tiers: anonymous 100/min (by IP),
-  authenticated 300/min (by userId), writes 20/min. `RateLimiterRedis` when
-  `REDIS_ENABLED=true`, else in-memory with a startup warning.
-- `src/utils/redis.ts` — `getRedisClient()`, returns `null` when disabled;
-  connection errors fail open.
-- `src/middleware/errorHandler.ts` — the only place a status is decided for an
-  unhandled throw. `AppError` carries its own; a Zod `ZodError` becomes **400**
-  naming the offending fields; everything else is a 500. Controllers therefore
-  call `schema.parse()` and let it throw — 41 sites across 13 controllers — and
-  must not catch it to hand-roll a status. The body is
-  `{ detail: string, errors?: [{ field, message }] }`: `detail` stays a plain
-  string because `services/api.ts` renders it straight to the user.
-- **Environments**: `Environment` model keeps searchable metadata in columns
-  (`name/description/author/version/category/color/tags`) and everything else in
-  one opaque `content` JSON blob. Deliberately separate from `SharedEnvironment`
-  (the forum entity) — a personal env can be promoted, the tables stay distinct.
-- **QuickNorm / CustomAlias**: full CRUD, plus a dedicated `POST /:id/use` per
-  entity (see gotcha 19). `CustomAlias` carries `@@unique([userId, trigger])`;
-  the controller maps Prisma P2002 to 409.
-- **Scoped bulk deletes**: `DELETE /annotations` and `DELETE /highlights`, both
-  scoped to `req.user.id`. Intended caller is `applyEnvironment(replace)` ONLY —
-  do not wire into end-user UI without a dedicated confirm flow.
-- Dossier item mutations are scoped to their dossier (IDOR fix — keep it that
-  way when adding item routes). `POST`/`GET /dossiers/:id/snapshots` are
-  scoped to the owner the same way. Write-only from the UI today ("Snapshot"
-  in the detail view); there is no restore yet.
-- **Saved-norm change tracking** (`routes/notifications.ts`, all behind
-  `authenticate`): `POST /notifications/normas/check` — the reader registers
-  `{normaKey, normaData: {norma_data, article_text}}` (Zod, 2 MB cap on the
-  text) — plus `GET /notifications/normas`, `GET …/unread-count`,
-  `POST …/mark-read`. One `NormaWatch` row per `(userId, normaKey)` holds
-  the last snapshot; a `NormaChangeNotification` is written when the
-  **text** differs. `compareNormaSnapshots` in `utils/normaWatcher.ts` is
-  the one definition of "changed" for both writers of those rows (this
-  endpoint and the background watcher): compare anything but `article_text`
-  and the two ping-pong false notifications forever, because each stores
-  `norma_data` in its own shape. A stored snapshot with no text
-  (metadata-only, from before this contract) is a `baseline`: the snapshot
-  is replaced and nothing is notified.
-- **`utils/normaWatcher.ts`** — started from `index.ts`. Every
-  `NORMA_WATCH_INTERVAL_MS` (6 h, floor 1 min) it refetches up to 100
-  watches through the Python API — `LEGAL_API_URL` is the **base** URL,
-  `/fetch_article_text` is appended — and notifies on a text change.
-  `NORMA_WATCH_ENABLED=false` turns it off. A malformed answer (no
-  `norma_data`, empty text) is a no-op, never a fallback to the stored data.
-  A run that fails outright (database unreachable as it starts) is logged by
-  the scheduler. **Nothing in the backend handles rejections globally**, so
-  any fire-and-forget promise (`void f()`) that rejects crashes the whole
-  server: catch it where it is fired.
-- **Article discussions** (`routes/articleDiscussions.ts`): threads anchored
-  on `{normaKey, articleId, version}` with comments, toggled votes and
-  reports; `PATCH /admin/article-discussions/:threadId` (moderation) is
-  `requireAdmin`. `sort=recent|active|popular` orders by `createdAt`,
-  `updatedAt`, vote count.
-- **Account data**: `GET /auth/export` (the user's data, minus password and
-  tokens) and `DELETE /auth/account` (password re-checked; every relation to
-  `User` cascades). Reached from the Settings modal.
-- **`GET /api/health/detailed`** — a `SELECT 1`, for the frontend's health
-  banner. The Python `/health/detailed` is the one that probes the sources
-  (see Key API Endpoints).
-
-### Frontend (`/frontend/src`)
-
-- `App.tsx` — routing. Routes: `/` (search), `/dossier`, `/history`,
-  `/environments`, `/forum`, `/documents`, `/admin/*`, plus `/login` and
-  `/register`.
-- `store/useAppStore.ts` — Zustand + Immer, the single global store.
-- `types/index.ts` — shared types. `services/` — one file per backend entity.
-- `components/features/` — `search`, `workspace`, `dossier`, `environments`,
-  `bulletin` (the Forum), `history`, `compare`, `settings`, `documents`
-  (`DocumentReviewPage`: citations found in a TXT/Markdown/HTML/DOCX the
-  user drops in — parsed in the browser, never uploaded — each opening the
-  reader through `navigate('/')` + `triggerSearch`, gotcha 15).
-- `components/layout/` — `Layout`, `Sidebar`, `ReaderLayout`.
-- `components/ui/` — shared primitives: `Button`, `IconButton`, `Input`, `Card`,
-  `Modal`, `ConfirmDialog`, `Toast`, `EmptyState`, plus feature-flavoured modals.
-  Interaction tokens live in `constants/interactions.ts`, stacking bands in
-  `constants/zIndex.ts`. Compose these rather than hand-rolling Tailwind.
-
-## Key API Endpoints
-
-POST unless noted, JSON bodies.
-
-- `/fetch_norma_data` — build norm structure from params
-- `/fetch_article_text` — fetch article text (array response)
-- `/stream_article_text` — stream results as NDJSON, one object per line
-- `/fetch_brocardi_info` — Brocardi annotations (position, ratio, spiegazione, massime)
-- `/fetch_all_data` — article text + Brocardi in one call
-- `/fetch_tree` — article tree for a complete URN
-- `/parse_query`, `/extract_citations` — NL parsing and citation detection
-- `/fetch_rubriche` — article titles and repealed articles for an act, from the
-  AKN index. Structure only: it never carries the display text
-- `/fetch_recitals` — every considerando of an EU act (`regolamento ue` /
-  `direttiva ue`) in one call: `{recitals: [{number, text}], count, url}`.
-  Reads the OJ page the tree already uses; a consolidated text has no
-  preamble and answers an empty list. Normattiva acts get a 400
-- `/fetch_act_fingerprints` — `{urn}` → a sha256 per article of the act's
-  AKN text plus, for the codici, the FRBRWork date of each article (the day
-  its current text came into force). `urn` is the act's full URL as
-  `norma_data.url` gives it (`https://www.normattiva.it/uri-res/N2Ls?urn:nir:…`),
-  not a bare `urn:nir:` string; an article suffix (`~art2`) is stripped. A
-  change detector, never the text: a client refetches only the articles
-  whose hash moved. `available: false` with empty maps when there is no AKN
-  index, or an index without fingerprints — the caller must then refetch
-  everything, not conclude nothing changed
-- `GET /fetch_alias_catalog` — the presets we ship plus the act names the
-  resolver already understands. The only GET among these; a POST answers 405
-- `/export_pdf` — PDF via Playwright (rejects non-Normattiva URNs — SSRF guard)
-- `GET /history` — server-side search history
-- `GET /health/detailed` — probes Normattiva, EUR-Lex and Brocardi **for
-  real**, on the shared client and circuit breakers. One result is cached
-  for `HEALTH_DETAILED_TTL` seconds (120) behind an `asyncio.Lock`, so N
-  concurrent cold callers run one probe; the body carries `cached` and the
-  status stays 503 while a source fails. Never wire it to a tight loop
-
-Root `app.py` maps failures through `_error_response`, so the status now carries
-meaning: `ValidationError` → 400 (missing `act_type`/`article`, malformed article
-input), `ResourceNotFoundError` → 404 (the article is not in the act),
-`RateLimitExceededError` → 429, everything else 500. Before, every failure was a
-500 — and `stream_article_text` raised through to Quart and answered an HTML
-error page instead of NDJSON.
-
-```json
-{
-  "act_type": "codice civile",
-  "date": "1990-08-07",         // optional
-  "act_number": "241",           // optional
-  "article": "2043",             // required: single, list "1,2", or range "3-5"
-  "version": "vigente",          // optional: "vigente" | "originale"
-  "version_date": "2024-01-15",  // optional
-  "annex": "A",                  // optional (allegato)
-  "celex_consolidated": "02002L0058-20091219"  // optional, EU acts only: serve this consolidated version
-}
-```
-
-Request fields are `act_type/act_number/date`; the `norma_data` in responses uses
-`tipo_atto/numero_atto/data`. The mismatch is real — map, don't assume.
-
-## Date System
-
-Two complementary paths, chosen by whether you need speed or truth.
-
-**Backend** (`visualex_api/tools/text_op.py`):
-- `complete_date_or_parse(date_str)` — **sync, fast, approximate**. Year-only
-  dates become `YYYY-01-01`. Used by `urngenerator.py` so URN generation never
-  blocks on a lookup.
-- `complete_date_or_parse_async(date_str)` — **async, slow, accurate**. Drives
-  Playwright to read the real publication date from Normattiva, memoised in
-  `_date_cache`. Used where the date is displayed or compared.
-- `complete_date()` — the low-level Playwright call behind the async wrapper.
-
-**Frontend** (`frontend/src/utils/dateUtils.ts`):
-- `parseItalianDate(dateStr)` — parses while preserving the original precision.
-- `formatDateItalianLong(date)` — "7 agosto 1990". Use this for every displayed
-  date; never `toLocaleDateString()`.
-
-**The principle**: synthetic `YYYY-01-01` exists for URNs only. The UI shows the
-precision the backend actually has — a year-only entry displays as a year, and
-that is correct, not a bug to normalise away.
-
-If date completion feels slow, you are probably calling the async variant in a
-loop; if a browser timeout appears, the async wrapper catches it and falls back
-to the cached or synthetic value.
-
-## Scraping Architecture
-
-1. **Routing**: `NormaController.get_scraper_for_norma()` picks the source —
-   EUR-Lex for TUE/TFUE/CDFUE/Regolamento UE/Direttiva UE, Normattiva for Italian
-   state law, Brocardi for annotations on Normattiva sources.
-   EU acts come from the Official Journal page unless the request names a
-   `celex_consolidated` (sector-0 CELEX, `02002L0058-20091219`): then the
-   tree, rubriche and article text are read from that consolidated page,
-   whose markup is different (`title-article-norm`, `modref` markers) and
-   handled by its own branch in `eurlex_scraper.py` / `treextractor.py`.
-   Consolidated texts carry no preamble — recitals always come from the OJ
-   page of the base act.
-2. **Parallel fetching** via `asyncio.gather()`.
-3. **Streaming**: `/stream_article_text` uses a Quart `Response` generator.
-4. **Browsers**: always through the `PlaywrightManager` singleton.
-
-Scrapers parse third-party HTML. When one breaks, the site changed — expect to
-update selectors, not logic.
-
-### Async rules (Python)
-
-Every scraper method is async (`get_document()`, `get_info()`). Quart routes are
-async by default. Never block the loop: wrap blocking I/O in
-`asyncio.to_thread()`. Playwright is async throughout — `WebDriverManager` is a
-deprecated alias of `PlaywrightManager`; Selenium is gone.
-
-Errors use the hierarchy in `visualex_api/tools/exceptions.py`
-(`ValidationError`, `ResourceNotFoundError`, `RateLimitExceededError`), surfaced
-by `NormaController.handle_error()`. Logging is structlog.
-
-## Frontend State
-
-One Zustand store (`store/useAppStore.ts`) with Immer. Always mutate through
-actions.
-
-**Server-backed** (hydrated by `fetchUserData`, mutated optimistically then
-synced): bookmarks, dossiers + items, environments, quickNorms, customAliases,
-annotations and highlights (these two hydrate per-article via
-`loadAnnotationsForArticle` / `loadHighlightsForArticle`), history.
-
-**UI-only** (persisted to `localStorage` through the `persist` partialize):
-workspace tabs and z-index, settings, `searchPanelState`.
-
-The partialize deliberately holds UI state only. **Every user-owned slice is
-server-backed** — see gotcha 17, which is the rule any new slice must follow.
-
-### How the collections differ
-
-- **Dossiers** (`/dossier`) — the working file for a task: many articles, read in
-  place, reorderable, exportable, shareable. This is where real work happens.
-- **Bookmarks** — a save action in the reading toolbar backed by
-  `bookmarkService`. There is **no bookmarks page or route**; the dedicated UI was
-  removed as dead code. Don't document or build against a bookmarks page without
-  first deciding to rebuild one.
-- **History** (`/history`) — server-side search history. It also hosts
-  `NormaChangesSection`, the one place the "a saved norm changed"
-  notifications are listed and marked read; the Cronologia entry in the
-  sidebar badges their unread count (`useForumNotifications().count.normaChanges`,
-  deliberately kept out of the Forum's `total`, which nothing on that page
-  could clear). Marking read dispatches `NORMA_NOTIFICATIONS_CHANGED_EVENT`
-  on `window` so the badge drops before the next 30s poll.
-
-All of them reopen a norm through `triggerSearch()`.
-
-### Aliases
-
-Three different things. Conflating them is the recurring mistake.
-
-- **Presets** (80) — shipped in `preset_aliases.yaml`, served by
-  `GET /fetch_alias_catalog`. 21 of them only rename an act type: "codice
-  appalti" IS the "Codice Contratti Pubblici" tile already in the palette's
-  grid, so listing them duplicates that grid. The palette shows only the 59
-  that carry a number and a date (`gdpr` → Reg. UE 679/2016), which is work
-  the grid cannot save.
-- **Known acts** (392) — names `act_resolver.py` understands unaided ("statuto
-  dei lavoratori", "TUSL"). These need no alias at all; one would only drift.
-- **CustomAlias** — the user's own, server-backed. A custom trigger beats a
-  preset of the same name, because the client resolves its own aliases before
-  asking the server. So the palette hides the shadowed preset rather than
-  advertising a shortcut that no longer runs, and the manager badges it
-  "sovrascritto".
-
-`AliasManager` is reached **only** from the command palette (gotcha 27), and in
-the palette the presets cost one line of header text at rest — they render as
-rows only once the user types, and cmdk does the matching. `useAliasCatalog`
-keeps its `loaded` flag in component state, so the palette and the manager each
-fetch the catalog once for as long as they stay mounted — two calls per session,
-never repeated, nothing persisted.
-
-### Reading surface
-
-The dashboard article view (`ArticleTabContent`) composes: `ArticleBody` (renders
-sanitised HTML + hosts `SelectionPopup`), `useArticleMarkers` (turns raw text into
-HTML with highlight `<mark>`s and wavy note anchors), and the toolbar
-(`ReadingToolbar`). Keys are `buildItemKey(norma)` and
-`uniqueArticleIdFromNorma(norma)` from `utils/normaKeys.ts` — the dossier reader
-uses the same two functions, and they must stay byte-identical or annotations
-made on one surface stop appearing on the other.
-
-**The text is structured, never rewritten** (round A, spec
-`docs/superpowers/specs/2026-09-25-lettura-testo-design.md`).
-`parseArticleStructure` (`utils/articleStructure.ts`) reads heading, rubric,
-commi, items with their printed enumerator and level, Normattiva's
-`((modifications))` and repeal notices, `(119)` references and the
-AGGIORNAMENTO notes, as raw ranges that partition `article_text`;
-`renderArticleHtml` (`utils/articleRender.ts`, behind `useArticleMarkers`)
-emits one `div.vlx-b.vlx-{kind}` per block, cutting the text at every block and
-mark edge and nesting marks with a stack, so the HTML is always well-formed and
-escaped. Styles are the `.vlx-*` rules in `index.css` (READING SURFACE): a 68ch
-measure, commi divided by space, hanging numbers and items. The contract is
-gotcha 23: the rendered text nodes spell `article_text` minus `\n` — any new
-label goes in CSS (`content: attr(...)`), never in a text node.
-`articleRender.test.ts` enforces it on 27 real texts
-(`utils/__fixtures__/articleTexts.ts`). Tab, dossier reader and Study Mode all
-render this way; Study Mode hides the heading and rubric blocks
-(`vlx-hide-header`) instead of cutting them, so its offsets are
-document-relative like everywhere else. The Brocardi sections render flat
-(`structure: null`).
-
-**Offsets are measured from the text alone.** `SelectionPopup` takes a
-`textRootRef` (the element holding only the article text) and stores the anchor
-from `getSelectionAnchor` (`utils/selectionOffset.ts`), which reads
-`Range.toString()`: `Selection.toString()` is rendered text and writes a newline
-per line or comma boundary, which made every cross-comma highlight unmatched.
-The renderer also accepts, at the same offset, a stored text that differs only
-in whitespace, so those older highlights show again.
-
-**Normattiva's update notes** are interactive and out of the way:
-`useArticleTextInteractions` delegates click and Enter/Space on the body — a
-`(119)` chip opens `UpdateNotePopover`, the "Note di aggiornamento (N)" toggle
-folds the tail through the `vlx-updates-open` class on the text container
-(the HTML never changes when it opens). A reference whose note is not in the
-text is plain text; only `((49))` is dimmed.
-
-**Notes**: a Peek popover (`NotesPeekPanel`) from the toolbar for browsing and
-free notes; `InlineNoteComposer` anchored on the selection when creating an
-anchored note; `InlineNotePopover` when clicking an existing wavy underline.
-Three entry points, deliberately distinct — don't collapse them.
-
-**Highlights**: created **only** from `SelectionPopup`. The toolbar's Highlighter
-button opens `HighlightsActionsPicker`, an action bar that toggles visibility and
-exports to `.txt` — it is not a second creator (that was tried and rolled back).
-
-**Discussions**: the toolbar's speech-bubble button opens
-`ArticleDiscussionPanel`, a draggable portal anchored on
-`{normaKey, articleId, version}` (threads, replies, votes, report; moderation
-is admin-only, `PATCH /admin/article-discussions/:id`). The panel is mounted
-for every rendered article and fetches **only while open** — a load on mount
-cost one GET per article of a range.
-
-**Saved-norm change check**: when a *bookmarked* article is shown,
-`ArticleTabContent` posts `{norma_data, article_text}` to
-`/notifications/normas/check`; the server keeps one snapshot per
-`(user, normaKey)` and answers `changed` when the **text** differs, which
-the reader toasts. The effect is keyed on `(itemKey, isSavedArticle)` and
-reads the body through a ref, so a re-render with the same text as a new
-object does not post again; it is separate from the highlights/annotations
-load effect, which stays keyed on identity alone.
-
-**The index is a window, the text is not.** `TreeViewPanel` takes a `variant`:
-`'window'` on desktop — a draggable, backdrop-less window portalled to
-`document.body`, parked where the user left it — and `'drawer'` on mobile, the
-old right-side sheet. Neither closes when an article is picked: taking three
-articles out of an index without reopening it is the whole point. Ownership of
-the desktop window lives in the store as a single `structureWindow.blockId`, so
-opening one block's index hands the window over rather than stacking a second.
-The floating mechanism belongs to the *tool*, not the content — the owner's own
-framing, and the correction that shaped round 2a.
-
-**Opening an act without an article.** `fetchActUrn` (`utils/actUrn.ts`) resolves
-an act's URN structurally, with no text fetched; `addNormaIndexToTab` then drops
-an article-less block on a tab and points the window at it atomically. The
-palette's "Apri l'indice e sfoglia" is the entry point. A block with zero
-articles is a legitimate state — guard anything that dereferences the active
-article (`StudyMode` is mounted conditionally for exactly this reason).
-
-**Going back.** `readingBackStack` records **citation jumps only**. Picking from
-the index does not lose your place, and a previous/next arrow is undone by the
-opposite arrow; recording those would fill the stack with stops nobody wants.
-`ReadingBackControl` renders once for the whole app — the stack is global, so a
-per-tab copy would sit inside the very tab an entry points at. It names its
-destination, and it has no keyboard shortcut on purpose: every natural
-combination for "back" already belongs to the browser.
-
-### Dossier
-
-A dossier is where the articles needed for a task are aggregated and read.
-
-- **Rows expand in place**: clicking a norma row renders `DossierItemReader.tsx`
-  inline, reusing the dashboard reading layer (markers, `SelectionPopup`, note
-  composer and popover). "Apri su Dashboard" and "Copia citazione" live in the
-  expanded footer. `ArticleViewerModal` no longer exists.
-- **Fetching**: `utils/articleFetchCache.ts` — session-only cache, in-flight
-  de-dup, max 3 concurrent fetches, errors not cached so "Riprova" really
-  refetches.
-- **Important star**: reading statuses (unread/reading/done) were removed. The
-  star persists through a `_dossierMeta` envelope packed into the item's `content`
-  JSON — no backend schema change — via `packItemContent`/`unpackItemContent` in
-  `dossierUtils.ts`. `updateDossierItemStatus` writes only `'unread' | 'important'`
-  and defers the PUT while an item is still in `pendingDossierItemIds` (its
-  `addItem` POST hasn't returned a server id yet), replaying it once settled.
-  Legacy status values still hydrate and simply render as unstarred.
-- **Collection**: `AddToDossierPopover.tsx` is the only add-from-reading entry
-  point (from `ReadingToolbar` and `LooseArticleCard`). It lists recent dossiers,
-  guards duplicates, and its inline "Nuovo dossier" waits for the server id
-  before adding — `createDossier()` returns `Promise<string | null>`.
-  `DossierModal` is create-only.
-- **Rows** (`SortableDossierItem`): the expand toggle lives on a header-scoped
-  sub-div, never wrapping the reader or the action buttons (see gotcha 22); the
-  star keeps a 44px touch target.
-
-## Shared utilities — check before writing a new one
-
-Duplicating any of these is a defect, not a shortcut.
-
-**Python**: `urngenerator.py` (URNs) · `text_op.py` (text parsing + dates) ·
-`treextractor.py` (trees) · `PlaywrightManager` (browsers) ·
-`article_suffixes.py` (the ordinal suffix table).
-
-**Frontend**:
-- `utils/normaKeys.ts` — `buildItemKey(norma)` (norm + article),
-  `buildNormaKey(norma)` (act only, used to group streaming results),
-  `uniqueArticleIdFromNorma(norma)`. Both keys share their act-level segments so
-  they cannot drift. `buildItemKey` is the annotation/highlight key contract and
-  must stay byte-identical across dashboard and dossier.
-- `utils/actUrn.ts` — `fetchActUrn(params)`: an act's URN with no article text
-  fetched. It sends `article: '1'` because the endpoint refuses to build a
-  `NormaVisitata` without one — a probe, not a request for article 1.
-- `utils/readingBackStack.ts` — `appendBackEntry`, `peekReadingBack`,
-  `findLiveBackIndex` for citation-jump undo.
-- `hooks/useIsDesktop.ts` — viewport check for components that must render
-  *structurally* different markup per breakpoint (portal vs. inline). It existed
-  as two private copies before round 2a; do not make a third. For anything a CSS
-  breakpoint can express, use the CSS breakpoint.
-- `utils/articleSuffixes.ts` — `ARTICLE_ORDINAL_SUFFIXES` and
-  `ARTICLE_SUFFIX_ALTERNATION`, the one ordinal table behind every article-number
-  regex (`citationMatcher`, `citationParser`, `treeUtils`, `articleStructure`).
-  Mirrors `visualex_api/tools/article_suffixes.py` — change both together. Each
-  pattern must close the alternation with `\b`.
-- `utils/articleIds.ts` — `getUniqueArticleId(article)` (canonical `allN:num`),
-  `filterLoadedIdsForAnnex(ids, annex)`, `findArticleByNormalizedId(articles, id)`
-  (**tolerant** lookup — required, see gotcha 9).
-- `utils/dateUtils.ts` — `parseItalianDate`, `formatDateItalianLong`,
-  `expandTwoDigitYear` (the one two-digit-year pivot, same as the backend's
-  `_expand_year`: "90" → 1990, "23" → 2023).
-- `utils/euCitation.ts` — the one reading of an EU pair ("2024/2847" is year
-  then number, "679/2016" the reverse, "2006/2004" number first), shared by
-  the palette parser and the in-text matcher and mirrored by
-  `resolve_eu_year_and_number` in `nl_parser.py`, which `citation_linker.py`
-  reuses through `build_eu_act_pattern` / `eu_act_from_groups`. Change all
-  four together. The two in-text detectors (`citationMatcher.ts`,
-  `citation_linker.py`) read the same prose forms: "regolamento (UE)
-  2016/679, art. 5", "art. 5 del regolamento (UE) 2016/679", "art. 5, comma
-  1, del …", and a list ("articoli 8 e 9 del …") becomes one link per number,
-  all towards the EU act. The client matcher reads the article-first form
-  for numbered national acts too ("art. 7 del d.lgs. 196/2003", with or
-  without the preposition), as the server's `_EXPLICIT_CITE_RE` and
-  `_ART_DEL_ACT_RE` do, and the codici and the Costituzione named in full
-  ("art. 5 del codice civile") through `FULL_ACT_NAMES`, the palette's own
-  vocabulary. An article the prose gives to an act no pattern can read
-  ("art. 17 della legge 23 agosto 1988, n. 400") gets no link on the
-  client rather than one to the act being read.
-- `utils/normaMeta.ts` — `formatNormaMeta(norma, { variant })` for the subtitle
-  (`'card-mobile' | 'card-desktop' | 'block'`), `formatCitation(norma)` for the
-  copyable citation string.
-- `utils/articleFetchCache.ts` — `fetchArticleForNorma`, cached and capped.
-- `utils/articleStructure.ts` + `utils/articleRender.ts` — the structured
-  reading text (see Reading surface). `parseArticleStructure`, `getRubricText`,
-  `getUpdateNoteParagraphs`; `renderArticleHtml` is what `useArticleMarkers`
-  calls. Real test texts in `utils/__fixtures__/articleTexts.ts`.
-- `utils/selectionOffset.ts` — `getSelectionAnchor(root, selection)` (text and
-  plain-text offset of a selection, from the DOM text) and `plainOffsetAt`.
-  Every surface that creates a highlight or an anchored note goes through it.
-- `hooks/useArticleTextInteractions.ts` — the update-note chips and the
-  foldable AGGIORNAMENTO tail, for any surface that renders structured text.
-- `components/features/dossier/dossierUtils.ts` — `searchParamsFromNorma`,
-  `packItemContent`/`unpackItemContent`, `computeItemCounts`, `dossierRecency`,
-  `dossierContainsArticle`, `computeNormaGroups`, `formatTimestampLong`.
-- `hooks/useAnnexNavigation.ts` — shared tree fetch + annex switch + load article.
-- `utils/deepLinks.ts` — `buildSearchDeepLink(params, articleId)` /
-  `parseSearchDeepLink(value)`: the `?norma=` share link (base64url JSON with
-  an optional article to focus, which `SearchPanel` focuses even inside a
-  range). `SearchPanel` still reads the older `?share=`.
-- `utils/searchFilters.ts` — `matchesSearchFilters(article, filters)` for the
-  palette's source / Brocardi / historical / year filters, applied
-  client-side to each streamed result. `SearchPanel` counts what a filter
-  drops and, when nothing got through, says so instead of showing an empty
-  search.
-- `utils/normaChanges.ts` — `normaFromChangeNotification` /
-  `normaChangeLabel`: reopen and label a change notification from the
-  snapshot the server stored (null, not a guess, when the snapshot has no
-  identity).
-- `hooks/useForumNotifications.ts` — the one 30s poller behind both sidebar
-  badges (Forum `total`, Cronologia `normaChanges`).
-- `hooks/useServiceHealth.ts` + `ui/ServiceHealthBanner` — probes
-  `/api/health/detailed` (Node, a `SELECT 1`) and `/health/detailed` (Python, which reaches
-  Normattiva, EUR-Lex and Brocardi for real). Once on mount, then every
-  **5 minutes** per visible tab, plus "Ricontrolla"; the Python answer is
-  cached server-side for `HEALTH_DETAILED_TTL`. Do not tighten either loop —
-  the first version polled every 60s per tab.
-
-## UI Conventions
-
-Non-obvious rules baked into the codebase. Follow them so new surfaces stay
-coherent.
-
-**Destructive confirmations** — never `window.confirm`. Use
-`components/ui/ConfirmDialog` with `variant="danger"`, and word the message so it
-names the scope *and* what is not touched ("Segnalibri e dossier non saranno
-toccati").
-
-**Keyboard-accessible collapsibles** — a `div` that toggles on click needs
-`role="button"`, `tabIndex={0}`, `aria-expanded`, a dynamic `aria-label`
-(espandi/comprimi), and `onKeyDown` for Enter/Space with `preventDefault()`. The
-handler must start with `if (e.target !== e.currentTarget) return;` or interactive
-children re-trigger the toggle. Always add
-`focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500`.
-Never nest interactive content inside the element carrying `role="button"` —
-scope the role to the header, as `SortableDossierItem` does.
-
-**Popovers with `@floating-ui/react`** — split positioning and animation across
-**two** elements: outer div takes `refs.setFloating` + `floatingStyles`, inner div
-owns the entry animation. On the same element the scale transform overwrites the
-positioning transform. Compute `transformOrigin` from `placement` (see
-`getTransformOrigin` in `NotesPeekPanel.tsx`). Anchor via a `useState` element,
-not a ref object, and pass it at render time (gotcha 13).
-
-**Toggle buttons** — drive the visual from an `isPressed` selector, not a fixed
-colour: idle `text-slate-400` + hover accent, active `bg-{accent}-50
-text-{accent}` (plus `fill-` when the icon has a body). Toast wording must match
-the action actually taken. Always set `aria-pressed`.
-
-**Two flavours of pop-up** — *Peek* (header, scrollable body, composer; ~360px,
-page-themed) when the surface lists or edits content; *action bar* (thin dark
-slate, 2-4 icon buttons with 1px dividers, no chrome) when it only performs
-actions. Both use the outer/inner split above.
-
-**Sticky filter rows** — `sticky top-0` alone lets content scroll through. Give
-the row an opaque background matching the panel, bleed it edge-to-edge with
-negative margins matching the parent padding, add `border-b border-current/10`,
-and raise it to `z-20`.
-
-**Stacking** — use the bands in `constants/zIndex.ts` (`sidebar` 50, `dock` 80,
-overlay band 1000+), never a bare literal. See gotcha 22 before assuming a
-z-index will be honoured.
-
-**Beating inline `style="..."` without `!important`** — when markup you don't
-control ships inline styles (e.g. `useArticleMarkers` emits
-`<mark style="background-color:hsl(var(--hl-yellow-bg))">`), first try
-**redefining the CSS variable in a narrower scope** so the inline `hsl(var(--…))`
-resolves differently. Only if the inline style references no variable, fall back
-to a single narrowly-scoped `!important` with a comment justifying why every
-other route fails.
-
-**Colour markers** — for a list mirroring something already coloured in the
-article body, use a 4px stripe down the card's leading edge rather than
-re-applying a saturated background behind the text.
-
-**Mobile-first** — interactive controls keep a 44px touch target on mobile.
-`TOUCH_TARGET_RESPONSIVE` in `constants/interactions.ts` covers the height only
-(`min-h-[44px] md:min-h-0`); icon-only buttons need the width too, so they carry
-`min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0` explicitly — as the dossier
-row's star and remove buttons do.
-
-## Common Patterns
-
-**New scraper** — add the class in `services/`, implement async
-`get_document(normavisitata) -> Tuple[str, str]`, register the act type in
-`NormaController.get_scraper_for_norma()`, extend `tools/map.py` if needed.
-
-**New API endpoint** — route in `NormaController._setup_routes()`, async handler,
-`await request.get_json()`, return `jsonify()`, log with structlog.
-
-**New frontend component** — compose the `ui/` primitives and the interaction
-constants; import types from `types/index.ts`; reach state through
-`useAppStore()`; Tailwind v4 for styling.
-
-**Playwright work** —
-
-```python
-from visualex_api.tools.browser_manager import PlaywrightManager
-
-manager = PlaywrightManager()
-browser = await manager.get_browser()
-page = await browser.new_page()
-# ... work
-await page.close()
-```
-
-The manager owns the lifecycle; don't tear browsers down yourself.
-
-## Working in this repo
-
-Feature work runs as **rounds**: a short interview about real usage, a spec in
-`docs/superpowers/specs/`, a plan in `docs/superpowers/plans/`, then
-implementation task by task with a review after each. The specs and plans are the
-record of *why*; read the relevant one before reopening an area.
-
-Verification before calling anything done: `npm run test` and `npm run build` in
-`frontend/`, plus a real browser pass for UI work (dev server at
-`http://localhost:5173`; the app requires login). Fix pre-existing errors you
-surface in files you touch rather than deferring them.
-
-Specialised subagents live in `~/.claude/agents` — check what is actually
-available before dispatching, rather than assuming a name exists.
-
-`docs/archive/` holds superseded design material (the March 2026 BMAD cycle, the
-April polish audits). It is history, not guidance. `docs/design/` holds visual
-work that is decided but not yet applied. If a `docs/merlt/` directory shows up in
-your working tree, it belongs to `visualex-merlt-main`, not to `main`.
-
-## Environment Variables
-
-**Python API** — `HOST` (`0.0.0.0`), `PORT` (`5000`), `REDIS_ENABLED` (`false`;
-filesystem cache when off, warned at startup), `REDIS_URL`,
-`REDIS_CACHE_PREFIX` (`vlx`), `PERSISTENT_CACHE_TTL` (`86400`),
-`HTTP_MAX_CONCURRENCY` / `HTTP_TIMEOUT` / `HTTP_MAX_RETRIES`,
-`ALLOWED_ORIGINS` (**unset means localhost only — production must set it**),
-`RATE_LIMIT` / `RATE_LIMIT_WINDOW` (`1000` / `600` per IP),
-`AKN_ENABLED` (`true` — kill switch for the whole Akoma Ntoso path, read at
-call time), `AKN_CACHE_MAX_ACTS` (`40` — parsed article indexes held in memory;
-a few tens of KB for an ordinary act, a few hundred KB for a codice because of
-the per-article fingerprints), `HEALTH_DETAILED_TTL` (`120` — seconds the
-`/health/detailed` probe is cached, read at call time). Template in
-`.env.example`.
-
-Runtime dependency worth knowing: `lxml` (`requirements.txt`) is what the AKN
-parser uses; it ships a `cp314` wheel, so `deploy.sh` needs no compiler.
-
-**Node backend** — see `backend/.env.example`. `REDIS_ENABLED` defaults to
-`"true"` there to mirror production; set `"false"` for dev without Redis.
-`NORMA_WATCH_ENABLED` / `NORMA_WATCH_INTERVAL_MS` / `LEGAL_API_URL` drive the
-saved-norm watcher (see the Node backend section); all three have defaults.
-
-## Critical Files
-
-Breaking one of these breaks the product. Read before editing.
-
-**Python** — `visualex_api/app.py` (controller) · `tools/norma.py` (models) ·
-`tools/text_op.py` (parsing + dates) · `tools/browser_manager.py` (browser pool) ·
-`services/*_scraper.py` (fragile HTML parsers).
-
-**Frontend core** — `store/useAppStore.ts` · `types/index.ts` · `services/api.ts` ·
-`utils/normaKeys.ts` · `utils/articleIds.ts` · `utils/articleSuffixes.ts` ·
-`utils/articleStructure.ts` · `utils/articleRender.ts` · `utils/dateUtils.ts` ·
-`utils/normaMeta.ts` · `utils/articleFetchCache.ts` · `utils/actUrn.ts` ·
-`utils/readingBackStack.ts` · `hooks/useAnnexNavigation.ts` ·
-`hooks/useIsDesktop.ts` · `constants/zIndex.ts` · `constants/interactions.ts`.
-
-**Frontend features** — each of these folders was split out of a monolith and is
-meant to stay split; add new features as new files, not inside the shells:
-
-- `features/dossier/` — `DossierPage.tsx` is a thin shell routing list/detail via
-  `?dossier=<id>`; `DossierListView.tsx` (grid, context menu, shortcuts `n` `/`
-  `i`), `DossierDetailView.tsx`, `SortableDossierItem.tsx` (row + star + expand),
-  `DossierItemReader.tsx` (in-place article), `AddToDossierPopover.tsx`,
-  `ToolbarButton.tsx` (colour-token toolbar button with `pressed`/`pressedColor`),
-  one file per modal, shared helpers in `dossierUtils.ts`.
-- `features/environments/` — `EnvironmentPage.tsx` shell + `EnvironmentCard.tsx` +
-  one file per modal; `EnvironmentContentViewer.tsx` renders the shared
-  dossier/quickNorm/alias/annotation/highlight tree. Cards carry a category
-  stripe and a stale/fresh chip; primary action is "Unisci", replace lives in the
-  3-dot menu behind a danger `ConfirmDialog`.
-- `features/bulletin/` — the Forum. Folder and component names stay `bulletin`
-  because they match the backend `SharedEnvironment` model; the route is `/forum`
-  and the UI label is "Forum". `BulletinBoardPage.tsx` is a shell over three dumb
-  views (`ForumExploreView`, `ForumMyEnvironmentsView`, `ForumSuggestionsView`).
-  The suggestion flow adds `SuggestionReviewDialog`, `EditSuggestionDialog`,
-  `SuggestionItemCard` (all five itemTypes), `AliasConflictDialog`,
-  `AddItemsDialog` and `AttributionChip` (see gotchas 20-21).
-- `features/search/` — `ArticleTabContent.tsx` (the reading surface),
-  `ArticleBody.tsx`, `NotesPeekPanel.tsx`, `InlineNoteComposer.tsx`,
-  `InlineNotePopover.tsx`, `UpdateNotePopover.tsx` (a Normattiva update note,
-  opened from its `(119)`), `HighlightsActionsPicker.tsx`, `ReadingToolbar.tsx`,
-  `SearchPanel.tsx` (streaming merge logic, and the mount point for both
-  `CommandPalette.tsx` and `AliasManager` — see gotcha 27),
-  `TreeViewPanel.tsx` (the article index window).
-- `features/settings/` — `AliasManager.tsx` and nothing else. Named for what it
-  edits, not for where it opens: it is reached from the command palette, not
-  from Settings (gotcha 27). See the Aliases section above.
-- `features/workspace/` — `WorkspaceManager`, `WorkspaceTabPanel`,
-  `NormaBlockComponent`, `LooseArticleCard`, `LazyStudyMode` (the
-  `StudyMode/` bundle behind `lazy()`; `PDFViewer` and `CompareView` are
-  lazy the same way), and `WorkspaceNavigator` (the dock: "Allinea" and
-  "Chiudi tutte", the latter behind a danger `ConfirmDialog` because the
-  workspace is persisted).
-- `features/history/` — `HistoryView.tsx` plus `NormaChangesSection.tsx`
-  (see History above).
-- `features/documents/` — `DocumentReviewPage.tsx` only.
-
-**Backend** — `prisma/schema.prisma` · `src/lib/prisma.ts` · `controllers/` (`environmentController`,
-`quickNormController`, `customAliasController`, `dossierController`) ·
-`routes/` (all authenticate-gated, mounted on `/api`).
-
-## Gotchas
-
-1. **Scraper fragility** — every scraper depends on third-party HTML. Breakage
-   means the site changed.
-2. **Async context** — never block the Python event loop; wrap blocking calls in
-   `asyncio.to_thread()`.
-3. **Rate limiting** — per-IP, configured in `config.py`; 429 when exceeded.
-4. **Playwright** — needed for PDF export and date completion
-   (`playwright install chromium`); always via `PlaywrightManager`.
-5. **Dates** — sync for URNs (approximate), async for display (accurate); never
-   render a synthetic `YYYY-01-01`. See Date System.
-6. **CORS/proxy** — the Vite dev server proxies to the Python API; check
-   `vite.config.ts`. `ALLOWED_ORIGINS` unset means localhost only.
-7. **Annex handling** — codici carry a default annex in the URN; see
-   `create_norma_visitata_from_data()`.
-8. **Selenium is gone** — Playwright only.
-9. **Article id formatting (`-bis` / `-ter`)** — the tree API and the scraper
-   disagree (`"1-bis"` vs `"1 bis"`). Server-side both are now canonicalised
-   through `normalize_article_key` (`services/akn_parser.py`), which reads the
-   ordinal from `tools/article_suffixes.py` and falls back to "any alphabetic
-   tail" for anything that table does not list — Normattiva goes well past
-   `decies` ("2409 octiesdecies" c.c.). On the frontend the tolerant
-   `findArticleByNormalizedId` is still required: a naive `===` silently misses
-   and falls back to the first article. Always use it, then canonicalise with
-   `getUniqueArticleId(match)` before storing in state. The accepted forms now
-   include the dotted sub-number (`270-bis.1`, `171-octies.1`), the slash
-   (`314/2`) and multi-token ordinals (`135-sex-decies`), on both the server
-   normaliser and the archive (`archivio_normativo/hierarchy.py`).
-10. **Popover positioning vs entry animation** — floating-ui positions with an
-    inline `transform`; an `animate-in zoom-in-95` on the *same* element
-    overwrites it and the popover flies from (0,0). Split across two elements.
-11. **`set-state-in-effect`** — prefer deriving the value during render over
-    silencing the rule. Silence only for effects synchronising with an external
-    signal *and* mutating external state in the same transaction, and always
-    leave the justification on the disable line.
-12. **Workspace tab pin was removed** — the flag only suppressed bring-to-front,
-    which contradicted the word "pin". Don't reintroduce without a product
-    reason. `Dossier.isPinned` is unrelated and stays.
-13. **Popover first paint at (0,0)** — floating-ui computes position
-    asynchronously. Registering the reference in a layout effect leaves the first
-    paint uncoordinated. For DOM anchors pass
-    `useFloating({ elements: { reference: anchorEl } })` at render time. For
-    **virtual** elements that path throws, so use `refs.setPositionReference()`
-    plus `visibility: isPositioned ? 'visible' : 'hidden'`.
-14. **StrictMode double-invoke + multi-step store actions** — an effect issuing
-    two separate mutations runs both twice against the same closure value.
-    Collapse them into one atomic store action (`drainNextSearch` is the
-    canonical example) so the second invocation finds the precondition already
-    satisfied and no-ops.
-15. **Dossier "apri tutte le norme"** — `triggerSearch` overwrites the trigger, so
-    a loop keeps only the last. The flow queues params and drains them one at a
-    time; each carries `tabLabel` (cosmetic) and `targetTabId` (load-bearing —
-    tells `processResult` to skip merge heuristics). The destination tab is
-    pre-created synchronously before `navigate('/')`. Without `targetTabId` a
-    stale orphan tab in persisted state can swallow the results.
-16. **Capture the selection rect eagerly** — before `hidePopup()` /
-    `removeAllRanges()`, because the selection is gone immediately after. The rect
-    travels through `onAddNote(text, startOffset, rect)`.
-17. **Every user-owned slice is server-backed** — every create/update/delete must
-    round-trip the backend. The canonical regressions were `importDossier` and
-    `applyEnvironment`, which pushed a local `uuidv4()` into the store; the UI
-    looked fine until the first `addItem` 404'd on a ghost entity. Creation goes
-    through `service.create()` first so the store holds server ids; mutations are
-    optimistic + sync + revert. `applyEnvironment(replace)` also wipes
-    server-side first, gated behind a danger `ConfirmDialog`.
-18. **Never silently swallow errors in load paths** — `.catch(() => [])` in
-    `fetchUserData` once hid a backend restart behind an empty UI for a whole
-    session. Log with context before any fallback.
-19. **Atomic usage counters** — `usageCount` bumps go through `POST /:id/use`
-    (`increment: 1`), never a read-modify-write PUT. Client pattern: bump locally
-    for instant feedback, then fire-and-forget `service.use(id)`; the next
-    `fetchUserData` is the source of truth.
-20. **SuggestionItem payloads are server-trusted** — the `take` handler trusts the
-    stored shape, so any rename must happen before storage. That is why the alias
-    Rename path is deferred; Replace and Skip cover the flows.
-21. **`sourceSuggestionId` + `originalAuthorId` are the attribution contract** —
-    never mutate or filter them out. If a row has an author, the UI shows the
-    `AttributionChip`; a deleted author renders "@utente-rimosso" by design.
-22. **A z-index is inert on a `static` element, and `backdrop-filter` traps its
-    descendants.** The sidebar was `lg:static` with `z-50` (never applied) *and*
-    `backdrop-blur-xl`, which creates a stacking context — so its hover tooltips
-    could not escape it no matter how high their own z-index went, and page
-    content painted over them. Before reaching for a bigger number, check that the
-    element is positioned and that no ancestor sets `backdrop-filter`, `filter`,
-    `transform`, `opacity < 1` or `isolation`. Fix the ancestor or portal out;
-    raising the child's value does nothing.
-
+A bare `tsc --noEmit` does not walk the project references and reports a false
+green. The MERL-T suite runs in CI or against a disposable database
+(`services/merlt/CLAUDE.md`), never against the development stack's.
+First-time setup: `docs/setup.md`. `--dev` prepares a fresh checkout itself (env
+files, venv, packages, Chromium). `--prod --branch main|develop` fast-forwards the
+checkout to origin's latest commit of that branch (`scripts/prod/update.sh`) and
+deploys it; `--no-pull` deploys what is checked out — `main`, `develop` or a
+`vX.Y.Z` tag, clean tree, unless `--allow-branch`; a bare `--prod` asks at the
+terminal. Either way after a backup of an existing stack; on its first run it creates `infra/.env` and `apps/server/.env`
+with generated secrets and refuses development values. Both modes read
+`infra/.env` and, by default, share the stack name `visualex` (`VISUALEX_STACK`):
+never run `--dev` on the deployment host. Design:
+`docs/superpowers/specs/2026-09-29-modular-deployment-design.md`.
+
+## Git flow — `docs/git-workflow.md`
+
+- `main` is the released version; `develop` is where work lands and the
+  default branch.
+- Branch from `develop` (`feat/`, `fix/`, `refactor/`, `chore/`, `docs/`),
+  open a pull request into `develop`, merge it yourself with a merge commit
+  titled `merge: <branch> — <what changes>` once CI is green.
+- Review is requested, never awaited: `.github/CODEOWNERS` asks the other
+  developer to review changes to authentication, the Prisma schema and
+  migrations, licences, `.github/`, `infra/` and the data scripts,
+  `.claude/settings.json`, and `normattiva_scraper.py`; the author merges at
+  green CI. The licence, assignment and contribution terms are decided by
+  both owners together.
+- A migration or a file several areas share (this file, `.claude/settings.json`,
+  `.github/`, `infra/`, `start.sh`) is reserved in the owners' coordination
+  register before a branch touches it.
+- A release (`X.Y.Z`: the minor number per batch of features, the patch per
+  hotfix) is a pull request `develop → main`, then a tag `vX.Y.Z`, with its
+  section in `CHANGELOG.md` and a short Italian note for users; the checklist
+  is in `docs/git-workflow.md`. A hotfix starts from `main`, returns to `main`,
+  and `main` is merged into `develop` at once.
+- The deployment host runs the latest release; a `preview/…` branch runs
+  there only when the owner asks.
+- No other long-lived branch: experiments sit behind flags.
+- The shared hook (`.claude/settings.json`) refuses commits on `main` and
+  `develop` of this repository, pushes to them, and `prisma migrate
+  dev/reset`. GitHub's ruleset refuses the same pushes and any merge whose CI
+  is not green.
+
+## Before calling work done
+
+- The suites of every area you touched, green.
+- UI work: a real browser pass on `http://localhost:5173` (login required).
+- Errors you surface in files you touch are fixed, pre-existing ones too.
+- Feature work runs as rounds: an interview about real use, a spec in
+  `docs/superpowers/specs/`, a plan in `docs/superpowers/plans/`, then task by
+  task with a review after each. `docs/archive/` is history, not guidance.
+
+## Rules that cross areas
+
+**Nothing private enters the repository.** It is public. No notes from the
+owners' private workspaces, no infrastructure addresses, no personal paths or
+names, no secrets. `.env` files are never committed and Claude does not read
+them.
+
+**Data moves by export and import.** `scripts/backup.sh` and
+`scripts/restore.sh`; never copy a database's files, never delete a volume you
+did not create.
 
 23. **`article_text` is a data contract, not a string.** Highlights and anchored
     notes are pinned by `(startOffset, text)` where the offset counts characters
@@ -981,70 +132,25 @@ meant to stay split; add new features as new files, not inside the shells:
     is frozen and why AKN is never the display text. The same holds on the
     rendering side: the structured reading surface may wrap characters in
     elements but never add, drop or change one — `articleRender.test.ts`
-    checks the rendered text nodes against `article_text` on 27 real texts.
+    checks the rendered text nodes against `article_text` on 27 real texts,
+    with the annotation signs on (a sign has no text node).
     (Inserting only `\n` would not move any offset — newlines are invisible in
     the projection — but the saved-norm watcher compares `article_text`
     verbatim, so it would still raise false "changed" notifications.)
-
-24. **A missing article gets you a different one.** Normattiva answers a request
-    for a nonexistent article with the act's Art. 1 and HTTP 200. The existence
-    check in `create_norma_visitata_from_data` is what turns that into a 404
-    ("Articolo N non presente in …", through `_error_response`); it fails open,
-    so a Normattiva outage is never reported as "does not exist". A range where
-    *some* articles exist keeps those and drops the rest.
-
-25. **`store/workspaceTabActions.ts` is a dead duplicate — edit `useAppStore.ts`.**
-    The live workspace-tab actions are inlined in the store (`addNormaToTab` and
-    friends); nothing imports the factory in that file. Its only live export is
-    the `NormaBlock` / `LooseArticle` *types*, imported by `useGlobalSearch.ts`.
-    Editing an action there changes nothing at runtime. The file carries a header
-    saying so; relocating the types and deleting the rest is queued for round 2b.
-26. **A portal escapes `hidden md:block`, so a CSS breakpoint cannot gate it.**
-    `display: none` hides descendants, but a portal re-parents to `document.body`
-    and leaves the hidden subtree behind — the desktop renderer would surface its
-    window on a phone, next to the mobile one. Anything portalled that exists in
-    only one breakpoint needs a real viewport check (`useIsDesktop`), not a
-    wrapper class. Conversely, a non-portalled `fixed` element inside a
-    transformed ancestor is positioned against *that ancestor*, not the viewport
-    (see gotcha 22) — which is why the structure window portals at all.
-
-27. **A store flag only opens a modal that is actually mounted.** `AliasManager`
-    (and its siblings) render inside `SearchPanel`, so `aliasManagerOpen` is
-    inert on `/dossier`, `/history` or any route that is not the search page —
-    the flag flipped and nothing appeared, silently. That is why the alias
-    manager is reached from the command palette, which lives in the same subtree,
-    and why the Settings entry that used to open it was removed rather than kept
-    as a second door. Before adding a global-looking "open X" button, check where
-    X is mounted.
-
-29. **A Tailwind class whose token is undeclared fails in total silence.**
-    `frontend/tailwind.config.js` is a v3-style config and Tailwind v4 never
-    loads it — there is no `@config` in `src/index.css`. Every
-    `primary-<number>` class the app wrote therefore generated no CSS at all:
-    568 of them across 60 files, including 38 buttons carrying `text-white` on
-    a `bg-primary-600` that painted nothing, and the
-    `focus-visible:ring-primary-500` this file prescribes for accessibility.
-    No build error, no lint warning, no visual difference from a typo. The
-    scale now lives in the `@theme` block of `index.css`, which is the only
-    place v4 reads; `src/theme.test.ts` compiles the real stylesheet and fails
-    if a step stops resolving. **`--color-primary` and `--color-primary-500`
-    are different tokens** — `bg-primary` (213 uses) comes from the first and
-    must keep working. Everything else the config declares — `font-sans`,
-    `shadow-glow`, `animate-shimmer` — is still inert.
-
-28. **Two vocabularies name the same act, and they disagree on case.**
-    `constants/actTypes.ts` spells it `Regolamento UE`; the backend resolver
-    answers `regolamento ue`. A `===` between the two silently produced an act
-    with no name in the palette ("· n. 1689 del 2024") and skipped the step
-    that collects an act's number and date. Compare case-insensitively and fall
-    back to the raw value: the resolver knows 389 names against `ACT_TYPES`'
-    40, so a miss is the normal case, not the exception. Same trap as
-    `codice_urn` on the backend.
-
-<!-- second-brain:inizio -->
-## Second brain (vault Obsidian)
-- Scheda del progetto: `🛠️ Progetti/VisuaLexAPI/VisuaLexAPI.md` (stato repo generato ogni ora, non modificarlo a mano).
-- Decisioni architetturali: `🛠️ Progetti/VisuaLexAPI/ADR/` — leggi le ADR prima di cambiare l'architettura; per una nuova decisione scrivi una ADR (template `🧩 Template/ADR.md`).
-- Memorie di Claude Code copiate in `🛠️ Progetti/VisuaLexAPI/Memorie/` (sola lettura: la fonte è `~/.claude/projects`).
-- Accesso: server MCP `obsidian` (Local REST API). Non scrivere nel vault fuori da ADR e note del progetto.
-<!-- second-brain:fine -->
+    Decision texts are held to the same contract (notes and highlights on
+    decisions are stored since PR 4): the readers in
+    `services/visualex/visualex_api/services/decisions/` — the Cassazione's text
+    from the court's PDF (`pdf_text.py`), its fallback from the text field, the
+    Corte costituzionale's open data — may add or move `\n` and move a boundary
+    between blocks, never change another character. The anchors count characters
+    in the projection: each block stripped at its edges, concatenated, every `\n`
+    removed. `test_decisions_text_frozen.py` (synthetic cases) and its `_local`
+    twin (real decisions kept out of the repository) are in place now: they
+    compare each reader's projection with a stored SHA-256 and length, never the
+    text. The freeze binds now: PR 4 stores notes and highlights on decisions,
+    so a reader's output may no longer change a character, and the golden is
+    never re-recorded to make a test pass. The web side holds the same line:
+    `decisionRender.ts` renders the text (`renderDecisionHtml`) and
+    `decisionRender.test.ts` checks that the rendered text nodes spell
+    `decisionProjection`; the anchors that no longer land are listed on the
+    decision's tab (`UnmatchedAnchors`), so none is dropped silently.

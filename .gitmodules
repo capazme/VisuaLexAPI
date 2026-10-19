@@ -1,0 +1,3 @@
+[submodule "vendor/mcp-legal-it"]
+	path = vendor/mcp-legal-it
+	url = https://github.com/capazme/mcp-legal-it.git
