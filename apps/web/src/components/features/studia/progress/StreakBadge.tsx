@@ -4,7 +4,7 @@ import { Check } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import type { StatoGiorno } from '../../../../types/studia';
 import { formatDayLong } from './layout';
-import { INK_BG, INK_BORDER, INK_TEXT, MUTED_TEXT, ON_INK } from './tokens';
+import { DAY_STATE_LABEL, INK_BG, INK_BORDER, INK_TEXT, MUTED_TEXT, ON_INK } from './tokens';
 import { spring } from '../../../../lib/motion';
 
 export interface StreakBadgeProps {
@@ -18,13 +18,6 @@ export interface StreakBadgeProps {
   /** Smaller still, over the area's other views: the count without its line. */
   dense?: boolean;
 }
-
-const DAY_STATE_LABEL: Record<StatoGiorno, string> = {
-  fatto: 'obiettivo raggiunto',
-  riposo: 'giorno di riposo, la serie regge',
-  saltato: 'non fatto',
-  oggi: 'oggi, da fare',
-};
 
 /**
  * The streak (Studia progress spec §6.1): a round ink badge with «§» that breathes slowly, the count in

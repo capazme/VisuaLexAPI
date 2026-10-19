@@ -4,7 +4,7 @@ import type { Materia, Progressi } from '../../../../types/studia';
 import { MATERIA_LABEL } from '../studiaLabels';
 import { totalCards } from './layout';
 import { orderStops, stopStates } from './today';
-import { CARD_STATES, FOCUS_RING, INK_BG, INK_BORDER, MUTED_TEXT, PANEL_HEADING, TILE } from './tokens';
+import { BLOCK_HEADING, CARD_STATES, INK_BG, INK_BORDER, MUTED_TEXT, SECONDARY_BUTTON, TILE } from './tokens';
 
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -27,7 +27,7 @@ export function SubjectRoad({ materie, selected }: SubjectRoadProps) {
   const stops = orderStops(materie);
   return (
     <section aria-labelledby="studia-percorso" className="space-y-3">
-      <h3 id="studia-percorso" className={PANEL_HEADING}>
+      <h3 id="studia-percorso" className={BLOCK_HEADING}>
         Il percorso
       </h3>
       {/* The line that joins the stops, behind their marks: a pseudo-element, so the list holds only its items. */}
@@ -79,12 +79,7 @@ export function SubjectRoad({ materie, selected }: SubjectRoadProps) {
                     type="button"
                     aria-label={`Ripassa ${label}`}
                     onClick={() => navigate(`/studia/ripasso/sessione?materia=${stop.materia}`)}
-                    className={cn(
-                      'min-h-[44px] rounded-xl border px-4 text-sm font-semibold transition-[background-color,scale] active:scale-[0.97]',
-                      INK_BORDER,
-                      'text-primary-900 hover:bg-primary-50 dark:text-primary-200 dark:hover:bg-primary-900/30',
-                      FOCUS_RING,
-                    )}
+                    className={SECONDARY_BUTTON}
                   >
                     Ripassa
                   </button>

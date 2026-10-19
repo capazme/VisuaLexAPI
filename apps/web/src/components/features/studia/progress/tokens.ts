@@ -1,4 +1,4 @@
-import type { ConteggiStati, Materia } from '../../../../types/studia';
+import type { ConteggiStati, Materia, StatoGiorno } from '../../../../types/studia';
 
 /**
  * Direction D, «Registro vivo» (Studia progress spec §6.1): the app's own tokens, light and dark. Ink is the
@@ -13,14 +13,20 @@ export const STAMP = 'border-red-700 text-red-700 dark:border-red-400 dark:text-
 export const SUCCESS_TEXT = 'text-green-600 dark:text-green-400';
 export const MUTED_TEXT = 'text-slate-500 dark:text-slate-400';
 
-/** A tile of the dashboard: the band and the panels. */
+/** A tile of the dashboard: the missions, the statistics, a stop of the road. */
 export const TILE = 'rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900';
-/** A panel: a tile with the register's double rule in ink down its left edge. */
-export const PANEL = `${TILE} border-l-4 [border-left-style:double] border-l-primary-900 dark:border-l-primary-300 p-4`;
-/** A panel's heading, in the reader's serif and small capitals. */
-export const PANEL_HEADING = `font-serif text-base tracking-wide [font-variant:small-caps] ${INK_TEXT}`;
+/**
+ * A block's heading: the reader's serif, in sentence case. One type language (Gymnasium spec §5.1): headings
+ * in Newsreader, labels in Geist; no small capitals and no double rule.
+ */
+export const BLOCK_HEADING = 'font-serif text-xl font-medium tracking-tight text-slate-900 dark:text-slate-50';
 
 export const FOCUS_RING = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900';
+
+/** A secondary button: an ink outline, 44 px, a press that gives a little. */
+export const SECONDARY_BUTTON = `min-h-[44px] rounded-xl border px-4 text-sm font-semibold transition-[background-color,scale] active:scale-[0.97] ${INK_BORDER} text-primary-900 hover:bg-primary-50 dark:text-primary-200 dark:hover:bg-primary-900/30 ${FOCUS_RING}`;
+/** A quiet action under a mission: words in ink, 44 px tall, underlined on hover. */
+export const QUIET_BUTTON = `-mx-2 min-h-[44px] justify-self-start rounded-lg px-2 text-left text-sm font-medium text-primary-900 underline-offset-4 hover:underline dark:text-primary-200 ${FOCUS_RING}`;
 
 const SUBJECT_TOKEN: Record<Materia, string> = {
   DIRITTO_CIVILE: '--category-civil',
@@ -50,3 +56,13 @@ export const CARD_STATES: { key: keyof ConteggiStati; label: string; swatch: str
   { key: 'apprendimento', label: 'In apprendimento', swatch: 'bg-primary-500' },
   { key: 'consolidate', label: 'Consolidate', swatch: 'bg-emerald-600 dark:bg-emerald-500' },
 ];
+
+/** A day's state in words: the boxes are never read by their look alone. */
+export const DAY_STATE_LABEL: Record<StatoGiorno | 'futuro' | 'vuoto', string> = {
+  fatto: 'obiettivo raggiunto',
+  riposo: 'giorno di riposo, la serie regge',
+  saltato: 'non fatto',
+  oggi: 'oggi, da fare',
+  futuro: 'ancora da venire',
+  vuoto: 'prima del primo giorno',
+};

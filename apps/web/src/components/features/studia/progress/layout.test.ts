@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { GiornoAttivita } from '../../../../types/studia';
-import { addDays, calendarGrid, formatDayLong, heatLevel, niceMax, percent, weekday } from './layout';
+import { addDays, calendarGrid, currentWeek, formatDayLong, heatLevel, niceMax, percent, weekday } from './layout';
 
 const day = (giorno: string, ripassi: number): GiornoAttivita => ({ giorno, ripassi, nuove: 0, sbagliate: 0, valido: ripassi >= 10, riposo: false });
 
@@ -80,5 +80,33 @@ describe('the progress layout', () => {
   it('writes a share as a whole percentage', () => {
     expect(percent(1, 3)).toBe(33);
     expect(percent(0, 0)).toBe(0);
+  });
+
+  describe('the current week (Gymnasium spec §5.1)', () => {
+    const last7 = (today: string, states: string[]) =>
+      states.map((stato, i) => ({ giorno: addDays(today, i - 6), stato: stato as 'fatto' | 'riposo' | 'saltato' | 'oggi' }));
+
+    it('runs Monday to Sunday with the seven letters; past days from the streak, today, the rest to come', () => {
+      // Thursday 22 October 2026.
+      const week = currentWeek('2026-10-22', last7('2026-10-22', ['fatto', 'fatto', 'fatto', 'fatto', 'riposo', 'saltato', 'oggi']), false);
+      expect(week.map((d) => d.lettera).join('')).toBe('LMMGVSD');
+      expect(week.map((d) => d.giorno)).toEqual(['2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-24', '2026-10-25']);
+      expect(week.map((d) => d.stato)).toEqual(['fatto', 'riposo', 'saltato', 'oggi', 'futuro', 'futuro', 'futuro']);
+    });
+
+    it('starts on today when today is Monday, and holds a Sunday whole', () => {
+      expect(currentWeek('2026-10-19', last7('2026-10-19', ['fatto', 'fatto', 'fatto', 'fatto', 'fatto', 'fatto', 'fatto']), false).map((d) => d.stato)).toEqual([
+        'fatto', 'futuro', 'futuro', 'futuro', 'futuro', 'futuro', 'futuro',
+      ]);
+      expect(currentWeek('2026-10-25', last7('2026-10-25', ['fatto', 'riposo', 'fatto', 'saltato', 'fatto', 'fatto', 'oggi']), false).map((d) => d.stato)).toEqual([
+        'fatto', 'riposo', 'fatto', 'saltato', 'fatto', 'fatto', 'oggi',
+      ]);
+    });
+
+    it('shows nothing missed to someone whose streak has not begun', () => {
+      expect(currentWeek('2026-10-22', last7('2026-10-22', ['saltato', 'saltato', 'saltato', 'saltato', 'saltato', 'saltato', 'oggi']), true).map((d) => d.stato)).toEqual([
+        'vuoto', 'vuoto', 'vuoto', 'oggi', 'futuro', 'futuro', 'futuro',
+      ]);
+    });
   });
 });

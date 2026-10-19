@@ -18,13 +18,16 @@ interface Answer {
  * The dashboard's one read (`GET /lingo/srs/progressi`, Studia progress spec D4), for the subject asked.
  * While a new read travels the last answer stays on screen, marked loading, so the page does not jump;
  * an answer for a subject chosen before never overwrites the one that came after. `reload` reads again.
+ * With `enabled` false nothing is read (and what it returns is not meant to be used): «Oggi» reads a subject only
+ * when one is chosen.
  */
-export function useProgress(materia: Materia | undefined): ProgressState & { reload: () => void } {
+export function useProgress(materia: Materia | undefined, enabled = true): ProgressState & { reload: () => void } {
   const [reads, setReads] = useState(0);
   const key = `${materia ?? ''}#${reads}`;
   const [answer, setAnswer] = useState<Answer>({ key: '', data: null, failed: false });
 
   useEffect(() => {
+    if (!enabled) return;
     let live = true;
     studiaService.progress(materia).then(
       (data) => live && setAnswer({ key, data, failed: false }),
@@ -33,7 +36,7 @@ export function useProgress(materia: Materia | undefined): ProgressState & { rel
     return () => {
       live = false;
     };
-  }, [key, materia]);
+  }, [key, materia, enabled]);
 
   const reload = useCallback(() => setReads((n) => n + 1), []);
   if (answer.key !== key) return { status: 'loading', data: answer.data, reload };

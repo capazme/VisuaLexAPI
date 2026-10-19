@@ -1,4 +1,4 @@
-import type { ConteggiStati, GiornoAttivita } from '../../../../types/studia';
+import type { ConteggiStati, GiornoAttivita, StatoGiorno } from '../../../../types/studia';
 
 /**
  * The layout of the progress dashboard's charts, pure (Studia progress spec §4, §6). Days are the
@@ -40,6 +40,36 @@ export function formatDayShort(day: string): string {
 /** «13 ottobre 2026». */
 export function formatDate(day: string): string {
   return dayMonth.format(dayDate(day));
+}
+
+/**
+ * A box of the current week: what the streak says of a past day or today; `futuro` for a day still to come;
+ * `vuoto` for a past day before someone's streak began, which is not a missed one.
+ */
+export interface WeekDay {
+  giorno: string;
+  /** «L», «M», «M», «G», «V», «S», «D». */
+  lettera: string;
+  stato: StatoGiorno | 'futuro' | 'vuoto';
+}
+
+const WEEK_LETTERS = ['L', 'M', 'M', 'G', 'V', 'S', 'D'] as const;
+
+/**
+ * The current week, Monday to Sunday (Gymnasium spec §5.1), from the server's today and its last seven days
+ * (`serie.ultimiGiorni`, which reach back to this week's Monday). A day still to come is `futuro`; a past day of
+ * someone whose streak has not begun (`fresh`) is `vuoto`: their week shows nothing missed.
+ */
+export function currentWeek(today: string, ultimiGiorni: { giorno: string; stato: StatoGiorno }[], fresh: boolean): WeekDay[] {
+  const monday = addDays(today, -weekday(today));
+  return WEEK_LETTERS.map((lettera, index) => {
+    const giorno = addDays(monday, index);
+    if (giorno > today) return { giorno, lettera, stato: 'futuro' };
+    const known = ultimiGiorni.find((d) => d.giorno === giorno)?.stato;
+    if (giorno === today) return { giorno, lettera, stato: known ?? 'oggi' };
+    if (fresh) return { giorno, lettera, stato: 'vuoto' };
+    return { giorno, lettera, stato: known ?? 'saltato' };
+  });
 }
 
 export interface CalendarCell {

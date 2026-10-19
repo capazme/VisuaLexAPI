@@ -160,7 +160,7 @@ describe('App routing — Studia', () => {
   it('opens a session at /studia/ripasso/sessione, inside the area', async () => {
     renderAt('/studia/ripasso/sessione?materia=DIRITTO_CIVILE');
     expect(await screen.findByRole('heading', { name: 'Sessione di ripasso' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 1, name: 'VisuaLex Gymnasium' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Gymnasium: la tua palestra giuridica' })).toBeInTheDocument();
   });
 
   it('keeps a card’s address inside the Studia area', async () => {
