@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, useCallback, type FocusEvent, type KeyboardEvent, type PointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Folder, Clock, Moon, Sun, Settings, LogOut, Shield, Users, Keyboard, FileSearch, Scale, Network, Bot, Repeat, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, type LucideIcon } from 'lucide-react';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { Search, Folder, FolderOpen, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Scale, Network, Bot, Repeat, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { isMerltEnabled } from '../../features/merlt/featureFlag';
 import { isMerltGraphEnabled } from '../../features/merlt/graph/featureFlag';
@@ -37,6 +37,8 @@ interface NavItemProps {
   onClick?: () => void;
   id?: string;
   badgeCount?: number;
+  /** Active on its own address only, not under it: «Dossier pubblici» (`/forum`) beside «Community» (`/forum/community`). */
+  end?: boolean;
   /** The keyboard shortcut that does the same, shown in the hover label (not part of the name). */
   hint?: string;
   layout: SidebarLayout;
@@ -153,12 +155,14 @@ function useSidebarLabel() {
   return { shown, hide, handlers };
 }
 
-function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint, layout }: NavItemProps) {
+function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint, layout, end }: NavItemProps) {
   const { shown: showTooltip, hide, handlers } = useSidebarLabel();
   // State, not a ref object: the tooltip reads the element while rendering (gotcha 13).
   const [linkEl, setLinkEl] = useState<HTMLAnchorElement | null>(null);
   const showBadge = (badgeCount ?? 0) > 0;
   const words = layout !== 'rail';
+  // The active dot slides between neighbouring entries («Dossier pubblici», «Community»): under reduced motion it jumps.
+  const reduceMotion = useReducedMotion();
 
   // In the rail the whole control is an icon, and `label` only ever reached the eye — the
   // tooltip is `hidden md:block` and shows on hover, so a screen reader and a
@@ -170,6 +174,7 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint, layout 
     <NavLink
       ref={setLinkEl}
       to={to}
+      end={end}
       id={id}
       aria-label={accessibleName}
       className={({ isActive }) => cn(
@@ -190,7 +195,7 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint, layout 
         <>
           {/* A navigation entry is seen tens of times a day: its hover is the colour alone. */}
           <motion.div
-            whileTap={{ scale: 0.95 }}
+            whileTap={reduceMotion ? undefined : { scale: 0.95 }}
             transition={spring.snappy}
             className="grid h-11 w-11 shrink-0 place-items-center"
           >
@@ -227,7 +232,7 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint, layout 
             <motion.span
               layoutId="activeIndicator"
               className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-primary-600 rounded-r-full"
-              transition={spring.snappy}
+              transition={reduceMotion ? { duration: 0 } : spring.snappy}
             />
           )}
 
@@ -473,8 +478,12 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
               {showGraph && <NavItem to="/grafo" icon={Network} label="Grafo" onClick={closeMobile} layout={layout} />}
             </>
           )}
+          {/* The section keeps its name; its areas are named apart, so «Forum» is not written twice. */}
           {section === 'forum' && (
-            <NavItem to="/forum" icon={Users} label="Forum" onClick={closeMobile} badgeCount={forumNotifications.total} layout={layout} />
+            <>
+              <NavItem to="/forum" end icon={FolderOpen} label="Dossier pubblici" onClick={closeMobile} badgeCount={forumNotifications.total} layout={layout} />
+              <NavItem to="/forum/community" icon={MessagesSquare} label="Community" onClick={closeMobile} layout={layout} />
+            </>
           )}
         </div>
       </motion.nav>

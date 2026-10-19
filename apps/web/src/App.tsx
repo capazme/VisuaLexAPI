@@ -6,6 +6,7 @@ import { RegisterPage } from './pages/RegisterPage';
 import { DossierPage } from './components/features/dossier/DossierPage';
 import { HistoryView } from './components/features/history/HistoryView';
 import { BulletinBoardPage } from './components/features/bulletin/BulletinBoardPage';
+import { ForumCommunityPage } from './components/features/bulletin/ForumCommunityPage';
 import { DocumentReviewPage } from './components/features/documents/DocumentReviewPage';
 import { ConsentProvider } from './features/merlt/consent/ConsentContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
@@ -104,7 +105,9 @@ function App() {
           <Route path="dossier" element={<DossierPage />} />
           <Route path="history" element={<HistoryView />} />
           <Route path="environments" element={<EnvironmentsRedirect />} />
+          {/* The Forum's two areas: «Dossier pubblici» at its old address, «Community» a placeholder. */}
           <Route path="forum" element={<BulletinBoardPage />} />
+          <Route path="forum/community" element={<ForumCommunityPage />} />
           <Route path="documents" element={<DocumentReviewPage />} />
           {/* How to connect an AI application through MCP, and the connected ones (user menu). */}
           <Route path="collega-app" element={<ConnectAiAppPage />} />
