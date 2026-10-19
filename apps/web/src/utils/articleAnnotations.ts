@@ -157,7 +157,7 @@ export const hasAnnotations = (group: BlockAnnotations | undefined): group is Bl
 
 /**
  * The highlights no block's sign shows: those of another section of the
- * article (the Brocardi Ratio and Spiegazione) and those whose text is no
+ * article (the Brocardi Ratio and Spiegazione, no longer shown) and those whose text is no
  * longer where they were saved. They need a place of their own to be removed
  * from (LooseHighlightsList), since the signs cannot reach them.
  */

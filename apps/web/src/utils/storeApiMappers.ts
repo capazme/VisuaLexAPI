@@ -24,8 +24,9 @@ export function buildWireNormaKey(itemKey: string, articleId: string): string {
 }
 
 /**
- * Prefix under which an article AND all its sub-sections (brocardi/ratio,
- * brocardi/spiegazione, …) live on the wire. The backend normaKeyPrefix
+ * Prefix under which an article AND all its sub-sections (`brocardi/ratio`,
+ * `brocardi/spiegazione`: what was marked on the Brocardi sections, no longer
+ * shown since D-078 but still the reader's) live on the wire. The backend normaKeyPrefix
  * startsWith query returns every row whose key begins with this prefix in
  * a single round trip.
  *
@@ -39,7 +40,7 @@ export function buildWireNormaKeyPrefix(itemKey: string, articleId: string): str
 }
 
 /**
- * Strip brocardi sub-section suffix (if any) from an articleId. Keeps
+ * Strip a sub-section suffix (if any) from an articleId. Keeps
  * the article proper as cache key / prefix root.
  */
 export function articleRootOf(articleId: string): string {

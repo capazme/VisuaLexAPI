@@ -68,7 +68,6 @@ function historyToSearchParams(item: SearchHistoryItem): SearchParams {
         date: item.date || '',
         article: item.article?.toString() || '',
         version: 'vigente',
-        show_brocardi_info: true,
     };
 }
 
@@ -282,7 +281,6 @@ export function HistoryView() {
             article: item.article?.toString() || '',
             version: 'vigente',
             version_date: '',
-            show_brocardi_info: true
         });
     };
 

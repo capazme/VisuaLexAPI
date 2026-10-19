@@ -14,7 +14,7 @@ describe('getHealthSnapshot', () => {
     vi.mocked(legalFetch).mockReset();
   });
 
-  it('names unavailable sources by their label, the doctrine one credited to its source', async () => {
+  it('names unavailable sources by their label, and one it does not know by its key', async () => {
     vi.mocked(legalFetch).mockImplementation(async (url) =>
       String(url).startsWith('/api/')
         ? answer({ status: 'ok' })
@@ -23,7 +23,7 @@ describe('getHealthSnapshot', () => {
               services: {
                 normattiva: { status: 'ok' },
                 eurlex: { status: 'error' },
-                brocardi: { status: 'error' },
+                italgiure: { status: 'error' },
               },
             },
             false,
@@ -32,7 +32,7 @@ describe('getHealthSnapshot', () => {
     const snapshot = await getHealthSnapshot(new AbortController().signal);
     const api = snapshot.services.find((s) => s.name === 'API normativa e fonti');
     expect(api?.state).toBe('degraded');
-    expect(api?.detail).toBe('Non disponibili: EUR-Lex, Dottrina (Brocardi.it)');
+    expect(api?.detail).toBe('Non disponibili: EUR-Lex, italgiure');
   });
 });
 

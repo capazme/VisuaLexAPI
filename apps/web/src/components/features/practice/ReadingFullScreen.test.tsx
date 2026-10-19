@@ -23,7 +23,6 @@ vi.mock('../../../features/merlt/useMerltFeatures', () => ({
   useMerltFeatures: () => ({ canContribute: false, qaAskable: false, consentLevel: 'none', merltEnabled: false }),
 }));
 vi.mock('../../../plugins/PluginSlot', () => ({ PluginSlot: () => null }));
-vi.mock('../search/BrocardiDisplay', () => ({ BrocardiDisplay: () => null }));
 vi.mock('../dossier/AddToDossierPopover', () => ({ AddToDossierPopover: () => null }));
 vi.mock('../decisions/DecisionResultList', () => ({
   DecisionResultList: ({ besideId }: { besideId?: string }) => <div data-testid="topic-list" data-beside={besideId} />,

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  brocardiDecisionRef,
   decisionKey,
   decisionPath,
   describeNotice,
@@ -323,33 +322,11 @@ describe('formatDecisionShort', () => {
   });
 });
 
-describe('brocardiDecisionRef', () => {
-  it('reads the courts Brocardi heads a massima with', () => {
-    expect(brocardiDecisionRef('Cass. civ.', '31191', '2025')).toEqual({ corte: 'cassazione', archivio: 'civile', numero: 31191, anno: 2025 });
-    expect(brocardiDecisionRef('Cass. pen', '12', '2023')).toEqual({ corte: 'cassazione', archivio: 'penale', numero: 12, anno: 2023 });
-    expect(brocardiDecisionRef('Cass. lav.', '7', '2019')).toEqual({ corte: 'cassazione', archivio: 'civile', sezione: 'L', numero: 7, anno: 2019 });
-    expect(brocardiDecisionRef('Cass. sez. un.', '8', '2018')).toEqual({ corte: 'cassazione', sezione: 'U', numero: 8, anno: 2018 });
-    expect(brocardiDecisionRef('Corte cost.', '71', '2020')).toEqual({ corte: 'corte_costituzionale', numero: 71, anno: 2020 });
-    expect(brocardiDecisionRef('Corte Costituzionale', '71', '2020')?.corte).toBe('corte_costituzionale');
-  });
-
-  it('reads «Cassazione» spelled out as a bare Cass., naming no archive', () => {
-    expect(brocardiDecisionRef('Cassazione', '2633', '1982')).toEqual({ corte: 'cassazione', numero: 2633, anno: 1982 });
-  });
-
-  it('names no archive for a bare «Cass.», and is linked as a reference', () => {
-    const ref = brocardiDecisionRef('Cass', '2633', '1982');
-    expect(ref).toEqual({ corte: 'cassazione', numero: 2633, anno: 1982 });
-    expect(formatDecisionShort(ref!)).toBe('Cass., n. 2633/1982');
-    expect(linkableDecisionPath(ref!, new Date('2026-10-06'))).toBe('/sentenze/cassazione/2633/1982');
-  });
-
-  it('is null for another court or no number', () => {
-    for (const autorita of ['Cons. Stato', 'TAR Lazio', 'Trib.', 'CGUE', null]) {
-      expect(brocardiDecisionRef(autorita, '10', '2020')).toBeNull();
-    }
-    expect(brocardiDecisionRef('Cass. civ.', null, '2020')).toBeNull();
-    expect(brocardiDecisionRef('Cass. civ.', 'x', '2020')).toBeNull();
+describe('a bare Cassazione reference', () => {
+  it('names no archive, and is linked as a reference', () => {
+    const ref = { corte: 'cassazione' as const, numero: 2633, anno: 1982 };
+    expect(formatDecisionShort(ref)).toBe('Cass., n. 2633/1982');
+    expect(linkableDecisionPath(ref, new Date('2026-10-06'))).toBe('/sentenze/cassazione/2633/1982');
   });
 });
 

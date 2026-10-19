@@ -2041,13 +2041,13 @@ const appStore = createStore<AppState>()(
                 // always 401 and only burn rate-limit points — skip it.
                 if (!isAuthenticated()) return;
                 // Batch: cache by the article root (suffix-free) so the
-                // article body + every brocardi sub-section share a single
+                // article body + every sub-section (the old /brocardi/ ones) share a single
                 // round trip via normaKeyPrefix.
                 const articleRoot = articleRootOf(articleId);
                 const cacheKey = `${normaKey}::${articleRoot}`;
                 if (get().loadedAnnotationKeys[cacheKey]) return;
                 // Mark BEFORE awaiting so concurrent mounts (StrictMode,
-                // rapid article switches, MarkableBrocardiSection siblings)
+                // rapid article switches)
                 // coalesce onto the first in-flight request. Cleared on
                 // error so retries on the next mount still work.
                 set((state) => { state.loadedAnnotationKeys[cacheKey] = true; });
@@ -2057,7 +2057,7 @@ const appStore = createStore<AppState>()(
                     const mapped = server.map(annotationApiToStore);
                     set((state) => {
                         // Replace every annotation whose articleId sits under
-                        // this article root (main body + /brocardi/* sections)
+                        // this article root (main body + its sub-sections)
                         // so server state wins over stale local entries.
                         state.annotations = state.annotations
                             .filter(a => !(
