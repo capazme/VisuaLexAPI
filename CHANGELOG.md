@@ -12,6 +12,48 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.8.5] - 2026-10-19
+
+The first part of the 1.9 redesign, released early at the owners' request (G-305).
+
+### Look and feel («Inchiostro»)
+
+- A new palette, self-hosted fonts and motion tokens; the login and the
+  Scrivania redrawn; a book mark while the app loads; the theme set before the
+  first paint.
+- The primitives (buttons, dialogs, sheets, toasts, tooltips) follow one set of
+  states and timings; entrances that never generated CSS now play, briefly, and
+  leave nothing applied once they end; hover motion removed from rows and lists.
+
+### Navigation
+
+- The sidebar shows its words: a wide bar with icons and labels from 1280 px,
+  which can be narrowed and remembers the choice; the icon rail between 1024 and
+  1280 px; a drawer with 44 px rows on a phone.
+
+### Gymnasium
+
+- The home is «Oggi»: today's missions first, computed from the progress the
+  app already reads, then the progress (streak, goal, week, the states of the
+  cards), then every mission, those the server does not record yet marked
+  «In arrivo»; titled «Gymnasium: la tua palestra giuridica».
+- The review scope counted by institute (server, for the next steps).
+
+### Forum
+
+- Two areas: «Dossier pubblici», the published dossiers as before, and a
+  «Community» placeholder; titled «Forum: il luogo del dibattito giuridico».
+
+### Dossier
+
+- The list filters by category from a menu beside the sort, and labels show
+  with a capital initial wherever a dossier's labels are shown, the PDF aside.
+
+### Connected AI applications
+
+- mcp-legal-it at v2.16.1; the tools that read Brocardi stay withheld from
+  MERL-T's experts.
+
 ## [1.8.0] - 2026-10-19
 
 ### Licence
