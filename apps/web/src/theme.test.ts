@@ -228,6 +228,31 @@ describe('the entrance utilities', () => {
   }, 30000);
 });
 
+describe('the lesson of Gymnasium (Gymnasium spec §5.4)', () => {
+  it('draws the note after a grade, the bar\'s safe edge, the side panel and the band its classes name', async () => {
+    const candidates = [
+      'motion-safe:animate-vlx-note',
+      'motion-safe:transition-[width]',
+      'pb-[max(0.75rem,env(safe-area-inset-bottom))]',
+      'pt-[max(0.5rem,env(safe-area-inset-top))]',
+      'w-[min(28rem,45%)]',
+      'min-h-8',
+      'border-current/40',
+      'z-[70]',
+    ];
+    const css = await compile(candidates);
+    expect(css).toMatch(/\.motion-safe\\:animate-vlx-note\s*\{\s*@media \(prefers-reduced-motion: no-preference\)\s*\{\s*animation: var\(--animate-vlx-note\)/);
+    expect(css).toMatch(/--animate-vlx-note:\s*vlx-note 1000ms/);
+    expect(css).toMatch(/@keyframes vlx-note/);
+    expect(css).toContain('env(safe-area-inset-bottom)');
+    expect(css).toContain('env(safe-area-inset-top)');
+    expect(css).toMatch(/width:\s*min\(28rem,\s*45%\)/);
+    expect(css).toMatch(/\.min-h-8\s*\{/);
+    expect(css).toMatch(/\.border-current\\\/40\s*\{/);
+    expect(css).toMatch(/z-index:\s*70/);
+  }, 30000);
+});
+
 describe('the interaction constants', () => {
   it('move what TRANSITION names, scale and translate included, and never the focus ring', async () => {
     const [property] = TRANSITION.split(' ');

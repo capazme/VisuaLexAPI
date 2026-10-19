@@ -215,7 +215,9 @@ The session becomes a screen of its own:
 - **The lesson frame**: the area's sidebar and its floating buttons are out of the way while the lesson
   runs. The executor uses what the shell already offers (the focus mode) if it does that; otherwise a
   page-level frame inside `StudiaPage`. `Layout.tsx` is not touched without reserving it in the register,
-  and the PR says which way was taken.
+  and the PR says which way was taken. *Taken in G2:* the frame inside `StudiaPage` (`LessonFrame`, portalled
+  over the shell in a band of its own, Tab kept inside it); Focus mode is a saved setting that leaves its own
+  button and the feedback button on screen, and `Layout.tsx` is untouched.
 - **The end**: the sentence («Hai ripassato 23 schede, 4 da rifare. Le prossime: domani.»), the ring and
   the streak as now, and two buttons: «Torna a Oggi» and, if cards are left, «Continua».
 - The celebration (progress spec §6.4) is kept as it is: once a day, 1.5 s, beside the card, never on top.

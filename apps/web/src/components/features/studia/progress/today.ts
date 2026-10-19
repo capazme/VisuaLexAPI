@@ -2,7 +2,7 @@ import type { ConteggiStati, Materia, Progressi, TappaIstituto } from '../../../
 import { MATERIA_LABEL } from '../studiaLabels';
 import { addDays, formatDayLong } from './layout';
 
-/** «Oggi»'s pure decisions (Gymnasium spec §5.1, §5.2): what the action card says, and the road's order. */
+/** «Oggi»'s pure decisions (Gymnasium spec §5.1, §5.2): what the action card says, and the road's order; and what the lesson's end offers (§5.4). */
 
 type Stop = Progressi['materie'][number];
 
@@ -73,7 +73,26 @@ export type TodayState = 'loading' | 'unread' | 'empty' | 'done' | 'todo';
 
 export function todayState(data: Progressi | null, failed: boolean, filtered: boolean): TodayState {
   if (data === null) return failed ? 'unread' : 'loading';
-  const { oggi, stati } = data;
-  if (oggi.dovute + oggi.nuove > 0) return 'todo';
+  const { stati } = data;
+  if (cardsLeft(data) > 0) return 'todo';
   return !filtered && stati.nuove + stati.apprendimento + stati.consolidate === 0 ? 'empty' : 'done';
+}
+
+/**
+ * The cards still on today in a read's scope: those still due and the new ones today still allows. The lesson's
+ * end offers «Continua» when there are any (the session carries at most 500 due cards, and the settings may have
+ * raised the new ones meanwhile); never a count the server did not give.
+ */
+export function cardsLeft(data: Progressi): number {
+  return data.oggi.dovute + data.oggi.nuove;
+}
+
+/**
+ * The cards still on today in one institute of a subject (G5), for the lesson's end: those due in it, and its new
+ * ones up to what the subject's read says today still allows (the new-card quota is the day's, not the institute's).
+ * Nothing when the road's read does not list the institute.
+ */
+export function instituteCardsLeft(stops: readonly TappaIstituto[], materia: Materia, istituto: string, subject: Progressi): number {
+  const stop = stops.find((s) => s.materia === materia && s.istituto === istituto);
+  return stop ? stop.dovute + Math.min(stop.nuove, subject.oggi.nuove) : 0;
 }

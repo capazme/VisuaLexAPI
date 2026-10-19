@@ -493,15 +493,43 @@ Its key handler reads the queue from refs and every queue update checks the head
 card: a second key pressed between a post resolving and the re-render must not drop the next card.
 Keys: space reveals (ignored on a focused button or link, in a field, under an `aria-modal` dialog or a
 `data-find-overlay` layer), 1–4 grade after the reveal, Esc closes the article first, then asks
-«Interrompere il ripasso?»; listed in the «?» dialog's «Ripasso» group. The visual rule of the review
-card (`ReviewCard`) is the spec's §6 and is not to be restyled: the anchor's citation small in slate sans
-above, question and answer in the reader's serif at a 60ch measure, the question a step larger, no
-shadow or gradient; the reveal is the card's one motion (the dashboard's celebration never touches the card) (a hairline, then the answer, `motion-safe:`
-only); on `GradeBar` the interval is the large text and the grade the small one, every button neutral
-but «Di nuovo» (warning tone), pinned at the bottom on a phone in the `pinnedBar` band (under the mobile
-menu's backdrop; `Layout` hides the feedback button there on a phone). An anchor opens its article
-(`DossierItemReader`) in a side panel on desktop and in `ui/Sheet` on a phone (the bottom sheet
-shared with `CardFormDialog`, marked `data-find-overlay`); the panel closes when the card changes.
+«Interrompere il ripasso?» while a card is on screen (with no card — the end, a failed read, the read on its way — it
+goes back to Oggi, as the header's button does); listed in the «?» dialog's «Ripasso» group.
+**The lesson** (Gymnasium spec `docs/superpowers/specs/2026-10-19-gymnasium-restyle-design.md` §5.4; the Studia screens
+spec §6 as rewritten for G2): the session is a screen of its own. `StudiaPage` draws it, with no heading of the area,
+in `LessonFrame`: portalled to the body in the `lesson` band (`z-[70]`, over the sidebar, the floating buttons, the
+feedback button and the plain toasts — the services' state is the user menu's since S1, out of reach until the lesson is left —; under the overlay band, so the article's sheet, the
+confirmation and the toast — at the top, off the bar — cover it), with Tab fenced off from the shell (`#root`)
+and the body: a dialog over it, or a popover the article portals to the body (a note being typed), keeps its own.
+The shell is not `inert` — the command palette is drawn inside it — so a screen reader's browse mode can still reach
+it. While the route's code loads, `LessonLoading` (`App.tsx`'s fallback) gives the frame its close button and Esc. The shell's Focus mode
+is not used — it is a saved setting and leaves its own button on screen — and `Layout` is untouched. Three rows: the
+header (the close button, «Interrompi», 44 px, and the progress bar, `role="progressbar"`, done of done and remaining,
+where done are the cards out of the queue — a «Di nuovo» holds it still —, easing under `motion-safe:` only; «Restano N»
+stays as screen-reader text), the card scrolling in the middle (beside it on desktop the article, `DossierItemReader`,
+in a column of its own that scrolls apart; on a phone `ui/Sheet`, marked `data-find-overlay`; the panel closes when the
+card changes; the scroll is keyed by step, so each card starts at its top), and `LessonBar` at the foot on every width (above the phone's safe edge, in the `pinnedBar` band inside
+the frame), holding the one action: «Mostra risposta» (`LESSON_PRIMARY`, the ink key of «Inizia») before the reveal,
+the four grades after it — the interval the large text and the grade the small one, every button neutral but
+«Di nuovo» (warning tone), 56 px, pressed with `active:scale-[0.97]`. The bar's line above the action says, in this
+order, «Non registrato: riprova», «Ripasso di pratica: non registrato» once the answer is shown, or the note after a
+grade (`useGradeNote`: «Torna tra 3 giorni» from `anteprima`, «Torna domani», «Torna in coda» for «Di nuovo», «Fatta
+per oggi» for a practice pass that takes the card out; one second, `motion-safe:animate-vlx-note`, said politely to a
+screen reader, never focused). `useReviewSession` does not say which grade moved the queue and is read only, so
+`useGradeNote` reads the grade where it is given — `recordGrade` on a click, a key 1–4 on the window's capture phase,
+with the session's own filters and nothing taken while a grade travels; a move with no grade behind it (a skip, a
+new read) clears the note; keep its filters in step with the hook's.
+The card (`ReviewCard`) is the area's tile — a sheet on the paper, no shadow or gradient — and comes in with each card
+(the session keys it by step: opacity and a few pixels, 180 ms, `motion-safe:` only): the anchor's citation small in
+slate sans above, question and answer in the reader's serif at a 60ch measure, the question a step larger; the reveal
+is the card's own motion (a hairline, then the answer, `motion-safe:` only; the celebration never touches the card);
+the articles under the answer are 44 px buttons. Nothing else moves between a grade and the next card. The end: the
+sentence («Hai ripassato 23 schede, 4 da rifare. Le prossime: domani.», focused), the ring and the streak
+(`SessionEndProgress`, from the day's read), and in the bar «Torna a Oggi» and, when the read of the session's scope
+still counts cards for today (`cardsLeft`, `progress/today.ts`: due plus the new ones today allows; for a session
+narrowed to one institute, G5, `instituteCardsLeft` over the road's read, `usePercorso`: the institute's due cards and
+its new ones up to what the subject's read allows, never the rest of the subject), «Continua», which reads the same
+session again.
 
 **«Oggi», the home** (`ReviewHome`, Gymnasium's home at `/studia/ripasso`, under the area's heading «Gymnasium: la tua
 palestra giuridica» — the section switcher keeps «Gymnasium»; spec
@@ -583,8 +611,8 @@ the browser's zone. **The celebration** (`progress/Celebration.tsx`): once a day
 read never replays it; a convenience, never the streak's source) — on the home when
 today counts with at least one review (confetti of «§» and «✓» from the stamp in the goal's row over the missions and the band, `confetti.ts` pure, on a canvas,
 and the stamp «Obiettivo raggiunto» pressed in; the stamp stays at rest afterwards), and in the session on the grade
-whose answer says `oggi.appenaRaggiunto` (`SessionCelebration`: a notice placed in the page over the header row «Restano N · Interrompi», so it scrolls away
-with it and never floats over the card or the grades; 1.5 s; no focus, no pointer, the keys untouched; an `aria-live`
+whose answer says `oggi.appenaRaggiunto` (`SessionCelebration`: a notice placed over the lesson's header row (the close button and the progress bar), never over the card
+or the grades; 1.5 s; no focus, no pointer, the keys untouched; an `aria-live`
 line says it to a screen reader). The confetti step by elapsed time (`confetti.ts`
 `stepsAt`), so they last 1.5 s on any screen. Under reduced motion nothing moves: no canvas, the end state only. The session's end screen adds the ring and the streak
 (`SessionEndProgress`, the same read).
@@ -1390,7 +1418,7 @@ the row an opaque background matching the panel, bleed it edge-to-edge with
 negative margins matching the parent padding, add `border-b border-current/10`,
 and raise it to `z-20`.
 
-**Stacking** — use the bands in `constants/zIndex.ts` (`pinnedBar` 35, `sidebar` 50, `dock` 80 — the bar of practices —,
+**Stacking** — use the bands in `constants/zIndex.ts` (`pinnedBar` 35, `sidebar` 50, `lesson` 70 — Gymnasium's lesson over the shell —, `dock` 80 — the bar of practices —,
 overlay band 1000+), never a bare literal. See gotcha 22 before assuming a
 z-index will be honoured. An overlay above `findWindow` (110) that covers the
 workspace carries `aria-modal="true"` (a real modal dialog) or `data-find-overlay`,

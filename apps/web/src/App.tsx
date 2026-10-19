@@ -44,6 +44,8 @@ const ValidationQueueView = lazy(() =>
 const ReviewHome = lazy(() =>
   import('./components/features/studia/ReviewHome').then(m => ({ default: m.ReviewHome })),
 );
+// Small and eager: what the lesson's frame shows while the session's code loads.
+import { LessonLoading } from './components/features/studia/LessonFrame';
 const ReviewSession = lazy(() =>
   import('./components/features/studia/ReviewSession').then(m => ({ default: m.ReviewSession })),
 );
@@ -170,7 +172,7 @@ function App() {
             >
               <Route index element={<Navigate to="ripasso" replace />} />
               <Route path="ripasso" element={<Suspense fallback={null}><ReviewHome /></Suspense>} />
-              <Route path="ripasso/sessione" element={<Suspense fallback={null}><ReviewSession /></Suspense>} />
+              <Route path="ripasso/sessione" element={<Suspense fallback={<LessonLoading />}><ReviewSession /></Suspense>} />
               <Route path="schede" element={<Suspense fallback={null}><MyCardsView /></Suspense>} />
               <Route path="schede/:id" element={<Suspense fallback={null}><MyCardsView /></Suspense>} />
               <Route path="valida" element={<Suspense fallback={null}><ValidationQueueView /></Suspense>} />
