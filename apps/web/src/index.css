@@ -1158,7 +1158,9 @@
   animation-name: var(--vlx-fade, vlx-none), var(--vlx-zoom, vlx-none), var(--vlx-slide, vlx-none);
   animation-duration: min(var(--tw-duration, 180ms), 200ms);
   animation-timing-function: var(--ease-out);
-  animation-fill-mode: both;
+  /* backwards, never both: a fill that outlives the entrance keeps a containing block and a stacking
+     context on the element (gotcha 22), so a non-portalled fixed modal inside it lands off-screen. */
+  animation-fill-mode: backwards;
 }
 @utility fade-in { --vlx-fade: vlx-enter-fade; }
 @utility fade-in-* { --vlx-fade: vlx-enter-fade; --vlx-enter-opacity: calc(--value(integer) * 1%); }

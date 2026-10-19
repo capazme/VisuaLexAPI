@@ -137,6 +137,8 @@ describe('the entrance utilities', () => {
   it('turn animate-in, fade-in, zoom-in-N and slide-in-from-* into real rules', async () => {
     const css = await compile(['animate-in', 'fade-in', 'fade-in-0', 'zoom-in-95', 'slide-in-from-bottom', 'slide-in-from-top-2', 'slide-in-from-right-10']);
     expect(css).toMatch(/\.animate-in\s*\{[^}]*animation-name:/);
+    // A finished entrance leaves nothing applied (gotcha 22): no «both» fill.
+    expect(css).toMatch(/\.animate-in\s*\{[^}]*animation-fill-mode:\s*backwards/);
     expect(css).toMatch(/\.fade-in\s*\{[^}]*--vlx-fade:\s*vlx-enter-fade/);
     expect(css).toMatch(/\.zoom-in-95\s*\{[^}]*--vlx-enter-scale:\s*calc\(95 \* 1%\)/);
     expect(css).toContain('.slide-in-from-bottom');
