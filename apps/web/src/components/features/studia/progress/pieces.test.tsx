@@ -77,7 +77,7 @@ describe('ActivityCalendar', () => {
     await userEvent.setup().tab();
     expect(grid).toHaveFocus();
     const readout = () => document.getElementById(grid.getAttribute('aria-describedby')!)!.textContent;
-    expect(readout()).toBe('Passa sopra un giorno, o toccalo, per i dettagli.');
+    expect(readout()).toBe('Passa sopra un giorno o toccalo per i dettagli; con la tastiera, le frecce ti spostano tra i giorni.');
     fireEvent.keyDown(grid, { key: 'ArrowUp' }); // from today, the day before
     // After the first day studied (14 October), a day that did not count says so.
     expect(readout()).toBe('martedì 20 ottobre: 4 ripassi, obiettivo non raggiunto');
@@ -118,14 +118,20 @@ describe('ActivityCalendar', () => {
   it('writes its legend in words', () => {
     render(<ActivityCalendar calendario={calendario} today={today} weeks={12} />);
     const legend = within(screen.getByRole('list', { name: 'Legenda del calendario' })).getAllByRole('listitem');
-    expect(legend.map((item) => item.textContent)).toEqual(['menopiù ripassi', 'giorno fatto', 'di riposo', 'saltato', 'oggi', 'a venire']);
+    // What a screen reader says: the drawn «meno ▢▢▢▢▢ più ripassi» is hidden, a sentence stands for it.
+    const spoken = (item: HTMLElement) => {
+      const copy = item.cloneNode(true) as HTMLElement;
+      copy.querySelectorAll('[aria-hidden]').forEach((hidden) => hidden.remove());
+      return copy.textContent;
+    };
+    expect(legend.map(spoken)).toEqual(['Più scuro il colore, più ripassi', 'giorno fatto', 'di riposo', 'saltato', 'oggi', 'a venire']);
   });
 
   it('never chooses a day still to come: End stops at today, and they do not answer a pointer', () => {
     const { container } = render(<ActivityCalendar calendario={calendario} today={today} weeks={12} />);
     const grid = screen.getByRole('group', { name: /Calendario dei ripassi/ });
     fireEvent.pointerEnter(container.querySelector('[data-day="2026-10-24"]')!);
-    expect(screen.getByText('Passa sopra un giorno, o toccalo, per i dettagli.')).toBeInTheDocument();
+    expect(screen.getByText('Passa sopra un giorno o toccalo per i dettagli; con la tastiera, le frecce ti spostano tra i giorni.')).toBeInTheDocument();
     fireEvent.keyDown(grid, { key: 'End' });
     fireEvent.keyDown(grid, { key: 'ArrowDown' });
     expect(document.getElementById(grid.getAttribute('aria-describedby')!)!.textContent).toBe('Oggi, mercoledì 21 ottobre: nessun ripasso');
@@ -133,10 +139,32 @@ describe('ActivityCalendar', () => {
 
   it('says nothing is missed for a newcomer, and counts nothing before the first day', () => {
     const { container } = render(<ActivityCalendar calendario={[]} today={today} weeks={12} />);
+    // Not even in the legend.
+    expect(within(screen.getByRole('list', { name: 'Legenda del calendario' })).queryByText('saltato')).toBeNull();
     expect(screen.getByRole('group', { name: 'Calendario dei ripassi dal 3 agosto 2026 a oggi: ancora nessun ripasso' })).toBeInTheDocument();
     expect(container.querySelectorAll('[data-stato="saltato"]')).toHaveLength(0);
     fireEvent.click(container.querySelector('[data-day="2026-10-16"]')!);
     expect(screen.getByText('venerdì 16 ottobre: nessun ripasso')).toBeInTheDocument();
+  });
+
+  it('keeps the day chosen, not its place, when the calendar changes width', () => {
+    const { container, rerender } = render(<ActivityCalendar calendario={calendario} today={today} weeks={26} />);
+    fireEvent.click(container.querySelector('[data-day="2026-10-14"]')!);
+    rerender(<ActivityCalendar calendario={calendario} today={today} weeks={12} />);
+    expect(screen.getByText(/^mercoledì 14 ottobre: 40 ripassi/)).toBeInTheDocument();
+  });
+
+  it('rims a day\'s mark with the ground on a subject\'s hue, and says a subject\'s empty day as such', () => {
+    const counted = [...calendario, day('2026-10-19', { ripassi: 0 })];
+    const { container } = render(<ActivityCalendar calendario={counted} today={today} weeks={12} hue="hsl(var(--category-civil))" narrowed />);
+    // The 14th is tinted (40 reviews) and counted: its dot has a rim; the 19th counted with other subjects, untinted.
+    expect(container.querySelector('[data-day="2026-10-14"] [data-halo]')).not.toBeNull();
+    expect(container.querySelector('[data-day="2026-10-19"] [data-halo]')).toBeNull();
+    fireEvent.click(container.querySelector('[data-day="2026-10-19"]')!);
+    expect(screen.getByText('lunedì 19 ottobre: nessun ripasso in questa materia, obiettivo raggiunto')).toBeInTheDocument();
+    // A missed day of the subject's calendar says the subject too; the 16th has no row at all.
+    fireEvent.click(container.querySelector('[data-day="2026-10-16"]')!);
+    expect(screen.getByText('venerdì 16 ottobre: nessun ripasso in questa materia, giorno saltato')).toBeInTheDocument();
   });
 
   it('reads a day of 9999 reviews whole, and a sum of five digits grouped', () => {
@@ -158,11 +186,31 @@ describe('CardStatesBar', () => {
     expect(screen.getByText('Nuove: 1 scheda (25%)', { selector: 'p' })).toBeInTheDocument();
   });
 
+  it('gives each segment a 44 px box at every width, the colour drawn inside it', () => {
+    render(<CardStatesBar stati={{ nuove: 15, apprendimento: 30, consolidate: 13 }} />);
+    for (const segment of screen.getAllByRole('button')) {
+      // jsdom measures nothing: the box is h-11 with no `md:` height, the colour an inset span.
+      expect(segment).toHaveClass('h-11');
+      expect(segment.className).not.toMatch(/\bmd:(?:min-h|h)-/);
+      expect(segment.firstElementChild).toHaveClass('absolute', 'md:inset-y-2');
+    }
+  });
+
   it('draws no segment for an empty state, and says when there is nothing', () => {
     const { rerender } = render(<CardStatesBar stati={{ nuove: 0, apprendimento: 3, consolidate: 0 }} />);
     expect(screen.getAllByRole('button')).toHaveLength(1);
     rerender(<CardStatesBar stati={{ nuove: 0, apprendimento: 0, consolidate: 0 }} />);
     expect(screen.getByText('Nessuna scheda da studiare, per ora.')).toBeInTheDocument();
+  });
+
+  it('rounds the three shares to add up to 100, and never writes «0%» for a state with cards', () => {
+    // 1, 1 and 1 would round to 33 each (99): the largest remainder gives the first the point left.
+    const { rerender } = render(<CardStatesBar stati={{ nuove: 1, apprendimento: 1, consolidate: 1 }} />);
+    expect(screen.getAllByRole('definition').map((dd) => dd.textContent)).toEqual(['134%', '133%', '133%']);
+    // 1 of 400 rounds to none: «<1%», and the other two still add up to 100.
+    rerender(<CardStatesBar stati={{ nuove: 1, apprendimento: 200, consolidate: 199 }} />);
+    expect(screen.getAllByRole('definition').map((dd) => dd.textContent)).toEqual(['1<1%', '20050%', '19950%']);
+    expect(screen.getByRole('button', { name: 'Nuove: 1 scheda (<1%)' })).toBeInTheDocument();
   });
 
   it('writes the three states by name, count and share, not by colour alone', () => {
@@ -252,6 +300,11 @@ describe('the subject filter', () => {
     render(<SubjectChips selected="DIRITTO_PENALE" onSelect={onSelect} />);
     const group = screen.getByRole('group', { name: 'Materia' });
     expect(within(group).getAllByRole('button')).toHaveLength(6);
+    // 44 px tall at every width, a computer too.
+    for (const chip of within(group).getAllByRole('button')) {
+      expect(chip).toHaveClass('min-h-[44px]');
+      expect(chip.className).not.toMatch(/\bmd:(?:min-h|h|py)-/);
+    }
     // A phone's sideways row with no bar drawn: in dark mode it showed light (theme.test.ts checks the CSS).
     expect(group).toHaveClass(...HIDDEN_SCROLLBAR.split(' '));
     expect(within(group).getByRole('button', { name: 'Diritto penale' })).toHaveAttribute('aria-pressed', 'true');

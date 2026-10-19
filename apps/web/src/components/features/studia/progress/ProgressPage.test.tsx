@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -89,6 +91,46 @@ describe('ProgressPage (Gymnasium spec §5.3)', () => {
     expect(screen.getAllByText('Nessuna scheda')).toHaveLength(5);
   });
 
+  it('greets nobody as new who has a record: back after more than 26 weeks', async () => {
+    progress.mockResolvedValue({ ...answer({ newcomer: true }), serie: { ...answer({ newcomer: true }).serie, record: 12 } });
+    renderPage();
+    await screen.findByRole('region', { name: 'Riepilogo' });
+    expect(screen.queryByText(/^Il primo giorno comincia oggi: qui/)).toBeNull();
+  });
+
+  it('never shows a subject\'s answer under another, and dims the subject\'s blocks while it reads again', async () => {
+    let settle: (value: Progressi) => void = () => {};
+    progress.mockImplementation((materia?: Materia) =>
+      materia === 'DIRITTO_CIVILE' ? new Promise((resolve) => (settle = resolve)) : Promise.resolve(answer({ reviews: materia ? 3 : 14 })),
+    );
+    renderPage();
+    await screen.findByRole('group', { name: /: 14 ripassi in 1 giorno$/ });
+    const user = userEvent.setup();
+    const chips = screen.getByRole('group', { name: 'Materia' });
+    await user.click(within(chips).getByRole('button', { name: 'Diritto penale' }));
+    await screen.findByRole('group', { name: /: 3 ripassi in 1 giorno$/ });
+    // To another subject: its places, not the last subject's numbers.
+    await user.click(within(chips).getByRole('button', { name: 'Diritto civile' }));
+    expect(screen.queryByRole('group', { name: /Calendario dei ripassi/ })).toBeNull();
+    expect(screen.queryByRole('group', { name: /Schede da ripassare/ })).toBeNull();
+    settle(answer({ reviews: 7 }));
+    expect(await screen.findByRole('group', { name: /: 7 ripassi in 1 giorno$/ })).toBeInTheDocument();
+    // A read again of what is on screen (a subject's read failed, «Riprova», then «Tutte le materie» while the day's
+    // read travels): the day's last answer stays in the subject's blocks, dimmed.
+    progress.mockImplementation((materia?: Materia) => (materia ? Promise.reject({ status: 503 }) : Promise.resolve(answer())));
+    await user.click(within(chips).getByRole('button', { name: 'Diritto penale' }));
+    const retry = await screen.findByRole('button', { name: 'Riprova' });
+    progress.mockImplementation(() => new Promise(() => {}));
+    await user.click(retry);
+    await user.click(within(chips).getByRole('button', { name: 'Tutte le materie' }));
+    for (const name of ['Il tuo calendario', 'Le schede per stato', 'I prossimi 14 giorni']) {
+      const block = screen.getByRole('region', { name });
+      expect(block).toHaveAttribute('aria-busy', 'true');
+      expect(block.querySelector('.opacity-60')).not.toBeNull();
+    }
+    expect(screen.getByRole('group', { name: /: 14 ripassi in 1 giorno$/ })).toBeInTheDocument();
+  });
+
   it('holds every block at its final size while the first read travels', () => {
     progress.mockReturnValue(new Promise(() => {}));
     renderPage();
@@ -99,6 +141,8 @@ describe('ProgressPage (Gymnasium spec §5.3)', () => {
     }
     expect(screen.queryByRole('group', { name: /Calendario dei ripassi/ })).toBeNull();
     expect(document.querySelectorAll('.motion-safe\\:animate-pulse').length).toBeGreaterThan(4);
+    // The calendar's place has the drawing's proportions: 22 + 26 weeks × 16 wide, 16 + 7 × 16 tall.
+    expect(within(screen.getByRole('region', { name: 'Il tuo calendario' })).getByText('', { selector: '[style*="aspect-ratio"]' })).toHaveStyle({ aspectRatio: '438 / 128' });
   });
 
   it('says a failed read with «Riprova», no alert, and reads again', async () => {
@@ -195,7 +239,7 @@ describe('ProgressPage (Gymnasium spec §5.3)', () => {
       expect(summary).toHaveTextContent('27.000ripassi negli ultimi 30 giorni');
       expect(calendar()).toHaveAccessibleName(/: 10\.499 ripassi in 2 giorni$/);
       const states = screen.getByRole('region', { name: 'Le schede per stato' });
-      expect(within(states).getAllByRole('definition').map((dd) => dd.textContent)).toEqual(['12.34555%', '10%', '999945%']);
+      expect(within(states).getAllByRole('definition').map((dd) => dd.textContent)).toEqual(['12.34555%', '1<1%', '999945%']);
       expect(within(states).getByText('22.345 schede · 45% consolidate')).toBeInTheDocument();
       expect(screen.getByRole('group', { name: 'Schede da ripassare nei prossimi 14 giorni: 10.035 schede, 9999 schede oggi' })).toBeInTheDocument();
       const subjects = within(screen.getByRole('region', { name: 'Per materia' })).getAllByRole('button');
@@ -203,7 +247,7 @@ describe('ProgressPage (Gymnasium spec §5.3)', () => {
       expect(subjects.at(-1)).toHaveTextContent(/^Diritto penaleNessuna schedaNessun ripasso negli ultimi 30 giorni$/);
       expect(document.body.textContent).not.toMatch(/NaN|undefined|Infinity/);
       // A segment of one card among 22.345 is still there to press.
-      expect(within(states).getByRole('button', { name: 'In apprendimento: 1 scheda (0%)' })).toHaveClass('min-w-3');
+      expect(within(states).getByRole('button', { name: 'In apprendimento: 1 scheda (<1%)' })).toHaveClass('min-w-3');
       expect(container.querySelectorAll('[data-empty]')).toHaveLength(1);
     });
 
@@ -214,5 +258,12 @@ describe('ProgressPage (Gymnasium spec §5.3)', () => {
       fireEvent.click(container.querySelector('[data-day="2026-10-12"]')!);
       expect(screen.getByText('lunedì 12 ottobre: 9999 ripassi, 200 nuove, 1450 sbagliate, obiettivo raggiunto')).toBeInTheDocument();
     });
+  });
+
+  // Measured at 1366 px: the chips were 34–36 px and the bar's segments 28 px. As «Contribuisci» (`contribuisci.test.ts`),
+  // no `md:` minimum or height but 44 px shrinks a target on a computer, in the files that draw this page's controls.
+  it.each(['ProgressPage.tsx', 'SubjectChips.tsx', 'CardStatesBar.tsx', 'SubjectProgress.tsx'])('%s keeps its targets at 44 px from `md` up', (file) => {
+    const source = readFileSync(join(resolve(process.cwd(), 'src/components/features/studia/progress'), file), 'utf8');
+    expect(source).not.toMatch(/\bmd:(?:min-h|min-w|h)-(?!\[44px\])/);
   });
 });

@@ -99,7 +99,7 @@ export function DueForecast({ prossimi, hue }: DueForecastProps) {
                       height={Math.max(h, 1.5)}
                       rx={3}
                       className={cn(
-                        today ? 'fill-amber-500 dark:fill-amber-400' : hue === undefined && 'fill-primary-900 dark:fill-primary-300',
+                        today ? 'fill-amber-600 dark:fill-amber-400' : hue === undefined && 'fill-primary-900 dark:fill-primary-300',
                         selected === index && 'opacity-75',
                       )}
                       style={!today && hue !== undefined ? { fill: hue } : undefined}

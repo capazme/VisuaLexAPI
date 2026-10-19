@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { GiornoAttivita } from '../../../../types/studia';
-import { addDays, calendarDayState, calendarGrid, currentWeek, formatCount, formatDayLong, heatLevel, niceMax, percent, recentReviews, scaleLines, weekday } from './layout';
+import { addDays, calendarDayState, calendarGrid, currentWeek, formatCount, formatDayLong, heatLevel, niceMax, percent, recentReviews, scaleLines, shareLabel, shares, weekday } from './layout';
 
 const day = (giorno: string, ripassi: number): GiornoAttivita => ({ giorno, ripassi, nuove: 0, sbagliate: 0, valido: ripassi >= 10, riposo: false });
 
@@ -113,6 +113,17 @@ describe('the progress layout', () => {
   it('writes a share as a whole percentage', () => {
     expect(percent(1, 3)).toBe(33);
     expect(percent(0, 0)).toBe(0);
+  });
+
+  it('rounds shares by the largest remainder, so they add up to 100', () => {
+    expect(shares([1, 1, 1])).toEqual([34, 33, 33]);
+    expect(shares([1, 2, 1])).toEqual([25, 50, 25]);
+    // 16.67, 16.67, 66.67 → 16, 16, 66 (98): the two points left go to the largest fractions, first on a tie.
+    expect(shares([1, 1, 4])).toEqual([17, 17, 66]);
+    expect(shares([12345, 1, 9999])).toEqual([55, 0, 45]);
+    expect(shares([0, 0, 0])).toEqual([0, 0, 0]);
+    for (const parts of [[3, 3, 3], [7, 11, 13], [1, 998, 1], [5, 0, 0]]) expect(shares(parts).reduce((a, b) => a + b, 0)).toBe(100);
+    expect([shareLabel(0, 1), shareLabel(0, 0), shareLabel(45, 9999)]).toEqual(['<1%', '0%', '45%']);
   });
 
   describe('the current week (Gymnasium spec §5.1)', () => {

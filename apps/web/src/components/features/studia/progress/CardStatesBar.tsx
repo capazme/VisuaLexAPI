@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { cn } from '../../../../lib/utils';
 import type { ConteggiStati } from '../../../../types/studia';
-import { formatCount, percent, totalCards } from './layout';
+import { formatCount, shareLabel, shares, totalCards } from './layout';
 import { CARD_STATES, FOCUS_RING, INK_TEXT, MUTED_TEXT } from './tokens';
 
 export interface CardStatesBarProps {
@@ -10,35 +10,46 @@ export interface CardStatesBarProps {
 
 type StateKey = keyof ConteggiStati;
 
+/** The bar's colour inside its 44 px row: the whole row on a phone, 28 px on a computer (the row's height never shrinks). */
+const BAR = 'pointer-events-none absolute inset-x-0 inset-y-0 md:inset-y-2';
+
 const cards = (n: number) => `${formatCount(n)} ${n === 1 ? 'scheda' : 'schede'}`;
 
 /**
  * The cards by state (Studia progress spec §4.2; Gymnasium spec §5.3): one stacked bar, new, learning and consolidated
  * (an interval of 21 days or more), and under it each state by name, count and share, so the bar is never read by its
- * colours alone. Each segment is a button: hover, tap or focus says its count and share.
+ * colours alone. The shares add up to 100 (`shares`), and a state with cards never reads «0%». Each segment is a button: hover, tap or focus says its count and share.
  */
 export function CardStatesBar({ stati }: CardStatesBarProps) {
   const [chosen, setChosen] = useState<StateKey | null>(null);
   const total = totalCards(stati);
   const shown = chosen ? CARD_STATES.find((s) => s.key === chosen)! : null;
+  // The three shares add up to 100; a state with cards that rounds to none reads «<1%».
+  const rounded = shares(CARD_STATES.map((state) => stati[state.key]));
+  const share = (key: StateKey) => shareLabel(rounded[CARD_STATES.findIndex((state) => state.key === key)], stati[key]);
 
   return (
     <div className="grid gap-4">
       {total === 0 ? (
-        <div className="h-11 rounded-md bg-slate-100 md:h-7 dark:bg-slate-800" />
+        <div className="relative h-11">
+          <span className={cn(BAR, 'rounded-md bg-slate-100 dark:bg-slate-800')} />
+        </div>
       ) : (
-        <div className="flex h-11 gap-0.5 overflow-hidden rounded-md md:h-7">
-          {CARD_STATES.filter((s) => stati[s.key] > 0).map((state) => (
+        // Each segment answers over 44 px at every width; on a computer the colour is drawn 28 px tall inside it.
+        <div className="flex h-11 gap-0.5">
+          {CARD_STATES.filter((s) => stati[s.key] > 0).map((state, index, segments) => (
             <button
               key={state.key}
               type="button"
-              aria-label={`${state.label}: ${cards(stati[state.key])} (${percent(stati[state.key], total)}%)`}
+              aria-label={`${state.label}: ${cards(stati[state.key])} (${share(state.key)})`}
               onPointerEnter={() => setChosen(state.key)}
               onFocus={() => setChosen(state.key)}
               onClick={() => setChosen(state.key)}
               style={{ flexGrow: stati[state.key] }}
-              className={cn('min-w-3 basis-0 motion-safe:transition-[flex-grow] motion-safe:duration-300', state.swatch, FOCUS_RING, 'focus-visible:ring-offset-0', chosen === state.key && 'opacity-80')}
-            />
+              className={cn('relative h-11 min-w-3 basis-0 rounded-md motion-safe:transition-[flex-grow] motion-safe:duration-300', FOCUS_RING, 'focus-visible:ring-offset-0', chosen === state.key && 'opacity-80')}
+            >
+              <span aria-hidden className={cn(BAR, state.swatch, index === 0 && 'rounded-l-md', index === segments.length - 1 && 'rounded-r-md')} />
+            </button>
           ))}
         </div>
       )}
@@ -53,7 +64,7 @@ export function CardStatesBar({ stati }: CardStatesBarProps) {
             </dt>
             <dd className="flex flex-wrap items-baseline gap-x-1.5">
               <span className={cn('font-serif text-2xl font-medium leading-none tabular-nums md:text-3xl', INK_TEXT)}>{formatCount(stati[state.key])}</span>
-              <span className={cn('text-xs tabular-nums', MUTED_TEXT)}>{percent(stati[state.key], total)}%</span>
+              <span className={cn('text-xs tabular-nums', MUTED_TEXT)}>{share(state.key)}</span>
             </dd>
           </div>
         ))}
@@ -62,8 +73,8 @@ export function CardStatesBar({ stati }: CardStatesBarProps) {
         {total === 0
           ? 'Nessuna scheda da studiare, per ora.'
           : shown
-            ? `${shown.label}: ${cards(stati[shown.key])} (${percent(stati[shown.key], total)}%)`
-            : `${cards(total)} · ${percent(stati.consolidate, total)}% consolidate`}
+            ? `${shown.label}: ${cards(stati[shown.key])} (${share(shown.key)})`
+            : `${cards(total)} · ${share('consolidate')} consolidate`}
       </p>
     </div>
   );
@@ -73,8 +84,10 @@ export function CardStatesBar({ stati }: CardStatesBarProps) {
 export function CardStatesBarSkeleton() {
   return (
     <div aria-hidden className="grid gap-4">
-      <div className="h-11 rounded-md bg-slate-100 motion-safe:animate-pulse md:h-7 dark:bg-slate-800" />
-      <div className="h-[4.5rem] rounded-lg bg-slate-100 motion-safe:animate-pulse md:h-[3.75rem] dark:bg-slate-800" />
+      <div className="relative h-11">
+        <span className={cn(BAR, 'rounded-md bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800')} />
+      </div>
+      <div className="h-[4.5rem] rounded-lg bg-slate-100 motion-safe:animate-pulse md:max-h-[3.75rem] dark:bg-slate-800" />
       <div className="min-h-5" />
     </div>
   );

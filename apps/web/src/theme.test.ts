@@ -241,10 +241,15 @@ describe('the Inchiostro palette', () => {
     for (const step of ['ink-100', 'primary-200', 'primary-400']) expect(ratio(linear('primary-900'), linear(step)), step).toBeGreaterThanOrEqual(3);
     for (const step of ['primary-600', 'primary-900']) expect(ratio(white, linear(step)), step).toBeGreaterThanOrEqual(3);
     for (const step of ['ink-800', 'primary-900', 'primary-700']) expect(ratio(linear('primary-300'), linear(step)), step).toBeGreaterThanOrEqual(3);
+    // On a subject's hue the ink mark sits on a rim of the tile's ground (white; dark: slate 900), whatever the hue.
+    expect(ratio(linear('primary-900'), white)).toBeGreaterThanOrEqual(3);
+    expect(ratio(linear('primary-300'), linear('ink-900'))).toBeGreaterThanOrEqual(3);
     for (const step of ['primary-500', 'primary-300']) expect(ratio(linear('ink-900'), linear(step)), step).toBeGreaterThanOrEqual(3);
     // The days to come and a day with nothing due, dotted on the tile (white; dark: slate 900).
     expect(ratio(linear('ink-500'), white)).toBeGreaterThanOrEqual(3);
     expect(ratio(linear('ink-400'), linear('ink-900'))).toBeGreaterThanOrEqual(3);
+    // Today's bar on its tinted column (amber 50; dark: amber 400 at 10% over slate 900, far apart).
+    expect(ratio(linear('amber-600'), linear('amber-50'))).toBeGreaterThanOrEqual(3);
     // «oggi» under the coming days, at 12 px: AA.
     expect(ratio(linear('amber-800'), white)).toBeGreaterThanOrEqual(4.5);
     expect(ratio(linear('amber-300'), linear('ink-900'))).toBeGreaterThanOrEqual(4.5);

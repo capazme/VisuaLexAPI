@@ -10,6 +10,8 @@ export interface ActivityCalendarProps {
   weeks: number;
   /** A subject's hue when the page is narrowed to one; the ink scale otherwise. */
   hue?: string;
+  /** The counts are one subject's (the day's states stay the whole day's): the readout says so. */
+  narrowed?: boolean;
 }
 
 const CELL = 13;
@@ -25,23 +27,41 @@ const DOT = 'fill-primary-900 dark:fill-primary-300';
 const DASH = 'stroke-primary-900 dark:stroke-primary-300';
 const RING = cn('stroke-current', INK_TEXT);
 const TO_COME = 'stroke-slate-500 dark:stroke-slate-400';
+/** The tile's ground, drawn under a mark on a subject's hue: no hue lets the ink mark fade (dark mode, the deep steps). */
+const HALO = 'stroke-white dark:stroke-slate-900';
 
 /** A point of the drawing as a share of its box, for the labels laid over it. */
 const share = (value: number, of: number) => `${(value / of) * 100}%`;
 
 const plural = (n: number, one: string, many: string) => `${formatCount(n)} ${n === 1 ? one : many}`;
 
-/** The mark a day's state adds over its cell: a dot, a dash, a dashed outline. `dark` is a cell of the deep steps. */
-function StateMark({ state, x, y, dark, riposo }: { state: CalendarDayState; x: number; y: number; dark: boolean; riposo: boolean }) {
+/**
+ * The mark a day's state adds over its cell: a dot, a dash, a dashed outline. `dark` is a cell of the ink scale's deep
+ * steps, where the mark takes the ground's colour. On a subject's hue (`halo`) the mark stays ink over a rim of the
+ * ground's colour: the hues differ too much for one colour to read on all of them, in light and dark.
+ */
+function StateMark({ state, x, y, dark, riposo, halo = false }: { state: CalendarDayState; x: number; y: number; dark: boolean; riposo: boolean; halo?: boolean }) {
+  const cx = x + CELL / 2;
+  const cy = y + CELL / 2;
   return (
     <>
       {riposo && (
-        <rect x={x + 0.75} y={y + 0.75} width={CELL - 1.5} height={CELL - 1.5} rx={2.5} fill="none" strokeWidth={1.2} strokeDasharray="2 1.5" className={RING} />
+        <>
+          {halo && <rect data-halo x={x + 0.75} y={y + 0.75} width={CELL - 1.5} height={CELL - 1.5} rx={2.5} fill="none" strokeWidth={2.6} className={HALO} />}
+          <rect x={x + 0.75} y={y + 0.75} width={CELL - 1.5} height={CELL - 1.5} rx={2.5} fill="none" strokeWidth={1.2} strokeDasharray="2 1.5" className={RING} />
+        </>
       )}
-      {/* In ink on the pale steps, in the ground's colour on the deep ones: readable on every cell. */}
-      {state === 'fatto' && <circle cx={x + CELL / 2} cy={y + CELL / 2} r={1.8} className={dark ? 'fill-white dark:fill-slate-900' : DOT} />}
+      {state === 'fatto' && (
+        <>
+          {halo && <circle data-halo cx={cx} cy={cy} r={2.9} className="fill-white dark:fill-slate-900" />}
+          <circle cx={cx} cy={cy} r={1.8} className={dark ? 'fill-white dark:fill-slate-900' : DOT} />
+        </>
+      )}
       {state === 'saltato' && (
-        <line x1={x + 3.5} x2={x + CELL - 3.5} y1={y + CELL / 2} y2={y + CELL / 2} strokeWidth={1.5} strokeLinecap="round" className={dark ? 'stroke-white dark:stroke-slate-900' : DASH} />
+        <>
+          {halo && <line data-halo x1={x + 3.5} x2={x + CELL - 3.5} y1={cy} y2={cy} strokeWidth={3.7} strokeLinecap="round" className={HALO} />}
+          <line x1={x + 3.5} x2={x + CELL - 3.5} y1={cy} y2={cy} strokeWidth={1.5} strokeLinecap="round" className={dark ? 'stroke-white dark:stroke-slate-900' : DASH} />
+        </>
       )}
     </>
   );
@@ -64,13 +84,17 @@ function Swatch({ children }: { children: ReactNode }) {
  * each in words. One tab stop: the arrows move by day (up, down) and by week (left, right), Home and End to the ends;
  * hovering or tapping a day does the same. The line under it says the chosen day, as a screen reader hears it.
  */
-export function ActivityCalendar({ calendario, today, weeks, hue }: ActivityCalendarProps) {
+export function ActivityCalendar({ calendario, today, weeks, hue, narrowed = false }: ActivityCalendarProps) {
   const grid = useMemo(() => calendarGrid(calendario, today, weeks), [calendario, today, weeks]);
   const firstDay = useMemo(() => calendario.reduce<string | undefined>((first, d) => (first === undefined || d.giorno < first ? d.giorno : first), undefined), [calendario]);
-  const [selected, setSelected] = useState<number | null>(null);
+  // The day chosen, by its date: a grid of another width (a window crossing `md`) keeps it, or lets it go if it is out.
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const readoutId = useId();
   const last = grid.cells.length - 1;
-  const chosen = selected === null ? null : grid.cells[Math.min(selected, last)];
+  const found = selectedDay === null ? -1 : grid.cells.findIndex((cell) => cell.giorno === selectedDay);
+  const selected = found < 0 ? null : found;
+  const chosen = selected === null ? null : grid.cells[selected];
+  const setSelected = (index: number) => setSelectedDay(grid.cells[index].giorno);
 
   const totals = useMemo(() => {
     let reviews = 0;
@@ -149,7 +173,7 @@ export function ActivityCalendar({ calendario, today, weeks, hue }: ActivityCale
                     style={tinted ? { fill: hue, fillOpacity: HUE_OPACITY[level] } : undefined}
                     strokeWidth={selected === index ? 1.5 : 0}
                   />
-                  <StateMark state={state} x={x} y={y} dark={level >= 3 && !tinted} riposo={cell.day?.riposo === true} />
+                  <StateMark state={state} x={x} y={y} dark={level >= 3 && !tinted} riposo={cell.day?.riposo === true} halo={tinted} />
                   {cell.giorno === today && <rect x={x - 1.5} y={y - 1.5} width={CELL + 3} height={CELL + 3} rx={4} fill="none" strokeWidth={1.5} className={RING} />}
                 </g>
               );
@@ -176,13 +200,17 @@ export function ActivityCalendar({ calendario, today, weeks, hue }: ActivityCale
       </div>
       <ul aria-label="Legenda del calendario" className={cn('flex flex-wrap items-center gap-x-4 gap-y-2 text-xs', MUTED_TEXT)}>
         <li className="flex items-center gap-1">
-          meno
-          {HEAT_FILL.map((fill) => (
-            <svg key={fill} aria-hidden viewBox="0 0 10 10" className="h-3 w-3">
-              <rect width="10" height="10" rx="2" className={fill} />
-            </svg>
-          ))}
-          più ripassi
+          {/* Drawn as «meno ▢▢▢▢▢ più ripassi»; said as one sentence. */}
+          <span aria-hidden className="flex items-center gap-1">
+            meno
+            {HEAT_FILL.map((fill) => (
+              <svg key={fill} viewBox="0 0 10 10" className="h-3 w-3">
+                <rect width="10" height="10" rx="2" className={fill} />
+              </svg>
+            ))}
+            più ripassi
+          </span>
+          <span className="sr-only">Più scuro il colore, più ripassi</span>
         </li>
         <li className="flex items-center gap-1.5">
           <Swatch>
@@ -198,13 +226,16 @@ export function ActivityCalendar({ calendario, today, weeks, hue }: ActivityCale
           </Swatch>
           di riposo
         </li>
-        <li className="flex items-center gap-1.5">
-          <Swatch>
-            <rect width={CELL} height={CELL} rx={3} className={HEAT_FILL[0]} />
-            <StateMark state="saltato" x={0} y={0} dark={false} riposo={false} />
-          </Swatch>
-          saltato
-        </li>
+        {/* A newcomer's calendar never says «saltato», not even in its legend: there is nothing to miss yet. */}
+        {firstDay !== undefined && (
+          <li className="flex items-center gap-1.5">
+            <Swatch>
+              <rect width={CELL} height={CELL} rx={3} className={HEAT_FILL[0]} />
+              <StateMark state="saltato" x={0} y={0} dark={false} riposo={false} />
+            </Swatch>
+            saltato
+          </li>
+        )}
         <li className="flex items-center gap-1.5">
           <Swatch>
             <rect width={CELL} height={CELL} rx={3} className={HEAT_FILL[0]} />
@@ -222,7 +253,7 @@ export function ActivityCalendar({ calendario, today, weeks, hue }: ActivityCale
       {/* Room for its longest day («Oggi, mercoledì 30 settembre: 9999 ripassi, 200 nuove, 1450 sbagliate, obiettivo
           raggiunto»): three lines on a phone, two from `md`, so choosing a day never moves the page. */}
       <p id={readoutId} aria-live="polite" className={cn('min-h-[3.75rem] text-sm tabular-nums md:min-h-10', chosen ? 'text-slate-800 dark:text-slate-100' : MUTED_TEXT)}>
-        {chosen ? describeDay(chosen, today, firstDay) : 'Passa sopra un giorno, o toccalo, per i dettagli.'}
+        {chosen ? describeDay(chosen, today, firstDay, narrowed) : 'Passa sopra un giorno o toccalo per i dettagli; con la tastiera, le frecce ti spostano tra i giorni.'}
       </p>
     </div>
   );
