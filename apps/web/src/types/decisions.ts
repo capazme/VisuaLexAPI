@@ -191,3 +191,32 @@ export type EuCaseLawAnswer =
   | { esito: 'richiesta_non_valida'; errori: Record<string, string> }
   | { esito: 'fonte_non_raggiungibile'; fonte: string }
   | { esito: 'errore_interno' };
+
+/** A massima of the Corte costituzionale's open data, as `/search_corte_cost_massime` gives it: the text verbatim. */
+export interface CorteCostMassima {
+  /** The Court's number of the massima. */
+  numero: string;
+  /** The Court's chain of classification headings. */
+  titolo: string;
+  testo: string;
+  /** How the massima names the article: a provision at issue (`norma`), a parameter (`parametro`), or both. */
+  ruoli: Array<'norma' | 'parametro'>;
+  pronuncia: {
+    identita: { corte: 'corte_costituzionale'; numero: number; anno: number };
+    tipo: 'sentenza' | 'ordinanza' | null;
+    data_decisione: string | null;
+    data_deposito: string | null;
+    /** The decision's page on the Court's site. */
+    url: string;
+  };
+}
+
+export type CorteCostMassimeAnswer =
+  | {
+      esito: 'risultati'; urn: string; pagina: number; per_pagina: number; totale: number;
+      per_ruolo: { norma: number; parametro: number }; massime: CorteCostMassima[];
+      fonte: { nome: string; licenza: string; url: string }; attribuzione: string; aggiornato_al: string | null;
+    }
+  | { esito: 'richiesta_non_valida'; errori: Record<string, string> }
+  | { esito: 'fonte_non_raggiungibile'; fonte: string; in_preparazione?: boolean }
+  | { esito: 'errore_interno' };

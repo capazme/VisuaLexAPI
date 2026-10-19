@@ -14,6 +14,7 @@ import { PluginSlot } from '../../../plugins/PluginSlot';
 import { getSlotComponents } from '../../../plugins/registry';
 import { DecisionResultList } from '../decisions/DecisionResultList';
 import { EuCaseLawBlock } from '../decisions/EuCaseLawBlock';
+import { CorteCostMassimeBlock } from '../decisions/CorteCostMassimeBlock';
 import { MassimeSection } from './MassimeSection';
 import type { MassimeState } from './massimeState';
 import { CaseLawControls } from './caseLaw/CaseLawControls';
@@ -64,7 +65,8 @@ function writeOpen(tabId: string | undefined, open: boolean): void {
 
 /**
  * «Giurisprudenza» under the article text: Brocardi's massime (their decisions as links), the
- * Massimario's reviews (a plugin panel in the `article_case_law` slot) and, on request, the
+ * Massimario's reviews (a plugin panel in the `article_case_law` slot), the Corte costituzionale's
+ * massime from its open data (`CorteCostMassimeBlock`, loaded when the section opens) and, on request, the
  * decisions of the Cassazione that mention the article. Closed by default; its state is kept
  * per host for the session. An act of the Union gets the Court of Justice's block (`EuCaseLawBlock`, loaded
  * when the section opens) in place of the Cassazione's. One set of controls at its head (the years, the text) narrows every block. Nothing is asked of the Cassazione's archive until the button is pressed,
@@ -194,6 +196,16 @@ export function CaseLawSection({ norma, massime, massimeState = 'answered', broc
                   props={{ articleUrn, isHistorical, besideId: tabId, backEntry }}
                 />
               </div>
+            )}
+
+            {/* The Court's own massime, a separate collection with its licence line (G-281); a State act's article only */}
+            {offersCassazione && articleUrn && (
+              <section aria-labelledby={`${panelId}-corte-cost`} className="space-y-3">
+                <h4 id={`${panelId}-corte-cost`} className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  Corte costituzionale — massime
+                </h4>
+                <CorteCostMassimeBlock articleUrn={articleUrn} besideId={tabId} backEntry={backEntry} />
+              </section>
             )}
 
             {offersCassazione && <section aria-labelledby={`${panelId}-cassazione`} className="space-y-3">
