@@ -104,7 +104,7 @@ describe('App routing', () => {
 
   it('opens the Community placeholder at /forum/community, with the Forum\'s title and a way to the public dossiers', async () => {
     renderAt('/forum/community');
-    expect(await screen.findByRole('heading', { level: 1, name: 'Forum: la tua piazza giuridica' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Forum: il luogo del dibattito giuridico' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'Community' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Apri i dossier pubblici' })).toHaveAttribute('href', '/forum');
     expect(screen.queryByText('Pagina non trovata')).toBeNull();

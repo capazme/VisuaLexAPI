@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { FolderOpen, MessagesSquare } from 'lucide-react';
-import { FORUM_TITLE } from '../../../features/sections/sections';
+import { SECTION_TITLES } from '../../../features/sections/sections';
 
 /**
  * The Forum's «Community» (`/forum/community`), beside «Dossier pubblici» (`/forum`): an honest placeholder.
@@ -11,7 +11,7 @@ export function ForumCommunityPage() {
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
       <header className="border-b border-slate-200 pb-3 dark:border-slate-800">
-        <h1 className="font-serif text-3xl font-medium tracking-tight text-slate-900 dark:text-slate-50">{FORUM_TITLE}</h1>
+        <h1 className="font-serif text-3xl font-medium tracking-tight text-slate-900 dark:text-slate-50">{SECTION_TITLES.forum}</h1>
       </header>
       <section aria-labelledby="forum-community-heading" className="max-w-prose">
         <h2 id="forum-community-heading" className="flex items-center gap-2 text-xl font-semibold text-slate-900 dark:text-slate-50">

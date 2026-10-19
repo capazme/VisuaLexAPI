@@ -33,7 +33,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   change only marks its card handled, and a 403 stops the queue with «Non sei più tra i validatori»),
   `/history`, `/forum` («Dossier pubblici»; `/environments`, the page «Ambienti» was, redirects there keeping an old
   share link's `?import=`), `/forum/community` («Community», `ForumCommunityPage`: an honest placeholder — the
-  Forum's title, «Domande e discussioni tra colleghi, in arrivo», a link to `/forum`; no sample posts, no counts, no
+  Forum's title (`SECTION_TITLES.forum`), «Domande e discussioni tra colleghi, in arrivo», a link to `/forum`; no sample posts, no counts, no
   server route), `/documents`, `/collega-app` («Collega un'app AI»,
   `features/connections/ConnectAiAppPage`: the MCP address from `GET /api/oauth/connection` with
   «Copia», one card per client that connects today — `aiClients.ts`, the survey of 13 Oct 2026, with
@@ -88,8 +88,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   Academia, Assistente and Grafo (`VITE_FEATURE_MERLT*`); Forum, «Dossier pubblici» (`/forum`, with the Forum's count;
   `end`, so it is not active under `/forum/community`) and «Community» — the section keeps its name and its areas are
   named apart, so «Forum» is never written twice. The section's line is «Dossier pubblici e community»; its title
-  with a phrase, «Forum: la tua piazza giuridica» (the first section with one; the others are to follow), is
-  `FORUM_TITLE` in `sections.ts`, proposed and not yet confirmed: change it there only.
+  with a phrase, «Forum: il luogo del dibattito giuridico» (the owner's, 19 Oct 2026), is the Community page's `h1`;
+  the sections' phrases live in `SECTION_TITLES` (`sections.ts`) only, with Opus's «Opus: la tua officina giuridica»
+  not shown yet (its page takes it in its own change).
   **Words, not only icons** (`layout`, `sidebarWidth.ts`): from `xl` the desktop column is a 224 px bar with
   icon and word and the groups' headings (the section's name, or «Studia» and «Contribuisci»), the palette's
   shortcut beside «Ricerca» (⌘K on a Mac, Ctrl K elsewhere); between `lg` and `xl` the 64 px rail of icons, each labelled on hover and keyboard focus; below

@@ -21,9 +21,12 @@ export const SECTIONS: readonly Section[] = [
   { id: 'forum', name: 'Forum', line: 'Dossier pubblici e community', icon: Users, home: '/forum' },
 ];
 
-/** The Forum's title with its phrase (the Community page's `h1`), the formula the sections are to take («Nome: la
- *  tua … giuridica»). Proposed, not yet confirmed by the owner: the one place to change it. */
-export const FORUM_TITLE = 'Forum: la tua piazza giuridica';
+/** The sections' titles with their phrase («Nome: …»), chosen by the owner on 19 October 2026; the one place to change
+ *  them. The Forum's is the Community page's `h1`; Opus's is not shown yet: its page takes it in its own change. */
+export const SECTION_TITLES = {
+  forum: 'Forum: il luogo del dibattito giuridico',
+  opus: 'Opus: la tua officina giuridica',
+} as const satisfies Partial<Record<SectionId, string>>;
 
 const under = (pathname: string, root: string) => pathname === root || pathname.startsWith(`${root}/`);
 

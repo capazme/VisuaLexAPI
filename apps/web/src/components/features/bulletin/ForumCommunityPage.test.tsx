@@ -8,7 +8,7 @@ vi.mock('../../../services/notificationService', () => ({ notificationService: {
 vi.mock('../../../hooks/useTour', () => ({ useTour: () => ({ tryStartTour: forum.tryStartTour }) }));
 
 import { ForumCommunityPage } from './ForumCommunityPage';
-import { FORUM_TITLE } from '../../../features/sections/sections';
+import { SECTION_TITLES } from '../../../features/sections/sections';
 
 function renderPage() {
   return render(
@@ -22,8 +22,10 @@ function renderPage() {
 describe('ForumCommunityPage', () => {
   it('carries the Forum\'s title with its phrase, from the one constant', () => {
     renderPage();
-    expect(FORUM_TITLE).toBe('Forum: la tua piazza giuridica');
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(FORUM_TITLE);
+    expect(SECTION_TITLES.forum).toBe('Forum: il luogo del dibattito giuridico');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(SECTION_TITLES.forum);
+    // Opus's phrase waits for its page.
+    expect(screen.queryByText(SECTION_TITLES.opus)).toBeNull();
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
   });
 
