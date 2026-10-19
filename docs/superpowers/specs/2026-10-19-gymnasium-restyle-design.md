@@ -270,6 +270,10 @@ subject.
    typed anchor needs the server to accept a card whose only anchor was typed (the form's «+ Ancora»
    suggests it does); the executor checks that the route allows it before building the button, and says so
    in the PR. If it does not, the empty state says how to start from an article and nothing else changes.
+   *Checked for G4, 19 October:* `POST /lingo/cards` takes the anchors as references and resolves each against
+   Normattiva (the route Claude's cards use), so a card whose only anchors were typed is accepted; it refuses
+   the Union's acts and answers 503 when no reference could be checked. Per the front-end owner's choice, the
+   button shows only while the sources answer (Normattiva «ok» in the Python probe).
 
 ## 9. What was verified, and what was not
 
