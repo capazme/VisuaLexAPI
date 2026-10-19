@@ -150,8 +150,9 @@ const plural = (n: number, one: string, many: string) => `${formatCount(n)} ${n 
 /**
  * What the line under the calendar says of a day, read aloud as it is (Gymnasium spec §5.3): «lunedì 12 ottobre: 14
  * ripassi, obiettivo raggiunto». A past day after `firstDay` that did not count says so; a day before it never does.
+ * `narrowed`: the counts are one subject's, so a day that counted with none of its reviews says so.
  */
-export function describeDay(cell: CalendarCell, today: string, firstDay?: string): string {
+export function describeDay(cell: CalendarCell, today: string, firstDay?: string, narrowed = false): string {
   const name = cell.giorno === today ? `Oggi, ${formatDayLong(cell.giorno)}` : formatDayLong(cell.giorno);
   const day = cell.day;
   const missed = calendarDayState(cell, today, firstDay) === 'saltato';
@@ -159,8 +160,10 @@ export function describeDay(cell: CalendarCell, today: string, firstDay?: string
     if (day?.riposo) return `${name}: giorno di riposo, la serie regge`;
     return missed ? `${name}: nessun ripasso, giorno saltato` : `${name}: nessun ripasso`;
   }
-  // A day with nothing to do that counted: the queue was empty when the user looked.
-  const parts = [day.ripassi === 0 ? 'niente da ripassare' : plural(day.ripassi, 'ripasso', 'ripassi')];
+  // A day with nothing to do that counted: the queue was empty when the user looked — or, on a subject's calendar, the
+  // day counted with other subjects (`narrowed`).
+  const none = narrowed ? 'nessun ripasso in questa materia' : 'niente da ripassare';
+  const parts = [day.ripassi === 0 ? none : plural(day.ripassi, 'ripasso', 'ripassi')];
   if (day.nuove > 0) parts.push(plural(day.nuove, 'nuova', 'nuove'));
   if (day.sbagliate > 0) parts.push(plural(day.sbagliate, 'sbagliata', 'sbagliate'));
   if (day.valido) parts.push('obiettivo raggiunto');

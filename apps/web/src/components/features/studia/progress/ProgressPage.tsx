@@ -143,9 +143,10 @@ export function ProgressPage() {
             title="Il tuo calendario"
             busy={scopeBusy}
             stale={scopeBusy && scope.data !== null}
-            note={scope.data && scope.data.calendario.length === 0 ? 'Il primo giorno comincia oggi: qui si segnano i giorni in cui ripassi.' : undefined}
+            // A newcomer only: someone back after more than the calendar's 26 weeks has a record, and an empty calendar.
+            note={scope.data && scope.data.calendario.length === 0 && day.data?.serie.record === 0 ? 'Il primo giorno comincia oggi: qui si segnano i giorni in cui ripassi.' : undefined}
           >
-            {scoped((data) => <ActivityCalendar calendario={data.calendario} today={data.oggi.giorno} weeks={weeks} hue={hue} />, <ActivityCalendarSkeleton weeks={weeks} />)}
+            {scoped((data) => <ActivityCalendar calendario={data.calendario} today={data.oggi.giorno} weeks={weeks} hue={hue} narrowed={materia !== undefined} />, <ActivityCalendarSkeleton weeks={weeks} />)}
           </Block>
 
           <Block id="studia-stati" title="Le schede per stato" busy={scopeBusy} stale={scopeBusy && scope.data !== null}>

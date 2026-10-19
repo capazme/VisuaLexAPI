@@ -34,10 +34,10 @@ export function SubjectProgress({ materie, selected, onSelect }: SubjectProgress
               aria-pressed={on}
               onClick={() => onSelect(on ? undefined : row.materia)}
               className={cn(
-                'grid min-h-[44px] w-full gap-2 rounded-xl border px-3 py-3 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60',
+                'grid min-h-[44px] w-full gap-2 rounded-xl text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60',
                 FOCUS_RING,
-                // The chosen one doubles its outline inside the border, so nothing moves.
-                on ? cn('bg-slate-50 ring-1 ring-inset ring-primary-900 dark:bg-slate-800/60 dark:ring-primary-300', INK_BORDER) : 'border-slate-200 dark:border-slate-800',
+                // The chosen one's border is twice as thick and its padding a pixel less, so nothing moves.
+                on ? cn('border-2 bg-slate-50 p-[11px] dark:bg-slate-800/60', INK_BORDER) : 'border border-slate-200 p-3 dark:border-slate-800',
               )}
             >
               <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">

@@ -133,10 +133,29 @@ describe('ActivityCalendar', () => {
 
   it('says nothing is missed for a newcomer, and counts nothing before the first day', () => {
     const { container } = render(<ActivityCalendar calendario={[]} today={today} weeks={12} />);
+    // Not even in the legend.
+    expect(within(screen.getByRole('list', { name: 'Legenda del calendario' })).queryByText('saltato')).toBeNull();
     expect(screen.getByRole('group', { name: 'Calendario dei ripassi dal 3 agosto 2026 a oggi: ancora nessun ripasso' })).toBeInTheDocument();
     expect(container.querySelectorAll('[data-stato="saltato"]')).toHaveLength(0);
     fireEvent.click(container.querySelector('[data-day="2026-10-16"]')!);
     expect(screen.getByText('venerdì 16 ottobre: nessun ripasso')).toBeInTheDocument();
+  });
+
+  it('keeps the day chosen, not its place, when the calendar changes width', () => {
+    const { container, rerender } = render(<ActivityCalendar calendario={calendario} today={today} weeks={26} />);
+    fireEvent.click(container.querySelector('[data-day="2026-10-14"]')!);
+    rerender(<ActivityCalendar calendario={calendario} today={today} weeks={12} />);
+    expect(screen.getByText(/^mercoledì 14 ottobre: 40 ripassi/)).toBeInTheDocument();
+  });
+
+  it('rims a day\'s mark with the ground on a subject\'s hue, and says a subject\'s empty day as such', () => {
+    const counted = [...calendario, day('2026-10-19', { ripassi: 0 })];
+    const { container } = render(<ActivityCalendar calendario={counted} today={today} weeks={12} hue="hsl(var(--category-civil))" narrowed />);
+    // The 14th is tinted (40 reviews) and counted: its dot has a rim; the 19th counted with other subjects, untinted.
+    expect(container.querySelector('[data-day="2026-10-14"] [data-halo]')).not.toBeNull();
+    expect(container.querySelector('[data-day="2026-10-19"] [data-halo]')).toBeNull();
+    fireEvent.click(container.querySelector('[data-day="2026-10-19"]')!);
+    expect(screen.getByText('lunedì 19 ottobre: nessun ripasso in questa materia, obiettivo raggiunto')).toBeInTheDocument();
   });
 
   it('reads a day of 9999 reviews whole, and a sum of five digits grouped', () => {

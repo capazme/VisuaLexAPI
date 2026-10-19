@@ -89,6 +89,46 @@ describe('ProgressPage (Gymnasium spec §5.3)', () => {
     expect(screen.getAllByText('Nessuna scheda')).toHaveLength(5);
   });
 
+  it('greets nobody as new who has a record: back after more than 26 weeks', async () => {
+    progress.mockResolvedValue({ ...answer({ newcomer: true }), serie: { ...answer({ newcomer: true }).serie, record: 12 } });
+    renderPage();
+    await screen.findByRole('region', { name: 'Riepilogo' });
+    expect(screen.queryByText(/^Il primo giorno comincia oggi: qui/)).toBeNull();
+  });
+
+  it('never shows a subject\'s answer under another, and dims the subject\'s blocks while it reads again', async () => {
+    let settle: (value: Progressi) => void = () => {};
+    progress.mockImplementation((materia?: Materia) =>
+      materia === 'DIRITTO_CIVILE' ? new Promise((resolve) => (settle = resolve)) : Promise.resolve(answer({ reviews: materia ? 3 : 14 })),
+    );
+    renderPage();
+    await screen.findByRole('group', { name: /: 14 ripassi in 1 giorno$/ });
+    const user = userEvent.setup();
+    const chips = screen.getByRole('group', { name: 'Materia' });
+    await user.click(within(chips).getByRole('button', { name: 'Diritto penale' }));
+    await screen.findByRole('group', { name: /: 3 ripassi in 1 giorno$/ });
+    // To another subject: its places, not the last subject's numbers.
+    await user.click(within(chips).getByRole('button', { name: 'Diritto civile' }));
+    expect(screen.queryByRole('group', { name: /Calendario dei ripassi/ })).toBeNull();
+    expect(screen.queryByRole('group', { name: /Schede da ripassare/ })).toBeNull();
+    settle(answer({ reviews: 7 }));
+    expect(await screen.findByRole('group', { name: /: 7 ripassi in 1 giorno$/ })).toBeInTheDocument();
+    // A read again of what is on screen (a subject's read failed, «Riprova», then «Tutte le materie» while the day's
+    // read travels): the day's last answer stays in the subject's blocks, dimmed.
+    progress.mockImplementation((materia?: Materia) => (materia ? Promise.reject({ status: 503 }) : Promise.resolve(answer())));
+    await user.click(within(chips).getByRole('button', { name: 'Diritto penale' }));
+    const retry = await screen.findByRole('button', { name: 'Riprova' });
+    progress.mockImplementation(() => new Promise(() => {}));
+    await user.click(retry);
+    await user.click(within(chips).getByRole('button', { name: 'Tutte le materie' }));
+    for (const name of ['Il tuo calendario', 'Le schede per stato', 'I prossimi 14 giorni']) {
+      const block = screen.getByRole('region', { name });
+      expect(block).toHaveAttribute('aria-busy', 'true');
+      expect(block.querySelector('.opacity-60')).not.toBeNull();
+    }
+    expect(screen.getByRole('group', { name: /: 14 ripassi in 1 giorno$/ })).toBeInTheDocument();
+  });
+
   it('holds every block at its final size while the first read travels', () => {
     progress.mockReturnValue(new Promise(() => {}));
     renderPage();
@@ -99,6 +139,8 @@ describe('ProgressPage (Gymnasium spec §5.3)', () => {
     }
     expect(screen.queryByRole('group', { name: /Calendario dei ripassi/ })).toBeNull();
     expect(document.querySelectorAll('.motion-safe\\:animate-pulse').length).toBeGreaterThan(4);
+    // The calendar's place has the drawing's proportions: 22 + 26 weeks × 16 wide, 16 + 7 × 16 tall.
+    expect(within(screen.getByRole('region', { name: 'Il tuo calendario' })).getByText('', { selector: '[style*="aspect-ratio"]' })).toHaveStyle({ aspectRatio: '438 / 128' });
   });
 
   it('says a failed read with «Riprova», no alert, and reads again', async () => {

@@ -646,8 +646,11 @@ calendar, the states and the coming days are the chosen subject's read; the summ
 day's. The calendar's cells carry a state (`layout.ts` `calendarDayState`, `data-stato`): a dot on a day that counted,
 a dashed outline on a rest, a dash on a past day that did not count (`saltato`), a ring on today, the rest of this week
 dotted (`calendarGrid`'s `future`, never chosen, so End stops at today), and no mark on a day before the first one the
-calendar holds (`vuoto`): a newcomer's calendar says nothing is missed. On a subject's calendar the flags are the whole
-day's, as the server sends them. The calendar is one tab stop (arrows by day and week, Home and End, a live readout; the
+calendar holds (`vuoto`): a newcomer's calendar says nothing is missed, not even in its legend. On a subject's calendar
+the flags are the whole day's, as the server sends them: a mark on the subject's hue sits on a rim of the tile's ground
+(`data-halo`), since no single colour reads on all five hues in both themes, and a day that counted with none of the
+subject's reviews reads «nessun ripasso in questa materia» (`describeDay`'s `narrowed`). The day chosen is kept by its
+date, so a grid that changes width keeps it. The calendar is one tab stop (arrows by day and week, Home and End, a live readout; the
 whole pitch of a cell hit-testable). Labels on both charts (weekdays, months, the scale, the days) are the interface's
 text at `text-xs` placed by percentages over or beside the drawing, never SVG `<text>`: a drawing scaled to its width
 scaled them under 11 px. The legend under it says each in words; the line under it (`describeDay`, «lunedì 12
@@ -656,7 +659,8 @@ the arrows as before. The coming days' scale is the interface's text in a column
 lines (`scaleLines`), the days in a row under it; today's column is tinted and its label set apart; a day with nothing
 due is a hollow mark on the base. Counts go through `formatCount` (`Intl.NumberFormat('it-IT')`: «12.345», four
 digits whole as Italian writes them). States: while the first read travels every block holds its final size
-(`ActivityCalendarSkeleton`, `DueForecastSkeleton`, `CardStatesBarSkeleton`); a failed read says «Non riesco a leggere i
+(`ActivityCalendarSkeleton`, `DueForecastSkeleton`, `CardStatesBarSkeleton`); «Il primo giorno comincia oggi» over the
+calendar only for someone with no record (an empty calendar after 26 weeks away is not a first day); a failed read says «Non riesco a leggere i
 tuoi progressi.» with «Riprova» (44 px, no alert) and keeps what was on screen; a new read of the same subject leaves
 the last answer, dimmed. No points and no level.
 
