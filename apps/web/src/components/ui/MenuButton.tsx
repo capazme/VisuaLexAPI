@@ -33,6 +33,8 @@ export interface MenuButtonProps {
   heading?: string;
   /** Classes for the list (a wider one, a capped height that scrolls), merged over the default `w-56`. */
   menuClassName?: string;
+  /** Classes for the wrapper around the trigger and the list (a trigger as wide as its column). */
+  className?: string;
 }
 
 /**
@@ -40,7 +42,7 @@ export interface MenuButtonProps {
  * and End move, Escape and Tab close, focus returns to the trigger, a click
  * outside closes. Clicks never reach the card it sits in. The dossier's menus.
  */
-export function MenuButton({ label, items, children, triggerClassName, align = 'right', placement = 'below', heading, menuClassName }: MenuButtonProps) {
+export function MenuButton({ label, items, children, triggerClassName, align = 'right', placement = 'below', heading, menuClassName, className }: MenuButtonProps) {
   // null = closed; otherwise which item takes the focus once the menu is drawn.
   const [openAt, setOpenAt] = useState<'first' | 'last' | null>(null);
   const open = openAt !== null;
@@ -107,7 +109,7 @@ export function MenuButton({ label, items, children, triggerClassName, align = '
   };
 
   return (
-    <div ref={wrapperRef} className="relative" onClick={(e) => e.stopPropagation()}>
+    <div ref={wrapperRef} className={cn('relative', className)} onClick={(e) => e.stopPropagation()}>
       <button
         ref={triggerRef}
         type="button"

@@ -81,8 +81,17 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (a link to `/` that puts the cursor in the search page's field, `focusSearchField`, with no window over it —
   the owner, 13 Oct 2026; its hover label carries ⌘K, the palette; the quick norms' dot sits under it;
   `#tour-nav-search` is what the welcome and search tours point at) and «Analizza documento» —, then the active
-  section's, in a group named after it: Opus, Dossier; Gymnasium, Ripasso, Le mie schede, Da validare (validators)
-  and Dossier; Academia, Assistente and Grafo (`VITE_FEATURE_MERLT*`); Forum, the Forum with its count. At the bottom only the user menu, whose dropdown holds Impostazioni,
+  section's, in a group named after it: Opus, Dossier; Gymnasium in two groups (Gymnasium spec §4), «Studia»
+  (Oggi, the home `/studia/ripasso`, and Dossier) and «Contribuisci» (Le mie schede, Da validare for validators);
+  Academia, Assistente and Grafo (`VITE_FEATURE_MERLT*`); Forum, the Forum with its count.
+  **Words, not only icons** (`layout`, `sidebarWidth.ts`): from `xl` the desktop column is a 224 px bar with
+  icon and word and the groups' headings (the section's name, or «Studia» and «Contribuisci»), ⌘K beside
+  «Ricerca»; between `lg` and `xl` the 64 px rail of icons, each labelled on hover and keyboard focus; below
+  `lg` the drawer, icon and word in rows of 44 px, its foot clear of the home indicator. From `xl` a control
+  at the foot narrows the bar to the rail and widens it again, remembered in the browser under
+  `visualex-sidebar` (`guardedStorage`); wide by default. Every column keeps 10 px of side padding and every
+  icon a 44 px box, so widening moves no icon: `Layout` animates the column's width (instantly under reduced
+  motion) and the words are clipped as it moves. With words the user menu opens over its button, not beside. At the bottom only the user menu, whose dropdown holds Impostazioni,
   Cronologia (moved there by the owner, 13 Oct 2026; the saved norms that changed are counted on the avatar
   and beside the entry, and both names say it in words: «Menu utente, 2 norme salvate cambiate»),
   «Collega un'app AI», the theme, «Scorciatoie (?)», «Pannello Admin» (admins) and «Esci». The dropdown is a portalled WAI-ARIA

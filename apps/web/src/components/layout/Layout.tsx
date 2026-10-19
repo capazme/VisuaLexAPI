@@ -1,7 +1,8 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Sidebar } from './Sidebar';
+import { useDesktopSidebar } from './sidebarWidth';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -38,6 +39,9 @@ export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
+  // From `xl` the desktop column shows its words unless the user narrowed it (remembered in the browser).
+  const desktopSidebar = useDesktopSidebar();
+  const reduceMotion = useReducedMotion();
   const navigate = useNavigate();
   // The find window searches the workspace, which is drawn only on the search page (spec §13.1).
   const { pathname } = useLocation();
@@ -172,10 +176,10 @@ export function Layout() {
       <motion.div
         initial={false}
         animate={{
-          width: sidebarVisible && !settings.focusMode ? 64 : 0,
+          width: sidebarVisible && !settings.focusMode ? desktopSidebar.width : 0,
           opacity: sidebarVisible && !settings.focusMode ? 1 : 0,
         }}
-        transition={spring.snappy}
+        transition={reduceMotion ? { duration: 0 } : spring.snappy}
         className="hidden lg:block flex-shrink-0 h-full"
       >
         {sidebarVisible && !settings.focusMode && (
@@ -183,6 +187,8 @@ export function Layout() {
             theme={settings.theme}
             toggleTheme={toggleTheme}
             isOpen={true}
+            layout={desktopSidebar.layout}
+            onToggleWide={desktopSidebar.toggle}
             closeMobile={() => { }}
             openSettings={() => setSettingsOpen(true)}
             openKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
@@ -197,6 +203,7 @@ export function Layout() {
             theme={settings.theme}
             toggleTheme={toggleTheme}
             isOpen={sidebarOpen}
+            layout="drawer"
             closeMobile={() => setSidebarOpen(false)}
             openSettings={() => setSettingsOpen(true)}
             openKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, type FocusEvent, type Keyboar
 import { createPortal } from 'react-dom';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Folder, Clock, Moon, Sun, Settings, LogOut, Shield, Users, Keyboard, FileSearch, Scale, Network, Bot, Repeat, Layers, ClipboardCheck } from 'lucide-react';
+import { Search, Folder, Clock, Moon, Sun, Settings, LogOut, Shield, Users, Keyboard, FileSearch, Scale, Network, Bot, Repeat, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { isMerltEnabled } from '../../features/merlt/featureFlag';
 import { isMerltGraphEnabled } from '../../features/merlt/graph/featureFlag';
@@ -14,6 +14,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useForumNotifications } from '../../hooks/useForumNotifications';
 import { Z_INDEX } from '../../constants/zIndex';
 import { spring } from '../../lib/motion';
+import type { SidebarLayout } from './sidebarWidth';
 
 interface SidebarProps {
   theme: string;
@@ -22,6 +23,11 @@ interface SidebarProps {
   closeMobile: () => void;
   openSettings: () => void;
   openKeyboardShortcuts: () => void;
+  /** Icons only (the desktop between `lg` and `xl`, or narrowed), icons and words (from `xl`), or the
+   *  phone's drawer (icons and words, rows of 44 px). */
+  layout?: SidebarLayout;
+  /** Narrows or widens the desktop bar; given only where the words fit (`xl`). */
+  onToggleWide?: () => void;
 }
 
 interface NavItemProps {
@@ -33,6 +39,7 @@ interface NavItemProps {
   badgeCount?: number;
   /** The keyboard shortcut that does the same, shown in the hover label (not part of the name). */
   hint?: string;
+  layout: SidebarLayout;
 }
 
 const menuItemClass = "w-full flex items-center gap-3 px-4 py-2.5 min-h-[44px] md:min-h-0 text-sm focus-visible:outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer";
@@ -129,13 +136,14 @@ function useSidebarLabel() {
   return { shown, hide, handlers };
 }
 
-function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint }: NavItemProps) {
+function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint, layout }: NavItemProps) {
   const { shown: showTooltip, hide, handlers } = useSidebarLabel();
   // State, not a ref object: the tooltip reads the element while rendering (gotcha 13).
   const [linkEl, setLinkEl] = useState<HTMLAnchorElement | null>(null);
   const showBadge = (badgeCount ?? 0) > 0;
+  const words = layout !== 'rail';
 
-  // The whole control is an icon, and `label` only ever reached the eye — the
+  // In the rail the whole control is an icon, and `label` only ever reached the eye — the
   // tooltip is `hidden md:block` and shows on hover, so a screen reader and a
   // keyboard user got an unnamed link. The count rides the name because a badge
   // announced on its own arrives without saying what it counts.
@@ -148,17 +156,18 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint }: NavIt
       id={id}
       aria-label={accessibleName}
       className={({ isActive }) => cn(
-        "relative flex items-center justify-center rounded-xl transition-colors duration-200",
+        "relative flex shrink-0 items-center rounded-xl transition-colors duration-200",
         "hover:bg-slate-100 dark:hover:bg-slate-800",
-        // Mobile: larger touch target (min 44px)
-        "w-12 h-12 md:w-11 md:h-11",
+        // The icon keeps the same 44 px box in every layout, so widening the bar moves no icon.
+        words ? "w-full h-11 overflow-hidden pr-2" : "w-11 h-11",
         isActive && "bg-primary-50 dark:bg-primary-900/10"
       )}
       onClick={() => {
         hide();
         onClick?.();
       }}
-      {...handlers}
+      // With its words written, the row needs no label of its own.
+      {...(words ? {} : handlers)}
     >
       {({ isActive }) => (
         <>
@@ -166,6 +175,7 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint }: NavIt
           <motion.div
             whileTap={{ scale: 0.95 }}
             transition={spring.snappy}
+            className="grid h-11 w-11 shrink-0 place-items-center"
           >
             <Icon
               size={22}
@@ -179,6 +189,22 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint }: NavIt
             />
           </motion.div>
 
+          {words && (
+            <span
+              aria-hidden
+              className={cn(
+                "min-w-0 flex-1 truncate whitespace-nowrap text-sm",
+                isActive ? "font-semibold text-primary-700 dark:text-primary-300" : "font-medium text-slate-700 dark:text-slate-300"
+              )}
+            >
+              {label}
+            </span>
+          )}
+          {/* The shortcut, for a keyboard: not in the phone's drawer. */}
+          {layout === 'wide' && hint && !showBadge && (
+            <kbd aria-hidden className="ml-2 shrink-0 font-sans text-[11px] text-slate-400 dark:text-slate-500">{hint}</kbd>
+          )}
+
           {/* Active indicator dot */}
           {isActive && (
             <motion.span
@@ -188,12 +214,17 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint }: NavIt
             />
           )}
 
-          {/* Notification badge */}
-          {showBadge && <CountBadge count={badgeCount ?? 0} className="absolute top-1 right-1 ring-2 ring-white dark:ring-slate-900" />}
+          {/* Notification badge: on the icon in the rail, at the end of the row with words. */}
+          {showBadge && (
+            <CountBadge
+              count={badgeCount ?? 0}
+              className={words ? "ml-2 shrink-0" : "absolute top-1 right-1 ring-2 ring-white dark:ring-slate-900"}
+            />
+          )}
 
-          {/* Tooltip - hidden on mobile */}
+          {/* Tooltip - the rail's only, hidden on mobile */}
           <AnimatePresence>
-            {showTooltip && <SidebarTooltip anchor={linkEl} label={label} hint={hint} onDismiss={hide} />}
+            {!words && showTooltip && <SidebarTooltip anchor={linkEl} label={label} hint={hint} onDismiss={hide} />}
           </AnimatePresence>
         </>
       )}
@@ -201,7 +232,57 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint }: NavIt
   );
 }
 
-export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings, openKeyboardShortcuts }: SidebarProps) {
+/**
+ * A group of entries, named for a screen reader; with words, its name is also written over it. In the
+ * rail a thin line stands for the heading.
+ */
+function NavGroup({ name, heading, layout, children }: { name: string; heading?: boolean; layout: SidebarLayout; children: React.ReactNode }) {
+  return (
+    <div role="group" aria-label={name} className="flex w-full flex-col items-start gap-3 md:gap-2">
+      {heading && layout !== 'rail' && (
+        <p aria-hidden className="w-full truncate whitespace-nowrap px-3 pt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">
+          {name}
+        </p>
+      )}
+      {children}
+    </div>
+  );
+}
+
+/** The desktop's control that narrows the bar to its icons or widens it to its words. */
+function WidthToggle({ layout, onToggle }: { layout: SidebarLayout; onToggle: () => void }) {
+  const { shown, hide, handlers } = useSidebarLabel();
+  const [el, setEl] = useState<HTMLButtonElement | null>(null);
+  const wide = layout === 'wide';
+  const label = wide ? 'Riduci la barra laterale' : 'Allarga la barra laterale';
+  const Icon: LucideIcon = wide ? PanelLeftClose : PanelLeftOpen;
+  return (
+    <button
+      ref={setEl}
+      type="button"
+      aria-label={label}
+      onClick={() => {
+        hide();
+        onToggle();
+      }}
+      {...(wide ? {} : handlers)}
+      className={cn(
+        "flex h-11 shrink-0 items-center rounded-xl text-slate-500 dark:text-slate-400 transition-colors duration-200",
+        "hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+        wide ? "w-full overflow-hidden" : "w-11",
+      )}
+    >
+      <span className="grid h-11 w-11 shrink-0 place-items-center"><Icon size={20} aria-hidden /></span>
+      {wide && <span aria-hidden className="min-w-0 truncate whitespace-nowrap text-sm">Riduci</span>}
+      <AnimatePresence>
+        {!wide && shown && <SidebarTooltip anchor={el} label={label} onDismiss={hide} />}
+      </AnimatePresence>
+    </button>
+  );
+}
+
+export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings, openKeyboardShortcuts, layout = 'rail', onToggleWide }: SidebarProps) {
   const navigate = useNavigate();
   const quickNorms = useAppStore((s) => s.quickNorms);
   const { user, isAdmin, isValidator, logout } = useAuth();
@@ -215,17 +296,19 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuPosition, setMenuPosition] = useState({ bottom: 0, left: 0 });
 
+  const words = layout !== 'rail';
+
   // Calculate menu position when showing
   useEffect(() => {
     if (showUserMenu && userButtonRef.current) {
       const rect = userButtonRef.current.getBoundingClientRect();
-      // Position the menu to the right of the button, aligned to bottom of button
-      setMenuPosition({
-        bottom: window.innerHeight - rect.bottom,
-        left: rect.right + 8, // 8px gap from button
-      });
+      // Beside the rail's avatar, aligned to its bottom; over the wider button of the bar with words
+      // (on a phone a menu beside it would leave the screen).
+      setMenuPosition(words
+        ? { bottom: window.innerHeight - rect.top + 8, left: rect.left }
+        : { bottom: window.innerHeight - rect.bottom, left: rect.right + 8 });
     }
-  }, [showUserMenu]);
+  }, [showUserMenu, words]);
 
   // «Ricerca» is the search page with the cursor in its field, no window over it (the owner, 13 Oct
   // 2026: «ok come raccomandi»); ⌘K is the palette. The link itself navigates.
@@ -303,7 +386,9 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         // On the desktop it fills the row it sits in, never taller: a low window scrolls the
         // navigation, not the document.
         "lg:h-full",
-        "w-20 md:w-16",
+        // The desktop copy is as wide as its column, which `Layout` sizes (64 px, or 224 with words);
+        // the phone's drawer has room for its words.
+        layout === 'drawer' ? "w-[17rem] max-w-[85vw]" : "w-full",
         // Clean Slate/Glass effect
         "bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl",
         "border-r border-slate-200 dark:border-slate-800",
@@ -318,53 +403,70 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
       )}
     >
       {/* The section switcher, where the open book was (sections spec S3). Below `lg` the layout's floating
-          menu button sits at the top left, over this place: the switcher goes under it. */}
-      <div id="tour-section-switcher" className="flex items-center justify-center pt-[4.5rem] pb-2 lg:p-0 lg:h-16 border-b border-slate-100 dark:border-slate-800/50">
-        <SectionSwitcher forumCount={forumNotifications.total} onChoose={closeMobile} />
+          menu button sits at the top left, over this place: the switcher goes under it. Every column keeps
+          10 px of side padding, so a 44 px control in the 64 px rail sits where it sits in the wide bar. */}
+      <div id="tour-section-switcher" className="flex items-center px-2.5 pt-[4.5rem] pb-2 lg:p-0 lg:px-2.5 lg:h-16 border-b border-slate-100 dark:border-slate-800/50">
+        <SectionSwitcher forumCount={forumNotifications.total} onChoose={closeMobile} withName={words} />
       </div>
 
       {/* Navigation */}
       {/* The one part that scrolls when the window is low (sixteen icons were 935 px tall): its labels are
           portalled (`SidebarTooltip`), so the overflow clips nothing. The scrollbar is thin, so a
-          very low window shows there is more; the column is 64 px wide. */}
+          very low window shows there is more. It clips the words while the bar narrows or widens. */}
       {/* `layoutScroll`: the active indicator's shared-layout animation measures against the nav's scroll. */}
       <motion.nav
         layoutScroll
         id="tour-sidebar"
-        className="min-h-0 flex-1 flex flex-col items-center overflow-y-auto overflow-x-hidden py-4 gap-3 md:gap-2 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1"
+        className="min-h-0 flex-1 flex flex-col items-start overflow-y-auto overflow-x-hidden overscroll-contain px-2.5 py-4 gap-3 md:gap-2 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1"
       >
-        <NavItem to="/" icon={Search} label="Ricerca" hint="⌘K" id="tour-nav-search" onClick={handleSearchClick} />
+        <NavItem to="/" icon={Search} label="Ricerca" hint="⌘K" id="tour-nav-search" onClick={handleSearchClick} layout={layout} />
         {quickNorms.length > 0 && (
-          <div className="-mt-1 w-5 h-1 rounded-full bg-amber-500/60" title={`${quickNorms.length} preferiti`} />
+          <div className="-mt-1 ml-3 w-5 h-1 rounded-full bg-amber-500/60" title={`${quickNorms.length} preferiti`} />
         )}
-        <NavItem to="/documents" icon={FileSearch} label="Analizza documento" onClick={closeMobile} />
+        <NavItem to="/documents" icon={FileSearch} label="Analizza documento" onClick={closeMobile} layout={layout} />
         {/* The active section's entries, after the Corpus ones above (sections spec S6). */}
-        <div role="group" aria-label={active.name} className="mt-1 flex w-full flex-col items-center gap-3 md:gap-2 border-t border-slate-100 dark:border-slate-800/50 pt-3 md:pt-2">
+        <div role="group" aria-label={active.name} className="mt-1 flex w-full flex-col items-start gap-3 md:gap-2 border-t border-slate-100 dark:border-slate-800/50 pt-3 md:pt-2">
           {section === 'gymnasium' && (
             <>
-              <NavItem to="/studia/ripasso" icon={Repeat} label="Ripasso" onClick={closeMobile} />
-              <NavItem to="/studia/schede" icon={Layers} label="Le mie schede" onClick={closeMobile} />
-              {isValidator && <NavItem to="/studia/valida" icon={ClipboardCheck} label="Da validare" onClick={closeMobile} />}
+              {/* Studying, then writing and validating (Gymnasium spec §4). */}
+              <NavGroup name="Studia" heading layout={layout}>
+                <NavItem to="/studia/ripasso" icon={Repeat} label="Oggi" onClick={closeMobile} layout={layout} />
+                <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" layout={layout} />
+              </NavGroup>
+              {layout === 'rail' && <div aria-hidden className="mx-auto h-px w-6 bg-slate-200 dark:bg-slate-700" />}
+              <NavGroup name="Contribuisci" heading layout={layout}>
+                <NavItem to="/studia/schede" icon={Layers} label="Le mie schede" onClick={closeMobile} layout={layout} />
+                {isValidator && <NavItem to="/studia/valida" icon={ClipboardCheck} label="Da validare" onClick={closeMobile} layout={layout} />}
+              </NavGroup>
             </>
           )}
-          {(section === 'opus' || section === 'gymnasium') && (
-            <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" />
+          {(section === 'opus' || section === 'forum' || (section === 'academia' && showAssistant)) && words && (
+            <p aria-hidden className="w-full truncate whitespace-nowrap px-3 pt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">
+              {active.name}
+            </p>
+          )}
+          {section === 'opus' && (
+            <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" layout={layout} />
           )}
           {section === 'academia' && showAssistant && (
             <>
-              <NavItem to="/merlt" icon={Scale} label="Assistente" onClick={closeMobile} />
+              <NavItem to="/merlt" icon={Scale} label="Assistente" onClick={closeMobile} layout={layout} />
               {/* Slice 4 Decision A: /grafo is the Q&A surface; the hub stays at /merlt. */}
-              {showGraph && <NavItem to="/grafo" icon={Network} label="Grafo" onClick={closeMobile} />}
+              {showGraph && <NavItem to="/grafo" icon={Network} label="Grafo" onClick={closeMobile} layout={layout} />}
             </>
           )}
           {section === 'forum' && (
-            <NavItem to="/forum" icon={Users} label="Forum" onClick={closeMobile} badgeCount={forumNotifications.total} />
+            <NavItem to="/forum" icon={Users} label="Forum" onClick={closeMobile} badgeCount={forumNotifications.total} layout={layout} />
           )}
         </div>
       </motion.nav>
 
-      {/* User Menu */}
-      <div className="flex flex-col items-center py-4 border-t border-slate-100 dark:border-slate-800/50">
+      {/* User Menu, and on the desktop from `xl` the control that narrows or widens the bar. On a phone the
+          drawer's foot clears the home indicator. */}
+      <div className={cn(
+        "flex flex-col items-start gap-1 px-2.5 py-4 border-t border-slate-100 dark:border-slate-800/50",
+        layout === 'drawer' && "pb-[max(1rem,env(safe-area-inset-bottom))]",
+      )}>
         <button
           ref={userButtonRef}
           aria-label={normaChanges > 0 ? `Menu utente, ${normaChangesLabel(normaChanges)}` : 'Menu utente'}
@@ -373,9 +475,9 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
           onClick={() => (showUserMenu ? closeMenu(false) : openMenu('first'))}
           onKeyDown={onTriggerKeyDown}
           className={cn(
-            "relative flex items-center justify-center rounded-xl transition-colors duration-200",
+            "relative flex shrink-0 items-center rounded-xl transition-colors duration-200",
             "hover:bg-slate-100 dark:hover:bg-slate-800",
-            "w-12 h-12 md:w-11 md:h-11",
+            words ? "w-full h-11 gap-2.5 overflow-hidden px-1 text-left" : "justify-center w-11 h-11",
             showUserMenu && "bg-primary-50 dark:bg-primary-900/10"
           )}
         >
@@ -384,7 +486,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
             whileTap={{ scale: 0.95 }}
             transition={spring.snappy}
             className={cn(
-              "rounded-lg flex items-center justify-center text-sm font-semibold",
+              "shrink-0 rounded-lg flex items-center justify-center text-sm font-semibold",
               "w-9 h-9 md:w-8 md:h-8",
               isAdmin
                 ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
@@ -393,8 +495,16 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
           >
             {user?.username?.charAt(0).toUpperCase() || 'U'}
           </motion.div>
-          {normaChanges > 0 && <CountBadge count={normaChanges} className="absolute top-0 right-0 ring-2 ring-white dark:ring-slate-900" />}
+          {words && (
+            <span aria-hidden className="min-w-0 flex-1 truncate whitespace-nowrap text-sm font-medium text-slate-700 dark:text-slate-300">
+              {user?.username}
+            </span>
+          )}
+          {normaChanges > 0 && (
+            <CountBadge count={normaChanges} className={words ? "shrink-0" : "absolute top-0 right-0 ring-2 ring-white dark:ring-slate-900"} />
+          )}
         </button>
+        {onToggleWide && layout !== 'drawer' && <WidthToggle layout={layout} onToggle={onToggleWide} />}
 
         {/* User Dropdown Menu - rendered via Portal */}
         {showUserMenu && createPortal(
