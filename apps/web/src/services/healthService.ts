@@ -57,3 +57,20 @@ export async function getHealthSnapshot(signal: AbortSignal): Promise<HealthSnap
   const hasDegraded = services.some(service => service.state === 'degraded');
   return { overall: hasOffline ? 'offline' : hasDegraded ? 'degraded' : 'online', services, checkedAt: new Date().toISOString() };
 }
+
+/**
+ * Whether Normattiva answers now, the one source a study card's anchors are checked against (the
+ * server refuses the Union's acts and answers 503 when no reference could be checked). Read from the
+ * Python probe, which the server caches for two minutes; anything but an «ok» for Normattiva is false.
+ */
+export async function cardSourcesAnswer(signal: AbortSignal): Promise<boolean> {
+  try {
+    const response = await legalFetch('/health/detailed', { signal });
+    const payload = await response.json().catch(() => ({})) as { services?: Record<string, { status?: string }> };
+    return payload.services?.normattiva?.status === 'ok';
+  } catch (error) {
+    // An abort is a `DOMException`, which is not an `Error` in every engine: read its name.
+    if ((error as { name?: unknown } | null)?.name === 'AbortError') throw error;
+    return false;
+  }
+}
