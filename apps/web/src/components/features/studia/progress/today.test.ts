@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Progressi } from '../../../../types/studia';
-import { nextDueDay, orderStops, stopStates, todayState } from './today';
+import { cardsLeft, nextDueDay, orderStops, stopStates, todayState } from './today';
 
 type Stop = Progressi['materie'][number];
 const stop = (materia: Stop['materia'], nuove: number, apprendimento: number, consolidate = 0): Stop => ({ materia, nuove, apprendimento, consolidate, ripassi30: 0 });
@@ -67,5 +67,13 @@ describe('the next day with cards', () => {
 
   it('is tomorrow while new cards wait, which `prossimi` does not count (today\'s quota of them used up)', () => {
     expect(nextDueDay(answer({}, [0, 0, 0, 2], { nuove: 30, apprendimento: 0, consolidate: 0 }))).toBe('domani');
+  });
+});
+
+describe('the cards left at the lesson\'s end (Gymnasium spec §5.4)', () => {
+  it('counts the cards still due and the new ones today still allows, and nothing else', () => {
+    expect(cardsLeft(answer())).toBe(0);
+    expect(cardsLeft(answer({ dovute: 4, nuove: 2 }))).toBe(6);
+    expect(cardsLeft(answer({ ripassi: 30 }, [12, 8]))).toBe(0);
   });
 });

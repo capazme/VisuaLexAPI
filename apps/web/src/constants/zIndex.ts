@@ -8,10 +8,10 @@
  *
  * The gap (120-999) is intentionally unused: it isolates the base band from
  * the overlay band so modals cannot be hidden by dynamic counters used for
- * floating windows (search panel). Study Mode's own layers
- * (backdrop 120, window 130) sit in that gap, over the find window; while an
- * overlay covers the workspace (`aria-modal="true"` or `data-find-overlay`,
- * `isWorkspaceCovered`) Cmd/Ctrl+F does not open the find window at all.
+ * floating windows (search panel). Study Mode's own layers sit in the overlay
+ * band (`studyBackdrop`, `studyPanel`); while an overlay covers the workspace
+ * (`aria-modal="true"` or `data-find-overlay`, `isWorkspaceCovered`) Cmd/Ctrl+F
+ * does not open the find window at all.
  *
  * IMPORTANT: Import and use these constants instead of hardcoding z-index.
  */
@@ -37,14 +37,21 @@ export const Z_INDEX = {
   floating: 'z-40',
 
   /**
-   * A bar pinned to the bottom of a phone's screen (the review's grades). Under the mobile menu's
-   * backdrop (`z-40`), so the open menu covers it; the feedback button and the services pill, which
-   * would sit on it, are hidden on that route on a phone (`Layout`).
+   * The bar at the foot of Gymnasium's lesson (the review's action and grades, `studia/GradeBar`): in the
+   * flow of `LessonFrame`, which holds it over the shell; the band keeps what the card raises from
+   * painting over it.
    */
   pinnedBar: 'z-[35]',
 
   /** App sidebar navigation */
   sidebar: 'z-50',
+
+  /**
+   * Gymnasium's lesson (`studia/LessonFrame`): a screen of its own over the shell — the sidebar, the
+   * floating buttons, the feedback button, the services pill and the plain toasts (`z-[60]`) — and under
+   * the overlay band, so its article sheet, its confirmation and its toast still cover it.
+   */
+  lesson: 'z-[70]',
 
   /** The bar of practices (the old dock's band) */
   dock: 'z-[80]',
