@@ -118,9 +118,20 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `bulletin` (the Forum, which absorbed «Ambienti»), `history`, `compare`, `settings`, `studia` (VisuaLex
   Gymnasium: the study cards, see `/studia` above and «Study cards under the article»),
   `documents`
-  (`DocumentReviewPage`: citations found in a TXT/Markdown/HTML/DOCX the
-  user drops in — parsed in the browser, never uploaded — each opening the
-  reader through `navigate('/')` + `triggerSearch`, gotcha 15) and `decisions`
+  (`DocumentReviewPage`, «Analizza documento»: citations found in a TXT/Markdown/HTML/DOCX the
+  user chooses or drops on the box — read in the browser (`documentFile.ts`), never uploaded, no
+  request at all — each opening the reader through `navigate('/')` + `triggerSearch`, gotcha 15. The
+  document is drawn as it is (`DocumentText`: every character once and in order, the citations only
+  wrapped in a `<mark>`, the test compares the drawn text with the file's), the citations listed beside
+  it by act (`citationGroups.ts`, pure: an act is its type, number and year, so «l. 241/90» and
+  «l. 241/1990» are one; a code by its name); a mark selects its row, a row scrolls the text to its mark
+  (the column; on a phone, where the columns are stacked, the page as well when the column is not wholly
+  in sight) and pulses it once (`--doc-pulse`, the theme's toga step); the box closes upwards, then the
+  result comes (`AnimatePresence mode="wait"`: both at once flashed a scrollbar), and the first 8 rows
+  enter 40 ms apart, none of it under reduced motion. While `/documents` is open it refuses a file
+  dropped **anywhere in the window** but on its box (`dragover`/`drop` listeners on `window`, so the
+  browser does not open the file in place of the app): a drop zone added elsewhere on the page, or in
+  the shell, is neutralised there until those listeners let it through) and `decisions`
   (`DecisionView`, the body of a decision wherever it is drawn; `DecisionEntryView`, a practice's
   decision read in its row, its window or the phone's reader, over `useDecisionAnswer` (the fetch, the
   candidates, the notices) and `DecisionAnswerBody`; `DecisionAddress`, the `/sentenze/…` route element;
@@ -1719,7 +1730,8 @@ meant to stay split; add new features as new files, not inside the shells:
   «Cronologia Ricerche» from `md`, one hidden by CSS); on `/dossier` it is the visible title of the list, of the
   open dossier and of «Cestino», and what sits under it is `h2` (a dossier's card; an open dossier's notes, acts,
   «Giurisprudenza» and «Rimossi di recente»).
-- `features/documents/` — `DocumentReviewPage.tsx` only.
+- `features/documents/` — `DocumentReviewPage.tsx` (the page), `DocumentText.tsx`, `CitationList.tsx`,
+  `citationGroups.ts`, `documentFile.ts`; invented sample files for the tests in `__tests__/fixtures.ts`.
 
 ## Gotchas
 
