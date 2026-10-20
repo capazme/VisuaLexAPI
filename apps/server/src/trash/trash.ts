@@ -36,6 +36,8 @@ export interface TrashListEntry {
   dossierId: string | null;
   label: string;
   itemCount: number;
+  /** A whole dossier's planner tasks, which went to the trash with it (absent when it had none). */
+  taskCount?: number;
   items?: { itemType: string; citation: string | null; actCitation: string | null }[];
   cards?: { istituto: string; domanda: string }[];
   clientName: string | null;
@@ -115,7 +117,7 @@ async function maybeSweep(): Promise<void> {
 }
 
 /**
- * Moves a whole dossier, with its entries and snapshots, to the trash. A
+ * Moves a whole dossier, with its entries, snapshots and planner tasks, to the trash. A
  * connected application names the entries the user was shown when confirming
  * (`seenItemIds`): one added or removed meanwhile refuses the move (409). The
  * web app's own deletion passes null: whatever the dossier holds goes, and
@@ -136,6 +138,8 @@ export async function trashDossier(
         items: { orderBy: { position: 'asc' } },
         snapshots: { orderBy: { version: 'asc' } },
         publishedCopy: { select: { id: true } },
+        // Its tasks follow it, done and trashed ones too, and come back with it (answer 2 on the task model).
+        tasks: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
       },
     });
     if (!dossier) throw new AppError(404, 'Dossier not found');
@@ -143,7 +147,7 @@ export async function trashDossier(
     if (seen && (seen.size !== dossier.items.length || dossier.items.some((item) => !seen.has(item.id)))) {
       throw new AppError(409, 'Il dossier è cambiato dopo la conferma: nulla è stato eliminato.');
     }
-    const { items, snapshots, publishedCopy, ...row } = dossier;
+    const { items, snapshots, publishedCopy, tasks, ...row } = dossier;
     const now = new Date();
     const entry = await tx.trashEntry.create({
       data: {
@@ -151,9 +155,9 @@ export async function trashDossier(
         kind: 'DOSSIER',
         dossierId: dossier.id,
         label: dossier.name,
-        summary: { itemCount: items.length },
+        summary: tasks.length > 0 ? { itemCount: items.length, taskCount: tasks.length } : { itemCount: items.length },
         // Its copy in the Forum stays published; the link (cleared with the row) comes back on restore.
-        payload: asJson({ dossier: row, items, snapshots, publishedCopyId: publishedCopy?.id ?? null }),
+        payload: asJson({ dossier: row, items, snapshots, publishedCopyId: publishedCopy?.id ?? null, tasks }),
         clientId: by.clientId,
         clientName: by.clientName,
         grantId: by.grantId,
@@ -161,7 +165,7 @@ export async function trashDossier(
         expiresAt: expiry(now),
       },
     });
-    // Items and snapshots cascade with the dossier.
+    // Items, snapshots and tasks cascade with the dossier.
     await tx.dossier.delete({ where: { id: dossier.id } });
     return { trashId: entry.id, itemCount: items.length };
   });
@@ -277,13 +281,14 @@ export async function listTrash(userId: string): Promise<TrashListEntry[]> {
     orderBy: { deletedAt: 'desc' },
   });
   return entries.map((entry) => {
-    const summary = entry.summary as { itemCount?: number; items?: ItemSummary[]; cards?: { istituto: string; domanda: string }[] };
+    const summary = entry.summary as { itemCount?: number; taskCount?: number; items?: ItemSummary[]; cards?: { istituto: string; domanda: string }[] };
     return {
       id: entry.id,
       kind: entry.kind,
       dossierId: entry.dossierId,
       label: entry.label,
       itemCount: summary.itemCount ?? 0,
+      ...(summary.taskCount ? { taskCount: summary.taskCount } : {}),
       ...(summary.items ? { items: summary.items } : {}),
       ...(summary.cards ? { cards: summary.cards } : {}),
       clientName: entry.clientName,
@@ -312,6 +317,32 @@ async function existingId(value: unknown, count: (id: string) => Promise<number>
   if (typeof value !== 'string' || !value) return null;
   return (await count(value)) > 0 ? value : null;
 }
+
+/** A planner task as the payload keeps it (dates as ISO strings; DATE and TIME columns at their UTC instant). */
+type StoredTask = {
+  id: string;
+  dossierItemId: string | null;
+  parentId: string | null;
+  position: number;
+  title: string;
+  description: string | null;
+  priority: number;
+  labels: string[];
+  plannedDate: string | null;
+  plannedTime: string | null;
+  dueDate: string | null;
+  dueTime: string | null;
+  recurrence: string | null;
+  recurrenceFrom: Prisma.TaskCreateManyInput['recurrenceFrom'];
+  durationMinutes: number | null;
+  assigneeId: string | null;
+  origin: Prisma.TaskCreateManyInput['origin'];
+  completedAt: string | null;
+  deletedAt: string | null;
+  createdAt: string;
+};
+
+const dateOrNull = (value: string | null) => (value === null ? null : new Date(value));
 
 const jsonOrNull = (value: unknown) => (value === null || value === undefined ? Prisma.JsonNull : (value as Prisma.InputJsonValue));
 
@@ -342,9 +373,11 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
       if (!entry) throw new AppError(404, 'Elemento del cestino non trovato.');
 
       if (entry.kind === 'DOSSIER') {
-        const { dossier, items, snapshots, publishedCopyId } = entry.payload as unknown as {
+        // `tasks` is absent from an entry trashed before the planner.
+        const { dossier, items, snapshots, publishedCopyId, tasks = [] } = entry.payload as unknown as {
           dossier: Record<string, unknown> & { id: string; createdAt: string; updatedAt: string };
           publishedCopyId?: string | null;
+          tasks?: StoredTask[];
           items: StoredItem[];
           snapshots: { id: string; dossierId: string; version: number; label: string | null; content: unknown; fingerprint: string | null; createdAt: string }[];
         };
@@ -382,6 +415,44 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
               content: jsonOrNull(s.content),
               fingerprint: s.fingerprint,
               createdAt: new Date(s.createdAt),
+            })),
+          });
+        }
+        if (tasks.length > 0) {
+          // A task keeps its entry and its parent when they came back with it (they always do: both
+          // are of the same dossier), its assignee when that account still exists.
+          const itemIds = new Set(items.map((item) => item.id));
+          const taskIds = new Set(tasks.map((task) => task.id));
+          const assignees = new Map<string, string | null>();
+          for (const task of tasks) {
+            if (task.assigneeId && !assignees.has(task.assigneeId)) {
+              assignees.set(task.assigneeId, await existingId(task.assigneeId, (id) => tx.user.count({ where: { id } })));
+            }
+          }
+          await tx.task.createMany({
+            data: tasks.map((task) => ({
+              id: task.id,
+              userId,
+              dossierId: dossier.id,
+              dossierItemId: task.dossierItemId && itemIds.has(task.dossierItemId) ? task.dossierItemId : null,
+              parentId: task.parentId && taskIds.has(task.parentId) ? task.parentId : null,
+              position: task.position,
+              title: task.title,
+              description: task.description,
+              priority: task.priority,
+              labels: task.labels,
+              plannedDate: dateOrNull(task.plannedDate),
+              plannedTime: dateOrNull(task.plannedTime),
+              dueDate: dateOrNull(task.dueDate),
+              dueTime: dateOrNull(task.dueTime),
+              recurrence: task.recurrence,
+              recurrenceFrom: task.recurrenceFrom,
+              durationMinutes: task.durationMinutes,
+              assigneeId: task.assigneeId ? (assignees.get(task.assigneeId) ?? null) : null,
+              origin: task.origin,
+              completedAt: dateOrNull(task.completedAt),
+              deletedAt: dateOrNull(task.deletedAt),
+              createdAt: new Date(task.createdAt),
             })),
           });
         }

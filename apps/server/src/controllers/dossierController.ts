@@ -477,7 +477,7 @@ export const moveDossierItem = async (req: Request, res: Response) => {
         _max: { position: true },
       });
 
-      return tx.dossierItem.update({
+      const moved = await tx.dossierItem.update({
         // Scoped by dossierId: the ownership check above proves the source
         // dossier is ours, not that the item belongs to it.
         where: { id: itemId, dossierId: source.id },
@@ -488,6 +488,9 @@ export const moveDossierItem = async (req: Request, res: Response) => {
           aboutItemId: null,
         },
       });
+      // A task is about an entry of its own dossier too: the tasks stay in the source, without the entry.
+      await tx.task.updateMany({ where: { dossierItemId: moved.id }, data: { dossierItemId: null } });
+      return moved;
     });
 
     res.json(serializeItem(item));
