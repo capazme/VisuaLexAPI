@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import time
 import hashlib
 from pathlib import Path
@@ -59,6 +60,12 @@ class PersistentCache:
             except OSError:
                 pass
             return None
+        # The file's modification time is when it was last read or written, for `prune`; the
+        # entry's age, which the TTL measures, is the timestamp inside it.
+        try:
+            os.utime(path)
+        except OSError:
+            pass
         return payload.get("data")
 
     def _write_to_disk(self, key: str, value: Any) -> None:
@@ -94,3 +101,34 @@ class PersistentCache:
                     continue
                 removed += 1
         return removed
+
+    def prune(self, max_idle: float, max_bytes: int) -> tuple[int, int, int]:
+        """Delete the entries not read nor written for `max_idle` seconds, then the least
+        recently used ones until the namespace holds at most `max_bytes`; return how many
+        went, the bytes they held and the bytes kept. Only this namespace's `*.json` files.
+
+        Synchronous: it stats every file, so call it through `asyncio.to_thread`. An entry
+        deleted while it is read or written is a cache miss later, nothing worse.
+        """
+        now = time.time()
+        entries = []
+        for path in self.directory.glob("*.json"):
+            try:
+                stat = path.stat()
+            except OSError:  # gone already
+                continue
+            entries.append((stat.st_mtime, stat.st_size, path))
+        entries.sort(key=lambda entry: entry[0])  # least recently used first
+        kept = sum(size for _, size, _ in entries)
+        removed = freed = 0
+        for used_at, size, path in entries:
+            if now - used_at <= max_idle and kept <= max_bytes:
+                break
+            try:
+                path.unlink()
+            except OSError:  # gone already, or not ours to delete
+                continue
+            removed += 1
+            freed += size
+            kept -= size
+        return removed, freed, kept

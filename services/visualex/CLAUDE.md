@@ -93,7 +93,10 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     index the web opens no longer fetch the same page three times. A EUR-Lex tree reads the
     page from the scraper's own copy (namespace `eurlex`, same URL) and leaves the page it
     visited there, only when it parsed into articles: one browser visit serves the tree, the
-    rubriche and the articles (`tests/test_tree_variants.py`)
+    rubriche and the articles (`tests/test_tree_variants.py`). The Normattiva page comes
+    through the shared client (its rate limit and host check, one attempt as before), and
+    no URL is visited, by the client or the browser, unless `is_allowed` and Normattiva or
+    EUR-Lex: `POST /fetch_tree` passes the caller's URL here
   - `text_op.py` — text parsing **and** date handling (see Date System)
   - `article_suffixes.py` — the ordinal table (`bis` … `vicies`) every
     article-number regex reads, longest-first so a short entry cannot claim the
@@ -137,8 +140,8 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     `ThrottledHttpClient.request`. `tests/test_egress_allowlist.py` fails the
     build when a URL literal names an undeclared host. The runtime check covers
     every `ThrottledHttpClient` (the shared one and the decision readers' own)
-    and nothing else — `SECURITY.md` lists the three paths it does not cover
-    (treextractor's own session, Playwright, redirect targets).
+    and treextractor's check before a browser — `SECURITY.md` lists what it does not
+    cover (the EUR-Lex scraper's and the PDF export's Playwright, redirect targets).
   - `tls.py` — the verifying SSL context for Italgiure, which serves an incomplete chain:
     the missing intermediate ships in `tools/certs/` and is trusted only under its SHA-256
     pin. Never "simplify" it into turning verification off (`tests/test_tls_italgiure.py`
@@ -179,7 +182,13 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     per-instance** — single-instance deployment only. Status at
     `GET /api/circuit-breakers`
   - `redis_cache.py` + `cache_manager.py` — Redis cache with automatic
-    filesystem fallback; startup warns when Redis is disabled or missing
+    filesystem fallback; startup warns when Redis is disabled or missing. The filesystem
+    cache deletes an expired entry only when its key is read again, so a namespace nobody
+    sweeps only grows. The Normattiva pages (2.6 MB for an article of a code) are pruned at
+    start and every six hours with the decision caches (`prune_normattiva_cache`): the
+    pages not read for 30 days go, then the least recently read down to 2 GB (the owner's
+    rule, G-338). A read refreshes the file's modification time, which is what `prune`
+    reads; the TTL still counts from the write
 
 **Timing harness** — `scripts/collector_timing.py` runs a fixed list of real requests
 in-process, cold then warm, and prints where each one's time goes (network per host, our
