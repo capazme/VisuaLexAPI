@@ -511,8 +511,14 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     <div className="flex items-center gap-2 px-3 pt-2" onKeyDown={keepKeys}>
       <motion.div key={step} {...stepMotion} className="flex min-w-0 flex-1 items-center gap-3">
         {step === 'select_act' && (
-          <>
-            <Search size={20} aria-hidden className="ml-1 shrink-0 text-ink-500 dark:text-ink-400" />
+          // The field's border carries the focus ring (`focus-within`); the box inside draws none, or the
+          // global `input:focus-visible` ring would stand out around it, over the icon.
+          <div className={cn(
+            'flex h-12 min-w-0 flex-1 items-center gap-3 rounded-lg border border-ink-200 bg-white px-3',
+            'focus-within:border-toga-500 focus-within:ring-2 focus-within:ring-toga-500/30',
+            'dark:border-ink-700 dark:bg-ink-950 dark:focus-within:border-toga-400',
+          )}>
+            <Search size={20} aria-hidden className="shrink-0 text-ink-500 dark:text-ink-400" />
             <Command.Input
               ref={boxRef}
               autoFocus
@@ -520,7 +526,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
               onValueChange={setInputValue}
               aria-describedby="command-palette-help"
               placeholder="Atto o citazione, es. art 2043 cc"
-              className="h-12 w-full min-w-0 bg-transparent text-lg font-medium text-ink-900 outline-none placeholder:font-normal placeholder:text-ink-500 dark:text-ink-50 dark:placeholder:text-ink-400"
+              className="h-full w-full min-w-0 bg-transparent text-lg font-medium text-ink-900 outline-none placeholder:font-normal placeholder:text-ink-500 focus-visible:ring-0 focus-visible:ring-offset-0 dark:text-ink-50 dark:placeholder:text-ink-400"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && decisionRef) {
                   e.preventDefault();
@@ -531,7 +537,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                 }
               }}
             />
-          </>
+          </div>
         )}
 
         {step === 'input_details' && (
@@ -588,13 +594,19 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     </div>
   );
 
-  // The help line, or what the box was read as. The visible line is aria-hidden: the status region says it.
+  // The help line, or what the box was read as, 10 px under the field and on the line of its text: the
+  // field's edge (12 px of row, 1 of border, 12 of padding), then on the first step the icon's 20 px and
+  // the gap's 12. The visible line is aria-hidden: the status region says it.
   const fieldLine = (
-    <div aria-hidden className="flex min-h-5 items-center gap-2 px-4 pb-2 text-xs">
+    <div aria-hidden className="flex min-h-5 items-center gap-3 pb-3 pl-[25px] pr-4 pt-2.5 text-xs">
+      {step === 'select_act' && (
+        <span className="flex w-5 shrink-0 justify-center">
+          {preview && <preview.icon size={14} className={preview.tone} />}
+        </span>
+      )}
       {step === 'select_act' && preview ? (
         <>
           <span id="command-palette-help" className="sr-only">{helpLine}</span>
-          <preview.icon size={14} className={cn('shrink-0', preview.tone)} />
           <span className={cn('min-w-0 flex-1 truncate font-medium', preview.tone)}>{preview.text}</span>
           <span className={cn('shrink-0', SUBTLE)}>{preview.action}</span>
         </>
@@ -640,14 +652,36 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     </nav>
   );
 
+  // ── What the box was read as: one strong row, the chosen one, in place of two columns with nothing
+  // to choose. Enter in the box runs the same thing.
+  const readAs = step !== 'select_act' ? null
+    : decisionRef
+      ? { icon: Gavel, text: formatDecisionShort(decisionRef), action: 'Apri la sentenza', run: handleOpenDecision }
+      : parsedCitation && citationPreview
+        ? {
+            icon: parsedCitation.fromAlias ? Tag : Zap,
+            text: `${parsedCitation.fromAlias ? 'tramite alias → ' : ''}${citationPreview}`,
+            action: citationReady ? "Apri l'articolo" : 'Completa',
+            run: handleCitationSearch,
+          }
+        : null;
+  const readAsRow = readAs && (
+    <Command.Group className="shrink-0 pt-2">
+      <PaletteRow value="lettura del campo" onSelect={readAs.run} still={still} className="min-h-[56px] gap-3 text-base">
+        <readAs.icon size={18} aria-hidden className="shrink-0 text-toga-700 dark:text-toga-300" />
+        <span className="min-w-0 flex-1 truncate">
+          <span className="font-medium text-ink-900 dark:text-ink-50">{readAs.text}</span>
+          <span className="font-medium text-toga-700 dark:text-toga-300"> · {readAs.action} ↵</span>
+        </span>
+      </PaletteRow>
+    </Command.Group>
+  );
+
   // ── «Scegli l'atto» ─────────────────────────────────────────────────────────────────────────────
-  const noActLine = decisionRef
-    ? 'Nessun atto: Invio apre la sentenza'
-    : citationReady
-      ? 'Premi Invio per cercare'
-      : resolvingRemotely
-        ? "Cerco l'atto… riconosco i nomi per esteso, non solo le sigle"
-        : 'Nessun atto con questo nome';
+  // A decision or a norm read in the box is `readAs`'s row, which takes the columns' place.
+  const noActLine = resolvingRemotely
+    ? "Cerco l'atto… riconosco i nomi per esteso, non solo le sigle"
+    : 'Nessun atto con questo nome';
 
   // The tour's second step points here (`#command-palette-results`): an id given to `Command.List` is
   // replaced by cmdk's own, so it lives on a container of ours.
@@ -771,6 +805,10 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
 
   // ── The body of each step ───────────────────────────────────────────────────────────────────────
   const scrollColumn = isDesktop ? 'min-h-0 overflow-y-auto overscroll-contain custom-scrollbar pb-2' : 'pb-2';
+  // «A portata di mano» has rows: something saved at rest, or a match while typing.
+  const atHandHasRows = typed
+    ? visibleQuickNorms.length > 0 || visibleAliases.length > 0 || showAliasDoor || visiblePresets.length > 0
+    : quickNorms.length > 0 || hasAliases;
   const selectBody = (
     <Command.List
       className={cn('px-2', isDesktop && 'h-full [&>[cmdk-list-sizer]]:flex [&>[cmdk-list-sizer]]:h-full [&>[cmdk-list-sizer]]:flex-col')}
@@ -786,22 +824,27 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
           </PaletteRow>
         </Command.Group>
       )}
-      <div className={cn(isDesktop ? 'grid min-h-0 flex-1 grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] gap-2' : 'flex flex-col')}>
-        {/* On a computer «A portata di mano» comes first for the keyboard, drawn on the right: ↓ reaches a
-            favourite before forty acts, and Enter on an opening runs the first favourite, as it always did.
-            On a phone the order is the one drawn, the acts first. */}
-        {isDesktop ? (
-          <>
-            <motion.div layoutScroll className={cn(scrollColumn, 'col-start-2 row-start-1 border-l border-ink-100 pl-2 dark:border-ink-800')}>{atHandColumn}</motion.div>
-            <motion.div layoutScroll className={cn(scrollColumn, 'col-start-1 row-start-1')}>{actColumn}</motion.div>
-          </>
-        ) : (
-          <>
-            <motion.div layoutScroll className={scrollColumn}>{actColumn}</motion.div>
-            <motion.div layoutScroll className={scrollColumn}>{atHandColumn}</motion.div>
-          </>
-        )}
-      </div>
+      {readAs ? (
+        <>
+          {readAsRow}
+          {/* Under it, only what still matches (a favourite «Art. 2043 c.c.», an alias, an act), in one column. */}
+          <motion.div layoutScroll className={cn(scrollColumn, isDesktop && 'flex-1')}>
+            {atHandHasRows && atHandColumn}
+            {actGroups.length > 0 && actColumn}
+          </motion.div>
+        </>
+      ) : (
+        <div className={cn(isDesktop ? 'grid min-h-0 flex-1 grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] gap-2' : 'flex flex-col')}>
+          {/* The order drawn is the keyboard's. On a computer the acts come first: the row chosen as the menu
+              opens is the first act. On a phone «A portata di mano» comes first when it holds something, so a
+              favourite is not under forty acts. */}
+          {!isDesktop && atHandHasRows && <motion.div layoutScroll className={scrollColumn}>{atHandColumn}</motion.div>}
+          <motion.div layoutScroll className={scrollColumn}>{actColumn}</motion.div>
+          {(isDesktop || !atHandHasRows) && (
+            <motion.div layoutScroll className={cn(scrollColumn, isDesktop && 'border-l border-ink-100 pl-2 dark:border-ink-800')}>{atHandColumn}</motion.div>
+          )}
+        </div>
+      )}
     </Command.List>
   );
 
@@ -916,7 +959,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
         <p role="status" className="sr-only">
           {decisionRef
             ? `Sentenza: ${formatDecisionShort(decisionRef)}. Invio per aprire.`
-            : preview ? `${preview.text}. ${citationReady ? 'Premi Invio per cercare.' : 'Premi Invio per completare.'}`
+            : preview ? `${preview.text}${preview.text.endsWith('.') ? '' : '.'} ${citationReady ? 'Premi Invio per cercare.' : 'Premi Invio per completare.'}`
               : topic ? `Cerca "${topic}" nelle sentenze della Cassazione.` : ''}
         </p>
         {fieldRow}

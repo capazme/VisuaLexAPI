@@ -241,19 +241,16 @@ describe('CommandPalette — the keys', () => {
     expect(screen.getByRole('button', { name: 'Atto' })).toHaveAttribute('aria-current', 'step');
   });
 
-  it('on a computer, Enter on an opening runs the first favourite, as before', async () => {
+  it('on a computer, the row chosen as it opens is the first act, favourites or not: Enter picks it', async () => {
     asDesktop(true);
-    const favourite = quickNorm(2043);
-    const original = appStore.getState().selectQuickNorm;
-    // the store's own counts the use on the server: not here
-    appStore.setState({ quickNorms: [favourite], selectQuickNorm: () => favourite });
-    const onSearch = vi.fn();
+    appStore.setState({ quickNorms: [quickNorm(2043)], customAliases: [alias(1)] });
     const user = userEvent.setup();
-    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={onSearch} />);
+    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
 
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Costituzione · Cost.' })).toHaveAttribute('aria-selected', 'true'));
     await user.keyboard('{Enter}');
-    expect(onSearch).toHaveBeenCalledWith(expect.objectContaining({ act_type: 'codice civile', article: '2043' }));
-    appStore.setState({ selectQuickNorm: original });
+    // Costituzione asks for its article
+    expect(screen.getByText('Articolo').parentElement).toHaveAttribute('aria-current', 'step');
   });
 
   it('tells a screen reader what the box was read as, a norm too', async () => {
@@ -263,5 +260,60 @@ describe('CommandPalette — the keys', () => {
     expect(screen.getByRole('combobox')).toHaveAccessibleDescription('Scrivi una citazione: art. 2043 c.c., l. 241/1990, Cass. civ. 10787/2024');
     await user.type(screen.getByRole('combobox'), 'art 2043 cc');
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/Premi Invio per cercare\.$/));
+  });
+});
+
+describe('CommandPalette — what the box was read as', () => {
+  it('is one strong row in place of the columns, chosen, and Enter opens it', async () => {
+    asDesktop(true);
+    const onSearch = vi.fn();
+    const user = userEvent.setup();
+    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={onSearch} />);
+
+    await user.type(screen.getByRole('combobox'), 'art 2043 cc');
+    const row = await screen.findByRole('option', { name: "art. 2043 c.c. · Apri l'articolo ↵" });
+    await waitFor(() => expect(row).toHaveAttribute('aria-selected', 'true'));
+    // no empty columns left behind
+    expect(screen.queryByText('Scegli l\'atto')).toBeNull();
+    expect(screen.queryByText('Premi Invio per cercare')).toBeNull();
+
+    await user.click(row);
+    expect(onSearch).toHaveBeenCalledWith(expect.objectContaining({ act_type: 'codice civile', article: '2043' }));
+  });
+
+  it('keeps under it what still matches, a favourite with the same article', async () => {
+    asDesktop(true);
+    appStore.setState({ quickNorms: [quickNorm(2043)] });
+    const user = userEvent.setup();
+    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+
+    await user.type(screen.getByRole('combobox'), 'art 2043 cc');
+    await screen.findByRole('option', { name: "art. 2043 c.c. · Apri l'articolo ↵" });
+    // the strong row first, then the favourite
+    expect(optionNames()).toEqual(["art. 2043 c.c. · Apri l'articolo ↵", 'Art. 2043 c.c.Codice civile']);
+  });
+});
+
+describe('CommandPalette — the field and its line', () => {
+  it('puts the focus ring on the field\'s border, not around the box inside it', () => {
+    asDesktop(true);
+    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    const box = screen.getByRole('combobox');
+    expect(box).toHaveClass('focus-visible:ring-0', 'focus-visible:ring-offset-0');
+    expect(box.parentElement).toHaveClass('border', 'focus-within:ring-2');
+  });
+});
+
+describe('CommandPalette — on a phone, the order', () => {
+  it('puts «A portata di mano» first when it holds something, the acts first otherwise', () => {
+    asDesktop(false);
+    appStore.setState({ quickNorms: [quickNorm(2043)] });
+    const { unmount } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    expect(optionNames()[0]).toBe('Art. 2043 c.c.Codice civile');
+    unmount();
+
+    appStore.setState({ quickNorms: [], customAliases: [] });
+    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    expect(optionNames()[0]).toBe('Costituzione · Cost.');
   });
 });

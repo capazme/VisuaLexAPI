@@ -207,8 +207,13 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   keys on a computer only. The box filters every list while it is typed (`filterPaletteActs`, `queryMatches`: each
   typed word begins a word of the row, case and accents folded, an abbreviation with or without its dots; «Nessun
   atto con questo nome»); cmdk's own filter is off (`shouldFilter={false}`): it would reorder the rows by score,
-  across the columns. On a computer «A portata di mano» comes first in the DOM, drawn on the right, so ↓ reaches a
-  favourite before the acts and Enter on an opening runs the first favourite, as before. cmdk takes Enter, the
+  across the columns. The order drawn is the keyboard's: on a computer the acts come first, so the row chosen as
+  the menu opens is the first act (Costituzione); on a phone «A portata di mano» comes first when it holds
+  something. A decision or a norm read in the box is one strong row in the columns' place, the chosen one
+  («art. 2043 c.c. · Apri l'articolo ↵», «… · Completa ↵» while it lacks number or date, «… · Apri la
+  sentenza ↵»), with under it only what still matches (a favourite, an alias, an act). The box sits in a
+  bordered field that carries the focus ring (`focus-within`; the box itself cancels the global
+  `input:focus-visible` ring), and the line under it starts 10 px below, on the line of the field's text. cmdk takes Enter, the
   arrows, Home and End anywhere inside it (Enter picks the chosen row): every control that is not the box keeps
   them (`keepKeys`), or Enter on «Filtri avanzati» would open the first act.
   On a computer the panel is a dialog («Menu di ricerca», `useRole` and `FloatingFocusManager`, modal): the focus
