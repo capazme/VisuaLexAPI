@@ -3,7 +3,7 @@ import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { addDays, romeDay } from '../lingo/studyDay';
 import { dateToDay, dayToDate } from '../lingo/studyDays';
-import { dayOfMonth, nextOccurrence, type RecurrenceRule } from './recurrence';
+import { dayOfMonth, landsOnDay, nextOccurrence, type RecurrenceRule } from './recurrence';
 
 /**
  * The planner's tasks (wave 1; the answers on the task model, 1–4, 7, 11, 13). Every function takes
@@ -290,15 +290,17 @@ export async function updateTask(userId: string, id: string, input: TaskInput): 
     }
     // A task that changes list (another dossier, another parent) goes after the last one of the new list.
     const listChanged = dossierMoved || parentId !== existing.parentId;
-    // The day a repetition keeps is the planned date's when the user sets the rule, its origin or the
-    // date; a write that leaves all three as they are keeps it, so a February 28th the tick shortened
-    // from the 31st does not become the 28th for good when the web sends the task back whole.
+    // The day a repetition keeps is the planned date's when the user sets the rule, its origin or a
+    // new day. A write that leaves the rule and its origin as they are, with a date where the kept day
+    // lands in its month, keeps it: a February 28th the tick shortened from the 31st does not become
+    // the 28th for good when the web sends the task back whole, or when «Annulla» puts it back there.
     const recurrenceFrom = input.recurrenceFrom ?? existing.recurrenceFrom;
     const repetitionKept =
       existing.recurrenceDay !== null &&
       shape.recurrence === existing.recurrence &&
       recurrenceFrom === existing.recurrenceFrom &&
-      shape.plannedDate === dayOrNull(existing.plannedDate);
+      shape.plannedDate !== null &&
+      landsOnDay(shape.plannedDate, existing.recurrenceDay);
     const recurrenceDay = !shape.recurrence || !shape.plannedDate ? null : repetitionKept ? existing.recurrenceDay : dayOfMonth(shape.plannedDate);
     return tx.task.update({
       where: { id },

@@ -40,6 +40,14 @@ export function dayOfMonth(day: string): number {
 }
 
 /**
+ * Whether `day` is where a monthly or yearly repetition keeping `recurrenceDay` lands in that month:
+ * the day itself, or the month's last day when the month is shorter (28 February for the 31st).
+ */
+export function landsOnDay(day: string, recurrenceDay: number): boolean {
+  return dayOfMonth(day) === Math.min(recurrenceDay, daysInMonth(Number(day.slice(0, 4)), Number(day.slice(5, 7))));
+}
+
+/**
  * `day` moved by whole months, on `date` (by default its own day of the month) or, in a month
  * without it, the month's last day.
  */

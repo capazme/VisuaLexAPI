@@ -381,6 +381,56 @@ describe('ticking', () => {
     expect(await tickOnTime(user.id, task.id, 5)).toEqual(['2029-02-28', '2030-02-28', '2031-02-28', '2032-02-29', '2033-02-28']);
   });
 
+  it('«Annulla» after a tick keeps the day: a monthly 31st put back on 28 February goes on to 31 March', async () => {
+    const user = await createTestUser('tasks-recur-undo-month');
+    const task = await created(user, { title: 'Fattura', plannedDate: '2027-01-31', recurrence: RECURRENCE_RULES.monthly });
+    // «Annulla» puts the planned date back with a PUT, as the web's undo toast does.
+    const undo = (plannedDate: string) => request(app).put(`/api/tasks/${task.id}`).set(authHeader(user)).send({ plannedDate });
+    expect(await tickOnTime(user.id, task.id, 1)).toEqual(['2027-02-28']);
+    for (let i = 0; i < 2; i += 1) {
+      expect(await tickOnTime(user.id, task.id, 1)).toEqual(['2027-03-31']);
+      expect((await undo('2027-02-28')).status).toBe(200);
+    }
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: task.id } })).recurrenceDay).toBe(31);
+    expect(await tickOnTime(user.id, task.id, 3)).toEqual(['2027-03-31', '2027-04-30', '2027-05-31']);
+    // Ticked on the 31st and undone back to it: the same.
+    expect((await undo('2027-05-31')).status).toBe(200);
+    expect(await tickOnTime(user.id, task.id, 1)).toEqual(['2027-06-30']);
+  });
+
+  it('«Annulla» after a tick keeps the day: a yearly 29 February put back on a 28th is the 29th again in a leap year', async () => {
+    const user = await createTestUser('tasks-recur-undo-leap');
+    const task = await created(user, { title: 'Rinnovo', plannedDate: '2028-02-29', recurrence: RECURRENCE_RULES.yearly });
+    const undo = (plannedDate: string) => request(app).put(`/api/tasks/${task.id}`).set(authHeader(user)).send({ plannedDate });
+    expect(await tickOnTime(user.id, task.id, 2)).toEqual(['2029-02-28', '2030-02-28']);
+    expect((await undo('2029-02-28')).status).toBe(200);
+    expect(await tickOnTime(user.id, task.id, 4)).toEqual(['2030-02-28', '2031-02-28', '2032-02-29', '2033-02-28']);
+    // From a leap year back to the 29th, then on.
+    expect((await undo('2032-02-29')).status).toBe(200);
+    expect(await tickOnTime(user.id, task.id, 1)).toEqual(['2033-02-28']);
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: task.id } })).recurrenceDay).toBe(29);
+  });
+
+  it('a new day the user picks, the rule or its origin changed, is the day kept from then on', async () => {
+    const user = await createTestUser('tasks-recur-new-day');
+    const task = await created(user, { title: 'Fattura', plannedDate: '2027-01-31', recurrence: RECURRENCE_RULES.monthly });
+    const put = (body: Record<string, unknown>) => request(app).put(`/api/tasks/${task.id}`).set(authHeader(user)).send(body);
+    const day = async () => (await prisma.task.findUniqueOrThrow({ where: { id: task.id } })).recurrenceDay;
+    // The 28th in a February of 29 days is not where the 31st lands: a new day.
+    expect((await put({ plannedDate: '2028-02-28' })).status).toBe(200);
+    expect(await day()).toBe(28);
+    expect((await put({ plannedDate: '2028-03-31' })).status).toBe(200);
+    expect(await day()).toBe(31);
+    // On the 30th of a month of 30 days the 31st lands there too: kept, unless the rule or its origin changes.
+    expect((await put({ plannedDate: '2028-04-30' })).status).toBe(200);
+    expect(await day()).toBe(31);
+    expect((await put({ recurrenceFrom: 'completamento' })).status).toBe(200);
+    expect(await day()).toBe(30);
+    expect((await put({ plannedDate: '2028-05-31', recurrenceFrom: 'pianificata' })).status).toBe(200);
+    expect((await put({ plannedDate: '2028-06-30', recurrence: RECURRENCE_RULES.yearly })).status).toBe(200);
+    expect(await day()).toBe(30);
+  });
+
   it('counts the next date from the Rome day of the tick', async () => {
     const user = await createTestUser('tasks-recur-rome');
     const task = await prisma.task.create({

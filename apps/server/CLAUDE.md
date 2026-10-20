@@ -582,8 +582,10 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   daily, working days (`FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR`, read as Monday–Friday minus the national
   holidays of `tasks/italianHolidays.ts`: fixed dates, Easter Monday, 4 October from 2026), weekly,
   monthly, yearly; it needs a planned date and refuses a deadline. Monthly and yearly keep their day
-  (`recurrenceDay`, the planned date's day when the user sets the rule, its origin or the date; a
-  write leaving all three unchanged keeps it): a month without it takes its last day for that
+  (`recurrenceDay`, the planned date's day when the user sets the rule, its origin or a new day; a
+  write leaving the rule and its origin unchanged, with a date where the kept day lands in its month —
+  the day, or the month's last when shorter: `landsOnDay` —, keeps it, so the web's «Annulla», which
+  puts a tick's `previousPlannedDate` back with a `PUT`, never turns a 31st into the 28th): a month without it takes its last day for that
   occurrence only (31 January → 28 February → 31 March), and a yearly 29 February is the 28th in
   common years and the 29th in leap years. Ticking a repeating task moves its planned date to the first occurrence after today
   (`pianificata`) or one step from today (`completamento`) and leaves it open; `{ plannedDate }` in
