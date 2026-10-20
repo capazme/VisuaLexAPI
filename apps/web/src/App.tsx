@@ -3,6 +3,7 @@ import { Layout } from './components/layout/Layout';
 import { SearchPage } from './pages/SearchPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { CreditsPage } from './pages/CreditsPage';
 import { DossierPage } from './components/features/dossier/DossierPage';
 import { HistoryView } from './components/features/history/HistoryView';
 import { BulletinBoardPage } from './components/features/bulletin/BulletinBoardPage';
@@ -85,6 +86,8 @@ function App() {
         {/* Public routes */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        {/* The sources and their licences: public, so an attribution reads without an account. */}
+        <Route path="/crediti" element={<CreditsPage />} />
         {/* The OAuth consent page (MCP spike): signed in, outside the app layout. */}
         <Route
           path="/connect"
