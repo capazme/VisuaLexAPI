@@ -3,7 +3,7 @@ import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { addDays, romeDay } from '../lingo/studyDay';
 import { dateToDay, dayToDate } from '../lingo/studyDays';
-import { nextOccurrence, type RecurrenceRule } from './recurrence';
+import { dayOfMonth, nextOccurrence, type RecurrenceRule } from './recurrence';
 
 /**
  * The planner's tasks (wave 1; the answers on the task model, 1–4, 7, 11, 13). Every function takes
@@ -215,6 +215,7 @@ export async function createTask(userId: string, input: TaskInput & { title: str
         dueTime: timeInput(input.dueTime) ?? null,
         recurrence: input.recurrence ?? null,
         recurrenceFrom: input.recurrenceFrom ?? 'pianificata',
+        recurrenceDay: shape.recurrence && shape.plannedDate ? dayOfMonth(shape.plannedDate) : null,
         origin: input.origin ?? 'lavoro',
       },
     });
@@ -289,6 +290,16 @@ export async function updateTask(userId: string, id: string, input: TaskInput): 
     }
     // A task that changes list (another dossier, another parent) goes after the last one of the new list.
     const listChanged = dossierMoved || parentId !== existing.parentId;
+    // The day a repetition keeps is the planned date's when the user sets the rule, its origin or the
+    // date; a write that leaves all three as they are keeps it, so a February 28th the tick shortened
+    // from the 31st does not become the 28th for good when the web sends the task back whole.
+    const recurrenceFrom = input.recurrenceFrom ?? existing.recurrenceFrom;
+    const repetitionKept =
+      existing.recurrenceDay !== null &&
+      shape.recurrence === existing.recurrence &&
+      recurrenceFrom === existing.recurrenceFrom &&
+      shape.plannedDate === dayOrNull(existing.plannedDate);
+    const recurrenceDay = !shape.recurrence || !shape.plannedDate ? null : repetitionKept ? existing.recurrenceDay : dayOfMonth(shape.plannedDate);
     return tx.task.update({
       where: { id },
       data: {
@@ -306,6 +317,7 @@ export async function updateTask(userId: string, id: string, input: TaskInput): 
         dueTime: timeInput(input.dueTime),
         recurrence: input.recurrence,
         recurrenceFrom: input.recurrenceFrom,
+        recurrenceDay,
         origin: input.origin,
       },
     });
@@ -339,7 +351,7 @@ export async function completeTask(userId: string, id: string, seenPlannedDate?:
       if (seenPlannedDate !== plannedDay) {
         throw new AppError(409, 'Il compito è già passato alla data successiva.');
       }
-      const next = nextOccurrence(task.recurrence as RecurrenceRule, task.recurrenceFrom, plannedDay, romeDay(now));
+      const next = nextOccurrence(task.recurrence as RecurrenceRule, task.recurrenceFrom, plannedDay, romeDay(now), task.recurrenceDay ?? undefined);
       const updated = await tx.task.update({ where: { id }, data: { plannedDate: dayToDate(next) } });
       return { task: updated, recurred: { previousPlannedDate: plannedDay, plannedDate: next } };
     }

@@ -11,8 +11,11 @@ import { nextWorkingDay } from './italianHolidays';
  * - every working day, written as the weekly-days rule but read by the server as Monday to Friday
  *   minus the Italian national holidays (`italianHolidays.ts`), which an RRULE cannot say.
  *
- * A month or a year without the day (the 31st, 29 February) takes its last day; the next step then
- * counts from that day (31 January, 28 February, 28 March).
+ * A month or a year without the day (the 31st, 29 February) takes its last day, for that month
+ * only: a task repeating from its planned date keeps its own day of the month (`recurrenceDay`,
+ * stored with the rule), so 31 January goes to 28 February, then 31 March, 30 April, 31 May, and a
+ * yearly 29 February is the 28th in common years and the 29th again in leap years (owner, 20
+ * October 2026).
  */
 export const RECURRENCE_RULES = {
   daily: 'FREQ=DAILY',
@@ -31,11 +34,18 @@ function daysInMonth(year: number, month: number): number {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
-/** `day` moved by whole months, on the same day of the month or the month's last day. */
-function addMonths(day: string, months: number): string {
+/** The day of the month of a day 'YYYY-MM-DD': what a monthly or yearly repetition keeps. */
+export function dayOfMonth(day: string): number {
+  return Number(day.slice(8, 10));
+}
+
+/**
+ * `day` moved by whole months, on `date` (by default its own day of the month) or, in a month
+ * without it, the month's last day.
+ */
+function addMonths(day: string, months: number, date: number = dayOfMonth(day)): string {
   const year = Number(day.slice(0, 4));
   const month = Number(day.slice(5, 7));
-  const date = Number(day.slice(8, 10));
   const index = year * 12 + (month - 1) + months;
   const targetYear = Math.floor(index / 12);
   const targetMonth = (index % 12) + 1;
@@ -66,10 +76,16 @@ function step(rule: RecurrenceRule, day: string): string {
  * - from the planned date («ogni»): the rule's occurrences from the planned date, the first one
  *   after today. A task done late does not come back in the past, and one done early moves one
  *   step: planned Monday weekly, done on Wednesday or on the Saturday before, comes back on Monday
- *   next. Months and years count from the planned date itself, so the 31st keeps its 31st across
- *   the short months skipped on the way.
+ *   next. Months and years land on `recurrenceDay` (by default the planned date's own day), so a
+ *   31st shortened to the 28th in February is the 31st again in March.
  */
-export function nextOccurrence(rule: RecurrenceRule, from: RecurrenceFrom, plannedDay: string, today: string): string {
+export function nextOccurrence(
+  rule: RecurrenceRule,
+  from: RecurrenceFrom,
+  plannedDay: string,
+  today: string,
+  recurrenceDay: number = dayOfMonth(plannedDay),
+): string {
   if (from === 'completamento') return step(rule, today);
   const late = daysBetween(plannedDay, today);
   switch (rule) {
@@ -83,7 +99,7 @@ export function nextOccurrence(rule: RecurrenceRule, from: RecurrenceFrom, plann
     case RECURRENCE_RULES.yearly: {
       const months = rule === RECURRENCE_RULES.monthly ? 1 : 12;
       for (let n = 1; ; n += 1) {
-        const next = addMonths(plannedDay, n * months);
+        const next = addMonths(plannedDay, n * months, recurrenceDay);
         if (daysBetween(today, next) > 0) return next;
       }
     }

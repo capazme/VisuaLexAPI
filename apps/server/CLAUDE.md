@@ -153,15 +153,16 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `trash_entries` and deletes them in one transaction, the dossier row locked
   (`FOR UPDATE`; for the cards, `trashLingoCards` locks the author's rows in id order,
   so a `PATCH` in flight finishes before the payload is read and one that comes
-  after finds no card): `POST /dossiers/:id/trash {itemIds}` (the entries the user
-  saw: a dossier that changed answers 409), `/dossiers/:id/trash-items`,
+  after finds no card): `POST /dossiers/:id/trash {itemIds, taskCount}` (the entries the user
+  saw and the number of planner tasks the dialog told them, both required: a dossier that changed
+  answers 409; every dossier answer carries `task_count` for that dialog, a count and never a title), `/dossiers/:id/trash-items`,
   `/lingo/cards/trash` — `/dossiers/:id/trash` is for exchanged tokens only; the
   card trash and `trash-items` are open to the web app too (a session's `trash-items` takes
   up to 5000 ids, an exchanged token's 1 to 50), and so are the web app's own deletions: `DELETE /dossiers/:id` moves
   the whole dossier there (owner, 13 October 2026, question 160: before, it was gone at
-  once), whatever it holds (`trashDossier` with no `seenItemIds`; its planner tasks go with it in the
+  once), whatever it holds (`trashDossier` with no `seen`; its planner tasks go with it in the
   payload, listed as `taskCount`, and come back on restore with their ids), answering
-  `{ trashId, itemCount }` for the page's «Annulla»; `DELETE /dossiers/:id/items/:itemId`
+  `{ trashId, itemCount, taskCount }` for the page's «Annulla»; `DELETE /dossiers/:id/items/:itemId`
   moves that one entry (question 181, «ok come raccomandi»), answering
   `{ trashId, moved, notFound }`, as `trash-items` does for a selection: one trash entry per action,
   restored with the entries' ids, a note's `aboutItemId` and `createdBy`. Nothing the web app reaches
@@ -579,8 +580,11 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   2), and no wording may suggest it. Repetition (`tasks/recurrence.ts`): a closed RRULE subset —
   daily, working days (`FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR`, read as Monday–Friday minus the national
   holidays of `tasks/italianHolidays.ts`: fixed dates, Easter Monday, 4 October from 2026), weekly,
-  monthly, yearly (a missing day takes the month's last); it needs a planned date and refuses a
-  deadline. Ticking a repeating task moves its planned date to the first occurrence after today
+  monthly, yearly; it needs a planned date and refuses a deadline. Monthly and yearly keep their day
+  (`recurrenceDay`, the planned date's day when the user sets the rule, its origin or the date; a
+  write leaving all three unchanged keeps it): a month without it takes its last day for that
+  occurrence only (31 January → 28 February → 31 March), and a yearly 29 February is the 28th in
+  common years and the 29th in leap years. Ticking a repeating task moves its planned date to the first occurrence after today
   (`pianificata`) or one step from today (`completamento`) and leaves it open; `{ plannedDate }` in
   the tick's body is the occurrence seen, required for a repeating task (400 without), a stale one
   409, so a double tick never moves it twice. Any other tick closes the task and its open

@@ -27,6 +27,7 @@ CREATE TABLE "tasks" (
     "due_time" TIME(0),
     "recurrence" TEXT,
     "recurrence_from" "TaskRecurrenceFrom" NOT NULL DEFAULT 'pianificata',
+    "recurrence_day" SMALLINT,
     "duration_minutes" INTEGER,
     "assignee_id" TEXT,
     "origin" "TaskOrigin" NOT NULL DEFAULT 'lavoro',
@@ -76,9 +77,11 @@ ALTER TABLE "tasks" ADD CONSTRAINT "tasks_assignee_id_fkey" FOREIGN KEY ("assign
 
 
 -- The ranges and pairings the model cannot say: a priority from 1 to 4; a time only with its date;
--- a positive duration; a task is never its own parent. (A longer cycle is refused by the routes.)
+-- a positive duration; a repetition's day of the month from 1 to 31; a task is never its own
+-- parent. (A longer cycle is refused by the routes.)
 ALTER TABLE "tasks" ADD CONSTRAINT "tasks_priority_check" CHECK ("priority" BETWEEN 1 AND 4);
 ALTER TABLE "tasks" ADD CONSTRAINT "tasks_planned_time_check" CHECK ("planned_time" IS NULL OR "planned_date" IS NOT NULL);
 ALTER TABLE "tasks" ADD CONSTRAINT "tasks_due_time_check" CHECK ("due_time" IS NULL OR "due_date" IS NOT NULL);
 ALTER TABLE "tasks" ADD CONSTRAINT "tasks_duration_minutes_check" CHECK ("duration_minutes" IS NULL OR "duration_minutes" > 0);
+ALTER TABLE "tasks" ADD CONSTRAINT "tasks_recurrence_day_check" CHECK ("recurrence_day" IS NULL OR "recurrence_day" BETWEEN 1 AND 31);
 ALTER TABLE "tasks" ADD CONSTRAINT "tasks_parent_not_self_check" CHECK ("parent_id" IS NULL OR "parent_id" <> "id");

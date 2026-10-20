@@ -97,6 +97,39 @@ describe('tasks and the dossier', () => {
     expect(after.find((task) => task.id === child.id)?.parentId).toBe(parent.id);
   });
 
+  it('a connected application deletes a whole dossier only with the number of tasks it told the user', async () => {
+    const alice = await createTestUser('tasks-delegated-dossier-trash');
+    const dossier = await prisma.dossier.create({ data: { name: 'Pratica Bianchi', userId: alice.id } });
+    const item = await prisma.dossierItem.create({ data: { dossierId: dossier.id, itemType: 'note', title: 'Nota', position: 0 } });
+    const parent = await prisma.task.create({ data: { userId: alice.id, dossierId: dossier.id, title: 'Ricorso Bianchi' } });
+    await prisma.task.create({ data: { userId: alice.id, dossierId: dossier.id, parentId: parent.id, title: 'Procura Bianchi' } });
+    await prisma.task.create({ data: { userId: alice.id, dossierId: dossier.id, title: 'Deposito', completedAt: new Date() } });
+    await prisma.task.create({ data: { userId: alice.id, title: 'senza dossier' } });
+
+    // What the confirmation dialog reads: the count, never a title.
+    const reader = await delegated(alice, 'dossier:read');
+    const listed = await request(app).get('/api/dossiers').set(reader);
+    expect(listed.status).toBe(200);
+    expect(listed.body.find((d: { id: string }) => d.id === dossier.id)).toMatchObject({ task_count: 3 });
+    expect(JSON.stringify(listed.body)).not.toContain('Ricorso');
+
+    const deleter = await delegated(alice, 'content:delete');
+    const trash = (body: Record<string, unknown>) => request(app).post(`/api/dossiers/${dossier.id}/trash`).set(deleter).send(body);
+    expect((await trash({ itemIds: [item.id] })).status).toBe(400);
+    // A task added (or gone) after the dialog: nothing moves.
+    const stale = await trash({ itemIds: [item.id], taskCount: 2 });
+    expect(stale.status).toBe(409);
+    expect(await prisma.task.count({ where: { dossierId: dossier.id } })).toBe(3);
+    expect(await prisma.trashEntry.count({ where: { userId: alice.id } })).toBe(0);
+
+    const moved = await trash({ itemIds: [item.id], taskCount: 3 });
+    expect(moved.status).toBe(200);
+    expect(moved.body).toMatchObject({ itemCount: 1, taskCount: 3 });
+    expect(await prisma.task.count({ where: { userId: alice.id } })).toBe(1);
+    const entries = (await request(app).get('/api/trash').set(authHeader(alice))).body;
+    expect(entries[0]).toMatchObject({ kind: 'DOSSIER', itemCount: 1, taskCount: 3, byApplication: true });
+  });
+
   it('restoring a dossier leaves alone a task of its payload that is live again elsewhere', async () => {
     const alice = await createTestUser('tasks-dossier-race');
     const dossier = await prisma.dossier.create({ data: { name: 'Pratica', userId: alice.id } });
