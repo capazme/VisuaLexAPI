@@ -254,10 +254,10 @@ const PERSON_KEYS = new Set(['username', 'email', 'displayname', 'fullname', 'fi
 // A name is also a dossier's or an environment's: it makes a person only beside a user's id.
 const NAME_KEYS = new Set([...PERSON_KEYS, 'name']);
 const UUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
-// What separates the words of a text: an email is a word with an `@` in it. Split, never a pattern
+// What separates the words of a text: any character an email cannot hold (`«bob@x.it»`,
+// `mailto:bob@x.it?subject=…`), so an email is a word with an `@` in it. Split, never a pattern
 // that would scan a long text again from every position.
-const WORD_BREAK = /[\s<>"'(),;[\]{}]+/;
-const WORD_END = new Set(['.', ':', '!', '?']);
+const WORD_BREAK = /[^a-z0-9._%+\-@]+/i;
 // What stands, in a text the user wrote, for another user's id or email.
 const OTHER_USER = '[altro utente]';
 
@@ -278,10 +278,10 @@ function identifiersIn(text: string): string[] {
   const found = (text.match(UUID_PATTERN) ?? []).map((id) => id.toLowerCase());
   if (!text.includes('@')) return found;
   for (const word of text.split(WORD_BREAK)) {
-    let email = word.toLowerCase().startsWith('mailto:') ? word.slice('mailto:'.length) : word;
-    let last = email.length;
-    while (last > 0 && WORD_END.has(email[last - 1])) last -= 1;
-    email = email.slice(0, last);
+    // A sentence's full stop is not the email's.
+    let last = word.length;
+    while (last > 0 && word[last - 1] === '.') last -= 1;
+    const email = word.slice(0, last);
     const at = email.indexOf('@');
     if (at > 0 && at < email.length - 1) found.push(email.toLowerCase());
   }
@@ -322,7 +322,10 @@ const isIdKey = (key: string) => /^_?u?id$/i.test(key) || /[_-]id$/i.test(key) |
  */
 function personKind(entries: [string, unknown][], own: OwnIdentity): 'none' | 'own' | 'user' | 'person' {
   const folded = entries.map(([key, inner]) => [foldKey(key), inner] as const);
-  const ids = entries.filter(([key, inner]) => isIdKey(key) && typeof inner === 'string' && inner !== '').map(([, inner]) => inner);
+  // An id by its key, or by its value: a user's id under `userid` or `AUTHORID` is one too.
+  const ids = entries
+    .filter(([key, inner]) => typeof inner === 'string' && inner !== '' && (isIdKey(key) || isUserId(inner, own)))
+    .map(([, inner]) => inner as string);
   if (ids.length === 0) return 'none';
   const record = folded.find(([key]) => key === 'id' || key === 'uid');
   const named = folded.some(([key]) => NAME_KEYS.has(key));

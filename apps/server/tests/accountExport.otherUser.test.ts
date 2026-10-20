@@ -228,11 +228,14 @@ describe('the account export, against a second user who touches everything', () 
         {
           text: 'Riga 5', ref: bob.id, link: `https://example.org/u/${bob.id.toUpperCase()}`, seen: [bob.id, 'altro'], [bob.id]: true,
           contact: bob.email.toUpperCase(), note: `Scrivere a mailto:${bob.email}. Grazie`,
+          quote: `Scrivere a «${bob.email}» o a “${bob.email}”, email:${bob.email}, ${bob.email}/ufficio, mailto:${bob.email.toUpperCase()}?subject=x`,
         },
         // Another user's id under any id key, beside a name, with no id of its own: ids and names go.
         { text: 'Riga 6', proposedBy: { authorId: bob.id, name: 'Bob Q7', role: 'proponente' }, by: { uploader_id: bob.id, name: 'Bob Q7' } },
         // The user's id beside someone else's: not the user's record.
         { text: 'Riga 7', invite: { ownerId: alice.id, inviteeId: 'ext-1', fullName: 'Bob Q7', when: 'oggi' } },
+        // A user's id under a key that does not look like an id's is still an id.
+        { text: 'Riga 8', by: { userid: bob.id, name: 'Bob Q7', role: 'a' }, BY: { AUTHORID: bob.id, name: 'Bob Q7', role: 'b' } },
       ],
       // Not ids: `paid`, `valid`. A client's name stays; an email under the email key goes, as ever.
       client: { email: 'cliente@studio.example', name: 'Cliente Rossi', paid: 'si', valid: 'no' },
@@ -254,9 +257,13 @@ describe('the account export, against a second user who touches everything', () 
         { text: 'Riga 2', kind: 'nota' },
         { text: 'Riga 3', team: ['Alice'] },
         { text: 'Riga 4', curator: { key: 'k1', role: 'curatore' } },
-        { text: 'Riga 5', link: 'https://example.org/u/[altro utente]', seen: ['altro'], note: 'Scrivere a mailto:[altro utente]. Grazie' },
+        {
+          text: 'Riga 5', link: 'https://example.org/u/[altro utente]', seen: ['altro'], note: 'Scrivere a mailto:[altro utente]. Grazie',
+          quote: 'Scrivere a «[altro utente]» o a “[altro utente]”, email:[altro utente], [altro utente]/ufficio, mailto:[altro utente]?subject=x',
+        },
         { text: 'Riga 6', proposedBy: { role: 'proponente' }, by: {} },
         { text: 'Riga 7', invite: { when: 'oggi' } },
+        { text: 'Riga 8', by: { role: 'a' }, BY: { role: 'b' } },
       ],
       client: { name: 'Cliente Rossi', paid: 'si', valid: 'no' },
       meUpper: { id: alice.id.toUpperCase(), displayName: 'Alice' },
