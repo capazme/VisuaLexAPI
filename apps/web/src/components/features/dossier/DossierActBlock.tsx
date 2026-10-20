@@ -71,7 +71,7 @@ export function DossierActBlock(props: DossierActBlockProps) {
         <div className="min-w-0 flex-1 px-1 py-1">
           {/* The accordion pattern: the heading holds the toggle, so the act is a
               heading to a screen reader and its name is the act's own words. */}
-          <h3 className="flex min-w-0 flex-wrap items-center gap-x-2 md:flex-nowrap">
+          <h2 className="flex min-w-0 flex-wrap items-center gap-x-2 md:flex-nowrap">
             <div
               role="button"
               tabIndex={0}
@@ -101,7 +101,7 @@ export function DossierActBlock(props: DossierActBlockProps) {
             <span className="flex-shrink-0 text-xs font-normal text-slate-400">
               {count === 1 ? '1 articolo' : `${count} articoli`}
             </span>
-          </h3>
+          </h2>
           {title && (
             <p className="ml-6 line-clamp-2 text-sm text-slate-500 md:line-clamp-none md:truncate dark:text-slate-400" title={title}>{title}</p>
           )}

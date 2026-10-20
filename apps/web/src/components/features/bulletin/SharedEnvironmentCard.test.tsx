@@ -54,6 +54,12 @@ describe('SharedEnvironmentCard «Ai miei dossier»', () => {
     const menu = screen.getByRole('button', { name: 'Azioni su «Ricorso Rossi»' });
     expect(menu).toHaveClass('min-h-[44px]', 'min-w-[44px]', 'md:min-h-0', 'md:min-w-0');
   });
+
+  it('gives «Mi piace» and «Ai miei dossier» a 44 px touch target on a phone', () => {
+    renderCard(base);
+    expect(screen.getByRole('button', { name: /Mi piace/ })).toHaveClass('min-h-[44px]', 'md:min-h-0');
+    expect(screen.getByRole('button', { name: /Aggiungi «Ricorso Rossi» ai miei dossier/ })).toHaveClass('min-h-[44px]', 'md:min-h-0');
+  });
 });
 
 describe('SharedEnvironmentCard — its tags', () => {

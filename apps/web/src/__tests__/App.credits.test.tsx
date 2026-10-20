@@ -10,8 +10,7 @@ vi.mock('../features/merlt/consent/ConsentContext', () => ({
 }));
 vi.mock('../components/layout/Layout', () => ({ Layout: () => <div data-testid="layout" /> }));
 vi.mock('../pages/SearchPage', () => ({ SearchPage: () => <div /> }));
-vi.mock('../pages/LoginPage', () => ({ LoginPage: () => <div data-testid="login" /> }));
-vi.mock('../pages/RegisterPage', () => ({ RegisterPage: () => <div /> }));
+vi.mock('../pages/AuthPage', () => ({ AuthPage: () => <div data-testid="login" /> }));
 vi.mock('../components/features/dossier/DossierPage', () => ({ DossierPage: () => <div /> }));
 vi.mock('../components/features/history/HistoryView', () => ({ HistoryView: () => <div /> }));
 vi.mock('../components/features/bulletin/BulletinBoardPage', () => ({ BulletinBoardPage: () => <div /> }));

@@ -214,6 +214,52 @@ describe('the Inchiostro palette', () => {
     expect(ratio(linear('amber-400'), over(linear('ink-900'), 0.8, linear('ink-950')))).toBeGreaterThanOrEqual(3);
   });
 
+  it('keeps the command palette\'s 11 px texts and the tour\'s small ones at AA (CommandPalette, the driver.js popover)', () => {
+    // The palette is white/90 (dark: slate-900/90) over its backdrop, slate-950/40 over the page; its results
+    // add slate-50/30 (dark: slate-950/20), its steps sit on slate 100 (dark: slate 800). The tour's popover is
+    // white (dark: slate 900). Amber and emerald are Tailwind's own scales, read from its theme.
+    const source = readFileSync(CSS_PATH, 'utf8') + readFileSync(resolve(process.cwd(), 'node_modules/tailwindcss/theme.css'), 'utf8');
+    const linear = (name: string): number[] => {
+      const m = source.match(new RegExp(`--color-${name}:\\s*oklch\\(([\\d.]+)%\\s+([\\d.]+)\\s+([\\d.]+)\\)`));
+      if (!m) throw new Error(`--color-${name} not found`);
+      const [L, C, H] = [Number(m[1]) / 100, Number(m[2]), (Number(m[3]) * Math.PI) / 180];
+      const a = C * Math.cos(H), b = C * Math.sin(H);
+      const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+      const mm = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+      const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+      return [
+        4.0767416621 * l - 3.3077115913 * mm + 0.2309699292 * s,
+        -1.2684380046 * l + 2.6097574011 * mm - 0.3413193965 * s,
+        -0.0041960863 * l - 0.7034186147 * mm + 1.707614701 * s,
+      ].map((v) => Math.min(1, Math.max(0, v)));
+    };
+    const gamma = (v: number) => (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
+    const unGamma = (v: number) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+    const over = (fg: number[], alpha: number, bg: number[]) => fg.map((c, i) => unGamma(alpha * gamma(c) + (1 - alpha) * gamma(bg[i])));
+    const lum = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    const ratio = (x: number[], y: number[]) => {
+      const [hi, lo] = [lum(x), lum(y)].sort((p, q) => q - p);
+      return (hi + 0.05) / (lo + 0.05);
+    };
+    const white = [1, 1, 1];
+    const panel = over(white, 0.9, over(linear('ink-950'), 0.4, linear('ink-50')));
+    const panelDark = over(linear('ink-900'), 0.9, over(linear('ink-950'), 0.4, linear('ink-950')));
+    const light = [panel, over(linear('ink-50'), 0.3, panel)];
+    const dark = [panelDark, over(linear('ink-950'), 0.2, panelDark)];
+    // The grey lines, the headings «Preferiti», «I tuoi alias», «In dotazione», the recognised citation.
+    for (const bg of light) for (const fg of ['ink-600', 'amber-700', 'toga-700', 'emerald-700']) expect(ratio(linear(fg), bg), fg).toBeGreaterThanOrEqual(4.5);
+    for (const bg of dark) for (const fg of ['ink-400', 'amber-400', 'toga-300', 'emerald-400']) expect(ratio(linear(fg), bg), fg).toBeGreaterThanOrEqual(4.5);
+    // The steps «Atto», «Dettagli», «Articolo»: to do, done, the one in use.
+    expect(ratio(linear('ink-600'), linear('ink-100'))).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(linear('ink-300'), linear('ink-800'))).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(linear('emerald-800'), over(linear('emerald-500'), 0.1, panel))).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(linear('emerald-400'), over(linear('emerald-500'), 0.1, panelDark))).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(white, linear('toga-600'))).toBeGreaterThanOrEqual(4.5);
+    // The tour's «1 di 6» and its close button.
+    expect(ratio(linear('ink-500'), white)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(linear('ink-400'), linear('ink-900'))).toBeGreaterThanOrEqual(4.5);
+  });
+
   it('keeps the marks and labels of Gymnasium\'s «Progressi» apart from what they sit on (ActivityCalendar, DueForecast)', () => {
     const source = readFileSync(CSS_PATH, 'utf8') + readFileSync(resolve(process.cwd(), 'node_modules/tailwindcss/theme.css'), 'utf8');
     // `primary-*` and `slate-*` are aliases (`var(--color-toga-*)`, `var(--color-ink-*)`): followed to the value.
@@ -259,9 +305,29 @@ describe('the Inchiostro palette', () => {
   });
 });
 
+describe('the tours (driver.js)', () => {
+  it('make every button of the popover a 44 px target with a focus ring', () => {
+    const css = readFileSync(CSS_PATH, 'utf8');
+    const rule = (selector: string) => {
+      const at = css.indexOf(`${selector} {`);
+      expect(at, selector).toBeGreaterThan(-1);
+      return css.slice(at, css.indexOf('}', at));
+    };
+    const footer = rule('.driver-popover.visualex-tour-popover .driver-popover-footer button');
+    expect(footer).toMatch(/min-height:\s*44px/);
+    // driver.js sets `display` inline on these buttons: the label is centred by its line height.
+    expect(footer).toMatch(/font:\s*500 13px\/42px/);
+    expect(footer).not.toMatch(/display:/);
+    const close = rule('.driver-popover.visualex-tour-popover .driver-popover-close-btn');
+    expect(close).toMatch(/width:\s*44px/);
+    expect(close).toMatch(/height:\s*44px/);
+    expect(css).toMatch(/\.driver-popover-close-btn:focus-visible\s*\{\s*outline:\s*2px solid/);
+  });
+});
+
 describe('the entrance utilities', () => {
   it('turn animate-in, fade-in, zoom-in-N and slide-in-from-* into real rules', async () => {
-    const css = await compile(['animate-in', 'fade-in', 'fade-in-0', 'zoom-in-95', 'slide-in-from-bottom', 'slide-in-from-top-2', 'slide-in-from-right-10']);
+    const css = await compile(['animate-in', 'fade-in', 'fade-in-0', 'zoom-in-95', 'slide-in-from-bottom', 'slide-in-from-top-2', 'slide-in-from-right-10', 'slide-in-from-left-2']);
     expect(css).toMatch(/\.animate-in\s*\{[^}]*animation-name:/);
     // A finished entrance leaves nothing applied (gotcha 22): no «both» fill.
     expect(css).toMatch(/\.animate-in\s*\{[^}]*animation-fill-mode:\s*backwards/);
@@ -270,6 +336,9 @@ describe('the entrance utilities', () => {
     expect(css).toContain('.slide-in-from-bottom');
     expect(css).toContain('.slide-in-from-top-2');
     expect(css).toContain('.slide-in-from-right-10');
+    expect(css).toMatch(/\.slide-in-from-left-2\s*\{[^}]*--vlx-enter-x:\s*calc\(2 \* var\(--spacing\) \* -1\)/);
+    // Both axes, so a slide nested in another does not inherit the outer one's axis.
+    expect(css).toMatch(/\.slide-in-from-top-2\s*\{[^}]*--vlx-enter-x:\s*0/);
   }, 30000);
 
   it('never last past 200 ms, whatever duration the class writes', async () => {

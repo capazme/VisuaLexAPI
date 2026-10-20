@@ -5,6 +5,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { FORUM_CATEGORIES } from '../../../utils/forumCategories';
 import { tagLabel } from '../../../utils/tagLabel';
+import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 
 interface SharedEnvironmentCardProps {
   environment: SharedEnvironment;
@@ -330,7 +331,7 @@ export function SharedEnvironmentCard({
           <button
             onClick={() => onLike(environment.id)}
             disabled={isLiking}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-medium transition-[color,background-color,border-color,opacity] ${
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-medium transition-[color,background-color,border-color,opacity] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${TOUCH_TARGET_RESPONSIVE} ${
               environment.userLiked
                 ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800'
                 : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
@@ -343,7 +344,7 @@ export function SharedEnvironmentCard({
             <button
               onClick={() => onImport(environment)}
               aria-label={`Aggiungi «${environment.title}» ai miei dossier`}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${TOUCH_TARGET_RESPONSIVE}`}
             >
               <FolderPlus size={16} aria-hidden />
               Ai miei dossier

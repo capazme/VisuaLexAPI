@@ -1,8 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { Layout } from './components/layout/Layout';
 import { SearchPage } from './pages/SearchPage';
-import { LoginPage } from './pages/LoginPage';
-import { RegisterPage } from './pages/RegisterPage';
+import { AuthPage } from './pages/AuthPage';
 import { CreditsPage } from './pages/CreditsPage';
 import { DossierPage } from './components/features/dossier/DossierPage';
 import { HistoryView } from './components/features/history/HistoryView';
@@ -84,8 +83,12 @@ function App() {
     <BrowserRouter>
       <Routes>
         {/* Public routes */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
+        {/* Signing in and signing up, one page with two tabs: one parent route, so changing tab
+            (which replaces the address) keeps the page mounted and animates. */}
+        <Route element={<AuthPage />}>
+          <Route path="/login" element={null} />
+          <Route path="/register" element={null} />
+        </Route>
         {/* The sources and their licences: public, so an attribution reads without an account. */}
         <Route path="/crediti" element={<CreditsPage />} />
         {/* The OAuth consent page (MCP spike): signed in, outside the app layout. */}
