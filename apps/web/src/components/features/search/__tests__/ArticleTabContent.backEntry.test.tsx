@@ -22,7 +22,6 @@ vi.mock('../../../../features/merlt/useMerltFeatures', () => ({
   useMerltFeatures: () => ({ canContribute: false, qaAskable: true, consentLevel: 'basic', merltEnabled: true }),
 }));
 vi.mock('../../../../plugins/PluginSlot', () => ({ PluginSlot: () => null }));
-vi.mock('../BrocardiDisplay', () => ({ BrocardiDisplay: () => null }));
 // What the two ways out of an article record as the way back: a citation jump and a decision opened.
 vi.mock('../../../../hooks/useCitationLinks', () => ({
   useCitationLinks: (_ref: unknown, options: { origin?: unknown }) => { h.origins.push(options.origin); },

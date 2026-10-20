@@ -4,6 +4,9 @@ import { resolve } from 'node:path';
 import postcss from 'postcss';
 import tailwind from '@tailwindcss/postcss';
 import { ACTIVE, FOCUS_RING, HIDDEN_SCROLLBAR, HOVER_LIFT, TRANSITION } from './constants/interactions';
+import { subjectHue } from './components/features/studia/progress/tokens';
+import { MATERIA_LABEL } from './components/features/studia/studiaLabels';
+import type { Materia } from './types/studia';
 
 /**
  * Tailwind failures are silent: a class whose token the theme never declares
@@ -295,6 +298,18 @@ describe('the lesson of Gymnasium (Gymnasium spec §5.4)', () => {
     expect(css).toMatch(/\.border-current\\\/40\s*\{/);
     expect(css).toMatch(/z-index:\s*70/);
   }, 30000);
+});
+
+describe('the hues of Gymnasium\'s subjects', () => {
+  it('each names a variable the stylesheet declares in the light theme and in the dark one', () => {
+    // An undeclared variable leaves `hsl(var(--x))` invalid: the chip and the bar draw no colour, silently.
+    const source = readFileSync(CSS_PATH, 'utf8');
+    for (const materia of Object.keys(MATERIA_LABEL) as Materia[]) {
+      const name = /var\((--[\w-]+)\)/.exec(subjectHue(materia))?.[1];
+      expect(name, materia).toBeDefined();
+      expect(source.match(new RegExp(`${name}:`, 'g')) ?? [], `${materia}: ${name}`).toHaveLength(2);
+    }
+  });
 });
 
 describe('the interaction constants', () => {

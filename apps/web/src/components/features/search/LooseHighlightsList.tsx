@@ -1,7 +1,7 @@
 import { X } from 'lucide-react';
 import type { Highlight } from '../../../types';
 import { getHighlightSwatch } from '../../../utils/highlightColors';
-import { DOCTRINE_LABEL } from '../../../utils/doctrineLabel';
+import { retiredSectionLabel } from '../../../utils/articleAnnotations';
 
 export interface LooseHighlightsListProps {
     /** `highlightsWithoutSign`: the highlights no block's sign shows. */
@@ -11,18 +11,16 @@ export interface LooseHighlightsListProps {
     onRemove: (id: string) => void;
 }
 
-/** "Dottrina · Ratio" for `<article>/brocardi/ratio`; "Non più nel testo" for the article's own. */
+/** "Non più nel testo" for the article's own; "Sezione non più disponibile · Ratio" for a retired section's. */
 function originLabel(highlight: Highlight, articleId: string): string {
     if (highlight.articleId === articleId) return 'Non più nel testo';
-    const section = highlight.articleId.split('/').pop() ?? '';
-    const name = section ? section[0].toUpperCase() + section.slice(1) : '';
-    return highlight.articleId.includes('/brocardi/') ? `${DOCTRINE_LABEL} · ${name}` : name;
+    return retiredSectionLabel(highlight.articleId) ?? 'Non più nel testo';
 }
 
 /**
  * What remains of the "Evidenziazioni" box under the article (round B): only
- * the highlights no sign in the text can reach — those made in the doctrine
- * sections, and those whose text changed — so they can still be removed.
+ * the highlights no sign in the text can reach — those made in a section no
+ * longer shown, and those whose text changed — so they can still be removed.
  * Desktop only, as the box was; absent when there are none.
  */
 export function LooseHighlightsList({ highlights, articleId, onRemove }: LooseHighlightsListProps) {

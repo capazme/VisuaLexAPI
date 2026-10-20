@@ -312,7 +312,7 @@ export function SearchPanel() {
     let parseFailures = 0;
 
     try {
-      // Always use streaming endpoint (now supports Brocardi too!)
+      // Always the streaming endpoint
       const response = await legalFetch('/stream_article_text', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -539,7 +539,6 @@ export function SearchPanel() {
       article: articleNumber,
       version: (normaData.versione as 'vigente' | 'originale') || 'vigente',
       version_date: normaData.data_versione || '',
-      show_brocardi_info: !requestIsHistorical(normaData),
       annex: normaData.allegato || undefined  // Preserve annex when navigating via cross-reference
     };
     // The text in force of an article of the same act already on the table is revealed,

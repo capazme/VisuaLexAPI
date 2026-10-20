@@ -29,8 +29,6 @@ vi.mock('../../../../features/merlt/useMerltFeatures', () => ({
   useMerltFeatures: () => ({ canContribute: false, qaAskable: true, consentLevel: 'basic', merltEnabled: true }),
 }));
 vi.mock('../../../../plugins/PluginSlot', () => ({ PluginSlot: () => null }));
-// Brocardi's section shows real words: the scope test searches one.
-vi.mock('../BrocardiDisplay', () => ({ BrocardiDisplay: () => <div data-testid="brocardi">Nemo iudex sine actore</div> }));
 
 import { ArticleTabContent } from '../ArticleTabContent';
 import { FindWindow } from '../FindWindow';
@@ -47,11 +45,10 @@ const NORMA: NormaVisitata = {
   tipo_atto: 'codice civile', data: '1942-03-16', numero_atto: '262', numero_articolo: '1284', allegato: '2',
   urn: 'urn:nir:stato:regio.decreto:1942-03-16;262:2~art1284',
 };
-const BROCARDI = { position: null, link: null, Brocardi: ['Nemo iudex sine actore'], Ratio: null, Spiegazione: null, Massime: null };
 
 
 function article(over: Partial<ArticleData> = {}): ArticleData {
-  return { article_text: TEXT, norma_data: NORMA, brocardi_info: BROCARDI, ...over };
+  return { article_text: TEXT, norma_data: NORMA, ...over };
 }
 
 function show(data: ArticleData) {
@@ -152,14 +149,13 @@ describe('ArticleTabContent — the magnifier opens the find window', () => {
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/^1 di \d+$/));
   });
 
-  it('searches the article text only: not Brocardi, not «Giurisprudenza», not the toolbar', async () => {
+  it('searches the article text only: not «Giurisprudenza», not the toolbar', async () => {
     showInTab(article({ article_text: ACCENTED.text }));
-    // each of the three words is on the page, outside the text root
-    expect(screen.getByTestId('brocardi')).toHaveTextContent('Nemo iudex');
+    // each of the two words is on the page, outside the text root
     expect(screen.getByText('Giurisprudenza')).toBeInTheDocument();
     expect(document.body.textContent).toContain('Allegato');
     fireEvent.click(magnifier());
-    for (const word of ['Nemo iudex', 'Giurisprudenza', 'Allegato']) {
+    for (const word of ['Giurisprudenza', 'Allegato']) {
       typeQuery(word);
       await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Nessun risultato'));
       expect(drawn()).toBe(0);

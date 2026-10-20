@@ -95,7 +95,6 @@ function parseURN(urn: string): ParseResult {
         act_number: actNumber,
         article: article || '1',
         version: 'vigente',
-        show_brocardi_info: true
       }
     };
   } catch {
@@ -149,7 +148,6 @@ export function parseNormattivaUrl(url: string): ParseResult {
             date: dateMatch[1],
             article: '1',
             version: 'vigente',
-            show_brocardi_info: true
           }
         };
       }

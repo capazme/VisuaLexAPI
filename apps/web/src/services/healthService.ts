@@ -1,5 +1,4 @@
 import { legalFetch } from './legalFetch';
-import { DOCTRINE_LABEL, DOCTRINE_SOURCE_NAME } from '../utils/doctrineLabel';
 
 export type ServiceHealthState = 'online' | 'degraded' | 'offline' | 'checking';
 
@@ -16,11 +15,10 @@ export interface HealthSnapshot {
   checkedAt: string;
 }
 
-// The Python API names its sources by key; the reader sees their names.
+// The Python API names its sources by key; the reader sees their names (an unknown key as it comes).
 const SOURCE_LABELS: Record<string, string> = {
   normattiva: 'Normattiva',
   eurlex: 'EUR-Lex',
-  brocardi: `${DOCTRINE_LABEL} (${DOCTRINE_SOURCE_NAME})`,
 };
 
 function sourceLabel(key: string): string {

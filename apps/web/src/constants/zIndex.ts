@@ -70,9 +70,6 @@ export const Z_INDEX = {
   findWindow: 'z-[110]',
 
   // ── OVERLAY BAND (1000+) ─────────────────────────────────────────
-  /** Side drawers (Brocardi drawer, etc.) */
-  drawer: 'z-[1000]',
-
   /** Standard modals and dialogs (Modal base consumed here) */
   modal: 'z-[1100]',
 

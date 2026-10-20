@@ -31,8 +31,6 @@
   --color-ring: hsl(var(--ring));
 
   /* Feature-specific semantic colors */
-  --color-brocardi: hsl(var(--brocardi));
-  --color-brocardi-foreground: hsl(var(--brocardi-foreground));
   --color-tree: hsl(var(--tree));
   --color-tree-foreground: hsl(var(--tree-foreground));
   --color-quicknorm: hsl(var(--quicknorm));
@@ -209,8 +207,6 @@
     --ring: 220 66% 54.3%;
 
     /* Feature colors — light */
-    --brocardi: 270 60% 62%;
-    --brocardi-foreground: 270 80% 20%;
     --tree: 160 84% 39%;
     --tree-foreground: 160 80% 15%;
     --quicknorm: 38 92% 50%;
@@ -231,6 +227,8 @@
     --category-administrative: 38 92% 50%;
     --category-eu: 160 84% 39%;
     --category-other: 220 9% 46%;
+    /* Gymnasium's procedura penale (studia/progress/tokens.ts): the violet it always had */
+    --category-penal-procedure: 270 60% 62%;
 
     /* Text highlight tokens — light theme */
     --hl-yellow-bg: 48 96% 89%;
@@ -288,6 +286,7 @@
     --category-administrative: 43 96% 56%;
     --category-eu: 158 64% 52%;
     --category-other: 218 11% 65%;
+    --category-penal-procedure: 270 60% 70%;
 
     /* Text highlight tokens — dark theme (inverted: dark saturated bg, light fg) */
     --hl-yellow-bg: 21 91% 30%;
@@ -306,8 +305,6 @@
     --vlx-find-current-fg: 285 60% 12%;
 
     /* Feature colors — dark (reduced intensity, higher opacity bg) */
-    --brocardi: 270 60% 70%;
-    --brocardi-foreground: 270 30% 90%;
     --tree: 160 60% 55%;
     --tree-foreground: 160 30% 90%;
     --quicknorm: 38 70% 55%;

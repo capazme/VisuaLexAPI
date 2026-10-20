@@ -78,8 +78,8 @@ import type { Dossier } from '../../../types';
 
 const s = () => appStore.getState();
 const CC = { tipo_atto: 'codice civile', data: '1942-03-16', numero_atto: '262', url: 'urn:nir:stato:regio.decreto:1942-03-16;262' };
-const ccArticle = (n: string) => ({ article_text: `Art. ${n}\nTesto ${n}.`, norma_data: { ...CC, numero_articolo: n }, brocardi_info: null });
-const params = (article: string) => ({ act_type: 'codice civile', act_number: '', date: '', article, version: 'vigente' as const, show_brocardi_info: false });
+const ccArticle = (n: string) => ({ article_text: `Art. ${n}\nTesto ${n}.`, norma_data: { ...CC, numero_articolo: n } });
+const params = (article: string) => ({ act_type: 'codice civile', act_number: '', date: '', article, version: 'vigente' as const });
 const REF = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 99999, anno: 2024 };
 
 const panel = () => render(<MemoryRouter><SearchPanel /></MemoryRouter>);
@@ -220,9 +220,9 @@ describe('SearchPanel with the practices: where a search lands (spec §5.1)', ()
 // A decree asked for as the palette asks (the year only), answered with its full date.
 const DLGS = { tipo_atto: 'decreto legislativo', data: '2008-04-09', numero_atto: '81', url: 'urn:nir:stato:decreto.legislativo:2008-04-09;81' };
 const dlgsArticle = (n: string, allegato?: string) => ({
-  article_text: `Art. ${n}\nTesto ${n}.`, norma_data: { ...DLGS, numero_articolo: n, ...(allegato ? { allegato } : {}) }, brocardi_info: null,
+  article_text: `Art. ${n}\nTesto ${n}.`, norma_data: { ...DLGS, numero_articolo: n, ...(allegato ? { allegato } : {}) },
 });
-const dlgsParams = (article: string) => ({ act_type: 'decreto legislativo', act_number: '81', date: '2008', article, version: 'vigente' as const, show_brocardi_info: false });
+const dlgsParams = (article: string) => ({ act_type: 'decreto legislativo', act_number: '81', date: '2008', article, version: 'vigente' as const });
 const rowNames = () => s().practices[0].acts.flatMap((a) => a.articles.map((x) =>
   `${x.norma_data.allegato ? `All. ${x.norma_data.allegato} ` : ''}${x.norma_data.numero_articolo}${x.norma_data.data_versione ? ` al ${x.norma_data.data_versione}` : ''}`));
 

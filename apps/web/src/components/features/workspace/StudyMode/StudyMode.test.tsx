@@ -4,7 +4,6 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('./StudyModeHeader', () => ({ StudyModeHeader: () => null }));
 vi.mock('./StudyModeContent', () => ({ StudyModeContent: () => <p>testo</p> }));
 vi.mock('./StudyModeToolsPanel', () => ({ StudyModeToolsPanel: () => null }));
-vi.mock('./StudyModeBrocardiPopover', () => ({ StudyModeBrocardiPopover: () => null }));
 vi.mock('./StudyModeSettings', () => ({ StudyModeSettings: () => null }));
 vi.mock('../../../ui/AdvancedExportModal', () => ({ AdvancedExportModal: () => null }));
 vi.mock('../../../../hooks/useTour', () => ({ useTour: () => ({ tryStartTour: vi.fn() }) }));

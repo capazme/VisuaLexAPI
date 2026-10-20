@@ -43,7 +43,6 @@ export function fetchArticleForNorma(norma: NormaVisitata): Promise<ArticleData>
           article: norma.numero_articolo?.toString() || '',
           version: norma.versione || 'vigente',
           version_date: norma.data_versione || '',
-          show_brocardi_info: false,
           ...(norma.allegato ? { annex: norma.allegato } : {}),
         }),
       });

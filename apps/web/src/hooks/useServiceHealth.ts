@@ -5,7 +5,7 @@ const INITIAL: HealthSnapshot = { overall: 'checking', services: [], checkedAt: 
 
 /**
  * How often a visible tab re-probes. The Python half of the probe
- * (`/health/detailed`) reaches Normattiva, EUR-Lex and Brocardi for real, so
+ * (`/health/detailed`) reaches Normattiva and EUR-Lex for real, so
  * the server caches its answer (`HEALTH_DETAILED_TTL`, two minutes) and the
  * client asks rarely: once on mount, every five minutes while the tab is
  * visible, and when the user presses "Ricontrolla". The first version asked

@@ -3,6 +3,7 @@ import {
   parseArticleStructure,
   getRubricText,
   getUpdateNoteParagraphs,
+  isNotice,
   type ArticleStructure,
   type BlockKind,
   type DecorationKind,
@@ -386,5 +387,15 @@ describe('headings and rubrics (the cases Study Mode relied on)', () => {
     expect(parseArticleStructure('').blocks).toEqual([]);
     expect(kinds(parseArticleStructure('Testo che non inizia con art.'))).toEqual(['comma']);
     expect(kinds(parseArticleStructure('   '))).toEqual(['comma']);
+  });
+});
+
+describe('isNotice', () => {
+  it('reads a notice the source writes in place of words, and not a rubric', () => {
+    expect(isNotice('ARTICOLO ABROGATO DAL D.LGS. 10 OTTOBRE 2022, N. 149')).toBe(true);
+    expect(isNotice('OMISSIS')).toBe(true);
+    expect(isNotice('Risarcimento per fatto illecito')).toBe(false);
+    expect(isNotice('Norme abrogate')).toBe(false);
+    expect(isNotice('DEFINIZIONI')).toBe(false);
   });
 });

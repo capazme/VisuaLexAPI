@@ -19,7 +19,6 @@ export function matchesSearchFilters(article: ArticleData, filters?: SearchFilte
   if (!filters) return true;
 
   if (filters.source !== 'all' && sourceOf(article) !== filters.source) return false;
-  if (filters.hasBrocardi && !article.brocardi_info) return false;
   if (filters.onlyHistorical && !article.versionInfo?.isHistorical) return false;
 
   const year = yearOf(article.norma_data?.data_versione || article.norma_data?.data);
@@ -32,7 +31,6 @@ export function matchesSearchFilters(article: ArticleData, filters?: SearchFilte
 export function defaultSearchFilters(): SearchFilters {
   return {
     source: 'all',
-    hasBrocardi: false,
     onlyHistorical: false,
   };
 }
