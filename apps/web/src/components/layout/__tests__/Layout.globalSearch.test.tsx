@@ -33,7 +33,7 @@ import { DecisionAddress } from '../../features/decisions/DecisionAddress';
 import { isWorkspaceCovered } from '../../../utils/findWindowControl';
 import { isTypedSearch } from '../../../hooks/useSearchActions';
 
-const PALETTE_BOX = "Es. 'art 2043 cc' o 'Cass. civ. 10787/2024'";
+const PALETTE_BOX = 'Atto o citazione, es. art 2043 cc';
 
 /** The layout over a few pages; each page says which it is, so a test sees where the reader is. */
 function at(path: string) {
@@ -134,7 +134,7 @@ describe('Layout — ⌘K opens the palette on every page', () => {
     const user = userEvent.setup();
     at('/dossier');
     pressCmdK();
-    await user.click(screen.getByRole('option', { name: /Codice Civile/i }));
+    await user.click(screen.getByRole('option', { name: 'Codice civile · c.c.' }));
     await user.click(screen.getByRole('button', { name: /Apri l'indice e sfoglia/ }));
     await waitFor(() => expect(addActIndexToPractice).toHaveBeenCalledWith(null, norma));
     expect(screen.getByText('Pagina di ricerca')).toBeInTheDocument();
