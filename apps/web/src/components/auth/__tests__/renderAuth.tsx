@@ -18,7 +18,7 @@ function Address() {
 
 /** The auth page as `App.tsx` mounts it: one parent route over `/login` and `/register`. */
 export function renderAuth(entry: InitialEntry = '/login', initialEntries: InitialEntry[] = []) {
-  return render(
+  const tree = () => (
     <MemoryRouter initialEntries={[...initialEntries, entry]} initialIndex={initialEntries.length}>
       <Routes>
         <Route
@@ -34,6 +34,9 @@ export function renderAuth(entry: InitialEntry = '/login', initialEntries: Initi
         </Route>
         <Route path="*" element={<Landed />} />
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
+  const result = render(tree());
+  /** Render the same tree again, as a change in a mocked hook would. */
+  return { ...result, rerenderSame: () => result.rerender(tree()) };
 }

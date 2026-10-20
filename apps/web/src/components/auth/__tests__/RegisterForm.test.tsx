@@ -35,7 +35,17 @@ describe('RegisterForm', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Tutti i campi sono obbligatori');
     expect(within(panel()).getByLabelText('Email')).toHaveFocus();
 
-    fill({ email: 'avv@studio.it', username: 'av', password: 'abc', confirm: 'abc' });
+    fill({ email: 'avv@studio', username: 'avv_rossi', password: 'abc', confirm: 'abc' });
+    submit();
+    expect(screen.getByRole('alert')).toHaveTextContent('Formato email non valido');
+    expect(within(panel()).getByLabelText('Email')).toHaveFocus();
+
+    fill({ email: 'avv@studio.it', password: 'ab', confirm: 'ab' });
+    submit();
+    expect(screen.getByRole('alert')).toHaveTextContent('Password deve essere almeno 3 caratteri');
+    expect(within(panel()).getByLabelText('Password')).toHaveFocus();
+
+    fill({ username: 'av', password: 'abc', confirm: 'abc' });
     submit();
     expect(screen.getByRole('alert')).toHaveTextContent('Username deve essere almeno 3 caratteri');
     expect(within(panel()).getByLabelText('Username')).toHaveFocus();

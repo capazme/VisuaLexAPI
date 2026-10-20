@@ -5,7 +5,9 @@
  * after the login reads (`utils/returnTo`), so the page never reloads and the history does not grow.
  * The tab is the page's own state and the address follows it: React Router 7 applies a navigation in
  * a transition, a render after the page's own update, so a tab read from the address would let the
- * form leaving unmount for one render (and lose what was typed in it) on a quick change back.
+ * form leaving unmount for one render (and lose what was typed in it) on a quick change back. Nothing
+ * in the app navigates between the two addresses while the page is open; something that did would
+ * have to change the tab as well.
  *
  * The motion, once per change of tab: the mark under the tabs slides (`transform`, 200 ms), the form
  * leaving fades (120 ms) while the one coming in fades from 8 px on the side of its tab (180 ms), and
@@ -16,6 +18,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { BookOpen } from 'lucide-react';
 import { BookMark } from '../ui/BookMark';
 import { FOCUS_RING } from '../../constants/interactions';
+import { useAuth } from '../../hooks/useAuth';
+import { focusField } from './authForm';
 import { LoginForm } from './LoginForm';
 import { RegisterForm } from './RegisterForm';
 
@@ -47,14 +51,22 @@ function enter(go: () => void) {
   }, ENTRY_MS);
 }
 
+/** The router matches without regard to case, so «/Register» is the sign-up tab too. */
 function tabOfPath(pathname: string): AuthTab {
-  return pathname.replace(/\/+$/, '') === '/register' ? 'register' : 'login';
+  return pathname.toLowerCase().replace(/\/+$/, '') === '/register' ? 'register' : 'login';
+}
+
+function isAuthPath(to: string): boolean {
+  return ['/login', '/register'].includes(to.split(/[?#]/)[0].toLowerCase().replace(/\/+$/, ''));
 }
 
 export function AuthPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const [tab, setTab] = useState<AuthTab>(() => tabOfPath(location.pathname));
+  // Once for the page: each change of tab mounts the sign-in form again, which would read the user
+  // again (a request per change) and start disabled until the answer.
+  const auth = useAuth();
 
   const [entering, setEntering] = useState(false);
   // The form fading out, and whether the last change of tab moves at all (not on the first paint,
@@ -66,6 +78,7 @@ export function AuthPage() {
   const tabRefs = useRef<Record<AuthTab, HTMLButtonElement | null>>({ login: null, register: null });
   const heightFrom = useRef<number | null>(null);
   const focusFirstField = useRef(false);
+  const pendingFocus = useRef<HTMLInputElement | null>(null);
   const exitTimer = useRef<number | undefined>(undefined);
   const heightTimer = useRef<number | undefined>(undefined);
 
@@ -77,7 +90,15 @@ export function AuthPage() {
     [],
   );
 
-  const firstField = (id: AuthTab) => frameRef.current?.querySelector<HTMLElement>(`#auth-panel-${id} input`);
+  const firstField = (id: AuthTab) => frameRef.current?.querySelector<HTMLInputElement>(`#auth-panel-${id} input`) ?? null;
+
+  // A first field still disabled (the user is being read) takes the focus once enabled.
+  useEffect(() => {
+    if (pendingFocus.current && !pendingFocus.current.disabled) {
+      pendingFocus.current.focus();
+      pendingFocus.current = null;
+    }
+  });
 
   const releaseHeight = () => {
     window.clearTimeout(heightTimer.current);
@@ -89,7 +110,7 @@ export function AuthPage() {
 
   const switchTo = (next: AuthTab, focus: 'field' | 'tab') => {
     if (next === tab) {
-      if (focus === 'field') firstField(tab)?.focus();
+      if (focus === 'field') focusField(firstField(tab), pendingFocus);
       return;
     }
     const still = prefersReducedMotion();
@@ -132,7 +153,7 @@ export function AuthPage() {
   useEffect(() => {
     if (!focusFirstField.current) return;
     focusFirstField.current = false;
-    firstField(tab)?.focus();
+    focusField(firstField(tab), pendingFocus);
   }, [tab]);
 
   const onTabKeyDown = (e: React.KeyboardEvent) => {
@@ -150,7 +171,8 @@ export function AuthPage() {
 
   const onSignedIn = (to: string) => {
     setEntering(true);
-    enter(() => navigate(to, { replace: true }));
+    // Back to this very page would leave the entrance on screen: the page stays mounted.
+    enter(() => navigate(isAuthPath(to) ? '/' : to, { replace: true }));
   };
 
   if (entering) {
@@ -219,9 +241,9 @@ export function AuthPage() {
             />
           </div>
 
-          {/* The frame clips only while its height moves; the panels' 6 px padding keeps the fields'
-              focus rings inside it. */}
-          <div ref={frameRef} className="relative -m-1.5 transition-[height] duration-200 ease-out">
+          {/* The frame clips only while its height moves; the panels' 8 px padding keeps the fields'
+              focus rings, and the 8 px a form comes in from, inside it. */}
+          <div ref={frameRef} className="relative -m-2 transition-[height] duration-200 ease-out">
             {TABS.filter((t) => t.id === tab || t.id === leaving).map((t) => {
               const isLeaving = t.id !== tab;
               const enterFrom = t.id === 'register' ? 'slide-in-from-right-2' : 'slide-in-from-left-2';
@@ -236,12 +258,12 @@ export function AuthPage() {
                   data-leaving={isLeaving || undefined}
                   className={
                     isLeaving
-                      ? 'pointer-events-none absolute inset-x-0 top-0 p-1.5 opacity-0 transition-opacity duration-[120ms] ease-out'
-                      : `p-1.5 ${animated ? `animate-in fade-in ${enterFrom}` : ''}`
+                      ? 'pointer-events-none absolute inset-x-0 top-0 p-2 opacity-0 transition-opacity duration-[120ms] ease-out'
+                      : `p-2 ${animated ? `animate-in fade-in ${enterFrom}` : ''}`
                   }
                 >
                   {t.id === 'login' ? (
-                    <LoginForm onSignedIn={onSignedIn} onSwitch={() => switchTo('register', 'field')} />
+                    <LoginForm auth={auth} onSignedIn={onSignedIn} onSwitch={() => switchTo('register', 'field')} />
                   ) : (
                     <RegisterForm onSwitch={() => switchTo('login', 'field')} />
                   )}

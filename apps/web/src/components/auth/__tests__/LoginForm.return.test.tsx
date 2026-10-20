@@ -28,6 +28,12 @@ describe('LoginForm: where the reader lands', () => {
     expect(sessionStorage.getItem('vlx:return-to')).toBeNull();
   });
 
+  it('never back on the sign-up tab, which would leave the entrance on screen', async () => {
+    sessionStorage.setItem('vlx:return-to', '/register');
+    renderLogin();
+    await waitFor(() => expect(screen.getByTestId('landed').textContent).toBe('/'), { timeout: 2000 });
+  });
+
   it('never on a foreign address', async () => {
     sessionStorage.setItem('vlx:return-to', '//evil.example/x');
     renderLogin();

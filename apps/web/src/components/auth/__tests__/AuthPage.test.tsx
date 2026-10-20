@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 
 const login = vi.fn();
-vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ login, loading: false, error: null }) }));
+let authLoading = false;
+vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ login, loading: authLoading, error: null }) }));
 vi.mock('../../../services/authService', () => ({ register: vi.fn() }));
 
 import { renderAuth } from './renderAuth';
@@ -31,6 +32,7 @@ function reduceMotion(reduce: boolean) {
 
 beforeEach(() => {
   login.mockReset().mockResolvedValue(undefined);
+  authLoading = false;
   sessionStorage.clear();
   reduceMotion(false);
 });
@@ -136,10 +138,27 @@ describe('AuthPage: two tabs on one page', () => {
     fireEvent.click(tab('Registrati'));
     fireEvent.click(tab('Accedi'));
     expect(address()).toHaveTextContent('/login');
-    expect(document.querySelectorAll('[role="tabpanel"]:not([data-leaving])')).toHaveLength(1);
+    expect(document.querySelector('[data-leaving]')).toHaveAttribute('id', 'auth-panel-register');
     await waitFor(() => expect(allPanels()).toHaveLength(1));
     expect(panel()).toHaveAttribute('id', 'auth-panel-login');
     expect(within(panel()).getByLabelText('Email')).toHaveValue('avv@studio.it');
+  });
+
+  it('the first field still disabled while the user is read takes the focus once enabled', () => {
+    authLoading = true;
+    const { rerenderSame } = renderAuth('/register');
+    fireEvent.click(tab('Accedi'));
+    const email = within(panel()).getByLabelText('Email');
+    expect(email).toBeDisabled();
+    expect(email).not.toHaveFocus();
+    authLoading = false;
+    rerenderSame();
+    expect(email).toHaveFocus();
+  });
+
+  it('opens «Registrati» from an address written in capitals', () => {
+    renderAuth('/Register');
+    expect(tab('Registrati')).toHaveAttribute('aria-selected', 'true');
   });
 
   it('under reduced motion the change is immediate: no form fading out, none sliding in', () => {

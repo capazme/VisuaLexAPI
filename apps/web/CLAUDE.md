@@ -72,8 +72,11 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   in `AuthFormParts.tsx`); one parent route over both addresses, so a change of tab replaces the address — the
   router state that carries the return after the login travels with it — and keeps the page mounted. The tab
   is the page's own state, read from the address when it opens: React Router 7 applies a navigation in a
-  transition, so a tab read from the address would unmount the form leaving for one render. A click or the
-  link under a form puts the cursor in the new form's first field, the arrows keep it on the tabs; the mark
+  transition, so a tab read from the address would unmount the form leaving for one render. `useAuth` runs
+  once, in the page, and `LoginForm` takes it as a prop: mounted again at each change of tab, a form's own
+  would read the user again (a request per change) and start disabled. A return address that is the page
+  itself goes to `/` instead, or the entrance would stay on screen. A click or the link under a form puts
+  the cursor in the new form's first field (once it is enabled), the arrows keep it on the tabs; the mark
   slides by `transform`, the form leaving fades, the next comes in from the side of its tab, the card's height
   follows, and under reduced motion the change is immediate; the wait for approval after signing up is drawn
   in the same card), `/crediti` (public, below), `/connect` (the consent page an MCP client's

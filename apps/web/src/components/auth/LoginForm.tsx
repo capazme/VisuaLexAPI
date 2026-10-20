@@ -2,9 +2,9 @@
  * The sign-in form, the «Accedi» tab of `AuthPage` (spec 2026-10-18-redesign-inchiostro §5.3.4).
  */
 import { useEffect, useRef, useState } from 'react';
+import type { useAuth } from '../../hooks/useAuth';
 import { useLocation } from 'react-router-dom';
 import { BookOpen } from 'lucide-react';
-import { useAuth } from '../../hooks/useAuth';
 import { getErrorMessage } from '../../utils/errors';
 import { locationToPath, takeReturnTo } from '../../utils/returnTo';
 import { FIELD, LABEL, PRIMARY_BUTTON, SWITCH_LINK, focusField } from './authForm';
@@ -13,20 +13,22 @@ import { FormError, PasswordToggle } from './AuthFormParts';
 const ERROR_ID = 'login-error';
 
 interface LoginFormProps {
+  /** The page's one `useAuth`: a form mounted again at each change of tab must not read the user again. */
+  auth: Pick<ReturnType<typeof useAuth>, 'login' | 'loading' | 'error'>;
   /** Signed in: where to go, which the page enters with its animation. */
   onSignedIn: (to: string) => void;
   /** «Registrati»: the other tab. */
   onSwitch: () => void;
 }
 
-export function LoginForm({ onSignedIn, onSwitch }: LoginFormProps) {
+export function LoginForm({ auth, onSignedIn, onSwitch }: LoginFormProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState('');
   const [invalid, setInvalid] = useState<'email' | 'password' | null>(null);
 
-  const { login, loading, error: authError } = useAuth();
+  const { login, loading, error: authError } = auth;
   const location = useLocation();
 
   const emailRef = useRef<HTMLInputElement>(null);
