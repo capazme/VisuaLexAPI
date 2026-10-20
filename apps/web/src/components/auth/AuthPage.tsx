@@ -62,6 +62,10 @@ export function AuthPage() {
   // hidden form (an account created with no word of the approval it waits for; a sign-in landing from
   // «Registrati»).
   const [busy, setBusy] = useState(false);
+  // An account created: the confirmation stays in the card until the tab changes; back on «Registrati»
+  // the form starts again empty (it stays mounted, so a new key mounts it afresh).
+  const [signedUp, setSignedUp] = useState(false);
+  const [registerKey, setRegisterKey] = useState(0);
 
   const [entering, setEntering] = useState(false);
   // Whether the last change of tab moves at all (not on the first paint, not under reduced motion).
@@ -89,6 +93,10 @@ export function AuthPage() {
       return;
     }
     setAnimated(!prefersReducedMotion());
+    if (next === 'register' && signedUp) {
+      setSignedUp(false);
+      setRegisterKey((k) => k + 1);
+    }
     setTab(next);
     focusFirstField.current = focus === 'field';
     const target = TABS.find((t) => t.id === next)!.path;
@@ -138,7 +146,8 @@ export function AuthPage() {
       <div className="grid min-h-full grid-rows-[1fr_auto] px-4 md:px-10">
         {/* On a computer the card's top sits where the card would be centred above «Crediti» (40 rem:
             the card, about 36 rem, and the foot): a card that grows (an error, the password's strength)
-            grows downwards, and the tabs never move. */}
+            grows downwards, and the tabs never move; the colophon, centred against the card, follows
+            half of it. */}
         <div className="pb-6 pt-8 md:pt-[max(1.5rem,calc((100dvh-40rem)/2))]">
           <div className="mx-auto grid w-full max-w-4xl gap-8 md:grid-cols-[minmax(0,1fr)_420px] md:items-center md:gap-16">
             <header className="flex flex-col items-center gap-4 text-center md:items-start md:gap-5 md:text-left">
@@ -208,14 +217,26 @@ export function AuthPage() {
                       aria-labelledby={`auth-tab-${t.id}`}
                       aria-hidden={!shown || undefined}
                       inert={!shown}
-                      className={`col-start-1 row-start-1 p-2 transition-[opacity,visibility] duration-[120ms] ease-out motion-reduce:transition-none ${
-                        shown ? (animated ? `animate-in fade-in ${enterFrom}` : '') : 'pointer-events-none invisible opacity-0'
+                      // The fade is on the way out only: a transition on the way in would hold the panel's
+                      // `visibility` at hidden for its first frame, and the focus sent to its first field
+                      // would be lost.
+                      className={`col-start-1 row-start-1 p-2 ${
+                        shown
+                          ? animated
+                            ? `animate-in fade-in ${enterFrom}`
+                            : ''
+                          : 'pointer-events-none invisible opacity-0 transition-[opacity,visibility] duration-[120ms] ease-out motion-reduce:transition-none'
                       }`}
                     >
                       {t.id === 'login' ? (
                         <LoginForm auth={auth} onBusy={setBusy} onSignedIn={onSignedIn} onSwitch={() => switchTo('register', 'field')} />
                       ) : (
-                        <RegisterForm onBusy={setBusy} onSwitch={() => switchTo('login', 'field')} />
+                        <RegisterForm
+                          key={registerKey}
+                          onBusy={setBusy}
+                          onRegistered={() => setSignedUp(true)}
+                          onSwitch={() => switchTo('login', 'field')}
+                        />
                       )}
                     </div>
                   );

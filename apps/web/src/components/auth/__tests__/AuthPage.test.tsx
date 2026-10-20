@@ -133,11 +133,13 @@ describe('AuthPage: two tabs on one page', () => {
     expect(hidden.className).toContain('opacity-0');
     expect(hidden.className).toContain('transition-[opacity,visibility]'); // visibility goes at the end of the fade
     expect(panel().className).toContain('slide-in-from-right-2');
+    // No transition on the way in: it would hold the panel hidden for a frame and lose the focus.
+    expect(panel().className).not.toContain('transition');
     fireEvent.click(tab('Accedi'));
     expect(panel().className).toContain('slide-in-from-left-2');
   });
 
-  it('a change of tab half-way through the last one leaves one form shown, with what was typed in it', () => {
+  it('a quick change back leaves one form shown, the other out of reach, with what was typed in it', () => {
     renderAuth('/login');
     fireEvent.change(within(panel()).getByLabelText('Email'), { target: { value: 'avv@studio.it' } });
     fireEvent.click(tab('Registrati'));

@@ -22,11 +22,13 @@ const STRENGTH_FILL = ['', 'bg-red-500', 'bg-amber-500', 'bg-emerald-500', 'bg-e
 interface RegisterFormProps {
   /** A request in flight, or none: the page holds the tabs still meanwhile. */
   onBusy: (busy: boolean) => void;
+  /** The account is created: the page mounts the form again empty when «Registrati» comes back. */
+  onRegistered: () => void;
   /** «Accedi» and «Torna ad Accedi»: the other tab. */
   onSwitch: () => void;
 }
 
-export function RegisterForm({ onBusy, onSwitch }: RegisterFormProps) {
+export function RegisterForm({ onBusy, onRegistered, onSwitch }: RegisterFormProps) {
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -123,6 +125,7 @@ export function RegisterForm({ onBusy, onSwitch }: RegisterFormProps) {
       onBusy(true);
       await register({ email, username, password });
       setRegistrationComplete(true);
+      onRegistered();
     } catch (error) {
       // The server does not say which field it refused («email or username already exists»).
       fail(getErrorMessage(error) || 'Errore durante la registrazione. Riprova.', 'email');
