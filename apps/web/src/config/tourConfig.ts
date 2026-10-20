@@ -327,8 +327,8 @@ export const COMMAND_PALETTE_STEPS: DriveStep[] = [
     {
         element: '[cmdk-input]',
         popover: {
-            title: 'Ricerca Intelligente',
-            description: 'Scrivi citazioni naturali: "art 2043 cc", "legge 241/1990", "costituzione art 1". Il sistema le interpreta automaticamente.',
+            title: 'Ricerca intelligente',
+            description: 'Scrivi la citazione come la scriveresti: "art. 2043 c.c.", "l. 241/1990", "Cass. civ. 10787/2024". Mentre scrivi, il campo filtra anche l\'elenco degli atti.',
             side: 'bottom',
             align: 'center',
         }
@@ -336,8 +336,8 @@ export const COMMAND_PALETTE_STEPS: DriveStep[] = [
     {
         element: '#command-palette-results',
         popover: {
-            title: 'Risultati e Suggerimenti',
-            description: 'Naviga con le frecce, premi Invio per selezionare. I risultati si aggiornano mentre digiti.',
+            title: 'Scegli l\'atto',
+            description: 'Gli atti per gruppo, con la loro sigla: scegline uno con un clic, o con le frecce e Invio; poi il menu chiede l\'articolo (per una legge o un decreto, prima numero e anno).',
             side: 'bottom',
             align: 'center',
         }
@@ -345,8 +345,8 @@ export const COMMAND_PALETTE_STEPS: DriveStep[] = [
     {
         element: '#command-palette-quick-norms',
         popover: {
-            title: 'Norme Rapide',
-            description: 'Le tue norme preferite appaiono qui per un accesso immediato. Premi il numero per selezionarle.',
+            title: 'A portata di mano',
+            description: 'I tuoi preferiti e i tuoi alias: gli atti che apri spesso, a un clic. Il fulmine su un articolo lo aggiunge ai preferiti.',
             side: 'bottom',
             align: 'center',
         }

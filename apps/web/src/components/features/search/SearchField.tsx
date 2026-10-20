@@ -5,7 +5,7 @@ import { FOCUS_RING } from '../../../constants/interactions';
 import { useAppStore } from '../../../store/useAppStore';
 import { citationSearchParams, useSearchQuery } from '../../../hooks/useSearchQuery';
 import { useSearchActions } from '../../../hooks/useSearchActions';
-import { subscribeSearchField } from '../../../utils/searchFieldControl';
+import { SEARCH_FIELD_FORM_ID, subscribeSearchField } from '../../../utils/searchFieldControl';
 import { defaultSearchFilters } from '../../../utils/searchFilters';
 import { formatDecisionShort } from '../../../utils/decisionLinks';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
@@ -19,7 +19,7 @@ export const SEARCH_BAR_HEIGHT = '4.5rem';
  * Enter opens a decision, searches a complete norm in the active practice, or searches a topic in the
  * Cassazione's decisions; a norm that still lacks its number, date or article goes on in the palette,
  * with the words already typed, which asks for the rest. «Opzioni» (⌘K) opens the palette with its
- * filters, aliases and the grid of acts. No practice is closed.
+ * filters, aliases and the list of acts, which drops from this form on a computer. No practice is closed.
  */
 export function SearchField() {
   const [value, setValue] = useState('');
@@ -113,7 +113,7 @@ export function SearchField() {
 
   return (
     <div className="relative w-full max-w-3xl">
-      <form role="search" aria-label="Ricerca" onSubmit={onSubmit} className="flex items-center gap-2">
+      <form id={SEARCH_FIELD_FORM_ID} role="search" aria-label="Ricerca" onSubmit={onSubmit} className="flex items-center gap-2">
         <div className="relative flex min-w-0 flex-1 items-center">
           <Search size={18} aria-hidden className="pointer-events-none absolute left-3 text-slate-400" />
           <input
@@ -155,7 +155,7 @@ export function SearchField() {
         >
           <SlidersHorizontal size={16} aria-hidden />
           <span className="hidden sm:inline">Opzioni</span>
-          <kbd className="hidden rounded border border-slate-200 px-1 text-[10px] font-semibold text-slate-400 md:inline dark:border-slate-700">⌘K</kbd>
+          <kbd className="hidden rounded border border-slate-200 px-1 text-[11px] font-semibold text-slate-500 md:inline dark:border-slate-700 dark:text-slate-400">⌘K</kbd>
         </button>
       </form>
 
@@ -179,7 +179,7 @@ export function SearchField() {
             )}
           />
           <span className="min-w-0 flex-1 truncate font-medium text-slate-700 dark:text-slate-200">{hint.text}</span>
-          {hint.action && <span className="flex-shrink-0 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{hint.action}</span>}
+          {hint.action && <span className="flex-shrink-0 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{hint.action}</span>}
         </div>
       )}
     </div>

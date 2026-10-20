@@ -70,23 +70,36 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   development mode (below) the address redirects to `/`. `VITE_FEATURE_MERLT`
   and `VITE_FEATURE_MERLT_GRAPH` decide the Sidebar's «Assistente» and «Grafo»
   entries and whether a page says it is unavailable. Outside the layout:
-  `/login` and `/register` (one page, `components/auth/AuthPage`, A1: the colophon beside a card with two
+  `/login` and `/register` (one page, `components/auth/AuthPage`, A1: the colophon — the mark, «VisuaLex»
+  and one sentence — beside a card with two
   tabs, «Accedi» and «Registrati» (`LoginForm`, `RegisterForm`, their shared classes in `authForm.ts` and parts
   in `AuthFormParts.tsx`); one parent route over both addresses, so a change of tab replaces the address — the
   router state that carries the return after the login travels with it — and keeps the page mounted. The tab
   is the page's own state, read from the address when it opens: React Router 7 applies a navigation in a
-  transition, so a tab read from the address would unmount the form leaving for one render. `useAuth` runs
-  once, in the page, and `LoginForm` takes it as a prop: mounted again at each change of tab, a form's own
-  would read the user again (a request per change) and start disabled; its error outlives the form, so an
-  error already on screen when the tab changes is not shown again on the empty form. While a sign-in or a
-  sign-up is on its way the tabs hold still (`aria-disabled`): the form would unmount under its request. A
+  transition, so a tab read from the address would lag one render behind the click. `useAuth` runs
+  once, in the page, and `LoginForm` takes it as a prop. The page holds still across a change of tab (A1b):
+  both forms stay mounted in one cell of a grid, the one not shown `invisible` and `inert`, so the card is as
+  tall as the taller form whichever is open and each form keeps what was typed in it, and its error (after a
+  sign-up, the confirmation stays until the tab changes, and back on «Registrati» a new key mounts the form
+  empty; «Torna ad Accedi» finds a fresh sign-in form too, a new key, with the failure the page's `useAuth`
+  still holds not shown); «Crediti»
+  is the last row of a grid as tall as the window; the page is its own scroller (`h-app`) with
+  `scrollbar-gutter: stable`, so a low window does not shift sideways when a bar appears; on a computer the
+  card's top sits where the card would be centred above the foot, so a form that grows (an error) grows
+  downwards and the tabs never move, and the colophon is centred against the card (text left-aligned; on a
+  phone centred above it), so it follows half of such a growth; its title is 48 px up to `lg` and 68 px from it
+  (between 768 and 1023 px the column beside the card is about 200 px). The register form fits a window 768 px high
+  inside (1366×768, 1470×753 measured as viewports; a 768 px screen with a browser's bars scrolls a little) by
+  its spacing (`space-y-4` between fields, `space-y-1.5` inside one), the sign-in form spaced the same. While a sign-in or a
+  sign-up is on its way the tabs hold still (`aria-disabled`): its answer would land on the hidden form. A
   return address that is the page itself (`isLoginPage` in `utils/returnTo.ts`, either tab) goes to `/`
-  instead, or the entrance would stay on screen. The columns are anchored at the top, not centred: the
-  card's height changes with the tab, and a centred page moved as a whole. Each form has a visually hidden
+  instead, or the entrance would stay on screen. Each form has a visually hidden
   `h2` («Accedi», «Registrati»), the tab being its heading on screen. A click or the link under a form puts
   the cursor in the new form's first field (once it is enabled), the arrows keep it on the tabs; the mark
-  slides by `transform`, the form leaving fades, the next comes in from the side of its tab, the card's height
-  follows, and under reduced motion the change is immediate; the wait for approval after signing up is drawn
+  slides by `transform`, the form leaving fades (its `visibility` follows at the end of the fade; the form
+  coming in has no transition, which would hold it hidden for a frame and lose the focus sent to its first
+  field), the next comes in from the side of its tab, and under reduced motion the change is immediate; the wait for approval
+  after signing up is drawn
   in the same card), `/crediti` (public, below), `/connect` (the consent page an MCP client's
   authorization request lands on: signed in, the user approves or refuses) and
   `/admin/*` (admins only).
@@ -221,7 +234,40 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   the decision, searches a ready norm (`citationSearchParams`), searches the topic, or hands a norm that still
   lacks its number, date or article to the palette with the words (`openCommandPaletteWith`); Enter pressed while
   the server is still naming the act waits for its answer. «Opzioni» (⌘K) opens the palette. No practice is
-  closed. `utils/searchFieldControl.ts` reaches it: `focusSearchField({ text? }, { wait? })` says whether the field took
+  closed.
+  **The palette's look** (`CommandPalette`, the search menu's brief O1, 20 Oct 2026): on a computer a panel that
+  drops from the field's form (`SEARCH_FIELD_FORM_ID` in `utils/searchFieldControl.ts`; floating-ui puts its top on
+  the field's, as wide as the field and «Opzioni», one height of at most 640 px while the box filters, so it does
+  not jump at every letter), hung at the top, centred, where no field is on screen (another page, Focus mode); on a
+  phone `ui/Sheet` («Menu di ricerca», its own «Chiudi»). From the top: the box, the one strong thing, with the help
+  line (12 px) or what the box was read as; the steps «Atto › Dettagli › Articolo» as a thin trail, the one in use in
+  ink (`aria-current="step"`), each 44 px on a phone; then two columns on a computer and one on a phone, in this
+  order: «Scegli l'atto» (`paletteActs.ts`: every act of `ACT_TYPES` named in full with the source convention's
+  abbreviation, «Codice civile · c.c.», in 44 px rows under group headings in Geist 12 px) and «A portata di mano»
+  (Preferiti, I tuoi alias with the presets' line, «In dotazione» while typing; six of each at rest, then «Tutti i
+  preferiti (N)» and «Gestisci alias (N)»; empty, one quiet line each, «Crea un alias» a row like a link);
+  «Filtri avanzati» closed at the foot, its state in words (`activeFiltersLabel`, `utils/searchFilters.ts`); the
+  keys on a computer only. The box filters every list while it is typed (`filterPaletteActs`, `queryMatches`: each
+  typed word begins a word of the row, case and accents folded, an abbreviation with or without its dots; «Nessun
+  atto con questo nome»); cmdk's own filter is off (`shouldFilter={false}`): it would reorder the rows by score,
+  across the columns. The order drawn is the keyboard's: on a computer the acts come first, so the row chosen as
+  the menu opens is the first act (Costituzione); on a phone «A portata di mano» comes first when it holds
+  something. A decision or a norm read in the box is one strong row in the columns' place, the chosen one
+  («art. 2043 c.c. · Apri l'articolo ↵», «… · Completa ↵» while it lacks number or date, «… · Apri la
+  sentenza ↵»), with under it only what still matches (a favourite, an alias, an act). The box sits in a
+  bordered field that carries the focus ring (`focus-within`; the box itself cancels the global
+  `input:focus-visible` ring), and the line under it starts 10 px below, on the line of the field's text. cmdk takes Enter, the
+  arrows, Home and End anywhere inside it (Enter picks the chosen row): every control that is not the box keeps
+  them (`keepKeys`), or Enter on «Filtri avanzati» would open the first act.
+  On a computer the panel is a dialog («Menu di ricerca», `useRole` and `FloatingFocusManager`, modal): the focus
+  stays inside, and goes back to what had it as the palette opened («Opzioni», the field), as it closes rather than
+  once the fade is over (the manager sits outside the `AnimatePresence`); nothing had it, the field. cmdk replaces an
+  id given to `Command.List` with its own, so the tour's `#command-palette-results` is on the acts' column;
+  `tourConfig.commandPalette.test.tsx` checks the palette's tour against the palette drawn, on both breakpoints. Motion: the panel fades in dropping 6 px (`dur.pop`) and leaves in `dur.press`; a new step slides in
+  from the side it moved to; the chosen row's tint is one element carried from row to row (`layoutId`); under
+  reduced motion everything only fades. This reverses spec `2026-10-18-redesign-inchiostro` §6.1 («no open or close
+  animation») for the palette, as the brief asked. There is no «ultimi atti aperti»: the web keeps no list of the
+  acts opened (the search history is the server's, read by its page alone). `utils/searchFieldControl.ts` reaches it: `focusSearchField({ text? }, { wait? })` says whether the field took
   the request, and the sidebar's «Ricerca», which navigates first, asks it to wait (2 s) for the field to mount;
   the empty page's button and examples and the empty practice use `focusSearchFieldOrPalette`, which opens the
   palette with the same words when no field is on screen (Focus mode).
@@ -281,7 +327,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   height of 36 px on a desktop and 44 px on a phone; `loading` keeps the label and puts a spinner in the
   icon's place (`aria-busy`), `status="error" | "success"` shows the outcome of the last press. `Modal`
   enters in `dur.panel` on `ease.drawer`, growing from 0.97, and `Sheet` rises from its edge on the same
-  timing; both only fade under reduced motion (`useReducedMotion`). `Toast` takes `spring.snappy`, rises
+  timing (its «Chiudi» in ink-500, dark ink-400: over 3:1, since it is often the one way out); both only fade under reduced motion (`useReducedMotion`). `Toast` takes `spring.snappy`, rises
   from the edge it lives on and pauses its time while `document.hidden`; the undo toast's countdown lives
   in `useUndoableAction` and does not pause. `Tooltip` waits 500 ms under a pointer, opens at once and
   without motion within 300 ms of another closing, and at once on keyboard focus.
@@ -367,10 +413,10 @@ Three different things. Conflating them is the recurring mistake.
 
 - **Presets** (80) — shipped in `preset_aliases.yaml`, served by
   `GET /fetch_alias_catalog`. 21 of them only rename an act type: "codice
-  appalti" IS the "Codice Contratti Pubblici" tile already in the palette's
-  grid, so listing them duplicates that grid. The palette shows only the 59
+  appalti" IS the "Codice dei contratti pubblici" row already in the palette's
+  list of acts, so listing them duplicates that list. The palette shows only the 59
   that carry a number and a date (`gdpr` → Reg. UE 679/2016), which is work
-  the grid cannot save.
+  the list cannot save.
 - **Known acts** (392) — names `act_resolver.py` understands unaided ("statuto
   dei lavoratori", "TUSL"). These need no alias at all; one would only drift.
 - **CustomAlias** — the user's own, server-backed. A custom trigger beats a
@@ -382,7 +428,7 @@ Three different things. Conflating them is the recurring mistake.
 `AliasManager` is reached **only** from the command palette (gotcha 27; both are mounted by `Layout`'s
 `GlobalSearch`), and in
 the palette the presets cost one line of header text at rest — they render as
-rows only once the user types, and cmdk does the matching. `useAliasCatalog`
+rows only once the user types, matched by `queryMatches` (`paletteActs.ts`). `useAliasCatalog`
 keeps its `loaded` flag in component state, so the palette and the manager each
 fetch the catalog once for as long as they stay mounted — two calls per session,
 never repeated, nothing persisted.
