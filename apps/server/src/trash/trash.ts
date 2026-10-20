@@ -395,10 +395,23 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
     return await prisma.$transaction(async (tx) => {
       const entry = await tx.trashEntry.findFirst({ where: { id: trashId, userId, expiresAt: { gt: new Date() } } });
       if (!entry) throw new AppError(404, 'Elemento del cestino non trovato.');
+      // A dossier's published copy is locked before its entry, in the order the admin's withdraw and
+      // republish take them (the copy, then the entry they rewrite): the other way round, a restore and
+      // one of those would deadlock.
+      const copyId = entry.kind === 'DOSSIER' ? (entry.payload as { publishedCopyId?: unknown }).publishedCopyId : null;
+      if (typeof copyId === 'string' && copyId) await tx.$queryRaw`SELECT id FROM shared_environments WHERE id = ${copyId} FOR UPDATE`;
+      // The entry goes first, as the one claim on it: a purge, the sweep or another restore that took
+      // it meanwhile is waited for and then leaves nothing to delete, a 404; a refusal further on rolls
+      // the deletion back. Its payload is the one the deletion returns, read after any wait: an admin's
+      // withdrawal that wrote its block into the entry meanwhile comes back with the dossier.
+      const claimed = await tx.$queryRaw<{ payload: Prisma.JsonValue }[]>`
+        DELETE FROM trash_entries WHERE id = ${entry.id} AND user_id = ${userId} RETURNING payload`;
+      if (claimed.length === 0) throw new AppError(404, 'Elemento del cestino non trovato.');
+      const payload = claimed[0].payload;
 
       if (entry.kind === 'DOSSIER') {
         // `tasks` is absent from an entry trashed before the planner.
-        const { dossier, items, snapshots, publishedCopyId, tasks = [] } = entry.payload as unknown as {
+        const { dossier, items, snapshots, publishedCopyId, tasks = [] } = payload as unknown as {
           dossier: Record<string, unknown> & { id: string; createdAt: string; updatedAt: string };
           publishedCopyId?: string | null;
           tasks?: StoredTask[];
@@ -503,14 +516,14 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
             data: { sourceDossierId: dossier.id },
           });
         }
-        await tx.trashEntry.delete({ where: { id: entry.id } });
         return { dossierId: dossier.id };
       }
 
       if (entry.kind === 'DOSSIER_ITEMS') {
-        const { items } = entry.payload as unknown as { items: StoredItem[] };
+        const { items } = payload as unknown as { items: StoredItem[] };
         const targetId = targetDossierId ?? entry.dossierId;
-        const target = targetId ? await tx.dossier.findFirst({ where: { id: targetId, userId } }) : null;
+        // Locked, so a dossier going to the trash meanwhile is waited for and found gone, not half-written to.
+        const target = targetId && (await lockDossier(tx, userId, targetId)) ? await tx.dossier.findFirst({ where: { id: targetId, userId } }) : null;
         if (!target) {
           if (targetDossierId) throw new AppError(404, 'Dossier not found');
           throw new AppError(409, 'Il dossier non esiste più: scegli dove ripristinare.');
@@ -527,13 +540,12 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
           data: items.map((item, i) => itemRow(item, target.id, start + i, about(item))),
         });
         await tx.dossier.update({ where: { id: target.id }, data: { updatedAt: new Date() } });
-        await tx.trashEntry.delete({ where: { id: entry.id } });
         return { dossierId: target.id };
       }
 
       if (entry.kind === 'LINGO_CARDS') {
         // `states` and `reviews` are absent from an entry trashed before reviews were kept.
-        const { cards, states = [], reviews = [] } = entry.payload as unknown as {
+        const { cards, states = [], reviews = [] } = payload as unknown as {
           cards: (Record<string, unknown> & { id: string; createdAt: string; ancore: (Record<string, unknown> & { id: string; ultimaVerifica: string })[] })[];
           states?: StoredReviewState[];
           reviews?: StoredReview[];
@@ -579,7 +591,6 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
             durataMs: log.durataMs,
           })),
         });
-        await tx.trashEntry.delete({ where: { id: entry.id } });
         return { dossierId: null };
       }
 

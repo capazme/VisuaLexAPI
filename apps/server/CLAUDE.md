@@ -174,7 +174,13 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   Restore brings every column back with the original ids — for a card, also the author's
   review state and log (`LingoStatoRipasso`, `LingoRevisioneSRS`), which the card's deletion
   would otherwise cascade away; an entry from before carries none and restores as it was; entries 30 days,
-  then swept (awaited, at most every ten minutes). No route reachable by an
+  then swept (awaited, at most every ten minutes). A restore deletes its entry first and restores the
+  payload that deletion returns: one purged, swept or restored meanwhile is waited for and answers 404,
+  as a second restore does (two at once: 200 and 404); ids taken again (P2002) are a 409. A dossier's
+  restore locks its published copy before the entry, the order of the admin's withdraw and republish
+  (the copy, then the entry they rewrite), so the two never deadlock and a block written meanwhile
+  comes back with the dossier. Entries restored into a dossier lock it, their own or the one the user
+  picks: their own gone meanwhile answers the 409 that asks where, a picked one 404 `Dossier not found`. No route reachable by an
   exchanged token deletes for good.
 - **`POST /api/dossiers/:id/norms`** — 1 to 50 references in free text
   (`norms/resolveReference.ts`): `parse_query`, then `fetch_norma_data` (the
@@ -581,8 +587,12 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   daily, working days (`FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR`, read as Monday–Friday minus the national
   holidays of `tasks/italianHolidays.ts`: fixed dates, Easter Monday, 4 October from 2026), weekly,
   monthly, yearly; it needs a planned date and refuses a deadline. Monthly and yearly keep their day
-  (`recurrenceDay`, the planned date's day when the user sets the rule, its origin or the date; a
-  write leaving all three unchanged keeps it): a month without it takes its last day for that
+  (`recurrenceDay`, the planned date's day when the user sets the rule, its origin or a new day; a
+  write leaving the rule and its origin unchanged, with a date where the kept day lands in its month —
+  the day, or the month's last when shorter: `landsOnDay`; for a yearly one, in the same month —, keeps
+  it, so the web's «Annulla», which puts a tick's `previousPlannedDate` back with a `PUT`, never turns a
+  31st into the 28th. The server cannot tell that from a user moving a 31st to 30 April meaning «the
+  30th from now on»: it keeps the 31st, and the 30th of a month of 31 days sets the 30th): a month without it takes its last day for that
   occurrence only (31 January → 28 February → 31 March), and a yearly 29 February is the 28th in
   common years and the 29th in leap years. Ticking a repeating task moves its planned date to the first occurrence after today
   (`pianificata`) or one step from today (`completamento`) and leaves it open; `{ plannedDate }` in

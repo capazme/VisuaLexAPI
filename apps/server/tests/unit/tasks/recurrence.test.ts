@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dayOfMonth, nextOccurrence, RECURRENCE_RULES as R } from '../../../src/tasks/recurrence';
+import { dayOfMonth, landsOnDay, nextOccurrence, RECURRENCE_RULES as R } from '../../../src/tasks/recurrence';
 
 describe('nextOccurrence from the planned date («ogni»)', () => {
   it('every day: the day after the planned date, or after today when done late', () => {
@@ -70,5 +70,20 @@ describe('nextOccurrence from the completion («ogni!»)', () => {
     expect(nextOccurrence(R.monthly, 'completamento', '2026-10-01', '2026-01-31')).toBe('2026-02-28');
     expect(nextOccurrence(R.yearly, 'completamento', '2026-10-01', '2028-02-29')).toBe('2029-02-28');
     expect(nextOccurrence(R.workingDays, 'completamento', '2026-10-01', '2026-12-24')).toBe('2026-12-28');
+  });
+});
+
+describe('landsOnDay: where a kept day falls in a month', () => {
+  it('on the day itself, or on the last day of a shorter month', () => {
+    expect(landsOnDay('2027-03-31', 31)).toBe(true);
+    expect(landsOnDay('2027-02-28', 31)).toBe(true);
+    expect(landsOnDay('2027-04-30', 31)).toBe(true);
+    expect(landsOnDay('2027-02-28', 29)).toBe(true);
+    expect(landsOnDay('2028-02-29', 29)).toBe(true);
+    expect(landsOnDay('2028-02-28', 29)).toBe(false);
+    expect(landsOnDay('2028-02-28', 31)).toBe(false);
+    expect(landsOnDay('2027-03-30', 31)).toBe(false);
+    expect(landsOnDay('2027-03-15', 15)).toBe(true);
+    expect(landsOnDay('2027-03-16', 15)).toBe(false);
   });
 });
