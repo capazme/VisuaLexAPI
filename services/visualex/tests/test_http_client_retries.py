@@ -157,6 +157,32 @@ class TestRetryAfterOutlivesTheCall:
         assert result.status == 200
 
 
+    async def test_our_own_backoff_does_not_pause_the_source(self, client, monkeypatch):
+        """A page that always fails (no Retry-After) must not slow the next request down."""
+        monkeypatch.setattr(hc, "HTTP_INITIAL_BACKOFF", 5.0)
+        async with Portal([503, 200]) as portal:
+            async with asyncio.timeout(2):
+                with pytest.raises(NetworkError):
+                    await client.request("GET", portal.url, source="normattiva", max_retries=0)
+                result = await client.request("GET", portal.url, source="normattiva", max_retries=0)
+        assert result.status == 200
+
+    async def test_a_pause_longer_than_the_limit_is_refused_at_once(self, client):
+        server, hits = await self._busy_then_ok(str(hc.ThrottledHttpClient.MAX_PAUSE_WAIT + 30))
+        url = str(server.make_url("/"))
+        try:
+            async with asyncio.timeout(5):
+                with pytest.raises(NetworkError):
+                    await client.request("GET", url, source="normattiva", max_retries=0)
+                with pytest.raises(NetworkError) as raised:
+                    await client.request("GET", url, source="normattiva", max_retries=0)
+        finally:
+            await server.close()
+        assert len(hits) == 1  # the source was not asked again
+        assert raised.value.status_code == 429
+        assert raised.value.retry_after > hc.ThrottledHttpClient.MAX_PAUSE_WAIT
+
+
 class TestDefaultBudgetUnchanged:
     async def test_a_firewall_status_is_retried_up_to_the_configured_budget(self, client):
         async with Portal([403]) as portal:
