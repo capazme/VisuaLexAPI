@@ -36,7 +36,7 @@ function ViewFrame({ view, heading, line, defaults, children, empty }: FrameProp
   const today = state.answer?.today ?? todayInRome();
   const tasks = state.answer?.tasks ?? [];
   return (
-    <section aria-labelledby={`opus-${view}`} className="space-y-5 pb-8">
+    <section aria-labelledby={`opus-${view}`} className="min-w-0 space-y-5 pb-8">
       <div>
         {/* Where the focus goes when the last row leaves (`focusAwayFrom`). */}
         <h2 id={`opus-${view}`} tabIndex={-1} data-focus-fallback className={cn(BLOCK_HEADING, 'focus-visible:outline-none')}>{heading}</h2>
@@ -51,7 +51,7 @@ function ViewFrame({ view, heading, line, defaults, children, empty }: FrameProp
         ) : tasks.length === 0 ? (
           <TaskViewEmpty {...empty} />
         ) : (
-          <div data-task-lists onKeyDown={moveBetweenRows} className="space-y-6">
+          <div data-task-lists onKeyDown={moveBetweenRows} className="min-w-0 space-y-6">
             {children(tasks, today, state.optimistic)}
           </div>
         )}
@@ -63,7 +63,7 @@ function ViewFrame({ view, heading, line, defaults, children, empty }: FrameProp
 
 function Group({ id, heading, count, children }: { id: string; heading: string; count: number; children: ReactNode }) {
   return (
-    <section aria-labelledby={id} className="space-y-1">
+    <section aria-labelledby={id} className="min-w-0 space-y-1">
       <h3 id={id} className={GROUP_HEADING}>
         {heading}
         <span className={COUNT}>
@@ -156,7 +156,7 @@ export function TaskTrashView() {
       empty={{ title: 'Il cestino dei compiti è vuoto' }}
     >
       {(tasks, _day, optimistic) => (
-        <ul aria-label="Compiti nel cestino" className="grid gap-1">
+        <ul aria-label="Compiti nel cestino" className="grid grid-cols-1 gap-1">
           {tasks.map((task) => (
             <li key={task.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/40">
               <div className="min-w-0 flex-1">

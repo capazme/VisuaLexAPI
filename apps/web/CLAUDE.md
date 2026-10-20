@@ -291,7 +291,11 @@ checks the files; «termine calcolato» comes with wave 2 and its warning), and 
 - **The count** beside «Oggi» and on the switcher's Opus entry: the today view's length, set by `TodayView`'s read
   and by `PlannerHost` every two minutes while the tab is visible and after every write.
 - Style: Gymnasium's tokens (`studia/progress/tokens.ts`) and `plannerStyles.ts`; every control 44 px at every width
-  and no text under 11 px (`plannerStyle.test.ts` reads the folder).
+  and no text under 11 px (`plannerStyle.test.ts` reads the folder). The tick (`TaskCheckbox`) is the native checkbox
+  as a transparent 44 px square over the 20 px box it draws; the title is a 44 px button; the dossier's link is 44 px
+  tall with its extra height laid over the gaps (`-my-3.5`). **A list that is a `grid` gets `grid-cols-1`** (a track
+  that may shrink): with the implicit `auto` track one `truncate` line — the dossier's name — widened every row to
+  763 px on a 390 px phone and clipped it (seen by «occhi», the headless pass, 20 October 2026).
 
 ## Frontend State
 

@@ -6,6 +6,7 @@ import { useAppStore } from '../../../store/useAppStore';
 import type { Task } from '../../../types/tasks';
 import { FOCUS_RING } from '../studia/progress/tokens';
 import { LinkedText } from './LinkedText';
+import { TaskCheckbox } from './TaskCheckbox';
 import { countdown, PRIORITY_LABEL, RECURRENCE_LABEL, shortDay } from './taskDates';
 import { DEADLINE_TONE, ICON_BUTTON, META, PRIORITY_STRIPE, PRIORITY_TEXT } from './plannerStyles';
 
@@ -39,33 +40,21 @@ export function TaskRow({ task, today, showDossier, isChild = false, onTick, onO
   const plannedLate = task.plannedDate !== null && task.plannedDate < today;
 
   return (
-    <li data-task-row data-task-id={task.id} className="relative">
+    <li data-task-row data-task-id={task.id} className="relative min-w-0">
       <div className="group relative flex items-start gap-1 rounded-xl py-1 pl-1 pr-1 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40">
         {stripe && <span aria-hidden className={cn('absolute bottom-2 left-0 top-2 w-1 rounded-full', stripe)} />}
-        <label className="grid h-11 w-11 shrink-0 cursor-pointer place-items-center">
-          <input
-            type="checkbox"
-            data-task-focus
-            checked={false}
-            onChange={() => onTick(task)}
-            aria-label={`Segna come fatto: ${task.title}`}
-            className={cn(
-              'h-5 w-5 cursor-pointer appearance-none rounded-md border-2 border-slate-500 bg-white transition-colors hover:border-primary-700 dark:border-slate-400 dark:bg-slate-900 dark:hover:border-primary-300',
-              FOCUS_RING,
-            )}
-          />
-        </label>
+        <TaskCheckbox label={`Segna come fatto: ${task.title}`} onTick={() => onTick(task)} focusTarget />
 
-        <div className="min-w-0 flex-1 py-2.5">
+        <div className="min-w-0 flex-1 pb-2.5">
           <button
             type="button"
             onClick={() => onOpen(task)}
-            className={cn('block w-full rounded text-left text-[15px] leading-snug text-slate-900 [overflow-wrap:anywhere] hover:underline hover:underline-offset-2 dark:text-slate-50', FOCUS_RING)}
+            className={cn('flex min-h-[44px] w-full items-center rounded py-2.5 text-left text-[15px] leading-snug text-slate-900 [overflow-wrap:anywhere] hover:underline hover:underline-offset-2 dark:text-slate-50', FOCUS_RING)}
           >
             {task.title}
           </button>
           {task.description && (
-            <p className="mt-0.5 line-clamp-2 text-sm text-slate-600 [overflow-wrap:anywhere] dark:text-slate-400">
+            <p className="-mt-1.5 mb-0.5 line-clamp-2 text-sm text-slate-600 [overflow-wrap:anywhere] dark:text-slate-400">
               <LinkedText text={task.description} />
             </p>
           )}
@@ -109,7 +98,8 @@ export function TaskRow({ task, today, showDossier, isChild = false, onTick, onO
             {showDossier && task.dossierId && (
               <Link
                 to={`/dossier?dossier=${encodeURIComponent(task.dossierId)}`}
-                className={cn(META, 'max-w-full rounded hover:text-slate-900 hover:underline dark:hover:text-slate-100', FOCUS_RING)}
+                // 44 px tall for a finger, its 14 px above and below laid over the gaps (the line stays its height).
+                className={cn(META, '-my-3.5 min-h-[44px] max-w-full rounded hover:text-slate-900 hover:underline dark:hover:text-slate-100', FOCUS_RING)}
               >
                 <Folder size={12} aria-hidden className="shrink-0" />
                 <span className="sr-only">Dossier: </span>

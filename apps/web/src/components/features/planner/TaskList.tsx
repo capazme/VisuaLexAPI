@@ -32,11 +32,11 @@ export function TaskList({ tasks, today, optimistic, showDossier = true, label }
 
   return (
     <>
-      <ul aria-label={label} onKeyDown={moveBetweenRows} className="grid gap-0.5">
+      <ul aria-label={label} onKeyDown={moveBetweenRows} className="grid min-w-0 grid-cols-1 gap-0.5">
         {nestTasks(tasks).map(({ task, children }) => (
           <TaskRow key={task.id} task={task} today={today} showDossier={showDossier} {...actions}>
             {children.length > 0 && (
-              <ul aria-label={`Sottocompiti di ${task.title}`} className="ml-6 grid gap-0.5 border-l border-slate-200 pl-2 dark:border-slate-800">
+              <ul aria-label={`Sottocompiti di ${task.title}`} className="ml-6 grid min-w-0 grid-cols-1 gap-0.5 border-l border-slate-200 pl-2 dark:border-slate-800">
                 {children.map((child) => (
                   <TaskRow key={child.id} task={child} today={today} showDossier={false} isChild {...actions} />
                 ))}

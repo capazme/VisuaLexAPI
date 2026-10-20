@@ -10,6 +10,7 @@ import { completeWithUndo, trashWithUndo, type Optimistic } from './taskActions'
 import { draftFromTask, draftProblem, emptyDraft, inputFromDraft, MAX_TITLE, type TaskDraft } from './taskDraft';
 import { failureMessage, plannerStore } from './plannerStore';
 import { TaskFields } from './TaskFields';
+import { TaskCheckbox } from './TaskCheckbox';
 import { useTaskView } from './useTaskView';
 import { FIELD, FIELD_LABEL } from './plannerStyles';
 
@@ -142,18 +143,10 @@ function Subtasks({ parent, today, inputRef }: { parent: Task; today: string; in
       </h3>
       {list.status === 'error' && <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">Non riesco a leggere i sottocompiti.</p>}
       {children.length > 0 && (
-        <ul className="mt-2 grid gap-1">
+        <ul className="mt-2 grid grid-cols-1 gap-1">
           {children.map((child) => (
             <li key={child.id} className="flex items-center gap-1">
-              <label className="grid h-11 w-11 shrink-0 cursor-pointer place-items-center">
-                <input
-                  type="checkbox"
-                  checked={false}
-                  onChange={() => void completeWithUndo(child, today, list.optimistic)}
-                  aria-label={`Segna come fatto: ${child.title}`}
-                  className="h-5 w-5 cursor-pointer appearance-none rounded-md border-2 border-slate-500 bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-400 dark:bg-slate-900"
-                />
-              </label>
+              <TaskCheckbox label={`Segna come fatto: ${child.title}`} onTick={() => void completeWithUndo(child, today, list.optimistic)} />
               <span className="min-w-0 flex-1 text-sm text-slate-900 [overflow-wrap:anywhere] dark:text-slate-100">{child.title}</span>
             </li>
           ))}

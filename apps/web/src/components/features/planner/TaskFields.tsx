@@ -39,7 +39,7 @@ export function TaskFields({ draft, onChange, withText = false, dossierLocked = 
   const lockedTitle = dossierLocked && draft.dossierId ? dossiers.find((d) => d.id === draft.dossierId)?.title ?? 'Dossier' : null;
 
   return (
-    <div className="grid gap-4">
+    <div className="grid grid-cols-1 gap-4">
       {withText && (
         <>
           <div className="grid gap-1.5">

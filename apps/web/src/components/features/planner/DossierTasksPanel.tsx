@@ -15,7 +15,7 @@ export function DossierTasksPanel({ dossierId }: { dossierId: string }) {
   const today = state.answer?.today ?? todayInRome();
   const tasks = state.answer?.tasks ?? [];
   return (
-    <section aria-labelledby="dossier-tasks-heading" className={cn(TILE, 'mb-6 space-y-3 p-3 md:p-4')}>
+    <section aria-labelledby="dossier-tasks-heading" className={cn(TILE, 'mb-6 min-w-0 space-y-3 p-3 md:p-4')}>
       <h3 id="dossier-tasks-heading" tabIndex={-1} data-focus-fallback className={cn(BLOCK_HEADING, 'focus-visible:outline-none')}>
         Compiti
         {tasks.length > 0 && (
