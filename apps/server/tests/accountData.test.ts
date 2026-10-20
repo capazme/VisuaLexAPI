@@ -23,7 +23,7 @@ describe('account data controls', () => {
     await prisma.lingoGiornataStudio.create({ data: { utenteId: alice.id, giorno: new Date('2026-10-19T00:00:00Z'), ripassi: 12, nuove: 3, sbagliate: 2, valido: true } });
     const response = await request(app).get('/api/auth/export').set(authHeader(alice));
     expect(response.body.data.lingoPreferenze).toEqual({ nuoveAlGiorno: 20, ripassiAlGiorno: 15, materieComunita: [] });
-    expect(response.body.data.lingoGiornate).toEqual([{ giorno: '2026-10-19', ripassi: 12, nuove: 3, sbagliate: 2, codaFinita: false, valido: true, voti: 0 }]);
+    expect(response.body.data.lingoGiornate).toEqual([{ giorno: '2026-10-19', ripassi: 12, ripassiDovuti: 0, nuove: 3, sbagliate: 2, codaFinita: false, valido: true, voti: 0 }]);
   });
 
   it('exports the XP credits, without the events’ ids, and deletes them with the account', async () => {

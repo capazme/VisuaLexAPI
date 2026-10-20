@@ -5,7 +5,9 @@ import { queueFinished } from './todayQueue';
 /**
  * The stored study days (Studia progress spec §5.1): one `LingoGiornataStudio` row per user and Rome day.
  * A recorded grade counts into today's row, a finished queue marks it, and a day counts (`valido`) with
- * at least N reviews or the queue finished. A validation vote counts into `voti` (Gymnasium XP spec §3.5),
+ * at least N reviews or the queue finished. A grade of a card already due also counts into `ripassi_dovuti`
+ * (Gymnasium XP spec §3.1, G-334: a card due by the end of the day, as the session's queue reads it).
+ * A validation vote counts into `voti` (Gymnasium XP spec §3.5),
  * which changes nothing for the streak. Nothing else writes these rows: the trash never touches them,
  * so deleting a card never rewrites a past day; once the day is over its `valido` stays as it was.
  *
@@ -43,7 +45,7 @@ export async function recordGradeDay(
   tx: Prisma.TransactionClient,
   userId: string,
   today: string,
-  grade: { isNew: boolean; wrong: boolean },
+  grade: { isNew: boolean; wrong: boolean; wasDue: boolean },
 ): Promise<GradeDay> {
   await tx.$executeRaw`
     INSERT INTO lingo_giornate_studio (utente_id, giorno, updated_at)
@@ -56,6 +58,7 @@ export async function recordGradeDay(
   const [row] = await tx.$queryRaw<{ ripassi: number; valido: boolean }[]>`
     UPDATE lingo_giornate_studio SET
       ripassi = ripassi + 1,
+      ripassi_dovuti = ripassi_dovuti + ${grade.wasDue ? 1 : 0},
       nuove = nuove + ${grade.isNew ? 1 : 0},
       sbagliate = sbagliate + ${grade.wrong ? 1 : 0},
       coda_finita = coda_finita OR ${finished},

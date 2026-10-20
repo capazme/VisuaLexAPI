@@ -61,9 +61,15 @@ export function logged(user: TestUser, cardId: string, at: string) {
   });
 }
 
-export function storedDay(user: TestUser, day: string, over: { ripassi?: number; nuove?: number; valido?: boolean; codaFinita?: boolean; voti?: number } = {}) {
+/** A stored day written by hand; `ripassiDovuti` defaults to the reviews that were not first reviews. */
+export function storedDay(user: TestUser, day: string, over: { ripassi?: number; ripassiDovuti?: number; nuove?: number; valido?: boolean; codaFinita?: boolean; voti?: number } = {}) {
+  const ripassi = over.ripassi ?? 0;
+  const nuove = over.nuove ?? 0;
   return prisma.lingoGiornataStudio.create({
-    data: { utenteId: user.id, giorno: new Date(`${day}T00:00:00Z`), ripassi: over.ripassi ?? 0, nuove: over.nuove ?? 0, valido: over.valido ?? false, codaFinita: over.codaFinita ?? false, voti: over.voti ?? 0 },
+    data: {
+      utenteId: user.id, giorno: new Date(`${day}T00:00:00Z`), ripassi, ripassiDovuti: over.ripassiDovuti ?? ripassi - nuove, nuove,
+      valido: over.valido ?? false, codaFinita: over.codaFinita ?? false, voti: over.voti ?? 0,
+    },
   });
 }
 

@@ -504,7 +504,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   at least `ripassiAlGiorno` reviews, or the whole day's queue finished). `lingo/studyDays.ts`
   writes it and nothing else does: `recordGradeDay`, inside the grade's transaction after the
   log row (the row created `ON CONFLICT DO NOTHING`, then locked `FOR UPDATE`, so racing grades
-  of one user both count); `markQueueFinished`, when a read of the session (not narrowed to a
+  of one user both count; `ripassi_dovuti` counts the grades of a card already due, which
+  Gymnasium's «dovute» reads, G-334); `markQueueFinished`, when a read of the session (not narrowed to a
   subject) or of the progress finds the queue finished, so a day with nothing to do counts;
   `recountToday`, when the goal changes (past days stay as stored); `countVoteDay`, in the vote's
   transaction, for `voti` (the day's validation votes, Gymnasium XP below; it changes nothing for the
@@ -591,7 +592,7 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   later) cascade from the user and from the card, `LingoPreferenzeStudio`
   (`lingo_preferenze_studio`) from the user; the export carries the log as `data.lingoRipassi` (not the derived state)
   and the preferences as `data.lingoPreferenze` (null when never saved), and the stored study days
-  as `data.lingoGiornate` (`giorno` as 'YYYY-MM-DD', with `voti`); `LingoGiornataStudio` cascades from the user,
+  as `data.lingoGiornate` (`giorno` as 'YYYY-MM-DD', with `voti` and `ripassiDovuti`); `LingoGiornataStudio` cascades from the user,
   as do the XP credits (`data.lingoCreditiXp`: mission, period, day, points, kind of event, subject).
 - **Search history** (`controllers/historyController.ts`, `/api/history`): a row is a
   norm (`act_type`) or a court decision (`decision_key`), never both and never neither: the

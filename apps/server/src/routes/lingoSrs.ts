@@ -173,7 +173,9 @@ router.post('/revisioni', async (req, res) => {
         durataMs: durataMs ?? null,
       },
     });
-    const day = await recordGradeDay(tx, userId, today, { isNew: !previous, wrong: rating === 1 });
+    // Due by the end of today, as `dueWhere` reads it: only these grades count toward «dovute» (G-334).
+    const wasDue = previous !== null && previous.dueAt < startOfRomeDay(today, 1);
+    const day = await recordGradeDay(tx, userId, today, { isNew: !previous, wrong: rating === 1, wasDue });
     // Last, after today's day row: the missions this grade completes (Gymnasium XP spec §5.1). Never fails the grade.
     const xp = await settleMissions(tx, userId, today, {
       tipo: 'revisione', logId: log.id, cardId, materia: inScope.materia, isNew: !previous, intervallo: result.scheduledDays,

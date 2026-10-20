@@ -474,7 +474,7 @@ export const exportAccountData = async (req: Request, res: Response) => {
     prisma.lingoPreferenzeStudio.findUnique({ where: { utenteId: userId }, select: { nuoveAlGiorno: true, ripassiAlGiorno: true, materieComunita: true } }),
     prisma.lingoGiornataStudio.findMany({
       where: { utenteId: userId },
-      select: { giorno: true, ripassi: true, nuove: true, sbagliate: true, codaFinita: true, valido: true, voti: true },
+      select: { giorno: true, ripassi: true, ripassiDovuti: true, nuove: true, sbagliate: true, codaFinita: true, valido: true, voti: true },
       orderBy: { giorno: 'asc' },
     }),
     // Gymnasium's XP ledger (spec 2026-10-20-gymnasium-xp-levels §8): what was credited, when and why. Not the

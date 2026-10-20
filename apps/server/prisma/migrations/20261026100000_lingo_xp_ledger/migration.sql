@@ -1,7 +1,8 @@
 -- Gymnasium's experience points (spec docs/superpowers/specs/2026-10-20-gymnasium-xp-levels-design.md §5.2, §7).
 -- The ledger lingo_crediti_xp: one credit per mission per period, append-only, removed only with the account
 -- (cascade). The counter lingo_giornate_studio.voti: validation votes cast that day, for the mission «convalida».
--- No backfill (G-317): the past cannot say which missions were done, so XP and `voti` start at zero for everyone.
+-- The counter lingo_giornate_studio.ripassi_dovuti: that day's grades of a card already due, for «dovute» (G-334).
+-- No backfill (G-317): the past cannot say which missions were done, so XP and both counters start at zero for everyone.
 -- The CHECKs are here, not in the Prisma model, as for the other Studia tables.
 
 -- CreateEnum
@@ -11,7 +12,8 @@ CREATE TYPE "LingoMissione" AS ENUM ('DOVUTE', 'NUOVE', 'OBIETTIVO', 'MATERIA_FE
 CREATE TYPE "LingoFonteXp" AS ENUM ('REVISIONE', 'PROPOSTA', 'VOTO', 'LETTURA');
 
 -- AlterTable
-ALTER TABLE "lingo_giornate_studio" ADD COLUMN     "voti" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "lingo_giornate_studio" ADD COLUMN     "ripassi_dovuti" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "voti" INTEGER NOT NULL DEFAULT 0;
 
 -- CreateTable
 CREATE TABLE "lingo_crediti_xp" (

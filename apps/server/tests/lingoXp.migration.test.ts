@@ -72,9 +72,10 @@ describe('lingo_crediti_xp', () => {
   });
 });
 
-describe('lingo_giornate_studio.voti', () => {
-  it('starts at zero', async () => {
+describe('lingo_giornate_studio.voti and .ripassi_dovuti', () => {
+  it('start at zero', async () => {
     const row = await prisma.lingoGiornataStudio.create({ data: { utenteId: user.id, giorno: new Date('2026-10-20T00:00:00Z'), ripassi: 3 } });
     expect(row.voti).toBe(0);
+    expect(row.ripassiDovuti).toBe(0);
   });
 });

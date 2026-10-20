@@ -1261,6 +1261,8 @@ model LingoGiornataStudio {
   utenteId   String   @map("utente_id")
   giorno     DateTime @db.Date
   ripassi    Int      @default(0)
+  // Of `ripassi`, the grades of a card that was due by the end of that day (Gymnasium XP spec §3.1, G-334).
+  ripassiDovuti Int @default(0) @map("ripassi_dovuti")
   nuove      Int      @default(0)
   sbagliate  Int      @default(0)
   codaFinita Boolean  @default(false) @map("coda_finita")

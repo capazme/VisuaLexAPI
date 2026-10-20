@@ -43,6 +43,34 @@ describe('«dovute»', () => {
     const row = (await credits(alice)).find((r) => r.missione === 'DOVUTE')!;
     expect(row).toMatchObject({ periodo: `G:${TODAY}`, punti: 20, fonte: 'REVISIONE', fonteId: log.id, materia: null });
   });
+
+  const today = () => prisma.lingoGiornataStudio.findUniqueOrThrow({ where: { utenteId_giorno: { utenteId: alice.id, giorno: new Date(`${TODAY}T00:00:00Z`) } } });
+  const dovute = async () => (await progress(a)).body.missioni.find((m: { id: string }) => m.id === 'dovute');
+
+  it('counts only the grades of a card already due (G-334): a card due tomorrow and a new card earn nothing', async () => {
+    const early = await card(alice);
+    await reviewed(alice, early.id, '2026-10-21', new Date('2026-10-17T08:00:00Z'));
+    const fresh = await card(alice);
+    for (const c of [early, fresh]) expect(missionsOf((await grade(a, c.id)).body)).not.toContain('dovute');
+    expect(await today()).toMatchObject({ ripassi: 2, ripassiDovuti: 0, nuove: 1 });
+    expect(await dovute()).toMatchObject({ stato: 'vuota' });
+    expect((await credits(alice)).map((r) => r.missione)).not.toContain('DOVUTE');
+  });
+
+  it('counts an overdue card, and a card due today graded at 23:30 in Rome', async () => {
+    const overdue = await card(alice);
+    await reviewed(alice, overdue.id, '2026-10-18', new Date('2026-10-15T08:00:00Z'));
+    const [late] = await dueCards(1);
+    const early = await card(alice);
+    await reviewed(alice, early.id, '2026-10-21', new Date('2026-10-17T08:00:00Z'));
+    await grade(a, early.id);
+    expect(await dovute()).toMatchObject({ stato: 'aperta', progresso: { fatte: 0, di: 2 } });
+    await grade(a, overdue.id);
+    setClock(`${TODAY}T21:30:00Z`);
+    expect(missionsOf((await grade(a, late.id)).body)).toContain('dovute');
+    expect(await today()).toMatchObject({ ripassi: 3, ripassiDovuti: 2, nuove: 0 });
+    expect(await dovute()).toMatchObject({ stato: 'fatta', progresso: { fatte: 2, di: 2 } });
+  });
 });
 
 describe('«nuove»', () => {

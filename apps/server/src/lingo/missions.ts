@@ -137,7 +137,7 @@ function factsFor(db: Prisma.TransactionClient, userId: string, today: string) {
   const scope = lazy(async () => reviewScope(userId, (await prefs()).materieComunita));
   const day = lazy(async () => {
     const row = await db.lingoGiornataStudio.findUnique({ where: { utenteId_giorno: { utenteId: userId, giorno: dayToDate(today) } } });
-    return { ripassi: row?.ripassi ?? 0, nuove: row?.nuove ?? 0, valido: row?.valido ?? false, voti: row?.voti ?? 0 };
+    return { ripassi: row?.ripassi ?? 0, ripassiDovuti: row?.ripassiDovuti ?? 0, nuove: row?.nuove ?? 0, valido: row?.valido ?? false, voti: row?.voti ?? 0 };
   });
   const due = lazy(async () => db.lingoStatoRipasso.count({ where: dueWhere(userId, await scope(), today) }));
   /** New cards left in the review scope, whatever the daily quota. */
@@ -177,8 +177,8 @@ const progress = (fatte: number, di: number) => ({ fatte: Math.min(fatte, di), d
 async function evaluate(id: MissionId, facts: Facts, today: string, event: XpEvent, userId: string, db: Prisma.TransactionClient): Promise<Evaluation> {
   switch (id) {
     case 'dovute': {
-      const { ripassi, nuove } = await facts.day();
-      const fatte = ripassi - nuove;
+      // Only grades of a card already due count (G-334): a card graded early cannot stand in for the due queue.
+      const fatte = (await facts.day()).ripassiDovuti;
       const due = await facts.due();
       const vuota = fatte === 0 && due === 0;
       return { fulfilled: fatte >= 1 && due === 0, vuota, ...(vuota ? {} : { progresso: progress(fatte, fatte + due) }) };
