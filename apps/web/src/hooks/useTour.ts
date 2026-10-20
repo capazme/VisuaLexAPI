@@ -165,6 +165,9 @@ export function useTour(options: UseTourOptions = {}) {
             stagePadding: 8, // Padding around highlighted element
             stageRadius: 8, // Border radius of spotlight
             popoverClass: 'visualex-tour-popover',
+            onPopoverRender: (popover) => {
+                popover.closeButton.setAttribute('aria-label', TOUR_UI.closeBtnLabel);
+            },
             onDestroyStarted: () => {
                 markTourComplete(tourType);
                 options.onComplete?.(tourType);

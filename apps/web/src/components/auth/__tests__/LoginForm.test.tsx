@@ -1,33 +1,18 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { screen, fireEvent, waitFor, within } from '@testing-library/react';
 
 const login = vi.fn().mockResolvedValue(undefined);
 vi.mock('../../../hooks/useAuth', () => ({
   useAuth: () => ({ login, loading: false, error: null }),
 }));
 
-import { LoginForm } from '../LoginForm';
-
-function Landed() {
-  const location = useLocation();
-  return <p data-testid="landed">{`${location.pathname}${location.search}`}</p>;
-}
+import { renderAuth } from './renderAuth';
 
 describe('LoginForm', () => {
   it('returns to the page that sent the user to sign in, query included', async () => {
     // The consent page carries its request in the query (/connect?request=…):
     // losing it on the way through the login would strand the sign-in.
-    render(
-      <MemoryRouter
-        initialEntries={[{ pathname: '/login', state: { from: { pathname: '/connect', search: '?request=req-1' } } }]}
-      >
-        <Routes>
-          <Route path="/login" element={<LoginForm />} />
-          <Route path="/connect" element={<Landed />} />
-        </Routes>
-      </MemoryRouter>,
-    );
+    renderAuth({ pathname: '/login', state: { from: { pathname: '/connect', search: '?request=req-1' } } });
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'a@b.it' } });
     fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: 'secret' } });
     fireEvent.submit(screen.getByLabelText(/email/i).closest('form')!);
@@ -35,14 +20,7 @@ describe('LoginForm', () => {
   });
 
   it('shows the book tracing itself between a successful sign-in and the app', async () => {
-    render(
-      <MemoryRouter initialEntries={['/login']}>
-        <Routes>
-          <Route path="/login" element={<LoginForm />} />
-          <Route path="/" element={<Landed />} />
-        </Routes>
-      </MemoryRouter>,
-    );
+    renderAuth('/login');
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'a@b.it' } });
     fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: 'secret' } });
     fireEvent.submit(screen.getByLabelText(/email/i).closest('form')!);
@@ -51,14 +29,35 @@ describe('LoginForm', () => {
   });
 
   it('names only the sources VisuaLex still reads: Brocardi is no longer one', () => {
-    render(<MemoryRouter><LoginForm /></MemoryRouter>);
+    renderAuth('/login');
     expect(screen.getByText('Normattiva · EUR-Lex')).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent(/brocardi/i);
   });
 
   it('links the credits from its foot, readable before signing in', () => {
-    render(<MemoryRouter><LoginForm /></MemoryRouter>);
+    renderAuth('/login');
     const link = within(screen.getByRole('contentinfo')).getByRole('link', { name: 'Crediti' });
     expect(link).toHaveAttribute('href', '/crediti');
+  });
+
+  it('puts the focus on the field an error names', () => {
+    renderAuth('/login');
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'a@b.it' } });
+    fireEvent.submit(screen.getByLabelText(/email/i).closest('form')!);
+    const password = screen.getByLabelText(/^password$/i);
+    expect(screen.getByRole('alert')).toHaveTextContent('Inserisci email e password.');
+    expect(password).toHaveFocus();
+    expect(password).toHaveAttribute('aria-invalid', 'true');
+    expect(password).toHaveAttribute('aria-describedby', 'login-error');
+  });
+
+  it('puts the focus back on the password when the server refuses it', async () => {
+    login.mockRejectedValueOnce(new Error('Credenziali non valide'));
+    renderAuth('/login');
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'a@b.it' } });
+    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: 'wrong' } });
+    fireEvent.submit(screen.getByLabelText(/email/i).closest('form')!);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Credenziali non valide');
+    expect(screen.getByLabelText(/^password$/i)).toHaveFocus();
   });
 });

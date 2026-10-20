@@ -35,15 +35,25 @@ export function locationToPath(loc: { pathname?: string; search?: string; hash?:
   return safeReturnPath(`${loc.pathname}${loc.search ?? ''}${loc.hash ?? ''}`);
 }
 
-/** The router matches paths without case and with extra slashes, and a percent escape is a letter. */
-function isLoginPage(pathname: string): boolean {
+/**
+ * Which tab of the sign-in page a path names, `/login` or `/register` (one page, `AuthPage`), or null
+ * for any other. The router matches paths without case and with extra slashes, and a percent escape is
+ * a letter.
+ */
+export function authPageTab(pathname: string): 'login' | 'register' | null {
   let name = pathname;
   try {
     name = decodeURIComponent(pathname);
   } catch {
     // a malformed escape: keep the raw pathname
   }
-  return name.toLowerCase().replace(/\/+$/, '') === '/login';
+  name = name.toLowerCase().replace(/\/+$/, '');
+  return name === '/login' ? 'login' : name === '/register' ? 'register' : null;
+}
+
+/** The sign-in page, either tab: never an address to come back to after signing in. */
+export function isLoginPage(pathname: string): boolean {
+  return authPageTab(pathname) !== null;
 }
 
 export function stashReturnTo(path: string): void {

@@ -39,7 +39,10 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `sticky bottom-0` at every width (the keyboard moves to the next card's heading after a vote, back to the
   verdict after «Annulla»; `Layout` hides the floating feedback button below `md` on this route, as in a review
   session, where it would cover the verdicts); the subject is remembered in `localStorage`; a vote that outlives a subject
-  change only marks its card handled, and a 403 stops the queue with «Non sei più tra i validatori»),
+  change only marks its card handled, and a 403 stops the queue with «Non sei più tra i validatori»; the queue is
+  read only once the outlet's `validator` is `true` — while the account loads it waits, for someone the account
+  says is not a validator it shows «Questa sezione è riservata…» with no request, which the server would refuse with
+  403, and when `/auth/me` failed (`validator` null, never taken for «not a validator») it reads and the server decides),
   `/history`, `/forum` («Dossier pubblici»; `/environments`, the page «Ambienti» was, redirects there keeping an old
   share link's `?import=`), `/forum/community` («Community», `ForumCommunityPage`: an honest placeholder — the
   Forum's title (`SECTION_TITLES.forum`), «Domande e discussioni tra colleghi, in arrivo», a link to `/forum`; no sample posts, no counts, no
@@ -67,7 +70,24 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   development mode (below) the address redirects to `/`. `VITE_FEATURE_MERLT`
   and `VITE_FEATURE_MERLT_GRAPH` decide the Sidebar's «Assistente» and «Grafo»
   entries and whether a page says it is unavailable. Outside the layout:
-  `/login`, `/register`, `/crediti` (public, below), `/connect` (the consent page an MCP client's
+  `/login` and `/register` (one page, `components/auth/AuthPage`, A1: the colophon beside a card with two
+  tabs, «Accedi» and «Registrati» (`LoginForm`, `RegisterForm`, their shared classes in `authForm.ts` and parts
+  in `AuthFormParts.tsx`); one parent route over both addresses, so a change of tab replaces the address — the
+  router state that carries the return after the login travels with it — and keeps the page mounted. The tab
+  is the page's own state, read from the address when it opens: React Router 7 applies a navigation in a
+  transition, so a tab read from the address would unmount the form leaving for one render. `useAuth` runs
+  once, in the page, and `LoginForm` takes it as a prop: mounted again at each change of tab, a form's own
+  would read the user again (a request per change) and start disabled; its error outlives the form, so an
+  error already on screen when the tab changes is not shown again on the empty form. While a sign-in or a
+  sign-up is on its way the tabs hold still (`aria-disabled`): the form would unmount under its request. A
+  return address that is the page itself (`isLoginPage` in `utils/returnTo.ts`, either tab) goes to `/`
+  instead, or the entrance would stay on screen. The columns are anchored at the top, not centred: the
+  card's height changes with the tab, and a centred page moved as a whole. Each form has a visually hidden
+  `h2` («Accedi», «Registrati»), the tab being its heading on screen. A click or the link under a form puts
+  the cursor in the new form's first field (once it is enabled), the arrows keep it on the tabs; the mark
+  slides by `transform`, the form leaving fades, the next comes in from the side of its tab, the card's height
+  follows, and under reduced motion the change is immediate; the wait for approval after signing up is drawn
+  in the same card), `/crediti` (public, below), `/connect` (the consent page an MCP client's
   authorization request lands on: signed in, the user approves or refuses) and
   `/admin/*` (admins only).
 - **The credits** (C1, 19 Oct 2026): `data/credits.ts` is the one source of truth for a source's
@@ -230,7 +250,12 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (a local toggle for the pipeline trace).
 - `features/merlt/consent/` and `features/merlt/privacy/` — the MERL-T consent (spec
   `docs/superpowers/specs/2026-10-13-merlt-data-protection-design.md`). The server is its only
-  record (`ConsentContext`, nothing in the browser: until it answers, `canTrack` is false). A level
+  record (`ConsentContext`, nothing in the browser: until it answers, `canTrack` is false). It is read through
+  `consentRead.ts` (`readMerltConsent`): one `GET /api/merlt/consent` shared by the mounts that ask while it travels
+  (StrictMode's second effect, a provider mounted again), and none after a server without MERL-T answered 404
+  `merlt_disabled`, which reads as `DISABLED_CONSENT` for the life of the page; any other failure is an error, asked
+  again by the next mount; `useAuth`'s logout drops a read on its way and forgets the «without MERL-T» answer
+  (`clearConsentRead`). A level
   counts only under the current version of the MERL-T notice (`INFORMATIVA_MERLT`, a text
   administrators edit as new versions in «Testi di VisuaLex Gymnasium»); `ConsentScreen`, in the `global`
   slot, asks it once as the app loads when it is unanswered — the first entry, then only a new
@@ -1327,7 +1352,9 @@ Duplicating any of these is a defect, not a shortcut.
   (`hasDecisionText`).
 - `utils/returnTo.ts` — where the login sends the reader back: router state or the
   sessionStorage stash, only what the browser's URL parser reads as a path of the app, never a
-  URL parameter; a logout forgets it.
+  URL parameter; a logout forgets it. `authPageTab` names the tab of the sign-in page a path opens
+  (`/login`, `/register`, read as the router reads them: case, trailing slashes, percent escapes) and
+  `isLoginPage` is either tab: never stashed, never returned to.
 - `utils/readingBackStack.ts` — `appendBackEntry`, `peekReadingBack`,
   `findLiveBackIndex` (over the practices), `ReadingBackEntry` (what a surface pushes) and `PracticeBackEntry`
   (what the stack holds) for citation-jump undo.
@@ -1518,7 +1545,7 @@ children re-trigger the toggle. Always add
 Never nest interactive content inside the element carrying `role="button"` —
 scope the role to the header, as `DossierArticleRow` does. A collapsible whose header
 is a section heading follows the accordion pattern instead (`DossierActBlock`):
-the toggle sits inside the `<h3>`, its name is the heading's own text and its
+the toggle sits inside the `<h2>`, its name is the heading's own text and its
 state is `aria-expanded` alone, with no `aria-label` replacing what it says.
 
 **Popovers with `@floating-ui/react`** — split positioning and animation across
@@ -1628,7 +1655,9 @@ meant to stay split; add new features as new files, not inside the shells:
   `InlineNotePopover.tsx`, `UpdateNotePopover.tsx` (a Normattiva update note,
   opened from its `(119)`), `BlockAnnotationsPopover.tsx` (a block's notes and
   highlights, opened from its sign), `NoteCard.tsx`, `LooseHighlightsList.tsx`, `HighlightsActionsPicker.tsx`, `ReadingToolbar.tsx`,
-  `SearchPanel.tsx` (streaming merge logic), `CommandPalette.tsx`, `SearchField.tsx` (the search page's field)
+  `SearchPanel.tsx` (streaming merge logic), `CommandPalette.tsx` (no text under 11 px and its steps, «Gestisci»,
+  the close button and the filters 44 px on a phone — `CommandPalette.test.tsx` reads the file; its colours are
+  checked in `theme.test.ts`), `SearchField.tsx` (the search page's field)
   and `GlobalSearch.tsx` (the palette and the managers it opens, mounted by `Layout` — see gotcha 27),
   `TreeViewPanel.tsx` (the article index window).
 - `features/settings/` — `AliasManager.tsx` and nothing else. Named for what it
@@ -1700,7 +1729,10 @@ meant to stay split; add new features as new files, not inside the shells:
   module-wide, so a tour asked while another shows is not started (it is asked again the next time its
   surface mounts, and a tour not seen stays unseen), and `tryStartTour` looks at «seen» again when its delay ends;
   `practiceAct` is asked only for a practice that has an act. `tourConfig.targets.test.tsx` fails when a tour's
-  target is written nowhere in the sources, and checks the search tour against the search page.
+  target is written nowhere in the sources, and checks the search tour against the search page. The popover
+  (`visualex-tour-popover` in `index.css`) draws every button 44 px with a focus ring — the label centred by its
+  line height, since driver.js writes `display` on the buttons inline —, and `useTour` renames
+  driver.js's «×» «Chiudi» in `onPopoverRender` (driver.js writes «Close» and has no option for it; `TOUR_UI`).
   `SearchPanel` mounts them (imported statically: the table is the app's main surface; `PDFViewer`, Study Mode and
   `CompareView` stay behind `lazy()`), one layout per breakpoint (`useIsDesktop`); a decision opened from any link lands in its practice
   and opens beside on the desktop (the window a link was clicked in is never the one a third window
@@ -1711,7 +1743,10 @@ meant to stay split; add new features as new files, not inside the shells:
   from what the dossier kept, `addKnownDecisions`, so «Salva come dossier» saves them back) land in
   the practices.
 - `features/history/` — `HistoryView.tsx`, `DecisionHistoryRow.tsx` (a decision's row) plus
-  `NormaChangesSection.tsx` (see History above).
+  `NormaChangesSection.tsx` (see History above). The card's title is the page's `h1` («Cronologia» on a phone,
+  «Cronologia Ricerche» from `md`, one hidden by CSS); on `/dossier` it is the visible title of the list, of the
+  open dossier and of «Cestino», and what sits under it is `h2` (a dossier's card; an open dossier's notes, acts,
+  «Giurisprudenza» and «Rimossi di recente»).
 - `features/documents/` — `DocumentReviewPage.tsx` only.
 
 ## Gotchas
@@ -1846,7 +1881,9 @@ meant to stay split; add new features as new files, not inside the shells:
     `@utility` rules at the end of `index.css` that move with the individual
     `translate` and `scale` properties, so they compose with floating-ui's
     positioning `transform` instead of replacing it (gotcha 10), last at
-    most 200 ms and fill `backwards` only: a `both` fill keeps the element a
+    most 200 ms and fill `backwards` only (each `slide-in-from-*` writes both axes: the offsets are
+    inherited custom properties, and an error box sliding from the top inside a panel that slid from
+    the side came in on the diagonal): a `both` fill keeps the element a
     containing block and a stacking context after the entrance (gotcha 22). `theme.test.ts` checks they generate CSS. The palette is the
     «Inchiostro» one (spec `2026-10-18-redesign-inchiostro`): `slate`, `gray`,
     `zinc`, `neutral` are aliases of `ink`, `blue`, `indigo`, `primary-<n>` of

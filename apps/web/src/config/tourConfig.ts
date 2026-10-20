@@ -615,4 +615,6 @@ export const TOUR_UI = {
     prevBtnText: 'Indietro',
     doneBtnText: 'Fine',
     progressText: '{{current}} di {{total}}',
+    // driver.js names its «×» «Close» and has no option for it: `useTour` renames it on every step.
+    closeBtnLabel: 'Chiudi',
 } as const;
