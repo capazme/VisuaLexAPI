@@ -86,7 +86,14 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
   - `norma.py` — core models `Norma` / `NormaVisitata` (both with
     `to_dict()`/`from_dict()`; `NormaVisitata` implements hash/equality and is
     the primary container across the API)
-  - `urngenerator.py` — URN generation · `treextractor.py` — article trees
+  - `urngenerator.py` — URN generation · `treextractor.py` — article trees. One page, one
+    download: a Normattiva tree is parsed once in its widest form (section labels and
+    metadata, key `…|details=True|metadata=True`) and every other variant is cut from it
+    (`_narrow`: drop the labels, drop the metadata), so the existence check, a range and the
+    index the web opens no longer fetch the same page three times. A EUR-Lex tree reads the
+    page from the scraper's own copy (namespace `eurlex`, same URL) and leaves the page it
+    visited there, only when it parsed into articles: one browser visit serves the tree, the
+    rubriche and the articles (`tests/test_tree_variants.py`)
   - `text_op.py` — text parsing **and** date handling (see Date System)
   - `article_suffixes.py` — the ordinal table (`bis` … `vicies`) every
     article-number regex reads, longest-first so a short entry cannot claim the
@@ -173,6 +180,12 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     `GET /api/circuit-breakers`
   - `redis_cache.py` + `cache_manager.py` — Redis cache with automatic
     filesystem fallback; startup warns when Redis is disabled or missing
+
+**Timing harness** — `scripts/collector_timing.py` runs a fixed list of real requests
+in-process, cold then warm, and prints where each one's time goes (network per host, our
+throttle and retry waits, parsing, Playwright, cache); `--compare <earlier run>` checks the
+returned article and decision texts byte for byte (root rule 23). It talks to the real
+sources: a few runs, never a loop, never on the deployment host.
 
 ## Key API Endpoints
 
