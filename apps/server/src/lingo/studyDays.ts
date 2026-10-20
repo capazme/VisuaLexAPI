@@ -1,11 +1,12 @@
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { readPreferences } from './studyPreferences';
 import { queueFinished } from './todayQueue';
 
 /**
  * The stored study days (Studia progress spec §5.1): one `LingoGiornataStudio` row per user and Rome day.
  * A recorded grade counts into today's row, a finished queue marks it, and a day counts (`valido`) with
- * at least N reviews or the queue finished. Nothing else writes these rows: the trash never touches them,
+ * at least N reviews or the queue finished. A validation vote counts into `voti` (Gymnasium XP spec §3.5),
+ * which changes nothing for the streak. Nothing else writes these rows: the trash never touches them,
  * so deleting a card never rewrites a past day; once the day is over its `valido` stays as it was.
  *
  * `giorno` is a DATE. Prisma reads and writes it as a Date at UTC midnight, so a day travels through
@@ -16,6 +17,9 @@ import { queueFinished } from './todayQueue';
 export function dayToDate(day: string): Date {
   return new Date(`${day}T00:00:00.000Z`);
 }
+
+/** 00:00 in Rome of `day`, as the UTC TIMESTAMP the review columns hold (`lingo_revisioni_srs.data_revisione`). */
+export const romeDayStartSql = (day: string) => Prisma.sql`((${day}::date)::timestamp AT TIME ZONE 'Europe/Rome') AT TIME ZONE 'UTC'`;
 
 /** The inverse of `dayToDate`. */
 export function dateToDay(date: Date): string {
@@ -60,6 +64,23 @@ export async function recordGradeDay(
     WHERE utente_id = ${userId} AND giorno = ${today}::date
     RETURNING ripassi, valido`;
   return { ripassi: row.ripassi, obiettivo: ripassiAlGiorno, before: locked.valido, after: row.valido };
+}
+
+/**
+ * Inside the vote's transaction, after the vote row: one more vote cast today (Gymnasium XP spec §3.5). The row
+ * is created if missing (zero reviews, not counting), then updated, which locks it. Never decreased: a vote
+ * deleted later (a withdrawal, an archive) stays counted.
+ */
+export async function countVoteDay(tx: Prisma.TransactionClient, userId: string, today: string): Promise<number> {
+  await tx.$executeRaw`
+    INSERT INTO lingo_giornate_studio (utente_id, giorno, updated_at)
+    VALUES (${userId}, ${today}::date, CURRENT_TIMESTAMP)
+    ON CONFLICT (utente_id, giorno) DO NOTHING`;
+  const [row] = await tx.$queryRaw<{ voti: number }[]>`
+    UPDATE lingo_giornate_studio SET voti = voti + 1, updated_at = CURRENT_TIMESTAMP
+    WHERE utente_id = ${userId} AND giorno = ${today}::date
+    RETURNING voti`;
+  return row.voti;
 }
 
 /**
