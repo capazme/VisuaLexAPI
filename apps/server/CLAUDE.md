@@ -159,7 +159,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   card trash and `trash-items` are open to the web app too (a session's `trash-items` takes
   up to 5000 ids, an exchanged token's 1 to 50), and so are the web app's own deletions: `DELETE /dossiers/:id` moves
   the whole dossier there (owner, 13 October 2026, question 160: before, it was gone at
-  once), whatever it holds (`trashDossier` with no `seenItemIds`), answering
+  once), whatever it holds (`trashDossier` with no `seenItemIds`; its planner tasks go with it in the
+  payload, listed as `taskCount`, and come back on restore with their ids), answering
   `{ trashId, itemCount }` for the page's «Annulla»; `DELETE /dossiers/:id/items/:itemId`
   moves that one entry (question 181, «ok come raccomandi»), answering
   `{ trashId, moved, notFound }`, as `trash-items` does for a selection: one trash entry per action,
@@ -590,7 +591,39 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   transaction and retried until MERL-T confirms (`services/merlt/userData.ts`,
   `docs/merlt/claude-notes.md`). Reached from the Settings modal. The export's
   history rows include `decisionKey` (raw Prisma fields, as the rest of the export); its
-  discussion threads keep a release's time but not the releasing admin's id.
+  discussion threads keep a release's time but not the releasing admin's id. The planner's tasks
+  are `data.tasks` (the user's own, the trashed ones too; days 'YYYY-MM-DD', times 'HH:MM'; never
+  `assigneeId`, another person's id from wave 4); they cascade with the account, and a task assigned
+  to a deleted account loses its assignee.
+- **The planner's tasks** (Opus, wave 1; the task model answered in the owners' notes, answers
+  1–4, 7, 11, 13): `Task` (`tasks`, migration `20261025100001_planner_tasks`: a new table and two
+  enums, nothing else; CHECKs for priority 1–4, a time only with its date, a positive duration, no
+  self-parent). The owner's alone (`userId`); `assigneeId` stays null until sharing (wave 4) and no
+  route writes it, nor `durationMinutes`. `dossierId` null = the inbox; a subtask always sits in its
+  parent's dossier, and a task moved to another dossier takes its subtasks and loses their entries.
+  `dossierItemId` is an entry of the same dossier: `SET NULL` when the entry goes (trash included,
+  not restored with it) and cleared by `moveDossierItem`. Planned date and deadline are two
+  Europe/Rome civil days (`DATE`, through `dayToDate`/`dateToDay`) with an optional `TIME`
+  ('HH:MM'); «today» is `romeDay`. The deadline is what the user wrote: nothing computes one (wave
+  2), and no wording may suggest it. Repetition (`tasks/recurrence.ts`): a closed RRULE subset —
+  daily, working days (`FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR`, read as Monday–Friday minus the national
+  holidays of `tasks/italianHolidays.ts`: fixed dates, Easter Monday, 4 October from 2026), weekly,
+  monthly, yearly (a missing day takes the month's last); it needs a planned date and refuses a
+  deadline. Ticking a repeating task moves its planned date to the first occurrence after today
+  (`pianificata`) or one step from today (`completamento`) and leaves it open; `{ plannedDate }` in
+  the tick's body is the occurrence seen, a stale one 409. Any other tick closes the task and its open
+  subtasks at one instant, and reopening reopens what closed at that instant. Routes
+  (`routes/tasks.ts`, `/api/tasks`, session only — not in the delegated table): `GET
+  ?view=today|upcoming|inbox|dossier|trash[&dossierId]` (`today`: planned or due today or before;
+  `upcoming`: planned or due today to +6; open tasks only; at most 1000, `truncated`), `GET`/`PUT
+  /:id`, `POST /`, `POST /:id/complete`, `/:id/reopen`, `POST /reorder { taskIds }`, `DELETE /:id`
+  (to the trash: `deletedAt` on the task and its subtasks, swept after 30 days) and `POST
+  /:id/restore` (what went at that instant; a subtask whose parent is still there comes back on
+  its own). Everything is scoped by `userId` in `tasks/tasks.ts`: another user's task, dossier,
+  entry or parent is a 404 (`tests/tasks.idor.test.ts`). **A title may name a client**: no message
+  repeats one, closed values answer without echoing, and the router's own error handler logs a
+  database error by kind and code only, never Prisma's message. `serializeTask` is the one answer
+  shape.
 - **`GET /api/health/detailed`** — a `SELECT 1`, for the frontend's health
   banner. The Python `/health/detailed` is the one that probes the sources
   (see Key API Endpoints).
