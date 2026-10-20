@@ -429,6 +429,12 @@ describe('ticking', () => {
     expect((await put({ plannedDate: '2028-05-31', recurrenceFrom: 'pianificata' })).status).toBe(200);
     expect((await put({ plannedDate: '2028-06-30', recurrence: RECURRENCE_RULES.yearly })).status).toBe(200);
     expect(await day()).toBe(30);
+    // A yearly one keeps its day only within its month: 30 June to 31 July is a new day, then to 28
+    // February too, though the 31st would land there.
+    expect((await put({ plannedDate: '2028-07-31' })).status).toBe(200);
+    expect(await day()).toBe(31);
+    expect((await put({ plannedDate: '2029-02-28' })).status).toBe(200);
+    expect(await day()).toBe(28);
   });
 
   it('counts the next date from the Rome day of the tick', async () => {
