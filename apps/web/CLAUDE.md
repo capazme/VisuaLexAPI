@@ -124,10 +124,15 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   route changes under the full colour, and the page comes out through the holes of the same screen once its title is
   there — the router renders a navigation in a transition, so the colour holds for it, at most 400 ms (`flushSync` would
   not make it synchronous) —, then the title's ink dries (`vlx-ink-drying`); the geometry and the timing are pure in
-  `halftone.ts` (about 700 ms, kept a few frames under 750; sparser and shorter below 768 px). A tap or a key during it
-  brings it to its end (Enter, Space and Esc are taken, so they do not press the switcher again). The focus goes to the
+  `halftone.ts` (about 700 ms, kept a few frames under 750; sparser and shorter below 768 px). A frame's cost is the
+  wave's ring: the part already solid is one filled shape and its dots are not drawn (`solidRadiusWhileCovering`,
+  `openRadiusWhileRevealing`); a large screen draws a sparser grid (`MAX_DOTS`) on a canvas of at most
+  `MAX_CANVAS_PIXELS` (`canvasRatio`). A tap or a key during it brings it to its end (Enter, Space and Esc are taken,
+  so they do not press the switcher again); the browser's Back while the colour prints drops the change, with no
+  swap. The focus goes to the
   new page's title unless the user moved it meanwhile: each section's home marks its heading
-  `data-section-title="<section id>"` with `tabIndex={-1}` (Gymnasium's `h1`, the dossier list's `h2` — `opus` or
+  `data-section-title="<section id>"` with `tabIndex={-1}` and `FOCUS_RING`, so a keyboard user sees where the focus
+  went (Gymnasium's `h1`, the dossier list's `h2` — `opus` or
   `gymnasium` by the kind it lists, since the same element stays from one to the other —, «Dossier pubblici», the
   MERL-T hub); a new home marks its own. Under reduced motion the page changes at once; where no canvas can be drawn,
   the View Transition on `vlx-page`, held until the title is there. Choosing the section one is in goes to its home
@@ -622,7 +627,8 @@ heading and its rule are the column's width), in the order the owner fixed:
    (`.vlx-mission-done`: a quieter ink, struck through in the section's hue) and slides under those still open
    (`missionOrder`), except the due cards', which carries the action and stays first; done since this browser last drew
    it, a drop of ink falls into its box and the ink crosses its words first (`MissionMark`'s `drip`,
-   `.vlx-mission-inking`, `MISSION_INK_MS`), then it moves. «Tutte le missioni» keeps to the words. When the server records
+   `.vlx-mission-inking`, `MISSION_INK_MS`), then it moves (a moving row keeps its padding wherever it lands; the
+   list's `-mb-4` takes the last one's back). «Tutte le missioni» keeps to the words. When the server records
    missions, only `missions.ts`
    changes. **No points and no level are shown** until the server keeps them. The first mission carries the action:
    «Oggi: 18 da ripassare, 8 nuove» (a part that is zero left out; «Oggi in Diritto penale: …» when a subject is chosen),
@@ -698,8 +704,8 @@ line says it to a screen reader). The confetti step by elapsed time (`confetti.t
 `stepsAt`), so they last 1.5 s on any screen. Under reduced motion nothing moves: no canvas, the end state only. The session's end screen adds the ring and the streak
 (`SessionEndProgress`, the same read).
 **The small motions** (S2): the tally's new mark (the count pops with it), today's count landing in the ring
-(`GoalRing`'s `vlx-digit-land`: the new digit falls into place and takes on its weight, 360 ms; reaching the goal, the
-ring closes as it settles) and a mission's ink play **only for what grew since this browser last drew it** —
+(`GoalRing`'s `vlx-digit-land`: the new digit falls into place and takes on its weight, 360 ms, over its own place held
+unseen at the final weight, so «di 10» beside it does not move; reaching the goal, the ring closes as it settles) and a mission's ink play **only for what grew since this browser last drew it** —
 `progress/seenProgress.ts` (`useStreakGrowth`, `useReviewsGrowth`, `useFreshMissions`) keeps the streak and today's
 reviews and missions under `visualex.studia.visto`, a convenience like the celebration's, never a number's source; with
 nothing stored nothing plays, and what a view draws it records (the dense strip draws no tally and leaves the streak's

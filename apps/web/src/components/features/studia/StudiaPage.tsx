@@ -4,6 +4,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import { LessonFrame } from './LessonFrame';
 import { StudyStrip } from './progress/StudyStrip';
 import { useProgress } from './progress/useProgress';
+import { FOCUS_RING } from '../../../constants/interactions';
 
 /** What the area tells its views; `validator` is undefined while the account is still loading. */
 export interface StudiaOutletContext {
@@ -49,7 +50,7 @@ export function StudiaPage() {
   return (
     <div className={cn('mx-auto flex h-full w-full flex-col gap-4', isColumn(pathname) ? 'max-w-3xl' : 'max-w-6xl')}>
       <header className="border-b border-slate-200 pb-3 dark:border-slate-800">
-        <h1 data-section-title="gymnasium" tabIndex={-1} className="focus:outline-none font-serif text-2xl font-medium tracking-tight text-slate-900 md:text-3xl dark:text-slate-50">Gymnasium: la tua palestra giuridica</h1>
+        <h1 data-section-title="gymnasium" tabIndex={-1} className={`${FOCUS_RING} rounded-sm font-serif text-2xl font-medium tracking-tight text-slate-900 md:text-3xl dark:text-slate-50`}>Gymnasium: la tua palestra giuridica</h1>
       </header>
       {underStrip(pathname) && <AreaStrip />}
       <Outlet context={context} />

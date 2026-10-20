@@ -35,6 +35,7 @@ import { actsSummary, layoutDossier } from './dossierLayout';
 import { deleteDossierMessage, deleteDossierWithUndo } from './deleteDossierWithUndo';
 import { hasTagCategory, tagCategories, tagLabel } from '../../../utils/tagLabel';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
+import { FOCUS_RING } from '../../../constants/interactions';
 
 type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -256,7 +257,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
   return (
     <div className="animate-in fade-in duration-200">
       <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 mb-6">
-        <h2 data-section-title={sectionKind === 'studio' ? 'gymnasium' : 'opus'} tabIndex={-1} className="focus:outline-none font-serif text-3xl font-medium tracking-tight text-slate-900 dark:text-slate-50">{sectionKind ? `I tuoi ${kindLabel(sectionKind).toLowerCase()}` : 'I tuoi Dossier'}</h2>
+        <h2 data-section-title={sectionKind === 'studio' ? 'gymnasium' : 'opus'} tabIndex={-1} className={`${FOCUS_RING} rounded-sm font-serif text-3xl font-medium tracking-tight text-slate-900 dark:text-slate-50`}>{sectionKind ? `I tuoi ${kindLabel(sectionKind).toLowerCase()}` : 'I tuoi Dossier'}</h2>
         <div className="flex gap-2">
           {trashCount > 0 && onOpenTrash && (
             <button

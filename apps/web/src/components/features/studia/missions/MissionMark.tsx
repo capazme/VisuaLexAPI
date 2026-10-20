@@ -90,7 +90,12 @@ export function MissionRow({ mission, bar = false, quietNote = false, aside, chi
       layout={layout ? 'position' : false}
       transition={spring.snappy}
       data-missione={mission.id}
-      className="grid grid-cols-[24px_minmax(0,1fr)] gap-x-3 py-4 first:pt-3 last:pb-0"
+      className={cn(
+        'grid grid-cols-[24px_minmax(0,1fr)] gap-x-3 py-4 first:pt-3',
+        // A row that moves keeps its padding wherever it lands: the last one's is taken back by the list's margin
+        // (`MissionsOfToday`). The first row and its missing rule never change: the due cards stay first.
+        !layout && 'last:pb-0',
+      )}
     >
       <MissionMark status={mission.status} drip={inked && ink === 'drip'} />
       <div className="grid min-w-0 gap-2">

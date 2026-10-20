@@ -24,7 +24,7 @@ export interface HalftoneTiming {
  * under 750: the reveal starts once the new page's title is there, a frame or two after the colour covers.
  */
 export const HALFTONE_TIMING = {
-  desktop: { spacing: 18, coverWave: 200, coverGrow: 140, revealWave: 160, revealShrink: 140, inkDelay: 140, inkDry: 220 },
+  desktop: { spacing: 22, coverWave: 200, coverGrow: 140, revealWave: 160, revealShrink: 140, inkDelay: 140, inkDry: 220 },
   phone: { spacing: 26, coverWave: 150, coverGrow: 130, revealWave: 120, revealShrink: 120, inkDelay: 110, inkDry: 240 },
 } as const satisfies Record<'desktop' | 'phone', HalftoneTiming>;
 
@@ -53,6 +53,35 @@ export function halftoneLattice(width: number, height: number, spacing: number):
   return { xs: Float32Array.from(xs), ys: Float32Array.from(ys) };
 }
 
+/**
+ * At most this many dots a frame: on a large screen the grid grows sparser rather than the frame heavier. A frame's
+ * cost follows the dots drawn and the pixels filled (measured headless, without a GPU: 541 dots on a phone hold
+ * 60 fps, 6 500 on 1920 × 1080 do not). 1366 × 768 keeps its 22 px; 1920 × 1080 goes to about 26 px, the phone's.
+ */
+export const MAX_DOTS = 3200;
+/** At most this many canvas pixels to fill a frame, a 1080p screen's: on a larger or denser one the density gives way. */
+export const MAX_CANVAS_PIXELS = 2_100_000;
+
+/** How many dots `halftoneLattice` sets over the screen. */
+export function dotCount(width: number, height: number, spacing: number): number {
+  const h = spacing / Math.SQRT2;
+  const cols = Math.ceil(width / h) + 1;
+  const rows = Math.ceil(height / h) + 1;
+  return Math.ceil(rows / 2) * Math.ceil(cols / 2) + Math.floor(rows / 2) * Math.floor(cols / 2);
+}
+
+/** The spacing to draw with: the timing's own, or wider until the screen holds no more than `MAX_DOTS`. */
+export function halftoneSpacing(width: number, height: number, base: number): number {
+  let spacing = base;
+  while (dotCount(width, height, spacing) > MAX_DOTS) spacing *= 1.02;
+  return spacing;
+}
+
+/** The canvas's density: the screen's, at most 1.5, and lower when the canvas would pass `MAX_CANVAS_PIXELS`. */
+export function canvasRatio(width: number, height: number, devicePixelRatio: number): number {
+  return Math.min(devicePixelRatio || 1, 1.5, Math.sqrt(MAX_CANVAS_PIXELS / (width * height)));
+}
+
 /** The radius at which the dots leave no hole (a hair over h, so their antialiased edges leave no seam). */
 export function fullRadius(spacing: number): number {
   return (spacing / Math.SQRT2) * 1.04;
@@ -68,6 +97,25 @@ const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 export function coverRadiusAt(elapsed: number, share: number, t: HalftoneTiming): number {
   const p = clamp01((elapsed - share * t.coverWave) / t.coverGrow);
   return fullRadius(t.spacing) * (1 - (1 - p) ** 3);
+}
+
+/**
+ * While the colour prints, the radius of the disc around the tap that is already solid: every dot within
+ * `solid + h` of the tap is full, and every point within `solid` of it lies within h of such a dot. The disc is filled
+ * in one stroke and its dots are not drawn — the frame's cost is the wave's ring, not the whole screen's dots.
+ * `farthest`: the distance from the tap to the farthest corner. Negative while nothing is solid yet.
+ */
+export function solidRadiusWhileCovering(elapsed: number, farthest: number, t: HalftoneTiming): number {
+  return (farthest * (elapsed - t.coverGrow)) / t.coverWave - t.spacing / Math.SQRT2;
+}
+
+/**
+ * While the page comes out, the radius beyond which the colour is still solid: the dots past `open - h` have not
+ * started to shrink, so every point past `open` lies within h of a full dot. Filled in one stroke (the screen less
+ * the disc); only the dots inside it are drawn.
+ */
+export function openRadiusWhileRevealing(elapsed: number, farthest: number, t: HalftoneTiming): number {
+  return (farthest * elapsed) / t.revealWave + t.spacing / Math.SQRT2;
 }
 
 /** A dot's radius while the new page comes out: it shrinks from full cover to nothing, slow and then faster. */

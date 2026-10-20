@@ -40,12 +40,20 @@ export function GoalRing({ ripassi, obiettivo, raggiunto, giorno, compact = fals
   }, [share]);
 
   const lands = useReviewsGrowth(giorno, ripassi) !== null;
-  // Keyed by the count, so each new one lands afresh.
-  const count = (size: string) => (
-    <span key={ripassi} className={cn('inline-block font-serif font-semibold tabular-nums', size, raggiunto ? SUCCESS_TEXT : INK_TEXT, lands && 'vlx-digit-land')}>
-      {ripassi}
-    </span>
-  );
+  // Keyed by the count, so each new one lands afresh. While it lands, its place is held by the count at its final
+  // weight, unseen: the lighter digit is narrower, and « di 10» beside it must not move.
+  const count = (size: string) => {
+    const digits = cn('font-serif font-semibold tabular-nums', size, raggiunto ? SUCCESS_TEXT : INK_TEXT);
+    if (!lands) return <span key={ripassi} className={digits}>{ripassi}</span>;
+    return (
+      <span key={ripassi} className="relative inline-block">
+        <span className={cn(digits, 'invisible')}>{ripassi}</span>
+        <span data-testid="goal-count-landing" className={cn(digits, 'vlx-digit-land absolute inset-0 text-center')}>
+          {ripassi}
+        </span>
+      </span>
+    );
+  };
 
   const centre = SIZE / 2;
   const stroke = compact ? COMPACT_STROKE : STROKE;

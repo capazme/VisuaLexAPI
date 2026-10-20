@@ -106,11 +106,22 @@ describe('SectionSwitcher (spec S3)', () => {
   });
 
   it('goes to the home of the section it is in without a change to show', () => {
-    renderSwitcher('/studia/schede');
-    fireEvent.click(trigger());
-    fireEvent.click(screen.getByRole('menuitemradio', { name: /Gymnasium/ }));
-    expect(screen.getByTestId('where')).toHaveTextContent('/studia/ripasso');
-    expect(document.querySelector('canvas')).toBeNull();
+    // jsdom has no canvas: the spy says whether a change asked for one at all.
+    const getContext = vi.spyOn(HTMLCanvasElement.prototype, 'getContext');
+    try {
+      renderSwitcher('/studia/schede');
+      fireEvent.click(trigger());
+      fireEvent.click(screen.getByRole('menuitemradio', { name: /Gymnasium/ }));
+      expect(screen.getByTestId('where')).toHaveTextContent('/studia/ripasso');
+      expect(getContext).not.toHaveBeenCalled();
+
+      // Another section does ask for one: the spy would see a change start.
+      fireEvent.click(trigger());
+      fireEvent.click(screen.getByRole('menuitemradio', { name: /Forum/ }));
+      expect(getContext).toHaveBeenCalledOnce();
+    } finally {
+      getContext.mockRestore();
+    }
   });
 
   it('draws no dot inside the Forum, where its own entry counts', () => {

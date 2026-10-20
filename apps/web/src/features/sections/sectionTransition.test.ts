@@ -6,7 +6,7 @@ const FRAME = 16;
 
 /** A 2D context that draws nothing: jsdom has no canvas. */
 function stubContext() {
-  return { setTransform: vi.fn(), clearRect: vi.fn(), fillRect: vi.fn(), beginPath: vi.fn(), moveTo: vi.fn(), arc: vi.fn(), fill: vi.fn(), fillStyle: '' };
+  return { setTransform: vi.fn(), clearRect: vi.fn(), fillRect: vi.fn(), beginPath: vi.fn(), moveTo: vi.fn(), arc: vi.fn(), rect: vi.fn(), fill: vi.fn(), fillStyle: '' };
 }
 
 function reducedMotion(reduce: boolean) {
@@ -120,6 +120,36 @@ describe('playSectionTransition (S2)', () => {
     window.dispatchEvent(enter);
     expect(enter.defaultPrevented).toBe(true);
     expect(canvas()).toBeNull();
+  });
+
+  it('drops the change when the browser goes Back while the colour prints: no swap over where the user went', () => {
+    reducedMotion(false);
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(stubContext() as unknown as CanvasRenderingContext2D);
+    const swap = vi.fn(newPage);
+    const t = HALFTONE_TIMING.desktop;
+    playSectionTransition({ section: 'gymnasium', origin: null, color: 'red', swap });
+    vi.advanceTimersByTime(t.coverWave);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    expect(canvas()).toBeNull();
+    vi.advanceTimersByTime(t.coverGrow + t.revealWave + t.revealShrink + FRAME * 4);
+    expect(swap).not.toHaveBeenCalled();
+    expect(title()).not.toHaveFocus();
+  });
+
+  it('after the swap, Back only ends the screen and the new title does not take the focus', () => {
+    reducedMotion(false);
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(stubContext() as unknown as CanvasRenderingContext2D);
+    let draw = () => {};
+    const swap = vi.fn(() => { draw = newPage; });
+    const t = HALFTONE_TIMING.desktop;
+    playSectionTransition({ section: 'gymnasium', origin: null, color: 'red', swap });
+    vi.advanceTimersByTime(t.coverWave + t.coverGrow + FRAME * 2);
+    expect(swap).toHaveBeenCalledOnce();
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    expect(canvas()).toBeNull();
+    draw();
+    vi.advanceTimersByTime(FRAME * 3);
+    expect(title()).not.toHaveFocus();
   });
 
   it('the returned function finishes it too, and a key does the same', () => {

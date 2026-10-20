@@ -835,13 +835,18 @@ describe('the motions of «Oggi» (S2)', () => {
     const { unmount } = renderHome();
     const tally = await screen.findByTestId('streak-tally');
     expect(tally).toHaveAttribute('data-marks', '4');
-    const count = within(screen.getByRole('img', { name: /^Obiettivo di oggi: 9 di 10/ })).getByText('9');
-    expect(count).toHaveClass('vlx-digit-land');
+    const ring = within(screen.getByRole('img', { name: /^Obiettivo di oggi: 9 di 10/ }));
+    const landing = ring.getByTestId('goal-count-landing');
+    expect(landing).toHaveClass('vlx-digit-land', 'absolute');
+    // Its place is held at the final weight, unseen, so « di 10» does not move while it lands.
+    const [held] = ring.getAllByText('9').filter((el) => el !== landing);
+    expect(held).toHaveClass('invisible', 'font-semibold');
     unmount();
 
     // Seen now: the next visit draws them at rest.
     renderHome();
-    const again = within(await screen.findByRole('img', { name: /^Obiettivo di oggi: 9 di 10/ })).getByText('9');
-    expect(again).not.toHaveClass('vlx-digit-land');
+    const again = within(await screen.findByRole('img', { name: /^Obiettivo di oggi: 9 di 10/ }));
+    expect(again.getByText('9')).not.toHaveClass('vlx-digit-land');
+    expect(again.queryByTestId('goal-count-landing')).toBeNull();
   });
 });
