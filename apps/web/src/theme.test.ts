@@ -4,6 +4,9 @@ import { resolve } from 'node:path';
 import postcss from 'postcss';
 import tailwind from '@tailwindcss/postcss';
 import { ACTIVE, FOCUS_RING, HIDDEN_SCROLLBAR, HOVER_LIFT, TRANSITION } from './constants/interactions';
+import { subjectHue } from './components/features/studia/progress/tokens';
+import { MATERIA_LABEL } from './components/features/studia/studiaLabels';
+import type { Materia } from './types/studia';
 
 /**
  * Tailwind failures are silent: a class whose token the theme never declares
@@ -169,11 +172,159 @@ describe('the Inchiostro palette', () => {
     expect(ratio(linear('ink-700'), light[0])).toBeGreaterThanOrEqual(7);
     expect(ratio(linear('ink-300'), dark[0])).toBeGreaterThanOrEqual(7);
   });
+
+  it('keeps the user menu\'s services status at AA, and its dot at 3:1 on the bar (ServiceHealthMenuEntry)', () => {
+    // Amber and emerald are Tailwind's own scales, read from its theme; the menu is white (dark: slate 800), the
+    // bar white/80 over the page (dark: slate-900/80 over slate-950). The dot's white (dark: slate 900) ring
+    // keeps it apart from the avatar.
+    const source = readFileSync(CSS_PATH, 'utf8') + readFileSync(resolve(process.cwd(), 'node_modules/tailwindcss/theme.css'), 'utf8');
+    const linear = (name: string): number[] => {
+      const m = source.match(new RegExp(`--color-${name}:\\s*oklch\\(([\\d.]+)%\\s+([\\d.]+)\\s+([\\d.]+)\\)`));
+      if (!m) throw new Error(`--color-${name} not found`);
+      const [L, C, H] = [Number(m[1]) / 100, Number(m[2]), (Number(m[3]) * Math.PI) / 180];
+      const a = C * Math.cos(H), b = C * Math.sin(H);
+      const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+      const mm = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+      const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+      return [
+        4.0767416621 * l - 3.3077115913 * mm + 0.2309699292 * s,
+        -1.2684380046 * l + 2.6097574011 * mm - 0.3413193965 * s,
+        -0.0041960863 * l - 0.7034186147 * mm + 1.707614701 * s,
+      ].map((v) => Math.min(1, Math.max(0, v)));
+    };
+    const gamma = (v: number) => (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
+    const unGamma = (v: number) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+    const over = (fg: number[], alpha: number, bg: number[]) => fg.map((c, i) => unGamma(alpha * gamma(c) + (1 - alpha) * gamma(bg[i])));
+    const lum = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    const ratio = (x: number[], y: number[]) => {
+      const [hi, lo] = [lum(x), lum(y)].sort((p, q) => q - p);
+      return (hi + 0.05) / (lo + 0.05);
+    };
+    const white = [1, 1, 1];
+    const menuDark = linear('ink-800');
+    // A service's state: OK, Degradato or Offline, Controllo; its name; «Ricontrolla».
+    for (const fg of ['emerald-700', 'amber-700', 'ink-500', 'ink-600', 'toga-700']) expect(ratio(linear(fg), white), fg).toBeGreaterThanOrEqual(4.5);
+    for (const fg of ['emerald-400', 'amber-400', 'ink-400', 'ink-300', 'toga-300']) expect(ratio(linear(fg), menuDark), fg).toBeGreaterThanOrEqual(4.5);
+    // The entry's icon beside its phrase, and the dot on the user button.
+    for (const fg of ['emerald-600', 'amber-600']) expect(ratio(linear(fg), white), fg).toBeGreaterThanOrEqual(3);
+    expect(ratio(linear('amber-600'), over(white, 0.8, linear('ink-50')))).toBeGreaterThanOrEqual(3);
+    expect(ratio(linear('amber-400'), over(linear('ink-900'), 0.8, linear('ink-950')))).toBeGreaterThanOrEqual(3);
+  });
+
+  it('keeps the command palette\'s 11 px texts and the tour\'s small ones at AA (CommandPalette, the driver.js popover)', () => {
+    // The palette is white/90 (dark: slate-900/90) over its backdrop, slate-950/40 over the page; its results
+    // add slate-50/30 (dark: slate-950/20), its steps sit on slate 100 (dark: slate 800). The tour's popover is
+    // white (dark: slate 900). Amber and emerald are Tailwind's own scales, read from its theme.
+    const source = readFileSync(CSS_PATH, 'utf8') + readFileSync(resolve(process.cwd(), 'node_modules/tailwindcss/theme.css'), 'utf8');
+    const linear = (name: string): number[] => {
+      const m = source.match(new RegExp(`--color-${name}:\\s*oklch\\(([\\d.]+)%\\s+([\\d.]+)\\s+([\\d.]+)\\)`));
+      if (!m) throw new Error(`--color-${name} not found`);
+      const [L, C, H] = [Number(m[1]) / 100, Number(m[2]), (Number(m[3]) * Math.PI) / 180];
+      const a = C * Math.cos(H), b = C * Math.sin(H);
+      const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+      const mm = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+      const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+      return [
+        4.0767416621 * l - 3.3077115913 * mm + 0.2309699292 * s,
+        -1.2684380046 * l + 2.6097574011 * mm - 0.3413193965 * s,
+        -0.0041960863 * l - 0.7034186147 * mm + 1.707614701 * s,
+      ].map((v) => Math.min(1, Math.max(0, v)));
+    };
+    const gamma = (v: number) => (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
+    const unGamma = (v: number) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+    const over = (fg: number[], alpha: number, bg: number[]) => fg.map((c, i) => unGamma(alpha * gamma(c) + (1 - alpha) * gamma(bg[i])));
+    const lum = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    const ratio = (x: number[], y: number[]) => {
+      const [hi, lo] = [lum(x), lum(y)].sort((p, q) => q - p);
+      return (hi + 0.05) / (lo + 0.05);
+    };
+    const white = [1, 1, 1];
+    const panel = over(white, 0.9, over(linear('ink-950'), 0.4, linear('ink-50')));
+    const panelDark = over(linear('ink-900'), 0.9, over(linear('ink-950'), 0.4, linear('ink-950')));
+    const light = [panel, over(linear('ink-50'), 0.3, panel)];
+    const dark = [panelDark, over(linear('ink-950'), 0.2, panelDark)];
+    // The grey lines, the headings «Preferiti», «I tuoi alias», «In dotazione», the recognised citation.
+    for (const bg of light) for (const fg of ['ink-600', 'amber-700', 'toga-700', 'emerald-700']) expect(ratio(linear(fg), bg), fg).toBeGreaterThanOrEqual(4.5);
+    for (const bg of dark) for (const fg of ['ink-400', 'amber-400', 'toga-300', 'emerald-400']) expect(ratio(linear(fg), bg), fg).toBeGreaterThanOrEqual(4.5);
+    // The steps «Atto», «Dettagli», «Articolo»: to do, done, the one in use.
+    expect(ratio(linear('ink-600'), linear('ink-100'))).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(linear('ink-300'), linear('ink-800'))).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(linear('emerald-800'), over(linear('emerald-500'), 0.1, panel))).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(linear('emerald-400'), over(linear('emerald-500'), 0.1, panelDark))).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(white, linear('toga-600'))).toBeGreaterThanOrEqual(4.5);
+    // The tour's «1 di 6» and its close button.
+    expect(ratio(linear('ink-500'), white)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(linear('ink-400'), linear('ink-900'))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('keeps the marks and labels of Gymnasium\'s «Progressi» apart from what they sit on (ActivityCalendar, DueForecast)', () => {
+    const source = readFileSync(CSS_PATH, 'utf8') + readFileSync(resolve(process.cwd(), 'node_modules/tailwindcss/theme.css'), 'utf8');
+    // `primary-*` and `slate-*` are aliases (`var(--color-toga-*)`, `var(--color-ink-*)`): followed to the value.
+    const linear = (name: string): number[] => {
+      const alias = source.match(new RegExp(`--color-${name}:\\s*var\\(--color-([a-z0-9-]+)\\)`));
+      if (alias) return linear(alias[1]);
+      const m = source.match(new RegExp(`--color-${name}:\\s*oklch\\(([\\d.]+)%\\s+([\\d.]+)\\s+([\\d.]+)\\)`));
+      if (!m) throw new Error(`--color-${name} not found`);
+      const [L, C, H] = [Number(m[1]) / 100, Number(m[2]), (Number(m[3]) * Math.PI) / 180];
+      const a = C * Math.cos(H), b = C * Math.sin(H);
+      const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+      const mm = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+      const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+      return [
+        4.0767416621 * l - 3.3077115913 * mm + 0.2309699292 * s,
+        -1.2684380046 * l + 2.6097574011 * mm - 0.3413193965 * s,
+        -0.0041960863 * l - 0.7034186147 * mm + 1.707614701 * s,
+      ].map((v) => Math.min(1, Math.max(0, v)));
+    };
+    const lum = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    const ratio = (x: number[], y: number[]) => {
+      const [hi, lo] = [lum(x), lum(y)].sort((p, q) => q - p);
+      return (hi + 0.05) / (lo + 0.05);
+    };
+    const white = [1, 1, 1];
+    // A day's mark (the dot, the dash) is ink on the calendar's pale steps (HEAT_FILL 0–2) and the ground's colour on
+    // the deep ones (3–4): 3:1, a graphic that carries the day's state (WCAG 1.4.11).
+    for (const step of ['ink-100', 'primary-200', 'primary-400']) expect(ratio(linear('primary-900'), linear(step)), step).toBeGreaterThanOrEqual(3);
+    for (const step of ['primary-600', 'primary-900']) expect(ratio(white, linear(step)), step).toBeGreaterThanOrEqual(3);
+    for (const step of ['ink-800', 'primary-900', 'primary-700']) expect(ratio(linear('primary-300'), linear(step)), step).toBeGreaterThanOrEqual(3);
+    // On a subject's hue the ink mark sits on a rim of the tile's ground (white; dark: slate 900), whatever the hue.
+    expect(ratio(linear('primary-900'), white)).toBeGreaterThanOrEqual(3);
+    expect(ratio(linear('primary-300'), linear('ink-900'))).toBeGreaterThanOrEqual(3);
+    for (const step of ['primary-500', 'primary-300']) expect(ratio(linear('ink-900'), linear(step)), step).toBeGreaterThanOrEqual(3);
+    // The days to come and a day with nothing due, dotted on the tile (white; dark: slate 900).
+    expect(ratio(linear('ink-500'), white)).toBeGreaterThanOrEqual(3);
+    expect(ratio(linear('ink-400'), linear('ink-900'))).toBeGreaterThanOrEqual(3);
+    // Today's bar on its tinted column (amber 50; dark: amber 400 at 10% over slate 900, far apart).
+    expect(ratio(linear('amber-600'), linear('amber-50'))).toBeGreaterThanOrEqual(3);
+    // «oggi» under the coming days, at 12 px: AA.
+    expect(ratio(linear('amber-800'), white)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(linear('amber-300'), linear('ink-900'))).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+describe('the tours (driver.js)', () => {
+  it('make every button of the popover a 44 px target with a focus ring', () => {
+    const css = readFileSync(CSS_PATH, 'utf8');
+    const rule = (selector: string) => {
+      const at = css.indexOf(`${selector} {`);
+      expect(at, selector).toBeGreaterThan(-1);
+      return css.slice(at, css.indexOf('}', at));
+    };
+    const footer = rule('.driver-popover.visualex-tour-popover .driver-popover-footer button');
+    expect(footer).toMatch(/min-height:\s*44px/);
+    // driver.js sets `display` inline on these buttons: the label is centred by its line height.
+    expect(footer).toMatch(/font:\s*500 13px\/42px/);
+    expect(footer).not.toMatch(/display:/);
+    const close = rule('.driver-popover.visualex-tour-popover .driver-popover-close-btn');
+    expect(close).toMatch(/width:\s*44px/);
+    expect(close).toMatch(/height:\s*44px/);
+    expect(css).toMatch(/\.driver-popover-close-btn:focus-visible\s*\{\s*outline:\s*2px solid/);
+  });
 });
 
 describe('the entrance utilities', () => {
   it('turn animate-in, fade-in, zoom-in-N and slide-in-from-* into real rules', async () => {
-    const css = await compile(['animate-in', 'fade-in', 'fade-in-0', 'zoom-in-95', 'slide-in-from-bottom', 'slide-in-from-top-2', 'slide-in-from-right-10']);
+    const css = await compile(['animate-in', 'fade-in', 'fade-in-0', 'zoom-in-95', 'slide-in-from-bottom', 'slide-in-from-top-2', 'slide-in-from-right-10', 'slide-in-from-left-2']);
     expect(css).toMatch(/\.animate-in\s*\{[^}]*animation-name:/);
     // A finished entrance leaves nothing applied (gotcha 22): no «both» fill.
     expect(css).toMatch(/\.animate-in\s*\{[^}]*animation-fill-mode:\s*backwards/);
@@ -182,12 +333,52 @@ describe('the entrance utilities', () => {
     expect(css).toContain('.slide-in-from-bottom');
     expect(css).toContain('.slide-in-from-top-2');
     expect(css).toContain('.slide-in-from-right-10');
+    expect(css).toMatch(/\.slide-in-from-left-2\s*\{[^}]*--vlx-enter-x:\s*calc\(2 \* var\(--spacing\) \* -1\)/);
+    // Both axes, so a slide nested in another does not inherit the outer one's axis.
+    expect(css).toMatch(/\.slide-in-from-top-2\s*\{[^}]*--vlx-enter-x:\s*0/);
   }, 30000);
 
   it('never last past 200 ms, whatever duration the class writes', async () => {
     const css = await compile(['animate-in', 'duration-300']);
     expect(css).toMatch(/\.animate-in\s*\{[^}]*animation-duration:\s*min\(var\(--tw-duration,\s*180ms\),\s*200ms\)/);
   }, 30000);
+});
+
+describe('the lesson of Gymnasium (Gymnasium spec §5.4)', () => {
+  it('draws the note after a grade, the bar\'s safe edge, the side panel and the band its classes name', async () => {
+    const candidates = [
+      'motion-safe:animate-vlx-note',
+      'motion-safe:transition-[width]',
+      'pb-[max(0.75rem,env(safe-area-inset-bottom))]',
+      'pt-[max(0.5rem,env(safe-area-inset-top))]',
+      'w-[min(28rem,45%)]',
+      'min-h-8',
+      'border-current/40',
+      'z-[70]',
+    ];
+    const css = await compile(candidates);
+    expect(css).toMatch(/\.motion-safe\\:animate-vlx-note\s*\{\s*@media \(prefers-reduced-motion: no-preference\)\s*\{\s*animation: var\(--animate-vlx-note\)/);
+    expect(css).toMatch(/--animate-vlx-note:\s*vlx-note 1000ms/);
+    expect(css).toMatch(/@keyframes vlx-note/);
+    expect(css).toContain('env(safe-area-inset-bottom)');
+    expect(css).toContain('env(safe-area-inset-top)');
+    expect(css).toMatch(/width:\s*min\(28rem,\s*45%\)/);
+    expect(css).toMatch(/\.min-h-8\s*\{/);
+    expect(css).toMatch(/\.border-current\\\/40\s*\{/);
+    expect(css).toMatch(/z-index:\s*70/);
+  }, 30000);
+});
+
+describe('the hues of Gymnasium\'s subjects', () => {
+  it('each names a variable the stylesheet declares in the light theme and in the dark one', () => {
+    // An undeclared variable leaves `hsl(var(--x))` invalid: the chip and the bar draw no colour, silently.
+    const source = readFileSync(CSS_PATH, 'utf8');
+    for (const materia of Object.keys(MATERIA_LABEL) as Materia[]) {
+      const name = /var\((--[\w-]+)\)/.exec(subjectHue(materia))?.[1];
+      expect(name, materia).toBeDefined();
+      expect(source.match(new RegExp(`${name}:`, 'g')) ?? [], `${materia}: ${name}`).toHaveLength(2);
+    }
+  });
 });
 
 describe('the interaction constants', () => {
@@ -211,7 +402,8 @@ describe('the interaction constants', () => {
   }, 30000);
 });
 
-describe('the services pill beside the sidebar', () => {
+// The services pill, which started after the sidebar, went into the user menu (S1); `Layout` still sets the width.
+describe('what would float beside the sidebar', () => {
   it('reads the sidebar\'s drawn width from `--sidebar-width`, 64 px by default', async () => {
     const css = await compile(['lg:left-[calc(var(--sidebar-width,64px)+2rem)]']);
     expect(css).toMatch(/left:\s*calc\(var\(--sidebar-width,\s*64px\) \+ 2rem\)/);

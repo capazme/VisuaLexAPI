@@ -235,7 +235,6 @@ export function useAnnexNavigation({
             annex: annexForApi,
             version: 'vigente',
             version_date: '',
-            show_brocardi_info: true
           })
         });
 
@@ -264,7 +263,6 @@ export function useAnnexNavigation({
         article: articleToSearch,
         version: 'vigente',
         version_date: '',
-        show_brocardi_info: true,
         annex: annexForApi
       });
       return null;
@@ -315,7 +313,6 @@ export function useAnnexNavigation({
             annex: annexForApi,
             version: 'vigente',
             version_date: '',
-            show_brocardi_info: true
           })
         });
 
@@ -342,7 +339,6 @@ export function useAnnexNavigation({
         article: articleNumber,
         version: 'vigente',
         version_date: '',
-        show_brocardi_info: true,
         annex: annexForApi
       });
     }

@@ -31,8 +31,6 @@
   --color-ring: hsl(var(--ring));
 
   /* Feature-specific semantic colors */
-  --color-brocardi: hsl(var(--brocardi));
-  --color-brocardi-foreground: hsl(var(--brocardi-foreground));
   --color-tree: hsl(var(--tree));
   --color-tree-foreground: hsl(var(--tree-foreground));
   --color-quicknorm: hsl(var(--quicknorm));
@@ -148,6 +146,16 @@
     to { opacity: 1; transform: none; }
   }
 
+  /* The note after a grade in Gymnasium's lesson («Torna tra 3 giorni»): it rises in, holds, and fades
+     within its second on screen. Used only as `motion-safe:animate-vlx-note`; still under reduced motion. */
+  --animate-vlx-note: vlx-note 1000ms var(--ease-out) both;
+  @keyframes vlx-note {
+    0% { opacity: 0; translate: 0 4px; }
+    15% { opacity: 1; translate: 0 0; }
+    80% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
   /* Type (spec §4.2): Newsreader to read and for titles, Geist for the interface, Geist Mono for
      identifiers. Self-hosted through @fontsource-variable (imported in main.tsx). */
   --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
@@ -199,8 +207,6 @@
     --ring: 220 66% 54.3%;
 
     /* Feature colors — light */
-    --brocardi: 270 60% 62%;
-    --brocardi-foreground: 270 80% 20%;
     --tree: 160 84% 39%;
     --tree-foreground: 160 80% 15%;
     --quicknorm: 38 92% 50%;
@@ -221,6 +227,8 @@
     --category-administrative: 38 92% 50%;
     --category-eu: 160 84% 39%;
     --category-other: 220 9% 46%;
+    /* Gymnasium's procedura penale (studia/progress/tokens.ts): the violet it always had */
+    --category-penal-procedure: 270 60% 62%;
 
     /* Text highlight tokens — light theme */
     --hl-yellow-bg: 48 96% 89%;
@@ -278,6 +286,7 @@
     --category-administrative: 43 96% 56%;
     --category-eu: 158 64% 52%;
     --category-other: 218 11% 65%;
+    --category-penal-procedure: 270 60% 70%;
 
     /* Text highlight tokens — dark theme (inverted: dark saturated bg, light fg) */
     --hl-yellow-bg: 21 91% 30%;
@@ -296,8 +305,6 @@
     --vlx-find-current-fg: 285 60% 12%;
 
     /* Feature colors — dark (reduced intensity, higher opacity bg) */
-    --brocardi: 270 60% 70%;
-    --brocardi-foreground: 270 30% 90%;
     --tree: 160 60% 55%;
     --tree-foreground: 160 30% 90%;
     --quicknorm: 38 70% 55%;
@@ -1165,10 +1172,13 @@
 @utility fade-in { --vlx-fade: vlx-enter-fade; }
 @utility fade-in-* { --vlx-fade: vlx-enter-fade; --vlx-enter-opacity: calc(--value(integer) * 1%); }
 @utility zoom-in-* { --vlx-zoom: vlx-enter-zoom; --vlx-enter-scale: calc(--value(integer) * 1%); }
-@utility slide-in-from-bottom { --vlx-slide: vlx-enter-slide; --vlx-enter-y: 100%; }
-@utility slide-in-from-bottom-* { --vlx-slide: vlx-enter-slide; --vlx-enter-y: calc(--value(integer) * var(--spacing)); }
-@utility slide-in-from-top-* { --vlx-slide: vlx-enter-slide; --vlx-enter-y: calc(--value(integer) * var(--spacing) * -1); }
-@utility slide-in-from-right-* { --vlx-slide: vlx-enter-slide; --vlx-enter-x: calc(--value(integer) * var(--spacing)); }
+/* Each slide writes both axes: custom properties inherit, so an error box sliding from the top inside a
+   panel that slid from the side would otherwise come in on the diagonal. */
+@utility slide-in-from-bottom { --vlx-slide: vlx-enter-slide; --vlx-enter-x: 0; --vlx-enter-y: 100%; }
+@utility slide-in-from-bottom-* { --vlx-slide: vlx-enter-slide; --vlx-enter-x: 0; --vlx-enter-y: calc(--value(integer) * var(--spacing)); }
+@utility slide-in-from-top-* { --vlx-slide: vlx-enter-slide; --vlx-enter-x: 0; --vlx-enter-y: calc(--value(integer) * var(--spacing) * -1); }
+@utility slide-in-from-right-* { --vlx-slide: vlx-enter-slide; --vlx-enter-y: 0; --vlx-enter-x: calc(--value(integer) * var(--spacing)); }
+@utility slide-in-from-left-* { --vlx-slide: vlx-enter-slide; --vlx-enter-y: 0; --vlx-enter-x: calc(--value(integer) * var(--spacing) * -1); }
 
 /* The tours (driver.js, `popoverClass: 'visualex-tour-popover'` in hooks/useTour.ts): the paper surface,
    the interface face, the primary button. Doubled class, so it wins over driver.css whichever loads last. */
@@ -1187,6 +1197,7 @@
   box-shadow: 0 0 0 1px var(--color-ink-700), 0 16px 40px -12px rgb(0 0 0 / 0.6);
 }
 .driver-popover.visualex-tour-popover .driver-popover-title {
+  padding-right: 28px; /* clear of the close button */
   font-family: var(--font-serif);
   font-size: 22px;
   font-weight: 500;
@@ -1206,13 +1217,19 @@
   font-variant-numeric: tabular-nums;
   color: var(--color-ink-500);
 }
+.dark .driver-popover.visualex-tour-popover .driver-popover-progress-text { color: var(--color-ink-400); }
+/* Every button of the tour is a 44 px target (driver.css draws them 28 px), with a focus ring
+   (driver.css takes the outline away). driver.js writes `display: block` on them inline at every step
+   (and `none` to hide one), so the label is centred by its line height, never by a display of ours:
+   42 px of line and 1 px of border above and below (driver.css's border-box). */
 .driver-popover.visualex-tour-popover .driver-popover-footer button {
-  padding: 7px 12px;
+  min-height: 44px;
+  padding: 0 14px;
   border-radius: 6px;
   border: 1px solid var(--color-ink-200);
   background: transparent;
   color: inherit;
-  font: 500 13px/1 var(--font-sans);
+  font: 500 13px/42px var(--font-sans);
   text-shadow: none;
   transition: background-color 160ms var(--ease-out), transform 120ms var(--ease-out);
 }
@@ -1227,7 +1244,19 @@
   color: var(--color-ink-950);
 }
 .driver-popover.visualex-tour-popover .driver-popover-footer .driver-popover-btn-disabled { opacity: 0.4; }
-.driver-popover.visualex-tour-popover .driver-popover-close-btn { color: var(--color-ink-500); }
+.driver-popover.visualex-tour-popover .driver-popover-close-btn {
+  width: 44px;
+  height: 44px;
+  line-height: 44px;
+  font-size: 22px;
+  color: var(--color-ink-500);
+}
+.dark .driver-popover.visualex-tour-popover .driver-popover-close-btn { color: var(--color-ink-400); }
+.driver-popover.visualex-tour-popover .driver-popover-footer button:focus-visible,
+.driver-popover.visualex-tour-popover .driver-popover-close-btn:focus-visible {
+  outline: 2px solid var(--color-toga-500);
+  outline-offset: 2px;
+}
 .driver-popover.visualex-tour-popover .driver-popover-arrow-side-top { border-top-color: #fff; }
 .driver-popover.visualex-tour-popover .driver-popover-arrow-side-bottom { border-bottom-color: #fff; }
 .driver-popover.visualex-tour-popover .driver-popover-arrow-side-left { border-left-color: #fff; }

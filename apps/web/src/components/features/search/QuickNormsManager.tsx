@@ -102,7 +102,6 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
       date: actDate,
       article: article || '1',
       version: 'vigente',
-      show_brocardi_info: true
     };
 
     if (!validateSearchParams(searchParams)) {

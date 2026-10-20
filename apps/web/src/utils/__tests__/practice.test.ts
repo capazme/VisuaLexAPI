@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { ArticleData, BrocardiInfo, Norma, NormaVisitata } from '../../types';
+import type { ArticleData, Norma, NormaVisitata } from '../../types';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../normaKeys';
 import {
   addArticles, articleWindowId, besideAfterOpen, besideRefFor, decisionOrder, decisionWindowId, findPracticeArticle,
@@ -39,18 +39,27 @@ describe('addArticles', () => {
       .toEqual([buildItemKey(art1218.norma_data), buildItemKey(fromSearch.norma_data), buildItemKey(fromIndex.norma_data)]);
     expect(r.added).toEqual([practiceArticleKey(fromIndex), practiceArticleKey(art1218)]);
   });
-  it('merges an identical copy, which fills Brocardi and gives the act its URN', () => {
-    const first = art(CC_RD, '2043', {}, { brocardi_error: 'timeout' });
-    const brocardi = { position: 'Libro IV' } as BrocardiInfo;
+  it('merges an identical copy, which keeps the stored row and gives the act its URN', () => {
+    const first = art(CC_RD, '2043');
     let r = addArticles([], CC_RD, [first], id);
     r = addArticles(r.acts, { ...CC_RD, urn: 'urn:nir:stato:regio.decreto:1942-03-16;262' },
-      [art(CC_RD, '2043', {}, { brocardi_info: brocardi })], id);
+      [art(CC_RD, '2043', {}, { article_text: 'Art. 2043, fetched again' })], id);
     expect(r.added).toEqual([]);
-    expect(r.acts[0].articles).toHaveLength(1);
-    expect(r.acts[0].articles[0].brocardi_info).toEqual(brocardi);
-    expect(r.acts[0].articles[0].brocardi_error).toBeUndefined();
-    expect(r.acts[0].articles[0].norma_data).toEqual(first.norma_data);
+    expect(r.acts[0].articles).toEqual([first]);
     expect(r.acts[0].norma.urn).toBe('urn:nir:stato:regio.decreto:1942-03-16;262');
+  });
+  it('takes an article in without what Brocardi gave it, as an API not yet updated may still send it (D-078)', () => {
+    const plain = art(CC_RD, '2043');
+    const incoming = { ...plain, brocardi_info: { Ratio: 'ratio', Massime: ['massima'] }, brocardi_error: 'timeout' } as unknown as ArticleData;
+    const r = addArticles([], CC_RD, [incoming], id);
+    expect(r.acts[0].articles).toEqual([plain]);
+    expect(Object.keys(r.acts[0].articles[0])).not.toContain('brocardi_info');
+    expect(Object.keys(r.acts[0].articles[0])).not.toContain('brocardi_error');
+    // the input is not changed
+    expect(incoming).toHaveProperty('brocardi_info');
+    // an article without them is stored as given, the same object
+    const clean = art(CC_RD, '2044');
+    expect(addArticles(r.acts, CC_RD, [clean], id).acts[0].articles).toContain(clean);
   });
   it('keeps a past text beside the text in force, after it, under another key', () => {
     const inForce = art(CC_RD, '2043');

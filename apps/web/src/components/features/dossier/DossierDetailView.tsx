@@ -455,10 +455,10 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         <div className="flex flex-col md:flex-row justify-between md:items-start gap-4">
           <div className="flex-1">
             <div className="flex items-center gap-3 flex-wrap">
-              <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2 md:gap-3">
-                <Folder className="text-blue-500" size={24} />
+              <h1 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2 md:gap-3">
+                <Folder className="text-blue-500" size={24} aria-hidden />
                 <span className="truncate">{dossier.title}</span>
-              </h2>
+              </h1>
               {dossier.isPinned && (
                 <Star size={16} className="text-yellow-500 fill-yellow-500 flex-shrink-0" />
               )}

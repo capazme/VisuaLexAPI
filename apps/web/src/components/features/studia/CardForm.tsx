@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type FormEvent, type RefObject } from 'react';
+import { useEffect, useId, useRef, useState, type FocusEvent, type FormEvent, type RefObject } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '../../ui/Button';
 import { FormSelect } from '../../ui/FormSelect';
@@ -14,9 +14,12 @@ import type { EsitoAncoraRifiutata, Materia, Scheda, SchedaInput, TipoScheda } f
 import { inferMateria } from './inferMateria';
 import { MATERIA_LABEL, TIPO_LABEL } from './studiaLabels';
 
-/** What the form opens on: an article of the reader (with the words selected, the heading), or a draft to edit. */
+/**
+ * What the form opens on: an article of the reader (with the words selected, the heading), no article at all
+ * («+ Nuova scheda» in Le mie schede: the anchors are typed as references), or a draft to edit.
+ */
 export type CardFormMode =
-  | { kind: 'create'; norma: NormaVisitata; passage?: string; suggestedIstituto?: string }
+  | { kind: 'create'; norma?: NormaVisitata; passage?: string; suggestedIstituto?: string }
   | { kind: 'edit'; card: Scheda };
 
 export interface CardFormProps {
@@ -59,7 +62,7 @@ function referenceOf(urn: string): string {
 
 function initialAnchors(mode: CardFormMode): AnchorChip[] {
   if (mode.kind === 'create') {
-    return [{ key: 'reader', riferimento: citeNorm(mode.norma), principale: true, fixed: true }];
+    return mode.norma ? [{ key: 'reader', riferimento: citeNorm(mode.norma), principale: true, fixed: true }] : [];
   }
   return mode.card.ancore.map((a, i) => ({ key: `stored-${i}`, riferimento: referenceOf(a.urn), principale: a.isPrimary, fixed: false }));
 }
@@ -90,8 +93,11 @@ const unrecognisedAct = (fromReader: boolean): string =>
 
 /** What the failed call says to the person, never the server's raw text (some of it is English). */
 function failureMessage(error: unknown, editing: boolean): string {
-  const status = typeof error === 'object' && error !== null && 'status' in error ? (error as { status?: unknown }).status : undefined;
-  if (status === 503) return 'La scheda non è stata salvata: non riesco a controllare l’articolo in questo momento. Riprova più tardi.';
+  // The apiClient's rejection carries `status`; a bare axios error has it on its response.
+  const rejection = (typeof error === 'object' && error !== null ? error : {}) as { status?: unknown; response?: { status?: unknown } };
+  const status = rejection.status ?? rejection.response?.status;
+  // The service answered that it cannot serve now (the sources down, or a gateway before it): not the person's connection.
+  if (status === 502 || status === 503 || status === 504) return 'La scheda non è stata salvata: il servizio non è disponibile al momento. Riprova più tardi.';
   if (editing && status === 404) return 'La scheda non esiste più: chiudi questa finestra e riapri l’elenco.';
   if (editing && status === 409) return 'La scheda non è più una bozza: non si può modificare.';
   return 'La scheda non è stata salvata: controlla la connessione e riprova.';
@@ -147,8 +153,9 @@ function TextareaField({ id, label, value, onChange, limit, rows, error, inputRe
 }
 
 /**
- * The form of a study card, for the three ways in: «+ Nuova scheda» under an article, «Crea scheda»
- * from a selection, «Modifica» in the list. The server checks every anchor against the sources and
+ * The form of a study card, for the four ways in: «+ Nuova scheda» under an article, «Crea scheda»
+ * from a selection, «+ Nuova scheda» in Le mie schede (no article: the reference field stands open),
+ * «Modifica» in the list. The server checks every anchor against the sources and
  * says which failed; the form shows that on the chip, in the server's words. The fields hold plain
  * text, sent and shown as it is.
  */
@@ -159,14 +166,19 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
   const formRef = useRef<HTMLFormElement>(null);
   const addedKeys = useRef(0);
 
-  const [materia, setMateria] = useState<Materia | ''>(() => (mode.kind === 'edit' ? mode.card.materia : inferMateria(mode.norma) ?? ''));
+  const [materia, setMateria] = useState<Materia | ''>(() =>
+    mode.kind === 'edit' ? mode.card.materia : (mode.norma && inferMateria(mode.norma)) ?? '',
+  );
   const [istituto, setIstituto] = useState(() => (mode.kind === 'edit' ? mode.card.istituto : mode.suggestedIstituto ?? ''));
   const [tipo, setTipo] = useState<TipoScheda>(() => (mode.kind === 'edit' ? mode.card.tipo : 'ISTITUTO_DEFINIZIONE'));
   const [domanda, setDomanda] = useState(() => (mode.kind === 'edit' ? mode.card.domanda : ''));
   const [risposta, setRisposta] = useState(() => (mode.kind === 'edit' ? mode.card.risposta : mode.passage ?? ''));
   const [spiegazione, setSpiegazione] = useState(() => (mode.kind === 'edit' ? mode.card.spiegazione ?? '' : ''));
   const [anchors, setAnchors] = useState<AnchorChip[]>(() => initialAnchors(mode));
-  const [adding, setAdding] = useState(false);
+  // With no anchor to start from, the reference field stands open: the article is the first thing a card needs.
+  const [adding, setAdding] = useState(() => anchors.length === 0);
+  // Open from the start, the field leaves the focus to the first field; opened by «+ Ancora», it takes it.
+  const [fieldTakesFocus, setFieldTakesFocus] = useState(() => anchors.length > 0);
   const [pending, setPending] = useState('');
   const [pendingError, setPendingError] = useState<string | null>(null);
 
@@ -185,6 +197,21 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
 
   const focusFirst = (element: HTMLElement | null) => {
     if (initialFocusRef) initialFocusRef.current = element;
+  };
+
+  // The form opens from its top, «Materia» in view: the dialog's first focus, given while it is still
+  // entering, left the body scrolled. Once that focus lands the body goes back to the top; the field
+  // it lands on is in the first rows, so it stays in view.
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const opened = useRef(false);
+  const startFromTop = (event: FocusEvent<HTMLFormElement>) => {
+    if (opened.current) return;
+    opened.current = true;
+    // A first focus the person gave (a click lower down) keeps its place.
+    if (!initialFocusRef || event.target !== initialFocusRef.current) return;
+    requestAnimationFrame(() => {
+      if (bodyRef.current) bodyRef.current.scrollTop = 0;
+    });
   };
 
   /** The anchors with `reference` added, or as they were when it is empty, already there or too long (with the reason). */
@@ -209,6 +236,7 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
     setPending('');
     setPendingError(null);
     setAdding(false);
+    setErrors((e) => ({ ...e, ancore: undefined }));
   };
 
   const closeAdding = () => {
@@ -272,7 +300,8 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
     setAnchors(list);
     setPending('');
     setPendingError(null);
-    setAdding(false);
+    // With no anchor the reference field stays open: it is where the missing anchor goes, and takes the focus.
+    setAdding(list.length === 0);
     setErrors(found);
     setFormError(null);
     if (Object.keys(found).length > 0) {
@@ -311,8 +340,8 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
   const atAnchorLimit = anchors.length >= MAX_ANCHORS;
 
   return (
-    <form ref={formRef} onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
-      <div className="flex-1 space-y-5 overflow-y-auto p-4 md:p-6">
+    <form ref={formRef} onSubmit={submit} onFocus={startFromTop} className="flex min-h-0 flex-1 flex-col">
+      <div ref={bodyRef} className="flex-1 space-y-5 overflow-y-auto p-4 md:p-6">
         <div className="grid gap-5 md:grid-cols-2">
           <div className="space-y-1.5 w-full">
             <label htmlFor={fieldId('materia')} className={LABEL}>Materia</label>
@@ -455,7 +484,7 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
           {adding ? (
             <div className="flex flex-col gap-2 md:flex-row md:items-start">
               <Input
-                autoFocus
+                autoFocus={fieldTakesFocus}
                 aria-label="Riferimento dell’ancora"
                 className="min-h-[44px] md:min-h-0"
                 value={pending}
@@ -474,13 +503,13 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
                   }
                 }}
                 error={pendingError ?? undefined}
+                aria-invalid={pendingError || errors.ancore ? true : undefined}
+                aria-describedby={errors.ancore ? fieldId('ancore-error') : undefined}
                 placeholder="es. art. 2043 c.c."
                 autoComplete="off"
               />
-              <div className="flex gap-2">
-                <Button type="button" variant="secondary" className={TARGET} onClick={addPending}>Aggiungi</Button>
-                <Button type="button" variant="ghost" className={TARGET} onClick={closeAdding}>Annulla</Button>
-              </div>
+              {/* One «Annulla» only, the dialog's: the field closes with Esc, or with «Aggiungi» left empty. */}
+              <Button type="button" variant="secondary" className={cn(TARGET, 'shrink-0 self-start')} onClick={addPending}>Aggiungi</Button>
             </div>
           ) : (
             <Button
@@ -489,13 +518,16 @@ export function CardForm({ mode, onSaved, onCancel, initialFocusRef }: CardFormP
               size="sm"
               className={TARGET}
               disabled={atAnchorLimit}
-              onClick={() => setAdding(true)}
+              onClick={() => {
+                setFieldTakesFocus(true);
+                setAdding(true);
+              }}
             >
               + Ancora
             </Button>
           )}
           {atAnchorLimit && <p className="ml-1 text-xs text-slate-500 dark:text-slate-400">Al massimo {MAX_ANCHORS} ancore per scheda.</p>}
-          {errors.ancore && <p className="ml-1 text-xs font-medium text-red-500 dark:text-red-400">{errors.ancore}</p>}
+          {errors.ancore && <p id={fieldId('ancore-error')} className="ml-1 text-xs font-medium text-red-500 dark:text-red-400">{errors.ancore}</p>}
         </div>
 
         {formError && (

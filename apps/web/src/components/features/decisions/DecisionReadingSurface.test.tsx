@@ -95,7 +95,7 @@ describe('DecisionReadingSurface', () => {
     fireEvent.click(container.querySelector('.citation-hover')!);
     expect(appStore.getState().searchTrigger).toEqual({
       act_type: 'codice civile', act_number: '', date: '', article: '2043',
-      version: 'vigente', show_brocardi_info: true, besideId: 'dec-tab',
+      version: 'vigente', besideId: 'dec-tab',
     });
     expect(pushReadingBack).toHaveBeenCalledExactlyOnceWith(
       { tabId: 'dec-tab', blockId: 'dec-tab', articleId: '', label: 'Cass. civ., sez. III, n. 99999/2024' },

@@ -36,9 +36,8 @@ function asksForOriginal(version: unknown): boolean {
 
 /**
  * Whether the request asked for a past text: the original, or a date. It is the
- * request, not the page, and mirrors `is_historical_request` on the server —
- * the two decide the same thing, one to keep Brocardi out, one to switch the
- * annotation tools off.
+ * request, not the page, and reads it the way `is_historical_request` on the
+ * server does; here it switches the annotation tools off.
  */
 export function requestIsHistorical(request: VersionRequest | null | undefined): boolean {
   if (!request) return false;
@@ -128,8 +127,6 @@ export interface VersionDisplay {
    * wrong words.
    */
   readOnly: boolean;
-  /** Brocardi's commentary and massime carry no date: shown only with the text in force. */
-  doctrineVisible: boolean;
   /** Whether a "nel testo in vigore al …" citation may be made. */
   canCite: boolean;
   /**
@@ -208,7 +205,7 @@ function bannerFor(
       body: `${window}, secondo il testo consolidato di Normattiva (a fini informativi). Non è il testo attuale. `
         + 'Il testo in vigore a una data non dice quale disciplina si applichi al fatto: possono contare '
         + 'disposizioni transitorie, efficacia retroattiva o norme più favorevoli.',
-      note: 'Dottrina, massime, note ed evidenziazioni non sono mostrate su un testo storico.',
+      note: 'Note ed evidenziazioni non sono mostrate su un testo storico.',
       actions: canCite ? ['go_current', 'copy_citation'] : ['go_current'],
     };
   }
@@ -256,7 +253,6 @@ export function describeVersion(
     banner: validity ? bannerFor(validity, requestedDay, canCite) : null,
     textVisible: !notYet,
     readOnly,
-    doctrineVisible: !asked && !readOnly,
     canCite,
     canCopyOrSave: !notYet && !unreliable,
     copyBlockedReason: notYet ? NOT_YET_REASON : unreliable ? UNRELIABLE_REASON : undefined,
@@ -267,8 +263,8 @@ export function describeVersion(
 export type TextAtDateChoice = { kind: 'date'; date: string } | { kind: 'original' };
 
 /**
- * The search the "Testo alla data" dialog sends. Doctrine is not requested (the
- * server would refuse it anyway), and the annex is kept: the old modal dropped it.
+ * The search the "Testo alla data" dialog sends. The annex is kept: the old
+ * modal dropped it.
  */
 export function buildTextAtDateParams(norma: NormaVisitata, choice: TextAtDateChoice): SearchParams {
   return {
@@ -278,7 +274,6 @@ export function buildTextAtDateParams(norma: NormaVisitata, choice: TextAtDateCh
     article: norma.numero_articolo,
     version: choice.kind === 'original' ? 'originale' : 'vigente',
     ...(choice.kind === 'date' ? { version_date: choice.date } : {}),
-    show_brocardi_info: false,
     ...(norma.allegato ? { annex: norma.allegato } : {}),
   };
 }

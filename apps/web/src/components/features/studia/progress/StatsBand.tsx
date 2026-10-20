@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { Check } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import type { ConteggiStati, Progressi } from '../../../../types/studia';
@@ -14,8 +15,6 @@ export interface StatsBandProps {
   loading: boolean;
   settingsOpen: boolean;
   onOpenSettings: () => void;
-  monthOpen: boolean;
-  onOpenMonth: () => void;
   /** The celebration: the streak's count pops. */
   celebrate?: boolean;
 }
@@ -88,11 +87,11 @@ function StateNumbers({ stati }: { stati: ConteggiStati }) {
 
 /**
  * «I tuoi progressi», one band (Gymnasium spec §5.1): the streak, today's goal and the gear; the current week as
- * seven boxes; the cards by state as three numbers with their bar; «Il tuo mese», which opens the long calendar
- * and the coming days in a sheet. While the first read travels it holds its final size; a failed read leaves the
+ * seven boxes; the cards by state as three numbers with their bar; «Tutti i progressi», a link to `/studia/progressi`,
+ * where the long calendar, the coming days and the subjects live (G3: the data in one place). While the first read travels it holds its final size; a failed read leaves the
  * heading and the gear (the missions say it failed, with «Riprova»).
  */
-export function StatsBand({ data, loading, settingsOpen, onOpenSettings, monthOpen, onOpenMonth, celebrate = false }: StatsBandProps) {
+export function StatsBand({ data, loading, settingsOpen, onOpenSettings, celebrate = false }: StatsBandProps) {
   return (
     <section aria-labelledby="studia-progressi" aria-busy={loading} className={cn(TILE, 'grid gap-5 p-5 md:p-6')}>
       <div className="flex items-center gap-3">
@@ -114,9 +113,9 @@ export function StatsBand({ data, loading, settingsOpen, onOpenSettings, monthOp
             </div>
           </div>
           <StateNumbers stati={data.stati} />
-          <button type="button" aria-haspopup="dialog" aria-expanded={monthOpen} onClick={onOpenMonth} className={cn(SECONDARY_BUTTON, 'w-full md:w-auto md:justify-self-start')}>
-            Il tuo mese
-          </button>
+          <Link to="/studia/progressi" className={cn(SECONDARY_BUTTON, 'inline-flex w-full items-center justify-center md:w-auto md:justify-self-start')}>
+            Tutti i progressi
+          </Link>
         </>
       ) : loading ? (
         // The final size, so nothing jumps when the read answers.

@@ -15,7 +15,7 @@ vi.mock('../../ui/ChangelogNotification', () => ({ ChangelogNotification: () => 
 vi.mock('../../ui/Toast', () => ({ UndoToastContainer: () => null }));
 vi.mock('../../ui/SyncErrorToast', () => ({ SyncErrorToast: () => null }));
 vi.mock('../../ui/KeyboardShortcutsModal', () => ({ KeyboardShortcutsModal: () => null }));
-vi.mock('../../ui/ServiceHealthBanner', () => ({ ServiceHealthBanner: () => null }));
+vi.mock('../../../hooks/useServiceHealth', () => ({ useServiceHealth: () => ({ snapshot: { overall: 'online', services: [], checkedAt: '' }, refresh: vi.fn() }) }));
 vi.mock('../../features/compare/CompareView', () => ({ CompareView: () => null }));
 vi.mock('../../../plugins/PluginSlot', () => ({ PluginSlot: () => null }));
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ isAuthenticated: true }) }));
@@ -77,7 +77,7 @@ describe('Layout — the sidebar\'s two copies (Gymnasium spec §4)', () => {
     expect(desktop?.onToggleWide).toBeTypeOf('function');
   });
 
-  // The services pill starts after it (`ServiceHealthBanner`): never half under the bar with words.
+  // For what would float beside it from `lg`; the services pill, its one reader, went into the user menu (S1).
   it('tells what floats beside it the width it is drawn at: 224, 64, or 0 when hidden or in Focus mode', () => {
     expect(atWidth(true).sidebarWidth).toBe('224px');
     expect(atWidth(false).sidebarWidth).toBe('64px');

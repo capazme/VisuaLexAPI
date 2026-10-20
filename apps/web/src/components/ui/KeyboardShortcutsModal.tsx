@@ -42,7 +42,6 @@ const shortcutGroups: ShortcutGroup[] = [
     title: 'Ricerca',
     shortcuts: [
       { keys: ['Enter'], description: 'Esegui ricerca' },
-      { keys: [modKey, 'Enter'], description: 'Ricerca con dottrina' },
     ],
   },
   {

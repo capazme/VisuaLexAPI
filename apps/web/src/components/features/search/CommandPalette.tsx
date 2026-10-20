@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { Command } from 'cmdk';
-import { Search, X, Check, Star, Zap, Lightbulb, ArrowRight, Book, Tag, List, Plus, Settings2, Sparkles, SlidersHorizontal, Gavel } from 'lucide-react';
+import { Search, X, Check, Star, Zap, ArrowRight, Book, Tag, List, Plus, Settings2, Sparkles, SlidersHorizontal, Gavel } from 'lucide-react';
 import type { SearchParams, CustomAlias, SearchFilters } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { parseItalianDate } from '../../../utils/dateUtils';
@@ -14,7 +14,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { defaultSearchFilters } from '../../../utils/searchFilters';
 import { citationSearchParams, useSearchQuery } from '../../../hooks/useSearchQuery';
 import { formatDecisionShort } from '../../../utils/decisionLinks';
-import { spring } from '../../../lib/motion';
+import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -75,7 +75,6 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   const [actNumber, setActNumber] = useState('');
   const [actDate, setActDate] = useState('');
   const [inputValue, setInputValue] = useState('');
-  const [includeBrocardi, setIncludeBrocardi] = useState(true);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [filters, setFilters] = useState<SearchFilters>(defaultSearchFilters);
 
@@ -218,12 +217,11 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
         article: alias.searchParams.article || '1',
         version: 'vigente',
         version_date: '',
-        show_brocardi_info: includeBrocardi,
         filters,
       });
       onClose();
     }
-  }, [trackAliasUsage, onSearch, onClose, includeBrocardi, filters]);
+  }, [trackAliasUsage, onSearch, onClose, filters]);
 
   const handleSelectPreset = useCallback((trigger: string) => {
     const preset = catalog.presets[trigger];
@@ -265,7 +263,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     }
 
     if (citationReady) {
-      onSearch(citationSearchParams(parsedCitation, { showBrocardi: includeBrocardi, filters }));
+      onSearch(citationSearchParams(parsedCitation, { filters }));
       onClose();
     } else if (parsedCitation.act_type) {
       setSelectedAct(parsedCitation.act_type);
@@ -284,7 +282,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
         setStep('input_article');
       }
     }
-  }, [parsedCitation, citationReady, onSearch, onClose, includeBrocardi, filters, trackAliasUsage]);
+  }, [parsedCitation, citationReady, onSearch, onClose, filters, trackAliasUsage]);
 
   const handleSubmitArticle = useCallback(() => {
     if (!selectedAct || !article) return;
@@ -296,11 +294,10 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
       date: actDate ? parseItalianDate(actDate) : '',
       version: 'vigente',
       version_date: '',
-      show_brocardi_info: includeBrocardi,
       filters,
     });
     onClose();
-  }, [selectedAct, article, actNumber, actDate, onSearch, onClose, includeBrocardi, filters]);
+  }, [selectedAct, article, actNumber, actDate, onSearch, onClose, filters]);
 
   const handleSubmitDetails = useCallback(() => {
     if (!selectedAct || !actNumber || !actDate) return;
@@ -322,12 +319,11 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
       date: actDate ? parseItalianDate(actDate) : '',
       version: 'vigente',
       version_date: '',
-      show_brocardi_info: includeBrocardi,
       filters,
     });
 
     onClose();
-  }, [selectedAct, actNumber, actDate, includeBrocardi, filters, onBrowseStructure, onClose]);
+  }, [selectedAct, actNumber, actDate, filters, onBrowseStructure, onClose]);
 
   /**
    * The act as a human would name it.
@@ -375,12 +371,13 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                 type="button"
                 onClick={() => setStep('select_act')}
                 className={cn(
-                  "group flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-[color,background-color,border-color,box-shadow] cursor-pointer",
+                  "group flex items-center gap-2 px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-[color,background-color,border-color,box-shadow] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+                  TOUCH_TARGET_RESPONSIVE,
                   step === 'select_act'
-                    ? "bg-primary-500 text-white shadow-lg shadow-primary-500/20"
+                    ? "bg-primary-600 text-white shadow-lg shadow-primary-500/20"
                     : selectedAct
-                      ? "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"
-                      : "bg-slate-100 dark:bg-slate-800 text-slate-400"
+                      ? "bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 hover:bg-emerald-500/20"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
                 )}
               >
                 {selectedAct && step !== 'select_act' ? <Check size={12} strokeWidth={3} /> : <Book size={12} strokeWidth={3} />}
@@ -392,12 +389,13 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                   type="button"
                   onClick={() => selectedAct && setStep('input_details')}
                   className={cn(
-                    "group flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-[color,background-color,border-color,box-shadow] cursor-pointer",
+                    "group flex items-center gap-2 px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-[color,background-color,border-color,box-shadow] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+                  TOUCH_TARGET_RESPONSIVE,
                     step === 'input_details'
-                      ? "bg-primary-500 text-white shadow-lg shadow-primary-500/20"
+                      ? "bg-primary-600 text-white shadow-lg shadow-primary-500/20"
                       : (actNumber && actDate)
-                        ? "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"
-                        : "bg-slate-100 dark:bg-slate-800 text-slate-400"
+                        ? "bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 hover:bg-emerald-500/20"
+                        : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
                   )}
                 >
                   {(actNumber && actDate) && step !== 'input_details' ? <Check size={12} strokeWidth={3} /> : <Zap size={12} strokeWidth={3} />}
@@ -406,10 +404,11 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
               )}
 
               <div className={cn(
-                "flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-[color,background-color,border-color,box-shadow]",
+                "flex items-center gap-2 px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-[color,background-color,border-color,box-shadow]",
+                TOUCH_TARGET_RESPONSIVE,
                 step === 'input_article'
-                  ? "bg-primary-500 text-white shadow-lg shadow-primary-500/20"
-                  : "bg-slate-100 dark:bg-slate-800 text-slate-400"
+                  ? "bg-primary-600 text-white shadow-lg shadow-primary-500/20"
+                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
               )}>
                 <Star size={12} strokeWidth={3} />
                 <span>Articolo</span>
@@ -461,11 +460,11 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                         <div className="w-5 h-5 rounded-md flex items-center justify-center bg-emerald-500 text-white">
                           <Gavel size={10} strokeWidth={3} />
                         </div>
-                        <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                        <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
                           Sentenza → {formatDecisionShort(decisionRef)}
                         </span>
                         <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        <span className="text-[11px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest">
                           Invio apre
                         </span>
                       </motion.div>
@@ -491,14 +490,14 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                         <span className={cn(
                           "text-xs font-bold uppercase tracking-wider",
                           parsedCitation.fromAlias
-                            ? "text-indigo-600 dark:text-indigo-400"
-                            : citationReady ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
+                            ? "text-indigo-700 dark:text-indigo-300"
+                            : citationReady ? "text-emerald-700 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400"
                         )}>
                           {parsedCitation.fromAlias && <span className="opacity-60 mr-1">tramite alias →</span>}
                           {citationPreview}
                         </span>
                         <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        <span className="text-[11px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest">
                           {citationReady ? "Invio Ricerca" : "Invio Completa"}
                         </span>
                       </motion.div>
@@ -537,7 +536,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                       ATTO / ARTICOLO chips. */}
                   <div className="flex-1 min-w-0">
                     {actNumber && actDate && (
-                      <span className="block mb-1.5 px-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">
+                      <span className="block mb-1.5 px-1 text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest truncate">
                         {selectedActLabel} n. {actNumber} del {actDate}
                       </span>
                     )}
@@ -561,8 +560,10 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
               )}
 
               <button
+                type="button"
                 onClick={onClose}
-                className="p-2 sm:hidden text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl"
+                aria-label="Chiudi"
+                className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center sm:hidden text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-xl"
               >
                 <X size={20} />
               </button>
@@ -573,14 +574,14 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
           <div className="flex-1 overflow-y-auto max-h-[60vh] custom-scrollbar bg-slate-50/30 dark:bg-slate-950/20">
             {step === 'select_act' && (
               <Command.List id="command-palette-results" className="p-3">
-                <Command.Empty className="px-6 py-12 text-center text-slate-400">
+                <Command.Empty className="px-6 py-12 text-center text-slate-600 dark:text-slate-400">
                   {decisionRef ? (
                     <>
                       <div className="w-16 h-16 rounded-3xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-4">
                         <Gavel size={24} className="text-emerald-600 dark:text-emerald-400" />
                       </div>
                       <p className="font-bold text-slate-600 dark:text-slate-300">{formatDecisionShort(decisionRef)}</p>
-                      <p className="text-xs font-medium opacity-60 mt-1">Premi Enter per aprire la sentenza</p>
+                      <p className="text-xs font-medium mt-1">Premi Enter per aprire la sentenza</p>
                     </>
                   ) : citationReady ? (
                     <>
@@ -591,7 +592,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                         <Check size={24} className="text-emerald-600 dark:text-emerald-400" />
                       </div>
                       <p className="font-bold text-slate-600 dark:text-slate-300">{citationPreview}</p>
-                      <p className="text-xs font-medium opacity-60 mt-1">Premi Enter per cercare</p>
+                      <p className="text-xs font-medium mt-1">Premi Enter per cercare</p>
                     </>
                   ) : resolvingRemotely ? (
                     <>
@@ -603,7 +604,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                         <Search size={24} className="animate-pulse" />
                       </div>
                       <p className="font-bold">Cerco l'atto…</p>
-                      <p className="text-xs font-medium opacity-60 mt-1">Riconosco i nomi per esteso, non solo le sigle</p>
+                      <p className="text-xs font-medium mt-1">Riconosco i nomi per esteso, non solo le sigle</p>
                     </>
                   ) : (
                     <>
@@ -611,7 +612,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                         <X size={24} />
                       </div>
                       <p className="font-bold">Nessun risultato trovato</p>
-                      <p className="text-xs font-medium opacity-60 mt-1">Prova a cambiare i criteri di ricerca</p>
+                      <p className="text-xs font-medium mt-1">Prova a cambiare i criteri di ricerca</p>
                     </>
                   )}
                 </Command.Empty>
@@ -641,13 +642,14 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                 {/* QuickNorms Section */}
                 <Command.Group id="command-palette-quick-norms" className="mb-4">
                   <div className="flex items-center justify-between px-3 mb-3">
-                    <div className="flex items-center gap-2 text-[10px] font-black text-amber-500 uppercase tracking-widest">
+                    <div className="flex items-center gap-2 text-[11px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-widest">
                       <Star size={12} fill="currentColor" strokeWidth={3} />
                       Preferiti
                     </div>
                     <button
+                      type="button"
                       onClick={handleOpenQuickNormsManager}
-                      className="p-1 px-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                      className={cn("p-1 px-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-[11px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors", TOUCH_TARGET_RESPONSIVE)}
                     >
                       Gestisci
                     </button>
@@ -671,13 +673,13 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                           </div>
                           <div className="flex-1 min-w-0">
                             <span className="block text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{qn.label}</span>
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-tight line-clamp-1">{qn.searchParams.act_type}</span>
+                            <span className="text-[11px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-tight line-clamp-1">{qn.searchParams.act_type}</span>
                           </div>
                         </Command.Item>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-xs text-slate-400 text-center py-2">Nessun preferito salvato</p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 text-center py-2">Nessun preferito salvato</p>
                   )}
                 </Command.Group>
 
@@ -690,7 +692,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                     typing "alias" finds it even when the group is scrolled away. */}
                 <Command.Group className="mb-4">
                   <div className="flex items-center justify-between gap-3 px-3 mb-3">
-                    <div className="flex items-center gap-2 text-[10px] font-black text-indigo-500 uppercase tracking-widest">
+                    <div className="flex items-center gap-2 text-[11px] font-black text-indigo-700 dark:text-indigo-300 uppercase tracking-widest">
                       <Tag size={12} strokeWidth={3} />
                       I tuoi alias
                     </div>
@@ -698,7 +700,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                         A second grid of tiles for them duplicated the act list
                         below it. */}
                     {presetEntries.length > 0 && (
-                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest truncate">
+                      <span className="text-[11px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest truncate">
                         +{presetEntries.length} già pronti{presetHint && `: ${presetHint}…`}
                       </span>
                     )}
@@ -723,7 +725,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                           <span className="block text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
                             {alias.trigger}
                           </span>
-                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-tight line-clamp-1">
+                          <span className="text-[11px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-tight line-clamp-1">
                             → {alias.expandTo}
                           </span>
                         </div>
@@ -750,7 +752,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                         <span className="block text-sm font-bold text-indigo-600 dark:text-indigo-400 truncate">
                           {hasAliases ? 'Gestisci alias' : 'Crea il tuo primo alias'}
                         </span>
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-tight line-clamp-1">
+                        <span className="text-[11px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-tight line-clamp-1">
                           {hasAliases
                             ? 'I tuoi, più quelli già riconosciuti'
                             : 'Una sigla tua per una norma che apri spesso'}
@@ -766,11 +768,11 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                 {visiblePresets.length > 0 && (
                   <Command.Group className="mb-4">
                     <div className="flex items-center justify-between px-3 mb-3">
-                      <div className="flex items-center gap-2 text-[10px] font-black text-emerald-600 dark:text-emerald-500 uppercase tracking-widest">
+                      <div className="flex items-center gap-2 text-[11px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-widest">
                         <Sparkles size={12} strokeWidth={3} />
                         In dotazione
                       </div>
-                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                      <span className="text-[11px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest">
                         Non devi crearli
                       </span>
                     </div>
@@ -794,7 +796,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                             <span className="block text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
                               {trigger}
                             </span>
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-tight line-clamp-1">
+                            <span className="text-[11px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-tight line-clamp-1">
                               → {[preset.act_type, preset.act_number && `n. ${preset.act_number}`, preset.date]
                                   .filter(Boolean)
                                   .join(' ')}
@@ -810,7 +812,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                 <div className="space-y-4">
                   {Object.entries(getActTypesByGroup()).map(([group, acts]) => (
                     <Command.Group key={group} className="space-y-1">
-                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-3 mb-2">
+                      <div className="text-[11px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest px-3 mb-2">
                         {group}
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 px-1 pb-1">
@@ -853,7 +855,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                 </div>
                 <div className="text-center mb-8">
                   <h4 className="text-xl font-black text-slate-900 dark:text-white mb-2 uppercase tracking-tight">Inserisci {step === 'input_details' ? 'i Dettagli' : 'Articolo'}</h4>
-                  <p className="text-sm font-medium text-slate-500 dark:text-slate-400 max-w-xs mx-auto">
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400 max-w-xs mx-auto">
                     Stai consultando: <span className="text-primary-600 dark:text-primary-400 font-bold">{selectedActLabel}</span>
                   </p>
                 </div>
@@ -885,44 +887,12 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
 
           {/* Premium Footer */}
           <div className="px-6 py-5 border-t border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl">
-            {/* Quick Settings - Brocardi Toggle */}
-            <div id="command-palette-brocardi-toggle" className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-4">
-                <div className={cn(
-                  "p-2 rounded-xl border transition-[color,background-color,border-color,box-shadow]",
-                  includeBrocardi
-                    ? "bg-purple-500 text-white border-purple-600 shadow-md shadow-purple-500/20"
-                    : "bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700"
-                )}>
-                  <Lightbulb size={16} fill={includeBrocardi ? "currentColor" : "none"} />
-                </div>
-                <div>
-                  <span className="block text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">Includi dottrina</span>
-                  <span className="text-[10px] font-bold text-slate-400">Ratio legis, spiegazioni e massime correlate</span>
-                </div>
-              </div>
-
-              <div
-                onClick={() => setIncludeBrocardi(!includeBrocardi)}
-                className={cn(
-                  "w-12 h-6 rounded-full relative transition-colors p-1 cursor-pointer",
-                  includeBrocardi ? "bg-purple-500" : "bg-slate-200 dark:bg-slate-700"
-                )}
-              >
-                <motion.div
-                  className="w-4 h-4 rounded-full bg-white shadow-sm"
-                  animate={{ x: includeBrocardi ? 24 : 0 }}
-                  transition={spring.snappy}
-                />
-              </div>
-            </div>
-
             {/* Advanced legal filters */}
-            <div className="border-t border-slate-200 dark:border-slate-800 pt-4 mb-4">
+            <div className="mb-4">
               <button
                 type="button"
                 onClick={() => setShowAdvancedFilters(value => !value)}
-                className="w-full flex items-center justify-between text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400"
+                className={cn("w-full flex items-center justify-between text-xs font-black uppercase tracking-widest text-slate-600 dark:text-slate-400", TOUCH_TARGET_RESPONSIVE)}
                 aria-expanded={showAdvancedFilters}
               >
                 <span className="flex items-center gap-2"><SlidersHorizontal size={14} /> Filtri avanzati</span>
@@ -930,29 +900,25 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
               </button>
               {showAdvancedFilters && (
                 <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <label className="flex flex-col gap-1 text-slate-500 dark:text-slate-400">
+                  <label className="flex flex-col gap-1 text-slate-600 dark:text-slate-400">
                     Fonte
                     <select
                       value={filters.source}
                       onChange={(event) => setFilters(previous => ({ ...previous, source: event.target.value as SearchFilters['source'] }))}
-                      className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-slate-800 dark:text-slate-200"
+                      className={cn("rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-slate-800 dark:text-slate-200", TOUCH_TARGET_RESPONSIVE)}
                     >
                       <option value="all">Tutte le fonti</option>
                       <option value="normattiva">Normattiva</option>
                       <option value="eurlex">EUR-Lex</option>
                     </select>
                   </label>
-                  <label className="flex items-center gap-2 self-end rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2 text-slate-600 dark:text-slate-300">
-                    <input type="checkbox" checked={filters.hasBrocardi} onChange={(event) => setFilters(previous => ({ ...previous, hasBrocardi: event.target.checked }))} />
-                    Solo articoli con dottrina
-                  </label>
-                  <label className="flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2 text-slate-600 dark:text-slate-300">
+                  <label className={cn("flex items-center gap-2 self-end rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2 text-slate-600 dark:text-slate-300", TOUCH_TARGET_RESPONSIVE)}>
                     <input type="checkbox" checked={filters.onlyHistorical} onChange={(event) => setFilters(previous => ({ ...previous, onlyHistorical: event.target.checked }))} />
                     Solo versioni storiche
                   </label>
                   <div className="flex gap-2">
-                    <input aria-label="Anno iniziale" type="number" placeholder="Dal" value={filters.yearFrom ?? ''} onChange={(event) => setFilters(previous => ({ ...previous, yearFrom: event.target.value ? Number(event.target.value) : undefined }))} className="w-1/2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2" />
-                    <input aria-label="Anno finale" type="number" placeholder="Al" value={filters.yearTo ?? ''} onChange={(event) => setFilters(previous => ({ ...previous, yearTo: event.target.value ? Number(event.target.value) : undefined }))} className="w-1/2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2" />
+                    <input aria-label="Anno iniziale" type="number" placeholder="Dal" value={filters.yearFrom ?? ''} onChange={(event) => setFilters(previous => ({ ...previous, yearFrom: event.target.value ? Number(event.target.value) : undefined }))} className={cn("w-1/2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2", TOUCH_TARGET_RESPONSIVE)} />
+                    <input aria-label="Anno finale" type="number" placeholder="Al" value={filters.yearTo ?? ''} onChange={(event) => setFilters(previous => ({ ...previous, yearTo: event.target.value ? Number(event.target.value) : undefined }))} className={cn("w-1/2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2", TOUCH_TARGET_RESPONSIVE)} />
                   </div>
                 </div>
               )}
@@ -960,13 +926,13 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
 
             {/* Hint Badges */}
             <div className="flex flex-wrap gap-2 justify-center pt-2">
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100/50 dark:bg-slate-800/50 text-[10px] font-black text-slate-400 uppercase tracking-widest border border-slate-200/50 dark:border-slate-700/50">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100/50 dark:bg-slate-800/50 text-[11px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest border border-slate-200/50 dark:border-slate-700/50">
                 <span className="bg-white dark:bg-slate-900 px-1 rounded shadow-sm border border-slate-200 dark:border-slate-700">↑↓</span> Naviga
               </div>
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100/50 dark:bg-slate-800/50 text-[10px] font-black text-slate-400 uppercase tracking-widest border border-slate-200/50 dark:border-slate-700/50">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100/50 dark:bg-slate-800/50 text-[11px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest border border-slate-200/50 dark:border-slate-700/50">
                 <span className="bg-white dark:bg-slate-900 px-1 rounded shadow-sm border border-slate-200 dark:border-slate-700">↵</span> Seleziona
               </div>
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100/50 dark:bg-slate-800/50 text-[10px] font-black text-slate-400 uppercase tracking-widest border border-slate-200/50 dark:border-slate-700/50">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100/50 dark:bg-slate-800/50 text-[11px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest border border-slate-200/50 dark:border-slate-700/50">
                 <span className="bg-white dark:bg-slate-900 px-1 rounded shadow-sm border border-slate-200 dark:border-slate-700">ESC</span> Chiudi
               </div>
             </div>

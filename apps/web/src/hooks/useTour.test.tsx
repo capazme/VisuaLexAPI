@@ -5,9 +5,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.unmock('./useTour');
 
 // driver.js, reduced to what the hook asks of it: a driver that is active from `drive` to `destroy`.
-const made: Array<{ active: boolean; destroy: () => void; options: { onDestroyStarted?: () => void; onDestroyed?: () => void; steps: unknown[] } }> = [];
+type DriverOptions = {
+  onDestroyStarted?: () => void;
+  onDestroyed?: () => void;
+  onPopoverRender?: (popover: { closeButton: HTMLButtonElement }) => void;
+  steps: unknown[];
+};
+const made: Array<{ active: boolean; destroy: () => void; options: DriverOptions }> = [];
 vi.mock('driver.js', () => ({
-  driver: (options: { onDestroyStarted?: () => void; onDestroyed?: () => void; steps: unknown[] }) => {
+  driver: (options: DriverOptions) => {
     const d = {
       active: false,
       options,
@@ -67,5 +73,16 @@ describe('useTour — one tour at a time', () => {
     localStorage.setItem(TOUR_STORAGE_KEY, JSON.stringify({ version: TOUR_VERSION, completed: { welcome: true } }));
     act(() => { vi.advanceTimersByTime(400); });
     expect(made).toHaveLength(0);
+  });
+});
+
+describe('useTour — the popover speaks Italian', () => {
+  it('names driver.js\'s close button «Chiudi» on every step (driver.js writes «Close» and has no option for it)', () => {
+    const { result } = renderHook(() => useTour());
+    act(() => { result.current.startTour('welcome'); });
+    const closeButton = document.createElement('button');
+    closeButton.setAttribute('aria-label', 'Close');
+    made[0].options.onPopoverRender?.({ closeButton });
+    expect(closeButton).toHaveAttribute('aria-label', 'Chiudi');
   });
 });

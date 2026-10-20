@@ -151,14 +151,13 @@ export function useSearchQuery(inputValue: string): SearchQueryReading {
 }
 
 /** The search a ready norm runs: the text in force, the date as the API reads it. */
-export function citationSearchParams(citation: ParsedCitation, options: { showBrocardi: boolean; filters: SearchFilters }): SearchParams {
+export function citationSearchParams(citation: ParsedCitation, options: { filters: SearchFilters }): SearchParams {
   const params = toSearchParams(citation);
   return {
     ...params,
     date: params.date ? parseItalianDate(params.date) : '',
     version: 'vigente',
     version_date: '',
-    show_brocardi_info: options.showBrocardi,
     filters: options.filters,
   };
 }

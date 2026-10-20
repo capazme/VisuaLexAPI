@@ -12,9 +12,14 @@ import { MATERIA_LABEL, anchorLabel, cardTitle, normaFromAnchor } from './studia
 import { useValidationQueue, type VoteOutcome } from './useValidationQueue';
 import { VoteBar } from './VoteBar';
 import type { StudiaOutletContext } from './StudiaPage';
+import { BLOCK_HEADING, FOCUS_RING, INK_TEXT, MUTED_TEXT, TILE } from './progress/tokens';
 
 const STORAGE_KEY = 'visualex.studia.valida.materia';
 const MEASURE = 'max-w-[60ch]';
+const PART_HEADING = 'mb-1 text-sm font-semibold text-slate-700 dark:text-slate-200';
+/** A state of the queue with nothing to judge: a tile, its sentence in the reader's serif. */
+const STATE_TILE = cn(TILE, 'space-y-1 p-5 md:p-6');
+const STATE_LINE = cn('font-serif text-xl leading-snug', INK_TEXT);
 const MATERIE = Object.keys(MATERIA_LABEL) as Materia[];
 
 type ToastState = { message: string; type: 'success' | 'error' | 'info' } | null;
@@ -53,24 +58,24 @@ function CardBody({ card, headingRef }: { card: Scheda; headingRef: RefObject<HT
   const anchors = [...card.ancore].sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary));
   const others = anchors.slice(1);
   return (
-    <article aria-label="Scheda da validare" className="space-y-5">
+    <article aria-label="Scheda da validare" className={cn(TILE, 'space-y-5 p-5 md:p-6')}>
       <div>
         {/* Focusable by script only: after a vote the keyboard lands here, on the card that comes next. */}
-        <h3 ref={headingRef} tabIndex={-1} className="mb-2 text-sm text-slate-500 focus:outline-none dark:text-slate-400">{cardTitle(card)}</h3>
+        <h3 ref={headingRef} tabIndex={-1} className={cn('mb-2 break-words text-sm focus:outline-none', MUTED_TEXT)}>{cardTitle(card)}</h3>
         <p className={cn(MEASURE, 'whitespace-pre-line break-words text-left font-serif text-xl leading-[1.7] text-slate-900 dark:text-slate-50')}>{card.domanda}</p>
         <hr className={cn(MEASURE, 'my-4 border-slate-200 dark:border-slate-700')} />
         <p className={cn(MEASURE, 'whitespace-pre-line break-words text-left font-serif text-lg leading-[1.7] text-slate-800 dark:text-slate-200')}>{card.risposta}</p>
       </div>
       {card.spiegazione && (
         <section>
-          <h4 className="mb-1 text-sm font-semibold text-slate-700 dark:text-slate-200">Spiegazione</h4>
+          <h4 className={PART_HEADING}>Spiegazione</h4>
           <p className={cn(MEASURE, 'whitespace-pre-line break-words text-left font-serif text-base leading-[1.7] text-slate-600 dark:text-slate-400')}>{card.spiegazione}</p>
         </section>
       )}
       {others.length > 0 && (
         <section>
-          <h4 className="mb-1 text-sm font-semibold text-slate-700 dark:text-slate-200">Altre ancore</h4>
-          <ul className="space-y-1 text-sm text-slate-600 dark:text-slate-300">
+          <h4 className={PART_HEADING}>Altre ancore</h4>
+          <ul className="space-y-1 break-words text-sm text-slate-700 dark:text-slate-200">
             {others.map((anchor) => (
               <li key={`${anchor.normaKey}|${anchor.articleId}`}>{anchorLabel(anchor) ?? anchor.urn}</li>
             ))}
@@ -91,9 +96,9 @@ function AnchoredArticle({ card, showToast }: { card: Scheda; showToast: (messag
   const norma = useMemo(() => (urn ? normaFromAnchor({ urn }) : null), [urn]);
   if (!anchor || !norma) {
     return (
-      <div className="space-y-1 text-sm text-slate-600 dark:text-slate-300">
+      <div className="space-y-1 text-sm text-slate-700 dark:text-slate-200">
         {anchor && <p className="break-words">{anchorLabel(anchor) ?? anchor.urn}</p>}
-        <p className="text-slate-500 dark:text-slate-400">Il testo di questo articolo non si può aprire qui.</p>
+        <p className={MUTED_TEXT}>Il testo di questo articolo non si può aprire qui.</p>
       </div>
     );
   }
@@ -108,9 +113,14 @@ function AnchoredArticle({ card, showToast }: { card: Scheda; showToast: (messag
 export function ValidationQueueView() {
   const desktop = useIsDesktop();
   const [materia, setMateria] = useState<Materia | undefined>(rememberedMateria);
-  const { status, card, voting, vote, retry } = useValidationQueue(materia);
-  // A refusal reads «no longer» unless the account says the person never was a validator.
-  const neverValidator = useOutletContext<StudiaOutletContext | undefined>()?.validator === false;
+  // What the account says (undefined while it loads, null when it could not be read: then the server
+  // decides); outside the area's outlet the server decides too.
+  const outlet = useOutletContext<StudiaOutletContext | undefined>();
+  const validator = outlet ? outlet.validator : true;
+  const { status, card, voting, vote, retry } = useValidationQueue(materia, validator);
+  // A refusal reads «no longer» unless the account says the person never was a validator, or could
+  // not say (as before the account was asked, when a failed read counted as «not a validator»).
+  const neverValidator = validator === false || validator === null;
   const [toast, setToast] = useState<ToastState>(null);
   // The collapsed section belongs to a card: the next one starts closed.
   const [openFor, setOpenFor] = useState<string | null>(null);
@@ -144,32 +154,38 @@ export function ValidationQueueView() {
 
   return (
     <section className="flex min-h-0 flex-col gap-4">
-      <h2 className="sr-only">Da validare</h2>
-      <div className="max-w-xs">
-        <FormSelect aria-label="Materia" value={materia ?? ''} onChange={(e) => chooseMateria(e.target.value)} className="min-h-[44px] md:min-h-0">
-          <option value="">Tutte le materie</option>
-          {MATERIE.map((m) => (
-            <option key={m} value={m}>{MATERIA_LABEL[m]}</option>
-          ))}
-        </FormSelect>
-      </div>
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className={BLOCK_HEADING}>Da validare</h2>
+        <div className="w-full md:w-64">
+          <FormSelect aria-label="Materia" value={materia ?? ''} onChange={(e) => chooseMateria(e.target.value)} className="min-h-[44px] rounded-xl">
+            <option value="">Tutte le materie</option>
+            {MATERIE.map((m) => (
+              <option key={m} value={m}>{MATERIA_LABEL[m]}</option>
+            ))}
+          </FormSelect>
+        </div>
+      </header>
 
-      {status === 'loading' && <p className="text-sm text-slate-500 dark:text-slate-400">Carico le schede…</p>}
-      {status === 'empty' && <p className="py-8 text-sm text-slate-600 dark:text-slate-300">{materia ? 'Nessuna scheda da validare in questa materia' : 'Nessuna scheda da validare'}</p>}
+      {status === 'loading' && <p className={cn('text-sm', MUTED_TEXT)}>Carico le schede…</p>}
+      {status === 'empty' && (
+        <div className={STATE_TILE}>
+          <p className={STATE_LINE}>{materia ? 'Nessuna scheda da validare in questa materia' : 'Nessuna scheda da validare'}</p>
+        </div>
+      )}
       {status === 'forbidden' && (
-        <div role="alert" className="space-y-1 py-8 text-sm text-slate-600 dark:text-slate-300">
-          <p className="font-medium text-slate-800 dark:text-slate-100">{neverValidator ? 'Questa sezione è riservata ai validatori di VisuaLex Gymnasium' : 'Non sei più tra i validatori'}</p>
+        <div role="alert" className={cn(STATE_TILE, 'text-sm text-slate-700 dark:text-slate-200')}>
+          <p className={STATE_LINE}>{neverValidator ? 'Questa sezione è riservata ai validatori di VisuaLex Gymnasium' : 'Non sei più tra i validatori'}</p>
           <p>Se pensi sia un errore, chiedilo a un amministratore.</p>
         </div>
       )}
       {status === 'error' && (
-        <div role="alert" className="flex flex-wrap items-center gap-3 py-4 text-sm text-red-600 dark:text-red-400">
+        <div role="alert" className="flex flex-wrap items-center gap-x-3 py-4 text-sm text-red-700 dark:text-red-400">
           Non riesco a leggere le schede da validare.
           <button type="button" onClick={() => {
               votedOn.current = null;
               retry();
             }}
-            className="min-h-[44px] rounded px-2 font-medium underline md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+            className={cn('min-h-[44px] rounded px-1 font-medium underline', FOCUS_RING)}>
             Riprova
           </button>
         </div>
@@ -187,10 +203,10 @@ export function ValidationQueueView() {
                       type="button"
                       aria-expanded={openFor === card.id}
                       onClick={() => setOpenFor(openFor === card.id ? null : card.id)}
-                      className="flex min-h-[44px] w-full items-center justify-between rounded text-left text-sm font-semibold text-slate-700 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                      className={cn('flex min-h-[44px] w-full items-center justify-between rounded text-left text-sm font-semibold text-slate-700 dark:text-slate-200', FOCUS_RING)}
                     >
                       Testo dell’articolo
-                      <ChevronDown size={16} aria-hidden className={cn('transition-transform', openFor === card.id && 'rotate-180')} />
+                      <ChevronDown size={16} aria-hidden className={cn('transition-transform motion-reduce:transition-none', openFor === card.id && 'rotate-180')} />
                     </button>
                   </h4>
                   {openFor === card.id && <AnchoredArticle card={card} showToast={showToast} />}
@@ -198,8 +214,8 @@ export function ValidationQueueView() {
               )}
             </div>
             {desktop && (
-              // Scrolls on its own, and is cut to what is left under the page's heading, the area's strip, the filter and the vote bar (about 21.5rem).
-              <div className="sticky top-0 max-h-[calc(100dvh-21.5rem)] min-w-0 overflow-y-auto pb-4">
+              // Scrolls on its own, and is cut to what is left under the page's heading, the area's strip, the heading with the filter and the vote bar (about 22rem).
+              <div className={cn(TILE, 'sticky top-0 max-h-[calc(100dvh-22rem)] min-w-0 overflow-y-auto p-4')}>
                 <AnchoredArticle card={card} showToast={showToast} />
               </div>
             )}

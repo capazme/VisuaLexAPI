@@ -9,7 +9,8 @@ export interface SubjectChipsProps {
   onSelect: (materia: Materia | undefined) => void;
 }
 
-const CHIP = 'inline-flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap rounded-md border px-3 text-sm md:min-h-0 md:py-1.5';
+/** 44 px at every width: on a computer too, where the chips used to drop to 34 px. */
+const CHIP = 'inline-flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap rounded-md border px-3 text-sm';
 
 /**
  * The subject filter of the dashboard and of the session it starts (Studia progress spec §6.2):

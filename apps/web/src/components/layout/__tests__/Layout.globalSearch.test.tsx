@@ -10,7 +10,7 @@ vi.mock('../../ui/ChangelogNotification', () => ({ ChangelogNotification: () => 
 vi.mock('../../ui/Toast', () => ({ UndoToastContainer: () => null }));
 vi.mock('../../ui/SyncErrorToast', () => ({ SyncErrorToast: () => null }));
 vi.mock('../../ui/KeyboardShortcutsModal', () => ({ KeyboardShortcutsModal: () => null }));
-vi.mock('../../ui/ServiceHealthBanner', () => ({ ServiceHealthBanner: () => null }));
+vi.mock('../../../hooks/useServiceHealth', () => ({ useServiceHealth: () => ({ snapshot: { overall: 'online', services: [], checkedAt: '' }, refresh: vi.fn() }) }));
 vi.mock('../../features/compare/CompareView', () => ({ CompareView: () => null }));
 vi.mock('../../../plugins/PluginSlot', () => ({ PluginSlot: () => null }));
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ isAuthenticated: true }) }));
@@ -141,7 +141,7 @@ describe('Layout — ⌘K opens the palette on every page', () => {
   });
 
   it('a quick norm used from its manager on another page lands on the search page, as a trigger checked for an annex', async () => {
-    const params = { act_type: 'codice civile', act_number: '', date: '', article: '2043', version: 'vigente' as const, version_date: '', show_brocardi_info: true };
+    const params = { act_type: 'codice civile', act_number: '', date: '', article: '2043', version: 'vigente' as const, version_date: '' };
     appStore.setState({
       quickNorms: [{ id: 'q1', label: 'Danno ingiusto', searchParams: params, createdAt: '', usageCount: 0 }],
       quickNormsManagerOpen: true,
@@ -157,7 +157,7 @@ describe('Layout — ⌘K opens the palette on every page', () => {
   });
 
   it('a quick norm picked in the palette runs as a typed search, and its saved params stay unmarked', async () => {
-    const params = { act_type: 'codice civile', act_number: '', date: '', article: '2043', version: 'vigente' as const, version_date: '', show_brocardi_info: true };
+    const params = { act_type: 'codice civile', act_number: '', date: '', article: '2043', version: 'vigente' as const, version_date: '' };
     appStore.setState({
       quickNorms: [{ id: 'q1', label: 'Danno ingiusto', searchParams: params, createdAt: '', usageCount: 0 }],
       selectQuickNorm: () => appStore.getState().quickNorms[0],

@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 const tour = vi.hoisted(() => ({ onComplete: undefined as undefined | ((t: string) => void) }));
 vi.mock('../../../hooks/useTour', () => ({
@@ -522,5 +524,23 @@ describe('CommandPalette — Escape', () => {
     document.dispatchEvent(event);
     expect(event.defaultPrevented).toBe(true);
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('CommandPalette — sizes on a phone (the owner\'s pass of 20 October 2026)', () => {
+  it('writes no text under 11 px', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/components/features/search/CommandPalette.tsx'), 'utf8');
+    const sizes = [...source.matchAll(/text-\[(\d+)px\]/g)].map((m) => Number(m[1]));
+    expect(sizes.filter((px) => px < 11)).toEqual([]);
+  });
+
+  it('gives the steps «Atto» and «Articolo» and «Gestisci» 44 px on a phone, and names the close button', () => {
+    appStore.setState({ quickNorms: [] });
+    renderPalette();
+    const atto = screen.getByRole('button', { name: 'Atto' });
+    expect(atto).toHaveClass('min-h-[44px]', 'md:min-h-0');
+    expect(screen.getByText('Articolo').parentElement).toHaveClass('min-h-[44px]', 'md:min-h-0');
+    expect(screen.getByRole('button', { name: 'Gestisci' })).toHaveClass('min-h-[44px]', 'md:min-h-0');
+    expect(screen.getByRole('button', { name: 'Chiudi' })).toHaveClass('min-h-[44px]', 'min-w-[44px]');
   });
 });

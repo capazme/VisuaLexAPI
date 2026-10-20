@@ -83,6 +83,23 @@ describe('the read by institute', () => {
     expect(JSON.stringify(unknown.body)).toContain('Materia non valida.');
   });
 
+  it('opens a session whose counts agree with the stop it was taken from', async () => {
+    const odd = 'Risoluzione per inadempimento (art. 1453) — è “così”';
+    const [due, later] = [await card(alice, odd), await card(alice, odd)];
+    await card(alice, odd);
+    await card(alice, 'Altro istituto');
+    await state(alice, due.id, '2026-10-15', '2026-10-10T07:00:00Z');
+    await state(alice, later.id, '2026-10-25', '2026-10-19T07:00:00Z');
+
+    const stop = (await percorso()).body.find((s: { istituto: string }) => s.istituto === odd);
+    const response = await request(app).get('/api/lingo/srs/sessione').query({ materia: stop.materia, istituto: stop.istituto }).set(a);
+
+    expect(response.status).toBe(200);
+    expect(response.body.conteggi).toEqual({ dovute: stop.dovute, nuove: stop.nuove });
+    expect(response.body.cards).toHaveLength(stop.dovute + stop.nuove);
+    expect(response.body.cards.every((c: { istituto: string }) => c.istituto === odd)).toBe(true);
+  });
+
   it('splits an institute into new, learning, consolidated and due', async () => {
     const [fresh, learning, overdue, solid] = [
       await card(alice, 'Risoluzione'),

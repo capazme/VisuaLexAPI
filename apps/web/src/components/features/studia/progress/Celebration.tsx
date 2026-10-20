@@ -148,11 +148,11 @@ export interface SessionCelebrationProps {
 }
 
 /**
- * The goal closing during a review (Studia progress spec §6.4): a notice over the session's header row
- * («Restano N · Interrompi»), never over the card or the grades, with the stamp and the confetti inside it.
- * It sits in the page, so it scrolls away with the header rather than float over a long answer; it takes no
- * focus and no pointer (the button under it stays usable), so the keys keep working. Gone in 1.5 s
- * (decision 6). Under reduced motion it is the same notice, still.
+ * The goal closing during a review (Studia progress spec §6.4): a notice over the lesson's header row (the
+ * close button and the progress bar, Gymnasium spec §5.4), never over the card or the grades, with the stamp and
+ * the confetti inside it. It is placed in that row, not fixed over the screen; it takes no focus and no pointer
+ * (the button under it stays usable), so the keys keep working. Gone in 1.5 s (decision 6). Under reduced motion
+ * it is the same notice, still.
  */
 export function SessionCelebration({ giorno, serie, onStart, onDone }: SessionCelebrationProps) {
   const start = useRef(onStart);

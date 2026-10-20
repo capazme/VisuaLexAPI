@@ -24,7 +24,7 @@ export interface AnnotationActionsOptions {
 /**
  * What the selection popup's «Evidenzia» and «Nota» do, and the tooltip composer's state, for any
  * surface that renders the reader's marks: the same guard, the same store calls, the same toasts.
- * The anchor's `scopedArticleId` lets a sub-section (Brocardi) target its own scope.
+ * The anchor's `scopedArticleId` lets a sub-section of the article target its own scope.
  */
 export function useAnnotationActions({
   key, articleId, highlights, showToast, enabled = true, onHighlightAdded, onNoteSelection, onNoteAdded,

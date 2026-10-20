@@ -300,6 +300,68 @@ describe('persist version 1: the saved tabs become practices, once', () => {
   });
 });
 
+describe('Brocardi out of the saved practices (D-078)', () => {
+  // What Brocardi gave an article, as a browser saved it before D-078 (no Brocardi text here).
+  const LEGACY = {
+    brocardi_info: { position: 'Libro IV', link: null, Brocardi: ['Neminem laedere'], Ratio: 'ratio', Spiegazione: 'spiegazione', Massime: ['massima'] },
+    brocardi_error: 'timeout',
+  };
+  const legacy = (numero: string) => ({ ...article(CC_RD, numero), ...LEGACY });
+  const withLegacy = () => practice('p1', 'Danno', {
+    acts: [{ id: 'a', key: 'codice civile', norma: CC_RD, articles: [legacy('2043'), legacy('2044')] as never, isCollapsed: false }],
+  });
+  const savedFields = (state: AppState) => state.practices.flatMap((p) => p.acts.flatMap((a) => a.articles.flatMap(Object.keys)));
+
+  it('a reload drops brocardi_info and brocardi_error from every saved article, and keeps the rest as saved', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const state = reload({ practices: [withLegacy()], activePracticeId: 'p1' });
+    expect(savedFields(state)).not.toContain('brocardi_info');
+    expect(savedFields(state)).not.toContain('brocardi_error');
+    expect(state.practices[0].acts[0].articles).toEqual([article(CC_RD, '2043'), article(CC_RD, '2044')]);
+    // not a loss of the reader's own: nothing is logged
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('a version-0 state drops them too, from the tabs the practices are made of', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const state = loadV0({ workspaceTabs: [tab('tab-cc', 'Codice civile', 1, [block('b1', CC_RD, [legacy('2043')])])] });
+    expect(state.practices[0].acts[0].articles).toHaveLength(1);
+    expect(savedFields(state)).not.toContain('brocardi_info');
+    expect(savedFields(state)).not.toContain('brocardi_error');
+  });
+
+  it('really rehydrates a visualex-storage holding them without them, and the next save writes none', async () => {
+    localStorage.setItem(options().name, JSON.stringify({ state: { practices: [withLegacy()], activePracticeId: 'p1' }, version: 1 }));
+    await appStore.persist.rehydrate();
+    expect(savedFields(appStore.getState())).not.toContain('brocardi_info');
+    appStore.getState().renamePractice('p1', 'Danno ingiusto');
+    expect(localStorage.getItem(options().name)).not.toContain('brocardi');
+    localStorage.removeItem(options().name);
+  });
+
+  it('saves an article arriving with them (a staggered release) without them, with no reload in between', () => {
+    localStorage.removeItem(options().name);
+    appStore.setState({ practices: [], activePracticeId: null });
+    appStore.getState().addArticlesToPractice(null, CC_RD, [legacy('2043') as never]);
+    expect(savedFields(appStore.getState())).not.toContain('brocardi_info');
+    expect(savedFields(appStore.getState())).not.toContain('brocardi_error');
+    expect(appStore.getState().practices[0].acts[0].articles).toEqual([article(CC_RD, '2043')]);
+    const stored = localStorage.getItem(options().name);
+    expect(stored).toContain('"practices"');
+    expect(stored).not.toContain('brocardi');
+    localStorage.removeItem(options().name);
+  });
+
+  it('leaves the old flags of a saved search inert where they sit: the article keeps whatever else it was saved with', () => {
+    const saved = { ...article(CC_RD, '2043'), show_brocardi_info: true, hasBrocardi: true };
+    const state = reload({
+      practices: [practice('p1', 'Danno', { acts: [{ id: 'a', key: 'codice civile', norma: CC_RD, articles: [saved] as never, isCollapsed: false }] })],
+      activePracticeId: 'p1',
+    });
+    expect(state.practices[0].acts[0].articles).toEqual([saved]);
+  });
+});
+
 describe('partialize', () => {
   it('saves the practices and the active one; never the tabs, the marker, the open rows, the pending reveal or the notice', () => {
     appStore.setState({

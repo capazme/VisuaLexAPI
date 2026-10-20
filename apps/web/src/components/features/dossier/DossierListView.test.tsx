@@ -35,12 +35,12 @@ beforeEach(() => {
 });
 
 describe('DossierListView — the quick-open of a card', () => {
-  it('opens a single past group as that text, without doctrine, in the dossier\'s practice', () => {
+  it('opens a single past group as that text, in the dossier\'s practice', () => {
     open([PAST]);
     const { searchQueue, practices } = appStore.getState();
     expect(searchQueue).toHaveLength(1);
     expect(searchQueue[0]).toMatchObject({
-      article: '1284', version: 'vigente', version_date: '2007-12-29', show_brocardi_info: false,
+      article: '1284', version: 'vigente', version_date: '2007-12-29',
       tabLabel: 'Pratica Rossi — testo al 29/12/2007',
     });
     expect(practices.map((p) => p.label)).toEqual(['Pratica Rossi']);
@@ -50,7 +50,7 @@ describe('DossierListView — the quick-open of a card', () => {
   it('opens a single group in force as it always did', () => {
     open([CIVIL]);
     expect(appStore.getState().searchQueue[0]).toMatchObject({
-      version: 'vigente', version_date: '', show_brocardi_info: true, tabLabel: 'Pratica Rossi',
+      version: 'vigente', version_date: '', tabLabel: 'Pratica Rossi',
     });
   });
 
@@ -59,8 +59,8 @@ describe('DossierListView — the quick-open of a card', () => {
     fireEvent.click(screen.getByRole('button', { name: /Apri tutto/ }));
     const { searchQueue, practices } = appStore.getState();
     expect(searchQueue).toHaveLength(2);
-    expect(searchQueue[0]).toMatchObject({ version: 'vigente', version_date: '', show_brocardi_info: true });
-    expect(searchQueue[1]).toMatchObject({ version: 'vigente', version_date: '2007-12-29', show_brocardi_info: false });
+    expect(searchQueue[0]).toMatchObject({ version: 'vigente', version_date: '' });
+    expect(searchQueue[1]).toMatchObject({ version: 'vigente', version_date: '2007-12-29' });
     expect(practices.map((p) => p.label)).toEqual(['Pratica Rossi']);
     expect(searchQueue.map((q) => q.targetPracticeId)).toEqual([practices[0].id, practices[0].id]);
   });
@@ -75,7 +75,7 @@ describe('DossierListView — the quick-open of a card', () => {
     open([CIVIL, PAST]);
     fireEvent.click(screen.getByText('Testo al 29/12/2007'));
     expect(appStore.getState().searchTrigger).toMatchObject({
-      version_date: '2007-12-29', show_brocardi_info: false, tabLabel: 'Pratica Rossi — testo al 29/12/2007',
+      version_date: '2007-12-29', tabLabel: 'Pratica Rossi — testo al 29/12/2007',
     });
   });
 });
@@ -164,13 +164,13 @@ describe('DossierListView — dossiers di lavoro and di studio', () => {
     { ...dossier([PENAL]), id: 's', title: 'Diritto penale', kind: 'studio', published: { sharedEnvironmentId: 'e1', version: 2, isActive: true, updatedAt: '2026-10-14' } },
     { ...dossier([]), id: 'o', title: 'Senza tipo' },
   ];
-  const titles = () => screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+  const titles = () => screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
 
   it("lists the section's kind: Opus the dossiers di lavoro (one with no kind among them), Gymnasium those di studio (sections spec S7)", () => {
     appStore.setState({ dossiers: kinds });
     sectionStore.setState({ section: 'opus', dossierKind: 'lavoro' });
     const { unmount } = render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
-    expect(screen.getByRole('heading', { level: 2, name: 'I tuoi dossier di lavoro' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'I tuoi dossier di lavoro' })).toBeInTheDocument();
     expect(titles().sort()).toEqual(['Pratica Rossi', 'Senza tipo']);
     // The kind filter is gone: the section is the filter.
     expect(screen.queryByRole('group', { name: 'Tipo di dossier' })).toBeNull();
@@ -178,7 +178,7 @@ describe('DossierListView — dossiers di lavoro and di studio', () => {
 
     sectionStore.setState({ section: 'gymnasium', dossierKind: 'studio' });
     render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
-    expect(screen.getByRole('heading', { level: 2, name: 'I tuoi dossier di studio' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'I tuoi dossier di studio' })).toBeInTheDocument();
     expect(titles()).toEqual(['Diritto penale']);
     expect(screen.getAllByText('Di studio', { selector: 'span' })).toHaveLength(1);
     expect(screen.getByText('Pubblicato nel Forum')).toBeInTheDocument();
@@ -197,7 +197,7 @@ describe('DossierListView — dossiers di lavoro and di studio', () => {
       appStore.setState({ dossiers: kinds });
       render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
       expect(titles()).toHaveLength(3);
-      expect(screen.getByRole('heading', { level: 2, name: 'I tuoi Dossier' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1, name: 'I tuoi Dossier' })).toBeInTheDocument();
     } finally {
       vi.unstubAllEnvs();
     }
@@ -213,7 +213,7 @@ describe('DossierListView — the category menu (D1)', () => {
     tagged('c', 'Registro trattamenti', ['gdpr']),
     tagged('d', 'Valutazione d\'impatto', ['GDPR', 'cancellazione']),
   ];
-  const titles = () => screen.queryAllByRole('heading', { level: 3 }).map((h) => h.textContent).sort();
+  const titles = () => screen.queryAllByRole('heading', { level: 2 }).map((h) => h.textContent).sort();
   const renderList = () => render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
 
   it('lists the categories capitalised and in alphabetical order, «Tutte le categorie» first, one for «gdpr» and «GDPR»', () => {

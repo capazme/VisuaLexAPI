@@ -469,7 +469,6 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
             const hit = findPracticeArticle({ ...act, articles: studyRows }, articleId);
             if (hit) setStudyKey(practiceArticleKey(hit));
           }}
-          onCrossReferenceNavigate={onCrossReference}
           normaLabel={heading}
           allArticleIds={allArticleIds}
           onLoadArticle={(number) => openArticle(number)}

@@ -230,10 +230,210 @@ export const changePassword = async (req: Request, res: Response) => {
   res.json({ message: 'Password changed successfully' });
 };
 
+/** A row taken from someone else (a suggestion, a Forum download) says so, never whose it was. */
+const withoutOriginalAuthor = <T extends { originalAuthorId: string | null }>({ originalAuthorId, ...row }: T) =>
+  ({ ...row, fromAnotherUser: originalAuthorId !== null });
+
+/** A key of an archived environment's content, folded: `Author_Id`, `author-id` and `authorId` are one key. */
+const foldKey = (key: string) => key.toLowerCase().replace(/[_-]/g, '');
+// The web's attribution of a row taken from someone else (`originalAuthor`, `originalAuthorId`,
+// `originalAuthorDisplayName`, any key that starts so): it becomes `fromAnotherUser`.
+const isAttributionKey = (folded: string) => folded.startsWith('originalauthor');
+// A person's identity, in a file the user imported by hand (someone else's, possibly): it stays
+// only when it is the user's own id, username or email. `user`, `owner`, `suggester` and
+// `reporter` are the web's person objects ({ id, username }): an object never is, so it goes whole.
+// A display or full name cannot be told from the user's own, so it always goes.
+const IDENTITY_KEYS = new Set([
+  'author', 'authorid', 'authorname', 'authorusername', 'authoremail', 'username', 'userid', 'useremail', 'email',
+  'user', 'owner', 'ownerid', 'suggester', 'suggesterid', 'reporter', 'reporterid',
+  'displayname', 'fullname', 'autoreid', 'utenteid',
+]);
+// Keys that only a person has: beside an id, they make the object a person (`personKind`).
+const PERSON_KEYS = new Set(['username', 'email', 'displayname', 'fullname', 'firstname', 'lastname']);
+// A name is also a dossier's or an environment's: it makes a person only beside a user's id.
+const NAME_KEYS = new Set([...PERSON_KEYS, 'name']);
+const UUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+// What separates the words of a text: any character an email cannot hold (`«bob@x.it»`,
+// `mailto:bob@x.it?subject=…`), so an email is a word with an `@` in it. Split, never a pattern
+// that would scan a long text again from every position.
+const WORD_BREAK = /[^a-z0-9._%+\-@]+/i;
+// What stands, in a text the user wrote, for another user's id or email.
+const OTHER_USER = '[altro utente]';
+
+/** `others`: the ids and emails, lowercased, of the other users the content names (`othersIn`). */
+type OwnIdentity = { id: string; username: string; email: string; others: ReadonlySet<string> };
+
+const isOwnId = (value: unknown, own: OwnIdentity) => typeof value === 'string' && value.toLowerCase() === own.id.toLowerCase();
+
+const isOwnIdentity = (value: unknown, own: OwnIdentity) =>
+  typeof value === 'string' && (isOwnId(value, own) || value === own.username || value.toLowerCase() === own.email.toLowerCase());
+
+/** A user's id: the user's own or another's. */
+const isUserId = (value: unknown, own: OwnIdentity) =>
+  typeof value === 'string' && (isOwnId(value, own) || own.others.has(value.toLowerCase()));
+
+/** The ids and emails a text could hold, lowercased: the candidates for a user's. */
+function identifiersIn(text: string): string[] {
+  const found = (text.match(UUID_PATTERN) ?? []).map((id) => id.toLowerCase());
+  if (!text.includes('@')) return found;
+  for (const word of text.split(WORD_BREAK)) {
+    // A sentence's full stop is not the email's.
+    let last = word.length;
+    while (last > 0 && word[last - 1] === '.') last -= 1;
+    const email = word.slice(0, last);
+    const at = email.indexOf('@');
+    if (at > 0 && at < email.length - 1) found.push(email.toLowerCase());
+  }
+  return found;
+}
+
+/** A string that holds another user's id or email, alone or inside a longer text. */
+const holdsOtherUser = (value: unknown, own: OwnIdentity) =>
+  typeof value === 'string' && identifiersIn(value).some((found) => own.others.has(found));
+
+/** A string that is another user's id or email, and nothing else. */
+const isOtherUserIdentifier = (value: unknown, own: OwnIdentity) =>
+  typeof value === 'string' && own.others.has(value.trim().toLowerCase());
+
+/** A text the user wrote, with another user's id or email in it: that id or email is covered, the text stays. */
+function withOtherUsersCovered(text: string, own: OwnIdentity): string {
+  let out = text;
+  for (const found of new Set(identifiersIn(text))) {
+    if (!own.others.has(found)) continue;
+    out = out.replace(new RegExp(found.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), OTHER_USER);
+  }
+  return out;
+}
+
+/** `id`, `uid`, `_id`, `userId`, `autore_id`, `AUTHOR-ID`: a key that names an id (not `paid`, not `valid`). */
+const isIdKey = (key: string) => /^_?u?id$/i.test(key) || /[_-]id$/i.test(key) || /[a-z0-9]I[dD]$/.test(key);
+
+/**
+ * What an object of the content is, as a person:
+ * - `user`: a user's record, someone else's: its own `id` is another user's, beside a name,
+ *   username or email. It goes whole: whatever else it holds is that person's.
+ * - `person`: someone's identity on a row: an id beside a key only a person has (`PERSON_KEYS`),
+ *   say `{ author_id, username }` or `{ id, displayName, text }`, or, in an object with no `id`
+ *   of its own, another user's id beside a name (`{ authorId, name }`). Its ids and names go, whatever
+ *   the keys are called, so no id is left behind under a key the lists do not know.
+ * - `own`: either of the two, but the user's: their username or email, or else only their id,
+ *   and no other user's id or email (a display name cannot be checked). Its names stay.
+ */
+function personKind(entries: [string, unknown][], own: OwnIdentity): 'none' | 'own' | 'user' | 'person' {
+  const folded = entries.map(([key, inner]) => [foldKey(key), inner] as const);
+  // An id by its key, or by its value: a user's id under `userid` or `AUTHORID` is one too.
+  const ids = entries
+    .filter(([key, inner]) => typeof inner === 'string' && inner !== '' && (isIdKey(key) || isUserId(inner, own)))
+    .map(([, inner]) => inner as string);
+  if (ids.length === 0) return 'none';
+  const record = folded.find(([key]) => key === 'id' || key === 'uid');
+  const named = folded.some(([key]) => NAME_KEYS.has(key));
+  const isUserRecord = named && record !== undefined && isUserId(record[1], own);
+  // A dossier's own id is not a user's: its `userId` beside its name does not make it a person,
+  // nor does the user's own id beside a name (`{ name, userId, folderId }`, the user's folder).
+  const isPerson = folded.some(([key]) => PERSON_KEYS.has(key)) || (named && !record && ids.some((inner) => own.others.has(inner.toLowerCase())));
+  if (!isUserRecord && !isPerson) return 'none';
+  const checkable = folded.filter(([key]) => key === 'username' || key === 'email');
+  const mine = folded.every(([, inner]) => !holdsOtherUser(inner, own))
+    && checkable.every(([, inner]) => isOwnIdentity(inner, own))
+    && (checkable.length > 0 || ids.every((inner) => isOwnId(inner, own)));
+  if (mine) return 'own';
+  return isUserRecord ? 'user' : 'person';
+}
+
+const isOtherUserRecord = (value: unknown, own: OwnIdentity) =>
+  typeof value === 'object' && value !== null && !Array.isArray(value) && personKind(Object.entries(value), own) === 'user';
+
+/**
+ * An archived environment's content is the JSON the web posted or a file the user imported by
+ * hand, whose rows could carry the web's `originalAuthor` ({ id, username }) or an
+ * `originalAuthorId`, which become `fromAnotherUser`, and anyone's `authorId`, `username`,
+ * `user_id`, `email` and the like (`IDENTITY_KEYS`, case and `_`/`-` folded), which go unless they
+ * are the user's own. Someone else's person object loses its ids and names, or goes whole when it
+ * is a user's record (`personKind`). Another user's id or email goes, under any key; inside a
+ * longer text it is covered (`OTHER_USER`) and the text stays. At any depth; nothing else changes.
+ * `marked` false: the attribution goes without a `fromAnotherUser` in its place (a search's
+ * parameters, which the row's own `fromAnotherUser` already speaks for).
+ */
+function withoutAuthors(value: unknown, own: OwnIdentity, marked = true): unknown {
+  if (typeof value === 'string') return withOtherUsersCovered(value, own);
+  if (Array.isArray(value)) {
+    return value
+      .filter((inner) => !isOtherUserIdentifier(inner, own) && !isOtherUserRecord(inner, own))
+      .map((inner) => withoutAuthors(inner, own, marked));
+  }
+  if (typeof value !== 'object' || value === null) return value;
+  const entries = Object.entries(value);
+  const kind = personKind(entries, own);
+  const out: Record<string, unknown> = {};
+  let fromAnotherUser = false;
+  for (const [key, inner] of entries) {
+    const folded = foldKey(key);
+    if (isAttributionKey(folded)) {
+      fromAnotherUser ||= inner !== null && inner !== undefined;
+      continue;
+    }
+    // The user's own record keeps its names (a display name cannot be checked); anything else is read as ever.
+    if (IDENTITY_KEYS.has(folded) && !isOwnIdentity(inner, own) && !(kind === 'own' && NAME_KEYS.has(folded))) continue;
+    // Someone else's record or identity: its ids and names go (a record at the top, which no
+    // parent removes, keeps only what is not about the person).
+    if ((kind === 'person' || kind === 'user') && (isIdKey(key) || NAME_KEYS.has(folded))) continue;
+    if (holdsOtherUser(key, own) || isOtherUserIdentifier(inner, own) || isOtherUserRecord(inner, own)) continue;
+    // Defined, not assigned: a `__proto__` key in the blob stays a key of the row.
+    Object.defineProperty(out, key, { value: withoutAuthors(inner, own, marked), enumerable: true, writable: true, configurable: true });
+  }
+  if (fromAnotherUser && marked) out.fromAnotherUser = true;
+  return out;
+}
+
+/** Every id and email the content holds, in its values and its keys, lowercased. */
+function collectIdentifiers(value: unknown, into: Set<string>) {
+  if (typeof value === 'string') {
+    for (const found of identifiersIn(value)) into.add(found);
+  } else if (Array.isArray(value)) {
+    for (const inner of value) collectIdentifiers(inner, into);
+  } else if (typeof value === 'object' && value !== null) {
+    for (const [key, inner] of Object.entries(value)) {
+      collectIdentifiers(key, into);
+      collectIdentifiers(inner, into);
+    }
+  }
+}
+
+/**
+ * The ids and emails, among those the content holds, of another user of this instance. A user who
+ * deleted their account is no longer found: their id stays where no other rule takes it.
+ */
+async function othersIn(contents: unknown[], own: { id: string; email: string }): Promise<Set<string>> {
+  const candidates = new Set<string>();
+  for (const content of contents) collectIdentifiers(content, candidates);
+  candidates.delete(own.id.toLowerCase());
+  candidates.delete(own.email.toLowerCase());
+  const all = [...candidates];
+  const ids = all.filter((found) => !found.includes('@'));
+  const emails = all.filter((found) => found.includes('@'));
+  const others = new Set<string>();
+  // Below Postgres' bind-parameter limit, whatever the size of the content.
+  for (let i = 0; i < ids.length; i += 5000) {
+    const users = await prisma.user.findMany({ where: { id: { in: ids.slice(i, i + 5000) } }, select: { id: true } });
+    for (const { id } of users) others.add(id.toLowerCase());
+  }
+  for (let i = 0; i < emails.length; i += 5000) {
+    const users = await prisma.$queryRaw<{ email: string }[]>`
+      SELECT lower(email) AS email FROM users WHERE lower(email) = ANY(${emails.slice(i, i + 5000)}::text[])`;
+    for (const { email } of users) others.add(email);
+  }
+  return others;
+}
+
 /**
  * Export the user's portable data set. Passwords, tokens and operational
  * secrets are deliberately excluded; the payload is versioned so a future
  * importer can migrate it without guessing its shape.
+ *
+ * Only what the user wrote or what is about them: no other person's id, name
+ * or text. Under the user's discussions, the replies of others travel as a
+ * count; a row the user took from someone else says so, not from whom.
  */
 export const exportAccountData = async (req: Request, res: Response) => {
   const userId = req.user!.id;
@@ -248,7 +448,12 @@ export const exportAccountData = async (req: Request, res: Response) => {
     prisma.environment.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
     prisma.quickNorm.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
     prisma.customAlias.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
-    prisma.articleThread.findMany({ where: { userId }, include: { comments: true }, orderBy: { createdAt: 'asc' } }),
+    // The user's own replies are in `comments`; the others' are counted, never read.
+    prisma.articleThread.findMany({
+      where: { userId },
+      include: { _count: { select: { comments: { where: { userId: { not: userId } } } } } },
+      orderBy: { createdAt: 'asc' },
+    }),
     prisma.articleComment.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
     prisma.lingoCard.findMany({ where: { autoreId: userId }, include: { ancore: true }, orderBy: { createdAt: 'asc' } }),
     prisma.lingoValidazioneCard.findMany({
@@ -284,15 +489,44 @@ export const exportAccountData = async (req: Request, res: Response) => {
       orderBy: { createdAt: 'asc' },
     }),
   ]);
+  // A quick norm's or an alias's search, taken from a proposal, is the proposer's JSON too.
+  const others = await othersIn([
+    ...dossiers.flatMap((dossier) => [...dossier.items.map((item) => item.content), ...dossier.snapshots.map((snapshot) => snapshot.content)]),
+    ...environments.map((env) => env.content),
+    ...quickNorms.map((norm) => norm.searchParams),
+    ...customAliases.map((alias) => alias.searchParams),
+  ], req.user!);
+  const own: OwnIdentity = { id: userId, username: req.user!.username, email: req.user!.email, others };
 
   res.json({
     schemaVersion: 1,
     exportedAt: new Date().toISOString(),
     user,
     data: {
-      folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases,
+      folders, bookmarks,
+      annotations: annotations.map(withoutOriginalAuthor),
+      highlights: highlights.map(withoutOriginalAuthor),
+      // An entry's content comes from the client as it is (a dossier imported from a link keeps a
+      // note entry whole), and a snapshot copies it: both are read as an archived environment's.
+      dossiers: dossiers.map(({ items, snapshots, ...dossier }) => withoutOriginalAuthor({
+        ...dossier,
+        items: items.map((item) => ({ ...item, content: withoutAuthors(item.content, own) })),
+        snapshots: snapshots.map((snapshot) => ({ ...snapshot, content: withoutAuthors(snapshot.content, own) })),
+      })),
+      history,
+      // An environment downloaded from the Forum was saved with its publisher's username as `author`,
+      // indistinguishable from a name typed by the user: only the user's own username travels.
+      environments: environments.map((env) => ({
+        ...env,
+        author: env.author !== null && env.author === user?.username ? env.author : null,
+        content: withoutAuthors(env.content, own),
+      })),
+      // A search stays a search: no `fromAnotherUser` inside it. The texts taken with it (a label,
+      // an alias's expansion and description) travel as they are, like a taken note's text.
+      quickNorms: quickNorms.map((norm) => withoutOriginalAuthor({ ...norm, searchParams: withoutAuthors(norm.searchParams, own, false) })),
+      customAliases: customAliases.map((alias) => withoutOriginalAuthor({ ...alias, searchParams: withoutAuthors(alias.searchParams, own, false) })),
       // The release time is the author's; the releasing admin's id is another person's identifier.
-      threads: threads.map(({ passageReleasedById: _releasedBy, ...thread }) => thread),
+      threads: threads.map(({ passageReleasedById: _releasedBy, _count, ...thread }) => ({ ...thread, repliesFromOthers: _count.comments })),
       comments, lingoCards, lingoValidazioni,
       lingoAccettazioni: lingoAccettazioni.map(({ testo, acceptedAt }) => ({ chiave: testo.chiave, versione: testo.versione, acceptedAt })),
       // The review log (the scheduling state is derived from it and not exported), the daily goals, and the

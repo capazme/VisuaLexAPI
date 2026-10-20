@@ -14,10 +14,11 @@ vi.mock('../features/merlt/consent/ConsentContext', () => ({
   ConsentProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 
-// The development mode decides the MERL-T addresses (DevRoute); each test sets it.
+// The development mode decides the MERL-T addresses (DevRoute); each test sets it. The account is a
+// validator: «Da validare» reads its queue only for one.
 const account = vi.hoisted(() => ({ devMode: true }));
 vi.mock('../hooks/useAuth', () => ({
-  useAuth: () => ({ loading: false, devMode: account.devMode }),
+  useAuth: () => ({ loading: false, devMode: account.devMode, isValidator: true }),
 }));
 
 // Layout renders the Outlet inside a marker so tests can assert the shell stays mounted.
@@ -34,8 +35,7 @@ vi.mock('../components/layout/Layout', async () => {
 
 // Page stubs (keep the router test light — pages pull the store/services).
 vi.mock('../pages/SearchPage', () => ({ SearchPage: () => <div data-testid="search-page" /> }));
-vi.mock('../pages/LoginPage', () => ({ LoginPage: () => <div /> }));
-vi.mock('../pages/RegisterPage', () => ({ RegisterPage: () => <div /> }));
+vi.mock('../pages/AuthPage', () => ({ AuthPage: () => <div /> }));
 vi.mock('../components/features/dossier/DossierPage', () => ({ DossierPage: () => <div /> }));
 vi.mock('../components/features/history/HistoryView', () => ({ HistoryView: () => <div /> }));
 vi.mock('../components/features/bulletin/BulletinBoardPage', () => ({ BulletinBoardPage: () => <div data-testid="forum" /> }));
@@ -173,10 +173,20 @@ describe('App routing — Studia', () => {
     expect(window.location.pathname).toBe('/studia/ripasso');
   });
 
-  it('opens a session at /studia/ripasso/sessione, inside the area', async () => {
+  it('opens a session at /studia/ripasso/sessione, inside the area, as the lesson in its frame (Gymnasium spec §5.4)', async () => {
     renderAt('/studia/ripasso/sessione?materia=DIRITTO_CIVILE');
-    expect(await screen.findByRole('heading', { name: 'Sessione di ripasso' })).toBeInTheDocument();
+    const session = await screen.findByRole('heading', { name: 'Sessione di ripasso' });
+    expect(screen.getByTestId('lesson-frame')).toContainElement(session);
+    // The lesson is a screen of its own: the area's heading is not drawn over it.
+    expect(screen.queryByRole('heading', { level: 1, name: 'Gymnasium: la tua palestra giuridica' })).toBeNull();
+  });
+
+  it('opens «Progressi» at /studia/progressi, inside the area, under its heading (Gymnasium spec §5.3)', async () => {
+    renderAt('/studia/progressi');
+    expect(await screen.findByRole('heading', { level: 2, name: 'I tuoi progressi' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Gymnasium: la tua palestra giuridica' })).toBeInTheDocument();
+    // The read is mocked to fail here: the page says so.
+    expect(await screen.findByText('Non riesco a leggere i tuoi progressi.')).toBeInTheDocument();
   });
 
   it('keeps a card’s address inside the Studia area', async () => {

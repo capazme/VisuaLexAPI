@@ -28,7 +28,6 @@ const URN = 'urn:nir:stato:legge:1990-08-07;241~art3';
 const data: ArticleData = {
   article_text: ARTICLE_TEXT,
   norma_data: { tipo_atto: 'legge', data: '1990-08-07', numero_atto: '241', numero_articolo: '3', urn: URN },
-  brocardi_info: null,
 };
 
 const PAST: ArticleValidity = {

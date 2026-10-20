@@ -1,5 +1,4 @@
 import { legalFetch } from './legalFetch';
-import { DOCTRINE_LABEL, DOCTRINE_SOURCE_NAME } from '../utils/doctrineLabel';
 
 export type ServiceHealthState = 'online' | 'degraded' | 'offline' | 'checking';
 
@@ -16,11 +15,10 @@ export interface HealthSnapshot {
   checkedAt: string;
 }
 
-// The Python API names its sources by key; the reader sees their names.
+// The Python API names its sources by key; the reader sees their names (an unknown key as it comes).
 const SOURCE_LABELS: Record<string, string> = {
   normattiva: 'Normattiva',
   eurlex: 'EUR-Lex',
-  brocardi: `${DOCTRINE_LABEL} (${DOCTRINE_SOURCE_NAME})`,
 };
 
 function sourceLabel(key: string): string {
@@ -56,4 +54,21 @@ export async function getHealthSnapshot(signal: AbortSignal): Promise<HealthSnap
   const hasOffline = services.some(service => service.state === 'offline');
   const hasDegraded = services.some(service => service.state === 'degraded');
   return { overall: hasOffline ? 'offline' : hasDegraded ? 'degraded' : 'online', services, checkedAt: new Date().toISOString() };
+}
+
+/**
+ * Whether Normattiva answers now, the one source a study card's anchors are checked against (the
+ * server refuses the Union's acts and answers 503 when no reference could be checked). Read from the
+ * Python probe, which the server caches for two minutes; anything but an «ok» for Normattiva is false.
+ */
+export async function cardSourcesAnswer(signal: AbortSignal): Promise<boolean> {
+  try {
+    const response = await legalFetch('/health/detailed', { signal });
+    const payload = await response.json().catch(() => ({})) as { services?: Record<string, { status?: string }> };
+    return payload.services?.normattiva?.status === 'ok';
+  } catch (error) {
+    // An abort is a `DOMException`, which is not an `Error` in every engine: read its name.
+    if ((error as { name?: unknown } | null)?.name === 'AbortError') throw error;
+    return false;
+  }
 }
