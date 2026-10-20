@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { addDays } from '../src/lingo/studyDay';
 import {
-  card, cards, createTestUser, creditByHand, credits, grade, gradeAll, logged, preferences, prisma, progress, reviewed,
+  app, card, cards, createTestUser, creditByHand, credits, grade, gradeAll, logged, preferences, prisma, progress, request, reviewed,
   session, setClock, storedDay, type Headers, type TestUser,
 } from './xpHelpers';
 
@@ -266,5 +266,21 @@ describe('Rome days', () => {
       expect(row.giorno.toISOString().slice(0, 10)).toBe(day);
       expect(row.periodo).toBe(`G:${day}`);
     }
+  });
+});
+
+describe('the trash', () => {
+  it('leaves the credits as they were when a studied card goes to the trash and comes back', async () => {
+    const fresh = await cards(alice, 3);
+    await gradeAll(a, fresh.map((c) => c.id));
+    const before = await credits(alice);
+    expect(before.length).toBeGreaterThan(0);
+    const trashed = await request(app).post('/api/lingo/cards/trash').set(a).send({ cardIds: [fresh[0].id] });
+    expect(trashed.status).toBe(200);
+    expect(await credits(alice)).toEqual(before);
+    const [entry] = (await request(app).get('/api/trash').set(a)).body;
+    expect((await request(app).post(`/api/trash/${entry.id}/restore`).set(a).send({})).status).toBe(200);
+    expect((await progress(a)).body.crediti).toEqual([]);
+    expect(await credits(alice)).toEqual(before);
   });
 });
