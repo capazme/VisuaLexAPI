@@ -478,7 +478,7 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   carry `lingo_validatore`.
 - **Card review** (`routes/lingoSrs.ts`, `/api/lingo/srs`, session only — not in the
   delegated table, so every path is a 403 for an exchanged token; Studia spec decisions
-  7–9, 17, 18): `GET /sessione?materia=` answers `{ conteggi: { dovute, nuove }, cards }`,
+  7–9, 17, 18): `GET /sessione?materia=&istituto=` (`istituto` only with `materia`, else 400; exact match on the values `/percorso` returns, so a stop round-trips; a session narrowed this way never marks the day's queue finished) answers `{ conteggi: { dovute, nuove }, cards }`,
   the due cards first (earliest `dueAt`, at most 500 fetched, `dovute` exact), then the
   new ones (oldest first) up to the daily goal minus the cards introduced today — state
   rows with `reps = 1` reviewed today, since only a day's first grade is recorded — so

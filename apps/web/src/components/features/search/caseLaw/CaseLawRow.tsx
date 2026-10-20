@@ -93,8 +93,8 @@ function ClampedText({ children }: { children: ReactNode }) {
 /**
  * The one row of case law under an article (case-law section spec, D3), whatever the source: the
  * decision's estremi as a link that opens beside, the day when known else the year, a short text,
- * the source as a small label. Brocardi's massime, the Massimario's passages and the Cassazione's
- * hits all draw it, so the three read alike. Draws an `<li>`: the caller owns the `<ul>`.
+ * the source as a small label. The Massimario's passages, the Cassazione's hits and the Court of
+ * Justice's judgments all draw it, so they read alike. Draws an `<li>`: the caller owns the `<ul>`.
  */
 export function CaseLawRow({
   decision, label, detail, authority, date, year, whenLabel, source, badges, context, externalHref, externalNote, besideId, backEntry, children, footer,

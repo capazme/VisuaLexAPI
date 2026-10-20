@@ -3,6 +3,7 @@ import { Layout } from './components/layout/Layout';
 import { SearchPage } from './pages/SearchPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { CreditsPage } from './pages/CreditsPage';
 import { DossierPage } from './components/features/dossier/DossierPage';
 import { HistoryView } from './components/features/history/HistoryView';
 import { BulletinBoardPage } from './components/features/bulletin/BulletinBoardPage';
@@ -44,6 +45,11 @@ const ValidationQueueView = lazy(() =>
 const ReviewHome = lazy(() =>
   import('./components/features/studia/ReviewHome').then(m => ({ default: m.ReviewHome })),
 );
+const ProgressPage = lazy(() =>
+  import('./components/features/studia/progress/ProgressPage').then(m => ({ default: m.ProgressPage })),
+);
+// Small and eager: what the lesson's frame shows while the session's code loads.
+import { LessonLoading } from './components/features/studia/LessonFrame';
 const ReviewSession = lazy(() =>
   import('./components/features/studia/ReviewSession').then(m => ({ default: m.ReviewSession })),
 );
@@ -80,6 +86,8 @@ function App() {
         {/* Public routes */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        {/* The sources and their licences: public, so an attribution reads without an account. */}
+        <Route path="/crediti" element={<CreditsPage />} />
         {/* The OAuth consent page (MCP spike): signed in, outside the app layout. */}
         <Route
           path="/connect"
@@ -158,7 +166,7 @@ function App() {
               </DevRoute>
             }
           />
-          {/* VisuaLex Studia: behind VITE_FEATURE_STUDIA; /studia opens the review; valida is the validators' queue. */}
+          {/* VisuaLex Studia: behind VITE_FEATURE_STUDIA; /studia opens the review; progressi the data; valida is the validators' queue. */}
           {isStudiaEnabled() && (
             <Route
               path="studia"
@@ -170,7 +178,8 @@ function App() {
             >
               <Route index element={<Navigate to="ripasso" replace />} />
               <Route path="ripasso" element={<Suspense fallback={null}><ReviewHome /></Suspense>} />
-              <Route path="ripasso/sessione" element={<Suspense fallback={null}><ReviewSession /></Suspense>} />
+              <Route path="ripasso/sessione" element={<Suspense fallback={<LessonLoading />}><ReviewSession /></Suspense>} />
+              <Route path="progressi" element={<Suspense fallback={null}><ProgressPage /></Suspense>} />
               <Route path="schede" element={<Suspense fallback={null}><MyCardsView /></Suspense>} />
               <Route path="schede/:id" element={<Suspense fallback={null}><MyCardsView /></Suspense>} />
               <Route path="valida" element={<Suspense fallback={null}><ValidationQueueView /></Suspense>} />

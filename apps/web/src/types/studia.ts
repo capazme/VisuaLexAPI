@@ -211,3 +211,15 @@ export interface Progressi {
   calendario: GiornoAttivita[];
   prossimi: { giorno: string; schede: number }[];
 }
+
+/**
+ * An institute's stop on the road (`GET /lingo/srs/percorso`, Gymnasium restyle spec §6, G5): the cards of the
+ * user's review scope in one institute, by the same three states as `Progressi.materie`. `dovute` is no fourth
+ * state: the cards studied and due by the end of today in Rome, a subset of `apprendimento + consolidate`.
+ * `istituto` is the card's own label, passed back verbatim to narrow the session.
+ */
+export interface TappaIstituto extends ConteggiStati {
+  materia: Materia;
+  istituto: string;
+  dovute: number;
+}

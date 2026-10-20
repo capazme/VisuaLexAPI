@@ -156,8 +156,20 @@ export const hasAnnotations = (group: BlockAnnotations | undefined): group is Bl
   !!group && group.notes.length + group.highlights.length + group.threads.length > 0;
 
 /**
+ * How a mark on a section no longer shown is named: «Sezione non più disponibile · Ratio» for
+ * `<article>/brocardi/ratio` (the Brocardi sections went, D-078, and what was marked on them stays the
+ * reader's, to read and remove); null for a mark on the article's own text, whose id has no `/`.
+ */
+export function retiredSectionLabel(articleId: string): string | null {
+  const slash = articleId.indexOf('/');
+  if (slash === -1) return null;
+  const section = articleId.slice(articleId.lastIndexOf('/') + 1);
+  return section ? `Sezione non più disponibile · ${section[0].toUpperCase()}${section.slice(1)}` : 'Sezione non più disponibile';
+}
+
+/**
  * The highlights no block's sign shows: those of another section of the
- * article (the Brocardi Ratio and Spiegazione) and those whose text is no
+ * article (the Brocardi Ratio and Spiegazione, no longer shown) and those whose text is no
  * longer where they were saved. They need a place of their own to be removed
  * from (LooseHighlightsList), since the signs cannot reach them.
  */

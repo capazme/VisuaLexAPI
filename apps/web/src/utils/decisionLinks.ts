@@ -365,33 +365,6 @@ export function isDecisionKey(key: string): boolean {
 }
 
 /**
- * The decision a Brocardi massima is headed with ("Cass. civ.", "Cass. pen.", "Cass. lav.",
- * "Cass. sez. un.", "Cass.", "Corte cost.", then "n. 31191/2025"), or null for another court
- * or no number. A bare «Cass.» names no archive and «Cass. sez. un.» only its section: the route
- * resolves them (Sentenze design §2), never a guess here. «Cass. lav.» is the civil labour section.
- */
-export function brocardiDecisionRef(
-  autorita: string | null | undefined,
-  numero: string | null | undefined,
-  anno: string | null | undefined,
-): LooseDecisionRef | null {
-  const n = /^\d{1,7}$/.test(numero?.trim() ?? '') ? Number(numero!.trim()) : NaN;
-  if (!(n >= 1)) return null;
-  const year = /^\d{4}$/.test(anno?.trim() ?? '') ? Number(anno!.trim()) : null;
-  const words = (autorita ?? '').toLowerCase().replace(/\./g, ' ').replace(/\s+/g, ' ').trim();
-  if (/^(corte cost|c cost)/.test(words) || words.includes('costituzionale')) {
-    return { corte: 'corte_costituzionale', numero: n, anno: year };
-  }
-  const cass = /^cass(?:azione)?(?: (civ|pen|lav|sez un))?$/.exec(words);
-  if (!cass) return null;
-  if (cass[1] === 'civ') return { corte: 'cassazione', archivio: 'civile', numero: n, anno: year };
-  if (cass[1] === 'pen') return { corte: 'cassazione', archivio: 'penale', numero: n, anno: year };
-  if (cass[1] === 'lav') return { corte: 'cassazione', archivio: 'civile', sezione: 'L', numero: n, anno: year };
-  if (cass[1] === 'sez un') return { corte: 'cassazione', sezione: 'U', numero: n, anno: year };
-  return { corte: 'cassazione', numero: n, anno: year };
-}
-
-/**
  * A section as a sentence takes it, with its article. The Sezioni Unite are plural ("delle Sezioni
  * Unite", "le Sezioni Unite"); every other section, numbered or not, is singular ("della Sez. III",
  * "la Sez. III").

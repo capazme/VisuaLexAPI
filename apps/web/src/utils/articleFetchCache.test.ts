@@ -19,7 +19,7 @@ describe('fetchArticleForNorma', () => {
     expect(url).toBe('/fetch_article_text');
     expect(JSON.parse((init as RequestInit).body as string)).toMatchObject({
       act_type: 'codice civile', act_number: '262', date: '1942-03-16',
-      article: '2043', version: 'vigente', show_brocardi_info: false,
+      article: '2043', version: 'vigente',
     });
   });
   it('caches by norm identity: second call does not refetch', async () => {

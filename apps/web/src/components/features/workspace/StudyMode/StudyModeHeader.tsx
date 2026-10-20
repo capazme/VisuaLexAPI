@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ChevronLeft, ChevronRight, Settings, Zap, Sun, Moon, BookOpen, Maximize2, Minimize2, GripHorizontal, StickyNote, Lightbulb, Download } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Settings, Zap, Sun, Moon, BookOpen, Maximize2, Minimize2, GripHorizontal, StickyNote, Download } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import type { ArticleData } from '../../../../types';
 import type { StudyModeTheme } from './StudyMode';
@@ -24,8 +24,6 @@ interface StudyModeHeaderProps {
   isDragging?: boolean;
   showToolsPanel?: boolean;
   onToggleTools?: () => void;
-  showBrocardi?: boolean;
-  onToggleBrocardi?: () => void;
   onExport?: () => void;
 }
 
@@ -66,8 +64,6 @@ export function StudyModeHeader({
   isDragging,
   showToolsPanel,
   onToggleTools,
-  showBrocardi,
-  onToggleBrocardi,
   onExport
 }: StudyModeHeaderProps) {
   const styles = THEME_HEADER_STYLES[theme];
@@ -175,20 +171,6 @@ export function StudyModeHeader({
                   title="Note e highlights (T)"
                 >
                   <StickyNote size={14} className="sm:w-4 sm:h-4" />
-                </button>
-              )}
-
-              {onToggleBrocardi && (
-                <button
-                  id="tour-study-brocardi"
-                  onClick={onToggleBrocardi}
-                  className={cn(
-                    "p-1.5 sm:p-2 rounded-md transition-colors",
-                    showBrocardi ? 'text-amber-600 bg-amber-50 dark:bg-amber-900/30 dark:text-amber-400' : styles.button
-                  )}
-                  title="Approfondimenti (B)"
-                >
-                  <Lightbulb size={14} className="sm:w-4 sm:h-4" />
                 </button>
               )}
 

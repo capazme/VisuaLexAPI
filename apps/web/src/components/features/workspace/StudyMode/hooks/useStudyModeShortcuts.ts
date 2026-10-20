@@ -4,7 +4,6 @@ interface StudyModeHandlers {
   onClose: () => void;
   onNavigate: (direction: 'prev' | 'next') => void;
   onFontSize: (delta: number) => void;
-  onToggleBrocardi: () => void;
   onToggleTools: () => void;
   onToggleSettings: () => void;
   onTheme: (theme: 'light' | 'dark' | 'sepia') => void;
@@ -80,10 +79,6 @@ export function useStudyModeShortcuts(
           // Cmd/Ctrl + B = Bookmark
           e.preventDefault();
           handlers.onBookmark();
-        } else {
-          // B = Brocardi panel
-          e.preventDefault();
-          handlers.onToggleBrocardi();
         }
         break;
 
@@ -152,7 +147,6 @@ export const STUDY_MODE_SHORTCUTS = [
   { key: 'ESC', label: 'Chiudi' },
   { key: '← →', label: 'Naviga' },
   { key: '+ -', label: 'Zoom' },
-  { key: 'B', label: 'Dottrina' },
   { key: 'T', label: 'Tools' },
   { key: 'S', label: 'Settings' },
   { key: 'N', label: 'Nota' },

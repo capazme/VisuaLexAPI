@@ -86,7 +86,7 @@ function DesktopPeek({ anchorEl, onClose, ...rest }: Omit<ArticleCardsPeekProps,
           <div
             style={{ transformOrigin: getTransformOrigin(placement) }}
             className={cn(
-              'flex max-h-[inherit] w-[360px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900',
+              'flex max-h-[inherit] w-[360px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900',
               'motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 duration-150',
             )}
           >
@@ -131,15 +131,17 @@ function MobileSheet({ onClose, ...rest }: Omit<ArticleCardsPeekProps, 'isOpen' 
 }
 
 const ROW =
-  'flex min-h-[44px] w-full items-start justify-between gap-3 px-4 py-2.5 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:text-slate-200 dark:hover:bg-slate-800/60';
+  'flex min-h-[44px] w-full items-start justify-between gap-3 px-4 py-2.5 text-left text-sm text-slate-800 transition-colors hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:text-slate-100 dark:hover:bg-slate-800/60';
+/** The label of a part of a community card, small and in Geist. */
+const PART = 'text-xs font-semibold text-slate-600 dark:text-slate-300';
 
 function RowBody({ card }: { card: SchedaDellArticolo }) {
   return (
     <>
-      <span className="min-w-0 break-words">
+      <span className="min-w-0 break-words font-serif text-[15px] leading-snug">
         {card.domanda}
         {card.comunita && card.stato === 'VALIDATA' && card.approvazioni !== null && (
-          <span className="mt-0.5 block text-xs text-slate-500 dark:text-slate-400">Validata da {card.approvazioni}</span>
+          <span className="mt-0.5 block font-sans text-xs text-slate-600 dark:text-slate-300">Validata da {card.approvazioni}</span>
         )}
       </span>
       <StateChip stato={card.stato} className="mt-0.5 shrink-0" />
@@ -155,7 +157,7 @@ function CommunityRow({ card }: { card: SchedaDellArticolo }) {
   return (
     <>
       <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-controls={open ? detailId : undefined} className={ROW}>
-        <Chevron size={16} aria-hidden className="mt-0.5 shrink-0 text-slate-400" />
+        <Chevron size={16} aria-hidden className="mt-0.5 shrink-0 text-slate-500 dark:text-slate-400" />
         <span className="flex min-w-0 flex-1 items-start justify-between gap-3">
           <RowBody card={card} />
         </span>
@@ -163,12 +165,12 @@ function CommunityRow({ card }: { card: SchedaDellArticolo }) {
       {open && (
         <div id={detailId} className="space-y-2 bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:bg-slate-800/40 dark:text-slate-200">
           <div>
-            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Risposta</p>
+            <p className={PART}>Risposta</p>
             <p className="whitespace-pre-line break-words">{card.risposta}</p>
           </div>
           {card.spiegazione && (
             <div>
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Spiegazione</p>
+              <p className={PART}>Spiegazione</p>
               <p className="whitespace-pre-line break-words">{card.spiegazione}</p>
             </div>
           )}
@@ -182,16 +184,16 @@ function PeekBody({ cards, articleLabel, onClose }: Pick<ArticleCardsPeekProps, 
   return (
     <>
       <header className="flex items-center justify-between gap-2 border-b border-slate-200 py-1 pl-4 pr-1 dark:border-slate-800">
-        <h3 className="min-w-0 truncate text-sm font-semibold text-slate-900 dark:text-white">
+        <h3 className="min-w-0 truncate font-serif text-base font-medium text-slate-900 dark:text-slate-50">
           Schede su {articleLabel}
-          <span className="ml-2 text-xs font-medium text-slate-500 dark:text-slate-400">{cards.length}</span>
+          <span className="ml-2 font-sans text-xs font-medium text-slate-600 dark:text-slate-300">{cards.length}</span>
         </h3>
         <button
           type="button"
           onClick={onClose}
           aria-label="Chiudi"
           title="Chiudi (Esc)"
-          className="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0 md:min-w-0 md:p-1.5 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+          className="inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
         >
           <X size={16} aria-hidden="true" />
         </button>

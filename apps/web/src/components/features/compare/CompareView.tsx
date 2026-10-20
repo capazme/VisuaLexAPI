@@ -123,7 +123,6 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
         act_type: params.act_type,
         article: params.article,
         version: version === 'data' ? 'vigente' : version,
-        show_brocardi_info: false,
       };
 
       // Only add optional fields if they have actual values

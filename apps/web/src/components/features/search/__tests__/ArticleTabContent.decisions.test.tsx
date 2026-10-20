@@ -17,7 +17,6 @@ vi.mock('../../../../features/merlt/useMerltFeatures', () => ({
   useMerltFeatures: () => ({ canContribute: false, qaAskable: true, consentLevel: 'basic', merltEnabled: true }),
 }));
 vi.mock('../../../../plugins/PluginSlot', () => ({ PluginSlot: () => null }));
-vi.mock('../BrocardiDisplay', () => ({ BrocardiDisplay: () => null }));
 vi.mock('../CaseLawSection', () => ({ CaseLawSection: () => null }));
 
 import { ArticleTabContent } from '../ArticleTabContent';

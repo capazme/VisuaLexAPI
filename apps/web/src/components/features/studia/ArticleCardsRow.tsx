@@ -1,4 +1,5 @@
 import { useId, useImperativeHandle, useMemo, useState, type Ref } from 'react';
+import { Layers } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Tooltip } from '../../ui/Tooltip';
 import type { NormaVisitata } from '../../../types';
@@ -25,8 +26,9 @@ export interface ArticleCardsRowProps {
 }
 
 const PAST_REASON = 'Le schede si ancorano al testo vigente';
+// 44 px at every width, the look of the reader's other quiet entries: words, no box.
 const ACTION =
-  'inline-flex min-h-[44px] items-center rounded px-1 transition-colors md:min-h-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
+  'inline-flex min-h-[44px] items-center rounded px-1 underline-offset-4 transition-colors hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
 
 /**
  * Under the article, outside its text: «Schede su questo articolo (3) · + Nuova scheda». The count
@@ -65,7 +67,7 @@ export function ArticleCardsRow({ norma, articleText, structure, historical, ref
       aria-describedby={canCreate ? undefined : reasonId}
       className={cn(
         ACTION,
-        'font-medium text-primary-600 hover:underline dark:text-primary-400',
+        'font-medium text-primary-700 dark:text-primary-300',
         'aria-disabled:cursor-not-allowed aria-disabled:text-slate-400 aria-disabled:hover:no-underline dark:aria-disabled:text-slate-600',
       )}
     >
@@ -74,7 +76,8 @@ export function ArticleCardsRow({ norma, articleText, structure, historical, ref
   );
 
   return (
-    <div role="group" aria-label="Schede di studio" className="mt-4 flex flex-wrap items-center gap-x-1 text-sm text-slate-500 dark:text-slate-400">
+    <div role="group" aria-label="Schede di studio" className="mt-4 flex flex-wrap items-center gap-x-1 border-t border-slate-100 pt-1 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-300">
+      <Layers size={14} aria-hidden className="mr-1 shrink-0 text-slate-500 dark:text-slate-400" />
       {status === 'ready' && (
         <>
           {count > 0 ? (
@@ -84,7 +87,7 @@ export function ArticleCardsRow({ norma, articleText, structure, historical, ref
               onClick={() => setPeekOpen((open) => !open)}
               aria-haspopup="dialog"
               aria-expanded={peekOpen}
-              className={cn(ACTION, 'text-slate-600 hover:text-slate-900 hover:underline dark:text-slate-300 dark:hover:text-white')}
+              className={cn(ACTION, 'text-slate-700 hover:text-slate-900 dark:text-slate-200 dark:hover:text-white')}
             >
               Schede su questo articolo ({count})
             </button>

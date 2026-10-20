@@ -25,6 +25,8 @@ export const FOCUS_RING = 'focus-visible:outline-none focus-visible:ring-2 focus
 
 /** A secondary button: an ink outline, 44 px, a press that gives a little. */
 export const SECONDARY_BUTTON = `min-h-[44px] rounded-xl border px-4 text-sm font-semibold transition-[background-color,scale] active:scale-[0.97] ${INK_BORDER} text-primary-900 hover:bg-primary-50 dark:text-primary-200 dark:hover:bg-primary-900/30 ${FOCUS_RING}`;
+/** A solid ink button, 44 px: the one action of a block («+ Nuova scheda» in an empty list, «Proponi alla comunità», «Invia»). */
+export const INK_BUTTON = `inline-flex min-h-[44px] items-center justify-center rounded-xl px-4 text-sm font-semibold transition-[background-color,opacity,scale] active:scale-[0.97] disabled:opacity-60 hover:bg-primary-800 dark:hover:bg-primary-200 ${INK_BG} ${ON_INK} ${FOCUS_RING}`;
 /** A quiet action under a mission: words in ink, 44 px tall, underlined on hover. */
 export const QUIET_BUTTON = `-mx-2 min-h-[44px] justify-self-start rounded-lg px-2 text-left text-sm font-medium text-primary-900 underline-offset-4 hover:underline dark:text-primary-200 ${FOCUS_RING}`;
 
@@ -33,7 +35,7 @@ const SUBJECT_TOKEN: Record<Materia, string> = {
   DIRITTO_PENALE: '--category-penal',
   DIRITTO_AMMINISTRATIVO: '--category-administrative',
   DIRITTO_PROCESSUALE_CIVILE: '--category-compliance',
-  DIRITTO_PROCESSUALE_PENALE: '--brocardi',
+  DIRITTO_PROCESSUALE_PENALE: '--category-penal-procedure',
 };
 
 /** The subject's hue as a CSS colour, for an inline style: it follows the theme through the variable. */

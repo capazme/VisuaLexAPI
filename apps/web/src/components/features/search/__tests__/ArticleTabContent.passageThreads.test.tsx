@@ -47,7 +47,6 @@ const articleData: ArticleData = {
     numero_articolo: '1',
     urn: URN,
   },
-  brocardi_info: null,
 };
 
 const passageSummary: ArticleDiscussionPassageSummary = {

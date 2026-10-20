@@ -155,7 +155,6 @@ export function useCitationPreview(options: UseCitationPreviewOptions = {}) {
       act_type: citation.act_type,
       article: citation.article,
       version: 'vigente',
-      show_brocardi_info: false, // Skip Brocardi per preview
     };
 
     // Only add optional fields if they have actual values

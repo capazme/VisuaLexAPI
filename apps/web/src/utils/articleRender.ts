@@ -15,8 +15,9 @@
  * open from one run to the next. The result is always well-formed: a mark that
  * crosses a block is split per block, two overlapping highlights both show.
  *
- * `structure === null` is the flat mode used by the Brocardi sections: no
- * block wrappers, and every newline is a `<br />`, as before.
+ * `structure === null` is the flat mode: no block wrappers, and every newline
+ * is a `<br />`. The Brocardi sections used it; since they went (D-078) no
+ * surface does, and it stays under its tests.
  */
 import type { Annotation, Highlight } from '../types';
 import { HIGHLIGHT_STYLES } from './highlightColors';
@@ -33,7 +34,7 @@ import {
 
 export interface RenderArticleInput {
   raw: string;
-  /** Parsed structure; null renders flat (Brocardi sections). */
+  /** Parsed structure; null renders flat. */
   structure: ArticleStructure | null;
   highlights: Highlight[];
   annotations: Annotation[];

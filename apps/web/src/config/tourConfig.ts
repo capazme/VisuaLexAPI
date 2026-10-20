@@ -36,7 +36,7 @@ export type TourType = keyof typeof TOUR_KEYS;
 // ==================== PAGE TOURS ====================
 
 /**
- * Welcome Tour - Prima visita assoluta (3 step)
+ * Welcome Tour - Prima visita assoluta (4 step)
  */
 export const WELCOME_STEPS: DriveStep[] = [
     {
@@ -321,7 +321,7 @@ export const FORUM_STEPS: DriveStep[] = [
 // ==================== FEATURE TOURS ====================
 
 /**
- * Command Palette Tour - Ricerca veloce (4 step)
+ * Command Palette Tour - Ricerca veloce (3 step)
  */
 export const COMMAND_PALETTE_STEPS: DriveStep[] = [
     {
@@ -339,15 +339,6 @@ export const COMMAND_PALETTE_STEPS: DriveStep[] = [
             title: 'Risultati e Suggerimenti',
             description: 'Naviga con le frecce, premi Invio per selezionare. I risultati si aggiornano mentre digiti.',
             side: 'bottom',
-            align: 'center',
-        }
-    },
-    {
-        element: '#command-palette-brocardi-toggle',
-        popover: {
-            title: 'Opzione dottrina',
-            description: 'Attiva per ottenere spiegazioni, ratio legis e massime giurisprudenziali insieme al testo.',
-            side: 'top',
             align: 'center',
         }
     },
@@ -509,7 +500,7 @@ export const PRACTICE_STEPS: DriveStep[] = [
 ];
 
 /**
- * Practice Act Tour - Esplorazione di un atto (7 step)
+ * Practice Act Tour - Esplorazione di un atto (6 step)
  */
 export const PRACTICE_ACT_STEPS: DriveStep[] = [
     {
@@ -563,15 +554,6 @@ export const PRACTICE_ACT_STEPS: DriveStep[] = [
             title: 'Barra Strumenti',
             description: 'In una riga aperta: note personali, evidenziatore, glosse, ricerca nel testo, copia, esportazione e altro.',
             side: 'bottom',
-            align: 'center',
-        }
-    },
-    {
-        element: '.brocardi-display',
-        popover: {
-            title: 'Dottrina e spiegazioni',
-            description: 'Ratio legis, massime giurisprudenziali e riferimenti. Attiva "Includi dottrina" nella ricerca.',
-            side: 'top',
             align: 'center',
         }
     }

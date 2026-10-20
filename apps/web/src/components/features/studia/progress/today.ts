@@ -1,30 +1,55 @@
-import type { Progressi } from '../../../../types/studia';
+import type { ConteggiStati, Materia, Progressi, TappaIstituto } from '../../../../types/studia';
 import { MATERIA_LABEL } from '../studiaLabels';
-import { addDays, formatDayLong } from './layout';
+import { addDays, formatCount, formatDayLong } from './layout';
 
-/** «Oggi»'s pure decisions (Gymnasium spec §5.1, §5.2): what the action card says, and the road's order. */
+/** «Oggi»'s pure decisions (Gymnasium spec §5.1, §5.2): what the action card says, and the road's order; and what the lesson's end offers (§5.4). */
 
 type Stop = Progressi['materie'][number];
 
-const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+const count = (n: number, one: string, many: string) => `${formatCount(n)} ${n === 1 ? one : many}`;
 
 /**
  * The order of the road (Gymnasium spec §5.2 as corrected): what still asks for work first — the cards
- * new and in learning — then by name. «Da ripassare» by subject is not in the progress read; it comes with
- * the institute read of G5.
+ * new and in learning — then by name. It stays so with the institute read of G5, which answers later and
+ * would otherwise move the stops under the reader's hand.
  */
 export function orderStops(materie: readonly Stop[]): Stop[] {
   const open = (stop: Stop) => stop.nuove + stop.apprendimento;
   return [...materie].sort((a, b) => open(b) - open(a) || MATERIA_LABEL[a.materia].localeCompare(MATERIA_LABEL[b.materia], 'it'));
 }
 
-/** «3 nuove · 5 in apprendimento · 2 consolidate»: the bar's three states in words, never by colour alone. */
-export function stopStates(stop: Stop): string {
+/** «3 nuove · 5 in apprendimento · 2 consolidate»: the bar's three states in words, never by colour alone; «12.345» grouped. */
+export function stopStates(stop: ConteggiStati): string {
   return [
     count(stop.nuove, 'nuova', 'nuove'),
-    `${stop.apprendimento} in apprendimento`,
+    `${formatCount(stop.apprendimento)} in apprendimento`,
     count(stop.consolidate, 'consolidata', 'consolidate'),
   ].join(' · ');
+}
+
+/**
+ * The institutes of one subject on the road (Gymnasium spec §5.2, G5): the most cards due first, then by name
+ * as an Italian reader sorts it. Free stops: the order says where the work is, it locks nothing.
+ */
+export function orderInstitutes(stops: readonly TappaIstituto[], materia: Materia): TappaIstituto[] {
+  return stops.filter((stop) => stop.materia === materia).sort((a, b) => b.dovute - a.dovute || a.istituto.localeCompare(b.istituto, 'it'));
+}
+
+/** The cards due today by subject, the sum of its institutes': what the subject's stop says. */
+export function dueBySubject(stops: readonly TappaIstituto[]): Map<Materia, number> {
+  const due = new Map<Materia, number>();
+  for (const stop of stops) due.set(stop.materia, (due.get(stop.materia) ?? 0) + stop.dovute);
+  return due;
+}
+
+/** «3 da ripassare», or «Niente da ripassare» (new cards are not «da ripassare»: the bar says them). */
+export function dueLabel(dovute: number): string {
+  return dovute === 0 ? 'Niente da ripassare' : `${dovute} da ripassare`;
+}
+
+/** The session narrowed to one institute of a subject, the institute spelt as the read gave it (`GET /lingo/srs/sessione`). */
+export function instituteSessionPath(materia: Materia, istituto: string): string {
+  return `/studia/ripasso/sessione?${new URLSearchParams({ materia, istituto }).toString()}`;
 }
 
 /**
@@ -48,7 +73,26 @@ export type TodayState = 'loading' | 'unread' | 'empty' | 'done' | 'todo';
 
 export function todayState(data: Progressi | null, failed: boolean, filtered: boolean): TodayState {
   if (data === null) return failed ? 'unread' : 'loading';
-  const { oggi, stati } = data;
-  if (oggi.dovute + oggi.nuove > 0) return 'todo';
+  const { stati } = data;
+  if (cardsLeft(data) > 0) return 'todo';
   return !filtered && stati.nuove + stati.apprendimento + stati.consolidate === 0 ? 'empty' : 'done';
+}
+
+/**
+ * The cards still on today in a read's scope: those still due and the new ones today still allows. The lesson's
+ * end offers «Continua» when there are any (the session carries at most 500 due cards, and the settings may have
+ * raised the new ones meanwhile); never a count the server did not give.
+ */
+export function cardsLeft(data: Progressi): number {
+  return data.oggi.dovute + data.oggi.nuove;
+}
+
+/**
+ * The cards still on today in one institute of a subject (G5), for the lesson's end: those due in it, and its new
+ * ones up to what the subject's read says today still allows (the new-card quota is the day's, not the institute's).
+ * Nothing when the road's read does not list the institute.
+ */
+export function instituteCardsLeft(stops: readonly TappaIstituto[], materia: Materia, istituto: string, subject: Progressi): number {
+  const stop = stops.find((s) => s.materia === materia && s.istituto === istituto);
+  return stop ? stop.dovute + Math.min(stop.nuove, subject.oggi.nuove) : 0;
 }

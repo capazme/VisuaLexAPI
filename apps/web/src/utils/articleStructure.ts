@@ -413,7 +413,11 @@ function isLetterSuccessor(previous: string | undefined, letter: string): boolea
   return !!previous && previous.length === 1 && LETTERS.indexOf(previous) + 1 === LETTERS.indexOf(letter);
 }
 
-function isNotice(text: string): boolean {
+/**
+ * Whether a piece of text is a notice the source writes in place of words («ARTICOLO ABROGATO DAL …»,
+ * «…», «OMISSIS»): nearly all capitals and naming a repeal, a suppression, a replacement or an omission.
+ */
+export function isNotice(text: string): boolean {
   const t = text.trim();
   if (t === '...' || t === '…') return true;
   const letters = t.match(/\p{L}/gu) ?? [];
