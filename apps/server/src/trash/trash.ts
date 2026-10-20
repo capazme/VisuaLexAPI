@@ -395,6 +395,11 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
     return await prisma.$transaction(async (tx) => {
       const entry = await tx.trashEntry.findFirst({ where: { id: trashId, userId, expiresAt: { gt: new Date() } } });
       if (!entry) throw new AppError(404, 'Elemento del cestino non trovato.');
+      // The entry goes first, as the one claim on it: a purge, the sweep or another restore that took
+      // it meanwhile is waited for and then leaves nothing to delete, a 404; a refusal further on rolls
+      // the deletion back.
+      const { count } = await tx.trashEntry.deleteMany({ where: { id: entry.id, userId } });
+      if (count === 0) throw new AppError(404, 'Elemento del cestino non trovato.');
 
       if (entry.kind === 'DOSSIER') {
         // `tasks` is absent from an entry trashed before the planner.
@@ -503,14 +508,14 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
             data: { sourceDossierId: dossier.id },
           });
         }
-        await tx.trashEntry.delete({ where: { id: entry.id } });
         return { dossierId: dossier.id };
       }
 
       if (entry.kind === 'DOSSIER_ITEMS') {
         const { items } = entry.payload as unknown as { items: StoredItem[] };
         const targetId = targetDossierId ?? entry.dossierId;
-        const target = targetId ? await tx.dossier.findFirst({ where: { id: targetId, userId } }) : null;
+        // Locked, so a dossier going to the trash meanwhile is waited for and found gone, not half-written to.
+        const target = targetId && (await lockDossier(tx, userId, targetId)) ? await tx.dossier.findFirst({ where: { id: targetId, userId } }) : null;
         if (!target) {
           if (targetDossierId) throw new AppError(404, 'Dossier not found');
           throw new AppError(409, 'Il dossier non esiste più: scegli dove ripristinare.');
@@ -527,7 +532,6 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
           data: items.map((item, i) => itemRow(item, target.id, start + i, about(item))),
         });
         await tx.dossier.update({ where: { id: target.id }, data: { updatedAt: new Date() } });
-        await tx.trashEntry.delete({ where: { id: entry.id } });
         return { dossierId: target.id };
       }
 
@@ -579,7 +583,6 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
             durataMs: log.durataMs,
           })),
         });
-        await tx.trashEntry.delete({ where: { id: entry.id } });
         return { dossierId: null };
       }
 
@@ -589,11 +592,6 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
     // An id taken again since the deletion (restored twice in a race, or re-created).
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       throw new AppError(409, 'Questi elementi sono già stati ripristinati.');
-    }
-    // A row the restore writes to went meanwhile: the entry itself, purged or swept while it was
-    // being restored, is the one that can.
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-      throw new AppError(404, 'Elemento del cestino non trovato.');
     }
     return quietly('Trash restore', error);
   }

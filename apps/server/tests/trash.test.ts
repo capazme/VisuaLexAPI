@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import type { Prisma } from '@prisma/client';
 import { request, app, prisma, createTestUser, authHeader, type TestUser } from './helpers';
 import { exchangeCode, startAuthorization, tokenExchange } from './oauth/oauthHelpers';
 import { spendDelegatedCounter } from '../src/middleware/delegated';
@@ -263,23 +264,49 @@ describe('the trash', () => {
     expect(await prisma.trashEntry.count()).toBe(0);
   });
 
+  /**
+   * Runs `hold` in a transaction on another connection, starts the restore while it is open, and
+   * commits only once the restore is waiting on a lock it holds: the restore has read the entry and
+   * reached the write that waits, so the test passes through that path, not a 404 read up front.
+   */
+  async function restoreDuring(hold: (tx: Prisma.TransactionClient) => Promise<unknown>, trashId: string, body: object = {}) {
+    let restoring: Promise<{ status: number; body: { detail?: string } }> | undefined;
+    await prisma.$transaction(async (tx) => {
+      await hold(tx);
+      restoring = request(app).post(`/api/trash/${trashId}/restore`).set(authHeader(alice)).send(body).then((res) => res);
+      for (let waited = 0; ; waited += 50) {
+        const [{ waiting }] = await prisma.$queryRaw<{ waiting: number }[]>`SELECT count(*)::int AS waiting FROM pg_locks WHERE NOT granted`;
+        if (waiting > 0) break;
+        if (waited > 4000) throw new Error('the restore never waited on the lock');
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+    }, { timeout: 10_000 });
+    return restoring!;
+  }
+
   it('a restore whose entry is purged meanwhile is a 404, and restores nothing', async () => {
     const { bearer } = await connected(alice);
     await request(app).post(`/api/dossiers/${dossierId}/trash-items`).set(bearer).send({ itemIds: [art3] });
     const [entry] = (await request(app).get('/api/trash').set(authHeader(alice))).body;
-    let restoring: Promise<{ status: number; body: { detail?: string } }> | undefined;
-    // A purge in flight on another connection: the entry locked and deleted, not yet committed. The
-    // restore still reads it, then waits on its deletion, which finds no row (Prisma's P2025).
-    await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM trash_entries WHERE id = ${entry.id} FOR UPDATE`;
-      await tx.trashEntry.delete({ where: { id: entry.id } });
-      restoring = request(app).post(`/api/trash/${entry.id}/restore`).set(authHeader(alice)).send({}).then((res) => res);
-      await new Promise((resolve) => setTimeout(resolve, 500));
-    });
-    const res = await restoring!;
+    // A purge in flight: the entry deleted, not yet committed.
+    const res = await restoreDuring((tx) => tx.trashEntry.delete({ where: { id: entry.id } }), entry.id);
     expect(res.status).toBe(404);
     expect(res.body.detail).toBe('Elemento del cestino non trovato.');
     expect(await prisma.dossierItem.findUnique({ where: { id: art3 } })).toBeNull();
+  });
+
+  it('entries restored into a dossier going to the trash meanwhile ask where, and stay in the trash', async () => {
+    const { bearer } = await connected(alice);
+    await request(app).post(`/api/dossiers/${dossierId}/trash-items`).set(bearer).send({ itemIds: [art3] });
+    const [entry] = (await request(app).get('/api/trash').set(authHeader(alice))).body;
+    // The dossier's deletion in flight: its row locked and deleted, not yet committed.
+    const res = await restoreDuring(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM dossiers WHERE id = ${dossierId} FOR UPDATE`;
+      await tx.dossier.delete({ where: { id: dossierId } });
+    }, entry.id);
+    expect(res.status).toBe(409);
+    expect(res.body.detail).toBe('Il dossier non esiste più: scegli dove ripristinare.');
+    expect(await prisma.trashEntry.findUnique({ where: { id: entry.id } })).not.toBeNull();
   });
 
   it('the sweep removes expired entries only', async () => {
