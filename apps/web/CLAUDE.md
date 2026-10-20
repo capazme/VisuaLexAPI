@@ -171,7 +171,27 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   the decision, searches a ready norm (`citationSearchParams`), searches the topic, or hands a norm that still
   lacks its number, date or article to the palette with the words (`openCommandPaletteWith`); Enter pressed while
   the server is still naming the act waits for its answer. «Opzioni» (⌘K) opens the palette. No practice is
-  closed. `utils/searchFieldControl.ts` reaches it: `focusSearchField({ text? }, { wait? })` says whether the field took
+  closed.
+  **The palette's look** (`CommandPalette`, the search menu's brief O1, 20 Oct 2026): on a computer a panel that
+  drops from the field's form (`SEARCH_FIELD_FORM_ID` in `utils/searchFieldControl.ts`; floating-ui puts its top on
+  the field's, as wide as the field and «Opzioni», one height of at most 640 px while the box filters, so it does
+  not jump at every letter), hung at the top, centred, where no field is on screen (another page, Focus mode); on a
+  phone `ui/Sheet` («Menu di ricerca», its own «Chiudi»). From the top: the box, the one strong thing, with the help
+  line (12 px) or what the box was read as; the steps «Atto › Dettagli › Articolo» as a thin trail, the one in use in
+  ink (`aria-current="step"`), each 44 px on a phone; then two columns on a computer and one on a phone, in this
+  order: «Scegli l'atto» (`paletteActs.ts`: every act of `ACT_TYPES` named in full with the source convention's
+  abbreviation, «Codice civile · c.c.», in 44 px rows under group headings in Geist 12 px) and «A portata di mano»
+  (Preferiti, I tuoi alias with the presets' line, «In dotazione» while typing; six of each at rest, then «Tutti i
+  preferiti (N)» and «Gestisci alias (N)»; empty, one quiet line each, «Crea un alias» a row like a link);
+  «Filtri avanzati» closed at the foot, its state in words (`activeFiltersLabel`, `utils/searchFilters.ts`); the
+  keys on a computer only. The box filters every list while it is typed (`filterPaletteActs`, `queryMatches`: each
+  typed word begins a word of the row, case and accents folded, an abbreviation with or without its dots; «Nessun
+  atto con questo nome»); cmdk's own filter is off (`shouldFilter={false}`): it reorders the rows by score, across
+  the columns. Motion: the panel fades in dropping 6 px (`dur.pop`) and leaves in `dur.press`; a new step slides in
+  from the side it moved to; the chosen row's tint is one element carried from row to row (`layoutId`); under
+  reduced motion everything only fades. This reverses spec `2026-10-18-redesign-inchiostro` §6.1 («no open or close
+  animation») for the palette, as the brief asked. There is no «ultimi atti aperti»: the web keeps no list of the
+  acts opened (the search history is the server's, read by its page alone). `utils/searchFieldControl.ts` reaches it: `focusSearchField({ text? }, { wait? })` says whether the field took
   the request, and the sidebar's «Ricerca», which navigates first, asks it to wait (2 s) for the field to mount;
   the empty page's button and examples and the empty practice use `focusSearchFieldOrPalette`, which opens the
   palette with the same words when no field is on screen (Focus mode).
@@ -311,10 +331,10 @@ Three different things. Conflating them is the recurring mistake.
 
 - **Presets** (80) — shipped in `preset_aliases.yaml`, served by
   `GET /fetch_alias_catalog`. 21 of them only rename an act type: "codice
-  appalti" IS the "Codice Contratti Pubblici" tile already in the palette's
-  grid, so listing them duplicates that grid. The palette shows only the 59
+  appalti" IS the "Codice dei contratti pubblici" row already in the palette's
+  list of acts, so listing them duplicates that list. The palette shows only the 59
   that carry a number and a date (`gdpr` → Reg. UE 679/2016), which is work
-  the grid cannot save.
+  the list cannot save.
 - **Known acts** (392) — names `act_resolver.py` understands unaided ("statuto
   dei lavoratori", "TUSL"). These need no alias at all; one would only drift.
 - **CustomAlias** — the user's own, server-backed. A custom trigger beats a
@@ -326,7 +346,7 @@ Three different things. Conflating them is the recurring mistake.
 `AliasManager` is reached **only** from the command palette (gotcha 27; both are mounted by `Layout`'s
 `GlobalSearch`), and in
 the palette the presets cost one line of header text at rest — they render as
-rows only once the user types, and cmdk does the matching. `useAliasCatalog`
+rows only once the user types, matched by `queryMatches` (`paletteActs.ts`). `useAliasCatalog`
 keeps its `loaded` flag in component state, so the palette and the manager each
 fetch the catalog once for as long as they stay mounted — two calls per session,
 never repeated, nothing persisted.
