@@ -76,6 +76,7 @@ class ThrottledHttpClient:
 
         attempt = 0
         last_status: Optional[int] = None
+        retry_after: Optional[float] = None
         async with self._semaphore:
             while attempt <= retries:
                 await self._respect_min_interval()
@@ -107,6 +108,7 @@ class ThrottledHttpClient:
                                 },
                             )
                             attempt += 1
+                            retry_after = wait_time
                             await self._wait_before(attempt, retries, wait_time)
                             continue
 
@@ -115,6 +117,7 @@ class ThrottledHttpClient:
                 except aiohttp.ClientError as exc:
                     if isinstance(exc, aiohttp.ClientResponseError):
                         last_status = exc.status
+                    retry_after = None
                     wait_time = self._retry_delay(attempt)
                     log.warning(
                         "HTTP request failed; retrying",
@@ -123,6 +126,7 @@ class ThrottledHttpClient:
                     attempt += 1
                     await self._wait_before(attempt, retries, wait_time)
                 except asyncio.TimeoutError:
+                    retry_after = None
                     wait_time = self._retry_delay(attempt)
                     log.warning(
                         "HTTP request timeout; retrying",
@@ -133,6 +137,7 @@ class ThrottledHttpClient:
             raise NetworkError(
                 f"Exceeded retry budget for {url} after {retries + 1} attempts",
                 status_code=last_status,
+                retry_after=retry_after,
             )
 
     @staticmethod

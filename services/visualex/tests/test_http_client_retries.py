@@ -93,6 +93,7 @@ class TestMaxRetries:
         finally:
             await server.close()
         assert raised.value.status_code == 429
+        assert raised.value.retry_after == 60.0
 
     async def test_one_retry_makes_two_attempts(self, client):
         async with Portal([503]) as portal:
