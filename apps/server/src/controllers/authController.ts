@@ -251,52 +251,94 @@ const IDENTITY_KEYS = new Set([
 ]);
 // Keys that only a person has: beside an id, they make the object a person (`personKind`).
 const PERSON_KEYS = new Set(['username', 'email', 'displayname', 'fullname', 'firstname', 'lastname']);
-// A name is also a dossier's or an environment's: it makes a person only of a user's own record.
+// A name is also a dossier's or an environment's: it makes a person only beside a user's id.
 const NAME_KEYS = new Set([...PERSON_KEYS, 'name']);
 const UUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+// What separates the words of a text: an email is a word with an `@` in it. Split, never a pattern
+// that would scan a long text again from every position.
+const WORD_BREAK = /[\s<>"'(),;[\]{}]+/;
+const WORD_END = new Set(['.', ':', '!', '?']);
+// What stands, in a text the user wrote, for another user's id or email.
+const OTHER_USER = '[altro utente]';
 
-/** `foreignUserIds`: the ids, lowercased, of the other users the content names (`foreignUserIdsIn`). */
-type OwnIdentity = { id: string; username: string; email: string; foreignUserIds: ReadonlySet<string> };
+/** `others`: the ids and emails, lowercased, of the other users the content names (`othersIn`). */
+type OwnIdentity = { id: string; username: string; email: string; others: ReadonlySet<string> };
+
+const isOwnId = (value: unknown, own: OwnIdentity) => typeof value === 'string' && value.toLowerCase() === own.id.toLowerCase();
 
 const isOwnIdentity = (value: unknown, own: OwnIdentity) =>
-  typeof value === 'string' && (value === own.id || value === own.username || value.toLowerCase() === own.email.toLowerCase());
+  typeof value === 'string' && (isOwnId(value, own) || value === own.username || value.toLowerCase() === own.email.toLowerCase());
 
-/** A string that holds another user's id, alone or inside a longer text (a link, a `user:<id>`). */
-const holdsForeignUserId = (value: unknown, own: OwnIdentity) =>
-  typeof value === 'string' && (value.match(UUID_PATTERN) ?? []).some((id) => own.foreignUserIds.has(id.toLowerCase()));
+/** A user's id: the user's own or another's. */
+const isUserId = (value: unknown, own: OwnIdentity) =>
+  typeof value === 'string' && (isOwnId(value, own) || own.others.has(value.toLowerCase()));
 
-/** `id`, `uid`, `userId`, `autore_id`: a key that names an id. */
-const isIdKey = (folded: string) => folded === 'id' || folded.endsWith('id');
+/** The ids and emails a text could hold, lowercased: the candidates for a user's. */
+function identifiersIn(text: string): string[] {
+  const found = (text.match(UUID_PATTERN) ?? []).map((id) => id.toLowerCase());
+  if (!text.includes('@')) return found;
+  for (const word of text.split(WORD_BREAK)) {
+    let email = word.toLowerCase().startsWith('mailto:') ? word.slice('mailto:'.length) : word;
+    let last = email.length;
+    while (last > 0 && WORD_END.has(email[last - 1])) last -= 1;
+    email = email.slice(0, last);
+    const at = email.indexOf('@');
+    if (at > 0 && at < email.length - 1) found.push(email.toLowerCase());
+  }
+  return found;
+}
+
+/** A string that holds another user's id or email, alone or inside a longer text. */
+const holdsOtherUser = (value: unknown, own: OwnIdentity) =>
+  typeof value === 'string' && identifiersIn(value).some((found) => own.others.has(found));
+
+/** A string that is another user's id or email, and nothing else. */
+const isOtherUserIdentifier = (value: unknown, own: OwnIdentity) =>
+  typeof value === 'string' && own.others.has(value.trim().toLowerCase());
+
+/** A text the user wrote, with another user's id or email in it: that id or email is covered, the text stays. */
+function withOtherUsersCovered(text: string, own: OwnIdentity): string {
+  let out = text;
+  for (const found of new Set(identifiersIn(text))) {
+    if (!own.others.has(found)) continue;
+    out = out.replace(new RegExp(found.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), OTHER_USER);
+  }
+  return out;
+}
+
+/** `id`, `uid`, `_id`, `userId`, `autore_id`, `AUTHOR-ID`: a key that names an id (not `paid`, not `valid`). */
+const isIdKey = (key: string) => /^_?u?id$/i.test(key) || /[_-]id$/i.test(key) || /[a-z0-9]I[dD]$/.test(key);
 
 /**
  * What an object of the content is, as a person:
  * - `user`: a user's record, someone else's: its own `id` is another user's, beside a name,
  *   username or email. It goes whole: whatever else it holds is that person's.
  * - `person`: someone's identity on a row: an id beside a key only a person has (`PERSON_KEYS`),
- *   say `{ author_id, username }` or `{ id, displayName, text }`. Its ids and names go, whatever
+ *   say `{ author_id, username }` or `{ id, displayName, text }`, or, in an object with no `id`
+ *   of its own, a user's id beside a name (`{ authorId, name }`). Its ids and names go, whatever
  *   the keys are called, so no id is left behind under a key the lists do not know.
- * - `own`: either of the two, but the user's: their id, username or email, and no other user's id
- *   (a display name cannot be checked). Its names stay.
+ * - `own`: either of the two, but the user's: their username or email, or else only their id,
+ *   and no other user's id or email (a display name cannot be checked). Its names stay.
  */
 function personKind(entries: [string, unknown][], own: OwnIdentity): 'none' | 'own' | 'user' | 'person' {
   const folded = entries.map(([key, inner]) => [foldKey(key), inner] as const);
-  const ids = folded.filter(([key, inner]) => isIdKey(key) && typeof inner === 'string' && inner !== '');
+  const ids = entries.filter(([key, inner]) => isIdKey(key) && typeof inner === 'string' && inner !== '').map(([, inner]) => inner);
   if (ids.length === 0) return 'none';
-  const record = folded.find(([key]) => key === 'id' || key === 'uid')?.[1];
-  const isUserRecord = typeof record === 'string' && (record === own.id || own.foreignUserIds.has(record.toLowerCase()))
-    && folded.some(([key]) => NAME_KEYS.has(key));
-  const isPerson = folded.some(([key]) => PERSON_KEYS.has(key));
+  const record = folded.find(([key]) => key === 'id' || key === 'uid');
+  const named = folded.some(([key]) => NAME_KEYS.has(key));
+  const isUserRecord = named && record !== undefined && isUserId(record[1], own);
+  // A dossier's own id is not a user's: its `userId` beside its name does not make it a person.
+  const isPerson = folded.some(([key]) => PERSON_KEYS.has(key)) || (named && !record && ids.some((inner) => isUserId(inner, own)));
   if (!isUserRecord && !isPerson) return 'none';
-  // The user's, by something that can be checked: their id, username or email, and nobody else's.
   const checkable = folded.filter(([key]) => key === 'username' || key === 'email');
-  const mine = folded.every(([, inner]) => !holdsForeignUserId(inner, own))
+  const mine = folded.every(([, inner]) => !holdsOtherUser(inner, own))
     && checkable.every(([, inner]) => isOwnIdentity(inner, own))
-    && (checkable.length > 0 || ids.some(([, inner]) => inner === own.id));
+    && (checkable.length > 0 || ids.every((inner) => isOwnId(inner, own)));
   if (mine) return 'own';
   return isUserRecord ? 'user' : 'person';
 }
 
-const isOtherUser = (value: unknown, own: OwnIdentity) =>
+const isOtherUserRecord = (value: unknown, own: OwnIdentity) =>
   typeof value === 'object' && value !== null && !Array.isArray(value) && personKind(Object.entries(value), own) === 'user';
 
 /**
@@ -305,13 +347,14 @@ const isOtherUser = (value: unknown, own: OwnIdentity) =>
  * `originalAuthorId`, which become `fromAnotherUser`, and anyone's `authorId`, `username`,
  * `user_id`, `email` and the like (`IDENTITY_KEYS`, case and `_`/`-` folded), which go unless they
  * are the user's own. Someone else's person object loses its ids and names, or goes whole when it
- * is a user's record (`personKind`); a string that holds another user's id goes, under any key.
- * At any depth; nothing else in the blob changes.
+ * is a user's record (`personKind`). Another user's id or email goes, under any key; inside a
+ * longer text it is covered (`OTHER_USER`) and the text stays. At any depth; nothing else changes.
  */
 function withoutAuthors(value: unknown, own: OwnIdentity): unknown {
+  if (typeof value === 'string') return withOtherUsersCovered(value, own);
   if (Array.isArray(value)) {
     return value
-      .filter((inner) => !holdsForeignUserId(inner, own) && !isOtherUser(inner, own))
+      .filter((inner) => !isOtherUserIdentifier(inner, own) && !isOtherUserRecord(inner, own))
       .map((inner) => withoutAuthors(inner, own));
   }
   if (typeof value !== 'object' || value === null) return value;
@@ -329,8 +372,8 @@ function withoutAuthors(value: unknown, own: OwnIdentity): unknown {
     if (IDENTITY_KEYS.has(folded) && !isOwnIdentity(inner, own) && !(kind === 'own' && NAME_KEYS.has(folded))) continue;
     // Someone else's record or identity: its ids and names go (a record at the top, which no
     // parent removes, keeps only what is not about the person).
-    if ((kind === 'person' || kind === 'user') && (isIdKey(folded) || NAME_KEYS.has(folded))) continue;
-    if (holdsForeignUserId(key, own) || holdsForeignUserId(inner, own) || isOtherUser(inner, own)) continue;
+    if ((kind === 'person' || kind === 'user') && (isIdKey(key) || NAME_KEYS.has(folded))) continue;
+    if (holdsOtherUser(key, own) || isOtherUserIdentifier(inner, own) || isOtherUserRecord(inner, own)) continue;
     // Defined, not assigned: a `__proto__` key in the blob stays a key of the row.
     Object.defineProperty(out, key, { value: withoutAuthors(inner, own), enumerable: true, writable: true, configurable: true });
   }
@@ -338,33 +381,44 @@ function withoutAuthors(value: unknown, own: OwnIdentity): unknown {
   return out;
 }
 
-/** Every id-shaped string in the content, lowercased: the candidates for a user's id. */
-function collectUuids(value: unknown, into: Set<string>) {
+/** Every id and email the content holds, in its values and its keys, lowercased. */
+function collectIdentifiers(value: unknown, into: Set<string>) {
   if (typeof value === 'string') {
-    for (const id of value.match(UUID_PATTERN) ?? []) into.add(id.toLowerCase());
+    for (const found of identifiersIn(value)) into.add(found);
   } else if (Array.isArray(value)) {
-    for (const inner of value) collectUuids(inner, into);
+    for (const inner of value) collectIdentifiers(inner, into);
   } else if (typeof value === 'object' && value !== null) {
     for (const [key, inner] of Object.entries(value)) {
-      collectUuids(key, into);
-      collectUuids(inner, into);
+      collectIdentifiers(key, into);
+      collectIdentifiers(inner, into);
     }
   }
 }
 
-/** The ids, among those the content holds, that belong to another user of this instance. */
-async function foreignUserIdsIn(contents: unknown[], ownId: string): Promise<Set<string>> {
+/**
+ * The ids and emails, among those the content holds, of another user of this instance. A user who
+ * deleted their account is no longer found: their id stays where no other rule takes it.
+ */
+async function othersIn(contents: unknown[], own: { id: string; email: string }): Promise<Set<string>> {
   const candidates = new Set<string>();
-  for (const content of contents) collectUuids(content, candidates);
-  candidates.delete(ownId.toLowerCase());
-  const foreign = new Set<string>();
+  for (const content of contents) collectIdentifiers(content, candidates);
+  candidates.delete(own.id.toLowerCase());
+  candidates.delete(own.email.toLowerCase());
   const all = [...candidates];
+  const ids = all.filter((found) => !found.includes('@'));
+  const emails = all.filter((found) => found.includes('@'));
+  const others = new Set<string>();
   // Below Postgres' bind-parameter limit, whatever the size of the content.
-  for (let i = 0; i < all.length; i += 5000) {
-    const users = await prisma.user.findMany({ where: { id: { in: all.slice(i, i + 5000) } }, select: { id: true } });
-    for (const { id } of users) foreign.add(id.toLowerCase());
+  for (let i = 0; i < ids.length; i += 5000) {
+    const users = await prisma.user.findMany({ where: { id: { in: ids.slice(i, i + 5000) } }, select: { id: true } });
+    for (const { id } of users) others.add(id.toLowerCase());
   }
-  return foreign;
+  for (let i = 0; i < emails.length; i += 5000) {
+    const users = await prisma.$queryRaw<{ email: string }[]>`
+      SELECT lower(email) AS email FROM users WHERE lower(email) = ANY(${emails.slice(i, i + 5000)}::text[])`;
+    for (const { email } of users) others.add(email);
+  }
+  return others;
 }
 
 /**
@@ -431,13 +485,13 @@ export const exportAccountData = async (req: Request, res: Response) => {
     }),
   ]);
   // A quick norm's or an alias's search, taken from a proposal, is the proposer's JSON too.
-  const foreignUserIds = await foreignUserIdsIn([
+  const others = await othersIn([
     ...dossiers.flatMap((dossier) => [...dossier.items.map((item) => item.content), ...dossier.snapshots.map((snapshot) => snapshot.content)]),
     ...environments.map((env) => env.content),
     ...quickNorms.map((norm) => norm.searchParams),
     ...customAliases.map((alias) => alias.searchParams),
-  ], userId);
-  const own: OwnIdentity = { id: userId, username: req.user!.username, email: req.user!.email, foreignUserIds };
+  ], req.user!);
+  const own: OwnIdentity = { id: userId, username: req.user!.username, email: req.user!.email, others };
 
   res.json({
     schemaVersion: 1,

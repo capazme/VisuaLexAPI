@@ -208,7 +208,7 @@ describe('the account export, against a second user who touches everything', () 
 
     const [norm] = response.body.data.quickNorms as { label: string; searchParams: unknown; fromAnotherUser: boolean }[];
     expect(norm).toMatchObject({ label: 'Norma proposta e accolta', fromAnotherUser: true });
-    expect(norm.searchParams).toEqual({ act_type: 'codice civile', article: '1453', fromAnotherUser: true });
+    expect(norm.searchParams).toEqual({ act_type: 'codice civile', article: '1453', ref: 'user:[altro utente]', fromAnotherUser: true });
     const [alias] = response.body.data.customAliases as { trigger: string; searchParams: unknown }[];
     expect(alias.searchParams).toEqual({ act_type: 'codice civile', article: '1453' });
   });
@@ -219,14 +219,24 @@ describe('the account export, against a second user who touches everything', () 
     const content = {
       rows: [
         { text: 'Riga 1', originalAuthorUsername: bob.username, originalAuthorName: 'Bob Q7', originalAuthorEmail: bob.email },
-        { text: 'Riga 2', displayName: 'Bob Q7', fullName: 'Bob Q7', autoreId: bob.id, utente_id: bob.id },
+        { text: 'Riga 2', displayName: 'Bob Q7', fullName: 'Bob Q7', autoreId: bob.id, utente_id: bob.id, kind: 'nota' },
         // Bob's own record, under keys no list names: it goes whole, with what else it holds.
         { text: 'Riga 3', curator: { id: bob.id, name: 'Bob Q7', bio: 'Bob Q7 bio' }, team: [{ id: bob.id, name: 'Bob Q7' }, 'Alice'] },
         // An id beside a key only a person has, whatever the id is called: ids and names go.
         { text: 'Riga 4', curator: { key: 'k1', person_ref_id: 'not-a-user', displayName: 'Bob Q7', role: 'curatore' } },
-        // A user's id anywhere, alone or inside a text, and as a key.
-        { text: 'Riga 5', ref: bob.id, link: `https://example.org/u/${bob.id.toUpperCase()}`, seen: [bob.id, 'altro'], [bob.id]: true },
+        // A user's id or email anywhere: alone it goes, as a key too; inside a text it is covered.
+        {
+          text: 'Riga 5', ref: bob.id, link: `https://example.org/u/${bob.id.toUpperCase()}`, seen: [bob.id, 'altro'], [bob.id]: true,
+          contact: bob.email.toUpperCase(), note: `Scrivere a mailto:${bob.email}. Grazie`,
+        },
+        // Another user's id under any id key, beside a name, with no id of its own: ids and names go.
+        { text: 'Riga 6', proposedBy: { authorId: bob.id, name: 'Bob Q7', role: 'proponente' }, by: { uploader_id: bob.id, name: 'Bob Q7' } },
+        // The user's id beside someone else's: not the user's record.
+        { text: 'Riga 7', invite: { ownerId: alice.id, inviteeId: 'ext-1', fullName: 'Bob Q7', when: 'oggi' } },
       ],
+      // Not ids: `paid`, `valid`. A client's name stays; an email under the email key goes, as ever.
+      client: { email: 'cliente@studio.example', name: 'Cliente Rossi', paid: 'si', valid: 'no' },
+      meUpper: { id: alice.id.toUpperCase(), displayName: 'Alice' },
       // A dossier's and an environment's id and name are not a person, nor the user's own id beside them.
       dossier: { id: 'd-1', name: 'Dossier di Alice', userId: alice.id },
       // The user's own record keeps its names.
@@ -241,11 +251,15 @@ describe('the account export, against a second user who touches everything', () 
     expect(env!.content).toEqual({
       rows: [
         { text: 'Riga 1', fromAnotherUser: true },
-        { text: 'Riga 2' },
+        { text: 'Riga 2', kind: 'nota' },
         { text: 'Riga 3', team: ['Alice'] },
         { text: 'Riga 4', curator: { key: 'k1', role: 'curatore' } },
-        { text: 'Riga 5', seen: ['altro'] },
+        { text: 'Riga 5', link: 'https://example.org/u/[altro utente]', seen: ['altro'], note: 'Scrivere a mailto:[altro utente]. Grazie' },
+        { text: 'Riga 6', proposedBy: { role: 'proponente' }, by: {} },
+        { text: 'Riga 7', invite: { when: 'oggi' } },
       ],
+      client: { name: 'Cliente Rossi', paid: 'si', valid: 'no' },
+      meUpper: { id: alice.id.toUpperCase(), displayName: 'Alice' },
       dossier: { id: 'd-1', name: 'Dossier di Alice', userId: alice.id },
       me: { id: alice.id, name: 'Alice A.', displayName: 'Alice' },
       meByEmail: { uid: 'local-1', email: alice.email, fullName: 'Alice A.' },
@@ -254,5 +268,6 @@ describe('the account export, against a second user who touches everything', () 
     expect(exported).not.toContain(bob.id);
     expect(exported.toLowerCase()).not.toContain(bob.id.toLowerCase());
     expect(exported).not.toContain('Bob Q7');
+    expect(exported.toLowerCase()).not.toContain(bob.email.toLowerCase());
   });
 });

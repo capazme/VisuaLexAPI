@@ -603,10 +603,13 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `user`, `owner`, `suggester`, `reporter`, goes whole): an environment imported
   by hand may be someone else's file. Persons are also read by shape
   (`personKind`): an object whose own `id` is another user's, beside a name, goes
-  whole; an id beside `username`, `email`, `displayName`, `fullName` and the like
-  loses its ids and names, whatever they are called; the user's own record stays.
-  And any string that holds another user's id (looked up among the export's ids)
-  goes, under any key. A dossier entry's and a snapshot's `content`, and a quick
+  whole; an id beside `username`, `email`, `displayName`, `fullName` and the like,
+  or a user's id beside a name in an object with no `id` of its own, loses its ids
+  and names, whatever they are called; the user's own record stays. Another user's
+  id or email (the export's ids and emails are looked up among the users) goes
+  under any key, or is covered by `[altro utente]` inside a longer text. Not
+  caught: a deleted user's id under a key no rule reads, and another user's
+  username under such a key (a bare word cannot be told from a username). A dossier entry's and a snapshot's `content`, and a quick
   norm's or an alias's `searchParams` (a proposal's JSON, stored as it came), are
   read the same way (a dossier imported from a link keeps a note entry as the
   client sent it). An archived environment's `author`
