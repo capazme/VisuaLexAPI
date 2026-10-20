@@ -66,6 +66,17 @@ export function AuthPage() {
   // the form starts again empty (it stays mounted, so a new key mounts it afresh).
   const [signedUp, setSignedUp] = useState(false);
   const [registerKey, setRegisterKey] = useState(0);
+  // And «Torna ad Accedi» finds a fresh sign-in form: a new key empties it, and the failure the page's
+  // `useAuth` still holds (until the next sign-in) is not shown on it. A new failure is the form's own
+  // message, so hiding the same words again loses nothing.
+  const [loginKey, setLoginKey] = useState(0);
+  const [spentError, setSpentError] = useState<string | null>(null);
+  const loginAuth = { login: auth.login, loading: auth.loading, error: auth.error === spentError ? null : auth.error };
+  const onRegistered = () => {
+    setSignedUp(true);
+    setLoginKey((k) => k + 1);
+    setSpentError(auth.error);
+  };
 
   const [entering, setEntering] = useState(false);
   // Whether the last change of tab moves at all (not on the first paint, not under reduced motion).
@@ -150,9 +161,11 @@ export function AuthPage() {
             half of it. */}
         <div className="pb-6 pt-8 md:pt-[max(1.5rem,calc((100dvh-40rem)/2))]">
           <div className="mx-auto grid w-full max-w-4xl gap-8 md:grid-cols-[minmax(0,1fr)_420px] md:items-center md:gap-16">
+            {/* The title grows only from `lg`: between 768 and 1023 px the column beside the card is about
+                200-430 px, and «VisuaLex» at 68 px is 272 px wide. */}
             <header className="flex flex-col items-center gap-4 text-center md:items-start md:gap-5 md:text-left">
               <BookOpen aria-hidden="true" size={44} strokeWidth={1.5} className="text-primary-600 dark:text-primary-400" />
-              <h1 className="font-serif text-5xl font-medium leading-none tracking-tight text-slate-900 dark:text-slate-50 md:text-[4.25rem]">
+              <h1 className="font-serif text-5xl font-medium leading-none tracking-tight text-slate-900 dark:text-slate-50 lg:text-[4.25rem]">
                 VisuaLex
               </h1>
               <p className="max-w-[34ch] font-serif text-xl leading-relaxed text-slate-600 dark:text-slate-300">
@@ -229,12 +242,18 @@ export function AuthPage() {
                       }`}
                     >
                       {t.id === 'login' ? (
-                        <LoginForm auth={auth} onBusy={setBusy} onSignedIn={onSignedIn} onSwitch={() => switchTo('register', 'field')} />
+                        <LoginForm
+                          key={loginKey}
+                          auth={loginAuth}
+                          onBusy={setBusy}
+                          onSignedIn={onSignedIn}
+                          onSwitch={() => switchTo('register', 'field')}
+                        />
                       ) : (
                         <RegisterForm
                           key={registerKey}
                           onBusy={setBusy}
-                          onRegistered={() => setSignedUp(true)}
+                          onRegistered={onRegistered}
                           onSwitch={() => switchTo('login', 'field')}
                         />
                       )}

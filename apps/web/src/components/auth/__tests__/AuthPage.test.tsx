@@ -190,6 +190,27 @@ describe('AuthPage: two tabs on one page', () => {
     expect(within(panel()).getByLabelText('Username')).toHaveValue('avv_rossi');
   });
 
+  it('«Torna ad Accedi» after signing up: a fresh sign-in form, without the values and the failure from before', async () => {
+    authError = 'Credenziali non valide'; // the page's useAuth keeps the last failure until the next sign-in
+    renderAuth('/login');
+    fireEvent.change(within(panel()).getByLabelText('Email'), { target: { value: 'vecchio@studio.it' } });
+    fireEvent.change(within(panel()).getByLabelText(/^password$/i), { target: { value: 'sbagliata' } });
+    expect(screen.getByRole('alert')).toHaveTextContent('Credenziali non valide');
+    fireEvent.click(tab('Registrati'));
+    const p = within(panel());
+    fireEvent.change(p.getByLabelText('Email'), { target: { value: 'avv@studio.it' } });
+    fireEvent.change(p.getByLabelText('Username'), { target: { value: 'avv_rossi' } });
+    fireEvent.change(p.getByLabelText('Password'), { target: { value: 'Segreta123' } });
+    fireEvent.change(p.getByLabelText('Conferma password'), { target: { value: 'Segreta123' } });
+    fireEvent.click(p.getByRole('button', { name: 'Crea account' }));
+    await screen.findByRole('heading', { name: 'Registrazione completata' });
+    fireEvent.click(within(panel()).getByRole('button', { name: 'Torna ad Accedi' }));
+    expect(within(panel()).getByLabelText('Email')).toHaveValue('');
+    expect(within(panel()).getByLabelText(/^password$/i)).toHaveValue('');
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(within(panel()).getByLabelText('Email')).toHaveFocus();
+  });
+
   it('holds the tabs still while a sign-in is on its way', async () => {
     let finish: () => void = () => {};
     login.mockImplementation(() => new Promise<void>((resolve) => { finish = resolve; }));

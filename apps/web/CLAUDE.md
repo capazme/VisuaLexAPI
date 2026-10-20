@@ -81,12 +81,14 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   both forms stay mounted in one cell of a grid, the one not shown `invisible` and `inert`, so the card is as
   tall as the taller form whichever is open and each form keeps what was typed in it, and its error (after a
   sign-up, the confirmation stays until the tab changes, and back on «Registrati» a new key mounts the form
-  empty); «Crediti»
+  empty; «Torna ad Accedi» finds a fresh sign-in form too, a new key, with the failure the page's `useAuth`
+  still holds not shown); «Crediti»
   is the last row of a grid as tall as the window; the page is its own scroller (`h-app`) with
   `scrollbar-gutter: stable`, so a low window does not shift sideways when a bar appears; on a computer the
   card's top sits where the card would be centred above the foot, so a form that grows (an error) grows
   downwards and the tabs never move, and the colophon is centred against the card (text left-aligned; on a
-  phone centred above it), so it follows half of such a growth. The register form fits a window 768 px high
+  phone centred above it), so it follows half of such a growth; its title is 48 px up to `lg` and 68 px from it
+  (between 768 and 1023 px the column beside the card is about 200 px). The register form fits a window 768 px high
   inside (1366×768, 1470×753 measured as viewports; a 768 px screen with a browser's bars scrolls a little) by
   its spacing (`space-y-4` between fields, `space-y-1.5` inside one), the sign-in form spaced the same. While a sign-in or a
   sign-up is on its way the tabs hold still (`aria-disabled`): its answer would land on the hidden form. A
