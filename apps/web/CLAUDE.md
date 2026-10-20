@@ -67,7 +67,16 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   development mode (below) the address redirects to `/`. `VITE_FEATURE_MERLT`
   and `VITE_FEATURE_MERLT_GRAPH` decide the Sidebar's «Assistente» and «Grafo»
   entries and whether a page says it is unavailable. Outside the layout:
-  `/login`, `/register`, `/crediti` (public, below), `/connect` (the consent page an MCP client's
+  `/login` and `/register` (one page, `components/auth/AuthPage`, A1: the colophon beside a card with two
+  tabs, «Accedi» and «Registrati» (`LoginForm`, `RegisterForm`, their shared classes in `authForm.ts` and parts
+  in `AuthFormParts.tsx`); one parent route over both addresses, so a change of tab replaces the address — the
+  router state that carries the return after the login travels with it — and keeps the page mounted. The tab
+  is the page's own state, read from the address when it opens: React Router 7 applies a navigation in a
+  transition, so a tab read from the address would unmount the form leaving for one render. A click or the
+  link under a form puts the cursor in the new form's first field, the arrows keep it on the tabs; the mark
+  slides by `transform`, the form leaving fades, the next comes in from the side of its tab, the card's height
+  follows, and under reduced motion the change is immediate; the wait for approval after signing up is drawn
+  in the same card), `/crediti` (public, below), `/connect` (the consent page an MCP client's
   authorization request lands on: signed in, the user approves or refuses) and
   `/admin/*` (admins only).
 - **The credits** (C1, 19 Oct 2026): `data/credits.ts` is the one source of truth for a source's
@@ -1818,7 +1827,9 @@ meant to stay split; add new features as new files, not inside the shells:
     `@utility` rules at the end of `index.css` that move with the individual
     `translate` and `scale` properties, so they compose with floating-ui's
     positioning `transform` instead of replacing it (gotcha 10), last at
-    most 200 ms and fill `backwards` only: a `both` fill keeps the element a
+    most 200 ms and fill `backwards` only (each `slide-in-from-*` writes both axes: the offsets are
+    inherited custom properties, and an error box sliding from the top inside a panel that slid from
+    the side came in on the diagonal): a `both` fill keeps the element a
     containing block and a stacking context after the entrance (gotcha 22). `theme.test.ts` checks they generate CSS. The palette is the
     «Inchiostro» one (spec `2026-10-18-redesign-inchiostro`): `slate`, `gray`,
     `zinc`, `neutral` are aliases of `ink`, `blue`, `indigo`, `primary-<n>` of
