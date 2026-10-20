@@ -145,6 +145,14 @@ async function lockDossiers(tx: Prisma.TransactionClient, userId: string, ids: (
   await tx.$queryRaw`SELECT id FROM dossiers WHERE id IN (${Prisma.join(wanted)}) AND user_id = ${userId} ORDER BY id FOR UPDATE`;
 }
 
+/**
+ * Serialises the user's re-parentings: two at once (A under B, B under A) would each check its own
+ * loop before the other's write and close one together. Taken first, before any row lock.
+ */
+async function lockParentChanges(tx: Prisma.TransactionClient, userId: string): Promise<void> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('tasks:parent:' || ${userId}::text))`;
+}
+
 /** The task and every task under it, at any depth, as ids (the user's rows only). */
 async function subtreeIds(tx: Prisma.TransactionClient, userId: string, id: string): Promise<string[]> {
   const rows = await tx.$queryRaw<{ id: string }[]>`
@@ -220,6 +228,7 @@ export async function createTask(userId: string, input: TaskInput & { title: str
  */
 export async function updateTask(userId: string, id: string, input: TaskInput): Promise<Task> {
   return prisma.$transaction(async (tx) => {
+    if (typeof input.parentId === 'string') await lockParentChanges(tx, userId);
     // The dossiers a move may touch are locked before the task, in the order the dossier's trash takes
     // them (dossier, then its tasks); the task is then re-read, and a dossier changed meanwhile is a 409.
     if (input.dossierId !== undefined || input.parentId !== undefined) {
@@ -278,9 +287,12 @@ export async function updateTask(userId: string, id: string, input: TaskInput): 
         await tx.task.updateMany({ where: { id: { in: below }, userId }, data: { dossierId, dossierItemId: null } });
       }
     }
+    // A task that changes list (another dossier, another parent) goes after the last one of the new list.
+    const listChanged = dossierMoved || parentId !== existing.parentId;
     return tx.task.update({
       where: { id },
       data: {
+        position: listChanged ? await nextPosition(tx, userId, dossierId, parentId) : undefined,
         title: input.title,
         description: input.description,
         priority: input.priority,
@@ -309,8 +321,8 @@ export interface CompleteResult {
 /**
  * Ticks a task. A repeating one moves to its next planned date and stays open; any other closes,
  * with the open tasks under it, all at the same instant (so that reopening it reopens them).
- * `seenPlannedDate`, when the client sends it, is the occurrence the user ticked: a repeating task
- * that has already moved on (a second click, another tab) answers 409 instead of moving twice.
+ * `seenPlannedDate` is the occurrence the user ticked, required for a repeating task (400 without):
+ * one that has already moved on (a second click, another tab) answers 409 instead of moving twice.
  * Ticking a closed task changes nothing.
  */
 export async function completeTask(userId: string, id: string, seenPlannedDate?: string, now: Date = new Date()): Promise<CompleteResult> {
@@ -321,7 +333,10 @@ export async function completeTask(userId: string, id: string, seenPlannedDate?:
 
     const plannedDay = dayOrNull(task.plannedDate);
     if (task.recurrence && plannedDay) {
-      if (seenPlannedDate !== undefined && seenPlannedDate !== plannedDay) {
+      if (seenPlannedDate === undefined) {
+        throw new AppError(400, 'Per spuntare un compito che si ripete indica la data spuntata (plannedDate).');
+      }
+      if (seenPlannedDate !== plannedDay) {
         throw new AppError(409, 'Il compito è già passato alla data successiva.');
       }
       const next = nextOccurrence(task.recurrence as RecurrenceRule, task.recurrenceFrom, plannedDay, romeDay(now));
@@ -347,15 +362,27 @@ export async function reopenTask(userId: string, id: string): Promise<Task> {
   });
 }
 
-/** Manual order: the tasks named take positions 0, 1, 2… in that order. One that is not the user's (or in the trash) refuses all. */
+/**
+ * Manual order within one list: the tasks named, all of the same dossier (or the inbox) and under the
+ * same parent, take positions 0, 1, 2… in that order, in one statement. One that is not the user's (or
+ * is in the trash) refuses all (404), and so do tasks of two lists (400).
+ */
 export async function reorderTasks(userId: string, taskIds: string[]): Promise<void> {
   const ids = [...new Set(taskIds)];
   await prisma.$transaction(async (tx) => {
-    const found = await tx.task.count({ where: { id: { in: ids }, userId, deletedAt: null } });
-    if (found !== ids.length) throw new AppError(404, NOT_FOUND);
-    for (const [index, taskId] of ids.entries()) {
-      await tx.task.updateMany({ where: { id: taskId, userId, deletedAt: null }, data: { position: index } });
-    }
+    // Locked in id order: a move to another list in flight finishes first, and is then seen here.
+    const rows = await tx.$queryRaw<{ id: string; dossier_id: string | null; parent_id: string | null }[]>`
+      SELECT id, dossier_id, parent_id FROM tasks
+      WHERE id = ANY(${ids}::text[]) AND user_id = ${userId} AND deleted_at IS NULL
+      ORDER BY id FOR UPDATE`;
+    if (rows.length !== ids.length) throw new AppError(404, NOT_FOUND);
+    const lists = new Set(rows.map((row) => `${row.dossier_id ?? ''}|${row.parent_id ?? ''}`));
+    if (lists.size > 1) throw new AppError(400, 'Si ordinano i compiti di una lista alla volta.');
+    // `updated_at` is a TIMESTAMP holding UTC, as Prisma writes it.
+    await tx.$executeRaw`
+      UPDATE tasks AS t SET position = (o.ord - 1)::int, updated_at = (now() AT TIME ZONE 'UTC')
+      FROM unnest(${ids}::text[]) WITH ORDINALITY AS o(id, ord)
+      WHERE t.id = o.id AND t.user_id = ${userId}`;
   });
 }
 
@@ -383,10 +410,12 @@ export async function restoreTask(userId: string, id: string, now: Date = new Da
       include: { parent: { select: { deletedAt: true } } },
     });
     if (!task || !task.deletedAt) throw new AppError(404, 'Compito non trovato nel cestino.');
+    // It comes back after the last one of its list: its old place may have been taken meanwhile.
+    const parentId = task.parent?.deletedAt ? null : task.parentId;
+    const position = await nextPosition(tx, userId, task.dossierId, parentId);
     const ids = await subtreeIds(tx, userId, id);
     await tx.task.updateMany({ where: { id: { in: ids }, userId, deletedAt: task.deletedAt }, data: { deletedAt: null } });
-    if (task.parent?.deletedAt) await tx.task.update({ where: { id }, data: { parentId: null } });
-    return tx.task.findUniqueOrThrow({ where: { id } });
+    return tx.task.update({ where: { id }, data: { parentId, position } });
   });
 }
 

@@ -27,7 +27,8 @@ import {
  *
  * - `GET /api/tasks?view=today|upcoming|inbox|dossier|trash[&dossierId=]` — `{ view, today, tasks, truncated }`;
  * - `GET /api/tasks/:id`, `POST /api/tasks`, `PUT /api/tasks/:id`;
- * - `POST /api/tasks/:id/complete { plannedDate? }` — `{ task, recurred }`; `POST /api/tasks/:id/reopen`;
+ * - `POST /api/tasks/:id/complete { plannedDate }` (the occurrence ticked; required for a repeating task) — `{ task, recurred }`;
+ *   `POST /api/tasks/:id/reopen`;
  * - `POST /api/tasks/reorder { taskIds }` — the manual order;
  * - `DELETE /api/tasks/:id` — to the trash, with its subtasks; `POST /api/tasks/:id/restore`.
  *
