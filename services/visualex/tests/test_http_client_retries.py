@@ -5,6 +5,7 @@ A real aiohttp server on 127.0.0.1 answers; the egress check is patched open for
 that address and the waits are patched to zero. Nothing leaves the machine.
 """
 import asyncio
+import time
 
 import pytest
 from aiohttp import web
@@ -100,6 +101,60 @@ class TestMaxRetries:
             with pytest.raises(NetworkError):
                 await client.request("GET", portal.url, max_retries=1)
         assert portal.hits == 2
+
+
+class TestRetryAfterOutlivesTheCall:
+    """A spent budget gives up at once, but the Retry-After is not dropped: the next
+    request to the same source waits it out (act_dates asks again in a loop of URNs)."""
+
+    @staticmethod
+    async def _busy_then_ok(retry_after, busy=1):
+        hits = []
+
+        async def handler(request):
+            hits.append(time.monotonic())
+            if len(hits) <= busy:
+                return web.Response(status=429, text="no", headers={"Retry-After": retry_after})
+            return web.Response(status=200, text="ok")
+
+        app = web.Application()
+        app.router.add_get("/", handler)
+        server = TestServer(app)
+        await server.start_server()
+        return server, hits
+
+    @pytest.mark.parametrize("max_retries", [0, 1])
+    async def test_the_next_request_from_the_same_loop_waits_for_retry_after(self, client, max_retries):
+        # Every attempt of the first call is refused, so its budget is spent on 429s.
+        server, hits = await self._busy_then_ok("0.6", busy=max_retries + 1)
+        url = str(server.make_url("/"))
+        try:
+            results = []
+            for _ in range(2):  # the caller's own loop, as act_dates.resolve_many
+                try:
+                    results.append((await client.request(
+                        "GET", url, source="normattiva", max_retries=max_retries)).status)
+                except NetworkError as exc:
+                    results.append(exc.status_code)
+                if results[-1] == 200:
+                    break
+        finally:
+            await server.close()
+        assert results == [429, 200]
+        assert len(hits) == max_retries + 2
+        assert hits[-1] - hits[-2] >= 0.55
+
+    async def test_the_pause_holds_only_the_source_that_asked(self, client):
+        server, hits = await self._busy_then_ok("60")
+        url = str(server.make_url("/"))
+        try:
+            async with asyncio.timeout(5):
+                with pytest.raises(NetworkError):
+                    await client.request("GET", url, source="normattiva", max_retries=0)
+                result = await client.request("GET", url, source="eurlex", max_retries=0)
+        finally:
+            await server.close()
+        assert result.status == 200
 
 
 class TestDefaultBudgetUnchanged:
