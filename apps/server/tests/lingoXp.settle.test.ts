@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LINGO_XP_LOCK_CLASS, settleMissions } from '../src/lingo/missions';
 import {
-  card, createTestUser, creditByHand, credits, grade, prisma, progress, session, setClock, storedDay,
+  card, createTestUser, creditByHand, credits, grade, makeValidator, prisma, progress, propose, session, setClock, storedDay, vote,
   type Headers, type TestUser,
 } from './xpHelpers';
 
@@ -130,5 +130,47 @@ describe('XP never fails the event', () => {
     }
     expect(await prisma.lingoRevisioneSRS.count({ where: { utenteId: alice.id } })).toBe(1);
     expect((await progress(a)).body.crediti).toHaveLength(2);
+  });
+
+  /** Runs `act` while no credit can be written: every insert into the ledger fails. */
+  async function withBlockedLedger(act: () => Promise<void>) {
+    await prisma.$executeRawUnsafe('ALTER TABLE lingo_crediti_xp ADD CONSTRAINT xp_test_block CHECK (false) NOT VALID');
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      await act();
+      expect(error).toHaveBeenCalledWith(expect.stringContaining('[xp]'), expect.any(String));
+    } finally {
+      await prisma.$executeRawUnsafe('ALTER TABLE lingo_crediti_xp DROP CONSTRAINT xp_test_block');
+      error.mockRestore();
+    }
+  }
+
+  it('keeps the proposal when its credit cannot be written', async () => {
+    const draft = await card(alice);
+    await withBlockedLedger(async () => {
+      const response = await propose(a, draft.id);
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({ stato: 'PROPOSTA_COMMUNITY', xp: { crediti: [] } });
+    });
+    expect((await prisma.lingoCard.findUniqueOrThrow({ where: { id: draft.id } })).stato).toBe('PROPOSTA_COMMUNITY');
+    // «scrivi» is the one mission a read cannot catch up: it is lost, and logged.
+    expect((await progress(a)).body.crediti).toEqual([]);
+  });
+
+  it('keeps the vote, and the archive it decides, when its credit cannot be written', async () => {
+    const carol = await makeValidator('xp_settle_carol');
+    const c = session(carol, 'c');
+    await vote(c, (await card(alice, 'DIRITTO_CIVILE', 'PROPOSTA_COMMUNITY')).id);
+    const authorless = await card(null, 'DIRITTO_CIVILE', 'PROPOSTA_COMMUNITY');
+    await withBlockedLedger(async () => {
+      const response = await vote(c, authorless.id, 'ERRATA');
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({ stato: 'ARCHIVIATA', xp: { crediti: [] } });
+    });
+    expect(await prisma.lingoCard.findUnique({ where: { id: authorless.id } })).toBeNull();
+    const day = await prisma.lingoGiornataStudio.findFirstOrThrow({ where: { utenteId: carol.id } });
+    expect(day.voti).toBe(2);
+    expect(await credits(carol)).toEqual([]);
+    expect((await progress(c)).body.crediti).toEqual([{ missione: 'convalida', punti: 20 }]);
   });
 });

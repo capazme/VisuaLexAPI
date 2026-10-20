@@ -132,10 +132,13 @@ describe('the progress read', () => {
   });
 
   it('does not deadlock with the account’s deletion', async () => {
-    for (let i = 0; i < 5; i++) {
+    // The case of spec §5.1: today's row exists, so marking the queue finished is an UPDATE that touches no
+    // foreign key, and the read then writes a credit («obiettivo», nothing left), whose insert needs the user row.
+    for (let i = 0; i < 10; i++) {
       const user = await createTestUser(`xp_reads_gone_${i}`);
       const done = await card(user);
       await reviewed(user, done.id, '2026-10-25', new Date('2026-10-17T08:00:00Z')); // studied, nothing due: the queue is finished
+      await storedDay(user, TODAY, { ripassi: 3 });
       const [read] = await Promise.all([progress(session(user, `g${i}`)), deleteUserAccount(user.id)]);
       expect([200, 401]).toContain(read.status);
       expect(await prisma.lingoCreditoXp.count({ where: { utenteId: user.id } })).toBe(0);

@@ -37,7 +37,9 @@ describe('what the client sends', () => {
     const own = await card(alice);
     const response = await request(app).post(GRADE).set(session(alice)).set('Date', 'Mon, 01 Jan 2024 00:00:00 GMT').send({ cardId: own.id, rating: 3 });
     expect(response.status).toBe(200);
-    for (const row of await credits(alice)) expect(row.giorno.toISOString().slice(0, 10)).toBe(TODAY);
+    const rows = await credits(alice);
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) expect(row.giorno.toISOString().slice(0, 10)).toBe(TODAY);
   });
 });
 

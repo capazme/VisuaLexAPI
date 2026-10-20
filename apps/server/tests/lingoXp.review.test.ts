@@ -167,6 +167,25 @@ describe('«settimana»', () => {
     expect(missionsOf(answer.body)).not.toContain('settimana');
   });
 
+  it('credits nothing in a week whose streak holds no multiple of seven', async () => {
+    // Seven days counted to Sunday 18 October; this week a rest on Tuesday 20 stretches the run, so from Monday
+    // to Sunday it reads 8, 8, 9, 10, 11, 12, 13: graded day by day, the week's mission never pays.
+    await preferences(alice, { ripassiAlGiorno: 1 });
+    for (let day = '2026-10-12'; day <= '2026-10-18'; day = addDays(day, 1)) await storedDay(alice, day, { ripassi: 10, valido: true });
+    const streaks: number[] = [];
+    for (let day = '2026-10-19'; day <= '2026-10-25'; day = addDays(day, 1)) {
+      if (day === '2026-10-20') continue;
+      setClock(`${day}T08:00:00Z`);
+      const c = await card(alice);
+      await reviewed(alice, c.id, day, new Date(`${addDays(day, -3)}T08:00:00Z`));
+      const answer = await grade(a, c.id);
+      streaks.push(answer.body.oggi.serie);
+      expect(missionsOf(answer.body)).not.toContain('settimana');
+    }
+    expect(streaks).toEqual([8, 9, 10, 11, 12, 13]);
+    expect((await credits(alice)).filter((r) => r.missione === 'SETTIMANA')).toEqual([]);
+  });
+
   it('credits at fourteen with a rest day inside the run', async () => {
     await preferences(alice, { ripassiAlGiorno: 1 });
     await countedBefore(daysBefore(14, ['2026-10-10']));

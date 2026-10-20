@@ -1,4 +1,4 @@
-import type { LingoFonteXp, LingoMateria, LingoMissione, Prisma } from '@prisma/client';
+import { Prisma, type LingoFonteXp, type LingoMateria, type LingoMissione } from '@prisma/client';
 import { CONSOLIDATED_DAYS, maturity } from './cardMaturity';
 import { levelOf } from './levels';
 import { reviewScope } from './reviewQueue';
@@ -126,9 +126,9 @@ interface SubjectStat {
 }
 
 /** A value computed on first use: a mission not evaluated reads nothing. */
-function lazy<T>(compute: () => Promise<T>): () => Promise<T> {
+function lazy<T, A extends unknown[] = []>(compute: (...args: A) => Promise<T>): (...args: A) => Promise<T> {
   let value: Promise<T> | null = null;
-  return () => (value ??= compute());
+  return (...args: A) => (value ??= compute(...args));
 }
 
 /** The stored facts the missions read, for one user and one Rome day. */
@@ -147,14 +147,17 @@ function factsFor(db: Prisma.TransactionClient, userId: string, today: string) {
     const states = await db.lingoStatoRipasso.findMany({ where: { utenteId: userId, card: await scope() }, select: { dueAt: true, lastReviewAt: true } });
     return states.filter((s) => maturity(s.lastReviewAt, s.dueAt) === 'consolidate').length;
   });
-  /** Per subject: the Rome day of the last recorded review before today, and today's recorded reviews. */
-  const subjects = lazy(async (): Promise<SubjectStat[]> => {
+  /**
+   * Per subject: the Rome day of the last recorded review before today, and today's recorded reviews. A grade
+   * asks only for its card's subject (`only`), so it does not aggregate the whole log.
+   */
+  const subjects = lazy(async (only?: LingoMateria): Promise<SubjectStat[]> => {
     const rows = await db.$queryRaw<{ materia: LingoMateria; ultimo: string | null; oggi: number }[]>`
       SELECT c.materia::text AS materia,
              to_char(((MAX(r.data_revisione) FILTER (WHERE r.data_revisione < ${romeDayStartSql(today)}) AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Rome')::date, 'YYYY-MM-DD') AS ultimo,
              (COUNT(*) FILTER (WHERE r.data_revisione >= ${romeDayStartSql(today)}))::int AS oggi
       FROM lingo_revisioni_srs r JOIN lingo_cards c ON c.id = r.card_id
-      WHERE r.utente_id = ${userId}
+      WHERE r.utente_id = ${userId} ${only ? Prisma.sql`AND c.materia::text = ${only}` : Prisma.empty}
       GROUP BY c.materia`;
     return rows;
   });
@@ -230,7 +233,8 @@ async function evaluate(id: MissionId, facts: Facts, today: string, event: XpEve
  * the quota) reach 5; «vuota» when none.
  */
 async function evaluateStaleSubject(facts: Facts, today: string, event: XpEvent, userId: string, db: Prisma.TransactionClient): Promise<Evaluation> {
-  const stats = (await facts.subjects()).filter((s) => qualifies(s, today));
+  // One settle evaluates this mission once, so the lazy value is asked with the same argument each time.
+  const stats = (await facts.subjects(event.tipo === 'revisione' ? event.materia : undefined)).filter((s) => qualifies(s, today));
   if (event.tipo === 'revisione') {
     const stat = stats.find((s) => s.materia === event.materia);
     if (!stat || stat.oggi < STALE_SUBJECT_REVIEWS) return { fulfilled: false, vuota: false };
@@ -290,6 +294,7 @@ function fonteIdOf(event: XpEvent): string | null {
  */
 export async function settleMissions(tx: Prisma.TransactionClient, userId: string, today: string, event: XpEvent): Promise<XpEsito> {
   await tx.$executeRawUnsafe('SAVEPOINT xp');
+  let settled: { before: XpLivello; crediti: XpCredito[]; dayTotal: number };
   try {
     await tx.$executeRawUnsafe(`SET LOCAL lock_timeout = '1s'`);
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(${LINGO_XP_LOCK_CLASS}::int, hashtext(${userId}::text))`;
@@ -315,17 +320,20 @@ export async function settleMissions(tx: Prisma.TransactionClient, userId: strin
       crediti.push({ missione: mission.id, punti: mission.punti });
       dayTotal += mission.punti;
     }
-    await tx.$executeRawUnsafe('RELEASE SAVEPOINT xp');
-    await tx.$executeRawUnsafe('SET LOCAL lock_timeout TO DEFAULT');
-    const total = before.totale + crediti.reduce((sum, c) => sum + c.punti, 0);
-    const livello = { ...levelOf(total), totale: total, oggi: dayTotal };
-    return { crediti, livello, nuovoLivello: livello.livello > before.livello };
+    settled = { before, crediti, dayTotal };
   } catch (error) {
     // Also undoes the SET LOCAL. The error's text may carry the statement's values: only its name is logged.
     await tx.$executeRawUnsafe('ROLLBACK TO SAVEPOINT xp');
     console.error(`[xp] settle after «${event.tipo}» failed:`, error instanceof Error ? error.name : 'unknown error');
     return { crediti: [], livello: await levelNow(tx, userId, today), nuovoLivello: false };
   }
+  // Outside the try: once released, the savepoint cannot be rolled back to.
+  await tx.$executeRawUnsafe('RELEASE SAVEPOINT xp');
+  await tx.$executeRawUnsafe('SET LOCAL lock_timeout TO DEFAULT');
+  const { before, crediti, dayTotal } = settled;
+  const total = before.totale + crediti.reduce((sum, c) => sum + c.punti, 0);
+  const livello = { ...levelOf(total), totale: total, oggi: dayTotal };
+  return { crediti, livello, nuovoLivello: livello.livello > before.livello };
 }
 
 /**
