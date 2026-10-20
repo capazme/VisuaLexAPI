@@ -52,7 +52,7 @@ export function MerltHubPage() {
       <header className="rounded-2xl border border-indigo-200 bg-indigo-50/80 p-6 dark:border-indigo-900 dark:bg-indigo-950/20">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 data-section-title tabIndex={-1} className="focus:outline-none flex items-center gap-3 font-serif text-3xl font-medium tracking-tight text-slate-900 dark:text-slate-50">
+            <h1 data-section-title="academia" tabIndex={-1} className="focus:outline-none flex items-center gap-3 font-serif text-3xl font-medium tracking-tight text-slate-900 dark:text-slate-50">
               <Bot className="text-indigo-500" />
               Assistente
             </h1>

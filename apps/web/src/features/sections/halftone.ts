@@ -19,9 +19,12 @@ export interface HalftoneTiming {
   inkDry: number;
 }
 
-/** Between 600 and 750 ms in all (the brief): an effect the first time, no weight the twentieth. */
+/**
+ * Between 600 and 750 ms in all (the brief): an effect the first time, no weight the twentieth. Kept a few frames
+ * under 750: the reveal starts once the new page's title is there, a frame or two after the colour covers.
+ */
 export const HALFTONE_TIMING = {
-  desktop: { spacing: 18, coverWave: 200, coverGrow: 140, revealWave: 160, revealShrink: 140, inkDelay: 140, inkDry: 260 },
+  desktop: { spacing: 18, coverWave: 200, coverGrow: 140, revealWave: 160, revealShrink: 140, inkDelay: 140, inkDry: 220 },
   phone: { spacing: 26, coverWave: 150, coverGrow: 130, revealWave: 120, revealShrink: 120, inkDelay: 110, inkDry: 240 },
 } as const satisfies Record<'desktop' | 'phone', HalftoneTiming>;
 

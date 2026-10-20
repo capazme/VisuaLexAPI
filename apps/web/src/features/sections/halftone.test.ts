@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { HALFTONE_TIMING, coverRadiusAt, fullRadius, halftoneLattice, revealRadiusAt, totalDuration } from './halftone';
 
 describe('the section change halftone (S2)', () => {
-  it('lasts between 600 and 750 ms, on a computer and on a phone', () => {
+  it('lasts between 600 and 750 ms, on a computer and on a phone, with room for the frames the new page takes', () => {
+    const frames = 3 * (1000 / 60);
     for (const t of Object.values(HALFTONE_TIMING)) {
       expect(totalDuration(t)).toBeGreaterThanOrEqual(600);
-      expect(totalDuration(t)).toBeLessThanOrEqual(750);
+      expect(totalDuration(t) + frames).toBeLessThanOrEqual(750);
     }
   });
 

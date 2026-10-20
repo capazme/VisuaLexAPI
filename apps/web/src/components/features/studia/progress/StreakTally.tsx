@@ -32,8 +32,8 @@ export function StreakTally({ count, grew }: { count: number; grew: boolean }) {
             key={i}
             initial={moving && bound ? { x: apart(i) } : false}
             animate={{ x: bound ? together(i) : apart(i) }}
-            // The four close up one after another as the stroke reaches them.
-            transition={{ ...spring.snappy, delay: 0.12 + i * 0.03 }}
+            // The four close up one after another as the stroke reaches them; under reduced motion, at once.
+            transition={reduce ? { duration: 0 } : { ...spring.snappy, delay: 0.12 + i * 0.03 }}
           >
             <motion.path
               d="M0 3 L0 19"

@@ -121,13 +121,17 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `sectionTransition.ts` — a canvas over the whole screen (`Z_INDEX.sectionTransition`, `pointer-events: none`, removed
   at its end) where a halftone on a grid turned 45° prints the new section's hue (`--vlx-section-<id>` in `index.css`,
   `sectionHue`) from the tap (`MenuItem.onSelect` receives the click; a key's click starts from the entry's middle), the
-  page swaps under the full colour and comes out through the holes of the same screen, then the title's ink dries
-  (`vlx-ink-drying`); the geometry and the timing are pure in `halftone.ts` (600–750 ms; sparser and shorter below
-  768 px). A tap or a key during it brings it to its end; the colour waits at most 400 ms for a lazy page's title. The
-  focus goes to the new page's title: each section's home marks its heading `data-section-title` with `tabIndex={-1}`
-  (Gymnasium's `h1`, the dossier list's `h2`, «Dossier pubblici», the MERL-T hub) — a new home marks its own. Under
-  reduced motion the page changes at once; where no canvas can be drawn, the View Transition on `vlx-page`. Choosing
-  the section one is in goes to its home with no change shown. The sidebar: the Corpus entries for everyone — «Ricerca»
+  route changes under the full colour, and the page comes out through the holes of the same screen once its title is
+  there — the router renders a navigation in a transition, so the colour holds for it, at most 400 ms (`flushSync` would
+  not make it synchronous) —, then the title's ink dries (`vlx-ink-drying`); the geometry and the timing are pure in
+  `halftone.ts` (about 700 ms, kept a few frames under 750; sparser and shorter below 768 px). A tap or a key during it
+  brings it to its end (Enter, Space and Esc are taken, so they do not press the switcher again). The focus goes to the
+  new page's title unless the user moved it meanwhile: each section's home marks its heading
+  `data-section-title="<section id>"` with `tabIndex={-1}` (Gymnasium's `h1`, the dossier list's `h2` — `opus` or
+  `gymnasium` by the kind it lists, since the same element stays from one to the other —, «Dossier pubblici», the
+  MERL-T hub); a new home marks its own. Under reduced motion the page changes at once; where no canvas can be drawn,
+  the View Transition on `vlx-page`, held until the title is there. Choosing the section one is in goes to its home
+  with no change shown. The sidebar: the Corpus entries for everyone — «Ricerca»
   (a link to `/` that puts the cursor in the search page's field, `focusSearchField`, with no window over it —
   the owner, 13 Oct 2026; its hover label carries ⌘K, the palette; the quick norms' dot sits under it;
   `#tour-nav-search` is what the welcome and search tours point at) and «Analizza documento» —, then the active

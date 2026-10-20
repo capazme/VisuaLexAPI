@@ -1,4 +1,3 @@
-import { flushSync } from 'react-dom';
 import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { create } from 'zustand';
@@ -92,8 +91,8 @@ export function useSection() {
       return;
     }
     // By hand under the colour: the app's BrowserRouter ignores navigate's `viewTransition` option, which needs a
-    // data router, and the new page must be there before the screen lets it through.
-    finishRunning = playSectionTransition({ origin, color: sectionHue(id), swap: () => flushSync(go) });
+    // data router. The router renders the new page in a transition: the screen holds until its title is there.
+    finishRunning = playSectionTransition({ section: id, origin, color: sectionHue(id), swap: go });
   };
 
   return { section, active: SECTIONS.find((s) => s.id === section)!, sections, chooseSection };

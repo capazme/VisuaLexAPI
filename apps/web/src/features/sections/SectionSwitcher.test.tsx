@@ -94,8 +94,8 @@ describe('SectionSwitcher (spec S3)', () => {
         <SectionSwitcher forumCount={0} />
         <main>
           <Routes>
-            <Route path="/dossier" element={<h2 data-section-title tabIndex={-1}>I tuoi dossier di lavoro</h2>} />
-            <Route path="/studia/ripasso" element={<h1 data-section-title tabIndex={-1}>Gymnasium: la tua palestra giuridica</h1>} />
+            <Route path="/dossier" element={<h2 data-section-title="opus" tabIndex={-1}>I tuoi dossier di lavoro</h2>} />
+            <Route path="/studia/ripasso" element={<h1 data-section-title="gymnasium" tabIndex={-1}>Gymnasium: la tua palestra giuridica</h1>} />
           </Routes>
         </main>
       </MemoryRouter>,

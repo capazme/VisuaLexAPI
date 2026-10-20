@@ -2,10 +2,14 @@ import { Z_INDEX } from '../../constants/zIndex';
 import type { SectionId } from './sections';
 import { HALFTONE_TIMING, coverRadiusAt, halftoneLattice, revealRadiusAt, type HalftoneTiming } from './halftone';
 
-/** The heading a section's home marks as its title: the focus goes there, and its ink dries. */
-export const SECTION_TITLE = '[data-section-title]';
+/**
+ * A section's home marks its heading `data-section-title="<section id>"` (with `tabIndex={-1}`): the focus goes there
+ * and its ink dries. The id says whose title it is: the dossier list stays mounted from Gymnasium to Opus, and its
+ * heading changes section without changing element.
+ */
+const titleOf = (section: SectionId) => `[data-section-title="${section}"]`;
 
-/** How long the full colour waits for the new page's title (a lazy page's code on its way) before it lets go anyway. */
+/** How long the full colour waits for the new page's title (the router renders it in a transition; a lazy page's code may be on its way). */
 const HOLD_MAX = 400;
 /** How long the focus waits for the new page's title once the screen is gone. */
 const TITLE_WAIT = 1500;
@@ -13,6 +17,8 @@ const TITLE_WAIT = 1500;
 const MAX_PIXEL_RATIO = 1.5;
 /** Below this width the screen is sparser and the wave shorter. */
 const PHONE_WIDTH = 768;
+/** The keys that end the change are the change's: they do not also press the switcher they were typed on. */
+const KEYS_TAKEN = new Set(['Enter', ' ', 'Escape']);
 
 export function prefersReducedMotion(): boolean {
   return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -23,29 +29,26 @@ export function sectionHue(id: SectionId): string {
   return getComputedStyle(document.documentElement).getPropertyValue(`--vlx-section-${id}`).trim() || 'rgb(30 41 82)';
 }
 
-/** The title of the page on screen, if it has one. */
-function currentTitle(): HTMLElement | null {
-  return document.querySelector<HTMLElement>(SECTION_TITLE);
-}
-
-/**
- * Waits, frame by frame, for a title other than `previous` (the old page's) and calls `found` with it; gives up
- * after `TITLE_WAIT`. Returns the way to stop waiting.
- */
-function watchTitle(previous: Element | null, found: (title: HTMLElement) => void): () => void {
+/** Waits, frame by frame, for `section`'s title and calls `found` with it; gives up after `TITLE_WAIT`. Returns the way to stop. */
+function watchTitle(section: SectionId, found: (title: HTMLElement) => void): () => void {
   const start = performance.now();
   let request = 0;
   const look = (now: number) => {
-    const title = currentTitle();
-    if (title && title !== previous) found(title);
+    const title = document.querySelector<HTMLElement>(titleOf(section));
+    if (title) found(title);
     else if (now - start < TITLE_WAIT) request = requestAnimationFrame(look);
   };
   request = requestAnimationFrame(look);
   return () => cancelAnimationFrame(request);
 }
 
-function focusTitle(title: HTMLElement) {
-  title.focus({ preventScroll: true });
+/**
+ * The focus goes to the title only if nobody moved it meanwhile: it is still where the choice left it (the switcher)
+ * or nowhere. A click into a field, or a Tab, while a lazy page's title was on its way keeps its focus.
+ */
+function focusTitleUnlessMoved(title: HTMLElement, leftOn: Element | null) {
+  const active = document.activeElement;
+  if (active === leftOn || active === null || active === document.body) title.focus({ preventScroll: true });
 }
 
 /** The ink of the title dries: wet, a little blurred and heavier, then as it is (`index.css`, `vlx-ink-drying`). */
@@ -63,31 +66,55 @@ function dryInk(title: HTMLElement, delay: number, duration: number): () => void
 }
 
 export interface SectionTransition {
+  /** The section chosen: its home's title is what the screen waits for, and what takes the focus. */
+  section: SectionId;
   /** Where the tap was, in the viewport; the screen prints from there (the middle of the screen without it). */
   origin: { x: number; y: number } | null;
   /** The new section's hue, a CSS colour (`sectionHue`). */
   color: string;
-  /** Changes the page, synchronously: called once, under the full colour (at once without the screen). */
+  /**
+   * Changes the page: called once, under the full colour (at once without the screen). The router renders the new
+   * page in a transition, so it may come a frame or more later: its title says when it is there.
+   */
   swap: () => void;
 }
 
 /**
- * The section change (S2): a halftone prints the new section's colour from the tap, the new page comes out through
- * the holes of the same screen, and its title's ink dries — 600 to 750 ms (`halftone.ts`). The screen is a canvas over
- * everything that never takes a click, removed at the end; a tap or a key during it brings it to its end at once. The
- * focus goes to the new page's title. Under reduced motion the page changes at once and nothing moves; where a canvas
- * cannot be drawn, the browser's View Transition (`index.css`, `vlx-page`) or nothing. Returns the way to finish it.
+ * The section change (S2): a halftone prints the new section's colour from the tap, the page changes under the full
+ * colour and comes out through the holes of the same screen once its title is there (at most `HOLD_MAX` later), and
+ * the title's ink dries — about 700 ms (`halftone.ts`). The screen is a canvas over everything that never takes a
+ * click, removed at the end; a tap or a key during it brings it to its end at once. The focus goes to the new page's
+ * title. Under reduced motion the page changes at once and nothing moves; where a canvas cannot be drawn, the
+ * browser's View Transition (`index.css`, `vlx-page`), held until the title is there, or nothing. Returns the way to
+ * finish it.
  */
-export function playSectionTransition({ origin, color, swap }: SectionTransition): () => void {
-  const previous = currentTitle();
+export function playSectionTransition({ section, origin, color, swap }: SectionTransition): () => void {
+  const leftOn = document.activeElement;
   const canvas = prefersReducedMotion() ? null : document.createElement('canvas');
   const context = canvas?.getContext('2d') ?? null;
 
   if (!canvas || !context) {
-    const doc = document as Document & { startViewTransition?: (cb: () => void) => unknown };
-    if (canvas && doc.startViewTransition) doc.startViewTransition(swap);
-    else swap();
-    return watchTitle(previous, focusTitle);
+    const doc = document as Document & { startViewTransition?: (cb: () => Promise<void>) => unknown };
+    let stop = () => {};
+    if (canvas && doc.startViewTransition) {
+      // The browser keeps the old page's picture until the callback settles: settle it when the new title is there.
+      doc.startViewTransition(
+        () =>
+          new Promise<void>((resolve) => {
+            swap();
+            const timer = window.setTimeout(resolve, HOLD_MAX);
+            stop = watchTitle(section, (title) => {
+              window.clearTimeout(timer);
+              resolve();
+              focusTitleUnlessMoved(title, leftOn);
+            });
+          }),
+      );
+    } else {
+      swap();
+      stop = watchTitle(section, (title) => focusTitleUnlessMoved(title, leftOn));
+    }
+    return () => stop();
   }
 
   const width = window.innerWidth;
@@ -136,9 +163,9 @@ export function playSectionTransition({ origin, color, swap }: SectionTransition
 
   const swapPage = () => {
     swap();
-    stopWatching = watchTitle(previous, (found) => {
+    stopWatching = watchTitle(section, (found) => {
       title = found;
-      focusTitle(found);
+      focusTitleUnlessMoved(found, leftOn);
       // The ink dries only while the screen is still playing: a title that comes late just takes the focus.
       if (phase === 'hold' || phase === 'reveal') {
         const into = phase === 'reveal' ? performance.now() - revealStart : 0;
@@ -155,9 +182,13 @@ export function playSectionTransition({ origin, color, swap }: SectionTransition
     window.removeEventListener('keydown', finish, true);
   };
 
-  /** A tap or a key: the change is over at once (the page swapped if it was not, no ink drying). */
-  function finish() {
+  /** A tap or a key: the change is over at once (the page asked for if it was not, no ink drying). */
+  function finish(event?: Event) {
     if (phase === 'done') return;
+    if (event instanceof KeyboardEvent && KEYS_TAKEN.has(event.key)) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
     if (phase === 'cover') swapPage();
     end();
     clearInk?.();
@@ -177,7 +208,7 @@ export function playSectionTransition({ origin, color, swap }: SectionTransition
         draw((share) => coverRadiusAt(elapsed, share, t));
       }
     } else if (phase === 'hold') {
-      // The new page is drawn under the colour; its title says it is there (a lazy page may take a moment).
+      // The new page comes under the colour; its title says it is there.
       if (title !== null || now - holdStart >= HOLD_MAX) {
         phase = 'reveal';
         revealStart = now;
