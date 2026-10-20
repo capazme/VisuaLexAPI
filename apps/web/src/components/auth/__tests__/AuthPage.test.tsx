@@ -12,9 +12,10 @@ import { renderAuth } from './renderAuth';
 
 const address = () => screen.getByTestId('address');
 const tab = (name: 'Accedi' | 'Registrati') => screen.getByRole('tab', { name });
-/** The panel a reader can use: the one leaving is hidden from them. */
+/** The panel a reader can use: the other form stays mounted, hidden from them. */
 const panel = () => screen.getByRole('tabpanel');
 const allPanels = () => document.querySelectorAll('[role="tabpanel"]');
+const shownPanels = () => document.querySelectorAll('[role="tabpanel"]:not([aria-hidden])');
 
 function reduceMotion(reduce: boolean) {
   vi.spyOn(window, 'matchMedia').mockImplementation(
@@ -82,7 +83,7 @@ describe('AuthPage: two tabs on one page', () => {
     renderAuth('/register');
     fireEvent.click(tab('Registrati'));
     expect(within(panel()).getByLabelText('Email')).toHaveFocus();
-    expect(allPanels()).toHaveLength(1);
+    expect(shownPanels()).toHaveLength(1);
   });
 
   it('the arrows, Home and End change tab and keep the focus on the tabs', () => {
@@ -106,7 +107,7 @@ describe('AuthPage: two tabs on one page', () => {
     renderAuth('/login');
     fireEvent.click(within(panel()).getByRole('button', { name: 'Registrati' }));
     expect(address()).toHaveTextContent('/register');
-    await waitFor(() => expect(allPanels()).toHaveLength(1));
+    expect(shownPanels()).toHaveLength(1);
     fireEvent.click(within(panel()).getByRole('button', { name: 'Accedi' }));
     expect(address()).toHaveTextContent('/login');
     expect(within(panel()).getByLabelText('Email')).toHaveFocus();
@@ -121,30 +122,30 @@ describe('AuthPage: two tabs on one page', () => {
     expect(mark.style.transform).toBe('translateX(100%)');
   });
 
-  it('fades the form out while the next one comes in from the side of its tab, then drops it', async () => {
+  it('fades the form out, hidden and out of reach, while the next one comes in from the side of its tab', () => {
     renderAuth('/login');
     expect(panel().className).not.toContain('animate-in'); // the first paint does not move
     fireEvent.click(tab('Registrati'));
-    const leaving = document.querySelector('[data-leaving]');
-    expect(leaving).toHaveAttribute('id', 'auth-panel-login');
-    expect(leaving).toHaveAttribute('aria-hidden', 'true');
-    expect(leaving).toHaveAttribute('inert');
-    expect(leaving?.className).toContain('opacity-0');
+    const hidden = document.getElementById('auth-panel-login')!;
+    expect(hidden).toHaveAttribute('aria-hidden', 'true');
+    expect(hidden).toHaveAttribute('inert');
+    expect(hidden.className).toMatch(/\binvisible\b/);
+    expect(hidden.className).toContain('opacity-0');
+    expect(hidden.className).toContain('transition-[opacity,visibility]'); // visibility goes at the end of the fade
     expect(panel().className).toContain('slide-in-from-right-2');
-    await waitFor(() => expect(allPanels()).toHaveLength(1));
     fireEvent.click(tab('Accedi'));
     expect(panel().className).toContain('slide-in-from-left-2');
   });
 
-  it('a change of tab half-way through the last one leaves one form, with what was typed in it', async () => {
+  it('a change of tab half-way through the last one leaves one form shown, with what was typed in it', () => {
     renderAuth('/login');
-    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'avv@studio.it' } });
+    fireEvent.change(within(panel()).getByLabelText('Email'), { target: { value: 'avv@studio.it' } });
     fireEvent.click(tab('Registrati'));
     fireEvent.click(tab('Accedi'));
     expect(address()).toHaveTextContent('/login');
-    expect(document.querySelector('[data-leaving]')).toHaveAttribute('id', 'auth-panel-register');
-    await waitFor(() => expect(allPanels()).toHaveLength(1));
+    expect(shownPanels()).toHaveLength(1);
     expect(panel()).toHaveAttribute('id', 'auth-panel-login');
+    expect(document.getElementById('auth-panel-register')).toHaveAttribute('inert');
     expect(within(panel()).getByLabelText('Email')).toHaveValue('avv@studio.it');
   });
 
@@ -156,8 +157,6 @@ describe('AuthPage: two tabs on one page', () => {
     expect(email).toBeDisabled();
     expect(email).not.toHaveFocus();
     authLoading = false;
-  authError = null;
-  register.mockReset().mockResolvedValue({ message: 'ok' });
     rerenderSame();
     expect(email).toHaveFocus();
   });
@@ -171,28 +170,30 @@ describe('AuthPage: two tabs on one page', () => {
     renderAuth('/login');
     expect(within(panel()).getByRole('heading', { level: 2, name: 'Accedi' })).toBeInTheDocument();
     fireEvent.click(tab('Registrati'));
-    await waitFor(() => expect(allPanels()).toHaveLength(1));
     expect(within(panel()).getByRole('heading', { level: 2, name: 'Registrati' })).toBeInTheDocument();
   });
 
-  it('does not show a failed sign-in\'s error again on the empty form a change of tab brings back', async () => {
-    // The page's useAuth keeps the error of the last failure until the next sign-in.
+  it('keeps each form as it was across changes of tab, what was typed and its error', () => {
+    // Both forms stay mounted: the one coming back is the same form, not an empty one.
     authError = 'Credenziali non valide';
     renderAuth('/login');
+    fireEvent.change(within(panel()).getByLabelText('Email'), { target: { value: 'avv@studio.it' } });
+    fireEvent.click(tab('Registrati'));
+    fireEvent.change(within(panel()).getByLabelText('Username'), { target: { value: 'avv_rossi' } });
+    expect(screen.queryByRole('alert')).toBeNull(); // the hidden form's error is hidden with it
+    fireEvent.click(tab('Accedi'));
+    expect(within(panel()).getByLabelText('Email')).toHaveValue('avv@studio.it');
     expect(screen.getByRole('alert')).toHaveTextContent('Credenziali non valide');
     fireEvent.click(tab('Registrati'));
-    fireEvent.click(tab('Accedi'));
-    await waitFor(() => expect(allPanels()).toHaveLength(1));
-    expect(within(panel()).getByLabelText('Email')).toHaveValue('');
-    expect(screen.queryByRole('alert')).toBeNull();
+    expect(within(panel()).getByLabelText('Username')).toHaveValue('avv_rossi');
   });
 
   it('holds the tabs still while a sign-in is on its way', async () => {
     let finish: () => void = () => {};
     login.mockImplementation(() => new Promise<void>((resolve) => { finish = resolve; }));
     renderAuth('/login');
-    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'a@b.it' } });
-    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: 'pw' } });
+    fireEvent.change(within(panel()).getByLabelText('Email'), { target: { value: 'a@b.it' } });
+    fireEvent.change(within(panel()).getByLabelText(/^password$/i), { target: { value: 'pw' } });
     fireEvent.click(within(panel()).getByRole('button', { name: 'Accedi' }));
     expect(tab('Registrati')).toHaveAttribute('aria-disabled', 'true');
     fireEvent.click(tab('Registrati'));
@@ -222,30 +223,56 @@ describe('AuthPage: two tabs on one page', () => {
     expect(tab('Accedi')).not.toHaveAttribute('aria-disabled');
   });
 
-  it('anchors the page at the top, so only the card\'s height moves with the tab', () => {
+  it('holds the page still: both forms in one cell, «Crediti» in the last row, a gutter kept for the bar', () => {
     renderAuth('/login');
-    const columns = screen.getByRole('main').parentElement!;
-    expect(columns.className).toContain('items-start');
-    expect(columns.className).not.toMatch(/\bmy-auto\b|\bitems-center\b/);
+    // The card is as tall as the taller form whichever is shown: both sit in the same cell of a grid.
+    for (const p of allPanels()) expect(p.className).toMatch(/\bcol-start-1\b.*\brow-start-1\b/);
+    expect(allPanels()[0].parentElement!.className).toMatch(/\bgrid\b/);
+    // «Crediti» is the last row of a grid as tall as the window, not a line after the card.
+    const foot = screen.getByRole('contentinfo');
+    const page = foot.parentElement!;
+    expect(page.lastElementChild).toBe(foot);
+    expect(page.className).toContain('grid-rows-[1fr_auto]');
+    expect(page.className).toContain('min-h-full');
+    expect(foot).not.toContainElement(screen.getByRole('main'));
+    // The page scrolls in its own box, which keeps the gutter of a bar that may appear.
+    expect(page.parentElement!.className).toMatch(/\bh-app\b/);
+    expect(page.parentElement!.className).toContain('overflow-y-auto');
+    expect(page.parentElement!.className).toContain('[scrollbar-gutter:stable]');
+    fireEvent.click(tab('Registrati'));
+    expect(screen.getByRole('contentinfo')).toBe(foot);
+    expect(allPanels()).toHaveLength(2);
+  });
+
+  it('centres the colophon against the card on a computer, above it on a phone', () => {
+    renderAuth('/login');
+    const colophon = screen.getByRole('banner');
+    expect(colophon.parentElement!.className).toContain('md:items-center');
+    expect(colophon.className).toMatch(/(^|\s)items-center\b/);
+    expect(colophon.className).toMatch(/(^|\s)text-center\b/);
+    expect(colophon.className).toContain('md:items-start');
+    expect(colophon.className).toContain('md:text-left');
   });
 
   it('under reduced motion the change is immediate: no form fading out, none sliding in', () => {
     reduceMotion(true);
     renderAuth('/login');
     fireEvent.click(tab('Registrati'));
-    expect(allPanels()).toHaveLength(1);
+    expect(shownPanels()).toHaveLength(1);
     expect(panel()).toHaveAttribute('id', 'auth-panel-register');
     expect(panel().className).not.toContain('animate-in');
     expect(panel().className).not.toContain('slide-in');
+    // Nor a fade on the way out, nor a slide of the mark.
+    expect(document.getElementById('auth-panel-login')!.className).toContain('motion-reduce:transition-none');
+    expect(screen.getByTestId('auth-tab-mark').className).toContain('motion-reduce:transition-none');
   });
 
   it('keeps the way back after the login across changes of tab', async () => {
     renderAuth({ pathname: '/login', state: { from: { pathname: '/dossier', search: '?dossier=7' } } });
     fireEvent.click(tab('Registrati'));
     fireEvent.click(tab('Accedi'));
-    await waitFor(() => expect(allPanels()).toHaveLength(1));
-    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'a@b.it' } });
-    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: 'pw' } });
+    fireEvent.change(within(panel()).getByLabelText('Email'), { target: { value: 'a@b.it' } });
+    fireEvent.change(within(panel()).getByLabelText(/^password$/i), { target: { value: 'pw' } });
     await act(async () => {
       fireEvent.click(within(panel()).getByRole('button', { name: 'Accedi' }));
     });

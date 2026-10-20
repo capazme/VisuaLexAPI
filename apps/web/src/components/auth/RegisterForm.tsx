@@ -174,8 +174,8 @@ export function RegisterForm({ onBusy, onSwitch }: RegisterFormProps) {
       <h2 className="sr-only">Registrati</h2>
       {formError && <FormError id={ERROR_ID} message={formError} />}
 
-      <form onSubmit={handleSubmit} className="space-y-5">
-        <div className="space-y-2">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-1.5">
           <label htmlFor="register-email" className={LABEL}>
             Email
           </label>
@@ -194,7 +194,7 @@ export function RegisterForm({ onBusy, onSwitch }: RegisterFormProps) {
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <label htmlFor="register-username" className={LABEL}>
             Username
           </label>
@@ -229,7 +229,7 @@ export function RegisterForm({ onBusy, onSwitch }: RegisterFormProps) {
           )}
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <label htmlFor="register-password" className={LABEL}>
             Password
           </label>
@@ -265,7 +265,7 @@ export function RegisterForm({ onBusy, onSwitch }: RegisterFormProps) {
           )}
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <label htmlFor="register-confirm-password" className={LABEL}>
             Conferma password
           </label>
@@ -300,7 +300,7 @@ export function RegisterForm({ onBusy, onSwitch }: RegisterFormProps) {
         </button>
       </form>
 
-      <p className="mt-4 flex flex-wrap items-center gap-x-1 text-sm text-slate-600 dark:text-slate-400">
+      <p className="mt-2 flex flex-wrap items-center gap-x-1 text-sm text-slate-600 dark:text-slate-400">
         Hai già un account?
         <button type="button" onClick={onSwitch} className={SWITCH_LINK}>
           Accedi

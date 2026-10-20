@@ -13,7 +13,7 @@ import { FormError, PasswordToggle } from './AuthFormParts';
 const ERROR_ID = 'login-error';
 
 interface LoginFormProps {
-  /** The page's one `useAuth`: a form mounted again at each change of tab must not read the user again. */
+  /** The page's one `useAuth`. */
   auth: Pick<ReturnType<typeof useAuth>, 'login' | 'loading' | 'error'>;
   /** A request in flight, or none: the page holds the tabs still meanwhile. */
   onBusy: (busy: boolean) => void;
@@ -91,8 +91,8 @@ export function LoginForm({ auth, onBusy, onSignedIn, onSwitch }: LoginFormProps
       <h2 className="sr-only">Accedi</h2>
       {error && <FormError id={ERROR_ID} message={error} />}
 
-      <form onSubmit={handleSubmit} className="space-y-5">
-        <div className="space-y-2">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-1.5">
           <label htmlFor="login-email" className={LABEL}>
             Email
           </label>
@@ -111,7 +111,7 @@ export function LoginForm({ auth, onBusy, onSignedIn, onSwitch }: LoginFormProps
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <label htmlFor="login-password" className={LABEL}>
             Password
           </label>
@@ -138,7 +138,7 @@ export function LoginForm({ auth, onBusy, onSignedIn, onSwitch }: LoginFormProps
         </button>
       </form>
 
-      <p className="mt-4 flex flex-wrap items-center gap-x-1 text-sm text-slate-600 dark:text-slate-400">
+      <p className="mt-2 flex flex-wrap items-center gap-x-1 text-sm text-slate-600 dark:text-slate-400">
         Non hai un account?
         <button type="button" onClick={onSwitch} className={SWITCH_LINK}>
           Registrati
