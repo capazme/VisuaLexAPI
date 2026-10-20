@@ -196,7 +196,9 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     least recently read down to 2 GB (G-338), a ceiling for a longer TTL or a busy day. A
     read refreshes the file's modification time, which is what `prune` reads; the TTL
     still counts from the write. `sweep_expired` reads an entry's write time from its
-    first bytes (`_HEAD`), not by decoding a 2.6 MB page
+    first bytes (`_HEAD`), not by decoding a 2.6 MB page. An entry is written to
+    `<digest>.<random>.tmp` and renamed over `<digest>.json` (`os.replace`), so a reader or
+    a sweep never meets one half written; a temporary a crash left goes after an hour
 
 **Timing harness** — `scripts/collector_timing.py` runs a fixed list of real requests
 in-process, cold then warm, and prints where each one's time goes (network per host, our

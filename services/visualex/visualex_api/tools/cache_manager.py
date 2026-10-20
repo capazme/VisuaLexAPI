@@ -187,11 +187,11 @@ async def prune_normattiva_cache(manager: Optional["CacheManager"] = None) -> in
     prune = getattr(cache, "prune", None)
     if prune is None:
         return 0
-    expired = await asyncio.to_thread(cache.sweep_expired)
+    expired, expired_bytes = await asyncio.to_thread(cache.sweep_expired_counted)
     removed, freed, kept = await asyncio.to_thread(
         prune, NORMATTIVA_CACHE_MAX_IDLE, NORMATTIVA_CACHE_MAX_BYTES)
     log.info("Normattiva cache pruned", expired=expired, removed=removed,
-             freed_mb=round(freed / 2 ** 20), kept_mb=round(kept / 2 ** 20))
+             freed_mb=round((expired_bytes + freed) / 2 ** 20), kept_mb=round(kept / 2 ** 20))
     return expired + removed
 
 
