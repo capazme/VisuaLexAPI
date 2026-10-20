@@ -236,10 +236,9 @@ const withoutOriginalAuthor = <T extends { originalAuthorId: string | null }>({ 
 
 /** A key of an archived environment's content, folded: `Author_Id`, `author-id` and `authorId` are one key. */
 const foldKey = (key: string) => key.toLowerCase().replace(/[_-]/g, '');
-// The web's attribution of a row taken from someone else: it becomes `fromAnotherUser`.
-const ATTRIBUTION_KEYS = new Set([
-  'originalauthor', 'originalauthorid', 'originalauthorusername', 'originalauthorname', 'originalauthoremail',
-]);
+// The web's attribution of a row taken from someone else (`originalAuthor`, `originalAuthorId`,
+// `originalAuthorDisplayName`, any key that starts so): it becomes `fromAnotherUser`.
+const isAttributionKey = (folded: string) => folded.startsWith('originalauthor');
 // A person's identity, in a file the user imported by hand (someone else's, possibly): it stays
 // only when it is the user's own id, username or email. `user`, `owner`, `suggester` and
 // `reporter` are the web's person objects ({ id, username }): an object never is, so it goes whole.
@@ -315,7 +314,7 @@ const isIdKey = (key: string) => /^_?u?id$/i.test(key) || /[_-]id$/i.test(key) |
  *   username or email. It goes whole: whatever else it holds is that person's.
  * - `person`: someone's identity on a row: an id beside a key only a person has (`PERSON_KEYS`),
  *   say `{ author_id, username }` or `{ id, displayName, text }`, or, in an object with no `id`
- *   of its own, a user's id beside a name (`{ authorId, name }`). Its ids and names go, whatever
+ *   of its own, another user's id beside a name (`{ authorId, name }`). Its ids and names go, whatever
  *   the keys are called, so no id is left behind under a key the lists do not know.
  * - `own`: either of the two, but the user's: their username or email, or else only their id,
  *   and no other user's id or email (a display name cannot be checked). Its names stay.
@@ -330,8 +329,9 @@ function personKind(entries: [string, unknown][], own: OwnIdentity): 'none' | 'o
   const record = folded.find(([key]) => key === 'id' || key === 'uid');
   const named = folded.some(([key]) => NAME_KEYS.has(key));
   const isUserRecord = named && record !== undefined && isUserId(record[1], own);
-  // A dossier's own id is not a user's: its `userId` beside its name does not make it a person.
-  const isPerson = folded.some(([key]) => PERSON_KEYS.has(key)) || (named && !record && ids.some((inner) => isUserId(inner, own)));
+  // A dossier's own id is not a user's: its `userId` beside its name does not make it a person,
+  // nor does the user's own id beside a name (`{ name, userId, folderId }`, the user's folder).
+  const isPerson = folded.some(([key]) => PERSON_KEYS.has(key)) || (named && !record && ids.some((inner) => own.others.has(inner.toLowerCase())));
   if (!isUserRecord && !isPerson) return 'none';
   const checkable = folded.filter(([key]) => key === 'username' || key === 'email');
   const mine = folded.every(([, inner]) => !holdsOtherUser(inner, own))
@@ -352,13 +352,15 @@ const isOtherUserRecord = (value: unknown, own: OwnIdentity) =>
  * are the user's own. Someone else's person object loses its ids and names, or goes whole when it
  * is a user's record (`personKind`). Another user's id or email goes, under any key; inside a
  * longer text it is covered (`OTHER_USER`) and the text stays. At any depth; nothing else changes.
+ * `marked` false: the attribution goes without a `fromAnotherUser` in its place (a search's
+ * parameters, which the row's own `fromAnotherUser` already speaks for).
  */
-function withoutAuthors(value: unknown, own: OwnIdentity): unknown {
+function withoutAuthors(value: unknown, own: OwnIdentity, marked = true): unknown {
   if (typeof value === 'string') return withOtherUsersCovered(value, own);
   if (Array.isArray(value)) {
     return value
       .filter((inner) => !isOtherUserIdentifier(inner, own) && !isOtherUserRecord(inner, own))
-      .map((inner) => withoutAuthors(inner, own));
+      .map((inner) => withoutAuthors(inner, own, marked));
   }
   if (typeof value !== 'object' || value === null) return value;
   const entries = Object.entries(value);
@@ -367,7 +369,7 @@ function withoutAuthors(value: unknown, own: OwnIdentity): unknown {
   let fromAnotherUser = false;
   for (const [key, inner] of entries) {
     const folded = foldKey(key);
-    if (ATTRIBUTION_KEYS.has(folded)) {
+    if (isAttributionKey(folded)) {
       fromAnotherUser ||= inner !== null && inner !== undefined;
       continue;
     }
@@ -378,9 +380,9 @@ function withoutAuthors(value: unknown, own: OwnIdentity): unknown {
     if ((kind === 'person' || kind === 'user') && (isIdKey(key) || NAME_KEYS.has(folded))) continue;
     if (holdsOtherUser(key, own) || isOtherUserIdentifier(inner, own) || isOtherUserRecord(inner, own)) continue;
     // Defined, not assigned: a `__proto__` key in the blob stays a key of the row.
-    Object.defineProperty(out, key, { value: withoutAuthors(inner, own), enumerable: true, writable: true, configurable: true });
+    Object.defineProperty(out, key, { value: withoutAuthors(inner, own, marked), enumerable: true, writable: true, configurable: true });
   }
-  if (fromAnotherUser) out.fromAnotherUser = true;
+  if (fromAnotherUser && marked) out.fromAnotherUser = true;
   return out;
 }
 
@@ -519,8 +521,10 @@ export const exportAccountData = async (req: Request, res: Response) => {
         author: env.author !== null && env.author === user?.username ? env.author : null,
         content: withoutAuthors(env.content, own),
       })),
-      quickNorms: quickNorms.map((norm) => withoutOriginalAuthor({ ...norm, searchParams: withoutAuthors(norm.searchParams, own) })),
-      customAliases: customAliases.map((alias) => withoutOriginalAuthor({ ...alias, searchParams: withoutAuthors(alias.searchParams, own) })),
+      // A search stays a search: no `fromAnotherUser` inside it. The texts taken with it (a label,
+      // an alias's expansion and description) travel as they are, like a taken note's text.
+      quickNorms: quickNorms.map((norm) => withoutOriginalAuthor({ ...norm, searchParams: withoutAuthors(norm.searchParams, own, false) })),
+      customAliases: customAliases.map((alias) => withoutOriginalAuthor({ ...alias, searchParams: withoutAuthors(alias.searchParams, own, false) })),
       // The release time is the author's; the releasing admin's id is another person's identifier.
       threads: threads.map(({ passageReleasedById: _releasedBy, _count, ...thread }) => ({ ...thread, repliesFromOthers: _count.comments })),
       comments, lingoCards, lingoValidazioni,

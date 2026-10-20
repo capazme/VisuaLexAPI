@@ -55,6 +55,7 @@ async function seedBobEverywhere(alice: TestUser, bob: TestUser) {
           searchParams: {
             act_type: 'codice civile', article: '1453',
             proposedBy: { id: bob.id, name: 'Bob Q7' }, authorId: bob.id, ref: `user:${bob.id}`, originalAuthorUsername: bob.username,
+            filters: [{ field: 'anno', originalAuthorId: bob.id }],
           },
         },
       },
@@ -208,7 +209,8 @@ describe('the account export, against a second user who touches everything', () 
 
     const [norm] = response.body.data.quickNorms as { label: string; searchParams: unknown; fromAnotherUser: boolean }[];
     expect(norm).toMatchObject({ label: 'Norma proposta e accolta', fromAnotherUser: true });
-    expect(norm.searchParams).toEqual({ act_type: 'codice civile', article: '1453', ref: 'user:[altro utente]', fromAnotherUser: true });
+    // A search stays a search: the row says it was taken, its parameters do not.
+    expect(norm.searchParams).toEqual({ act_type: 'codice civile', article: '1453', ref: 'user:[altro utente]', filters: [{ field: 'anno' }] });
     const [alias] = response.body.data.customAliases as { trigger: string; searchParams: unknown }[];
     expect(alias.searchParams).toEqual({ act_type: 'codice civile', article: '1453' });
   });
@@ -219,6 +221,8 @@ describe('the account export, against a second user who touches everything', () 
     const content = {
       rows: [
         { text: 'Riga 1', originalAuthorUsername: bob.username, originalAuthorName: 'Bob Q7', originalAuthorEmail: bob.email },
+        // Any `originalAuthor…` key is the attribution, whatever follows the prefix.
+        { text: 'Riga 1b', originalAuthorDisplayName: 'Bob Q7', original_author_full_name: 'Bob Q7', ORIGINALAUTHORNICK: 'bq7' },
         { text: 'Riga 2', displayName: 'Bob Q7', fullName: 'Bob Q7', autoreId: bob.id, utente_id: bob.id, kind: 'nota' },
         // Bob's own record, under keys no list names: it goes whole, with what else it holds.
         { text: 'Riga 3', curator: { id: bob.id, name: 'Bob Q7', bio: 'Bob Q7 bio' }, team: [{ id: bob.id, name: 'Bob Q7' }, 'Alice'] },
@@ -242,6 +246,8 @@ describe('the account export, against a second user who touches everything', () 
       meUpper: { id: alice.id.toUpperCase(), displayName: 'Alice' },
       // A dossier's and an environment's id and name are not a person, nor the user's own id beside them.
       dossier: { id: 'd-1', name: 'Dossier di Alice', userId: alice.id },
+      // The user's own folder, with no id of its own: the user's id beside a name is not a person.
+      folder: { name: 'Fascicolo Rossi', userId: alice.id, folderId: 'f-1' },
       // The user's own record keeps its names.
       me: { id: alice.id, name: 'Alice A.', displayName: 'Alice', friend: { id: bob.id, name: 'Bob Q7' } },
       meByEmail: { uid: 'local-1', email: alice.email, fullName: 'Alice A.' },
@@ -254,6 +260,7 @@ describe('the account export, against a second user who touches everything', () 
     expect(env!.content).toEqual({
       rows: [
         { text: 'Riga 1', fromAnotherUser: true },
+        { text: 'Riga 1b', fromAnotherUser: true },
         { text: 'Riga 2', kind: 'nota' },
         { text: 'Riga 3', team: ['Alice'] },
         { text: 'Riga 4', curator: { key: 'k1', role: 'curatore' } },
@@ -268,6 +275,7 @@ describe('the account export, against a second user who touches everything', () 
       client: { name: 'Cliente Rossi', paid: 'si', valid: 'no' },
       meUpper: { id: alice.id.toUpperCase(), displayName: 'Alice' },
       dossier: { id: 'd-1', name: 'Dossier di Alice', userId: alice.id },
+      folder: { name: 'Fascicolo Rossi', userId: alice.id, folderId: 'f-1' },
       me: { id: alice.id, name: 'Alice A.', displayName: 'Alice' },
       meByEmail: { uid: 'local-1', email: alice.email, fullName: 'Alice A.' },
     });
