@@ -1170,7 +1170,9 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   «Da «dossier»», «Schede di studio» by their first questions) and a dossier's
   own «Rimossi di recente (n)» at its bottom (`DossierRecentlyRemoved`). Each
   entry (`TrashEntryRow`, `trashSummary.ts`) is restored whole — a 409 asks
-  which dossier to restore into — or emptied behind a danger confirmation; a
+  which dossier to restore into; a 404 drops an entry the server no longer has, and with a dossier
+  chosen the trash is read again to tell that from the chosen dossier gone (asked again) — or
+  emptied behind a danger confirmation; a
   restore reloads that dossier from the server (`refreshDossier`). A dossier deleted
   from the web goes there (owner, 13 October 2026, question 160): `deleteDossierWithUndo`
   (`dossier/deleteDossierWithUndo.ts`, the list's and the detail's «Elimina») removes it
