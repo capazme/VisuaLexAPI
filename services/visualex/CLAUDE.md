@@ -10,7 +10,8 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
   `brocardi_scraper.py` (switched off, below), `pdfextractor.py` (Playwright pool),
   `http_client.py` (the shared throttled aiohttp client — TLS verification on;
   `request(..., max_retries=n)` lowers the retry budget for a caller that paces
-  itself, `None` keeps `HTTP_MAX_RETRIES`).
+  itself, `None` keeps `HTTP_MAX_RETRIES`; once the budget is spent it gives up at once,
+  without the backoff or the `Retry-After` no attempt would follow).
   - `brocardi_scraper.py` is **switched off**: Brocardi is no longer a source
     (D-078). No route calls it, no answer carries `brocardi_info` or
     `brocardi_error` (a client's `show_brocardi_info` is ignored),
