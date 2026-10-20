@@ -153,14 +153,16 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `trash_entries` and deletes them in one transaction, the dossier row locked
   (`FOR UPDATE`; for the cards, `trashLingoCards` locks the author's rows in id order,
   so a `PATCH` in flight finishes before the payload is read and one that comes
-  after finds no card): `POST /dossiers/:id/trash {itemIds}` (the entries the user
-  saw: a dossier that changed answers 409), `/dossiers/:id/trash-items`,
+  after finds no card): `POST /dossiers/:id/trash {itemIds, taskCount}` (the entries the user
+  saw and the number of planner tasks the dialog told them, both required: a dossier that changed
+  answers 409; every dossier answer carries `task_count` for that dialog, a count and never a title), `/dossiers/:id/trash-items`,
   `/lingo/cards/trash` — `/dossiers/:id/trash` is for exchanged tokens only; the
   card trash and `trash-items` are open to the web app too (a session's `trash-items` takes
   up to 5000 ids, an exchanged token's 1 to 50), and so are the web app's own deletions: `DELETE /dossiers/:id` moves
   the whole dossier there (owner, 13 October 2026, question 160: before, it was gone at
-  once), whatever it holds (`trashDossier` with no `seenItemIds`), answering
-  `{ trashId, itemCount }` for the page's «Annulla»; `DELETE /dossiers/:id/items/:itemId`
+  once), whatever it holds (`trashDossier` with no `seen`; its planner tasks go with it in the
+  payload, listed as `taskCount`, and come back on restore with their ids), answering
+  `{ trashId, itemCount, taskCount }` for the page's «Annulla»; `DELETE /dossiers/:id/items/:itemId`
   moves that one entry (question 181, «ok come raccomandi»), answering
   `{ trashId, moved, notFound }`, as `trash-items` does for a selection: one trash entry per action,
   restored with the entries' ids, a note's `aboutItemId` and `createdBy`. Nothing the web app reaches
@@ -223,7 +225,9 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   only when the snapshot names no article.
 - `src/middleware/errorHandler.ts` — the only place a status is decided for an
   unhandled throw. `AppError` carries its own; a Zod `ZodError` becomes **400**
-  naming the offending fields; everything else is a 500. Controllers therefore
+  naming the offending fields; the JSON parser's own refusals (a malformed or too large body) keep
+  their 4xx with a fixed `detail`, logged by type only — their error carries the raw body; everything
+  else is a 500. Controllers therefore
   call `schema.parse()` and let it throw — 41 sites across 13 controllers — and
   must not catch it to hand-roll a status. The body is
   `{ detail: string, errors?: [{ field, message }] }`: `detail` stays a plain
@@ -563,6 +567,52 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   (`lingo_preferenze_studio`) from the user; the export carries the log as `data.lingoRipassi` (not the derived state)
   and the preferences as `data.lingoPreferenze` (null when never saved), and the stored study days
   as `data.lingoGiornate` (`giorno` as 'YYYY-MM-DD'); `LingoGiornataStudio` cascades from the user.
+- **The planner's tasks** (Opus, wave 1; the task model answered in the owners' notes, answers
+  1–4, 7, 11, 13): `Task` (`tasks`, migration `20261025100001_planner_tasks`: a new table and two
+  enums, nothing else; CHECKs for priority 1–4, a time only with its date, a positive duration, no
+  self-parent). The owner's alone (`userId`); `assigneeId` stays null until sharing (wave 4) and no
+  route writes it, nor `durationMinutes`. `dossierId` null = the inbox; a subtask always sits in its
+  parent's dossier, and a task moved to another dossier takes its subtasks and loses their entries.
+  `dossierItemId` is an entry of the same dossier: `SET NULL` when the entry goes (trash included,
+  not restored with it) and cleared by `moveDossierItem`. Planned date and deadline are two
+  Europe/Rome civil days (`DATE`, through `dayToDate`/`dateToDay`) with an optional `TIME`
+  ('HH:MM'); «today» is `romeDay`. The deadline is what the user wrote: nothing computes one (wave
+  2), and no wording may suggest it. Repetition (`tasks/recurrence.ts`): a closed RRULE subset —
+  daily, working days (`FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR`, read as Monday–Friday minus the national
+  holidays of `tasks/italianHolidays.ts`: fixed dates, Easter Monday, 4 October from 2026), weekly,
+  monthly, yearly; it needs a planned date and refuses a deadline. Monthly and yearly keep their day
+  (`recurrenceDay`, the planned date's day when the user sets the rule, its origin or the date; a
+  write leaving all three unchanged keeps it): a month without it takes its last day for that
+  occurrence only (31 January → 28 February → 31 March), and a yearly 29 February is the 28th in
+  common years and the 29th in leap years. Ticking a repeating task moves its planned date to the first occurrence after today
+  (`pianificata`) or one step from today (`completamento`) and leaves it open; `{ plannedDate }` in
+  the tick's body is the occurrence seen, required for a repeating task (400 without), a stale one
+  409, so a double tick never moves it twice. Any other tick closes the task and its open
+  subtasks at one instant, and reopening reopens what closed at that instant. Routes
+  (`routes/tasks.ts`, `/api/tasks`, session only — not in the delegated table): `GET
+  ?view=today|upcoming|inbox|dossier|trash[&dossierId]` (`today`: planned or due today or before;
+  `upcoming`: planned or due today to +6; open tasks only; at most 1000, `truncated`), `GET`/`PUT
+  /:id`, `POST /`, `POST /:id/complete`, `/:id/reopen`, `POST /reorder { taskIds }` (one list at a
+  time — same dossier, same parent — else 400; one `UPDATE … FROM unnest … WITH ORDINALITY`, never a
+  loop of updates inside the interactive transaction's 5 s), `DELETE /:id`
+  (to the trash: `deletedAt` on the task and its subtasks, swept after 30 days; a live subtask of a
+  swept parent stays, detached) and `POST
+  /:id/restore` (what went at that instant; a subtask whose parent is still there comes back on
+  its own). A task that changes list (dossier or parent) or comes back from the trash goes after the
+  last one of its list. A named parent is locked before it is read as live; a re-parenting takes a
+  per-user advisory lock first, so two at once cannot close a loop; a move between dossiers locks
+  both dossier rows before the task. `trashDossier` locks the dossier, then its tasks, before reading
+  the payload, so a write in flight lands in it and one that comes after finds no task; a dossier's
+  restore leaves alone a task of its payload that is live again elsewhere. A database error in the
+  dossier trash or a restore is logged by kind and code only (`quietly`): those queries carry names
+  and titles. Everything is scoped by `userId` in `tasks/tasks.ts`: another user's task, dossier,
+  entry or parent is a 404 (`tests/tasks.idor.test.ts`). **A title may name a client**: no message
+  repeats one, closed values answer without echoing, and the router's own error handler logs a
+  database error by kind and code only, never Prisma's message. `serializeTask` is the one answer
+  shape. The account export carries them as `data.tasks`: the user's own, the trashed ones too
+  (days 'YYYY-MM-DD', times 'HH:MM'), never `assigneeId` (another person's id from wave 4) — the
+  export's rule, no other person's id, name or text. They cascade with the account, and a task
+  assigned to a deleted account loses its assignee.
 - **Search history** (`controllers/historyController.ts`, `/api/history`): a row is a
   norm (`act_type`) or a court decision (`decision_key`), never both and never neither: the
   `search_history_one_kind` CHECK (migration `20261015100000`, not in Prisma's model) holds it
