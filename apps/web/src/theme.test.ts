@@ -324,7 +324,7 @@ describe('the tours (driver.js)', () => {
 
 describe('the entrance utilities', () => {
   it('turn animate-in, fade-in, zoom-in-N and slide-in-from-* into real rules', async () => {
-    const css = await compile(['animate-in', 'fade-in', 'fade-in-0', 'zoom-in-95', 'slide-in-from-bottom', 'slide-in-from-top-2', 'slide-in-from-right-10']);
+    const css = await compile(['animate-in', 'fade-in', 'fade-in-0', 'zoom-in-95', 'slide-in-from-bottom', 'slide-in-from-top-2', 'slide-in-from-right-10', 'slide-in-from-left-2']);
     expect(css).toMatch(/\.animate-in\s*\{[^}]*animation-name:/);
     // A finished entrance leaves nothing applied (gotcha 22): no «both» fill.
     expect(css).toMatch(/\.animate-in\s*\{[^}]*animation-fill-mode:\s*backwards/);
@@ -333,6 +333,9 @@ describe('the entrance utilities', () => {
     expect(css).toContain('.slide-in-from-bottom');
     expect(css).toContain('.slide-in-from-top-2');
     expect(css).toContain('.slide-in-from-right-10');
+    expect(css).toMatch(/\.slide-in-from-left-2\s*\{[^}]*--vlx-enter-x:\s*calc\(2 \* var\(--spacing\) \* -1\)/);
+    // Both axes, so a slide nested in another does not inherit the outer one's axis.
+    expect(css).toMatch(/\.slide-in-from-top-2\s*\{[^}]*--vlx-enter-x:\s*0/);
   }, 30000);
 
   it('never last past 200 ms, whatever duration the class writes', async () => {

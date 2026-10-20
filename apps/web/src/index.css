@@ -1172,10 +1172,13 @@
 @utility fade-in { --vlx-fade: vlx-enter-fade; }
 @utility fade-in-* { --vlx-fade: vlx-enter-fade; --vlx-enter-opacity: calc(--value(integer) * 1%); }
 @utility zoom-in-* { --vlx-zoom: vlx-enter-zoom; --vlx-enter-scale: calc(--value(integer) * 1%); }
-@utility slide-in-from-bottom { --vlx-slide: vlx-enter-slide; --vlx-enter-y: 100%; }
-@utility slide-in-from-bottom-* { --vlx-slide: vlx-enter-slide; --vlx-enter-y: calc(--value(integer) * var(--spacing)); }
-@utility slide-in-from-top-* { --vlx-slide: vlx-enter-slide; --vlx-enter-y: calc(--value(integer) * var(--spacing) * -1); }
-@utility slide-in-from-right-* { --vlx-slide: vlx-enter-slide; --vlx-enter-x: calc(--value(integer) * var(--spacing)); }
+/* Each slide writes both axes: custom properties inherit, so an error box sliding from the top inside a
+   panel that slid from the side would otherwise come in on the diagonal. */
+@utility slide-in-from-bottom { --vlx-slide: vlx-enter-slide; --vlx-enter-x: 0; --vlx-enter-y: 100%; }
+@utility slide-in-from-bottom-* { --vlx-slide: vlx-enter-slide; --vlx-enter-x: 0; --vlx-enter-y: calc(--value(integer) * var(--spacing)); }
+@utility slide-in-from-top-* { --vlx-slide: vlx-enter-slide; --vlx-enter-x: 0; --vlx-enter-y: calc(--value(integer) * var(--spacing) * -1); }
+@utility slide-in-from-right-* { --vlx-slide: vlx-enter-slide; --vlx-enter-y: 0; --vlx-enter-x: calc(--value(integer) * var(--spacing)); }
+@utility slide-in-from-left-* { --vlx-slide: vlx-enter-slide; --vlx-enter-y: 0; --vlx-enter-x: calc(--value(integer) * var(--spacing) * -1); }
 
 /* The tours (driver.js, `popoverClass: 'visualex-tour-popover'` in hooks/useTour.ts): the paper surface,
    the interface face, the primary button. Doubled class, so it wins over driver.css whichever loads last. */

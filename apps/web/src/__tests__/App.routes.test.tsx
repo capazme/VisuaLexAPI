@@ -35,8 +35,7 @@ vi.mock('../components/layout/Layout', async () => {
 
 // Page stubs (keep the router test light — pages pull the store/services).
 vi.mock('../pages/SearchPage', () => ({ SearchPage: () => <div data-testid="search-page" /> }));
-vi.mock('../pages/LoginPage', () => ({ LoginPage: () => <div /> }));
-vi.mock('../pages/RegisterPage', () => ({ RegisterPage: () => <div /> }));
+vi.mock('../pages/AuthPage', () => ({ AuthPage: () => <div /> }));
 vi.mock('../components/features/dossier/DossierPage', () => ({ DossierPage: () => <div /> }));
 vi.mock('../components/features/history/HistoryView', () => ({ HistoryView: () => <div /> }));
 vi.mock('../components/features/bulletin/BulletinBoardPage', () => ({ BulletinBoardPage: () => <div data-testid="forum" /> }));
