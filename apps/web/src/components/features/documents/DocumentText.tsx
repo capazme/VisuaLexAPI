@@ -39,7 +39,8 @@ export const DocumentText = memo(function DocumentText({ text, citations, select
     <div
       data-testid="document-text"
       onClick={handleClick}
-      className="mx-auto max-w-[68ch] whitespace-pre-wrap font-serif text-[1.0625rem] leading-[1.7] text-slate-800 [overflow-wrap:anywhere] dark:text-slate-200"
+      // `--doc-pulse`: the colour of the ring that marks a citation chosen in the list, per theme.
+      className="mx-auto max-w-[68ch] [--doc-pulse:var(--color-toga-500)] dark:[--doc-pulse:var(--color-toga-400)] whitespace-pre-wrap font-serif text-[1.0625rem] leading-[1.7] text-slate-800 [overflow-wrap:anywhere] dark:text-slate-200"
     >
       {pieces.map(piece => piece.cite === null
         ? text.slice(piece.from, piece.to)

@@ -106,8 +106,12 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   it by act (`citationGroups.ts`, pure: an act is its type, number and year, so «l. 241/90» and
   «l. 241/1990» are one; a code by its name); a mark selects its row, a row scrolls the text to its mark
   (the column; on a phone, where the columns are stacked, the page as well when the column is not wholly
-  in sight) and pulses it once; the box closes upwards when the result comes and
-  the first 8 rows enter 40 ms apart, none of it under reduced motion) and `decisions`
+  in sight) and pulses it once (`--doc-pulse`, the theme's toga step); the box closes upwards, then the
+  result comes (`AnimatePresence mode="wait"`: both at once flashed a scrollbar), and the first 8 rows
+  enter 40 ms apart, none of it under reduced motion. While `/documents` is open it refuses a file
+  dropped **anywhere in the window** but on its box (`dragover`/`drop` listeners on `window`, so the
+  browser does not open the file in place of the app): a drop zone added elsewhere on the page, or in
+  the shell, is neutralised there until those listeners let it through) and `decisions`
   (`DecisionView`, the body of a decision wherever it is drawn; `DecisionEntryView`, a practice's
   decision read in its row, its window or the phone's reader, over `useDecisionAnswer` (the fetch, the
   candidates, the notices) and `DecisionAnswerBody`; `DecisionAddress`, the `/sentenze/…` route element;

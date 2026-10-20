@@ -41,12 +41,19 @@ function revealPanel(panel: HTMLElement, behavior: ScrollBehavior) {
   if (box.top < 0 || box.bottom > window.innerHeight) panel.scrollIntoView?.({ block: 'nearest', behavior });
 }
 
-/** One ring that widens and fades from the citation: where the eye should land, once. toga-500, which reads on
- *  paper and on ink alike; a shadow, because a transform does not move an inline element. */
+/**
+ * One ring that widens and fades from the citation: where the eye should land, once. A shadow, because a
+ * transform does not move an inline element. Its colour is `--doc-pulse`, the theme's toga step set on the
+ * text (`DocumentText`), read as a colour because a keyframe cannot be relied on to resolve a `var()`.
+ */
 function pulse(mark: HTMLElement) {
   if (typeof mark.animate !== 'function') return;
+  const colour = getComputedStyle(mark).getPropertyValue('--doc-pulse').trim() || 'currentColor';
   mark.animate(
-    [{ boxShadow: '0 0 0 0 rgb(62 114 215 / 0.55)' }, { boxShadow: '0 0 0 7px rgb(62 114 215 / 0)' }],
+    [
+      { boxShadow: `0 0 0 0 color-mix(in oklch, ${colour} 55%, transparent)` },
+      { boxShadow: `0 0 0 7px color-mix(in oklch, ${colour} 0%, transparent)` },
+    ],
     // After the smooth scroll has brought it into view.
     { duration: 700, delay: 280, easing: `cubic-bezier(${ease.out.join(', ')})` },
   );
@@ -64,8 +71,7 @@ export function DocumentReviewPage() {
   const navigate = useNavigate();
   const reduceMotion = useReducedMotion();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const zoneRef = useRef<HTMLButtonElement>(null);
-  const resultHeadingRef = useRef<HTMLHeadingElement>(null);
+  const zoneRef = useRef<HTMLButtonElement | null>(null);
   const textBodyRef = useRef<HTMLDivElement>(null);
   const listBodyRef = useRef<HTMLDivElement>(null);
   // The reading in flight: a file chosen while another is read wins, the older answer is dropped.
@@ -75,6 +81,8 @@ export function DocumentReviewPage() {
   const [loaded, setLoaded] = useState<LoadedDocument | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
+  // A reading that has lasted 200 ms: only then are «Leggo il documento…» shown and announced, together.
+  const [slowReading, setSlowReading] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
 
@@ -82,12 +90,19 @@ export function DocumentReviewPage() {
   const groups = useMemo(() => (loaded ? groupCitationsByAct(loaded.text, citations) : []), [loaded, citations]);
   const countLabel = citations.length === 0 ? 'Nessuna citazione' : citationCountLabel(citations.length, groups.length);
 
-  useEffect(() => {
-    const target = focusAfterRef.current;
-    if (!target) return;
+  // The focus follows the change once its target is mounted: the box and the result take turns
+  // (AnimatePresence, `mode="wait"`), so the target appears only after the other has left.
+  const focusOnMount = useCallback((target: 'result' | 'zone') => (element: HTMLElement | null) => {
+    if (!element || focusAfterRef.current !== target) return;
     focusAfterRef.current = null;
-    (target === 'result' ? resultHeadingRef.current : zoneRef.current)?.focus({ preventScroll: true });
-  }, [loaded]);
+    element.focus({ preventScroll: true });
+  }, []);
+  const zoneFocus = useMemo(() => focusOnMount('zone'), [focusOnMount]);
+  const resultFocus = useMemo(() => focusOnMount('result'), [focusOnMount]);
+  const zoneElement = useCallback((element: HTMLButtonElement | null) => {
+    zoneRef.current = element;
+    zoneFocus(element);
+  }, [zoneFocus]);
 
   // A file let go anywhere but on the box would be opened by the browser in place of the app: refused,
   // over the whole window (the margins and the sidebar too) while the page is open.
@@ -109,9 +124,13 @@ export function DocumentReviewPage() {
     const id = ++readingRef.current;
     setError(null);
     setReading(true);
+    setSlowReading(false);
+    const slow = window.setTimeout(() => { if (id === readingRef.current) setSlowReading(true); }, 200);
     const result = await readDocumentFile(file);
+    window.clearTimeout(slow);
     if (id !== readingRef.current) return;
     setReading(false);
+    setSlowReading(false);
     if (!result.ok) {
       setError(result.error);
       return;
@@ -126,6 +145,7 @@ export function DocumentReviewPage() {
   const chooseAnother = () => {
     readingRef.current += 1;
     setReading(false);
+    setSlowReading(false);
     setDragging(false);
     setError(null);
     setSelected(null);
@@ -215,9 +235,11 @@ export function DocumentReviewPage() {
         onChange={event => { const file = event.target.files?.[0]; if (file) void handleFile(file); event.target.value = ''; }}
       />
 
-      <p className="sr-only" aria-live="polite">{reading ? 'Leggo il documento…' : loaded ? countLabel : ''}</p>
+      <p className="sr-only" aria-live="polite">{slowReading ? 'Leggo il documento…' : loaded ? countLabel : ''}</p>
 
-      <AnimatePresence initial={false}>
+      {/* One after the other: the box closes, then the result comes. Both at once would lay the columns out
+          under a box still closing, and the page would grow a scrollbar for a moment. */}
+      <AnimatePresence initial={false} mode="wait">
         {!loaded ? (
           <motion.div
             key="zone"
@@ -229,7 +251,7 @@ export function DocumentReviewPage() {
           >
             <div className="flex flex-col gap-3 pb-1">
               <button
-                ref={zoneRef}
+                ref={zoneElement}
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 onDragEnter={onZoneDrag}
@@ -255,9 +277,9 @@ export function DocumentReviewPage() {
                   {dragging ? 'Lo leggo qui, nel tuo browser' : 'o trascinalo qui · TXT, Markdown, HTML o DOCX, fino a 15 MB'}
                 </span>
               </button>
-              {reading && (
+              {slowReading && (
                 // Shown only if the reading lasts: a small file is read before the line appears.
-                <p aria-hidden="true" className="flex items-center gap-2 text-sm text-slate-600 animate-in fade-in duration-200 dark:text-slate-400" style={{ animationDelay: '200ms' }}>
+                <p aria-hidden="true" className="flex items-center gap-2 text-sm text-slate-600 animate-in fade-in duration-200 dark:text-slate-400">
                   <Loader2 size={15} className="motion-safe:animate-spin text-primary-600 dark:text-primary-400" />
                   Leggo il documento…
                 </p>
@@ -272,12 +294,12 @@ export function DocumentReviewPage() {
             initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
             animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
             exit={{ opacity: 0, transition: { duration: 0 } }}
-            transition={{ duration: reduceMotion ? 0.15 : dur.panel, ease: ease.out, delay: reduceMotion ? 0 : 0.06 }}
+            transition={{ duration: reduceMotion ? 0.15 : dur.panel, ease: ease.out }}
           >
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
               <FileText aria-hidden="true" size={18} className="shrink-0 text-slate-500 dark:text-slate-400" />
               <h2
-                ref={resultHeadingRef}
+                ref={resultFocus}
                 tabIndex={-1}
                 title={loaded.fileName}
                 className="line-clamp-2 min-w-0 flex-1 basis-48 text-base font-medium text-slate-900 outline-none [overflow-wrap:anywhere] dark:text-slate-50"
@@ -285,7 +307,8 @@ export function DocumentReviewPage() {
                 {loaded.fileName}
               </h2>
               <p className="text-sm tabular-nums text-slate-600 dark:text-slate-400">{countLabel}</p>
-              <Button variant="secondary" icon={<RotateCcw size={15} />} onClick={chooseAnother}>Scegli un altro documento</Button>
+              {/* 44 px at every width, as the box it brings back. */}
+              <Button variant="secondary" icon={<RotateCcw size={15} />} onClick={chooseAnother} className="md:min-h-11">Scegli un altro documento</Button>
             </div>
             {/* Citations first in the order of reading (a phone shows them above the text); on a computer
                 the text takes the left column. */}

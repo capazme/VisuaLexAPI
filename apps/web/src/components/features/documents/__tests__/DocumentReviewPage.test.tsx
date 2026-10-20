@@ -93,7 +93,12 @@ describe('DocumentReviewPage — before a document', () => {
     let finish: (text: string) => void = () => {};
     Object.assign(slow, { text: () => new Promise<string>(resolve => { finish = resolve; }) });
     await userEvent.upload(input(container), slow);
-    expect(screen.getAllByText('Leggo il documento…').length).toBeGreaterThan(0);
+    const live = container.querySelector('[aria-live]')!;
+    // Not at once: a small file is read before the line would show, so neither it nor the announcement comes.
+    expect(screen.queryAllByText('Leggo il documento…')).toHaveLength(0);
+    // Then both together, the line on screen and its announcement.
+    await waitFor(() => expect(live).toHaveTextContent('Leggo il documento…'));
+    expect(screen.getByText('Leggo il documento…', { selector: 'p[aria-hidden]' })).toBeInTheDocument();
     await act(async () => finish('art. 2043 c.c.'));
     expect(await screen.findByRole('heading', { level: 2, name: 'lungo.txt' })).toBeInTheDocument();
     // The box closes upwards and is gone with the line under it.
@@ -167,10 +172,20 @@ describe('DocumentReviewPage — the result', () => {
     expect(screen.getByText(/Riconosco, per esempio,/)).toHaveTextContent('«art. 2043 c.c.»');
   });
 
-  it('goes back to the box with «Scegli un altro documento»', async () => {
+  it('puts the focus on the result once it has come', async () => {
+    const { container } = render(<DocumentReviewPage />);
+    const heading = await choose(container, PARERE);
+    await waitFor(() => expect(heading).toHaveFocus());
+  });
+
+  it('goes back to the box with «Scegli un altro documento», a 44 px button at every width', async () => {
     const { container } = render(<DocumentReviewPage />);
     await choose(container, PARERE);
-    await userEvent.click(screen.getByRole('button', { name: 'Scegli un altro documento' }));
+    const again = screen.getByRole('button', { name: 'Scegli un altro documento' });
+    expect(again.className).toMatch(/(^| )min-h-11( |$)/);
+    expect(again.className).toMatch(/md:min-h-11/);
+    expect(again.className).not.toMatch(/md:min-h-9/);
+    await userEvent.click(again);
     const zone = await screen.findByRole('button', { name: /Scegli un documento/ });
     await waitFor(() => expect(zone).toHaveFocus());
     await waitFor(() => expect(screen.queryByText('6 citazioni in 2 atti', { selector: 'p:not([aria-live])' })).not.toBeInTheDocument());
@@ -224,6 +239,11 @@ describe('DocumentReviewPage — motion', () => {
     expect(window.scrollTo).not.toHaveBeenCalled();
     expect(animate).toHaveBeenCalledTimes(1);
     expect(animate.mock.contexts[0]).toBe(textBody().querySelectorAll('mark')[2]);
+    // The ring's colour is the theme's token, set on the text, never a colour written in the code.
+    expect(textBody().className).toMatch(/\[--doc-pulse:var\(--color-toga-500\)\]/);
+    expect(textBody().className).toMatch(/dark:\[--doc-pulse:var\(--color-toga-400\)\]/);
+    expect(JSON.stringify(animate.mock.calls[0][0])).not.toMatch(/rgb\(/);
+    expect(JSON.stringify(animate.mock.calls[0][0])).toMatch(/color-mix\(in oklch/);
   });
 
   it('scrolls the list to the row of a citation touched in the text, without a pulse', async () => {
