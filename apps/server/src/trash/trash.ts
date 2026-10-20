@@ -96,6 +96,20 @@ async function lockDossier(tx: Prisma.TransactionClient, userId: string, dossier
   return rows.length === 1;
 }
 
+/**
+ * A database error from a move to the trash or a restore, as it reaches the logs: its kind and code
+ * only. The rows travel through these queries (a dossier's name, its tasks' titles: a client's name,
+ * possibly), and Prisma's message can quote the arguments of the query it refused. The caller gets
+ * the usual 500; an `AppError` passes through untouched.
+ */
+function quietly(where: string, error: unknown): never {
+  if (error instanceof AppError) throw error;
+  const kind = error instanceof Error ? error.name : typeof error;
+  const code = error instanceof Prisma.PrismaClientKnownRequestError ? ` ${error.code}` : '';
+  console.error(`${where} failed: ${kind}${code}`);
+  throw new AppError(500, 'Internal server error');
+}
+
 let lastSweep = 0;
 
 /** Removes the entries past their 30 days; returns how many. */
@@ -132,6 +146,10 @@ export async function trashDossier(
   await maybeSweep();
   return prisma.$transaction(async (tx) => {
     if (!(await lockDossier(tx, userId, dossierId))) throw new AppError(404, 'Dossier not found');
+    // Its tasks are locked too, before they are read: a change in flight (an edit, a tick, a task
+    // moved to the trash) is committed first and lands in the payload, and one that comes after
+    // waits and then finds no task. Otherwise the payload would keep the task as it was.
+    await tx.$queryRaw`SELECT id FROM tasks WHERE dossier_id = ${dossierId} AND user_id = ${userId} ORDER BY id FOR UPDATE`;
     const dossier = await tx.dossier.findFirst({
       where: { id: dossierId, userId },
       include: {
@@ -168,7 +186,7 @@ export async function trashDossier(
     // Items, snapshots and tasks cascade with the dossier.
     await tx.dossier.delete({ where: { id: dossier.id } });
     return { trashId: entry.id, itemCount: items.length };
-  });
+  }).catch((error: unknown) => quietly('Dossier trash', error));
 }
 
 /**
@@ -565,7 +583,7 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       throw new AppError(409, 'Questi elementi sono già stati ripristinati.');
     }
-    throw error;
+    return quietly('Trash restore', error);
   }
 }
 

@@ -582,18 +582,26 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   monthly, yearly (a missing day takes the month's last); it needs a planned date and refuses a
   deadline. Ticking a repeating task moves its planned date to the first occurrence after today
   (`pianificata`) or one step from today (`completamento`) and leaves it open; `{ plannedDate }` in
-  the tick's body is the occurrence seen, a stale one 409. Any other tick closes the task and its open
+  the tick's body is the occurrence seen, required for a repeating task (400 without), a stale one
+  409, so a double tick never moves it twice. Any other tick closes the task and its open
   subtasks at one instant, and reopening reopens what closed at that instant. Routes
   (`routes/tasks.ts`, `/api/tasks`, session only — not in the delegated table): `GET
   ?view=today|upcoming|inbox|dossier|trash[&dossierId]` (`today`: planned or due today or before;
   `upcoming`: planned or due today to +6; open tasks only; at most 1000, `truncated`), `GET`/`PUT
-  /:id`, `POST /`, `POST /:id/complete`, `/:id/reopen`, `POST /reorder { taskIds }`, `DELETE /:id`
+  /:id`, `POST /`, `POST /:id/complete`, `/:id/reopen`, `POST /reorder { taskIds }` (one list at a
+  time — same dossier, same parent — else 400; one `UPDATE … FROM unnest … WITH ORDINALITY`, never a
+  loop of updates inside the interactive transaction's 5 s), `DELETE /:id`
   (to the trash: `deletedAt` on the task and its subtasks, swept after 30 days; a live subtask of a
   swept parent stays, detached) and `POST
   /:id/restore` (what went at that instant; a subtask whose parent is still there comes back on
-  its own). A named parent is locked before it is read as live, and a move between dossiers locks
-  both dossier rows before the task (the dossier trash's order); a dossier's restore leaves alone a
-  task of its payload that is live again elsewhere. Everything is scoped by `userId` in `tasks/tasks.ts`: another user's task, dossier,
+  its own). A task that changes list (dossier or parent) or comes back from the trash goes after the
+  last one of its list. A named parent is locked before it is read as live; a re-parenting takes a
+  per-user advisory lock first, so two at once cannot close a loop; a move between dossiers locks
+  both dossier rows before the task. `trashDossier` locks the dossier, then its tasks, before reading
+  the payload, so a write in flight lands in it and one that comes after finds no task; a dossier's
+  restore leaves alone a task of its payload that is live again elsewhere. A database error in the
+  dossier trash or a restore is logged by kind and code only (`quietly`): those queries carry names
+  and titles. Everything is scoped by `userId` in `tasks/tasks.ts`: another user's task, dossier,
   entry or parent is a 404 (`tests/tasks.idor.test.ts`). **A title may name a client**: no message
   repeats one, closed values answer without echoing, and the router's own error handler logs a
   database error by kind and code only, never Prisma's message. `serializeTask` is the one answer

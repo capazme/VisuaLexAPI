@@ -3,6 +3,7 @@ import { request, app, prisma, createTestUser, authHeader, type TestUser } from 
 import { addDays, romeDay } from '../src/lingo/studyDay';
 import { RECURRENCE_RULES } from '../src/tasks/recurrence';
 import { completeTask, listTasks, sweepTrashedTasks, TASK_TRASH_RETENTION_MS } from '../src/tasks/tasks';
+import { trashDossier, BY_THE_USER } from '../src/trash/trash';
 
 // The planner's tasks (wave 1): routes, views, subtasks, ticks, repetition, trash.
 
@@ -244,6 +245,23 @@ describe('changing a task', () => {
     expect((await request(app).put(`/api/tasks/${task.id}`).set(authHeader(user)).send({ parentId: parent.id })).status).toBe(404);
   });
 
+  it('two re-parentings at once cannot close a loop', async () => {
+    const user = await createTestUser('tasks-loop-race');
+    for (let round = 0; round < 5; round += 1) {
+      const a = await created(user, { title: `a${round}` });
+      const b = await created(user, { title: `b${round}` });
+      const statuses = (
+        await Promise.all([
+          request(app).put(`/api/tasks/${a.id}`).set(authHeader(user)).send({ parentId: b.id }),
+          request(app).put(`/api/tasks/${b.id}`).set(authHeader(user)).send({ parentId: a.id }),
+        ])
+      ).map((res) => res.status).sort();
+      expect(statuses).toEqual([200, 400]);
+      const [rowA, rowB] = await Promise.all([a.id, b.id].map((id) => prisma.task.findUniqueOrThrow({ where: { id } })));
+      expect(rowA.parentId === b.id && rowB.parentId === a.id).toBe(false);
+    }
+  });
+
   it('refuses a loop of subtasks', async () => {
     const user = await createTestUser('tasks-loop');
     const a = await created(user, { title: 'a' });
@@ -311,14 +329,55 @@ describe('ticking', () => {
     expect((await prisma.task.findUniqueOrThrow({ where: { id: task.id } })).plannedDate?.toISOString().slice(0, 10)).toBe(addDays(today, 7));
   });
 
+  it('a repeating task is ticked only with the occurrence seen; any other without it', async () => {
+    const user = await createTestUser('tasks-recur-seen');
+    const today = romeDay(new Date());
+    const repeating = await created(user, { title: 'r', plannedDate: today, recurrence: RECURRENCE_RULES.daily });
+    const plain = await created(user, { title: 'p', plannedDate: today });
+    const missing = await request(app).post(`/api/tasks/${repeating.id}/complete`).set(authHeader(user)).send({});
+    expect(missing.status).toBe(400);
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: repeating.id } })).plannedDate?.toISOString().slice(0, 10)).toBe(today);
+    expect((await request(app).post(`/api/tasks/${plain.id}/complete`).set(authHeader(user))).status).toBe(200);
+  });
+
+  it('two ticks of a repeating task at once move it once', async () => {
+    const user = await createTestUser('tasks-recur-double');
+    const today = romeDay(new Date());
+    const task = await created(user, { title: 'r', plannedDate: today, recurrence: RECURRENCE_RULES.weekly });
+    const tick = () => request(app).post(`/api/tasks/${task.id}/complete`).set(authHeader(user)).send({ plannedDate: today });
+    const statuses = (await Promise.all([tick(), tick()])).map((res) => res.status).sort();
+    expect(statuses).toEqual([200, 409]);
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: task.id } })).plannedDate?.toISOString().slice(0, 10)).toBe(addDays(today, 7));
+  });
+
   it('counts the next date from the Rome day of the tick', async () => {
     const user = await createTestUser('tasks-recur-rome');
     const task = await prisma.task.create({
       data: { userId: user.id, title: 'x', plannedDate: new Date('2026-10-24T00:00:00.000Z'), recurrence: RECURRENCE_RULES.daily, recurrenceFrom: 'completamento' },
     });
     // 00:30 on the 25th in Rome, still the 24th in UTC.
-    const { recurred } = await completeTask(user.id, task.id, undefined, new Date('2026-10-24T22:30:00Z'));
+    const { recurred } = await completeTask(user.id, task.id, '2026-10-24', new Date('2026-10-24T22:30:00Z'));
     expect(recurred).toEqual({ previousPlannedDate: '2026-10-24', plannedDate: '2026-10-26' });
+  });
+});
+
+describe('a dossier going to the trash while one of its tasks changes', () => {
+  it('waits for the change and keeps it in the payload', async () => {
+    const user = await createTestUser('tasks-trash-race');
+    const { dossier } = await dossierWithItem(user);
+    const task = await created(user, { title: 'prima', dossierId: dossier.id });
+    let trashing: Promise<{ trashId: string }> | undefined;
+    // An edit in flight on another connection: the row locked and changed, not yet committed.
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM tasks WHERE id = ${task.id} FOR UPDATE`;
+      await tx.task.update({ where: { id: task.id }, data: { title: 'dopo' } });
+      trashing = trashDossier(user.id, dossier.id, null, BY_THE_USER);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    });
+    const { trashId } = await trashing!;
+    const entry = await prisma.trashEntry.findUniqueOrThrow({ where: { id: trashId } });
+    const stored = (entry.payload as { tasks: { id: string; title: string }[] }).tasks;
+    expect(stored).toEqual([expect.objectContaining({ id: task.id, title: 'dopo' })]);
   });
 });
 
@@ -331,6 +390,53 @@ describe('order and trash', () => {
     const res = await request(app).post('/api/tasks/reorder').set(authHeader(user)).send({ taskIds: [c.id, a.id, b.id] });
     expect(res.status).toBe(200);
     expect((await view(user, 'inbox')).tasks.map((task) => task.title)).toEqual(['c', 'a', 'b']);
+  });
+
+  it('reorders one list at a time', async () => {
+    const user = await createTestUser('tasks-reorder-lists');
+    const { dossier } = await dossierWithItem(user);
+    const inbox = await created(user, { title: 'i' });
+    const filed = await created(user, { title: 'd', dossierId: dossier.id });
+    const child = await created(user, { title: 'c', parentId: inbox.id });
+    const reorder = (taskIds: string[]) => request(app).post('/api/tasks/reorder').set(authHeader(user)).send({ taskIds });
+    expect((await reorder([inbox.id, filed.id])).status).toBe(400);
+    expect((await reorder([inbox.id, child.id])).status).toBe(400);
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: filed.id } })).position).toBe(0);
+  });
+
+  it('reorders a thousand tasks in one call', async () => {
+    const user = await createTestUser('tasks-reorder-many');
+    const ids = Array.from({ length: 1000 }, (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`);
+    await prisma.task.createMany({ data: ids.map((id, i) => ({ id, userId: user.id, title: `t${i}`, position: i })) });
+    const reversed = [...ids].reverse();
+    const res = await request(app).post('/api/tasks/reorder').set(authHeader(user)).send({ taskIds: reversed });
+    expect(res.status).toBe(200);
+    const rows = await prisma.task.findMany({ where: { userId: user.id }, orderBy: { position: 'asc' }, select: { id: true, position: true } });
+    expect(rows.map((row) => row.id)).toEqual(reversed);
+    expect(rows.map((row) => row.position)).toEqual(ids.map((_, i) => i));
+  });
+
+  it('a task that changes list, or comes back from the trash, goes after the last one', async () => {
+    const user = await createTestUser('tasks-positions');
+    const { dossier } = await dossierWithItem(user);
+    await created(user, { title: 'd0', dossierId: dossier.id });
+    await created(user, { title: 'd1', dossierId: dossier.id });
+    const moving = await created(user, { title: 'm' });
+    const moved = await request(app).put(`/api/tasks/${moving.id}`).set(authHeader(user)).send({ dossierId: dossier.id });
+    expect(moved.body).toMatchObject({ dossier_id: dossier.id, position: 2 });
+
+    const parent = await created(user, { title: 'p' });
+    await created(user, { title: 'p0', parentId: parent.id });
+    const adopted = await request(app).put(`/api/tasks/${moving.id}`).set(authHeader(user)).send({ parentId: parent.id });
+    expect(adopted.body).toMatchObject({ parent_id: parent.id, dossier_id: null, position: 1 });
+
+    const first = await created(user, { title: 'first' });
+    expect(first.position).toBe(1);
+    await request(app).delete(`/api/tasks/${first.id}`).set(authHeader(user)).expect(200);
+    const taken = await created(user, { title: 'taken' });
+    expect(taken.position).toBe(1);
+    const restored = await request(app).post(`/api/tasks/${first.id}/restore`).set(authHeader(user));
+    expect(restored.body.position).toBe(2);
   });
 
   it('trashes a task with its subtasks and restores them together', async () => {
