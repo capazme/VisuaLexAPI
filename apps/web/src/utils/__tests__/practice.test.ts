@@ -48,6 +48,19 @@ describe('addArticles', () => {
     expect(r.acts[0].articles).toEqual([first]);
     expect(r.acts[0].norma.urn).toBe('urn:nir:stato:regio.decreto:1942-03-16;262');
   });
+  it('takes an article in without what Brocardi gave it, as an API not yet updated may still send it (D-078)', () => {
+    const plain = art(CC_RD, '2043');
+    const incoming = { ...plain, brocardi_info: { Ratio: 'ratio', Massime: ['massima'] }, brocardi_error: 'timeout' } as unknown as ArticleData;
+    const r = addArticles([], CC_RD, [incoming], id);
+    expect(r.acts[0].articles).toEqual([plain]);
+    expect(Object.keys(r.acts[0].articles[0])).not.toContain('brocardi_info');
+    expect(Object.keys(r.acts[0].articles[0])).not.toContain('brocardi_error');
+    // the input is not changed
+    expect(incoming).toHaveProperty('brocardi_info');
+    // an article without them is stored as given, the same object
+    const clean = art(CC_RD, '2044');
+    expect(addArticles(r.acts, CC_RD, [clean], id).acts[0].articles).toContain(clean);
+  });
   it('keeps a past text beside the text in force, after it, under another key', () => {
     const inForce = art(CC_RD, '2043');
     const past = art(CC_RD, '2043', { data_versione: '2007-12-29' }, { versionInfo: { isHistorical: true, requestedDate: '2007-12-29' } });
