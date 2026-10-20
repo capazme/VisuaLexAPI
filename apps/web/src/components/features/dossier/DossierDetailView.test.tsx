@@ -34,6 +34,10 @@ vi.mock('./dossierPdf', async (importOriginal) => {
 vi.mock('./dossierPdfMarks', () => ({ loadPdfMarks: pdf.loadPdfMarks }));
 vi.mock('../../../utils/actStructureCache', () => ({ fetchActRubriche: async () => ({ title: 'Titolo' }) }));
 vi.mock('./DossierItemReader', () => ({ DossierItemReader: () => null }));
+// The dossier's tasks panel reads its tasks from the server: an empty list here (its own tests: `planner/`).
+vi.mock('../../../services/taskService', () => ({
+  taskService: { list: async () => ({ today: '2026-10-20', tasks: [], truncated: false }) },
+}));
 vi.mock('../../../services/dossierService', () => ({
   dossierService: {
     getSnapshots: vi.fn(async () => []),

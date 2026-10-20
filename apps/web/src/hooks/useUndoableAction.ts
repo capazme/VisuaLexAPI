@@ -163,6 +163,13 @@ export interface UndoToast {
 let toastListener: ToastCallback | null = null;
 
 /**
+ * The toast on screen, dismissed when another starts: there is one container, and two countdowns each drawing
+ * their own toast every 100 ms took turns on it (two tasks ticked in a row flickered between the two messages).
+ * The one replaced resolves as kept, as when its time runs out.
+ */
+let dismissShown: (() => void) | null = null;
+
+/**
  * Register a listener for undo toasts (used by UndoToastContainer)
  */
 export function registerUndoToastListener(callback: ToastCallback): () => void {
@@ -210,6 +217,7 @@ export function showUndoToast<T>({
       if (resolved) return;
       resolved = true;
       clearInterval(interval);
+      if (dismissShown === handleDismiss) dismissShown = null;
       await undo(result);
       toastListener?.(null);
       resolve(false);
@@ -219,6 +227,7 @@ export function showUndoToast<T>({
       if (resolved) return;
       resolved = true;
       clearInterval(interval);
+      if (dismissShown === handleDismiss) dismissShown = null;
       toastListener?.(null);
       resolve(true);
     };
@@ -232,6 +241,8 @@ export function showUndoToast<T>({
       });
     };
 
+    dismissShown?.();
+    dismissShown = handleDismiss;
     updateToast();
   }));
 }
