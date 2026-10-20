@@ -39,7 +39,10 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `sticky bottom-0` at every width (the keyboard moves to the next card's heading after a vote, back to the
   verdict after «Annulla»; `Layout` hides the floating feedback button below `md` on this route, as in a review
   session, where it would cover the verdicts); the subject is remembered in `localStorage`; a vote that outlives a subject
-  change only marks its card handled, and a 403 stops the queue with «Non sei più tra i validatori»),
+  change only marks its card handled, and a 403 stops the queue with «Non sei più tra i validatori»; the queue is
+  read only once the outlet's `validator` is `true` — while the account loads it waits, for someone the account
+  says is not a validator it shows «Questa sezione è riservata…» with no request, which the server would refuse with
+  403, and when `/auth/me` failed (`validator` null, never taken for «not a validator») it reads and the server decides),
   `/history`, `/forum` («Dossier pubblici»; `/environments`, the page «Ambienti» was, redirects there keeping an old
   share link's `?import=`), `/forum/community` («Community», `ForumCommunityPage`: an honest placeholder — the
   Forum's title (`SECTION_TITLES.forum`), «Domande e discussioni tra colleghi, in arrivo», a link to `/forum`; no sample posts, no counts, no
@@ -219,7 +222,12 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (a local toggle for the pipeline trace).
 - `features/merlt/consent/` and `features/merlt/privacy/` — the MERL-T consent (spec
   `docs/superpowers/specs/2026-10-13-merlt-data-protection-design.md`). The server is its only
-  record (`ConsentContext`, nothing in the browser: until it answers, `canTrack` is false). A level
+  record (`ConsentContext`, nothing in the browser: until it answers, `canTrack` is false). It is read through
+  `consentRead.ts` (`readMerltConsent`): one `GET /api/merlt/consent` shared by the mounts that ask while it travels
+  (StrictMode's second effect, a provider mounted again), and none after a server without MERL-T answered 404
+  `merlt_disabled`, which reads as `DISABLED_CONSENT` for the life of the page; any other failure is an error, asked
+  again by the next mount; `useAuth`'s logout drops a read on its way and forgets the «without MERL-T» answer
+  (`clearConsentRead`). A level
   counts only under the current version of the MERL-T notice (`INFORMATIVA_MERLT`, a text
   administrators edit as new versions in «Testi di VisuaLex Gymnasium»); `ConsentScreen`, in the `global`
   slot, asks it once as the app loads when it is unanswered — the first entry, then only a new
@@ -1509,7 +1517,7 @@ children re-trigger the toggle. Always add
 Never nest interactive content inside the element carrying `role="button"` —
 scope the role to the header, as `DossierArticleRow` does. A collapsible whose header
 is a section heading follows the accordion pattern instead (`DossierActBlock`):
-the toggle sits inside the `<h3>`, its name is the heading's own text and its
+the toggle sits inside the `<h2>`, its name is the heading's own text and its
 state is `aria-expanded` alone, with no `aria-label` replacing what it says.
 
 **Popovers with `@floating-ui/react`** — split positioning and animation across
@@ -1619,7 +1627,9 @@ meant to stay split; add new features as new files, not inside the shells:
   `InlineNotePopover.tsx`, `UpdateNotePopover.tsx` (a Normattiva update note,
   opened from its `(119)`), `BlockAnnotationsPopover.tsx` (a block's notes and
   highlights, opened from its sign), `NoteCard.tsx`, `LooseHighlightsList.tsx`, `HighlightsActionsPicker.tsx`, `ReadingToolbar.tsx`,
-  `SearchPanel.tsx` (streaming merge logic), `CommandPalette.tsx`, `SearchField.tsx` (the search page's field)
+  `SearchPanel.tsx` (streaming merge logic), `CommandPalette.tsx` (no text under 11 px and its steps, «Gestisci»,
+  the close button and the filters 44 px on a phone — `CommandPalette.test.tsx` reads the file; its colours are
+  checked in `theme.test.ts`), `SearchField.tsx` (the search page's field)
   and `GlobalSearch.tsx` (the palette and the managers it opens, mounted by `Layout` — see gotcha 27),
   `TreeViewPanel.tsx` (the article index window).
 - `features/settings/` — `AliasManager.tsx` and nothing else. Named for what it
@@ -1691,7 +1701,10 @@ meant to stay split; add new features as new files, not inside the shells:
   module-wide, so a tour asked while another shows is not started (it is asked again the next time its
   surface mounts, and a tour not seen stays unseen), and `tryStartTour` looks at «seen» again when its delay ends;
   `practiceAct` is asked only for a practice that has an act. `tourConfig.targets.test.tsx` fails when a tour's
-  target is written nowhere in the sources, and checks the search tour against the search page.
+  target is written nowhere in the sources, and checks the search tour against the search page. The popover
+  (`visualex-tour-popover` in `index.css`) draws every button 44 px with a focus ring — the label centred by its
+  line height, since driver.js writes `display` on the buttons inline —, and `useTour` renames
+  driver.js's «×» «Chiudi» in `onPopoverRender` (driver.js writes «Close» and has no option for it; `TOUR_UI`).
   `SearchPanel` mounts them (imported statically: the table is the app's main surface; `PDFViewer`, Study Mode and
   `CompareView` stay behind `lazy()`), one layout per breakpoint (`useIsDesktop`); a decision opened from any link lands in its practice
   and opens beside on the desktop (the window a link was clicked in is never the one a third window
@@ -1702,7 +1715,10 @@ meant to stay split; add new features as new files, not inside the shells:
   from what the dossier kept, `addKnownDecisions`, so «Salva come dossier» saves them back) land in
   the practices.
 - `features/history/` — `HistoryView.tsx`, `DecisionHistoryRow.tsx` (a decision's row) plus
-  `NormaChangesSection.tsx` (see History above).
+  `NormaChangesSection.tsx` (see History above). The card's title is the page's `h1` («Cronologia» on a phone,
+  «Cronologia Ricerche» from `md`, one hidden by CSS); on `/dossier` it is the visible title of the list, of the
+  open dossier and of «Cestino», and what sits under it is `h2` (a dossier's card; an open dossier's notes, acts,
+  «Giurisprudenza» and «Rimossi di recente»).
 - `features/documents/` — `DocumentReviewPage.tsx` only.
 
 ## Gotchas

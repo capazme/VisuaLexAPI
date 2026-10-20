@@ -113,9 +113,14 @@ function AnchoredArticle({ card, showToast }: { card: Scheda; showToast: (messag
 export function ValidationQueueView() {
   const desktop = useIsDesktop();
   const [materia, setMateria] = useState<Materia | undefined>(rememberedMateria);
-  const { status, card, voting, vote, retry } = useValidationQueue(materia);
-  // A refusal reads «no longer» unless the account says the person never was a validator.
-  const neverValidator = useOutletContext<StudiaOutletContext | undefined>()?.validator === false;
+  // What the account says (undefined while it loads, null when it could not be read: then the server
+  // decides); outside the area's outlet the server decides too.
+  const outlet = useOutletContext<StudiaOutletContext | undefined>();
+  const validator = outlet ? outlet.validator : true;
+  const { status, card, voting, vote, retry } = useValidationQueue(materia, validator);
+  // A refusal reads «no longer» unless the account says the person never was a validator, or could
+  // not say (as before the account was asked, when a failed read counted as «not a validator»).
+  const neverValidator = validator === false || validator === null;
   const [toast, setToast] = useState<ToastState>(null);
   // The collapsed section belongs to a card: the next one starts closed.
   const [openFor, setOpenFor] = useState<string | null>(null);

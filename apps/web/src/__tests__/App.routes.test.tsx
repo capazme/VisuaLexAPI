@@ -14,10 +14,11 @@ vi.mock('../features/merlt/consent/ConsentContext', () => ({
   ConsentProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 
-// The development mode decides the MERL-T addresses (DevRoute); each test sets it.
+// The development mode decides the MERL-T addresses (DevRoute); each test sets it. The account is a
+// validator: «Da validare» reads its queue only for one.
 const account = vi.hoisted(() => ({ devMode: true }));
 vi.mock('../hooks/useAuth', () => ({
-  useAuth: () => ({ loading: false, devMode: account.devMode }),
+  useAuth: () => ({ loading: false, devMode: account.devMode, isValidator: true }),
 }));
 
 // Layout renders the Outlet inside a marker so tests can assert the shell stays mounted.
