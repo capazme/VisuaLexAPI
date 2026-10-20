@@ -58,6 +58,7 @@ import { lastActTitle, resolveBlockUrn } from './useActDetails';
 import { fetchActRubriche } from '../../../utils/actStructureCache';
 import { MenuButton } from '../../ui/MenuButton';
 import { DossierRecentlyRemoved } from './DossierRecentlyRemoved';
+import { DossierTasksPanel } from '../planner/DossierTasksPanel';
 import type { useTrash } from './useTrash';
 import { EditDossierModal } from './EditDossierModal';
 import { kindLabel } from './dossierKinds';
@@ -536,6 +537,9 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
           </div>
         </div>
       </header>
+
+      {/* The dossier's tasks (the planner, wave 1), before its entries. */}
+      <DossierTasksPanel dossierId={dossier.id} />
 
       {dossier.items.length > 0 && (
         <div className="mb-4 flex flex-col md:flex-row gap-3">
