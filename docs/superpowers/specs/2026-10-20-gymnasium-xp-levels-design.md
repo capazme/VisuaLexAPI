@@ -1,12 +1,15 @@
 # Gymnasium — experience points, levels and missions recorded by the server
 
-**Status:** proposal, 20 October 2026, for both owners to read before anything is built. Design only: no
-code, no migration yet.
+**Status:** decided, 20 October 2026: both owners have answered every question this spec raised (§10). Design
+only: no code, no migration yet.
 **Target:** release 1.10 (owners' decision L-30: 1.9 is the redesign alone).
 **Decisions it rests on** (codes of the owners' decision register):
 - **G-303:** points and levels will, later, be the engine of validator authority;
 - **G-253:** every validator vote weighs the same for now; authority comes gradually, later;
-- **L-27:** the draft table of missions, weights and level curve is a starting point, to be revised;
+- **L-27:** the draft table of missions, weights and level curve is a starting point, to be revised; its
+  follow-up of 20 October settled the five open choices (§10);
+- **G-314…G-318:** the points for proposing a card, the daily ceiling, who sees a level, no XP for the past,
+  and XP never weighing a vote by itself (§10);
 - **L-30:** 1.9 is the redesign, points and levels go in 1.10;
 - **G1b** (Gymnasium restyle spec, merged in 1.8.5): the web counts the three daily missions it can already
   read and shows the others as «In arrivo», with no points and no level until the server keeps them.
@@ -55,8 +58,8 @@ This spec moves the missions to the server and gives them points:
 
 ### 3.1 The catalogue of the first cut
 
-Values are the draft's (L-27), except «Consolida 50 schede», which the draft lists without a value (§10,
-question 1). Ids are the web's (`apps/web/src/components/features/studia/missions/missions.ts`), so G1b's
+Values are the draft's (L-27), and «Consolida 50 schede», which the draft lists without a value, is set at 100
+(L-27 follow-up, choice 1); all are to be reviewed after a month of use. Ids are the web's (`apps/web/src/components/features/studia/missions/missions.ts`), so G1b's
 list keeps its keys; the database enum is their upper-case form. The catalogue lives in
 `lingo/missions.ts` as one constant (id, group, value, the event kinds that evaluate it, its target
 constants); Italian titles stay in the web.
@@ -70,7 +73,7 @@ constants); Italian titles stay in the web.
 | `scrivi` | Proponi una scheda | daily | 25 | one of the user's drafts is proposed to the community, a card never credited before (§3.4) |
 | `convalida` | Convalida due schede della comunità | daily, validators only | 20 | two validation votes cast today, whatever their verdict (§3.5) |
 | `settimana` | Una settimana di serie | weekly | 50 | the streak reaches a positive multiple of 7 this week |
-| `consolida` | Consolida 50 schede | long run, once | 100 (proposed) | 50 cards in the review scope have an interval of 21 days or more (`CONSOLIDATED_DAYS`) |
+| `consolida` | Consolida 50 schede | long run, once | 100 | 50 cards in the review scope have an interval of 21 days or more (`CONSOLIDATED_DAYS`) |
 
 **Main** marks the draft's three missions of the day: they make «Le missioni di oggi» and its summary
 «2 di 3» as in G1b; the other daily missions are listed in «Tutte le missioni», where they can be done
@@ -85,7 +88,7 @@ missions (100, 250, 500 consolidated cards…) are later too.
 The weighting principle (the draft's): more effort, and more value for others, earns more. Reviewing is
 worth less than writing for the community, and writing less than solving a case.
 
-**The same missions for everyone** in the first cut (§10, question 4): the catalogue is fixed and every
+**The same missions for everyone** in the first cut (L-27 follow-up, choice 4; personalised later): the catalogue is fixed and every
 mission is always listed (`convalida` only to validators); one with nothing to do in its period says so
 (`vuota`, as in G1b) and is not counted in the summary.
 
@@ -102,11 +105,10 @@ amount of repetition earns more:
 - the most a day can earn is the sum of its missions: 105 XP from the six daily missions, plus 50 on the
   day the weekly mission closes, plus a long-run mission once in a lifetime (255 at the very most).
 
-**The daily ceiling** is therefore a belt, not the rule: `XP_DAILY_CEILING = 300`, checked when a credit
+**The daily ceiling** (G-315) is therefore a safety net, not the rule: there is no cap below the sum of the
+missions, and `XP_DAILY_CEILING = 300` is checked when a credit
 is written. A credit that would take the day's total past it is not written and is logged as a warning:
-in normal use it never bites, and a test pins that the catalogue's daily maximum stays under it. If the
-owners want a ceiling under the catalogue's sum (so that nobody can earn everything in a day), that is
-§10, question 7.
+in normal use it never bites, and a test pins that the catalogue's daily maximum stays under it.
 
 ### 3.3 The user's settings cannot lower a target
 
@@ -134,8 +136,9 @@ leave the user's review, so the user studies less, not more. If it is abused, th
 day's scope at its first read (a later change, §9).
 
 This departs from G1b's web rule for «Impara 5 schede nuove», which lowers the target to what the daily
-quota allows. The front-end owner decides (§10, question 5); once the server keeps the missions, the web
-shows the server's progress and no longer computes its own.
+quota allows. The owners decided it (L-27 follow-up, choice 5): «Impara 5» and the daily goal do not go
+below 5 new cards and 10 reviews for XP, so G1b's web rule changes in 1.10. Once the server keeps the
+missions, the web shows the server's progress and no longer computes its own.
 
 ### 3.4 Writing: credited at the proposal, once per card
 
@@ -149,8 +152,8 @@ proposal text, and puts the card before the validators. So:
   earns nothing (the unique key `(missione, fonte_id)`, the card's id as `fonte_id`, §5.2);
 - nothing is taken back if the validators archive the card: the reputation stream (§6) is where the
   quality of a user's writing will count;
-- the mission's visible name becomes «Proponi una scheda», since that is what it rewards (§10,
-  question 6). It is `aperta` whenever not credited today: anyone can write.
+- the mission's visible name is «Proponi una scheda», since that is what it rewards (G-314: the points are
+  for proposing a card to the community, once per card, never taken back). It is `aperta` whenever not credited today: anyone can write.
 
 ### 3.5 Validating: credited for the act, not the verdict
 
@@ -188,8 +191,8 @@ for the tests. Example: 412 XP is level 4, 37 into it, 175 for the next. The lev
 is computed from the total on every read, so it cannot drift from the ledger.
 
 A consequence to accept now: if the curve is made steeper after 1.10 ships, some users' levels go down.
-The recommendation is to settle the curve before 1.10 and, after it, only ever make it gentler (§10,
-question 2). Titles every ten levels are a later decision (§10, question 3).
+The curve is therefore fixed before 1.10 and, after release, may only become gentler (L-27 follow-up,
+choice 2). There are no titles in 1.10 (choice 3); titles every ten levels are a later decision.
 
 ## 5. Server
 
@@ -451,8 +454,8 @@ decision 14 already foresees the RLCF weighted sum replacing the count), the exi
   `User.lingoValidatore`), does not change a threshold, and unlocks no content (stops are free, Gymnasium
   restyle spec §5.2).
 - **The level is private.** Only its owner sees it: no leaderboard, no badge in the Forum, nothing that
-  shows one user's study to another (progress spec §7). Showing it to others is a later decision (§10,
-  question 8).
+  shows one user's study to another (progress spec §7). Showing it to others is a later decision
+  (G-316: in 1.10 the level is visible only to its owner, with no leaderboards and no badges).
 
 ## 7. Migration
 
@@ -460,7 +463,7 @@ One migration, written by hand and applied with `migrate deploy` (never `migrate
 the table with its two unique keys, index and checks, and the column `lingo_giornate_studio.voti`
 (`INTEGER NOT NULL DEFAULT 0`). **No backfill:** the ledger records missions it saw; the past cannot say
 which missions were done on a given day (whether the due cards were all reviewed, for instance), so XP
-starts at zero for everyone on the day 1.10 ships (§10, question 9), and `voti` starts at zero. Its name
+starts at zero for everyone on the day 1.10 ships (G-317), and `voti` starts at zero. Its name
 is reserved with the orchestrator before it is written (proposed: `<next free timestamp>_lingo_xp_ledger`);
 the drift check covers the model, and the checks are written in SQL as for the other Studia tables.
 
@@ -482,8 +485,9 @@ the drift check covers the model, and the checks are written in SQL as for the o
   own records and its own clock.
 - **A change of purpose, later.** Today XP serves the user's own motivation. Using it to weigh votes
   (G-303) is a new purpose: it uses a person's study history to decide how much their judgement counts.
-  Before that ships, the privacy notice must say so, and the authority spec must weigh it; this spec only
-  flags it.
+  G-318 settles the limits: XP alone never weighs a vote; at most it becomes one input of a future authority
+  model, and the privacy notice is updated before any use of XP in votes. The authority spec must also weigh
+  it; this spec only flags it.
 
 ## 9. First cut and later
 
@@ -497,36 +501,29 @@ whose `crediti` is not empty); the celebration of a new level; the XP of each mi
 
 **Later:** `caso` (with the short cases); more weekly missions; long-run ladders; titles every ten levels;
 missions chosen from what the user studies; freezing the day's scope for `dovute` if needed (§3.3); a
-history of credits on screen; the reputation stream and the authority model (§6), each with its own spec.
+history of credits on screen; the reputation stream and the authority model (§6), each with its own spec; a review of the mission
+weights after a month of use.
 
-## 10. Questions for the owners
+## 10. Decisions
 
-Weights, curve, titles and the choice of missions are the front-end owner's (L-27); the rest is for
-both. Each with a recommendation.
+All the questions this spec raised were answered by the owners on 20 October 2026. G-314…G-318 were
+accepted by both owners as recommended; the five choices are the front-end owner's (L-27 follow-up).
 
-1. **The weights.** Keep the draft's for 1.10 (20, 15, 10, 15, 25, 20, 50; `caso` 40 when it exists) and
-   give «Consolida 50 schede» **100**. *Recommended:* yes; revise after a month of real use.
-2. **The curve.** Keep `100 + 25·(n − 1)`; since the level is computed from the total, a steeper curve
-   later would lower levels. *Recommended:* keep it, settle it before 1.10, and afterwards only make it
-   gentler.
-3. **Titles every ten levels.** *Recommended:* not in 1.10.
-4. **The same missions for everyone,** or chosen from what the user studies. *Recommended:* the same for
-   everyone in 1.10, personalised later.
-5. **The quota and the goal cannot lower a mission's target** (§3.3): «Impara 5» ignores the daily
-   quota, and the goal mission needs at least 10 reviews (unless nothing is left to study); the subjects
-   switched on still count, as an accepted, bounded hole. This changes G1b's rule for
-   «Impara 5»; the front-end owner decides. *Recommended:* yes, because a level must mean effort if it is
-   to feed authority.
-6. **«Scrivi una scheda» is credited at the proposal,** once per card, never at the draft, never taken
-   back; its visible name becomes «Proponi una scheda». *Recommended:* yes.
-7. **The daily ceiling:** the catalogue already caps a day at 105 XP (155 on the weekly day); the belt is
-   300. *Recommended:* no ceiling under the catalogue's sum.
-8. **Who sees a level:** only its owner in 1.10. *Recommended:* yes; showing it in the Forum is a later
-   decision, together with authority.
-9. **No XP for the past:** everyone starts at zero on release. *Recommended:* yes.
-10. **Validating earns XP whatever the verdict,** and XP never weighs a vote by itself, now or later (at
-    most one input of the authority model). *Recommended:* yes; record it as the principle for the
-    authority spec.
+| Code | Decision | Date |
+| --- | --- | --- |
+| G-314 | XP for proposing a card to the community, once per card, never taken back; the mission is named «Proponi una scheda» (§3.4) | 20 Oct 2026 |
+| G-315 | No daily cap below the sum of the missions; 300 only as a safety net (§3.2) | 20 Oct 2026 |
+| G-316 | The level is visible only to its owner in 1.10; no leaderboards or badges (§6.3) | 20 Oct 2026 |
+| G-317 | Nobody gets XP for the past; everyone starts at zero at release (§7) | 20 Oct 2026 |
+| G-318 | XP alone never weighs a vote. At most it becomes one input of a future authority model, and the privacy notice is updated before any use of XP in votes (§6, §8) | 20 Oct 2026 |
+| L-27 (1) | The draft's mission weights for 1.10, with «Consolida 50 schede» at 100, to be reviewed after a month of use (§3.1) | 20 Oct 2026 |
+| L-27 (2) | The curve `100 + 25·(n − 1)`, fixed before 1.10; after release it may only become gentler (§4) | 20 Oct 2026 |
+| L-27 (3) | No titles in 1.10 (§4) | 20 Oct 2026 |
+| L-27 (4) | The same missions for everyone in 1.10, personalised later (§3.1) | 20 Oct 2026 |
+| L-27 (5) | «Impara 5» and the daily goal do not go below 5 new cards and 10 reviews for XP; this changes G1b's web rule in 1.10 (§3.3) | 20 Oct 2026 |
+
+Validating earns XP whatever the verdict (§3.5); together with G-318 it is the principle the authority
+spec starts from.
 
 ## 11. Testing
 
