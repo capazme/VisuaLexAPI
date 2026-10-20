@@ -125,6 +125,16 @@ export function todayMissions(data: Progressi): Mission[] {
   return [dovute, nuove, obiettivo];
 }
 
+/**
+ * Today's missions as drawn (S2): a mission done slides under those still open, except the due cards', which carries
+ * the page's action («Inizia», «Continua», «Hai finito per oggi») and stays first. `holding`: the missions whose ink is
+ * still running, which keep their place until it has.
+ */
+export function missionOrder(missions: readonly Mission[], holding: ReadonlySet<string> = new Set()): Mission[] {
+  const sinks = (m: Mission) => m.id !== 'dovute' && m.status === 'fatta' && !holding.has(m.id);
+  return [...missions.filter((m) => !sinks(m)), ...missions.filter(sinks)];
+}
+
 /** «2 di 3»: the missions done, of those that have something to do today. */
 export function missionSummary(missions: readonly Mission[]): { done: number; of: number } {
   const counted = missions.filter((m) => m.status === 'fatta' || m.status === 'aperta');
