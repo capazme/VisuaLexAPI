@@ -27,6 +27,7 @@ import { ServiceHealthDot } from '../ui/ServiceHealthMenuEntry';
 import { serviceHealthLabel, serviceHealthNeedsNotice } from '../../utils/serviceHealth';
 import { PluginSlot } from '../../plugins/PluginSlot';
 import { spring } from '../../lib/motion';
+import { PlannerHost } from '../features/planner/PlannerHost';
 
 export function Layout() {
   const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel, openCommandPalette } = useAppStore(useShallow(s => ({
@@ -320,6 +321,9 @@ export function Layout() {
 
       {/* The palette (⌘K) and the managers it opens, on every page */}
       <GlobalSearch />
+
+      {/* The planner's quick add («q»), its toast and the count beside «Oggi», on every page */}
+      <PlannerHost enabled={isAuthenticated} />
 
       {/* Find in the text (Cmd/Ctrl+F, the reading toolbars' magnifier) */}
       <FindWindow />

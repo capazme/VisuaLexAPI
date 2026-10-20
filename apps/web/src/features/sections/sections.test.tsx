@@ -29,9 +29,12 @@ describe('sectionForPath (spec S1)', () => {
     ['/merlt', 'academia'],
     ['/merlt/valida', 'academia'],
     ['/grafo', 'academia'],
+    ['/opus', 'opus'],
+    ['/opus/oggi', 'opus'],
+    ['/opus/cestino', 'opus'],
   ])('%s belongs to %s', (path, section) => expect(sectionForPath(path)).toBe(section));
 
-  it.each(['/', '/dossier', '/documents', '/history', '/collega-app', '/sentenze/cass/1/2024', '/studiare', '/forums'])(
+  it.each(['/', '/dossier', '/documents', '/history', '/collega-app', '/sentenze/cass/1/2024', '/studiare', '/forums', '/opuscolo'])(
     '%s is a Corpus page, of no section',
     (path) => expect(sectionForPath(path)).toBeNull(),
   );
@@ -99,6 +102,7 @@ describe('useSection', () => {
     expect(sectionStore.getState().section).toBe('gymnasium');
     expect(result.current.pathname).toBe('/studia/ripasso');
     act(() => result.current.chooseSection('opus'));
-    expect(result.current.pathname).toBe('/dossier');
+    // Opus opens on its planner's «Oggi» (P1b); the dossiers stay a Corpus page at /dossier.
+    expect(result.current.pathname).toBe('/opus/oggi');
   });
 });

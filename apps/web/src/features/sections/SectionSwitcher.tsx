@@ -1,6 +1,8 @@
 import { MenuButton } from '../../components/ui/MenuButton';
 import { cn } from '../../lib/utils';
 import { useSection } from './useSection';
+import { plannerStore } from '../../components/features/planner/plannerStore';
+import { todayCountLabel } from '../../components/features/planner/taskDates';
 
 /**
  * The switcher at the top of the sidebar, where the open book was (spec S3): the active section's
@@ -11,6 +13,8 @@ import { useSection } from './useSection';
 export function SectionSwitcher({ forumCount, onChoose, withName = false }: { forumCount: number; onChoose?: () => void; withName?: boolean }) {
   const { section, active, sections, chooseSection } = useSection();
   const forumDot = forumCount > 0 && section !== 'forum';
+  // Opus's count (overdue plus today's tasks) rides its entry, as the Forum's does; no dot: it is a to-do, not news.
+  const opusCount = plannerStore((s) => s.todayCount) ?? 0;
 
   return (
     <MenuButton
@@ -28,7 +32,8 @@ export function SectionSwitcher({ forumCount, onChoose, withName = false }: { fo
         description: s.line,
         icon: s.icon,
         checked: s.id === section,
-        badge: s.id === 'forum' ? forumCount : undefined,
+        badge: s.id === 'forum' ? forumCount : s.id === 'opus' ? opusCount : undefined,
+        badgeLabel: s.id === 'opus' ? todayCountLabel(opusCount) : undefined,
         onSelect: () => {
           chooseSection(s.id);
           onChoose?.();

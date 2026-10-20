@@ -52,6 +52,14 @@ const shortcutGroups: ShortcutGroup[] = [
     ],
   },
   {
+    title: 'Compiti',
+    shortcuts: [
+      { keys: ['Q'], description: 'Nuovo compito (nella pagina di un dossier, in quel dossier)' },
+      { keys: ['↑', '↓'], description: 'Compito precedente/successivo' },
+      { keys: ['Spazio'], description: 'Segna come fatto' },
+    ],
+  },
+  {
     title: 'Ripasso',
     shortcuts: [
       { keys: ['Spazio'], description: 'Mostra risposta' },
