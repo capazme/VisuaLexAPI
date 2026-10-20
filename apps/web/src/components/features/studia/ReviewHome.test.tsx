@@ -792,3 +792,61 @@ describe('ReviewHome', () => {
     });
   });
 });
+
+describe('the motions of «Oggi» (S2)', () => {
+  const SEEN = 'visualex.studia.visto';
+  afterEach(() => localStorage.removeItem(SEEN));
+
+  /** Today: 9 reviews, 5 of them new cards (the mission of the new ones done), the goal still open. */
+  function newOnesDone(): Progressi {
+    const data = answer(10, 8, { ripassi: 9 });
+    data.calendario = [...data.calendario, { giorno: '2026-10-19', ripassi: 9, nuove: 5, sbagliate: 0, valido: false, riposo: false }];
+    return data;
+  }
+  const today = () => within(screen.getByRole('list', { name: 'Missioni di oggi' }));
+  const order = () => today().getAllByRole('listitem').map((li) => li.getAttribute('data-missione'));
+
+  it('runs the ink of a mission done since it was last drawn, then slides it under the open ones', async () => {
+    localStorage.setItem(SEEN, JSON.stringify({ serie: 4, giorno: '2026-10-19', ripassi: 9, missioni: [] }));
+    progress.mockResolvedValue(newOnesDone());
+    renderHome();
+    await screen.findByRole('list', { name: 'Missioni di oggi' });
+    expect(order()).toEqual(['dovute', 'nuove', 'obiettivo']);
+    const title = today().getByText('Impara 5 schede nuove');
+    expect(title).toHaveClass('vlx-mission-inking');
+    await waitFor(() => expect(order()).toEqual(['dovute', 'obiettivo', 'nuove']), { timeout: 3000 });
+    expect(today().getByText('Impara 5 schede nuove')).toHaveClass('vlx-mission-done');
+    expect(JSON.parse(localStorage.getItem(SEEN)!).missioni).toEqual(['nuove']);
+  });
+
+  it('draws a mission already seen done at rest, under the open ones, with no ink running', async () => {
+    localStorage.setItem(SEEN, JSON.stringify({ serie: 4, giorno: '2026-10-19', ripassi: 9, missioni: ['nuove'] }));
+    progress.mockResolvedValue(newOnesDone());
+    renderHome();
+    await screen.findByRole('list', { name: 'Missioni di oggi' });
+    expect(order()).toEqual(['dovute', 'obiettivo', 'nuove']);
+    expect(today().getByText('Impara 5 schede nuove')).toHaveClass('vlx-mission-done');
+    expect(today().getByText('Impara 5 schede nuove')).not.toHaveClass('vlx-mission-inking');
+  });
+
+  it('draws the new tally mark and lands the count only for what grew since this browser drew it', async () => {
+    localStorage.setItem(SEEN, JSON.stringify({ serie: 3, giorno: '2026-10-19', ripassi: 7, missioni: [] }));
+    progress.mockResolvedValue(answer(10, 8, { ripassi: 9 }, 4));
+    const { unmount } = renderHome();
+    const tally = await screen.findByTestId('streak-tally');
+    expect(tally).toHaveAttribute('data-marks', '4');
+    const ring = within(screen.getByRole('img', { name: /^Obiettivo di oggi: 9 di 10/ }));
+    const landing = ring.getByTestId('goal-count-landing');
+    expect(landing).toHaveClass('vlx-digit-land', 'absolute');
+    // Its place is held at the final weight, unseen, so « di 10» does not move while it lands.
+    const [held] = ring.getAllByText('9').filter((el) => el !== landing);
+    expect(held).toHaveClass('invisible', 'font-semibold');
+    unmount();
+
+    // Seen now: the next visit draws them at rest.
+    renderHome();
+    const again = within(await screen.findByRole('img', { name: /^Obiettivo di oggi: 9 di 10/ }));
+    expect(again.getByText('9')).not.toHaveClass('vlx-digit-land');
+    expect(again.queryByTestId('goal-count-landing')).toBeNull();
+  });
+});

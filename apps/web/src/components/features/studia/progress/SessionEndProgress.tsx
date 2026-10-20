@@ -13,7 +13,7 @@ export function SessionEndProgress({ data }: { data: Progressi | null }) {
   const { oggi, serie } = data;
   return (
     <div className={`${TILE} flex flex-wrap items-center justify-center gap-x-8 gap-y-4 p-5`}>
-      <GoalRing ripassi={oggi.ripassi} obiettivo={oggi.obiettivo} raggiunto={oggi.raggiunto} />
+      <GoalRing giorno={oggi.giorno} ripassi={oggi.ripassi} obiettivo={oggi.obiettivo} raggiunto={oggi.raggiunto} />
       <StreakBadge attuale={serie.attuale} record={serie.record} ultimiGiorni={serie.ultimiGiorni} />
     </div>
   );

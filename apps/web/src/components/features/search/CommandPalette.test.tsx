@@ -157,7 +157,7 @@ describe('CommandPalette — reaching the alias manager', () => {
     appStore.setState({ customAliases: [] });
     renderPalette();
 
-    expect(screen.getByText(/Crea il tuo primo alias/i)).toBeInTheDocument();
+    expect(screen.getByText('Crea un alias')).toBeInTheDocument();
   });
 
   it('opens the manager from that entry', async () => {
@@ -165,7 +165,7 @@ describe('CommandPalette — reaching the alias manager', () => {
     const user = userEvent.setup();
     renderPalette();
 
-    await user.click(screen.getByText(/Crea il tuo primo alias/i));
+    await user.click(screen.getByText('Crea un alias'));
 
     // The palette closes first, then hands over — hence the wait.
     await waitFor(() => expect(appStore.getState().aliasManagerOpen).toBe(true));

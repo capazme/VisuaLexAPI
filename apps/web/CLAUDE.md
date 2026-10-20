@@ -161,7 +161,26 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   active section — from the address on `/studia/*`, `/forum`, `/merlt*`, `/grafo`, else the last one, kept in the
   browser under `visualex-section`, Opus by default; `SectionSwitcher`: the menu button at the top of the sidebar,
   `#tour-section-switcher`, on `ui/MenuButton` with `menuitemradio` entries, a dot for the Forum's news from
-  another section). The sidebar: the Corpus entries for everyone — «Ricerca»
+  another section). **The section change** (S2, «la stampa a mezzatinta»): `chooseSection(id, origin)` plays
+  `sectionTransition.ts` — a canvas over the whole screen (`Z_INDEX.sectionTransition`, `pointer-events: none`, removed
+  at its end) where a halftone on a grid turned 45° prints the new section's hue (`--vlx-section-<id>` in `index.css`,
+  `sectionHue`) from the tap (`MenuItem.onSelect` receives the click; a key's click starts from the entry's middle), the
+  route changes under the full colour, and the page comes out through the holes of the same screen once its title is
+  there — the router renders a navigation in a transition, so the colour holds for it, at most 400 ms (`flushSync` would
+  not make it synchronous) —, then the title's ink dries (`vlx-ink-drying`); the geometry and the timing are pure in
+  `halftone.ts` (about 700 ms, kept a few frames under 750; sparser and shorter below 768 px). A frame's cost is the
+  wave's ring: the part already solid is one filled shape and its dots are not drawn (`solidRadiusWhileCovering`,
+  `openRadiusWhileRevealing`); a large screen draws a sparser grid (`MAX_DOTS`) on a canvas of at most
+  `MAX_CANVAS_PIXELS` (`canvasRatio`). A tap or a key during it brings it to its end (Enter, Space and Esc are taken,
+  so they do not press the switcher again); the browser's Back while the colour prints drops the change, with no
+  swap. The focus goes to the
+  new page's title unless the user moved it meanwhile: each section's home marks its heading
+  `data-section-title="<section id>"` with `tabIndex={-1}` and `FOCUS_RING`, so a keyboard user sees where the focus
+  went (Gymnasium's `h1`, the dossier list's `h1` — `opus` or
+  `gymnasium` by the kind it lists, since the same element stays from one to the other —, «Dossier pubblici», the
+  MERL-T hub); a new home marks its own. Under reduced motion the page changes at once; where no canvas can be drawn,
+  the View Transition on `vlx-page`, held until the title is there. Choosing the section one is in goes to its home
+  with no change shown. The sidebar: the Corpus entries for everyone — «Ricerca»
   (a link to `/` that puts the cursor in the search page's field, `focusSearchField`, with no window over it —
   the owner, 13 Oct 2026; its hover label carries ⌘K, the palette; the quick norms' dot sits under it;
   `#tour-nav-search` is what the welcome and search tours point at) and «Analizza documento» —, then the active
@@ -215,7 +234,40 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   the decision, searches a ready norm (`citationSearchParams`), searches the topic, or hands a norm that still
   lacks its number, date or article to the palette with the words (`openCommandPaletteWith`); Enter pressed while
   the server is still naming the act waits for its answer. «Opzioni» (⌘K) opens the palette. No practice is
-  closed. `utils/searchFieldControl.ts` reaches it: `focusSearchField({ text? }, { wait? })` says whether the field took
+  closed.
+  **The palette's look** (`CommandPalette`, the search menu's brief O1, 20 Oct 2026): on a computer a panel that
+  drops from the field's form (`SEARCH_FIELD_FORM_ID` in `utils/searchFieldControl.ts`; floating-ui puts its top on
+  the field's, as wide as the field and «Opzioni», one height of at most 640 px while the box filters, so it does
+  not jump at every letter), hung at the top, centred, where no field is on screen (another page, Focus mode); on a
+  phone `ui/Sheet` («Menu di ricerca», its own «Chiudi»). From the top: the box, the one strong thing, with the help
+  line (12 px) or what the box was read as; the steps «Atto › Dettagli › Articolo» as a thin trail, the one in use in
+  ink (`aria-current="step"`), each 44 px on a phone; then two columns on a computer and one on a phone, in this
+  order: «Scegli l'atto» (`paletteActs.ts`: every act of `ACT_TYPES` named in full with the source convention's
+  abbreviation, «Codice civile · c.c.», in 44 px rows under group headings in Geist 12 px) and «A portata di mano»
+  (Preferiti, I tuoi alias with the presets' line, «In dotazione» while typing; six of each at rest, then «Tutti i
+  preferiti (N)» and «Gestisci alias (N)»; empty, one quiet line each, «Crea un alias» a row like a link);
+  «Filtri avanzati» closed at the foot, its state in words (`activeFiltersLabel`, `utils/searchFilters.ts`); the
+  keys on a computer only. The box filters every list while it is typed (`filterPaletteActs`, `queryMatches`: each
+  typed word begins a word of the row, case and accents folded, an abbreviation with or without its dots; «Nessun
+  atto con questo nome»); cmdk's own filter is off (`shouldFilter={false}`): it would reorder the rows by score,
+  across the columns. The order drawn is the keyboard's: on a computer the acts come first, so the row chosen as
+  the menu opens is the first act (Costituzione); on a phone «A portata di mano» comes first when it holds
+  something. A decision or a norm read in the box is one strong row in the columns' place, the chosen one
+  («art. 2043 c.c. · Apri l'articolo ↵», «… · Completa ↵» while it lacks number or date, «… · Apri la
+  sentenza ↵»), with under it only what still matches (a favourite, an alias, an act). The box sits in a
+  bordered field that carries the focus ring (`focus-within`; the box itself cancels the global
+  `input:focus-visible` ring), and the line under it starts 10 px below, on the line of the field's text. cmdk takes Enter, the
+  arrows, Home and End anywhere inside it (Enter picks the chosen row): every control that is not the box keeps
+  them (`keepKeys`), or Enter on «Filtri avanzati» would open the first act.
+  On a computer the panel is a dialog («Menu di ricerca», `useRole` and `FloatingFocusManager`, modal): the focus
+  stays inside, and goes back to what had it as the palette opened («Opzioni», the field), as it closes rather than
+  once the fade is over (the manager sits outside the `AnimatePresence`); nothing had it, the field. cmdk replaces an
+  id given to `Command.List` with its own, so the tour's `#command-palette-results` is on the acts' column;
+  `tourConfig.commandPalette.test.tsx` checks the palette's tour against the palette drawn, on both breakpoints. Motion: the panel fades in dropping 6 px (`dur.pop`) and leaves in `dur.press`; a new step slides in
+  from the side it moved to; the chosen row's tint is one element carried from row to row (`layoutId`); under
+  reduced motion everything only fades. This reverses spec `2026-10-18-redesign-inchiostro` §6.1 («no open or close
+  animation») for the palette, as the brief asked. There is no «ultimi atti aperti»: the web keeps no list of the
+  acts opened (the search history is the server's, read by its page alone). `utils/searchFieldControl.ts` reaches it: `focusSearchField({ text? }, { wait? })` says whether the field took
   the request, and the sidebar's «Ricerca», which navigates first, asks it to wait (2 s) for the field to mount;
   the empty page's button and examples and the empty practice use `focusSearchFieldOrPalette`, which opens the
   palette with the same words when no field is on screen (Focus mode).
@@ -275,7 +327,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   height of 36 px on a desktop and 44 px on a phone; `loading` keeps the label and puts a spinner in the
   icon's place (`aria-busy`), `status="error" | "success"` shows the outcome of the last press. `Modal`
   enters in `dur.panel` on `ease.drawer`, growing from 0.97, and `Sheet` rises from its edge on the same
-  timing; both only fade under reduced motion (`useReducedMotion`). `Toast` takes `spring.snappy`, rises
+  timing (its «Chiudi» in ink-500, dark ink-400: over 3:1, since it is often the one way out); both only fade under reduced motion (`useReducedMotion`). `Toast` takes `spring.snappy`, rises
   from the edge it lives on and pauses its time while `document.hidden`; the undo toast's countdown lives
   in `useUndoableAction` and does not pause. `Tooltip` waits 500 ms under a pointer, opens at once and
   without motion within 300 ms of another closing, and at once on keyboard focus.
@@ -286,7 +338,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   only, `HOVER_LIFT` lifts 1 px for a fine pointer and goes on nothing that is a row or a list item.
   **Motion** comes from `lib/motion.ts` (`ease`, `dur`, `spring.snappy` for panels and rows,
   `spring.gentle` for rare moments): no component types a spring or a curve, and a transition names what
-  changes. `lib/motion.guard.test.ts` fails on a `transition-all` or a hand-typed spring; the Gymnasium
+  changes. A CSS transition that needs a spring takes `--ease-catch` (`index.css`, a damped spring sampled as a
+  `linear()` curve; the lesson bar's ink). `lib/motion.guard.test.ts` fails on a `transition-all` or a hand-typed spring; the Gymnasium
   celebration's stamp is the one exception. A row or a list item takes a colour change on hover, never a
   scale or a lift.
 
@@ -360,10 +413,10 @@ Three different things. Conflating them is the recurring mistake.
 
 - **Presets** (80) — shipped in `preset_aliases.yaml`, served by
   `GET /fetch_alias_catalog`. 21 of them only rename an act type: "codice
-  appalti" IS the "Codice Contratti Pubblici" tile already in the palette's
-  grid, so listing them duplicates that grid. The palette shows only the 59
+  appalti" IS the "Codice dei contratti pubblici" row already in the palette's
+  list of acts, so listing them duplicates that list. The palette shows only the 59
   that carry a number and a date (`gdpr` → Reg. UE 679/2016), which is work
-  the grid cannot save.
+  the list cannot save.
 - **Known acts** (392) — names `act_resolver.py` understands unaided ("statuto
   dei lavoratori", "TUSL"). These need no alias at all; one would only drift.
 - **CustomAlias** — the user's own, server-backed. A custom trigger beats a
@@ -375,7 +428,7 @@ Three different things. Conflating them is the recurring mistake.
 `AliasManager` is reached **only** from the command palette (gotcha 27; both are mounted by `Layout`'s
 `GlobalSearch`), and in
 the palette the presets cost one line of header text at rest — they render as
-rows only once the user types, and cmdk does the matching. `useAliasCatalog`
+rows only once the user types, matched by `queryMatches` (`paletteActs.ts`). `useAliasCatalog`
 keeps its `loaded` flag in component state, so the palette and the manager each
 fetch the catalog once for as long as they stay mounted — two calls per session,
 never repeated, nothing persisted.
@@ -608,7 +661,9 @@ The shell is not `inert` — the command palette is drawn inside it — so a scr
 it. While the route's code loads, `LessonLoading` (`App.tsx`'s fallback) gives the frame its close button and Esc. The shell's Focus mode
 is not used — it is a saved setting and leaves its own button on screen — and `Layout` is untouched. Three rows: the
 header (the close button, «Interrompi», 44 px, and the progress bar, `role="progressbar"`, done of done and remaining,
-where done are the cards out of the queue — a «Di nuovo» holds it still —, easing under `motion-safe:` only; «Restano N»
+where done are the cards out of the queue — a «Di nuovo» holds it still —; at each grade that moves it the head runs
+ahead in the section's hue (`vlx-lesson-head`, 150 ms), the ink catches up 70 ms later on `--ease-catch` (300 ms) and the
+bar trembles by a pixel (Web Animations, `PLUCK`), 370 ms in all, all of it `motion-safe:` only; «Restano N»
 stays as screen-reader text), the card scrolling in the middle (beside it on desktop the article, `DossierItemReader`,
 in a column of its own that scrolls apart; on a phone `ui/Sheet`, marked `data-find-overlay`; the panel closes when the
 card changes; the scroll is keyed by step, so each card starts at its top), and `LessonBar` at the foot on every width (above the phone's safe edge, in the `pinnedBar` band inside
@@ -650,7 +705,12 @@ heading and its rule are the column's width), in the order the owner fixed:
    of five, or of what today allows (`oggi.nuove`, the quota and the cards left; `NEW_CARDS_TARGET`); «Raggiungi l'obiettivo
    di oggi», `oggi.ripassi` of `oggi.obiettivo`, done when the server says `raggiunto`, the goal line under it. A mission
    with nothing to do today says so and leaves the summary; a count past its target stops at it («5 di 5»; the ring keeps
-   the real count), and a goal the server counted with the queue finished under it says why. When the server records
+   the real count), and a goal the server counted with the queue finished under it says why. A mission done reads done
+   (`.vlx-mission-done`: a quieter ink, struck through in the section's hue) and slides under those still open
+   (`missionOrder`), except the due cards', which carries the action and stays first; done since this browser last drew
+   it, a drop of ink falls into its box and the ink crosses its words first (`MissionMark`'s `drip`,
+   `.vlx-mission-inking`, `MISSION_INK_MS`), then it moves (a moving row keeps its padding wherever it lands; the
+   list's `-mb-4` takes the last one's back). «Tutte le missioni» keeps to the words. When the server records
    missions, only `missions.ts`
    changes. **No points and no level are shown** until the server keeps them. The first mission carries the action:
    «Oggi: 18 da ripassare, 8 nuove» (a part that is zero left out; «Oggi in Diritto penale: …» when a subject is chosen),
@@ -664,8 +724,9 @@ heading and its rule are the column's width), in the order the owner fixed:
    «+ Nuova scheda» under the text — Le mie schede has its own «+ Nuova scheda» since G4, not named here) or the community's cards; a failed
    first read says «Non riesco a leggere i tuoi progressi.» with «Riprova» and keeps «Inizia» (the session reads its own
    cards); `todayState` and `nextDueDay` decide it, pure, in `progress/today.ts`.
-2. **«I tuoi progressi»** (`progress/StatsBand`), one band: `StreakBadge compact` (the «§», the count, «Il primo giorno
-   comincia oggi» or «giorni di fila · record N») and `GoalRing compact` (40 px, «5 di 10»), the gear «Impostazioni dello
+2. **«I tuoi progressi»** (`progress/StatsBand`), one band: `StreakBadge compact` (the «§», the count with the bundle
+   of five being filled as tally marks beside it, `StreakTally` — the fifth is the stroke across the four in the
+   section's hue —, «Il primo giorno comincia oggi» or «giorni di fila · record N») and `GoalRing compact` (40 px, «5 di 10»), the gear «Impostazioni dello
    studio» (`progress/StudySettings`: `SettingsGear` and `StudySettingsSheet`, `StudyPreferences open` in a `ui/Sheet`
    capped at `max-w-lg` from `md`, not closed by Esc or the backdrop), the current week (`layout.ts` `currentWeek`: Monday
    to Sunday from the server's today and `serie.ultimiGiorni`, seven boxes with «LMMGVSD», a day to come dotted, and the
@@ -724,6 +785,14 @@ or the grades; 1.5 s; no focus, no pointer, the keys untouched; an `aria-live`
 line says it to a screen reader). The confetti step by elapsed time (`confetti.ts`
 `stepsAt`), so they last 1.5 s on any screen. Under reduced motion nothing moves: no canvas, the end state only. The session's end screen adds the ring and the streak
 (`SessionEndProgress`, the same read).
+**The small motions** (S2): the tally's new mark (the count pops with it), today's count landing in the ring
+(`GoalRing`'s `vlx-digit-land`: the new digit falls into place and takes on its weight, 360 ms, over its own place held
+unseen at the final weight, so «di 10» beside it does not move; reaching the goal, the ring closes as it settles) and a mission's ink play **only for what grew since this browser last drew it** —
+`progress/seenProgress.ts` (`useStreakGrowth`, `useReviewsGrowth`, `useFreshMissions`) keeps the streak and today's
+reviews and missions under `visualex.studia.visto`, a convenience like the celebration's, never a number's source; with
+nothing stored nothing plays, and what a view draws it records (the dense strip draws no tally and leaves the streak's
+growth to «Oggi»). None of them takes a key or the focus or delays a card, and under reduced motion each is drawn at
+its end at once. The celebration is unchanged.
 
 **«Progressi», the page of the data** (`progress/ProgressPage`, `/studia/progressi`, the sidebar's «Progressi» in
 «Studia» after Oggi; Gymnasium spec §5.3, G3). The same read as «Oggi» — `useProgress(undefined)` for the whole day and
@@ -1567,7 +1636,7 @@ negative margins matching the parent padding, add `border-b border-current/10`,
 and raise it to `z-20`.
 
 **Stacking** — use the bands in `constants/zIndex.ts` (`pinnedBar` 35, `sidebar` 50, `lesson` 70 — Gymnasium's lesson over the shell —, `dock` 80 — the bar of practices —,
-overlay band 1000+), never a bare literal. See gotcha 22 before assuming a
+overlay band 1000+, and `sectionTransition` 2000 over everything: the section change's canvas, which takes no click), never a bare literal. See gotcha 22 before assuming a
 z-index will be honoured. An overlay above `findWindow` (110) that covers the
 workspace carries `aria-modal="true"` (a real modal dialog) or `data-find-overlay`,
 or Cmd/Ctrl+F opens the find window hidden under it.

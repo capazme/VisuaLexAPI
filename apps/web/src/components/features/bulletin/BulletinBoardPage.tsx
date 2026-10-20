@@ -24,6 +24,7 @@ import { customAliasService } from '../../../services/customAliasService';
 import { notificationService } from '../../../services/notificationService';
 import { publishMerltEvent, MERLT_EVENT_TYPES } from '../../../features/merlt/merltEventBus';
 import type { SharedEnvironment, EnvironmentCategory, SharedEnvironmentListResponse, EnvironmentSuggestion, StudyImportReport } from '../../../types';
+import { FOCUS_RING } from '../../../constants/interactions';
 
 type TabType = 'explore' | 'my' | 'suggestions';
 
@@ -401,7 +402,7 @@ export function BulletinBoardPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="font-serif text-3xl font-medium tracking-tight text-slate-900 dark:text-slate-50 flex items-center gap-2">
+          <h1 data-section-title="forum" tabIndex={-1} className={`${FOCUS_RING} rounded-sm font-serif text-3xl font-medium tracking-tight text-slate-900 dark:text-slate-50 flex items-center gap-2`}>
             <FolderOpen className="text-primary-600 dark:text-primary-400" size={28} aria-hidden />
             Dossier pubblici
           </h1>

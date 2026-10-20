@@ -1,4 +1,5 @@
-import type { RefObject } from 'react';
+import { useEffect, useState, type ReactNode, type RefObject } from 'react';
+import { useReducedMotion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { cn } from '../../../../lib/utils';
 import type { Progressi } from '../../../../types/studia';
@@ -6,8 +7,9 @@ import { estimateLabel } from '../studiaLabels';
 import { GoalStamp } from '../progress/Celebration';
 import { nextDueDay, todayState } from '../progress/today';
 import { BLOCK_HEADING, FOCUS_RING, INK_BG, INK_TEXT, MUTED_TEXT, ON_INK, QUIET_BUTTON, SECONDARY_BUTTON, TILE } from '../progress/tokens';
-import { MissionRow } from './MissionMark';
-import { missionSummary, todayMissions } from './missions';
+import { MISSION_INK_MS, MissionRow } from './MissionMark';
+import { missionOrder, missionSummary, todayMissions, type Mission } from './missions';
+import { useFreshMissions } from '../progress/seenProgress';
 
 export interface TodayMissionsProps {
   /** The whole day's answer: the missions are the day's. Null before the first one, or when it could not be read. */
@@ -135,6 +137,46 @@ function TodayAction({ action, actionFailed, subject, onRetry, onAllSubjects, on
 }
 
 /**
+ * The list of today's missions (S2): a mission done since this browser last drew it has its ink run (the drop, then
+ * the words), and once it has, slides under those still open (`missionOrder`); under reduced motion the order and the
+ * marks are final at once. Mounted with the day's read, so its first answer is not taken for a mission just done.
+ */
+function MissionsOfToday({ day, missions, children }: { day: Progressi; missions: Mission[]; children: (mission: Mission) => ReactNode }) {
+  const reduce = useReducedMotion() ?? false;
+  const done = missions.filter((m) => m.status === 'fatta').map((m) => m.id);
+  const fresh = useFreshMissions(day.oggi.giorno, done);
+  // The fresh missions whose ink has run: they may move now.
+  const [inked, setInked] = useState<ReadonlySet<string>>(() => new Set());
+  const running = reduce ? [] : [...fresh].filter((id) => !inked.has(id));
+  const runningKey = running.join(' ');
+  useEffect(() => {
+    if (!runningKey) return;
+    const timer = window.setTimeout(() => setInked((before) => new Set([...before, ...runningKey.split(' ')])), MISSION_INK_MS);
+    return () => window.clearTimeout(timer);
+  }, [runningKey]);
+  const met = day.oggi.raggiunto;
+
+  return (
+    // `-mb-4`: the last row's bottom padding, which a moving row keeps (`MissionRow`'s `layout`).
+    <ol aria-label="Missioni di oggi" className={cn('divide-y divide-slate-100 dark:divide-slate-800', !reduce && '-mb-4')}>
+      {missionOrder(missions, new Set(running)).map((mission) => (
+        // Met by the count, the stamp says it to the eye; met with the queue finished under it, the line says why.
+        <MissionRow
+          key={mission.id}
+          mission={mission}
+          bar
+          ink={running.includes(mission.id) ? 'drip' : 'still'}
+          layout={!reduce}
+          quietNote={mission.id === 'obiettivo' && met && day.oggi.ripassi >= day.oggi.obiettivo}
+        >
+          {children(mission)}
+        </MissionRow>
+      ))}
+    </ol>
+  );
+}
+
+/**
  * «Le missioni di oggi» (Gymnasium spec §5.1), first on the page: the day's three missions, one under the other,
  * each with its mark, its progress and an action, and the summary «2 di 3». The first carries the page's one
  * primary button; the other two open the settings that set their targets; the goal's is sealed by the stamp once
@@ -197,11 +239,10 @@ export function TodayMissions({ day, dayFailed, action, actionFailed, onRetry, s
         </div>
       )}
 
-      {missions && (
-        <ol aria-label="Missioni di oggi" className="divide-y divide-slate-100 dark:divide-slate-800">
-          {missions.map((mission) => (
-            // Met by the count, the stamp says it to the eye; met with the queue finished under it, the line says why.
-            <MissionRow key={mission.id} mission={mission} bar quietNote={mission.id === 'obiettivo' && met && day !== null && day.oggi.ripassi >= day.oggi.obiettivo}>
+      {missions && day && (
+        <MissionsOfToday day={day} missions={missions}>
+          {(mission) => (
+            <>
               {mission.id === 'dovute' && (
                 // The day's read failing again is said here too: the missions above are its last answer.
                 <TodayAction action={action} actionFailed={actionFailed || dayFailed} subject={subject} onRetry={onRetry} onAllSubjects={onAllSubjects} onStart={onStart} met={met} />
@@ -221,9 +262,9 @@ export function TodayMissions({ day, dayFailed, action, actionFailed, onRetry, s
                     Cambia l’obiettivo
                   </button>
                 ))}
-            </MissionRow>
-          ))}
-        </ol>
+            </>
+          )}
+        </MissionsOfToday>
       )}
     </section>
   );

@@ -134,6 +134,9 @@ describe('the Inchiostro palette', () => {
     expect(ratio(white, rgb('toga-600'))).toBeGreaterThanOrEqual(6);
     expect(ratio(rgb('ink-400'), rgb('ink-950'))).toBeGreaterThanOrEqual(7);
     expect(ratio(rgb('toga-400'), rgb('ink-950'))).toBeGreaterThanOrEqual(6.5);
+    // A mission done (S2, `.vlx-mission-done`): ink 600 on the white tile, ink 300 on the dark one (ink 900).
+    expect(ratio(rgb('ink-600'), white)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(rgb('ink-300'), rgb('ink-900'))).toBeGreaterThanOrEqual(4.5);
   });
 
   it('keeps the sidebar\'s 11 px texts at AA on its glass, over the page and over the phone\'s backdrop', () => {
@@ -423,5 +426,38 @@ describe('the scrollbars in dark mode', () => {
     const css = await compile(HIDDEN_SCROLLBAR.split(' '));
     expect(css).toMatch(/\.\\\[scrollbar-width\\:none\\\]\s*\{\s*scrollbar-width:\s*none/);
     expect(css).toMatch(/\.\\\[\\&\\:\\:-webkit-scrollbar\\\]\\:hidden\s*\{\s*&::-webkit-scrollbar\s*\{\s*display:\s*none/);
+  }, 30000);
+});
+
+describe('the section change and Gymnasium\'s small motions (S2)', () => {
+  it('declares every section\'s hue, the wash, the wet ink and the mission inks in the light theme and in the dark one', () => {
+    // The halftone reads `--vlx-section-<id>` by name (`sectionHue`): an undeclared one would print nothing.
+    const source = readFileSync(CSS_PATH, 'utf8');
+    for (const name of ['opus', 'gymnasium', 'academia', 'forum'].map((id) => `--vlx-section-${id}`).concat('--vlx-gymnasium-wash', '--vlx-wet-ink', '--vlx-todo-ink', '--vlx-done-ink')) {
+      expect(source.match(new RegExp(`${name}:`, 'g')) ?? [], name).toHaveLength(2);
+    }
+  });
+
+  it('compiles the lesson bar\'s spring, its delay, the head and the halftone\'s band', async () => {
+    const css = await compile([
+      'motion-safe:ease-(--ease-catch)',
+      'motion-safe:delay-[70ms]',
+      'motion-safe:duration-150',
+      'motion-safe:duration-300',
+      'z-[2000]',
+      'vlx-lesson-head',
+    ]);
+    expect(css).toMatch(/transition-timing-function:\s*var\(--ease-catch\)/);
+    expect(css).toMatch(/--ease-catch:\s*linear\(0,/);
+    expect(css).toMatch(/transition-delay:\s*70ms/);
+    expect(css).toMatch(/z-index:\s*2000/);
+    expect(css).toMatch(/\.vlx-lesson-head\s*\{\s*background:\s*var\(--vlx-gymnasium-wash\)/);
+  }, 30000);
+
+  it('draws the drying ink, the inked mission and the landing digit, and stills them all under reduced motion', async () => {
+    const css = await compile([]);
+    for (const name of ['vlx-ink-dry', 'vlx-ink-through', 'vlx-digit-land']) expect(css).toMatch(new RegExp(`@keyframes ${name}`));
+    const reduced = css.split('@media (prefers-reduced-motion: reduce)').slice(1).join(' ');
+    for (const rule of ['.vlx-ink-drying', '.vlx-mission-inking', '.vlx-digit-land']) expect(reduced).toContain(rule);
   }, 30000);
 });
