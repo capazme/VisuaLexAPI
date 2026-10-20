@@ -337,7 +337,7 @@ export const COMMAND_PALETTE_STEPS: DriveStep[] = [
         element: '#command-palette-results',
         popover: {
             title: 'Scegli l\'atto',
-            description: 'Gli atti per gruppo, con la loro sigla: scegline uno con un clic, o con le frecce e Invio; poi il menu chiede l\'articolo.',
+            description: 'Gli atti per gruppo, con la loro sigla: scegline uno con un clic, o con le frecce e Invio; poi il menu chiede l\'articolo (per una legge o un decreto, prima numero e anno).',
             side: 'bottom',
             align: 'center',
         }

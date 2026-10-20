@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('../../../hooks/useTour', () => ({
@@ -93,7 +93,7 @@ describe('CommandPalette — the field and the steps', () => {
     await user.click(screen.getByRole('option', { name: 'Codice civile · c.c.' }));
     expect(screen.getByText('Articolo').parentElement).toHaveAttribute('aria-current', 'step');
     expect(screen.getByRole('button', { name: 'Atto' })).not.toHaveAttribute('aria-current');
-    expect(screen.getByText('Scrivi il numero dell’articolo: 2043, 1-bis')).toBeInTheDocument();
+    expect(screen.getByText("Scrivi il numero dell'articolo: 2043, 1-bis")).toBeInTheDocument();
   });
 
   it('searches the article typed, as before', async () => {
@@ -106,7 +106,7 @@ describe('CommandPalette — the field and the steps', () => {
     const box = screen.getByRole('textbox', { name: "Numero dell'articolo" });
     await user.clear(box);
     await user.type(box, '2043');
-    await user.click(screen.getByRole('button', { name: 'Apri l’articolo' }));
+    await user.click(screen.getByRole('button', { name: "Apri l'articolo" }));
 
     expect(onSearch).toHaveBeenCalledWith(expect.objectContaining({ act_type: 'codice civile', article: '2043' }));
   });
@@ -139,7 +139,7 @@ describe('CommandPalette — «Scegli l\'atto»', () => {
     const user = userEvent.setup();
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
     await user.type(screen.getByRole('combobox'), 'zzzz');
-    // once the server has said it is no act either (until then: «Cerco l’atto…»)
+    // once the server has said it is no act either (until then: «Cerco l'atto…»)
     expect(await screen.findByText('Nessun atto con questo nome')).toBeInTheDocument();
   });
 });
@@ -193,11 +193,51 @@ describe('CommandPalette — «Filtri avanzati»', () => {
 
     await user.click(toggle);
     await user.selectOptions(screen.getByRole('combobox', { name: 'Fonte' }), 'eurlex');
-    await user.type(screen.getByRole('spinbutton', { name: 'Dal anno' }), '1990');
+    await user.type(screen.getByRole('spinbutton', { name: "Dall'anno" }), '1990');
     expect(toggle).toHaveTextContent('2 filtri attivi');
 
     await user.click(screen.getByRole('option', { name: 'Codice civile · c.c.' }));
-    await user.click(screen.getByRole('button', { name: 'Apri l’articolo' }));
+    await user.click(screen.getByRole('button', { name: "Apri l'articolo" }));
     expect(onSearch).toHaveBeenCalledWith(expect.objectContaining({ filters: expect.objectContaining({ source: 'eurlex', yearFrom: 1990 }) }));
+  });
+});
+
+describe('CommandPalette — the keys', () => {
+  it('leaves Enter to a button: «Filtri avanzati» opens, no act is picked', async () => {
+    asDesktop(true);
+    const user = userEvent.setup();
+    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+
+    const toggle = screen.getByRole('button', { name: /Filtri avanzati/ });
+    toggle.focus();
+    await user.keyboard('{Enter}');
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    // still on the first step: Enter did not reach cmdk's list
+    expect(screen.getByRole('button', { name: 'Atto' })).toHaveAttribute('aria-current', 'step');
+  });
+
+  it('on a computer, Enter on an opening runs the first favourite, as before', async () => {
+    asDesktop(true);
+    const favourite = quickNorm(2043);
+    const original = appStore.getState().selectQuickNorm;
+    // the store's own counts the use on the server: not here
+    appStore.setState({ quickNorms: [favourite], selectQuickNorm: () => favourite });
+    const onSearch = vi.fn();
+    const user = userEvent.setup();
+    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={onSearch} />);
+
+    await user.keyboard('{Enter}');
+    expect(onSearch).toHaveBeenCalledWith(expect.objectContaining({ act_type: 'codice civile', article: '2043' }));
+    appStore.setState({ selectQuickNorm: original });
+  });
+
+  it('tells a screen reader what the box was read as, a norm too', async () => {
+    asDesktop(true);
+    const user = userEvent.setup();
+    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    expect(screen.getByRole('combobox')).toHaveAccessibleDescription('Scrivi una citazione: art. 2043 c.c., l. 241/1990, Cass. civ. 10787/2024');
+    await user.type(screen.getByRole('combobox'), 'art 2043 cc');
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/Premi Invio per cercare\.$/));
   });
 });

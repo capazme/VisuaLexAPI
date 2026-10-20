@@ -33,6 +33,7 @@ describe('the palette\'s list of acts', () => {
     expect(names('cpc')).toContain('Codice di procedura civile');
     expect(names('c.p.c.')).toContain('Codice di procedura civile');
     expect(names('d.lgs')).toEqual(['Decreto legislativo']);
+    expect(names('dlgs')).toEqual(['Decreto legislativo']);
     expect(names('PROPRIETA')).toEqual(['Codice della proprietà industriale']);
     // the old label's words still find it
     expect(names('privacy')).toEqual(['Codice in materia di protezione dei dati personali']);
@@ -61,6 +62,9 @@ describe('queryMatches', () => {
     expect(queryMatches('mio', 'mio-contratto', 'Art. 1490 c.c.')).toBe(true);
     expect(queryMatches('contr 1490', 'mio-contratto', 'Art. 1490 c.c.')).toBe(true);
     expect(queryMatches('tratto', 'mio-contratto')).toBe(false);
+    // a favourite's abbreviation, with or without its dots
+    expect(queryMatches('2043 cc', 'Art. 2043 c.c.')).toBe(true);
+    expect(queryMatches('2043 c.c.', 'Art. 2043 cc')).toBe(true);
     expect(queryMatches('', 'anything')).toBe(true);
   });
 });

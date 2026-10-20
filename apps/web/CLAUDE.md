@@ -186,8 +186,11 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   «Filtri avanzati» closed at the foot, its state in words (`activeFiltersLabel`, `utils/searchFilters.ts`); the
   keys on a computer only. The box filters every list while it is typed (`filterPaletteActs`, `queryMatches`: each
   typed word begins a word of the row, case and accents folded, an abbreviation with or without its dots; «Nessun
-  atto con questo nome»); cmdk's own filter is off (`shouldFilter={false}`): it reorders the rows by score, across
-  the columns. Motion: the panel fades in dropping 6 px (`dur.pop`) and leaves in `dur.press`; a new step slides in
+  atto con questo nome»); cmdk's own filter is off (`shouldFilter={false}`): it would reorder the rows by score,
+  across the columns. On a computer «A portata di mano» comes first in the DOM, drawn on the right, so ↓ reaches a
+  favourite before the acts and Enter on an opening runs the first favourite, as before. cmdk takes Enter, the
+  arrows, Home and End anywhere inside it (Enter picks the chosen row): every control that is not the box keeps
+  them (`keepKeys`), or Enter on «Filtri avanzati» would open the first act. Motion: the panel fades in dropping 6 px (`dur.pop`) and leaves in `dur.press`; a new step slides in
   from the side it moved to; the chosen row's tint is one element carried from row to row (`layoutId`); under
   reduced motion everything only fades. This reverses spec `2026-10-18-redesign-inchiostro` §6.1 («no open or close
   animation») for the palette, as the brief asked. There is no «ultimi atti aperti»: the web keeps no list of the

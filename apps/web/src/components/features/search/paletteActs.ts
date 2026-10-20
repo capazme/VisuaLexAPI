@@ -1,4 +1,5 @@
 import { ACT_TYPES } from '../../../constants/actTypes';
+import { foldAlias } from '../../../hooks/useAliasCatalog';
 import { ACT_TYPES as ABBREVIATED_TYPES, EU_ACTS, NAMED_ACTS, NAMED_HEADINGS } from '../../../utils/sources/actTypes';
 
 /**
@@ -37,25 +38,29 @@ const NAMES: Readonly<Record<string, string>> = {
   'decreto legge': 'Decreto-legge',
   'decreto del presidente della repubblica': 'Decreto del Presidente della Repubblica',
   'preleggi': 'Disposizioni sulla legge in generale (preleggi)',
-  'norme in materia ambientale': 'Codice dell’ambiente',
+  'norme in materia ambientale': "Codice dell'ambiente",
   'regolamento ue': 'Regolamento UE',
   'direttiva ue': 'Direttiva UE',
 };
 
-/** Case, accents and apostrophes folded, the way a lawyer types: «proprieta» finds «proprietà». */
-export function foldPaletteText(text: string): string {
-  return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-}
-
-/** The words of a text, folded: letters and digits only, every other character a boundary. */
+/**
+ * The words of a text, case and accents folded (`foldAlias`: «proprieta» finds «proprietà»): letters and
+ * digits only, every other character a boundary. A run of one-letter words is also kept joined, so an
+ * abbreviation is found with or without its dots: «c.p.c.» by «cpc», «Art. 2043 c.c.» by «2043 cc».
+ */
 function wordsOf(text: string): string[] {
-  return foldPaletteText(text).split(/[^a-z0-9]+/).filter(Boolean);
-}
-
-/** An abbreviation's words, plus the same letters run together: «c.p.c.» is found by «c.p.c» and «cpc». */
-function abbreviationWords(abbreviation: string): string[] {
-  const parts = wordsOf(abbreviation);
-  return parts.length > 1 ? [...parts, parts.join('')] : parts;
+  const words = foldAlias(text).split(/[^a-z0-9]+/).filter(Boolean);
+  const runs: string[] = [];
+  let run: string[] = [];
+  for (const word of [...words, '']) {
+    if (word.length === 1) {
+      run.push(word);
+      continue;
+    }
+    if (run.length > 1) runs.push(run.join(''));
+    run = [];
+  }
+  return [...words, ...runs];
 }
 
 /**
@@ -84,8 +89,8 @@ function paletteAct(value: string, label: string): PaletteAct {
   const name = NAMES[key] ?? NAMED_HEADINGS[key] ?? capitalised(value);
   const found = NAMED_ACTS[key] ?? ABBREVIATED_TYPES[key] ?? EU_ACTS[key];
   // «Preleggi» is its own abbreviation: written twice it says nothing.
-  const abbreviation = found && !wordsOf(name).includes(foldPaletteText(found)) ? found : undefined;
-  const words = [...wordsOf(name), ...wordsOf(value), ...wordsOf(label), ...(abbreviation ? abbreviationWords(abbreviation) : [])];
+  const abbreviation = found && !wordsOf(name).includes(foldAlias(found)) ? found : undefined;
+  const words = [...wordsOf(name), ...wordsOf(value), ...wordsOf(label), ...(abbreviation ? [...wordsOf(abbreviation), foldAlias(abbreviation).replace(/[^a-z0-9]/g, '')] : [])];
   return { value, name, abbreviation, words: [...new Set(words)] };
 }
 
