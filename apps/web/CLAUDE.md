@@ -98,9 +98,15 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `bulletin` (the Forum, which absorbed «Ambienti»), `history`, `compare`, `settings`, `studia` (VisuaLex
   Gymnasium: the study cards, see `/studia` above and «Study cards under the article»),
   `documents`
-  (`DocumentReviewPage`: citations found in a TXT/Markdown/HTML/DOCX the
-  user drops in — parsed in the browser, never uploaded — each opening the
-  reader through `navigate('/')` + `triggerSearch`, gotcha 15) and `decisions`
+  (`DocumentReviewPage`, «Analizza documento»: citations found in a TXT/Markdown/HTML/DOCX the
+  user chooses or drops on the box — read in the browser (`documentFile.ts`), never uploaded, no
+  request at all — each opening the reader through `navigate('/')` + `triggerSearch`, gotcha 15. The
+  document is drawn as it is (`DocumentText`: every character once and in order, the citations only
+  wrapped in a `<mark>`, the test compares the drawn text with the file's), the citations listed beside
+  it by act (`citationGroups.ts`, pure: an act is its type, number and year, so «l. 241/90» and
+  «l. 241/1990» are one; a code by its name); a mark selects its row, a row scrolls the text to its mark
+  (the column alone, never the page) and pulses it once; the box closes upwards when the result comes and
+  the first 8 rows enter 40 ms apart, none of it under reduced motion) and `decisions`
   (`DecisionView`, the body of a decision wherever it is drawn; `DecisionEntryView`, a practice's
   decision read in its row, its window or the phone's reader, over `useDecisionAnswer` (the fetch, the
   candidates, the notices) and `DecisionAnswerBody`; `DecisionAddress`, the `/sentenze/…` route element;
@@ -1684,7 +1690,8 @@ meant to stay split; add new features as new files, not inside the shells:
   the practices.
 - `features/history/` — `HistoryView.tsx`, `DecisionHistoryRow.tsx` (a decision's row) plus
   `NormaChangesSection.tsx` (see History above).
-- `features/documents/` — `DocumentReviewPage.tsx` only.
+- `features/documents/` — `DocumentReviewPage.tsx` (the page), `DocumentText.tsx`, `CitationList.tsx`,
+  `citationGroups.ts`, `documentFile.ts`; invented sample files for the tests in `__tests__/fixtures.ts`.
 
 ## Gotchas
 

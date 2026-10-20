@@ -1,0 +1,194 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { extractCitations } from '../../../../utils/citationMatcher';
+import { DocumentReviewPage } from '../DocumentReviewPage';
+import { PARERE, testFile } from './fixtures';
+
+const navigateMock = vi.fn();
+const triggerSearchMock = vi.fn();
+vi.mock('react-router-dom', () => ({ useNavigate: () => navigateMock }));
+vi.mock('../../../../store/useAppStore', () => ({
+  useAppStore: (select: (state: { triggerSearch: typeof triggerSearchMock }) => unknown) => select({ triggerSearch: triggerSearchMock }),
+}));
+
+const input = (container: HTMLElement) => container.querySelector<HTMLInputElement>('input[type="file"]')!;
+
+async function choose(container: HTMLElement, text: string, name = 'parere.txt') {
+  await userEvent.upload(input(container), testFile([text], name));
+  return screen.findByRole('heading', { level: 2, name });
+}
+
+/** A line on screen, not its echo in the live region (which a screen reader hears once). */
+const visible = (text: string) => screen.getByText(text, { selector: 'p:not([aria-live])' });
+
+/** The text column's own body: what scrolls, and what the marks sit in. */
+const textBody = () => screen.getByTestId('document-text');
+
+beforeEach(() => {
+  // Framer Motion puts the window's scroll back after measuring a height of `auto`; jsdom has no scrollTo.
+  window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
+  navigateMock.mockReset();
+  triggerSearchMock.mockReset();
+});
+
+describe('DocumentReviewPage — before a document', () => {
+  it('has a title with its phrase and says, to a screen reader too, that nothing leaves the browser', () => {
+    render(<DocumentReviewPage />);
+    expect(screen.getByRole('heading', { level: 1, name: 'Analizza documento' })).toHaveClass('font-serif');
+    expect(screen.getByText('Trova le norme citate in un atto: il file resta nel tuo browser.')).toBeInTheDocument();
+    const badge = screen.getByText(/^Resta nel tuo browser/);
+    expect(badge).toHaveTextContent('Resta nel tuo browser: il documento non viene inviato al server né salvato.');
+  });
+
+  it('opens the file picker from the box, with Enter and Space as with a click', async () => {
+    const { container } = render(<DocumentReviewPage />);
+    const click = vi.spyOn(input(container), 'click');
+    const zone = screen.getByRole('button', { name: /Scegli un documento/ });
+    zone.focus();
+    await userEvent.keyboard('{Enter}');
+    await userEvent.keyboard(' ');
+    expect(click).toHaveBeenCalledTimes(2);
+    expect(zone.className).toMatch(/min-h-48/);
+  });
+
+  it('changes the box while a file is over it, and reads the file let go on it', async () => {
+    render(<DocumentReviewPage />);
+    const zone = screen.getByRole('button', { name: /Scegli un documento/ });
+    const file = testFile([PARERE], 'trascinato.txt');
+    const dataTransfer = { types: ['Files'], files: [file], dropEffect: 'none' };
+
+    fireEvent.dragEnter(zone, { dataTransfer });
+    expect(zone).toHaveTextContent('Lascia qui il documento');
+    expect(zone.className).toMatch(/border-solid/);
+    fireEvent.dragLeave(zone, { dataTransfer });
+    expect(zone).toHaveTextContent('Scegli un documento');
+    expect(zone.className).toMatch(/border-dashed/);
+
+    fireEvent.dragOver(zone, { dataTransfer });
+    fireEvent.drop(zone, { dataTransfer });
+    expect(await screen.findByRole('heading', { level: 2, name: 'trascinato.txt' })).toBeInTheDocument();
+  });
+
+  it('says it is reading while a file takes time', async () => {
+    const { container } = render(<DocumentReviewPage />);
+    const slow = testFile(['art. 2043 c.c.'], 'lungo.txt');
+    let finish: (text: string) => void = () => {};
+    Object.assign(slow, { text: () => new Promise<string>(resolve => { finish = resolve; }) });
+    await userEvent.upload(input(container), slow);
+    expect(screen.getAllByText('Leggo il documento…').length).toBeGreaterThan(0);
+    await act(async () => finish('art. 2043 c.c.'));
+    expect(await screen.findByRole('heading', { level: 2, name: 'lungo.txt' })).toBeInTheDocument();
+    // The box closes upwards and is gone with the line under it.
+    await waitFor(() => expect(screen.queryAllByText('Leggo il documento…')).toHaveLength(0));
+  });
+
+  it('keeps the words of each refusal, under the box', async () => {
+    const { container } = render(<DocumentReviewPage />);
+    await userEvent.upload(input(container), testFile(['%PDF'], 'atto.pdf'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('I PDF scansionati o non testuali richiedono OCR.');
+    await userEvent.upload(input(container), testFile(['   '], 'vuoto.txt'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Il documento non contiene testo leggibile.');
+    expect(screen.getByRole('button', { name: /Scegli un documento/ })).toBeInTheDocument();
+  });
+});
+
+describe('DocumentReviewPage — the result', () => {
+  it('counts the citations and groups them by act', async () => {
+    const { container } = render(<DocumentReviewPage />);
+    await choose(container, PARERE);
+    expect(visible('6 citazioni in 2 atti')).toBeInTheDocument();
+    const list = screen.getByRole('complementary', { name: 'Citazioni' });
+    expect(within(list).getByRole('heading', { level: 3, name: /^Codice civile\s+4 citazioni$/ })).toBeInTheDocument();
+    expect(within(list).getByRole('heading', { level: 3, name: /^l\. 241\/1990\s+2 citazioni$/ })).toBeInTheDocument();
+    expect(within(list).getAllByRole('button', { name: /^Apri / })).toHaveLength(6);
+  });
+
+  it('draws the document as it is: every character, once, in order', async () => {
+    const text = `${PARERE}\n\n\tUn rientro,   spazi doppi e «virgolette».\nart. 5 del regolamento (UE) 2016/679`;
+    const { container } = render(<DocumentReviewPage />);
+    await choose(container, text);
+    expect(textBody().textContent).toBe(text);
+    expect(textBody().querySelectorAll('mark')).toHaveLength(extractCitations(text).length);
+    expect(textBody().className).toMatch(/font-serif/);
+    expect(textBody().className).toMatch(/whitespace-pre-wrap/);
+  });
+
+  it('selects in the list what is touched in the text, and in the text what is touched in the list', async () => {
+    const { container } = render(<DocumentReviewPage />);
+    await choose(container, PARERE);
+    const marks = textBody().querySelectorAll<HTMLElement>('mark');
+    const list = screen.getByRole('complementary', { name: 'Citazioni' });
+
+    await userEvent.click(marks[2]);
+    const row = within(list).getByText('art. 2043').closest('button')!;
+    expect(row).toHaveAttribute('aria-current', 'true');
+    expect(marks[2]).toHaveAttribute('data-selected', 'true');
+
+    await userEvent.click(within(list).getByText('art. 1455').closest('button')!);
+    expect(marks[1]).toHaveAttribute('data-selected', 'true');
+    expect(marks[2]).not.toHaveAttribute('data-selected');
+    expect(row).not.toHaveAttribute('aria-current');
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
+
+  it('opens a citation as it always has: the reader, then the search', async () => {
+    const { container } = render(<DocumentReviewPage />);
+    await choose(container, PARERE);
+    await userEvent.click(screen.getByRole('button', { name: 'Apri art. 3 l. 241/1990' }));
+    expect(navigateMock).toHaveBeenCalledWith('/');
+    expect(triggerSearchMock).toHaveBeenCalledWith({
+      act_type: 'legge', act_number: '241', date: '1990', article: '3', version: 'vigente', version_date: '',
+    });
+  });
+
+  it('says so when it finds nothing, with what it recognises', async () => {
+    const { container } = render(<DocumentReviewPage />);
+    await choose(container, 'Una lettera senza riferimenti a norme.');
+    expect(visible('Nessuna citazione')).toBeInTheDocument();
+    expect(screen.getByText('Non ho trovato citazioni di norme in questo documento.')).toBeInTheDocument();
+    expect(screen.getByText(/Riconosco, per esempio,/)).toHaveTextContent('«art. 2043 c.c.»');
+  });
+
+  it('goes back to the box with «Scegli un altro documento»', async () => {
+    const { container } = render(<DocumentReviewPage />);
+    await choose(container, PARERE);
+    await userEvent.click(screen.getByRole('button', { name: 'Scegli un altro documento' }));
+    const zone = await screen.findByRole('button', { name: /Scegli un documento/ });
+    await waitFor(() => expect(zone).toHaveFocus());
+    await waitFor(() => expect(screen.queryByText('6 citazioni in 2 atti', { selector: 'p:not([aria-live])' })).not.toBeInTheDocument());
+  });
+});
+
+describe('DocumentReviewPage — the worst cases', () => {
+  it('lists 400 citations, the first 8 entering one after the other and none of the rest', async () => {
+    const many = Array.from({ length: 400 }, (_, i) => `Punto ${i + 1}: art. ${i + 1} c.c.`).join('\n');
+    const { container } = render(<DocumentReviewPage />);
+    await choose(container, many, 'lungo.txt');
+    expect(visible('400 citazioni in 1 atto')).toBeInTheDocument();
+    const rows = container.querySelectorAll<HTMLElement>('[data-cite-row]');
+    expect(rows).toHaveLength(400);
+    const cascading = Array.from(rows).filter(row => row.className.includes('motion-safe:animate-in'));
+    expect(cascading).toHaveLength(8);
+    expect(cascading.map(row => row.style.animationDelay)).toEqual(['0ms', '40ms', '80ms', '120ms', '160ms', '200ms', '240ms', '280ms']);
+  });
+
+  it('keeps a document of 300 pages inside its column, which scrolls on its own', async () => {
+    const page = 'Il presente atto richiama l’art. 1218 c.c. e prosegue con un testo di riempimento. '.repeat(30);
+    const long = Array.from({ length: 300 }, (_, i) => `Pagina ${i + 1}\n${page}`).join('\n\n');
+    const { container } = render(<DocumentReviewPage />);
+    await choose(container, long, 'trecento-pagine.txt');
+    expect(textBody().textContent).toBe(long);
+    expect(textBody().parentElement?.className).toMatch(/overflow-y-auto/);
+    expect(textBody().className).toMatch(/\[overflow-wrap:anywhere\]/);
+  });
+
+  it('wraps a very long file name instead of widening the page, and keeps it whole for the pointer', async () => {
+    const name = `${'parere-pro-veritate-sul-recesso-dal-contratto-di-fornitura-'.repeat(6)}definitivo.txt`;
+    const { container } = render(<DocumentReviewPage />);
+    const heading = await choose(container, PARERE, name);
+    expect(heading).toHaveAttribute('title', name);
+    expect(heading.className).toMatch(/\[overflow-wrap:anywhere\]/);
+    expect(heading.className).toMatch(/line-clamp-2/);
+  });
+});
