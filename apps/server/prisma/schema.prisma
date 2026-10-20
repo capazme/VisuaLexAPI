@@ -76,6 +76,7 @@ model User {
   lingoRevisioni        LingoRevisioneSRS[]
   lingoPreferenzeStudio LingoPreferenzeStudio?
   lingoGiornateStudio   LingoGiornataStudio[]
+  lingoCreditiXp        LingoCreditoXp[]
 
   // LingoLex validation: set by an administrator; the votes this user cast (kept,
   // anonymous, when the account goes), the notice versions they wrote (same) and
@@ -269,7 +270,7 @@ model MerltQaJob {
   // rather than age-since-submit. A heavy ReAct deliberation legitimately
   // runs up to ~11min; sweeping on createdAt alone would flip a live,
   // still-progressing query to `timeout` (see jobWatchdog.ts qaStaleAfterMs).
-  updatedAt    DateTime       @updatedAt @map("updated_at")
+  updatedAt    DateTime       @default(now()) @updatedAt @map("updated_at") // the migration gives it a default
   startedAt    DateTime?      @map("started_at")
   completedAt  DateTime?      @map("completed_at")
 
@@ -1264,12 +1265,55 @@ model LingoGiornataStudio {
   sbagliate  Int      @default(0)
   codaFinita Boolean  @default(false) @map("coda_finita")
   valido     Boolean  @default(false)
+  // Validation votes cast that day (Gymnasium XP spec §3.5), written only by the vote route; never decreased.
+  voti       Int      @default(0)
   updatedAt  DateTime @updatedAt @map("updated_at")
 
   utente User @relation(fields: [utenteId], references: [id], onDelete: Cascade)
 
   @@id([utenteId, giorno])
   @@map("lingo_giornate_studio")
+}
+
+// Gymnasium's experience points (spec 2026-10-20-gymnasium-xp-levels §5.2): one row per mission credited per
+// period, append-only (only an account deletion's cascade removes rows). `punti` is the value at the time.
+// The CHECKs on `punti`, on the shape of `periodo` and on the event's id are in the migration, not here.
+enum LingoMissione {
+  DOVUTE
+  NUOVE
+  OBIETTIVO
+  MATERIA_FERMA
+  SCRIVI
+  CONVALIDA
+  SETTIMANA
+  CONSOLIDA
+}
+
+enum LingoFonteXp {
+  REVISIONE
+  PROPOSTA
+  VOTO
+  LETTURA
+}
+
+model LingoCreditoXp {
+  id        String        @id @default(uuid())
+  utenteId  String        @map("utente_id")
+  missione  LingoMissione
+  periodo   String        // G:YYYY-MM-DD (a day), S:YYYY-MM-DD (the Monday of a week), U (once)
+  giorno    DateTime      @db.Date
+  punti     Int
+  fonte     LingoFonteXp
+  fonteId   String?       @map("fonte_id") // the review log row, the card, the vote; no foreign key
+  materia   LingoMateria?
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  utente User @relation(fields: [utenteId], references: [id], onDelete: Cascade)
+
+  @@unique([utenteId, missione, periodo])
+  @@unique([missione, fonteId])
+  @@index([utenteId, giorno])
+  @@map("lingo_crediti_xp")
 }
 
 // The thresholds of the community's validation (Studia, spec 2026-10-18). One row per key; the
