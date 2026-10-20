@@ -204,7 +204,10 @@ describe('CaseLawSection — «Cerca sentenze sul tema dell’articolo»', () =>
   });
 
   it('is not offered for a generic rubric, which alone would find every act\'s decisions', async () => {
-    for (const topic of ['Definizioni', 'OGGETTO.', ' Ambito di applicazione ', 'Entrata in vigore', 'Abrogazioni', 'Finalita']) {
+    for (const topic of [
+      'Definizioni', 'OGGETTO.', ' Ambito di applicazione ', 'Entrata in vigore', 'Abrogazioni', 'Finalita',
+      'Oggetto e ambito di applicazione', 'Finalità e oggetto', 'Definizioni e ambito di applicazione.', 'Abrogazione',
+    ]) {
       const view = show({ topic });
       await userEvent.click(toggle());
       expect(topicLink(), topic).toBeNull();

@@ -10,6 +10,10 @@ export const GENERIC_RUBRICS: readonly string[] = [
   'Entrata in vigore',
   'Abrogazioni',
   'Finalità',
+  'Oggetto e ambito di applicazione',
+  'Finalità e oggetto',
+  'Definizioni e ambito di applicazione',
+  'Abrogazione',
 ];
 
 /** A rubric as the list compares it: no accents, lower case, spaces collapsed and trimmed, no final period. */

@@ -378,7 +378,8 @@ only when the reader presses the button (`DecisionResultList`; not offered on an
 article's rubric (`topic`, `getRubricText`; no rubric, no link; not on an act of the Union, nor when the
 «rubric» is a notice the source wrote in its place, `isNotice`, or the text is repealed or not yet in force, nor
 for a generic rubric — `GENERIC_RUBRICS` in `caseLaw/genericRubrics.ts`, «Definizioni», «Oggetto», «Ambito di
-applicazione», «Entrata in vigore», «Abrogazioni», «Finalità», compared ignoring case, accents, spaces and a final
+applicazione», «Entrata in vigore», «Abrogazioni», «Finalità», «Oggetto e ambito di applicazione», «Finalità e
+oggetto», «Definizioni e ambito di applicazione», «Abrogazione», compared ignoring case, accents, spaces and a final
 period by `isGenericRubric`: alone they would find every act's decisions),
 which records the way back (`backEntry`, as a decision's link does) and opens beside the article — the
 decisions on its subject, whether or not they cite it. It took the place of the
