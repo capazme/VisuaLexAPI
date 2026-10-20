@@ -209,7 +209,8 @@ async function evaluate(id: MissionId, facts: Facts, today: string, event: XpEve
     case 'convalida': {
       const { voti } = await facts.day();
       const vuota = voti < VOTES_TARGET && !(await facts.votable());
-      return { fulfilled: voti >= VOTES_TARGET, vuota, progresso: progress(voti, VOTES_TARGET) };
+      // A «vuota» with no vote cast has nothing to count, so no progress (spec §5.3); one vote still shows «1 of 2».
+      return { fulfilled: voti >= VOTES_TARGET, vuota, ...(vuota && voti === 0 ? {} : { progresso: progress(voti, VOTES_TARGET) }) };
     }
     case 'settimana': {
       const { valido } = await facts.day();

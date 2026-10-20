@@ -390,7 +390,8 @@ read before rewriting it; nothing else writes it. Only «dovute» reads it; the 
 - `stato`: `fatta` (credited for the period), `aperta`, `vuota` (nothing to do in this period) or
   `in-arrivo` (announced, not yet recorded) — G1b's `MissionStatus`.
 - `progresso: { fatte, di }` maps to the web's `progress: { done, of }`; absent for `scrivi`, `in-arrivo`
-  and a `vuota` with nothing to count.
+  and a `vuota` with nothing to count: «convalida» with no vote cast and nothing to vote on has none, with one vote
+  cast it stays `vuota` with «1 of 2».
 - `motivo` (only on `nuove`, when not `fatta`): `quota` (§5.1).
 - `materia` (only on `materia-ferma`): the subject the mission is about.
 - `missioni`, `livello` and `crediti` are never narrowed by `materia`, like `oggi.raggiunto` and `serie`.

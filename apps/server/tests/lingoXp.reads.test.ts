@@ -43,13 +43,19 @@ describe('the progress read', () => {
     ]);
   });
 
-  it('lists «convalida» to a validator only, «vuota» with nothing to vote on', async () => {
+  it('lists «convalida» to a validator only, «vuota» with nothing to vote on, its progress only with a vote to count', async () => {
     const carol = await makeValidator('xp_reads_carol');
-    expect(mission((await progress(session(carol, 'c'))).body, 'convalida')).toEqual({
-      id: 'convalida', gruppo: 'giornaliera', principale: false, punti: 20, stato: 'vuota', progresso: { fatte: 0, di: 2 },
+    const c = session(carol, 'c');
+    // A «vuota» with nothing to count carries no progress (spec §5.3).
+    expect(mission((await progress(c)).body, 'convalida')).toEqual({
+      id: 'convalida', gruppo: 'giornaliera', principale: false, punti: 20, stato: 'vuota',
     });
-    await card(alice, 'DIRITTO_CIVILE', 'PROPOSTA_COMMUNITY');
-    expect(mission((await progress(session(carol, 'c'))).body, 'convalida')).toMatchObject({ stato: 'aperta' });
+    const first = await card(alice, 'DIRITTO_CIVILE', 'PROPOSTA_COMMUNITY');
+    expect(mission((await progress(c)).body, 'convalida')).toEqual({
+      id: 'convalida', gruppo: 'giornaliera', principale: false, punti: 20, stato: 'aperta', progresso: { fatte: 0, di: 2 },
+    });
+    await vote(c, first.id);
+    expect(mission((await progress(c)).body, 'convalida')).toMatchObject({ stato: 'vuota', progresso: { fatte: 1, di: 2 } });
     expect(mission((await progress(a)).body, 'convalida')).toBeUndefined();
   });
 
