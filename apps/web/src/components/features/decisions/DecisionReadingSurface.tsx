@@ -236,7 +236,6 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
       date: citation.date || '',
       article: citation.article,
       version: 'vigente',
-      show_brocardi_info: true,
       ...(hostTabId ? { besideId: hostTabId } : {}),
     });
   }, [triggerSearch, hostTabId]);

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
 const login = vi.fn().mockResolvedValue(undefined);
@@ -54,5 +54,11 @@ describe('LoginForm', () => {
     render(<MemoryRouter><LoginForm /></MemoryRouter>);
     expect(screen.getByText('Normattiva · EUR-Lex')).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent(/brocardi/i);
+  });
+
+  it('links the credits from its foot, readable before signing in', () => {
+    render(<MemoryRouter><LoginForm /></MemoryRouter>);
+    const link = within(screen.getByRole('contentinfo')).getByRole('link', { name: 'Crediti' });
+    expect(link).toHaveAttribute('href', '/crediti');
   });
 });

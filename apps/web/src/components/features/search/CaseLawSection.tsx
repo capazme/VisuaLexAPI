@@ -1,38 +1,31 @@
 import { useCallback, useId, useMemo, useState } from 'react';
-import { ChevronDown, SlidersHorizontal } from 'lucide-react';
-import type { MassimaStructured, NormaVisitata } from '../../../types';
+import { ChevronDown, Search, SlidersHorizontal } from 'lucide-react';
+import type { NormaVisitata } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
-import { DOCTRINE_ATTRIBUTION, DOCTRINE_SOURCE_NAME } from '../../../utils/doctrineLabel';
-import { httpsUrl } from '../../../utils/decisionLinks';
 import { citeNorm } from '../../../utils/sources';
 import { isEuropeanAct } from '../../../utils/versionDisplay';
 import { searchNorma } from '../../../utils/decisionSearchNorma';
 import type { ReadingBackEntry } from '../../../utils/readingBackStack';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
+import { useAppStore } from '../../../store/useAppStore';
 import { PluginSlot } from '../../../plugins/PluginSlot';
 import { getSlotComponents } from '../../../plugins/registry';
 import { DecisionResultList } from '../decisions/DecisionResultList';
 import { EuCaseLawBlock } from '../decisions/EuCaseLawBlock';
-import { MassimeSection } from './MassimeSection';
-import type { MassimeState } from './massimeState';
 import { CaseLawControls } from './caseLaw/CaseLawControls';
 import { CaseLawFiltersContext } from './caseLaw/caseLawFiltersContext';
 import { narrowingCount, NO_FILTERS, type CaseLawFilters } from './caseLaw/caseLawFilter';
 import { mergeYearCounts, type YearCount } from './caseLaw/caseLawYears';
+import { isGenericRubric } from './caseLaw/genericRubrics';
 
 interface CaseLawSectionProps {
   norma: NormaVisitata;
-  /** Brocardi's massime; `null` when the source gave none. */
-  massime: (string | MassimaStructured)[] | null;
   /**
-   * What Brocardi did: `answered` (its massime, or a line saying it has none), `failed` (a line
-   * saying it did not answer: a failure is never shown as an absence), `hidden` (a past text, gotcha 32,
-   * or Brocardi was not asked): no subsection.
+   * The article's subject, its rubric: «Cerca sentenze sul tema dell'articolo» opens a topic search of
+   * the Cassazione with it. No rubric, or a generic one (`GENERIC_RUBRICS`), no link.
    */
-  massimeState?: MassimeState;
-  /** The article's page on Brocardi, credited beside the massime. */
-  brocardiLink?: string | null;
+  topic?: string | null;
   articleUrn?: string;
   /** The place the article is read in (a practice or one of its windows): a decision opens beside it. */
   tabId?: string;
@@ -63,9 +56,10 @@ function writeOpen(tabId: string | undefined, open: boolean): void {
 }
 
 /**
- * «Giurisprudenza» under the article text: Brocardi's massime (their decisions as links), the
- * Massimario's reviews (a plugin panel in the `article_case_law` slot) and, on request, the
- * decisions of the Cassazione that mention the article. Closed by default; its state is kept
+ * «Giurisprudenza» under the article text: the Massimario's reviews (a plugin panel in the
+ * `article_case_law` slot), on request the decisions of the Cassazione that mention the article, and
+ * a topic search of the Cassazione by the article's rubric (it took the place of the Brocardi
+ * glossary's «Sentenze su questo tema», D-078). Closed by default; its state is kept
  * per host for the session. An act of the Union gets the Court of Justice's block (`EuCaseLawBlock`, loaded
  * when the section opens) in place of the Cassazione's. One set of controls at its head (the years, the text) narrows every block. Nothing is asked of the Cassazione's archive until the button is pressed,
  * and an act of the Union is not offered the archive at all (its search cannot read an EU act;
@@ -75,11 +69,13 @@ function writeOpen(tabId: string | undefined, open: boolean): void {
  * can search both archives only from a request sent without one (Task 15), so each opening of
  * the section starts from the route's own choice.
  */
-export function CaseLawSection({ norma, massime, massimeState = 'answered', brocardiLink, articleUrn, tabId, backEntry, isHistorical = false }: CaseLawSectionProps) {
+export function CaseLawSection({ norma, topic, articleUrn, tabId, backEntry, isHistorical = false }: CaseLawSectionProps) {
   const panelId = useId();
   const [open, setOpen] = useState(() => readOpen(tabId));
   const [searched, setSearched] = useState(false);
   const desktop = useIsDesktop();
+  const openTopicSearch = useAppStore((s) => s.openTopicSearch);
+  const pushReadingBack = useAppStore((s) => s.pushReadingBack);
   const [filters, setFilters] = useState<CaseLawFilters>(NO_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
   // the years of the rows each block has loaded, for the chips
@@ -113,8 +109,8 @@ export function CaseLawSection({ norma, massime, massimeState = 'answered', broc
     writeOpen(tabId, next);
   };
 
-  const hasMassime = Boolean(massime && massime.length > 0);
-  const sourceLink = httpsUrl(brocardiLink);
+  // A generic rubric («Definizioni», «Oggetto»…) alone would find every act's decisions: no link for it.
+  const tema = topic?.trim() && !isGenericRubric(topic) ? topic.trim() : undefined;
   const hasMassimario = getSlotComponents('article_case_law').length > 0;
   const offersCassazione = !isEuropeanAct(norma.tipo_atto);
 
@@ -163,28 +159,6 @@ export function CaseLawSection({ norma, massime, massimeState = 'answered', broc
               </div>
             </div>
 
-            {massimeState !== 'hidden' && (
-              <section aria-labelledby={`${panelId}-massime`} className="space-y-2">
-                <h4 id={`${panelId}-massime`} className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                  Massime (Brocardi)
-                </h4>
-                {massimeState === 'answered' && <p className="text-[11px] text-slate-400">
-                  {sourceLink ? (
-                    <a href={sourceLink} target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600 dark:hover:text-slate-200">
-                      {DOCTRINE_ATTRIBUTION}
-                    </a>
-                  ) : DOCTRINE_ATTRIBUTION}
-                </p>}
-                {massimeState === 'failed' ? (
-                  <p className="text-sm text-slate-500 dark:text-slate-400">{`${DOCTRINE_SOURCE_NAME} non ha risposto: le massime non sono disponibili ora.`}</p>
-                ) : hasMassime ? (
-                  <MassimeSection massime={massime} besideId={tabId} backEntry={backEntry} />
-                ) : (
-                  <p className="text-sm text-slate-500 dark:text-slate-400">{`${DOCTRINE_SOURCE_NAME} non riporta massime per questo articolo.`}</p>
-                )}
-              </section>
-            )}
-
             {/* The Massimario's panel is its own heading ("Nelle rassegne della Cassazione", with the
                 count) and renders nothing when there are no reviews, so no wrapper of ours names it. */}
             {hasMassimario && (
@@ -219,6 +193,29 @@ export function CaseLawSection({ norma, massime, massimeState = 'answered', broc
                 </button>
               )}
             </section>}
+
+            {/* The decisions on the article's subject, whether or not they cite it: a topic window beside.
+                The Cassazione's archive only, so not for an act of the Union. */}
+            {offersCassazione && tema && (
+              <button
+                type="button"
+                onClick={() => {
+                  // the way back to the article first, as a decision's link records it (on a phone the
+                  // topic search takes the full-screen reader's place)
+                  if (backEntry) pushReadingBack(backEntry);
+                  openTopicSearch({ tema }, `Tema: ${tema}`, tabId ? { besideId: tabId } : undefined);
+                }}
+                className="group -mx-1 flex min-h-[44px] items-start gap-2 rounded-lg px-1 py-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              >
+                <Search size={14} aria-hidden="true" className="mt-1 shrink-0 text-primary-700 dark:text-primary-300" />
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium text-primary-700 underline-offset-4 group-hover:underline dark:text-primary-300">
+                    Cerca sentenze sul tema dell’articolo
+                  </span>
+                  <span className="block break-words text-xs text-slate-600 dark:text-slate-400">«{tema}»</span>
+                </span>
+              </button>
+            )}
 
             {/* An act of the Union has no Cassazione block; its case law is the Union's courts' */}
             {!offersCassazione && (

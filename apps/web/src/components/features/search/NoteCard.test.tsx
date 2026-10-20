@@ -18,6 +18,17 @@ describe('NoteCard', () => {
     expect(props.onStartEdit).toHaveBeenCalled();
   });
 
+  it('says a note on a section no longer shown is not on the article\'s text (D-078)', () => {
+    render(<NoteCard {...base({ note: { ...base().note, articleId: '1/brocardi/ratio', anchorText: 'la ratio della norma' } })} />);
+    expect(screen.getByText('Sezione non più disponibile · Ratio')).toBeInTheDocument();
+    expect(screen.getByText(/la ratio della norma/)).toBeInTheDocument();
+  });
+
+  it('labels nothing on a note on the article\'s own text', () => {
+    render(<NoteCard {...base()} />);
+    expect(screen.queryByText(/Sezione non più disponibile/)).toBeNull();
+  });
+
   it('saves with Cmd+Enter and cancels with Escape', () => {
     const props = base({ isEditing: true, editingText: 'nuovo' });
     render(<NoteCard {...props} />);

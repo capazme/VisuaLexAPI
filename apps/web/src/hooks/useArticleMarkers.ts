@@ -10,8 +10,7 @@ interface UseArticleMarkersInput {
   annotations: Annotation[];
   /**
    * The parsed structure of `rawText` (`parseArticleStructure`, memoised by
-   * the caller). Omitted or null renders flat — the Brocardi sections, which
-   * have no commi to divide.
+   * the caller). Omitted or null renders flat, with no commi to divide.
    */
   structure?: ArticleStructure | null;
   /** The annotation signs of the practice's row and the dossier reader; see RenderArticleInput. */

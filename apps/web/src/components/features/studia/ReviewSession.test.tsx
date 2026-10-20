@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
 vi.mock('../../../services/studiaService', () => ({
-  studiaService: { session: vi.fn(), review: vi.fn(), progress: vi.fn() },
+  studiaService: { session: vi.fn(), review: vi.fn(), progress: vi.fn(), percorso: vi.fn() },
 }));
 
 // The reader is tested with the dossier; here it is a stand-in that shows which article it was given.
@@ -22,11 +22,13 @@ import { appStore } from '../../../store/useAppStore';
 import { Z_INDEX } from '../../../constants/zIndex';
 import type { Progressi, SchedaDiRipasso } from '../../../types/studia';
 import { SESSION_NOTICE_MS } from './progress/Celebration';
+import { GRADE_NOTE_MS } from './useGradeNote';
 import { ReviewSession } from './ReviewSession';
 
 const session = vi.mocked(studiaService.session);
 const review = vi.mocked(studiaService.review);
 const progress = vi.mocked(studiaService.progress);
+const percorso = vi.mocked(studiaService.percorso);
 
 const CELEBRATED_KEY = 'visualex.studia.festeggiato';
 
@@ -86,6 +88,8 @@ beforeEach(() => {
   review.mockResolvedValue({ registrata: true, prossimoRipasso: '2026-10-12', scheduledDays: 1 });
   progress.mockReset();
   progress.mockResolvedValue(progressAnswer(3, false, 2));
+  percorso.mockReset();
+  percorso.mockResolvedValue([]);
   localStorage.removeItem(CELEBRATED_KEY);
   appStore.setState({ searchTrigger: null });
 });
@@ -97,6 +101,19 @@ describe('the review session', () => {
     renderSession([card('a')], '/studia/ripasso/sessione?materia=DIRITTO_PENALE');
     await screen.findByText('Domanda a?');
     expect(session).toHaveBeenCalledWith('DIRITTO_PENALE');
+  });
+
+  it('asks for the session of one institute of the subject, spelt as the road gave it (G5)', async () => {
+    const istituto = 'Risoluzione per inadempimento (art. 1453 c.c.) & 50% «diffida»';
+    renderSession([card('a')], `/studia/ripasso/sessione?${new URLSearchParams({ materia: 'DIRITTO_CIVILE', istituto })}`);
+    await screen.findByText('Domanda a?');
+    expect(session).toHaveBeenCalledWith('DIRITTO_CIVILE', istituto);
+  });
+
+  it('ignores an institute without its subject, which the server would refuse', async () => {
+    renderSession([card('a')], '/studia/ripasso/sessione?istituto=Mora');
+    await screen.findByText('Domanda a?');
+    expect(session).toHaveBeenCalledWith(undefined);
   });
 
   it('ignores a subject it does not know', async () => {
@@ -146,15 +163,22 @@ describe('the review session', () => {
     expect(within(hard).getByText('Difficile')).toHaveClass('text-xs');
     expect(buttons[0]).toHaveClass('bg-amber-50');
     expect(buttons[1]).not.toHaveClass('bg-amber-50');
-    buttons.forEach((b) => expect(b).toHaveClass('min-h-[44px]'));
+    // Over the 44 px floor: the grades are the lesson's targets, pressed a hundred times a session.
+    buttons.forEach((b) => expect(b).toHaveClass('min-h-[56px]'));
   });
 
-  it('pins the bar to the bottom on a phone and puts it in the flow from md up', async () => {
+  it('holds the one action in the bar at the foot on every width, over the phone\'s safe edge (Gymnasium spec §5.4)', async () => {
     renderSession([card('a')]);
     const reveal = await screen.findByRole('button', { name: /Mostra risposta/ });
-    expect(reveal.parentElement).toHaveClass('fixed', 'inset-x-0', 'bottom-0', 'md:static', Z_INDEX.pinnedBar);
-    expect(reveal).toHaveClass('min-h-[44px]');
+    const bar = screen.getByTestId('lesson-bar');
+    expect(bar).toContainElement(reveal);
+    // The last of the lesson's rows, in the flow of its frame: never fixed, never put back in the page from md up.
+    expect(bar).toHaveClass('shrink-0', 'pb-[max(0.75rem,env(safe-area-inset-bottom))]', Z_INDEX.pinnedBar);
+    expect(bar.className).not.toMatch(/\bfixed\b|md:static/);
+    expect(reveal).toHaveClass('min-h-[48px]');
     expect(within(reveal).getByText('Spazio')).toBeInTheDocument();
+    await show();
+    expect(bar).toContainElement(screen.getByRole('group', { name: 'Come è andata?' }));
   });
 
   describe('the reveal motion', () => {
@@ -425,7 +449,7 @@ describe('the review session', () => {
       await gradeAll([1, 3, 3, 3]);
       expect(await screen.findByText('Hai ripassato 3 schede, 1 da rifare. Le prossime: domani.')).toBeInTheDocument();
       expect(review).toHaveBeenCalledTimes(3);
-      await userEvent.setup().click(screen.getByRole('button', { name: 'Torna al ripasso' }));
+      await userEvent.setup().click(screen.getByRole('button', { name: 'Torna a Oggi' }));
       expect(await screen.findByText('Landing')).toBeInTheDocument();
     });
 
@@ -526,4 +550,373 @@ describe('the goal of the day in the session (Studia progress spec §6.4)', () =
     expect(await screen.findByText('Obiettivo di oggi raggiunto · serie di 3 giorni')).toBeInTheDocument();
     expect(screen.queryByText('Serie di 3 giorni')).not.toBeInTheDocument();
   });
+});
+
+describe('the lesson (Gymnasium spec §5.4)', () => {
+  const bar = () => screen.getByRole('progressbar', { name: 'Avanzamento del ripasso' });
+
+  describe('the progress bar', () => {
+    it('fills as cards leave the queue, done of done and remaining, and holds still on «Di nuovo»', async () => {
+      const user = userEvent.setup();
+      renderSession([card('a'), card('b'), card('c'), card('d')]);
+      await screen.findByText('Domanda a?');
+      expect(bar()).toHaveAttribute('aria-valuenow', '0');
+      expect(bar()).toHaveAttribute('aria-valuemax', '4');
+      expect(screen.getByTestId('lesson-progress-fill')).toHaveStyle({ width: '0%' });
+
+      await show();
+      await user.click(screen.getByRole('button', { name: /Bene/ }));
+      await screen.findByText('Domanda b?');
+      expect(bar()).toHaveAttribute('aria-valuenow', '1');
+      expect(bar()).toHaveAttribute('aria-valuetext', '1 di 4 schede');
+      expect(screen.getByTestId('lesson-progress-fill')).toHaveStyle({ width: '25%' });
+
+      // «b» goes to the back: nothing left the queue.
+      await show();
+      await user.click(screen.getByRole('button', { name: /Di nuovo/ }));
+      await screen.findByText('Domanda c?');
+      expect(bar()).toHaveAttribute('aria-valuenow', '1');
+      expect(screen.getByText('Restano 3')).toHaveClass('sr-only');
+    });
+
+    it('eases under motion-safe only, so under reduced motion it jumps', async () => {
+      renderSession([card('a')]);
+      await screen.findByText('Domanda a?');
+      const fill = screen.getByTestId('lesson-progress-fill');
+      expect(fill).toHaveClass('motion-safe:transition-[width]');
+      expect([...fill.classList].filter((c) => /^(transition|duration|ease|animate)/.test(c))).toEqual([]);
+    });
+
+    it('is full at the end, and an empty track before the queue is read', async () => {
+      session.mockReturnValueOnce(new Promise(() => {}));
+      const { unmount } = render(
+        <MemoryRouter initialEntries={['/studia/ripasso/sessione']}>
+          <Routes><Route path="/studia/ripasso/sessione" element={<ReviewSession />} /></Routes>
+        </MemoryRouter>,
+      );
+      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+      expect(screen.getByTestId('lesson-progress-fill')).toHaveStyle({ width: '0%' });
+      unmount();
+
+      renderSession([card('a')]);
+      await show();
+      await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
+      await screen.findByText(/Hai ripassato 1 scheda/);
+      expect(bar()).toHaveAttribute('aria-valuenow', '1');
+      expect(screen.getByTestId('lesson-progress-fill')).toHaveStyle({ width: '100%' });
+    });
+  });
+
+  describe('the note after a grade', () => {
+    it('says when the card comes back, from the interval the button showed, for about a second, without taking focus', async () => {
+      renderSession([card('a'), card('b')]);
+      await show();
+      await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
+      const question = await screen.findByRole('heading', { name: 'Domanda b?' });
+      expect(screen.getByTestId('grade-note')).toHaveTextContent('Torna tra 8 giorni');
+      expect(screen.getByTestId('grade-note')).toHaveClass('motion-safe:animate-vlx-note');
+      expect(screen.getByTestId('lesson-bar')).toContainElement(screen.getByTestId('grade-note'));
+      expect(document.activeElement).toBe(question);
+      await waitFor(() => expect(screen.queryByTestId('grade-note')).not.toBeInTheDocument(), { timeout: GRADE_NOTE_MS + 1000 });
+    });
+
+    it('reads the grade given with a key as well', async () => {
+      renderSession([card('a'), card('b')]);
+      await screen.findByText('Domanda a?');
+      fireEvent.keyDown(document.body, { key: ' ' });
+      await screen.findByText('Risposta a.');
+      fireEvent.keyDown(document.body, { key: '2' });
+      await screen.findByText('Domanda b?');
+      expect(screen.getByTestId('grade-note')).toHaveTextContent('Torna tra 3 giorni');
+    });
+
+    it('says «Torna in coda» for «Di nuovo», and nothing once the lesson is over', async () => {
+      const user = userEvent.setup();
+      renderSession([card('a'), card('b')]);
+      await show();
+      await user.click(screen.getByRole('button', { name: /Di nuovo/ }));
+      await screen.findByText('Domanda b?');
+      expect(screen.getByTestId('grade-note')).toHaveTextContent('Torna in coda');
+      await show();
+      await user.click(screen.getByRole('button', { name: /Facile/ }));
+      await screen.findByText('Domanda a?');
+      expect(screen.getByTestId('grade-note')).toHaveTextContent('Torna tra 21 giorni');
+      await show();
+      await user.click(screen.getByRole('button', { name: 'Bene' }));
+      await screen.findByText(/Hai ripassato 2 schede/);
+      expect(screen.queryByTestId('grade-note')).not.toBeInTheDocument();
+    });
+
+    it('says «Fatta per oggi» on the practice pass that takes the card out, promising no interval', async () => {
+      const user = userEvent.setup();
+      renderSession([card('a'), card('b')]);
+      await show();
+      await user.click(screen.getByRole('button', { name: /Di nuovo/ }));
+      await show();
+      await user.click(screen.getByRole('button', { name: /Di nuovo/ }));
+      // «a» again, for practice: «Bene» takes it out, and nothing is recorded.
+      await screen.findByText('Domanda a?');
+      await show();
+      await user.click(screen.getByRole('button', { name: 'Bene' }));
+      await screen.findByText('Domanda b?');
+      expect(screen.getByTestId('grade-note')).toHaveTextContent('Fatta per oggi');
+      expect(review).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps the first grade when a second key is pressed while it travels', async () => {
+      let finish: (value: Awaited<ReturnType<typeof studiaService.review>>) => void = () => {};
+      review.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+      renderSession([card('a'), card('b')]);
+      await screen.findByText('Domanda a?');
+      fireEvent.keyDown(document.body, { key: ' ' });
+      await screen.findByText('Risposta a.');
+      fireEvent.keyDown(document.body, { key: '4' });
+      fireEvent.keyDown(document.body, { key: '2' });
+      finish({ registrata: true, prossimoRipasso: '2026-11-09', scheduledDays: 21 });
+      await screen.findByText('Domanda b?');
+      expect(review).toHaveBeenCalledTimes(1);
+      expect(review).toHaveBeenCalledWith(expect.objectContaining({ rating: 4 }));
+      expect(screen.getByTestId('grade-note')).toHaveTextContent('Torna tra 21 giorni');
+    });
+
+    it('takes the grade that went through after one that failed', async () => {
+      review.mockRejectedValueOnce(new Error('down'));
+      const user = userEvent.setup();
+      renderSession([card('a'), card('b')]);
+      await show();
+      await user.click(screen.getByRole('button', { name: /Facile/ }));
+      expect(await screen.findByRole('alert')).toHaveTextContent('Non registrato: riprova');
+      expect(screen.queryByTestId('grade-note')).not.toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: /Difficile/ }));
+      await screen.findByText('Domanda b?');
+      expect(screen.getByTestId('grade-note')).toHaveTextContent('Torna tra 3 giorni');
+    });
+
+    it('says nothing for a card that left the review', async () => {
+      review.mockRejectedValueOnce(Object.assign(new Error('gone'), { status: 404 }));
+      renderSession([card('a'), card('b')]);
+      await show();
+      await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
+      await screen.findByText('Domanda b?');
+      expect(screen.queryByTestId('grade-note')).not.toBeInTheDocument();
+    });
+
+    it('ignores a key typed into a field', async () => {
+      renderSession([card('a'), card('b')]);
+      await show();
+      const field = document.createElement('input');
+      document.body.appendChild(field);
+      fireEvent.keyDown(field, { key: '4' });
+      field.remove();
+      await userEvent.setup().click(screen.getByRole('button', { name: /Difficile/ }));
+      await screen.findByText('Domanda b?');
+      expect(screen.getByTestId('grade-note')).toHaveTextContent('Torna tra 3 giorni');
+    });
+
+    it('never carries the last note of a lesson into the next one', async () => {
+      progress.mockResolvedValue({ ...progressAnswer(3, false, 2), oggi: { ...progressAnswer(3, false, 2).oggi, dovute: 4 } });
+      const user = userEvent.setup();
+      renderSession([card('a')]);
+      await show();
+      await user.click(screen.getByRole('button', { name: /Bene/ }));
+      session.mockResolvedValue({ conteggi: { dovute: 1, nuove: 0 }, cards: [card('e')] });
+      await user.click(await screen.findByRole('button', { name: 'Continua' }));
+      await screen.findByText('Domanda e?');
+      expect(screen.queryByTestId('grade-note')).not.toBeInTheDocument();
+    });
+
+    it('frees itself when a key never reaches the session, and the next grade says its own interval', async () => {
+      renderSession([card('a'), card('b')]);
+      await show();
+      // A handler in the page stops the key before the document hears it.
+      const stop = (event: KeyboardEvent) => event.stopPropagation();
+      document.body.addEventListener('keydown', stop);
+      fireEvent.keyDown(document.body, { key: '4' });
+      document.body.removeEventListener('keydown', stop);
+      expect(review).not.toHaveBeenCalled();
+      await userEvent.setup().click(screen.getByRole('button', { name: /Difficile/ }));
+      await screen.findByText('Domanda b?');
+      expect(screen.getByTestId('grade-note')).toHaveTextContent('Torna tra 3 giorni');
+    });
+  });
+
+  it('starts each card at the top of a scroll of its own', async () => {
+    renderSession([card('a'), card('b')]);
+    const before = (await screen.findByRole('heading', { name: 'Domanda a?' })).closest('.overflow-y-auto');
+    await show();
+    await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
+    const after = (await screen.findByRole('heading', { name: 'Domanda b?' })).closest('.overflow-y-auto');
+    expect(after).not.toBeNull();
+    expect(after).not.toBe(before);
+  });
+
+  describe('closing', () => {
+    it('names the button «Interrompi» while a card is on screen, and asks', async () => {
+      renderSession([card('a')]);
+      await screen.findByText('Domanda a?');
+      await userEvent.setup().click(screen.getByRole('button', { name: 'Interrompi' }));
+      expect(await screen.findByRole('alertdialog', { name: 'Interrompere il ripasso?' })).toBeInTheDocument();
+    });
+
+    it('goes back to Oggi at once from the end, by the button or Esc: there is nothing to interrupt', async () => {
+      renderSession([]);
+      await screen.findByText('Nessuna scheda da ripassare per ora.');
+      await userEvent.setup().click(screen.getByRole('button', { name: 'Chiudi' }));
+      expect(await screen.findByText('Landing')).toBeInTheDocument();
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    });
+
+    it('leaves on Esc from the end', async () => {
+      renderSession([]);
+      await screen.findByText('Nessuna scheda da ripassare per ora.');
+      fireEvent.keyDown(document.body, { key: 'Escape' });
+      expect(await screen.findByText('Landing')).toBeInTheDocument();
+    });
+
+    it('can be closed while the cards cannot be read', async () => {
+      session.mockRejectedValueOnce(new Error('down'));
+      render(
+        <MemoryRouter initialEntries={['/studia/ripasso/sessione']}>
+          <Routes>
+            <Route path="/studia/ripasso" element={<p>Landing</p>} />
+            <Route path="/studia/ripasso/sessione" element={<ReviewSession />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+      await screen.findByRole('alert');
+      await userEvent.setup().click(screen.getByRole('button', { name: 'Chiudi' }));
+      expect(await screen.findByText('Landing')).toBeInTheDocument();
+    });
+  });
+
+  describe('the end', () => {
+    it('offers «Torna a Oggi» alone, as the primary action, when nothing is left today', async () => {
+      renderSession([card('a')]);
+      await show();
+      await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
+      const sentence = await screen.findByText('Hai ripassato 1 scheda, nessuna da rifare. Le prossime: domani.');
+      await screen.findByRole('img', { name: /Obiettivo di oggi/ });
+      expect(screen.queryByRole('button', { name: 'Continua' })).not.toBeInTheDocument();
+      expect(screen.getByTestId('lesson-bar')).toContainElement(screen.getByRole('button', { name: 'Torna a Oggi' }));
+      // Focus goes to how it went.
+      expect(document.activeElement).toBe(sentence);
+    });
+
+    it('offers «Continua» when the day still has cards, and reads the session again', async () => {
+      progress.mockResolvedValue({ ...progressAnswer(3, false, 2), oggi: { ...progressAnswer(3, false, 2).oggi, dovute: 4 } });
+      renderSession([card('a')]);
+      await show();
+      await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
+      const more = await screen.findByRole('button', { name: 'Continua' });
+      session.mockResolvedValue({ conteggi: { dovute: 1, nuove: 0 }, cards: [card('e')] });
+      await userEvent.setup().click(more);
+      expect(await screen.findByText('Domanda e?')).toBeInTheDocument();
+      expect(session).toHaveBeenCalledTimes(2);
+      // A new lesson: its bar starts again.
+      expect(bar()).toHaveAttribute('aria-valuenow', '0');
+      expect(bar()).toHaveAttribute('aria-valuemax', '1');
+    });
+
+    it('counts what is left in the institute of a session narrowed to one, not in its whole subject (G5)', async () => {
+      const path = `/studia/ripasso/sessione?${new URLSearchParams({ materia: 'DIRITTO_CIVILE', istituto: 'Mora' })}`;
+      // The subject still has cards, in another institute; «Mora» has none.
+      progress.mockResolvedValue({ ...progressAnswer(3, false, 2), oggi: { ...progressAnswer(3, false, 2).oggi, dovute: 6, nuove: 2 } });
+      percorso.mockResolvedValue([
+        { materia: 'DIRITTO_CIVILE', istituto: 'Mora', nuove: 0, apprendimento: 1, consolidate: 0, dovute: 0 },
+        { materia: 'DIRITTO_CIVILE', istituto: 'Risoluzione per inadempimento', nuove: 2, apprendimento: 6, consolidate: 0, dovute: 6 },
+      ]);
+      renderSession([card('a')], path);
+      await show();
+      await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
+      await screen.findByRole('img', { name: /Obiettivo di oggi/ });
+      await waitFor(() => expect(percorso).toHaveBeenCalled());
+      expect(screen.queryByRole('button', { name: 'Continua' })).not.toBeInTheDocument();
+    });
+
+    it('offers «Continua» when the institute itself still has cards due, and reads its session again', async () => {
+      const path = `/studia/ripasso/sessione?${new URLSearchParams({ materia: 'DIRITTO_CIVILE', istituto: 'Mora' })}`;
+      percorso.mockResolvedValue([{ materia: 'DIRITTO_CIVILE', istituto: 'Mora', nuove: 0, apprendimento: 3, consolidate: 0, dovute: 3 }]);
+      renderSession([card('a')], path);
+      await show();
+      await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
+      await userEvent.setup().click(await screen.findByRole('button', { name: 'Continua' }));
+      await waitFor(() => expect(session).toHaveBeenCalledTimes(2));
+      expect(session).toHaveBeenLastCalledWith('DIRITTO_CIVILE', 'Mora');
+    });
+
+    it('counts what is left in the subject of a narrowed session', async () => {
+      progress.mockImplementation(async (materia) =>
+        materia === 'DIRITTO_PENALE' ? progressAnswer(3, false, 2) : { ...progressAnswer(3, false, 2), oggi: { ...progressAnswer(3, false, 2).oggi, nuove: 5 } },
+      );
+      renderSession([card('a', { materia: 'DIRITTO_PENALE' })], '/studia/ripasso/sessione?materia=DIRITTO_PENALE');
+      await show();
+      await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
+      await screen.findByRole('img', { name: /Obiettivo di oggi/ });
+      await waitFor(() => expect(progress).toHaveBeenCalledWith('DIRITTO_PENALE'));
+      expect(screen.queryByRole('button', { name: 'Continua' })).not.toBeInTheDocument();
+    });
+  });
+});
+
+// break-ui (the brief of G2): the longest a card can be by the server's schema (`schemas/lingo/card.ts`: question 2,000,
+// answer 4,000, explanation 8,000, an address of 500), a long act as the citation, one card, and 200 in a queue.
+describe('the lesson under the worst realistic data', () => {
+  const LONG_URN = 'urn:nir:stato:decreto.legge:2020-03-17;18~art103';
+  const sentence = 'Il termine per la proposizione del ricorso decorre dalla comunicazione del provvedimento impugnato, salvo che la parte provi di non averne avuto conoscenza senza sua colpa; vedi https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legislativo:2010-07-02;104~art41. ';
+  const longText = (limit: number) => sentence.repeat(Math.ceil(limit / sentence.length)).slice(0, limit).trim();
+  const worst = card('w', {
+    domanda: longText(2_000),
+    risposta: longText(4_000),
+    spiegazione: longText(8_000),
+    ancore: [
+      { normaKey: 'decreto_legge', articleId: 'art_103', urn: LONG_URN, isPrimary: true },
+      ...Array.from({ length: 9 }, (_, i) => ({ normaKey: 'codice_civile', articleId: `art_${1453 + i}`, urn: `urn:nir:stato:regio.decreto:1942-03-16;262:2~art${1453 + i}`, isPrimary: false })),
+    ],
+  });
+
+  it('shows every character of the longest card, wraps what cannot break, and keeps every article reachable', async () => {
+    renderSession([worst]);
+    const question = await screen.findByRole('heading', { name: worst.domanda });
+    expect(question).toHaveClass('break-words', 'whitespace-pre-line');
+    await show();
+    expect(screen.getByRole('group', { name: 'Risposta' })).toHaveTextContent(worst.risposta.replace(/\s+/g, ' '), { normalizeWhitespace: true });
+    expect(screen.getByText(worst.spiegazione as string)).toHaveClass('break-words');
+    const anchors = within(screen.getByRole('region', { name: 'Articoli' })).getAllByRole('button');
+    expect(anchors).toHaveLength(10);
+    anchors.forEach((a) => expect(a).toHaveClass('min-h-[44px]', 'max-w-full'));
+    // The grades stay in the bar, under the long card, never pushed off it.
+    expect(screen.getByTestId('lesson-bar')).toContainElement(screen.getByRole('group', { name: 'Come è andata?' }));
+  });
+
+  it('lets an interval wrap inside its button on the narrowest phone', async () => {
+    renderSession([card('a', { anteprima: { '1': 1, '2': 300, '3': 548, '4': 3650 } })]);
+    await show();
+    const buttons = within(screen.getByRole('group', { name: 'Come è andata?' })).getAllByRole('button');
+    expect(buttons.map((b) => b.textContent)).toEqual(['domaniDi nuovo', '10 mesiDifficile', '1,5 anniBene', '10 anniFacile']);
+    buttons.forEach((b) => expect(b).toHaveClass('min-w-0', 'flex-1', 'text-center'));
+  });
+
+  it('counts one card in the singular', async () => {
+    renderSession([card('a')]);
+    await screen.findByText('Domanda a?');
+    expect(bar()).toHaveAttribute('aria-valuetext', '0 di 1 scheda');
+    expect(screen.getByText('Resta 1')).toBeInTheDocument();
+  });
+
+  it('carries 200 cards: the bar moves by one in 200 and says it in words', async () => {
+    const cards = Array.from({ length: 200 }, (_, i) => card(`k${i}`));
+    renderSession(cards);
+    await screen.findByText('Domanda k0?');
+    expect(bar()).toHaveAttribute('aria-valuemax', '200');
+    expect(screen.getByText('Restano 200')).toBeInTheDocument();
+    await show();
+    await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
+    await screen.findByText('Domanda k1?');
+    expect(bar()).toHaveAttribute('aria-valuetext', '1 di 200 schede');
+    expect(screen.getByTestId('lesson-progress-fill')).toHaveStyle({ width: '0.5%' });
+  });
+
+  function bar() {
+    return screen.getByRole('progressbar', { name: 'Avanzamento del ripasso' });
+  }
 });

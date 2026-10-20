@@ -121,7 +121,6 @@ export function DocumentReviewPage() {
       article: citation.parsed.article,
       version: 'vigente',
       version_date: '',
-      show_brocardi_info: true,
     });
   };
 

@@ -7,6 +7,7 @@ import {
   resolveAnchors,
   signAriaLabel,
   signColors,
+  retiredSectionLabel,
 } from './articleAnnotations';
 import { parseArticleStructure } from './articleStructure';
 import { fixtureText } from './__fixtures__/articleTexts';
@@ -171,6 +172,16 @@ describe('describeBlock', () => {
     expect(describeBlock(RAW, STRUCTURE.blocks[0])).toBe('Art. 1453.');
     expect(describeBlock(RAW, STRUCTURE.blocks[1])).toBe('(Risolubilità del contratto per inadempimento).');
     expect(describeBlock(RAW, STRUCTURE.blocks[2])).toBe('Nei contratti con prestazioni corrispettive…');
+  });
+});
+
+describe('retiredSectionLabel', () => {
+  it('names a mark on a section no longer shown by the section, and none on the article\'s own text', () => {
+    expect(retiredSectionLabel('2043/brocardi/ratio')).toBe('Sezione non più disponibile · Ratio');
+    expect(retiredSectionLabel('all2:1284/brocardi/spiegazione')).toBe('Sezione non più disponibile · Spiegazione');
+    expect(retiredSectionLabel('2043/')).toBe('Sezione non più disponibile');
+    expect(retiredSectionLabel('2043')).toBeNull();
+    expect(retiredSectionLabel('all2:1284')).toBeNull();
   });
 });
 

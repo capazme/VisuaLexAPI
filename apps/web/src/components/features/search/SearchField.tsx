@@ -57,7 +57,7 @@ export function SearchField() {
       if (citationReady) {
         // Counted when the alias runs; a norm handed to the palette is counted there.
         if (parsedCitation.fromAlias && parsedCitation.aliasId) trackAliasUsage(parsedCitation.aliasId);
-        actions.search(citationSearchParams(parsedCitation, { showBrocardi: true, filters: defaultSearchFilters() }));
+        actions.search(citationSearchParams(parsedCitation, { filters: defaultSearchFilters() }));
       } else {
         // The act is named, its number, date or article is not: the palette asks for them.
         openCommandPaletteWith(words);

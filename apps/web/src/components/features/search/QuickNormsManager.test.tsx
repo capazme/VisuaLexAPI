@@ -13,7 +13,6 @@ const baseQuickNorm: QuickNorm = {
     date: '',
     article: '2043',
     version: 'vigente',
-    show_brocardi_info: true,
   },
   createdAt: new Date().toISOString(),
   usageCount: 4,

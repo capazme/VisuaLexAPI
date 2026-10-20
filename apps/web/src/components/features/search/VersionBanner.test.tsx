@@ -24,7 +24,7 @@ describe('VersionBanner — a past text', () => {
         expect(screen.getByText(/In vigore dal 25 dicembre 2003 al 29 dicembre 2007/)).toBeInTheDocument();
         expect(screen.getByText(/Non è il testo attuale/)).toBeInTheDocument();
         expect(screen.getByText(/non dice quale disciplina si applichi al fatto/)).toBeInTheDocument();
-        expect(screen.getByText('Dottrina, massime, note ed evidenziazioni non sono mostrate su un testo storico.')).toBeInTheDocument();
+        expect(screen.getByText('Note ed evidenziazioni non sono mostrate su un testo storico.')).toBeInTheDocument();
     });
 
     it('offers the way back to the text in force and the citation', () => {
