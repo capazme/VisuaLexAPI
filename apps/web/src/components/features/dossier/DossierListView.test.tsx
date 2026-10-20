@@ -170,7 +170,7 @@ describe('DossierListView — dossiers di lavoro and di studio', () => {
     appStore.setState({ dossiers: kinds });
     sectionStore.setState({ section: 'opus', dossierKind: 'lavoro' });
     const { unmount } = render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
-    expect(screen.getByRole('heading', { level: 2, name: 'I tuoi dossier di lavoro' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'I tuoi dossier di lavoro' })).toBeInTheDocument();
     expect(titles().sort()).toEqual(['Pratica Rossi', 'Senza tipo']);
     // The kind filter is gone: the section is the filter.
     expect(screen.queryByRole('group', { name: 'Tipo di dossier' })).toBeNull();
@@ -178,7 +178,7 @@ describe('DossierListView — dossiers di lavoro and di studio', () => {
 
     sectionStore.setState({ section: 'gymnasium', dossierKind: 'studio' });
     render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
-    expect(screen.getByRole('heading', { level: 2, name: 'I tuoi dossier di studio' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'I tuoi dossier di studio' })).toBeInTheDocument();
     expect(titles()).toEqual(['Diritto penale']);
     expect(screen.getAllByText('Di studio', { selector: 'span' })).toHaveLength(1);
     expect(screen.getByText('Pubblicato nel Forum')).toBeInTheDocument();
@@ -197,7 +197,7 @@ describe('DossierListView — dossiers di lavoro and di studio', () => {
       appStore.setState({ dossiers: kinds });
       render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
       expect(titles()).toHaveLength(3);
-      expect(screen.getByRole('heading', { level: 2, name: 'I tuoi Dossier' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1, name: 'I tuoi Dossier' })).toBeInTheDocument();
     } finally {
       vi.unstubAllEnvs();
     }

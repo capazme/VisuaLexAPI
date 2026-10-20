@@ -114,6 +114,11 @@ describe('DossierDetailView — the page by act', () => {
     expect(within(block).getAllByText(/^art\. \d+$/).map((el) => el.textContent)).toEqual(['art. 1', 'art. 3']);
   });
 
+  it('takes the dossier\'s title as the page\'s h1', () => {
+    renderView();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(dossier.title);
+  });
+
   it('puts the notes above the acts', () => {
     renderView();
     const notes = screen.getByRole('region', { name: /Note \(1\)/ });

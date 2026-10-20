@@ -256,7 +256,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
   return (
     <div className="animate-in fade-in duration-200">
       <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 mb-6">
-        <h2 className="font-serif text-3xl font-medium tracking-tight text-slate-900 dark:text-slate-50">{sectionKind ? `I tuoi ${kindLabel(sectionKind).toLowerCase()}` : 'I tuoi Dossier'}</h2>
+        <h1 className="font-serif text-3xl font-medium tracking-tight text-slate-900 dark:text-slate-50">{sectionKind ? `I tuoi ${kindLabel(sectionKind).toLowerCase()}` : 'I tuoi Dossier'}</h1>
         <div className="flex gap-2">
           {trashCount > 0 && onOpenTrash && (
             <button
