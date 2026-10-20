@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import type { MerltConsentResponse, MerltNotice } from '../../../../services/merltService';
@@ -13,6 +14,7 @@ vi.mock('../../../../services/merltService', () => ({
 }));
 
 import { ConsentProvider } from '../ConsentContext';
+import { _resetConsentReadForTests, clearConsentRead } from '../consentRead';
 import { useConsent } from '../useConsent';
 import { NoticeChangedError } from '../context';
 
@@ -87,6 +89,7 @@ beforeEach(() => {
   revokeConsentApi.mockReset();
   lastError = null;
   localStorage.removeItem('visualex.merlt.consent');
+  _resetConsentReadForTests();
 });
 
 describe('ConsentContext', () => {
@@ -159,6 +162,75 @@ describe('ConsentContext', () => {
     await act(async () => { screen.getByText('revoke').click(); });
     await waitFor(() => expect(screen.getByTestId('level').textContent).toBe('none'));
     expect(revokeConsentApi).toHaveBeenCalledWith({ reason: 'bye', deleteData: true });
+  });
+
+  it('asks the server once when two providers mount together (StrictMode, a remount)', async () => {
+    let resolve!: (v: MerltConsentResponse) => void;
+    fetchConsent.mockReturnValue(new Promise<MerltConsentResponse>((r) => { resolve = r; }));
+    render(
+      <StrictMode>
+        <ConsentProvider><Probe /></ConsentProvider>
+        <ConsentProvider><Probe /></ConsentProvider>
+      </StrictMode>,
+    );
+    await act(async () => { resolve(full); });
+    await waitFor(() => expect(screen.getAllByTestId('level').map((e) => e.textContent)).toEqual(['full', 'full']));
+    expect(fetchConsent).toHaveBeenCalledOnce();
+  });
+
+  it('a server without MERL-T reads as the disabled consent, and is not asked again', async () => {
+    // The shape services/api.ts rejects with.
+    fetchConsent.mockRejectedValue({ status: 404, message: 'merlt_disabled', data: { detail: 'merlt_disabled' } });
+    const first = renderWithProvider();
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('ready'));
+    expect(screen.getByTestId('level').textContent).toBe('none');
+    expect(screen.getByTestId('canTrack').textContent).toBe('false');
+    expect(screen.getByTestId('needsAnswer').textContent).toBe('false');
+    first.unmount();
+
+    renderWithProvider();
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('ready'));
+    expect(fetchConsent).toHaveBeenCalledOnce();
+  });
+
+  it('after a logout, the next account does not join the leaving account\'s read', async () => {
+    let resolveFirst!: (v: MerltConsentResponse) => void;
+    fetchConsent.mockReturnValueOnce(new Promise<MerltConsentResponse>((r) => { resolveFirst = r; }));
+    const first = renderWithProvider();
+    first.unmount();
+    clearConsentRead();
+
+    fetchConsent.mockResolvedValueOnce(none);
+    renderWithProvider();
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('ready'));
+    await act(async () => { resolveFirst(full); });
+    expect(screen.getByTestId('level').textContent).toBe('none');
+    expect(fetchConsent).toHaveBeenCalledTimes(2);
+  });
+
+  it('a logout forgets that the server was without MERL-T: the next sign-in asks again', async () => {
+    fetchConsent.mockRejectedValueOnce({ status: 404, message: 'merlt_disabled', data: { detail: 'merlt_disabled' } });
+    const first = renderWithProvider();
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('ready'));
+    first.unmount();
+    clearConsentRead();
+
+    fetchConsent.mockResolvedValueOnce(full);
+    renderWithProvider();
+    await waitFor(() => expect(screen.getByTestId('level').textContent).toBe('full'));
+    expect(fetchConsent).toHaveBeenCalledTimes(2);
+  });
+
+  it('any other failure stays an error, and the next mount asks again', async () => {
+    fetchConsent.mockRejectedValue({ status: 404, message: 'Not Found', data: undefined });
+    const first = renderWithProvider();
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('error'));
+    first.unmount();
+
+    fetchConsent.mockResolvedValue(full);
+    renderWithProvider();
+    await waitFor(() => expect(screen.getByTestId('level').textContent).toBe('full'));
+    expect(fetchConsent).toHaveBeenCalledTimes(2);
   });
 
   it('useConsent throws outside of a provider', () => {

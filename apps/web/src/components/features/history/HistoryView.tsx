@@ -350,9 +350,9 @@ export function HistoryView() {
                 {/* Mobile Header */}
                 <div className="md:hidden p-3 border-b border-slate-200 dark:border-slate-700">
                     <div className="flex items-center justify-between mb-2">
-                        <h2 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                            <Clock size={18} /> Cronologia
-                        </h2>
+                        <h1 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                            <Clock size={18} aria-hidden /> Cronologia
+                        </h1>
                         {history.length > 0 && (
                             <button
                                 onClick={handleClearHistory}
@@ -381,9 +381,9 @@ export function HistoryView() {
 
                 {/* Desktop Header */}
                 <div className="hidden md:flex p-4 border-b border-slate-200 dark:border-slate-700 flex-col sm:flex-row justify-between items-center gap-4">
-                    <h2 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                        <Clock size={20} /> Cronologia Ricerche
-                    </h2>
+                    <h1 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <Clock size={20} aria-hidden /> Cronologia Ricerche
+                    </h1>
 
                     <div className="flex items-center gap-2">
                         <div id="tour-history-search" className="relative w-full sm:w-64">
@@ -736,9 +736,9 @@ export function HistoryView() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
                     <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-md p-5">
                         <div className="flex items-start justify-between mb-3">
-                            <h3 className="text-base font-semibold text-slate-900 dark:text-white">
+                            <h2 className="text-base font-semibold text-slate-900 dark:text-white">
                                 Crea nuovo dossier
-                            </h3>
+                            </h2>
                             <button
                                 onClick={() => { setCreateDossierFor(null); setNewDossierTitle(''); }}
                                 className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded"

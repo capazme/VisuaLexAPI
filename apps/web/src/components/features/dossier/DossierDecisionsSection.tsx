@@ -23,9 +23,9 @@ export function DossierDecisionsSection({ decisions, onRemove }: Props) {
       aria-labelledby="dossier-decisions-heading"
       className="rounded-xl border border-slate-200 bg-white p-3 md:p-4 dark:border-slate-700 dark:bg-slate-900"
     >
-      <h3 id="dossier-decisions-heading" className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+      <h2 id="dossier-decisions-heading" className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
         Giurisprudenza ({decisions.length})
-      </h3>
+      </h2>
       <ul className="space-y-1">
         {decisions.map((item) => {
           const citation = decisionCitationOf(item.data);
