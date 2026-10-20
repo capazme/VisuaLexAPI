@@ -24,7 +24,7 @@ interface LoadedDocument {
   text: string;
 }
 
-const hasFiles = (event: DragEvent) => Array.from(event.dataTransfer?.types ?? []).includes('Files');
+const hasFiles = (event: DragEvent | globalThis.DragEvent) => Array.from(event.dataTransfer?.types ?? []).includes('Files');
 
 const prefersReducedMotion = () =>
   typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -33,6 +33,12 @@ const prefersReducedMotion = () =>
 function scrollWithin(container: HTMLElement, target: HTMLElement, behavior: ScrollBehavior) {
   const top = target.offsetTop - container.clientHeight / 3;
   container.scrollTo?.({ top: Math.max(0, top), behavior });
+}
+
+/** On a phone the columns are stacked: bring `panel` wholly into sight when part of it is off the screen. */
+function revealPanel(panel: HTMLElement, behavior: ScrollBehavior) {
+  const box = panel.getBoundingClientRect();
+  if (box.top < 0 || box.bottom > window.innerHeight) panel.scrollIntoView?.({ block: 'nearest', behavior });
 }
 
 /** One ring that widens and fades from the citation: where the eye should land, once. toga-500, which reads on
@@ -49,7 +55,8 @@ function pulse(mark: HTMLElement) {
 // Each column scrolls on its own: a document of 300 pages never makes the page scroll.
 const PANEL = 'flex min-h-0 flex-col overflow-hidden rounded-[10px] border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900';
 const PANEL_HEAD = 'flex min-h-11 shrink-0 items-center border-b border-slate-200 px-4 text-sm font-medium text-slate-700 dark:border-slate-800 dark:text-slate-300';
-const PANEL_BODY = 'relative min-h-0 flex-1 overflow-y-auto overscroll-contain';
+// Contained on a computer only: on a phone the stacked panels hand a swipe on to the page at their ends.
+const PANEL_BODY = 'relative min-h-0 flex-1 overflow-y-auto lg:overscroll-contain';
 const COLUMN_HEIGHT = 'lg:h-[calc(100dvh-17rem)] lg:min-h-[24rem]';
 
 export function DocumentReviewPage() {
@@ -82,6 +89,22 @@ export function DocumentReviewPage() {
     (target === 'result' ? resultHeadingRef.current : zoneRef.current)?.focus({ preventScroll: true });
   }, [loaded]);
 
+  // A file let go anywhere but on the box would be opened by the browser in place of the app: refused,
+  // over the whole window (the margins and the sidebar too) while the page is open.
+  useEffect(() => {
+    const refuse = (event: globalThis.DragEvent) => {
+      if (!event.dataTransfer || !hasFiles(event) || zoneRef.current?.contains(event.target as Node)) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'none';
+    };
+    window.addEventListener('dragover', refuse);
+    window.addEventListener('drop', refuse);
+    return () => {
+      window.removeEventListener('dragover', refuse);
+      window.removeEventListener('drop', refuse);
+    };
+  }, []);
+
   const handleFile = async (file: File) => {
     const id = ++readingRef.current;
     setError(null);
@@ -94,6 +117,8 @@ export function DocumentReviewPage() {
       return;
     }
     focusAfterRef.current = 'result';
+    // The box goes from under a file that may still hang over it: no dragleave will come.
+    setDragging(false);
     setLoaded({ fileName: file.name, text: result.text });
     setSelected(null);
   };
@@ -101,6 +126,7 @@ export function DocumentReviewPage() {
   const chooseAnother = () => {
     readingRef.current += 1;
     setReading(false);
+    setDragging(false);
     setError(null);
     setSelected(null);
     focusAfterRef.current = 'zone';
@@ -114,9 +140,8 @@ export function DocumentReviewPage() {
     if (!body || !mark) return;
     const still = prefersReducedMotion();
     scrollWithin(body, mark, still ? 'auto' : 'smooth');
-    // On a phone the text is under the list: bring its column into sight as well, when little of it shows.
-    const box = body.getBoundingClientRect();
-    if (box.top > window.innerHeight - 160 || box.bottom < 160) body.scrollIntoView?.({ block: 'nearest', behavior: still ? 'auto' : 'smooth' });
+    // The citation sits a third of the way down the column: with the column wholly in sight, so is it.
+    revealPanel(body, still ? 'auto' : 'smooth');
     if (!still) pulse(mark);
   }, []);
 
@@ -124,11 +149,13 @@ export function DocumentReviewPage() {
     setSelected(index);
     const body = listBodyRef.current;
     const row = body?.querySelector<HTMLElement>(`[data-cite-row="${index}"]`);
-    if (body && row) scrollWithin(body, row, prefersReducedMotion() ? 'auto' : 'smooth');
+    if (!body || !row) return;
+    const behavior = prefersReducedMotion() ? 'auto' : 'smooth';
+    scrollWithin(body, row, behavior);
+    revealPanel(body, behavior);
   }, []);
 
   const openCitation = useCallback((citation: CitationMatch) => {
-    setSelected(citations.indexOf(citation));
     // The search runs on the reader page: without navigating first the
     // trigger sits in the store until the user opens `/` by hand (the
     // pattern is HistoryView's handleItemClick).
@@ -141,7 +168,7 @@ export function DocumentReviewPage() {
       version: 'vigente',
       version_date: '',
     });
-  }, [citations, navigate, triggerSearch]);
+  }, [navigate, triggerSearch]);
 
   const onZoneDrag = (event: DragEvent<HTMLButtonElement>) => {
     if (!hasFiles(event)) return;
@@ -157,13 +184,6 @@ export function DocumentReviewPage() {
     if (file) void handleFile(file);
   };
 
-  // A file let go beside the box would be opened by the browser in place of the app: refused here.
-  const onPageDrag = (event: DragEvent<HTMLDivElement>) => {
-    if (!hasFiles(event) || zoneRef.current?.contains(event.target as Node)) return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'none';
-  };
-
   const errorBox = error && (
     <div role="alert" className="flex items-start gap-2.5 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
       <AlertCircle aria-hidden="true" size={17} className="mt-[3px] shrink-0" />
@@ -172,14 +192,13 @@ export function DocumentReviewPage() {
   );
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col" onDragOver={onPageDrag} onDrop={onPageDrag}>
+    <div className="mx-auto flex w-full max-w-6xl flex-col">
       <header className="mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b border-slate-200 pb-4 dark:border-slate-800">
         <div className="min-w-0">
           <h1 className="font-serif text-3xl font-medium tracking-tight text-slate-900 dark:text-slate-50">Analizza documento</h1>
           <p className="mt-1.5 text-sm text-slate-600 dark:text-slate-400">Trova le norme citate in un atto: il file resta nel tuo browser.</p>
         </div>
         <p
-          title="Il documento viene letto nel tuo browser e non viene inviato al server né salvato."
           className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
         >
           <ShieldCheck aria-hidden="true" size={14} />
@@ -220,7 +239,8 @@ export function DocumentReviewPage() {
                 aria-busy={reading || undefined}
                 className={cn(
                   'flex min-h-48 w-full flex-col items-center justify-center rounded-[10px] border-2 px-6 py-10 text-center',
-                  TRANSITION, FOCUS_RING,
+                  // Inset: the wrapper that closes upwards clips whatever is drawn outside the box.
+                  TRANSITION, FOCUS_RING, 'focus-visible:ring-inset focus-visible:ring-offset-0',
                   dragging
                     ? 'border-solid border-primary-600 bg-primary-50/70 dark:border-primary-400 dark:bg-primary-950/40'
                     : 'border-dashed border-slate-300 bg-white hover:border-primary-400 hover:bg-slate-50/60 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-primary-500 dark:hover:bg-slate-900/70'
@@ -278,7 +298,14 @@ export function DocumentReviewPage() {
               </aside>
               <section aria-labelledby="doc-text" className={cn(PANEL, COLUMN_HEIGHT, 'max-h-[80dvh] min-w-0 lg:col-start-1 lg:row-start-1 lg:max-h-none')}>
                 <h2 id="doc-text" className={PANEL_HEAD}>Testo del documento</h2>
-                <div ref={textBodyRef} className={cn(PANEL_BODY, 'px-5 py-6 md:px-8')}>
+                {/* Focusable: the marks are not, and Safari does not let the keyboard scroll a region with nothing to focus. */}
+                <div
+                  ref={textBodyRef}
+                  tabIndex={0}
+                  role="group"
+                  aria-labelledby="doc-text"
+                  className={cn(PANEL_BODY, 'px-5 py-6 md:px-8', FOCUS_RING, 'focus-visible:ring-inset focus-visible:ring-offset-0')}
+                >
                   <DocumentText text={loaded.text} citations={citations} selected={selected} onSelect={selectFromText} />
                 </div>
               </section>

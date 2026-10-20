@@ -105,7 +105,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   wrapped in a `<mark>`, the test compares the drawn text with the file's), the citations listed beside
   it by act (`citationGroups.ts`, pure: an act is its type, number and year, so «l. 241/90» and
   «l. 241/1990» are one; a code by its name); a mark selects its row, a row scrolls the text to its mark
-  (the column alone, never the page) and pulses it once; the box closes upwards when the result comes and
+  (the column; on a phone, where the columns are stacked, the page as well when the column is not wholly
+  in sight) and pulses it once; the box closes upwards when the result comes and
   the first 8 rows enter 40 ms apart, none of it under reduced motion) and `decisions`
   (`DecisionView`, the body of a decision wherever it is drawn; `DecisionEntryView`, a practice's
   decision read in its row, its window or the phone's reader, over `useDecisionAnswer` (the fetch, the

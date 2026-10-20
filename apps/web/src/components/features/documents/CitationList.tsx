@@ -33,7 +33,8 @@ export const CitationList = memo(function CitationList({ groups, selected, onSel
   return (
     <div className="pb-2">
       {groups.map((group, g) => (
-        <section key={group.key} aria-labelledby={`doc-act-${g}`}>
+        // Not a <section>: one landmark per act would crowd a screen reader's list of landmarks.
+        <div key={group.key}>
           <h3 id={`doc-act-${g}`} className="flex items-baseline gap-1.5 px-4 pb-1.5 pt-4 font-serif text-[1.0625rem] font-medium text-slate-900 dark:text-slate-50">
             <span className="min-w-0 [overflow-wrap:anywhere]">{group.heading}</span>{' '}
             <span aria-hidden="true" className="text-slate-400 dark:text-slate-500">·</span>{' '}
@@ -41,7 +42,7 @@ export const CitationList = memo(function CitationList({ groups, selected, onSel
               {group.entries.length}<span className="sr-only">{group.entries.length === 1 ? ' citazione' : ' citazioni'}</span>
             </span>
           </h3>
-          <ul>
+          <ul aria-labelledby={`doc-act-${g}`}>
             {group.entries.map(entry => {
               const isSelected = entry.index === selected;
               const order = row++;
@@ -89,7 +90,7 @@ export const CitationList = memo(function CitationList({ groups, selected, onSel
               );
             })}
           </ul>
-        </section>
+        </div>
       ))}
     </div>
   );

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { extractCitations } from '../../../../utils/citationMatcher';
@@ -68,6 +68,23 @@ describe('DocumentReviewPage — before a document', () => {
     fireEvent.dragOver(zone, { dataTransfer });
     fireEvent.drop(zone, { dataTransfer });
     expect(await screen.findByRole('heading', { level: 2, name: 'trascinato.txt' })).toBeInTheDocument();
+  });
+
+  it('refuses a file let go outside the box, so the browser does not open it in place of the app', () => {
+    render(<DocumentReviewPage />);
+    const outside = new Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(outside, 'dataTransfer', { value: { types: ['Files'], files: [], dropEffect: 'copy' } });
+    document.body.dispatchEvent(outside);
+    expect(outside.defaultPrevented).toBe(true);
+  });
+
+  it('does not keep the drop wording when the box comes back', async () => {
+    const { container } = render(<DocumentReviewPage />);
+    const zone = screen.getByRole('button', { name: /Scegli un documento/ });
+    fireEvent.dragEnter(zone, { dataTransfer: { types: ['Files'], files: [], dropEffect: 'none' } });
+    await choose(container, PARERE);
+    await userEvent.click(screen.getByRole('button', { name: 'Scegli un altro documento' }));
+    expect(await screen.findByRole('button', { name: /Scegli un documento/ })).toHaveTextContent('Scegli un documento');
   });
 
   it('says it is reading while a file takes time', async () => {
@@ -157,6 +174,83 @@ describe('DocumentReviewPage — the result', () => {
     const zone = await screen.findByRole('button', { name: /Scegli un documento/ });
     await waitFor(() => expect(zone).toHaveFocus());
     await waitFor(() => expect(screen.queryByText('6 citazioni in 2 atti', { selector: 'p:not([aria-live])' })).not.toBeInTheDocument());
+  });
+});
+
+describe('DocumentReviewPage — motion', () => {
+  const originalMatchMedia = window.matchMedia;
+  const scrollTo = vi.fn();
+  const animate = vi.fn();
+
+  const reduceMotion = (reduce: boolean) => {
+    window.matchMedia = ((query: string) => ({
+      matches: reduce && query.includes('prefers-reduced-motion: reduce'),
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    })) as typeof window.matchMedia;
+  };
+
+  beforeEach(() => {
+    scrollTo.mockReset();
+    animate.mockReset();
+    // jsdom has neither: without them the calls under `?.` would pass whatever they were given.
+    HTMLElement.prototype.scrollTo = scrollTo as unknown as HTMLElement['scrollTo'];
+    HTMLElement.prototype.animate = animate as unknown as HTMLElement['animate'];
+  });
+
+  afterEach(() => {
+    window.matchMedia = originalMatchMedia;
+    delete (HTMLElement.prototype as Partial<HTMLElement>).scrollTo;
+    delete (HTMLElement.prototype as Partial<HTMLElement>).animate;
+  });
+
+  it('scrolls the text column (not the window) to the citation chosen in the list, and pulses it once', async () => {
+    reduceMotion(false);
+    const { container } = render(<DocumentReviewPage />);
+    await choose(container, PARERE);
+    vi.mocked(window.scrollTo).mockClear();
+    const list = screen.getByRole('complementary', { name: 'Citazioni' });
+    await userEvent.click(within(list).getByText('art. 2043').closest('button')!);
+
+    const textColumn = textBody().parentElement!;
+    expect(scrollTo).toHaveBeenCalledTimes(1);
+    expect(scrollTo.mock.contexts[0]).toBe(textColumn);
+    expect(scrollTo.mock.calls[0][0]).toMatchObject({ behavior: 'smooth' });
+    expect(window.scrollTo).not.toHaveBeenCalled();
+    expect(animate).toHaveBeenCalledTimes(1);
+    expect(animate.mock.contexts[0]).toBe(textBody().querySelectorAll('mark')[2]);
+  });
+
+  it('scrolls the list to the row of a citation touched in the text, without a pulse', async () => {
+    reduceMotion(false);
+    const { container } = render(<DocumentReviewPage />);
+    await choose(container, PARERE);
+    await userEvent.click(textBody().querySelectorAll('mark')[4]);
+    const listColumn = screen.getByRole('complementary', { name: 'Citazioni' }).querySelector('[data-cite-row]')!.closest('.overflow-y-auto');
+    expect(scrollTo.mock.contexts[0]).toBe(listColumn);
+    expect(animate).not.toHaveBeenCalled();
+  });
+
+  it('under reduced motion, jumps to the citation and does not pulse it', async () => {
+    reduceMotion(true);
+    const { container } = render(<DocumentReviewPage />);
+    await choose(container, PARERE);
+    const list = screen.getByRole('complementary', { name: 'Citazioni' });
+    await userEvent.click(within(list).getByText('art. 1455').closest('button')!);
+    expect(scrollTo.mock.calls[0][0]).toMatchObject({ behavior: 'auto' });
+    expect(animate).not.toHaveBeenCalled();
+  });
+
+  it('lets the text column be scrolled from the keyboard', async () => {
+    const { container } = render(<DocumentReviewPage />);
+    await choose(container, PARERE);
+    expect(textBody().parentElement).toHaveAttribute('tabindex', '0');
+    expect(screen.getByRole('group', { name: 'Testo del documento' })).toBe(textBody().parentElement);
   });
 });
 

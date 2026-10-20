@@ -49,7 +49,7 @@ export const DocumentText = memo(function DocumentText({ text, citations, select
             data-cite={piece.cite}
             data-selected={piece.cite === selected || undefined}
             className={cn(
-              'cursor-pointer rounded-[3px] text-inherit underline decoration-2 underline-offset-[3px] [box-decoration-break:clone] transition-colors',
+              'cursor-pointer rounded-[3px] text-inherit underline decoration-2 underline-offset-[3px] box-decoration-clone transition-colors',
               piece.cite === selected
                 ? 'bg-primary-100 decoration-primary-600 dark:bg-primary-900/60 dark:decoration-primary-300'
                 : 'bg-transparent decoration-primary-500 hover:bg-primary-50 dark:decoration-primary-400 dark:hover:bg-primary-950/50'
