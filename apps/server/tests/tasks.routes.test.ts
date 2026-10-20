@@ -132,6 +132,8 @@ describe('creating a task', () => {
       await post(user, { title: name, origin: name }),
       await post(user, { title: name, plannedTime: '10:00' }),
       await request(app).get('/api/tasks').query({ view: name }).set(authHeader(user)),
+      // Refused by the JSON parser before any route: its error carries the raw body.
+      await request(app).post('/api/tasks').set(authHeader(user)).set('Content-Type', 'application/json').send(`{"title":"${name}",}`),
     ];
     for (const res of responses) {
       expect(res.status).toBe(400);
@@ -219,6 +221,27 @@ describe('changing a task', () => {
     // Detached from its parent, it may go anywhere.
     const detached = await request(app).put(`/api/tasks/${child.id}`).set(authHeader(user)).send({ parentId: null, dossierId: null });
     expect(detached.body).toMatchObject({ parent_id: null, dossier_id: null });
+  });
+
+  it('refuses to keep an entry of the old dossier when the task moves', async () => {
+    const user = await createTestUser('tasks-move-entry');
+    const { dossier, item } = await dossierWithItem(user);
+    const other = await prisma.dossier.create({ data: { name: 'Altra pratica', userId: user.id } });
+    const task = await created(user, { title: 't', dossierId: dossier.id, dossierItemId: item.id });
+    const host = await created(user, { title: 'h', dossierId: other.id });
+    const put = (body: Record<string, unknown>) => request(app).put(`/api/tasks/${task.id}`).set(authHeader(user)).send(body);
+    expect((await put({ dossierId: other.id, dossierItemId: item.id })).status).toBe(404);
+    expect((await put({ parentId: host.id, dossierItemId: item.id })).status).toBe(404);
+    expect(await prisma.task.findUniqueOrThrow({ where: { id: task.id } })).toMatchObject({ dossierId: dossier.id, dossierItemId: item.id, parentId: null });
+  });
+
+  it('refuses a parent in the trash', async () => {
+    const user = await createTestUser('tasks-trashed-parent');
+    const parent = await created(user, { title: 'p' });
+    const task = await created(user, { title: 't' });
+    await request(app).delete(`/api/tasks/${parent.id}`).set(authHeader(user)).expect(200);
+    expect((await post(user, { title: 'c', parentId: parent.id })).status).toBe(404);
+    expect((await request(app).put(`/api/tasks/${task.id}`).set(authHeader(user)).send({ parentId: parent.id })).status).toBe(404);
   });
 
   it('refuses a loop of subtasks', async () => {
@@ -349,5 +372,16 @@ describe('order and trash', () => {
     await sweepTrashedTasks(new Date(now));
     expect(await prisma.task.findUnique({ where: { id: old.id } })).toBeNull();
     expect(await prisma.task.findUnique({ where: { id: recent.id } })).not.toBeNull();
+  });
+
+  it('the sweep keeps a live subtask of a parent it removes, on its own', async () => {
+    const user = await createTestUser('tasks-sweep-child');
+    const parent = await created(user, { title: 'p' });
+    const child = await created(user, { title: 'c', parentId: parent.id });
+    const now = Date.now();
+    await prisma.task.update({ where: { id: parent.id }, data: { deletedAt: new Date(now - TASK_TRASH_RETENTION_MS - 60_000) } });
+    await sweepTrashedTasks(new Date(now));
+    expect(await prisma.task.findUnique({ where: { id: parent.id } })).toBeNull();
+    expect(await prisma.task.findUniqueOrThrow({ where: { id: child.id } })).toMatchObject({ parentId: null, deletedAt: null });
   });
 });

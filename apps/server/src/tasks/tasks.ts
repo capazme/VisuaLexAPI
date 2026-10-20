@@ -110,7 +110,7 @@ async function assertItemOfDossier(tx: Prisma.TransactionClient, dossierId: stri
   if (!item) throw new AppError(404, 'Voce del dossier non trovata.');
 }
 
-/** The user's task, open to changes (not in the trash), or a parent named by a client. */
+/** The user's task, open to changes (not in the trash), or a parent named by a client. Lock it first (`lockTask`) to rely on it. */
 async function liveTask(tx: Prisma.TransactionClient, userId: string, id: string, message = NOT_FOUND): Promise<Task> {
   const task = await tx.task.findFirst({ where: { id, userId, deletedAt: null } });
   if (!task) throw new AppError(404, message);
@@ -121,6 +121,28 @@ async function liveTask(tx: Prisma.TransactionClient, userId: string, id: string
 async function lockTask(tx: Prisma.TransactionClient, userId: string, id: string): Promise<void> {
   const rows = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM tasks WHERE id = ${id} AND user_id = ${userId} FOR UPDATE`;
   if (rows.length !== 1) throw new AppError(404, NOT_FOUND);
+}
+
+/**
+ * A parent named by a client, locked and read as live: a parent moved to the trash meanwhile either
+ * finishes first (and is refused here) or waits, so a live subtask never ends up under a trashed one.
+ */
+async function lockedParent(tx: Prisma.TransactionClient, userId: string, id: string): Promise<Task> {
+  const message = 'Compito principale non trovato.';
+  const rows = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM tasks WHERE id = ${id} AND user_id = ${userId} FOR UPDATE`;
+  if (rows.length !== 1) throw new AppError(404, message);
+  return liveTask(tx, userId, id, message);
+}
+
+/**
+ * Locks the user's dossier rows, in id order, for the rest of the transaction: a task moved between
+ * two dossiers and a dossier moved to the trash run one after the other, so the trash's payload never
+ * holds a task that has meanwhile left (its restore would collide with the live row).
+ */
+async function lockDossiers(tx: Prisma.TransactionClient, userId: string, ids: (string | null)[]): Promise<void> {
+  const wanted = [...new Set(ids.filter((id): id is string => id !== null))].sort();
+  if (wanted.length === 0) return;
+  await tx.$queryRaw`SELECT id FROM dossiers WHERE id IN (${Prisma.join(wanted)}) AND user_id = ${userId} ORDER BY id FOR UPDATE`;
 }
 
 /** The task and every task under it, at any depth, as ids (the user's rows only). */
@@ -151,7 +173,7 @@ const timeInput = (time: string | null | undefined) => (time === undefined ? und
 /** A new task, after the last one of its list (its dossier or the inbox, under its parent). */
 export async function createTask(userId: string, input: TaskInput & { title: string }): Promise<Task> {
   return prisma.$transaction(async (tx) => {
-    const parent = input.parentId ? await liveTask(tx, userId, input.parentId, 'Compito principale non trovato.') : null;
+    const parent = input.parentId ? await lockedParent(tx, userId, input.parentId) : null;
     if (parent && input.dossierId !== undefined && input.dossierId !== parent.dossierId) {
       throw new AppError(400, 'Un sottocompito sta nel dossier del compito principale.');
     }
@@ -198,7 +220,18 @@ export async function createTask(userId: string, input: TaskInput & { title: str
  */
 export async function updateTask(userId: string, id: string, input: TaskInput): Promise<Task> {
   return prisma.$transaction(async (tx) => {
-    await lockTask(tx, userId, id);
+    // The dossiers a move may touch are locked before the task, in the order the dossier's trash takes
+    // them (dossier, then its tasks); the task is then re-read, and a dossier changed meanwhile is a 409.
+    if (input.dossierId !== undefined || input.parentId !== undefined) {
+      const before = await tx.task.findFirst({ where: { id, userId }, select: { dossierId: true } });
+      const parentDossier = input.parentId ? (await tx.task.findFirst({ where: { id: input.parentId, userId }, select: { dossierId: true } }))?.dossierId ?? null : null;
+      await lockDossiers(tx, userId, [before?.dossierId ?? null, input.dossierId ?? null, parentDossier]);
+      await lockTask(tx, userId, id);
+      const now = await tx.task.findFirst({ where: { id, userId }, select: { dossierId: true } });
+      if (before && now && now.dossierId !== before.dossierId) throw new AppError(409, 'Il compito è cambiato nel frattempo: riprova.');
+    } else {
+      await lockTask(tx, userId, id);
+    }
     const existing = await liveTask(tx, userId, id);
 
     let parentId = existing.parentId;
@@ -208,7 +241,7 @@ export async function updateTask(userId: string, id: string, input: TaskInput): 
         parentId = null;
         if (input.dossierId !== undefined) dossierId = input.dossierId;
       } else {
-        const parent = await liveTask(tx, userId, input.parentId, 'Compito principale non trovato.');
+        const parent = await lockedParent(tx, userId, input.parentId);
         if (await isAncestorOrSelf(tx, userId, id, parent.id)) {
           throw new AppError(400, 'Un compito non può stare sotto un suo sottocompito.');
         }
@@ -235,7 +268,7 @@ export async function updateTask(userId: string, id: string, input: TaskInput): 
       recurrence: input.recurrence !== undefined ? input.recurrence : existing.recurrence,
     };
     checkShape(shape);
-    if (dossierId && shape.dossierItemId && shape.dossierItemId !== existing.dossierItemId) {
+    if (dossierId && shape.dossierItemId && (dossierMoved || shape.dossierItemId !== existing.dossierItemId)) {
       await assertItemOfDossier(tx, dossierId, shape.dossierItemId);
     }
 
@@ -429,7 +462,11 @@ let lastSweep = 0;
 
 /** Removes the tasks in the trash for more than 30 days (and, by the cascade, the tasks under them); returns how many. */
 export async function sweepTrashedTasks(now: Date = new Date()): Promise<number> {
-  const { count } = await prisma.task.deleteMany({ where: { deletedAt: { lt: new Date(now.getTime() - TASK_TRASH_RETENTION_MS) } } });
+  const cutoff = new Date(now.getTime() - TASK_TRASH_RETENTION_MS);
+  // A subtask out of the trash under a parent that is going (restored alone, or written in a race)
+  // stays, on its own: the cascade would otherwise delete a live task.
+  await prisma.task.updateMany({ where: { deletedAt: null, parent: { deletedAt: { lt: cutoff } } }, data: { parentId: null } });
+  const { count } = await prisma.task.deleteMany({ where: { deletedAt: { lt: cutoff } } });
   return count;
 }
 

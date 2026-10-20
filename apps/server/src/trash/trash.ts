@@ -422,20 +422,28 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
           // A task keeps its entry and its parent when they came back with it (they always do: both
           // are of the same dossier), its assignee when that account still exists.
           const itemIds = new Set(items.map((item) => item.id));
-          const taskIds = new Set(tasks.map((task) => task.id));
+          // A task that is live again elsewhere (it left the dossier in a race with the deletion) stays
+          // as it is: restoring the dossier must not fail on it.
+          const live = new Set(
+            (await tx.task.findMany({ where: { id: { in: tasks.map((task) => task.id) } }, select: { id: true } })).map((task) => task.id),
+          );
+          const restored = tasks.filter((task) => !live.has(task.id));
+          const taskIds = new Set(restored.map((task) => task.id));
           const assignees = new Map<string, string | null>();
           for (const task of tasks) {
-            if (task.assigneeId && !assignees.has(task.assigneeId)) {
+            if (taskIds.has(task.id) && task.assigneeId && !assignees.has(task.assigneeId)) {
               assignees.set(task.assigneeId, await existingId(task.assigneeId, (id) => tx.user.count({ where: { id } })));
             }
           }
+          // Parents are set in a second step: a large payload is inserted in several statements, and a
+          // subtask may come before its parent.
           await tx.task.createMany({
-            data: tasks.map((task) => ({
+            data: restored.map((task) => ({
               id: task.id,
               userId,
               dossierId: dossier.id,
               dossierItemId: task.dossierItemId && itemIds.has(task.dossierItemId) ? task.dossierItemId : null,
-              parentId: task.parentId && taskIds.has(task.parentId) ? task.parentId : null,
+              parentId: null,
               position: task.position,
               title: task.title,
               description: task.description,
@@ -455,6 +463,13 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
               createdAt: new Date(task.createdAt),
             })),
           });
+          const byParent = new Map<string, string[]>();
+          for (const task of restored) {
+            if (task.parentId && taskIds.has(task.parentId)) byParent.set(task.parentId, [...(byParent.get(task.parentId) ?? []), task.id]);
+          }
+          for (const [parentId, children] of byParent) {
+            await tx.task.updateMany({ where: { id: { in: children } }, data: { parentId } });
+          }
         }
         if (typeof publishedCopyId === 'string' && publishedCopyId) {
           // Relinked only when the copy is still the user's and linked to nothing else.

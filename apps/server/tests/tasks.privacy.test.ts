@@ -97,6 +97,25 @@ describe('tasks and the dossier', () => {
     expect(after.find((task) => task.id === child.id)?.parentId).toBe(parent.id);
   });
 
+  it('restoring a dossier leaves alone a task of its payload that is live again elsewhere', async () => {
+    const alice = await createTestUser('tasks-dossier-race');
+    const dossier = await prisma.dossier.create({ data: { name: 'Pratica', userId: alice.id } });
+    const other = await prisma.dossier.create({ data: { name: 'Altra', userId: alice.id } });
+    const left = await prisma.task.create({ data: { userId: alice.id, dossierId: dossier.id, title: 'uscito' } });
+    const child = await prisma.task.create({ data: { userId: alice.id, dossierId: dossier.id, parentId: left.id, title: 'figlio' } });
+    const stays = await prisma.task.create({ data: { userId: alice.id, dossierId: dossier.id, title: 'rimasto' } });
+    const deleted = await request(app).delete(`/api/dossiers/${dossier.id}`).set(authHeader(alice));
+    // What a move racing the deletion leaves: the row live in another dossier and in the payload too.
+    await prisma.task.create({ data: { id: left.id, userId: alice.id, dossierId: other.id, title: 'uscito' } });
+
+    const restored = await request(app).post(`/api/trash/${deleted.body.trashId}/restore`).set(authHeader(alice)).send({});
+    expect(restored.status).toBe(200);
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: left.id } })).dossierId).toBe(other.id);
+    expect(await prisma.task.findUniqueOrThrow({ where: { id: stays.id } })).toMatchObject({ dossierId: dossier.id });
+    // Its subtask comes back in the dossier, on its own.
+    expect(await prisma.task.findUniqueOrThrow({ where: { id: child.id } })).toMatchObject({ dossierId: dossier.id, parentId: null });
+  });
+
   it('a dossier without tasks is listed as before', async () => {
     const alice = await createTestUser('tasks-dossier-none');
     const dossier = await prisma.dossier.create({ data: { name: 'Vuota', userId: alice.id } });

@@ -224,7 +224,9 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   only when the snapshot names no article.
 - `src/middleware/errorHandler.ts` — the only place a status is decided for an
   unhandled throw. `AppError` carries its own; a Zod `ZodError` becomes **400**
-  naming the offending fields; everything else is a 500. Controllers therefore
+  naming the offending fields; the JSON parser's own refusals (a malformed or too large body) keep
+  their 4xx with a fixed `detail`, logged by type only — their error carries the raw body; everything
+  else is a 500. Controllers therefore
   call `schema.parse()` and let it throw — 41 sites across 13 controllers — and
   must not catch it to hand-roll a status. The body is
   `{ detail: string, errors?: [{ field, message }] }`: `detail` stays a plain
@@ -617,9 +619,12 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   ?view=today|upcoming|inbox|dossier|trash[&dossierId]` (`today`: planned or due today or before;
   `upcoming`: planned or due today to +6; open tasks only; at most 1000, `truncated`), `GET`/`PUT
   /:id`, `POST /`, `POST /:id/complete`, `/:id/reopen`, `POST /reorder { taskIds }`, `DELETE /:id`
-  (to the trash: `deletedAt` on the task and its subtasks, swept after 30 days) and `POST
+  (to the trash: `deletedAt` on the task and its subtasks, swept after 30 days; a live subtask of a
+  swept parent stays, detached) and `POST
   /:id/restore` (what went at that instant; a subtask whose parent is still there comes back on
-  its own). Everything is scoped by `userId` in `tasks/tasks.ts`: another user's task, dossier,
+  its own). A named parent is locked before it is read as live, and a move between dossiers locks
+  both dossier rows before the task (the dossier trash's order); a dossier's restore leaves alone a
+  task of its payload that is live again elsewhere. Everything is scoped by `userId` in `tasks/tasks.ts`: another user's task, dossier,
   entry or parent is a 404 (`tests/tasks.idor.test.ts`). **A title may name a client**: no message
   repeats one, closed values answer without echoing, and the router's own error handler logs a
   database error by kind and code only, never Prisma's message. `serializeTask` is the one answer
