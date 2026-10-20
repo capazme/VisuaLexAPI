@@ -60,7 +60,7 @@ describe('«Oggi»', () => {
       resolve(answer([task('a', { plannedDate: TODAY }), task('b', { plannedDate: '2026-10-18', dueDate: '2026-10-19', priority: 1, dossierId: 'd1' })])),
     );
     const groups = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
-    expect(groups).toEqual(['Scaduti1', 'Oggi1']);
+    expect(groups).toEqual(['Scaduti, 1 compito', 'Oggi, 1 compito']);
     const overdue = screen.getByRole('list', { name: 'Scaduti' });
     expect(within(overdue).getByText(/Termine finale ieri · scaduto da 1 giorno/)).toBeInTheDocument();
     expect(within(overdue).getByText('Urgente')).toBeInTheDocument();
@@ -124,6 +124,45 @@ describe('«Oggi»', () => {
     expect(screen.getByRole('checkbox', { name: /Compito a/ })).toBeInTheDocument();
   });
 
+  it('keeps a ticked row hidden until a read made after the tick, even when one made before, or a failed one, answers', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const a = task('a', { plannedDate: TODAY });
+    const b = task('b', { plannedDate: TODAY });
+    service.list.mockResolvedValue(answer([a, b]));
+    let landTick!: (value: unknown) => void;
+    service.complete.mockReturnValue(new Promise((r) => (landTick = r)));
+    renderAt(<TodayView />);
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Compito b/ }));
+    expect(screen.queryByRole('checkbox', { name: /Compito b/ })).toBeNull();
+    // Another write's read, which started before b's tick landed, still lists b.
+    await act(async () => plannerStore.getState().changed());
+    expect(screen.queryByRole('checkbox', { name: /Compito b/ })).toBeNull();
+    // The tick lands; the read after it fails: what is on screen is older than the tick.
+    service.list.mockRejectedValue({ status: 503 });
+    await act(async () => landTick({ task: b, recurred: null }));
+    await screen.findByRole('button', { name: 'Riprova' });
+    expect(screen.queryByRole('checkbox', { name: /Compito b/ })).toBeNull();
+    // A read after it, as the server answers it.
+    service.list.mockResolvedValue(answer([a]));
+    fireEvent.click(screen.getByRole('button', { name: 'Riprova' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Riprova' })).toBeNull());
+    expect(screen.getByRole('checkbox', { name: /Compito a/ })).toBeInTheDocument();
+    warn.mockRestore();
+  });
+
+  it('gives the focus to the next row when a row leaves, else the previous one, else the heading', async () => {
+    service.list.mockResolvedValue(answer([task('a', { plannedDate: TODAY }), task('b', { plannedDate: TODAY })]));
+    service.complete.mockResolvedValue({ task: task('a'), recurred: null });
+    renderAt(<TodayView />);
+    const a = await screen.findByRole('checkbox', { name: /Compito a/ });
+    a.focus();
+    fireEvent.click(a);
+    expect(screen.getByRole('checkbox', { name: /Compito b/ })).toHaveFocus();
+    service.list.mockResolvedValue(answer([]));
+    fireEvent.click(screen.getByRole('checkbox', { name: /Compito b/ }));
+    await waitFor(() => expect(screen.getByRole('heading', { level: 2, name: 'Oggi' })).toHaveFocus());
+  });
+
   it('moves between the rows with the arrows', async () => {
     service.list.mockResolvedValue(answer([task('a', { plannedDate: '2026-10-19' }), task('b', { plannedDate: TODAY }), task('c', { plannedDate: TODAY })]));
     renderAt(<TodayView />);
@@ -164,7 +203,7 @@ describe('the other views', () => {
     service.list.mockResolvedValue(answer([task('a', { plannedDate: '2026-10-22' }), task('b', { dueDate: TODAY })]));
     renderAt(<UpcomingView />);
     await screen.findByRole('list', { name: 'Oggi · martedì 20 ottobre' });
-    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Oggi · martedì 20 ottobre1', 'Giovedì 22 ottobre1']);
+    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Oggi · martedì 20 ottobre, 1 compito', 'Giovedì 22 ottobre, 1 compito']);
     expect(screen.getByText('Termine finale: scade oggi')).toBeInTheDocument();
   });
 

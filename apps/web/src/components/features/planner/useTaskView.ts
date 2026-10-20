@@ -12,61 +12,68 @@ export type TaskViewState =
 /**
  * One view of the tasks (`GET /api/tasks?view=`), read on mount, after every write anywhere in the app
  * (`plannerStore.version`) and on «Riprova». While a new read travels the last answer stays on screen; an older
- * read never overwrites a newer one. Rows hidden by a write on its way (`optimistic`) come back when it is refused,
- * and the next answer replaces them all. «Oggi» also gives the bar its count, so the two never disagree.
+ * read never overwrites a newer one. A row hidden by a write (`optimistic`) stays hidden while the write travels and
+ * until an answer read after it landed arrives — a read that started before, or a failed one that keeps the last
+ * answer, would show it again, not done — and comes back at once when the write is refused. «Oggi» also gives the bar
+ * its count, so the two never disagree.
  */
 export function useTaskView(view: TaskView, dossierId?: string) {
   const version = plannerStore((s) => s.version);
   const [reads, setReads] = useState(0);
   const scope = `${view}#${dossierId ?? ''}`;
   const key = `${scope}#${version}#${reads}`;
-  const [stored, setAnswer] = useState<{ key: string; scope: string; data: TaskViewAnswer | null; failed: boolean }>({ key: '', scope: '', data: null, failed: false });
+  // `readAt`: the write counter when the data on screen was read.
+  const [stored, setAnswer] = useState<{ key: string; scope: string; data: TaskViewAnswer | null; readAt: number; failed: boolean }>({ key: '', scope: '', data: null, readAt: -1, failed: false });
   // An answer for another view or dossier is never shown for this one.
-  const answer = stored.scope === scope ? stored : { key: '', scope, data: null, failed: false };
-  const [hidden, setHidden] = useState<{ key: string; ids: Set<string> }>({ key: '', ids: new Set() });
+  const answer = stored.scope === scope ? stored : { key: '', scope, data: null, readAt: -1, failed: false };
+  // A hidden row: null while its write travels, then the counter its landing set (an answer read at it or after knows).
+  const [hidden, setHidden] = useState<ReadonlyMap<string, number | null>>(new Map());
 
   useEffect(() => {
     let live = true;
     taskService.list(view, dossierId).then(
       (data) => {
         if (!live) return;
-        setAnswer({ key, scope, data, failed: false });
+        setAnswer({ key, scope, data, readAt: version, failed: false });
         if (view === 'today') plannerStore.getState().setTodayCount(data.tasks.length);
       },
       (error: { status?: number }) => {
         if (!live) return;
         // Logged by its status alone: the request carries no title, and the answer is not read.
         console.warn(`[planner] the ${view} view could not be read`, error?.status ?? 'no answer');
-        setAnswer((previous) => ({ key, scope, data: previous.scope === scope ? previous.data : null, failed: true }));
+        setAnswer((previous) =>
+          previous.scope === scope ? { ...previous, key, failed: true } : { key, scope, data: null, readAt: -1, failed: true },
+        );
       },
     );
     return () => {
       live = false;
     };
-  }, [key, scope, view, dossierId]);
+  }, [key, scope, view, dossierId, version]);
 
   const reload = useCallback(() => setReads((n) => n + 1), []);
 
-  // The rows hidden belong to the answer they were hidden from: a new answer shows what the server says.
-  const hiddenIds = hidden.key === answer.key ? hidden.ids : null;
-  const optimistic: Optimistic = useMemo(
-    () => ({
-      hide: (id) => setHidden((h) => ({ key: answer.key, ids: new Set(h.key === answer.key ? h.ids : []).add(id) })),
-      show: (id) =>
-        setHidden((h) => {
-          const ids = new Set(h.key === answer.key ? h.ids : []);
-          ids.delete(id);
-          return { key: answer.key, ids };
-        }),
-    }),
-    [answer.key],
-  );
+  const optimistic: Optimistic = useMemo(() => {
+    const change = (id: string, at: number | null | undefined) =>
+      setHidden((previous) => {
+        const next = new Map(previous);
+        if (at === undefined) next.delete(id);
+        else next.set(id, at);
+        return next;
+      });
+    return {
+      hide: (id) => change(id, null),
+      show: (id) => change(id, undefined),
+      // Called once the write has landed, before it bumps the counter: the next read is the first to see it.
+      landed: (id) => change(id, plannerStore.getState().version + 1),
+    };
+  }, []);
 
   const visible = useMemo<TaskViewAnswer | null>(() => {
     if (!answer.data) return null;
-    if (!hiddenIds || hiddenIds.size === 0) return answer.data;
+    const gone = new Set([...hidden].filter(([, at]) => at === null || answer.readAt < at).map(([id]) => id));
+    if (gone.size === 0) return answer.data;
     // A hidden task takes the subtasks the server closes or trashes with it.
-    const gone = new Set(hiddenIds);
     let grew = true;
     while (grew) {
       grew = false;
@@ -78,7 +85,7 @@ export function useTaskView(view: TaskView, dossierId?: string) {
       }
     }
     return { ...answer.data, tasks: answer.data.tasks.filter((task: Task) => !gone.has(task.id)) };
-  }, [answer.data, hiddenIds]);
+  }, [answer.data, answer.readAt, hidden]);
 
   let state: TaskViewState;
   if (answer.key !== key) state = { status: 'loading', answer: visible };

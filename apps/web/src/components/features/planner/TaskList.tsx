@@ -4,7 +4,7 @@ import { completeWithUndo, trashWithUndo, type Optimistic } from './taskActions'
 import { nestTasks } from './taskTree';
 import { TaskDialog } from './TaskDialog';
 import { TaskRow } from './TaskRow';
-import { moveBetweenRows } from './moveBetweenRows';
+import { focusAwayFrom, moveBetweenRows } from './moveBetweenRows';
 
 interface Props {
   tasks: Task[];
@@ -19,8 +19,14 @@ interface Props {
 export function TaskList({ tasks, today, optimistic, showDossier = true, label }: Props) {
   const [open, setOpen] = useState<{ task: Task; focus?: 'subtask' } | null>(null);
   const actions = {
-    onTick: (task: Task) => void completeWithUndo(task, today, optimistic),
-    onTrash: (task: Task) => void trashWithUndo(task, optimistic),
+    onTick: (task: Task) => {
+      focusAwayFrom(task.id);
+      void completeWithUndo(task, today, optimistic);
+    },
+    onTrash: (task: Task) => {
+      focusAwayFrom(task.id);
+      void trashWithUndo(task, optimistic);
+    },
     onOpen: (task: Task, focus?: 'subtask') => setOpen({ task, focus }),
   };
 
@@ -39,7 +45,7 @@ export function TaskList({ tasks, today, optimistic, showDossier = true, label }
           </TaskRow>
         ))}
       </ul>
-      {open && <TaskDialog mode="edit" task={open.task} focus={open.focus} today={today} onClose={() => setOpen(null)} />}
+      {open && <TaskDialog mode="edit" task={open.task} focus={open.focus} today={today} optimistic={optimistic} onClose={() => setOpen(null)} />}
     </>
   );
 }

@@ -22,3 +22,22 @@ export function moveBetweenRows(event: KeyboardEvent<HTMLElement>) {
   event.preventDefault();
   ticks[next]?.focus();
 }
+
+/**
+ * Before a row leaves (ticked, moved to the trash), the focus goes to the next row's tick, else the previous one's,
+ * else the view's heading: left where it was it would fall to the page's body, and the arrows and Space would stop.
+ * Only when the focus is in that row (or nowhere): a click elsewhere keeps its own.
+ */
+export function focusAwayFrom(taskId: string) {
+  const row = [...document.querySelectorAll<HTMLElement>('[data-task-row]')].find((el) => el.dataset.taskId === taskId);
+  if (!row) return;
+  const active = document.activeElement;
+  if (active && active !== document.body && !row.contains(active)) return;
+  const scope = row.closest('[data-task-lists]') ?? row.closest('ul') ?? document.body;
+  const ticks = [...scope.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((tick) => !row.contains(tick));
+  const after = ticks.find((tick) => row.compareDocumentPosition(tick) & Node.DOCUMENT_POSITION_FOLLOWING);
+  let target: HTMLElement | null = after ?? ticks[ticks.length - 1] ?? null;
+  // The nearest heading marked for it, outside the lists: the view's, the dossier panel's.
+  for (let el = row.parentElement; !target && el; el = el.parentElement) target = el.querySelector<HTMLElement>('[data-focus-fallback]');
+  target?.focus();
+}

@@ -10,19 +10,26 @@ import { TaskDialog } from './TaskDialog';
 /** The bar's count is read again every two minutes while the tab is on screen, and after every write. */
 const COUNT_EVERY_MS = 120_000;
 
-/** The key that opens the quick add from anywhere: free in the app (Layout, the dossier list's n / i, Study Mode). */
-export const QUICK_ADD_KEY = 'q';
+/**
+ * The key that opens the quick add from anywhere: «c», as in «compito». Free in the app (Layout's shortcuts carry a
+ * modifier; the dossier list's n / i, the selection popup's h / n, Study Mode's letters, the review's Space and 1–4).
+ */
+export const QUICK_ADD_KEY = 'c';
+
+/** The inputs that take letters; a checkbox (where the arrows leave the focus in a list) or a button does not. */
+const TYPING_INPUTS = new Set(['text', 'search', 'email', 'url', 'tel', 'password', 'number', 'date', 'time', 'datetime-local', 'month', 'week']);
 
 /** Whether a key press belongs to something else: a field, an open dialog or menu, a full-screen overlay. */
 function keyIsTaken(event: KeyboardEvent): boolean {
   if (event.metaKey || event.ctrlKey || event.altKey || event.repeat || event.defaultPrevented) return true;
   const target = event.target as HTMLElement | null;
-  if (target && (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable)) return true;
+  if (target instanceof HTMLInputElement && TYPING_INPUTS.has(target.type)) return true;
+  if (target && (['TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable)) return true;
   return document.querySelector('[aria-modal="true"], [data-find-overlay], [role="menu"]') !== null;
 }
 
 /**
- * The planner's pieces every page needs, mounted once by `Layout` (gotcha 27): «q» and the quick-add dialog (on a
+ * The planner's pieces every page needs, mounted once by `Layout` (gotcha 27): «c» and the quick-add dialog (on a
  * dossier's page the dossier is chosen), the planner's toast, and the count of today's and overdue tasks the sidebar
  * shows beside «Oggi».
  */

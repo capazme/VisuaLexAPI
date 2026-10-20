@@ -14,6 +14,7 @@ import { splitLinks } from './splitLinks';
 import { appStore } from '../../../store/useAppStore';
 
 const TODAY = '2026-10-20';
+const noOptimistic = { hide: () => {}, show: () => {}, landed: () => {} };
 
 function task(id: string, fields: Partial<Task> = {}): Task {
   return {
@@ -38,25 +39,31 @@ beforeEach(() => {
 
 const host = (path = '/') => render(<MemoryRouter initialEntries={[path]}><PlannerHost enabled /><input aria-label="Altro campo" /></MemoryRouter>);
 
-describe('«q», the quick add from anywhere', () => {
+describe('«c», the quick add from anywhere', () => {
   it('opens the new task, and on a dossier\'s page the dossier is chosen', async () => {
     host('/dossier?dossier=d1');
-    fireEvent.keyDown(window, { key: 'q' });
+    fireEvent.keyDown(window, { key: 'c' });
     const dialog = await screen.findByRole('dialog', { name: 'Nuovo compito' });
     expect(within(dialog).getByLabelText('Dossier')).toHaveValue('d1');
     expect(within(dialog).getByLabelText('Titolo')).toHaveFocus();
   });
 
+  it('works from a task\'s checkbox, where the arrows leave the focus', async () => {
+    render(<MemoryRouter><PlannerHost enabled /><input type="checkbox" aria-label="Segna come fatto: x" /></MemoryRouter>);
+    fireEvent.keyDown(screen.getByRole('checkbox'), { key: 'c' });
+    expect(await screen.findByRole('dialog', { name: 'Nuovo compito' })).toBeInTheDocument();
+  });
+
   it('is left alone in a field, with a modifier, and under a dialog', () => {
     host();
     const field = screen.getByLabelText('Altro campo');
-    fireEvent.keyDown(field, { key: 'q' });
-    fireEvent.keyDown(window, { key: 'q', metaKey: true });
+    fireEvent.keyDown(field, { key: 'c' });
+    fireEvent.keyDown(window, { key: 'c', metaKey: true });
     expect(plannerStore.getState().quickAdd).toBeNull();
     const modal = document.createElement('div');
     modal.setAttribute('aria-modal', 'true');
     document.body.append(modal);
-    fireEvent.keyDown(window, { key: 'q' });
+    fireEvent.keyDown(window, { key: 'c' });
     expect(plannerStore.getState().quickAdd).toBeNull();
     modal.remove();
   });
@@ -64,7 +71,7 @@ describe('«q», the quick add from anywhere', () => {
   it('creates the task with what was chosen, and its origin from the dossier\'s kind', async () => {
     service.create.mockResolvedValue(task('n', { dossierId: 'd2' }));
     host('/dossier?dossier=d2');
-    fireEvent.keyDown(window, { key: 'q' });
+    fireEvent.keyDown(window, { key: 'c' });
     const dialog = await screen.findByRole('dialog');
     fireEvent.change(within(dialog).getByLabelText('Titolo'), { target: { value: 'Ripassare la prescrizione' } });
     fireEvent.change(within(dialog).getByLabelText('Termine finale'), { target: { value: '2026-11-02' } });
@@ -111,13 +118,13 @@ describe('editing a task', () => {
     service.update.mockResolvedValue(parent);
     service.create.mockResolvedValue(task('s2', { parentId: 'p' }));
     const onClose = vi.fn();
-    render(<MemoryRouter><TaskDialog mode="edit" task={parent} today={TODAY} onClose={onClose} /></MemoryRouter>);
+    render(<MemoryRouter><TaskDialog mode="edit" task={parent} today={TODAY} optimistic={noOptimistic} onClose={onClose} /></MemoryRouter>);
     const dialog = screen.getByRole('dialog', { name: 'Modifica compito' });
     expect(await within(dialog).findByText('Compito s')).toBeInTheDocument();
     expect(service.list).toHaveBeenCalledWith('dossier', 'd1');
     fireEvent.change(within(dialog).getByLabelText('Nuovo sottocompito'), { target: { value: 'Bozza' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Aggiungi il sottocompito' }));
-    await waitFor(() => expect(service.create).toHaveBeenCalledWith({ title: 'Bozza', parentId: 'p' }));
+    await waitFor(() => expect(service.create).toHaveBeenCalledWith({ title: 'Bozza', parentId: 'p', origin: 'lavoro' }));
     fireEvent.change(within(dialog).getByLabelText('Descrizione'), { target: { value: 'Vedi https://example.org/atto.' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Salva' }));
     await waitFor(() => expect(service.update).toHaveBeenCalled());
@@ -128,7 +135,7 @@ describe('editing a task', () => {
   it("shows the server's refusal in the dialog", async () => {
     const parent = task('p');
     service.update.mockRejectedValue({ status: 400, message: 'Un compito con un termine finale non si ripete: togli la ripetizione o il termine.' });
-    render(<MemoryRouter><TaskDialog mode="edit" task={parent} today={TODAY} onClose={vi.fn()} /></MemoryRouter>);
+    render(<MemoryRouter><TaskDialog mode="edit" task={parent} today={TODAY} optimistic={noOptimistic} onClose={vi.fn()} /></MemoryRouter>);
     fireEvent.click(screen.getByRole('button', { name: 'Salva' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/non si ripete/);
   });

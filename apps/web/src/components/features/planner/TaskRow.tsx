@@ -39,7 +39,7 @@ export function TaskRow({ task, today, showDossier, isChild = false, onTick, onO
   const plannedLate = task.plannedDate !== null && task.plannedDate < today;
 
   return (
-    <li data-task-row className="relative">
+    <li data-task-row data-task-id={task.id} className="relative">
       <div className="group relative flex items-start gap-1 rounded-xl py-1 pl-1 pr-1 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40">
         {stripe && <span aria-hidden className={cn('absolute bottom-2 left-0 top-2 w-1 rounded-full', stripe)} />}
         <label className="grid h-11 w-11 shrink-0 cursor-pointer place-items-center">

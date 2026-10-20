@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from 'react';
+import { useId, useRef, useState, type FormEvent } from 'react';
 import { Trash2 } from 'lucide-react';
 import { Modal } from '../../ui/Modal';
 import { cn } from '../../../lib/utils';
@@ -6,7 +6,7 @@ import { useAppStore } from '../../../store/useAppStore';
 import { taskService } from '../../../services/taskService';
 import type { Task } from '../../../types/tasks';
 import { INK_BUTTON, QUIET_BUTTON, SECONDARY_BUTTON } from '../studia/progress/tokens';
-import { completeWithUndo, trashWithUndo } from './taskActions';
+import { completeWithUndo, trashWithUndo, type Optimistic } from './taskActions';
 import { draftFromTask, draftProblem, emptyDraft, inputFromDraft, MAX_TITLE, type TaskDraft } from './taskDraft';
 import { failureMessage, plannerStore } from './plannerStore';
 import { TaskFields } from './TaskFields';
@@ -14,12 +14,12 @@ import { useTaskView } from './useTaskView';
 import { FIELD, FIELD_LABEL } from './plannerStyles';
 
 type Props =
-  | { mode: 'edit'; task: Task; today: string; focus?: 'subtask'; onClose: () => void }
+  | { mode: 'edit'; task: Task; today: string; focus?: 'subtask'; optimistic: Optimistic; onClose: () => void }
   | { mode: 'create'; defaults: Partial<TaskDraft>; today: string; onClose: () => void; onCreated?: (task: Task) => void };
 
 /**
  * A task in full: title, description, dates, priority, labels, repetition, dossier; for a task that is not a subtask,
- * its subtasks (one level). Creating («q» from anywhere) takes the same fields. Saving waits for the server; a refusal
+ * its subtasks (one level). Creating («c» from anywhere) takes the same fields. Saving waits for the server; a refusal
  * keeps what was typed and says why, in the server's words.
  */
 export function TaskDialog(props: Props) {
@@ -31,7 +31,7 @@ export function TaskDialog(props: Props) {
   const titleRef = useRef<HTMLInputElement>(null);
   const subtaskRef = useRef<HTMLInputElement>(null);
   const dossiers = useAppStore((s) => s.dossiers);
-  const formId = 'planner-task-form';
+  const formId = `${useId()}-form`;
 
   const save = async (event?: FormEvent) => {
     event?.preventDefault();
@@ -64,9 +64,10 @@ export function TaskDialog(props: Props) {
   };
 
   const trash = () => {
-    if (!editing) return;
+    if (props.mode !== 'edit') return;
     onClose();
-    void trashWithUndo(editing, { hide: () => {}, show: () => {} });
+    // The list's own: the row goes at once, as from its «⋯».
+    void trashWithUndo(props.task, props.optimistic);
   };
 
   return (
@@ -114,6 +115,7 @@ function Subtasks({ parent, today, inputRef }: { parent: Task; today: string; in
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const id = useId();
 
   const add = async (event: FormEvent) => {
     event.preventDefault();
@@ -122,7 +124,8 @@ function Subtasks({ parent, today, inputRef }: { parent: Task; today: string; in
     setBusy(true);
     setError(null);
     try {
-      await taskService.create({ title: trimmed, parentId: parent.id });
+      // A subtask lives in its parent's dossier, and takes its origin.
+      await taskService.create({ title: trimmed, parentId: parent.id, origin: parent.origin });
       setTitle('');
       plannerStore.getState().changed();
     } catch (failure) {
@@ -133,8 +136,8 @@ function Subtasks({ parent, today, inputRef }: { parent: Task; today: string; in
   };
 
   return (
-    <section aria-labelledby="planner-subtasks" className="mt-6 border-t border-slate-200 pt-4 dark:border-slate-800">
-      <h3 id="planner-subtasks" className={FIELD_LABEL}>
+    <section aria-labelledby={`${id}-heading`} className="mt-6 border-t border-slate-200 pt-4 dark:border-slate-800">
+      <h3 id={`${id}-heading`} className={FIELD_LABEL}>
         Sottocompiti{children.length > 0 ? ` (${children.length})` : ''}
       </h3>
       {list.status === 'error' && <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">Non riesco a leggere i sottocompiti.</p>}
@@ -157,10 +160,10 @@ function Subtasks({ parent, today, inputRef }: { parent: Task; today: string; in
         </ul>
       )}
       <form onSubmit={add} className="mt-2 flex gap-2">
-        <label htmlFor="planner-subtask-title" className="sr-only">Nuovo sottocompito</label>
+        <label htmlFor={`${id}-title`} className="sr-only">Nuovo sottocompito</label>
         <input
           ref={inputRef}
-          id="planner-subtask-title"
+          id={`${id}-title`}
           value={title}
           maxLength={MAX_TITLE}
           placeholder="Aggiungi un sottocompito"

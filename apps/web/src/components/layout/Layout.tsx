@@ -322,7 +322,7 @@ export function Layout() {
       {/* The palette (⌘K) and the managers it opens, on every page */}
       <GlobalSearch />
 
-      {/* The planner's quick add («q»), its toast and the count beside «Oggi», on every page */}
+      {/* The planner's quick add («c»), its toast and the count beside «Oggi», on every page */}
       <PlannerHost enabled={isAuthenticated} />
 
       {/* Find in the text (Cmd/Ctrl+F, the reading toolbars' magnifier) */}

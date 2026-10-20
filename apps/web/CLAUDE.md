@@ -234,7 +234,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   from the edge it lives on and pauses its time while `document.hidden`; the undo toast's countdown lives
   in `useUndoableAction` and does not pause. One undo toast at a time: `showUndoToast` dismisses the one on
   screen (it resolves as kept) before it shows its own — two countdowns used to take turns on the one container,
-  and two tasks ticked in a row flickered between their messages. Its «Annulla» and close are 44 px on a phone. `Tooltip` waits 500 ms under a pointer, opens at once and
+  and two tasks ticked in a row flickered between their messages. Its «Annulla» and close are 44 px at every width. `Tooltip` waits 500 ms under a pointer, opens at once and
   without motion within 300 ms of another closing, and at once on keyboard focus.
   Interaction tokens live in `constants/interactions.ts`, stacking bands in
   `constants/zIndex.ts`. Compose these rather than hand-rolling Tailwind: `TRANSITION` names the
@@ -265,8 +265,12 @@ checks the files; «termine calcolato» comes with wave 2 and its warning), and 
   «Normale» the default and not shown) with a 4 px stripe, the labels, the dossier (a link; not in the dossier's own
   panel), «⋯» (Modifica, Aggiungi un sottocompito, Sposta nel cestino). `TaskList` nests subtasks one level under a
   parent in the same list (`nestTasks`; deeper ones under the top ancestor); the arrows, Home and End move between
-  the rows' ticks across every list of the page (`moveBetweenRows`, `data-task-lists`).
-- **Writes** (`taskActions.ts`): a tick hides the row, then `POST /complete` — a repeating task with its current
+  the rows' ticks across every list of the page (`moveBetweenRows`, `data-task-lists`). A row that leaves (ticked,
+  trashed) first hands the focus to the next row's tick, else the previous one's, else the view's heading
+  (`focusAwayFrom`, `data-focus-fallback`), so Space and the arrows go on.
+- **Writes** (`taskActions.ts`): a tick hides the row — until an answer read after the write landed
+  (`optimistic.landed`, the write counter): a read that started before, or a failed one keeping the last answer,
+  would show it again, not done — then `POST /complete` — a repeating task with its current
   `plannedDate` (the server needs it, and a stale one is a 409) — and the undo toast: «Annulla» reopens, or for a
   repeating task (`recurred`) puts the planned date back with a `PUT`. A deletion goes to the trash with its
   subtasks, «Annulla» restores. A refusal shows the row again and the server's Italian `detail` in the planner's toast
@@ -274,7 +278,7 @@ checks the files; «termine calcolato» comes with wave 2 and its warning), and 
   mounted reads again; nothing holds tasks between reads. No toast, log or error carries a task's title (it may name a
   client): `useTaskView` and the count log a status only.
 - **Adding**: `QuickAddField` at the top of each view (a title and Enter; «Dettagli» for dates, priority and dossier;
-  a line says where the task goes; a task that will not show in the view is announced); «q» from anywhere opens
+  a line says where the task goes; a task that will not show in the view is announced); «c» (as in «compito») from anywhere opens
   `TaskDialog` in `create` mode (`PlannerHost`, mounted by `Layout`; not in a field, with a modifier, or under a dialog,
   a menu or a `data-find-overlay`), with the dossier chosen on `/dossier?dossier=`; listed in the «?» dialog. No date
   is read from the words (wave 2). The origin follows the dossier's kind (`studio` or `lavoro`).

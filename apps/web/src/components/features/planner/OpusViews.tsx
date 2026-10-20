@@ -19,8 +19,8 @@ const COUNT = 'ml-2 font-sans text-sm font-normal text-slate-600 dark:text-slate
 interface FrameProps {
   view: TaskView;
   heading: string;
-  /** The line under the heading: the day, or what the view holds. */
-  line: string;
+  /** The line under the heading, from the server's day: the day itself, or what the view holds. */
+  line: string | ((today: string) => string);
   defaults?: (today: string) => Partial<TaskDraft>;
   children: (tasks: Task[], today: string, optimistic: ReturnType<typeof useTaskView>['optimistic']) => ReactNode;
   empty: { title: string; line?: string };
@@ -38,10 +38,12 @@ function ViewFrame({ view, heading, line, defaults, children, empty }: FrameProp
   return (
     <section aria-labelledby={`opus-${view}`} className="space-y-5 pb-8">
       <div>
-        <h2 id={`opus-${view}`} className={BLOCK_HEADING}>{heading}</h2>
-        <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-400">{line}</p>
+        {/* Where the focus goes when the last row leaves (`focusAwayFrom`). */}
+        <h2 id={`opus-${view}`} tabIndex={-1} data-focus-fallback className={cn(BLOCK_HEADING, 'focus-visible:outline-none')}>{heading}</h2>
+        <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-400">{typeof line === 'function' ? line(today) : line}</p>
       </div>
-      {defaults && <QuickAddField view={view} today={today} defaults={defaults(today)} />}
+      {/* Keyed on the day: a page left open overnight proposes the new day, not the one it was opened on. */}
+      {defaults && <QuickAddField key={today} view={view} today={today} defaults={defaults(today)} />}
       <div aria-busy={state.status === 'loading'} className={cn('space-y-6', state.status === 'loading' && state.answer && 'opacity-60 transition-opacity')}>
         {state.status === 'error' && <TaskViewError onRetry={state.reload} />}
         {state.answer === null ? (
@@ -64,7 +66,11 @@ function Group({ id, heading, count, children }: { id: string; heading: string; 
     <section aria-labelledby={id} className="space-y-1">
       <h3 id={id} className={GROUP_HEADING}>
         {heading}
-        <span className={COUNT}>{count}</span>
+        <span className={COUNT}>
+          <span className="sr-only">, </span>
+          {count}
+          <span className="sr-only">{count === 1 ? ' compito' : ' compiti'}</span>
+        </span>
       </h3>
       {children}
     </section>
@@ -73,12 +79,11 @@ function Group({ id, heading, count, children }: { id: string; heading: string; 
 
 /** «Oggi»: the overdue first, then today's; a new task is for today. */
 export function TodayView() {
-  const today = todayInRome();
   return (
     <ViewFrame
       view="today"
       heading="Oggi"
-      line={longDay(today, today)}
+      line={(today) => longDay(today, today)}
       defaults={(day) => ({ plannedDate: day })}
       empty={{ title: 'Nessun compito per oggi', line: 'Quello che aggiungi qui è per oggi.' }}
     >

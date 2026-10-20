@@ -8,6 +8,8 @@ import { shortDay } from './taskDates';
 export interface Optimistic {
   hide: (id: string) => void;
   show: (id: string) => void;
+  /** The write has landed: the row stays hidden until an answer read after it. */
+  landed: (id: string) => void;
 }
 
 const { changed, notify } = plannerStore.getState();
@@ -28,6 +30,7 @@ export async function completeWithUndo(task: Task, today: string, optimistic: Op
     notify(failureMessage(error, 'Non riesco a segnare il compito come fatto. Riprova.'), 'error');
     return;
   }
+  optimistic.landed(task.id);
   changed();
   const recurred = answer.recurred;
   await showUndoToast({
@@ -57,6 +60,7 @@ export async function trashWithUndo(task: Task, optimistic: Optimistic): Promise
     notify(failureMessage(error, 'Non riesco a spostare il compito nel cestino. Riprova.'), 'error');
     return;
   }
+  optimistic.landed(task.id);
   changed();
   const subtasks = taskCount - 1;
   await showUndoToast({
@@ -87,6 +91,7 @@ export async function restoreTask(task: Task, optimistic: Optimistic): Promise<v
     notify(failureMessage(error, 'Non riesco a ripristinare il compito. Riprova.'), 'error');
     return;
   }
+  optimistic.landed(task.id);
   changed();
   notify('Compito ripristinato');
 }
