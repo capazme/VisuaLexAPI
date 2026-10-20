@@ -72,8 +72,7 @@ export function computeNormaGroups(items: DossierItem[]): NormaGroup[] {
   return Array.from(groups.values());
 }
 
-// The search that opens a group on the dashboard: the version the group holds,
-// and Brocardi only for the text in force (its commentary carries no date).
+// The search that opens a group on the dashboard: the version the group holds.
 export function searchParamsFromGroup(group: NormaGroup): SearchParams {
   return {
     act_type: group.tipo_atto,
@@ -82,7 +81,6 @@ export function searchParamsFromGroup(group: NormaGroup): SearchParams {
     article: group.articles.join(','),
     version: (group.versione as SearchParams['version']) || 'vigente',
     version_date: group.data_versione || '',
-    show_brocardi_info: !requestIsHistorical({ versione: group.versione, data_versione: group.data_versione }),
     ...(group.allegato ? { annex: group.allegato } : {}),
   };
 }
@@ -130,8 +128,6 @@ export function searchParamsFromNorma(norma: NormaVisitata): SearchParams {
     article: norma.numero_articolo?.toString() || '',
     version: (norma.versione as SearchParams['version']) || 'vigente',
     version_date: norma.data_versione || '',
-    // Brocardi's commentary carries no date: a past text is read without it.
-    show_brocardi_info: !requestIsHistorical(norma),
     ...(norma.allegato ? { annex: norma.allegato } : {}),
   };
 }

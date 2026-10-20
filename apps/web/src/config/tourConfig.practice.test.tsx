@@ -1,7 +1,6 @@
 import { act, render } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ReadingToolbarSource from '../components/features/search/ReadingToolbar.tsx?raw';
-import BrocardiDisplaySource from '../components/features/search/BrocardiDisplay.tsx?raw';
 
 vi.mock('../hooks/useIsDesktop', () => ({ useIsDesktop: () => true, isDesktopViewport: () => true }));
 vi.mock('../services/legalFetch', () => ({ legalFetch: vi.fn() }));
@@ -38,7 +37,7 @@ const table = () => <PracticeTable onViewPdf={vi.fn()} onCrossReference={vi.fn()
 const selectors = (steps: typeof PRACTICE_STEPS) => steps.map((s) => s.element).filter((e): e is string => typeof e === 'string');
 
 // Rendered by the reading surface of an open row, not by the table: checked in the surfaces' source.
-const READING_SURFACE = { '.glass-toolbar': ReadingToolbarSource, '.brocardi-display': BrocardiDisplaySource };
+const READING_SURFACE = { '.glass-toolbar': ReadingToolbarSource };
 
 beforeEach(() => {
   tour.seen.clear();
@@ -66,8 +65,9 @@ describe('the practice tours point at what the table draws', () => {
     }
   });
 
-  it('no tour points at an element of the removed floating tabs', () => {
-    const removed = [/workspace-tab-panel/, /norma-block-header/, /norma-article-tabs/, /norma-study-mode-btn/, /norma-structure-btn/, /tour-workspace-/, /tour-quicknorms$/];
+  it('no tour points at an element of the removed floating tabs or of Brocardi', () => {
+    // Brocardi's surfaces are gone too (D-078)
+    const removed = [/workspace-tab-panel/, /norma-block-header/, /norma-article-tabs/, /norma-study-mode-btn/, /norma-structure-btn/, /tour-workspace-/, /tour-quicknorms$/, /brocardi/];
     for (const step of Object.values(TOUR_STEPS_MAP).flat()) {
       if (typeof step.element === 'string') {
         for (const gone of removed) expect(step.element, step.popover?.title).not.toMatch(gone);

@@ -24,25 +24,25 @@ const dossier = (items: DossierItem[]): Dossier => ({
 });
 
 describe('searchParamsFromNorma', () => {
-  it('maps NormaVisitata to SearchParams honoring stored version, without doctrine for a past text', () => {
+  it('maps NormaVisitata to SearchParams honoring stored version', () => {
     expect(searchParamsFromNorma({ ...norma, versione: 'originale', data_versione: '1990-01-01', allegato: '2' }))
       .toEqual({
         act_type: 'codice civile', act_number: '262', date: '1942-03-16', article: '2043',
-        version: 'originale', version_date: '1990-01-01', show_brocardi_info: false, annex: '2',
+        version: 'originale', version_date: '1990-01-01', annex: '2',
       });
   });
-  it('defaults to vigente and empty version_date, and asks for the doctrine of the text in force', () => {
+  it('defaults to vigente and empty version_date, and sends no Brocardi flag (D-078)', () => {
     const p = searchParamsFromNorma(norma);
     expect(p.version).toBe('vigente');
     expect(p.version_date).toBe('');
-    expect(p.show_brocardi_info).toBe(true);
+    expect(p).not.toHaveProperty('show_brocardi_info');
     expect(p).not.toHaveProperty('annex');
   });
   it.each([
     [{ versione: 'originale' }],
     [{ versione: 'vigente', data_versione: '2007-12-29' }],
-  ])('keeps the doctrine out of a reopened past text %j', (version) => {
-    expect(searchParamsFromNorma({ ...norma, ...version }).show_brocardi_info).toBe(false);
+  ])('sends no Brocardi flag for a reopened past text either %j', (version) => {
+    expect(searchParamsFromNorma({ ...norma, ...version })).not.toHaveProperty('show_brocardi_info');
   });
 });
 
@@ -171,7 +171,7 @@ describe('normaForDossier', () => {
   it('reopens the same version it stored', () => {
     const stored = normaForDossier(block, article({ versione: 'vigente', data_versione: '2007-12-29' }));
     expect(searchParamsFromNorma(stored)).toMatchObject({
-      article: '1284', version: 'vigente', version_date: '2007-12-29', show_brocardi_info: false,
+      article: '1284', version: 'vigente', version_date: '2007-12-29',
     });
   });
 });
@@ -229,19 +229,19 @@ describe('searchParamsFromGroup', () => {
     articles: ['1284', '1285'], versione: '', data_versione: '', allegato: '', ...over,
   });
 
-  it('asks for the text in force with Brocardi, as the dossier always did', () => {
+  it('asks for the text in force, with no Brocardi flag', () => {
     expect(searchParamsFromGroup(group())).toEqual({
       act_type: 'codice civile', act_number: '262', date: '1942-03-16', article: '1284,1285',
-      version: 'vigente', version_date: '', show_brocardi_info: true,
+      version: 'vigente', version_date: '',
     });
   });
 
-  it('asks for the past text a group holds, without Brocardi', () => {
+  it('asks for the past text a group holds', () => {
     expect(searchParamsFromGroup(group({ versione: 'vigente', data_versione: '2007-12-29' }))).toMatchObject({
-      version: 'vigente', version_date: '2007-12-29', show_brocardi_info: false,
+      version: 'vigente', version_date: '2007-12-29',
     });
     expect(searchParamsFromGroup(group({ versione: 'originale' }))).toMatchObject({
-      version: 'originale', version_date: '', show_brocardi_info: false,
+      version: 'originale', version_date: '',
     });
   });
 
@@ -288,8 +288,8 @@ describe('searchesForGroups', () => {
     expect(created).toEqual(['Pratica', 'Pratica — testo al 29/12/2007']);
     expect(searches.map((s) => s.targetPracticeId)).toEqual(['tab-1', 'tab-1', 'tab-2']);
     expect(searches.map((s) => s.tabLabel)).toEqual(['Pratica', 'Pratica', 'Pratica — testo al 29/12/2007']);
-    expect(searches[2]).toMatchObject({ version: 'vigente', version_date: '2007-12-29', show_brocardi_info: false });
-    expect(searches[0]).toMatchObject({ version: 'vigente', version_date: '', show_brocardi_info: true });
+    expect(searches[2]).toMatchObject({ version: 'vigente', version_date: '2007-12-29' });
+    expect(searches[0]).toMatchObject({ version: 'vigente', version_date: '' });
   });
 
   it('still routes the texts in force of two annexes to the one shared tab', () => {

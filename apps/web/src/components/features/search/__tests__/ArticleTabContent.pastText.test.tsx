@@ -36,7 +36,6 @@ vi.mock('../../../../plugins/PluginSlot', () => ({
     return null;
   },
 }));
-vi.mock('../BrocardiDisplay', () => ({ BrocardiDisplay: () => <div data-testid="brocardi" /> }));
 // The real comparison state, with the call to open it recorded.
 vi.mock('../../../../hooks/useCompare', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../hooks/useCompare')>();
@@ -49,13 +48,13 @@ import { appStore } from '../../../../store/useAppStore';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../../utils/normaKeys';
 import { fixtureText } from '../../../../utils/__fixtures__/articleTexts';
 import { NOT_YET_REASON, UNRELIABLE_REASON } from '../../../../utils/versionDisplay';
+import { getRubricText, parseArticleStructure } from '../../../../utils/articleStructure';
 
 const TEXT = fixtureText('nrm-cc-1284');
 const NORMA: NormaVisitata = {
   tipo_atto: 'codice civile', data: '1942-03-16', numero_atto: '262', numero_articolo: '1284', allegato: '2',
   urn: 'urn:nir:stato:regio.decreto:1942-03-16;262:2~art1284',
 };
-const BROCARDI = { position: null, link: null, Brocardi: ['Nemo iudex'], Ratio: null, Spiegazione: null, Massime: null };
 
 const CURRENT: ArticleValidity = {
   state: 'current', valid_from: '2025-12-28', valid_to: null, version_number: 8, act_updated: '2026-08-11', request_in_window: null,
@@ -69,7 +68,7 @@ const NOT_YET: ArticleValidity = {
 const PAST = { versione: 'vigente', data_versione: '2005-06-01' };
 
 function article(validity?: ArticleValidity, norma: Partial<NormaVisitata> = {}, over: Partial<ArticleData> = {}): ArticleData {
-  return { article_text: TEXT, norma_data: { ...NORMA, ...norma }, brocardi_info: BROCARDI, validity, ...over };
+  return { article_text: TEXT, norma_data: { ...NORMA, ...norma }, validity, ...over };
 }
 
 function show(data: ArticleData) {
@@ -118,7 +117,6 @@ describe('ArticleTabContent — the text in force', () => {
     expect(screen.getByRole('button', { name: 'In vigore dal 28-12-2025' })).toBeInTheDocument();
     expect(screen.queryByText('Testo storico')).not.toBeInTheDocument();
     expect(screen.getAllByTitle('Apri note')[0]).toBeEnabled();
-    expect(screen.getByTestId('brocardi')).toBeInTheDocument();
     expect(screen.getByText('Chiedi su questo articolo')).toBeInTheDocument();
   });
 
@@ -188,9 +186,11 @@ describe('ArticleTabContent — a past text is a reading', () => {
     }
   });
 
-  it('keeps Brocardi out, even when an older answer carried it', () => {
-    show(article(MIDDLE, PAST));
-    expect(screen.queryByTestId('brocardi')).not.toBeInTheDocument();
+  it('shows nothing of Brocardi, even when an older answer carried it (D-078)', () => {
+    const older = { ...article(CURRENT, { versione: 'vigente', data_versione: '' }), brocardi_info: { Brocardi: ['Nemo iudex'], Ratio: 'La ratio.', Massime: ['Una massima.'] } };
+    show(older as unknown as ArticleData);
+    fireEvent.click(screen.getByRole('button', { name: 'Giurisprudenza' }));
+    expect(screen.queryByText(/Brocardi|Nemo iudex|La ratio|Una massima|Massime/)).not.toBeInTheDocument();
   });
 
   it('keeps «Giurisprudenza» on a past text, with the Massimario slot told it is one', async () => {
@@ -198,7 +198,6 @@ describe('ArticleTabContent — a past text is a reading', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Giurisprudenza' }));
     expect(slotCalls.find((c) => c.slot === 'article_case_law')?.props).toMatchObject({ isHistorical: true });
     expect(screen.getByRole('button', { name: 'Cerca nell’archivio della Cassazione' })).toBeInTheDocument();
-    expect(screen.queryByText('Massime (Brocardi)')).not.toBeInTheDocument();
   });
 
   it('does not ask the discussions of the passages of a text it will not mark', () => {
@@ -224,7 +223,6 @@ describe('ArticleTabContent — a past text is a reading', () => {
 
   it('is read-only too when the source could not be read but a date was asked for', () => {
     show(article(undefined, PAST));
-    expect(screen.queryByTestId('brocardi')).not.toBeInTheDocument();
     expect(screen.getAllByTitle('Apri note — Non disponibile su un testo storico')[0]).toBeDisabled();
   });
 
@@ -244,16 +242,57 @@ describe('ArticleTabContent — a past text is a reading', () => {
   });
 });
 
+describe('ArticleTabContent — «Cerca sentenze sul tema dell’articolo»', () => {
+  const openTopicSearch = vi.fn(() => 'w');
+  const topicLink = () => screen.queryByRole('button', { name: /Cerca sentenze sul tema dell’articolo/ });
+  beforeEach(() => {
+    openTopicSearch.mockClear();
+    appStore.setState({ openTopicSearch });
+  });
+
+  it('searches the Cassazione by the article\'s rubric', () => {
+    const rubric = getRubricText(TEXT, parseArticleStructure(TEXT));
+    expect(rubric).toBeTruthy();
+    show(article(CURRENT, { versione: 'vigente', data_versione: '' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Giurisprudenza' }));
+    fireEvent.click(topicLink()!);
+    expect(openTopicSearch).toHaveBeenCalledExactlyOnceWith({ tema: rubric }, `Tema: ${rubric}`, undefined);
+  });
+
+  it.each([
+    '((ARTICOLO ABROGATO DAL D.LGS. 10 OTTOBRE 2022, N. 149))',
+    '((ARTICOLO SOPPRESSO DALLA L. 28 DICEMBRE 2005, N. 262))',
+    '((COMMA SOSTITUITO DAL D.L. 24 GENNAIO 2012, N. 1))',
+    '((OMISSIS))',
+  ])('takes no notice the source served in place of a rubric for one, with no validity to go by: %s', (notice) => {
+    show(article(undefined, {}, { article_text: `Art. 155-ter\n${notice}` }));
+    fireEvent.click(screen.getByRole('button', { name: 'Giurisprudenza' }));
+    expect(topicLink()).toBeNull();
+  });
+
+  it('offers nothing for a repealed article or one that did not exist yet', () => {
+    const abrogated: ArticleValidity = { ...CURRENT, state: 'abrogated' };
+    const first = show(article(abrogated));
+    fireEvent.click(screen.getByRole('button', { name: 'Giurisprudenza' }));
+    expect(topicLink()).toBeNull();
+    first.unmount();
+    show(article(NOT_YET, { versione: 'vigente', data_versione: '2010-01-01' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Giurisprudenza' }));
+    expect(topicLink()).toBeNull();
+  });
+});
+
 describe('ArticleTabContent — the way back and the way on', () => {
-  it('goes to the text in force without a date and with its doctrine', () => {
+  it('goes to the text in force without a date', () => {
     show(article(MIDDLE, PAST));
     fireEvent.click(screen.getByRole('button', { name: 'Vai al testo attuale' }));
     const params = triggerSearch.mock.calls[0][0];
-    expect(params).toMatchObject({ act_type: 'codice civile', article: '1284', version: 'vigente', show_brocardi_info: true });
+    expect(params).toMatchObject({ act_type: 'codice civile', article: '1284', version: 'vigente' });
+    expect(params).not.toHaveProperty('show_brocardi_info');
     expect(params.version_date).toBeUndefined();
   });
 
-  it('opens the dialog from the chip and asks for a text on a day, without doctrine and keeping the annex', async () => {
+  it('opens the dialog from the chip and asks for a text on a day, keeping the annex', async () => {
     show(article(CURRENT, { versione: 'vigente', data_versione: '' }));
     fireEvent.click(screen.getByRole('button', { name: 'In vigore dal 28-12-2025' }));
     const dialog = screen.getByRole('dialog', { name: 'Testo alla data' });
@@ -261,7 +300,7 @@ describe('ArticleTabContent — the way back and the way on', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: /Mostra il testo/ }));
     expect(triggerSearch).toHaveBeenCalledWith({
       act_type: 'codice civile', act_number: '262', date: '1942-03-16', article: '1284',
-      version: 'vigente', version_date: '2007-12-29', show_brocardi_info: false, annex: '2',
+      version: 'vigente', version_date: '2007-12-29', annex: '2',
     });
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument()); // it fades out
   });
@@ -299,7 +338,7 @@ describe('ArticleTabContent — an article that did not exist yet', () => {
     show(notYet());
     fireEvent.click(screen.getByRole('button', { name: 'Vai al testo del 13 settembre 2014' }));
     expect(triggerSearch).toHaveBeenCalledWith(expect.objectContaining({
-      version: 'vigente', version_date: '2014-09-13', show_brocardi_info: false,
+      version: 'vigente', version_date: '2014-09-13',
     }));
   });
 

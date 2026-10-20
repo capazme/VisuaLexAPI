@@ -173,10 +173,20 @@ describe('App routing — Studia', () => {
     expect(window.location.pathname).toBe('/studia/ripasso');
   });
 
-  it('opens a session at /studia/ripasso/sessione, inside the area', async () => {
+  it('opens a session at /studia/ripasso/sessione, inside the area, as the lesson in its frame (Gymnasium spec §5.4)', async () => {
     renderAt('/studia/ripasso/sessione?materia=DIRITTO_CIVILE');
-    expect(await screen.findByRole('heading', { name: 'Sessione di ripasso' })).toBeInTheDocument();
+    const session = await screen.findByRole('heading', { name: 'Sessione di ripasso' });
+    expect(screen.getByTestId('lesson-frame')).toContainElement(session);
+    // The lesson is a screen of its own: the area's heading is not drawn over it.
+    expect(screen.queryByRole('heading', { level: 1, name: 'Gymnasium: la tua palestra giuridica' })).toBeNull();
+  });
+
+  it('opens «Progressi» at /studia/progressi, inside the area, under its heading (Gymnasium spec §5.3)', async () => {
+    renderAt('/studia/progressi');
+    expect(await screen.findByRole('heading', { level: 2, name: 'I tuoi progressi' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Gymnasium: la tua palestra giuridica' })).toBeInTheDocument();
+    // The read is mocked to fail here: the page says so.
+    expect(await screen.findByText('Non riesco a leggere i tuoi progressi.')).toBeInTheDocument();
   });
 
   it('keeps a card’s address inside the Studia area', async () => {

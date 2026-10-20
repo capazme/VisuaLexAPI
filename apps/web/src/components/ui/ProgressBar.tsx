@@ -5,7 +5,7 @@ import { cn } from '../../lib/utils';
 export interface ProgressBarProps {
   value?: number;
   max?: number;
-  variant?: 'default' | 'success' | 'warning' | 'brocardi';
+  variant?: 'default' | 'success' | 'warning';
   size?: 'sm' | 'md';
   indeterminate?: boolean;
   label?: string;
@@ -34,7 +34,6 @@ export function ProgressBar({
     default: 'bg-primary-500',
     success: 'bg-emerald-500',
     warning: 'bg-amber-500',
-    brocardi: 'bg-brocardi',
   };
 
   return (

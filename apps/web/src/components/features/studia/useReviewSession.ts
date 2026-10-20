@@ -20,6 +20,8 @@ export interface ReviewSummary {
 }
 
 export interface ReviewSessionOptions {
+  /** One institute of `materia`, spelt as the road lists it: the session narrowed to it (Gymnasium spec §5.2). */
+  istituto?: string;
   /** The keys are left alone while a dialog of the screen is open. */
   paused?: boolean;
   /** Esc was pressed (and no dialog was open). */
@@ -54,7 +56,7 @@ function isForOtherControl(target: EventTarget | null, key: string): boolean {
  * a post resolving and the screen rendering would otherwise act on the card already graded. Every
  * move of the queue is made from the ref, and checks that the head is still the card it was made for.
  */
-export function useReviewSession(materia?: Materia, { paused = false, onEscape }: ReviewSessionOptions = {}) {
+export function useReviewSession(materia?: Materia, { istituto, paused = false, onEscape }: ReviewSessionOptions = {}) {
   const [queue, setQueueState] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -92,7 +94,8 @@ export function useReviewSession(materia?: Materia, { paused = false, onEscape }
     setLoading(true);
     setLoadError(false);
     try {
-      const session = await studiaService.session(materia);
+      // One argument when no institute is asked: the call stays exactly what it was before G5.
+      const session = await (istituto === undefined ? studiaService.session(materia) : studiaService.session(materia, istituto));
       if (request !== latest.current) return;
       setQueue(session.cards.map((card) => ({ card, posted: false })));
       setRevealed(false);
@@ -110,7 +113,7 @@ export function useReviewSession(materia?: Materia, { paused = false, onEscape }
     } finally {
       if (request === latest.current) setLoading(false);
     }
-  }, [materia, setQueue, setRevealed]);
+  }, [materia, istituto, setQueue, setRevealed]);
 
   useEffect(() => {
     // Leaving (or asking again) makes the answer in flight stale.

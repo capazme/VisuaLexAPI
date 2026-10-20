@@ -76,7 +76,8 @@ describe('SearchField — the search page\'s field', () => {
     await user.keyboard('{Enter}');
     expect(triggerSearch).toHaveBeenCalledTimes(1);
     const params = triggerSearch.mock.calls[0][0];
-    expect(params).toMatchObject({ article: '2043', version: 'vigente', show_brocardi_info: true });
+    expect(params).toMatchObject({ article: '2043', version: 'vigente' });
+    expect(params).not.toHaveProperty('show_brocardi_info');
     expect(isTypedSearch(params)).toBe(true);
     expect(field()).toHaveValue('');
   });

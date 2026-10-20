@@ -1,10 +1,14 @@
+import { useId, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ChevronDown } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import type { Materia, Progressi } from '../../../../types/studia';
 import { MATERIA_LABEL } from '../studiaLabels';
+import { InstituteStops } from './InstituteStops';
 import { totalCards } from './layout';
-import { orderStops, stopStates } from './today';
-import { BLOCK_HEADING, CARD_STATES, INK_BG, INK_BORDER, MUTED_TEXT, SECONDARY_BUTTON, TILE } from './tokens';
+import { dueBySubject, dueLabel, orderStops, stopStates } from './today';
+import { BLOCK_HEADING, CARD_STATES, INK_BG, INK_BORDER, INK_TEXT, MUTED_TEXT, QUIET_BUTTON, SECONDARY_BUTTON, TILE } from './tokens';
+import type { PercorsoState } from './usePercorso';
 
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -13,18 +17,39 @@ const STAGGER_MS = 40;
 
 export interface SubjectRoadProps {
   materie: Progressi['materie'];
-  /** The subject the chips chose: its stop is marked. */
+  /** The subject the chips chose: its stop is marked, and opens on its institutes when chosen. */
   selected: Materia | undefined;
+  /** The read by institute (G5): each subject's «N da ripassare» and its institutes' stops. */
+  percorso: PercorsoState;
+  onRetryPercorso: () => void;
 }
 
 /**
  * The road (Gymnasium spec §5.2): one stop per subject, joined by a line, free — no locks, no order
- * imposed. A stop says where the subject stands (its three states, as a bar and in words, and the
- * reviews of the last 30 days) and «Ripassa» starts a session narrowed to it.
+ * imposed. A stop says where the subject stands (its three states, as a bar and in words, the cards due
+ * today, the reviews of the last 30 days), «Ripassa» starts a session narrowed to it, and «Istituti» opens
+ * its institutes' stops in place (`InstituteStops`). The cards due come from the read by institute, which
+ * answers on its own: while it travels their line holds its place; if it fails the line is left out.
  */
-export function SubjectRoad({ materie, selected }: SubjectRoadProps) {
+export function SubjectRoad({ materie, selected, percorso, onRetryPercorso }: SubjectRoadProps) {
   const navigate = useNavigate();
+  const id = useId();
   const stops = orderStops(materie);
+  const due = percorso.data && dueBySubject(percorso.data);
+  // The subject the chips choose opens on its institutes, at mount and on each new choice; any other opens on
+  // request. Nothing closes but the reader. Derived during render, not in an effect (gotcha 11).
+  const [open, setOpen] = useState<ReadonlySet<Materia>>(() => new Set(selected ? [selected] : []));
+  const [opened, setOpened] = useState(selected);
+  if (opened !== selected) {
+    setOpened(selected);
+    if (selected) setOpen((previous) => new Set(previous).add(selected));
+  }
+  const toggle = (materia: Materia) =>
+    setOpen((previous) => {
+      const next = new Set(previous);
+      if (!next.delete(materia)) next.add(materia);
+      return next;
+    });
   return (
     <section aria-labelledby="studia-percorso" className="space-y-3">
       <h3 id="studia-percorso" className={BLOCK_HEADING}>
@@ -40,6 +65,10 @@ export function SubjectRoad({ materie, selected }: SubjectRoadProps) {
           const label = MATERIA_LABEL[stop.materia];
           const chosen = selected === stop.materia;
           const started = stop.apprendimento + stop.consolidate > 0;
+          const expanded = open.has(stop.materia);
+          const panel = `${id}-${stop.materia}`;
+          const institutes = percorso.data?.filter((tappa) => tappa.materia === stop.materia).length;
+          const dovute = due?.get(stop.materia) ?? 0;
           return (
             <li
               key={stop.materia}
@@ -68,6 +97,11 @@ export function SubjectRoad({ materie, selected }: SubjectRoadProps) {
                         ))}
                       </span>
                       <p className="text-sm tabular-nums text-slate-700 dark:text-slate-200">{stopStates(stop)}</p>
+                      {due ? (
+                        <p className={cn('text-sm tabular-nums', dovute > 0 ? cn('font-semibold', INK_TEXT) : MUTED_TEXT)}>{dueLabel(dovute)}</p>
+                      ) : (
+                        percorso.status === 'loading' && <span aria-hidden className="h-5 w-28 rounded bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800/60" />
+                      )}
                     </>
                   )}
                   <p className={cn('text-xs tabular-nums', MUTED_TEXT)}>
@@ -83,6 +117,27 @@ export function SubjectRoad({ materie, selected }: SubjectRoadProps) {
                   >
                     Ripassa
                   </button>
+                )}
+                {total > 0 && (
+                  <>
+                    <button
+                      type="button"
+                      aria-expanded={expanded}
+                      aria-controls={panel}
+                      onClick={() => toggle(stop.materia)}
+                      className={cn(QUIET_BUTTON, 'inline-flex items-center gap-1 md:col-span-2')}
+                    >
+                      <ChevronDown size={16} aria-hidden className={cn('shrink-0 transition-transform motion-reduce:transition-none', expanded && 'rotate-180')} />
+                      Istituti
+                      <span className="sr-only"> di {label}</span>
+                      {institutes !== undefined && <span className="tabular-nums"> ({institutes})</span>}
+                    </button>
+                    {expanded && (
+                      <div id={panel} className="md:col-span-2">
+                        <InstituteStops materia={stop.materia} percorso={percorso} onRetry={onRetryPercorso} />
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </li>

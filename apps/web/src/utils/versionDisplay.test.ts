@@ -93,7 +93,7 @@ describe('describeVersion — the text in force', () => {
       title: 'Testo consolidato di Normattiva, a fini informativi: fa fede la Gazzetta Ufficiale. Versione n. 8.',
     });
     expect(shown.banner).toBeNull();
-    expect(shown).toMatchObject({ textVisible: true, readOnly: false, doctrineVisible: true, canCite: true, canCopyOrSave: true });
+    expect(shown).toMatchObject({ textVisible: true, readOnly: false, canCite: true, canCopyOrSave: true });
   });
 
   it('says nothing about the version when the page names none', () => {
@@ -101,11 +101,10 @@ describe('describeVersion — the text in force', () => {
       .toBe('Testo consolidato di Normattiva, a fini informativi: fa fede la Gazzetta Ufficiale.');
   });
 
-  it('says the requested date falls in the text in force, and keeps the doctrine off', () => {
+  it('says the requested date falls in the text in force', () => {
     const shown = describeVersion(validity({ request_in_window: true }), { versione: 'vigente', data_versione: '2026-03-01' });
     expect(shown.banner).toEqual({ kind: 'current_in_window', body: 'La data richiesta cade nel testo attuale.', actions: [] });
     expect(shown.readOnly).toBe(false); // it is the text in force: a note on it is a note on the right words
-    expect(shown.doctrineVisible).toBe(false); // but it was fetched without doctrine
   });
 });
 
@@ -124,13 +123,13 @@ describe('describeVersion — a past text', () => {
       body: 'In vigore dal 25 dicembre 2003 al 29 dicembre 2007, secondo il testo consolidato di Normattiva (a fini informativi). '
         + 'Non è il testo attuale. Il testo in vigore a una data non dice quale disciplina si applichi al fatto: possono '
         + 'contare disposizioni transitorie, efficacia retroattiva o norme più favorevoli.',
-      note: 'Dottrina, massime, note ed evidenziazioni non sono mostrate su un testo storico.',
+      note: 'Note ed evidenziazioni non sono mostrate su un testo storico.',
       actions: ['go_current', 'copy_citation'],
     });
   });
 
-  it('is a reading: nothing is anchored to it and no doctrine rides along', () => {
-    expect(shown).toMatchObject({ readOnly: true, doctrineVisible: false, textVisible: true, canCite: true });
+  it('is a reading: nothing is anchored to it', () => {
+    expect(shown).toMatchObject({ readOnly: true, textVisible: true, canCite: true });
   });
 
   it('opens the update notes, where a delegated rate or a date is often to be found', () => {
@@ -218,15 +217,15 @@ describe('describeVersion — a repealed article', () => {
 describe('describeVersion — the source could not be read', () => {
   it('claims nothing for the text in force: no chip, and no "Vigente" by default', () => {
     expect(describeVersion(undefined, { versione: 'vigente' })).toEqual({
-      chip: null, banner: null, textVisible: true, readOnly: false, doctrineVisible: true, canCite: true,
+      chip: null, banner: null, textVisible: true, readOnly: false, canCite: true,
       canCopyOrSave: true, copyBlockedReason: undefined, updateNotesOpen: false,
     });
   });
 
-  it('still keeps the annotation tools and the doctrine off a text that was asked for by date', () => {
+  it('still keeps the annotation tools off a text that was asked for by date', () => {
     expect(describeVersion(undefined, { versione: 'vigente', data_versione: '2007-12-29' }))
-      .toMatchObject({ chip: null, banner: null, readOnly: true, doctrineVisible: false });
-    expect(describeVersion(undefined, { versione: 'originale' })).toMatchObject({ readOnly: true, doctrineVisible: false });
+      .toMatchObject({ chip: null, banner: null, readOnly: true });
+    expect(describeVersion(undefined, { versione: 'originale' })).toMatchObject({ readOnly: true });
   });
 });
 
@@ -290,10 +289,10 @@ describe('buildTextAtDateParams', () => {
     tipo_atto: 'codice civile', data: '1942-03-16', numero_atto: '262', numero_articolo: '1284', allegato: '2',
   };
 
-  it('asks for the text in force on a day, without doctrine, keeping the annex', () => {
+  it('asks for the text in force on a day, keeping the annex', () => {
     expect(buildTextAtDateParams(norma, { kind: 'date', date: '2007-12-29' })).toEqual({
       act_type: 'codice civile', act_number: '262', date: '1942-03-16', article: '1284',
-      version: 'vigente', version_date: '2007-12-29', show_brocardi_info: false, annex: '2',
+      version: 'vigente', version_date: '2007-12-29', annex: '2',
     });
   });
 
@@ -301,7 +300,7 @@ describe('buildTextAtDateParams', () => {
     const params = buildTextAtDateParams({ ...norma, allegato: undefined }, { kind: 'original' });
     expect(params).toEqual({
       act_type: 'codice civile', act_number: '262', date: '1942-03-16', article: '1284',
-      version: 'originale', show_brocardi_info: false,
+      version: 'originale',
     });
     expect(params).not.toHaveProperty('version_date');
     expect(params).not.toHaveProperty('annex');

@@ -1,8 +1,8 @@
 /**
  * The year of a case-law row, for every source alike (case-law section spec, D4): a source's rows
  * are read into `{ year, date? }`, counted per year, narrowed by a range and put in order. Pure:
- * a source says how to read its own rows (`YearsOf`), nothing here knows Brocardi, the Massimario
- * or the Cassazione.
+ * a source says how to read its own rows (`YearsOf`), nothing here knows the Massimario or the
+ * Cassazione.
  *
  * A row has no year, one, or several (a Massimario passage cites several decisions): it passes a
  * range when any of its years does, and a row with no year passes only while no range is set.

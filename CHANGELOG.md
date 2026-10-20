@@ -12,6 +12,51 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-10-20
+
+The rest of the 1.9 redesign: Gymnasium complete, the pages for credits and for
+mcp-legal-it, and Brocardi out of the web app (D-078). No migration.
+
+### Gymnasium
+
+- The lesson: the review session is a screen of its own, with a progress bar,
+  the card in serif, one action at the foot («Mostra risposta», then the four
+  grades with their intervals), a short note after each grade («Torna tra 3
+  giorni») and an ending with the streak, «Torna a Oggi» and «Continua».
+- «Contribuisci»: «+ Nuova scheda» in «Le mie schede» writes a card with no
+  article, its references typed and checked against Normattiva; shown only
+  while the sources answer.
+- The road gains its institutes: each subject opens its institute stops, with
+  how many cards are due, and a review session can be limited to one institute
+  (server: `GET /api/lingo/srs/sessione?materia=…&istituto=…`, optional).
+- «Progressi», `/studia/progressi`: streak and record, a calendar of the past
+  months, the cards by state, the next 14 days, progress by subject; it takes
+  the place of the «Il tuo mese» sheet on «Oggi».
+
+### Brocardi out of the web app (D-078)
+
+- No more doctrine, massime, relations, glossary or footnotes from Brocardi, in
+  the reader, beside it, in Study Mode or in the export; the palette loses
+  «Includi dottrina» and «Solo articoli con dottrina».
+- Saved practices drop the Brocardi fields when they are read and when they are
+  written; highlights and notes made on the old sections stay the reader's,
+  listed as «Sezione non più disponibile», and can be removed.
+- «Cerca sentenze sul tema dell'articolo» under «Giurisprudenza» searches the
+  Cassazione by the article's rubric, except for EU acts, notices and a short
+  list of generic rubrics.
+
+### Credits and connected AI applications
+
+- «Crediti», `/crediti`, public: the sources with their holders, licences and
+  attribution lines, the fonts and the libraries; linked from the user menu and
+  the login.
+- «Collega un'app AI» adds mcp-legal-it: the Claude Code plugin, the Claude
+  Desktop extension and the terminal, with the first-launch notes.
+
+### Navigation
+
+- The services' status moves into the user menu; the pill over the page is gone.
+
 ## [1.8.5] - 2026-10-19
 
 The first part of the 1.9 redesign, released early at the owners' request (G-305).

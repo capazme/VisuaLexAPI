@@ -42,7 +42,6 @@ const data: ArticleData = {
     numero_articolo: '3',
     urn: URN,
   },
-  brocardi_info: null,
 };
 
 const RECT = { x: 40, y: 120, width: 90, height: 18 };
