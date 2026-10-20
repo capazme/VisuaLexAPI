@@ -230,10 +230,40 @@ export const changePassword = async (req: Request, res: Response) => {
   res.json({ message: 'Password changed successfully' });
 };
 
+/** A row taken from someone else (a suggestion, a Forum download) says so, never whose it was. */
+const withoutOriginalAuthor = <T extends { originalAuthorId: string | null }>({ originalAuthorId, ...row }: T) =>
+  ({ ...row, fromAnotherUser: originalAuthorId !== null });
+
+/**
+ * An archived environment's content is the JSON the web posted, whose rows could carry the web's
+ * `originalAuthor` ({ id, username }) or an `originalAuthorId`: both become `fromAnotherUser`, at
+ * any depth, and nothing else in the blob changes.
+ */
+function withoutAuthors(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(withoutAuthors);
+  if (typeof value !== 'object' || value === null) return value;
+  const out: Record<string, unknown> = {};
+  let fromAnotherUser = false;
+  for (const [key, inner] of Object.entries(value)) {
+    if (key === 'originalAuthor' || key === 'originalAuthorId') {
+      fromAnotherUser ||= inner !== null && inner !== undefined;
+      continue;
+    }
+    // Defined, not assigned: a `__proto__` key in the blob stays a key of the row.
+    Object.defineProperty(out, key, { value: withoutAuthors(inner), enumerable: true, writable: true, configurable: true });
+  }
+  if (fromAnotherUser) out.fromAnotherUser = true;
+  return out;
+}
+
 /**
  * Export the user's portable data set. Passwords, tokens and operational
  * secrets are deliberately excluded; the payload is versioned so a future
  * importer can migrate it without guessing its shape.
+ *
+ * Only what the user wrote or what is about them: no other person's id, name
+ * or text. Under the user's discussions, the replies of others travel as a
+ * count; a row the user took from someone else says so, not from whom.
  */
 export const exportAccountData = async (req: Request, res: Response) => {
   const userId = req.user!.id;
@@ -248,7 +278,12 @@ export const exportAccountData = async (req: Request, res: Response) => {
     prisma.environment.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
     prisma.quickNorm.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
     prisma.customAlias.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
-    prisma.articleThread.findMany({ where: { userId }, include: { comments: true }, orderBy: { createdAt: 'asc' } }),
+    // The user's own replies are in `comments`; the others' are counted, never read.
+    prisma.articleThread.findMany({
+      where: { userId },
+      include: { _count: { select: { comments: { where: { userId: { not: userId } } } } } },
+      orderBy: { createdAt: 'asc' },
+    }),
     prisma.articleComment.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
     prisma.lingoCard.findMany({ where: { autoreId: userId }, include: { ancore: true }, orderBy: { createdAt: 'asc' } }),
     prisma.lingoValidazioneCard.findMany({
@@ -290,9 +325,22 @@ export const exportAccountData = async (req: Request, res: Response) => {
     exportedAt: new Date().toISOString(),
     user,
     data: {
-      folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases,
+      folders, bookmarks,
+      annotations: annotations.map(withoutOriginalAuthor),
+      highlights: highlights.map(withoutOriginalAuthor),
+      dossiers: dossiers.map(withoutOriginalAuthor),
+      history,
+      // An environment downloaded from the Forum was saved with its publisher's username as `author`,
+      // indistinguishable from a name typed by the user: only the user's own username travels.
+      environments: environments.map((env) => ({
+        ...env,
+        author: env.author !== null && env.author === user?.username ? env.author : null,
+        content: withoutAuthors(env.content),
+      })),
+      quickNorms: quickNorms.map(withoutOriginalAuthor),
+      customAliases: customAliases.map(withoutOriginalAuthor),
       // The release time is the author's; the releasing admin's id is another person's identifier.
-      threads: threads.map(({ passageReleasedById: _releasedBy, ...thread }) => thread),
+      threads: threads.map(({ passageReleasedById: _releasedBy, _count, ...thread }) => ({ ...thread, repliesFromOthers: _count.comments })),
       comments, lingoCards, lingoValidazioni,
       lingoAccettazioni: lingoAccettazioni.map(({ testo, acceptedAt }) => ({ chiave: testo.chiave, versione: testo.versione, acceptedAt })),
       // The review log (the scheduling state is derived from it and not exported), the daily goals, and the
