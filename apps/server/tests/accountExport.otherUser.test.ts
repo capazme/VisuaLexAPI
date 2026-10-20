@@ -47,8 +47,24 @@ async function seedBobEverywhere(alice: TestUser, bob: TestUser) {
     items: [
       { itemType: 'annotation', payload: { normaKey: 'codice_civile', articleId: '1453', text: 'Nota proposta e accolta' } },
       { itemType: 'highlight', payload: { normaKey: 'codice_civile', articleId: '1453', anchorText: 'contratti', startOffset: 4 } },
-      { itemType: 'quickNorm', payload: { label: 'Norma proposta e accolta', searchParams: { act_type: 'codice civile', article: '1453' } } },
-      { itemType: 'alias', payload: { trigger: 'ris', aliasType: 'shortcut', expandTo: 'risoluzione' } },
+      // A search is the proposer's JSON, stored as it came: Bob's identity in it, under any key.
+      {
+        itemType: 'quickNorm',
+        payload: {
+          label: 'Norma proposta e accolta',
+          searchParams: {
+            act_type: 'codice civile', article: '1453',
+            proposedBy: { id: bob.id, name: 'Bob Q7' }, authorId: bob.id, ref: `user:${bob.id}`, originalAuthorUsername: bob.username,
+          },
+        },
+      },
+      {
+        itemType: 'alias',
+        payload: {
+          trigger: 'ris', aliasType: 'reference', expandTo: 'risoluzione',
+          searchParams: { act_type: 'codice civile', article: '1453', by: { uid: bob.id, displayName: 'Bob Q7', email: bob.email }, utenteId: bob.id },
+        },
+      },
       { itemType: 'dossier', payload: { title: 'Dossier proposto e accolto', entries: [{ note: 'Voce accolta' }] } },
       { itemType: 'annotation', payload: { articleId: '1453', text: said('proposta respinta') } },
       { itemType: 'annotation', payload: { articleId: '1453', text: said('proposta in attesa') } },
@@ -150,10 +166,11 @@ describe('the account export, against a second user who touches everything', () 
     expect(exported).not.toContain(bob.username);
     expect(exported).not.toContain(bob.email);
     expect(exported).not.toContain(BOB_SAYS);
+    expect(exported).not.toContain('Bob Q7');
 
     // And Alice's own data is all there.
     for (const hers of ['Testo di Alice', 'Risposta di Alice', 'Alice risponde a una risposta', 'Alice sotto la glossa di Bob',
-      'Nota di Alice', 'Voce di Alice', 'Domanda di Alice', 'Il voto di Alice', 'Nota proposta e accolta', 'Norma proposta e accolta',
+      'Nota di Alice', 'Voce di Alice', 'Domanda di Alice', 'Il voto di Alice', 'Nota proposta e accolta', 'Norma proposta e accolta', 'risoluzione',
       'Dossier proposto e accolto', 'Voce accolta', 'Dossier pubblicato', 'Nota pubblicata', 'Nota mia', 'Nota presa', alice.id, alice.email]) {
       expect(exported).toContain(hers);
     }
@@ -180,5 +197,62 @@ describe('the account export, against a second user who touches everything', () 
       .find((d) => d.name === 'Importato da un link');
     expect(fromLink!.items[0].content).toEqual({ text: 'Nota da un link' });
     expect(fromLink!.snapshots[0].content).toEqual({ items: [{ content: { text: 'Nota da un link' } }] });
+  });
+
+  it('keeps of a search taken from a proposal only the search', async () => {
+    const alice = await createTestUser('export-alice');
+    const bob = await createTestUser('export-sweep-bobq7');
+    await seedBobEverywhere(alice, bob);
+
+    const response = await request(app).get('/api/auth/export').set(authHeader(alice));
+
+    const [norm] = response.body.data.quickNorms as { label: string; searchParams: unknown; fromAnotherUser: boolean }[];
+    expect(norm).toMatchObject({ label: 'Norma proposta e accolta', fromAnotherUser: true });
+    expect(norm.searchParams).toEqual({ act_type: 'codice civile', article: '1453', fromAnotherUser: true });
+    const [alias] = response.body.data.customAliases as { trigger: string; searchParams: unknown }[];
+    expect(alias.searchParams).toEqual({ act_type: 'codice civile', article: '1453' });
+  });
+
+  it('reads a person by its shape: names and ids of someone else go, under any key; the user’s own stay', async () => {
+    const alice = await createTestUser('export-alice');
+    const bob = await createTestUser('export-sweep-bobq7');
+    const content = {
+      rows: [
+        { text: 'Riga 1', originalAuthorUsername: bob.username, originalAuthorName: 'Bob Q7', originalAuthorEmail: bob.email },
+        { text: 'Riga 2', displayName: 'Bob Q7', fullName: 'Bob Q7', autoreId: bob.id, utente_id: bob.id },
+        // Bob's own record, under keys no list names: it goes whole, with what else it holds.
+        { text: 'Riga 3', curator: { id: bob.id, name: 'Bob Q7', bio: 'Bob Q7 bio' }, team: [{ id: bob.id, name: 'Bob Q7' }, 'Alice'] },
+        // An id beside a key only a person has, whatever the id is called: ids and names go.
+        { text: 'Riga 4', curator: { key: 'k1', person_ref_id: 'not-a-user', displayName: 'Bob Q7', role: 'curatore' } },
+        // A user's id anywhere, alone or inside a text, and as a key.
+        { text: 'Riga 5', ref: bob.id, link: `https://example.org/u/${bob.id.toUpperCase()}`, seen: [bob.id, 'altro'], [bob.id]: true },
+      ],
+      // A dossier's and an environment's id and name are not a person, nor the user's own id beside them.
+      dossier: { id: 'd-1', name: 'Dossier di Alice', userId: alice.id },
+      // The user's own record keeps its names.
+      me: { id: alice.id, name: 'Alice A.', displayName: 'Alice', friend: { id: bob.id, name: 'Bob Q7' } },
+      meByEmail: { uid: 'local-1', email: alice.email, fullName: 'Alice A.' },
+    };
+    await prisma.environment.create({ data: { userId: alice.id, name: 'Forme di persona', content } });
+
+    const response = await request(app).get('/api/auth/export').set(authHeader(alice));
+
+    const env = (response.body.data.environments as { name: string; content: unknown }[]).find((e) => e.name === 'Forme di persona');
+    expect(env!.content).toEqual({
+      rows: [
+        { text: 'Riga 1', fromAnotherUser: true },
+        { text: 'Riga 2' },
+        { text: 'Riga 3', team: ['Alice'] },
+        { text: 'Riga 4', curator: { key: 'k1', role: 'curatore' } },
+        { text: 'Riga 5', seen: ['altro'] },
+      ],
+      dossier: { id: 'd-1', name: 'Dossier di Alice', userId: alice.id },
+      me: { id: alice.id, name: 'Alice A.', displayName: 'Alice' },
+      meByEmail: { uid: 'local-1', email: alice.email, fullName: 'Alice A.' },
+    });
+    const exported = JSON.stringify(response.body);
+    expect(exported).not.toContain(bob.id);
+    expect(exported.toLowerCase()).not.toContain(bob.id.toLowerCase());
+    expect(exported).not.toContain('Bob Q7');
   });
 });

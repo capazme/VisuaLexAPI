@@ -237,44 +237,134 @@ const withoutOriginalAuthor = <T extends { originalAuthorId: string | null }>({ 
 /** A key of an archived environment's content, folded: `Author_Id`, `author-id` and `authorId` are one key. */
 const foldKey = (key: string) => key.toLowerCase().replace(/[_-]/g, '');
 // The web's attribution of a row taken from someone else: it becomes `fromAnotherUser`.
-const ATTRIBUTION_KEYS = new Set(['originalauthor', 'originalauthorid']);
+const ATTRIBUTION_KEYS = new Set([
+  'originalauthor', 'originalauthorid', 'originalauthorusername', 'originalauthorname', 'originalauthoremail',
+]);
 // A person's identity, in a file the user imported by hand (someone else's, possibly): it stays
 // only when it is the user's own id, username or email. `user`, `owner`, `suggester` and
 // `reporter` are the web's person objects ({ id, username }): an object never is, so it goes whole.
+// A display or full name cannot be told from the user's own, so it always goes.
 const IDENTITY_KEYS = new Set([
   'author', 'authorid', 'authorname', 'authorusername', 'authoremail', 'username', 'userid', 'useremail', 'email',
   'user', 'owner', 'ownerid', 'suggester', 'suggesterid', 'reporter', 'reporterid',
+  'displayname', 'fullname', 'autoreid', 'utenteid',
 ]);
+// Keys that only a person has: beside an id, they make the object a person (`personKind`).
+const PERSON_KEYS = new Set(['username', 'email', 'displayname', 'fullname', 'firstname', 'lastname']);
+// A name is also a dossier's or an environment's: it makes a person only of a user's own record.
+const NAME_KEYS = new Set([...PERSON_KEYS, 'name']);
+const UUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 
-type OwnIdentity = { id: string; username: string; email: string };
+/** `foreignUserIds`: the ids, lowercased, of the other users the content names (`foreignUserIdsIn`). */
+type OwnIdentity = { id: string; username: string; email: string; foreignUserIds: ReadonlySet<string> };
 
 const isOwnIdentity = (value: unknown, own: OwnIdentity) =>
   typeof value === 'string' && (value === own.id || value === own.username || value.toLowerCase() === own.email.toLowerCase());
+
+/** A string that holds another user's id, alone or inside a longer text (a link, a `user:<id>`). */
+const holdsForeignUserId = (value: unknown, own: OwnIdentity) =>
+  typeof value === 'string' && (value.match(UUID_PATTERN) ?? []).some((id) => own.foreignUserIds.has(id.toLowerCase()));
+
+/** `id`, `uid`, `userId`, `autore_id`: a key that names an id. */
+const isIdKey = (folded: string) => folded === 'id' || folded.endsWith('id');
+
+/**
+ * What an object of the content is, as a person:
+ * - `user`: a user's record, someone else's: its own `id` is another user's, beside a name,
+ *   username or email. It goes whole: whatever else it holds is that person's.
+ * - `person`: someone's identity on a row: an id beside a key only a person has (`PERSON_KEYS`),
+ *   say `{ author_id, username }` or `{ id, displayName, text }`. Its ids and names go, whatever
+ *   the keys are called, so no id is left behind under a key the lists do not know.
+ * - `own`: either of the two, but the user's: their id, username or email, and no other user's id
+ *   (a display name cannot be checked). Its names stay.
+ */
+function personKind(entries: [string, unknown][], own: OwnIdentity): 'none' | 'own' | 'user' | 'person' {
+  const folded = entries.map(([key, inner]) => [foldKey(key), inner] as const);
+  const ids = folded.filter(([key, inner]) => isIdKey(key) && typeof inner === 'string' && inner !== '');
+  if (ids.length === 0) return 'none';
+  const record = folded.find(([key]) => key === 'id' || key === 'uid')?.[1];
+  const isUserRecord = typeof record === 'string' && (record === own.id || own.foreignUserIds.has(record.toLowerCase()))
+    && folded.some(([key]) => NAME_KEYS.has(key));
+  const isPerson = folded.some(([key]) => PERSON_KEYS.has(key));
+  if (!isUserRecord && !isPerson) return 'none';
+  // The user's, by something that can be checked: their id, username or email, and nobody else's.
+  const checkable = folded.filter(([key]) => key === 'username' || key === 'email');
+  const mine = folded.every(([, inner]) => !holdsForeignUserId(inner, own))
+    && checkable.every(([, inner]) => isOwnIdentity(inner, own))
+    && (checkable.length > 0 || ids.some(([, inner]) => inner === own.id));
+  if (mine) return 'own';
+  return isUserRecord ? 'user' : 'person';
+}
+
+const isOtherUser = (value: unknown, own: OwnIdentity) =>
+  typeof value === 'object' && value !== null && !Array.isArray(value) && personKind(Object.entries(value), own) === 'user';
 
 /**
  * An archived environment's content is the JSON the web posted or a file the user imported by
  * hand, whose rows could carry the web's `originalAuthor` ({ id, username }) or an
  * `originalAuthorId`, which become `fromAnotherUser`, and anyone's `authorId`, `username`,
  * `user_id`, `email` and the like (`IDENTITY_KEYS`, case and `_`/`-` folded), which go unless they
- * are the user's own. At any depth; nothing else in the blob changes.
+ * are the user's own. Someone else's person object loses its ids and names, or goes whole when it
+ * is a user's record (`personKind`); a string that holds another user's id goes, under any key.
+ * At any depth; nothing else in the blob changes.
  */
 function withoutAuthors(value: unknown, own: OwnIdentity): unknown {
-  if (Array.isArray(value)) return value.map((inner) => withoutAuthors(inner, own));
+  if (Array.isArray(value)) {
+    return value
+      .filter((inner) => !holdsForeignUserId(inner, own) && !isOtherUser(inner, own))
+      .map((inner) => withoutAuthors(inner, own));
+  }
   if (typeof value !== 'object' || value === null) return value;
+  const entries = Object.entries(value);
+  const kind = personKind(entries, own);
   const out: Record<string, unknown> = {};
   let fromAnotherUser = false;
-  for (const [key, inner] of Object.entries(value)) {
+  for (const [key, inner] of entries) {
     const folded = foldKey(key);
     if (ATTRIBUTION_KEYS.has(folded)) {
       fromAnotherUser ||= inner !== null && inner !== undefined;
       continue;
     }
-    if (IDENTITY_KEYS.has(folded) && !isOwnIdentity(inner, own)) continue;
+    // The user's own record keeps its names (a display name cannot be checked); anything else is read as ever.
+    if (IDENTITY_KEYS.has(folded) && !isOwnIdentity(inner, own) && !(kind === 'own' && NAME_KEYS.has(folded))) continue;
+    // Someone else's record or identity: its ids and names go (a record at the top, which no
+    // parent removes, keeps only what is not about the person).
+    if ((kind === 'person' || kind === 'user') && (isIdKey(folded) || NAME_KEYS.has(folded))) continue;
+    if (holdsForeignUserId(key, own) || holdsForeignUserId(inner, own) || isOtherUser(inner, own)) continue;
     // Defined, not assigned: a `__proto__` key in the blob stays a key of the row.
     Object.defineProperty(out, key, { value: withoutAuthors(inner, own), enumerable: true, writable: true, configurable: true });
   }
   if (fromAnotherUser) out.fromAnotherUser = true;
   return out;
+}
+
+/** Every id-shaped string in the content, lowercased: the candidates for a user's id. */
+function collectUuids(value: unknown, into: Set<string>) {
+  if (typeof value === 'string') {
+    for (const id of value.match(UUID_PATTERN) ?? []) into.add(id.toLowerCase());
+  } else if (Array.isArray(value)) {
+    for (const inner of value) collectUuids(inner, into);
+  } else if (typeof value === 'object' && value !== null) {
+    for (const [key, inner] of Object.entries(value)) {
+      collectUuids(key, into);
+      collectUuids(inner, into);
+    }
+  }
+}
+
+/** The ids, among those the content holds, that belong to another user of this instance. */
+async function foreignUserIdsIn(contents: unknown[], ownId: string): Promise<Set<string>> {
+  const candidates = new Set<string>();
+  for (const content of contents) collectUuids(content, candidates);
+  candidates.delete(ownId.toLowerCase());
+  const foreign = new Set<string>();
+  const all = [...candidates];
+  // Below Postgres' bind-parameter limit, whatever the size of the content.
+  for (let i = 0; i < all.length; i += 5000) {
+    const users = await prisma.user.findMany({ where: { id: { in: all.slice(i, i + 5000) } }, select: { id: true } });
+    for (const { id } of users) foreign.add(id.toLowerCase());
+  }
+  return foreign;
 }
 
 /**
@@ -340,7 +430,14 @@ export const exportAccountData = async (req: Request, res: Response) => {
       orderBy: { createdAt: 'asc' },
     }),
   ]);
-  const own: OwnIdentity = { id: userId, username: req.user!.username, email: req.user!.email };
+  // A quick norm's or an alias's search, taken from a proposal, is the proposer's JSON too.
+  const foreignUserIds = await foreignUserIdsIn([
+    ...dossiers.flatMap((dossier) => [...dossier.items.map((item) => item.content), ...dossier.snapshots.map((snapshot) => snapshot.content)]),
+    ...environments.map((env) => env.content),
+    ...quickNorms.map((norm) => norm.searchParams),
+    ...customAliases.map((alias) => alias.searchParams),
+  ], userId);
+  const own: OwnIdentity = { id: userId, username: req.user!.username, email: req.user!.email, foreignUserIds };
 
   res.json({
     schemaVersion: 1,
@@ -365,8 +462,8 @@ export const exportAccountData = async (req: Request, res: Response) => {
         author: env.author !== null && env.author === user?.username ? env.author : null,
         content: withoutAuthors(env.content, own),
       })),
-      quickNorms: quickNorms.map(withoutOriginalAuthor),
-      customAliases: customAliases.map(withoutOriginalAuthor),
+      quickNorms: quickNorms.map((norm) => withoutOriginalAuthor({ ...norm, searchParams: withoutAuthors(norm.searchParams, own) })),
+      customAliases: customAliases.map((alias) => withoutOriginalAuthor({ ...alias, searchParams: withoutAuthors(alias.searchParams, own) })),
       // The release time is the author's; the releasing admin's id is another person's identifier.
       threads: threads.map(({ passageReleasedById: _releasedBy, _count, ...thread }) => ({ ...thread, repliesFromOthers: _count.comments })),
       comments, lingoCards, lingoValidazioni,

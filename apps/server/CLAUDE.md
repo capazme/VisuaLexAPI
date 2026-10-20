@@ -601,8 +601,14 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   (`IDENTITY_KEYS` in `authController.ts`; case, `_` and `-` folded), at any depth,
   stay only when they hold the user's own id, username or email (a person object,
   `user`, `owner`, `suggester`, `reporter`, goes whole): an environment imported
-  by hand may be someone else's file. A dossier entry's and a snapshot's `content`
-  are read the same way (a dossier imported from a link keeps a note entry as the
+  by hand may be someone else's file. Persons are also read by shape
+  (`personKind`): an object whose own `id` is another user's, beside a name, goes
+  whole; an id beside `username`, `email`, `displayName`, `fullName` and the like
+  loses its ids and names, whatever they are called; the user's own record stays.
+  And any string that holds another user's id (looked up among the export's ids)
+  goes, under any key. A dossier entry's and a snapshot's `content`, and a quick
+  norm's or an alias's `searchParams` (a proposal's JSON, stored as it came), are
+  read the same way (a dossier imported from a link keeps a note entry as the
   client sent it). An archived environment's `author`
   travels only when it is the user's own username (a Forum download stored its
   publisher's), else `null`. `tests/accountData.test.ts`, and
