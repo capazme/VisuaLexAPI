@@ -12,10 +12,51 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.9.1] - 2026-10-20
+
+Sign in and sign up on one page, Analizza documento redrawn, the account export
+without other users' data, and the minor findings of the 1.9 test. No
+migration.
+
+### Account and privacy
+
+- «Accedi» and «Registrati» on one page with two tabs and a short animation;
+  the registration form in the new design; the page holds still when the tab
+  changes, «Crediti» stays at the foot, the list under the subtitle is gone.
+- The account export holds no other user's id, name or text: replies, votes,
+  imported content, the search parameters of accepted proposals and person
+  objects inside hand-imported data are filtered, with a two-user test.
+
+### Analizza documento
+
+- Redrawn: a drop area, a reading text with the citations marked, the citations
+  grouped by act and counted, an empty state with examples; the document never
+  leaves the browser.
+
+### Search and navigation
+
+- The search menu in the new design: a panel under the field on a computer, a
+  sheet on a phone, the steps as a trail, acts in a column with their
+  abbreviation and filtered by word start as you type, favourites and aliases
+  «a portata di mano», a recognised citation as one strong row that opens the
+  article; a named dialog that keeps and returns the focus.
+- Moving between sections (Corpus, Opus, Gymnasium, Forum) prints a short ink
+  transition, and Gymnasium's marks, digits and missions move when they change;
+  every animation is off with reduced motion and none takes a key or the focus.
+
+### Minor findings after 1.9
+
+- 44 px targets on the Forum's cards, in the search menu and in the welcome
+  tour, whose buttons now speak Italian («Chiudi»); an `h1` on «Dossier» and
+  «Cronologia».
+- With MERL-T off the consent is read once per session; the validation queue is
+  asked only for validators.
+
 ## [1.9.0] - 2026-10-20
 
 The rest of the 1.9 redesign: Gymnasium complete, the pages for credits and for
-mcp-legal-it, and Brocardi out of the web app (D-078). No migration.
+mcp-legal-it, and a third-party doctrine source out of the web app (D-078). No
+migration.
 
 ### Gymnasium
 
@@ -33,13 +74,13 @@ mcp-legal-it, and Brocardi out of the web app (D-078). No migration.
   months, the cards by state, the next 14 days, progress by subject; it takes
   the place of the «Il tuo mese» sheet on «Oggi».
 
-### Brocardi out of the web app (D-078)
+### Third-party doctrine out of the web app (D-078)
 
-- No more doctrine, massime, relations, glossary or footnotes from Brocardi, in
-  the reader, beside it, in Study Mode or in the export; the palette loses
+- No more doctrine, massime, relations, glossary or footnotes from that source,
+  in the reader, beside it, in Study Mode or in the export; the palette loses
   «Includi dottrina» and «Solo articoli con dottrina».
-- Saved practices drop the Brocardi fields when they are read and when they are
-  written; highlights and notes made on the old sections stay the reader's,
+- Saved practices drop that source's fields when they are read and when they
+  are written; highlights and notes made on the old sections stay the reader's,
   listed as «Sezione non più disponibile», and can be removed.
 - «Cerca sentenze sul tema dell'articolo» under «Giurisprudenza» searches the
   Cassazione by the article's rubric, except for EU acts, notices and a short
