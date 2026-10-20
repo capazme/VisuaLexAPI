@@ -31,9 +31,9 @@ export function TrashPage({ trash, onBack, showToast }: Props) {
         <ArrowLeft size={16} /> Torna ai Dossier
       </button>
       <header className="mb-4 border-b border-slate-200 pb-4 dark:border-slate-800">
-        <h2 className="flex items-center gap-2 text-xl font-bold text-slate-900 md:text-2xl dark:text-white">
+        <h1 className="flex items-center gap-2 text-xl font-bold text-slate-900 md:text-2xl dark:text-white">
           <Trash2 className="text-slate-500" size={22} aria-hidden /> Cestino
-        </h2>
+        </h1>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
           Ciò che un’applicazione collegata ha eliminato resta qui 30 giorni, come ciò che elimini tu: i dossier, le voci che togli da un dossier, le schede di studio.
         </p>

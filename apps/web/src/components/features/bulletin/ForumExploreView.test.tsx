@@ -93,6 +93,8 @@ describe('ForumExploreView - «I più aggiunti» widget', () => {
     expect(screen.getByText('Compliance Privacy')).toBeInTheDocument();
     expect(screen.getByText('Diritto Civile')).toBeInTheDocument();
     expect(screen.getByText('Penale Base')).toBeInTheDocument();
+    // Each row is a 44 px target on a phone.
+    expect(screen.getByText('Compliance Privacy').closest('button')).toHaveClass('min-h-[44px]', 'md:min-h-0');
   });
 
   it('hides the widget when no environment has downloads', async () => {

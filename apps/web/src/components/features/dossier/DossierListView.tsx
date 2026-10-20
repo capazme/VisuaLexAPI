@@ -256,7 +256,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
   return (
     <div className="animate-in fade-in duration-200">
       <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 mb-6">
-        <h2 className="font-serif text-3xl font-medium tracking-tight text-slate-900 dark:text-slate-50">{sectionKind ? `I tuoi ${kindLabel(sectionKind).toLowerCase()}` : 'I tuoi Dossier'}</h2>
+        <h1 className="font-serif text-3xl font-medium tracking-tight text-slate-900 dark:text-slate-50">{sectionKind ? `I tuoi ${kindLabel(sectionKind).toLowerCase()}` : 'I tuoi Dossier'}</h1>
         <div className="flex gap-2">
           {trashCount > 0 && onOpenTrash && (
             <button
@@ -446,9 +446,9 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                  <h3 className="font-serif text-lg md:text-xl font-medium leading-snug tracking-tight text-slate-900 dark:text-slate-50 group-hover:text-primary-700 dark:group-hover:text-primary-300 transition-colors line-clamp-2">
+                  <h2 className="font-serif text-lg md:text-xl font-medium leading-snug tracking-tight text-slate-900 dark:text-slate-50 group-hover:text-primary-700 dark:group-hover:text-primary-300 transition-colors line-clamp-2">
                     {dossier.title}
-                  </h3>
+                  </h2>
                   {dossier.sourceSuggestionId && (
                     <AttributionChip author={dossier.originalAuthor} className="ml-1" />
                   )}

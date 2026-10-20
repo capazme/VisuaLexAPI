@@ -5,9 +5,12 @@ import { LessonFrame } from './LessonFrame';
 import { StudyStrip } from './progress/StudyStrip';
 import { useProgress } from './progress/useProgress';
 
-/** What the area tells its views; `validator` is undefined while the account is still loading. */
+/**
+ * What the area tells its views. `validator`: what the account says; undefined while it is still loading,
+ * null when it could not be read (`/auth/me` failed), so that «not read» is never taken for «not a validator».
+ */
 export interface StudiaOutletContext {
-  validator: boolean | undefined;
+  validator: boolean | null | undefined;
 }
 
 /** The views that show the smaller strip over them: «Oggi» and «Progressi» draw their own, the session is a lesson of its own. */
@@ -36,9 +39,9 @@ function AreaStrip() {
  * floating menu button. The session has no heading here: it runs in `LessonFrame`, over the shell.
  */
 export function StudiaPage() {
-  const { isValidator, loading } = useAuth();
+  const { isValidator, loading, user } = useAuth();
   const { pathname } = useLocation();
-  const context = { validator: loading ? undefined : isValidator } satisfies StudiaOutletContext;
+  const context = { validator: loading ? undefined : user ? isValidator : null } satisfies StudiaOutletContext;
   if (isLesson(pathname)) {
     return (
       <LessonFrame>

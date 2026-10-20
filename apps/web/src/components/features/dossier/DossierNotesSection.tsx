@@ -60,9 +60,9 @@ export function DossierNotesSection({ notes, onRemove }: Props) {
       aria-labelledby="dossier-notes-heading"
       className="rounded-xl border border-amber-200 bg-amber-50/60 p-3 md:p-4 dark:border-amber-900/50 dark:bg-amber-950/20"
     >
-      <h3 id="dossier-notes-heading" className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">
+      <h2 id="dossier-notes-heading" className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">
         Note ({notes.length})
-      </h3>
+      </h2>
       <ul className="space-y-2">
         {notes.map((note) => (
           <NoteRow key={note.id} note={note} onRemove={() => onRemove(note)} />

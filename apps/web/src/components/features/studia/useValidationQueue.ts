@@ -31,8 +31,13 @@ const statusOf = (error: unknown): number | undefined => (error as { status?: nu
  * background when few are left. A vote moves to the next card; a card gone (404) or already voted
  * (409) is skipped. A 403 — from the queue or from a vote — means the user is no longer a validator,
  * and the queue stops. Another subject starts over.
+ *
+ * `validator` is what the account says: the queue is read for a validator (`true`), never for someone
+ * the account says is not one (`false`, the refusal at once, with no request the server would refuse),
+ * not before the account is known (`undefined`, still loading), and, when the account could not be read
+ * (`null`), anyway: the server decides, as it did before the account was asked.
  */
-export function useValidationQueue(materia: Materia | undefined) {
+export function useValidationQueue(materia: Materia | undefined, validator: boolean | null | undefined) {
   const key = materia ?? '';
   const [state, setState] = useState<QueueState>(FRESH);
   const [voting, setVoting] = useState(false);
@@ -78,8 +83,8 @@ export function useValidationQueue(materia: Materia | undefined) {
     reading.current = false;
     keyNow.current = key;
     handled.current = new Set();
-    void read(generation.current);
-  }, [read, key]);
+    if (validator === true || validator === null) void read(generation.current);
+  }, [read, key, validator]);
 
   const retry = useCallback(() => {
     generation.current += 1;
@@ -88,10 +93,11 @@ export function useValidationQueue(materia: Materia | undefined) {
     void read(generation.current);
   }, [read]);
 
-  const current = state.key === key && !state.failure ? (state.cards[0] ?? null) : null;
+  const current = validator !== false && validator !== undefined && state.key === key && !state.failure ? (state.cards[0] ?? null) : null;
 
   let status: QueueStatus;
-  if (state.key !== key) status = 'loading';
+  if (validator === false) status = 'forbidden';
+  else if (validator === undefined || state.key !== key) status = 'loading';
   else if (state.failure) status = state.failure;
   else if (state.cards.length > 0) status = 'ready';
   else status = state.dry ? 'empty' : 'loading';
