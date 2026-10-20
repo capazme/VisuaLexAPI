@@ -208,6 +208,19 @@ describe('ConsentContext', () => {
     expect(fetchConsent).toHaveBeenCalledTimes(2);
   });
 
+  it('a logout forgets that the server was without MERL-T: the next sign-in asks again', async () => {
+    fetchConsent.mockRejectedValueOnce({ status: 404, message: 'merlt_disabled', data: { detail: 'merlt_disabled' } });
+    const first = renderWithProvider();
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('ready'));
+    first.unmount();
+    clearConsentRead();
+
+    fetchConsent.mockResolvedValueOnce(full);
+    renderWithProvider();
+    await waitFor(() => expect(screen.getByTestId('level').textContent).toBe('full'));
+    expect(fetchConsent).toHaveBeenCalledTimes(2);
+  });
+
   it('any other failure stays an error, and the next mount asks again', async () => {
     fetchConsent.mockRejectedValue({ status: 404, message: 'Not Found', data: undefined });
     const first = renderWithProvider();

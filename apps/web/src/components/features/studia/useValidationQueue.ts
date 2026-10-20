@@ -32,11 +32,12 @@ const statusOf = (error: unknown): number | undefined => (error as { status?: nu
  * (409) is skipped. A 403 — from the queue or from a vote — means the user is no longer a validator,
  * and the queue stops. Another subject starts over.
  *
- * `validator` is what the account says: the queue is read only for a validator (`true`), never for
- * someone the account says is not one (`false`, the refusal at once, with no request the server would
- * refuse), and not before the account is known (`undefined`, still loading).
+ * `validator` is what the account says: the queue is read for a validator (`true`), never for someone
+ * the account says is not one (`false`, the refusal at once, with no request the server would refuse),
+ * not before the account is known (`undefined`, still loading), and, when the account could not be read
+ * (`null`), anyway: the server decides, as it did before the account was asked.
  */
-export function useValidationQueue(materia: Materia | undefined, validator: boolean | undefined) {
+export function useValidationQueue(materia: Materia | undefined, validator: boolean | null | undefined) {
   const key = materia ?? '';
   const [state, setState] = useState<QueueState>(FRESH);
   const [voting, setVoting] = useState(false);
@@ -82,7 +83,7 @@ export function useValidationQueue(materia: Materia | undefined, validator: bool
     reading.current = false;
     keyNow.current = key;
     handled.current = new Set();
-    if (validator === true) void read(generation.current);
+    if (validator === true || validator === null) void read(generation.current);
   }, [read, key, validator]);
 
   const retry = useCallback(() => {
@@ -92,7 +93,7 @@ export function useValidationQueue(materia: Materia | undefined, validator: bool
     void read(generation.current);
   }, [read]);
 
-  const current = validator === true && state.key === key && !state.failure ? (state.cards[0] ?? null) : null;
+  const current = validator !== false && validator !== undefined && state.key === key && !state.failure ? (state.cards[0] ?? null) : null;
 
   let status: QueueStatus;
   if (validator === false) status = 'forbidden';

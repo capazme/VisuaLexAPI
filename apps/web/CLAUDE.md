@@ -40,8 +40,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   verdict after «Annulla»; `Layout` hides the floating feedback button below `md` on this route, as in a review
   session, where it would cover the verdicts); the subject is remembered in `localStorage`; a vote that outlives a subject
   change only marks its card handled, and a 403 stops the queue with «Non sei più tra i validatori»; the queue is
-  read only once the outlet's `validator` is `true` — while the account loads it waits, and for someone the account
-  says is not a validator it shows «Questa sezione è riservata…» with no request, which the server would refuse with 403),
+  read only once the outlet's `validator` is `true` — while the account loads it waits, for someone the account
+  says is not a validator it shows «Questa sezione è riservata…» with no request, which the server would refuse with
+  403, and when `/auth/me` failed (`validator` null, never taken for «not a validator») it reads and the server decides),
   `/history`, `/forum` («Dossier pubblici»; `/environments`, the page «Ambienti» was, redirects there keeping an old
   share link's `?import=`), `/forum/community` («Community», `ForumCommunityPage`: an honest placeholder — the
   Forum's title (`SECTION_TITLES.forum`), «Domande e discussioni tra colleghi, in arrivo», a link to `/forum`; no sample posts, no counts, no
@@ -208,7 +209,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `consentRead.ts` (`readMerltConsent`): one `GET /api/merlt/consent` shared by the mounts that ask while it travels
   (StrictMode's second effect, a provider mounted again), and none after a server without MERL-T answered 404
   `merlt_disabled`, which reads as `DISABLED_CONSENT` for the life of the page; any other failure is an error, asked
-  again by the next mount; `useAuth`'s logout drops a read on its way (`clearConsentRead`). A level
+  again by the next mount; `useAuth`'s logout drops a read on its way and forgets the «without MERL-T» answer
+  (`clearConsentRead`). A level
   counts only under the current version of the MERL-T notice (`INFORMATIVA_MERLT`, a text
   administrators edit as new versions in «Testi di VisuaLex Gymnasium»); `ConsentScreen`, in the `global`
   slot, asks it once as the app loads when it is unanswered — the first entry, then only a new

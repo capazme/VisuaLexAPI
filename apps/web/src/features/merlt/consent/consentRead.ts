@@ -52,9 +52,10 @@ export function readMerltConsent(): Promise<MerltConsentResponse> {
 
 /**
  * At logout: a read on its way is the account's that leaves, and the next account's provider must not
- * join it. What a server without MERL-T said is the server's, and stays.
+ * join it; and the next sign-in asks the server again whether MERL-T is there.
  */
 export function clearConsentRead(): void {
+  serverWithoutMerlt = false;
   pending = null;
 }
 
