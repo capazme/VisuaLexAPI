@@ -54,7 +54,7 @@ function Summary({ data }: { data: Progressi }) {
     <div className="flex flex-wrap items-center gap-x-10 gap-y-5">
       <StreakBadge compact attuale={data.serie.attuale} record={data.serie.record} ultimiGiorni={data.serie.ultimiGiorni} />
       <div className="shrink-0">
-        <GoalRing compact ripassi={data.oggi.ripassi} obiettivo={data.oggi.obiettivo} raggiunto={data.oggi.raggiunto} />
+        <GoalRing compact giorno={data.oggi.giorno} ripassi={data.oggi.ripassi} obiettivo={data.oggi.obiettivo} raggiunto={data.oggi.raggiunto} />
       </div>
       <p className="grid gap-1 md:ml-auto">
         <span className={cn('font-serif text-4xl font-medium leading-none tabular-nums', INK_TEXT)}>{formatCount(recentReviews(data.materie))}</span>

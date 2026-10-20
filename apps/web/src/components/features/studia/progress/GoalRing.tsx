@@ -1,5 +1,6 @@
 import { useEffect, useId, useState } from 'react';
 import { cn } from '../../../../lib/utils';
+import { useReviewsGrowth } from './seenProgress';
 import { INK_TEXT, MUTED_TEXT, SUCCESS_TEXT } from './tokens';
 
 export interface GoalRingProps {
@@ -7,6 +8,8 @@ export interface GoalRingProps {
   obiettivo: number;
   /** The day counts: the ring is full and green, also when the queue ended under the goal. */
   raggiunto: boolean;
+  /** The server's day of `ripassi`: with it, the count lands when it grew since this browser last drew it (S2). */
+  giorno?: string;
   /** The strip's ring (Gymnasium spec §5.1): small, with «5 di 10» beside it. */
   compact?: boolean;
   className?: string;
@@ -21,8 +24,11 @@ const COMPACT_STROKE = 22;
  * Today's goal as a ring (Studia progress spec §6.1): a thick arc from ink to primary inside a dotted
  * seal, the count in the reader's serif. It fills from empty when it appears and eases to each new
  * value; under reduced motion it is drawn at its value at once. `compact`: 40 px, the count beside it.
+ * When today's count grew since this browser last drew it, the new digit falls into place and takes on its weight
+ * (S2; inspired by Animorio's «Il contatore che prende peso», written from scratch; `vlx-digit-land` in `index.css`,
+ * nothing under reduced motion); reaching the goal, the ring closes as the digit settles. The numbers are the read's.
  */
-export function GoalRing({ ripassi, obiettivo, raggiunto, compact = false, className }: GoalRingProps) {
+export function GoalRing({ ripassi, obiettivo, raggiunto, giorno, compact = false, className }: GoalRingProps) {
   // A fragment id must be plain: React's ids carry characters a url(#…) reference would need escaped.
   const gradientId = `goal-ring-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
   const share = raggiunto ? 1 : Math.min(1, obiettivo > 0 ? ripassi / obiettivo : 0);
@@ -32,6 +38,14 @@ export function GoalRing({ ripassi, obiettivo, raggiunto, compact = false, class
     const frame = requestAnimationFrame(() => setShown(share));
     return () => cancelAnimationFrame(frame);
   }, [share]);
+
+  const lands = useReviewsGrowth(giorno, ripassi) !== null;
+  // Keyed by the count, so each new one lands afresh.
+  const count = (size: string) => (
+    <span key={ripassi} className={cn('inline-block font-serif font-semibold tabular-nums', size, raggiunto ? SUCCESS_TEXT : INK_TEXT, lands && 'vlx-digit-land')}>
+      {ripassi}
+    </span>
+  );
 
   const centre = SIZE / 2;
   const stroke = compact ? COMPACT_STROKE : STROKE;
@@ -70,7 +84,7 @@ export function GoalRing({ ripassi, obiettivo, raggiunto, compact = false, class
       <div className={cn('flex items-center gap-2', className)} role="img" aria-label={name}>
         <div className="h-10 w-10 shrink-0">{ring}</div>
         <p aria-hidden className="whitespace-nowrap leading-none">
-          <span className={cn('font-serif text-xl font-semibold tabular-nums', raggiunto ? SUCCESS_TEXT : INK_TEXT)}>{ripassi}</span>
+          {count('text-xl')}
           <span className={cn('text-sm', MUTED_TEXT)}> di {obiettivo}</span>
         </p>
       </div>
@@ -81,7 +95,7 @@ export function GoalRing({ ripassi, obiettivo, raggiunto, compact = false, class
     <div className={cn('relative h-32 w-32 shrink-0 md:h-[148px] md:w-[148px]', className)} role="img" aria-label={name}>
       {ring}
       <div className="absolute inset-0 grid place-content-center text-center leading-tight">
-        <span className={cn('font-serif text-3xl font-semibold tabular-nums md:text-4xl', raggiunto ? SUCCESS_TEXT : INK_TEXT)}>{ripassi}</span>
+        {count('text-3xl md:text-4xl')}
         <span className={cn('text-xs', MUTED_TEXT)}>di {obiettivo} ripassi</span>
       </div>
     </div>
