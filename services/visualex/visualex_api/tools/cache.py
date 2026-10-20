@@ -84,9 +84,11 @@ class PersistentCache:
         `{"timestamp": …}`, and return how many went. `get` deletes an expired entry only
         when its key is read again, so without a sweep a key nobody asks for stays on disk.
 
-        Synchronous: it reads every file's head, so call it through `asyncio.to_thread`. An entry
-        caught while it is being written reads as unreadable and goes: a cache miss later,
-        nothing worse.
+        Synchronous: it reads every file's head, so call it through `asyncio.to_thread`. An
+        entry whose head is the one `_write_to_disk` writes is judged by that head alone: if
+        the rest is damaged (a write cut short), `get` deletes it on its next read, or this
+        sweep once it expires. An entry caught before its head reached the disk reads as
+        unreadable and goes: a cache miss later, nothing worse.
         """
         now = time.time()
         removed = 0
