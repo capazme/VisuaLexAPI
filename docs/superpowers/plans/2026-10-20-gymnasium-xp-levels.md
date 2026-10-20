@@ -4,7 +4,7 @@
 
 **Goal:** The server keeps Gymnasium's missions and their experience points (XP): an append-only ledger with one credit per mission per period, the level computed from its total, the missions decided from stored facts only, and the answers the web needs for the level bar, «+20 XP» and the celebration of a new level (G1c).
 
-**Architecture:** One server pull request. A migration adds the ledger `lingo_crediti_xp` and the counter `lingo_giornate_studio.voti`. `lingo/levels.ts` is the one definition of the curve. `lingo/missions.ts` holds the catalogue, the evaluation of each mission from stored facts, `settleMissions` (the one writer of the ledger, inside the caller's transaction, under a savepoint, the user's XP lock and the daily ceiling) and `readMissions` (the list the read answers). The grade, the proposal, the vote, the progress read and the session read call `settleMissions`; the grade, the proposal and the vote answer `xp`, the progress read answers `livello`, `missioni` and `crediti`. Nothing in the delegated table, no MCP tool, nothing sent to MERL-T. The web part (G1c) is Bill's and Irnerio's, and starts from the contract below.
+**Architecture:** One server pull request. A migration adds the ledger `lingo_crediti_xp` and the counters `lingo_giornate_studio.voti` and `.ripassi_dovuti` (G-334). `lingo/levels.ts` is the one definition of the curve. `lingo/missions.ts` holds the catalogue, the evaluation of each mission from stored facts, `settleMissions` (the one writer of the ledger, inside the caller's transaction, under a savepoint, the user's XP lock and the daily ceiling) and `readMissions` (the list the read answers). The grade, the proposal, the vote, the progress read and the session read call `settleMissions`; the grade, the proposal and the vote answer `xp`, the progress read answers `livello`, `missioni` and `crediti`. Nothing in the delegated table, no MCP tool, nothing sent to MERL-T. The web part (G1c) is the web side's, and starts from the contract below.
 
 **Tech Stack:** Express 4, Prisma 5 (migration by hand), Zod 3, Vitest + supertest.
 
@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- **Git flow.** This plan on `docs/plan-xp-livelli` (docs only). The server on `feat/gymnasium-xp-server`, off `origin/develop` (rebased on the plan's branch while the plan is not merged). Pull requests into `develop`; the session never merges. The owner's authorization (G-331), verbatim: «sì: la PR della specifica si fonde, riservo il nome della migrazione e una sessione scrive il piano e poi costruisce il server; il web (barra di livello, «+20 XP») lo fanno Bill e Irnerio». Quote it in every subagent dispatch that commits: the session may commit and push its own branches, never merge.
+- **Git flow.** This plan on `docs/plan-xp-livelli` (docs only). The server on `feat/gymnasium-xp-server`, off `origin/develop` (rebased on the plan's branch while the plan is not merged). Pull requests into `develop`. Under the owners' authorization (G-331) the session may commit and push its own branches and never merges; every subagent dispatch that commits says so.
 - **The migration** is `20261026100000_lingo_xp_ledger`, reserved by the orchestrator. Written by hand (`prisma migrate diff` from a copy of the old schema saved in the scratch directory), applied with `migrate deploy` on the session's own test database only. Never `migrate dev`, never `reset` by hand, never `prisma format`. The orchestrator applies it to the development database after the merge.
 - **Server tests** run only through `npm --prefix apps/server test`, against the session's own throwaway database (a Homebrew PostgreSQL in the scratch directory on a free port, not 5436, started with `-k ''`; the wrapper rewrites host, port and database name of `DATABASE_URL` without printing it). Never read or print a `.env` file. Stop and delete the throwaway database at the end. Say in the PR which PostgreSQL version ran (Homebrew has 14 and 17, the stack 16).
 - **Machine load:** `uptime` before a full suite; one suite at a time, nothing left in the background.
@@ -22,7 +22,7 @@
 - **Errors you surface in files you touch are fixed**, pre-existing ones too.
 - **Before calling the PR done:** `npm --prefix apps/server run build` and the full `npm --prefix apps/server test` green; one fresh `code-reviewer` over the branch against the spec and this plan, with a security eye on forging XP and on export and deletion; every finding fixed.
 
-## The API contract for the web (G1c, Bill and Irnerio)
+## The API contract for the web (G1c, the web side)
 
 Fixed here so the web can start before the server is merged. Additive: every field the web reads today stays as it is. All routes are the user's session only; an exchanged token gets 403 as today.
 
@@ -69,6 +69,7 @@ export interface MissioneServer {
 - Progress mapping to the web's `Mission.progress`: `fatte` → `done`, `di` → `of`. The web keeps the Italian titles; `scrivi` is now «Proponi una scheda» (G-314). `motivo: 'quota'` is the line under «Impara 5 schede nuove» telling the user to raise the new cards a day.
 - `nuovoLivello` is true only on the event whose credits crossed a level; the web celebrates a level once (remembering the last one celebrated, per browser).
 - `stato: 'vuota'` missions are not counted in «2 di 3», as in G1b.
+- A `vuota` mission with something already counted keeps its `progresso`: «convalida» with one vote cast and nothing left to vote on is `vuota` with «1 of 2»; with no vote cast it has no `progresso`.
 - The web no longer computes the missions (`missions/missions.ts` takes `progressi.missioni`), and G1b's rule that lowers «Impara 5» to the daily quota goes (L-27 choice 5).
 
 ## Review Focus
@@ -225,7 +226,7 @@ export async function settleMissions(tx: Prisma.TransactionClient, userId: strin
 
 The facts, read inside the transaction, once per settle (`MissionContext`, built lazily: a mission not evaluated reads nothing): preferences; today's stored day (`ripassi`, `nuove`, `valido`, `voti`); `due` = `count(dueWhere(user, reviewScope(user, materieComunita), today))`; `newLeft` = `count(newCardsWhere(…))` (ignoring the quota); `introduced` = `introducedToday`; for the streak `countedDays` + `computeStreak(…, today, day.valido)`.
 
-- `dovute`: `fatte = ripassi − nuove`; fulfilled `fatte ≥ 1 && due = 0`; progress `fatte` of `fatte + due`; `vuota` when both 0.
+- `dovute`: `fatte = ripassi_dovuti` (G-334: today's grades of a card due before tomorrow, counted by `recordGradeDay` from the state the grade read, in the same migration); fulfilled `fatte ≥ 1 && due = 0`; progress `fatte` of `fatte + due`; `vuota` when both 0.
 - `nuove`: `target = min(5, nuove + newLeft)`; `vuota` when 0; fulfilled `nuove ≥ target`; `motivo: 'quota'` when `nuoveAlGiorno − nuove < target − nuove` (and not fulfilled).
 - `obiettivo`: `target = max(ripassiAlGiorno, 10)`; fulfilled `valido && (ripassi ≥ target || (ripassi ≥ 1 && due = 0 && newLeft = 0))`; progress `min(ripassi, target)` of `target`.
 - `materia-ferma`: on a grade, only the graded card's subject, only when today's recorded reviews in it reach 5: qualifies when `MAX(data_revisione)` of the user's log in that subject **before 00:00 Rome today** is on `today − 7` or earlier (Rome day in SQL: `(data_revisione AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Rome'`; the bound as `romeDayStartSql`); a subject never reviewed before today does not qualify. Credited with `materia`. (The read's choice of subject is Task 9.)
@@ -319,4 +320,4 @@ Grade route: keep the id of the created log row (`const log = await tx.lingoRevi
 - [ ] **Step 1:** Docs.
 - [ ] **Step 2:** `uptime`; `npm --prefix apps/server run build`; the full `npm --prefix apps/server test` on the throwaway database; fix anything red, pre-existing included.
 - [ ] **Step 3:** A fresh `code-reviewer` over `origin/develop...HEAD` against the spec and this plan, with the security brief: forging XP (client inputs, delegated reach, concurrency, the ceiling), the savepoint (can an XP failure leave the outer transaction aborted?), lock order and deadlocks, export and deletion (G-306: nothing of another person). Fix every finding; rerun the suites.
-- [ ] **Step 4:** Push `feat/gymnasium-xp-server`; open the PR into `develop` (not merged): what it does, «carries migration `20261026100000_lingo_xp_ledger`, to apply with `migrate deploy` after the merge», the PostgreSQL version the suite ran on, the contract section of this plan as the web's starting point. `tsk status T16 review`. Tell the orchestrator. Stop and delete the throwaway database; remove the worktrees.
+- [ ] **Step 4:** Push `feat/gymnasium-xp-server`; open the PR into `develop` (not merged): what it does, «carries migration `20261026100000_lingo_xp_ledger`, to apply with `migrate deploy` after the merge», the PostgreSQL version the suite ran on, the contract section of this plan as the web's starting point. Mark the task for review and tell the orchestrator. Stop and delete the throwaway database; remove the worktrees.
