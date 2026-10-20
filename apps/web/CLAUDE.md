@@ -263,7 +263,9 @@ the sanitized `practices` when it carries `practicesSeeded: true`, else `practic
 `workspaceTabs` — and drops `workspaceTabs`, `highestZIndex` and the marker; the topic searches it
 could not reopen are told once (`practiceNotice`). `merge` sanitizes the practices
 (`sanitizePractices`), which also drops `brocardi_info` and `brocardi_error` from every saved article
-(D-078: an article saved before kept showing Brocardi until it was fetched again); the old
+(D-078: an article saved before kept showing Brocardi until it was fetched again), and `addArticles` drops
+them from every article on its way in (an API not yet updated, during a staggered release, may still send
+them; they would sit in `localStorage` until a reload); the old
 `show_brocardi_info` and `hasBrocardi` in saved searches, quick norms and `?norma=` links are left where
 they are, inert: no code writes or reads them, a saved quick norm or link still sends its flag as saved,
 and the Python API ignores it. `persist` writes through `utils/guardedStorage.ts`: a save the
@@ -374,7 +376,10 @@ in whitespace, so those older highlights show again.
 only when the reader presses the button (`DecisionResultList`; not offered on an act of the Union,
 `isEuropeanAct`), and «Cerca sentenze sul tema dell’articolo»: a topic search of the Cassazione by the
 article's rubric (`topic`, `getRubricText`; no rubric, no link; not on an act of the Union, nor when the
-«rubric» is a notice the source wrote in its place, `isNotice`, or the text is repealed or not yet in force),
+«rubric» is a notice the source wrote in its place, `isNotice`, or the text is repealed or not yet in force, nor
+for a generic rubric — `GENERIC_RUBRICS` in `caseLaw/genericRubrics.ts`, «Definizioni», «Oggetto», «Ambito di
+applicazione», «Entrata in vigore», «Abrogazioni», «Finalità», compared ignoring case, accents, spaces and a final
+period by `isGenericRubric`: alone they would find every act's decisions),
 which records the way back (`backEntry`, as a decision's link does) and opens beside the article — the
 decisions on its subject, whether or not they cite it. It took the place of the
 Brocardi glossary's «Sentenze su questo tema»: Brocardi is no longer a source (D-078), and its massime,
