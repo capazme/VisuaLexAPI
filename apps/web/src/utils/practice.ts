@@ -163,8 +163,9 @@ export function findPracticeArticle(act: PracticeAct, articleId: string): Articl
 /**
  * Adds `articles` of `norma` to the act they belong to (`actKeyOf`), appending the act when the
  * practice has none. A copy whose `practiceArticleKey` is already there is one row: it fills the
- * act's URN when the stored act lacks it, never the stored row nor its `norma_data` (T2). The input
- * is not changed; untouched acts keep their identity.
+ * act's URN when the stored act lacks it, never the stored row nor its `norma_data` (T2). An article
+ * enters without what Brocardi gave it (`withoutBrocardi`, D-078). The input is not changed; untouched
+ * acts keep their identity.
  */
 export function addArticles(
   acts: PracticeAct[],
@@ -183,7 +184,7 @@ export function addArticles(
   for (const incoming of articles) {
     const articleKey = practiceArticleKey(incoming);
     if (act.articles.some((a) => practiceArticleKey(a) === articleKey)) continue;
-    act.articles.push(incoming);
+    act.articles.push(withoutBrocardi(incoming));
     added.push(articleKey);
   }
   // Array.prototype.sort is stable: copies that rank alike keep their order of arrival.
@@ -381,8 +382,10 @@ export function storedReference(value: unknown): DecisionReference | null {
 
 /**
  * A stored article without what Brocardi gave it (D-078): a browser that saved its practices before
- * would otherwise keep showing the old commentary and massime until the article is fetched again.
- * Nothing is logged: it is not a loss of the reader's own. The other fields stay as saved, the old
+ * would otherwise keep showing the old commentary and massime until the article is fetched again, and
+ * while the release is staggered an API not yet updated may still send them with a new article, which
+ * would sit in `localStorage` until the next reload. So it runs on the way in (`addArticles`) and on
+ * load (`sanitizePractices`). Nothing is logged: it is not a loss of the reader's own. The other fields stay as saved, the old
  * `show_brocardi_info` and `hasBrocardi` of saved searches included: no code reads them, and the API
  * ignores the flag when a saved search still sends it.
  */
