@@ -62,7 +62,22 @@ describe('CommandPalette — where it opens', () => {
     expect(panel.style.position).toBe('fixed');
     expect(screen.getByRole('button', { name: 'Chiudi' })).toBeInTheDocument();
     expect(screen.getByText('Naviga')).toBeInTheDocument();
-    expect(screen.queryByRole('dialog')).toBeNull();
+    // a dialog with its name, the focus kept inside
+    expect(screen.getByRole('dialog', { name: 'Menu di ricerca' })).toContainElement(screen.getByRole('combobox'));
+  });
+
+  it('on a computer, gives the focus back to what had it («Opzioni») when it closes', async () => {
+    asDesktop(true);
+    const opener = document.createElement('button');
+    opener.textContent = 'Opzioni';
+    document.body.appendChild(opener);
+    opener.focus();
+    const { rerender } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    await waitFor(() => expect(screen.getByRole('combobox')).toHaveFocus());
+
+    rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+    await waitFor(() => expect(opener).toHaveFocus());
+    opener.remove();
   });
 
   it('on a computer with no field on screen, hangs at the top, centred', () => {
@@ -150,6 +165,15 @@ describe('CommandPalette — «A portata di mano»', () => {
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
     expect(screen.getByText('Nessun preferito: il fulmine su un articolo lo aggiunge qui')).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Crea un alias' })).toBeInTheDocument();
+  });
+
+  it('on a phone, gives «Gestisci» a heading as tall as it, so it covers no favourite', () => {
+    asDesktop(false);
+    appStore.setState({ quickNorms: [quickNorm(1)] });
+    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    const group = document.getElementById('command-palette-quick-norms')!;
+    expect(group.className).toMatch(/\[&_\[cmdk-group-heading\]\]:min-h-\[44px\]/);
+    expect(within(group).getByRole('button', { name: 'Gestisci' })).toHaveClass('top-0', 'min-h-[44px]');
   });
 
   it('shows the first six of 30 favourites and of 50 aliases, and the way to all of them', () => {

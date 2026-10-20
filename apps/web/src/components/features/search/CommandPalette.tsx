@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { Command, useCommandState } from 'cmdk';
-import { autoUpdate, FloatingPortal, offset, size, useFloating } from '@floating-ui/react';
+import { autoUpdate, FloatingFocusManager, FloatingPortal, offset, size, useFloating, useInteractions, useRole } from '@floating-ui/react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { ChevronDown, ChevronRight, Gavel, List, Search, Settings2, SlidersHorizontal, Sparkles, Tag, X, Zap } from 'lucide-react';
 import type { SearchParams, CustomAlias, SearchFilters } from '../../../types';
@@ -441,8 +441,10 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   // is followed, and passed at render time (gotcha 13).
   const field = isOpen && isDesktop ? document.getElementById(SEARCH_FIELD_FORM_ID) : null;
   const anchor = field?.isConnected ? field : null;
-  const { refs, floatingStyles } = useFloating({
-    open: isOpen && anchor !== null,
+  // A dialog on a computer too: the focus stays inside while it is open and goes back where it was
+  // («Opzioni», the field) when it closes. Placed only when the field is there.
+  const { refs, floatingStyles, context } = useFloating({
+    open: isOpen,
     elements: { reference: anchor },
     placement: 'bottom-start',
     strategy: 'fixed',
@@ -463,6 +465,16 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     ],
     whileElementsMounted: autoUpdate,
   });
+  const role = useRole(context, { role: 'dialog' });
+  // What had the focus as the palette opened («Opzioni», the field, a button elsewhere): it gets it back.
+  // Taken during render as the palette opens (own state, no effect), before the box takes the focus.
+  const [wasOpen, setWasOpen] = useState(false);
+  const [opener, setOpener] = useState<HTMLElement | null>(null);
+  if (isOpen !== wasOpen) {
+    setWasOpen(isOpen);
+    if (isOpen) setOpener(document.activeElement instanceof HTMLElement ? document.activeElement : null);
+  }
+  const { getFloatingProps } = useInteractions([role]);
 
   // The step's content slides in from the side it moved to; the first step of an opening does not move.
   const stepMotion = direction === 0
@@ -637,8 +649,10 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
         ? "Cerco l'atto… riconosco i nomi per esteso, non solo le sigle"
         : 'Nessun atto con questo nome';
 
+  // The tour's second step points here (`#command-palette-results`): an id given to `Command.List` is
+  // replaced by cmdk's own, so it lives on a container of ours.
   const actColumn = (
-    <div>
+    <div id="command-palette-results">
       <div aria-hidden className={COLUMN_TITLE}>Scegli l'atto</div>
       {actGroups.length === 0 && <p className={QUIET_LINE}>{noActLine}</p>}
       {actGroups.map((group) => (
@@ -668,12 +682,17 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
       <div aria-hidden className={COLUMN_TITLE}>A portata di mano</div>
 
       {(!typed || visibleQuickNorms.length > 0) && (
-        <Command.Group id="command-palette-quick-norms" heading="Preferiti" className={cn('relative', GROUP_WITH_HEADING)}>
+        <Command.Group
+          id="command-palette-quick-norms"
+          heading="Preferiti"
+          // The heading is as tall as «Gestisci» (44 px on a phone), which sits in it and covers no row.
+          className={cn('relative', GROUP_WITH_HEADING, '[&_[cmdk-group-heading]]:flex [&_[cmdk-group-heading]]:min-h-[44px] [&_[cmdk-group-heading]]:items-end md:[&_[cmdk-group-heading]]:min-h-0')}
+        >
           <button
             type="button"
             onClick={handleOpenQuickNormsManager}
             onKeyDown={keepKeys}
-            className={cn('absolute right-1 top-1 inline-flex items-center rounded px-2 text-xs font-medium text-toga-700 hover:underline md:top-2 dark:text-toga-300', TOUCH_TARGET_RESPONSIVE, FOCUS_RING)}
+            className={cn('absolute right-1 top-0 inline-flex items-center rounded px-2 text-xs font-medium text-toga-700 hover:underline md:top-2 dark:text-toga-300', TOUCH_TARGET_RESPONSIVE, FOCUS_RING)}
           >
             Gestisci
           </button>
@@ -754,7 +773,6 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   const scrollColumn = isDesktop ? 'min-h-0 overflow-y-auto overscroll-contain custom-scrollbar pb-2' : 'pb-2';
   const selectBody = (
     <Command.List
-      id="command-palette-results"
       className={cn('px-2', isDesktop && 'h-full [&>[cmdk-list-sizer]]:flex [&>[cmdk-list-sizer]]:h-full [&>[cmdk-list-sizer]]:flex-col')}
     >
       {/* A topic, not a decision or a norm: its own line, over the two columns */}
@@ -950,12 +968,24 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
           onClick={onClose}
         />
       )}
+      {/* Outside the presence, so the focus goes back as the palette closes, not once its fade is over. */}
+      <FloatingFocusManager
+        context={context}
+        modal
+        disabled={!isOpen}
+        initialFocus={step === 'select_act' ? boxRef : 0}
+        // Nothing had it (⌘K on the page): the field when it is there, else nowhere — never the page's first control.
+        returnFocus={opener && opener !== document.body ? { current: opener } : anchor !== null}
+      >
       <AnimatePresence>
         {isOpen && (
           // Two elements: the outer is placed by floating-ui, the inner moves (gotcha 10).
           <div
             key="command-palette"
-            ref={anchor ? refs.setFloating : undefined}
+            // eslint-disable-next-line react-hooks/refs -- floating-ui exposes a stable setter, not a ref.current read
+            ref={refs.setFloating}
+            {...getFloatingProps()}
+            aria-label="Menu di ricerca"
             style={anchor ? floatingStyles : undefined}
             className={cn(
               // The box holds the panel's height; only the panel takes the pointer (a shorter step
@@ -982,6 +1012,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
           </div>
         )}
       </AnimatePresence>
+      </FloatingFocusManager>
     </FloatingPortal>
   );
 }

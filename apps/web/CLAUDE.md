@@ -190,7 +190,12 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   across the columns. On a computer «A portata di mano» comes first in the DOM, drawn on the right, so ↓ reaches a
   favourite before the acts and Enter on an opening runs the first favourite, as before. cmdk takes Enter, the
   arrows, Home and End anywhere inside it (Enter picks the chosen row): every control that is not the box keeps
-  them (`keepKeys`), or Enter on «Filtri avanzati» would open the first act. Motion: the panel fades in dropping 6 px (`dur.pop`) and leaves in `dur.press`; a new step slides in
+  them (`keepKeys`), or Enter on «Filtri avanzati» would open the first act.
+  On a computer the panel is a dialog («Menu di ricerca», `useRole` and `FloatingFocusManager`, modal): the focus
+  stays inside, and goes back to what had it as the palette opened («Opzioni», the field), as it closes rather than
+  once the fade is over (the manager sits outside the `AnimatePresence`); nothing had it, the field. cmdk replaces an
+  id given to `Command.List` with its own, so the tour's `#command-palette-results` is on the acts' column;
+  `tourConfig.commandPalette.test.tsx` checks the palette's tour against the palette drawn, on both breakpoints. Motion: the panel fades in dropping 6 px (`dur.pop`) and leaves in `dur.press`; a new step slides in
   from the side it moved to; the chosen row's tint is one element carried from row to row (`layoutId`); under
   reduced motion everything only fades. This reverses spec `2026-10-18-redesign-inchiostro` §6.1 («no open or close
   animation») for the palette, as the brief asked. There is no «ultimi atti aperti»: the web keeps no list of the
@@ -249,7 +254,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   height of 36 px on a desktop and 44 px on a phone; `loading` keeps the label and puts a spinner in the
   icon's place (`aria-busy`), `status="error" | "success"` shows the outcome of the last press. `Modal`
   enters in `dur.panel` on `ease.drawer`, growing from 0.97, and `Sheet` rises from its edge on the same
-  timing; both only fade under reduced motion (`useReducedMotion`). `Toast` takes `spring.snappy`, rises
+  timing (its «Chiudi» in ink-500, dark ink-400: over 3:1, since it is often the one way out); both only fade under reduced motion (`useReducedMotion`). `Toast` takes `spring.snappy`, rises
   from the edge it lives on and pauses its time while `document.hidden`; the undo toast's countdown lives
   in `useUndoableAction` and does not pause. `Tooltip` waits 500 ms under a pointer, opens at once and
   without motion within 300 ms of another closing, and at once on keyboard focus.
