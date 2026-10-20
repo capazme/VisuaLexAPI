@@ -21,7 +21,7 @@ export const plannerStore = create<{
   setTodayCount: (count: number) => void;
   /**
    * The server's Rome day, as the last read answered it. When it changes (a page left open overnight), every view
-   * mounted reads again: the lists, the dates they propose and «Scaduti» follow the new day.
+   * mounted reads again: the lists, the dates they propose and «Termini scaduti» and «In ritardo» follow the new day.
    */
   today: string | null;
   setToday: (today: string) => void;

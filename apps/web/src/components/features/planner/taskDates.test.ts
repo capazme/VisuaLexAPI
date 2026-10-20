@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { countdown, dayHeading, daysBetween, groupUpcoming, isOverdue, shortDay, splitToday, todayCountLabel } from './taskDates';
+import { countdown, dayHeading, daysBetween, groupUpcoming, shortDay, splitToday, todayCountLabel } from './taskDates';
 import { nestTasks } from './taskTree';
 import type { Task } from '../../../types/tasks';
 
@@ -59,13 +59,20 @@ describe('days in words', () => {
 });
 
 describe('«Oggi» and «Prossimi giorni»', () => {
-  it('puts the overdue first: planned or due before today', () => {
+  it('puts the missed deadlines first, then the tasks late on their planned day, then today\'s', () => {
     const late = task('a', { plannedDate: '2026-10-19' });
+    const lateBeforeItsDeadline = task('e', { plannedDate: '2026-10-19', dueDate: '2026-10-23' });
+    const lateWithDeadlineToday = task('f', { plannedDate: '2026-10-18', dueDate: TODAY });
     const missed = task('b', { plannedDate: TODAY, dueDate: '2026-10-18' });
+    // A past deadline is always in the first group, whatever the planned date.
+    const missedAndLate = task('g', { plannedDate: '2026-10-15', dueDate: '2026-10-19' });
     const now = task('c', { plannedDate: TODAY });
     const due = task('d', { dueDate: TODAY });
-    expect(isOverdue(missed, TODAY)).toBe(true);
-    expect(splitToday([now, late, due, missed], TODAY)).toEqual({ overdue: [late, missed], today: [now, due] });
+    expect(splitToday([now, late, due, missed, lateBeforeItsDeadline, missedAndLate, lateWithDeadlineToday], TODAY)).toEqual({
+      missedDeadline: [missed, missedAndLate],
+      late: [late, lateBeforeItsDeadline, lateWithDeadlineToday],
+      today: [now, due],
+    });
   });
 
   it('files a task once, under its planned date in the seven days, else its deadline', () => {

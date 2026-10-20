@@ -64,17 +64,22 @@ export function countdown(dueDate: string, today: string): { text: string; tone:
   return { text: `mancano ${left} giorni`, tone: left <= 3 ? 'soon' : 'later' };
 }
 
-/** Planned or due before today: the top of «Oggi». */
-export function isOverdue(task: Pick<Task, 'plannedDate' | 'dueDate'>, today: string): boolean {
-  return (task.plannedDate !== null && task.plannedDate < today) || (task.dueDate !== null && task.dueDate < today);
-}
 
-/** «Oggi»: the overdue tasks first, then today's, each in the server's order. */
-export function splitToday<T extends Pick<Task, 'plannedDate' | 'dueDate'>>(tasks: T[], today: string): { overdue: T[]; today: T[] } {
-  const overdue: T[] = [];
-  const rest: T[] = [];
-  for (const task of tasks) (isOverdue(task, today) ? overdue : rest).push(task);
-  return { overdue, today: rest };
+/**
+ * «Oggi» in three groups, each in the server's order: «Termini scaduti» (the deadline is past: always here, whatever
+ * the planned date), then «In ritardo» (planned before today, the deadline not past or absent), then today's.
+ */
+export function splitToday<T extends Pick<Task, 'plannedDate' | 'dueDate'>>(
+  tasks: T[],
+  today: string,
+): { missedDeadline: T[]; late: T[]; today: T[] } {
+  const groups = { missedDeadline: [] as T[], late: [] as T[], today: [] as T[] };
+  for (const task of tasks) {
+    if (task.dueDate !== null && task.dueDate < today) groups.missedDeadline.push(task);
+    else if (task.plannedDate !== null && task.plannedDate < today) groups.late.push(task);
+    else groups.today.push(task);
+  }
+  return groups;
 }
 
 /** The seven days of «Prossimi giorni», today included. */

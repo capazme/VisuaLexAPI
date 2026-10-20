@@ -5,6 +5,7 @@ import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
 import type { Task } from '../../../types/tasks';
 import { FOCUS_RING } from '../studia/progress/tokens';
+import { tagLabel } from '../../../utils/tagLabel';
 import { LinkedText } from './LinkedText';
 import { TaskCheckbox } from './TaskCheckbox';
 import { countdown, PRIORITY_LABEL, RECURRENCE_LABEL, shortDay } from './taskDates';
@@ -92,7 +93,8 @@ export function TaskRow({ task, today, showDossier, isChild = false, onTick, onO
               <span key={label} className={cn(META, 'rounded bg-slate-100 px-1.5 py-0.5 text-slate-700 dark:bg-slate-800 dark:text-slate-300')}>
                 <Tag size={11} aria-hidden />
                 <span className="sr-only">Etichetta: </span>
-                <span className="truncate">{label}</span>
+                {/* Shown as the dossiers' tags are, its first letter capitalised; stored as typed. */}
+                <span className="truncate">{tagLabel(label)}</span>
               </span>
             ))}
             {showDossier && task.dossierId && (

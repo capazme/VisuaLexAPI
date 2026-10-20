@@ -50,22 +50,33 @@ afterEach(() => {
 });
 
 describe('«Oggi»', () => {
-  it('holds the rows while it reads, then lists the overdue first, and gives the bar its count', async () => {
+  it('holds the rows while it reads, then lists the missed deadlines and the late tasks first, and gives the bar its count', async () => {
     let resolve!: (value: unknown) => void;
     service.list.mockReturnValue(new Promise((r) => (resolve = r)));
     renderAt(<TodayView />);
     expect(screen.getByRole('heading', { level: 2, name: 'Oggi' })).toBeInTheDocument();
     expect(document.querySelector('[aria-busy="true"]')).not.toBeNull();
     await act(async () =>
-      resolve(answer([task('a', { plannedDate: TODAY }), task('b', { plannedDate: '2026-10-18', dueDate: '2026-10-19', priority: 1, dossierId: 'd1' })])),
+      resolve(
+        answer([
+          task('a', { plannedDate: TODAY }),
+          task('b', { plannedDate: '2026-10-18', dueDate: '2026-10-19', priority: 1, dossierId: 'd1', labels: ['udienza', 'DPO'] }),
+          task('c', { plannedDate: '2026-10-19' }),
+        ]),
+      ),
     );
     const groups = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
-    expect(groups).toEqual(['Scaduti, 1 compito', 'Oggi, 1 compito']);
-    const overdue = screen.getByRole('list', { name: 'Scaduti' });
+    expect(groups).toEqual(['Termini scaduti, 1 compito', 'In ritardo, 1 compito', 'Oggi, 1 compito']);
+    expect(within(screen.getByRole('list', { name: 'In ritardo' })).getByRole('checkbox', { name: /Compito c/ })).toBeInTheDocument();
+    const overdue = screen.getByRole('list', { name: 'Termini scaduti' });
+    // Labels as the dossiers' tags: the first letter capitalised, the rest as typed.
+    expect(within(overdue).getByText('Udienza')).toBeInTheDocument();
+    expect(within(overdue).getByText('DPO')).toBeInTheDocument();
     expect(within(overdue).getByText(/Termine finale ieri · scaduto da 1 giorno/)).toBeInTheDocument();
     expect(within(overdue).getByText('Urgente')).toBeInTheDocument();
     expect(within(overdue).getByRole('link', { name: /Ricorso Rossi/ })).toHaveAttribute('href', '/dossier?dossier=d1');
-    expect(plannerStore.getState().todayCount).toBe(2);
+    // The count is still overdue plus today: every task the view lists.
+    expect(plannerStore.getState().todayCount).toBe(3);
     expect(service.list).toHaveBeenCalledWith('today', undefined);
   });
 

@@ -77,7 +77,7 @@ function Group({ id, heading, count, children }: { id: string; heading: string; 
   );
 }
 
-/** «Oggi»: the overdue first, then today's; a new task is for today. */
+/** «Oggi»: the missed deadlines first, then the tasks late on their planned day, then today's; a new task is for today. */
 export function TodayView() {
   return (
     <ViewFrame
@@ -88,12 +88,17 @@ export function TodayView() {
       empty={{ title: 'Nessun compito per oggi', line: 'Quello che aggiungi qui è per oggi.' }}
     >
       {(tasks, day, optimistic) => {
-        const { overdue, today: rest } = splitToday(tasks, day);
+        const { missedDeadline, late, today: rest } = splitToday(tasks, day);
         return (
           <>
-            {overdue.length > 0 && (
-              <Group id="opus-today-overdue" heading="Scaduti" count={overdue.length}>
-                <TaskList label="Scaduti" tasks={overdue} today={day} optimistic={optimistic} />
+            {missedDeadline.length > 0 && (
+              <Group id="opus-today-missed" heading="Termini scaduti" count={missedDeadline.length}>
+                <TaskList label="Termini scaduti" tasks={missedDeadline} today={day} optimistic={optimistic} />
+              </Group>
+            )}
+            {late.length > 0 && (
+              <Group id="opus-today-late" heading="In ritardo" count={late.length}>
+                <TaskList label="In ritardo" tasks={late} today={day} optimistic={optimistic} />
               </Group>
             )}
             {rest.length > 0 && (

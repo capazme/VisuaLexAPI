@@ -11,7 +11,7 @@ interface Props {
   today: string;
   optimistic: Optimistic;
   showDossier?: boolean;
-  /** The list's name for a screen reader («Scaduti», «Oggi», a day). */
+  /** The list's name for a screen reader («Termini scaduti», «In ritardo», «Oggi», a day). */
   label: string;
 }
 

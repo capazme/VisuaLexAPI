@@ -255,7 +255,9 @@ Personal tasks, filed under a dossier or in the inbox, with a planned date and a
 checks the files; «termine calcolato» comes with wave 2 and its warning), and no Todoist names, icons or texts.
 
 - **Pages**: `OpusPage` (the section's title, the view, «Cestino dei compiti»), `OpusViews`: `TodayView` (the
-  overdue — planned or due before today — under «Scaduti», then «Oggi»), `UpcomingView` (today and six days, a task
+  missed deadlines under «Termini scaduti» — a past deadline is always there, whatever the planned date —, then the
+  tasks planned before today whose deadline is not past or absent under «In ritardo», then «Oggi»: `splitToday`;
+  the owner's choice after the first pass, 20 October 2026), `UpcomingView` (today and six days, a task
   once, under its planned date when in range, else its deadline: `groupUpcoming`), `InboxView` (no dossier),
   `TaskTrashView` (`view=trash`: a task's trash is `deletedAt` on the row, not a `TrashEntry`, so it is not in the
   dossiers' `TrashPage`; «Ripristina», 30 days). «Today» is the server's day (`TaskViewAnswer.today`), never the browser's.
@@ -263,7 +265,7 @@ checks the files; «termine calcolato» comes with wave 2 and its warning), and 
   deadline first and bordered with its count (`countdown`: «scaduto da 2 giorni», «scade oggi», «manca 1 giorno»,
   «mancano 3 giorni»), the planned day, the repetition, the priority in words (1 «Urgente» is the most urgent, 4
   «Normale» the default and not shown) with a 4 px stripe — red, amber, ink: not a red-orange-blue scale with the
-  last unmarked, which is another app's look —, the labels, the dossier (a link; not in the dossier's own
+  last unmarked, which is another app's look —, the labels (first letter capitalised, as the dossiers' tags: `tagLabel`; stored as typed), the dossier (a link; not in the dossier's own
   panel), «⋯» (Modifica, Aggiungi un sottocompito, Sposta nel cestino). `TaskList` nests subtasks one level under a
   parent in the same list (`nestTasks`; deeper ones under the top ancestor); the arrows, Home and End move between
   the rows' ticks across every list of the page (`moveBetweenRows`, `data-task-lists`). A row that leaves (ticked,
@@ -1501,7 +1503,7 @@ Duplicating any of these is a defect, not a shortcut.
 - `utils/tagLabel.ts` — `tagLabel(tag)`: a dossier's tag as shown, its first letter capitalised and
   the rest as typed («accesso» → «Accesso», «DPO» stays). Display only — the stored tag never changes,
   every filter compares stored values, and the PDF and the editors show the tag as typed. The list's
-  card, the dossier's header, the import dialog and the Forum's card go through it.
+  card, the dossier's header, the import dialog, the Forum's card and a planner task's labels go through it.
   `tagCategories(tags)` makes the dossier list's category menu (Italian alphabetical order, case and
   accents ignored; values that differ only by case are one category filtering all of them, labelled by
   the spelling with the most capitals) and `hasTagCategory` filters by it.
