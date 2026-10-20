@@ -106,8 +106,8 @@ class ThrottledHttpClient:
                                     "retry_after": wait_time,
                                 },
                             )
-                            await asyncio.sleep(wait_time)
                             attempt += 1
+                            await self._wait_before(attempt, retries, wait_time)
                             continue
 
                         response.raise_for_status()
@@ -120,20 +120,27 @@ class ThrottledHttpClient:
                         "HTTP request failed; retrying",
                         extra={"source": source, "url": url, "attempt": attempt, "error": str(exc)},
                     )
-                    await asyncio.sleep(wait_time)
                     attempt += 1
+                    await self._wait_before(attempt, retries, wait_time)
                 except asyncio.TimeoutError:
                     wait_time = self._retry_delay(attempt)
                     log.warning(
                         "HTTP request timeout; retrying",
                         extra={"source": source, "url": url, "attempt": attempt},
                     )
-                    await asyncio.sleep(wait_time)
                     attempt += 1
+                    await self._wait_before(attempt, retries, wait_time)
             raise NetworkError(
                 f"Exceeded retry budget for {url} after {retries + 1} attempts",
                 status_code=last_status,
             )
+
+    @staticmethod
+    async def _wait_before(attempt: int, retries: int, wait_time: float) -> None:
+        """The wait before attempt number `attempt` (0 is the first). None when the budget is
+        spent: the caller gives up at once instead of after a Retry-After it will not use."""
+        if attempt <= retries:
+            await asyncio.sleep(wait_time)
 
     async def _respect_min_interval(self) -> None:
         async with self._request_lock:

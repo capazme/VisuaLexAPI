@@ -82,8 +82,19 @@ NON_NETWORK_HOSTS: dict[str, str] = {
 
 
 def is_allowed(url: str) -> bool:
-    """True when `url`'s host is one the running server may contact."""
+    """True when `url`'s host is one the running server may contact.
+
+    The host must be the one every client reads, Python's `urlparse` as the browser:
+    Chromium reads a backslash as a slash and drops tabs and newlines, so an internal
+    address followed by a backslash and `@eur-lex.europa.eu/` is EUR-Lex to `urlparse`
+    and the internal address to Playwright. A backslash, a control character, credentials
+    before the host or a scheme other than http(s) is refused.
+    """
+    if not isinstance(url, str) or "\\" in url or any(ord(c) < 0x20 or ord(c) == 0x7F for c in url):
+        return False
     try:
-        return (urlparse(url).hostname or "") in ALLOWED_HOSTS
+        parsed = urlparse(url)
+        return (parsed.scheme in ("http", "https") and "@" not in parsed.netloc
+                and (parsed.hostname or "") in ALLOWED_HOSTS)
     except ValueError:
         return False

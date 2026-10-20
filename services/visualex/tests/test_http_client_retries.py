@@ -77,6 +77,23 @@ class TestMaxRetries:
         assert portal.hits == 1
         assert raised.value.status_code is None
 
+    async def test_a_spent_budget_gives_up_without_waiting_for_retry_after(self, client):
+        """No attempt follows, so a Retry-After of a minute is not slept through."""
+        async def busy(request):
+            return web.Response(status=429, text="no", headers={"Retry-After": "60"})
+
+        app = web.Application()
+        app.router.add_get("/", busy)
+        server = TestServer(app)
+        await server.start_server()
+        try:
+            async with asyncio.timeout(5):
+                with pytest.raises(NetworkError) as raised:
+                    await client.request("GET", str(server.make_url("/")), max_retries=0)
+        finally:
+            await server.close()
+        assert raised.value.status_code == 429
+
     async def test_one_retry_makes_two_attempts(self, client):
         async with Portal([503]) as portal:
             with pytest.raises(NetworkError):

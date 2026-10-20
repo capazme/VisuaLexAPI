@@ -169,6 +169,7 @@ async def test_a_page_the_client_could_not_fetch_is_a_failure_kept_nowhere(isola
     "http://127.0.0.1:5000/normattiva",
     "http://169.254.169.254/latest/meta-data/eur-lex",
     "https://www.normattiva.it.evil.com/uri-res/N2Ls?urn:nir:stato:legge:1990-08-07;241",
+    "http://169.254.169.254\\@eur-lex.europa.eu/eli/reg/2016/679/oj/ita",  # Chromium's host
 ])
 async def test_an_undeclared_host_is_never_visited(isolated, url):
     browser = AsyncMock(return_value=GDPR)
@@ -178,7 +179,14 @@ async def test_an_undeclared_host_is_never_visited(isolated, url):
     assert FakeClient.visits == [] and browser.await_count == 0
 
 
-async def test_a_declared_host_the_tree_does_not_parse_is_not_visited(isolated):
-    answer = await treextractor.get_tree("https://dati.cortecostituzionale.it/", return_metadata=True)
+@pytest.mark.parametrize("url", [
+    "https://dati.cortecostituzionale.it/",
+    "https://dati.cortecostituzionale.it/normattiva",
+    "https://www.italgiure.giustizia.it/?eur-lex",
+])
+async def test_a_declared_host_the_tree_does_not_parse_is_not_visited(isolated, url):
+    browser = AsyncMock(return_value=GDPR)
+    with patch.object(treextractor, "_fetch_with_playwright", browser):
+        answer = await treextractor.get_tree(url, return_metadata=True)
     assert answer == ("Unrecognized norm URN format", 0, {})
-    assert FakeClient.visits == []
+    assert FakeClient.visits == [] and browser.await_count == 0

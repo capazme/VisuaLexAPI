@@ -2,6 +2,7 @@ import asyncio
 from bs4 import BeautifulSoup
 import logging
 import re
+from urllib.parse import urlparse
 from aiocache import cached, Cache
 from aiocache.serializers import JsonSerializer
 from playwright.async_api import async_playwright
@@ -82,6 +83,16 @@ async def _eurlex_page(normurn):
     return await _fetch_with_playwright(normurn), False
 
 
+def _source_of(normurn):
+    """"normattiva" or "eurlex" by the URL's host (the hosts every URL the app builds uses),
+    else None: a word in the path or the query decides nothing."""
+    try:
+        host = urlparse(normurn).hostname
+    except ValueError:
+        return None
+    return {"www.normattiva.it": "normattiva", "eur-lex.europa.eu": "eurlex"}.get(host)
+
+
 def _no_tree(result):
     """A failure (a blocked page, a timeout) or an empty tree: (message or [], 0[, {}]). Never kept
     in memory, as the persistent cache never keeps it: the next caller asks the source again
@@ -125,8 +136,9 @@ async def get_tree(normurn, link=False, details=False, return_metadata=False):
         return cached_result.get("result", []), cached_result.get("count", 0)
 
     # Use different fetch methods based on source
-    is_eurlex = "eur-lex" in normurn
-    is_normattiva = "normattiva" in normurn
+    source = _source_of(normurn)
+    is_eurlex = source == "eurlex"
+    is_normattiva = source == "normattiva"
 
     # One Normattiva page, one download: every (details, return_metadata) variant is read
     # from the widest tree of that page. The existence check, a range and the index the web
@@ -160,11 +172,11 @@ async def _tree_from_page(normurn, link, details, return_metadata, is_eurlex, eu
         return (message, 0, {}, from_copy) if return_metadata else (message, 0, from_copy)
 
     # `normurn` comes from the caller (POST /fetch_tree): only a declared host is visited, by
-    # the browser as by the client, and a URL of no source we parse is not visited at all.
+    # the browser as by the client, and only Normattiva's or EUR-Lex's host.
     if not is_allowed(normurn):
         logging.error(f"Tree refused for an undeclared host: {normurn[:80]}")
         return failure(f"Host non consentito: {normurn[:80]}")
-    if not is_eurlex and "normattiva" not in normurn:
+    if not is_eurlex and _source_of(normurn) != "normattiva":
         logging.warning(f"Unrecognized norm URN format: {normurn}")
         return failure("Unrecognized norm URN format")
 
@@ -194,7 +206,7 @@ async def _tree_from_page(normurn, link, details, return_metadata, is_eurlex, eu
 
     soup = BeautifulSoup(text, 'html.parser')
 
-    if "normattiva" in normurn:
+    if not is_eurlex:
         result, count, metadata = await _parse_normattiva_tree(
             soup, normurn, link, True, return_metadata=True)
         if count > 0:

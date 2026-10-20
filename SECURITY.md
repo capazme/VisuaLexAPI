@@ -54,9 +54,11 @@ open, not oversights:
 `POST /fetch_tree` was a third path until 21 October 2026: its caller-supplied
 `urn` was fetched by `tools/treextractor.get_tree` on an `aiohttp` session of its
 own. The tree now checks `is_allowed()` before any visit, by the client or by the
-browser, visits only a URL of a source it parses (Normattiva or EUR-Lex), and
-fetches a Normattiva page through the shared `ThrottledHttpClient`
-(`tests/test_tree_variants.py`).
+browser, visits only Normattiva's or EUR-Lex's host, and fetches a Normattiva
+page through the shared `ThrottledHttpClient` (`tests/test_tree_variants.py`).
+`is_allowed()` refuses what a browser would read as another host than Python
+does: a backslash, a control character, credentials before the host, a scheme
+other than http(s) (`tests/test_egress_allowlist.py`).
 
 If you are evaluating this server for client work, treat the table above as the
 list of sources it consults on its own initiative, and this section as the list

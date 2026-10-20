@@ -95,8 +95,8 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     visited there, only when it parsed into articles: one browser visit serves the tree, the
     rubriche and the articles (`tests/test_tree_variants.py`). The Normattiva page comes
     through the shared client (its rate limit and host check, one attempt as before), and
-    no URL is visited, by the client or the browser, unless `is_allowed` and Normattiva or
-    EUR-Lex: `POST /fetch_tree` passes the caller's URL here
+    no URL is visited, by the client or the browser, unless `is_allowed` and its host is
+    Normattiva's or EUR-Lex's (`_source_of`): `POST /fetch_tree` passes the caller's URL here
   - `text_op.py` — text parsing **and** date handling (see Date System)
   - `article_suffixes.py` — the ordinal table (`bis` … `vicies`) every
     article-number regex reads, longest-first so a short entry cannot claim the
@@ -137,7 +137,9 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     and `suggest_acts()` offers near misses. Chained after the exact-match paths
     in `alias_resolver` and `nl_parser`, so nothing that resolved before changes.
   - `egress.py` — `ALLOWED_HOSTS` plus `is_allowed(url)`, checked in
-    `ThrottledHttpClient.request`. `tests/test_egress_allowlist.py` fails the
+    `ThrottledHttpClient.request`; it refuses a backslash, a control character,
+    credentials before the host and a scheme other than http(s), which Chromium would
+    read as another host than `urlparse` does. `tests/test_egress_allowlist.py` fails the
     build when a URL literal names an undeclared host. The runtime check covers
     every `ThrottledHttpClient` (the shared one and the decision readers' own)
     and treextractor's check before a browser — `SECURITY.md` lists what it does not
