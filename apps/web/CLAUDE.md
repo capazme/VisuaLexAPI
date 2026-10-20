@@ -74,8 +74,13 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   is the page's own state, read from the address when it opens: React Router 7 applies a navigation in a
   transition, so a tab read from the address would unmount the form leaving for one render. `useAuth` runs
   once, in the page, and `LoginForm` takes it as a prop: mounted again at each change of tab, a form's own
-  would read the user again (a request per change) and start disabled. A return address that is the page
-  itself goes to `/` instead, or the entrance would stay on screen. A click or the link under a form puts
+  would read the user again (a request per change) and start disabled; its error outlives the form, so an
+  error already on screen when the tab changes is not shown again on the empty form. While a sign-in or a
+  sign-up is on its way the tabs hold still (`aria-disabled`): the form would unmount under its request. A
+  return address that is the page itself (`isLoginPage` in `utils/returnTo.ts`, either tab) goes to `/`
+  instead, or the entrance would stay on screen. The columns are anchored at the top, not centred: the
+  card's height changes with the tab, and a centred page moved as a whole. Each form has a visually hidden
+  `h2` («Accedi», «Registrati»), the tab being its heading on screen. A click or the link under a form puts
   the cursor in the new form's first field (once it is enabled), the arrows keep it on the tabs; the mark
   slides by `transform`, the form leaving fades, the next comes in from the side of its tab, the card's height
   follows, and under reduced motion the change is immediate; the wait for approval after signing up is drawn
@@ -1311,7 +1316,9 @@ Duplicating any of these is a defect, not a shortcut.
   (`hasDecisionText`).
 - `utils/returnTo.ts` — where the login sends the reader back: router state or the
   sessionStorage stash, only what the browser's URL parser reads as a path of the app, never a
-  URL parameter; a logout forgets it.
+  URL parameter; a logout forgets it. `authPageTab` names the tab of the sign-in page a path opens
+  (`/login`, `/register`, read as the router reads them: case, trailing slashes, percent escapes) and
+  `isLoginPage` is either tab: never stashed, never returned to.
 - `utils/readingBackStack.ts` — `appendBackEntry`, `peekReadingBack`,
   `findLiveBackIndex` (over the practices), `ReadingBackEntry` (what a surface pushes) and `PracticeBackEntry`
   (what the stack holds) for citation-jump undo.

@@ -19,6 +19,7 @@ import { BookOpen } from 'lucide-react';
 import { BookMark } from '../ui/BookMark';
 import { FOCUS_RING } from '../../constants/interactions';
 import { useAuth } from '../../hooks/useAuth';
+import { authPageTab, isLoginPage } from '../../utils/returnTo';
 import { focusField } from './authForm';
 import { LoginForm } from './LoginForm';
 import { RegisterForm } from './RegisterForm';
@@ -51,22 +52,21 @@ function enter(go: () => void) {
   }, ENTRY_MS);
 }
 
-/** The router matches without regard to case, so «/Register» is the sign-up tab too. */
-function tabOfPath(pathname: string): AuthTab {
-  return pathname.toLowerCase().replace(/\/+$/, '') === '/register' ? 'register' : 'login';
-}
-
-function isAuthPath(to: string): boolean {
-  return ['/login', '/register'].includes(to.split(/[?#]/)[0].toLowerCase().replace(/\/+$/, ''));
-}
 
 export function AuthPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<AuthTab>(() => tabOfPath(location.pathname));
+  const [tab, setTab] = useState<AuthTab>(() => authPageTab(location.pathname) ?? 'login');
   // Once for the page: each change of tab mounts the sign-in form again, which would read the user
   // again (a request per change) and start disabled until the answer.
   const auth = useAuth();
+  // Its error outlives the sign-in form, which a change of tab mounts again empty: an error already on
+  // screen when the tab changes is not shown again (a new failure is the form's own message).
+  const [staleError, setStaleError] = useState<string | null>(null);
+  const loginAuth = { login: auth.login, loading: auth.loading, error: auth.error === staleError ? null : auth.error };
+  // A request in flight (a sign-in, a sign-up): the tabs hold still, or the form would unmount under it
+  // (an account created with no word of the approval it waits for; a sign-in landing from «Registrati»).
+  const [busy, setBusy] = useState(false);
 
   const [entering, setEntering] = useState(false);
   // The form fading out, and whether the last change of tab moves at all (not on the first paint,
@@ -109,6 +109,7 @@ export function AuthPage() {
   };
 
   const switchTo = (next: AuthTab, focus: 'field' | 'tab') => {
+    if (busy) return;
     if (next === tab) {
       if (focus === 'field') focusField(firstField(tab), pendingFocus);
       return;
@@ -125,6 +126,7 @@ export function AuthPage() {
       exitTimer.current = window.setTimeout(() => setLeaving(null), EXIT_MS);
     }
     setAnimated(!still);
+    setStaleError(auth.error);
     setTab(next);
     focusFirstField.current = focus === 'field';
     const target = TABS.find((t) => t.id === next)!.path;
@@ -165,6 +167,7 @@ export function AuthPage() {
     else if (e.key === 'End') next = TABS[TABS.length - 1].id;
     if (!next) return;
     e.preventDefault();
+    if (busy) return;
     switchTo(next, 'tab');
     tabRefs.current[next]?.focus();
   };
@@ -172,7 +175,7 @@ export function AuthPage() {
   const onSignedIn = (to: string) => {
     setEntering(true);
     // Back to this very page would leave the entrance on screen: the page stays mounted.
-    enter(() => navigate(isAuthPath(to) ? '/' : to, { replace: true }));
+    enter(() => navigate(isLoginPage(to.split(/[?#]/)[0]) ? '/' : to, { replace: true }));
   };
 
   if (entering) {
@@ -185,7 +188,9 @@ export function AuthPage() {
 
   return (
     <div className="min-h-dvh bg-slate-50 dark:bg-slate-950 flex flex-col px-4 py-10 md:px-10">
-      <div className="mx-auto my-auto grid w-full max-w-5xl items-center gap-12 md:grid-cols-[minmax(0,1fr)_420px] md:gap-16">
+      {/* Anchored at the top, not centred: the card's height changes with the tab, and a centred page
+          would move as a whole (about 90 px at 1920 px), the clicked tab running from the pointer. */}
+      <div className="mx-auto grid w-full max-w-5xl items-start gap-12 md:mt-16 md:grid-cols-[minmax(0,1fr)_420px] md:gap-16">
         <header className="space-y-5">
           <BookOpen aria-hidden="true" size={44} strokeWidth={1.5} className="text-primary-600 dark:text-primary-400" />
           <h1 className="font-serif text-5xl font-medium tracking-tight text-slate-900 dark:text-slate-50 md:text-6xl">
@@ -222,8 +227,9 @@ export function AuthPage() {
                   aria-selected={selected}
                   aria-controls={selected ? `auth-panel-${t.id}` : undefined}
                   tabIndex={selected ? 0 : -1}
+                  aria-disabled={busy || undefined}
                   onClick={() => switchTo(t.id, 'field')}
-                  className={`min-h-[44px] flex-1 rounded-t-md px-2 pb-3 pt-1 font-serif text-2xl font-medium transition-colors ${
+                  className={`min-h-[44px] flex-1 rounded-t-md px-2 pb-3 pt-1 font-serif text-2xl font-medium transition-colors aria-disabled:cursor-not-allowed ${
                     selected
                       ? 'text-slate-900 dark:text-slate-50'
                       : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100'
@@ -263,9 +269,9 @@ export function AuthPage() {
                   }
                 >
                   {t.id === 'login' ? (
-                    <LoginForm auth={auth} onSignedIn={onSignedIn} onSwitch={() => switchTo('register', 'field')} />
+                    <LoginForm auth={loginAuth} onBusy={setBusy} onSignedIn={onSignedIn} onSwitch={() => switchTo('register', 'field')} />
                   ) : (
-                    <RegisterForm onSwitch={() => switchTo('login', 'field')} />
+                    <RegisterForm onBusy={setBusy} onSwitch={() => switchTo('login', 'field')} />
                   )}
                 </div>
               );
@@ -275,7 +281,7 @@ export function AuthPage() {
       </div>
 
       {/* The sources' attributions, readable before signing in. */}
-      <footer className="mx-auto mt-10 w-full max-w-5xl text-sm text-slate-600 dark:text-slate-400">
+      <footer className="mx-auto mt-auto w-full max-w-5xl pt-10 text-sm text-slate-600 dark:text-slate-400">
         <Link
           to="/crediti"
           className={`-ml-2 inline-flex min-h-[44px] items-center rounded-md px-2 hover:text-slate-900 hover:underline dark:hover:text-slate-100 ${FOCUS_RING}`}

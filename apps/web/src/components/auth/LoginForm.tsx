@@ -15,13 +15,15 @@ const ERROR_ID = 'login-error';
 interface LoginFormProps {
   /** The page's one `useAuth`: a form mounted again at each change of tab must not read the user again. */
   auth: Pick<ReturnType<typeof useAuth>, 'login' | 'loading' | 'error'>;
+  /** A request in flight, or none: the page holds the tabs still meanwhile. */
+  onBusy: (busy: boolean) => void;
   /** Signed in: where to go, which the page enters with its animation. */
   onSignedIn: (to: string) => void;
   /** «Registrati»: the other tab. */
   onSwitch: () => void;
 }
 
-export function LoginForm({ auth, onSignedIn, onSwitch }: LoginFormProps) {
+export function LoginForm({ auth, onBusy, onSignedIn, onSwitch }: LoginFormProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -68,12 +70,15 @@ export function LoginForm({ auth, onSignedIn, onSwitch }: LoginFormProps) {
       return;
     }
 
+    onBusy(true);
     try {
       await login(email, password);
       const stashed = takeReturnTo(); // always spent, so a stale address never returns later
       onSignedIn(fromState ?? stashed ?? '/');
     } catch (error) {
       fail(getErrorMessage(error) || 'Accesso non riuscito: controlla email e password.', 'password');
+    } finally {
+      onBusy(false);
     }
   };
 
@@ -82,6 +87,8 @@ export function LoginForm({ auth, onSignedIn, onSwitch }: LoginFormProps) {
 
   return (
     <>
+      {/* The tab says it on screen; the heading lets a screen reader's list of headings reach the form. */}
+      <h2 className="sr-only">Accedi</h2>
       {error && <FormError id={ERROR_ID} message={error} />}
 
       <form onSubmit={handleSubmit} className="space-y-5">

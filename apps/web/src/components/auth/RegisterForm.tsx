@@ -20,11 +20,13 @@ const STRENGTH_WORDS = ['', 'molto debole', 'debole', 'buona', 'forte'];
 const STRENGTH_FILL = ['', 'bg-red-500', 'bg-amber-500', 'bg-emerald-500', 'bg-emerald-600'];
 
 interface RegisterFormProps {
+  /** A request in flight, or none: the page holds the tabs still meanwhile. */
+  onBusy: (busy: boolean) => void;
   /** «Accedi» and «Torna ad Accedi»: the other tab. */
   onSwitch: () => void;
 }
 
-export function RegisterForm({ onSwitch }: RegisterFormProps) {
+export function RegisterForm({ onBusy, onSwitch }: RegisterFormProps) {
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -118,6 +120,7 @@ export function RegisterForm({ onSwitch }: RegisterFormProps) {
 
     try {
       setLoading(true);
+      onBusy(true);
       await register({ email, username, password });
       setRegistrationComplete(true);
     } catch (error) {
@@ -125,6 +128,7 @@ export function RegisterForm({ onSwitch }: RegisterFormProps) {
       fail(getErrorMessage(error) || 'Errore durante la registrazione. Riprova.', 'email');
     } finally {
       setLoading(false);
+      onBusy(false);
     }
   };
 
@@ -166,6 +170,8 @@ export function RegisterForm({ onSwitch }: RegisterFormProps) {
 
   return (
     <>
+      {/* The tab says it on screen; the heading lets a screen reader's list of headings reach the form. */}
+      <h2 className="sr-only">Registrati</h2>
       {formError && <FormError id={ERROR_ID} message={formError} />}
 
       <form onSubmit={handleSubmit} className="space-y-5">

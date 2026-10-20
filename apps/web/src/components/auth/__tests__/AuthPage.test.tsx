@@ -3,8 +3,10 @@ import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 
 const login = vi.fn();
 let authLoading = false;
-vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ login, loading: authLoading, error: null }) }));
-vi.mock('../../../services/authService', () => ({ register: vi.fn() }));
+let authError: string | null = null;
+vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ login, loading: authLoading, error: authError }) }));
+const register = vi.fn();
+vi.mock('../../../services/authService', () => ({ register: (...args: unknown[]) => register(...args) }));
 
 import { renderAuth } from './renderAuth';
 
@@ -33,6 +35,8 @@ function reduceMotion(reduce: boolean) {
 beforeEach(() => {
   login.mockReset().mockResolvedValue(undefined);
   authLoading = false;
+  authError = null;
+  register.mockReset().mockResolvedValue({ message: 'ok' });
   sessionStorage.clear();
   reduceMotion(false);
 });
@@ -152,6 +156,8 @@ describe('AuthPage: two tabs on one page', () => {
     expect(email).toBeDisabled();
     expect(email).not.toHaveFocus();
     authLoading = false;
+  authError = null;
+  register.mockReset().mockResolvedValue({ message: 'ok' });
     rerenderSame();
     expect(email).toHaveFocus();
   });
@@ -159,6 +165,68 @@ describe('AuthPage: two tabs on one page', () => {
   it('opens «Registrati» from an address written in capitals', () => {
     renderAuth('/Register');
     expect(tab('Registrati')).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('gives each form a heading, for a screen reader\'s list of headings', async () => {
+    renderAuth('/login');
+    expect(within(panel()).getByRole('heading', { level: 2, name: 'Accedi' })).toBeInTheDocument();
+    fireEvent.click(tab('Registrati'));
+    await waitFor(() => expect(allPanels()).toHaveLength(1));
+    expect(within(panel()).getByRole('heading', { level: 2, name: 'Registrati' })).toBeInTheDocument();
+  });
+
+  it('does not show a failed sign-in\'s error again on the empty form a change of tab brings back', async () => {
+    // The page's useAuth keeps the error of the last failure until the next sign-in.
+    authError = 'Credenziali non valide';
+    renderAuth('/login');
+    expect(screen.getByRole('alert')).toHaveTextContent('Credenziali non valide');
+    fireEvent.click(tab('Registrati'));
+    fireEvent.click(tab('Accedi'));
+    await waitFor(() => expect(allPanels()).toHaveLength(1));
+    expect(within(panel()).getByLabelText('Email')).toHaveValue('');
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('holds the tabs still while a sign-in is on its way', async () => {
+    let finish: () => void = () => {};
+    login.mockImplementation(() => new Promise<void>((resolve) => { finish = resolve; }));
+    renderAuth('/login');
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'a@b.it' } });
+    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: 'pw' } });
+    fireEvent.click(within(panel()).getByRole('button', { name: 'Accedi' }));
+    expect(tab('Registrati')).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(tab('Registrati'));
+    fireEvent.keyDown(tab('Accedi'), { key: 'ArrowRight' });
+    fireEvent.click(within(panel()).getByRole('button', { name: 'Registrati' }));
+    expect(address()).toHaveTextContent('/login');
+    expect(tab('Accedi')).toHaveAttribute('aria-selected', 'true');
+    await act(async () => finish());
+    expect(await screen.findByRole('status', { name: 'Accesso a VisuaLex' })).toBeInTheDocument();
+  });
+
+  it('holds the tabs still while a sign-up is on its way, so its confirmation shows', async () => {
+    let finish: () => void = () => {};
+    register.mockImplementation(() => new Promise((resolve) => { finish = () => resolve({ message: 'ok' }); }));
+    renderAuth('/register');
+    const p = within(panel());
+    fireEvent.change(p.getByLabelText('Email'), { target: { value: 'avv@studio.it' } });
+    fireEvent.change(p.getByLabelText('Username'), { target: { value: 'avv_rossi' } });
+    fireEvent.change(p.getByLabelText('Password'), { target: { value: 'Segreta123' } });
+    fireEvent.change(p.getByLabelText('Conferma password'), { target: { value: 'Segreta123' } });
+    fireEvent.click(p.getByRole('button', { name: 'Crea account' }));
+    fireEvent.click(tab('Accedi'));
+    fireEvent.keyDown(tab('Registrati'), { key: 'Home' });
+    expect(address()).toHaveTextContent('/register');
+    await act(async () => finish());
+    expect(await screen.findByRole('heading', { name: 'Registrazione completata' })).toBeInTheDocument();
+    expect(tab('Accedi')).not.toHaveAttribute('aria-disabled');
+  });
+
+  it('anchors the page at the top, so only the card\'s height moves with the tab', () => {
+    renderAuth('/login');
+    const columns = screen.getByRole('main').parentElement!;
+    expect(columns.className).toContain('items-start');
+    expect(columns.className).not.toMatch(/\bmy-auto\b|\bitems-center\b/);
   });
 
   it('under reduced motion the change is immediate: no form fading out, none sliding in', () => {
