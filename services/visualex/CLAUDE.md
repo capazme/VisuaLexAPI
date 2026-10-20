@@ -189,9 +189,12 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     cache deletes an expired entry only when its key is read again, so a namespace nobody
     sweeps only grows. The Normattiva pages (2.6 MB for an article of a code) are pruned at
     start and every six hours with the decision caches (`prune_normattiva_cache`): the
-    pages not read for 30 days go, then the least recently read down to 2 GB (the owner's
-    rule, G-338). A read refreshes the file's modification time, which is what `prune`
-    reads; the TTL still counts from the write
+    expired pages go (G-344: `get` refuses them anyway, so the scraper and
+    `normattiva_validity` never read one), then the pages not read for 30 days and the
+    least recently read down to 2 GB (G-338), a ceiling for a longer TTL or a busy day. A
+    read refreshes the file's modification time, which is what `prune` reads; the TTL
+    still counts from the write. `sweep_expired` reads an entry's write time from its
+    first bytes (`_HEAD`), not by decoding a 2.6 MB page
 
 **Timing harness** — `scripts/collector_timing.py` runs a fixed list of real requests
 in-process, cold then warm, and prints where each one's time goes (network per host, our

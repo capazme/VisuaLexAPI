@@ -1,12 +1,17 @@
 import asyncio
 import json
 import os
+import re
 import time
 import hashlib
 from pathlib import Path
 from typing import Any, Optional
 
 from .config import PERSISTENT_CACHE_DIR, PERSISTENT_CACHE_TTL
+
+# The head `_write_to_disk` gives every entry: the write time comes first, so a sweep reads it
+# from the first bytes instead of decoding the whole entry (a Normattiva page is 2.6 MB).
+_HEAD = re.compile(rb'\{"timestamp": (-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?), "data": ')
 
 
 class PersistentCache:
@@ -79,28 +84,37 @@ class PersistentCache:
         `{"timestamp": …}`, and return how many went. `get` deletes an expired entry only
         when its key is read again, so without a sweep a key nobody asks for stays on disk.
 
-        Synchronous: it reads every file, so call it through `asyncio.to_thread`. An entry
+        Synchronous: it reads every file's head, so call it through `asyncio.to_thread`. An entry
         caught while it is being written reads as unreadable and goes: a cache miss later,
         nothing worse.
         """
         now = time.time()
         removed = 0
         for path in self.directory.glob("*.json"):
-            try:
-                with path.open("r", encoding="utf-8") as handle:
-                    payload = json.load(handle)
-                timestamp = payload.get("timestamp") if isinstance(payload, dict) else None
-                expired = (not isinstance(timestamp, (int, float))
-                           or now - timestamp > self.ttl)
-            except (ValueError, OSError):  # not JSON, not UTF-8, unreadable
-                expired = True
-            if expired:
+            timestamp = self._written_at(path)
+            if timestamp is None or now - timestamp > self.ttl:
                 try:
                     path.unlink()
                 except OSError:  # gone already, or not ours to delete
                     continue
                 removed += 1
         return removed
+
+    @staticmethod
+    def _written_at(path: Path) -> Optional[float]:
+        """The entry's write time: from its head when it has the one `_write_to_disk` gives,
+        else from the whole entry decoded. None when it cannot be read as `{"timestamp": …}`."""
+        try:
+            with path.open("rb") as handle:
+                head = _HEAD.match(handle.read(64))
+            if head:
+                return float(head.group(1))
+            with path.open("r", encoding="utf-8") as handle:
+                payload = json.load(handle)
+        except (ValueError, OSError):  # not JSON, not UTF-8, unreadable
+            return None
+        timestamp = payload.get("timestamp") if isinstance(payload, dict) else None
+        return timestamp if isinstance(timestamp, (int, float)) else None
 
     def prune(self, max_idle: float, max_bytes: int) -> tuple[int, int, int]:
         """Delete the entries not read nor written for `max_idle` seconds, then the least

@@ -117,3 +117,44 @@ async def test_a_backend_without_prune_is_left_to_expire_its_keys():
     """Redis expires its keys itself."""
     manager = _Manager(SimpleNamespace(get=None, set=None))
     assert await cache_manager.prune_normattiva_cache(manager) == 0
+
+
+# The expired pages go first (G-344, 21 October 2026): `get` refuses an entry older than the TTL
+# and deletes it, so no reader (the scraper, normattiva_validity) can use one; the 2 GB ceiling
+# stays for a longer TTL or a busy day.
+
+def _written(cache, key, size, age):
+    """An entry written `age` seconds ago, as `_write_to_disk` writes it."""
+    with patch("visualex_api.tools.cache.time.time", return_value=time.time() - age):
+        cache._write_to_disk(key, "x" * size)
+    return cache._path_for_key(key)
+
+
+async def test_the_expired_pages_go_before_the_ceiling(cache_dir):
+    cache = PersistentCache("normattiva", ttl=DAY)
+    expired = _written(cache, "expired", 1000, 2 * DAY)
+    os.utime(expired)  # read a minute ago: a read never extends an entry's life
+    fresh = _written(cache, "fresh", 1000, 3600)
+    assert await cache_manager.prune_normattiva_cache(_Manager(cache)) == 1
+    assert not expired.exists() and fresh.exists()
+    assert cache._read_from_disk("fresh") == "x" * 1000
+
+
+async def test_the_ceiling_still_holds_after_the_sweep(cache_dir, monkeypatch):
+    cache = PersistentCache("normattiva", ttl=DAY)
+    older = _written(cache, "older", 1000, 7200)
+    os.utime(older, (time.time() - 7200,) * 2)
+    newer = _written(cache, "newer", 1000, 60)
+    monkeypatch.setattr(cache_manager, "NORMATTIVA_CACHE_MAX_BYTES", newer.stat().st_size)
+    assert await cache_manager.prune_normattiva_cache(_Manager(cache)) == 1
+    assert not older.exists() and newer.exists()
+
+
+def test_the_sweep_reads_an_entry_head_not_the_whole_page(cache_dir):
+    """A Normattiva page is 2.6 MB: the write time is read from the first bytes."""
+    cache = PersistentCache("normattiva", ttl=DAY)
+    expired = _written(cache, "expired", 3_000_000, 2 * DAY)
+    fresh = _written(cache, "fresh", 3_000_000, 60)
+    with patch("visualex_api.tools.cache.json.load", side_effect=AssertionError("decoded")):
+        assert cache.sweep_expired() == 1
+    assert not expired.exists() and fresh.exists()
