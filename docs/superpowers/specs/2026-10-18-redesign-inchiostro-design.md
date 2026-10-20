@@ -236,7 +236,10 @@ So the spectacle is concentrated where it is rare or where it explains space.
 
 ### 6.1 Removed or reduced (the audit's high findings)
 
-- `CommandPalette` (⌘K, opened dozens of times a day): no open or close animation.
+- `CommandPalette` (⌘K, opened dozens of times a day): no open or close animation. *Superseded on
+  20 October 2026 by the search menu's brief (O1):* the panel fades in dropping 6 px from the search field
+  (`dur.pop`) and leaves faster (`dur.press`); a step slides in from its side; the chosen row's tint slides
+  from row to row; under reduced motion everything only fades.
 - `StudyModeContent` footnotes button: `scale: 0` entry → `scale: 0.96` + opacity, no delay.
 - 101 `transition-all` → explicit properties (through `TRANSITION` and a sweep).
 - `hover:scale-*` (10) and `HOVER_LIFT` on lists: removed or gated to fine pointers.

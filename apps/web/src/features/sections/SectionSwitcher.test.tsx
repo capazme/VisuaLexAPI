@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
 const account = vi.hoisted(() => ({ devMode: false }));
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ devMode: account.devMode }) }));
@@ -86,6 +86,42 @@ describe('SectionSwitcher (spec S3)', () => {
     expect(screen.getByTestId('forum-dot')).toBeInTheDocument();
     fireEvent.click(trigger());
     expect(screen.getByRole('menuitemradio', { name: /Forum.*3 notifiche/ })).toBeInTheDocument();
+  });
+
+  it('takes the focus to the new section\'s title, as the page changes (S2)', async () => {
+    render(
+      <MemoryRouter initialEntries={['/dossier']}>
+        <SectionSwitcher forumCount={0} />
+        <main>
+          <Routes>
+            <Route path="/dossier" element={<h2 data-section-title="opus" tabIndex={-1}>I tuoi dossier di lavoro</h2>} />
+            <Route path="/studia/ripasso" element={<h1 data-section-title="gymnasium" tabIndex={-1}>Gymnasium: la tua palestra giuridica</h1>} />
+          </Routes>
+        </main>
+      </MemoryRouter>,
+    );
+    fireEvent.keyDown(trigger(), { key: 'ArrowDown' });
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Gymnasium/ }), { detail: 0 });
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Gymnasium: la tua palestra giuridica' })).toHaveFocus());
+  });
+
+  it('goes to the home of the section it is in without a change to show', () => {
+    // jsdom has no canvas: the spy says whether a change asked for one at all.
+    const getContext = vi.spyOn(HTMLCanvasElement.prototype, 'getContext');
+    try {
+      renderSwitcher('/studia/schede');
+      fireEvent.click(trigger());
+      fireEvent.click(screen.getByRole('menuitemradio', { name: /Gymnasium/ }));
+      expect(screen.getByTestId('where')).toHaveTextContent('/studia/ripasso');
+      expect(getContext).not.toHaveBeenCalled();
+
+      // Another section does ask for one: the spy would see a change start.
+      fireEvent.click(trigger());
+      fireEvent.click(screen.getByRole('menuitemradio', { name: /Forum/ }));
+      expect(getContext).toHaveBeenCalledOnce();
+    } finally {
+      getContext.mockRestore();
+    }
   });
 
   it('draws no dot inside the Forum, where its own entry counts', () => {

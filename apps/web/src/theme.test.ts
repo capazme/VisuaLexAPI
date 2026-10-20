@@ -134,6 +134,9 @@ describe('the Inchiostro palette', () => {
     expect(ratio(white, rgb('toga-600'))).toBeGreaterThanOrEqual(6);
     expect(ratio(rgb('ink-400'), rgb('ink-950'))).toBeGreaterThanOrEqual(7);
     expect(ratio(rgb('toga-400'), rgb('ink-950'))).toBeGreaterThanOrEqual(6.5);
+    // A mission done (S2, `.vlx-mission-done`): ink 600 on the white tile, ink 300 on the dark one (ink 900).
+    expect(ratio(rgb('ink-600'), white)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(rgb('ink-300'), rgb('ink-900'))).toBeGreaterThanOrEqual(4.5);
   });
 
   it('keeps the sidebar\'s 11 px texts at AA on its glass, over the page and over the phone\'s backdrop', () => {
@@ -211,6 +214,52 @@ describe('the Inchiostro palette', () => {
     expect(ratio(linear('amber-400'), over(linear('ink-900'), 0.8, linear('ink-950')))).toBeGreaterThanOrEqual(3);
   });
 
+  it('keeps the command palette\'s 11 px texts and the tour\'s small ones at AA (CommandPalette, the driver.js popover)', () => {
+    // The palette is white/90 (dark: slate-900/90) over its backdrop, slate-950/40 over the page; its results
+    // add slate-50/30 (dark: slate-950/20), its steps sit on slate 100 (dark: slate 800). The tour's popover is
+    // white (dark: slate 900). Amber and emerald are Tailwind's own scales, read from its theme.
+    const source = readFileSync(CSS_PATH, 'utf8') + readFileSync(resolve(process.cwd(), 'node_modules/tailwindcss/theme.css'), 'utf8');
+    const linear = (name: string): number[] => {
+      const m = source.match(new RegExp(`--color-${name}:\\s*oklch\\(([\\d.]+)%\\s+([\\d.]+)\\s+([\\d.]+)\\)`));
+      if (!m) throw new Error(`--color-${name} not found`);
+      const [L, C, H] = [Number(m[1]) / 100, Number(m[2]), (Number(m[3]) * Math.PI) / 180];
+      const a = C * Math.cos(H), b = C * Math.sin(H);
+      const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+      const mm = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+      const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+      return [
+        4.0767416621 * l - 3.3077115913 * mm + 0.2309699292 * s,
+        -1.2684380046 * l + 2.6097574011 * mm - 0.3413193965 * s,
+        -0.0041960863 * l - 0.7034186147 * mm + 1.707614701 * s,
+      ].map((v) => Math.min(1, Math.max(0, v)));
+    };
+    const gamma = (v: number) => (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
+    const unGamma = (v: number) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+    const over = (fg: number[], alpha: number, bg: number[]) => fg.map((c, i) => unGamma(alpha * gamma(c) + (1 - alpha) * gamma(bg[i])));
+    const lum = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    const ratio = (x: number[], y: number[]) => {
+      const [hi, lo] = [lum(x), lum(y)].sort((p, q) => q - p);
+      return (hi + 0.05) / (lo + 0.05);
+    };
+    const white = [1, 1, 1];
+    const panel = over(white, 0.9, over(linear('ink-950'), 0.4, linear('ink-50')));
+    const panelDark = over(linear('ink-900'), 0.9, over(linear('ink-950'), 0.4, linear('ink-950')));
+    const light = [panel, over(linear('ink-50'), 0.3, panel)];
+    const dark = [panelDark, over(linear('ink-950'), 0.2, panelDark)];
+    // The grey lines, the headings «Preferiti», «I tuoi alias», «In dotazione», the recognised citation.
+    for (const bg of light) for (const fg of ['ink-600', 'amber-700', 'toga-700', 'emerald-700']) expect(ratio(linear(fg), bg), fg).toBeGreaterThanOrEqual(4.5);
+    for (const bg of dark) for (const fg of ['ink-400', 'amber-400', 'toga-300', 'emerald-400']) expect(ratio(linear(fg), bg), fg).toBeGreaterThanOrEqual(4.5);
+    // The steps «Atto», «Dettagli», «Articolo»: to do, done, the one in use.
+    expect(ratio(linear('ink-600'), linear('ink-100'))).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(linear('ink-300'), linear('ink-800'))).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(linear('emerald-800'), over(linear('emerald-500'), 0.1, panel))).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(linear('emerald-400'), over(linear('emerald-500'), 0.1, panelDark))).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(white, linear('toga-600'))).toBeGreaterThanOrEqual(4.5);
+    // The tour's «1 di 6» and its close button.
+    expect(ratio(linear('ink-500'), white)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(linear('ink-400'), linear('ink-900'))).toBeGreaterThanOrEqual(4.5);
+  });
+
   it('keeps the marks and labels of Gymnasium\'s «Progressi» apart from what they sit on (ActivityCalendar, DueForecast)', () => {
     const source = readFileSync(CSS_PATH, 'utf8') + readFileSync(resolve(process.cwd(), 'node_modules/tailwindcss/theme.css'), 'utf8');
     // `primary-*` and `slate-*` are aliases (`var(--color-toga-*)`, `var(--color-ink-*)`): followed to the value.
@@ -256,9 +305,29 @@ describe('the Inchiostro palette', () => {
   });
 });
 
+describe('the tours (driver.js)', () => {
+  it('make every button of the popover a 44 px target with a focus ring', () => {
+    const css = readFileSync(CSS_PATH, 'utf8');
+    const rule = (selector: string) => {
+      const at = css.indexOf(`${selector} {`);
+      expect(at, selector).toBeGreaterThan(-1);
+      return css.slice(at, css.indexOf('}', at));
+    };
+    const footer = rule('.driver-popover.visualex-tour-popover .driver-popover-footer button');
+    expect(footer).toMatch(/min-height:\s*44px/);
+    // driver.js sets `display` inline on these buttons: the label is centred by its line height.
+    expect(footer).toMatch(/font:\s*500 13px\/42px/);
+    expect(footer).not.toMatch(/display:/);
+    const close = rule('.driver-popover.visualex-tour-popover .driver-popover-close-btn');
+    expect(close).toMatch(/width:\s*44px/);
+    expect(close).toMatch(/height:\s*44px/);
+    expect(css).toMatch(/\.driver-popover-close-btn:focus-visible\s*\{\s*outline:\s*2px solid/);
+  });
+});
+
 describe('the entrance utilities', () => {
   it('turn animate-in, fade-in, zoom-in-N and slide-in-from-* into real rules', async () => {
-    const css = await compile(['animate-in', 'fade-in', 'fade-in-0', 'zoom-in-95', 'slide-in-from-bottom', 'slide-in-from-top-2', 'slide-in-from-right-10']);
+    const css = await compile(['animate-in', 'fade-in', 'fade-in-0', 'zoom-in-95', 'slide-in-from-bottom', 'slide-in-from-top-2', 'slide-in-from-right-10', 'slide-in-from-left-2']);
     expect(css).toMatch(/\.animate-in\s*\{[^}]*animation-name:/);
     // A finished entrance leaves nothing applied (gotcha 22): no «both» fill.
     expect(css).toMatch(/\.animate-in\s*\{[^}]*animation-fill-mode:\s*backwards/);
@@ -267,6 +336,9 @@ describe('the entrance utilities', () => {
     expect(css).toContain('.slide-in-from-bottom');
     expect(css).toContain('.slide-in-from-top-2');
     expect(css).toContain('.slide-in-from-right-10');
+    expect(css).toMatch(/\.slide-in-from-left-2\s*\{[^}]*--vlx-enter-x:\s*calc\(2 \* var\(--spacing\) \* -1\)/);
+    // Both axes, so a slide nested in another does not inherit the outer one's axis.
+    expect(css).toMatch(/\.slide-in-from-top-2\s*\{[^}]*--vlx-enter-x:\s*0/);
   }, 30000);
 
   it('never last past 200 ms, whatever duration the class writes', async () => {
@@ -354,5 +426,38 @@ describe('the scrollbars in dark mode', () => {
     const css = await compile(HIDDEN_SCROLLBAR.split(' '));
     expect(css).toMatch(/\.\\\[scrollbar-width\\:none\\\]\s*\{\s*scrollbar-width:\s*none/);
     expect(css).toMatch(/\.\\\[\\&\\:\\:-webkit-scrollbar\\\]\\:hidden\s*\{\s*&::-webkit-scrollbar\s*\{\s*display:\s*none/);
+  }, 30000);
+});
+
+describe('the section change and Gymnasium\'s small motions (S2)', () => {
+  it('declares every section\'s hue, the wash, the wet ink and the mission inks in the light theme and in the dark one', () => {
+    // The halftone reads `--vlx-section-<id>` by name (`sectionHue`): an undeclared one would print nothing.
+    const source = readFileSync(CSS_PATH, 'utf8');
+    for (const name of ['opus', 'gymnasium', 'academia', 'forum'].map((id) => `--vlx-section-${id}`).concat('--vlx-gymnasium-wash', '--vlx-wet-ink', '--vlx-todo-ink', '--vlx-done-ink')) {
+      expect(source.match(new RegExp(`${name}:`, 'g')) ?? [], name).toHaveLength(2);
+    }
+  });
+
+  it('compiles the lesson bar\'s spring, its delay, the head and the halftone\'s band', async () => {
+    const css = await compile([
+      'motion-safe:ease-(--ease-catch)',
+      'motion-safe:delay-[70ms]',
+      'motion-safe:duration-150',
+      'motion-safe:duration-300',
+      'z-[2000]',
+      'vlx-lesson-head',
+    ]);
+    expect(css).toMatch(/transition-timing-function:\s*var\(--ease-catch\)/);
+    expect(css).toMatch(/--ease-catch:\s*linear\(0,/);
+    expect(css).toMatch(/transition-delay:\s*70ms/);
+    expect(css).toMatch(/z-index:\s*2000/);
+    expect(css).toMatch(/\.vlx-lesson-head\s*\{\s*background:\s*var\(--vlx-gymnasium-wash\)/);
+  }, 30000);
+
+  it('draws the drying ink, the inked mission and the landing digit, and stills them all under reduced motion', async () => {
+    const css = await compile([]);
+    for (const name of ['vlx-ink-dry', 'vlx-ink-through', 'vlx-digit-land']) expect(css).toMatch(new RegExp(`@keyframes ${name}`));
+    const reduced = css.split('@media (prefers-reduced-motion: reduce)').slice(1).join(' ');
+    for (const rule of ['.vlx-ink-drying', '.vlx-mission-inking', '.vlx-digit-land']) expect(reduced).toContain(rule);
   }, 30000);
 });

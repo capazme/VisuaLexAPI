@@ -4,6 +4,11 @@ import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('../../../hooks/useTour', () => ({ useTour: () => ({ tryStartTour: vi.fn(), startTour: vi.fn(), hasSeenTour: () => true }) }));
 vi.mock('../../../services/trashService', () => ({ trashService: { list: vi.fn(async () => []), restore: vi.fn(), purge: vi.fn() } }));
+// The detail reads its snapshots on mount: answered here, so no request leaves the test.
+vi.mock('../../../services/dossierService', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../services/dossierService')>();
+  return { ...actual, dossierService: { ...actual.dossierService, getSnapshots: vi.fn(async () => []) } };
+});
 
 import { appStore } from '../../../store/useAppStore';
 import { DossierPage } from './DossierPage';
@@ -13,7 +18,7 @@ describe('DossierPage', () => {
   it('opens the trash on ?trash=1', async () => {
     appStore.setState({ dossiers: [] });
     render(<MemoryRouter initialEntries={['/dossier?trash=1']}><DossierPage /></MemoryRouter>);
-    expect(screen.getByRole('heading', { name: 'Cestino' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Cestino' })).toBeInTheDocument();
     expect(await screen.findByText('Il cestino è vuoto')).toBeInTheDocument();
   });
 

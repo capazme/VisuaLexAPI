@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
-  fetchMerltConsent,
   setMerltConsent,
   revokeMerltConsent,
   type MerltConsentResponse,
@@ -8,6 +7,7 @@ import {
 import { clearLegacyConsentKeys, type MerltConsentLevel } from '../merltConsent';
 import { isMerltEnabled } from '../featureFlag';
 import { ConsentContext, NoticeChangedError, type ConsentContextValue } from './context';
+import { DISABLED_CONSENT, readMerltConsent } from './consentRead';
 
 /**
  * Single source of truth for MERL-T consent: the server (MerltUserPreference, read through
@@ -16,19 +16,10 @@ import { ConsentContext, NoticeChangedError, type ConsentContextValue } from './
  *
  * A level counts only under the current version of the MERL-T notice: when the person has not
  * answered it (`needsAnswer`), `ConsentScreen` asks, once, before work begins.
+ *
+ * Read through `readMerltConsent`: one request shared by the mounts that ask together, and none
+ * after a server without MERL-T said so (404 `merlt_disabled`), which reads as the disabled consent.
  */
-
-const DISABLED_CONSENT: MerltConsentResponse = {
-  level: 'none',
-  storedLevel: 'none',
-  noticeAnswered: true,
-  notice: null,
-  contributionEnabled: false,
-  validationEnabled: false,
-  graphEnabled: false,
-  updatedAt: null,
-  lastAuditAt: null,
-};
 
 type InternalState =
   | { status: 'loading' }
@@ -63,7 +54,7 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
     if (inFlightRef.current) return;
     inFlightRef.current = true;
     try {
-      const consent = await fetchMerltConsent();
+      const consent = await readMerltConsent();
       setState({ status: 'ready', consent });
     } catch (err) {
       setState({ status: 'error', error: err instanceof Error ? err.message : 'consent_fetch_failed' });
@@ -109,7 +100,7 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
     if (!isMerltEnabled()) return;
     let cancelled = false;
     inFlightRef.current = true;
-    fetchMerltConsent()
+    readMerltConsent()
       .then((consent) => {
         if (cancelled) return;
         setState({ status: 'ready', consent });

@@ -4,10 +4,14 @@ import { useAuth } from '../../../hooks/useAuth';
 import { LessonFrame } from './LessonFrame';
 import { StudyStrip } from './progress/StudyStrip';
 import { useProgress } from './progress/useProgress';
+import { FOCUS_RING } from '../../../constants/interactions';
 
-/** What the area tells its views; `validator` is undefined while the account is still loading. */
+/**
+ * What the area tells its views. `validator`: what the account says; undefined while it is still loading,
+ * null when it could not be read (`/auth/me` failed), so that «not read» is never taken for «not a validator».
+ */
 export interface StudiaOutletContext {
-  validator: boolean | undefined;
+  validator: boolean | null | undefined;
 }
 
 /** The views that show the smaller strip over them: «Oggi» and «Progressi» draw their own, the session is a lesson of its own. */
@@ -36,9 +40,9 @@ function AreaStrip() {
  * floating menu button. The session has no heading here: it runs in `LessonFrame`, over the shell.
  */
 export function StudiaPage() {
-  const { isValidator, loading } = useAuth();
+  const { isValidator, loading, user } = useAuth();
   const { pathname } = useLocation();
-  const context = { validator: loading ? undefined : isValidator } satisfies StudiaOutletContext;
+  const context = { validator: loading ? undefined : user ? isValidator : null } satisfies StudiaOutletContext;
   if (isLesson(pathname)) {
     return (
       <LessonFrame>
@@ -49,7 +53,7 @@ export function StudiaPage() {
   return (
     <div className={cn('mx-auto flex h-full w-full flex-col gap-4', isColumn(pathname) ? 'max-w-3xl' : 'max-w-6xl')}>
       <header className="border-b border-slate-200 pb-3 dark:border-slate-800">
-        <h1 className="font-serif text-2xl font-medium tracking-tight text-slate-900 md:text-3xl dark:text-slate-50">Gymnasium: la tua palestra giuridica</h1>
+        <h1 data-section-title="gymnasium" tabIndex={-1} className={`${FOCUS_RING} rounded-sm font-serif text-2xl font-medium tracking-tight text-slate-900 md:text-3xl dark:text-slate-50`}>Gymnasium: la tua palestra giuridica</h1>
       </header>
       {underStrip(pathname) && <AreaStrip />}
       <Outlet context={context} />

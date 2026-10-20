@@ -1,6 +1,14 @@
+import type { MouseEvent } from 'react';
 import { MenuButton } from '../../components/ui/MenuButton';
 import { cn } from '../../lib/utils';
 import { useSection } from './useSection';
+
+/** Where the entry was chosen: the pointer's place, or the entry's middle for a key (a click with `detail` 0). */
+function tapPoint(event: MouseEvent<HTMLButtonElement>): { x: number; y: number } {
+  if (event.detail > 0) return { x: event.clientX, y: event.clientY };
+  const box = event.currentTarget.getBoundingClientRect();
+  return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+}
 
 /**
  * The switcher at the top of the sidebar, where the open book was (spec S3): the active section's
@@ -29,8 +37,8 @@ export function SectionSwitcher({ forumCount, onChoose, withName = false }: { fo
         icon: s.icon,
         checked: s.id === section,
         badge: s.id === 'forum' ? forumCount : undefined,
-        onSelect: () => {
-          chooseSection(s.id);
+        onSelect: (event) => {
+          chooseSection(s.id, tapPoint(event));
           onChoose?.();
         },
       }))}

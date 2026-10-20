@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Progressi } from '../../../../types/studia';
-import { allMissions, goalLine, missionSummary, todayMissions } from './missions';
+import { allMissions, goalLine, missionOrder, missionSummary, todayMissions, type Mission } from './missions';
 
 /** A read of the whole day: today's row of the calendar holds the reviews and the first reviews done so far. */
 function day(over: {
@@ -169,5 +169,27 @@ describe('allMissions', () => {
       expect(mission).not.toHaveProperty('xp');
       expect(`${mission.title} ${mission.note ?? ''}`).not.toMatch(/\bXP\b|punti|livell/i);
     }
+  });
+});
+
+describe('missionOrder (S2)', () => {
+  const m = (id: Mission['id'], status: Mission['status']): Mission => ({ id, group: 'giornaliera', title: id, status });
+
+  it('slides a mission done under those still open', () => {
+    expect(missionOrder([m('dovute', 'aperta'), m('nuove', 'fatta'), m('obiettivo', 'aperta')]).map((x) => x.id)).toEqual(['dovute', 'obiettivo', 'nuove']);
+  });
+
+  it('keeps the due cards first, done or not: they carry the page’s action', () => {
+    expect(missionOrder([m('dovute', 'fatta'), m('nuove', 'aperta'), m('obiettivo', 'aperta')]).map((x) => x.id)).toEqual(['dovute', 'nuove', 'obiettivo']);
+  });
+
+  it('keeps a mission whose ink is still running in its place, and the order of those done', () => {
+    const missions = [m('dovute', 'aperta'), m('nuove', 'fatta'), m('obiettivo', 'fatta')];
+    expect(missionOrder(missions, new Set(['nuove'])).map((x) => x.id)).toEqual(['dovute', 'nuove', 'obiettivo']);
+    expect(missionOrder(missions).map((x) => x.id)).toEqual(['dovute', 'nuove', 'obiettivo']);
+  });
+
+  it('leaves a mission with nothing to do today where it is', () => {
+    expect(missionOrder([m('dovute', 'vuota'), m('nuove', 'fatta'), m('obiettivo', 'aperta')]).map((x) => x.id)).toEqual(['dovute', 'obiettivo', 'nuove']);
   });
 });

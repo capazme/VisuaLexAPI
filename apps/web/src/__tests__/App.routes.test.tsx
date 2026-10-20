@@ -14,10 +14,11 @@ vi.mock('../features/merlt/consent/ConsentContext', () => ({
   ConsentProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 
-// The development mode decides the MERL-T addresses (DevRoute); each test sets it.
+// The development mode decides the MERL-T addresses (DevRoute); each test sets it. The account is a
+// validator: «Da validare» reads its queue only for one.
 const account = vi.hoisted(() => ({ devMode: true }));
 vi.mock('../hooks/useAuth', () => ({
-  useAuth: () => ({ loading: false, devMode: account.devMode }),
+  useAuth: () => ({ loading: false, devMode: account.devMode, isValidator: true }),
 }));
 
 // Layout renders the Outlet inside a marker so tests can assert the shell stays mounted.
@@ -34,8 +35,7 @@ vi.mock('../components/layout/Layout', async () => {
 
 // Page stubs (keep the router test light — pages pull the store/services).
 vi.mock('../pages/SearchPage', () => ({ SearchPage: () => <div data-testid="search-page" /> }));
-vi.mock('../pages/LoginPage', () => ({ LoginPage: () => <div /> }));
-vi.mock('../pages/RegisterPage', () => ({ RegisterPage: () => <div /> }));
+vi.mock('../pages/AuthPage', () => ({ AuthPage: () => <div /> }));
 vi.mock('../components/features/dossier/DossierPage', () => ({ DossierPage: () => <div /> }));
 vi.mock('../components/features/history/HistoryView', () => ({ HistoryView: () => <div /> }));
 vi.mock('../components/features/bulletin/BulletinBoardPage', () => ({ BulletinBoardPage: () => <div data-testid="forum" /> }));

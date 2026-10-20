@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { forgetReturnTo, locationToPath, safeReturnPath, stashReturnTo, takeReturnTo } from './returnTo';
+import { authPageTab, forgetReturnTo, isLoginPage, locationToPath, safeReturnPath, stashReturnTo, takeReturnTo } from './returnTo';
 
 beforeEach(() => sessionStorage.clear());
 
@@ -38,6 +38,25 @@ describe('the return address', () => {
       stashReturnTo(login);
       expect(takeReturnTo()).toBeNull();
     }
+  });
+
+  it('never stashes the sign-up tab either: it is the same page', () => {
+    for (const register of ['/register', '/register/', '/Register?x=1', '/%72egister']) {
+      stashReturnTo(register);
+      expect(takeReturnTo()).toBeNull();
+    }
+  });
+
+  it('names the tab of the sign-in page a path opens, and nothing else', () => {
+    expect(authPageTab('/login')).toBe('login');
+    expect(authPageTab('/LOGIN//')).toBe('login');
+    expect(authPageTab('/register')).toBe('register');
+    expect(authPageTab('/%52egister')).toBe('register');
+    expect(authPageTab('/registered')).toBeNull();
+    expect(authPageTab('/dossier')).toBeNull();
+    expect(authPageTab('/%E0%A4%A')).toBeNull(); // a malformed escape is read raw
+    expect(isLoginPage('/register')).toBe(true);
+    expect(isLoginPage('/')).toBe(false);
   });
 
   it('forgets the stash on request', () => {
