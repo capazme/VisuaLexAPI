@@ -174,7 +174,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   Restore brings every column back with the original ids — for a card, also the author's
   review state and log (`LingoStatoRipasso`, `LingoRevisioneSRS`), which the card's deletion
   would otherwise cascade away; an entry from before carries none and restores as it was; entries 30 days,
-  then swept (awaited, at most every ten minutes). No route reachable by an
+  then swept (awaited, at most every ten minutes). An entry gone while it is being restored (purged,
+  swept: Prisma's P2025) is a 404, as a second restore is; ids taken again (P2002) a 409. No route reachable by an
   exchanged token deletes for good.
 - **`POST /api/dossiers/:id/norms`** — 1 to 50 references in free text
   (`norms/resolveReference.ts`): `parse_query`, then `fetch_norma_data` (the

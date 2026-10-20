@@ -263,6 +263,25 @@ describe('the trash', () => {
     expect(await prisma.trashEntry.count()).toBe(0);
   });
 
+  it('a restore whose entry is purged meanwhile is a 404, and restores nothing', async () => {
+    const { bearer } = await connected(alice);
+    await request(app).post(`/api/dossiers/${dossierId}/trash-items`).set(bearer).send({ itemIds: [art3] });
+    const [entry] = (await request(app).get('/api/trash').set(authHeader(alice))).body;
+    let restoring: Promise<{ status: number; body: { detail?: string } }> | undefined;
+    // A purge in flight on another connection: the entry locked and deleted, not yet committed. The
+    // restore still reads it, then waits on its deletion, which finds no row (Prisma's P2025).
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM trash_entries WHERE id = ${entry.id} FOR UPDATE`;
+      await tx.trashEntry.delete({ where: { id: entry.id } });
+      restoring = request(app).post(`/api/trash/${entry.id}/restore`).set(authHeader(alice)).send({}).then((res) => res);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    });
+    const res = await restoring!;
+    expect(res.status).toBe(404);
+    expect(res.body.detail).toBe('Elemento del cestino non trovato.');
+    expect(await prisma.dossierItem.findUnique({ where: { id: art3 } })).toBeNull();
+  });
+
   it('the sweep removes expired entries only', async () => {
     const { bearer } = await connected(alice);
     await request(app).post(`/api/dossiers/${dossierId}/trash-items`).set(bearer).send({ itemIds: [art3] });

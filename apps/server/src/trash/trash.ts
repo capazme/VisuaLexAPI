@@ -590,6 +590,11 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       throw new AppError(409, 'Questi elementi sono già stati ripristinati.');
     }
+    // A row the restore writes to went meanwhile: the entry itself, purged or swept while it was
+    // being restored, is the one that can.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+      throw new AppError(404, 'Elemento del cestino non trovato.');
+    }
     return quietly('Trash restore', error);
   }
 }
