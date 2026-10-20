@@ -104,6 +104,19 @@ describe('RegisterForm', () => {
     expect(within(panel()).getByLabelText('Email')).toHaveFocus();
   });
 
+  it('back on «Registrati» after signing up, an empty form, not the confirmation again', async () => {
+    renderAuth('/register');
+    fill({ email: 'avv@studio.it', username: 'avv_rossi', password: 'Segreta123', confirm: 'Segreta123' });
+    submit();
+    await screen.findByRole('heading', { name: 'Registrazione completata' });
+    fireEvent.click(screen.getByRole('tab', { name: 'Accedi' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Registrati' }));
+    expect(screen.queryByRole('heading', { name: 'Registrazione completata' })).toBeNull();
+    expect(within(panel()).getByLabelText('Email')).toHaveValue('');
+    expect(within(panel()).getByLabelText('Username')).toHaveValue('');
+    expect(within(panel()).getByLabelText('Email')).toHaveFocus();
+  });
+
   it('draws nothing of the old design: no blurred blots, glass or gradient', () => {
     const { container } = renderAuth('/register');
     expect(container.innerHTML).not.toMatch(/blur-3xl|backdrop-blur|bg-gradient|from-blue|to-indigo/);
