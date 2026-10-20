@@ -37,6 +37,10 @@ class ThrottledHttpClient:
         self._session_lock = asyncio.Lock()
         self._request_lock = asyncio.Lock()
         self._last_request_at = 0.0
+        # source → the monotonic time before which no request goes to it: the last
+        # Retry-After (or backoff) a rate-limit answer asked for, honoured by the next
+        # request even when the call that received it had no attempt left to spend it on.
+        self._not_before: Dict[str, float] = {}
 
     async def _get_session(self) -> aiohttp.ClientSession:
         async with self._session_lock:
@@ -77,8 +81,11 @@ class ThrottledHttpClient:
         attempt = 0
         last_status: Optional[int] = None
         retry_after: Optional[float] = None
+        # Wait out a pause before taking a slot, so a paused source does not hold one.
+        await self._respect_source_pause(source)
         async with self._semaphore:
             while attempt <= retries:
+                await self._respect_source_pause(source)
                 await self._respect_min_interval()
                 session = await self._get_session()
                 try:
@@ -109,6 +116,7 @@ class ThrottledHttpClient:
                             )
                             attempt += 1
                             retry_after = wait_time
+                            self._pause_source(source, wait_time)
                             await self._wait_before(attempt, retries, wait_time)
                             continue
 
@@ -143,9 +151,24 @@ class ThrottledHttpClient:
     @staticmethod
     async def _wait_before(attempt: int, retries: int, wait_time: float) -> None:
         """The wait before attempt number `attempt` (0 is the first). None when the budget is
-        spent: the caller gives up at once instead of after a Retry-After it will not use."""
+        spent: the caller gives up at once instead of after a Retry-After it will not use.
+        A rate-limit wait is not lost: `_pause_source` holds the source's next request."""
         if attempt <= retries:
             await asyncio.sleep(wait_time)
+
+    def _pause_source(self, source: str, wait_time: float) -> None:
+        until = time.monotonic() + wait_time
+        if until > self._not_before.get(source, 0.0):
+            self._not_before[source] = until
+
+    async def _respect_source_pause(self, source: str) -> None:
+        remaining = self._not_before.get(source, 0.0) - time.monotonic()
+        if remaining > 0:
+            log.info(
+                "Waiting out a rate-limit pause",
+                extra={"source": source, "seconds": round(remaining, 2)},
+            )
+            await asyncio.sleep(remaining)
 
     async def _respect_min_interval(self) -> None:
         async with self._request_lock:
