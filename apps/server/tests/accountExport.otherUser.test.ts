@@ -92,8 +92,18 @@ async function seedBobEverywhere(alice: TestUser, bob: TestUser) {
         }],
         annotations: [{ text: 'Nota presa', userId: bob.id, originalAuthor: { id: bob.id, username: bob.username } }],
         sharedBy: { author_id: bob.id, username: bob.username, email: bob.email },
-        owner: { author: alice.username, Email: alice.email.toUpperCase(), user_id: alice.id },
+        proposals: [{ label: 'Proposta', suggester: { id: bob.id, username: bob.username }, user: { id: bob.id, username: bob.username } }],
+        mine: { author: alice.username, Email: alice.email.toUpperCase(), user_id: alice.id },
       },
+    },
+  });
+
+  // A dossier imported from a link keeps a note entry as the client sent it, and a snapshot copies it.
+  await prisma.dossier.create({
+    data: {
+      userId: alice.id, name: 'Importato da un link',
+      items: { create: [{ itemType: 'note', title: 'Nota', content: { text: 'Nota da un link', user: { id: bob.id, username: bob.username }, ownerId: bob.id } }] },
+      snapshots: { create: [{ version: 1, content: { items: [{ content: { text: 'Nota da un link', authorUsername: bob.username } }] } }] },
     },
   });
 
@@ -149,7 +159,7 @@ describe('the account export, against a second user who touches everything', () 
     }
   });
 
-  it('keeps the user’s own identity in a hand-imported environment and drops the other’s, at any depth', async () => {
+  it('keeps the user’s own identity in hand-imported content and drops the other’s, at any depth', async () => {
     const alice = await createTestUser('export-alice');
     const bob = await createTestUser('export-sweep-bobq7');
     await seedBobEverywhere(alice, bob);
@@ -163,7 +173,12 @@ describe('the account export, against a second user who touches everything', () 
       dossiers: [{ title: 'Dossier importato', userId: alice.id, items: [{ type: 'note', data: 'Nota mia', meta: {} }] }],
       annotations: [{ text: 'Nota presa', fromAnotherUser: true }],
       sharedBy: {},
-      owner: { author: alice.username, Email: alice.email.toUpperCase(), user_id: alice.id },
+      proposals: [{ label: 'Proposta' }],
+      mine: { author: alice.username, Email: alice.email.toUpperCase(), user_id: alice.id },
     });
+    const fromLink = (response.body.data.dossiers as { name: string; items: { content: unknown }[]; snapshots: { content: unknown }[] }[])
+      .find((d) => d.name === 'Importato da un link');
+    expect(fromLink!.items[0].content).toEqual({ text: 'Nota da un link' });
+    expect(fromLink!.snapshots[0].content).toEqual({ items: [{ content: { text: 'Nota da un link' } }] });
   });
 });

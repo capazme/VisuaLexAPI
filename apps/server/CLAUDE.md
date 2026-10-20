@@ -599,8 +599,11 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   environment's content has its `originalAuthor`/`originalAuthorId` keys turned
   into the same flag. Its `authorId`, `username`, `user_id`, `email` and the like
   (`IDENTITY_KEYS` in `authController.ts`; case, `_` and `-` folded), at any depth,
-  stay only when they hold the user's own id, username or email: an environment
-  imported by hand may be someone else's file. An archived environment's `author`
+  stay only when they hold the user's own id, username or email (a person object,
+  `user`, `owner`, `suggester`, `reporter`, goes whole): an environment imported
+  by hand may be someone else's file. A dossier entry's and a snapshot's `content`
+  are read the same way (a dossier imported from a link keeps a note entry as the
+  client sent it). An archived environment's `author`
   travels only when it is the user's own username (a Forum download stored its
   publisher's), else `null`. `tests/accountData.test.ts`, and
   `tests/accountExport.otherUser.test.ts`: a second user touches the first one's

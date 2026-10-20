@@ -239,8 +239,12 @@ const foldKey = (key: string) => key.toLowerCase().replace(/[_-]/g, '');
 // The web's attribution of a row taken from someone else: it becomes `fromAnotherUser`.
 const ATTRIBUTION_KEYS = new Set(['originalauthor', 'originalauthorid']);
 // A person's identity, in a file the user imported by hand (someone else's, possibly): it stays
-// only when it is the user's own id, username or email.
-const IDENTITY_KEYS = new Set(['author', 'authorid', 'authorname', 'authoremail', 'username', 'userid', 'useremail', 'email']);
+// only when it is the user's own id, username or email. `user`, `owner`, `suggester` and
+// `reporter` are the web's person objects ({ id, username }): an object never is, so it goes whole.
+const IDENTITY_KEYS = new Set([
+  'author', 'authorid', 'authorname', 'authorusername', 'authoremail', 'username', 'userid', 'useremail', 'email',
+  'user', 'owner', 'ownerid', 'suggester', 'suggesterid', 'reporter', 'reporterid',
+]);
 
 type OwnIdentity = { id: string; username: string; email: string };
 
@@ -346,7 +350,13 @@ export const exportAccountData = async (req: Request, res: Response) => {
       folders, bookmarks,
       annotations: annotations.map(withoutOriginalAuthor),
       highlights: highlights.map(withoutOriginalAuthor),
-      dossiers: dossiers.map(withoutOriginalAuthor),
+      // An entry's content comes from the client as it is (a dossier imported from a link keeps a
+      // note entry whole), and a snapshot copies it: both are read as an archived environment's.
+      dossiers: dossiers.map(({ items, snapshots, ...dossier }) => withoutOriginalAuthor({
+        ...dossier,
+        items: items.map((item) => ({ ...item, content: withoutAuthors(item.content, own) })),
+        snapshots: snapshots.map((snapshot) => ({ ...snapshot, content: withoutAuthors(snapshot.content, own) })),
+      })),
       history,
       // An environment downloaded from the Forum was saved with its publisher's username as `author`,
       // indistinguishable from a name typed by the user: only the user's own username travels.
