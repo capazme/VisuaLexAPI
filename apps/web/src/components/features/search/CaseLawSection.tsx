@@ -17,12 +17,13 @@ import { CaseLawControls } from './caseLaw/CaseLawControls';
 import { CaseLawFiltersContext } from './caseLaw/caseLawFiltersContext';
 import { narrowingCount, NO_FILTERS, type CaseLawFilters } from './caseLaw/caseLawFilter';
 import { mergeYearCounts, type YearCount } from './caseLaw/caseLawYears';
+import { isGenericRubric } from './caseLaw/genericRubrics';
 
 interface CaseLawSectionProps {
   norma: NormaVisitata;
   /**
    * The article's subject, its rubric: «Cerca sentenze sul tema dell'articolo» opens a topic search of
-   * the Cassazione with it. No rubric, no link.
+   * the Cassazione with it. No rubric, or a generic one (`GENERIC_RUBRICS`), no link.
    */
   topic?: string | null;
   articleUrn?: string;
@@ -108,7 +109,8 @@ export function CaseLawSection({ norma, topic, articleUrn, tabId, backEntry, isH
     writeOpen(tabId, next);
   };
 
-  const tema = topic?.trim();
+  // A generic rubric («Definizioni», «Oggetto»…) alone would find every act's decisions: no link for it.
+  const tema = topic?.trim() && !isGenericRubric(topic) ? topic.trim() : undefined;
   const hasMassimario = getSlotComponents('article_case_law').length > 0;
   const offersCassazione = !isEuropeanAct(norma.tipo_atto);
 
