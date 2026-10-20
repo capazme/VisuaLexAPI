@@ -12,8 +12,10 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
   `request(..., max_retries=n)` lowers the retry budget for a caller that paces
   itself, `None` keeps `HTTP_MAX_RETRIES`; once the budget is spent it gives up at once,
   without the backoff or the `Retry-After` no attempt would follow — but a rate-limit
-  answer (429/503) pauses its `source` for that wait, so the next request to the same
-  source, from any caller, waits it out first; the pause lives in the client instance).
+  answer (429/503) that states a `Retry-After` pauses its `source` for that wait, so the
+  next request to the same source, from any caller, waits it out first, or is refused at
+  once (429) when more than `MAX_PAUSE_WAIT` (30 s) is left; our own backoff never pauses
+  the source; the pause lives in the client instance).
   - `brocardi_scraper.py` is **switched off**: Brocardi is no longer a source
     (D-078). No route calls it, no answer carries `brocardi_info` or
     `brocardi_error` (a client's `show_brocardi_info` is ignored),
