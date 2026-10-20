@@ -208,7 +208,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `consentRead.ts` (`readMerltConsent`): one `GET /api/merlt/consent` shared by the mounts that ask while it travels
   (StrictMode's second effect, a provider mounted again), and none after a server without MERL-T answered 404
   `merlt_disabled`, which reads as `DISABLED_CONSENT` for the life of the page; any other failure is an error, asked
-  again by the next mount. A level
+  again by the next mount; `useAuth`'s logout drops a read on its way (`clearConsentRead`). A level
   counts only under the current version of the MERL-T notice (`INFORMATIVA_MERLT`, a text
   administrators edit as new versions in «Testi di VisuaLex Gymnasium»); `ConsentScreen`, in the `global`
   slot, asks it once as the app loads when it is unanswered — the first entry, then only a new
@@ -1496,7 +1496,7 @@ children re-trigger the toggle. Always add
 Never nest interactive content inside the element carrying `role="button"` —
 scope the role to the header, as `DossierArticleRow` does. A collapsible whose header
 is a section heading follows the accordion pattern instead (`DossierActBlock`):
-the toggle sits inside the `<h3>`, its name is the heading's own text and its
+the toggle sits inside the `<h2>`, its name is the heading's own text and its
 state is `aria-expanded` alone, with no `aria-label` replacing what it says.
 
 **Popovers with `@floating-ui/react`** — split positioning and animation across
@@ -1681,7 +1681,8 @@ meant to stay split; add new features as new files, not inside the shells:
   surface mounts, and a tour not seen stays unseen), and `tryStartTour` looks at «seen» again when its delay ends;
   `practiceAct` is asked only for a practice that has an act. `tourConfig.targets.test.tsx` fails when a tour's
   target is written nowhere in the sources, and checks the search tour against the search page. The popover
-  (`visualex-tour-popover` in `index.css`) draws every button 44 px with a focus ring, and `useTour` renames
+  (`visualex-tour-popover` in `index.css`) draws every button 44 px with a focus ring — the label centred by its
+  line height, since driver.js writes `display` on the buttons inline —, and `useTour` renames
   driver.js's «×» «Chiudi» in `onPopoverRender` (driver.js writes «Close» and has no option for it; `TOUR_UI`).
   `SearchPanel` mounts them (imported statically: the table is the app's main surface; `PDFViewer`, Study Mode and
   `CompareView` stay behind `lazy()`), one layout per breakpoint (`useIsDesktop`); a decision opened from any link lands in its practice
@@ -1695,7 +1696,8 @@ meant to stay split; add new features as new files, not inside the shells:
 - `features/history/` — `HistoryView.tsx`, `DecisionHistoryRow.tsx` (a decision's row) plus
   `NormaChangesSection.tsx` (see History above). The card's title is the page's `h1` («Cronologia» on a phone,
   «Cronologia Ricerche» from `md`, one hidden by CSS); on `/dossier` it is the visible title of the list, of the
-  open dossier and of «Cestino».
+  open dossier and of «Cestino», and what sits under it is `h2` (a dossier's card; an open dossier's notes, acts,
+  «Giurisprudenza» and «Rimossi di recente»).
 - `features/documents/` — `DocumentReviewPage.tsx` only.
 
 ## Gotchas

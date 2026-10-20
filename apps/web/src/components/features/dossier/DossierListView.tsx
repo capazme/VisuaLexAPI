@@ -446,9 +446,9 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                  <h3 className="font-serif text-lg md:text-xl font-medium leading-snug tracking-tight text-slate-900 dark:text-slate-50 group-hover:text-primary-700 dark:group-hover:text-primary-300 transition-colors line-clamp-2">
+                  <h2 className="font-serif text-lg md:text-xl font-medium leading-snug tracking-tight text-slate-900 dark:text-slate-50 group-hover:text-primary-700 dark:group-hover:text-primary-300 transition-colors line-clamp-2">
                     {dossier.title}
-                  </h3>
+                  </h2>
                   {dossier.sourceSuggestionId && (
                     <AttributionChip author={dossier.originalAuthor} className="ml-1" />
                   )}

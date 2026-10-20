@@ -164,7 +164,7 @@ describe('DossierListView — dossiers di lavoro and di studio', () => {
     { ...dossier([PENAL]), id: 's', title: 'Diritto penale', kind: 'studio', published: { sharedEnvironmentId: 'e1', version: 2, isActive: true, updatedAt: '2026-10-14' } },
     { ...dossier([]), id: 'o', title: 'Senza tipo' },
   ];
-  const titles = () => screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+  const titles = () => screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
 
   it("lists the section's kind: Opus the dossiers di lavoro (one with no kind among them), Gymnasium those di studio (sections spec S7)", () => {
     appStore.setState({ dossiers: kinds });
@@ -213,7 +213,7 @@ describe('DossierListView — the category menu (D1)', () => {
     tagged('c', 'Registro trattamenti', ['gdpr']),
     tagged('d', 'Valutazione d\'impatto', ['GDPR', 'cancellazione']),
   ];
-  const titles = () => screen.queryAllByRole('heading', { level: 3 }).map((h) => h.textContent).sort();
+  const titles = () => screen.queryAllByRole('heading', { level: 2 }).map((h) => h.textContent).sort();
   const renderList = () => render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
 
   it('lists the categories capitalised and in alphabetical order, «Tutte le categorie» first, one for «gdpr» and «GDPR»', () => {

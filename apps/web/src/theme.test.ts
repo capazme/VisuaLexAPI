@@ -310,7 +310,11 @@ describe('the tours (driver.js)', () => {
       expect(at, selector).toBeGreaterThan(-1);
       return css.slice(at, css.indexOf('}', at));
     };
-    expect(rule('.driver-popover.visualex-tour-popover .driver-popover-footer button')).toMatch(/min-height:\s*44px/);
+    const footer = rule('.driver-popover.visualex-tour-popover .driver-popover-footer button');
+    expect(footer).toMatch(/min-height:\s*44px/);
+    // driver.js sets `display` inline on these buttons: the label is centred by its line height.
+    expect(footer).toMatch(/font:\s*500 13px\/42px/);
+    expect(footer).not.toMatch(/display:/);
     const close = rule('.driver-popover.visualex-tour-popover .driver-popover-close-btn');
     expect(close).toMatch(/width:\s*44px/);
     expect(close).toMatch(/height:\s*44px/);

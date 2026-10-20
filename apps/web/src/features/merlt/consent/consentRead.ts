@@ -36,16 +36,26 @@ function isMerltDisabled(err: unknown): boolean {
  */
 export function readMerltConsent(): Promise<MerltConsentResponse> {
   if (serverWithoutMerlt) return Promise.resolve(DISABLED_CONSENT);
-  pending ??= fetchMerltConsent()
+  if (pending) return pending;
+  const read = fetchMerltConsent()
     .catch((err: unknown) => {
       if (!isMerltDisabled(err)) throw err;
       serverWithoutMerlt = true;
       return DISABLED_CONSENT;
     })
     .finally(() => {
-      pending = null;
+      if (pending === read) pending = null;
     });
-  return pending;
+  pending = read;
+  return read;
+}
+
+/**
+ * At logout: a read on its way is the account's that leaves, and the next account's provider must not
+ * join it. What a server without MERL-T said is the server's, and stays.
+ */
+export function clearConsentRead(): void {
+  pending = null;
 }
 
 /** Tests only: forget what the server said, and any read on its way. */

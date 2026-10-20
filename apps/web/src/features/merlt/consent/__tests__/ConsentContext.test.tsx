@@ -14,7 +14,7 @@ vi.mock('../../../../services/merltService', () => ({
 }));
 
 import { ConsentProvider } from '../ConsentContext';
-import { _resetConsentReadForTests } from '../consentRead';
+import { _resetConsentReadForTests, clearConsentRead } from '../consentRead';
 import { useConsent } from '../useConsent';
 import { NoticeChangedError } from '../context';
 
@@ -191,6 +191,21 @@ describe('ConsentContext', () => {
     renderWithProvider();
     await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('ready'));
     expect(fetchConsent).toHaveBeenCalledOnce();
+  });
+
+  it('after a logout, the next account does not join the leaving account\'s read', async () => {
+    let resolveFirst!: (v: MerltConsentResponse) => void;
+    fetchConsent.mockReturnValueOnce(new Promise<MerltConsentResponse>((r) => { resolveFirst = r; }));
+    const first = renderWithProvider();
+    first.unmount();
+    clearConsentRead();
+
+    fetchConsent.mockResolvedValueOnce(none);
+    renderWithProvider();
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('ready'));
+    await act(async () => { resolveFirst(full); });
+    expect(screen.getByTestId('level').textContent).toBe('none');
+    expect(fetchConsent).toHaveBeenCalledTimes(2);
   });
 
   it('any other failure stays an error, and the next mount asks again', async () => {

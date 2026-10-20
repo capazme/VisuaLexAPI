@@ -108,7 +108,7 @@ describe('DossierDetailView — the page by act', () => {
   it('names each act once, in the order the acts entered, with its articles by number', () => {
     renderView();
     expect(screen.getAllByRole('heading', { name: `${L247} 2 articoli` })).toHaveLength(1);
-    const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent ?? '');
+    const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent ?? '');
     expect(headings.filter((h) => h.startsWith('l. '))).toEqual([`${L247}2 articoli`, `${L49}1 articolo`]);
     const block = screen.getByRole('region', { name: L247 });
     expect(within(block).getAllByText(/^art\. \d+$/).map((el) => el.textContent)).toEqual(['art. 1', 'art. 3']);

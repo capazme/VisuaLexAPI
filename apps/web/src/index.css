@@ -1216,17 +1216,17 @@
 }
 .dark .driver-popover.visualex-tour-popover .driver-popover-progress-text { color: var(--color-ink-400); }
 /* Every button of the tour is a 44 px target (driver.css draws them 28 px), with a focus ring
-   (driver.css takes the outline away). */
+   (driver.css takes the outline away). driver.js writes `display: block` on them inline at every step
+   (and `none` to hide one), so the label is centred by its line height, never by a display of ours:
+   42 px of line and 1 px of border above and below (driver.css's border-box). */
 .driver-popover.visualex-tour-popover .driver-popover-footer button {
-  display: inline-flex;
-  align-items: center;
   min-height: 44px;
   padding: 0 14px;
   border-radius: 6px;
   border: 1px solid var(--color-ink-200);
   background: transparent;
   color: inherit;
-  font: 500 13px/1 var(--font-sans);
+  font: 500 13px/42px var(--font-sans);
   text-shadow: none;
   transition: background-color 160ms var(--ease-out), transform 120ms var(--ease-out);
 }
