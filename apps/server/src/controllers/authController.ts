@@ -234,23 +234,40 @@ export const changePassword = async (req: Request, res: Response) => {
 const withoutOriginalAuthor = <T extends { originalAuthorId: string | null }>({ originalAuthorId, ...row }: T) =>
   ({ ...row, fromAnotherUser: originalAuthorId !== null });
 
+/** A key of an archived environment's content, folded: `Author_Id`, `author-id` and `authorId` are one key. */
+const foldKey = (key: string) => key.toLowerCase().replace(/[_-]/g, '');
+// The web's attribution of a row taken from someone else: it becomes `fromAnotherUser`.
+const ATTRIBUTION_KEYS = new Set(['originalauthor', 'originalauthorid']);
+// A person's identity, in a file the user imported by hand (someone else's, possibly): it stays
+// only when it is the user's own id, username or email.
+const IDENTITY_KEYS = new Set(['author', 'authorid', 'authorname', 'authoremail', 'username', 'userid', 'useremail', 'email']);
+
+type OwnIdentity = { id: string; username: string; email: string };
+
+const isOwnIdentity = (value: unknown, own: OwnIdentity) =>
+  typeof value === 'string' && (value === own.id || value === own.username || value.toLowerCase() === own.email.toLowerCase());
+
 /**
- * An archived environment's content is the JSON the web posted, whose rows could carry the web's
- * `originalAuthor` ({ id, username }) or an `originalAuthorId`: both become `fromAnotherUser`, at
- * any depth, and nothing else in the blob changes.
+ * An archived environment's content is the JSON the web posted or a file the user imported by
+ * hand, whose rows could carry the web's `originalAuthor` ({ id, username }) or an
+ * `originalAuthorId`, which become `fromAnotherUser`, and anyone's `authorId`, `username`,
+ * `user_id`, `email` and the like (`IDENTITY_KEYS`, case and `_`/`-` folded), which go unless they
+ * are the user's own. At any depth; nothing else in the blob changes.
  */
-function withoutAuthors(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(withoutAuthors);
+function withoutAuthors(value: unknown, own: OwnIdentity): unknown {
+  if (Array.isArray(value)) return value.map((inner) => withoutAuthors(inner, own));
   if (typeof value !== 'object' || value === null) return value;
   const out: Record<string, unknown> = {};
   let fromAnotherUser = false;
   for (const [key, inner] of Object.entries(value)) {
-    if (key === 'originalAuthor' || key === 'originalAuthorId') {
+    const folded = foldKey(key);
+    if (ATTRIBUTION_KEYS.has(folded)) {
       fromAnotherUser ||= inner !== null && inner !== undefined;
       continue;
     }
+    if (IDENTITY_KEYS.has(folded) && !isOwnIdentity(inner, own)) continue;
     // Defined, not assigned: a `__proto__` key in the blob stays a key of the row.
-    Object.defineProperty(out, key, { value: withoutAuthors(inner), enumerable: true, writable: true, configurable: true });
+    Object.defineProperty(out, key, { value: withoutAuthors(inner, own), enumerable: true, writable: true, configurable: true });
   }
   if (fromAnotherUser) out.fromAnotherUser = true;
   return out;
@@ -319,6 +336,7 @@ export const exportAccountData = async (req: Request, res: Response) => {
       orderBy: { createdAt: 'asc' },
     }),
   ]);
+  const own: OwnIdentity = { id: userId, username: req.user!.username, email: req.user!.email };
 
   res.json({
     schemaVersion: 1,
@@ -335,7 +353,7 @@ export const exportAccountData = async (req: Request, res: Response) => {
       environments: environments.map((env) => ({
         ...env,
         author: env.author !== null && env.author === user?.username ? env.author : null,
-        content: withoutAuthors(env.content),
+        content: withoutAuthors(env.content, own),
       })),
       quickNorms: quickNorms.map(withoutOriginalAuthor),
       customAliases: customAliases.map(withoutOriginalAuthor),

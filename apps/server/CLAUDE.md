@@ -597,9 +597,16 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   note, highlight, dossier, quick norm or alias taken from someone else carries
   `fromAnotherUser: true` instead of `originalAuthorId`, and an archived
   environment's content has its `originalAuthor`/`originalAuthorId` keys turned
-  into the same flag. An archived environment's `author` travels only when it is
-  the user's own username (a Forum download stored its publisher's), else `null`.
-  `tests/accountData.test.ts`.
+  into the same flag. Its `authorId`, `username`, `user_id`, `email` and the like
+  (`IDENTITY_KEYS` in `authController.ts`; case, `_` and `-` folded), at any depth,
+  stay only when they hold the user's own id, username or email: an environment
+  imported by hand may be someone else's file. An archived environment's `author`
+  travels only when it is the user's own username (a Forum download stored its
+  publisher's), else `null`. `tests/accountData.test.ts`, and
+  `tests/accountExport.otherUser.test.ts`: a second user touches the first one's
+  world everywhere (replies, votes, reports, suggestions taken, declined and
+  pending, a Forum download, Gymnasium votes and reviews, notifications) and the
+  whole serialized export must hold none of their id, username, email or text.
 - **`GET /api/health/detailed`** — a `SELECT 1`, for the frontend's health
   banner. The Python `/health/detailed` is the one that probes the sources
   (see Key API Endpoints).
