@@ -89,7 +89,7 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
           placeholder="Aggiungi un compito"
           aria-describedby={`${id}-summary`}
           autoComplete="off"
-          className="min-h-[44px] min-w-0 flex-1 rounded-lg bg-transparent px-2 text-base text-slate-900 placeholder:text-slate-500 focus-visible:outline-none md:text-sm dark:text-slate-100 dark:placeholder:text-slate-400"
+          className="min-h-[44px] min-w-0 flex-1 rounded-lg bg-transparent px-2 text-base text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 md:text-sm dark:text-slate-100 dark:placeholder:text-slate-400"
         />
         <button
           type="button"

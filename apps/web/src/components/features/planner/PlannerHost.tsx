@@ -6,6 +6,17 @@ import { taskService } from '../../../services/taskService';
 import { todayInRome } from '../../../utils/dateUtils';
 import { plannerStore } from './plannerStore';
 import { TaskDialog } from './TaskDialog';
+import { belongsTo } from './taskDraft';
+import type { TaskView } from '../../../types/tasks';
+
+/** The view the page shows, for «c»: what a new task starts with, and whether it will be seen there. */
+function pageView(pathname: string, dossierId: string | null): { view: TaskView; dossierId?: string } | null {
+  if (dossierId) return { view: 'dossier', dossierId };
+  if (pathname === '/opus/oggi') return { view: 'today' };
+  if (pathname === '/opus/prossimi') return { view: 'upcoming' };
+  if (pathname === '/opus/ingresso') return { view: 'inbox' };
+  return null;
+}
 
 /** The bar's count is read again every two minutes while the tab is on screen, and after every write. */
 const COUNT_EVERY_MS = 120_000;
@@ -39,6 +50,7 @@ export function PlannerHost({ enabled }: { enabled: boolean }) {
   const version = plannerStore((s) => s.version);
   // The store's own function: stable, so the toast's timer is not restarted by each render.
   const clearNotice = plannerStore((s) => s.clearNotice);
+  const serverToday = plannerStore((s) => s.today);
   const { pathname, search } = useLocation();
   const openDossierId = pathname === '/dossier' ? new URLSearchParams(search).get('dossier') : null;
 
@@ -59,7 +71,12 @@ export function PlannerHost({ enabled }: { enabled: boolean }) {
     const read = () => {
       if (document.visibilityState !== 'visible') return;
       taskService.list('today').then(
-        (answer) => live && plannerStore.getState().setTodayCount(answer.tasks.length),
+        (answer) => {
+          if (!live) return;
+          plannerStore.getState().setTodayCount(answer.tasks.length);
+          // A new day here makes every view mounted read again (`useTaskView`).
+          plannerStore.getState().setToday(answer.today);
+        },
         // The count keeps its last value; the status only, never a title.
         (error: { status?: number }) => console.warn('[planner] the count of today could not be read', error?.status ?? 'no answer'),
       );
@@ -74,14 +91,24 @@ export function PlannerHost({ enabled }: { enabled: boolean }) {
     };
   }, [enabled, version]);
 
+  const today = serverToday ?? todayInRome();
+  const shown = pageView(pathname, openDossierId);
+  // On «Oggi» and «Prossimi giorni» a new task is for today, as their own field proposes.
+  const forToday = shown?.view === 'today' || shown?.view === 'upcoming';
+
   return (
     <>
       {quickAdd && (
         <TaskDialog
           mode="create"
-          today={todayInRome()}
-          defaults={quickAdd.dossierId ? { dossierId: quickAdd.dossierId } : {}}
+          today={today}
+          defaults={{ ...(quickAdd.dossierId ? { dossierId: quickAdd.dossierId } : {}), ...(forToday ? { plannedDate: today } : {}) }}
           onClose={() => plannerStore.getState().closeQuickAdd()}
+          onCreated={(task) => {
+            // As the views' own field says it: a task the page will not list is announced.
+            const unseen = shown !== null && !belongsTo(task, shown.view, today, shown.dossierId);
+            plannerStore.getState().notify(unseen ? 'Compito aggiunto: non è in questa vista' : 'Compito aggiunto', unseen ? 'info' : 'success');
+          }}
         />
       )}
       <Toast

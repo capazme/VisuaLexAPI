@@ -17,18 +17,22 @@ export const FIELD_HINT = 'text-xs text-slate-600 dark:text-slate-400';
 /** An icon-only control: 44 px square at every width. */
 export const ICON_BUTTON = `inline-grid min-h-[44px] min-w-[44px] place-items-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-50 ${FOCUS_RING}`;
 
-/** The leading stripe of a task with a priority above the default (the colour markers' convention): never the only sign. */
+/**
+ * The leading stripe of a task with a priority above the default (the colour markers' convention): never the only
+ * sign. Red and amber for the two urgent ones, ink for «Media»: not a red-orange-blue scale with the last unmarked,
+ * which is another app's look.
+ */
 export const PRIORITY_STRIPE: Record<TaskPriority, string | null> = {
   1: 'bg-red-600 dark:bg-red-400',
   2: 'bg-amber-500 dark:bg-amber-400',
-  3: 'bg-primary-500 dark:bg-primary-400',
+  3: 'bg-slate-400 dark:bg-slate-500',
   4: null,
 };
 
 export const PRIORITY_TEXT: Record<TaskPriority, string> = {
   1: 'text-red-700 dark:text-red-300',
   2: 'text-amber-800 dark:text-amber-300',
-  3: 'text-primary-700 dark:text-primary-300',
+  3: 'text-slate-700 dark:text-slate-300',
   4: 'text-slate-600 dark:text-slate-400',
 };
 

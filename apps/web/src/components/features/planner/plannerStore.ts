@@ -19,6 +19,12 @@ export const plannerStore = create<{
   /** Overdue plus today's tasks, for the bar; null until first read. */
   todayCount: number | null;
   setTodayCount: (count: number) => void;
+  /**
+   * The server's Rome day, as the last read answered it. When it changes (a page left open overnight), every view
+   * mounted reads again: the lists, the dates they propose and «Scaduti» follow the new day.
+   */
+  today: string | null;
+  setToday: (today: string) => void;
   /** The quick-add dialog: open, and the dossier it starts with (null: none chosen, the inbox). */
   quickAdd: { dossierId: string | null } | null;
   openQuickAdd: (dossierId: string | null) => void;
@@ -31,6 +37,8 @@ export const plannerStore = create<{
   changed: () => set((s) => ({ version: s.version + 1 })),
   todayCount: null,
   setTodayCount: (todayCount) => set({ todayCount }),
+  today: null,
+  setToday: (today) => set((s) => (s.today === today ? s : { today })),
   quickAdd: null,
   openQuickAdd: (dossierId) => set({ quickAdd: { dossierId } }),
   closeQuickAdd: () => set({ quickAdd: null }),

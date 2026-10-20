@@ -15,6 +15,17 @@ export interface Optimistic {
 const { changed, notify } = plannerStore.getState();
 
 /**
+ * A refused write: the row comes back, and on a 4xx (a task changed meanwhile, 409; gone, 404) the views read again,
+ * or the row would stay as it was and every new attempt be refused the same way.
+ */
+function refused(task: Task, optimistic: Optimistic, error: unknown, fallback: string) {
+  optimistic.show(task.id);
+  notify(failureMessage(error, fallback), 'error');
+  const status = (error as { status?: number } | null)?.status;
+  if (status !== undefined && status >= 400 && status < 500) changed();
+}
+
+/**
  * Ticks a task, with «Annulla» for five seconds. A repeating task does not close: the server moves its planned date
  * (and needs the occurrence ticked, `plannedDate`, so a second tick of the same one is a 409), and «Annulla» puts the
  * date back; any other task closes with its open subtasks, and «Annulla» reopens them. The toast never repeats the
@@ -26,8 +37,7 @@ export async function completeWithUndo(task: Task, today: string, optimistic: Op
   try {
     answer = await taskService.complete(task.id, task.recurrence && task.plannedDate ? task.plannedDate : undefined);
   } catch (error) {
-    optimistic.show(task.id);
-    notify(failureMessage(error, 'Non riesco a segnare il compito come fatto. Riprova.'), 'error');
+    refused(task, optimistic, error, 'Non riesco a segnare il compito come fatto. Riprova.');
     return;
   }
   optimistic.landed(task.id);
@@ -56,8 +66,7 @@ export async function trashWithUndo(task: Task, optimistic: Optimistic): Promise
   try {
     ({ taskCount } = await taskService.trash(task.id));
   } catch (error) {
-    optimistic.show(task.id);
-    notify(failureMessage(error, 'Non riesco a spostare il compito nel cestino. Riprova.'), 'error');
+    refused(task, optimistic, error, 'Non riesco a spostare il compito nel cestino. Riprova.');
     return;
   }
   optimistic.landed(task.id);
@@ -87,8 +96,7 @@ export async function restoreTask(task: Task, optimistic: Optimistic): Promise<v
   try {
     await taskService.restore(task.id);
   } catch (error) {
-    optimistic.show(task.id);
-    notify(failureMessage(error, 'Non riesco a ripristinare il compito. Riprova.'), 'error');
+    refused(task, optimistic, error, 'Non riesco a ripristinare il compito. Riprova.');
     return;
   }
   optimistic.landed(task.id);

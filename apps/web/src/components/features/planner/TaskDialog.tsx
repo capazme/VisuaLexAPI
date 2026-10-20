@@ -46,7 +46,11 @@ export function TaskDialog(props: Props) {
     setError(null);
     try {
       if (editing) {
-        await taskService.update(editing.id, inputFromDraft(draft, { withDossier: editing.parentId === null }));
+        // A task moved to another dossier takes that dossier's kind as its origin (a dossier di studio: «studio»).
+        const moved = editing.parentId === null && draft.dossierId !== (editing.dossierId ?? '');
+        const kind = dossiers.find((d) => d.id === draft.dossierId)?.kind;
+        const origin = moved && editing.origin !== 'forum' ? (kind === 'studio' ? 'studio' : 'lavoro') : undefined;
+        await taskService.update(editing.id, inputFromDraft(draft, { withDossier: editing.parentId === null, origin }));
         plannerStore.getState().changed();
         plannerStore.getState().notify('Compito aggiornato');
         onClose();
@@ -54,8 +58,9 @@ export function TaskDialog(props: Props) {
         const kind = dossiers.find((d) => d.id === draft.dossierId)?.kind;
         const created = await taskService.create(inputFromDraft(draft, { withDossier: true, origin: kind === 'studio' ? 'studio' : 'lavoro' }));
         plannerStore.getState().changed();
-        plannerStore.getState().notify('Compito aggiunto');
-        if (props.mode === 'create') props.onCreated?.(created);
+        // The host says where it went when it knows the page's view; else the plain notice.
+        if (props.mode === 'create' && props.onCreated) props.onCreated(created);
+        else plannerStore.getState().notify('Compito aggiunto');
         onClose();
       }
     } catch (failure) {
@@ -118,6 +123,16 @@ function Subtasks({ parent, today, inputRef }: { parent: Task; today: string; in
   const [error, setError] = useState<string | null>(null);
   const id = useId();
 
+  const listRef = useRef<HTMLUListElement>(null);
+  // The ticked subtask leaves: the focus goes to the next one, else the previous one, else the field to add one.
+  const tick = (child: Task) => {
+    const items = [...(listRef.current?.querySelectorAll<HTMLElement>('[data-subtask-id]') ?? [])];
+    const at = items.findIndex((item) => item.dataset.subtaskId === child.id);
+    const next = at >= 0 ? (items[at + 1] ?? items[at - 1]) : undefined;
+    (next?.querySelector<HTMLElement>('input[type="checkbox"]') ?? inputRef.current)?.focus();
+    void completeWithUndo(child, today, list.optimistic);
+  };
+
   const add = async (event: FormEvent) => {
     event.preventDefault();
     const trimmed = title.trim();
@@ -143,10 +158,10 @@ function Subtasks({ parent, today, inputRef }: { parent: Task; today: string; in
       </h3>
       {list.status === 'error' && <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">Non riesco a leggere i sottocompiti.</p>}
       {children.length > 0 && (
-        <ul className="mt-2 grid grid-cols-1 gap-1">
+        <ul ref={listRef} className="mt-2 grid grid-cols-1 gap-1">
           {children.map((child) => (
-            <li key={child.id} className="flex items-center gap-1">
-              <TaskCheckbox label={`Segna come fatto: ${child.title}`} onTick={() => void completeWithUndo(child, today, list.optimistic)} />
+            <li key={child.id} data-subtask-id={child.id} className="flex items-center gap-1">
+              <TaskCheckbox label={`Segna come fatto: ${child.title}`} onTick={() => tick(child)} />
               <span className="min-w-0 flex-1 text-sm text-slate-900 [overflow-wrap:anywhere] dark:text-slate-100">{child.title}</span>
             </li>
           ))}

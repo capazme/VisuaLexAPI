@@ -4,7 +4,7 @@ import { completeWithUndo, trashWithUndo, type Optimistic } from './taskActions'
 import { nestTasks } from './taskTree';
 import { TaskDialog } from './TaskDialog';
 import { TaskRow } from './TaskRow';
-import { focusAwayFrom, moveBetweenRows } from './moveBetweenRows';
+import { focusAwayFrom, focusWhenRowLeaves, moveBetweenRows } from './moveBetweenRows';
 
 interface Props {
   tasks: Task[];
@@ -45,7 +45,20 @@ export function TaskList({ tasks, today, optimistic, showDossier = true, label }
           </TaskRow>
         ))}
       </ul>
-      {open && <TaskDialog mode="edit" task={open.task} focus={open.focus} today={today} optimistic={optimistic} onClose={() => setOpen(null)} />}
+      {open && (
+        <TaskDialog
+          mode="edit"
+          task={open.task}
+          focus={open.focus}
+          today={today}
+          optimistic={optimistic}
+          onClose={() => {
+            // Trashed from the dialog, or saved out of this view: its row may leave after the dialog has given it the focus.
+            focusWhenRowLeaves(open.task.id);
+            setOpen(null);
+          }}
+        />
+      )}
     </>
   );
 }

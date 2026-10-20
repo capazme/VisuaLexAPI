@@ -15,7 +15,7 @@ export type TaskViewState =
  * read never overwrites a newer one. A row hidden by a write (`optimistic`) stays hidden while the write travels and
  * until an answer read after it landed arrives — a read that started before, or a failed one that keeps the last
  * answer, would show it again, not done — and comes back at once when the write is refused. «Oggi» also gives the bar
- * its count, so the two never disagree.
+ * its count, so the two never disagree. A new day (`plannerStore.today`) or the tab coming back into view reads again.
  */
 export function useTaskView(view: TaskView, dossierId?: string) {
   const version = plannerStore((s) => s.version);
@@ -35,6 +35,7 @@ export function useTaskView(view: TaskView, dossierId?: string) {
       (data) => {
         if (!live) return;
         setAnswer({ key, scope, data, readAt: version, failed: false });
+        plannerStore.getState().setToday(data.today);
         if (view === 'today') plannerStore.getState().setTodayCount(data.tasks.length);
       },
       (error: { status?: number }) => {
@@ -52,6 +53,22 @@ export function useTaskView(view: TaskView, dossierId?: string) {
   }, [key, scope, view, dossierId, version]);
 
   const reload = useCallback(() => setReads((n) => n + 1), []);
+
+  // A page left open overnight: read again when the tab comes back into view, and when any read (the bar's count,
+  // every two minutes) answers a new day.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') reload();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    const unsubscribe = plannerStore.subscribe((state, previous) => {
+      if (previous.today !== null && state.today !== previous.today) reload();
+    });
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      unsubscribe();
+    };
+  }, [reload]);
 
   const optimistic: Optimistic = useMemo(() => {
     const change = (id: string, at: number | null | undefined) =>

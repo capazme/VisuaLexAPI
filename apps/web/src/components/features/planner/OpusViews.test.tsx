@@ -38,7 +38,7 @@ let unregister: () => void;
 
 beforeEach(() => {
   Object.values(service).forEach((fn) => fn.mockReset());
-  plannerStore.setState({ version: 0, todayCount: null, notice: null, quickAdd: null });
+  plannerStore.setState({ version: 0, todayCount: null, today: null, notice: null, quickAdd: null });
   appStore.setState({ dossiers: [{ id: 'd1', title: 'Ricorso Rossi', createdAt: '', items: [], kind: 'lavoro' }] });
   toasts = [];
   unregister = registerUndoToastListener((t) => toasts.push(t));
@@ -122,6 +122,43 @@ describe('«Oggi»', () => {
     fireEvent.click(await screen.findByRole('checkbox', { name: /Compito a/ }));
     await waitFor(() => expect(plannerStore.getState().notice?.message).toBe('Il compito è già passato alla data successiva.'));
     expect(screen.getByRole('checkbox', { name: /Compito a/ })).toBeInTheDocument();
+    // A 4xx reads the view again: the row on screen was stale.
+    await waitFor(() => expect(service.list).toHaveBeenCalledTimes(2));
+  });
+
+  it('follows a new day: a page left open overnight reads again and proposes the new date', async () => {
+    service.list.mockResolvedValue(answer([]));
+    service.create.mockResolvedValue(task('n', { plannedDate: '2026-10-21' }));
+    renderAt(<TodayView />);
+    expect(await screen.findByText('martedì 20 ottobre')).toBeInTheDocument();
+    // The bar's count, read every two minutes, answers the next day.
+    service.list.mockResolvedValue({ today: '2026-10-21', tasks: [], truncated: false });
+    act(() => plannerStore.getState().setToday('2026-10-21'));
+    expect(await screen.findByText('mercoledì 21 ottobre')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Nuovo compito'), { target: { value: 'Telefonare' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi il compito' }));
+    await waitFor(() => expect(service.create.mock.calls[0][0]).toMatchObject({ plannedDate: '2026-10-21' }));
+  });
+
+  it('reads again when the tab comes back into view', async () => {
+    service.list.mockResolvedValue(answer([]));
+    renderAt(<TodayView />);
+    await screen.findByText('Nessun compito per oggi');
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await waitFor(() => expect(service.list).toHaveBeenCalledTimes(2));
+  });
+
+  it('gives the focus to a neighbour when a task trashed from its dialog leaves', async () => {
+    service.list.mockResolvedValue(answer([task('a', { plannedDate: TODAY }), task('b', { plannedDate: TODAY })]));
+    service.trash.mockResolvedValue({ taskCount: 1 });
+    renderAt(<TodayView />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Compito a' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Modifica compito' });
+    service.list.mockResolvedValue(answer([task('b', { plannedDate: TODAY })]));
+    fireEvent.click(within(dialog).getByRole('button', { name: /Sposta nel cestino/ }));
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: /Compito b/ })).toHaveFocus());
   });
 
   it('keeps a ticked row hidden until a read made after the tick, even when one made before, or a failed one, answers', async () => {

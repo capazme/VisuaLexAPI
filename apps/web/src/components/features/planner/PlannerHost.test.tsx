@@ -28,7 +28,7 @@ function task(id: string, fields: Partial<Task> = {}): Task {
 beforeEach(() => {
   Object.values(service).forEach((fn) => fn.mockReset());
   service.list.mockResolvedValue({ today: TODAY, tasks: [], truncated: false });
-  plannerStore.setState({ version: 0, todayCount: null, notice: null, quickAdd: null });
+  plannerStore.setState({ version: 0, todayCount: null, today: null, notice: null, quickAdd: null });
   appStore.setState({
     dossiers: [
       { id: 'd1', title: 'Ricorso Rossi', createdAt: '', items: [], kind: 'lavoro' },
@@ -66,6 +66,19 @@ describe('«c», the quick add from anywhere', () => {
     fireEvent.keyDown(window, { key: 'c' });
     expect(plannerStore.getState().quickAdd).toBeNull();
     modal.remove();
+  });
+
+  it('proposes today on «Oggi», and says when the new task is not in the view', async () => {
+    service.create.mockResolvedValue(task('n', { plannedDate: '2026-10-30' }));
+    host('/opus/oggi');
+    await waitFor(() => expect(plannerStore.getState().today).toBe(TODAY));
+    fireEvent.keyDown(window, { key: 'c' });
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText('Data pianificata')).toHaveValue(TODAY);
+    fireEvent.change(within(dialog).getByLabelText('Titolo'), { target: { value: 'Più avanti' } });
+    fireEvent.change(within(dialog).getByLabelText('Data pianificata'), { target: { value: '2026-10-30' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Aggiungi' }));
+    await waitFor(() => expect(plannerStore.getState().notice?.message).toBe('Compito aggiunto: non è in questa vista'));
   });
 
   it('creates the task with what was chosen, and its origin from the dossier\'s kind', async () => {
@@ -130,6 +143,33 @@ describe('editing a task', () => {
     await waitFor(() => expect(service.update).toHaveBeenCalled());
     expect(service.update.mock.calls[0]).toEqual(['p', expect.objectContaining({ description: 'Vedi https://example.org/atto.', labels: ['udienza'], dossierId: 'd1' })]);
     await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+
+  it("takes the dossier's kind as its origin when it moves to another dossier", async () => {
+    const parent = task('p', { dossierId: 'd1' });
+    service.update.mockResolvedValue(parent);
+    render(<MemoryRouter><TaskDialog mode="edit" task={parent} today={TODAY} optimistic={noOptimistic} onClose={vi.fn()} /></MemoryRouter>);
+    fireEvent.change(screen.getByLabelText('Dossier'), { target: { value: 'd2' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Salva' }));
+    await waitFor(() => expect(service.update.mock.calls[0][1]).toMatchObject({ dossierId: 'd2', origin: 'studio' }));
+  });
+
+  it('hands the focus to the next subtask when one is ticked, then to the field', async () => {
+    const parent = task('p');
+    service.list.mockResolvedValue({ today: TODAY, tasks: [parent, task('s1', { parentId: 'p' }), task('s2', { parentId: 'p' })], truncated: false });
+    const complete = vi.fn().mockResolvedValue({ task: parent, recurred: null });
+    (service as unknown as { complete: typeof complete }).complete = complete;
+    render(<MemoryRouter><TaskDialog mode="edit" task={parent} today={TODAY} optimistic={noOptimistic} onClose={vi.fn()} /></MemoryRouter>);
+    const first = await screen.findByRole('checkbox', { name: /Compito s1/ });
+    // What the server lists once s1 is done.
+    service.list.mockResolvedValue({ today: TODAY, tasks: [parent, task('s2', { parentId: 'p' })], truncated: false });
+    first.focus();
+    fireEvent.click(first);
+    expect(screen.getByRole('checkbox', { name: /Compito s2/ })).toHaveFocus();
+    // s1 has left: s2 is the last one, and the focus goes to the field.
+    await waitFor(() => expect(screen.queryByRole('checkbox', { name: /Compito s1/ })).toBeNull());
+    fireEvent.click(screen.getByRole('checkbox', { name: /Compito s2/ }));
+    expect(screen.getByLabelText('Nuovo sottocompito')).toHaveFocus();
   });
 
   it("shows the server's refusal in the dialog", async () => {
