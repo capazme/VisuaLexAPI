@@ -6,12 +6,13 @@ here as data, `tests/test_egress_allowlist.py` fails the build if a URL literal
 appears for a host not listed, and `is_allowed()` is checked at request time in
 ThrottledHttpClient.
 
-That runtime check covers the `ThrottledHttpClient` instances only (the shared
-one and the decision readers' own). `POST /fetch_tree` reaches the network
-through treextractor's own aiohttp session, Playwright's `page.goto()` never
-consults this module, and the client does not re-check a redirect target.
-SECURITY.md ("Not yet covered") lists those three gaps; do not describe this list
-as an enforced boundary until they are closed.
+That runtime check covers the `ThrottledHttpClient` instances (the shared one
+and the decision readers' own), which carry the Normattiva tree too, and
+treextractor checks it before it starts a browser. Playwright's `page.goto()` in
+the EUR-Lex scraper and the PDF export never consults this module, no browser
+re-checks what a page loads, and the client does not re-check a redirect target.
+SECURITY.md ("Not yet covered") lists those gaps; do not describe this list as an
+enforced boundary until they are closed.
 
 The server sends no telemetry and has no analytics endpoint. Every host below is
 a source consulted to answer a legal question, or fetched for MERL-T's ingestion
