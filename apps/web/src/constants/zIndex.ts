@@ -103,6 +103,12 @@ export const Z_INDEX = {
   /** User menu popup */
   menuPanel: 'z-[1510]',
 
-  /** Settings modal — ALWAYS on top of everything */
+  /** Settings modal — on top of everything that takes a click */
   settings: 'z-[1900]',
+
+  /**
+   * The section change's halftone (`features/sections/sectionTransition.ts`): a canvas over the whole screen for
+   * under a second, which never takes a click (`pointer-events: none`) and is removed at its end.
+   */
+  sectionTransition: 'z-[2000]',
 } as const;

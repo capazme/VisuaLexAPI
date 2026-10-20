@@ -1244,18 +1244,100 @@
 .dark .driver-popover.visualex-tour-popover .driver-popover-arrow-side-left { border-left-color: var(--color-ink-900); }
 .dark .driver-popover.visualex-tour-popover .driver-popover-arrow-side-right { border-right-color: var(--color-ink-900); }
 
-/* Section hue (spec §4.1): the switcher's mark, and nothing else that carries meaning. */
-.vlx-section-mark { background: var(--color-toga-600); }
-.vlx-section-mark[data-section="gymnasium"] { background: oklch(31% 0.09 268); }
-.vlx-section-mark[data-section="academia"] { background: oklch(55% 0.09 70); }
-.vlx-section-mark[data-section="forum"] { background: oklch(55% 0.08 190); }
-.dark .vlx-section-mark { background: var(--color-toga-500); }
-.dark .vlx-section-mark[data-section="gymnasium"] { background: oklch(45% 0.11 268); }
-.dark .vlx-section-mark[data-section="academia"] { background: oklch(60% 0.09 70); }
-.dark .vlx-section-mark[data-section="forum"] { background: oklch(58% 0.08 190); }
+/* Section hue (spec §4.1): the switcher's mark, and nothing else that carries meaning. The same hues print the
+   section change's halftone (`sectionHue`, S2) and colour Gymnasium's small motions (the tally's stroke, the
+   mission's drop, the lesson bar's head); none of those carries meaning either. */
+:root {
+  --vlx-section-opus: var(--color-toga-600);
+  --vlx-section-gymnasium: oklch(31% 0.09 268);
+  --vlx-section-academia: oklch(55% 0.09 70);
+  --vlx-section-forum: oklch(55% 0.08 190);
+  /* The lesson bar's head runs ahead of the ink: the section's hue, lighter where the ink is dark. */
+  --vlx-gymnasium-wash: oklch(64% 0.1 268);
+  /* The title's ink while it is wet (S2): blacker than the heading's own in light, whiter in dark. */
+  --vlx-wet-ink: var(--color-ink-950);
+}
+.dark {
+  --vlx-section-opus: var(--color-toga-500);
+  --vlx-section-gymnasium: oklch(45% 0.11 268);
+  --vlx-section-academia: oklch(60% 0.09 70);
+  --vlx-section-forum: oklch(58% 0.08 190);
+  --vlx-gymnasium-wash: oklch(45% 0.11 268);
+  --vlx-wet-ink: #fff;
+}
+.vlx-section-mark { background: var(--vlx-section-opus); }
+.vlx-section-mark[data-section="gymnasium"] { background: var(--vlx-section-gymnasium); }
+.vlx-section-mark[data-section="academia"] { background: var(--vlx-section-academia); }
+.vlx-section-mark[data-section="forum"] { background: var(--vlx-section-forum); }
 
-/* Changing section (spec §6.3.2): the page leaves rising and fading, the next one arrives from below;
-   the sidebar and the rest of the screen hold still. Rare enough (a few times a day) to animate. */
+/* Changing section (S2): a halftone over the screen (`features/sections/sectionTransition.ts`), then the new page's
+   title's ink dries — wet, a little blurred and heavier, then as it is. The delay and the length come from the
+   script; the `backwards` fill keeps the title wet while the screen lets it through. */
+.vlx-ink-drying {
+  animation: vlx-ink-dry var(--vlx-ink-dry, 260ms) var(--ease-out) var(--vlx-ink-delay, 0ms) backwards;
+}
+@keyframes vlx-ink-dry {
+  from {
+    color: var(--vlx-wet-ink);
+    filter: blur(0.7px);
+    text-shadow: 0 0 0.5px currentColor, 0 0 1px currentColor;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vlx-ink-drying { animation: none; }
+}
+
+/* Gymnasium's small motions (S2). Each plays once for what grew since this browser last drew it
+   (`progress/seenProgress.ts`); under reduced motion none moves and the final state is drawn at once. */
+
+/* A mission done (today's missions): its words in a quieter ink, struck through in the section's hue. Done just now,
+   the ink crosses the words first — a band of the hue running left to right, leaving them done behind it — as the
+   drop fills the box (`MissionMark`, `MISSION_INK_MS`). */
+:root { --vlx-todo-ink: var(--color-ink-900); --vlx-done-ink: var(--color-ink-600); }
+.dark { --vlx-todo-ink: var(--color-ink-50); --vlx-done-ink: var(--color-ink-300); }
+.vlx-mission-done {
+  color: var(--vlx-done-ink);
+  text-decoration: line-through 1.5px var(--vlx-section-gymnasium);
+}
+.vlx-mission-inking {
+  color: transparent;
+  background: linear-gradient(90deg, var(--vlx-done-ink) 0 33%, var(--vlx-section-gymnasium) 33% 40%, var(--vlx-todo-ink) 47% 100%) 100% 0 / 300% 100% no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  text-decoration: line-through 1.5px;
+  animation: vlx-ink-through 320ms var(--ease-in-out) 300ms both;
+}
+@keyframes vlx-ink-through {
+  from { background-position: 100% 0; text-decoration-color: transparent; }
+  75% { text-decoration-color: transparent; }
+  to { background-position: 0 0; text-decoration-color: var(--vlx-section-gymnasium); }
+}
+
+/* Today's count when it grew: the new digit falls into place, overshoots a hair, squashes and takes on its weight
+   (from a regular weight to the ring's own semibold). Under 400 ms. */
+.vlx-digit-land { animation: vlx-digit-land 360ms var(--ease-out) backwards; }
+@keyframes vlx-digit-land {
+  0% { translate: 0 -0.45em; opacity: 0; font-weight: 400; }
+  55% { translate: 0 0.05em; scale: 1.05 0.93; opacity: 1; }
+  100% { translate: 0 0; scale: 1 1; }
+}
+
+/* The lesson's bar: the head runs ahead in the section's hue, the ink catches up a moment later on a spring
+   (`--ease-catch`, a damped spring sampled as a `linear()` curve, a hair of overshoot), then the bar trembles by a
+   pixel (`ReviewSession`, Web Animations). */
+:root {
+  /* ζ 0.75, ω 9 over the transition's length: 2.8 % of overshoot, settled at the end. */
+  --ease-catch: linear(0, 0.054, 0.1792, 0.3334, 0.4894, 0.6308, 0.7498, 0.844, 0.9143, 0.9638, 0.9962, 1.0154, 1.0251, 1.0283, 1.0273, 1.0241, 1.0198, 1.0153, 1.0112, 1.0077, 1.0049, 1.0028, 1.0013, 1.0003, 0.9996, 1);
+}
+.vlx-lesson-head { background: var(--vlx-gymnasium-wash); }
+
+@media (prefers-reduced-motion: reduce) {
+  .vlx-mission-inking { animation: none; background-position: 0 0; text-decoration-color: var(--vlx-section-gymnasium); }
+  .vlx-digit-land { animation: none; }
+}
+
+/* Where no canvas can be drawn, the browser's View Transition (spec §6.3.2): the page leaves rising and fading, the
+   next one arrives from below; the sidebar and the rest of the screen hold still. */
 .vlx-page { view-transition-name: vlx-page; }
 ::view-transition-old(root),
 ::view-transition-new(root) { animation: none; }

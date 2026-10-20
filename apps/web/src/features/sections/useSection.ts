@@ -8,6 +8,7 @@ import { useDevMode } from '../devMode/useDevMode';
 import { isStudiaEnabled } from '../studia/featureFlag';
 import type { DossierKind } from '../../types';
 import { SECTIONS, sectionForPath, type Section, type SectionId } from './sections';
+import { playSectionTransition, sectionHue } from './sectionTransition';
 
 /**
  * The last section the user was in, kept in the browser (spec S1): no migration, and a new device
@@ -57,6 +58,9 @@ function availableSections(devMode: boolean): Section[] {
   return SECTIONS.filter((s) => (s.id !== 'academia' || devMode) && (s.id !== 'gymnasium' || isStudiaEnabled()));
 }
 
+/** The section change on screen, if one is: a second choice brings it to its end first. */
+let finishRunning: (() => void) | null = null;
+
 export function useSection() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
@@ -74,15 +78,22 @@ export function useSection() {
   const wanted = fromPath ?? stored;
   const section = sections.some((s) => s.id === wanted) ? wanted : 'opus';
 
-  const chooseSection = (id: SectionId) => {
-    setSection(id);
-    const go = () => navigate(SECTIONS.find((s) => s.id === id)!.home);
-    // A View Transition where the browser has one (index.css animates `vlx-page`, spec §6.3.2). By hand:
-    // the app's BrowserRouter ignores navigate's `viewTransition` option, which needs a data router.
-    const doc = document as Document & { startViewTransition?: (cb: () => void) => unknown };
-    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    if (doc.startViewTransition && !reduce) doc.startViewTransition(() => flushSync(go));
-    else go();
+  /** `origin`: where the tap was, in the viewport; the halftone prints from there. */
+  const chooseSection = (id: SectionId, origin: { x: number; y: number } | null = null) => {
+    finishRunning?.();
+    finishRunning = null;
+    const go = () => {
+      setSection(id);
+      navigate(SECTIONS.find((s) => s.id === id)!.home);
+    };
+    // The section's own home again: no change of section to show.
+    if (id === section) {
+      go();
+      return;
+    }
+    // By hand under the colour: the app's BrowserRouter ignores navigate's `viewTransition` option, which needs a
+    // data router, and the new page must be there before the screen lets it through.
+    finishRunning = playSectionTransition({ origin, color: sectionHue(id), swap: () => flushSync(go) });
   };
 
   return { section, active: SECTIONS.find((s) => s.id === section)!, sections, chooseSection };
