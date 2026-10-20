@@ -174,10 +174,13 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   Restore brings every column back with the original ids — for a card, also the author's
   review state and log (`LingoStatoRipasso`, `LingoRevisioneSRS`), which the card's deletion
   would otherwise cascade away; an entry from before carries none and restores as it was; entries 30 days,
-  then swept (awaited, at most every ten minutes). A restore deletes its entry first: one purged, swept
-  or restored meanwhile is waited for and answers 404, as a second restore does; ids taken again
-  (P2002) are a 409. Entries restored into their dossier lock it, so one going to the trash meanwhile
-  answers the 409 that asks where. No route reachable by an
+  then swept (awaited, at most every ten minutes). A restore deletes its entry first and restores the
+  payload that deletion returns: one purged, swept or restored meanwhile is waited for and answers 404,
+  as a second restore does (two at once: 200 and 404); ids taken again (P2002) are a 409. A dossier's
+  restore locks its published copy before the entry, the order of the admin's withdraw and republish
+  (the copy, then the entry they rewrite), so the two never deadlock and a block written meanwhile
+  comes back with the dossier. Entries restored into a dossier lock it, their own or the one the user
+  picks: their own gone meanwhile answers the 409 that asks where, a picked one 404 `Dossier not found`. No route reachable by an
   exchanged token deletes for good.
 - **`POST /api/dossiers/:id/norms`** — 1 to 50 references in free text
   (`norms/resolveReference.ts`): `parse_query`, then `fetch_norma_data` (the
