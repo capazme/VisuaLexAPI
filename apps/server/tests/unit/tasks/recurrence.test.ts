@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { nextOccurrence, RECURRENCE_RULES as R } from '../../../src/tasks/recurrence';
+import { dayOfMonth, nextOccurrence, RECURRENCE_RULES as R } from '../../../src/tasks/recurrence';
 
 describe('nextOccurrence from the planned date («ogni»)', () => {
   it('every day: the day after the planned date, or after today when done late', () => {
@@ -29,6 +29,31 @@ describe('nextOccurrence from the planned date («ogni»)', () => {
     expect(nextOccurrence(R.yearly, 'pianificata', '2028-02-29', '2028-02-29')).toBe('2029-02-28');
     expect(nextOccurrence(R.yearly, 'pianificata', '2028-02-29', '2032-01-01')).toBe('2032-02-29');
     expect(nextOccurrence(R.yearly, 'pianificata', '2026-10-20', '2026-10-20')).toBe('2027-10-20');
+  });
+
+  /** Ticks a task on each planned date in turn, as a user who never falls behind does. */
+  function ticks(rule: typeof R.monthly | typeof R.yearly, first: string, count: number): string[] {
+    const recurrenceDay = dayOfMonth(first);
+    const dates: string[] = [];
+    let planned = first;
+    for (let i = 0; i < count; i += 1) {
+      planned = nextOccurrence(rule, 'pianificata', planned, planned, recurrenceDay);
+      dates.push(planned);
+    }
+    return dates;
+  }
+
+  it('every month: the 31st is shortened only in a month without it, never for good', () => {
+    expect(ticks(R.monthly, '2027-01-31', 6)).toEqual(['2027-02-28', '2027-03-31', '2027-04-30', '2027-05-31', '2027-06-30', '2027-07-31']);
+    expect(ticks(R.monthly, '2027-01-30', 3)).toEqual(['2027-02-28', '2027-03-30', '2027-04-30']);
+    expect(ticks(R.monthly, '2028-01-29', 2)).toEqual(['2028-02-29', '2028-03-29']);
+    // Done late, from a shortened date: the day kept, not the shortened one.
+    expect(nextOccurrence(R.monthly, 'pianificata', '2027-02-28', '2027-03-10', 31)).toBe('2027-03-31');
+    expect(nextOccurrence(R.monthly, 'pianificata', '2027-04-30', '2027-06-01', 31)).toBe('2027-06-30');
+  });
+
+  it('every year: 29 February goes back to the 29th in each leap year, tick after tick', () => {
+    expect(ticks(R.yearly, '2028-02-29', 5)).toEqual(['2029-02-28', '2030-02-28', '2031-02-28', '2032-02-29', '2033-02-28']);
   });
 
   it('every working day: skips weekends and the Italian holidays', () => {

@@ -48,18 +48,22 @@ function serializeItem(i: ItemRow) {
 }
 
 /**
- * What a dossier route includes besides the row: the entries in order, and the
- * dossier's copy in the Forum (owner-only: every dossier route is scoped to its owner).
+ * What a dossier route includes besides the row: the entries in order, the
+ * dossier's copy in the Forum (owner-only: every dossier route is scoped to its owner),
+ * and how many planner tasks it holds.
  */
 const DOSSIER_INCLUDE = {
   items: { orderBy: { position: 'asc' } },
   publishedCopy: { select: { id: true, currentVersion: true, isActive: true, updatedAt: true } },
+  _count: { select: { tasks: true } },
 } satisfies Prisma.DossierInclude;
 
 type PublishedCopyRow = { id: string; currentVersion: number; isActive: boolean; updatedAt: Date };
 
 /** A dossier as every route answers it. */
-function serializeDossier(d: Prisma.DossierGetPayload<object> & { items: ItemRow[]; publishedCopy: PublishedCopyRow | null }) {
+function serializeDossier(
+  d: Prisma.DossierGetPayload<object> & { items: ItemRow[]; publishedCopy: PublishedCopyRow | null; _count: { tasks: number } },
+) {
   return {
     id: d.id,
     name: d.name,
@@ -84,6 +88,9 @@ function serializeDossier(d: Prisma.DossierGetPayload<object> & { items: ItemRow
     updated_at: d.updatedAt,
     created_by: createdBy(d),
     items: d.items.map(serializeItem),
+    // Its planner tasks, done and trashed ones too: all go to the trash with the dossier. A count, never
+    // a title: a connected application reads it to tell the user, in the deletion's confirmation.
+    task_count: d._count.tasks,
   };
 }
 

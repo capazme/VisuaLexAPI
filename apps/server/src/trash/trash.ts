@@ -132,17 +132,18 @@ async function maybeSweep(): Promise<void> {
 
 /**
  * Moves a whole dossier, with its entries, snapshots and planner tasks, to the trash. A
- * connected application names the entries the user was shown when confirming
- * (`seenItemIds`): one added or removed meanwhile refuses the move (409). The
+ * connected application names what the user was shown when confirming (`seen`): the entries,
+ * and how many tasks go with them («e 3 compiti», never their titles; owner, 20 October 2026).
+ * An entry added or removed meanwhile, or another number of tasks, refuses the move (409). The
  * web app's own deletion passes null: whatever the dossier holds goes, and
  * comes back, together (owner, 13 October 2026, question 160).
  */
 export async function trashDossier(
   userId: string,
   dossierId: string,
-  seenItemIds: string[] | null,
+  seen: { itemIds: string[]; taskCount: number } | null,
   by: DeletedBy,
-): Promise<{ trashId: string; itemCount: number }> {
+): Promise<{ trashId: string; itemCount: number; taskCount: number }> {
   await maybeSweep();
   return prisma.$transaction(async (tx) => {
     if (!(await lockDossier(tx, userId, dossierId))) throw new AppError(404, 'Dossier not found');
@@ -161,9 +162,12 @@ export async function trashDossier(
       },
     });
     if (!dossier) throw new AppError(404, 'Dossier not found');
-    const seen = seenItemIds && new Set(seenItemIds);
-    if (seen && (seen.size !== dossier.items.length || dossier.items.some((item) => !seen.has(item.id)))) {
-      throw new AppError(409, 'Il dossier è cambiato dopo la conferma: nulla è stato eliminato.');
+    if (seen) {
+      const seenIds = new Set(seen.itemIds);
+      const sameItems = seenIds.size === dossier.items.length && dossier.items.every((item) => seenIds.has(item.id));
+      if (!sameItems || seen.taskCount !== dossier.tasks.length) {
+        throw new AppError(409, 'Il dossier è cambiato dopo la conferma: nulla è stato eliminato.');
+      }
     }
     const { items, snapshots, publishedCopy, tasks, ...row } = dossier;
     const now = new Date();
@@ -185,7 +189,7 @@ export async function trashDossier(
     });
     // Items, snapshots and tasks cascade with the dossier.
     await tx.dossier.delete({ where: { id: dossier.id } });
-    return { trashId: entry.id, itemCount: items.length };
+    return { trashId: entry.id, itemCount: items.length, taskCount: tasks.length };
   }).catch((error: unknown) => quietly('Dossier trash', error));
 }
 
@@ -352,6 +356,8 @@ type StoredTask = {
   dueTime: string | null;
   recurrence: string | null;
   recurrenceFrom: Prisma.TaskCreateManyInput['recurrenceFrom'];
+  /** Absent in a payload stored before the column: the repetition then counts from the planned date's day. */
+  recurrenceDay?: number | null;
   durationMinutes: number | null;
   assigneeId: string | null;
   origin: Prisma.TaskCreateManyInput['origin'];
@@ -473,6 +479,7 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
               dueTime: dateOrNull(task.dueTime),
               recurrence: task.recurrence,
               recurrenceFrom: task.recurrenceFrom,
+              recurrenceDay: task.recurrenceDay ?? null,
               durationMinutes: task.durationMinutes,
               assigneeId: task.assigneeId ? (assignees.get(task.assigneeId) ?? null) : null,
               origin: task.origin,

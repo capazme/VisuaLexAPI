@@ -289,7 +289,7 @@ export const exportAccountData = async (req: Request, res: Response) => {
       select: {
         id: true, dossierId: true, dossierItemId: true, parentId: true, position: true, title: true, description: true,
         priority: true, labels: true, plannedDate: true, plannedTime: true, dueDate: true, dueTime: true, recurrence: true,
-        recurrenceFrom: true, durationMinutes: true, origin: true, completedAt: true, deletedAt: true, createdAt: true, updatedAt: true,
+        recurrenceFrom: true, recurrenceDay: true, durationMinutes: true, origin: true, completedAt: true, deletedAt: true, createdAt: true, updatedAt: true,
       },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     }),

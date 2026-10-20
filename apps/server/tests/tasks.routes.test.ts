@@ -350,6 +350,37 @@ describe('ticking', () => {
     expect((await prisma.task.findUniqueOrThrow({ where: { id: task.id } })).plannedDate?.toISOString().slice(0, 10)).toBe(addDays(today, 7));
   });
 
+  /** Ticks the task on its own planned date, `count` times, through the service with that day as «today». */
+  async function tickOnTime(userId: string, id: string, count: number): Promise<string[]> {
+    const dates: string[] = [];
+    for (let i = 0; i < count; i += 1) {
+      const planned = (await prisma.task.findUniqueOrThrow({ where: { id } })).plannedDate!.toISOString().slice(0, 10);
+      const { recurred } = await completeTask(userId, id, planned, new Date(`${planned}T10:00:00Z`));
+      dates.push(recurred!.plannedDate);
+    }
+    return dates;
+  }
+
+  it('a monthly 31st is shortened only in the months without it, across ticks and edits', async () => {
+    const user = await createTestUser('tasks-recur-month-end');
+    const task = await created(user, { title: 'Fattura', plannedDate: '2027-01-31', recurrence: RECURRENCE_RULES.monthly });
+    expect(await tickOnTime(user.id, task.id, 2)).toEqual(['2027-02-28', '2027-03-31']);
+    expect(await tickOnTime(user.id, task.id, 1)).toEqual(['2027-04-30']);
+    // The web sends the task back whole, its shortened date unchanged: the 31st stays.
+    const put = (body: Record<string, unknown>) => request(app).put(`/api/tasks/${task.id}`).set(authHeader(user)).send(body);
+    expect((await put({ title: 'Fattura mensile', plannedDate: '2027-04-30', recurrence: RECURRENCE_RULES.monthly, recurrenceFrom: 'pianificata' })).status).toBe(200);
+    expect(await tickOnTime(user.id, task.id, 3)).toEqual(['2027-05-31', '2027-06-30', '2027-07-31']);
+    // A date the user picks is the new day kept.
+    expect((await put({ plannedDate: '2027-08-30' })).status).toBe(200);
+    expect(await tickOnTime(user.id, task.id, 2)).toEqual(['2027-09-30', '2027-10-30']);
+  });
+
+  it('a yearly 29 February is the 28th in common years and the 29th again in a leap year', async () => {
+    const user = await createTestUser('tasks-recur-leap');
+    const task = await created(user, { title: 'Rinnovo', plannedDate: '2028-02-29', recurrence: RECURRENCE_RULES.yearly });
+    expect(await tickOnTime(user.id, task.id, 5)).toEqual(['2029-02-28', '2030-02-28', '2031-02-28', '2032-02-29', '2033-02-28']);
+  });
+
   it('counts the next date from the Rome day of the tick', async () => {
     const user = await createTestUser('tasks-recur-rome');
     const task = await prisma.task.create({

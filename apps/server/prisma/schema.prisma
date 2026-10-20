@@ -1527,6 +1527,9 @@ model Task {
   // An RRULE (RFC 5545) of the closed subset in `tasks/recurrence.ts`; the server computes the next date.
   recurrence      String?
   recurrenceFrom  TaskRecurrenceFrom @default(pianificata) @map("recurrence_from")
+  // The day of the month a monthly or yearly repetition keeps (the planned date's when the rule or
+  // the date was set), so a month without it shortens that occurrence only.
+  recurrenceDay   Int?               @map("recurrence_day") @db.SmallInt
   durationMinutes Int?               @map("duration_minutes")
   assigneeId      String?            @map("assignee_id")
   origin          TaskOrigin         @default(lavoro)
