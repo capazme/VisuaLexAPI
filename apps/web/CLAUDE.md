@@ -70,23 +70,36 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   development mode (below) the address redirects to `/`. `VITE_FEATURE_MERLT`
   and `VITE_FEATURE_MERLT_GRAPH` decide the Sidebar's «Assistente» and «Grafo»
   entries and whether a page says it is unavailable. Outside the layout:
-  `/login` and `/register` (one page, `components/auth/AuthPage`, A1: the colophon beside a card with two
+  `/login` and `/register` (one page, `components/auth/AuthPage`, A1: the colophon — the mark, «VisuaLex»
+  and one sentence — beside a card with two
   tabs, «Accedi» and «Registrati» (`LoginForm`, `RegisterForm`, their shared classes in `authForm.ts` and parts
   in `AuthFormParts.tsx`); one parent route over both addresses, so a change of tab replaces the address — the
   router state that carries the return after the login travels with it — and keeps the page mounted. The tab
   is the page's own state, read from the address when it opens: React Router 7 applies a navigation in a
-  transition, so a tab read from the address would unmount the form leaving for one render. `useAuth` runs
-  once, in the page, and `LoginForm` takes it as a prop: mounted again at each change of tab, a form's own
-  would read the user again (a request per change) and start disabled; its error outlives the form, so an
-  error already on screen when the tab changes is not shown again on the empty form. While a sign-in or a
-  sign-up is on its way the tabs hold still (`aria-disabled`): the form would unmount under its request. A
+  transition, so a tab read from the address would lag one render behind the click. `useAuth` runs
+  once, in the page, and `LoginForm` takes it as a prop. The page holds still across a change of tab (A1b):
+  both forms stay mounted in one cell of a grid, the one not shown `invisible` and `inert`, so the card is as
+  tall as the taller form whichever is open and each form keeps what was typed in it, and its error (after a
+  sign-up, the confirmation stays until the tab changes, and back on «Registrati» a new key mounts the form
+  empty; «Torna ad Accedi» finds a fresh sign-in form too, a new key, with the failure the page's `useAuth`
+  still holds not shown); «Crediti»
+  is the last row of a grid as tall as the window; the page is its own scroller (`h-app`) with
+  `scrollbar-gutter: stable`, so a low window does not shift sideways when a bar appears; on a computer the
+  card's top sits where the card would be centred above the foot, so a form that grows (an error) grows
+  downwards and the tabs never move, and the colophon is centred against the card (text left-aligned; on a
+  phone centred above it), so it follows half of such a growth; its title is 48 px up to `lg` and 68 px from it
+  (between 768 and 1023 px the column beside the card is about 200 px). The register form fits a window 768 px high
+  inside (1366×768, 1470×753 measured as viewports; a 768 px screen with a browser's bars scrolls a little) by
+  its spacing (`space-y-4` between fields, `space-y-1.5` inside one), the sign-in form spaced the same. While a sign-in or a
+  sign-up is on its way the tabs hold still (`aria-disabled`): its answer would land on the hidden form. A
   return address that is the page itself (`isLoginPage` in `utils/returnTo.ts`, either tab) goes to `/`
-  instead, or the entrance would stay on screen. The columns are anchored at the top, not centred: the
-  card's height changes with the tab, and a centred page moved as a whole. Each form has a visually hidden
+  instead, or the entrance would stay on screen. Each form has a visually hidden
   `h2` («Accedi», «Registrati»), the tab being its heading on screen. A click or the link under a form puts
   the cursor in the new form's first field (once it is enabled), the arrows keep it on the tabs; the mark
-  slides by `transform`, the form leaving fades, the next comes in from the side of its tab, the card's height
-  follows, and under reduced motion the change is immediate; the wait for approval after signing up is drawn
+  slides by `transform`, the form leaving fades (its `visibility` follows at the end of the fade; the form
+  coming in has no transition, which would hold it hidden for a frame and lose the focus sent to its first
+  field), the next comes in from the side of its tab, and under reduced motion the change is immediate; the wait for approval
+  after signing up is drawn
   in the same card), `/crediti` (public, below), `/connect` (the consent page an MCP client's
   authorization request lands on: signed in, the user approves or refuses) and
   `/admin/*` (admins only).

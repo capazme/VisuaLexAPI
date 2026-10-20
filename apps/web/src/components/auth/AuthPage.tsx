@@ -4,16 +4,20 @@
  * on — `/login` or `/register` — and a change of tab replaces it, keeping the router state the return
  * after the login reads (`utils/returnTo`), so the page never reloads and the history does not grow.
  * The tab is the page's own state and the address follows it: React Router 7 applies a navigation in
- * a transition, a render after the page's own update, so a tab read from the address would let the
- * form leaving unmount for one render (and lose what was typed in it) on a quick change back. Nothing
+ * a transition, a render after the page's own update, so a tab read from the address would lag one
+ * render behind the click (the form leaving shown again for a frame on a quick change back). Nothing
  * in the app navigates between the two addresses while the page is open; something that did would
  * have to change the tab as well.
  *
- * The motion, once per change of tab: the mark under the tabs slides (`transform`, 200 ms), the form
- * leaving fades (120 ms) while the one coming in fades from 8 px on the side of its tab (180 ms), and
- * the card's height follows (200 ms). Under reduced motion the change is immediate.
+ * The page holds still across a change of tab (A1b): both forms stay mounted in one cell of a grid, the
+ * one not shown hidden by `visibility`, so the card is as tall as the taller of the two whichever is
+ * open; «Crediti» is the last row of a grid as tall as the window; and the page scrolls in its own
+ * box with `scrollbar-gutter: stable`, so a window too low for it does not shift sideways when a bar
+ * appears. The motion, once per change of tab: the mark under the tabs slides (`transform`, 200 ms),
+ * the form leaving fades (120 ms) while the one coming in fades from 8 px on the side of its tab
+ * (180 ms). Under reduced motion the change is immediate.
  */
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { BookOpen } from 'lucide-react';
 import { BookMark } from '../ui/BookMark';
@@ -30,11 +34,6 @@ const TABS: { id: AuthTab; label: string; path: string }[] = [
   { id: 'login', label: 'Accedi', path: '/login' },
   { id: 'register', label: 'Registrati', path: '/register' },
 ];
-
-/** How long the form leaving stays (its fade, 120 ms, and a frame). */
-const EXIT_MS = 140;
-/** How long the card's height is held while it moves (200 ms, and a frame). */
-const HEIGHT_MS = 220;
 
 // Entering the app (spec §6.3.1): once per session the book traces itself, then the app comes in.
 const ENTRY_MS = 720;
@@ -57,38 +56,36 @@ export function AuthPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const [tab, setTab] = useState<AuthTab>(() => authPageTab(location.pathname) ?? 'login');
-  // Once for the page: each change of tab mounts the sign-in form again, which would read the user
-  // again (a request per change) and start disabled until the answer.
+  // Read by the page, which passes it to the sign-in form.
   const auth = useAuth();
-  // Its error outlives the sign-in form, which a change of tab mounts again empty: an error already on
-  // screen when the tab changes is not shown again (a new failure is the form's own message).
-  const [staleError, setStaleError] = useState<string | null>(null);
-  const loginAuth = { login: auth.login, loading: auth.loading, error: auth.error === staleError ? null : auth.error };
-  // A request in flight (a sign-in, a sign-up): the tabs hold still, or the form would unmount under it
-  // (an account created with no word of the approval it waits for; a sign-in landing from «Registrati»).
+  // A request in flight (a sign-in, a sign-up): the tabs hold still, or its answer would land on the
+  // hidden form (an account created with no word of the approval it waits for; a sign-in landing from
+  // «Registrati»).
   const [busy, setBusy] = useState(false);
+  // An account created: the confirmation stays in the card until the tab changes; back on «Registrati»
+  // the form starts again empty (it stays mounted, so a new key mounts it afresh).
+  const [signedUp, setSignedUp] = useState(false);
+  const [registerKey, setRegisterKey] = useState(0);
+  // And «Torna ad Accedi» finds a fresh sign-in form: a new key empties it, and the failure the page's
+  // `useAuth` still holds (until the next sign-in) is not shown on it. A new failure is the form's own
+  // message, so hiding the same words again loses nothing.
+  const [loginKey, setLoginKey] = useState(0);
+  const [spentError, setSpentError] = useState<string | null>(null);
+  const loginAuth = { login: auth.login, loading: auth.loading, error: auth.error === spentError ? null : auth.error };
+  const onRegistered = () => {
+    setSignedUp(true);
+    setLoginKey((k) => k + 1);
+    setSpentError(auth.error);
+  };
 
   const [entering, setEntering] = useState(false);
-  // The form fading out, and whether the last change of tab moves at all (not on the first paint,
-  // not under reduced motion).
-  const [leaving, setLeaving] = useState<AuthTab | null>(null);
+  // Whether the last change of tab moves at all (not on the first paint, not under reduced motion).
   const [animated, setAnimated] = useState(false);
 
   const frameRef = useRef<HTMLDivElement>(null);
   const tabRefs = useRef<Record<AuthTab, HTMLButtonElement | null>>({ login: null, register: null });
-  const heightFrom = useRef<number | null>(null);
   const focusFirstField = useRef(false);
   const pendingFocus = useRef<HTMLInputElement | null>(null);
-  const exitTimer = useRef<number | undefined>(undefined);
-  const heightTimer = useRef<number | undefined>(undefined);
-
-  useEffect(
-    () => () => {
-      window.clearTimeout(exitTimer.current);
-      window.clearTimeout(heightTimer.current);
-    },
-    [],
-  );
 
   const firstField = (id: AuthTab) => frameRef.current?.querySelector<HTMLInputElement>(`#auth-panel-${id} input`) ?? null;
 
@@ -100,55 +97,22 @@ export function AuthPage() {
     }
   });
 
-  const releaseHeight = () => {
-    window.clearTimeout(heightTimer.current);
-    const frame = frameRef.current;
-    if (!frame) return;
-    frame.style.height = '';
-    frame.style.overflow = '';
-  };
-
   const switchTo = (next: AuthTab, focus: 'field' | 'tab') => {
     if (busy) return;
     if (next === tab) {
       if (focus === 'field') focusField(firstField(tab), pendingFocus);
       return;
     }
-    const still = prefersReducedMotion();
-    window.clearTimeout(exitTimer.current);
-    if (still) {
-      setLeaving(null);
-      releaseHeight();
-    } else {
-      // The height the card has now, mid-way through a previous change included.
-      heightFrom.current = frameRef.current?.getBoundingClientRect().height ?? null;
-      setLeaving(tab);
-      exitTimer.current = window.setTimeout(() => setLeaving(null), EXIT_MS);
+    setAnimated(!prefersReducedMotion());
+    if (next === 'register' && signedUp) {
+      setSignedUp(false);
+      setRegisterKey((k) => k + 1);
     }
-    setAnimated(!still);
-    setStaleError(auth.error);
     setTab(next);
     focusFirstField.current = focus === 'field';
     const target = TABS.find((t) => t.id === next)!.path;
     navigate({ pathname: target, search: location.search, hash: location.hash }, { replace: true, state: location.state });
   };
-
-  // The card's height, from the form that left to the one that came: held at the old value, then
-  // moved to the new one, then let go (`auto`), so a form that grows later (an error) is not clipped.
-  useLayoutEffect(() => {
-    const frame = frameRef.current;
-    const from = heightFrom.current;
-    heightFrom.current = null;
-    if (!frame || from === null) return;
-    const panel = frame.querySelector<HTMLElement>(`#auth-panel-${tab}`);
-    if (!panel) return;
-    window.clearTimeout(heightTimer.current);
-    frame.style.overflow = 'hidden';
-    frame.style.height = `${from}px`;
-    frame.getBoundingClientRect(); // commit the old height before moving to the new one
-    frame.style.height = `${panel.offsetHeight}px`;
-    heightTimer.current = window.setTimeout(releaseHeight, HEIGHT_MS);
-  }, [tab]);
 
   // A change by a click or by the link under a form puts the cursor in the new form's first field;
   // by the arrows the focus stays on the tab, so the arrows keep working.
@@ -187,108 +151,131 @@ export function AuthPage() {
   }
 
   return (
-    <div className="min-h-dvh bg-slate-50 dark:bg-slate-950 flex flex-col px-4 py-10 md:px-10">
-      {/* Anchored at the top, not centred: the card's height changes with the tab, and a centred page
-          would move as a whole (about 90 px at 1920 px), the clicked tab running from the pointer. */}
-      <div className="mx-auto grid w-full max-w-5xl items-start gap-12 md:mt-16 md:grid-cols-[minmax(0,1fr)_420px] md:gap-16">
-        <header className="space-y-5">
-          <BookOpen aria-hidden="true" size={44} strokeWidth={1.5} className="text-primary-600 dark:text-primary-400" />
-          <h1 className="font-serif text-5xl font-medium tracking-tight text-slate-900 dark:text-slate-50 md:text-6xl">
-            VisuaLex
-          </h1>
-          <p className="max-w-[34ch] font-serif text-xl leading-relaxed text-slate-600 dark:text-slate-300">
-            Le norme italiane ed europee, le sentenze che le leggono, e il tuo lavoro sopra: note, evidenziazioni, dossier.
-          </p>
-          <ul className="space-y-1.5 text-sm text-slate-500 dark:text-slate-400">
-            <li>Normattiva · EUR-Lex</li>
-            <li>Cassazione · Corte costituzionale · Corte di giustizia</li>
-            <li>Pratiche, dossier e schede di ripasso</li>
-          </ul>
-        </header>
+    // The page is its own scroller, so the gutter it keeps for a bar is its own: a window too low for
+    // the card scrolls without the page moving sideways.
+    <div className="h-app overflow-y-auto bg-slate-50 [scrollbar-gutter:stable] dark:bg-slate-950">
+      <div className="grid min-h-full grid-rows-[1fr_auto] px-4 md:px-10">
+        {/* On a computer the card's top sits where the card would be centred above «Crediti» (40 rem:
+            the card, about 36 rem, and the foot): a card that grows (an error, the password's strength)
+            grows downwards, and the tabs never move; the colophon, centred against the card, follows
+            half of it. */}
+        <div className="pb-6 pt-8 md:pt-[max(1.5rem,calc((100dvh-40rem)/2))]">
+          <div className="mx-auto grid w-full max-w-4xl gap-8 md:grid-cols-[minmax(0,1fr)_420px] md:items-center md:gap-16">
+            {/* The title grows only from `lg`: between 768 and 1023 px the column beside the card is about
+                200-430 px, and «VisuaLex» at 68 px is 272 px wide. */}
+            <header className="flex flex-col items-center gap-4 text-center md:items-start md:gap-5 md:text-left">
+              <BookOpen aria-hidden="true" size={44} strokeWidth={1.5} className="text-primary-600 dark:text-primary-400" />
+              <h1 className="font-serif text-5xl font-medium leading-none tracking-tight text-slate-900 dark:text-slate-50 lg:text-[4.25rem]">
+                VisuaLex
+              </h1>
+              <p className="max-w-[34ch] font-serif text-xl leading-relaxed text-slate-600 dark:text-slate-300">
+                Le norme italiane ed europee, le sentenze che le leggono, e il tuo lavoro sopra: note, evidenziazioni, dossier.
+              </p>
+            </header>
 
-        <main className="min-w-0 rounded-2xl border border-slate-200 bg-white p-6 shadow-lg sm:p-8 md:p-10 dark:border-slate-800 dark:bg-slate-900">
-          <div
-            role="tablist"
-            aria-label="Accedi o registrati"
-            onKeyDown={onTabKeyDown}
-            className="relative mb-7 flex border-b border-slate-200 dark:border-slate-800"
+            <main className="min-w-0 rounded-2xl border border-slate-200 bg-white p-6 shadow-lg sm:p-8 dark:border-slate-800 dark:bg-slate-900">
+              <div
+                role="tablist"
+                aria-label="Accedi o registrati"
+                onKeyDown={onTabKeyDown}
+                className="relative mb-6 flex border-b border-slate-200 dark:border-slate-800"
+              >
+                {TABS.map((t) => {
+                  const selected = t.id === tab;
+                  return (
+                    <button
+                      key={t.id}
+                      ref={(el) => {
+                        tabRefs.current[t.id] = el;
+                      }}
+                      type="button"
+                      role="tab"
+                      id={`auth-tab-${t.id}`}
+                      aria-selected={selected}
+                      aria-controls={`auth-panel-${t.id}`}
+                      tabIndex={selected ? 0 : -1}
+                      aria-disabled={busy || undefined}
+                      onClick={() => switchTo(t.id, 'field')}
+                      className={`min-h-[44px] flex-1 rounded-t-md px-2 pb-3 pt-1 font-serif text-2xl font-medium transition-colors aria-disabled:cursor-not-allowed ${
+                        selected
+                          ? 'text-slate-900 dark:text-slate-50'
+                          : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100'
+                      } ${FOCUS_RING}`}
+                    >
+                      {t.label}
+                    </button>
+                  );
+                })}
+                <span
+                  aria-hidden="true"
+                  data-testid="auth-tab-mark"
+                  className="pointer-events-none absolute -bottom-px left-0 h-0.5 w-1/2 rounded-full bg-primary-600 transition-transform duration-200 ease-out motion-reduce:transition-none dark:bg-primary-400"
+                  style={{ transform: tab === 'register' ? 'translateX(100%)' : 'translateX(0)' }}
+                />
+              </div>
+
+              {/* Both forms in one cell: the card is as tall as the taller, whichever is shown. The one
+                  hidden keeps what was typed in it, fades out (its `visibility` follows at the end of
+                  the fade) and is out of reach meanwhile (`inert`). The panels' 8 px padding keeps the
+                  fields' focus rings, and the 8 px a form comes in from, inside the card. */}
+              <div ref={frameRef} className="-m-2 grid">
+                {TABS.map((t) => {
+                  const shown = t.id === tab;
+                  const enterFrom = t.id === 'register' ? 'slide-in-from-right-2' : 'slide-in-from-left-2';
+                  return (
+                    <div
+                      key={t.id}
+                      id={`auth-panel-${t.id}`}
+                      role="tabpanel"
+                      aria-labelledby={`auth-tab-${t.id}`}
+                      aria-hidden={!shown || undefined}
+                      inert={!shown}
+                      // The fade is on the way out only: a transition on the way in would hold the panel's
+                      // `visibility` at hidden for its first frame, and the focus sent to its first field
+                      // would be lost.
+                      className={`col-start-1 row-start-1 p-2 ${
+                        shown
+                          ? animated
+                            ? `animate-in fade-in ${enterFrom}`
+                            : ''
+                          : 'pointer-events-none invisible opacity-0 transition-[opacity,visibility] duration-[120ms] ease-out motion-reduce:transition-none'
+                      }`}
+                    >
+                      {t.id === 'login' ? (
+                        <LoginForm
+                          key={loginKey}
+                          auth={loginAuth}
+                          onBusy={setBusy}
+                          onSignedIn={onSignedIn}
+                          onSwitch={() => switchTo('register', 'field')}
+                        />
+                      ) : (
+                        <RegisterForm
+                          key={registerKey}
+                          onBusy={setBusy}
+                          onRegistered={onRegistered}
+                          onSwitch={() => switchTo('login', 'field')}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </main>
+          </div>
+        </div>
+
+        {/* The sources' attributions, readable before signing in: the grid's last row, at the foot of
+            the window whatever the tab. */}
+        <footer className="mx-auto w-full max-w-4xl pb-4 text-sm text-slate-600 dark:text-slate-400">
+          <Link
+            to="/crediti"
+            className={`-ml-2 inline-flex min-h-[44px] items-center rounded-md px-2 hover:text-slate-900 hover:underline dark:hover:text-slate-100 ${FOCUS_RING}`}
           >
-            {TABS.map((t) => {
-              const selected = t.id === tab;
-              return (
-                <button
-                  key={t.id}
-                  ref={(el) => {
-                    tabRefs.current[t.id] = el;
-                  }}
-                  type="button"
-                  role="tab"
-                  id={`auth-tab-${t.id}`}
-                  aria-selected={selected}
-                  aria-controls={selected ? `auth-panel-${t.id}` : undefined}
-                  tabIndex={selected ? 0 : -1}
-                  aria-disabled={busy || undefined}
-                  onClick={() => switchTo(t.id, 'field')}
-                  className={`min-h-[44px] flex-1 rounded-t-md px-2 pb-3 pt-1 font-serif text-2xl font-medium transition-colors aria-disabled:cursor-not-allowed ${
-                    selected
-                      ? 'text-slate-900 dark:text-slate-50'
-                      : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100'
-                  } ${FOCUS_RING}`}
-                >
-                  {t.label}
-                </button>
-              );
-            })}
-            <span
-              aria-hidden="true"
-              data-testid="auth-tab-mark"
-              className="pointer-events-none absolute -bottom-px left-0 h-0.5 w-1/2 rounded-full bg-primary-600 transition-transform duration-200 ease-out dark:bg-primary-400"
-              style={{ transform: tab === 'register' ? 'translateX(100%)' : 'translateX(0)' }}
-            />
-          </div>
-
-          {/* The frame clips only while its height moves; the panels' 8 px padding keeps the fields'
-              focus rings, and the 8 px a form comes in from, inside it. */}
-          <div ref={frameRef} className="relative -m-2 transition-[height] duration-200 ease-out">
-            {TABS.filter((t) => t.id === tab || t.id === leaving).map((t) => {
-              const isLeaving = t.id !== tab;
-              const enterFrom = t.id === 'register' ? 'slide-in-from-right-2' : 'slide-in-from-left-2';
-              return (
-                <div
-                  key={t.id}
-                  id={`auth-panel-${t.id}`}
-                  role="tabpanel"
-                  aria-labelledby={`auth-tab-${t.id}`}
-                  aria-hidden={isLeaving || undefined}
-                  inert={isLeaving}
-                  data-leaving={isLeaving || undefined}
-                  className={
-                    isLeaving
-                      ? 'pointer-events-none absolute inset-x-0 top-0 p-2 opacity-0 transition-opacity duration-[120ms] ease-out'
-                      : `p-2 ${animated ? `animate-in fade-in ${enterFrom}` : ''}`
-                  }
-                >
-                  {t.id === 'login' ? (
-                    <LoginForm auth={loginAuth} onBusy={setBusy} onSignedIn={onSignedIn} onSwitch={() => switchTo('register', 'field')} />
-                  ) : (
-                    <RegisterForm onBusy={setBusy} onSwitch={() => switchTo('login', 'field')} />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </main>
+            Crediti
+          </Link>
+        </footer>
       </div>
-
-      {/* The sources' attributions, readable before signing in. */}
-      <footer className="mx-auto mt-auto w-full max-w-5xl pt-10 text-sm text-slate-600 dark:text-slate-400">
-        <Link
-          to="/crediti"
-          className={`-ml-2 inline-flex min-h-[44px] items-center rounded-md px-2 hover:text-slate-900 hover:underline dark:hover:text-slate-100 ${FOCUS_RING}`}
-        >
-          Crediti
-        </Link>
-      </footer>
     </div>
   );
 }

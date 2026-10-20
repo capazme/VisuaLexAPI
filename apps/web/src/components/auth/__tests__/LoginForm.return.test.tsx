@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 
 const login = vi.fn();
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ login, loading: false, error: null }) }));
@@ -8,8 +8,10 @@ import { renderAuth } from './renderAuth';
 
 function renderLogin(state?: unknown) {
   renderAuth({ pathname: '/login', state });
-  fireEvent.change(screen.getByPlaceholderText('nome@studio.it'), { target: { value: 'a@b.it' } });
-  fireEvent.change(screen.getByPlaceholderText('••••••••'), { target: { value: 'pw' } });
+  // The form on screen: the sign-up form stays mounted beside it, hidden.
+  const form = within(screen.getByRole('tabpanel'));
+  fireEvent.change(form.getByPlaceholderText('nome@studio.it'), { target: { value: 'a@b.it' } });
+  fireEvent.change(form.getByPlaceholderText('••••••••'), { target: { value: 'pw' } });
   fireEvent.click(screen.getByRole('button', { name: /^accedi$/i }));
 }
 
