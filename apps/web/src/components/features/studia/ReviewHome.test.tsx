@@ -53,6 +53,7 @@ function renderHome() {
       <Routes>
         <Route path="/studia/ripasso" element={<ReviewHome />} />
         <Route path="/studia/ripasso/sessione" element={<Where />} />
+        <Route path="/studia/progressi" element={<Where />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -91,25 +92,18 @@ describe('ReviewHome', () => {
     expect(screen.getByTestId('where').textContent).not.toContain('materia');
   });
 
-  it('draws the statistics: the cards by state as three numbers, and «Il tuo mese» opens the calendar and the coming days', async () => {
+  it('draws the statistics: the cards by state as three numbers, and «Tutti i progressi» leads to the page of the data', async () => {
     progress.mockResolvedValue(answer(3, 0));
     renderHome();
     const band = await screen.findByRole('region', { name: 'I tuoi progressi' });
     const numbers = within(band).getAllByRole('definition').map((dd) => dd.textContent);
     expect(numbers).toEqual(['3', '5', '2']);
     expect(within(band).getAllByRole('term').map((dt) => dt.textContent)).toEqual(['Nuove', 'In apprendimento', 'Consolidate']);
-    // The long calendar and the coming days are not on the page.
-    expect(screen.queryByRole('heading', { name: 'Attività' })).toBeNull();
-    const month = within(band).getByRole('button', { name: 'Il tuo mese' });
-    expect(month).toHaveAttribute('aria-expanded', 'false');
-    const user = userEvent.setup();
-    await user.click(month);
-    const sheet = screen.getByRole('dialog', { name: 'Il tuo mese' });
-    for (const heading of ['Attività', 'Prossimi 14 giorni']) {
-      expect(within(sheet).getByRole('heading', { name: heading })).toBeInTheDocument();
-    }
-    // It holds nothing typed: Esc closes it.
-    await user.keyboard('{Escape}');
+    // The long calendar and the coming days live on /studia/progressi (G3): no sheet repeats them here.
+    expect(screen.queryByRole('heading', { name: 'Il tuo calendario' })).toBeNull();
+    expect(within(band).queryByRole('button', { name: 'Il tuo mese' })).toBeNull();
+    await userEvent.setup().click(within(band).getByRole('link', { name: 'Tutti i progressi' }));
+    expect(screen.getByTestId('where')).toHaveTextContent('/studia/progressi');
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
@@ -724,16 +718,15 @@ describe('ReviewHome', () => {
   });
 
   describe('the statistics (Gymnasium spec §5.1)', () => {
-    it('opens «Il tuo mese» on the subject chosen', async () => {
+    it('leaves the subject chosen for «Progressi» to open on: one choice for the area', async () => {
       progress.mockResolvedValue(answer(5, 5));
       renderHome();
       await screen.findByText('Oggi: 5 da ripassare, 5 nuove');
       progress.mockResolvedValue(answer(2, 3));
-      const user = userEvent.setup();
-      await user.click(within(screen.getByRole('group', { name: 'Materia' })).getByRole('button', { name: 'Diritto penale' }));
+      await userEvent.setup().click(within(screen.getByRole('group', { name: 'Materia' })).getByRole('button', { name: 'Diritto penale' }));
       await screen.findByText('Oggi in Diritto penale: 2 da ripassare, 3 nuove');
-      await user.click(screen.getByRole('button', { name: 'Il tuo mese' }));
-      expect(within(screen.getByRole('dialog', { name: 'Il tuo mese' })).getByText('In Diritto penale.')).toBeInTheDocument();
+      expect(localStorage.getItem(STORAGE_KEY)).toBe('DIRITTO_PENALE');
+      expect(screen.getByRole('link', { name: 'Tutti i progressi' })).toHaveAttribute('href', '/studia/progressi');
     });
 
     it('draws the current week, Monday to Sunday, with its seven letters', async () => {

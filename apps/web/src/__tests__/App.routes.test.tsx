@@ -181,6 +181,14 @@ describe('App routing — Studia', () => {
     expect(screen.queryByRole('heading', { level: 1, name: 'Gymnasium: la tua palestra giuridica' })).toBeNull();
   });
 
+  it('opens «Progressi» at /studia/progressi, inside the area, under its heading (Gymnasium spec §5.3)', async () => {
+    renderAt('/studia/progressi');
+    expect(await screen.findByRole('heading', { level: 2, name: 'I tuoi progressi' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Gymnasium: la tua palestra giuridica' })).toBeInTheDocument();
+    // The read is mocked to fail here: the page says so.
+    expect(await screen.findByText('Non riesco a leggere i tuoi progressi.')).toBeInTheDocument();
+  });
+
   it('keeps a card’s address inside the Studia area', async () => {
     renderAt('/studia/schede/k1');
     expect(await screen.findByRole('heading', { name: 'Le mie schede' })).toBeInTheDocument();

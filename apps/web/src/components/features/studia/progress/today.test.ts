@@ -27,6 +27,8 @@ describe('the road\'s order (Gymnasium spec §5.2, as corrected)', () => {
   it('says the three states in words, singular and plural', () => {
     expect(stopStates(stop('DIRITTO_CIVILE', 1, 5, 1))).toBe('1 nuova · 5 in apprendimento · 1 consolidata');
     expect(stopStates(stop('DIRITTO_CIVILE', 300, 0, 412))).toBe('300 nuove · 0 in apprendimento · 412 consolidate');
+    // Five digits grouped, as everywhere on the progress pages; four stay whole, as Italian writes them.
+    expect(stopStates(stop('DIRITTO_CIVILE', 9999, 12345, 0))).toBe('9999 nuove · 12.345 in apprendimento · 0 consolidate');
   });
 });
 

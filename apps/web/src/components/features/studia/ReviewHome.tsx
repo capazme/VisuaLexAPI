@@ -7,44 +7,22 @@ import type { StudiaOutletContext } from './StudiaPage';
 import { MissionList } from './missions/MissionList';
 import { TodayMissions } from './missions/TodayMissions';
 import { ConfettiBurst } from './progress/Celebration';
-import { MonthSheet } from './progress/MonthSheet';
 import { StatsBand } from './progress/StatsBand';
 import { StudySettingsSheet } from './progress/StudySettings';
 import { SubjectChips } from './progress/SubjectChips';
 import { SubjectRoad, SubjectRoadSkeleton, SubjectRoadUnread } from './progress/SubjectRoad';
+import { rememberedMateria, rememberMateria } from './progress/rememberedSubject';
 import { useCelebratedToday } from './progress/useCelebratedToday';
 import { usePercorso } from './progress/usePercorso';
 import { useProgress } from './progress/useProgress';
-import { BLOCK_HEADING, subjectHue } from './progress/tokens';
-
-const STORAGE_KEY = 'visualex.studia.ripasso.materia';
-const MATERIE = Object.keys(MATERIA_LABEL) as Materia[];
-
-/** The subject last chosen on this browser; a missing, unreadable or unknown value is «all subjects». */
-function rememberedMateria(): Materia | undefined {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return MATERIE.find((materia) => materia === stored);
-  } catch {
-    return undefined;
-  }
-}
-
-function rememberMateria(materia: Materia | undefined): void {
-  try {
-    if (materia) localStorage.setItem(STORAGE_KEY, materia);
-    else localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    // Private mode or a full store: the choice lasts for this visit only.
-  }
-}
+import { BLOCK_HEADING } from './progress/tokens';
 
 /**
  * «Oggi», Gymnasium's home (Gymnasium spec §5.1), in the order the owner fixed: today's missions (the first carries
- * «Inizia»), the statistics (streak, goal, the current week, the cards by state; «Il tuo mese» in a sheet), the full
- * list of missions, then «Cosa ripassi» (the subject chips) and the road. The missions and the statistics are the
- * whole day's (`useProgress(undefined)`); a subject chosen narrows the first mission's action, the session it starts
- * and «Il tuo mese», through a second read made only while one is chosen. The road's institutes and the cards due by
+ * «Inizia»), the statistics (streak, goal, the current week, the cards by state; «Tutti i progressi» leads to
+ * `/studia/progressi`), the full list of missions, then «Cosa ripassi» (the subject chips) and the road. The missions
+ * and the statistics are the whole day's (`useProgress(undefined)`); a subject chosen narrows the first mission's
+ * action and the session it starts, through a second read made only while one is chosen. The road's institutes and the cards due by
  * subject come from a third, `usePercorso` (G5), on which nothing above the road waits. The server decides what
  * «today» is.
  */
@@ -57,7 +35,7 @@ export function ReviewHome() {
   const percorso = usePercorso();
   const action = materia ? narrowed : day;
   const data = day.data;
-  const [sheet, setSheet] = useState<'settings' | 'month' | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const stampRef = useRef<HTMLDivElement>(null);
   const { celebratedBefore, markCelebrated } = useCelebratedToday();
   // The day whose burst has run its course on this page.
@@ -96,17 +74,15 @@ export function ReviewHome() {
           subject={subject}
           onAllSubjects={() => choose(undefined)}
           onStart={start}
-          onOpenSettings={() => setSheet('settings')}
+          onOpenSettings={() => setSettingsOpen(true)}
           celebrate={celebrate}
           stampRef={stampRef}
         />
         <StatsBand
           data={data}
           loading={loading && data === null}
-          settingsOpen={sheet === 'settings'}
-          onOpenSettings={() => setSheet('settings')}
-          monthOpen={sheet === 'month'}
-          onOpenMonth={() => setSheet('month')}
+          settingsOpen={settingsOpen}
+          onOpenSettings={() => setSettingsOpen(true)}
           celebrate={celebrate}
         />
         {celebrate && data && (
@@ -133,16 +109,7 @@ export function ReviewHome() {
         )}
       </div>
 
-      {sheet === 'settings' && <StudySettingsSheet onClose={() => setSheet(null)} onChanged={reload} />}
-      {/* The subject's read, once it has answered; the day's until then. */}
-      {sheet === 'month' && (action.data ?? data) && (
-        <MonthSheet
-          data={(action.data ?? data)!}
-          subject={action.data ? subject : undefined}
-          hue={materia && action.data ? subjectHue(materia) : undefined}
-          onClose={() => setSheet(null)}
-        />
-      )}
+      {settingsOpen && <StudySettingsSheet onClose={() => setSettingsOpen(false)} onChanged={reload} />}
     </section>
   );
 }
