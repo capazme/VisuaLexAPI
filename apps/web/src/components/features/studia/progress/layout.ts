@@ -24,7 +24,6 @@ export function weekday(day: string): number {
 
 const longDay = new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
 const shortDay = new Intl.DateTimeFormat('it-IT', { weekday: 'short', day: 'numeric', timeZone: 'UTC' });
-const shortMonth = new Intl.DateTimeFormat('it-IT', { month: 'short', timeZone: 'UTC' });
 const dayMonth = new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 
 /** «martedì 7 ottobre». */
@@ -81,46 +80,6 @@ export interface CalendarCell {
   row: number;
 }
 
-export interface CalendarGrid {
-  cells: CalendarCell[];
-  /** The rest of this week after today, drawn as days to come: never chosen, never counted. */
-  future: CalendarCell[];
-  columns: number;
-  /** A month's short name over the first column that starts in it. */
-  months: { column: number; label: string }[];
-  /** The most reviews in a day of the grid (0 when none). */
-  max: number;
-}
-
-/**
- * The activity calendar: `weeks` columns, Monday on top, the last column ending today. The first
- * column starts on the Monday `weeks - 1` weeks before this week's, as the server's calendar does.
- */
-export function calendarGrid(days: GiornoAttivita[], today: string, weeks: number): CalendarGrid {
-  const byDay = new Map(days.map((d) => [d.giorno, d]));
-  const start = addDays(today, -weekday(today) - (weeks - 1) * 7);
-  const cells: CalendarCell[] = [];
-  const months: CalendarGrid['months'] = [];
-  let max = 0;
-  let index = 0;
-  for (let giorno = start; giorno <= today; giorno = addDays(giorno, 1), index += 1) {
-    const column = Math.floor(index / 7);
-    const day = byDay.get(giorno) ?? null;
-    if (day) max = Math.max(max, day.ripassi);
-    cells.push({ giorno, day, column, row: index % 7 });
-    if (index % 7 === 0) {
-      const label = shortMonth.format(dayDate(giorno));
-      if (months.length === 0 || months[months.length - 1].label !== label) months.push({ column, label });
-    }
-  }
-  // The first column's label is dropped when the next one starts a month: the two would overlap.
-  if (months.length > 1 && months[1].column === 1) months.shift();
-  const last = cells[cells.length - 1];
-  const future: CalendarCell[] = [];
-  for (let row = last.row + 1; row < 7; row += 1) future.push({ giorno: addDays(today, row - last.row), day: null, column: last.column, row });
-  return { cells, future, columns: Math.ceil(cells.length / 7), months, max };
-}
-
 /**
  * A day of the calendar as the legend names it (Gymnasium spec §5.3): `fatto` the day counted, `riposo` a rest that
  * kept the streak, `saltato` a past day that did not count, `oggi` still open, `futuro` to come, and `vuoto` a day
@@ -171,12 +130,6 @@ export function describeDay(cell: CalendarCell, today: string, firstDay?: string
   else if (missed) parts.push('obiettivo non raggiunto');
   if (day.riposo) parts.push('giorno di riposo, la serie regge');
   return `${name}: ${parts.join(', ')}`;
-}
-
-/** 0 for no review, else 1–4 by the share of the busiest day. */
-export function heatLevel(count: number, max: number): 0 | 1 | 2 | 3 | 4 {
-  if (count <= 0 || max <= 0) return 0;
-  return Math.min(4, Math.max(1, Math.ceil((4 * count) / max))) as 1 | 2 | 3 | 4;
 }
 
 /** A round top for a bar chart's scale, at least 5: 7 → 10, 23 → 25, 140 → 150. */

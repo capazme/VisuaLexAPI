@@ -269,7 +269,7 @@ describe('the Inchiostro palette', () => {
     expect(ratio(linear('ink-400'), linear('ink-900'))).toBeGreaterThanOrEqual(4.5);
   });
 
-  it('keeps the marks and labels of Gymnasium\'s «Progressi» apart from what they sit on (ActivityCalendar, DueForecast)', () => {
+  it('keeps the marks and labels of Gymnasium\'s «Progressi» apart from what they sit on (ReviewTrend, DueForecast)', () => {
     const source = readFileSync(CSS_PATH, 'utf8') + readFileSync(resolve(process.cwd(), 'node_modules/tailwindcss/theme.css'), 'utf8');
     // `primary-*` and `slate-*` are aliases (`var(--color-toga-*)`, `var(--color-ink-*)`): followed to the value.
     const linear = (name: string): number[] => {
@@ -294,18 +294,15 @@ describe('the Inchiostro palette', () => {
       return (hi + 0.05) / (lo + 0.05);
     };
     const white = [1, 1, 1];
-    // A day's mark (the dot, the dash) is ink on the calendar's pale steps (HEAT_FILL 0–2) and the ground's colour on
-    // the deep ones (3–4): 3:1, a graphic that carries the day's state (WCAG 1.4.11).
-    for (const step of ['ink-100', 'primary-200', 'primary-400']) expect(ratio(linear('primary-900'), linear(step)), step).toBeGreaterThanOrEqual(3);
-    for (const step of ['primary-600', 'primary-900']) expect(ratio(white, linear(step)), step).toBeGreaterThanOrEqual(3);
-    for (const step of ['ink-800', 'primary-900', 'primary-700']) expect(ratio(linear('primary-300'), linear(step)), step).toBeGreaterThanOrEqual(3);
-    // On a subject's hue the ink mark sits on a rim of the tile's ground (white; dark: slate 900), whatever the hue.
-    expect(ratio(linear('primary-900'), white)).toBeGreaterThanOrEqual(3);
-    expect(ratio(linear('primary-300'), linear('ink-900'))).toBeGreaterThanOrEqual(3);
-    for (const step of ['primary-500', 'primary-300']) expect(ratio(linear('ink-900'), linear(step)), step).toBeGreaterThanOrEqual(3);
-    // The days to come and a day with nothing due, dotted on the tile (white; dark: slate 900).
+    // The trend's line and its cursor's dot on the tile (white; dark: slate 900): 3:1, a graphic (WCAG 1.4.11) (G7).
+    expect(ratio(linear('primary-600'), white)).toBeGreaterThanOrEqual(3);
+    expect(ratio(linear('primary-400'), linear('ink-900'))).toBeGreaterThanOrEqual(3);
+    // The goal's dashed line, the ticks of the days not done, and a day with nothing due, on the tile.
     expect(ratio(linear('ink-500'), white)).toBeGreaterThanOrEqual(3);
     expect(ratio(linear('ink-400'), linear('ink-900'))).toBeGreaterThanOrEqual(3);
+    // The bars of the coming days, ink on the tile.
+    expect(ratio(linear('primary-900'), white)).toBeGreaterThanOrEqual(3);
+    expect(ratio(linear('primary-300'), linear('ink-900'))).toBeGreaterThanOrEqual(3);
     // Today's bar on its tinted column (amber 50; dark: amber 400 at 10% over slate 900, far apart).
     expect(ratio(linear('amber-600'), linear('amber-50'))).toBeGreaterThanOrEqual(3);
     // «oggi» under the coming days, at 12 px: AA.

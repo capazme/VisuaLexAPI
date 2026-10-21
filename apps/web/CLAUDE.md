@@ -894,7 +894,7 @@ the list, from it they sit in the band's sticky box, read after the band. The do
    `DAY_STATE_LABEL`), then the cards by state as three numbers in Newsreader with their names in Geist (a `dl`) and the
    bar. From `xl` the band is the right column, about 400 to 490 px: `aside` adds the `xl:` classes that stack it as on a phone (the
    week and «Tutti i progressi» at the column's width, the numbers at `text-3xl`, the three states in columns as wide as
-   their words, so «In apprendimento» keeps one line). «Tutti i progressi», a link (44 px, full width on a phone), leads to `/studia/progressi`: the long calendar, the
+   their words, so «In apprendimento» keeps one line). «Tutti i progressi», a link (44 px, full width on a phone), leads to `/studia/progressi`: the trend, the
    coming days and the subjects live there alone (G3 removed the «Il tuo mese» sheet, so no chart is drawn twice).
    **No text on «Oggi» or «Progressi» is under 11 px** (the stamp's date included; the compact stamp is the session's):
    `typeScale.test.tsx` reads the files of `missions/` and `progress/` and fails on a `text-[Npx]` under 11 or an SVG
@@ -964,9 +964,7 @@ its end at once. The celebration is unchanged.
 progressi», then: **the summary** (`StreakBadge compact`, `GoalRing compact` and the reviews
 of the last 30 days in a large number, `recentReviews`: the sum of `materie[].ripassi30`; always the whole day's, as
 the streak and the goal are); **the subject chips** (`SubjectChips`, 44 px at every width — Oggi's too —, the subject «Oggi» remembers, and a line saying
-what it narrows); **«Il tuo calendario»** (`ActivityCalendar`, across the page: 26 weeks on a computer and 12 on a phone by
-`useIsDesktop` — the server keeps 26, `CALENDAR_WEEKS`, so a wider page shows no more —; from `lg` the drawing takes three
-quarters and the legend and the day's line a column beside it, the line holding five lines' room); then, side by side
+what it narrows); **«Il tuo andamento»** (`ReviewTrend`, G7, which replaced the calendar: see below); then, side by side
 from `lg`, **«Le schede per stato»** (`CardStatesBar`: the bar's segments are buttons as before, each a 44 px box at every width with its colour
 drawn 28 px tall inside on a computer, and under it the
 three states by name, count and share — `shares` rounds by the largest remainder so the three add up to 100, and a state
@@ -975,27 +973,31 @@ with cards that rounds to none reads «<1%», never «0%»); **«I prossimi 14 g
 page — pressed again it clears —, its share consolidated, a bar of the three states and the states in words,
 `stopStates`, and the reviews of 30 days; no «N da ripassare», which the progress read does not carry by subject). Every control on the page is 44 px tall at every width
 (`ProgressPage.test.tsx` guards its files against an `md:` height, as `contribuisci.test.ts` does Contribuisci's); the
-calendar's cells and the coming days' columns are the exception the progress spec §6.3 names, reached by the arrows. The
-calendar, the states and the coming days are the chosen subject's read; the summary and «Per materia» stay the whole
-day's. The calendar's cells carry a state (`layout.ts` `calendarDayState`, `data-stato`): a dot on a day that counted,
-a dashed outline on a rest, a dash on a past day that did not count (`saltato`), a ring on today, the rest of this week
-dotted (`calendarGrid`'s `future`, never chosen, so End stops at today), and no mark on a day before the first one the
-calendar holds (`vuoto`): a newcomer's calendar says nothing is missed, not even in its legend. On a subject's calendar
-the flags are the whole day's, as the server sends them: a mark on the subject's hue sits on a rim of the tile's ground
-(`data-halo`), since no single colour reads on all five hues in both themes, and a day with none of the subject's
-reviews reads «nessun ripasso in questa materia», counted or missed (`describeDay`'s `narrowed`). The day chosen is kept by its
-date, so a grid that changes width keeps it. The calendar is one tab stop (arrows by day and week, Home and End, a live readout; the
-whole pitch of a cell hit-testable). Labels on both charts (weekdays, months, the scale, the days) are the interface's
-text at `text-xs` placed by percentages over or beside the drawing, never SVG `<text>`: a drawing scaled to its width
-scaled them under 11 px. The legend under it says each in words (the heat scale, drawn «meno ▢▢▢▢▢ più ripassi», is
-said as one sentence); before a day is chosen the line says how to choose one, by pointer or by the arrows; the line under it (`describeDay`, «lunedì 12
-ottobre: 14 ripassi, obiettivo raggiunto», commas, read aloud as written) is the day's name for a screen reader, with
-the arrows as before. The coming days' scale is the interface's text in a column beside the drawing, on whole-number
+trend's points and the coming days' columns are the exception the progress spec §6.3 names, reached by the arrows. The
+trend, the states and the coming days are the chosen subject's read; the summary and «Per materia» stay the whole
+day's. **The trend** (`ReviewTrend`, pure parts in `trend.ts`): the reviews of a period as a line — 7 days, 30 days
+(it opens there) or six months, the server's 26 weeks summed by week (`trendSeries`) —, the period's total in
+Newsreader and its change on the period before of the same length (green up, ink down, never red; none when that
+period had no reviews, none for six months); a monotone cubic curve (`resampleMonotone`: no peak between two days,
+never under zero) resampled to `CURVE_SAMPLES` points so one period's curve bends into another's (`curvePaths`);
+the area a wash of the line's colour through `currentColor` in the gradient's stops (`stop-color` reads no variable
+as an attribute); a round scale of four ticks (`trendScale`: steps of 1, 2, 2.5, 5 × 10ⁿ, covering the goal); the
+goal a dashed line named «obiettivo» (×7 by week); the days not done (`calendarDayState` `saltato`, after the first
+day studied) small ticks under the axis. A cursor follows the pointer or a finger (`touch-action: pan-y`: the page
+still scrolls) with a spring, the line full up to it and lighter after, its label «mar 14 ott · 12 ripassi ·
+obiettivo raggiunto» (`pointLabel`); one tab stop, the arrows by point, Home and End, a hidden live line
+(`describeDay`, or «Settimana dal …» by week); «Vedi i numeri», a `<details>` with the period's table; the periods
+are tabs (arrows, Home, End, the selection follows the focus). The SVG is drawn in the card's real pixels
+(`ResizeObserver`), its words the interface's text laid over it at `text-xs`, never SVG `<text>`
+(`typeScale.test.tsx`). Opening: the line draws from the left (a clip scaled from 0) in 900 ms while the total counts
+up; another period or subject: the curve bends in 500 ms, the pill slides (`layoutId` in its own `LayoutGroup`), the
+numbers fade; a resize redraws at once; reduced motion draws everything at once. A newcomer (no day, no record) reads
+the first-day sentence in place of the chart. The coming days' scale is the interface's text in a column beside the drawing, on whole-number
 lines (`scaleLines`), the days in a row under it; today's column is tinted and its label set apart; a day with nothing
 due is a hollow mark on the base. Counts go through `formatCount` (`Intl.NumberFormat('it-IT')`: «12.345», four
 digits whole as Italian writes them). States: while the first read travels every block holds its final size
-(`ActivityCalendarSkeleton`, `DueForecastSkeleton`, `CardStatesBarSkeleton`); «Il primo giorno comincia oggi» over the
-calendar only for someone with no record (an empty calendar after 26 weeks away is not a first day); a failed read says «Non riesco a leggere i
+(`ReviewTrendSkeleton`, `DueForecastSkeleton`, `CardStatesBarSkeleton`); «Il primo giorno comincia oggi» in place of
+the trend only for someone with no record (no day after 26 weeks away is not a first day); a failed read says «Non riesco a leggere i
 tuoi progressi.» with «Riprova» (44 px, no alert) and keeps what was on screen; a new read of the same subject leaves
 the last answer, dimmed. No points and no level.
 
