@@ -1,5 +1,5 @@
 import type { ArticleData, ArticleUpcoming, ArticleValidity, NormaVisitata, SearchParams, ValidityState } from '../types';
-import { addDaysToIsoDate, formatDateDashed, formatDateForCitation, formatDateForDisplay, parseItalianDate, withPreposition } from './dateUtils';
+import { addDaysToIsoDate, formatDateDashed, formatDateForCitation, formatDateForDisplay, parseItalianDate, todayInRome, withPreposition } from './dateUtils';
 
 /**
  * What a reader is told about the version of the text on screen.
@@ -218,26 +218,40 @@ function bannerFor(
 
 /**
  * The article that will change (G-355, V1): the text served is today's and the source has already published a later
- * one. Beside the text, informing only: the later text is not served yet (G-357 will).
+ * one. Beside the text, informing only: the later text is not served yet (G-357 will). A practice keeps its articles
+ * in the browser, never read again: past the day, the same answer says it in the past tense, and that the text on
+ * screen was in force until the day before.
  */
-function upcomingBanner(upcoming: ArticleUpcoming): VersionBanner {
+function upcomingBanner(upcoming: ArticleUpcoming, validity: ArticleValidity | undefined, passed: boolean): VersionBanner {
   const from = withPreposition('dal', formatDateForCitation(upcoming.valid_from));
   const day = from.charAt(0).toUpperCase() + from.slice(1);
+  const repealed = upcoming.change === 'abrogated';
+  if (passed) {
+    const lastDay = addDaysToIsoDate(upcoming.valid_from, -1);
+    return {
+      kind: 'upcoming',
+      title: `${day} questo articolo ${repealed ? 'è abrogato' : 'è cambiato'}.`,
+      body: `Qui leggi il testo in vigore fino ${withPreposition('al', formatDateForCitation(lastDay))}: non è più il testo attuale.`,
+      actions: [],
+    };
+  }
+  const since = validity?.valid_from ? `, ${withPreposition('dal', formatDateForCitation(validity.valid_from))}` : '';
   return {
     kind: 'upcoming',
-    title: `${day} questo articolo ${upcoming.change === 'abrogated' ? 'è abrogato' : 'cambia'}.`,
-    body: 'Qui leggi il testo in vigore oggi.',
+    title: `${day} questo articolo ${repealed ? 'è abrogato' : 'cambia'}.`,
+    body: `Qui leggi il testo in vigore oggi${since}.`,
     actions: [],
   };
 }
 
-function upcomingChip(upcoming: ArticleUpcoming, today: VersionChip | null): VersionChip {
+function upcomingChip(upcoming: ArticleUpcoming, validity: ArticleValidity | undefined, today: VersionChip | null, passed: boolean): VersionChip {
   const day = formatDateDashed(upcoming.valid_from);
-  const what = upcoming.change === 'abrogated' ? 'è abrogato' : 'cambia';
+  const what = upcoming.change === 'abrogated' ? 'è abrogato' : passed ? 'è cambiato' : 'cambia';
+  const version = validity?.version_number ? ` Versione n. ${validity.version_number}.` : '';
   return {
     tone: 'upcoming',
-    label: `Cambia dal ${day}`,
-    title: `${today ? `${today.label}. ` : ''}Dal ${day} questo articolo ${what}. ${SOURCE_NOTE}`,
+    label: `${passed ? 'Cambiato' : 'Cambia'} dal ${day}`,
+    title: `${today ? `${today.label}. ` : ''}Dal ${day} questo articolo ${what}.${version} ${SOURCE_NOTE}`,
   };
 }
 
@@ -253,6 +267,8 @@ export function describeVersion(
   validity: ArticleValidity | undefined,
   request: VersionRequest | null | undefined,
   upcoming?: ArticleUpcoming,
+  /** Today in Rome (ISO): the day the source's windows are read against; given by the tests. */
+  today: string = todayInRome(),
 ): VersionDisplay {
   const asked = requestIsHistorical(request);
   const requestedDay = textOf(request?.data_versione);
@@ -280,9 +296,11 @@ export function describeVersion(
   // A later text announced only beside today's: a text asked for by date or as the original says nothing of it.
   const willChange = Boolean(upcoming?.valid_from) && !asked && !banner && validity?.state !== 'abrogated' && validity?.state !== 'not_yet';
 
+  const passed = willChange && upcoming!.valid_from <= today;
+
   return {
-    chip: willChange ? upcomingChip(upcoming!, chip) : chip,
-    banner: willChange ? upcomingBanner(upcoming!) : banner,
+    chip: willChange ? upcomingChip(upcoming!, validity, chip, passed) : chip,
+    banner: willChange ? upcomingBanner(upcoming!, validity, passed) : banner,
     textVisible: !notYet,
     readOnly,
     canCite,

@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { VersionBanner } from './VersionBanner';
 import { describeVersion } from '../../../utils/versionDisplay';
-import type { ArticleValidity } from '../../../types';
+import type { ArticleUpcoming, ArticleValidity } from '../../../types';
 
 const MIDDLE: ArticleValidity = {
     state: 'historical', valid_from: '2003-12-25', valid_to: '2007-12-29', version_number: 7, act_updated: null, request_in_window: true,
@@ -113,48 +113,71 @@ describe('VersionBanner — an article that will change (V1, G-355)', () => {
     const TODAY: ArticleValidity = {
         state: 'current', valid_from: '1986-07-01', valid_to: '2026-12-31', version_number: 1, act_updated: null, request_in_window: null,
     };
-    const later = (change: 'abrogated' | 'amended') => ({ change, valid_from: '2027-01-01', version_number: 2 });
+    const later = (change: 'abrogated' | 'amended'): ArticleUpcoming => ({ change, valid_from: '2027-01-01', version_number: 2 });
     const undated = { versione: 'vigente' };
+    // Measured on 21 October 2026; the day is given, so the tests do not change meaning on 1 January 2027.
+    const DAY = '2026-10-21';
+    const show = (validity: ArticleValidity | undefined, request: { versione: string; data_versione?: string }, upcoming?: ArticleUpcoming, today = DAY) =>
+        describeVersion(validity, request, upcoming, today);
 
     it('says the article is repealed from that day, written in full, and that the text is today\'s', () => {
-        const display = describeVersion(TODAY, undated, later('abrogated'));
+        const display = show(TODAY, undated, later('abrogated'));
         render(<VersionBanner banner={display.banner!} />);
-        expect(screen.getByRole('status')).toHaveTextContent('Dal 1° gennaio 2027 questo articolo è abrogato.Qui leggi il testo in vigore oggi.');
+        expect(screen.getByRole('status')).toHaveTextContent('Dal 1° gennaio 2027 questo articolo è abrogato.Qui leggi il testo in vigore oggi, dal 1° luglio 1986.');
         expect(screen.queryByText(/2027-01-01/)).toBeNull();
         expect(screen.queryByRole('button')).toBeNull();
     });
 
     it('says it changes, when amended', () => {
-        render(<VersionBanner banner={describeVersion(TODAY, undated, later('amended')).banner!} />);
+        render(<VersionBanner banner={show(TODAY, undated, later('amended')).banner!} />);
         expect(screen.getByRole('status')).toHaveTextContent('Dal 1° gennaio 2027 questo articolo cambia.');
     });
 
     it('elides the preposition before 8 and 11, as every date of the app', () => {
-        const title = (valid_from: string) => describeVersion(TODAY, undated, { change: 'amended', valid_from, version_number: null }).banner!.title;
+        const title = (valid_from: string) => show(TODAY, undated, { change: 'amended', valid_from, version_number: null }).banner!.title;
         expect(title('2027-08-08')).toBe("Dall'8 agosto 2027 questo articolo cambia.");
         expect(title('2027-03-11')).toBe("Dall'11 marzo 2027 questo articolo cambia.");
     });
 
     it('marks the chip «Cambia dal …» in the same tone, and keeps today\'s window in its title', () => {
-        const chip = describeVersion(TODAY, undated, later('abrogated')).chip!;
+        const chip = show(TODAY, undated, later('abrogated')).chip!;
         expect(chip).toMatchObject({ tone: 'upcoming', label: 'Cambia dal 01-01-2027' });
         expect(chip.title).toContain('In vigore dal 01-07-1986');
         expect(chip.title).toContain('è abrogato');
     });
 
     it('shows nothing without `upcoming`, as before', () => {
-        const display = describeVersion(TODAY, undated);
+        const display = show(TODAY, undated);
         expect(display.banner).toBeNull();
         expect(display.chip?.tone).toBe('current');
     });
 
     it('says nothing of it on a text asked for by date or as the original, which the server does not mark', () => {
-        expect(describeVersion(TODAY, { versione: 'vigente', data_versione: '2020-01-01' }, later('abrogated')).banner?.kind).not.toBe('upcoming');
-        expect(describeVersion(TODAY, { versione: 'originale' }, later('abrogated')).banner).toBeNull();
+        expect(show(TODAY, { versione: 'vigente', data_versione: '2020-01-01' }, later('abrogated')).banner?.kind).not.toBe('upcoming');
+        expect(show(TODAY, { versione: 'originale' }, later('abrogated')).banner).toBeNull();
+    });
+
+    it('past the day, in an article a practice kept, says it in the past tense and that the text was in force until the day before', () => {
+        const display = show(TODAY, undated, later('abrogated'), '2027-01-15');
+        expect(display.banner).toMatchObject({ title: 'Dal 1° gennaio 2027 questo articolo è abrogato.', body: 'Qui leggi il testo in vigore fino al 31 dicembre 2026: non è più il testo attuale.' });
+        expect(display.chip?.label).toBe('Cambiato dal 01-01-2027');
+        expect(show(TODAY, undated, later('amended'), '2027-01-01').banner?.title).toBe('Dal 1° gennaio 2027 questo articolo è cambiato.');
+    });
+
+    it('says it even when the source\'s page of today could not be read: the server read the article at today', () => {
+        const display = show(undefined, undated, later('amended'));
+        expect(display.banner?.body).toBe('Qui leggi il testo in vigore oggi.');
+        expect(display.chip?.label).toBe('Cambia dal 01-01-2027');
+    });
+
+    it('gives way to what the source says of a text repealed, not yet in force or outside the day asked', () => {
+        expect(show({ ...TODAY, state: 'abrogated' }, undated, later('amended')).banner).toBeNull();
+        expect(show({ ...TODAY, state: 'not_yet', valid_from: null }, undated, later('amended')).banner?.kind).toBe('not_yet');
+        expect(show({ ...TODAY, request_in_window: false }, undated, later('amended')).banner?.kind).toBe('unreliable');
     });
 
     it('changes nothing else: today\'s text can be annotated, cited and copied', () => {
-        const display = describeVersion(TODAY, undated, later('abrogated'));
+        const display = show(TODAY, undated, later('abrogated'));
         expect(display).toMatchObject({ readOnly: false, canCite: true, canCopyOrSave: true, textVisible: true });
     });
 });

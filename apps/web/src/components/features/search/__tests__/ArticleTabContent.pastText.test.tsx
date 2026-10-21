@@ -129,7 +129,7 @@ describe('ArticleTabContent — the text in force', () => {
     const TODAY: ArticleValidity = { ...CURRENT, valid_to: '2026-12-31' };
     show(article(TODAY, { versione: 'vigente', data_versione: '' }, { upcoming: { change: 'abrogated', valid_from: '2027-01-01', version_number: 9 } }));
     const banner = screen.getByText('Dal 1° gennaio 2027 questo articolo è abrogato.').closest('[role="status"]')!;
-    expect(banner).toHaveTextContent('Qui leggi il testo in vigore oggi.');
+    expect(banner).toHaveTextContent('Qui leggi il testo in vigore oggi, dal 28 dicembre 2025.');
     // Rule 23: the text root holds article_text alone.
     expect(document.querySelector('.vlx-b')!.parentElement!.contains(banner)).toBe(false);
     expect(screen.getByRole('button', { name: 'Cambia dal 01-01-2027' })).toBeInTheDocument();
