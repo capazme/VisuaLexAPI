@@ -12,6 +12,49 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.9.2] - 2026-10-21
+
+The look of VisuaLex, on the computer and on the phone; faster reading of the
+sources; dependency security fixes. No migration.
+
+### Look and navigation
+
+- Moving between sections is a short fade under 250 ms, the section's mark
+  changing colour, instead of the ink transition; instant with reduced motion.
+- One frame for section pages: the title in the same place and size from
+  Dossier to the Forum, Analizza documento and Cronologia; the fixed Focus button
+  never covers a page's action.
+- On the phone: the same top bar on every page, hiding while you scroll down and
+  coming back up, never hidden while the focus is in it; the feedback entry in
+  the user menu; filters on one row; titles of one size.
+
+### Gymnasium
+
+- «Oggi» uses the full width: today's missions and every other mission on the
+  left, the progress and the subjects to review on the right.
+- The study settings open inside the «I tuoi progressi» card.
+- «Progressi» at full width; the cards by state and the next 14 days side by
+  side.
+
+### Release notes
+
+- The «Novità» window always shows the new version's note, and those of any
+  version skipped; the notes now live in `apps/web/src/content/novita/`.
+
+### Sources and caching
+
+- The act tree is downloaded once per page and an EUR-Lex act visited once by
+  the browser; the Normattiva tree goes through the shared HTTP client, which
+  pauses a source after a stated `Retry-After`.
+- The Normattiva cache is pruned (2 GB, 30 days) and its expired pages are
+  removed at start and every six hours.
+
+### Security
+
+- `@modelcontextprotocol/sdk` 1.32.0 in the server and the MCP server, and the
+  `follow-redirects` and `launch-editor` advisories fixed (production was not
+  using the affected parts of the SDK).
+
 ## [1.9.1] - 2026-10-20
 
 Sign in and sign up on one page, Analizza documento redrawn, the account export
