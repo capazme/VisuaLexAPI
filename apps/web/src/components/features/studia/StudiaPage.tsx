@@ -30,8 +30,8 @@ function AreaStrip() {
  * section switcher keeps the short name — and the view. Its views —
  * Oggi, Progressi, Le mie schede, Da validare for validators — are the sidebar's entries in this section
  * (sections spec S6, Gymnasium spec §4). Every view is in the sections' frame (`PageFrame`, G6 and W2): the layout's
- * full width, the heading at its left edge; the layout pads the page and, below `lg`, starts it under its floating
- * menu button. The session has no heading here: it runs in `LessonFrame`, over the shell.
+ * full width, the heading at its left edge; the layout pads the page and, below `lg`, starts it under the phone's
+ * bar. The session has no heading here: it runs in `LessonFrame`, over the shell.
  */
 export function StudiaPage() {
   const { isValidator, loading, user } = useAuth();

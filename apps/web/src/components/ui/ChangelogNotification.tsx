@@ -7,6 +7,7 @@ import { cn } from '../../lib/utils';
 import { spring } from '../../lib/motion';
 import { ACTIVE, FOCUS_RING, TRANSITION } from '../../constants/interactions';
 import { newsSince, parseNote, type Inline, type VersionNews } from '../../content/novita/releaseNotes';
+import { focusPage } from '../../utils/focusPage';
 
 /**
  * The version's news (R1): a toast when the app is at a version this browser has not seen, and «Vedi»
@@ -14,7 +15,8 @@ import { newsSince, parseNote, type Inline, type VersionNews } from '../../conte
  * the versions skipped since the last visit, the newest first. `/version` gives the number only.
  * Dismissed (the X, or the window closed), the version is remembered and the toast does not come back.
  * The component stays mounted, so the toast and the window leave with their motion; the focus goes back
- * to where it was before it entered the toast, which is gone by then. A screen reader hears the news from
+ * to where it was before it entered the toast, which is gone by then — or, when it came from nowhere (a click on «Vedi»
+ * with the focus on the body), to the page's `<main>` (`focusPage`), not the body. A screen reader hears the news from
  * a status region present from the first render (a region that arrives with its text is often not read).
  */
 export function ChangelogNotification() {
@@ -30,15 +32,17 @@ export function ChangelogNotification() {
 
   const rememberFocus = (event: FocusEvent<HTMLDivElement>) => {
     const from = event.relatedTarget;
-    if (from instanceof HTMLElement && !event.currentTarget.contains(from)) returnFocusRef.current = from;
+    // The body is no place to give it back to (the owners' review, 21 Oct 2026): `dismiss` then gives it to the page.
+    if (from instanceof HTMLElement && from !== document.body && !event.currentTarget.contains(from)) returnFocusRef.current = from;
   };
 
   // Whatever had the focus — «Vedi», the X, the window's own buttons — is leaving; the window's return of the
-  // focus (to «Vedi», already gone) runs as it closes, so this one comes after it.
+  // focus (to «Vedi», already gone) runs as it closes, so this one comes after it. With nowhere to go back to, the
+  // page takes it: what holds it now is still leaving.
   const dismiss = () => {
     dismissNotification();
     const back = returnFocusRef.current;
-    if (back) window.setTimeout(() => back.isConnected && back.focus(), 0);
+    window.setTimeout(() => (back?.isConnected ? back.focus() : focusPage()), 0);
   };
 
   return (

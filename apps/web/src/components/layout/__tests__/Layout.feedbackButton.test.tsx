@@ -5,8 +5,9 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('../Sidebar', () => ({ Sidebar: () => null }));
 vi.mock('../../ui/SettingsModal', () => ({ SettingsModal: () => null }));
 vi.mock('../../ui/FeedbackButton', () => ({
-  FeedbackButton: ({ className }: { className?: string }) => <button type="button" data-testid="feedback" className={className}>Feedback</button>,
+  FeedbackButton: ({ className }: { className?: string; onOpen: () => void }) => <button type="button" data-testid="feedback" className={className}>Feedback</button>,
 }));
+vi.mock('../../ui/FeedbackModal', () => ({ FeedbackModal: () => null }));
 vi.mock('../../ui/ChangelogNotification', () => ({ ChangelogNotification: () => null }));
 vi.mock('../../ui/Toast', () => ({ UndoToastContainer: () => null }));
 vi.mock('../../ui/SyncErrorToast', () => ({ SyncErrorToast: () => null }));
@@ -23,19 +24,15 @@ import { Layout } from '../Layout';
 
 const at = (path: string) => render(<MemoryRouter initialEntries={[path]}><Layout /></MemoryRouter>);
 
-describe('Layout — what sits where a bar is pinned to the bottom on a phone', () => {
-  it.each(['/studia/ripasso/sessione?materia=DIRITTO_CIVILE', '/studia/valida'])(
+describe('Layout — what floats at the foot of the page on a phone', () => {
+  // On a phone it is the user menu's «Invia un commento» (M1): it covered the bars pinned to the bottom and the pages' rows.
+  it.each(['/', '/studia/ripasso', '/studia/ripasso/sessione?materia=DIRITTO_CIVILE', '/studia/valida', '/studia/schede', '/dossier'])(
     'hides the feedback button on a phone on %s',
     (path) => {
       at(path);
       expect(screen.getByTestId('feedback')).toHaveClass('max-md:hidden');
     },
   );
-
-  it.each(['/', '/studia', '/studia/ripasso', '/studia/schede', '/dossier'])('leaves it as it is on %s', (path) => {
-    at(path);
-    expect(screen.getByTestId('feedback')).not.toHaveClass('max-md:hidden');
-  });
 
   // The services pill covered the foot of the page on a phone: it is the user menu's «Stato dei servizi» (S1).
   it.each(['/', '/studia/ripasso', '/studia/ripasso/sessione', '/studia/valida', '/dossier'])('draws no services pill on %s', (path) => {

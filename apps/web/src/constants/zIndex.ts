@@ -48,7 +48,7 @@ export const Z_INDEX = {
 
   /**
    * Gymnasium's lesson (`studia/LessonFrame`): a screen of its own over the shell — the sidebar, the
-   * floating buttons (the menu button with its services dot), the feedback button and the plain toasts (`z-[60]`) — and under
+   * phone's bar at the top (the menu button with its services dot), the floating buttons, the feedback button and the plain toasts (`z-[60]`) — and under
    * the overlay band, so its article sheet, its confirmation and its toast still cover it.
    */
   lesson: 'z-[70]',

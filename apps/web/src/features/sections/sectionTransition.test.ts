@@ -245,6 +245,17 @@ describe('playSectionTransition (T1)', () => {
     expect(title()).not.toHaveFocus();
   });
 
+  it('takes the focus from where the shell parked it as the phone\'s drawer closed (the bar\'s menu button, M1)', async () => {
+    reducedMotion(true);
+    document.body.insertAdjacentHTML('beforeend', '<button data-focus-parked>Apri il menu</button>');
+    const toggle = document.querySelector<HTMLElement>('[data-focus-parked]')!;
+    let draw = () => {};
+    playSectionTransition({ section: 'gymnasium', swap: () => { draw = newPage; }, still: true });
+    toggle.focus();
+    draw();
+    await waitFor(() => expect(title()).toHaveFocus());
+  });
+
   it('plays no transition of its own when still (the phone\'s drawer closes over it): the page changes at once', async () => {
     reducedMotion(false);
     const { start } = stubViewTransition();

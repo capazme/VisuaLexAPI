@@ -76,7 +76,10 @@ function watchTitle(section: SectionId, found: (title: HTMLElement) => void): { 
  */
 function focusTitleUnlessMoved(title: HTMLElement, leftOn: Element | null, byPointer: boolean) {
   const active = document.activeElement;
-  if (active !== leftOn && active !== null && active !== document.body) return;
+  // The shell's own parking place is not a move by the user: the phone's drawer, closing over the choice, leaves the
+  // focus on the bar's menu button (`data-focus-parked`, M1).
+  const parked = active instanceof HTMLElement && active.hasAttribute('data-focus-parked');
+  if (active !== leftOn && active !== null && active !== document.body && !parked) return;
   if (byPointer) {
     title.setAttribute('data-pointer-focus', '');
     title.addEventListener('blur', () => title.removeAttribute('data-pointer-focus'), { once: true });

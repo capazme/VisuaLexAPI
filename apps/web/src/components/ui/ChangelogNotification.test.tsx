@@ -150,6 +150,39 @@ describe('ChangelogNotification', () => {
     await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Prima' })).toHaveFocus());
   });
 
+  // The owners' review, 21 Oct 2026: «Vedi» pressed with the focus on the body (a click) had nowhere to give it back, and it fell to
+  // the body; the page's <main> takes it, focusable only while it holds it.
+  it('gives the focus to the page\'s <main> when it came from nowhere, once the window closes', async () => {
+    localStorage.setItem(VERSION_STORAGE_KEY, '1.9.0');
+    answer('1.9.1');
+    render(
+      <>
+        <main data-testid="page"><p>Pagina</p></main>
+        <ChangelogNotification />
+      </>
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Vedi' }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Chiudi' }));
+
+    const main = screen.getByTestId('page');
+    await vi.waitFor(() => expect(main).toHaveFocus());
+    main.blur();
+    expect(main).not.toHaveAttribute('tabindex');
+  });
+
+  it('gives the focus to the page\'s <main> when the toast is dismissed from nowhere', async () => {
+    localStorage.setItem(VERSION_STORAGE_KEY, '1.9.0');
+    answer('1.9.1');
+    render(
+      <>
+        <main data-testid="page"><p>Pagina</p></main>
+        <ChangelogNotification />
+      </>
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Chiudi notifica' }));
+    await vi.waitFor(() => expect(screen.getByTestId('page')).toHaveFocus());
+  });
+
   it('remembers the version once the window is closed, and says nothing on a first visit', async () => {
     localStorage.setItem(VERSION_STORAGE_KEY, '1.9.0');
     answer('1.9.1');

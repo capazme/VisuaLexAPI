@@ -37,8 +37,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   card read-only (`ArticleReadOnly`: the reader's text, copy only, no marks; on a phone a collapsed «Testo
   dell'articolo»); `VoteBar` sends Approvata at once and asks a reason for Migliorabile and Errata, and sits
   `sticky bottom-0` at every width (the keyboard moves to the next card's heading after a vote, back to the
-  verdict after «Annulla»; `Layout` hides the floating feedback button below `md` on this route, as in a review
-  session, where it would cover the verdicts); the subject is remembered in `localStorage`; a vote that outlives a subject
+  verdict after «Annulla»; below `md` no feedback button floats over it, nor over any page: there it is the user
+  menu's «Invia un commento», M1); the subject is remembered in `localStorage`; a vote that outlives a subject
   change only marks its card handled, and a 403 stops the queue with «Non sei più tra i validatori»; the queue is
   read only once the outlet's `validator` is `true` — while the account loads it waits, for someone the account
   says is not a validator it shows «Questa sezione è riservata…» with no request, which the server would refuse with
@@ -133,7 +133,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   with a note skipped since the last visit, the newest first; one version under the title «Novità in vX.Y.Z»,
   several under «Novità dalla tua ultima visita», each headed «Versione X.Y.Z»; a version with no note says
   «Correzioni e miglioramenti»). The component stays mounted, so the toast and the window leave with their
-  motion, and once they go the focus returns to where it was before it entered the toast; a screen reader
+  motion, and once they go the focus returns to where it was before it entered the toast, or, when it came from the body (a click on «Vedi»), to `Layout`'s `<main>` (`utils/focusPage.ts`: focusable only while it holds it — a `tabindex` it kept would make every click on the page focus it); a screen reader
   hears «Novità in vX.Y.Z» from a status region drawn from the first render. The number comes from the server
   and the note from the bundle, so the version is marked seen only when the bundle has its note
   (`hasReleaseNote`): a tab opened before a deploy shows «Correzioni e miglioramenti», and after a reload the
@@ -188,7 +188,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   title does not move), the Cronologia and the MERL-T hub; «Cestino» and the MERL-T pages under a way back
   («Torna ai Dossier», «MERL-T») write their `h1` with `PAGE_TITLE`. A dossier's own page (its name, its star and
   its actions), Impostazioni (a dialog, not a page), the Scrivania, the lesson, the reader and the practice, the
-  login and «Crediti» (public, outside the layout) stay out. `PageFrame.test.tsx` reads the section pages' files
+  login stay out; «Crediti», public and outside the layout, is in the frame since M1 (the column's width and padding, the
+  text in its 672 px column). On a phone `actionBeside` keeps icon-only actions on the title's row (the dossier list's
+  «⋯» and «+»). `PageFrame.test.tsx` reads the section pages' files
   and fails on a title of their own, an icon in an `h1` or a root narrowed with `mx-auto max-w-…`. **The sections** (D-076, spec
   `docs/superpowers/specs/2026-10-18-sections-switcher-design.md`): Corpus is the common core and no section;
   over it Opus, Gymnasium (the code's `studia`), Academia (development mode only) and Forum, in
@@ -198,7 +200,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `#tour-section-switcher`, on `ui/MenuButton` with `menuitemradio` entries, a dot for the Forum's news from
   another section). **The section change** (T1, which replaced S2's halftone on the owner's word, 21 October 2026: light, and never
   over the page): `chooseSection(id)` plays `sectionTransition.ts`, a View Transition on `vlx-page` only (`index.css`) —
-  the layout's content area, not `<main>`, so the floating buttons and the search bar hold still. It is named only
+  the layout's content area, not `<main>`, so the bars at the top and the floating buttons hold still. It is named only
   while a transition runs (`lib/pageTransition.ts`, the class `vlx-page-changing` on the root; the sign-in page's
   entrance goes through it too): a `view-transition-name` makes a stacking context (gotcha 22), and `<main>` keeps
   its own with `isolate`. The content fades out in 100 ms, then the new one fades in rising by 5 px in 140 ms,
@@ -259,7 +261,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   The narrow/widen control is `SIDEBAR_TOGGLE_TEXT`, the entries' words' colour (slate 700 / dark slate 300). At the bottom only the user menu, whose dropdown holds Impostazioni,
   Cronologia (moved there by the owner, 13 Oct 2026; the saved norms that changed are counted on the avatar
   and beside the entry, and both names say it in words: «Menu utente, 2 norme salvate cambiate»),
-  «Collega un'app AI», «Crediti» (`/crediti`), the services' status, the theme, «Scorciatoie» (no «(?)» since S1: the `?` key still opens it),
+  «Collega un'app AI», «Crediti» (`/crediti`), on a phone «Invia un commento» (the feedback form, which `Layout` holds and
+  the floating button opens from `md`, M1), the services' status, the theme, «Scorciatoie» (no «(?)» since S1: the `?` key still opens it),
   «Pannello Admin» (admins) and «Esci». **The services' status** (S1, 19 Oct 2026; it was a pill fixed at the bottom left,
   over the foot of the page on a phone) is `ui/ServiceHealthMenuEntry`: the status icon and phrase («Servizi operativi»,
   «Alcune fonti non disponibili», «Servizio non raggiungibile», «Controllo servizi…», `utils/serviceHealth`; a screen
@@ -268,19 +271,37 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   read as "unavailable") and «Ricontrolla», which keeps the menu open; it opens folded each time. `Layout` runs the one `useServiceHealth` and
   hands the reading to both copies of the sidebar; when it is degraded or offline (not while checking) an amber dot
   (`ServiceHealthDot`) sits at the foot of the avatar — clear of the count of changed norms — and, below `lg`, on the
-  floating menu button, and both names end with the phrase («Menu utente di …, alcune fonti non disponibili»). The menu
+  menu button of the phone's bar, and both names end with the phrase («Menu utente di …, alcune fonti non disponibili»). The menu
   grows upwards and scrolls rather than leave a low window. The dropdown is a portalled WAI-ARIA
   menu (`role="menu"`/`menuitem`): focus goes to the first entry on open (ArrowUp opens on the last), the arrows,
   Home and End move, Esc closes and returns focus to the avatar, Tab closes and goes on from the avatar, the
-  backdrop closes; entries are 44 px high on a phone. Below `lg` the menu opens from a floating button
-  at the top left, and `Layout` starts every page's content under it (`pt-[4.5rem]`, repeated at `md`)
-  except the search page, whose field sits beside it (`pl-[4.5rem]` below `lg`). There is no «Ricerca Veloce», no
+  backdrop closes; entries are 44 px high on a phone. **The phone's bar** (M1, 21 Oct 2026): below `lg` every page
+  has one bar at the top. On the search page it is the field's bar (56 px below `lg`, 72 from it), with `MenuToggle`
+  beside the field; on every other page `PhoneTopBar` (`layout/PhoneTopBar.tsx`): `MenuToggle` at the left (44 px, the
+  services' dot), the page's name in Newsreader in the middle (`phoneBarTitle.ts`: the menu's word for the page, else
+  the section's name), the magnifier on the right, which opens the search menu (the palette); on the page's paper with a
+  hairline, absolutely placed over the content area (`Z_INDEX.floating`), which starts under it (`pt-[calc(4.5rem+env(safe-area-inset-top))]`,
+  repeated at `md`), and whose `scroll-padding-top` stops what the focus or an anchor scrolls to under it (WCAG 2.4.11).
+  Below `md` it slides away scrolling down and comes back scrolling up or near the top (`useHideOnScroll`, which listens
+  to the content scroller below `md` only, holds the scroll top to the last real one so iOS's bounce at the end is no
+  move up, and never hides while the focus is inside the bar; a new address and a focus landing in it bring it back;
+  under reduced motion at once); from `md` it stays, and the Focus button sits inside its right end. A sticky row of a page pins under it
+  with `top-[var(--phone-bar-offset,0px)]`: `<main>` sets the bar's height below `lg` and 0 once it has slid away
+  («Le mie schede»'s filters and its card's column, the Cronologia's dates, «Da validare»'s article; a new sticky row
+  does the same, or it slides under the bar). Focus mode and Gymnasium's lesson draw no bar. During a section change
+  the bar is named (`vlx-phone-bar`, `index.css`), so the page's picture passes under it. The drawer's section switcher
+  sits where the bar is; the closed drawer is `inert`, and whatever closes it from inside (an entry, a link, the
+  backdrop) gives the focus to the bar's menu button, where a dialog an entry opens gives it back. That button is
+  `data-focus-parked`: a section chosen in the drawer still focuses its new title (`sectionTransition.ts` does not
+  take the parked focus for a move by the user).
+  There is no «Ricerca Veloce», no
   «Sentenze» and no row of system buttons. `Layout` mounts the same component twice (the desktop column and
   the phone's off-canvas copy), so both show the same list and the same menu.
   **The search page's field** (`features/search/SearchField`, spec
   `docs/superpowers/specs/2026-10-13-fixed-search-design.md`): `Layout` draws it on `/` (not in Focus mode) in a
-  bar of `SEARCH_BAR_HEIGHT` above the content scroller, so it is always on screen, and sets
-  `--search-bar-height` on `<main>`, which `h-app-row` subtracts. It reads what is typed with the palette's own
+  bar above the content scroller (56 px and the iPhone's top edge below `lg`, 72 from it; the phone's bar there), so it
+  is always on screen, and sets `--search-bar-height` on `<main>`, which `h-app-row` subtracts and the bar takes as its
+  height. It reads what is typed with the palette's own
   reading, `hooks/useSearchQuery` (a decision, a norm with the server's resolver as fallback, a topic): Enter opens
   the decision, searches a ready norm (`citationSearchParams`), searches the topic, or hands a norm that still
   lacks its number, date or article to the palette with the words (`openCommandPaletteWith`); Enter pressed while
@@ -1166,8 +1187,7 @@ opposite arrow; recording those would fill the stack with stops nobody wants.
 per-practice copy would sit inside the very place an entry points at. It names its
 destination, and it has no keyboard shortcut on purpose: every natural
 combination for "back" already belongs to the browser. It floats centred above the bar of practices on the desktop (`bottomOffset`
-from the bar's measured height) and, on a phone, a fixed 80 px up, clear of the services
-pill and the feedback button; the bottom is the one edge the table's sticky headings and the windows' headers leave free.
+from the bar's measured height) and, on a phone, a fixed 80 px up; the bottom is the one edge the table's sticky headings and the windows' headers leave free.
 The reading surfaces push a `ReadingBackEntry` (`{ tabId, blockId, articleId, articleKey?, label }`: `tabId` names a practice, one of
 its windows or the phone's reader, `blockId` an act or a decision) and `pushReadingBack` keeps it as a `PracticeBackEntry`
 (`{ practiceId, subject, place }`, spec §6.3) — `table` for a practice's row, `beside` for a window or the reader — the
@@ -1703,7 +1723,9 @@ actions. Both use the outer/inner split above.
 **Sticky filter rows** — `sticky top-0` alone lets content scroll through. Give
 the row an opaque background matching the panel, bleed it edge-to-edge with
 negative margins matching the parent padding, add `border-b border-current/10`,
-and raise it to `z-20`.
+and raise it to `z-20`. A row that pins to the page's top uses
+`top-[var(--phone-bar-offset,0px)]` (with `transition-[top]`, still under reduced
+motion), or on a phone it pins under the bar at the top (see «The phone's bar»).
 
 **Stacking** — use the bands in `constants/zIndex.ts` (`pinnedBar` 35, `sidebar` 50, `lesson` 70 — Gymnasium's lesson over the shell —, `dock` 80 — the bar of practices —,
 overlay band 1000+), never a bare literal. See gotcha 22 before assuming a
@@ -1755,7 +1777,7 @@ meant to stay split; add new features as new files, not inside the shells:
   `i`; the search, then two menus — the order and «Filtra per categoria», one
   category at a time, «Tutte le categorie» first («Tutte» on a phone, by `useIsDesktop`), the categories of the section's dossiers, absent when
   there are none — on one row on a computer, half and half under the search on
-  a phone), `DossierDetailView.tsx` (sections and header), `DossierActBlock.tsx`
+  a phone; on a phone the title keeps its row with «⋯» — «Importa da file JSON», «Cestino (n)» — and «+», M1), `DossierDetailView.tsx` (sections and header), `DossierActBlock.tsx`
   (an act and its rows), `DossierArticleRow.tsx` (row + star + expand),
   `DossierNotesSection.tsx`, `DossierItemReader.tsx` (in-place article),
   `AddToDossierPopover.tsx`, one file per modal, shared helpers in
@@ -1766,7 +1788,8 @@ meant to stay split; add new features as new files, not inside the shells:
   `/forum`, the page's `h1` «Dossier pubblici», and what leaves it says so («Ritira dai dossier pubblici», toast
   «Dossier ritirato»; in the dossier's header «Copia pubblicata ritirata»), never «dal Forum»: the Forum is the section, which also holds «Community»
   (`ForumCommunityPage`, `/forum/community`, a placeholder). `BulletinBoardPage.tsx` is a shell over three dumb views, the tabs «Esplora · I miei pubblicati ·
-  Suggerimenti» (`ForumExploreView`, `ForumMyEnvironmentsView`, `ForumSuggestionsView`). «Pubblica un dossier»
+  Suggerimenti» (`ForumExploreView`, `ForumMyEnvironmentsView`, `ForumSuggestionsView`); Explore's filters are one row
+  from `sm` and, on a phone, the search across with the category («Tutte»), the order and the 44 px refresh under it, M1. «Pubblica un dossier»
   is `PublishDossierPicker` (the user's dossiers not yet in the Forum, then the dossier's own
   `PublishDossierDialog`; the Forum never publishes a workspace); «Modifica» on a published dossier
   (`EditSharedEnvironmentModal`) edits its name, description, category and tags only — what it holds changes

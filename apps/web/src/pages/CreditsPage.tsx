@@ -10,6 +10,7 @@ import { BookOpen, ExternalLink } from 'lucide-react';
 import { CREDITS, CREDIT_GROUPS, type Credit } from '../data/credits';
 import { FOCUS_RING } from '../constants/interactions';
 import { cn } from '../lib/utils';
+import { PageFrame } from '../components/layout/PageFrame';
 
 const LINK = cn(
   'inline-flex min-h-[44px] items-center gap-1.5 rounded-md font-medium text-primary-700 underline-offset-4 hover:underline dark:text-primary-300',
@@ -88,8 +89,10 @@ export function CreditsPage() {
   }, [hash]);
 
   return (
-    <div className="min-h-dvh bg-slate-50 px-4 pb-16 pt-6 md:px-10 dark:bg-slate-950">
-      <div className="mx-auto w-full max-w-2xl">
+    // The sections' frame (W2), outside the layout: its column (`max-w-7xl`, the layout's padding), the title at its left
+    // edge in `PageFrame`'s size; the text keeps its reading column.
+    <div className="min-h-dvh bg-slate-50 dark:bg-slate-950">
+      <div className="mx-auto w-full max-w-7xl p-4 pb-16 md:p-8 md:pb-16">
         <header>
           <Link to="/" className={cn('-ml-2 inline-flex min-h-[44px] items-center gap-2 rounded-md px-2 text-slate-700 dark:text-slate-300', FOCUS_RING)}>
             <BookOpen aria-hidden size={20} strokeWidth={1.5} className="text-primary-600 dark:text-primary-400" />
@@ -97,33 +100,36 @@ export function CreditsPage() {
           </Link>
         </header>
 
-        <main>
-          <div className="mt-8 border-b border-slate-200 pb-6 dark:border-slate-800">
-            <h1 className="font-serif text-4xl font-medium tracking-tight text-slate-900 md:text-5xl dark:text-slate-50">Crediti</h1>
-            <p className="mt-4 max-w-prose font-serif text-lg leading-relaxed text-slate-700 dark:text-slate-300">
-              VisuaLex usa i dati pubblici delle fonti elencate qui sotto e in questa pagina ne indica la provenienza:
-              per ciascuna, cosa usiamo, a quali condizioni e come la citiamo. In fondo, i caratteri tipografici
-              dell’interfaccia.
-            </p>
-          </div>
+        <main className="mt-8">
+          <PageFrame title="Crediti">
+            <div className="max-w-2xl">
+              <div className="border-b border-slate-200 pb-6 dark:border-slate-800">
+                <p className="max-w-prose font-serif text-lg leading-relaxed text-slate-700 dark:text-slate-300">
+                  VisuaLex usa i dati pubblici delle fonti elencate qui sotto e in questa pagina ne indica la provenienza:
+                  per ciascuna, cosa usiamo, a quali condizioni e come la citiamo. In fondo, i caratteri tipografici
+                  dell’interfaccia.
+                </p>
+              </div>
 
-          {CREDIT_GROUPS.map((group) => {
-            const entries = CREDITS.filter((credit) => credit.group === group.id);
-            if (entries.length === 0) return null;
-            const headingId = `crediti-${group.id}`;
-            return (
-              <section key={group.id} aria-labelledby={headingId} className="mt-10">
-                <h2 id={headingId} className="font-serif text-2xl font-medium text-slate-900 dark:text-slate-50">
-                  {group.title}
-                </h2>
-                <div className="mt-2">
-                  {entries.map((credit) => (
-                    <CreditEntry key={credit.id} credit={credit} />
-                  ))}
-                </div>
-              </section>
-            );
-          })}
+              {CREDIT_GROUPS.map((group) => {
+                const entries = CREDITS.filter((credit) => credit.group === group.id);
+                if (entries.length === 0) return null;
+                const headingId = `crediti-${group.id}`;
+                return (
+                  <section key={group.id} aria-labelledby={headingId} className="mt-10">
+                    <h2 id={headingId} className="font-serif text-2xl font-medium text-slate-900 dark:text-slate-50">
+                      {group.title}
+                    </h2>
+                    <div className="mt-2">
+                      {entries.map((credit) => (
+                        <CreditEntry key={credit.id} credit={credit} />
+                      ))}
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
+          </PageFrame>
         </main>
       </div>
     </div>

@@ -75,6 +75,8 @@ const SECTION_PAGES = [
   'pages/MerltHubPage.tsx',
   'features/merlt/contrib/ContribPage.tsx',
   'features/merlt/validate/ValidationPage.tsx',
+  // Public, outside the layout, in the same frame since M1: the title at the column's edge, the text narrow.
+  'pages/CreditsPage.tsx',
 ];
 
 describe('the section pages (W2)', () => {

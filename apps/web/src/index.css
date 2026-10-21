@@ -1347,6 +1347,12 @@
    does not blend: its two pictures are not cross-faded, the new one covers the old (the default `plus-lighter` would
    add them, the old sidebar's entries showing through the new). */
 .vlx-page-changing .vlx-page { view-transition-name: vlx-page; }
+/* The phone's bar (M1) lies over the content area: named too, so the page's picture does not paint over it; it holds
+   still, its two pictures not blended. */
+.vlx-page-changing .vlx-phone-bar { view-transition-name: vlx-phone-bar; }
+::view-transition-old(vlx-phone-bar),
+::view-transition-new(vlx-phone-bar) { mix-blend-mode: normal; animation: none; }
+::view-transition-group(vlx-phone-bar) { animation: none; }
 ::view-transition { pointer-events: none; }
 ::view-transition-old(root),
 ::view-transition-new(root) { mix-blend-mode: normal; }

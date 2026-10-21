@@ -126,7 +126,7 @@ export function StatsBand({ data, loading, settingsOpen, onToggleSettings, onClo
     gear.current?.focus();
   };
   return (
-    <section aria-labelledby="studia-progressi" aria-busy={loading} className={cn(TILE, 'grid gap-5 p-5 md:p-6')}>
+    <section aria-labelledby="studia-progressi" aria-busy={loading} className={cn(TILE, 'grid gap-5 p-4 md:p-6')}>
       <div className="flex items-center gap-3">
         <h3 id="studia-progressi" className={BLOCK_HEADING}>
           I tuoi progressi

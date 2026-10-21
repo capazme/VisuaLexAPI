@@ -423,7 +423,7 @@ export function HistoryView() {
                                 <div key={key} className="relative">
                                     {/* Date label with timeline line */}
                                     {/* Mobile: smaller, simpler date label */}
-                                    <div className="md:hidden flex items-center gap-2 mb-3 sticky top-0 bg-white dark:bg-slate-800 py-1 z-10">
+                                    <div className="md:hidden flex items-center gap-2 mb-3 sticky top-[var(--phone-bar-offset,0px)] transition-[top] duration-200 ease-out motion-reduce:transition-none bg-white dark:bg-slate-800 py-1 z-10">
                                         <div className="flex items-center gap-1.5 bg-blue-50 dark:bg-blue-900/30 px-2.5 py-1 rounded-full">
                                             <Calendar size={12} className="text-blue-600 dark:text-blue-400" />
                                             <span className="text-xs font-bold text-blue-600 dark:text-blue-400">{label}</span>
@@ -432,7 +432,7 @@ export function HistoryView() {
                                     </div>
 
                                     {/* Desktop: full date label */}
-                                    <div className="hidden md:flex items-center gap-3 mb-4 sticky top-0 bg-white dark:bg-slate-800 py-2 z-10">
+                                    <div className="hidden md:flex items-center gap-3 mb-4 sticky top-[var(--phone-bar-offset,0px)] transition-[top] duration-200 ease-out motion-reduce:transition-none bg-white dark:bg-slate-800 py-2 z-10">
                                         <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-full">
                                             <Calendar size={14} className="text-blue-600 dark:text-blue-400" />
                                             <span className="text-sm font-bold text-blue-600 dark:text-blue-400">{label}</span>
