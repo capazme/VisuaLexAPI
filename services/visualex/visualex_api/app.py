@@ -25,8 +25,7 @@ from visualex_api.tools.exceptions import (
 )
 from visualex_api.services.normattiva_scraper import NormattivaScraper
 from visualex_api.services.eurlex_scraper import EurlexScraper
-from visualex_api.services.pdfextractor import PDFExtractor, cleanup_browser_pool, is_allowed_pdf_urn
-from visualex_api.tools.sys_op import WebDriverManager
+from visualex_api.services.pdfextractor import PDFExtractor, cleanup_browser_pool, extract_pdf, is_allowed_pdf_urn
 from visualex_api.tools.urngenerator import complete_request_date, pdf_cache_path
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import article_input_error, parse_article_input
@@ -87,7 +86,6 @@ class NormaController:
         logger.info("Initializing services")
         self.normattiva_scraper = NormattivaScraper()
         self.eurlex_scraper = EurlexScraper()
-        self.driver_manager = WebDriverManager()
         self.pdf_extractor = PDFExtractor()
         logger.info("Services initialized")
     
@@ -829,16 +827,12 @@ class NormaController:
                     logger.info(f"PDF file exists but is empty: {pdf_path}. Regenerating.")
                     await asyncio.to_thread(os.remove, pdf_path)
 
-            # Extract the PDF using Selenium
-            driver = await asyncio.to_thread(self.driver_manager.setup_driver)
-            try:
-                pdf_extractor = PDFExtractor()
-                extracted_pdf_path = await asyncio.to_thread(
-                    pdf_extractor.extract_pdf, driver, urn
-                )
-                logger.info(f"PDF extracted: {extracted_pdf_path}")
-            finally:
-                await asyncio.to_thread(self.driver_manager.close_drivers)
+            # Extract the PDF with Playwright, through the shared browser pool, as the
+            # root app does. This used to call Selenium-era methods (`setup_driver`,
+            # `close_drivers`) that PlaywrightManager does not have, so every export
+            # that missed the cache answered 500.
+            extracted_pdf_path = await extract_pdf(urn)
+            logger.info(f"PDF extracted: {extracted_pdf_path}")
 
             # Verify the extracted PDF
             exists_extracted = await asyncio.to_thread(os.path.exists, extracted_pdf_path)

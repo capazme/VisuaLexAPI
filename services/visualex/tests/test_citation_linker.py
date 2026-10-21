@@ -371,6 +371,16 @@ class TestLongLists:
         assert len(c) > 1
 
 
+    def test_a_long_whitespace_run_after_an_eu_act_word_stays_fast(self):
+        # The text a citation is linked in is the caller's: the EU head's
+        # whitespace used to backtrack quadratically (inventory row 5.5).
+        import time
+        text = "art. 5 del regolamento" + " " * 16_000 + "fine"
+        started = time.perf_counter()
+        extract_citations(text)
+        assert time.perf_counter() - started < 1.0
+
+
 class TestContextNeedsANumber:
     """An act that needs a number ("legge") but came out without one cannot be
     opened, so it must not take over the context of the bare articles after it."""
