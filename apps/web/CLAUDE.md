@@ -162,8 +162,27 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (the column; on a phone, where the columns are stacked, the page as well when the column is not wholly
   in sight) and pulses it once (`--doc-pulse`, the theme's toga step); the box closes upwards, then the
   result comes (`AnimatePresence mode="wait"`: both at once flashed a scrollbar), and the first 8 rows
-  enter 40 ms apart, none of it under reduced motion. While `/documents` is open it refuses a file
-  dropped **anywhere in the window** but on its box (`dragover`/`drop` listeners on `window`, so the
+  enter 40 ms apart, none of it under reduced motion. **The box** (`DropZone`, D6, a native `<button>`: the click,
+  Enter and Space open the picker) follows a file from `dragover` alone — `dragenter`/`dragleave` fire between
+  children —, on `window`: `idle`, `page` (a file over the window), `over` (over the box, which leans the sheets
+  towards the pointer), back to `idle` 400 ms after the last event (the HTML standard lets a still pointer send a
+  `dragover` only every 350 ± 200 ms; the brief's 200 could rest the box under a file still held). Its frame is an SVG measured on the box: dashes
+  that stand still at rest and turn slowly under a mouse or the keyboard's focus (`vlx-dash`, `stroke-dashoffset`,
+  paused by default; Bill: nothing moves for ever on an open page), in ink and faster over the window, one line over
+  the box, all stopped in a hidden tab (`data-tab-hidden`) —
+  three strokes shown by their opacity, as the tinted ground: only transforms, opacity and the dash offset move;
+  three sheets in a pile fan out, then open wide (Framer Motion, `spring.gentle`); let go, they settle and a wave
+  runs in from the frame, and the ink sheet flies to the document's row (`SheetFlight`, in a portal, taking the
+  kind's colour by a veil's opacity). The row (`DocumentRow`, `documentJob.ts`): the kind's mark (DOCX ink, HTML
+  amber, Markdown and TXT slate), the name cut with an ellipsis, the size, «Leggo il documento…» then «Cerco le
+  citazioni…» (the search after a frame, so the words are on screen) over a bar that slides — no percentage it
+  does not know —, the check for 450 ms, then the text; a refusal turns it red, shakes it once (`vlx-shake`, 300 ms)
+  with its reason, and ✕ slides it away. «Il file resta nel tuo browser» is in the box in every state; a phone
+  says «Tocca per scegliere un documento». A polite live region says «Documento in lettura» (the search for citations is too short
+  to say), «Pronto», the refusal, then the count. Several files let go at once: the first is read, and its row says
+  «Letto il primo dei N file: uno alla volta». Under reduced motion the dashes stand, the sheets change place without
+  moving, and nothing is thrown, bounced or shaken. While `/documents` is open it refuses a file
+  dropped **anywhere in the window** but on its box (the same `dragover`/`drop` listeners on `window`, so the
   browser does not open the file in place of the app): a drop zone added elsewhere on the page, or in
   the shell, is neutralised there until those listeners let it through) and `decisions`
   (`DecisionView`, the body of a decision wherever it is drawn; `DecisionEntryView`, a practice's
@@ -2121,7 +2140,8 @@ meant to stay split; add new features as new files, not inside the shells:
   on a phone; the saved norms that changed come under the title, then the card. On `/dossier` the `h1` is the visible
   title of the list, of the open dossier and of «Cestino», and what sits under it is `h2` (a dossier's card; an open
   dossier's notes, acts, «Giurisprudenza» and «Rimossi di recente»).
-- `features/documents/` — `DocumentReviewPage.tsx` (the page), `DocumentText.tsx`, `CitationList.tsx`,
+- `features/documents/` — `DocumentReviewPage.tsx` (the page), `DropZone.tsx` (the box), `DocumentRow.tsx`
+  (the document's row and `SheetFlight`), `documentJob.ts`, `DocumentText.tsx`, `CitationList.tsx`,
   `citationGroups.ts`, `documentFile.ts`; invented sample files for the tests in `__tests__/fixtures.ts`.
 
 ## Gotchas
