@@ -86,15 +86,21 @@ def build_eu_act_pattern() -> str:
     mandatory for regulations checks the captured group afterwards through
     ``eu_act_from_groups`` — a group that exists in only one alternative cannot
     be told apart from an empty one.
+
+    Every run of whitespace is possessive (``\\s*+``): the runs sit next to
+    each other when the optional parts are absent, and a backtracking ``\\s*``
+    split a long run every way it could — «regolamento» and 16,000 spaces took
+    seconds, from the citation linker too. Nothing after a run starts with
+    whitespace, so giving one back never helped a match.
     """
     head = (
         r"\b((?:regolamento" + _EU_QUALIFIER + r"|reg\.?|direttiva" + _EU_QUALIFIER + r"|dir\.?))"
-        r"\s*(?:\(?\s*(" + _EU_MARKER + r")\s*\)?)?"
+        r"\s*+(?:\(?\s*+(" + _EU_MARKER + r")\s*+\)?)?"
     )
     return (
         head
-        + r"\s*(?:n\.?\s*)?"
-        r"(\d{1,4})\s*/\s*(\d{1,4})(\s*/\s*" + _EU_MARKER + r")?(?!\s*/\s*\d)\b"
+        + r"\s*+(?:n\.?\s*+)?"
+        r"(\d{1,4})\s*+/\s*+(\d{1,4})(\s*+/\s*+" + _EU_MARKER + r")?(?!\s*/\s*\d)\b"
     )
 
 
