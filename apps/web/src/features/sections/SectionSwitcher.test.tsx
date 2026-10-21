@@ -115,14 +115,15 @@ describe('SectionSwitcher (spec S3)', () => {
         <main>
           <Routes>
             <Route path="/studia/ripasso" element={<h1 data-section-title="gymnasium" tabIndex={-1}>Gymnasium: la tua palestra giuridica</h1>} />
-            <Route path="/dossier" element={<h2 data-section-title="opus" tabIndex={-1}>I tuoi dossier di lavoro</h2>} />
+            {/* Opus's home is the planner's «Oggi». */}
+            <Route path="/opus/oggi" element={<h1 data-section-title="opus" tabIndex={-1}>Opus: la tua officina giuridica</h1>} />
           </Routes>
         </main>
       </MemoryRouter>,
     );
     fireEvent.click(trigger(), { detail: 1 });
     fireEvent.click(screen.getByRole('menuitemradio', { name: /Opus/ }), { detail: 1 });
-    const heading = await screen.findByRole('heading', { name: 'I tuoi dossier di lavoro' });
+    const heading = await screen.findByRole('heading', { name: 'Opus: la tua officina giuridica' });
     await waitFor(() => expect(heading).toHaveFocus());
     expect(heading).toHaveAttribute('data-pointer-focus');
   });
