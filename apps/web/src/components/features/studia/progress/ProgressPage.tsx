@@ -67,7 +67,7 @@ function Summary({ data }: { data: Progressi }) {
           <span className={cn('text-sm', MUTED_TEXT)}>{recentReviews(data.materie) === 1 ? 'ripasso' : 'ripassi'} negli ultimi 30 giorni</span>
         </p>
       </div>
-      <LevelBar livello={data.livello} className="lg:max-w-md" />
+      {data.livello && <LevelBar livello={data.livello} className="lg:max-w-md" />}
     </div>
   );
 }

@@ -71,6 +71,19 @@ describe('ProgressPage (Gymnasium spec §5.3)', () => {
     expect(within(summary).getByText('Ancora 100 punti per il livello 2.')).toBeInTheDocument();
   });
 
+  it('draws the page without the level a server without the points (#253) does not send', async () => {
+    const bare: Progressi = { ...answer() };
+    delete bare.livello;
+    delete bare.missioni;
+    delete bare.crediti;
+    progress.mockResolvedValue(bare);
+    renderPage();
+    const summary = await screen.findByRole('region', { name: 'Riepilogo' });
+    expect(within(summary).getByRole('img', { name: 'Serie: 13 giorni di fila, record 27' })).toBeInTheDocument();
+    expect(within(summary).queryByTestId('level-bar')).toBeNull();
+    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Il tuo calendario', 'Le schede per stato', 'I prossimi 14 giorni', 'Per materia']);
+  });
+
   it('uses the frame\'s full width (G6): the calendar across it, the states and the coming days side by side, the subjects in two columns', async () => {
     progress.mockResolvedValue(answer());
     renderPage();

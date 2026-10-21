@@ -973,7 +973,9 @@ the list, from it they sit in the band's sticky box, read after the band. The do
    the week, **the level** (`progress/LevelBar`, G1c: «Livello 4», «oggi +45 XP», a quiet bar of `nelLivello` of `perIlProssimo` and
    «Ancora 138 XP per il livello 5», all from the read's `livello`, which the server computes; the user's alone, G-316 — never
    in the Forum, a public dossier or anything another user sees —, no title, L-27 choice 3, and never a weight of a vote,
-   G-318); the gear «Impostazioni dello
+   G-318; a read with no `livello`, `missioni` or `crediti` — a server without the points, #253 — draws no level bar and no
+   missions, «Le missioni di oggi» keeping the day's action alone, and the rest of «Oggi» and «Progressi» as before);
+   the gear «Impostazioni dello
    studio» (`progress/StudySettings`: `SettingsGear` with `aria-controls`, and `StudySettingsPanel` — G6, the owner's
    «si estende il tab»: `StudyPreferences open` inside the card under its heading, no window and no veil, its height
    in `dur.pop` on `ease.out` through Framer Motion, at once under reduced motion; the gear again or Esc inside closes it

@@ -190,7 +190,9 @@ function MissionsOfToday({ day, missions, children }: { day: Progressi; missions
 export function TodayMissions({ day, dayFailed, action, actionFailed, onRetry, subject, onAllSubjects, onStart, onOpenSettings, settingsPanel, celebrate, stampRef }: TodayMissionsProps) {
   const state = todayState(day, dayFailed, false);
   const missions = day && (state === 'todo' || state === 'done') ? todayMissions(day) : null;
-  const summary = missions ? missionSummary(missions) : null;
+  // A server without the points (#253) sends no missions: the day's action stands alone, with no «0 di 0».
+  const bare = missions !== null && missions.length === 0;
+  const summary = missions && !bare ? missionSummary(missions) : null;
   const met = day?.oggi.raggiunto ?? false;
 
   return (
@@ -242,7 +244,13 @@ export function TodayMissions({ day, dayFailed, action, actionFailed, onRetry, s
         </div>
       )}
 
-      {missions && day && (
+      {bare && (
+        <div className="mt-4">
+          <TodayAction action={action} actionFailed={actionFailed || dayFailed} subject={subject} onRetry={onRetry} onAllSubjects={onAllSubjects} onStart={onStart} met={met} />
+        </div>
+      )}
+
+      {missions && !bare && day && (
         <MissionsOfToday day={day} missions={missions}>
           {(mission) => (
             <>
