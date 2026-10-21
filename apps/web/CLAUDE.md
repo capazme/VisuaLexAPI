@@ -6,7 +6,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
 
 ### Frontend (`apps/web/src`)
 
-- `App.tsx` — routing. In the signed-in layout: `/` (search), `/dossier`,
+- `App.tsx` — routing. In the signed-in layout: `/` (search), `/dossier`, `/opus` (the planner, below: `OpusPage`
+  over `oggi`, `prossimi`, `ingresso` and `cestino`; `/opus` redirects to `oggi`),
   `/studia` (VisuaLex Gymnasium, the study cards; the code keeps the name `studia`: `StudiaPage` with its views under
   `components/features/studia/`, `studiaService`; behind `VITE_FEATURE_STUDIA`, default on
   (`features/studia/featureFlag.ts`; in production a build argument of the ingress image, key only
@@ -180,11 +181,11 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (`PAGE_TITLE`: Newsreader, 28 px on a phone, 30 px from `md`), the sentence under it (`line`, at a reading
   measure), the main action on its right from `md` and under it on a phone (`action`), and no icon beside the title;
   a header with an action pads its right side from `lg` just enough to stay clear of `Layout`'s fixed Focus button
-  (`FOCUS_BUTTON_CLEARANCE`, from `--sidebar-width` and `100vw`: up to 42 px, nothing once the window is about
-  1560 px wide — between 1024 and 1550 px the button covered «Svuota cronologia» and «Gestisci»);
+  (`FOCUS_BUTTON_CLEARANCE`, from `--sidebar-width` and `100vw`: up to 44 px, the button's width, nothing once the
+  window is about 1590 px wide — between 1024 and 1550 px the button covered «Svuota cronologia» and «Gestisci»);
   `section` marks a section's home for the switcher's focus (`data-section-title`, `tabIndex={-1}`, `FOCUS_RING`).
   It draws the dossier list, «Dossier pubblici», Community, Gymnasium (every view but the lesson, through
-  `StudiaPage`), «Analizza documento», «Collega un'app AI» (its body keeps a column of 768 px: it reads as text, the
+  `StudiaPage`), Opus's planner (`OpusPage`, its views in a 768 px column), «Analizza documento», «Collega un'app AI» (its body keeps a column of 768 px: it reads as text, the
   title does not move), the Cronologia and the MERL-T hub; «Cestino» and the MERL-T pages under a way back
   («Torna ai Dossier», «MERL-T») write their `h1` with `PAGE_TITLE`. A dossier's own page (its name, its star and
   its actions), Impostazioni (a dialog, not a page), the Scrivania, the lesson, the reader and the practice, the
@@ -195,7 +196,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `docs/superpowers/specs/2026-10-18-sections-switcher-design.md`): Corpus is the common core and no section;
   over it Opus, Gymnasium (the code's `studia`), Academia (development mode only) and Forum, in
   `features/sections/` (`sections.ts`: names, lines, icons, home addresses, `sectionForPath`; `useSection`: the
-  active section — from the address on `/studia/*`, `/forum`, `/merlt*`, `/grafo`, else the last one, kept in the
+  active section — from the address on `/opus/*`, `/studia/*`, `/forum`, `/merlt*`, `/grafo`, else the last one, kept in the
   browser under `visualex-section`, Opus by default; `SectionSwitcher`: the menu button at the top of the sidebar,
   `#tour-section-switcher`, on `ui/MenuButton` with `menuitemradio` entries, a dot for the Forum's news from
   another section). **The section change** (T1, which replaced S2's halftone on the owner's word, 21 October 2026: light, and never
@@ -228,23 +229,26 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `data-section-title="<section id>"` with `tabIndex={-1}` and `FOCUS_RING` (`PageFrame`'s `section`), so a keyboard user sees where the focus
   went — and only a keyboard user: the browser counts a focus the script gives after a focused menu entry as visible,
   so a choice made with a pointer (`MenuItem.onSelect`'s click, `detail` above 0) marks the title
-  `data-pointer-focus`, which `index.css` draws with no ring, until it loses the focus (Gymnasium's `h1`, the dossier list's `h1` — `opus` or
-  `gymnasium` by the kind it lists, since the same element stays from one to the other —, «Dossier pubblici», the
-  MERL-T hub); a new home marks its own. Under reduced motion the page changes at once and nothing moves; without View
+  `data-pointer-focus`, which `index.css` draws with no ring, until it loses the focus (Gymnasium's `h1`, Opus's — the planner's, `OpusPage`, on «Oggi» —, the dossier list's
+  `h1` — `opus` or `gymnasium` by the kind it lists, since the same element stays from one to the other —, «Dossier
+  pubblici», the MERL-T hub); a new home marks its own. Under reduced motion the page changes at once and nothing moves; without View
   Transitions the page changes at once, and only the mark and the sidebar's entries move. Choosing the section one is
   in goes to its home
   with no change shown. The sidebar: the Corpus entries for everyone — «Ricerca»
   (a link to `/` that puts the cursor in the search page's field, `focusSearchField`, with no window over it —
   the owner, 13 Oct 2026; its hover label carries ⌘K, the palette; the quick norms' dot sits under it;
   `#tour-nav-search` is what the welcome and search tours point at) and «Analizza documento» —, then the active
-  section's, in a group named after it: Opus, Dossier; Gymnasium in two groups (Gymnasium spec §4), «Studia»
+  section's, in a group named after it: Opus, «Oggi» (the home, `/opus/oggi`, with the count of overdue and today's
+  tasks, named in words: «Oggi, 3 compiti per oggi o scaduti»), «Prossimi giorni», «Lista d'ingresso» and Dossier;
+  Gymnasium in two groups (Gymnasium spec §4), «Studia»
   (Oggi, the home `/studia/ripasso`, Progressi, `/studia/progressi`, and Dossier) and «Contribuisci» (Le mie schede, Da validare for validators);
   Academia, Assistente and Grafo (`VITE_FEATURE_MERLT*`); Forum, «Dossier pubblici» (`/forum`, with the Forum's count;
   `end`, so it is not active under `/forum/community`) and «Community» — the section keeps its name and its areas are
   named apart, so «Forum» is never written twice. The section's line is «Dossier pubblici e community»; its title
   with a phrase, «Forum: il luogo del dibattito giuridico» (the owner's, 19 Oct 2026), is the Community page's `h1`;
-  the sections' phrases live in `SECTION_TITLES` (`sections.ts`) only, with Opus's «Opus: la tua officina giuridica»
-  not shown yet (its page takes it in its own change).
+  the sections' phrases live in `SECTION_TITLES` (`sections.ts`) only; Opus's «Opus: la tua officina giuridica» is the
+  planner's `h1` (`OpusPage`). The switcher's Opus entry carries the same count as «Oggi» (`MenuItem.badgeLabel` names
+  what a count counts; without it «N notifiche»), and no dot: it is a to-do, not news. A count is 11 px on red 600.
   **Words, not only icons** (`layout`, `sidebarWidth.ts`): from `xl` the desktop column is a 224 px bar with
   icon and word and the groups' headings (the section's name, or «Studia» and «Contribuisci»), the palette's
   shortcut beside «Ricerca» (⌘K on a Mac, Ctrl K elsewhere); between `lg` and `xl` the 64 px rail of icons, each labelled on hover and keyboard focus; below
@@ -401,7 +405,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   enters in `dur.panel` on `ease.drawer`, growing from 0.97, and `Sheet` rises from its edge on the same
   timing (its «Chiudi» in ink-500, dark ink-400: over 3:1, since it is often the one way out); both only fade under reduced motion (`useReducedMotion`). `Toast` takes `spring.snappy`, rises
   from the edge it lives on and pauses its time while `document.hidden`; the undo toast's countdown lives
-  in `useUndoableAction` and does not pause. `Tooltip` waits 500 ms under a pointer, opens at once and
+  in `useUndoableAction` and does not pause. One undo toast at a time: `showUndoToast` dismisses the one on
+  screen (it resolves as kept) before it shows its own — two countdowns used to take turns on the one container,
+  and two tasks ticked in a row flickered between their messages. Its «Annulla» and close are 44 px at every width. `Tooltip` waits 500 ms under a pointer, opens at once and
   without motion within 300 ms of another closing, and at once on keyboard focus.
   Interaction tokens live in `constants/interactions.ts`, stacking bands in
   `constants/zIndex.ts`. Compose these rather than hand-rolling Tailwind: `TRANSITION` names the
@@ -415,6 +421,72 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   celebration's stamp is the one exception. A row or a list item takes a colour change on hover, never a
   scale or a lift.
 
+### The planner (Opus, wave 1)
+
+Personal tasks, filed under a dossier or in the inbox, with a planned date and a deadline the user writes
+(`/api/tasks`, `apps/server/CLAUDE.md`). `components/features/planner/`; `types/tasks.ts`; `services/taskService.ts`
+(maps the snake_case answer once). Wording: no string may suggest a computed deadline (`plannerStyle.test.ts`
+checks the files; «termine calcolato» comes with wave 2 and its warning), and no Todoist names, icons or texts.
+
+- **Pages**: `OpusPage` (in `PageFrame` with `section="opus"`: the section's title, which the switcher focuses,
+  «Cestino dei compiti» as its action, the view in a 768 px column), `OpusViews`: `TodayView` (the
+  missed deadlines under «Termini scaduti» — a past deadline is always there, whatever the planned date —, then the
+  tasks planned before today whose deadline is not past or absent under «In ritardo», then «Oggi»: `splitToday`;
+  the owner's choice after the first pass, 20 October 2026), `UpcomingView` (today and six days, a task
+  once, under its planned date when in range, else its deadline: `groupUpcoming`), `InboxView` (no dossier),
+  `TaskTrashView` (`view=trash`: a task's trash is `deletedAt` on the row, not a `TrashEntry`, so it is not in the
+  dossiers' `TrashPage`; «Ripristina», 30 days). «Today» is the server's day (`TaskViewAnswer.today`), never the browser's.
+- **The row** (`TaskRow`): a real checkbox (Space ticks it), the title as a button (opens `TaskDialog`), then the
+  deadline first and bordered with its count (`countdown`: «scaduto da 2 giorni», «scade oggi», «manca 1 giorno»,
+  «mancano 3 giorni»), the planned day, the repetition, the priority in words (1 «Urgente» is the most urgent, 4
+  «Normale» the default and not shown) with a 4 px stripe — red, amber, ink: not a red-orange-blue scale with the
+  last unmarked, which is another app's look —, the labels (first letter capitalised, as the dossiers' tags: `tagLabel`; stored as typed), the dossier (a link; not in the dossier's own
+  panel), «⋯» (Modifica, Aggiungi un sottocompito, Sposta nel cestino). `TaskList` nests subtasks one level under a
+  parent in the same list (`nestTasks`; deeper ones under the top ancestor); the arrows, Home and End move between
+  the rows' ticks across every list of the page (`moveBetweenRows`, `data-task-lists`). A row that leaves (ticked,
+  trashed) first hands the focus to the next row's tick, else the previous one's, else the view's heading
+  (`focusAwayFrom`, `data-focus-fallback`), so Space and the arrows go on.
+- **Writes** (`taskActions.ts`): a tick hides the row — until an answer read after the write landed
+  (`optimistic.landed`, the write counter): a read that started before, or a failed one keeping the last answer,
+  would show it again, not done — then `POST /complete` — a repeating task with its current
+  `plannedDate` (the server needs it, and a stale one is a 409) — and the undo toast: «Annulla» reopens, or for a
+  repeating task (`recurred`) puts the planned date back with a `PUT`. A deletion goes to the trash with its
+  subtasks, «Annulla» restores. A refusal shows the row again and the server's Italian `detail` in the planner's toast
+  — and a 4xx (409, 404) makes the views read again, or the stale row would be refused the same way at every try
+  (`PlannerHost`, at the top: the undo toast holds the bottom). Every write bumps `plannerStore.version` and every view
+  mounted reads again; nothing holds tasks between reads. No toast, log or error carries a task's title (it may name a
+  client): `useTaskView` and the count log a status only.
+- **Adding**: `QuickAddField` at the top of each view (a title and Enter; «Dettagli» for dates, priority and dossier;
+  a line says where the task goes; a task that will not show in the view is announced); «c» (as in «compito») from anywhere opens
+  `TaskDialog` in `create` mode (`PlannerHost`, mounted by `Layout`; not in a field, with a modifier, or under a dialog,
+  a menu or a `data-find-overlay`), with the dossier chosen on `/dossier?dossier=` and today's date on «Oggi» and
+  «Prossimi giorni»; a task the page will not list is announced, as from the field; listed in the «?» dialog. No date
+  is read from the words (wave 2). The origin follows the dossier's kind (`studio` or `lavoro`).
+- **The dialog** (`TaskDialog`, a `ui/Modal`): every field (`TaskFields`; a repetition and a deadline switch each
+  other off, and the times need their dates), the subtasks of a top-level task (read from its dossier's or the inbox's
+  view) with a field to add one, «Sposta nel cestino». `taskDraft.ts` checks what the server would refuse before
+  sending and builds the input (a subtask's dossier is never sent: it is its parent's).
+- **The dossier's panel** (`DossierTasksPanel`, after the header of `DossierDetailView`): its open tasks and the quick
+  add with the dossier fixed.
+- **The count** beside «Oggi» and on the switcher's Opus entry: the today view's length, set by `TodayView`'s read
+  and by `PlannerHost` every two minutes while the tab is visible and after every write.
+- **A new day**: every read stores the server's day (`plannerStore.today`); when one answers a different day (the
+  count's, every two minutes) or the tab comes back into view, every view mounted reads again, and the quick add,
+  keyed on the day, proposes the new one. A page left open overnight no longer files the morning's first task under
+  yesterday.
+- **Focus after the dialog**: a task trashed from its dialog, or saved out of the view, leaves after the dialog gave
+  its row the focus back; `focusWhenRowLeaves` watches for a few seconds and hands the focus to the row's neighbour
+  (or the heading) when no row of the task is left. A subtask ticked in the dialog hands it to the next subtask, else
+  the field to add one.
+- **Origin**: a task's origin follows its dossier's kind when it is created or moved to another dossier (`studio`
+  for a dossier di studio, else `lavoro`; a `forum` origin is kept); a subtask takes its parent's.
+- Style: Gymnasium's tokens (`studia/progress/tokens.ts`) and `plannerStyles.ts`; every control 44 px at every width
+  and no text under 11 px (`plannerStyle.test.ts` reads the folder). The tick (`TaskCheckbox`) is the native checkbox
+  as a transparent 44 px square over the 20 px box it draws; the title is a 44 px button; the dossier's link is 44 px
+  tall with its extra height laid over the gaps (`-my-3.5`). **A list that is a `grid` gets `grid-cols-1`** (a track
+  that may shrink): with the implicit `auto` track one `truncate` line — the dossier's name — widened every row to
+  763 px on a 390 px phone and clipped it (seen by «occhi», the headless pass, 20 October 2026).
+
 ## Frontend State
 
 One Zustand store (`store/useAppStore.ts`) with Immer. Always mutate through
@@ -426,7 +498,9 @@ annotations and highlights (these two hydrate per-article via
 `loadAnnotationsForArticle` / `loadHighlightsForArticle`). The search history is
 not a store slice: `HistoryView` keeps it in local state and reloads it on mount.
 
-**Not in the store:** study cards are server state fetched per view (`studiaService`, `useMyCards`,
+**Not in the store:** the planner's tasks are server state read per view (`planner/useTaskView`; see «The
+planner» above), never in `useAppStore`; `planner/plannerStore` holds only what the planner's surfaces share
+(a write counter, the bar's count, the server's day, the quick-add dialog, the planner's toast). Study cards are server state fetched per view (`studiaService`, `useMyCards`,
 `useArticleCards` over `utils/articleCardsCache.ts`, `useReviewSession`), never in `useAppStore`.
 
 **UI-only** (persisted to `localStorage` through the `persist` partialize):
@@ -1311,7 +1385,9 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   «Da «dossier»», «Schede di studio» by their first questions) and a dossier's
   own «Rimossi di recente (n)» at its bottom (`DossierRecentlyRemoved`). Each
   entry (`TrashEntryRow`, `trashSummary.ts`) is restored whole — a 409 asks
-  which dossier to restore into — or emptied behind a danger confirmation; a
+  which dossier to restore into; a 404 drops an entry the server no longer has, and with a dossier
+  chosen the trash is read again to tell that from the chosen dossier gone (asked again) — or
+  emptied behind a danger confirmation; a
   restore reloads that dossier from the server (`refreshDossier`). A dossier deleted
   from the web goes there (owner, 13 October 2026, question 160): `deleteDossierWithUndo`
   (`dossier/deleteDossierWithUndo.ts`, the list's and the detail's «Elimina») removes it
@@ -1646,7 +1722,7 @@ Duplicating any of these is a defect, not a shortcut.
 - `utils/tagLabel.ts` — `tagLabel(tag)`: a dossier's tag as shown, its first letter capitalised and
   the rest as typed («accesso» → «Accesso», «DPO» stays). Display only — the stored tag never changes,
   every filter compares stored values, and the PDF and the editors show the tag as typed. The list's
-  card, the dossier's header, the import dialog and the Forum's card go through it.
+  card, the dossier's header, the import dialog, the Forum's card and a planner task's labels go through it.
   `tagCategories(tags)` makes the dossier list's category menu (Italian alphabetical order, case and
   accents ignored; values that differ only by case are one category filtering all of them, labelled by
   the spelling with the most capitals) and `hasTagCategory` filters by it.
@@ -1900,6 +1976,9 @@ meant to stay split; add new features as new files, not inside the shells:
   the dossier's «Apri tutto» (`dossier/openInPractice.ts`: one practice, its decisions unread, identified
   from what the dossier kept, `addKnownDecisions`, so «Salva come dossier» saves them back) land in
   the practices.
+- `features/planner/` — Opus's planner: pages and views (`OpusPage`, `OpusViews`), the row and its list, the
+  dialog and its fields, the quick add, `PlannerHost` (mounted by `Layout`), the dossier's panel; the pure helpers
+  (`taskDates`, `taskTree`, `taskDraft`, `splitLinks`, `moveBetweenRows`) apart from the components. See «The planner».
 - `features/history/` — `HistoryView.tsx`, `DecisionHistoryRow.tsx` (a decision's row) plus
   `NormaChangesSection.tsx` (see History above). The page is in the sections' frame (W2): one `h1`, «Cronologia», on
   every width, with the one search field (`#tour-history-search`, «/» focuses it) and «Svuota cronologia» beside it

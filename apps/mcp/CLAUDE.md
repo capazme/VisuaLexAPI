@@ -78,7 +78,10 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   decision «B»); an Accept with the box empty is told to tick it, apart from a
   Decline. The box's label is «Confermo», short enough for a terminal. The
   dossier's title (another user's, when it came with an environment) sits in
-  «» and is cut at 60 characters. `lingolex_elimina_card` is the third destructive tool
+  «» and is cut at 60 characters. A whole dossier's dialog also says how many planner tasks go
+  with it («con 3 voci e 3 compiti», from the server's `task_count`; never their titles, which may
+  name a client), and that number travels with the move as `taskCount`, so a dossier that gained or
+  lost a task meanwhile is a 409 (owner, 20 October 2026). `lingolex_elimina_card` is the third destructive tool
   (below); `tests/tools.test.ts` fails if any other tool becomes destructive. Adding a tool means adding its route to `apps/server`'s
   `oauth/delegatedRoutes.ts`, which is a security decision.
 - **LingoLex cards** (`src/tools/cards.ts`; second-round spec §6) —

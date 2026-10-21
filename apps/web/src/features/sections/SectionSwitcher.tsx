@@ -2,6 +2,8 @@ import { MenuButton } from '../../components/ui/MenuButton';
 import { cn } from '../../lib/utils';
 import { useSection } from './useSection';
 import { SECTION_HOME_CODE } from './sections';
+import { plannerStore } from '../../components/features/planner/plannerStore';
+import { todayCountLabel } from '../../components/features/planner/taskDates';
 
 /**
  * The switcher at the top of the sidebar, where the open book was (spec S3): the active section's
@@ -13,6 +15,8 @@ import { SECTION_HOME_CODE } from './sections';
 export function SectionSwitcher({ forumCount, onChoose, withName = false, inDrawer = false }: { forumCount: number; onChoose?: () => void; withName?: boolean; inDrawer?: boolean }) {
   const { section, active, sections, chooseSection } = useSection();
   const forumDot = forumCount > 0 && section !== 'forum';
+  // Opus's count (overdue plus today's tasks) rides its entry, as the Forum's does; no dot: it is a to-do, not news.
+  const opusCount = plannerStore((s) => s.todayCount) ?? 0;
 
   return (
     <MenuButton
@@ -32,7 +36,8 @@ export function SectionSwitcher({ forumCount, onChoose, withName = false, inDraw
         description: s.line,
         icon: s.icon,
         checked: s.id === section,
-        badge: s.id === 'forum' ? forumCount : undefined,
+        badge: s.id === 'forum' ? forumCount : s.id === 'opus' ? opusCount : undefined,
+        badgeLabel: s.id === 'opus' ? todayCountLabel(opusCount) : undefined,
         // A key's click (Enter, Space) has `detail` 0.
         onSelect: (event) => {
           chooseSection(s.id, { still: inDrawer, byPointer: event.detail > 0 });

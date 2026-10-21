@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import type { Prisma } from '@prisma/client';
 import { request, app, prisma, createTestUser, authHeader, type TestUser } from './helpers';
 import { exchangeCode, startAuthorization, tokenExchange } from './oauth/oauthHelpers';
 import { spendDelegatedCounter } from '../src/middleware/delegated';
@@ -52,7 +53,7 @@ describe('the trash', () => {
 
   it('moves a whole dossier, with its entries and snapshots, into one entry', async () => {
     const { bearer } = await connected(alice);
-    const moved = await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({ itemIds: [art3, art25, noteId] });
+    const moved = await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({ itemIds: [art3, art25, noteId], taskCount: 0 });
     expect(moved.status).toBe(200);
     expect(moved.body).toMatchObject({ itemCount: 3 });
     expect(await prisma.dossier.count({ where: { id: dossierId } })).toBe(0);
@@ -66,20 +67,20 @@ describe('the trash', () => {
     const { bearer } = await connected(alice);
     // An entry added while the user was reading the confirmation dialog.
     const late = await addItem(dossierId, { itemType: 'norm', title: 'legge', content: law('9') });
-    const refused = await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({ itemIds: [art3, art25, noteId] });
+    const refused = await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({ itemIds: [art3, art25, noteId], taskCount: 0 });
     expect(refused.status).toBe(409);
     expect(refused.body.detail).toBe('Il dossier è cambiato dopo la conferma: nulla è stato eliminato.');
     expect(await prisma.dossierItem.count({ where: { dossierId } })).toBe(4);
     expect(await prisma.trashEntry.count()).toBe(0);
     expect((await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({})).status).toBe(400);
-    const moved = await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({ itemIds: [late, noteId, art25, art3] });
+    const moved = await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({ itemIds: [late, noteId, art25, art3], taskCount: 0 });
     expect(moved.status).toBe(200);
   });
 
   it('a dossier deleted from the web app goes to the trash as the user\'s own, and comes back whole (question 160)', async () => {
     const deleted = await request(app).delete(`/api/dossiers/${dossierId}`).set(authHeader(alice));
     expect(deleted.status).toBe(200);
-    expect(deleted.body).toEqual({ trashId: expect.any(String), itemCount: 3 });
+    expect(deleted.body).toEqual({ trashId: expect.any(String), itemCount: 3, taskCount: 0 });
     expect(await prisma.dossier.count({ where: { id: dossierId } })).toBe(0);
     const list = (await request(app).get('/api/trash').set(authHeader(alice))).body;
     expect(list).toEqual([expect.objectContaining({
@@ -166,7 +167,7 @@ describe('the trash', () => {
   it('restores a dossier with the same ids for the dossier, its entries and its snapshots', async () => {
     const { bearer } = await connected(alice);
     const before = await prisma.dossierSnapshot.findMany({ where: { dossierId } });
-    await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({ itemIds: [art3, art25, noteId] });
+    await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({ itemIds: [art3, art25, noteId], taskCount: 0 });
     const [entry] = (await request(app).get('/api/trash').set(authHeader(alice))).body;
     const restored = await request(app).post(`/api/trash/${entry.id}/restore`).set(authHeader(alice)).send({});
     expect(restored.status).toBe(200);
@@ -191,7 +192,7 @@ describe('the trash', () => {
       snapshots: await prisma.dossierSnapshot.findMany({ where: { dossierId } }),
     };
     const { bearer } = await connected(alice);
-    await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({ itemIds: [art3, art25, noteId] });
+    await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({ itemIds: [art3, art25, noteId], taskCount: 0 });
     const [entry] = (await request(app).get('/api/trash').set(authHeader(alice))).body;
     expect((await request(app).post(`/api/trash/${entry.id}/restore`).set(authHeader(alice)).send({})).status).toBe(200);
     expect(strip(await prisma.dossier.findUniqueOrThrow({ where: { id: dossierId } }))).toEqual(before.dossier);
@@ -203,7 +204,7 @@ describe('the trash', () => {
     const author = await createTestUser('trash-gone-author');
     await prisma.dossier.update({ where: { id: dossierId }, data: { originalAuthorId: author.id } });
     const { bearer } = await connected(alice);
-    await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({ itemIds: [art3, art25, noteId] });
+    await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({ itemIds: [art3, art25, noteId], taskCount: 0 });
     await prisma.user.delete({ where: { id: author.id } });
     const [entry] = (await request(app).get('/api/trash').set(authHeader(alice))).body;
     expect((await request(app).post(`/api/trash/${entry.id}/restore`).set(authHeader(alice)).send({})).status).toBe(200);
@@ -263,6 +264,93 @@ describe('the trash', () => {
     expect(await prisma.trashEntry.count()).toBe(0);
   });
 
+  /**
+   * Runs `hold` in a transaction on another connection, starts the restore while it is open, and
+   * commits only once the restore is waiting on a lock it holds: the restore has read the entry and
+   * reached the write that waits, so the test passes through that path, not a 404 read up front.
+   */
+  async function restoreDuring(
+    hold: (tx: Prisma.TransactionClient) => Promise<unknown>,
+    trashId: string,
+    { restores = 1, then }: { restores?: number; then?: (tx: Prisma.TransactionClient) => Promise<unknown> } = {},
+  ) {
+    const restoring: Promise<{ status: number; body: { detail?: string } }>[] = [];
+    await prisma.$transaction(async (tx) => {
+      await hold(tx);
+      for (let i = 0; i < restores; i += 1) {
+        restoring.push(request(app).post(`/api/trash/${trashId}/restore`).set(authHeader(alice)).send({}).then((res) => res));
+      }
+      for (let waited = 0; ; waited += 50) {
+        const [{ waiting }] = await prisma.$queryRaw<{ waiting: number }[]>`SELECT count(*)::int AS waiting FROM pg_locks WHERE NOT granted`;
+        if (waiting >= restores) break;
+        if (waited > 4000) throw new Error('the restore never waited on the lock');
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      await then?.(tx);
+    }, { timeout: 10_000 });
+    return Promise.all(restoring);
+  }
+
+  it('a restore whose entry is purged meanwhile is a 404, and restores nothing', async () => {
+    const { bearer } = await connected(alice);
+    await request(app).post(`/api/dossiers/${dossierId}/trash-items`).set(bearer).send({ itemIds: [art3] });
+    const [entry] = (await request(app).get('/api/trash').set(authHeader(alice))).body;
+    // A purge in flight: the entry deleted, not yet committed.
+    const [res] = await restoreDuring((tx) => tx.trashEntry.delete({ where: { id: entry.id } }), entry.id);
+    expect(res.status).toBe(404);
+    expect(res.body.detail).toBe('Elemento del cestino non trovato.');
+    expect(await prisma.dossierItem.findUnique({ where: { id: art3 } })).toBeNull();
+  });
+
+  it('entries restored into a dossier going to the trash meanwhile ask where, and stay in the trash', async () => {
+    const { bearer } = await connected(alice);
+    await request(app).post(`/api/dossiers/${dossierId}/trash-items`).set(bearer).send({ itemIds: [art3] });
+    const [entry] = (await request(app).get('/api/trash').set(authHeader(alice))).body;
+    // The dossier's deletion in flight: its row locked and deleted, not yet committed.
+    const [res] = await restoreDuring(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM dossiers WHERE id = ${dossierId} FOR UPDATE`;
+      await tx.dossier.delete({ where: { id: dossierId } });
+    }, entry.id);
+    expect(res.status).toBe(409);
+    expect(res.body.detail).toBe('Il dossier non esiste più: scegli dove ripristinare.');
+    expect(await prisma.trashEntry.findUnique({ where: { id: entry.id } })).not.toBeNull();
+  });
+
+  it('two restores of one entry at once: one brings it back, the other is a 404', async () => {
+    const { bearer } = await connected(alice);
+    await request(app).post(`/api/dossiers/${dossierId}/trash-items`).set(bearer).send({ itemIds: [art3] });
+    const [entry] = (await request(app).get('/api/trash').set(authHeader(alice))).body;
+    // Both held on the entry's row, so both have read it before either deletes it.
+    const answers = await restoreDuring((tx) => tx.$queryRaw`SELECT id FROM trash_entries WHERE id = ${entry.id} FOR UPDATE`, entry.id, { restores: 2 });
+    expect(answers.map((res) => res.status).sort()).toEqual([200, 404]);
+    expect(answers.find((res) => res.status === 404)?.body.detail).toBe('Elemento del cestino non trovato.');
+    expect(await prisma.dossierItem.findUniqueOrThrow({ where: { id: art3 } })).toMatchObject({ dossierId });
+  });
+
+  it("a dossier's restore and the admin's withdrawal of its published copy take their locks in one order", async () => {
+    const copy = await prisma.sharedEnvironment.create({
+      data: { title: 'Copia', category: 'civil', tags: [], userId: alice.id, content: {}, sourceDossierId: dossierId },
+    });
+    const { trashId } = (await request(app).delete(`/api/dossiers/${dossierId}`).set(authHeader(alice))).body;
+    const entry = await prisma.trashEntry.findUniqueOrThrow({ where: { id: trashId } });
+    expect((entry.payload as { publishedCopyId?: string }).publishedCopyId).toBe(copy.id);
+    // The withdrawal's steps (sharedEnvironmentController): the copy first, then the trash entry it rewrites.
+    const now = new Date().toISOString();
+    const [res] = await restoreDuring(
+      (tx) => tx.sharedEnvironment.update({ where: { id: copy.id }, data: { isActive: false, withdrawnByAdminAt: new Date(now) } }),
+      trashId,
+      {
+        then: (tx) => tx.$executeRaw`
+          UPDATE "trash_entries"
+          SET "payload" = jsonb_set("payload", '{dossier,forumBlockedAt}', to_jsonb(${now}::text))
+          WHERE "user_id" = ${alice.id} AND "kind" = 'DOSSIER' AND "payload"->>'publishedCopyId' = ${copy.id}`,
+      },
+    );
+    expect(res.status).toBe(200);
+    // The restore waited for the withdrawal and brought the block back with the dossier.
+    expect((await prisma.dossier.findUniqueOrThrow({ where: { id: dossierId } })).forumBlockedAt?.toISOString()).toBe(now);
+  });
+
   it('the sweep removes expired entries only', async () => {
     const { bearer } = await connected(alice);
     await request(app).post(`/api/dossiers/${dossierId}/trash-items`).set(bearer).send({ itemIds: [art3] });
@@ -275,7 +363,7 @@ describe('the trash', () => {
 
   it('goes with the account', async () => {
     const { bearer } = await connected(alice);
-    await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({ itemIds: [art3, art25, noteId] });
+    await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({ itemIds: [art3, art25, noteId], taskCount: 0 });
     await deleteUserAccount(alice.id);
     expect(await prisma.trashEntry.count()).toBe(0);
   });
@@ -296,7 +384,7 @@ describe('the trash', () => {
     expect((await request(app).post(`/api/trash/${entry.id}/restore`).set(bearer).send({})).status).toBe(403);
     expect((await request(app).delete(`/api/trash/${entry.id}`).set(bearer)).status).toBe(403);
     // The whole dossier, with seen ids, is for connected applications: the web app uses DELETE /dossiers/:id.
-    expect((await request(app).post(`/api/dossiers/${dossierId}/trash`).set(authHeader(alice)).send({ itemIds: [] })).status).toBe(403);
+    expect((await request(app).post(`/api/dossiers/${dossierId}/trash`).set(authHeader(alice)).send({ itemIds: [], taskCount: 0 })).status).toBe(403);
     expect(await prisma.dossier.count({ where: { id: dossierId } })).toBe(1);
     const own = await request(app).post(`/api/dossiers/${dossierId}/trash-items`).set(authHeader(alice)).send({ itemIds: [art25] });
     expect(own.status).toBe(200);
@@ -369,7 +457,7 @@ describe('the trash', () => {
   it("another user's dossier is a 404 for both moving routes, and nothing moves (security review of PR 3)", async () => {
     const bob = await createTestUser('trash-bob3');
     const { bearer } = await connected(bob);
-    expect((await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({ itemIds: [] })).status).toBe(404);
+    expect((await request(app).post(`/api/dossiers/${dossierId}/trash`).set(bearer).send({ itemIds: [], taskCount: 0 })).status).toBe(404);
     expect((await request(app).post(`/api/dossiers/${dossierId}/trash-items`).set(bearer).send({ itemIds: [art3] })).status).toBe(404);
     expect(await prisma.dossierItem.count({ where: { dossierId } })).toBe(3);
     expect(await prisma.trashEntry.count()).toBe(0);

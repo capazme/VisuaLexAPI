@@ -242,10 +242,29 @@ describe('omnilex_elimina_dossier', () => {
     expect(asked[0].message).toMatch(/dossier «Prova» con 3 voci/);
     // The entries shown travel with the move: the server refuses it if the dossier changed meanwhile.
     expect(trashCalls()).toEqual([
-      expect.objectContaining({ path: '/dossiers/d1/trash', bearer: 'api-token-for-content:delete', body: { itemIds: ['i1', 'i2', 'n1'] } }),
+      expect.objectContaining({ path: '/dossiers/d1/trash', bearer: 'api-token-for-content:delete', body: { itemIds: ['i1', 'i2', 'n1'], taskCount: 0 } }),
     ]);
-    expect(JSON.parse(text(result))).toMatchObject({ dossier_nel_cestino: 'Prova', voci: 3 });
+    expect(JSON.parse(text(result))).toMatchObject({ dossier_nel_cestino: 'Prova', voci: 3, compiti: 0 });
+    // No task, no word about tasks.
+    expect(asked[0].message).not.toMatch(/compit/);
     await client.close();
+  });
+
+  it('says how many planner tasks go with the dossier, without listing them, and the server checks that number', async () => {
+    env.stub.dossiers[0].task_count = 3;
+    const client = await connect();
+    const result = await client.callTool({ name: 'omnilex_elimina_dossier', arguments: { dossier: 'Prova' } });
+    expect(asked[0].message.split('\n')[0]).toBe('ELIMINAZIONE — Spostare nel cestino il dossier «Prova» con 3 voci e 3 compiti?');
+    expect(trashCalls()).toEqual([expect.objectContaining({ path: '/dossiers/d1/trash', body: { itemIds: ['i1', 'i2', 'n1'], taskCount: 3 } })]);
+    expect(JSON.parse(text(result))).toMatchObject({ voci: 3, compiti: 3 });
+    await client.close();
+  });
+
+  it('one task is «e 1 compito»; entries alone never mention tasks', () => {
+    expect(deletionMessage({ dossierName: 'Prova', lines: [], total: 0, wholeDossier: true, tasks: 1 }).split('\n')[0]).toBe(
+      'ELIMINAZIONE — Spostare nel cestino il dossier «Prova» con 0 voci e 1 compito?',
+    );
+    expect(deletionMessage({ dossierName: 'Prova', lines: ['Nota'], total: 1, tasks: 4 })).not.toMatch(/compit/);
   });
 
   it('a dossier that changed after the question is reported, and nothing is deleted', async () => {
