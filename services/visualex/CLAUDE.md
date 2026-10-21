@@ -336,7 +336,25 @@ cannot be read): `{state, valid_from, valid_to, version_number, act_updated,
 request_in_window}`, dates in ISO form. It is the source's own statement of which
 version came back; `norma_data.data_versione` is only the date the caller sent. A
 `version_date` after today (Europe/Rome) is a 400 — Normattiva would answer with the
-current text and say nothing.
+current text and say nothing — and so is one that cannot be read as a date.
+
+A date always asks for the text in force on that day, with or without «vigente» and
+over «originale» (owner, G-353; `append_version_info` writes `!vig=<day>`, and the AKN
+fallback reads the export at that day, never the original from today's). A request
+with no date is the text in force: Normattiva answers it with its latest version, also
+one not in force yet (art. 3 d.P.R. 131/1986 on 21 October 2026: repealed from 1
+January 2027). When the page's window starts after today (`starts_after_today`), the
+handlers read the article at today (`!vig=<today>`) and serve that text, its `url` and
+its `validity`, with the later version in `upcoming` (owner, G-355;
+`NormaController._document_in_force`): `{change: "abrogated" | "amended", valid_from,
+version_number}`, absent otherwise. `norma_data` stays the request's (no date), so the
+key notes and highlights are stored under does not move. The first page stands as before,
+its `validity` saying when it starts, when today's cannot be read and when nothing is in
+force today (today's page is `not_yet`, an article inserted from a later day, or itself
+starts after today). The text comes from the scraper's memory and the page from the
+persistent cache, which can expire first after a restart: for an undated request whose
+page has left the cache it is read once more, so a later version is never served
+unrecognised (and a watched norm does not flip between two texts).
 
 Root `app.py` maps failures through `_error_response`, so the status now carries
 meaning: `ValidationError` → 400 (missing `act_type`/`article`, malformed article
