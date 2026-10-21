@@ -68,15 +68,22 @@ export function Layout() {
   const storedSection = sectionStore((s) => s.section);
   const sectionName = SECTIONS.find((s) => s.id === (sectionForPath(pathname) ?? storedSection))?.name ?? 'VisuaLex';
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
-  const phoneBar = useHideOnScroll(scroller, { enabled: showPhoneBar && !sidebarOpen, resetKey: pathname });
+  const [phoneBarElement, setPhoneBarElement] = useState<HTMLElement | null>(null);
+  const phoneBar = useHideOnScroll(scroller, { enabled: showPhoneBar && !sidebarOpen, resetKey: pathname, bar: phoneBarElement });
   // The services' probe, once for both copies of the sidebar and running with the menu closed (S1): its
   // status is the user menu's «Stato dei servizi», and a fault is a dot on the user button and, on a
   // phone, on the button that opens the drawer, whose names say it.
   const serviceHealth = useServiceHealth();
   const servicesNotice = serviceHealthNeedsNotice(serviceHealth.snapshot.overall);
-  // An entry of the drawer's user menu closes the drawer, whose controls are then out of reach (`inert`): the focus goes
-  // to the menu button, where a dialog the entry opens gives it back.
+  // Closing the drawer (an entry, a link, the backdrop) puts its controls out of reach (`inert`): the focus they held goes
+  // to the menu button, where a dialog an entry opens gives it back and a section's new title may still take it.
   const menuToggleRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const closeDrawer = () => {
+    setSidebarOpen(false);
+    const active = document.activeElement;
+    if (!active || active === document.body || drawerRef.current?.contains(active)) menuToggleRef.current?.focus({ preventScroll: true });
+  };
   const menuToggle = {
     buttonRef: menuToggleRef,
     open: sidebarOpen,
@@ -197,7 +204,7 @@ export function Layout() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
+          onClick={closeDrawer}
         />
       )}
 
@@ -229,14 +236,13 @@ export function Layout() {
 
       {/* Mobile Sidebar */}
       {!settings.focusMode && (
-        <div className="lg:hidden">
+        <div ref={drawerRef} className="lg:hidden">
           <Sidebar
             theme={settings.theme}
             toggleTheme={toggleTheme}
             isOpen={sidebarOpen}
             layout="drawer"
-            closeMobile={() => setSidebarOpen(false)}
-            focusAfterMenu={() => menuToggleRef.current?.focus()}
+            closeMobile={closeDrawer}
             openSettings={() => setSettingsOpen(true)}
             openKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
             openFeedback={isAuthenticated ? () => setFeedbackOpen(true) : undefined}
@@ -286,6 +292,7 @@ export function Layout() {
             title={phoneBarTitle(pathname, sectionName)}
             hidden={phoneBar.hidden}
             onReveal={phoneBar.reveal}
+            barRef={setPhoneBarElement}
             onSearch={openCommandPalette}
           />
         )}
@@ -309,7 +316,14 @@ export function Layout() {
 
         {/* Content Area. `vlx-page`: the one part a section change's View Transition animates (index.css, T1); the
             sidebar, the floating buttons and the search bar stay still. */}
-        <div ref={setScroller} className="vlx-page flex-1 overflow-y-auto w-full h-full">
+        <div
+          ref={setScroller}
+          className={cn(
+            'vlx-page flex-1 overflow-y-auto w-full h-full',
+            // What the keyboard's focus or an anchor scrolls to stops under the phone's bar, not behind it (WCAG 2.4.11).
+            showPhoneBar && 'max-lg:scroll-pt-[calc(3.5rem+env(safe-area-inset-top)+0.5rem)]',
+          )}
+        >
           <div data-testid="layout-content" className={cn(
             'max-w-7xl mx-auto p-4 md:p-8',
             // Under the phone's bar, 56 px and the iPhone's top edge, with the page's 16 px of air (md: again, or

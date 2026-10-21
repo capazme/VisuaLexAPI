@@ -56,17 +56,35 @@ describe('Layout — the phone\'s bar below lg (M1)', () => {
   });
 
   it('sets where sticky rows pin under it, and clears it once the bar slides away scrolling down', () => {
-    at('/studia/schede');
-    const main = document.querySelector('main')!;
-    expect(main).toHaveClass('max-lg:[--phone-bar-offset:calc(3.5rem+env(safe-area-inset-top))]');
-    expect(main).not.toHaveClass('max-md:[--phone-bar-offset:0px]');
-    const scroller = screen.getByTestId('layout-content').parentElement!;
-    Object.defineProperty(scroller, 'scrollTop', { value: 400, configurable: true });
-    act(() => {
-      scroller.dispatchEvent(new Event('scroll'));
-    });
-    expect(screen.getByTestId('phone-top-bar')).toHaveClass('max-md:-translate-y-full');
-    expect(main).toHaveClass('max-md:[--phone-bar-offset:0px]');
+    const original = window.matchMedia;
+    // A phone: the bar moves below md only.
+    window.matchMedia = ((query: string) => ({ ...original(query), matches: query === '(max-width: 767.98px)' })) as typeof window.matchMedia;
+    try {
+      at('/studia/schede');
+      const main = document.querySelector('main')!;
+      expect(main).toHaveClass('max-lg:[--phone-bar-offset:calc(3.5rem+env(safe-area-inset-top))]');
+      expect(main).not.toHaveClass('max-md:[--phone-bar-offset:0px]');
+      const scroller = screen.getByTestId('layout-content').parentElement!;
+      Object.defineProperty(scroller, 'scrollHeight', { value: 4000, configurable: true });
+      Object.defineProperty(scroller, 'clientHeight', { value: 800, configurable: true });
+      Object.defineProperty(scroller, 'scrollTop', { value: 400, configurable: true });
+      act(() => {
+        scroller.dispatchEvent(new Event('scroll'));
+      });
+      expect(screen.getByTestId('phone-top-bar')).toHaveClass('max-md:-translate-y-full');
+      expect(main).toHaveClass('max-md:[--phone-bar-offset:0px]');
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
+  it('stops what the focus or an anchor scrolls to under the bar (WCAG 2.4.11), and only where the bar is', () => {
+    const { unmount } = at('/forum');
+    const PADDING = 'max-lg:scroll-pt-[calc(3.5rem+env(safe-area-inset-top)+0.5rem)]';
+    expect(screen.getByTestId('layout-content').parentElement).toHaveClass(PADDING);
+    unmount();
+    at('/');
+    expect(screen.getByTestId('layout-content').parentElement).not.toHaveClass(PADDING);
   });
 
   it('leaves the search page to its own bar: the field, with the menu button beside it', () => {

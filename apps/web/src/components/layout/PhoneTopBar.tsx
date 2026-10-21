@@ -27,6 +27,8 @@ export function MenuToggle({ open, onToggle, notice, buttonRef }: MenuToggleProp
     <button
       ref={buttonRef}
       type="button"
+      // Where the shell parks the focus as the drawer closes; a section's new title may still take it.
+      data-focus-parked=""
       onClick={onToggle}
       aria-label={`${open ? 'Chiudi il menu' : 'Apri il menu'}${notice ? `, ${notice}` : ''}`}
       aria-expanded={open}
@@ -52,6 +54,8 @@ export interface PhoneTopBarProps {
   onReveal: () => void;
   /** The magnifier: the search menu (the palette), on any page. */
   onSearch: () => void;
+  /** The bar's element, for `useHideOnScroll`: it never hides while the focus is inside it. */
+  barRef?: Ref<HTMLElement>;
 }
 
 /**
@@ -61,9 +65,10 @@ export interface PhoneTopBarProps {
  * of the way scrolling down and comes back scrolling up — at once under reduced motion; from `md` it stays, and its
  * right side leaves room for `Layout`'s Focus button.
  */
-export function PhoneTopBar({ menu, title, hidden, onReveal, onSearch }: PhoneTopBarProps) {
+export function PhoneTopBar({ menu, title, hidden, onReveal, onSearch, barRef }: PhoneTopBarProps) {
   return (
     <header
+      ref={barRef}
       data-testid="phone-top-bar"
       onFocus={onReveal}
       className={cn(

@@ -281,15 +281,19 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   services' dot), the page's name in Newsreader in the middle (`phoneBarTitle.ts`: the menu's word for the page, else
   the section's name), the magnifier on the right, which opens the search menu (the palette); on the page's paper with a
   hairline, absolutely placed over the content area (`Z_INDEX.floating`), which starts under it (`pt-[calc(4.5rem+env(safe-area-inset-top))]`,
-  repeated at `md`). Below `md` it slides away scrolling down and comes back scrolling up or near the top
-  (`useHideOnScroll` on the content scroller; a new address and a focus landing in it bring it back; under reduced motion
-  at once); from `md` it stays, and the Focus button sits inside its right end. A sticky row of a page pins under it
+  repeated at `md`), and whose `scroll-padding-top` stops what the focus or an anchor scrolls to under it (WCAG 2.4.11).
+  Below `md` it slides away scrolling down and comes back scrolling up or near the top (`useHideOnScroll`, which listens
+  to the content scroller below `md` only, holds the scroll top to the last real one so iOS's bounce at the end is no
+  move up, and never hides while the focus is inside the bar; a new address and a focus landing in it bring it back;
+  under reduced motion at once); from `md` it stays, and the Focus button sits inside its right end. A sticky row of a page pins under it
   with `top-[var(--phone-bar-offset,0px)]`: `<main>` sets the bar's height below `lg` and 0 once it has slid away
   («Le mie schede»'s filters and its card's column, the Cronologia's dates, «Da validare»'s article; a new sticky row
   does the same, or it slides under the bar). Focus mode and Gymnasium's lesson draw no bar. During a section change
   the bar is named (`vlx-phone-bar`, `index.css`), so the page's picture passes under it. The drawer's section switcher
-  sits where the bar is; the closed drawer is `inert`, and an entry of its user menu gives the focus to the bar's menu
-  button (`focusAfterMenu`), where a dialog it opens gives it back.
+  sits where the bar is; the closed drawer is `inert`, and whatever closes it from inside (an entry, a link, the
+  backdrop) gives the focus to the bar's menu button, where a dialog an entry opens gives it back. That button is
+  `data-focus-parked`: a section chosen in the drawer still focuses its new title (`sectionTransition.ts` does not
+  take the parked focus for a move by the user).
   There is no «Ricerca Veloce», no
   «Sentenze» and no row of system buttons. `Layout` mounts the same component twice (the desktop column and
   the phone's off-canvas copy), so both show the same list and the same menu.

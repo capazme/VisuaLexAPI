@@ -216,7 +216,7 @@ export function ValidationQueueView() {
             {desktop && (
               // Scrolls on its own, and is cut to what is left under the page's heading, the area's strip, the heading with the filter and the vote bar (about 22rem);
               // below lg it pins under the phone's bar (M1).
-              <div className={cn(TILE, 'sticky top-[var(--phone-bar-offset,0px)] max-h-[calc(100dvh-22rem)] min-w-0 overflow-y-auto p-4')}>
+              <div className={cn(TILE, 'sticky top-[var(--phone-bar-offset,0px)] transition-[top] duration-200 ease-out motion-reduce:transition-none max-h-[calc(100dvh-22rem)] min-w-0 overflow-y-auto p-4')}>
                 <AnchoredArticle card={card} showToast={showToast} />
               </div>
             )}
