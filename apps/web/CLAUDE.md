@@ -162,8 +162,27 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (the column; on a phone, where the columns are stacked, the page as well when the column is not wholly
   in sight) and pulses it once (`--doc-pulse`, the theme's toga step); the box closes upwards, then the
   result comes (`AnimatePresence mode="wait"`: both at once flashed a scrollbar), and the first 8 rows
-  enter 40 ms apart, none of it under reduced motion. While `/documents` is open it refuses a file
-  dropped **anywhere in the window** but on its box (`dragover`/`drop` listeners on `window`, so the
+  enter 40 ms apart, none of it under reduced motion. **The box** (`DropZone`, D6, a native `<button>`: the click,
+  Enter and Space open the picker) follows a file from `dragover` alone — `dragenter`/`dragleave` fire between
+  children —, on `window`: `idle`, `page` (a file over the window), `over` (over the box, which leans the sheets
+  towards the pointer), back to `idle` 400 ms after the last event (the HTML standard lets a still pointer send a
+  `dragover` only every 350 ± 200 ms; the brief's 200 could rest the box under a file still held). Its frame is an SVG measured on the box: dashes
+  that stand still at rest and turn slowly under a mouse or the keyboard's focus (`vlx-dash`, `stroke-dashoffset`,
+  paused by default; Bill: nothing moves for ever on an open page), in ink and faster over the window, one line over
+  the box, all stopped in a hidden tab (`data-tab-hidden`) —
+  three strokes shown by their opacity, as the tinted ground: only transforms, opacity and the dash offset move;
+  three sheets in a pile fan out, then open wide (Framer Motion, `spring.gentle`); let go, they settle and a wave
+  runs in from the frame, and the ink sheet flies to the document's row (`SheetFlight`, in a portal, taking the
+  kind's colour by a veil's opacity). The row (`DocumentRow`, `documentJob.ts`): the kind's mark (DOCX ink, HTML
+  amber, Markdown and TXT slate), the name cut with an ellipsis, the size, «Leggo il documento…» then «Cerco le
+  citazioni…» (the search after a frame, so the words are on screen) over a bar that slides — no percentage it
+  does not know —, the check for 450 ms, then the text; a refusal turns it red, shakes it once (`vlx-shake`, 300 ms)
+  with its reason, and ✕ slides it away. «Il file resta nel tuo browser» is in the box in every state; a phone
+  says «Tocca per scegliere un documento». A polite live region says «Documento in lettura» (the search for citations is too short
+  to say), «Pronto», the refusal, then the count. Several files let go at once: the first is read, and its row says
+  «Letto il primo dei N file: uno alla volta». Under reduced motion the dashes stand, the sheets change place without
+  moving, and nothing is thrown, bounced or shaken. While `/documents` is open it refuses a file
+  dropped **anywhere in the window** but on its box (the same `dragover`/`drop` listeners on `window`, so the
   browser does not open the file in place of the app): a drop zone added elsewhere on the page, or in
   the shell, is neutralised there until those listeners let it through) and `decisions`
   (`DecisionView`, the body of a decision wherever it is drawn; `DecisionEntryView`, a practice's
@@ -991,7 +1010,7 @@ the list, from it they sit in the band's sticky box, read after the band. The do
    `DAY_STATE_LABEL`), then the cards by state as three numbers in Newsreader with their names in Geist (a `dl`) and the
    bar. From `xl` the band is the right column, about 400 to 490 px: `aside` adds the `xl:` classes that stack it as on a phone (the
    week and «Tutti i progressi» at the column's width, the numbers at `text-3xl`, the three states in columns as wide as
-   their words, so «In apprendimento» keeps one line). «Tutti i progressi», a link (44 px, full width on a phone), leads to `/studia/progressi`: the long calendar, the
+   their words, so «In apprendimento» keeps one line). «Tutti i progressi», a link (44 px, full width on a phone), leads to `/studia/progressi`: the trend, the
    coming days and the subjects live there alone (G3 removed the «Il tuo mese» sheet, so no chart is drawn twice).
    **No text on «Oggi» or «Progressi» is under 11 px** (the stamp's date included; the compact stamp is the session's):
    `typeScale.test.tsx` reads the files of `missions/` and `progress/` and fails on a `text-[Npx]` under 11 or an SVG
@@ -1078,12 +1097,11 @@ level, never as «+XP» in the lesson (spec §5.3).
 «Studia» after Oggi; Gymnasium spec §5.3, G3). The same read as «Oggi» — `useProgress(undefined)` for the whole day and
 `useProgress(materia, enabled)` while a subject is chosen —, no route of its own on the server. Under the area's heading
 (in the sections' full-width frame, as «Oggi», G6; `StudiaPage` draws no strip over it) the page heading «I tuoi
-progressi», then: **the summary** (`StreakBadge compact`, `GoalRing compact` and the reviews
-of the last 30 days in a large number, `recentReviews`: the sum of `materie[].ripassi30`; always the whole day's, as
-the streak and the goal are); **the subject chips** (`SubjectChips`, 44 px at every width — Oggi's too —, the subject «Oggi» remembers, and a line saying
-what it narrows); **«Il tuo calendario»** (`ActivityCalendar`, across the page: 26 weeks on a computer and 12 on a phone by
-`useIsDesktop` — the server keeps 26, `CALENDAR_WEEKS`, so a wider page shows no more —; from `lg` the drawing takes three
-quarters and the legend and the day's line a column beside it, the line holding five lines' room); then, side by side
+progressi», then: **the summary** (`StreakBadge compact` and `GoalRing compact`, always the whole
+day's, as the server's streak and goal are; the reviews of 30 days are the trend's total only — G7, Bill: the sum of
+`materie[].ripassi30`, the review log joined to the cards, and the calendar's daily counters are two counts of one
+thing, which part when cards are deleted for good, and read as two answers); **the subject chips** (`SubjectChips`, 44 px at every width — Oggi's too —, the subject «Oggi» remembers, and a line saying
+what it narrows); **«Il tuo andamento»** (`ReviewTrend`, G7, which replaced the calendar: see below); then, side by side
 from `lg`, **«Le schede per stato»** (`CardStatesBar`: the bar's segments are buttons as before, each a 44 px box at every width with its colour
 drawn 28 px tall inside on a computer, and under it the
 three states by name, count and share — `shares` rounds by the largest remainder so the three add up to 100, and a state
@@ -1092,27 +1110,41 @@ with cards that rounds to none reads «<1%», never «0%»); **«I prossimi 14 g
 page — pressed again it clears —, its share consolidated, a bar of the three states and the states in words,
 `stopStates`, and the reviews of 30 days; no «N da ripassare», which the progress read does not carry by subject). Every control on the page is 44 px tall at every width
 (`ProgressPage.test.tsx` guards its files against an `md:` height, as `contribuisci.test.ts` does Contribuisci's); the
-calendar's cells and the coming days' columns are the exception the progress spec §6.3 names, reached by the arrows. The
-calendar, the states and the coming days are the chosen subject's read; the summary and «Per materia» stay the whole
-day's. The calendar's cells carry a state (`layout.ts` `calendarDayState`, `data-stato`): a dot on a day that counted,
-a dashed outline on a rest, a dash on a past day that did not count (`saltato`), a ring on today, the rest of this week
-dotted (`calendarGrid`'s `future`, never chosen, so End stops at today), and no mark on a day before the first one the
-calendar holds (`vuoto`): a newcomer's calendar says nothing is missed, not even in its legend. On a subject's calendar
-the flags are the whole day's, as the server sends them: a mark on the subject's hue sits on a rim of the tile's ground
-(`data-halo`), since no single colour reads on all five hues in both themes, and a day with none of the subject's
-reviews reads «nessun ripasso in questa materia», counted or missed (`describeDay`'s `narrowed`). The day chosen is kept by its
-date, so a grid that changes width keeps it. The calendar is one tab stop (arrows by day and week, Home and End, a live readout; the
-whole pitch of a cell hit-testable). Labels on both charts (weekdays, months, the scale, the days) are the interface's
-text at `text-xs` placed by percentages over or beside the drawing, never SVG `<text>`: a drawing scaled to its width
-scaled them under 11 px. The legend under it says each in words (the heat scale, drawn «meno ▢▢▢▢▢ più ripassi», is
-said as one sentence); before a day is chosen the line says how to choose one, by pointer or by the arrows; the line under it (`describeDay`, «lunedì 12
-ottobre: 14 ripassi, obiettivo raggiunto», commas, read aloud as written) is the day's name for a screen reader, with
-the arrows as before. The coming days' scale is the interface's text in a column beside the drawing, on whole-number
+trend's points and the coming days' columns are the exception the progress spec §6.3 names, reached by the arrows. The
+trend, the states and the coming days are the chosen subject's read; the summary and «Per materia» stay the whole
+day's. **The trend** (`ReviewTrend`, pure parts in `trend.ts`): the reviews of a period as a line — 7 days, 30 days
+(where it opens on a computer; on a phone 7 days — thirty points in some 250 px read as a saw, Bill) or six months, the server's 26 weeks summed by week (`trendSeries`) —, the period's total in
+Newsreader and its change on the period before, over whole days — today, only begun, out of both: the days up to
+yesterday against as many before them (green 700 up, 4.5:1; ink down, never red; none when those had no reviews,
+none for six months); a monotone cubic curve (`resampleMonotone`: no peak between two days,
+never under zero) resampled to `CURVE_SAMPLES` (175) points so one period's curve bends into another's
+(`curvePaths`) — 174 steps share out over the gaps of 7, 30 and 26 points, so every point is a sample and the curve
+passes through each value exactly;
+the area a wash of the line's colour through `currentColor` in the gradient's stops (`stop-color` reads no variable
+as an attribute); a round scale of four ticks (`trendScale`: steps of 1, 2, 2.5, 5 × 10ⁿ, covering the goal); the
+goal a dashed line named «obiettivo» (×7 by week) at its end, in the right margin, over no point; the days not done
+(`calendarDayState` `saltato`, after the first day studied) small ticks under the axis, one per week with any on six
+months; this week, still going, says «settimana in corso». A subject's line and dot take its hue a fifth darker on
+the light card (`color-mix` with `--vlx-trend-shade`, `index.css`; amministrativo is 2.1:1 on white as it is), its
+wash the hue itself; `theme.test.ts` checks the twelve hues at 3:1. A cursor follows the pointer or a finger (`touch-action: pan-y`: the page
+still scrolls) with a spring, the line full up to it and lighter after, its label «mar 14 ott · 12 ripassi ·
+obiettivo raggiunto» (`pointLabel`); one tab stop, the arrows by point, Home and End, a hidden live line
+(`describeDay`, or «Settimana dal …» by week) that speaks for the keyboard only (a moving pointer would flood a screen
+reader); «Vedi i numeri», a `<details>` with the period's table; the periods
+are tabs (arrows, Home, End, the selection follows the focus). The SVG is drawn in the card's real pixels
+(`ResizeObserver`), its words the interface's text laid over it at `text-xs`, never SVG `<text>`
+(`typeScale.test.tsx`). The period and the opening are the page's (`ProgressPage`): a subject not read yet shows the
+skeleton and mounts the chart again, on the same period and with no second opening. Opening: the line draws from the
+left (a share drawn from 0 to 1, times the plot's width as it is, so a card measured after the first render draws
+whole) in 900 ms while the total counts up, once — back on the same period and value it does not count again; another period, or a subject already read:
+the curve bends in 500 ms, the pill slides (`layoutId` in its own `LayoutGroup`), the numbers fade; a resize redraws
+at once; reduced motion draws everything at once. A newcomer (no day, no record) reads
+the first-day sentence in place of the chart. The coming days' scale is the interface's text in a column beside the drawing, on whole-number
 lines (`scaleLines`), the days in a row under it; today's column is tinted and its label set apart; a day with nothing
 due is a hollow mark on the base. Counts go through `formatCount` (`Intl.NumberFormat('it-IT')`: «12.345», four
 digits whole as Italian writes them). States: while the first read travels every block holds its final size
-(`ActivityCalendarSkeleton`, `DueForecastSkeleton`, `CardStatesBarSkeleton`); «Il primo giorno comincia oggi» over the
-calendar only for someone with no record (an empty calendar after 26 weeks away is not a first day); a failed read says «Non riesco a leggere i
+(`ReviewTrendSkeleton`, `DueForecastSkeleton`, `CardStatesBarSkeleton`); «Il primo giorno comincia oggi» in place of
+the trend only for someone with no record (no day after 26 weeks away is not a first day); a failed read says «Non riesco a leggere i
 tuoi progressi.» with «Riprova» (44 px, no alert) and keeps what was on screen; a new read of the same subject leaves
 the last answer, dimmed. The summary ends with the level (`LevelBar`, G1c), the whole day's.
 
@@ -2127,7 +2159,8 @@ meant to stay split; add new features as new files, not inside the shells:
   on a phone; the saved norms that changed come under the title, then the card. On `/dossier` the `h1` is the visible
   title of the list, of the open dossier and of «Cestino», and what sits under it is `h2` (a dossier's card; an open
   dossier's notes, acts, «Giurisprudenza» and «Rimossi di recente»).
-- `features/documents/` — `DocumentReviewPage.tsx` (the page), `DocumentText.tsx`, `CitationList.tsx`,
+- `features/documents/` — `DocumentReviewPage.tsx` (the page), `DropZone.tsx` (the box), `DocumentRow.tsx`
+  (the document's row and `SheetFlight`), `documentJob.ts`, `DocumentText.tsx`, `CitationList.tsx`,
   `citationGroups.ts`, `documentFile.ts`; invented sample files for the tests in `__tests__/fixtures.ts`.
 
 ## Gotchas
