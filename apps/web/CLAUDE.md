@@ -167,7 +167,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   children —, on `window`: `idle`, `page` (a file over the window), `over` (over the box, which leans the sheets
   towards the pointer), back to `idle` 400 ms after the last event (the HTML standard lets a still pointer send a
   `dragover` only every 350 ± 200 ms; the brief's 200 could rest the box under a file still held). Its frame is an SVG measured on the box: dashes
-  that turn slowly (`vlx-dash`, `stroke-dashoffset`), in ink and faster over the window, one line over the box —
+  that stand still at rest and turn slowly under a mouse or the keyboard's focus (`vlx-dash`, `stroke-dashoffset`,
+  paused by default; Bill: nothing moves for ever on an open page), in ink and faster over the window, one line over
+  the box, all stopped in a hidden tab (`data-tab-hidden`) —
   three strokes shown by their opacity, as the tinted ground: only transforms, opacity and the dash offset move;
   three sheets in a pile fan out, then open wide (Framer Motion, `spring.gentle`); let go, they settle and a wave
   runs in from the frame, and the ink sheet flies to the document's row (`SheetFlight`, in a portal, taking the

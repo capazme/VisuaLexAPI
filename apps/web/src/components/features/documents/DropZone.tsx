@@ -1,4 +1,4 @@
-import { forwardRef, useLayoutEffect, useRef, useState, type Ref } from 'react';
+import { forwardRef, useEffect, useLayoutEffect, useRef, useState, type Ref } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { ArrowUp, ShieldCheck } from 'lucide-react';
 import { FOCUS_RING } from '../../../constants/interactions';
@@ -64,8 +64,9 @@ const Sheet = forwardRef<HTMLDivElement, { ink?: boolean }>(function Sheet({ ink
 
 /**
  * «Analizza documento»'s box (D6), inspired by Animorio's «zona dei file», written from scratch in SVG, CSS and Framer
- * Motion: a dashed frame whose dashes turn slowly at rest (`stroke-dashoffset`, `vlx-dash` in `index.css`), in ink and
- * faster while a file is dragged over the window, joined into one line over the box; three sheets in a pile that fan
+ * Motion: a dashed frame whose dashes stand still at rest and turn slowly under a mouse or the keyboard's focus
+ * (`stroke-dashoffset`, `vlx-dash` in `index.css`; a hidden tab stops them), in ink and faster while a file is dragged
+ * over the window, joined into one line over the box; three sheets in a pile that fan
  * out, then open wide and lean towards the pointer; let go, they settle with a little bounce while a wave runs in from
  * the frame. The words say what to do, and that the file stays in the browser, in every state. Under reduced motion the
  * dashes stand still and the sheets change place without moving.
@@ -74,6 +75,13 @@ export const DropZone = forwardRef<HTMLButtonElement, DropZoneProps>(function Dr
   const still = useReducedMotion() ?? false;
   const frame = useRef<HTMLSpanElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
+  // A hidden tab stops the dashes (`index.css`): nothing turns where nobody looks.
+  const [tabHidden, setTabHidden] = useState(() => typeof document !== 'undefined' && document.hidden);
+  useEffect(() => {
+    const onVisibility = () => setTabHidden(document.hidden);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
 
   // The frame is drawn on the box's own size, so the dashes are the same length at every width.
   useLayoutEffect(() => {
@@ -99,6 +107,7 @@ export const DropZone = forwardRef<HTMLButtonElement, DropZoneProps>(function Dr
       onClick={onChoose}
       aria-busy={busy || undefined}
       data-phase={phase}
+      data-tab-hidden={tabHidden || undefined}
       className={cn(
         'group relative flex min-h-48 w-full flex-col items-center justify-center overflow-hidden rounded-[10px] bg-white px-6 py-8 text-center dark:bg-slate-900',
         // Inset: the wrapper that closes upwards clips whatever is drawn outside the box.

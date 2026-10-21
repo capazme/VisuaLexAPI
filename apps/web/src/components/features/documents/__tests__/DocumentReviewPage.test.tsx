@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -139,6 +141,23 @@ describe('DocumentReviewPage — before a document', () => {
     expect(later.defaultPrevented).toBe(false);
     removed.mockRestore();
     cleared.mockRestore();
+  });
+
+  it('keeps its dashes still at rest, turning under a mouse or the focus, and stops them in a hidden tab (Bill)', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8');
+    expect(css).toMatch(/\.vlx-dash \{[^}]*animation-play-state: paused;/);
+    expect(css).toMatch(/\.group:hover \.vlx-dash, \.group:focus-visible \.vlx-dash \{ animation-play-state: running; \}/);
+    expect(css).toMatch(/\.group\[data-tab-hidden\] \.vlx-dash, \.group\[data-tab-hidden\] \.vlx-dash-run \{ animation-play-state: paused; \}/);
+    render(<DocumentReviewPage />);
+    const zone = screen.getByRole('button', { name: /Scegli un documento/ });
+    expect(zone).toHaveClass('group');
+    expect(zone).not.toHaveAttribute('data-tab-hidden');
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+    act(() => { document.dispatchEvent(new Event('visibilitychange')); });
+    expect(zone).toHaveAttribute('data-tab-hidden');
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
+    act(() => { document.dispatchEvent(new Event('visibilitychange')); });
+    expect(zone).not.toHaveAttribute('data-tab-hidden');
   });
 
   it('keeps the promise in sight in every state: the file stays in the browser', () => {
