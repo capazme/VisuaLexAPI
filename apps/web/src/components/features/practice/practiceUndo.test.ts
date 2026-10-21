@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { appStore } from '../../../store/useAppStore';
 import { registerUndoToastListener, type UndoToast } from '../../../hooks/useUndoableAction';
-import { resetNotifications } from '../../ui/notifications/notifications';
+import { notificationStore, resetNotifications } from '../../ui/notifications/notifications';
 import { articleRowKey, practiceArticleKey } from '../../../utils/practice';
 import { L24, L241, article } from '../../../utils/__fixtures__/savedWorkspaces';
 import { closeAllPracticesWithUndo, closePracticeWithUndo, removePracticeActWithUndo } from './practiceUndo';
@@ -91,5 +91,24 @@ describe('practiceUndo (K1a)', () => {
     await settle();
     await shown!.onUndo();
     expect(s().practices[0].beside).toHaveLength(2);
+  });
+
+  it('an act whose practice was closed meanwhile cannot come back: «Annulla» says so, never «Ripristinato»', async () => {
+    const p = s().createPractice('Pratica');
+    s().createPractice('Altra');
+    const actId = s().addArticlesToPractice(p, L24, [article(L24, '5')]).actId;
+    removePracticeActWithUndo(p, actId);
+    await settle();
+    const removal = shown!;
+    closePracticeWithUndo(p);
+    await settle();
+    await removal.onUndo();
+    const messages = notificationStore.getState().entries.map((e) => e.message);
+    expect(messages).toContain('Non ripristinabile: la pratica «Pratica» è stata chiusa.');
+    expect(messages).not.toContain('Ripristinato');
+    // The practice's own «Annulla» still brings it back, without the act (it was taken off before).
+    await shown!.onUndo();
+    expect(s().practices.find((x) => x.id === p)?.acts).toEqual([]);
+    expect(notificationStore.getState().entries.map((e) => e.message)).toContain('Ripristinato');
   });
 });

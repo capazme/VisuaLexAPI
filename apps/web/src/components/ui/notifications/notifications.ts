@@ -5,9 +5,10 @@ export type NotificationType = 'success' | 'error' | 'info' | 'warning';
 
 /**
  * Why a notification goes: its time ran out, the user closed it (✕, Esc, a swipe), «Annulla», a fourth pushed it out
- * of the stack, or what showed it took it back (a `Toast` no longer visible). The card's exit follows it (K1a).
+ * of the stack, or what showed it took it back (a `Toast` no longer visible); `dropped`, every notification at once at
+ * logout, held actions not carried out. The card's exit follows it (K1a).
  */
-export type CloseReason = 'timeout' | 'dismiss' | 'undo' | 'evicted' | 'external';
+export type CloseReason = 'timeout' | 'dismiss' | 'undo' | 'evicted' | 'external' | 'dropped';
 
 /** At most this many on each edge: a fourth closes the oldest (K1a). */
 export const STACK_MAX = 3;
@@ -136,9 +137,12 @@ export function notify(input: NotificationInput): number {
   const own: Handlers = { countdown: null, onUndo: input.onUndo, onClose: input.onClose };
   handlers.set(id, own);
 
-  // A fourth on the same edge closes the oldest; one put in another's place does not count it.
+  // A fourth on the same edge closes the oldest — of the plain ones first: an «Annulla» or a notification that stays
+  // until closed (an error to read) goes only when nothing else can. One put in another's place does not count it.
   const live = notificationStore.getState().entries.filter((e) => e.position === position && !e.closing && e.id !== input.after);
-  live.slice(0, Math.max(0, live.length - STACK_MAX + 1)).forEach((e) => closeNotification(e.id, 'evicted'));
+  const plain = (e: NotificationEntry) => !e.undoable && e.duration > 0;
+  const order = [...live.filter(plain), ...live.filter((e) => !plain(e))];
+  order.slice(0, Math.max(0, live.length - STACK_MAX + 1)).forEach((e) => closeNotification(e.id, 'evicted'));
 
   const politeness = input.ariaLive ?? (input.type === 'error' ? 'assertive' : 'polite');
   notificationStore.setState((s) => ({
@@ -184,10 +188,17 @@ export function registerNotificationHost(): () => void {
   return () => notificationStore.setState((s) => ({ hosts: s.hosts - 1 }));
 }
 
-/** For tests: no notification. The stacks count themselves out as they unmount. */
+/**
+ * No notification any more, and none of them told why: at logout the next user must not see the last one's, and an
+ * «Annulla» held (an import waiting) must not carry out its action for nobody. Also between tests; the stacks count
+ * themselves out as they unmount.
+ */
 export function resetNotifications() {
+  const told = [...handlers.values()];
   handlers.forEach((h) => h.countdown?.stop());
   handlers.clear();
   undoneSlots.clear();
   notificationStore.setState({ entries: [], announced: { polite: null, assertive: null } });
+  // Told last, the list already empty: what they held ends (an «Annulla» resolves as not standing, its undo not run).
+  told.forEach((h) => h.onClose?.('dropped'));
 }

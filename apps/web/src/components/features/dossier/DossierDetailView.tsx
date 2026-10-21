@@ -346,7 +346,12 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     // Many articles at once («seleziona tutti» on a code is most often a slip, and floods the dossier): no question
     // first, but nothing written until the notification's time is out — «Annulla» leaves the dossier as it was (K1a).
     if (articles.length > BULK_IMPORT_WAIT) {
+      // Nothing is written yet: leaving the page (or reloading it) would lose the import, so the browser asks first.
+      // The notification's time stops while the tab is hidden, so the import waits for the user to come back.
+      const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+      window.addEventListener('beforeunload', warn);
       void showUndoToast({ action: () => undefined, undo: () => {}, message: `${articles.length} articoli verranno importati nel dossier` }).then((stands) => {
+        window.removeEventListener('beforeunload', warn);
         if (!stands) return;
         // The dossier deleted meanwhile (it is in the trash): nothing to write into.
         if (!appStore.getState().dossiers.some((d) => d.id === dossier.id)) {

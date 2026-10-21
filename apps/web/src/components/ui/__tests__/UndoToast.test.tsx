@@ -185,4 +185,37 @@ describe('NotificationHost (K1a)', () => {
     fireEvent.keyDown(close, { key: 'Escape' });
     expect(within(card('Prima')).getByRole('button', { name: 'Annulla' })).toHaveFocus();
   });
+
+  it('closed with a mouse click, gives the focus to no other notification: the next one\'s time still runs', async () => {
+    vi.useFakeTimers();
+    render(<NotificationHost />);
+    let waiting: Promise<boolean> | undefined;
+    await act(async () => {
+      waiting = showUndoToast({ action: () => 1, undo: vi.fn(), message: 'Importazione in attesa' });
+      notify({ type: 'info', message: 'Seconda', duration: 0 });
+    });
+    const settled = vi.fn();
+    void waiting!.then(settled);
+    const card = (text: string) => cards().find((c) => c.textContent?.includes(text))!;
+    const close = within(card('Seconda')).getByRole('button', { name: 'Chiudi notifica' });
+    // A mouse press focuses the button, then clicks it (`detail` 1).
+    act(() => close.focus());
+    fireEvent.click(close, { detail: 1 });
+    expect(within(card('Importazione in attesa')).getByRole('button', { name: 'Annulla' })).not.toHaveFocus();
+    await act(async () => vi.advanceTimersByTime(5000));
+    expect(settled).toHaveBeenCalledWith(true);
+  });
+
+  it('pushes out a plain notification before an «Annulla» or an error that stays', () => {
+    const closed: string[] = [];
+    const add = (message: string, over: Partial<Parameters<typeof notify>[0]> = {}) =>
+      notify({ type: 'success', message, duration: 3000, onClose: () => closed.push(message), ...over });
+    act(() => {
+      add('Annulla da tenere', { onUndo: vi.fn(), duration: 5000 });
+      add('Errore fisso', { type: 'error', duration: 0 });
+      add('Semplice');
+      add('Quarta');
+    });
+    expect(closed).toEqual(['Semplice']);
+  });
 });

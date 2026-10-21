@@ -79,4 +79,12 @@ describe('showUndoToast', () => {
     await vi.advanceTimersByTimeAsync(4500);
     await expect(first.done).resolves.toBe(true);
   });
+
+  it('dropped at logout, resolves as not standing and runs no undo: a held action is not carried out', async () => {
+    const { done, undo } = show();
+    await vi.advanceTimersByTimeAsync(0);
+    resetNotifications();
+    await expect(done).resolves.toBe(false);
+    expect(undo).not.toHaveBeenCalled();
+  });
 });

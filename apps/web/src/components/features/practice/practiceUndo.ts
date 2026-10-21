@@ -1,4 +1,5 @@
 import { showUndoToast } from '../../../hooks/useUndoableAction';
+import { notify } from '../../ui/notifications/notifications';
 import { appStore } from '../../../store/useAppStore';
 
 /**
@@ -8,6 +9,15 @@ import { appStore } from '../../../store/useAppStore';
  * it had beside while the row has room. What was opened meanwhile stays; the same act added again meanwhile takes the
  * removed articles. The structure window and the phone's reader one of them held are not brought back.
  */
+
+/**
+ * «Annulla» with nothing left to put back (the act's practice closed meanwhile, the practices open again already): it
+ * says so, and throws, so the notification does not come back as «Ripristinato».
+ */
+function notRestorable(message: string): never {
+  notify({ type: 'info', message, duration: 4000 });
+  throw new Error(message);
+}
 
 const rowsUnder = (prefix: string) =>
   Object.fromEntries(Object.entries(appStore.getState().practiceRows).filter(([key]) => key.startsWith(prefix))) as Record<string, true>;
@@ -21,7 +31,11 @@ export function closePracticeWithUndo(practiceId: string): void {
   const wasActive = state.activePracticeId === practiceId;
   void showUndoToast({
     action: () => appStore.getState().closePractice(practiceId),
-    undo: () => appStore.getState().reopenPractices([{ practice, index: at }], rows, wasActive ? practiceId : null),
+    undo: () => {
+      if (!appStore.getState().reopenPractices([{ practice, index: at }], rows, wasActive ? practiceId : null)) {
+        notRestorable(`Non ripristinabile: la pratica «${practice.label}» è già sul tavolo.`);
+      }
+    },
     message: `Pratica «${practice.label}» chiusa`,
   });
 }
@@ -31,7 +45,11 @@ export function closeAllPracticesWithUndo(): void {
   if (practices.length === 0) return;
   void showUndoToast({
     action: () => appStore.getState().closeAllPractices(),
-    undo: () => appStore.getState().reopenPractices(practices.map((practice, index) => ({ practice, index })), { ...practiceRows }, activePracticeId),
+    undo: () => {
+      if (!appStore.getState().reopenPractices(practices.map((practice, index) => ({ practice, index })), { ...practiceRows }, activePracticeId)) {
+        notRestorable('Non ripristinabile: le pratiche sono già sul tavolo.');
+      }
+    },
     message: practices.length === 1 ? 'Pratica chiusa' : `${practices.length} pratiche chiuse`,
   });
 }
@@ -47,7 +65,11 @@ export function removePracticeActWithUndo(practiceId: string, actId: string): vo
   const rows = rowsUnder(`${practiceId}/${actId}/`);
   void showUndoToast({
     action: () => appStore.getState().removePracticeAct(practiceId, actId),
-    undo: () => appStore.getState().restorePracticeAct(practiceId, act, at, beside, rows),
+    undo: () => {
+      if (!appStore.getState().restorePracticeAct(practiceId, act, at, beside, rows)) {
+        notRestorable(`Non ripristinabile: la pratica «${practice.label}» è stata chiusa.`);
+      }
+    },
     message: 'Atto tolto dalla pratica',
   });
 }

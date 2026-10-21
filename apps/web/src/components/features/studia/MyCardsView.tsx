@@ -4,7 +4,7 @@ import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { studiaService } from '../../../services/studiaService';
-import { useAppStore } from '../../../store/useAppStore';
+import { appStore, useAppStore } from '../../../store/useAppStore';
 import { invalidateArticleCards } from '../../../utils/articleCardsCache';
 import type { AncoraScheda, Scheda } from '../../../types/studia';
 import { showUndoToast } from '../../../hooks/useUndoableAction';
@@ -259,7 +259,8 @@ export function MyCardsView() {
               await trashService.restore(id);
             } catch (error) {
               console.error('Failed to restore a deleted card:', card.id, error);
-              setToast({ message: 'Non riesco a ripristinare la scheda ora: è nel Cestino, ripristinala da lì.', type: 'error' });
+              // The page may be gone by now (the notification is the app's): the app's error line, not this page's toast.
+              appStore.getState().pushSyncError('Non riesco a ripristinare la scheda ora: è nel Cestino, ripristinala da lì.');
               throw error;
             }
             invalidateArticleCards();

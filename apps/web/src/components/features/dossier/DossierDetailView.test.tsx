@@ -493,4 +493,17 @@ describe('DossierDetailView — an import from the act\'s index (K1a)', () => {
     expect(addToDossier).not.toHaveBeenCalled();
     expect(appStore.getState().lastSyncError?.message).toBe('Nessun articolo importato: il dossier «Ricorso Rossi» non c’è più.');
   });
+
+  it('asks before leaving the page while an import waits, and no more once it is written', async () => {
+    await importing(150);
+    await waitFor(() => expect(toast).not.toBeNull());
+    const leaving = () => {
+      const event = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    expect(leaving()).toBe(true);
+    await act(async () => { toast?.onDismiss(); });
+    expect(leaving()).toBe(false);
+  });
 });

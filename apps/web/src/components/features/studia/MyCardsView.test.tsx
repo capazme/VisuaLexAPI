@@ -511,7 +511,7 @@ describe('«Le mie schede», delete', () => {
     await pressDelete();
     await waitFor(() => expect(shown).not.toBeNull());
     await act(async () => { await shown!.onUndo(); });
-    expect(await screen.findByText(/Non riesco a ripristinare la scheda ora/)).toBeInTheDocument();
+    expect(appStore.getState().lastSyncError?.message).toBe('Non riesco a ripristinare la scheda ora: è nel Cestino, ripristinala da lì.');
     error.mockRestore();
   });
 

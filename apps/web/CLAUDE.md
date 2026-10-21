@@ -407,7 +407,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `components/ui/notifications/`): every `Toast` while `isVisible` and every `showUndoToast` is an entry of one
   store (`notifications.ts`), drawn by `NotificationHost` (mounted once in `Layout`, in the toast band): a stack at
   the bottom (at the top for `position="top"`), three at most per edge — the newest first, a fourth closes the oldest
-  (an «Annulla» pushed out stands), the others move with `spring.gentle`; a list named «Notifiche», read from a
+  plain one first (an «Annulla» or a notification that stays until closed goes only when nothing else can; one pushed
+  out stands), the others move with `spring.gentle`; a list named «Notifiche», read from a
   polite and an assertive live region that `notify` sets when one arrives (a closing one never makes an older one read
   again). Where no host is mounted (a component's test) a `Toast` draws itself alone at
   its edge (`role="alert"` on its fixed box, as before). The card (`NotificationCard`, Framer Motion's `useAnimate`)
@@ -419,9 +420,13 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   into the line, which draws back to the centre; ✕, Esc from inside it and a swipe to the side (a coarse pointer;
   a short one springs back) fold it and slide it away. «Annulla» closes it at once — nothing in a closing
   notification takes a click (`inert`) — awaits the undo and draws «Ripristinato» in its place for 1.5 s (`undoneSlots`: the place is kept when the undo
-  outlasts the exit); the focus of a notification closed from the keyboard goes to the next one still open; an undo
+  outlasts the exit); the focus of a notification closed from the keyboard (Esc, or a key's click, `detail` 0, or a
+  `:focus-visible` button) goes to the next one still open — never after a mouse click or a swipe, where it would
+  hold the next one's time for ever; an undo
   that throws has reported its failure and gets no «Ripristinato» (the dossier, entry, card and task undos rethrow
-  after saying so). Plain toasts stay 3 s. Under reduced motion it fades, already open, and the time line still draws
+  after saying so; a practice's or an act's with nothing left to put back says «Non ripristinabile: …»). At logout
+  (`clearUserData`) every notification goes, `dropped`: an «Annulla» resolves as not standing and runs no undo, so an
+  action held until the notification is gone (a large import) is not carried out. Plain toasts stay 3 s. Under reduced motion it fades, already open, and the time line still draws
   back. Its «Annulla» and ✕ are 44 px at every width. `registerUndoToastListener` hands the newest «Annulla» on screen
   to a test. `Tooltip` waits 500 ms under a pointer, opens at once and
   without motion within 300 ms of another closing, and at once on keyboard focus.
@@ -1784,7 +1789,8 @@ people (K1a, the owner's L-35): an action whose «Annulla» puts everything back
 server (the 30-day trash, or a write held until the notification is gone, as an import
 of more than 100 articles from an act's index) asks nothing and offers «Annulla»
 (`showUndoToast`); browser-only state (the practices) likewise. A held write checks, when it runs, that
-its target is still there (the import does not write into a dossier deleted meanwhile). Otherwise never
+its target is still there (the import does not write into a dossier deleted meanwhile), and while it waits the
+browser asks before the page is left (`beforeunload`). Otherwise never
 `window.confirm`: use `components/ui/ConfirmDialog` with `variant="danger"`, and word
 the message so it names the scope *and* what is not touched ("Segnalibri e dossier non
 saranno toccati").

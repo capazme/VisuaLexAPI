@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { motion, stagger, useAnimate, type AnimationPlaybackControls, type PanInfo } from 'framer-motion';
 import { AlertCircle, CheckCircle2, Info, X, XCircle } from 'lucide-react';
 import { cn } from '../../../lib/utils';
@@ -160,12 +160,14 @@ export function NotificationCard({ entry, still, standalone = false, onUndo, onD
   }, [closing]);
 
   /**
-   * Closed from inside (Esc, ✕, «Annulla» by the keyboard), it would take the focus down with it: the focus goes to
-   * the next notification of the stack still open, if there is one.
+   * Closed from the keyboard (Esc, or ✕ and «Annulla» pressed with a key), it would take the focus down with it: the
+   * focus goes to the next notification of the stack still open, if there is one. Never after a mouse click or a swipe:
+   * the focus would land in a notification the user is not on and hold its time for ever (an import waiting for its
+   * «Annulla» would never start).
    */
-  const handOff = (then: () => void) => () => {
+  const handOff = (then: () => void, fromKeys: boolean) => {
     const root = scope.current;
-    if (root?.contains(document.activeElement)) {
+    if (fromKeys && root?.contains(document.activeElement)) {
       const next = [...(root.closest('ol')?.querySelectorAll<HTMLElement>('[data-card]:not([inert])') ?? [])].find((card) => card !== root);
       next?.querySelector<HTMLElement>('button:not([disabled])')?.focus();
     }
@@ -177,7 +179,17 @@ export function NotificationCard({ entry, still, standalone = false, onUndo, onD
     // The notification's Esc, not the page's: a dialog under it stays open.
     event.preventDefault();
     event.stopPropagation();
-    handOff(onDismiss)();
+    handOff(onDismiss, true);
+  };
+  // A key's click (Enter, Space) has `detail` 0; a focus ring drawn says the keyboard brought the focus there.
+  const byKeys = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    if (event.detail === 0) return true;
+    try {
+      return event.currentTarget.matches(':focus-visible');
+    } catch {
+      // A browser (or a test's DOM) that does not know the pseudo-class: a click with a pointer.
+      return false;
+    }
   };
 
   const onPointerDown = (event: ReactPointerEvent) => {
@@ -195,7 +207,7 @@ export function NotificationCard({ entry, still, standalone = false, onUndo, onD
   const onDragEnd = (_: unknown, info: PanInfo) => {
     if (Math.abs(info.offset.x) < SWIPE_PX && Math.abs(info.velocity.x) < SWIPE_SPEED) return;
     swipedTo.current = info.offset.x < 0 ? -1 : 1;
-    handOff(onDismiss)();
+    handOff(onDismiss, false);
   };
 
   const word = 'opacity-0 motion-reduce:opacity-100';
@@ -247,7 +259,7 @@ export function NotificationCard({ entry, still, standalone = false, onUndo, onD
             <button
               type="button"
               data-word
-              onClick={handOff(onUndo)}
+              onClick={(event) => handOff(onUndo, byKeys(event))}
               disabled={closing}
               className={cn(
                 'min-h-[44px] shrink-0 rounded-lg px-3 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/30',
@@ -276,7 +288,7 @@ export function NotificationCard({ entry, still, standalone = false, onUndo, onD
           <button
             type="button"
             data-word
-            onClick={handOff(onDismiss)}
+            onClick={(event) => handOff(onDismiss, byKeys(event))}
             disabled={closing}
             aria-label="Chiudi notifica"
             className={cn(
@@ -297,7 +309,7 @@ export function NotificationCard({ entry, still, standalone = false, onUndo, onD
               <div
                 key={side}
                 className={cn(
-                  'absolute bottom-0 h-1.5 w-px origin-bottom transition-transform duration-200 ease-out',
+                  'absolute bottom-0 h-1.5 w-px origin-bottom transition-transform duration-200 ease-out motion-reduce:transition-none',
                   side,
                   LINE_INK(entry.type),
                   entry.clock.held && 'scale-y-[2.5]',

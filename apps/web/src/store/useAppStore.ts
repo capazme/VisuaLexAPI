@@ -3,6 +3,7 @@ import { createStore } from 'zustand/vanilla';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { v4 as uuidv4 } from 'uuid';
+import { resetNotifications } from '../components/ui/notifications/notifications';
 import type { AppSettings, Bookmark, Dossier, DossierItem, DossierKind, DossierNormaData, DossierSentenzaData, Annotation, Highlight, Norma, NormaVisitata, ArticleData, SearchParams, QuickNorm, CustomAlias, Environment } from '../types';
 import { getErrorMessage } from '../utils/errors';
 import {
@@ -229,8 +230,9 @@ interface AppState {
     /**
      * «Annulla» after closing practices (K1a): puts back those that are not open, each at the index it had (or the end),
      * with their open rows; `activeId` becomes active again if it is among them. What was opened meanwhile stays.
+     * False when there was nothing to put back: «Annulla» then says so, never «Ripristinato».
      */
-    reopenPractices: (closed: { practice: Practice; index: number }[], rows: Record<string, true>, activeId: string | null) => void;
+    reopenPractices: (closed: { practice: Practice; index: number }[], rows: Record<string, true>, activeId: string | null) => boolean;
     /** Ignored for an id that names no practice. */
     setActivePractice: (id: string) => void;
     reorderPractices: (fromIndex: number, toIndex: number) => void;
@@ -270,9 +272,10 @@ interface AppState {
     /**
      * «Annulla» after `removePracticeAct` (K1a): the act back at `index` in its practice with its open rows, and the
      * windows it had beside back at their places while the row has room (two). The same act added again meanwhile
-     * (under a new id) takes the removed articles instead of a second copy of the act. Ignored when the practice is gone.
+     * (under a new id) takes the removed articles instead of a second copy of the act. False when the practice is gone
+     * (closed meanwhile): nothing to put the act back into, and «Annulla» says so.
      */
-    restorePracticeAct: (practiceId: string, act: PracticeAct, index: number, beside: { ref: BesideRef; index: number }[], rows: Record<string, true>) => void;
+    restorePracticeAct: (practiceId: string, act: PracticeAct, index: number, beside: { ref: BesideRef; index: number }[], rows: Record<string, true>) => boolean;
     /**
      * «Sposta in un'altra pratica» (T13): the act keeps its id, its articles and its open rows. Into
      * a practice that already holds the act (`actKeyOf`) it joins that act, whose id it takes, and
@@ -697,7 +700,10 @@ const appStore = createStore<AppState>()(
                 state.phoneReader = null;
             }),
 
-            reopenPractices: (closed, rows, activeId) => set((state) => {
+            reopenPractices: (closed, rows, activeId) => {
+                const openNow = new Set(get().practices.map((p) => p.id));
+                if (closed.every(({ practice }) => openNow.has(practice.id))) return false;
+                set((state) => {
                 const open = new Set(state.practices.map((p) => p.id));
                 const back = closed.filter(({ practice }) => !open.has(practice.id)).sort((a, b) => a.index - b.index);
                 if (back.length === 0) return;
@@ -707,7 +713,9 @@ const appStore = createStore<AppState>()(
                 }
                 if (activeId && back.some(({ practice }) => practice.id === activeId)) activate(state, activeId);
                 else if (state.activePracticeId === null) state.activePracticeId = back[0].practice.id;
-            }),
+                });
+                return true;
+            },
 
             setActivePractice: (id) => {
                 const { practices, activePracticeId } = get();
@@ -819,9 +827,13 @@ const appStore = createStore<AppState>()(
                 });
             },
 
-            restorePracticeAct: (practiceId, act, index, beside, rows) => set((state) => {
+            restorePracticeAct: (practiceId, act, index, beside, rows) => {
+                const before = get().practices.find((p) => p.id === practiceId);
+                if (!before) return false;
+                if (before.acts.some((a) => a.id === act.id)) return true;
+                set((state) => {
                 const practice = state.practices.find((p) => p.id === practiceId);
-                if (!practice || practice.acts.some((a) => a.id === act.id)) return;
+                if (!practice) return;
                 const again = practice.acts.find((a) => a.key === act.key);
                 if (again) {
                     // Added again meanwhile: the removed articles join it; its own windows and rows stay as they are.
@@ -835,7 +847,9 @@ const appStore = createStore<AppState>()(
                     practice.beside.splice(Math.min(at, practice.beside.length), 0, ref);
                 }
                 Object.assign(state.practiceRows, rows);
-            }),
+                });
+                return true;
+            },
 
             moveActToPractice: (actId, fromPracticeId, to) => {
                 const created = typeof to === 'string' ? null : newPractice(to.newLabel, false);
@@ -1189,6 +1203,8 @@ const appStore = createStore<AppState>()(
             },
 
             clearUserData: () => {
+                // The notifications on screen go, without carrying out what they held (an import waiting for its «Annulla»).
+                resetNotifications();
                 // The backup of the last user's saved tabs (`backupV0`) goes too: a shared browser keeps nothing of them.
                 removeV0Backup();
                 set((state) => {

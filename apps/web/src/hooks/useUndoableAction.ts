@@ -155,7 +155,8 @@ export function useUndoableAction<T>({
 /**
  * Runs `action`, then shows a notification with «Annulla» in the stack (`components/ui/notifications`, K1a) for
  * `duration` ms, held while the user is on it. Resolves to true when the action stands (the time ran out, the
- * notification was closed or pushed out by a fourth), to false when it was undone. «Annulla» closes it at once — a
+ * notification was closed or pushed out by a fourth), to false when it was undone or dropped at logout (an action held
+ * until the notification is gone, as a large import, is then not carried out). «Annulla» closes it at once — a
  * last-moment click on a notification that is leaving is not taken — and awaits `undo`; once `undo` is done the
  * notification comes back in the same place saying «Ripristinato». An `undo` that throws has reported its own failure:
  * no «Ripristinato» then.
@@ -190,7 +191,8 @@ export function showUndoToast<T>({
       onClose: (reason) => {
         if (reason === 'undo' || resolved) return;
         resolved = true;
-        resolve(true);
+        // Dropped (the user logged out): what it held is not carried out, and nothing is undone either.
+        resolve(reason !== 'dropped');
       },
     });
   }));
