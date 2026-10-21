@@ -576,7 +576,16 @@ Breaking one of these breaks the product. Read before editing.
     article, the refusal names the annex it looked in and adds where the article is
     («Articolo 29 non presente nell'allegato 1 di …: su Normattiva l'art. 29 si trova
     nell'allegato 2»), from the tree just read (`_where_else_in_tree`). Never for a
-    code's default annex: another annex of a code is another code. A request that asks
+    code's default annex: another annex of a code is another code. Every code in
+    `NORMATTIVA_URN_CODICI` whose URN ends in `:N` is bound to that annex (the c.c. and
+    the c.p.a. at 2, the c.p., the c.p.c., the cod. nav. and the others at 1; since
+    G-350 also the codice del turismo, the disp. att. c.p.p., the reg. navigazione and
+    the codici penali militari), so an article missing there is «non presente» in the
+    code, with no hint: the preleggi are annex 1 of the c.c.'s decree, their own row.
+    The one exception is a row of the table that names more than one code (`CODE_ROWS_OF_SEVERAL_CODES` in
+    `map.py`, read by `create_norma_visitata_from_data`): its other annex is the other
+    code of the same row (the war code is annex 2 of r.d. 303/1941), so the refusal
+    names the default annex and says where the article is. A request that asks
     for the dispositivo explicitly (`annex: ""`) is checked against the dispositivo alone,
     and its refusal reads «non presente nel testo di …» with the same hint: before, an
     article found only in an annex passed and came back as the act's art. 1.

@@ -194,6 +194,7 @@ def _is_default_annex(norm: Mapping[str, Any], annex: str) -> bool:
     act = f"{kind}:{_text(norm, 'data')};{_text(norm, 'numero_atto')}"
     return act_default_annex(act) == annex
 
+
 def cite_act(norm: Mapping[str, Any]) -> str:
     """The act alone: "l. 7 agosto 1990, n. 241", "c.c.", "reg. (UE) 2016/679"."""
     return _act(norm)[0]
