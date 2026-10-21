@@ -99,3 +99,20 @@ async def test_another_code_keeps_its_plain_refusal():
     with patch("app.get_tree", new=AsyncMock(return_value=tree)), pytest.raises(ResourceNotFoundError) as refused:
         await ctrl.create_norma_visitata_from_data({"act_type": "codice del turismo", "article": "300"})
     assert str(refused.value).startswith("Articolo 300 non presente in ")
+
+
+@pytest.mark.parametrize("norm,citation", [
+    ({"tipo_atto": "codice del turismo", "allegato": "1", "numero_articolo": "5"},
+     "art. 5, d.lgs. 23 maggio 2011, n. 79"),
+    ({"tipo_atto": "codice del processo amministrativo", "allegato": "2", "numero_articolo": "29"},
+     "art. 29, d.lgs. 2 luglio 2010, n. 104"),
+    # an annex other than the code's default is still named
+    ({"tipo_atto": "codice del processo amministrativo", "allegato": "1", "numero_articolo": "29"},
+     "art. 29, d.lgs. 2 luglio 2010, n. 104 (Allegato 1)"),
+    ({"tipo_atto": "decreto legislativo", "numero_atto": "81", "data": "2008-04-09", "allegato": "A",
+      "numero_articolo": "1"}, "art. 1, d.lgs. 9 aprile 2008, n. 81 (Allegato A)"),
+])
+def test_a_codes_default_annex_is_never_named(norm, citation):
+    # The code is its annex, as the c.c. is Allegato 2 of r.d. 262/1942 (owner, G-351's spirit).
+    from visualex_api.tools.sources import cite_article
+    assert cite_article(norm) == citation

@@ -17,7 +17,7 @@ from __future__ import annotations
 import re
 from typing import Any, Mapping, Optional
 
-from .map import extract_codice_details
+from .map import codice_urn, extract_codice_details
 
 NORMATTIVA_RESOLVER = "https://www.normattiva.it/uri-res/N2Ls?"
 
@@ -184,6 +184,11 @@ def _act(norm: Mapping[str, Any]) -> tuple[str, str]:
     return act + (f", n. {number}" if number else ""), ", "
 
 
+def _is_default_annex(norm: Mapping[str, Any], annex: str) -> bool:
+    """Whether `annex` is the annex the codes table keys the norm's code by."""
+    row = codice_urn(_text(norm, "tipo_atto"))
+    return bool(row) and row.endswith(f":{annex}")
+
 def cite_act(norm: Mapping[str, Any]) -> str:
     """The act alone: "l. 7 agosto 1990, n. 241", "c.c.", "reg. (UE) 2016/679"."""
     return _act(norm)[0]
@@ -194,6 +199,9 @@ def cite_article(norm: Mapping[str, Any]) -> str:
     act, joiner = _act(norm)
     annex = _text(norm, "allegato")
     kind = _key(_text(norm, "tipo_atto"))
-    # A code's annex is the code itself (c.c. is Allegato 2 of r.d. 262/1942): never named.
-    named = f" (Allegato {annex})" if annex and joiner == ", " and kind not in _EU else ""
+    # A code's annex is the code itself (c.c. is Allegato 2 of r.d. 262/1942): never named,
+    # whether the code has a name of its own or is cited by its decree (the codice del
+    # turismo is «d.lgs. 23 maggio 2011, n. 79», never «… (Allegato 1)»).
+    named = (f" (Allegato {annex})" if annex and joiner == ", " and kind not in _EU
+             and not _is_default_annex(norm, annex) else "")
     return f"art. {_text(norm, 'numero_articolo')}{joiner}{act}{named}"

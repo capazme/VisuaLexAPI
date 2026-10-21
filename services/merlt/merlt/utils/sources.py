@@ -241,6 +241,10 @@ def _annex(norm: Mapping[str, Any], joined: str, short: bool) -> str:
     annex = _text(norm, "allegato")
     if not annex or _key(_text(norm, "tipo_atto")) in _NAMED or _key(_text(norm, "tipo_atto")) in _EU:
         return ""
+    # A code's annex is the code itself, also for a code cited by its decree (the codice
+    # del turismo is «d.lgs. 23 maggio 2011, n. 79», never «… (Allegato 1)»).
+    if (_CODES_BY_NAME.get(_key(_text(norm, "tipo_atto"))) or "").endswith(f":{annex}"):
+        return ""
     return f" (All. {annex})" if short else f" (Allegato {annex})"
 
 

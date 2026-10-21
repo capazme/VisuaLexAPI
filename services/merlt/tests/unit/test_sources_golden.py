@@ -234,3 +234,17 @@ def test_an_administrative_identity_takes_the_kind_and_section_as_the_convention
     assert admin_section("6") is None
     assert admin_section("II-quater") == "sez. II-quater"
     assert admin_section("plenaria") == "ad. plen."
+
+
+@pytest.mark.parametrize("norm,citation", [
+    ({"tipo_atto": "codice del turismo", "allegato": "1", "numero_articolo": "5"},
+     "art. 5, d.lgs. 23 maggio 2011, n. 79"),
+    ({"tipo_atto": "codice del processo amministrativo", "allegato": "2", "numero_articolo": "29"},
+     "art. 29, d.lgs. 2 luglio 2010, n. 104"),
+    ({"tipo_atto": "codice del processo amministrativo", "allegato": "1", "numero_articolo": "29"},
+     "art. 29, d.lgs. 2 luglio 2010, n. 104 (Allegato 1)"),
+])
+def test_a_codes_default_annex_is_never_named(norm, citation):
+    # The code is its annex, as the c.c. is Allegato 2 of r.d. 262/1942 (G-350, G-351).
+    from merlt.utils.sources import cite_article
+    assert cite_article(norm) == citation
