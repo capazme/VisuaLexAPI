@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { useIsDesktop } from '../../../../hooks/useIsDesktop';
 import { cn } from '../../../../lib/utils';
 import type { Materia, Progressi } from '../../../../types/studia';
 import { MATERIA_LABEL } from '../studiaLabels';
@@ -7,12 +8,11 @@ import { DueForecast, DueForecastSkeleton } from './DueForecast';
 import { ReviewTrend, ReviewTrendSkeleton } from './ReviewTrend';
 import type { TrendPeriod } from './trend';
 import { GoalRing } from './GoalRing';
-import { formatCount, recentReviews } from './layout';
 import { rememberedMateria, rememberMateria } from './rememberedSubject';
 import { StreakBadge } from './StreakBadge';
 import { SubjectChips } from './SubjectChips';
 import { SubjectProgress } from './SubjectProgress';
-import { BLOCK_HEADING, INK_TEXT, MUTED_TEXT, SECONDARY_BUTTON, TILE, subjectHue } from './tokens';
+import { BLOCK_HEADING, MUTED_TEXT, SECONDARY_BUTTON, TILE, subjectHue } from './tokens';
 import { useProgress } from './useProgress';
 
 const PULSE = 'rounded-lg bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800';
@@ -45,7 +45,10 @@ function Block({ id, title, busy, stale, note, children }: BlockProps) {
   );
 }
 
-/** The streak, today's goal and the reviews of the last 30 days: the pieces of «Oggi», drawn once (Gymnasium spec §5.3). */
+/**
+ * The streak and today's goal: the pieces of «Oggi», drawn once (Gymnasium spec §5.3). The reviews of 30 days are
+ * the trend's own total (G7, Bill): two counts of one thing, from two tables of the server, read as two answers.
+ */
 function Summary({ data }: { data: Progressi }) {
   return (
     <div className="flex flex-wrap items-center gap-x-10 gap-y-5">
@@ -53,10 +56,6 @@ function Summary({ data }: { data: Progressi }) {
       <div className="shrink-0">
         <GoalRing compact giorno={data.oggi.giorno} ripassi={data.oggi.ripassi} obiettivo={data.oggi.obiettivo} raggiunto={data.oggi.raggiunto} />
       </div>
-      <p className="grid gap-1 md:ml-auto">
-        <span className={cn('font-serif text-4xl font-medium leading-none tabular-nums', INK_TEXT)}>{formatCount(recentReviews(data.materie))}</span>
-        <span className={cn('text-sm', MUTED_TEXT)}>{recentReviews(data.materie) === 1 ? 'ripasso' : 'ripassi'} negli ultimi 30 giorni</span>
-      </p>
     </div>
   );
 }
@@ -66,7 +65,6 @@ function SummarySkeleton() {
     <div aria-hidden className="flex flex-wrap items-center gap-x-10 gap-y-5">
       <div className={cn(PULSE, 'h-10 w-40')} />
       <div className={cn(PULSE, 'h-10 w-24')} />
-      <div className={cn(PULSE, 'h-[3.75rem] w-44 md:ml-auto')} />
     </div>
   );
 }
@@ -87,7 +85,9 @@ export function ProgressPage() {
   const [materia, setMateria] = useState<Materia | undefined>(rememberedMateria);
   // The trend's period and its opening are the page's: a subject read anew mounts the chart again, on the same period
   // and without playing the opening a second time.
-  const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>('30g');
+  // On a phone the chart opens on 7 days: thirty points in some 250 px are a saw no one reads (Bill).
+  const desktop = useIsDesktop();
+  const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>(() => (desktop ? '30g' : '7g'));
   const [trendOpened, setTrendOpened] = useState(false);
   const day = useProgress(undefined);
   const narrowed = useProgress(materia, materia !== undefined);

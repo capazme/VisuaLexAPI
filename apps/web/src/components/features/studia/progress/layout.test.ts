@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { GiornoAttivita } from '../../../../types/studia';
-import { addDays, calendarDayState, currentWeek, formatCount, niceMax, percent, recentReviews, scaleLines, shareLabel, shares, weekday } from './layout';
+import { addDays, calendarDayState, currentWeek, formatCount, niceMax, percent, scaleLines, shareLabel, shares, weekday } from './layout';
 
 const day = (giorno: string, ripassi: number): GiornoAttivita => ({ giorno, ripassi, nuove: 0, sbagliate: 0, valido: ripassi >= 10, riposo: false });
 
@@ -33,7 +33,6 @@ describe('the progress layout', () => {
 
   it('writes counts the Italian way, sums the reviews of 30 days, and puts the scale’s lines on whole numbers', () => {
     expect([formatCount(9999), formatCount(12345)]).toEqual(['9999', '12.345']);
-    expect(recentReviews([{ ripassi30: 310 }, { ripassi30: 0 }, { ripassi30: 2 }])).toBe(312);
     expect(scaleLines(5)).toEqual([3, 5]);
     expect(scaleLines(30)).toEqual([15, 30]);
     expect(scaleLines(10000)).toEqual([5000, 10000]);

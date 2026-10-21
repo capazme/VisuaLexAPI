@@ -961,9 +961,10 @@ its end at once. The celebration is unchanged.
 «Studia» after Oggi; Gymnasium spec §5.3, G3). The same read as «Oggi» — `useProgress(undefined)` for the whole day and
 `useProgress(materia, enabled)` while a subject is chosen —, no route of its own on the server. Under the area's heading
 (in the sections' full-width frame, as «Oggi», G6; `StudiaPage` draws no strip over it) the page heading «I tuoi
-progressi», then: **the summary** (`StreakBadge compact`, `GoalRing compact` and the reviews
-of the last 30 days in a large number, `recentReviews`: the sum of `materie[].ripassi30`; always the whole day's, as
-the streak and the goal are); **the subject chips** (`SubjectChips`, 44 px at every width — Oggi's too —, the subject «Oggi» remembers, and a line saying
+progressi», then: **the summary** (`StreakBadge compact` and `GoalRing compact`, always the whole
+day's, as the server's streak and goal are; the reviews of 30 days are the trend's total only — G7, Bill: the sum of
+`materie[].ripassi30`, the review log joined to the cards, and the calendar's daily counters are two counts of one
+thing, which part when cards are deleted for good, and read as two answers); **the subject chips** (`SubjectChips`, 44 px at every width — Oggi's too —, the subject «Oggi» remembers, and a line saying
 what it narrows); **«Il tuo andamento»** (`ReviewTrend`, G7, which replaced the calendar: see below); then, side by side
 from `lg`, **«Le schede per stato»** (`CardStatesBar`: the bar's segments are buttons as before, each a 44 px box at every width with its colour
 drawn 28 px tall inside on a computer, and under it the
@@ -976,7 +977,7 @@ page — pressed again it clears —, its share consolidated, a bar of the three
 trend's points and the coming days' columns are the exception the progress spec §6.3 names, reached by the arrows. The
 trend, the states and the coming days are the chosen subject's read; the summary and «Per materia» stay the whole
 day's. **The trend** (`ReviewTrend`, pure parts in `trend.ts`): the reviews of a period as a line — 7 days, 30 days
-(it opens there) or six months, the server's 26 weeks summed by week (`trendSeries`) —, the period's total in
+(where it opens on a computer; on a phone 7 days — thirty points in some 250 px read as a saw, Bill) or six months, the server's 26 weeks summed by week (`trendSeries`) —, the period's total in
 Newsreader and its change on the period before, over whole days — today, only begun, out of both: the days up to
 yesterday against as many before them (green 700 up, 4.5:1; ink down, never red; none when those had no reviews,
 none for six months); a monotone cubic curve (`resampleMonotone`: no peak between two days,

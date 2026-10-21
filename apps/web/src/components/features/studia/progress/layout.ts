@@ -173,11 +173,6 @@ export function totalCards(stati: ConteggiStati): number {
   return stati.nuove + stati.apprendimento + stati.consolidate;
 }
 
-/** The reviews of the last 30 Rome days, every subject's (`materie[].ripassi30`, which the server counts apart). */
-export function recentReviews(materie: readonly { ripassi30: number }[]): number {
-  return materie.reduce((n, row) => n + row.ripassi30, 0);
-}
-
 /**
  * The value lines of the coming days' chart: a whole number near half the scale, and its top (5 → 3 and 5). Each is
  * drawn at its own value's height, so a label never names a line it does not sit on.

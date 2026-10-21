@@ -223,7 +223,7 @@ column beside the drawing, which takes three quarters of the width, so the cells
 
 *Corrected on 21 October (G7, the owner: «la gente è più abituata a interpretare questo tipo di grafici»).* The
 calendar is gone (`ActivityCalendar` and its helpers): «Il tuo andamento» (`ReviewTrend`) draws the reviews as a line
-in the same full-width card, over three periods — 7 days, 30 days (the one it opens on) and 6 months, the server's 26
+in the same full-width card, over three periods — 7 days, 30 days (the one it opens on, on a computer; a phone opens on 7) and 6 months, the server's 26
 weeks summed by week. Above it the period's total, large in Newsreader, and its change on the period before of the
 same length («+18% sui 30 giorni prima»), green when it rises and ink when it falls, never red; nothing when that
 period had no reviews, and nothing for six months, the server keeps no more. The line is smooth but honest (a
@@ -243,8 +243,8 @@ disegnano i ripassi di ogni giorno.» in place of the chart.
 (`GET /lingo/srs/progressi`, no new route). Under the area's heading and the page heading «I tuoi progressi», in
 this order:
 
-1. **The summary**: the streak (the «§», the count, the record), today's goal (the ring) and the reviews of the last
-   30 days in a large number (the sum of `materie[].ripassi30`). The pieces are Oggi's (`StreakBadge`, `GoalRing`),
+1. **The summary**: the streak (the «§», the count, the record) and today's goal (the ring). *Corrected for G7:*
+   the reviews of the last 30 days left it for the trend's total, so the page says one count, not two. The pieces are Oggi's (`StreakBadge`, `GoalRing`),
    drawn once.
 2. **The subject chips**, as on Oggi and sharing its remembered choice. A subject narrows the trend (G7), the cards by
    state and the coming days; the summary stays the whole day's (the streak and the goal are, on the server) and «Per

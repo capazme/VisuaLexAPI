@@ -59,8 +59,8 @@ describe('ProgressPage (Gymnasium spec §5.3)', () => {
     const summary = await screen.findByRole('region', { name: 'Riepilogo' });
     expect(within(summary).getByRole('img', { name: 'Serie: 13 giorni di fila, record 27' })).toBeInTheDocument();
     expect(within(summary).getByRole('img', { name: 'Obiettivo di oggi: 6 di 10 ripassi' })).toBeInTheDocument();
-    // 0 + 100 + 200 + 300 + 400, every subject's reviews of the last 30 days.
-    expect(summary).toHaveTextContent('1000ripassi negli ultimi 30 giorni');
+    // The reviews of 30 days are the trend's total, not the summary's (Bill): one count, not two.
+    expect(summary).not.toHaveTextContent('negli ultimi 30 giorni');
     expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Il tuo andamento', 'Le schede per stato', 'I prossimi 14 giorni', 'Per materia']);
     expect(progress).toHaveBeenCalledTimes(1);
     expect(progress).toHaveBeenCalledWith(undefined);
@@ -80,7 +80,7 @@ describe('ProgressPage (Gymnasium spec §5.3)', () => {
     expect(within(block('Per materia')).getByRole('list')).toHaveClass('lg:grid-cols-2');
   });
 
-  it('opens the trend on 30 days, on a computer and on a phone (G7)', async () => {
+  it('opens the trend on 30 days on a computer, on 7 on a phone (G7, Bill)', async () => {
     progress.mockResolvedValue(answer());
     const { unmount } = renderPage();
     await screen.findByRole('region', { name: 'Riepilogo' });
@@ -90,7 +90,7 @@ describe('ProgressPage (Gymnasium spec §5.3)', () => {
     desktop.value = false;
     renderPage();
     await screen.findByRole('region', { name: 'Riepilogo' });
-    expect(screen.getByRole('tab', { name: '30 giorni' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tab', { name: '7 giorni' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('greets a newcomer: the first day begins today, nothing missed, nothing counted before it', async () => {
@@ -167,7 +167,7 @@ describe('ProgressPage (Gymnasium spec §5.3)', () => {
     expect(screen.queryByRole('region', { name: 'Riepilogo' })).toBeNull();
     progress.mockResolvedValue(answer());
     await userEvent.setup().click(screen.getByRole('button', { name: 'Riprova' }));
-    expect(await screen.findByRole('region', { name: 'Riepilogo' })).toHaveTextContent('1000');
+    expect(within(await screen.findByRole('region', { name: 'Riepilogo' })).getByRole('img', { name: /^Serie: 13 giorni/ })).toBeInTheDocument();
     expect(screen.queryByText('Non riesco a leggere i tuoi progressi.')).toBeNull();
   });
 
@@ -178,7 +178,7 @@ describe('ProgressPage (Gymnasium spec §5.3)', () => {
     renderPage();
     const retry = await screen.findByRole('button', { name: 'Riprova' });
     const summary = screen.getByRole('region', { name: 'Riepilogo' });
-    expect(summary).toHaveTextContent('1000');
+    expect(within(summary).getByRole('img', { name: /^Serie: 13 giorni/ })).toBeInTheDocument();
     // The subject's blocks say they could not be read; the whole day's stay.
     expect(within(screen.getByRole('region', { name: 'Il tuo andamento' })).getByText('I numeri tornano appena riesco a leggerli.')).toBeInTheDocument();
     expect(within(screen.getByRole('region', { name: 'Per materia' })).getAllByRole('button')).toHaveLength(5);
@@ -187,10 +187,10 @@ describe('ProgressPage (Gymnasium spec §5.3)', () => {
     await userEvent.setup().click(retry);
     expect(summary).toHaveAttribute('aria-busy', 'true');
     expect(summary).toHaveClass('opacity-60');
-    expect(summary).toHaveTextContent('1000');
+    expect(within(summary).getByRole('img', { name: /^Serie: 13 giorni/ })).toBeInTheDocument();
     failDay({ status: 503 });
     expect(await screen.findByText('Non riesco a leggere i tuoi progressi.')).toBeInTheDocument();
-    expect(summary).toHaveTextContent('1000');
+    expect(within(summary).getByRole('img', { name: /^Serie: 13 giorni/ })).toBeInTheDocument();
     expect(summary).not.toHaveClass('opacity-60');
   });
 
@@ -205,7 +205,7 @@ describe('ProgressPage (Gymnasium spec §5.3)', () => {
     expect(screen.getByText('Andamento, schede per stato e prossimi giorni: solo Diritto penale.')).toBeInTheDocument();
     expect(within(screen.getByRole('region', { name: 'Le schede per stato' })).getByText('1 scheda · 0% consolidate')).toBeInTheDocument();
     // The summary and the list of subjects stay the whole day's.
-    expect(screen.getByRole('region', { name: 'Riepilogo' })).toHaveTextContent('1000');
+    expect(within(screen.getByRole('region', { name: 'Riepilogo' })).getByRole('img', { name: /^Serie: 13 giorni/ })).toBeInTheDocument();
     expect(within(screen.getByRole('region', { name: 'Per materia' })).getAllByRole('button')).toHaveLength(5);
     expect(localStorage.getItem(STORAGE_KEY)).toBe('DIRITTO_PENALE');
     // A subject in the list narrows the page the same way; pressed again, it clears.
@@ -260,8 +260,7 @@ describe('ProgressPage (Gymnasium spec §5.3)', () => {
       const summary = await screen.findByRole('region', { name: 'Riepilogo' });
       expect(within(summary).getByRole('img', { name: 'Serie: 365 giorni di fila, record 999' })).toBeInTheDocument();
       expect(within(summary).getByRole('img', { name: 'Obiettivo di oggi: 500 di 10 ripassi, raggiunto' })).toBeInTheDocument();
-      // 3000 × (0 + 2 + 3 + 4), every subject's but the empty one.
-      expect(summary).toHaveTextContent('27.000ripassi negli ultimi 30 giorni');
+      expect(summary).not.toHaveTextContent('negli ultimi 30 giorni');
       expect(trend()).toHaveAccessibleName(/: 10\.499 ripassi in tutto;/);
       const states = screen.getByRole('region', { name: 'Le schede per stato' });
       expect(within(states).getAllByRole('definition').map((dd) => dd.textContent)).toEqual(['12.34555%', '1<1%', '999945%']);
