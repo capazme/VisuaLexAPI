@@ -82,6 +82,40 @@ describe('Layout — the phone\'s bar and the keyboard', () => {
     expect(within(bar).getByRole('button', { name: 'Apri il menu' })).toHaveFocus();
   });
 
+  it('closes the drawer with Esc and gives the focus to the menu button, from the button itself', () => {
+    const { bar } = page();
+    const toggle = within(bar).getByRole('button', { name: 'Apri il menu' });
+    toggle.focus();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.keyDown(toggle, { key: 'Escape' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveFocus();
+  });
+
+  it('closes the drawer with Esc and gives the focus to the menu button, from inside the drawer', () => {
+    const { bar } = page();
+    fireEvent.click(within(bar).getByRole('button', { name: 'Apri il menu' }));
+    const entry = screen.getByRole('button', { name: 'Voce del menu' });
+    entry.focus();
+
+    fireEvent.keyDown(entry, { key: 'Escape' });
+    const toggle = within(bar).getByRole('button', { name: 'Apri il menu' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveFocus();
+  });
+
+  it('leaves an Esc a control inside the drawer took', () => {
+    const { bar } = page();
+    fireEvent.click(within(bar).getByRole('button', { name: 'Apri il menu' }));
+    const entry = screen.getByRole('button', { name: 'Voce del menu' });
+    entry.addEventListener('keydown', (e) => e.preventDefault());
+
+    fireEvent.keyDown(entry, { key: 'Escape' });
+    expect(within(bar).getByRole('button', { name: 'Chiudi il menu' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
   it('parks the focus on a button a section\'s new title may still take', () => {
     const { bar } = page();
     expect(within(bar).getByRole('button', { name: 'Apri il menu' })).toHaveAttribute('data-focus-parked');

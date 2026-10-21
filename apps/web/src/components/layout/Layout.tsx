@@ -85,6 +85,20 @@ export function Layout() {
     const active = document.activeElement;
     if (!active || active === document.body || drawerRef.current?.contains(active)) menuToggleRef.current?.focus({ preventScroll: true });
   };
+  // Esc closes the drawer and gives the focus to the button that opened it, wherever the focus was (opening it from the
+  // bar leaves the focus on that button). An Esc a control inside took (the user menu, the section switcher) or a
+  // dialog over the drawer (the palette, ⌘K) is theirs.
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented || document.querySelector('[aria-modal="true"]')) return;
+      e.preventDefault();
+      setSidebarOpen(false);
+      menuToggleRef.current?.focus({ preventScroll: true });
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [sidebarOpen]);
   const menuToggle = {
     buttonRef: menuToggleRef,
     open: sidebarOpen,
