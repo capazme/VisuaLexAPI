@@ -26,11 +26,15 @@ from visualex_api.tools.norma import Norma, NormaVisitata
 from visualex_api.services.normattiva_scraper import NormattivaScraper
 from visualex_api.services.eurlex_scraper import EurlexScraper
 from visualex_api.services.pdfextractor import extract_pdf, cleanup_browser_pool, is_allowed_pdf_urn
-from visualex_api.services.akn_parser import normalize_article_key
+from visualex_api.services.akn_parser import comparable_article_key
+from visualex_api.tools.article_suffixes import other_ordinal_spelling
 from visualex_api.services import act_dates, massimario_portal
 from visualex_api.services.normattiva_validity import (
     read_validity,
     reject_future_version_date,
+    starts_after_today,
+    today_in_rome,
+    upcoming_change,
 )
 from types import SimpleNamespace
 
@@ -188,6 +192,14 @@ class RateLimitedTaskQueue:
                     await asyncio.sleep(self.spacing)
 
 
+def _asks_for_text_in_force(nv) -> bool:
+    """A request with no date and not for the original: the text in force."""
+    day = nv.data_versione
+    version = nv.versione
+    return (not (isinstance(day, str) and day.strip())
+            and not (isinstance(version, str) and version.strip().lower() == 'originale'))
+
+
 class NormaController:
     def __init__(self):
         self.app = Quart(__name__)
@@ -273,15 +285,16 @@ class NormaController:
                     continue
 
                 try:
-                    article_text, url = await scraper.get_document(nv)
+                    article_text, url, validity, upcoming = await self._document_in_force(scraper, nv)
                     result = {
                         'article_text': article_text,
                         'norma_data': nv.to_dict(),
                         'url': url
                     }
-                    validity = await self._validity_for(scraper, nv, url)
                     if validity:
                         result['validity'] = validity
+                    if upcoming:
+                        result['upcoming'] = upcoming
 
                 except Exception as exc:
                     result = {'error': str(exc), 'norma_data': nv.to_dict()}
@@ -537,25 +550,33 @@ class NormaController:
                     if tree_metadata and 'annexes' in tree_metadata and tree_count > 0:
                         annexes = tree_metadata['annexes']
                         log.info("Smart lookup: found annexes", annex_count=len(annexes))
+                        # Each part's numbers as canonical keys, once: normalising them for
+                        # every requested article cost ~0.6 s of blocking CPU on a range of
+                        # 100 articles of a code.
+                        part_keys = [
+                            {comparable_article_key(art) for art in annex_info.get('article_numbers', [])}
+                            for annex_info in annexes
+                        ]
 
                         # For each requested article, check where it exists
                         for article in articles:
-                            article_normalized = article.strip().lower()
+                            # Canonical keys on both sides, either spelling of the ordinal: the
+                            # tree writes "21 nonies" and the request "21-nonies", and a raw
+                            # comparison never found a suffixed article in its annex, so the
+                            # request went to the dispositivo and Normattiva answered its art. 1.
+                            wanted = comparable_article_key(article.strip())
+                            wanted_keys = {wanted, other_ordinal_spelling(wanted)} - {None}
                             found_in_dispositivo = False
                             found_in_annex = None
                             best_annex = None
                             best_annex_count = 0
 
-                            for annex_info in annexes:
+                            for annex_info, keys in zip(annexes, part_keys):
                                 annex_num = annex_info.get('number')  # None for dispositivo
-                                article_numbers = annex_info.get('article_numbers', [])
                                 article_count = annex_info.get('article_count', 0)
 
                                 # Check if article exists in this section
-                                article_exists = any(
-                                    art.strip().lower() == article_normalized
-                                    for art in article_numbers
-                                )
+                                article_exists = not keys.isdisjoint(wanted_keys)
 
                                 if article_exists:
                                     if annex_num is None:
@@ -594,7 +615,7 @@ class NormaController:
             cleaned_article = article.strip().replace(' ', '-') if ' ' in article.strip() else article.strip()
             log.info("Processing article", article=cleaned_article)
 
-            exists = await self._article_exists_in_tree(norma, cleaned_article, scope)
+            cleaned_article, exists = await self._source_spelling(norma, cleaned_article, scope)
             if exists is False:
                 log.info("Requested article is not in the act",
                          article=cleaned_article, norma=str(norma))
@@ -630,6 +651,31 @@ class NormaController:
         log.info("Created NormaVisitata instances", norma_visitata_list=[nv.to_dict() for nv in norma_visitata_list])
         return norma_visitata_list
 
+    async def _source_spelling(self, norma, article, annex):
+        """`article` as the act spells its ordinal, and whether the act holds it.
+
+        Returns `(article, exists)`, `exists` as `_article_exists_in_tree` answers it.
+
+        Two spellings circulate for 9, 15, 16, 18, 19 and 20 («novies» / «nonies», …) and
+        Normattiva uses one per act: «391 novies» in the c.p.p., «21 nonies» in l.
+        241/1990. Asked with the other one, the article was «non presente» (and its URN,
+        `~art391nonies`, is not the act's). Only an article whose ordinal has another
+        spelling is looked up, in the tree the existence check reads anyway; when the act
+        holds the other spelling and not the one asked, the act's is used, so the URN and
+        the stored norm are the act's. Anything else, the tree unreadable included, keeps
+        what was asked. One existence check for any other article, at most two for one
+        whose ordinal has two spellings (a tree that failed is not cached).
+        """
+        exists = await self._article_exists_in_tree(norma, article, annex)
+        if exists is not False:
+            return article, exists
+        other = other_ordinal_spelling(comparable_article_key(article))
+        if other is not None and await self._article_exists_in_tree(norma, other, annex):
+            log.info("Article asked with the other spelling of its ordinal",
+                     asked=article, act_spelling=other)
+            return other, True
+        return article, exists
+
     async def _article_exists_in_tree(self, norma, article, annex):
         """Whether `article` is in the act's article tree.
 
@@ -641,7 +687,9 @@ class NormaController:
         a bare act URL is also accepted, for the tree-only path.
 
         Article numbers are canonicalised on both sides with the AKN parser's
-        `normalize_article_key`: the tree API and the scraper disagree on the
+        `comparable_article_key` (`normalize_article_key`, with an ordinal split in
+        two words joined: the tree's "135 sex decies" is the request's
+        "135-sexdecies"): the tree API and the scraper disagree on the
         separator ("1-bis" vs "1 bis"). That normaliser reads the ordinal from
         the shared table in `tools/article_suffixes.py` and falls back to "any
         alphabetic tail" for anything the table does not list, which is
@@ -676,19 +724,19 @@ class NormaController:
             index = await fetch_act_index(norma)
             if index is not None:
                 log.info("Tree unusable, answered from the AKN index", **log_ctx)
-                wanted = normalize_article_key(article)
-                return any(normalize_article_key(k) == wanted for k in index.keys)
+                wanted = comparable_article_key(article)
+                return any(comparable_article_key(k) == wanted for k in index.keys)
             log.warning("Tree unusable and no AKN index, skipping existence check",
                         **log_ctx)
             return None
 
-        wanted = normalize_article_key(article)
+        wanted = comparable_article_key(article)
         for entry in articles:
             if not isinstance(entry, dict):
                 continue  # section/annex labels are bare strings
             if annex is not None and str(entry.get('allegato') or '') != str(annex):
                 continue
-            if normalize_article_key(entry.get('numero', '')) == wanted:
+            if comparable_article_key(entry.get('numero', '')) == wanted:
                 return True
         return False
 
@@ -710,10 +758,10 @@ class NormaController:
         articles = tree_result[0] if isinstance(tree_result, (tuple, list)) and len(tree_result) == 3 else tree_result
         if isinstance(articles, str) or not articles:
             return ''
-        wanted = normalize_article_key(article)
+        wanted = comparable_article_key(article)
         parts = []
         for entry in articles:
-            if not isinstance(entry, dict) or normalize_article_key(entry.get('numero', '')) != wanted:
+            if not isinstance(entry, dict) or comparable_article_key(entry.get('numero', '')) != wanted:
                 continue
             part = str(entry.get('allegato') or '')
             if part != str(annex) and part not in parts:
@@ -735,6 +783,71 @@ class NormaController:
             return eurlex_scraper
         else:
             return normattiva_scraper
+
+    async def _document_in_force(self, scraper, nv):
+        """The article's text with its validity: `(text, url, validity, upcoming)`.
+
+        A request with no date asks for the text in force, but Normattiva answers it
+        with its latest version, also one not in force yet (art. 3 d.P.R. 131/1986 on
+        21 October 2026: repealed from 1 January 2027). When the page's window starts
+        after today (Europe/Rome), the text in force today is read instead (`!vig=` with
+        today) and the later one is described in `upcoming` (owner, G-355). A request
+        with a date or for the original is served as asked (G-353: a date is always the
+        text in force on that day). The norm keeps the request's identity, so its notes
+        and highlights are keyed as before; if the second read fails the first page is
+        served as it was, its validity saying when it starts.
+        """
+        article_text, url = await scraper.get_document(nv)
+        validity = await self._validity_for(scraper, nv, url)
+        if (validity is None and _asks_for_text_in_force(nv) and isinstance(scraper, NormattivaScraper)
+                and await self._page_left_the_cache(scraper, url)):
+            # The text comes from the scraper's memory (a day from when it was filled)
+            # and the page from the persistent cache (a day from when it was written):
+            # after a restart the page can expire first, and without it a later version
+            # would go out unrecognised. Read it once more.
+            validity = await self._validity_for(scraper, nv, url)
+        if not (validity and _asks_for_text_in_force(nv) and starts_after_today(validity)):
+            return article_text, url, validity, None
+        in_force = NormaVisitata(
+            norma=nv.norma, allegato=nv.allegato, numero_articolo=nv.numero_articolo,
+            versione='vigente', data_versione=today_in_rome().isoformat(),
+        )
+        try:
+            text_today, url_today = await scraper.get_document(in_force)
+        except Exception as exc:  # noqa: BLE001 - the page already read still stands
+            log.warning("Text in force today could not be read; serving the later version",
+                        url=str(url)[:120], error=str(exc))
+            return article_text, url, validity, None
+        # The validity of today's page, judged against what was asked: no date.
+        validity_today = await self._validity_for(scraper, nv, url_today)
+        if validity_today and (validity_today.get('state') == 'not_yet' or starts_after_today(validity_today)):
+            # Nothing is in force today (an article inserted from a later day), or the
+            # source ignored the day: the first page stands, as before (G-355 left open).
+            log.info("No text in force today; serving the later version as it was",
+                     url=str(url)[:120], today_state=validity_today.get('state'))
+            return article_text, url, validity, None
+        log.info("Served the text in force today instead of a later version",
+                 later_from=validity.get('valid_from'), url=str(url_today)[:120])
+        return text_today, url_today, validity_today, upcoming_change(validity)
+
+    @staticmethod
+    async def _page_left_the_cache(scraper, url):
+        """True when the page for `url` was missing from the scraper's persistent cache
+        and has been read again and stored; False when it was there, or cannot be read."""
+        cache = getattr(scraper, 'cache', None)
+        if cache is None or not url:
+            return False
+        try:
+            if await cache.get(url):
+                return False
+            page = await scraper.request_document(url, source="normattiva")
+            if not page:
+                return False
+            await cache.set(url, page)
+            return True
+        except Exception as exc:  # noqa: BLE001 - the text already read still stands
+            log.warning("Page could not be read again for its validity", url=str(url)[:120], error=str(exc))
+            return False
 
     @staticmethod
     async def _validity_for(scraper, nv, url):
@@ -912,16 +1025,17 @@ class NormaController:
                     return {'error': 'Unsupported act type', 'norma_data': nv.to_dict()}
 
                 try:
-                    article_text, url = await scraper.get_document(nv)
+                    article_text, url, validity, upcoming = await self._document_in_force(scraper, nv)
                     log.info("Document fetched successfully", article_text=article_text, url=url)
                     result = {
                         'article_text': article_text,
                         'norma_data': nv.to_dict(),
                         'url': url
                     }
-                    validity = await self._validity_for(scraper, nv, url)
                     if validity:
                         result['validity'] = validity
+                    if upcoming:
+                        result['upcoming'] = upcoming
                     return result
                 except Exception as exc:
                     log.error("Error fetching article text", error=str(exc))
@@ -1344,8 +1458,7 @@ class NormaController:
                     return {'error': 'Unsupported act type', 'norma_data': nv.to_dict()}
 
                 try:
-                    article_text, url = await scraper.get_document(nv)
-                    validity = await self._validity_for(scraper, nv, url)
+                    article_text, url, validity, upcoming = await self._document_in_force(scraper, nv)
                     result = {
                         'article_text': article_text,
                         'url': url,
@@ -1353,6 +1466,8 @@ class NormaController:
                     }
                     if validity:
                         result['validity'] = validity
+                    if upcoming:
+                        result['upcoming'] = upcoming
                     return result
                 except Exception as exc:
                     log.error("Error fetching all data", error=str(exc))
