@@ -86,7 +86,7 @@ function NoCardsYet({ sources, onNew }: { sources: boolean | undefined; onNew: (
     </Link>
   );
   return (
-    <div className={cn(TILE, 'grid justify-items-stretch gap-3 p-5 md:justify-items-start md:p-6')}>
+    <div className={cn(TILE, 'grid justify-items-stretch gap-3 p-4 md:justify-items-start md:p-6')}>
       <p className={cn('font-serif text-xl leading-snug md:text-2xl', INK_TEXT)}>Non hai ancora schede.</p>
       {sources === undefined ? null : sources ? (
         <>

@@ -193,7 +193,7 @@ export function TodayMissions({ day, dayFailed, action, actionFailed, onRetry, s
   const met = day?.oggi.raggiunto ?? false;
 
   return (
-    <section aria-labelledby="studia-missioni" aria-busy={state === 'loading'} className={cn(TILE, 'p-5 md:p-6')}>
+    <section aria-labelledby="studia-missioni" aria-busy={state === 'loading'} className={cn(TILE, 'p-4 md:p-6')}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <h3 id="studia-missioni" className={BLOCK_HEADING}>
           Le missioni di oggi

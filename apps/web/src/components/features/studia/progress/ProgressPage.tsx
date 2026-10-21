@@ -37,7 +37,7 @@ interface BlockProps {
 function Block({ id, title, busy, stale, note, children }: BlockProps) {
   return (
     // `content-start`: beside a taller block (G6) the room left goes under the content, never between its rows.
-    <section aria-labelledby={id} aria-busy={busy} className={cn(TILE, 'grid content-start gap-4 p-5 md:p-6')}>
+    <section aria-labelledby={id} aria-busy={busy} className={cn(TILE, 'grid content-start gap-4 p-4 md:p-6')}>
       <div className="grid gap-1">
         <h3 id={id} className={BLOCK_HEADING}>
           {title}
@@ -121,7 +121,7 @@ export function ProgressPage() {
 
       {failed && (
         // No alert: the page says it where the numbers would be, and the button reads again.
-        <div className={cn(TILE, 'flex flex-wrap items-center justify-between gap-3 p-5')}>
+        <div className={cn(TILE, 'flex flex-wrap items-center justify-between gap-3 p-4 md:p-5')}>
           <p className="text-sm text-slate-800 dark:text-slate-100">Non riesco a leggere i tuoi progressi.</p>
           <button type="button" onClick={reload} className={SECONDARY_BUTTON}>
             Riprova
@@ -131,7 +131,7 @@ export function ProgressPage() {
 
       {!nothing && (
         <>
-          <section aria-label="Riepilogo" aria-busy={dayBusy} className={cn(TILE, 'p-5 md:p-6 transition-opacity', dayBusy && day.data !== null && 'opacity-60')}>
+          <section aria-label="Riepilogo" aria-busy={dayBusy} className={cn(TILE, 'p-4 md:p-6 transition-opacity', dayBusy && day.data !== null && 'opacity-60')}>
             {day.data ? <Summary data={day.data} /> : <SummarySkeleton />}
           </section>
 

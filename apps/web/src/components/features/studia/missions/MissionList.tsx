@@ -45,7 +45,7 @@ export function MissionList({ data, loading, validator }: MissionListProps) {
       <div aria-hidden className="space-y-3">
         <div className="h-7 w-48 rounded bg-slate-100 dark:bg-slate-800/60" />
         <div className="h-5 w-72 max-w-full rounded bg-slate-100 dark:bg-slate-800/60" />
-        <div className={cn(TILE, 'divide-y divide-slate-100 px-5 dark:divide-slate-800 md:px-6')}>
+        <div className={cn(TILE, 'divide-y divide-slate-100 px-4 dark:divide-slate-800 md:px-6')}>
           {GROUPS.map(({ group }) => (
             <div key={group} className="space-y-4 py-4">
               <div className="h-5 w-28 rounded bg-slate-100 dark:bg-slate-800/60" />
@@ -68,7 +68,7 @@ export function MissionList({ data, loading, validator }: MissionListProps) {
         </h3>
         <p className={cn('max-w-prose text-sm', MUTED_TEXT)}>Le tre di oggi sono qui sopra. Le missioni «In arrivo» non si possono ancora compiere.</p>
       </div>
-      <div className={cn(TILE, 'divide-y divide-slate-100 px-5 dark:divide-slate-800 md:px-6')}>
+      <div className={cn(TILE, 'divide-y divide-slate-100 px-4 dark:divide-slate-800 md:px-6')}>
         {GROUPS.map(({ group, label }) => (
           <section key={group} aria-labelledby={`studia-missioni-${group}`} className="py-4">
             <h4 id={`studia-missioni-${group}`} className="text-sm font-semibold text-slate-700 dark:text-slate-200">
