@@ -52,22 +52,53 @@ describe('DocumentReviewPage — before a document', () => {
     expect(zone.className).toMatch(/min-h-48/);
   });
 
-  it('changes the box while a file is over it, and reads the file let go on it', async () => {
+  it('follows a file over the window and over the box from `dragover` alone, and reads the file let go on it (D6)', async () => {
     render(<DocumentReviewPage />);
     const zone = screen.getByRole('button', { name: /Scegli un documento/ });
     const file = testFile([PARERE], 'trascinato.txt');
     const dataTransfer = { types: ['Files'], files: [file], dropEffect: 'none' };
 
-    fireEvent.dragEnter(zone, { dataTransfer });
+    // Over the window: the dashes run in ink, the sheets fan out.
+    fireEvent.dragOver(document.body, { dataTransfer });
+    expect(zone).toHaveAttribute('data-phase', 'page');
     expect(zone).toHaveTextContent('Lascia qui il documento');
-    expect(zone.className).toMatch(/border-solid/);
-    fireEvent.dragLeave(zone, { dataTransfer });
-    expect(zone).toHaveTextContent('Scegli un documento');
-    expect(zone.className).toMatch(/border-dashed/);
-
+    // Over the box: one line, the sheets open wide.
     fireEvent.dragOver(zone, { dataTransfer });
+    expect(zone).toHaveAttribute('data-phase', 'over');
+    expect(zone).toHaveTextContent('Rilascia per leggerlo');
+    // No event for 200 ms: the file went away.
+    await waitFor(() => expect(zone).toHaveAttribute('data-phase', 'idle'));
+    expect(zone).toHaveTextContent('Scegli un documento');
+    // A child of the box is the box: no `dragleave` to fool it.
+    fireEvent.dragOver(zone.querySelector('span.font-serif')!, { dataTransfer });
+    expect(zone).toHaveAttribute('data-phase', 'over');
+
     fireEvent.drop(zone, { dataTransfer });
+    expect(zone).toHaveAttribute('data-phase', 'idle');
+    expect(screen.getByText('trascinato.txt', { selector: '[title]' })).toBeInTheDocument();
     expect(await screen.findByRole('heading', { level: 2, name: 'trascinato.txt' })).toBeInTheDocument();
+  });
+
+  it('throws the ink sheet to the row when a file is let go on the box, not when it is chosen (D6)', async () => {
+    const { container } = render(<DocumentReviewPage />);
+    const zone = screen.getByRole('button', { name: /Scegli un documento/ });
+    const flying = () => document.body.querySelector(':scope > div.fixed[aria-hidden]');
+    await userEvent.upload(input(container), testFile([PARERE], 'scelto.txt'));
+    expect(flying()).toBeNull();
+    await screen.findByRole('heading', { level: 2, name: 'scelto.txt' });
+    await userEvent.click(screen.getByRole('button', { name: 'Scegli un altro documento' }));
+    const again = await screen.findByRole('button', { name: /Scegli un documento/ });
+    fireEvent.drop(again, { dataTransfer: { types: ['Files'], files: [testFile([PARERE], 'lasciato.txt')], dropEffect: 'none' } });
+    expect(flying()).not.toBeNull();
+    void zone;
+  });
+
+  it('keeps the promise in sight in every state: the file stays in the browser', () => {
+    render(<DocumentReviewPage />);
+    const zone = screen.getByRole('button', { name: /Scegli un documento/ });
+    expect(zone).toHaveTextContent('Il file resta nel tuo browser');
+    fireEvent.dragOver(zone, { dataTransfer: { types: ['Files'], files: [], dropEffect: 'none' } });
+    expect(zone).toHaveTextContent('Il file resta nel tuo browser');
   });
 
   it('refuses a file let go outside the box, so the browser does not open it in place of the app', () => {
@@ -81,37 +112,59 @@ describe('DocumentReviewPage — before a document', () => {
   it('does not keep the drop wording when the box comes back', async () => {
     const { container } = render(<DocumentReviewPage />);
     const zone = screen.getByRole('button', { name: /Scegli un documento/ });
-    fireEvent.dragEnter(zone, { dataTransfer: { types: ['Files'], files: [], dropEffect: 'none' } });
+    fireEvent.dragOver(zone, { dataTransfer: { types: ['Files'], files: [], dropEffect: 'none' } });
     await choose(container, PARERE);
     await userEvent.click(screen.getByRole('button', { name: 'Scegli un altro documento' }));
     expect(await screen.findByRole('button', { name: /Scegli un documento/ })).toHaveTextContent('Scegli un documento');
   });
 
-  it('says it is reading while a file takes time', async () => {
+  it('says each step on the document\'s row, honestly, and announces it (D6)', async () => {
     const { container } = render(<DocumentReviewPage />);
     const slow = testFile(['art. 2043 c.c.'], 'lungo.txt');
     let finish: (text: string) => void = () => {};
     Object.assign(slow, { text: () => new Promise<string>(resolve => { finish = resolve; }) });
     await userEvent.upload(input(container), slow);
     const live = container.querySelector('[aria-live]')!;
-    // Not at once: a small file is read before the line would show, so neither it nor the announcement comes.
-    expect(screen.queryAllByText('Leggo il documento…')).toHaveLength(0);
-    // Then both together, the line on screen and its announcement.
-    await waitFor(() => expect(live).toHaveTextContent('Leggo il documento…'));
-    expect(screen.getByText('Leggo il documento…', { selector: 'p[aria-hidden]' })).toBeInTheDocument();
+    // The row at once: its name, its size, the step, a bar with no percentage.
+    expect(screen.getByText('lungo.txt', { selector: '[title]' })).toBeInTheDocument();
+    expect(screen.getByText('Leggo il documento…', { selector: 'span' })).toBeInTheDocument();
+    expect(live).toHaveTextContent('Documento in lettura');
+    expect(container.textContent).not.toMatch(/\d+\s?%/);
     await act(async () => finish('art. 2043 c.c.'));
+    await waitFor(() => expect(container.querySelector('[data-stage="done"]')).not.toBeNull());
+    expect(live).toHaveTextContent('Pronto');
     expect(await screen.findByRole('heading', { level: 2, name: 'lungo.txt' })).toBeInTheDocument();
-    // The box closes upwards and is gone with the line under it.
     await waitFor(() => expect(screen.queryAllByText('Leggo il documento…')).toHaveLength(0));
   });
 
-  it('keeps the words of each refusal, under the box', async () => {
+  it('turns the row red with the reason of a refusal, says it, and lets it go with ✕ (D6)', async () => {
     const { container } = render(<DocumentReviewPage />);
     await userEvent.upload(input(container), testFile(['%PDF'], 'atto.pdf'));
-    expect(await screen.findByRole('alert')).toHaveTextContent('I PDF scansionati o non testuali richiedono OCR.');
+    const row = await waitFor(() => {
+      const found = container.querySelector('[data-stage="error"]');
+      if (!found) throw new Error('no refusal yet');
+      return found as HTMLElement;
+    });
+    expect(row).toHaveTextContent('I PDF scansionati o non testuali richiedono OCR.');
+    expect(row).toHaveClass('vlx-shake');
+    expect(container.querySelector('[aria-live]')).toHaveTextContent('I PDF scansionati o non testuali richiedono OCR.');
     await userEvent.upload(input(container), testFile(['   '], 'vuoto.txt'));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Il documento non contiene testo leggibile.');
-    expect(screen.getByRole('button', { name: /Scegli un documento/ })).toBeInTheDocument();
+    await waitFor(() => expect(container.querySelector('[data-stage="error"]')).toHaveTextContent('Il documento non contiene testo leggibile.'));
+    await userEvent.click(screen.getByRole('button', { name: 'Chiudi l’avviso' }));
+    await waitFor(() => expect(container.querySelector('[data-stage]')).toBeNull());
+    expect(screen.getByRole('button', { name: /Scegli un documento/ })).toHaveFocus();
+  });
+
+  it('on a phone says to tap, with no word of dragging', () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({ matches: query.includes('hover: none'), media: query, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
+    try {
+      render(<DocumentReviewPage />);
+      const zone = screen.getByRole('button', { name: /Tocca per scegliere un documento/ });
+      expect(zone).not.toHaveTextContent('trascinalo');
+    } finally {
+      window.matchMedia = original;
+    }
   });
 });
 
@@ -222,6 +275,15 @@ describe('DocumentReviewPage — motion', () => {
     window.matchMedia = originalMatchMedia;
     delete (HTMLElement.prototype as Partial<HTMLElement>).scrollTo;
     delete (HTMLElement.prototype as Partial<HTMLElement>).animate;
+  });
+
+  it('under reduced motion throws no sheet when a file is let go (D6)', async () => {
+    reduceMotion(true);
+    render(<DocumentReviewPage />);
+    const zone = screen.getByRole('button', { name: /Scegli un documento/ });
+    fireEvent.drop(zone, { dataTransfer: { types: ['Files'], files: [testFile([PARERE], 'fermo.txt')], dropEffect: 'none' } });
+    expect(document.body.querySelector(':scope > div.fixed[aria-hidden]')).toBeNull();
+    expect(await screen.findByRole('heading', { level: 2, name: 'fermo.txt' })).toBeInTheDocument();
   });
 
   it('scrolls the text column (not the window) to the citation chosen in the list, and pulses it once', async () => {

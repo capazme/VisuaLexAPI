@@ -7,23 +7,39 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { AlertCircle, FileText, Loader2, RotateCcw, ShieldCheck, Upload } from 'lucide-react';
+import { FileText, RotateCcw, ShieldCheck } from 'lucide-react';
 import { extractCitations, type CitationMatch } from '../../../utils/citationMatcher';
 import { useAppStore } from '../../../store/useAppStore';
 import { Button } from '../../ui/Button';
-import { FOCUS_RING, TRANSITION } from '../../../constants/interactions';
+import { FOCUS_RING } from '../../../constants/interactions';
 import { dur, ease } from '../../../lib/motion';
 import { cn } from '../../../lib/utils';
 import { citationCountLabel, groupCitationsByAct } from './citationGroups';
 import { CitationList } from './CitationList';
 import { DOCUMENT_ACCEPT, readDocumentFile } from './documentFile';
 import { DocumentText } from './DocumentText';
+import { DropZone, type DropPhase } from './DropZone';
+import { DocumentRow, SheetFlight } from './DocumentRow';
+import { documentKind, type DocumentJob } from './documentJob';
 import { PageFrame } from '../../layout/PageFrame';
 
 interface LoadedDocument {
   fileName: string;
   text: string;
+  /** Found while the row said «Cerco le citazioni…». */
+  citations: CitationMatch[];
 }
+
+/** How long the check stays on the row before the text comes (D6): the time to see it. */
+const DONE_MS = 450;
+/** A file over the window with no `dragover` for this long has gone: the box rests again. */
+const DRAG_REST_MS = 200;
+
+/** A phone: no dragging there (D6). */
+const isTouch = () => typeof window.matchMedia === 'function' && window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+
+/** The next frame drawn, then the task after it: the row's new words are on screen before the work goes on. */
+const nextPaint = () => new Promise<void>((resolve) => (typeof requestAnimationFrame === 'function' ? requestAnimationFrame(() => setTimeout(resolve, 0)) : setTimeout(resolve, 0)));
 
 const hasFiles = (event: DragEvent | globalThis.DragEvent) => Array.from(event.dataTransfer?.types ?? []).includes('Files');
 
@@ -73,6 +89,8 @@ export function DocumentReviewPage() {
   const reduceMotion = useReducedMotion();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const zoneRef = useRef<HTMLButtonElement | null>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const markRef = useRef<HTMLSpanElement>(null);
   const textBodyRef = useRef<HTMLDivElement>(null);
   const listBodyRef = useRef<HTMLDivElement>(null);
   // The reading in flight: a file chosen while another is read wins, the older answer is dropped.
@@ -80,14 +98,17 @@ export function DocumentReviewPage() {
   const focusAfterRef = useRef<'result' | 'zone' | null>(null);
 
   const [loaded, setLoaded] = useState<LoadedDocument | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [reading, setReading] = useState(false);
-  // A reading that has lasted 200 ms: only then are «Leggo il documento…» shown and announced, together.
-  const [slowReading, setSlowReading] = useState(false);
-  const [dragging, setDragging] = useState(false);
+  // The file being read, or refused: its row under the box.
+  const [job, setJob] = useState<DocumentJob | null>(null);
+  const [phase, setPhase] = useState<DropPhase>('idle');
+  const [lean, setLean] = useState({ x: 0, y: 0 });
+  const [landings, setLandings] = useState(0);
+  // The ink sheet thrown to the row, from where it stood.
+  const [flight, setFlight] = useState<DOMRect | null>(null);
+  const [touch] = useState(isTouch);
   const [selected, setSelected] = useState<number | null>(null);
 
-  const citations = useMemo(() => (loaded ? extractCitations(loaded.text) : []), [loaded]);
+  const citations = useMemo(() => loaded?.citations ?? [], [loaded]);
   const groups = useMemo(() => (loaded ? groupCitationsByAct(loaded.text, citations) : []), [loaded, citations]);
   const countLabel = citations.length === 0 ? 'Nessuna citazione' : citationCountLabel(citations.length, groups.length);
 
@@ -105,50 +126,96 @@ export function DocumentReviewPage() {
     zoneFocus(element);
   }, [zoneFocus]);
 
-  // A file let go anywhere but on the box would be opened by the browser in place of the app: refused,
-  // over the whole window (the margins and the sidebar too) while the page is open.
+  /**
+   * Reads a file in the browser, its row saying each step: «Leggo il documento…», «Cerco le citazioni…» (the search,
+   * after a frame, so the words are on screen while it runs), the check, then the text. A refusal stays on the row.
+   * `thrown`: let go on the box, so the sheets land and one flies to the row.
+   */
+  const handleFile = async (file: File, thrown = false) => {
+    const id = ++readingRef.current;
+    const base: DocumentJob = { id, name: file.name, bytes: file.size, kind: documentKind(file.name), stage: 'reading' };
+    setJob(base);
+    if (thrown) {
+      setLandings((n) => n + 1);
+      // Read now, as the pulse is: reduced motion throws nothing.
+      if (!prefersReducedMotion() && sheetRef.current) setFlight(sheetRef.current.getBoundingClientRect());
+    }
+    const result = await readDocumentFile(file);
+    if (id !== readingRef.current) return;
+    if (!result.ok) {
+      setJob({ ...base, stage: 'error', error: result.error });
+      return;
+    }
+    setJob({ ...base, stage: 'searching' });
+    await nextPaint();
+    if (id !== readingRef.current) return;
+    const found = extractCitations(result.text);
+    setJob({ ...base, stage: 'done' });
+    await new Promise((resolve) => setTimeout(resolve, DONE_MS));
+    if (id !== readingRef.current) return;
+    focusAfterRef.current = 'result';
+    setJob(null);
+    setLoaded({ fileName: file.name, text: result.text, citations: found });
+    setSelected(null);
+  };
+  // The window's listeners (below) live once; the file goes to the handler of the latest render.
+  const handleFileRef = useRef(handleFile);
   useEffect(() => {
-    const refuse = (event: globalThis.DragEvent) => {
-      if (!event.dataTransfer || !hasFiles(event) || zoneRef.current?.contains(event.target as Node)) return;
+    handleFileRef.current = handleFile;
+  });
+
+  // A file over the window, from `dragover` alone (`dragenter`/`dragleave` fire between children too): over the box or
+  // elsewhere, and where on the box; with no event for 200 ms it has gone. Let go anywhere but on the box, the browser
+  // would open it in place of the app: refused over the whole window (the margins and the sidebar too).
+  useEffect(() => {
+    let rest = 0;
+    const onBox = (event: globalThis.DragEvent) => Boolean(zoneRef.current?.contains(event.target as Node));
+    const over = (event: globalThis.DragEvent) => {
+      if (!hasFiles(event)) return;
       event.preventDefault();
-      event.dataTransfer.dropEffect = 'none';
+      const box = onBox(event);
+      if (event.dataTransfer) event.dataTransfer.dropEffect = box ? 'copy' : 'none';
+      setPhase(box ? 'over' : 'page');
+      const zone = zoneRef.current;
+      if (box && zone) {
+        const r = zone.getBoundingClientRect();
+        const clamp = (v: number, m: number) => Math.max(-m, Math.min(m, v));
+        setLean({ x: clamp(((event.clientX - (r.left + r.width / 2)) / Math.max(1, r.width)) * 24, 8), y: clamp(((event.clientY - (r.top + r.height / 2)) / Math.max(1, r.height)) * 16, 5) });
+      }
+      window.clearTimeout(rest);
+      rest = window.setTimeout(() => setPhase('idle'), DRAG_REST_MS);
     };
-    window.addEventListener('dragover', refuse);
-    window.addEventListener('drop', refuse);
+    const drop = (event: globalThis.DragEvent) => {
+      if (!hasFiles(event)) return;
+      event.preventDefault();
+      window.clearTimeout(rest);
+      setPhase('idle');
+      if (!onBox(event)) {
+        if (event.dataTransfer) event.dataTransfer.dropEffect = 'none';
+        return;
+      }
+      const file = event.dataTransfer?.files?.[0];
+      if (file) void handleFileRef.current(file, true);
+    };
+    window.addEventListener('dragover', over);
+    window.addEventListener('drop', drop);
     return () => {
-      window.removeEventListener('dragover', refuse);
-      window.removeEventListener('drop', refuse);
+      window.clearTimeout(rest);
+      window.removeEventListener('dragover', over);
+      window.removeEventListener('drop', drop);
     };
   }, []);
 
-  const handleFile = async (file: File) => {
-    const id = ++readingRef.current;
-    setError(null);
-    setReading(true);
-    setSlowReading(false);
-    const slow = window.setTimeout(() => { if (id === readingRef.current) setSlowReading(true); }, 200);
-    const result = await readDocumentFile(file);
-    window.clearTimeout(slow);
-    if (id !== readingRef.current) return;
-    setReading(false);
-    setSlowReading(false);
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
-    focusAfterRef.current = 'result';
-    // The box goes from under a file that may still hang over it: no dragleave will come.
-    setDragging(false);
-    setLoaded({ fileName: file.name, text: result.text });
-    setSelected(null);
+  const dismissJob = () => {
+    readingRef.current += 1;
+    setJob(null);
+    zoneRef.current?.focus();
   };
 
   const chooseAnother = () => {
     readingRef.current += 1;
-    setReading(false);
-    setSlowReading(false);
-    setDragging(false);
-    setError(null);
+    setJob(null);
+    setPhase('idle');
     setSelected(null);
     focusAfterRef.current = 'zone';
     setLoaded(null);
@@ -191,27 +258,6 @@ export function DocumentReviewPage() {
     });
   }, [navigate, triggerSearch]);
 
-  const onZoneDrag = (event: DragEvent<HTMLButtonElement>) => {
-    if (!hasFiles(event)) return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'copy';
-    setDragging(true);
-  };
-
-  const onZoneDrop = (event: DragEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-    setDragging(false);
-    const file = event.dataTransfer.files?.[0];
-    if (file) void handleFile(file);
-  };
-
-  const errorBox = error && (
-    <div role="alert" className="flex items-start gap-2.5 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
-      <AlertCircle aria-hidden="true" size={17} className="mt-[3px] shrink-0" />
-      <span>{error}</span>
-    </div>
-  );
-
   return (
     <PageFrame
       title="Analizza documento"
@@ -233,7 +279,10 @@ export function DocumentReviewPage() {
         onChange={event => { const file = event.target.files?.[0]; if (file) void handleFile(file); event.target.value = ''; }}
       />
 
-      <p className="sr-only" aria-live="polite">{slowReading ? 'Leggo il documento…' : loaded ? countLabel : ''}</p>
+      {/* What happens, said once: «Documento in lettura», «Cerco le citazioni», «Pronto», a refusal, then the count. */}
+      <p className="sr-only" aria-live="polite">
+        {job?.stage === 'error' ? job.error : job?.stage === 'reading' ? 'Documento in lettura' : job?.stage === 'searching' ? 'Cerco le citazioni' : job?.stage === 'done' ? 'Pronto' : loaded ? countLabel : ''}
+      </p>
 
       {/* One after the other: the box closes, then the result comes. Both at once would lay the columns out
           under a box still closing, and the page would grow a scrollbar for a moment. */}
@@ -248,41 +297,30 @@ export function DocumentReviewPage() {
             transition={{ duration: dur.panel, ease: ease.drawer }}
           >
             <div className="flex flex-col gap-3 pb-1">
-              <button
+              <DropZone
                 ref={zoneElement}
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                onDragEnter={onZoneDrag}
-                onDragOver={onZoneDrag}
-                onDragLeave={() => setDragging(false)}
-                onDrop={onZoneDrop}
-                aria-busy={reading || undefined}
-                className={cn(
-                  'flex min-h-48 w-full flex-col items-center justify-center rounded-[10px] border-2 px-6 py-10 text-center',
-                  // Inset: the wrapper that closes upwards clips whatever is drawn outside the box.
-                  TRANSITION, FOCUS_RING, 'focus-visible:ring-inset focus-visible:ring-offset-0',
-                  dragging
-                    ? 'border-solid border-primary-600 bg-primary-50/70 dark:border-primary-400 dark:bg-primary-950/40'
-                    : 'border-dashed border-slate-300 bg-white hover:border-primary-400 hover:bg-slate-50/60 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-primary-500 dark:hover:bg-slate-900/70'
+                phase={phase}
+                lean={lean}
+                landings={landings}
+                touch={touch}
+                busy={job !== null && job.stage !== 'error'}
+                onChoose={() => fileInputRef.current?.click()}
+                sheetRef={sheetRef}
+              />
+              {/* The document's row; a refusal slides away with its ✕. */}
+              <AnimatePresence initial={false}>
+                {job && (
+                  <motion.div
+                    key={job.id}
+                    initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={reduceMotion ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, x: 48 }}
+                    transition={{ duration: dur.pop, ease: ease.out }}
+                  >
+                    <DocumentRow job={job} onDismiss={dismissJob} markRef={markRef} hidden={flight !== null} />
+                  </motion.div>
                 )}
-              >
-                {/* The children let the drag through, so leaving one is not leaving the box. */}
-                <Upload aria-hidden="true" size={28} className={cn('pointer-events-none mb-3', dragging ? 'text-primary-600 dark:text-primary-300' : 'text-slate-400 dark:text-slate-500')} />
-                <span className="pointer-events-none font-serif text-xl text-slate-900 dark:text-slate-50">
-                  {dragging ? 'Lascia qui il documento' : 'Scegli un documento'}
-                </span>
-                <span className="pointer-events-none mt-1.5 text-sm text-slate-600 dark:text-slate-400">
-                  {dragging ? 'Lo leggo qui, nel tuo browser' : 'o trascinalo qui · TXT, Markdown, HTML o DOCX, fino a 15 MB'}
-                </span>
-              </button>
-              {slowReading && (
-                // Shown only if the reading lasts: a small file is read before the line appears.
-                <p aria-hidden="true" className="flex items-center gap-2 text-sm text-slate-600 animate-in fade-in duration-200 dark:text-slate-400">
-                  <Loader2 size={15} className="motion-safe:animate-spin text-primary-600 dark:text-primary-400" />
-                  Leggo il documento…
-                </p>
-              )}
-              {errorBox}
+              </AnimatePresence>
             </div>
           </motion.div>
         ) : (
@@ -334,6 +372,7 @@ export function DocumentReviewPage() {
           </motion.div>
         )}
       </AnimatePresence>
+      {flight && <SheetFlight from={flight} target={markRef} onDone={() => setFlight(null)} />}
     </PageFrame>
   );
 }
