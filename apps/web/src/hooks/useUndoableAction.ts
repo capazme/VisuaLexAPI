@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { closeNotification, notificationStore, notify, RESTORED_MS, undoNotification, UNDO_MS } from '../components/ui/notifications/notifications';
 
 export interface UndoableActionOptions<T> {
   /** Action to execute */
@@ -149,100 +150,75 @@ export function useUndoableAction<T>({
   };
 }
 
-// ============ Global Undo Toast Manager ============
-
-type ToastCallback = (toast: UndoToast | null) => void;
-
-export interface UndoToast {
-  message: string;
-  timeRemaining: number;
-  onUndo: () => void;
-  onDismiss: () => void;
-}
-
-let toastListener: ToastCallback | null = null;
+// ============ The global «Annulla» notification ============
 
 /**
- * The toast on screen, dismissed when another starts: there is one container, and two countdowns each drawing
- * their own toast every 100 ms took turns on it (two tasks ticked in a row flickered between the two messages).
- * The one replaced resolves as kept, as when its time runs out.
- */
-let dismissShown: (() => void) | null = null;
-
-/**
- * Register a listener for undo toasts (used by UndoToastContainer)
- */
-export function registerUndoToastListener(callback: ToastCallback): () => void {
-  toastListener = callback;
-  return () => {
-    toastListener = null;
-  };
-}
-
-/**
- * Show an undo toast globally.
- * Returns a promise that resolves to true if action was completed,
- * or false if it was undone.
+ * Runs `action`, then shows a notification with «Annulla» in the stack (`components/ui/notifications`, K1a) for
+ * `duration` ms, held while the user is on it. Resolves to true when the action stands (the time ran out, the
+ * notification was closed or pushed out by a fourth), to false when it was undone. «Annulla» closes it at once — a
+ * last-moment click on a notification that is leaving is not taken — and awaits `undo`; once `undo` is done the
+ * notification comes back in the same place saying «Ripristinato». An `undo` that throws has reported its own failure:
+ * no «Ripristinato» then.
  */
 export function showUndoToast<T>({
   action,
   undo,
   message,
-  duration = 5000,
+  duration = UNDO_MS,
 }: {
   action: () => T | Promise<T>;
   undo: (result: T) => void | Promise<void>;
   message: string;
   duration?: number;
 }): Promise<boolean> {
-  // Execute action first, then drive the toast countdown synchronously.
   return Promise.resolve(action()).then((result) => new Promise<boolean>((resolve) => {
     let resolved = false;
-    let timeRemaining = duration;
-
-    // Declared before the handlers, which stop it: once the toast is resolved its countdown must
-    // end, or the next tick would show it again as a ghost. The tick runs after this scope has
-    // finished, so the handlers it calls exist by then.
-    const interval = setInterval(() => {
-      timeRemaining -= 100;
-      if (timeRemaining <= 0) {
-        clearInterval(interval);
-        handleDismiss();
-      } else {
-        updateToast();
-      }
-    }, 100);
-
-    const handleUndo = async () => {
-      if (resolved) return;
-      resolved = true;
-      clearInterval(interval);
-      if (dismissShown === handleDismiss) dismissShown = null;
-      await undo(result);
-      toastListener?.(null);
-      resolve(false);
-    };
-
-    const handleDismiss = () => {
-      if (resolved) return;
-      resolved = true;
-      clearInterval(interval);
-      if (dismissShown === handleDismiss) dismissShown = null;
-      toastListener?.(null);
-      resolve(true);
-    };
-
-    const updateToast = () => {
-      toastListener?.({
-        message,
-        timeRemaining,
-        onUndo: handleUndo,
-        onDismiss: handleDismiss,
-      });
-    };
-
-    dismissShown?.();
-    dismissShown = handleDismiss;
-    updateToast();
+    const id = notify({
+      type: 'success',
+      message,
+      duration,
+      onUndo: async () => {
+        resolved = true;
+        try {
+          await undo(result);
+          notify({ type: 'success', message: 'Ripristinato', duration: RESTORED_MS, after: id });
+        } catch {
+          // The undo said what went wrong.
+        }
+        resolve(false);
+      },
+      onClose: (reason) => {
+        if (reason === 'undo' || resolved) return;
+        resolved = true;
+        resolve(true);
+      },
+    });
   }));
+}
+
+/** The newest «Annulla» on screen, as `registerUndoToastListener` hands it. */
+export interface UndoToast {
+  message: string;
+  timeRemaining: number;
+  /** Resolves once the undo is done. */
+  onUndo: () => Promise<void>;
+  onDismiss: () => void;
+}
+
+/**
+ * Tells `callback` each time the newest «Annulla» on screen changes: the notification, or null once none is left.
+ * What a test drives the undo through, without drawing the stack.
+ */
+export function registerUndoToastListener(callback: (toast: UndoToast | null) => void): () => void {
+  let shown: number | null = null;
+  return notificationStore.subscribe(({ entries }) => {
+    const newest = [...entries].reverse().find((e) => e.undoable && !e.closing);
+    if ((newest?.id ?? null) === shown) return;
+    shown = newest?.id ?? null;
+    callback(
+      newest
+        ? { message: newest.message, timeRemaining: newest.clock.remaining, onUndo: () => undoNotification(newest.id), onDismiss: () => closeNotification(newest.id, 'dismiss') }
+        : null,
+    );
+  });
 }

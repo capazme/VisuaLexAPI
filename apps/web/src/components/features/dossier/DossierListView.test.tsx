@@ -1,8 +1,10 @@
 import { beforeEach, describe, it, expect, vi } from 'vitest';
-import { act, render, screen, fireEvent } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { appStore } from '../../../store/useAppStore';
 import { DossierListView } from './DossierListView';
+import { registerUndoToastListener, type UndoToast } from '../../../hooks/useUndoableAction';
+import { resetNotifications } from '../../ui/notifications/notifications';
 import { sectionStore } from '../../../features/sections/useSection';
 import type { Dossier, NormaVisitata } from '../../../types';
 
@@ -94,14 +96,22 @@ describe('DossierListView — the menu of a card', () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
-  it('deletes through the confirmation', () => {
-    appStore.setState({ dossiers: [dossier([CIVIL])], practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [] });
-    render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
-    fireEvent.click(screen.getByRole('button', { name: 'Azioni su Pratica Rossi' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Elimina' }));
-    expect(screen.getByText('Eliminare questo dossier?')).toBeInTheDocument();
-    // It goes to the trash (question 160), and the dialog says so.
-    expect(screen.getByText(/«Pratica Rossi» andrà nel cestino, dove resta 30 giorni/)).toBeInTheDocument();
+  it('deletes with no confirmation: the dossier goes to the trash and the notification offers «Annulla» (K1a)', async () => {
+    const deleteDossier = vi.fn().mockResolvedValue({ trashId: 't1', itemCount: 1 });
+    appStore.setState({ dossiers: [dossier([CIVIL])], practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [], deleteDossier });
+    let shown: UndoToast | null = null;
+    const unregister = registerUndoToastListener((t) => { shown = t; });
+    try {
+      render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
+      fireEvent.click(screen.getByRole('button', { name: 'Azioni su Pratica Rossi' }));
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Elimina' }));
+      expect(screen.queryByRole('alertdialog')).toBeNull();
+      expect(deleteDossier).toHaveBeenCalledWith('d1');
+      await waitFor(() => expect(shown?.message).toBe('Dossier «Pratica Rossi» spostato nel cestino'));
+    } finally {
+      unregister();
+      resetNotifications();
+    }
   });
 });
 

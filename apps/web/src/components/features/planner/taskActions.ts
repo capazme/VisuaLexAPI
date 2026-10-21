@@ -51,6 +51,8 @@ export async function completeWithUndo(task: Task, today: string, optimistic: Op
         else await taskService.reopen(task.id);
       } catch (error) {
         notify(failureMessage(error, 'Non riesco ad annullare. Riprova.'), 'error');
+        // Said: no «Ripristinato» after it.
+        throw error;
       } finally {
         changed();
       }
@@ -79,6 +81,8 @@ export async function trashWithUndo(task: Task, optimistic: Optimistic): Promise
         await taskService.restore(task.id);
       } catch (error) {
         notify(failureMessage(error, 'Non riesco a ripristinare il compito. Riprova.'), 'error');
+        // Said: no «Ripristinato» after it.
+        throw error;
       } finally {
         changed();
       }

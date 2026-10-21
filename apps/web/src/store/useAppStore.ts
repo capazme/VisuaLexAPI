@@ -19,7 +19,7 @@ import {
     addArticles, articleRowKey, besideAfterOpen, besideRefFor, DEFAULT_PRACTICE_LABEL, DEFAULT_SEARCH_LABEL, decisionRowKey,
     findPracticeArticle, holdsSubject, labelOr, mergeDecisionEntries, practiceArticleKey,
     practiceLabel, sameBesideSubject, sameDecision, sanitizePractices, subjectOfRef, type BesideRef, type Practice,
-    type PracticeDecision, type PracticeSubject,
+    type PracticeAct, type PracticeDecision, type PracticeSubject,
 } from '../utils/practice';
 import { shortAct } from '../utils/sources';
 import { DECISIONS_PRACTICE_LABEL, practiceNoticeText, practicesFromTabs } from '../utils/practiceMigration';
@@ -226,6 +226,11 @@ interface AppState {
     closePractice: (id: string) => void;
     /** Empties the table; a reload shows no practice (§5). */
     closeAllPractices: () => void;
+    /**
+     * «Annulla» after closing practices (K1a): puts back those that are not open, each at the index it had (or the end),
+     * with their open rows; `activeId` becomes active again if it is among them. What was opened meanwhile stays.
+     */
+    reopenPractices: (closed: { practice: Practice; index: number }[], rows: Record<string, true>, activeId: string | null) => void;
     /** Ignored for an id that names no practice. */
     setActivePractice: (id: string) => void;
     reorderPractices: (fromIndex: number, toIndex: number) => void;
@@ -262,6 +267,11 @@ interface AppState {
     removePracticeArticle: (practiceId: string, actId: string, articleKey: string) => void;
     /** Takes the act off the table with its rows, its reveal, its windows and the structure window it owned. */
     removePracticeAct: (practiceId: string, actId: string) => void;
+    /**
+     * «Annulla» after `removePracticeAct` (K1a): the act back at `index` in its practice, with the windows it had beside
+     * and its open rows. Ignored when the practice is gone or holds the act again.
+     */
+    restorePracticeAct: (practiceId: string, act: PracticeAct, index: number, beside: BesideRef[], rows: Record<string, true>) => void;
     /**
      * «Sposta in un'altra pratica» (T13): the act keeps its id, its articles and its open rows. Into
      * a practice that already holds the act (`actKeyOf`) it joins that act, whose id it takes, and
@@ -686,6 +696,18 @@ const appStore = createStore<AppState>()(
                 state.phoneReader = null;
             }),
 
+            reopenPractices: (closed, rows, activeId) => set((state) => {
+                const open = new Set(state.practices.map((p) => p.id));
+                const back = closed.filter(({ practice }) => !open.has(practice.id)).sort((a, b) => a.index - b.index);
+                if (back.length === 0) return;
+                for (const { practice, index } of back) state.practices.splice(Math.min(index, state.practices.length), 0, practice);
+                for (const [key, on] of Object.entries(rows)) {
+                    if (back.some(({ practice }) => key.startsWith(`${practice.id}/`))) state.practiceRows[key] = on;
+                }
+                if (activeId && back.some(({ practice }) => practice.id === activeId)) activate(state, activeId);
+                else if (state.activePracticeId === null) state.activePracticeId = back[0].practice.id;
+            }),
+
             setActivePractice: (id) => {
                 const { practices, activePracticeId } = get();
                 if (activePracticeId === id || !practices.some((p) => p.id === id)) return;
@@ -795,6 +817,14 @@ const appStore = createStore<AppState>()(
                 dropRows(state, `${practiceId}/${actId}/`);
                 });
             },
+
+            restorePracticeAct: (practiceId, act, index, beside, rows) => set((state) => {
+                const practice = state.practices.find((p) => p.id === practiceId);
+                if (!practice || practice.acts.some((a) => a.id === act.id)) return;
+                practice.acts.splice(Math.min(index, practice.acts.length), 0, act);
+                practice.beside.push(...beside);
+                Object.assign(state.practiceRows, rows);
+            }),
 
             moveActToPractice: (actId, fromPracticeId, to) => {
                 const created = typeof to === 'string' ? null : newPractice(to.newLabel, false);

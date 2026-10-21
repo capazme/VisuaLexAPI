@@ -34,6 +34,15 @@ vi.mock('./dossierPdf', async (importOriginal) => {
 vi.mock('./dossierPdfMarks', () => ({ loadPdfMarks: pdf.loadPdfMarks }));
 vi.mock('../../../utils/actStructureCache', () => ({ fetchActRubriche: async () => ({ title: 'Titolo' }) }));
 vi.mock('./DossierItemReader', () => ({ DossierItemReader: () => null }));
+// The act's index, reduced to what it hands over: this many articles of a law.
+const tree = vi.hoisted(() => ({ count: 0 }));
+vi.mock('./TreeNavigatorModal', () => ({
+  TreeNavigatorModal: ({ onImport, onClose }: { onImport: (a: { numero: string }[], act: { tipo_atto: string; data: string; numero_atto: string }) => void; onClose: () => void }) => (
+    <button type="button" onClick={() => { onImport(Array.from({ length: tree.count }, (_, i) => ({ numero: String(i + 1) })), { tipo_atto: 'legge', data: '2012-12-31', numero_atto: '247' }); onClose(); }}>
+      importa dall'indice
+    </button>
+  ),
+}));
 // The dossier's tasks panel reads its tasks from the server: an empty list here (its own tests: `planner/`).
 vi.mock('../../../services/taskService', () => ({
   taskService: { list: async () => ({ today: '2026-10-20', tasks: [], truncated: false }) },
@@ -207,16 +216,13 @@ describe('DossierDetailView — the page by act', () => {
     expect(reload).toHaveBeenCalledTimes(2);
   });
 
-  it('a multiple selection is one call and one trash entry; its confirmation says where the entries go', async () => {
+  it('a multiple selection is one call and one trash entry, with no confirmation: «Annulla» puts it back (K1a)', async () => {
     renderView();
     fireEvent.click(screen.getByRole('button', { name: 'Altre azioni' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Seleziona elementi' }));
     fireEvent.click(screen.getByRole('button', { name: 'Seleziona tutti' }));
     fireEvent.click(screen.getByRole('button', { name: 'Elimina' }));
-    const dialog = screen.getByRole('alertdialog');
-    expect(dialog).toHaveTextContent('andranno nel cestino, dove restano 30 giorni e si possono ripristinare');
-    expect(dialog).toHaveTextContent('Gli articoli originali salvati nei segnalibri o in altri dossier non saranno toccati');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Elimina' }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
     await waitFor(() => expect(toast?.message).toBe('3 elementi rimossi'));
     expect(dossierService.trashItems).toHaveBeenCalledTimes(1);
     expect([...vi.mocked(dossierService.trashItems).mock.calls[0][1]].sort()).toEqual(['a1', 'a3', 'b1']);
@@ -442,5 +448,40 @@ describe('DossierDetailView — «Esporta → PDF»', () => {
     expect(screen.getByRole('dialog', { name: 'Esporta in PDF' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Scarica PDF/ })).toBeEnabled();
     error.mockRestore();
+  });
+});
+
+describe('DossierDetailView — an import from the act\'s index (K1a)', () => {
+  const importing = async (count: number) => {
+    tree.count = count;
+    const addToDossier = vi.fn();
+    appStore.setState({ addToDossier });
+    renderView();
+    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Articoli da una norma' }));
+    fireEvent.click(screen.getByRole('button', { name: "importa dall'indice" }));
+    return addToDossier;
+  };
+
+  it('a few articles go in at once', async () => {
+    const addToDossier = await importing(3);
+    expect(addToDossier).toHaveBeenCalledTimes(3);
+    expect(toast).toBeNull();
+  });
+
+  it('more than a hundred ask no question, and write nothing until the notification is gone', async () => {
+    const addToDossier = await importing(150);
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    await waitFor(() => expect(toast?.message).toBe('Importo 150 articoli nel dossier'));
+    expect(addToDossier).not.toHaveBeenCalled();
+    await act(async () => { toast?.onDismiss(); });
+    await waitFor(() => expect(addToDossier).toHaveBeenCalledTimes(150));
+  });
+
+  it('«Annulla» leaves the dossier as it was: nothing was written', async () => {
+    const addToDossier = await importing(150);
+    await waitFor(() => expect(toast).not.toBeNull());
+    await act(async () => { await toast?.onUndo(); });
+    expect(addToDossier).not.toHaveBeenCalled();
   });
 });

@@ -8,6 +8,7 @@ vi.mock('../../../services/studiaService', () => ({
 }));
 
 vi.mock('../../../services/healthService', () => ({ cardSourcesAnswer: vi.fn() }));
+vi.mock('../../../services/trashService', () => ({ trashService: { restore: vi.fn() } }));
 
 vi.mock('../../../utils/articleCardsCache', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../utils/articleCardsCache')>()),
@@ -20,6 +21,9 @@ import { invalidateArticleCards } from '../../../utils/articleCardsCache';
 import { appStore } from '../../../store/useAppStore';
 import type { Scheda, StatoScheda } from '../../../types/studia';
 import { MyCardsView } from './MyCardsView';
+import { trashService } from '../../../services/trashService';
+import { registerUndoToastListener, type UndoToast } from '../../../hooks/useUndoableAction';
+import { resetNotifications } from '../../ui/notifications/notifications';
 
 const list = vi.mocked(studiaService.list);
 const get = vi.mocked(studiaService.get);
@@ -303,8 +307,6 @@ describe('«Le mie schede», the act filter after a deletion', () => {
   const deleteCard = async (id: string) => {
     const detail = await screen.findByRole('article', { name: 'Scheda' });
     await userEvent.setup().click(within(detail).getByRole('button', { name: 'Elimina' }));
-    const dialog = await screen.findByRole('alertdialog');
-    await userEvent.setup().click(within(dialog).getByRole('button', { name: 'Elimina' }));
     await waitFor(() => expect(trash).toHaveBeenCalledWith([id]));
   };
 
@@ -458,29 +460,31 @@ describe('«Le mie schede», the actions a state allows', () => {
 });
 
 describe('«Le mie schede», delete', () => {
-  const openConfirm = async () => {
-    renderView('/studia/schede/r1');
-    const detail = await screen.findByRole('article', { name: 'Scheda' });
-    await userEvent.setup().click(within(detail).getByRole('button', { name: 'Elimina' }));
-    return screen.findByRole('alertdialog');
-  };
-
-  it('asks first, saying where the card goes', async () => {
-    const dialog = await openConfirm();
-    expect(dialog).toHaveTextContent('La scheda va nel cestino per 30 giorni. Le altre schede non sono toccate.');
-    expect(trash).not.toHaveBeenCalled();
-    await userEvent.setup().click(within(dialog).getByRole('button', { name: 'Annulla' }));
-    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
-    expect(trash).not.toHaveBeenCalled();
+  let shown: UndoToast | null;
+  let unregister: () => void;
+  beforeEach(() => {
+    shown = null;
+    unregister = registerUndoToastListener((t) => { shown = t; });
+  });
+  afterEach(() => {
+    unregister();
+    resetNotifications();
   });
 
-  it('moves the card to the trash, says so, and returns to the list', async () => {
+  /** Opens the card, then (`listAfter`) what the list answers once it is gone, then presses «Elimina». */
+  const pressDelete = async (listAfter?: Scheda[]) => {
+    renderView('/studia/schede/r1');
+    const detail = await screen.findByRole('article', { name: 'Scheda' });
+    if (listAfter) list.mockResolvedValue(page(listAfter));
+    await userEvent.setup().click(within(detail).getByRole('button', { name: 'Elimina' }));
+  };
+
+  it('moves the card to the trash at once, with «Annulla» and no confirmation, and returns to the list (K1a)', async () => {
     trash.mockResolvedValue({ trashId: 't1', moved: ['r1'], notFound: [], notDeletable: [] });
-    const dialog = await openConfirm();
-    list.mockResolvedValue(page(FIVE.filter((c) => c.id !== 'r1')));
-    await userEvent.setup().click(within(dialog).getByRole('button', { name: 'Elimina' }));
+    await pressDelete(FIVE.filter((c) => c.id !== 'r1'));
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(trash).toHaveBeenCalledWith(['r1']);
-    expect(await screen.findByText('Scheda nel cestino')).toBeInTheDocument();
+    await waitFor(() => expect(shown?.message).toBe('Scheda nel cestino'));
     // The row under the article must not go on counting it.
     expect(invalidateArticleCards).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('where')).toHaveTextContent('/studia/schede');
@@ -488,26 +492,47 @@ describe('«Le mie schede», delete', () => {
     expect(screen.queryByRole('article')).not.toBeInTheDocument();
   });
 
+  it('«Annulla» takes the card back out of the trash and lists it again', async () => {
+    trash.mockResolvedValue({ trashId: 't1', moved: ['r1'], notFound: [], notDeletable: [] });
+    vi.mocked(trashService.restore).mockResolvedValue({ dossierId: null });
+    await pressDelete(FIVE.filter((c) => c.id !== 'r1'));
+    await waitFor(() => expect(shown).not.toBeNull());
+    list.mockResolvedValue(page(FIVE));
+    await act(async () => { await shown!.onUndo(); });
+    expect(trashService.restore).toHaveBeenCalledWith('t1');
+    expect(invalidateArticleCards).toHaveBeenCalledTimes(2);
+    expect(await screen.findByRole('link', { name: /Domanda r1\?/ })).toBeInTheDocument();
+  });
+
+  it('says plainly when «Annulla» cannot reach the trash', async () => {
+    trash.mockResolvedValue({ trashId: 't1', moved: ['r1'], notFound: [], notDeletable: [] });
+    vi.mocked(trashService.restore).mockRejectedValue(new Error('down'));
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await pressDelete();
+    await waitFor(() => expect(shown).not.toBeNull());
+    await act(async () => { await shown!.onUndo(); });
+    expect(await screen.findByText(/Non riesco a ripristinare la scheda ora/)).toBeInTheDocument();
+    error.mockRestore();
+  });
+
   it('says plainly when the card can no longer be deleted, and stays on it', async () => {
     trash.mockResolvedValue({ moved: [], notFound: [], notDeletable: ['r1'] });
-    const dialog = await openConfirm();
-    await userEvent.setup().click(within(dialog).getByRole('button', { name: 'Elimina' }));
+    await pressDelete();
     expect(await screen.findByText(/non si può eliminare nello stato in cui si trova/)).toBeInTheDocument();
     expect(invalidateArticleCards).not.toHaveBeenCalled();
     expect(screen.getByTestId('where')).toHaveTextContent('/studia/schede/r1');
+    expect(shown).toBeNull();
   });
 
   it('says plainly when the card is gone already', async () => {
     trash.mockResolvedValue({ moved: [], notFound: ['r1'], notDeletable: [] });
-    const dialog = await openConfirm();
-    await userEvent.setup().click(within(dialog).getByRole('button', { name: 'Elimina' }));
+    await pressDelete();
     expect(await screen.findByText(/La scheda non c’è più/)).toBeInTheDocument();
   });
 
   it('says what failed and what to do when the trash cannot be reached', async () => {
     trash.mockRejectedValue(new Error('down'));
-    const dialog = await openConfirm();
-    await userEvent.setup().click(within(dialog).getByRole('button', { name: 'Elimina' }));
+    await pressDelete();
     expect(await screen.findByText('Non sono riuscito a spostare la scheda nel cestino. Riprova.')).toBeInTheDocument();
     expect(screen.getByTestId('where')).toHaveTextContent('/studia/schede/r1');
   });
