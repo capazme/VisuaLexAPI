@@ -7,6 +7,7 @@ vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ devMode: account.devMo
 
 import { SectionSwitcher } from './SectionSwitcher';
 import { sectionStore } from './useSection';
+import { SECTION_HOME_CODE } from './sections';
 
 function Where() {
   return <span data-testid="where">{useLocation().pathname}</span>;
@@ -103,25 +104,85 @@ describe('SectionSwitcher (spec S3)', () => {
     fireEvent.keyDown(trigger(), { key: 'ArrowDown' });
     fireEvent.click(screen.getByRole('menuitemradio', { name: /Gymnasium/ }), { detail: 0 });
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Gymnasium: la tua palestra giuridica' })).toHaveFocus());
+    // From the keyboard the ring shows where the focus went.
+    expect(screen.getByRole('heading', { name: 'Gymnasium: la tua palestra giuridica' })).not.toHaveAttribute('data-pointer-focus');
+  });
+
+  it('chosen with the mouse, the new title takes the focus without its ring (T1)', async () => {
+    render(
+      <MemoryRouter initialEntries={['/studia/ripasso']}>
+        <SectionSwitcher forumCount={0} />
+        <main>
+          <Routes>
+            <Route path="/studia/ripasso" element={<h1 data-section-title="gymnasium" tabIndex={-1}>Gymnasium: la tua palestra giuridica</h1>} />
+            <Route path="/dossier" element={<h2 data-section-title="opus" tabIndex={-1}>I tuoi dossier di lavoro</h2>} />
+          </Routes>
+        </main>
+      </MemoryRouter>,
+    );
+    fireEvent.click(trigger(), { detail: 1 });
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Opus/ }), { detail: 1 });
+    const heading = await screen.findByRole('heading', { name: 'I tuoi dossier di lavoro' });
+    await waitFor(() => expect(heading).toHaveFocus());
+    expect(heading).toHaveAttribute('data-pointer-focus');
   });
 
   it('goes to the home of the section it is in without a change to show', () => {
-    // jsdom has no canvas: the spy says whether a change asked for one at all.
-    const getContext = vi.spyOn(HTMLCanvasElement.prototype, 'getContext');
+    // The spy says whether a change asked the browser for a View Transition at all.
+    const start = vi.fn((update: () => Promise<void>) => {
+      const done = update();
+      return { finished: Promise.resolve(), skipTransition: vi.fn(), ready: done, updateCallbackDone: done };
+    });
+    Object.defineProperty(document, 'startViewTransition', { configurable: true, value: start });
     try {
       renderSwitcher('/studia/schede');
       fireEvent.click(trigger());
       fireEvent.click(screen.getByRole('menuitemradio', { name: /Gymnasium/ }));
       expect(screen.getByTestId('where')).toHaveTextContent('/studia/ripasso');
-      expect(getContext).not.toHaveBeenCalled();
+      expect(start).not.toHaveBeenCalled();
 
-      // Another section does ask for one: the spy would see a change start.
+      // Another section does ask for one.
       fireEvent.click(trigger());
       fireEvent.click(screen.getByRole('menuitemradio', { name: /Forum/ }));
-      expect(getContext).toHaveBeenCalledOnce();
+      expect(start).toHaveBeenCalledOnce();
     } finally {
-      getContext.mockRestore();
+      Reflect.deleteProperty(document, 'startViewTransition');
     }
+  });
+
+  it('in the phone\'s drawer asks for no View Transition: the drawer closing is the change (T1)', () => {
+    const start = vi.fn();
+    Object.defineProperty(document, 'startViewTransition', { configurable: true, value: start });
+    try {
+      render(
+        <MemoryRouter initialEntries={['/dossier']}>
+          <Where />
+          <SectionSwitcher forumCount={0} inDrawer />
+        </MemoryRouter>,
+      );
+      fireEvent.click(trigger());
+      fireEvent.click(screen.getByRole('menuitemradio', { name: /Forum/ }));
+      expect(screen.getByTestId('where')).toHaveTextContent('/forum');
+      expect(start).not.toHaveBeenCalled();
+    } finally {
+      Reflect.deleteProperty(document, 'startViewTransition');
+    }
+  });
+
+  it('fetches the code of the other sections\' homes when it opens, so the change finds them there (T1)', () => {
+    const gymnasium = vi.spyOn(SECTION_HOME_CODE, 'gymnasium').mockResolvedValue(undefined);
+    renderSwitcher('/forum');
+    expect(gymnasium).not.toHaveBeenCalled();
+    fireEvent.click(trigger());
+    expect(gymnasium).toHaveBeenCalledOnce();
+    gymnasium.mockRestore();
+  });
+
+  it('changes the mark\'s colour in 200 ms, stilled under reduced motion (T1)', () => {
+    renderSwitcher('/forum');
+    const mark = trigger().querySelector('.vlx-section-mark');
+    expect(mark).toHaveAttribute('data-section', 'forum');
+    expect(mark).toHaveClass('transition-colors', 'duration-200', 'motion-reduce:transition-none');
   });
 
   it('draws no dot inside the Forum, where its own entry counts', () => {

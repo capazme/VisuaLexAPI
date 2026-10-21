@@ -1,22 +1,16 @@
-import type { MouseEvent } from 'react';
 import { MenuButton } from '../../components/ui/MenuButton';
 import { cn } from '../../lib/utils';
 import { useSection } from './useSection';
-
-/** Where the entry was chosen: the pointer's place, or the entry's middle for a key (a click with `detail` 0). */
-function tapPoint(event: MouseEvent<HTMLButtonElement>): { x: number; y: number } {
-  if (event.detail > 0) return { x: event.clientX, y: event.clientY };
-  const box = event.currentTarget.getBoundingClientRect();
-  return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
-}
+import { SECTION_HOME_CODE } from './sections';
 
 /**
  * The switcher at the top of the sidebar, where the open book was (spec S3): the active section's
  * icon, a menu of the sections the user can enter, each with its line. The Forum's count rides its
  * entry, and a dot on the icon says it from any other section (S5). `withName`: the bar with words
- * (from `xl`, and the phone's drawer) writes the section's name beside its mark.
+ * (from `xl`, and the phone's drawer) writes the section's name beside its mark. `inDrawer`: the phone's drawer, which
+ * closes over the change, so the page changes at once under it (T1).
  */
-export function SectionSwitcher({ forumCount, onChoose, withName = false }: { forumCount: number; onChoose?: () => void; withName?: boolean }) {
+export function SectionSwitcher({ forumCount, onChoose, withName = false, inDrawer = false }: { forumCount: number; onChoose?: () => void; withName?: boolean; inDrawer?: boolean }) {
   const { section, active, sections, chooseSection } = useSection();
   const forumDot = forumCount > 0 && section !== 'forum';
 
@@ -26,6 +20,8 @@ export function SectionSwitcher({ forumCount, onChoose, withName = false }: { fo
       align="left"
       menuClassName="w-72"
       className={withName ? 'w-full' : undefined}
+      // A failed fetch is the route's to report, when it is visited.
+      onOpen={() => sections.forEach((s) => s.id !== section && SECTION_HOME_CODE[s.id]?.().catch(() => {}))}
       triggerClassName={cn(
         'relative rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800',
         // The mark sits where it sits in the rail (4 px in from a 44 px control), so widening the bar moves no icon.
@@ -37,14 +33,16 @@ export function SectionSwitcher({ forumCount, onChoose, withName = false }: { fo
         icon: s.icon,
         checked: s.id === section,
         badge: s.id === 'forum' ? forumCount : undefined,
+        // A key's click (Enter, Space) has `detail` 0.
         onSelect: (event) => {
-          chooseSection(s.id, tapPoint(event));
+          chooseSection(s.id, { still: inDrawer, byPointer: event.detail > 0 });
           onChoose?.();
         },
       }))}
     >
-      {/* The section's own hue lives only here and on page headers' hairline (spec 2026-10-18-redesign-inchiostro §4.1). */}
-      <span aria-hidden data-section={section} className="vlx-section-mark grid h-9 w-9 place-items-center rounded-[10px] text-white transition-colors">
+      {/* The section's own hue lives only here and on page headers' hairline (spec 2026-10-18-redesign-inchiostro §4.1).
+          On a change of section it passes to the new hue in 200 ms, the change's one touch of colour (T1). */}
+      <span aria-hidden data-section={section} className="vlx-section-mark grid h-9 w-9 place-items-center rounded-[10px] text-white transition-colors duration-200 ease-out motion-reduce:transition-none">
         <active.icon className="h-5 w-5" strokeWidth={1.75} />
       </span>
       {withName && (

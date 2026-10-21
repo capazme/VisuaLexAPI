@@ -260,6 +260,25 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     expect(handlers.closeMobile).toHaveBeenCalled();
     expect(hrefs()).toEqual(['/', '/documents', '/forum', '/forum/community']);
   });
+
+  it('fades in the new section\'s entries only, never the Corpus ones above them (T1)', () => {
+    // jsdom has no Web Animations: the spy records which elements fade in.
+    const animate = vi.fn();
+    Element.prototype.animate = animate as unknown as typeof Element.prototype.animate;
+    try {
+      renderSidebar('/');
+      expect(animate).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole('button', { name: /^Sezione:/ }));
+      fireEvent.click(screen.getByRole('menuitemradio', { name: /Forum/ }));
+      const faded = animate.mock.contexts as HTMLElement[];
+      expect(faded.length).toBeGreaterThan(0);
+      const forum = screen.getByRole('group', { name: 'Forum' });
+      for (const entry of faded) expect(forum).toContainElement(entry);
+      expect(faded).toContain(screen.getByRole('link', { name: 'Community' }));
+    } finally {
+      delete (Element.prototype as Partial<Element>).animate;
+    }
+  });
 });
 
 describe('Sidebar — Cronologia in the user menu (the owner, 13 Oct 2026)', () => {
