@@ -123,6 +123,28 @@ router.get('/sessione', async (req, res) => {
   res.json({ conteggi: { dovute, nuove: newCards.length }, cards });
 });
 
+// Today's counts and nothing else (G-356): the cards due by the end of today in Rome and the new ones today still
+// allows, over the whole scope, as `/sessione` counts them. A read for another page (Opus's «Oggi»): unlike
+// `/sessione` and `/progressi`, it never marks the day's queue finished, settles a mission or credits points, and
+// writes no row at all. Takes no parameters.
+const countsSchema = z.object({}).strict();
+
+router.get('/conteggi', async (req, res) => {
+  const userId = req.user!.id;
+  countsSchema.parse(req.query);
+  const today = romeDay(new Date());
+
+  const { nuoveAlGiorno, materieComunita } = await readPreferences(prisma, userId);
+  const scope = reviewScope(userId, materieComunita);
+  const [dovute, introduced, available] = await Promise.all([
+    prisma.lingoStatoRipasso.count({ where: dueWhere(userId, scope, today) }),
+    introducedToday(prisma, userId, today),
+    prisma.lingoCard.count({ where: newCardsWhere(userId, scope) }),
+  ]);
+  const nuove = Math.min(Math.max(0, nuoveAlGiorno - introduced), available);
+  res.json({ giorno: today, dovute, nuove });
+});
+
 router.post('/revisioni', async (req, res) => {
   const userId = req.user!.id;
   const { cardId, rating, durataMs } = gradeSchema.parse(req.body);
