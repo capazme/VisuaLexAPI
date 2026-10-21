@@ -122,3 +122,23 @@ class TestSplitOrdinal:
         with patch("app.get_tree", new=AsyncMock(return_value="Errore")), \
                 patch("app.fetch_act_index", new=AsyncMock(return_value=index)):
             assert await ctrl._article_exists_in_tree("https://x", "135-sexdecies", None) is True
+
+
+class TestRepeatedNumberIsLinear:
+    """`\\d+[\\w./-]*\\.?` overlapped: «Art. » + 20,000 digits + «!» took 7 s."""
+
+    @pytest.mark.parametrize("line", ["Art. " + "1" * 20_000 + "!", "Art." + " " * 20_000 + "1!"])
+    def test_hostile_line(self, line):
+        import time
+        from visualex_api.services.akn_parser import _REPEATED_NUMBER
+        started = time.perf_counter()
+        assert _REPEATED_NUMBER.fullmatch(line) is None
+        assert time.perf_counter() - started < 0.5
+
+    @pytest.mark.parametrize("line,matches", [
+        ("Art. 1159.", True), ("Art. 2545-quinquiesdecies.", True), ("Art.1", True), ("art 25 bis", False),
+        ("Art. 270-bis.1", True), ("Art.", False), ("Arte 1", False),
+    ])
+    def test_same_lines(self, line, matches):
+        from visualex_api.services.akn_parser import _REPEATED_NUMBER
+        assert bool(_REPEATED_NUMBER.fullmatch(line)) is matches

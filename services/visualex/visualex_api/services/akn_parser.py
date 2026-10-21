@@ -90,7 +90,10 @@ _UNBRACKETED_MAX = 160
 # The repeated "Art. N." line, written as the key would not read it: the other
 # spelling of the ordinal («Art. 2545-quinquiesdecies.» under 2545-quindecies), or
 # the number without its suffix («Art. 1159.» under 1159-bis).
-_REPEATED_NUMBER = re.compile(r"Art\.?\s*\d+[\w./-]*\.?", re.I)
+# One digit, then the rest in one possessive run: `\d+[\w./-]*\.?` let the digits and the
+# class (which holds digits and the dot) split a long number every way («Art. » + 20,000
+# digits + «!»: 7 s). Same strings matched.
+_REPEATED_NUMBER = re.compile(r"Art\.?\s*+\d[\w./-]*+", re.I)
 
 # An abrogated article carries no rubrica because it carries no content. Saying
 # so is more useful than leaving the row blank — the reader cannot otherwise
