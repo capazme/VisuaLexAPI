@@ -381,6 +381,31 @@ class TestEuActsHardening:
         assert r.date is None
 
 
+class TestEuPatternIsLinear:
+    """Adjacent whitespace runs in the EU head used to backtrack quadratically:
+    «regolamento» and 16,000 spaces took 7.6 s (inventory row 5.5)."""
+
+    HOSTILE = [
+        "regolamento" + " " * 16_000,
+        "regolamento (" + " " * 16_000,
+        "regolamento ue" + " " * 16_000 + "n." + " " * 16_000,
+        "direttiva 2002" + " " * 16_000 + "/" + " " * 16_000,
+        "dir" + " " * 16_000 + "ue" + " " * 16_000 + ")" + " " * 16_000,
+    ]
+
+    @pytest.mark.parametrize("text", HOSTILE, ids=range(len(HOSTILE)))
+    def test_hostile_whitespace_stays_fast(self, text):
+        import time
+        from visualex_api.tools.nl_parser import EU_ACT_RE
+        started = time.perf_counter()
+        assert EU_ACT_RE.search(text) is None
+        assert time.perf_counter() - started < 0.5
+
+    def test_spaced_citation_still_reads(self):
+        r = parse_nl_query("regolamento   (  UE  )   n.   2016 / 679 art. 6")
+        assert (r.act_type, r.act_number, r.date, r.article) == ("regolamento ue", "679", "2016", "6")
+
+
 class TestEuPairRule:
     """The rule table behind resolve_eu_year_and_number, with the year injected."""
 

@@ -1,15 +1,19 @@
 import asyncio
-import aiohttp
 from bs4 import BeautifulSoup
 import logging
 import re
+from urllib.parse import urlparse
 from aiocache import cached, Cache
 from aiocache.serializers import JsonSerializer
 from playwright.async_api import async_playwright
 
 from .cache import PersistentCache
+from .cache_manager import get_cache_manager
+from .egress import is_allowed
+from .exceptions import DocumentNotFoundError, NetworkError
 from .logging_config import log_handlers
 from ..services.akn_parser import normalize_article_key
+from ..services.http_client import http_client
 
 # Configurazione del logging
 logging.basicConfig(level=logging.INFO,
@@ -43,6 +47,50 @@ async def _fetch_with_playwright(url: str) -> str:
             return html
         finally:
             await browser.close()
+
+
+# The shortest EUR-Lex page the scraper accepts as an act (EurlexScraper.request_document): a
+# shorter one is an error or a challenge page, never stored where the scraper reads.
+_EURLEX_MIN_PAGE = 1000
+
+
+def _full_key(normurn, link):
+    """The persistent key of the widest Normattiva tree: section labels and metadata."""
+    return f"{normurn}|link={link}|details=True|metadata=True"
+
+
+def _narrow(result, count, metadata, details, return_metadata):
+    """A Normattiva tree as `get_tree(details, return_metadata)` answers it, from the widest
+    one (`details=True, return_metadata=True`) of the same page and `link`. The parser builds
+    the same article entries and the same metadata whatever `details` and `return_metadata`
+    say; `details` only adds the section labels (bare strings) between them, so dropping the
+    strings is the narrower parse (tests/test_tree_variants.py)."""
+    if not details and isinstance(result, list):
+        result = [entry for entry in result if isinstance(entry, dict)]
+    if return_metadata:
+        return result, count, metadata
+    return result, count
+
+
+async def _eurlex_page(normurn):
+    """The EUR-Lex page behind a tree: the copy the scraper keeps (namespace "eurlex", keyed by
+    the same URL), else one Playwright visit. The article text is read from that page too, so
+    one visit serves the tree, the rubriche and every article of the act."""
+    cached_html = await get_cache_manager().get_persistent("eurlex").get(normurn)
+    if cached_html:
+        logging.info(f"EUR-Lex page from the scraper's cache: {normurn[:80]}")
+        return cached_html, True
+    return await _fetch_with_playwright(normurn), False
+
+
+def _source_of(normurn):
+    """"normattiva" or "eurlex" by the URL's host (the hosts every URL the app builds uses),
+    else None: a word in the path or the query decides nothing."""
+    try:
+        host = urlparse(normurn).hostname
+    except ValueError:
+        return None
+    return {"www.normattiva.it": "normattiva", "eur-lex.europa.eu": "eurlex"}.get(host)
 
 
 def _no_tree(result):
@@ -88,62 +136,94 @@ async def get_tree(normurn, link=False, details=False, return_metadata=False):
         return cached_result.get("result", []), cached_result.get("count", 0)
 
     # Use different fetch methods based on source
-    is_eurlex = "eur-lex" in normurn
+    source = _source_of(normurn)
+    is_eurlex = source == "eurlex"
+    is_normattiva = source == "normattiva"
+
+    # One Normattiva page, one download: every (details, return_metadata) variant is read
+    # from the widest tree of that page. The existence check, a range and the index the web
+    # opens ask for three different variants of the same page, and each used to fetch it.
+    if is_normattiva:
+        full = await _tree_cache.get(_full_key(normurn, link))
+        if full:
+            logging.info(f"Persistent cache hit for the full tree: {normurn[:50]}")
+            return _narrow(full.get("result", []), full.get("count", 0),
+                           full.get("metadata", {}), details, return_metadata)
+
+    if is_eurlex:
+        # The scraper's copy first; a copy that holds no article (a refused visit the scraper
+        # kept) is not trusted, and the page is visited again, as it was before the copy was read.
+        answer = await _tree_from_page(normurn, link, details, return_metadata, is_eurlex,
+                                       eurlex_copy=True)
+        if answer[1] == 0 and answer[-1]:
+            answer = await _tree_from_page(normurn, link, details, return_metadata, is_eurlex,
+                                           eurlex_copy=False)
+    else:
+        answer = await _tree_from_page(normurn, link, details, return_metadata, is_eurlex)
+    return answer[:-1]
+
+
+async def _tree_from_page(normurn, link, details, return_metadata, is_eurlex, eurlex_copy=False):
+    """`get_tree`'s answer read from the page, plus whether the page was the EUR-Lex scraper's
+    copy (the last element, dropped by `get_tree`)."""
+    from_copy = False
+
+    def failure(message):
+        return (message, 0, {}, from_copy) if return_metadata else (message, 0, from_copy)
+
+    # `normurn` comes from the caller (POST /fetch_tree): only a declared host is visited, by
+    # the browser as by the client, and only Normattiva's or EUR-Lex's host.
+    if not is_allowed(normurn):
+        logging.error(f"Tree refused for an undeclared host: {normurn[:80]}")
+        return failure(f"Host non consentito: {normurn[:80]}")
+    if not is_eurlex and _source_of(normurn) != "normattiva":
+        logging.warning(f"Unrecognized norm URN format: {normurn}")
+        return failure("Unrecognized norm URN format")
 
     try:
         if is_eurlex:
             # EUR-Lex requires Playwright to bypass WAF
-            text = await _fetch_with_playwright(normurn)
+            if eurlex_copy:
+                text, from_copy = await _eurlex_page(normurn)
+            else:
+                text = await _fetch_with_playwright(normurn)
         else:
-            # Normattiva and others use simple HTTP
-            # Certificate verification enabled (aiohttp default).
-            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector()) as session:
-                async with session.get(normurn, timeout=30) as response:
-                    response.raise_for_status()
-                    text = await response.text()
-    except aiohttp.ClientError as e:
-        logging.error(f"HTTP error while fetching page: {e}", exc_info=True)
-        error_msg = f"Failed to retrieve the page: {e}"
-        if return_metadata:
-            return error_msg, 0, {}
-        return error_msg, 0
-    except asyncio.TimeoutError:
-        logging.error("Request timed out")
-        if return_metadata:
-            return "Request timed out", 0, {}
-        return "Request timed out", 0
+            # Normattiva through the shared client, as its article pages: its rate limit and
+            # its host check. One attempt, as when the tree had a session of its own: the
+            # retry budget toward the source is not raised here.
+            text = (await http_client.request("GET", normurn, source="normattiva",
+                                              max_retries=0)).text
+    except (NetworkError, DocumentNotFoundError) as e:
+        logging.error(f"HTTP error while fetching page: {e}")
+        return failure(f"Failed to retrieve the page: {e}")
     except Exception as e:
         logging.error(f"Unexpected error: {e}", exc_info=True)
-        error_msg = f"Unexpected error: {e}"
-        if return_metadata:
-            return error_msg, 0, {}
-        return error_msg, 0
+        return failure(f"Unexpected error: {e}")
 
     if not text or len(text) < 500:
         logging.error(f"Empty or too short response from {normurn[:50]}")
-        if return_metadata:
-            return "Empty response from server", 0, {}
-        return "Empty response from server", 0
+        return failure("Empty response from server")
 
     soup = BeautifulSoup(text, 'html.parser')
 
-    if "normattiva" in normurn:
-        if return_metadata:
-            result, count, metadata = await _parse_normattiva_tree(soup, normurn, link, details, return_metadata=True)
-        else:
-            result, count = await _parse_normattiva_tree(soup, normurn, link, details, return_metadata=False)
-            metadata = {}
-    elif is_eurlex:
+    if not is_eurlex:
+        result, count, metadata = await _parse_normattiva_tree(
+            soup, normurn, link, True, return_metadata=True)
+        if count > 0:
+            await _tree_cache.set(_full_key(normurn, link),
+                                  {"result": result, "count": count, "metadata": metadata})
+            logging.info(f"Stored full tree in persistent cache: {normurn[:50]}, {count} articles")
+        return _narrow(result, count, metadata, details, return_metadata) + (from_copy,)
+    else:
         # No annexes on EUR-Lex, but the parse does yield article titles.
         result, count, metadata = await _parse_eurlex_tree(soup, normurn, link, details)
-    else:
-        logging.warning(f"Unrecognized norm URN format: {normurn}")
-        if return_metadata:
-            return "Unrecognized norm URN format", 0, {}
-        return "Unrecognized norm URN format", 0
+        if count > 0 and not from_copy and len(text) >= _EURLEX_MIN_PAGE:
+            # A page that parsed into articles is the act's: kept where the scraper reads it.
+            await get_cache_manager().get_persistent("eurlex").set(normurn, text)
 
     # Store in persistent cache for future restarts
     if count > 0:
+        cache_key = f"{normurn}|link={link}|details={details}|metadata={return_metadata}"
         cache_data = {"result": result, "count": count}
         if return_metadata:
             cache_data["metadata"] = metadata
@@ -151,8 +231,13 @@ async def get_tree(normurn, link=False, details=False, return_metadata=False):
         logging.info(f"Stored tree in persistent cache: {normurn[:50]}, {count} articles")
 
     if return_metadata:
-        return result, count, metadata
-    return result, count
+        return result, count, metadata, from_copy
+    return result, count, from_copy
+
+
+# "art. 1" in the tree's links, or "art 1" without the dot, as some annexes write it
+# (d.lgs. 36/2023, Allegato I.4): the dotless ones used to be dropped from the tree.
+_ARTICLE_LABEL_PREFIX = re.compile(r'^\s*art(?:\.\s*|\s+)', re.IGNORECASE)
 
 
 async def _parse_normattiva_tree(soup, normurn, link, details, return_metadata=False):
@@ -283,7 +368,7 @@ async def _parse_normattiva_tree(soup, normurn, link, details, return_metadata=F
         if a_tag and a_tag.find_parent('li') == li:
             text_content = a_tag.get_text(separator=" ", strip=True)
             # Rimuove "art. ", spazi e punti finali
-            article_num = re.sub(r'^\s*art\.\s*', '', text_content, flags=re.IGNORECASE).strip().rstrip('.')
+            article_num = _ARTICLE_LABEL_PREFIX.sub('', text_content).strip().rstrip('.')
 
             # Skip invalid article numbers (e.g., "orig", empty strings, non-article text)
             if not article_num or not re.match(r'^[\dIVXLCDM]', article_num, re.IGNORECASE):
@@ -345,7 +430,7 @@ def _extract_normattiva_article(a_tag, normurn, link, attachment_number=None):
     """
     # Rimuove eventuali prefissi come "art. " e spazi
     text_content = a_tag.get_text(separator=" ", strip=True)
-    text_content = re.sub(r'^\s*art\.\s*', '', text_content, flags=re.IGNORECASE)
+    text_content = _ARTICLE_LABEL_PREFIX.sub('', text_content)
 
     article_data = {
         "numero": text_content,

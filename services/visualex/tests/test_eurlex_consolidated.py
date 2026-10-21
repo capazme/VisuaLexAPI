@@ -207,6 +207,25 @@ class TestConsolidatedArticleText:
         assert text.startswith("Articolo 1")
         assert "Oggetto e finalità" in text
 
+    async def test_oj_missing_article_is_not_served_as_a_longer_number(self):
+        # "Articolo 17" starts with "Articolo 1": a page without art. 1 used to
+        # answer a request for it with art. 17 (inventory row 3.1).
+        soup = soup_of("gdpr_oj_trimmed.html")
+        soup.find("p", class_="oj-ti-art", string="Articolo 1").decompose()
+        with pytest.raises(DocumentNotFoundError):
+            await EurlexScraper().extract_article_text(soup, "1")
+        text17 = await EurlexScraper().extract_article_text(soup, "17")
+        assert text17.startswith("Articolo 17")
+
+    async def test_oj_missing_article_in_a_class_less_page(self):
+        # The legacy page reaches the eli-subdivision strategy last; the same
+        # guard holds there.
+        html = ('<html><body><div class="eli-subdivision">'
+                '<p>Articolo 17</p><p>Diritto alla cancellazione</p>'
+                '</div></body></html>')
+        with pytest.raises(DocumentNotFoundError):
+            await EurlexScraper().extract_article_text(BeautifulSoup(html, "html.parser"), "1")
+
     async def test_inline_amendment_markers_are_not_text(self):
         soup = soup_of("eprivacy_consolidated_20091219.html")
         scraper = EurlexScraper()
@@ -529,12 +548,18 @@ class TestConsolidatedTree:
 
 class TestTreeFailuresAreNotKept:
     async def test_a_failed_page_is_asked_again(self):
+        from types import SimpleNamespace
         from unittest.mock import AsyncMock, patch
         from visualex_api.tools import treextractor
         url = "https://eur-lex.europa.eu/legal-content/IT/TXT/HTML/?uri=CELEX:32099R9999"
         page = (FIXTURES / "gdpr_oj_trimmed.html").read_text(encoding="utf-8")
         fetch = AsyncMock(side_effect=[RuntimeError("waf"), page])
+        # the scraper's copy of the page, which the tree reads first: empty, and kept out of
+        # the repository's download/cache
+        eurlex_copy = SimpleNamespace(get=AsyncMock(return_value=None), set=AsyncMock())
+        manager = SimpleNamespace(get_persistent=lambda namespace: eurlex_copy)
         with patch.object(treextractor, "_fetch_with_playwright", fetch), \
+                patch.object(treextractor, "get_cache_manager", lambda: manager), \
                 patch.object(treextractor._tree_cache, "get", AsyncMock(return_value=None)), \
                 patch.object(treextractor._tree_cache, "set", AsyncMock()):
             _, count, _ = await treextractor.get_tree(url, details=True, return_metadata=True)

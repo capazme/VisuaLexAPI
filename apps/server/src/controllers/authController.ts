@@ -437,7 +437,7 @@ async function othersIn(contents: unknown[], own: { id: string; email: string })
  */
 export const exportAccountData = async (req: Request, res: Response) => {
   const userId = req.user!.id;
-  const [user, folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments, lingoCards, lingoValidazioni, lingoAccettazioni, lingoRipassi, lingoPreferenze, lingoGiornate, lingoCreditiXp, merltConsenso, merltConsensoStorico] = await Promise.all([
+  const [user, folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments, lingoCards, lingoValidazioni, lingoAccettazioni, lingoRipassi, lingoPreferenze, lingoGiornate, lingoCreditiXp, merltConsenso, merltConsensoStorico, tasks] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, username: true, createdAt: true, updatedAt: true } }),
     prisma.folder.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
     prisma.bookmark.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
@@ -495,6 +495,16 @@ export const exportAccountData = async (req: Request, res: Response) => {
       select: { previousLevel: true, nextLevel: true, source: true, reason: true, createdAt: true, informativa: { select: { versione: true } } },
       orderBy: { createdAt: 'asc' },
     }),
+    // The planner's tasks the user owns, in the trash too. Not the assignee: from wave 4 it may be another person.
+    prisma.task.findMany({
+      where: { userId },
+      select: {
+        id: true, dossierId: true, dossierItemId: true, parentId: true, position: true, title: true, description: true,
+        priority: true, labels: true, plannedDate: true, plannedTime: true, dueDate: true, dueTime: true, recurrence: true,
+        recurrenceFrom: true, recurrenceDay: true, durationMinutes: true, origin: true, completedAt: true, deletedAt: true, createdAt: true, updatedAt: true,
+      },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    }),
   ]);
   // A quick norm's or an alias's search, taken from a proposal, is the proposer's JSON too.
   const others = await othersIn([
@@ -542,6 +552,14 @@ export const exportAccountData = async (req: Request, res: Response) => {
       lingoGiornate: lingoGiornate.map(({ giorno, ...day }) => ({ giorno: dateToDay(giorno), ...day })),
       lingoCreditiXp: lingoCreditiXp.map(({ giorno, ...credit }) => ({ ...credit, giorno: dateToDay(giorno) })),
       merltConsenso, merltConsensoStorico,
+      // Rome civil days as 'YYYY-MM-DD' and times as 'HH:MM' (a DATE or a TIME travels as a UTC instant).
+      tasks: tasks.map(({ plannedDate, plannedTime, dueDate, dueTime, ...task }) => ({
+        ...task,
+        plannedDate: plannedDate && dateToDay(plannedDate),
+        plannedTime: plannedTime && plannedTime.toISOString().slice(11, 16),
+        dueDate: dueDate && dateToDay(dueDate),
+        dueTime: dueTime && dueTime.toISOString().slice(11, 16),
+      })),
     },
   });
 };

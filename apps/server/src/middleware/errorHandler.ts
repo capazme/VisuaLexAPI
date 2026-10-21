@@ -65,6 +65,16 @@ export const errorHandler = (
     });
   }
 
+  // The JSON parser's own refusals (a malformed body, one too large) come before any route. Their
+  // error carries the raw body (`err.body`), and the message of a malformed one quotes a piece of it:
+  // neither is logged nor answered, since a body may hold a client's name (a planner task's title).
+  const parserError = err as Error & { type?: unknown; status?: unknown };
+  if (typeof parserError.type === 'string' && typeof parserError.status === 'number' && parserError.status >= 400 && parserError.status < 500) {
+    console.warn(`Request body refused: ${parserError.type}`);
+    const detail = parserError.type === 'entity.parse.failed' ? 'Invalid request: the body is not valid JSON' : 'Invalid request body';
+    return res.status(parserError.status).json({ detail });
+  }
+
   // Prisma's own outcome codes for a row that is not there (an update or
   // delete by id that raced a deletion) and for a unique-key collision (two
   // clicks on a vote toggle): the caller's state is stale, not the server's.

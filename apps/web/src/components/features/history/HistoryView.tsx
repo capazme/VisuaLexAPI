@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Clock, Loader2, Search, ArrowRight, Calendar, Trash2, Zap, FolderPlus, MoreVertical, Check, Plus, X } from 'lucide-react';
+import { Loader2, Search, ArrowRight, Calendar, Trash2, Zap, FolderPlus, MoreVertical, Check, Plus, X } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { cn } from '../../../lib/utils';
@@ -14,6 +14,7 @@ import { getHistory, deleteHistoryItem, clearHistory, type SearchHistoryItem } f
 import { NormaChangesSection } from './NormaChangesSection';
 import { labelFromParams } from '../../../utils/sources';
 import { DecisionHistoryRow } from './DecisionHistoryRow';
+import { PageFrame } from '../../layout/PageFrame';
 import { decisionHistoryLabel, identityFromKey } from '../../../utils/decisionLinks';
 
 // Stripe color per act_type — keyed on lowercased exact match. Codes get
@@ -344,74 +345,41 @@ export function HistoryView() {
     }, [filteredHistory]);
 
     return (
-        <div className="max-w-4xl mx-auto animate-in fade-in duration-200">
-            <NormaChangesSection onOpen={handleOpenNorma} />
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-                {/* Mobile Header */}
-                <div className="md:hidden p-3 border-b border-slate-200 dark:border-slate-700">
-                    <div className="flex items-center justify-between mb-2">
-                        <h1 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                            <Clock size={18} aria-hidden /> Cronologia
-                        </h1>
-                        {history.length > 0 && (
-                            <button
-                                onClick={handleClearHistory}
-                                disabled={clearing}
-                                className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50 min-h-[44px] min-w-[44px]"
-                                title="Svuota cronologia"
-                            >
-                                {clearing ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                            </button>
-                        )}
-                    </div>
-                    <div className="relative">
+        <PageFrame
+            title="Cronologia"
+            className="animate-in fade-in duration-200"
+            action={
+                <>
+                    <div id="tour-history-search" className="relative min-w-0 flex-1 md:w-64 md:flex-none">
                         <input
                             ref={searchInputRef}
                             type="text"
-                            placeholder="Cerca..."
+                            placeholder="Cerca nella cronologia..."
+                            aria-label="Cerca nella cronologia"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             aria-keyshortcuts="/"
                             title="Cerca (premi /)"
-                            className="w-full pl-9 pr-4 py-2 text-sm rounded-lg bg-slate-100 dark:bg-slate-700 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-slate-900 transition-colors min-h-[44px]"
+                            className="w-full pl-9 pr-4 py-2 text-sm rounded-lg bg-slate-100 dark:bg-slate-700 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-slate-900 transition-colors min-h-[44px] md:min-h-0 md:py-1.5 md:rounded-full"
                         />
-                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <Search size={16} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     </div>
-                </div>
-
-                {/* Desktop Header */}
-                <div className="hidden md:flex p-4 border-b border-slate-200 dark:border-slate-700 flex-col sm:flex-row justify-between items-center gap-4">
-                    <h1 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                        <Clock size={20} aria-hidden /> Cronologia Ricerche
-                    </h1>
-
-                    <div className="flex items-center gap-2">
-                        <div id="tour-history-search" className="relative w-full sm:w-64">
-                            <input
-                                ref={searchInputRef}
-                                type="text"
-                                placeholder="Cerca nella cronologia..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                aria-keyshortcuts="/"
-                                title="Cerca (premi /)"
-                                className="w-full pl-9 pr-4 py-1.5 text-sm rounded-full bg-slate-100 dark:bg-slate-700 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-slate-900 transition-colors"
-                            />
-                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        </div>
-                        {history.length > 0 && (
-                            <button
-                                onClick={handleClearHistory}
-                                disabled={clearing}
-                                className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors disabled:opacity-50"
-                                title="Svuota cronologia"
-                            >
-                                {clearing ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                            </button>
-                        )}
-                    </div>
-                </div>
-                
+                    {history.length > 0 && (
+                        <button
+                            onClick={handleClearHistory}
+                            disabled={clearing}
+                            className="flex shrink-0 items-center justify-center p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg md:rounded-full transition-colors disabled:opacity-50 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0"
+                            title="Svuota cronologia"
+                            aria-label="Svuota cronologia"
+                        >
+                            {clearing ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                        </button>
+                    )}
+                </>
+            }
+        >
+            <NormaChangesSection onOpen={handleOpenNorma} />
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
                 {/* Timeline with grouped dates. No inner scroll: the page is the
                     scroll context so the action dropdown isn't clipped. Sticky date
                     headers attach to the next overflow ancestor. */}
@@ -455,7 +423,7 @@ export function HistoryView() {
                                 <div key={key} className="relative">
                                     {/* Date label with timeline line */}
                                     {/* Mobile: smaller, simpler date label */}
-                                    <div className="md:hidden flex items-center gap-2 mb-3 sticky top-0 bg-white dark:bg-slate-800 py-1 z-10">
+                                    <div className="md:hidden flex items-center gap-2 mb-3 sticky top-[var(--phone-bar-offset,0px)] transition-[top] duration-200 ease-out motion-reduce:transition-none bg-white dark:bg-slate-800 py-1 z-10">
                                         <div className="flex items-center gap-1.5 bg-blue-50 dark:bg-blue-900/30 px-2.5 py-1 rounded-full">
                                             <Calendar size={12} className="text-blue-600 dark:text-blue-400" />
                                             <span className="text-xs font-bold text-blue-600 dark:text-blue-400">{label}</span>
@@ -464,7 +432,7 @@ export function HistoryView() {
                                     </div>
 
                                     {/* Desktop: full date label */}
-                                    <div className="hidden md:flex items-center gap-3 mb-4 sticky top-0 bg-white dark:bg-slate-800 py-2 z-10">
+                                    <div className="hidden md:flex items-center gap-3 mb-4 sticky top-[var(--phone-bar-offset,0px)] transition-[top] duration-200 ease-out motion-reduce:transition-none bg-white dark:bg-slate-800 py-2 z-10">
                                         <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-full">
                                             <Calendar size={14} className="text-blue-600 dark:text-blue-400" />
                                             <span className="text-sm font-bold text-blue-600 dark:text-blue-400">{label}</span>
@@ -781,6 +749,6 @@ export function HistoryView() {
                     </div>
                 </div>
             )}
-        </div>
+        </PageFrame>
     );
 }

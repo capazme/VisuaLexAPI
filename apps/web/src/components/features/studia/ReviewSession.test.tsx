@@ -584,7 +584,24 @@ describe('the lesson (Gymnasium spec §5.4)', () => {
       await screen.findByText('Domanda a?');
       const fill = screen.getByTestId('lesson-progress-fill');
       expect(fill).toHaveClass('motion-safe:transition-[width]');
-      expect([...fill.classList].filter((c) => /^(transition|duration|ease|animate)/.test(c))).toEqual([]);
+      expect([...fill.classList].filter((c) => /^(transition|duration|ease|animate|delay)/.test(c))).toEqual([]);
+    });
+
+    it('runs its head ahead in the section’s hue and lets the ink catch up on a spring, under 400 ms (S2)', async () => {
+      const user = userEvent.setup();
+      renderSession([card('a'), card('b')]);
+      await screen.findByText('Domanda a?');
+      const fill = screen.getByTestId('lesson-progress-fill');
+      const head = bar().querySelector('.vlx-lesson-head')!;
+      expect(head).toHaveClass('motion-safe:transition-[width]', 'motion-safe:duration-150');
+      expect(fill).toHaveClass('motion-safe:delay-[70ms]', 'motion-safe:duration-300', 'motion-safe:ease-(--ease-catch)');
+      // The ink is drawn over the head: it comes after it.
+      expect(head.compareDocumentPosition(fill) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      await show();
+      await user.click(screen.getByRole('button', { name: /Bene/ }));
+      await screen.findByText('Domanda b?');
+      expect(head).toHaveStyle({ width: '50%' });
+      expect(fill).toHaveStyle({ width: '50%' });
     });
 
     it('is full at the end, and an empty track before the queue is read', async () => {

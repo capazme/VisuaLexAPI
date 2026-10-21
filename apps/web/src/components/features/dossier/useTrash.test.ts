@@ -12,7 +12,7 @@ vi.mock('../../../utils/articleCardsCache', () => ({ invalidateArticleCards: vi.
 
 import { appStore } from '../../../store/useAppStore';
 import { invalidateArticleCards } from '../../../utils/articleCardsCache';
-import { useTrash } from './useTrash';
+import { GONE_FROM_TRASH, useTrash } from './useTrash';
 import type { TrashEntry } from '../../../services/trashService';
 
 const entry = (over: Partial<TrashEntry> = {}): TrashEntry => ({
@@ -91,7 +91,29 @@ describe('useTrash — what can go wrong', () => {
     expect(result.current.entries).toEqual([]);
   });
 
-  it("does not ask for a dossier when the entry's own is still here (restored meanwhile)", async () => {
+  it('with a dossier chosen, a 404 drops the entry when the trash no longer has it', async () => {
+    list.mockResolvedValueOnce([entry()]).mockResolvedValueOnce([]);
+    restoreCall.mockRejectedValue({ status: 404, message: 'Elemento del cestino non trovato.' });
+    const { result } = renderHook(() => useTrash());
+    await waitFor(() => expect(result.current.entries).toHaveLength(1));
+    let outcome;
+    await act(async () => { outcome = await result.current.restore(entry(), 'd2'); });
+    expect(outcome).toEqual({ kind: 'failed', message: GONE_FROM_TRASH });
+    expect(result.current.entries).toEqual([]);
+  });
+
+  it('with a dossier chosen, a 404 while the entry is still there asks for another dossier', async () => {
+    list.mockResolvedValue([entry()]);
+    restoreCall.mockRejectedValue({ status: 404, message: 'Dossier not found' });
+    const { result } = renderHook(() => useTrash());
+    await waitFor(() => expect(result.current.entries).toHaveLength(1));
+    let outcome;
+    await act(async () => { outcome = await result.current.restore(entry(), 'd2'); });
+    expect(outcome).toEqual({ kind: 'needs-target', message: 'Il dossier scelto non esiste più: scegline un altro.' });
+    expect(result.current.entries).toHaveLength(1);
+  });
+
+  it("does not ask for a dossier when the entry's own is still here (its ids taken again)", async () => {
     appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', items: [], tags: [] }] });
     list.mockResolvedValue([entry()]);
     restoreCall.mockRejectedValue({ status: 409, message: 'Questi elementi sono già stati ripristinati.' });

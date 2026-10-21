@@ -60,4 +60,18 @@ describe('showUndoToast', () => {
     expect(seen).toHaveLength(count);
     await expect(done).resolves.toBe(true);
   });
+
+  it('a second toast replaces the first, which is kept, and they never take turns on screen', async () => {
+    const first = show();
+    await vi.advanceTimersByTimeAsync(500);
+    const second = showUndoToast({ action: () => 'other', undo: vi.fn(), message: 'Compito completato' });
+    await vi.advanceTimersByTimeAsync(0);
+    await expect(first.done).resolves.toBe(true);
+    const from = seen.length;
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(seen.slice(from).every((t) => t?.message === 'Compito completato')).toBe(true);
+    await lastToast()?.onUndo();
+    expect(first.undo).not.toHaveBeenCalled();
+    await expect(second).resolves.toBe(false);
+  });
 });

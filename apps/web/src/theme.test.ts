@@ -7,6 +7,7 @@ import { ACTIVE, FOCUS_RING, HIDDEN_SCROLLBAR, HOVER_LIFT, TRANSITION } from './
 import { subjectHue } from './components/features/studia/progress/tokens';
 import { MATERIA_LABEL } from './components/features/studia/studiaLabels';
 import type { Materia } from './types/studia';
+import { FOCUS_BUTTON_CLEARANCE } from './components/layout/PageFrame';
 
 /**
  * Tailwind failures are silent: a class whose token the theme never declares
@@ -41,6 +42,14 @@ describe('the primary colour scale', () => {
     expect(css).toContain('.bg-primary');
     expect(css).toContain('.ring-ring');
     expect(css).toContain('.bg-background');
+  }, 30000);
+});
+
+describe('the page frame (W2)', () => {
+  it('compiles the room a header leaves for the Focus button, from `lg`', async () => {
+    const css = await compile([FOCUS_BUTTON_CLEARANCE]);
+    expect(css).toMatch(/padding-right:\s*clamp\(0px,\s*calc\(2\.75rem - \(100vw - var\(--sidebar-width,\s*0px\) - 80rem\) \/ 2\),\s*2\.75rem\)/);
+    expect(css).toContain('@media (width >= 64rem)');
   }, 30000);
 });
 
@@ -134,6 +143,9 @@ describe('the Inchiostro palette', () => {
     expect(ratio(white, rgb('toga-600'))).toBeGreaterThanOrEqual(6);
     expect(ratio(rgb('ink-400'), rgb('ink-950'))).toBeGreaterThanOrEqual(7);
     expect(ratio(rgb('toga-400'), rgb('ink-950'))).toBeGreaterThanOrEqual(6.5);
+    // A mission done (S2, `.vlx-mission-done`): ink 600 on the white tile, ink 300 on the dark one (ink 900).
+    expect(ratio(rgb('ink-600'), white)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(rgb('ink-300'), rgb('ink-900'))).toBeGreaterThanOrEqual(4.5);
   });
 
   it('keeps the sidebar\'s 11 px texts at AA on its glass, over the page and over the phone\'s backdrop', () => {
@@ -423,5 +435,90 @@ describe('the scrollbars in dark mode', () => {
     const css = await compile(HIDDEN_SCROLLBAR.split(' '));
     expect(css).toMatch(/\.\\\[scrollbar-width\\:none\\\]\s*\{\s*scrollbar-width:\s*none/);
     expect(css).toMatch(/\.\\\[\\&\\:\\:-webkit-scrollbar\\\]\\:hidden\s*\{\s*&::-webkit-scrollbar\s*\{\s*display:\s*none/);
+  }, 30000);
+});
+
+describe('Gymnasium\'s small motions (S2)', () => {
+  it('declares every section\'s hue, the wash and the mission inks in the light theme and in the dark one', () => {
+    // The switcher's mark and Gymnasium's motions read `--vlx-section-<id>` by name: an undeclared one draws nothing.
+    const source = readFileSync(CSS_PATH, 'utf8');
+    for (const name of ['opus', 'gymnasium', 'academia', 'forum'].map((id) => `--vlx-section-${id}`).concat('--vlx-gymnasium-wash', '--vlx-todo-ink', '--vlx-done-ink')) {
+      expect(source.match(new RegExp(`${name}:`, 'g')) ?? [], name).toHaveLength(2);
+    }
+  });
+
+  it('compiles the lesson bar\'s spring, its delay and the head', async () => {
+    const css = await compile([
+      'motion-safe:ease-(--ease-catch)',
+      'motion-safe:delay-[70ms]',
+      'motion-safe:duration-150',
+      'motion-safe:duration-300',
+      'vlx-lesson-head',
+    ]);
+    expect(css).toMatch(/transition-timing-function:\s*var\(--ease-catch\)/);
+    expect(css).toMatch(/--ease-catch:\s*linear\(0,/);
+    expect(css).toMatch(/transition-delay:\s*70ms/);
+    expect(css).toMatch(/\.vlx-lesson-head\s*\{\s*background:\s*var\(--vlx-gymnasium-wash\)/);
+  }, 30000);
+
+  it('draws the inked mission and the landing digit, and stills them under reduced motion', async () => {
+    const css = await compile([]);
+    for (const name of ['vlx-ink-through', 'vlx-digit-land']) expect(css).toMatch(new RegExp(`@keyframes ${name}`));
+    const reduced = css.split('@media (prefers-reduced-motion: reduce)').slice(1).join(' ');
+    for (const rule of ['.vlx-mission-inking', '.vlx-digit-land']) expect(reduced).toContain(rule);
+  }, 30000);
+});
+
+describe('the section change (T1)', () => {
+  const ms = (css: string, rule: RegExp) => {
+    const match = css.match(rule);
+    expect(match, String(rule)).not.toBeNull();
+    return match!.slice(1).map(Number);
+  };
+
+  it('fades the page out, then in rising by a few pixels, in under 250 ms, with no overlap and nothing else moving', async () => {
+    const css = await compile([]);
+    const [out] = ms(css, /::view-transition-old\(vlx-page\)\s*\{\s*animation:\s*vlx-page-out\s+(\d+)ms/);
+    const [into, delay] = ms(css, /::view-transition-new\(vlx-page\)\s*\{\s*animation:\s*vlx-page-in\s+(\d+)ms\s+var\(--ease-out\)\s+(\d+)ms/);
+    expect(delay).toBeGreaterThanOrEqual(out);
+    expect(delay + into).toBeLessThan(250);
+    const [rise] = ms(css, /@keyframes vlx-page-in\s*\{\s*from\s*\{\s*opacity:\s*0;\s*translate:\s*0\s+(\d+)px/);
+    expect(rise).toBeGreaterThanOrEqual(4);
+    expect(rise).toBeLessThanOrEqual(6);
+    // The groups' default animation lasts 250 ms: it must not, or the change would outlast its budget.
+    expect(css).toMatch(/::view-transition-group\(root\),\s*::view-transition-group\(vlx-page\)\s*\{\s*animation:\s*none/);
+    // The root's two pictures are not added (the default `plus-lighter`): the new one covers the old.
+    expect(css).toMatch(/::view-transition-old\(root\),\s*::view-transition-new\(root\)\s*\{\s*mix-blend-mode:\s*normal/);
+    // Named only while a transition runs: at rest the content area is no stacking context (gotcha 22).
+    expect(css).toMatch(/\.vlx-page-changing \.vlx-page\s*\{\s*view-transition-name:\s*vlx-page/);
+    expect(css).not.toMatch(/(^|\})\s*\.vlx-page\s*\{/);
+    // A tap goes through to the page; from the sign-in page, with no old page, the new one does not wait.
+    expect(css).toMatch(/::view-transition\s*\{\s*pointer-events:\s*none/);
+    expect(css).toMatch(/::view-transition-new\(vlx-page\):only-child\s*\{\s*animation-delay:\s*0ms/);
+    const reduced = css.split('@media (prefers-reduced-motion: reduce)').slice(1).join(' ');
+    expect(reduced).toMatch(/::view-transition-new\(\*\)\s*\{\s*animation:\s*none\s*!important/);
+  }, 30000);
+
+  it('draws no ring on a title focused after a choice made with a pointer, over the utilities\' ring', async () => {
+    const css = await compile(FOCUS_RING.split(' '));
+    expect(css).toMatch(/\[data-pointer-focus\]:focus\s*\{\s*outline:\s*none;\s*box-shadow:\s*none/);
+    // Outside every layer, so it wins over `focus-visible:ring-2` (in the utilities layer) whatever the order.
+    const rule = css.indexOf('[data-pointer-focus]:focus');
+    const layers = [...css.matchAll(/@layer [\w-]+\s*\{/g)];
+    for (const layer of layers) {
+      let depth = 0;
+      let at = layer.index! + layer[0].length - 1;
+      for (; at < css.length; at += 1) {
+        if (css[at] === '{') depth += 1;
+        else if (css[at] === '}' && (depth -= 1) === 0) break;
+      }
+      expect(rule < layer.index! || rule > at, layer[0]).toBe(true);
+    }
+  }, 30000);
+
+  it('compiles the mark\'s colour change, 200 ms, and stills it under reduced motion', async () => {
+    const css = await compile(['transition-colors', 'duration-200', 'ease-out', 'motion-reduce:transition-none']);
+    expect(css).toMatch(/\.duration-200\s*\{[^}]*transition-duration:\s*200ms/);
+    expect(css).toMatch(/\.motion-reduce\\:transition-none\s*\{\s*@media \(prefers-reduced-motion: reduce\)\s*\{\s*transition-property:\s*none/);
   }, 30000);
 });

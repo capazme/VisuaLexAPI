@@ -8,6 +8,8 @@ vi.mock('../../ui/SettingsModal', () => ({ SettingsModal: () => null }));
 vi.mock('../../ui/FeedbackButton', () => ({ FeedbackButton: () => null }));
 vi.mock('../../ui/ChangelogNotification', () => ({ ChangelogNotification: () => null }));
 vi.mock('../../ui/Toast', () => ({ UndoToastContainer: () => null }));
+// The planner's host reads the tasks from the server: not under test here.
+vi.mock('../../features/planner/PlannerHost', () => ({ PlannerHost: () => null }));
 vi.mock('../../ui/SyncErrorToast', () => ({ SyncErrorToast: () => null }));
 vi.mock('../../ui/KeyboardShortcutsModal', () => ({ KeyboardShortcutsModal: () => null }));
 vi.mock('../../../hooks/useServiceHealth', () => ({ useServiceHealth: () => ({ snapshot: { overall: 'online', services: [], checkedAt: '' }, refresh: vi.fn() }) }));
@@ -204,9 +206,12 @@ describe('Layout — the search page\'s field', () => {
     expect(screen.getByTestId('search-bar').nextElementSibling).toContainElement(screen.getByText('Pagina di ricerca'));
   });
 
-  it('starts beside the floating menu button below lg, and ends before the Focus toggle from md', () => {
+  it('is the phone\'s bar below lg, the menu button beside the field, and ends before the Focus toggle from md', () => {
     at('/');
-    expect(screen.getByTestId('search-bar')).toHaveClass('pl-[4.5rem]', 'lg:pl-8', 'md:pr-[4.5rem]');
+    const bar = screen.getByTestId('search-bar');
+    expect(bar).toHaveClass('h-[var(--search-bar-height)]', 'pl-1', 'lg:pl-8', 'md:pr-[3.25rem]', 'lg:pr-[4.5rem]');
+    expect(bar.firstElementChild).toHaveAccessibleName('Apri il menu');
+    expect(document.querySelector('main')).toHaveClass('[--search-bar-height:calc(3.5rem+env(safe-area-inset-top))]', 'lg:[--search-bar-height:4.5rem]');
   });
 
   it.each(['/dossier', '/history'])('is not drawn on %s', (path) => {

@@ -1,11 +1,12 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { Check, type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Z_INDEX } from '../../constants/zIndex';
 
 export interface MenuItem {
   label: string;
-  onSelect: () => void;
+  /** The click that chose it: a key's (Enter, Space) has `detail` 0. */
+  onSelect: (event: ReactMouseEvent<HTMLButtonElement>) => void;
   icon?: LucideIcon;
   danger?: boolean;
   disabled?: boolean;
@@ -16,6 +17,8 @@ export interface MenuItem {
   checked?: boolean;
   /** A count drawn beside the label and read with it. */
   badge?: number;
+  /** What the count counts, read in its place: «3 compiti per oggi o scaduti». Without it, «N notifiche». */
+  badgeLabel?: string;
 }
 
 export interface MenuButtonProps {
@@ -35,6 +38,8 @@ export interface MenuButtonProps {
   menuClassName?: string;
   /** Classes for the wrapper around the trigger and the list (a trigger as wide as its column). */
   className?: string;
+  /** Called each time the menu opens (the section switcher fetches the code of the pages it leads to). */
+  onOpen?: () => void;
 }
 
 /**
@@ -42,7 +47,7 @@ export interface MenuButtonProps {
  * and End move, Escape and Tab close, focus returns to the trigger, a click
  * outside closes. Clicks never reach the card it sits in. The dossier's menus.
  */
-export function MenuButton({ label, items, children, triggerClassName, align = 'right', placement = 'below', heading, menuClassName, className }: MenuButtonProps) {
+export function MenuButton({ label, items, children, triggerClassName, align = 'right', placement = 'below', heading, menuClassName, className, onOpen }: MenuButtonProps) {
   // null = closed; otherwise which item takes the focus once the menu is drawn.
   const [openAt, setOpenAt] = useState<'first' | 'last' | null>(null);
   const open = openAt !== null;
@@ -65,6 +70,7 @@ export function MenuButton({ label, items, children, triggerClassName, align = '
   useEffect(() => {
     if (openAt === 'first') focusItem(enabled[0]);
     else if (openAt === 'last') focusItem(enabled[enabled.length - 1]);
+    if (openAt !== null) onOpen?.();
     // Focus once per opening; `enabled` is derived from `items` on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openAt]);
@@ -156,7 +162,7 @@ export function MenuButton({ label, items, children, triggerClassName, align = '
                 aria-checked={item.checked}
                 disabled={item.disabled}
                 tabIndex={-1}
-                onClick={() => { close(true); item.onSelect(); }}
+                onClick={(event) => { close(true); item.onSelect(event); }}
                 className={cn(
                   'flex min-h-[44px] w-full items-center gap-2 px-3 py-2 text-left text-sm md:min-h-0',
                   'focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40',
@@ -178,10 +184,10 @@ export function MenuButton({ label, items, children, triggerClassName, align = '
                   <span className="ml-auto flex shrink-0 items-center gap-2 self-start">
                     {(item.badge ?? 0) > 0 && (
                       <>
-                        <span aria-hidden className="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-semibold leading-none">
+                        <span aria-hidden className="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-600 text-white text-[11px] font-semibold leading-none">
                           {(item.badge ?? 0) > 99 ? '99+' : item.badge}
                         </span>
-                        <span className="sr-only">, {item.badge} notifiche</span>
+                        <span className="sr-only">, {item.badgeLabel ?? `${item.badge} notifiche`}</span>
                       </>
                     )}
                     {/* The checked item says so in more than its weight; `aria-checked` says it to a screen reader. */}

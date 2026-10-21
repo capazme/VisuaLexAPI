@@ -64,4 +64,16 @@ describe('MenuButton', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Azioni' }));
     expect(screen.getByRole('menuitem', { name: 'Disattivata' })).toBeDisabled();
   });
+
+  it('says each time it opens, by click or by the arrows', () => {
+    const onOpen = vi.fn();
+    render(<MenuButton label="Azioni" items={[{ label: 'Modifica', onSelect: vi.fn() }]} onOpen={onOpen}>⋯</MenuButton>);
+    const trigger = screen.getByRole('button', { name: 'Azioni' });
+    expect(onOpen).not.toHaveBeenCalled();
+    fireEvent.click(trigger);
+    expect(onOpen).toHaveBeenCalledOnce();
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+    fireEvent.keyDown(trigger, { key: 'ArrowUp' });
+    expect(onOpen).toHaveBeenCalledTimes(2);
+  });
 });

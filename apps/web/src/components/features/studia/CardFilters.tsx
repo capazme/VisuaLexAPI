@@ -63,8 +63,9 @@ export function CardFilters({ value, onChange, search, onSearchChange, acts }: C
     <div
       role="group"
       aria-label="Filtri"
-      // Opaque, bled over the layout's page padding (p-4 md:p-8) so cards scrolling under it do not show.
-      className={cn('sticky top-0 -mx-4 space-y-2 border-b border-current/10 bg-slate-50 px-4 pb-2 pt-2 md:-mx-2 md:px-2 dark:bg-slate-950', Z_INDEX.sticky)}
+      // Opaque, bled over the layout's page padding (p-4 md:p-8) so cards scrolling under it do not show. On a phone it pins
+      // under the bar at the top (`--phone-bar-offset`, set by `Layout`), and moves up with it when the bar slides away.
+      className={cn('sticky top-[var(--phone-bar-offset,0px)] transition-[top] duration-200 ease-out motion-reduce:transition-none -mx-4 space-y-2 border-b border-current/10 bg-slate-50 px-4 pb-2 pt-2 md:-mx-2 md:px-2 dark:bg-slate-950', Z_INDEX.sticky)}
     >
       <div className="flex gap-2">
         <div className="relative min-w-0 flex-1">

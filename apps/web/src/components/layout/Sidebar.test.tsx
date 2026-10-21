@@ -15,6 +15,10 @@ import { Sidebar, SIDEBAR_SMALL_TEXT, SIDEBAR_TOGGLE_TEXT } from './Sidebar';
 import { appStore } from '../../store/useAppStore';
 import { subscribeSearchField } from '../../utils/searchFieldControl';
 import { sectionStore } from '../../features/sections/useSection';
+import { plannerStore } from '../features/planner/plannerStore';
+
+/** Opus's entries: the planner's three views, then the dossiers. */
+const OPUS_HREFS = ['/', '/documents', '/opus/oggi', '/opus/prossimi', '/opus/ingresso', '/dossier'];
 import type { ServiceHealthState } from '../../services/healthService';
 
 /** `Layout`'s one probe of the services, handed to the sidebar (S1). */
@@ -175,10 +179,25 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     }
   });
 
-  it('Opus: the dossiers', () => {
+  it("Opus: the planner's views, then the dossiers", () => {
     renderSidebar('/');
-    expect(hrefs()).toEqual(['/', '/documents', '/dossier']);
-    expect(screen.getByRole('group', { name: 'Opus' })).toContainElement(screen.getByRole('link', { name: 'Dossier' }));
+    expect(hrefs()).toEqual(OPUS_HREFS);
+    const opus = screen.getByRole('group', { name: 'Opus' });
+    expect(within(opus).getAllByRole('link').map((a) => a.getAttribute('aria-label'))).toEqual(['Oggi', 'Prossimi giorni', "Lista d'ingresso", 'Dossier']);
+  });
+
+  it('counts the overdue and today\'s tasks beside «Oggi», and says it in words (row 16)', () => {
+    plannerStore.setState({ todayCount: 3 });
+    try {
+      renderSidebar('/opus/oggi');
+      const today = screen.getByRole('link', { name: 'Oggi, 3 compiti per oggi o scaduti' });
+      expect(today).toHaveAttribute('aria-current', 'page');
+      expect(today).toHaveTextContent('3');
+      cleanupAndRender('/opus/oggi', () => plannerStore.setState({ todayCount: 0 }));
+      expect(screen.getByRole('link', { name: 'Oggi' })).not.toHaveTextContent(/\d/);
+    } finally {
+      plannerStore.setState({ todayCount: null });
+    }
   });
 
   it('Gymnasium: «Studia» holds Oggi, Progressi and the dossiers, «Contribuisci» Le mie schede and, for a validator only, «Da validare» (Gymnasium spec §4)', () => {
@@ -225,7 +244,7 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     expect(hrefs()).toEqual(['/', '/documents', '/merlt', '/grafo']);
     // Without the mode the section is not offered: a stored Academia falls back to Opus.
     cleanupAndRender('/', () => { account.devMode = false; sectionStore.setState({ section: 'academia' }); });
-    expect(hrefs()).toEqual(['/', '/documents', '/dossier']);
+    expect(hrefs()).toEqual(OPUS_HREFS);
     expect(screen.queryByRole('link', { name: /Grafo|Assistente/ })).toBeNull();
   });
 
@@ -242,12 +261,12 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     vi.stubEnv('VITE_FEATURE_STUDIA', 'false');
     sectionStore.setState({ section: 'gymnasium' });
     renderSidebar('/');
-    expect(hrefs()).toEqual(['/', '/documents', '/dossier']);
+    expect(hrefs()).toEqual(OPUS_HREFS);
   });
 
   it("is the same list in the phone's copy, closed off-canvas or open (spec D8)", () => {
     renderSidebar('/', { isOpen: false });
-    expect(hrefs()).toEqual(['/', '/documents', '/dossier']);
+    expect(hrefs()).toEqual(OPUS_HREFS);
     openUserMenu();
     expect(screen.getByRole('menuitem', { name: /Impostazioni/ })).toBeInTheDocument();
   });
@@ -259,6 +278,25 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     expect(screen.getByTestId('where')).toHaveTextContent('/forum');
     expect(handlers.closeMobile).toHaveBeenCalled();
     expect(hrefs()).toEqual(['/', '/documents', '/forum', '/forum/community']);
+  });
+
+  it('fades in the new section\'s entries only, never the Corpus ones above them (T1)', () => {
+    // jsdom has no Web Animations: the spy records which elements fade in.
+    const animate = vi.fn();
+    Element.prototype.animate = animate as unknown as typeof Element.prototype.animate;
+    try {
+      renderSidebar('/');
+      expect(animate).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole('button', { name: /^Sezione:/ }));
+      fireEvent.click(screen.getByRole('menuitemradio', { name: /Forum/ }));
+      const faded = animate.mock.contexts as HTMLElement[];
+      expect(faded.length).toBeGreaterThan(0);
+      const forum = screen.getByRole('group', { name: 'Forum' });
+      for (const entry of faded) expect(forum).toContainElement(entry);
+      expect(faded).toContain(screen.getByRole('link', { name: 'Community' }));
+    } finally {
+      delete (Element.prototype as Partial<Element>).animate;
+    }
   });
 });
 
@@ -346,6 +384,59 @@ describe('Sidebar — the user menu (spec D2)', () => {
     expect(screen.getByTestId('where')).toHaveTextContent('/crediti');
     expect(handlers.closeMobile).toHaveBeenCalled();
     expect(screen.queryByRole('menu', { name: 'Menu utente' })).toBeNull();
+  });
+
+  it('holds «Invia un commento» on a phone, after «Crediti», and opens the form from it (M1)', () => {
+    const openFeedback = vi.fn();
+    render(
+      <MemoryRouter>
+        <Sidebar theme="light" isOpen serviceHealth={serviceHealth} {...handlers} openFeedback={openFeedback} layout="drawer" />
+      </MemoryRouter>,
+    );
+    openUserMenu();
+    const names = screen.getAllByRole('menuitem').map((e) => e.textContent?.trim());
+    expect(names.indexOf('Invia un commento')).toBe(names.indexOf('Crediti') + 1);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Invia un commento' }));
+    expect(openFeedback).toHaveBeenCalledTimes(1);
+    expect(handlers.closeMobile).toHaveBeenCalled();
+    expect(screen.queryByRole('menu', { name: 'Menu utente' })).toBeNull();
+  });
+
+  it('takes the closed drawer out of reach (inert), and only the drawer', () => {
+    const { container, rerender } = render(
+      <MemoryRouter>
+        <Sidebar theme="light" isOpen={false} serviceHealth={serviceHealth} {...handlers} layout="drawer" />
+      </MemoryRouter>,
+    );
+    expect(container.querySelector('aside')).toHaveAttribute('inert');
+    rerender(
+      <MemoryRouter>
+        <Sidebar theme="light" isOpen serviceHealth={serviceHealth} {...handlers} layout="drawer" />
+      </MemoryRouter>,
+    );
+    expect(container.querySelector('aside')).not.toHaveAttribute('inert');
+    rerender(
+      <MemoryRouter>
+        <Sidebar theme="light" isOpen={false} serviceHealth={serviceHealth} {...handlers} layout="rail" />
+      </MemoryRouter>,
+    );
+    expect(container.querySelector('aside')).not.toHaveAttribute('inert');
+  });
+
+  it('leaves «Invia un commento» to the floating button from md', () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({ ...original(query), matches: query === '(min-width: 768px)' })) as typeof window.matchMedia;
+    try {
+      render(
+        <MemoryRouter>
+          <Sidebar theme="light" isOpen serviceHealth={serviceHealth} {...handlers} openFeedback={vi.fn()} />
+        </MemoryRouter>,
+      );
+      openUserMenu();
+      expect(screen.queryByRole('menuitem', { name: 'Invia un commento' })).toBeNull();
+    } finally {
+      window.matchMedia = original;
+    }
   });
 
   it('opens the shortcuts', () => {

@@ -10,9 +10,6 @@ import { defaultSearchFilters } from '../../../utils/searchFilters';
 import { formatDecisionShort } from '../../../utils/decisionLinks';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 
-/** The field's height, which `Layout` subtracts from the practice's columns (`--search-bar-height`). */
-export const SEARCH_BAR_HEIGHT = '4.5rem';
-
 /**
  * The search page's field, always on screen above the practices (spec
  * `2026-10-13-fixed-search-design.md`). It reads what is typed as the palette does (`useSearchQuery`):

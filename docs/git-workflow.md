@@ -88,8 +88,11 @@ Each release has a section in `CHANGELOG.md`, in English, written from the
 merge titles (`sh scripts/release-notes.sh vPREVIOUS origin/develop` lists
 them, after a `git fetch`),
 and a short note in Italian for the people who use VisuaLex: what changed in
-the parts they use, by area, without technical terms. The note goes in the
-GitHub release.
+the parts they use, by area, without technical terms, never naming a doctrine
+source («una fonte esterna di dottrina»). The note is a file of the web app,
+`apps/web/src/content/novita/X.Y.Z.md` (a bold line per area, `- ` per item,
+no `#` heading): the window «Novità» shows it after an update, and the GitHub
+release carries the same text.
 
 ## Release
 
@@ -106,14 +109,16 @@ A release is cut when the owners say so. The checklist, in order:
    `[Unreleased]` in `CHANGELOG.md` up to date from `release-notes.sh` (pull
    requests do not edit it, so they never conflict on it), rename it to
    `[X.Y.Z] - YYYY-MM-DD`, and open a new empty `[Unreleased]` above it; set `version.txt` to `X.Y.Z`; write the
-   Italian note. Pull request into `develop`, merge.
+   Italian note in `apps/web/src/content/novita/X.Y.Z.md`, in the same pull request (the web suite fails
+   on a `version.txt` with no note). Pull request into `develop`, merge.
 4. **Pull request `develop → main`**, titled `merge: develop — release X.Y.Z`.
    The check "Release source" accepts only `develop` and `hotfix/…` as the
    source of a pull request into `main`. Merge it with a merge commit.
 5. **Tag**, on `main`:
    `git tag -a vX.Y.Z -m "Release X.Y.Z" && git push origin vX.Y.Z`, then the
    GitHub release from the tag, with the changelog section and the Italian
-   note: `gh release create vX.Y.Z --title "VisuaLex X.Y.Z" --notes-file <note>`.
+   note (`apps/web/src/content/novita/X.Y.Z.md`, then the changelog section):
+   `gh release create vX.Y.Z --title "VisuaLex X.Y.Z" --notes-file <note>`.
 6. **Deploy** (below), and record it in the coordination register.
 
 ## Deploy
@@ -130,8 +135,8 @@ preview could not go back to the release.
 ## Hotfix
 
 1. `git switch -c hotfix/thing origin/main`, fix, raise the patch number in
-   `version.txt` and add its section to `CHANGELOG.md`; pull request into
-   `main`.
+   `version.txt`, add its section to `CHANGELOG.md` and its Italian note in
+   `apps/web/src/content/novita/X.Y.Z.md`; pull request into `main`.
 2. Merge it, then tag and release on `main` as in "Release", steps 5 and 6.
 3. Right after, a pull request `main → develop`.
 

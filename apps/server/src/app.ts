@@ -31,6 +31,7 @@ import lingoTestiRoutes from './routes/lingoTesti';
 import adminStudiaTestiRoutes from './routes/adminStudiaTesti';
 import adminStudiaSoglieRoutes from './routes/adminStudiaSoglie';
 import lingoSrsRoutes from './routes/lingoSrs';
+import taskRoutes from './routes/tasks';
 import { merltKillSwitch } from './middleware/merlt/featureGate';
 import { prisma } from './lib/prisma';
 import { createOAuthRouter } from './routes/oauth';
@@ -139,6 +140,8 @@ app.use('/api/lingo/testi', lingoTestiRoutes);
 app.use('/api/admin/studia/testi', adminStudiaTestiRoutes);
 app.use('/api/admin/studia/soglie', adminStudiaSoglieRoutes);
 app.use('/api/lingo/srs', lingoSrsRoutes);
+// The planner's tasks, same reason.
+app.use('/api/tasks', taskRoutes);
 // The consent page and the connected applications (MCP spike), same reason.
 app.use('/api/oauth', oauthAccountRoutes);
 app.use('/api', authRoutes);

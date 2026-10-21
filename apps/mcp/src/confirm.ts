@@ -61,12 +61,15 @@ export function deletionMessage(what: {
   total: number;
   /** For a whole dossier: the question names the dossier, not its entries. */
   wholeDossier?: boolean;
+  /** For a whole dossier: how many planner tasks go with it, counted and never listed (their titles may name a client). */
+  tasks?: number;
   attachedNotesStaying?: number;
 }): string {
   const name = clean(what.dossierName, MAX_TITLE) || clean(what.dossierId ?? '', MAX_TITLE) || 'senza nome';
   // The fixed words come first, so no stored text can pose as the question.
+  const tasks = what.tasks ? ` e ${what.tasks} ${what.tasks === 1 ? 'compito' : 'compiti'}` : '';
   const head = what.wholeDossier
-    ? `ELIMINAZIONE — Spostare nel cestino il dossier «${name}» con ${what.total} ${what.total === 1 ? 'voce' : 'voci'}?`
+    ? `ELIMINAZIONE — Spostare nel cestino il dossier «${name}» con ${what.total} ${what.total === 1 ? 'voce' : 'voci'}${tasks}?`
     : `ELIMINAZIONE — Spostare nel cestino ${what.total} ${what.total === 1 ? 'voce' : 'voci'} del dossier «${name}»?`;
   const shown = what.lines.slice(0, MAX_LINES).map((line) => `- ${clean(line)}`);
   if (what.lines.length > MAX_LINES) shown.push(`e altre ${what.lines.length - MAX_LINES}${hiddenKinds(what.kinds?.slice(MAX_LINES))}`);

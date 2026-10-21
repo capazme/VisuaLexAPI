@@ -18,6 +18,7 @@ import { citationCountLabel, groupCitationsByAct } from './citationGroups';
 import { CitationList } from './CitationList';
 import { DOCUMENT_ACCEPT, readDocumentFile } from './documentFile';
 import { DocumentText } from './DocumentText';
+import { PageFrame } from '../../layout/PageFrame';
 
 interface LoadedDocument {
   fileName: string;
@@ -212,19 +213,16 @@ export function DocumentReviewPage() {
   );
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col">
-      <header className="mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b border-slate-200 pb-4 dark:border-slate-800">
-        <div className="min-w-0">
-          <h1 className="font-serif text-3xl font-medium tracking-tight text-slate-900 dark:text-slate-50">Analizza documento</h1>
-          <p className="mt-1.5 text-sm text-slate-600 dark:text-slate-400">Trova le norme citate in un atto: il file resta nel tuo browser.</p>
-        </div>
-        <p
-          className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
-        >
+    <PageFrame
+      title="Analizza documento"
+      line="Trova le norme citate in un atto: il file resta nel tuo browser."
+      action={
+        <p className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
           <ShieldCheck aria-hidden="true" size={14} />
           Resta nel tuo browser<span className="sr-only">: il documento non viene inviato al server né salvato.</span>
         </p>
-      </header>
+      }
+    >
 
       <input
         ref={fileInputRef}
@@ -336,6 +334,6 @@ export function DocumentReviewPage() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </PageFrame>
   );
 }

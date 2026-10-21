@@ -1,4 +1,5 @@
-import type { RefObject } from 'react';
+import { useEffect, useState, type ReactNode, type RefObject } from 'react';
+import { useReducedMotion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { cn } from '../../../../lib/utils';
 import type { Progressi } from '../../../../types/studia';
@@ -6,8 +7,9 @@ import { estimateLabel } from '../studiaLabels';
 import { GoalStamp } from '../progress/Celebration';
 import { nextDueDay, todayState } from '../progress/today';
 import { BLOCK_HEADING, FOCUS_RING, INK_BG, INK_TEXT, MUTED_TEXT, ON_INK, QUIET_BUTTON, SECONDARY_BUTTON, TILE } from '../progress/tokens';
-import { MissionRow } from './MissionMark';
-import { missionSummary, todayMissions } from './missions';
+import { MISSION_INK_MS, MissionRow } from './MissionMark';
+import { missionOrder, missionSummary, todayMissions, type Mission } from './missions';
+import { useFreshMissions } from '../progress/seenProgress';
 
 export interface TodayMissionsProps {
   /** The whole day's answer: the missions are the day's. Null before the first one, or when it could not be read. */
@@ -25,8 +27,10 @@ export interface TodayMissionsProps {
   onAllSubjects: () => void;
   /** «Inizia» and «Continua»: they stay usable when the progress cannot be read (the session reads its own cards). */
   onStart: () => void;
-  /** The study settings, which set the targets of the new cards and of the goal. */
-  onOpenSettings: () => void;
+  /** Opens the study settings in «I tuoi progressi» (G6), at the community's subjects when asked. */
+  onOpenSettings: (target?: 'comunita') => void;
+  /** The id of the settings' panel, which the «Cambia…» buttons control. */
+  settingsPanel?: string;
   /** The stamp is pressed in now (the celebration, once a day; the caller decides). */
   celebrate: boolean;
   /** Where the celebration's confetti start: the stamp, in the goal's row, so they start where the eye is. */
@@ -60,13 +64,13 @@ const RETRY = cn('min-h-[44px] rounded px-1 font-sans text-base font-medium unde
 function Unread({ onRetry, onStart }: { onRetry: () => void; onStart: () => void }) {
   return (
     <div className="grid justify-items-stretch gap-3 md:justify-items-start">
-      <p role="alert" className={cn('font-serif text-xl leading-snug md:text-2xl', INK_TEXT)}>
+      <p role="alert" className={cn('max-w-prose font-serif text-xl leading-snug md:text-2xl', INK_TEXT)}>
         Non riesco a leggere i tuoi progressi.{' '}
         <button type="button" onClick={onRetry} className={RETRY}>
           Riprova
         </button>
       </p>
-      <p className={cn('-mt-1 text-sm', MUTED_TEXT)}>Puoi ripassare lo stesso: il ripasso legge le sue schede.</p>
+      <p className={cn('-mt-1 max-w-prose text-sm', MUTED_TEXT)}>Puoi ripassare lo stesso: il ripasso legge le sue schede.</p>
       <button type="button" onClick={onStart} className={PRIMARY}>
         Inizia
       </button>
@@ -100,19 +104,19 @@ function TodayAction({ action, actionFailed, subject, onRetry, onAllSubjects, on
   return (
     <div className="grid justify-items-stretch gap-3 pt-1 md:justify-items-start">
       <div className="grid gap-1">
-        <p className={cn('font-serif text-xl leading-snug md:text-2xl', INK_TEXT)} aria-live="polite">
+        <p className={cn('max-w-prose font-serif text-xl leading-snug md:text-2xl', INK_TEXT)} aria-live="polite">
           {state === 'done' && (filtered ? 'Niente da ripassare in questa materia, per oggi.' : 'Hai finito per oggi.')}
           {state === 'todo' && todoSentence(action, subject)}
         </p>
         {state === 'todo' && <p className={cn('text-sm', MUTED_TEXT)}>{estimateLabel(cards)}</p>}
         {state === 'done' && (
-          <p className={cn('text-sm', MUTED_TEXT)}>{next ? `Le prossime schede: ${next}.` : 'Nessuna scheda in programma nei prossimi 14 giorni.'}</p>
+          <p className={cn('max-w-prose text-sm', MUTED_TEXT)}>{next ? `Le prossime schede: ${next}.` : 'Nessuna scheda in programma nei prossimi 14 giorni.'}</p>
         )}
       </div>
 
       {/* A read after the first failed: what is on screen is the last answer. */}
       {actionFailed && (
-        <p role="alert" className="text-sm text-red-700 dark:text-red-400">
+        <p role="alert" className="max-w-prose text-sm text-red-700 dark:text-red-400">
           Non riesco a leggere i tuoi progressi.{' '}
           <button type="button" onClick={onRetry} className={cn(RETRY, 'text-sm')}>
             Riprova
@@ -135,6 +139,46 @@ function TodayAction({ action, actionFailed, subject, onRetry, onAllSubjects, on
 }
 
 /**
+ * The list of today's missions (S2): a mission done since this browser last drew it has its ink run (the drop, then
+ * the words), and once it has, slides under those still open (`missionOrder`); under reduced motion the order and the
+ * marks are final at once. Mounted with the day's read, so its first answer is not taken for a mission just done.
+ */
+function MissionsOfToday({ day, missions, children }: { day: Progressi; missions: Mission[]; children: (mission: Mission) => ReactNode }) {
+  const reduce = useReducedMotion() ?? false;
+  const done = missions.filter((m) => m.status === 'fatta').map((m) => m.id);
+  const fresh = useFreshMissions(day.oggi.giorno, done);
+  // The fresh missions whose ink has run: they may move now.
+  const [inked, setInked] = useState<ReadonlySet<string>>(() => new Set());
+  const running = reduce ? [] : [...fresh].filter((id) => !inked.has(id));
+  const runningKey = running.join(' ');
+  useEffect(() => {
+    if (!runningKey) return;
+    const timer = window.setTimeout(() => setInked((before) => new Set([...before, ...runningKey.split(' ')])), MISSION_INK_MS);
+    return () => window.clearTimeout(timer);
+  }, [runningKey]);
+  const met = day.oggi.raggiunto;
+
+  return (
+    // `-mb-4`: the last row's bottom padding, which a moving row keeps (`MissionRow`'s `layout`).
+    <ol aria-label="Missioni di oggi" className={cn('divide-y divide-slate-100 dark:divide-slate-800', !reduce && '-mb-4')}>
+      {missionOrder(missions, new Set(running)).map((mission) => (
+        // Met by the count, the stamp says it to the eye; met with the queue finished under it, the line says why.
+        <MissionRow
+          key={mission.id}
+          mission={mission}
+          bar
+          ink={running.includes(mission.id) ? 'drip' : 'still'}
+          layout={!reduce}
+          quietNote={mission.id === 'obiettivo' && met && day.oggi.ripassi >= day.oggi.obiettivo}
+        >
+          {children(mission)}
+        </MissionRow>
+      ))}
+    </ol>
+  );
+}
+
+/**
  * «Le missioni di oggi» (Gymnasium spec §5.1), first on the page: the day's three missions, one under the other,
  * each with its mark, its progress and an action, and the summary «2 di 3». The first carries the page's one
  * primary button; the other two open the settings that set their targets; the goal's is sealed by the stamp once
@@ -142,14 +186,14 @@ function TodayAction({ action, actionFailed, subject, onRetry, onAllSubjects, on
  * While the first read travels the card holds its size; a failed read says so and keeps «Inizia»; with no card
  * at all, how to begin.
  */
-export function TodayMissions({ day, dayFailed, action, actionFailed, onRetry, subject, onAllSubjects, onStart, onOpenSettings, celebrate, stampRef }: TodayMissionsProps) {
+export function TodayMissions({ day, dayFailed, action, actionFailed, onRetry, subject, onAllSubjects, onStart, onOpenSettings, settingsPanel, celebrate, stampRef }: TodayMissionsProps) {
   const state = todayState(day, dayFailed, false);
   const missions = day && (state === 'todo' || state === 'done') ? todayMissions(day) : null;
   const summary = missions ? missionSummary(missions) : null;
   const met = day?.oggi.raggiunto ?? false;
 
   return (
-    <section aria-labelledby="studia-missioni" aria-busy={state === 'loading'} className={cn(TILE, 'p-5 md:p-6')}>
+    <section aria-labelledby="studia-missioni" aria-busy={state === 'loading'} className={cn(TILE, 'p-4 md:p-6')}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <h3 id="studia-missioni" className={BLOCK_HEADING}>
           Le missioni di oggi
@@ -191,23 +235,22 @@ export function TodayMissions({ day, dayFailed, action, actionFailed, onRetry, s
             </Link>{' '}
             e scegli «+ Nuova scheda» sotto il testo: le missioni partono dalla prima scheda.
           </p>
-          <button type="button" aria-haspopup="dialog" onClick={onOpenSettings} className={QUIET_BUTTON}>
+          <button type="button" aria-controls={settingsPanel} onClick={() => onOpenSettings('comunita')} className={QUIET_BUTTON}>
             Oppure accendi le schede della comunità
           </button>
         </div>
       )}
 
-      {missions && (
-        <ol aria-label="Missioni di oggi" className="divide-y divide-slate-100 dark:divide-slate-800">
-          {missions.map((mission) => (
-            // Met by the count, the stamp says it to the eye; met with the queue finished under it, the line says why.
-            <MissionRow key={mission.id} mission={mission} bar quietNote={mission.id === 'obiettivo' && met && day !== null && day.oggi.ripassi >= day.oggi.obiettivo}>
+      {missions && day && (
+        <MissionsOfToday day={day} missions={missions}>
+          {(mission) => (
+            <>
               {mission.id === 'dovute' && (
                 // The day's read failing again is said here too: the missions above are its last answer.
                 <TodayAction action={action} actionFailed={actionFailed || dayFailed} subject={subject} onRetry={onRetry} onAllSubjects={onAllSubjects} onStart={onStart} met={met} />
               )}
               {mission.id === 'nuove' && mission.status !== 'fatta' && (
-                <button type="button" aria-haspopup="dialog" onClick={onOpenSettings} className={QUIET_BUTTON}>
+                <button type="button" aria-controls={settingsPanel} onClick={() => onOpenSettings(mission.status === 'vuota' ? 'comunita' : undefined)} className={QUIET_BUTTON}>
                   {mission.status === 'vuota' ? 'Accendi le schede della comunità' : 'Cambia le nuove al giorno'}
                 </button>
               )}
@@ -217,13 +260,13 @@ export function TodayMissions({ day, dayFailed, action, actionFailed, onRetry, s
                     <GoalStamp giorno={day.oggi.giorno} serie={day.serie.attuale} press={celebrate} className="ml-1 mt-1" />
                   </div>
                 ) : (
-                  <button type="button" aria-haspopup="dialog" onClick={onOpenSettings} className={QUIET_BUTTON}>
+                  <button type="button" aria-controls={settingsPanel} onClick={() => onOpenSettings()} className={QUIET_BUTTON}>
                     Cambia l’obiettivo
                   </button>
                 ))}
-            </MissionRow>
-          ))}
-        </ol>
+            </>
+          )}
+        </MissionsOfToday>
       )}
     </section>
   );

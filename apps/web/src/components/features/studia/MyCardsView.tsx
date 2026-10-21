@@ -86,7 +86,7 @@ function NoCardsYet({ sources, onNew }: { sources: boolean | undefined; onNew: (
     </Link>
   );
   return (
-    <div className={cn(TILE, 'grid justify-items-stretch gap-3 p-5 md:justify-items-start md:p-6')}>
+    <div className={cn(TILE, 'grid justify-items-stretch gap-3 p-4 md:justify-items-start md:p-6')}>
       <p className={cn('font-serif text-xl leading-snug md:text-2xl', INK_TEXT)}>Non hai ancora schede.</p>
       {sources === undefined ? null : sources ? (
         <>
@@ -331,7 +331,7 @@ export function MyCardsView() {
         )}
 
         {id ? (
-          <div className={cn('min-w-0 pt-2 md:pt-0', desktop && 'sticky top-0 max-h-dvh overflow-y-auto pb-4')}>
+          <div className={cn('min-w-0 pt-2 md:pt-0', desktop && 'sticky top-[var(--phone-bar-offset,0px)] max-h-[calc(100dvh-var(--phone-bar-offset,0px))] overflow-y-auto pb-4')}>
             {selected ? (
               <DetailOf
                 // Its confirmations and pending request belong to this card: another one starts clean.
