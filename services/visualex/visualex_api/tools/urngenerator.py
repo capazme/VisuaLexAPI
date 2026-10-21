@@ -188,14 +188,18 @@ def append_version_info(urn, version, version_date):
     if isinstance(version, str):
         # Read the word the way is_historical_request does: stripped, lower-cased.
         version = version.strip().lower()
-    if version == "originale":
+    if isinstance(version_date, str) and version_date.strip():
+        # A date always asks for the text in force on that day (owner, G-353), with
+        # or without «vigente», and over «originale», as the web reads a request
+        # (`requestedVersion`). Only «vigente» used to carry it: a date with no
+        # version reached Normattiva without it and came back as today's text,
+        # shown as the past one.
+        urn += "!vig=" + parse_date(version_date)
+    elif version == "originale":
         urn += "@originale"
     elif version == "vigente":
         urn += "!vig="
-        if version_date:
-            formatted_version_date = parse_date(version_date)
-            urn += formatted_version_date
-        logging.info(f"Appended version info to URN: {urn}")
+    logging.info(f"Appended version info to URN: {urn}")
     return urn
 
 _UNSAFE_IN_FILENAME = re.compile(r"[^A-Za-z0-9._-]")

@@ -1675,8 +1675,10 @@ Duplicating any of these is a defect, not a shortcut.
   of the text in force starts with, D8), `labelFromParams` (the parsers'
   previews), `normFromUrn` (a Normattiva URN or an ELI read back into a norm; the
   preleggi are never the codice civile). `actTypes.ts` holds the tables; its
-  `CODES_TABLE` is a copy of the API's `NORMATTIVA_URN_CODICI`, and the golden test
-  fails when the two differ. Never write a norm's label inline: a new surface
+  `CODES_TABLE` is a copy of the API's `NORMATTIVA_URN_CODICI`, and `ANNEXED_ACTS` of the
+  API's table of acts whose text is their annex (the TULPS), and the golden test fails when
+  either differs. A code's default annex, and such an act's annex, are never named in a
+  label (G-350, G-351). Never write a norm's label inline: a new surface
   picks one of these.
 - `utils/sources/normEntry.ts` — `rebuildNormEntry`: a norm from someone else (a shared
   environment, a file, a share link) rebuilt from closed values — a known act type, fixed forms,
