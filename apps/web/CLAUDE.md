@@ -154,7 +154,19 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `DecisionTextView`: a court decision's text; `DecisionReadingSurface`: the same text with the
   reader's marks and the norms it cites as links; `DecisionDownloads`: its two PDF buttons; `DecisionResultList`, the Cassazione's decisions for an
   article or a topic, `EuCaseLawBlock`, the Union's courts' decisions that cite an article of a regulation or a directive, and `DecisionSearchTabView`, a topic search's window (or the phone's reader); design `docs/superpowers/specs/2026-10-01-sentenze-design.md`).
-- `components/layout/` — `Layout`, `Sidebar`, `ReaderLayout`. **The sections** (D-076, spec
+- `components/layout/` — `Layout`, `Sidebar`, `ReaderLayout`, `PageFrame`. **The page frame** (W2, 21 Oct 2026):
+  `PageFrame` is the frame of every section page — the layout's own width (`Layout`'s `max-w-7xl` and its padding: a
+  1216 px column at 1920 px) with nothing narrower inside, the `h1` at the column's left edge in one size
+  (`PAGE_TITLE`: Newsreader, 28 px on a phone, 30 px from `md`), the sentence under it (`line`, at a reading
+  measure), the main action on its right from `md` and under it on a phone (`action`), and no icon beside the title;
+  `section` marks a section's home for the switcher's focus (`data-section-title`, `tabIndex={-1}`, `FOCUS_RING`).
+  It draws the dossier list, «Dossier pubblici», Community, Gymnasium (every view but the lesson, through
+  `StudiaPage`), «Analizza documento», «Collega un'app AI» (its body keeps a column of 768 px: it reads as text, the
+  title does not move), the Cronologia and the MERL-T hub; «Cestino» and the MERL-T pages under a way back
+  («Torna ai Dossier», «MERL-T») write their `h1` with `PAGE_TITLE`. A dossier's own page (its name, its star and
+  its actions), Impostazioni (a dialog, not a page), the Scrivania, the lesson, the reader and the practice, the
+  login and «Crediti» (public, outside the layout) stay out. `PageFrame.test.tsx` reads the section pages' files
+  and fails on a title of their own, an icon in an `h1` or a root narrowed with `mx-auto max-w-…`. **The sections** (D-076, spec
   `docs/superpowers/specs/2026-10-18-sections-switcher-design.md`): Corpus is the common core and no section;
   over it Opus, Gymnasium (the code's `studia`), Academia (development mode only) and Forum, in
   `features/sections/` (`sections.ts`: names, lines, icons, home addresses, `sectionForPath`; `useSection`: the
@@ -175,7 +187,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   so they do not press the switcher again); the browser's Back while the colour prints drops the change, with no
   swap. The focus goes to the
   new page's title unless the user moved it meanwhile: each section's home marks its heading
-  `data-section-title="<section id>"` with `tabIndex={-1}` and `FOCUS_RING`, so a keyboard user sees where the focus
+  `data-section-title="<section id>"` with `tabIndex={-1}` and `FOCUS_RING` (`PageFrame`'s `section`), so a keyboard user sees where the focus
   went (Gymnasium's `h1`, the dossier list's `h1` — `opus` or
   `gymnasium` by the kind it lists, since the same element stays from one to the other —, «Dossier pubblici», the
   MERL-T hub); a new home marks its own. Under reduced motion the page changes at once; where no canvas can be drawn,
@@ -1816,10 +1828,12 @@ meant to stay split; add new features as new files, not inside the shells:
   from what the dossier kept, `addKnownDecisions`, so «Salva come dossier» saves them back) land in
   the practices.
 - `features/history/` — `HistoryView.tsx`, `DecisionHistoryRow.tsx` (a decision's row) plus
-  `NormaChangesSection.tsx` (see History above). The card's title is the page's `h1` («Cronologia» on a phone,
-  «Cronologia Ricerche» from `md`, one hidden by CSS); on `/dossier` it is the visible title of the list, of the
-  open dossier and of «Cestino», and what sits under it is `h2` (a dossier's card; an open dossier's notes, acts,
-  «Giurisprudenza» and «Rimossi di recente»).
+  `NormaChangesSection.tsx` (see History above). The page is in the sections' frame (W2): one `h1`, «Cronologia», on
+  every width, with the one search field (`#tour-history-search`, «/» focuses it) and «Svuota cronologia» beside it
+  — until W2 a phone's and a computer's header were both drawn, one hidden by CSS, and «/» focused the hidden field
+  on a phone; the saved norms that changed come under the title, then the card. On `/dossier` the `h1` is the visible
+  title of the list, of the open dossier and of «Cestino», and what sits under it is `h2` (a dossier's card; an open
+  dossier's notes, acts, «Giurisprudenza» and «Rimossi di recente»).
 - `features/documents/` — `DocumentReviewPage.tsx` (the page), `DocumentText.tsx`, `CitationList.tsx`,
   `citationGroups.ts`, `documentFile.ts`; invented sample files for the tests in `__tests__/fixtures.ts`.
 

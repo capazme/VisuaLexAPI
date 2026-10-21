@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check, Loader2, ScrollText } from 'lucide-react';
+import { ArrowLeft, Check, Loader2 } from 'lucide-react';
 import type { SearchParams } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
 import { Button } from '../../../components/ui/Button';
+import { PAGE_TITLE } from '../../../components/layout/PageFrame';
 import { Toast } from '../../../components/ui/Toast';
 import { useMerltFeatures } from '../useMerltFeatures';
 import { ValidationCard, type ValidationCardModel } from './ValidationCard';
@@ -196,9 +197,7 @@ export function ValidationPage() {
         <Link to="/merlt" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700">
           <ArrowLeft size={14} /> MERL-T
         </Link>
-        <h1 className="flex items-center gap-2 font-serif text-3xl font-medium tracking-tight text-slate-900 dark:text-slate-50">
-          <ScrollText className="text-primary-500" /> Validazione community
-        </h1>
+        <h1 className={PAGE_TITLE}>Validazione community</h1>
         <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
           Vota le proposte di nodi e relazioni in attesa. I voti sono pesati per la tua authority;
           al raggiungimento del consenso la proposta entra (o viene respinta) nel grafo.

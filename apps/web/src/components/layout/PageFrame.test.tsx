@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { PAGE_TITLE, PageFrame } from './PageFrame';
@@ -38,5 +40,35 @@ describe('PageFrame (W2)', () => {
     const page = screen.getByRole('heading', { level: 1 });
     expect(page).not.toHaveAttribute('data-section-title');
     expect(page).not.toHaveAttribute('tabindex');
+  });
+});
+
+/**
+ * The section pages (W2): each draws its title through the frame, or — under a way back — with `PAGE_TITLE`; none writes
+ * a title of its own, puts an icon beside it, or narrows the page under the layout's frame.
+ */
+const SECTION_PAGES = [
+  'components/features/dossier/DossierListView.tsx',
+  'components/features/dossier/TrashPage.tsx',
+  'components/features/bulletin/BulletinBoardPage.tsx',
+  'components/features/bulletin/ForumCommunityPage.tsx',
+  'components/features/studia/StudiaPage.tsx',
+  'components/features/documents/DocumentReviewPage.tsx',
+  'features/connections/ConnectAiAppPage.tsx',
+  'components/features/history/HistoryView.tsx',
+  'pages/MerltHubPage.tsx',
+  'features/merlt/contrib/ContribPage.tsx',
+  'features/merlt/validate/ValidationPage.tsx',
+];
+
+describe('the section pages (W2)', () => {
+  it.each(SECTION_PAGES)('%s takes its title from the frame', (file) => {
+    const source = readFileSync(resolve(process.cwd(), 'src', file), 'utf8');
+    expect(source).toMatch(/<PageFrame\b|className=\{PAGE_TITLE\}/);
+    // Any `<h1` left is the frame's token alone, with its words and nothing else inside.
+    for (const [, inside] of source.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/g)) expect(inside).not.toMatch(/</);
+    expect(source).not.toMatch(/<h1\b(?![^>]*className=\{PAGE_TITLE\})/);
+    // The root of the page is the frame's width.
+    expect(source).not.toMatch(/mx-auto[^"'`]*max-w-(?:3xl|4xl|6xl)|max-w-(?:3xl|4xl|6xl)[^"'`]*mx-auto/);
   });
 });

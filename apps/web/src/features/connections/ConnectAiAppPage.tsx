@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Bot, CheckCircle2, ExternalLink, Info, ShieldCheck, Trash2, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ExternalLink, Info, ShieldCheck, Trash2, XCircle } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { getErrorMessage } from '../../utils/errors';
 import { connectionsService, type ConnectionInfo } from './connectionsService';
 import { ConnectedAppsSection } from './ConnectedAppsSection';
 import { CopyableCode } from './CopyableCode';
+import { PageFrame } from '../../components/layout/PageFrame';
 import { AI_TOOLS, UNSUPPORTED_CLIENTS, aiClients, type AiClient } from './aiClients';
 import {
   LEGAL_IT_CLIENTS,
@@ -199,161 +200,160 @@ export function ConnectAiAppPage() {
   const mcpUrl = state.status === 'ready' ? state.info.mcpUrl : null;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8 pb-12">
-      <header>
-        <h1 className="flex items-center gap-2 font-serif text-3xl font-medium tracking-tight text-slate-900 dark:text-slate-50">
-          <Bot className="text-primary-500" size={24} aria-hidden /> Collega un’app AI
-        </h1>
-        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+    // The title at the frame's edge, as on every section page (W2); the page reads as text, so its body keeps a column
+    // of 768 px.
+    <PageFrame title="Collega un’app AI">
+      <div className="max-w-3xl space-y-8 pb-12">
+        <p className="text-sm text-slate-600 dark:text-slate-300">
           Un’app di intelligenza artificiale collegata a VisuaLex può leggere i tuoi dossier, crearne di nuovi e aggiungervi
           norme, sentenze, note e schede di studio, con il tuo account. Il collegamento usa il protocollo MCP: copi
           l’indirizzo nell’app, accedi a VisuaLex e scegli tu i permessi.
         </p>
-      </header>
 
-      <nav aria-label="Le due parti della pagina" className="space-y-2">
-        <p className="text-sm text-slate-600 dark:text-slate-300">
-          Sono due cose diverse: VisuaLex collega l’app AI al tuo account e ai tuoi dossier, online; mcp-legal-it si installa sul
-          tuo computer e dà all’app AI strumenti di diritto italiano, senza account.
-        </p>
-        <ul className="grid gap-2 sm:grid-cols-2">
-          {PARTS.map((part) => (
-            <li key={part.href}>
-              <a
-                href={part.href}
-                className={cn(
-                  'flex min-h-[44px] flex-col justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 transition-colors duration-150 hover:border-primary-300 hover:bg-primary-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-primary-700 dark:hover:bg-slate-700',
-                  focusRing,
-                )}
-              >
-                <span className="text-sm font-semibold text-slate-900 dark:text-white">{part.name}</span>
-                <span className="text-xs text-slate-600 dark:text-slate-300">{part.line}</span>
-              </a>
-            </li>
-          ))}
-        </ul>
-      </nav>
-
-      <section id="visualex" aria-labelledby="visualex-title" className={cn(anchorTarget, 'space-y-8')}>
-        <h2 id="visualex-title" className={partTitle}>
-          VisuaLex
-        </h2>
-        <section
-          aria-labelledby="ai-personal-data"
-          className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
-        >
-          <ShieldCheck size={18} className="mt-0.5 shrink-0" aria-hidden />
-          <div className="space-y-1">
-            <h2 id="ai-personal-data" className="font-semibold">
-              Dati personali e app AI
-            </h2>
-            <p>
-              Un’app AI collegata legge i nomi dei tuoi dossier, i titoli e i riferimenti delle voci e le tue schede di studio, e li
-              passa al servizio di intelligenza artificiale che usa. Non scrivere lì dati personali dei clienti, oppure collega
-              solo app AI di cui ti fidi.
-            </p>
-            <p>
-              Un’app collegata agisce con il tuo account, nei limiti dei permessi che le dai; puoi revocarla in qualsiasi momento
-              qui sotto.
-            </p>
-          </div>
-        </section>
-
-        <section aria-labelledby="mcp-address" className="space-y-2">
-          <h2 id="mcp-address" className={sectionTitle}>
-            L’indirizzo di VisuaLex
-          </h2>
-          {state.status === 'loading' && <p className="text-sm text-slate-500">Caricamento…</p>}
-          {state.status === 'error' && (
-            <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-              {state.message}
-            </p>
-          )}
-          {state.status === 'ready' && mcpUrl && <CopyableCode code={mcpUrl} label="l’indirizzo del server MCP" />}
-          {state.status === 'ready' && !mcpUrl && (
-            <p className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
-              <Info size={16} className="mt-0.5 shrink-0" aria-hidden />
-              Il collegamento con le app AI non è attivo su questo server. Chiedi all’amministratore di attivarlo.
-            </p>
-          )}
-        </section>
-
-        {mcpUrl && (
-          <section aria-labelledby="ai-clients" className="space-y-3">
-            <h2 id="ai-clients" className={sectionTitle}>
-              Come collegare la tua app
-            </h2>
-            <div className="space-y-4">
-              {aiClients(mcpUrl).map((client) => (
-                <ClientCard key={client.id} client={client} />
-              ))}
-            </div>
-            <div className="text-sm text-slate-600 dark:text-slate-300">
-              <p className="font-medium">Non ancora supportate</p>
-              <ul className="mt-1 space-y-1">
-                {UNSUPPORTED_CLIENTS.map((client) => (
-                  <li key={client.name} className="flex items-start gap-2">
-                    <XCircle size={14} className="mt-1 shrink-0 text-slate-400" aria-hidden />
-                    <span>
-                      <span className="font-medium">{client.name}</span>: {client.reason}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </section>
-        )}
-
-        <section aria-labelledby="ai-can-do" className="space-y-3">
-          <h2 id="ai-can-do" className={sectionTitle}>
-            Cosa può fare un’app collegata
-          </h2>
-          <ul className="list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-200">
-            {AI_TOOLS.map((tool) => (
-              <li key={tool.name}>
-                <span className="font-medium">{tool.name}</span>: {tool.what}
+        <nav aria-label="Le due parti della pagina" className="space-y-2">
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            Sono due cose diverse: VisuaLex collega l’app AI al tuo account e ai tuoi dossier, online; mcp-legal-it si installa sul
+            tuo computer e dà all’app AI strumenti di diritto italiano, senza account.
+          </p>
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {PARTS.map((part) => (
+              <li key={part.href}>
+                <a
+                  href={part.href}
+                  className={cn(
+                    'flex min-h-[44px] flex-col justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 transition-colors duration-150 hover:border-primary-300 hover:bg-primary-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-primary-700 dark:hover:bg-slate-700',
+                    focusRing,
+                  )}
+                >
+                  <span className="text-sm font-semibold text-slate-900 dark:text-white">{part.name}</span>
+                  <span className="text-xs text-slate-600 dark:text-slate-300">{part.line}</span>
+                </a>
               </li>
             ))}
           </ul>
-          <p className="text-sm text-slate-600 dark:text-slate-300">
-            Non può modificare né spostare nulla, e non riceve il testo degli articoli.
-          </p>
-          {state.status === 'ready' && state.info.scopes.length > 0 && (
-            <div>
-              <p className="text-sm font-medium text-slate-700 dark:text-slate-200">I permessi che un’app può chiederti</p>
-              <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-slate-600 dark:text-slate-300">
-                {state.info.scopes.map((scope) => (
-                  <li key={scope.scope}>{scope.label}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          <div className={card}>
-            <p className="flex items-center gap-2 text-sm font-medium text-slate-800 dark:text-slate-100">
-              <Trash2 size={16} aria-hidden /> Eliminare richiede due conferme
-            </p>
-            <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-slate-600 dark:text-slate-300">
-              <li>
-                Il permesso di eliminare è spento all’inizio: lo accendi tu, per ogni app, quando la autorizzi o da «Applicazioni collegate»
+        </nav>
+
+        <section id="visualex" aria-labelledby="visualex-title" className={cn(anchorTarget, 'space-y-8')}>
+          <h2 id="visualex-title" className={partTitle}>
+            VisuaLex
+          </h2>
+          <section
+            aria-labelledby="ai-personal-data"
+            className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
+          >
+            <ShieldCheck size={18} className="mt-0.5 shrink-0" aria-hidden />
+            <div className="space-y-1">
+              <h2 id="ai-personal-data" className="font-semibold">
+                Dati personali e app AI
+              </h2>
+              <p>
+                Un’app AI collegata legge i nomi dei tuoi dossier, i titoli e i riferimenti delle voci e le tue schede di studio, e li
+                passa al servizio di intelligenza artificiale che usa. Non scrivere lì dati personali dei clienti, oppure collega
+                solo app AI di cui ti fidi.
+              </p>
+              <p>
+                Un’app collegata agisce con il tuo account, nei limiti dei permessi che le dai; puoi revocarla in qualsiasi momento
                 qui sotto.
-              </li>
-              <li>
-                Ogni eliminazione ti chiede conferma nell’app, con un modulo in cui spunti «Confermo». Se l’app non sa mostrare il
-                modulo, l’eliminazione viene rifiutata.
-              </li>
-            </ol>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-              Ciò che viene eliminato finisce nel cestino per 30 giorni: lo trovi in Dossier → Cestino e puoi ripristinarlo.
+              </p>
+            </div>
+          </section>
+
+          <section aria-labelledby="mcp-address" className="space-y-2">
+            <h2 id="mcp-address" className={sectionTitle}>
+              L’indirizzo di VisuaLex
+            </h2>
+            {state.status === 'loading' && <p className="text-sm text-slate-500">Caricamento…</p>}
+            {state.status === 'error' && (
+              <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+                {state.message}
+              </p>
+            )}
+            {state.status === 'ready' && mcpUrl && <CopyableCode code={mcpUrl} label="l’indirizzo del server MCP" />}
+            {state.status === 'ready' && !mcpUrl && (
+              <p className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
+                <Info size={16} className="mt-0.5 shrink-0" aria-hidden />
+                Il collegamento con le app AI non è attivo su questo server. Chiedi all’amministratore di attivarlo.
+              </p>
+            )}
+          </section>
+
+          {mcpUrl && (
+            <section aria-labelledby="ai-clients" className="space-y-3">
+              <h2 id="ai-clients" className={sectionTitle}>
+                Come collegare la tua app
+              </h2>
+              <div className="space-y-4">
+                {aiClients(mcpUrl).map((client) => (
+                  <ClientCard key={client.id} client={client} />
+                ))}
+              </div>
+              <div className="text-sm text-slate-600 dark:text-slate-300">
+                <p className="font-medium">Non ancora supportate</p>
+                <ul className="mt-1 space-y-1">
+                  {UNSUPPORTED_CLIENTS.map((client) => (
+                    <li key={client.name} className="flex items-start gap-2">
+                      <XCircle size={14} className="mt-1 shrink-0 text-slate-400" aria-hidden />
+                      <span>
+                        <span className="font-medium">{client.name}</span>: {client.reason}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </section>
+          )}
+
+          <section aria-labelledby="ai-can-do" className="space-y-3">
+            <h2 id="ai-can-do" className={sectionTitle}>
+              Cosa può fare un’app collegata
+            </h2>
+            <ul className="list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-200">
+              {AI_TOOLS.map((tool) => (
+                <li key={tool.name}>
+                  <span className="font-medium">{tool.name}</span>: {tool.what}
+                </li>
+              ))}
+            </ul>
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              Non può modificare né spostare nulla, e non riceve il testo degli articoli.
             </p>
-          </div>
+            {state.status === 'ready' && state.info.scopes.length > 0 && (
+              <div>
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-200">I permessi che un’app può chiederti</p>
+                <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-slate-600 dark:text-slate-300">
+                  {state.info.scopes.map((scope) => (
+                    <li key={scope.scope}>{scope.label}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div className={card}>
+              <p className="flex items-center gap-2 text-sm font-medium text-slate-800 dark:text-slate-100">
+                <Trash2 size={16} aria-hidden /> Eliminare richiede due conferme
+              </p>
+              <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-slate-600 dark:text-slate-300">
+                <li>
+                  Il permesso di eliminare è spento all’inizio: lo accendi tu, per ogni app, quando la autorizzi o da «Applicazioni collegate»
+                  qui sotto.
+                </li>
+                <li>
+                  Ogni eliminazione ti chiede conferma nell’app, con un modulo in cui spunti «Confermo». Se l’app non sa mostrare il
+                  modulo, l’eliminazione viene rifiutata.
+                </li>
+              </ol>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                Ciò che viene eliminato finisce nel cestino per 30 giorni: lo trovi in Dossier → Cestino e puoi ripristinarlo.
+              </p>
+            </div>
+          </section>
+
+          <section aria-label="Applicazioni collegate">
+            <ConnectedAppsSection />
+          </section>
         </section>
 
-        <section aria-label="Applicazioni collegate">
-          <ConnectedAppsSection />
-        </section>
-      </section>
-
-      <LegalItSection />
-    </div>
+        <LegalItSection />
+      </div>
+    </PageFrame>
   );
 }

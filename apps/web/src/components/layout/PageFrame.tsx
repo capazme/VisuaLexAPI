@@ -36,7 +36,7 @@ export function PageFrame({ title, line, action, section, titleId, className, ch
           </h1>
           {line && <p className="mt-1 max-w-prose text-slate-600 dark:text-slate-400">{line}</p>}
         </div>
-        {action && <div className="flex shrink-0 flex-wrap gap-2">{action}</div>}
+        {action && <div className="flex shrink-0 gap-2">{action}</div>}
       </header>
       {children}
     </div>
