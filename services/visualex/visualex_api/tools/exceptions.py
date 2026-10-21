@@ -98,9 +98,12 @@ class NetworkError(ScraperError):
             status_code=504
         )
     """
-    def __init__(self, message: str, status_code: int = None):
+    def __init__(self, message: str, status_code: int = None, retry_after: float = None):
         super().__init__(message)
         self.status_code = status_code
+        # The wait the source asked for (429/503) when the client gave up instead of waiting:
+        # a caller that asks again itself waits at least this long.
+        self.retry_after = retry_after
 
 
 class DocumentNotFoundError(ScraperError):
