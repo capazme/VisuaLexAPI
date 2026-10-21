@@ -331,7 +331,7 @@ export function MyCardsView() {
         )}
 
         {id ? (
-          <div className={cn('min-w-0 pt-2 md:pt-0', desktop && 'sticky top-0 max-h-dvh overflow-y-auto pb-4')}>
+          <div className={cn('min-w-0 pt-2 md:pt-0', desktop && 'sticky top-[var(--phone-bar-offset,0px)] max-h-[calc(100dvh-var(--phone-bar-offset,0px))] overflow-y-auto pb-4')}>
             {selected ? (
               <DetailOf
                 // Its confirmations and pending request belong to this card: another one starts clean.

@@ -1,3 +1,4 @@
+import type { Ref } from 'react';
 import { Search } from 'lucide-react';
 import { FOCUS_RING } from '../../constants/interactions';
 import { Z_INDEX } from '../../constants/zIndex';
@@ -16,12 +17,15 @@ export interface MenuToggleProps {
   onToggle: () => void;
   /** The services' state in words when it needs a notice («alcune fonti non disponibili»): a dot, and the name says it. */
   notice?: string;
+  /** The button, for `Layout` to give it the focus back when the drawer closes from its user menu. */
+  buttonRef?: Ref<HTMLButtonElement>;
 }
 
 /** The button that opens the drawer below `lg`, at the left of the bar on every page (M1). */
-export function MenuToggle({ open, onToggle, notice }: MenuToggleProps) {
+export function MenuToggle({ open, onToggle, notice, buttonRef }: MenuToggleProps) {
   return (
     <button
+      ref={buttonRef}
       type="button"
       onClick={onToggle}
       aria-label={`${open ? 'Chiudi il menu' : 'Apri il menu'}${notice ? `, ${notice}` : ''}`}
@@ -63,7 +67,8 @@ export function PhoneTopBar({ menu, title, hidden, onReveal, onSearch }: PhoneTo
       data-testid="phone-top-bar"
       onFocus={onReveal}
       className={cn(
-        'absolute inset-x-0 top-0 border-b border-slate-200 bg-slate-50 pt-[env(safe-area-inset-top)] lg:hidden dark:border-slate-800 dark:bg-slate-950',
+        // `vlx-phone-bar`: named during a section change (index.css, T1), so the page's picture passes under it.
+        'vlx-phone-bar absolute inset-x-0 top-0 border-b border-slate-200 bg-slate-50 pt-[env(safe-area-inset-top)] lg:hidden dark:border-slate-800 dark:bg-slate-950',
         Z_INDEX.floating,
         'transition-[translate] duration-200 ease-out motion-reduce:transition-none',
         hidden && 'max-md:-translate-y-full',

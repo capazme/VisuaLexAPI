@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Sidebar } from './Sidebar';
@@ -62,7 +62,9 @@ export function Layout() {
   const showSearchBar = onSearchPage && !settings.focusMode;
   // Below lg a bar sits at the top of every page (M1): the search page's is its field, with the menu button beside it;
   // every other page has `PhoneTopBar` over its content area, and starts under it. Focus mode draws neither.
-  const showPhoneBar = !onSearchPage && !settings.focusMode;
+  // Gymnasium's lesson covers the shell (`LessonFrame`): no bar under it for Tab to reach.
+  const inLesson = /^\/studia\/ripasso\/sessione(\/|$)/.test(pathname);
+  const showPhoneBar = !onSearchPage && !settings.focusMode && !inLesson;
   const storedSection = sectionStore((s) => s.section);
   const sectionName = SECTIONS.find((s) => s.id === (sectionForPath(pathname) ?? storedSection))?.name ?? 'VisuaLex';
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
@@ -72,7 +74,11 @@ export function Layout() {
   // phone, on the button that opens the drawer, whose names say it.
   const serviceHealth = useServiceHealth();
   const servicesNotice = serviceHealthNeedsNotice(serviceHealth.snapshot.overall);
+  // An entry of the drawer's user menu closes the drawer, whose controls are then out of reach (`inert`): the focus goes
+  // to the menu button, where a dialog the entry opens gives it back.
+  const menuToggleRef = useRef<HTMLButtonElement>(null);
   const menuToggle = {
+    buttonRef: menuToggleRef,
     open: sidebarOpen,
     onToggle: () => setSidebarOpen(!sidebarOpen),
     notice: servicesNotice ? serviceHealthLabel(serviceHealth.snapshot.overall).toLowerCase() : undefined,
@@ -230,6 +236,7 @@ export function Layout() {
             isOpen={sidebarOpen}
             layout="drawer"
             closeMobile={() => setSidebarOpen(false)}
+            focusAfterMenu={() => menuToggleRef.current?.focus()}
             openSettings={() => setSettingsOpen(true)}
             openKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
             openFeedback={isAuthenticated ? () => setFeedbackOpen(true) : undefined}

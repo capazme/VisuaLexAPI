@@ -22,7 +22,7 @@ describe('the Scrivania on a phone', () => {
   it('draws the examples as pills in one row that scrolls sideways, with no bar, and in a line from md', () => {
     renderPage();
     const row = screen.getByRole('group', { name: 'Esempi di ricerca' });
-    expect(row).toHaveClass('overflow-x-auto', 'md:flex-wrap', 'max-md:-mx-4', 'max-md:px-4', ...HIDDEN_SCROLLBAR.split(' '));
+    expect(row).toHaveClass('overflow-x-auto', 'md:flex-wrap', 'max-md:-mx-4', 'max-md:px-4', 'max-md:py-1', ...HIDDEN_SCROLLBAR.split(' '));
     expect(row).not.toHaveClass('flex-wrap');
     const pills = within(row).getAllByRole('button');
     expect(pills.map((p) => p.textContent)).toEqual(['Art. 2043 c.c.', 'Art. 5 GDPR', 'Art. 1 Costituzione']);
@@ -35,5 +35,15 @@ describe('the Scrivania on a phone', () => {
       'max-md:-mx-4', 'max-md:w-auto', 'max-md:px-0', 'max-md:flex', 'max-md:flex-col', 'max-md:justify-center',
       'max-md:min-h-[calc(100dvh-var(--search-bar-height,0px)-2rem)]',
     );
+  });
+
+  it('takes Focus mode\'s padding off instead, where no search bar is drawn', () => {
+    appStore.setState((s) => ({ settings: { ...s.settings, focusMode: true } }));
+    try {
+      const { container } = renderPage();
+      expect(container.firstElementChild).toHaveClass('max-md:min-h-[calc(100dvh-6rem)]');
+    } finally {
+      appStore.setState((s) => ({ settings: { ...s.settings, focusMode: false } }));
+    }
   });
 });

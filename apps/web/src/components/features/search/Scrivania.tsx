@@ -27,12 +27,13 @@ const ROW =
 
 export function Scrivania() {
   const navigate = useNavigate();
-  const { dossiers, quickNorms, selectQuickNorm, triggerSearch, openQuickNormsManager } = useAppStore(useShallow((s) => ({
+  const { dossiers, quickNorms, selectQuickNorm, triggerSearch, openQuickNormsManager, focusMode } = useAppStore(useShallow((s) => ({
     dossiers: s.dossiers,
     quickNorms: s.quickNorms,
     selectQuickNorm: s.selectQuickNorm,
     triggerSearch: s.triggerSearch,
     openQuickNormsManager: s.openQuickNormsManager,
+    focusMode: s.settings.focusMode,
   })));
 
   const now = new Date();
@@ -46,8 +47,10 @@ export function Scrivania() {
       className={cn(
         'w-full min-h-full bg-slate-50 px-6 pb-24 pt-14 dark:bg-slate-950 md:pt-20',
         // On a phone (M1): the page's 16 px margin (the layout's; the reader's column's 16 taken back, and none of its own), and the
-        // block centred in the window under the search bar when it is shorter than it.
-        'max-md:-mx-4 max-md:w-auto max-md:flex max-md:min-h-[calc(100dvh-var(--search-bar-height,0px)-2rem)] max-md:flex-col max-md:justify-center max-md:px-0 max-md:py-8',
+        // block centred in the window under the search bar when it is shorter than it (the layout's padding taken off:
+        // 1rem above and below, 3rem in Focus mode, which draws no search bar).
+        'max-md:-mx-4 max-md:w-auto max-md:flex max-md:flex-col max-md:justify-center max-md:px-0 max-md:py-8',
+        focusMode ? 'max-md:min-h-[calc(100dvh-6rem)]' : 'max-md:min-h-[calc(100dvh-var(--search-bar-height,0px)-2rem)]',
       )}
     >
       <div className="mx-auto w-full max-w-[760px]">
@@ -69,11 +72,11 @@ export function Scrivania() {
           </span>
         </div>
 
-        {/* On a phone three pills in a row that scrolls sideways, «Prova» first, never one left alone on a line (M1); from
-            md the links in a line. */}
+        {/* On a phone three pills in a row that scrolls sideways, «Prova» first, never one left alone on a line (M1), with
+            room above and below for their focus ring (the row clips); from md the links in a line. */}
         <div
           className={cn(
-            'mt-5 flex items-center gap-2 overflow-x-auto max-md:-mx-4 max-md:px-4 md:flex-wrap md:items-baseline md:gap-x-5 md:gap-y-2 md:overflow-visible',
+            'mt-5 flex items-center gap-2 overflow-x-auto max-md:-mx-4 max-md:px-4 max-md:py-1 md:flex-wrap md:items-baseline md:gap-x-5 md:gap-y-2 md:overflow-visible',
             HIDDEN_SCROLLBAR,
             ENTER,
           )}

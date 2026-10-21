@@ -28,6 +28,9 @@ interface SidebarProps {
   closeMobile: () => void;
   openSettings: () => void;
   openKeyboardShortcuts: () => void;
+  /** The drawer's: where the focus goes when an entry of the user menu closes the drawer (the bar's menu button); without
+   *  it the focus goes back to the avatar. */
+  focusAfterMenu?: () => void;
   /** Opens the feedback form: on a phone an entry of the user menu, «Invia un commento» (M1); from `md` the floating
    *  button does it. Not given, no entry. */
   openFeedback?: () => void;
@@ -315,7 +318,7 @@ function WidthToggle({ layout, onToggle }: { layout: SidebarLayout; onToggle: ()
   );
 }
 
-export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings, openKeyboardShortcuts, openFeedback, layout = 'rail', onToggleWide, serviceHealth }: SidebarProps) {
+export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, focusAfterMenu, openSettings, openKeyboardShortcuts, openFeedback, layout = 'rail', onToggleWide, serviceHealth }: SidebarProps) {
   const navigate = useNavigate();
   const quickNorms = useAppStore((s) => s.quickNorms);
   const { user, isAdmin, isValidator, logout } = useAuth();
@@ -411,15 +414,18 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
   };
 
   // A menu entry closes the menu (and the phone's off-canvas copy), gives focus back to the avatar (where a
-  // dialog it opens returns it) and then acts.
+  // dialog it opens returns it) — in the drawer, which goes out of reach, to `focusAfterMenu` — and then acts.
   const fromMenu = (action: () => void) => () => {
-    closeMenu(true);
+    closeMenu(focusAfterMenu === undefined);
     closeMobile();
+    focusAfterMenu?.();
     action();
   };
 
   return (
     <aside
+      // The closed drawer is only slid off the screen: out of reach of Tab and of a screen reader too (M1).
+      inert={layout === 'drawer' && !isOpen ? true : undefined}
       className={cn(
         // Base layout
         "fixed inset-y-0 left-0 z-50 flex flex-col",

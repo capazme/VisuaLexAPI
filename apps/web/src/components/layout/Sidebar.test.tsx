@@ -383,6 +383,41 @@ describe('Sidebar — the user menu (spec D2)', () => {
     expect(screen.queryByRole('menu', { name: 'Menu utente' })).toBeNull();
   });
 
+  it('puts the focus where the layout says, not on the drawer\'s avatar, when a drawer\'s entry closes it', () => {
+    const focusAfterMenu = vi.fn();
+    render(
+      <MemoryRouter>
+        <Sidebar theme="light" isOpen serviceHealth={serviceHealth} {...handlers} focusAfterMenu={focusAfterMenu} layout="drawer" />
+      </MemoryRouter>,
+    );
+    openUserMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: /Impostazioni/ }));
+    expect(focusAfterMenu).toHaveBeenCalledTimes(1);
+    expect(handlers.openSettings).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: /Menu utente/ })).not.toHaveFocus();
+  });
+
+  it('takes the closed drawer out of reach (inert), and only the drawer', () => {
+    const { container, rerender } = render(
+      <MemoryRouter>
+        <Sidebar theme="light" isOpen={false} serviceHealth={serviceHealth} {...handlers} layout="drawer" />
+      </MemoryRouter>,
+    );
+    expect(container.querySelector('aside')).toHaveAttribute('inert');
+    rerender(
+      <MemoryRouter>
+        <Sidebar theme="light" isOpen serviceHealth={serviceHealth} {...handlers} layout="drawer" />
+      </MemoryRouter>,
+    );
+    expect(container.querySelector('aside')).not.toHaveAttribute('inert');
+    rerender(
+      <MemoryRouter>
+        <Sidebar theme="light" isOpen={false} serviceHealth={serviceHealth} {...handlers} layout="rail" />
+      </MemoryRouter>,
+    );
+    expect(container.querySelector('aside')).not.toHaveAttribute('inert');
+  });
+
   it('leaves «Invia un commento» to the floating button from md', () => {
     const original = window.matchMedia;
     window.matchMedia = ((query: string) => ({ ...original(query), matches: query === '(min-width: 768px)' })) as typeof window.matchMedia;

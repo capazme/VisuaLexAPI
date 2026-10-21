@@ -285,7 +285,11 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (`useHideOnScroll` on the content scroller; a new address and a focus landing in it bring it back; under reduced motion
   at once); from `md` it stays, and the Focus button sits inside its right end. A sticky row of a page pins under it
   with `top-[var(--phone-bar-offset,0px)]`: `<main>` sets the bar's height below `lg` and 0 once it has slid away
-  («Le mie schede»'s filters). Focus mode draws neither bar. The drawer's section switcher sits where the bar is.
+  («Le mie schede»'s filters and its card's column, the Cronologia's dates, «Da validare»'s article; a new sticky row
+  does the same, or it slides under the bar). Focus mode and Gymnasium's lesson draw no bar. During a section change
+  the bar is named (`vlx-phone-bar`, `index.css`), so the page's picture passes under it. The drawer's section switcher
+  sits where the bar is; the closed drawer is `inert`, and an entry of its user menu gives the focus to the bar's menu
+  button (`focusAfterMenu`), where a dialog it opens gives it back.
   There is no «Ricerca Veloce», no
   «Sentenze» and no row of system buttons. `Layout` mounts the same component twice (the desktop column and
   the phone's off-canvas copy), so both show the same list and the same menu.

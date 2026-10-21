@@ -16,7 +16,6 @@ const PAGES: ReadonlyArray<readonly [RegExp, string]> = [
   [/^\/collega-app(\/|$)/, 'Collega un’app AI'],
   [/^\/merlt\/?$/, 'Assistente'],
   [/^\/grafo(\/|$)/, 'Grafo'],
-  [/^\/sentenze(\/|$)/, 'Sentenza'],
 ];
 
 export function phoneBarTitle(pathname: string, sectionName: string): string {

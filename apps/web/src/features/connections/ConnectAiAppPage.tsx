@@ -26,7 +26,7 @@ const DELETIONS: Record<AiClient['confirmsDeletions'], { text: string; tone: str
 
 const sectionTitle = 'text-base font-semibold text-slate-900 dark:text-white';
 const card = 'rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800';
-// An anchor scrolled to the top clears the floating menu button (below lg) and the Focus toggle (from md).
+// An anchor scrolled to the top clears the phone's bar (below lg, 56 px) and the Focus toggle (from md).
 const anchorTarget = 'scroll-mt-20';
 const partTitle = 'font-serif text-2xl font-medium tracking-tight text-slate-900 dark:text-slate-50';
 const focusRing = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';

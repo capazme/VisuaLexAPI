@@ -76,6 +76,16 @@ describe('Layout — the phone\'s bar below lg (M1)', () => {
     for (const cls of INSET) expect(screen.getByTestId('layout-content')).not.toHaveClass(cls);
   });
 
+  it('draws no bar under Gymnasium\'s lesson, which covers the shell', () => {
+    at('/studia/ripasso/sessione?materia=DIRITTO_CIVILE');
+    expect(screen.queryByTestId('phone-top-bar')).toBeNull();
+  });
+
+  it('names the bar for a section change, so the page\'s picture passes under it (T1)', () => {
+    at('/forum');
+    expect(screen.getByTestId('phone-top-bar')).toHaveClass('vlx-phone-bar');
+  });
+
   it('adds nothing in focus mode, where neither the bar nor the button is drawn', () => {
     appStore.setState((s) => ({ settings: { ...s.settings, focusMode: true } }));
     at('/dossier');

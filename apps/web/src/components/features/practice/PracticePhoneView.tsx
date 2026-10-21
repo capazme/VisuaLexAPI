@@ -131,7 +131,7 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming }: Pr
     <>
       {readerOpen ? <ReadingFullScreen onCrossReference={onCrossReference} /> : (
         <div ref={rootRef} data-testid="practice-phone-view" className="flex w-full flex-col bg-slate-50 dark:bg-slate-950">
-          {/* Under the search page's field, which sits beside the layout's menu button: no inset. */}
+          {/* Under the search page's field, the phone's bar with the menu button beside it: no inset. */}
           <div className="flex-shrink-0 border-b border-slate-200 bg-white/80 px-4 py-2 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/80">
             <div className="flex items-center justify-between">
               <button

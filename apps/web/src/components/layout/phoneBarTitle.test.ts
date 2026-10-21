@@ -16,7 +16,6 @@ describe('phoneBarTitle', () => {
     ['/collega-app', 'Collega un’app AI'],
     ['/merlt', 'Assistente'],
     ['/grafo', 'Grafo'],
-    ['/sentenze/cassazione/1/2024', 'Sentenza'],
   ])('names %s as the menu does: %s', (path, title) => {
     expect(phoneBarTitle(path, 'Opus')).toBe(title);
   });
