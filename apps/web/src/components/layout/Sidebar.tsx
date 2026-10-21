@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, type FocusEvent, type Keyboar
 import { createPortal } from 'react-dom';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from 'framer-motion';
-import { Search, Folder, FolderOpen, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Scale, Network, Bot, ScrollText, Repeat, ChartColumn, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, type LucideIcon } from 'lucide-react';
+import { Search, Folder, FolderOpen, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Scale, Network, Bot, ScrollText, MessageSquarePlus, Repeat, ChartColumn, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { isMerltEnabled } from '../../features/merlt/featureFlag';
 import { isMerltGraphEnabled } from '../../features/merlt/graph/featureFlag';
@@ -12,6 +12,7 @@ import { useEntriesEntrance } from '../../features/sections/useEntriesEntrance';
 import { useAppStore } from '../../store/useAppStore';
 import { focusSearchField } from '../../utils/searchFieldControl';
 import { useAuth } from '../../hooks/useAuth';
+import { useIsDesktop } from '../../hooks/useIsDesktop';
 import { useForumNotifications } from '../../hooks/useForumNotifications';
 import type { ServiceHealthReading } from '../../hooks/useServiceHealth';
 import { ServiceHealthDot, ServiceHealthMenuEntry } from '../ui/ServiceHealthMenuEntry';
@@ -27,6 +28,9 @@ interface SidebarProps {
   closeMobile: () => void;
   openSettings: () => void;
   openKeyboardShortcuts: () => void;
+  /** Opens the feedback form: on a phone an entry of the user menu, «Invia un commento» (M1); from `md` the floating
+   *  button does it. Not given, no entry. */
+  openFeedback?: () => void;
   /** Icons only (the desktop between `lg` and `xl`, or narrowed), icons and words (from `xl`), or the
    *  phone's drawer (icons and words, rows of 44 px). */
   layout?: SidebarLayout;
@@ -311,7 +315,7 @@ function WidthToggle({ layout, onToggle }: { layout: SidebarLayout; onToggle: ()
   );
 }
 
-export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings, openKeyboardShortcuts, layout = 'rail', onToggleWide, serviceHealth }: SidebarProps) {
+export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings, openKeyboardShortcuts, openFeedback, layout = 'rail', onToggleWide, serviceHealth }: SidebarProps) {
   const navigate = useNavigate();
   const quickNorms = useAppStore((s) => s.quickNorms);
   const { user, isAdmin, isValidator, logout } = useAuth();
@@ -329,6 +333,8 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
   const [menuPosition, setMenuPosition] = useState({ bottom: 0, left: 0, maxHeight: 0 });
 
   const words = layout !== 'rail';
+  // The floating feedback button covered the foot of every page on a phone: there it is this menu's entry (M1).
+  const feedbackInMenu = !useIsDesktop() && openFeedback !== undefined;
 
   // Placed when it opens, in the same update, so its first paint has its height bounded before an entry takes
   // focus (opened on «Esci» in a low window, the focused entry would otherwise end up out of view).
@@ -609,6 +615,12 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
                   <ScrollText size={16} />
                   Crediti
                 </button>
+                {feedbackInMenu && (
+                  <button type="button" role="menuitem" tabIndex={-1} onClick={fromMenu(openFeedback)} className={menuItemClass}>
+                    <MessageSquarePlus size={16} />
+                    Invia un commento
+                  </button>
+                )}
                 <ServiceHealthMenuEntry health={serviceHealth} itemClassName={menuItemClass} />
                 <button type="button" role="menuitem" tabIndex={-1} onClick={fromMenu(toggleTheme)} className={menuItemClass}>
                   {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}

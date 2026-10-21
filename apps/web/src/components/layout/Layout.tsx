@@ -8,6 +8,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { SettingsModal } from '../ui/SettingsModal';
 import { FeedbackButton } from '../ui/FeedbackButton';
+import { FeedbackModal } from '../ui/FeedbackModal';
 import { ChangelogNotification } from '../ui/ChangelogNotification';
 import { UndoToastContainer } from '../ui/Toast';
 import { SyncErrorToast } from '../ui/SyncErrorToast';
@@ -45,6 +46,7 @@ export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   // From `xl` the desktop column shows its words unless the user narrowed it (remembered in the browser).
   const desktopSidebar = useDesktopSidebar();
   const reduceMotion = useReducedMotion();
@@ -55,11 +57,6 @@ export function Layout() {
   // The find window searches the workspace, which is drawn only on the search page (spec §13.1).
   const { pathname } = useLocation();
   const onSearchPage = pathname === '/';
-  // The review's grade bar and the validators' vote bar are pinned to the bottom edge on a phone,
-  // where the feedback button would cover them.
-  const inReviewSession = pathname.startsWith('/studia/ripasso/sessione');
-  const onValidationQueue = pathname === '/studia/valida' || pathname.startsWith('/studia/valida/');
-  const barPinnedAtBottom = inReviewSession || onValidationQueue;
   // The search page's field sits above its content, outside the scroller, so it is always on screen
   // (spec 2026-10-13-fixed-search-design.md); Focus mode hides it, ⌘K still opens the palette.
   const showSearchBar = onSearchPage && !settings.focusMode;
@@ -218,6 +215,7 @@ export function Layout() {
             closeMobile={() => { }}
             openSettings={() => setSettingsOpen(true)}
             openKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
+            openFeedback={isAuthenticated ? () => setFeedbackOpen(true) : undefined}
             serviceHealth={serviceHealth}
           />
         )}
@@ -234,6 +232,7 @@ export function Layout() {
             closeMobile={() => setSidebarOpen(false)}
             openSettings={() => setSettingsOpen(true)}
             openKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
+            openFeedback={isAuthenticated ? () => setFeedbackOpen(true) : undefined}
             serviceHealth={serviceHealth}
           />
         </div>
@@ -319,8 +318,10 @@ export function Layout() {
       {/* Keyboard Shortcuts Modal */}
       <KeyboardShortcutsModal isOpen={keyboardShortcutsOpen} onClose={() => setKeyboardShortcutsOpen(false)} />
 
-      {/* Feedback Button - only for authenticated users */}
-      {isAuthenticated && <FeedbackButton className={barPinnedAtBottom ? 'max-md:hidden' : undefined} />}
+      {/* Feedback, for a signed-in user: the floating button from md; on a phone, where it covered the foot of every
+          page (the bars pinned to the bottom, «6 di 10» in the progress card), the user menu's «Invia un commento» (M1). */}
+      {isAuthenticated && <FeedbackButton className="max-md:hidden" onOpen={() => setFeedbackOpen(true)} />}
+      <FeedbackModal isOpen={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
 
       {/* Version changelog notification */}
       <ChangelogNotification />

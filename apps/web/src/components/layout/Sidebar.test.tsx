@@ -367,6 +367,38 @@ describe('Sidebar — the user menu (spec D2)', () => {
     expect(screen.queryByRole('menu', { name: 'Menu utente' })).toBeNull();
   });
 
+  it('holds «Invia un commento» on a phone, after «Crediti», and opens the form from it (M1)', () => {
+    const openFeedback = vi.fn();
+    render(
+      <MemoryRouter>
+        <Sidebar theme="light" isOpen serviceHealth={serviceHealth} {...handlers} openFeedback={openFeedback} layout="drawer" />
+      </MemoryRouter>,
+    );
+    openUserMenu();
+    const names = screen.getAllByRole('menuitem').map((e) => e.textContent?.trim());
+    expect(names.indexOf('Invia un commento')).toBe(names.indexOf('Crediti') + 1);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Invia un commento' }));
+    expect(openFeedback).toHaveBeenCalledTimes(1);
+    expect(handlers.closeMobile).toHaveBeenCalled();
+    expect(screen.queryByRole('menu', { name: 'Menu utente' })).toBeNull();
+  });
+
+  it('leaves «Invia un commento» to the floating button from md', () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({ ...original(query), matches: query === '(min-width: 768px)' })) as typeof window.matchMedia;
+    try {
+      render(
+        <MemoryRouter>
+          <Sidebar theme="light" isOpen serviceHealth={serviceHealth} {...handlers} openFeedback={vi.fn()} />
+        </MemoryRouter>,
+      );
+      openUserMenu();
+      expect(screen.queryByRole('menuitem', { name: 'Invia un commento' })).toBeNull();
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
   it('opens the shortcuts', () => {
     renderSidebar();
     openUserMenu();
