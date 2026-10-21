@@ -242,6 +242,8 @@ export function Layout() {
         className={cn(
           // `isolate`: a stacking context of its own, as it has always been (gotcha 22).
           'isolate flex-1 flex flex-col min-w-0 h-full overflow-hidden relative',
+          // It holds the focus a closing «Novità» gives back (`focusPage`), with no ring around the whole page.
+          'focus:outline-none',
           // The practice's columns (`h-app-row`) are the viewport less the search bar: 56 px below lg (and the iPhone's
           // top edge), 72 from it.
           showSearchBar && '[--search-bar-height:calc(3.5rem+env(safe-area-inset-top))] lg:[--search-bar-height:4.5rem]',

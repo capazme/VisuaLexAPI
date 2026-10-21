@@ -5,6 +5,7 @@ import { Modal } from './Modal';
 import { cn } from '../../lib/utils';
 import type { ChangelogEntry } from '../../config/versionConfig';
 import { spring } from '../../lib/motion';
+import { focusPage } from '../../utils/focusPage';
 
 /**
  * Changelog notification component
@@ -38,6 +39,7 @@ export function ChangelogNotification() {
 
   const handleDismissToast = () => {
     dismissNotification();
+    focusPage();
   };
 
   return (
@@ -104,6 +106,7 @@ export function ChangelogNotification() {
         onClose={handleCloseModal}
         title={`Novità in v${currentVersion}`}
         size="md"
+        onReturnFocusLost={focusPage}
       >
         <ChangelogContent changelog={changelog} />
       </Modal>

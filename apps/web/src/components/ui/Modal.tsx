@@ -19,6 +19,9 @@ export interface ModalProps {
   role?: 'dialog' | 'alertdialog';
   footer?: ReactNode;
   initialFocusRef?: RefObject<HTMLElement | null>;
+  /** Called as the dialog closes when what had the focus before it opened is no longer on the page (the toast that
+   *  opened it has gone), to put the focus somewhere: without it the focus falls to the body. */
+  onReturnFocusLost?: () => void;
   closeOnBackdrop?: boolean;
   closeOnEscape?: boolean;
   showCloseButton?: boolean;
@@ -58,6 +61,7 @@ export function Modal({
   role = 'dialog',
   footer,
   initialFocusRef,
+  onReturnFocusLost,
   closeOnBackdrop = true,
   closeOnEscape = true,
   showCloseButton = true,
@@ -70,6 +74,10 @@ export function Modal({
   const descriptionId = description ? `modal-desc-${reactId}` : undefined;
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const onReturnFocusLostRef = useRef(onReturnFocusLost);
+  useEffect(() => {
+    onReturnFocusLostRef.current = onReturnFocusLost;
+  });
   const dialogRef = useRef<HTMLDivElement>(null);
   const tokenRef = useRef<symbol>(Symbol('modal'));
   // Spec §6.2: 240 ms on the drawer curve, growing from 0.97 where it stands; under reduced motion a fade.
@@ -148,7 +156,9 @@ export function Modal({
     }, 50);
     return () => {
       window.clearTimeout(timer);
-      previouslyFocusedRef.current?.focus?.();
+      const previous = previouslyFocusedRef.current;
+      if (previous?.isConnected) previous.focus?.();
+      else onReturnFocusLostRef.current?.();
     };
   }, [isOpen, initialFocusRef]);
 
