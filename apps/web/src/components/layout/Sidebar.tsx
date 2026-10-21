@@ -440,7 +440,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
           menu button sits at the top left, over this place: the switcher goes under it. Every column keeps
           10 px of side padding, so a 44 px control in the 64 px rail sits where it sits in the wide bar. */}
       <div id="tour-section-switcher" className="flex items-center px-2.5 pt-[4.5rem] pb-2 lg:p-0 lg:px-2.5 lg:h-16 border-b border-slate-100 dark:border-slate-800/50">
-        <SectionSwitcher forumCount={forumNotifications.total} onChoose={closeMobile} withName={words} />
+        <SectionSwitcher forumCount={forumNotifications.total} onChoose={closeMobile} withName={words} inDrawer={layout === 'drawer'} />
       </div>
 
       {/* Navigation */}

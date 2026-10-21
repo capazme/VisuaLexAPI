@@ -7,9 +7,10 @@ import { SECTION_HOME_CODE } from './sections';
  * The switcher at the top of the sidebar, where the open book was (spec S3): the active section's
  * icon, a menu of the sections the user can enter, each with its line. The Forum's count rides its
  * entry, and a dot on the icon says it from any other section (S5). `withName`: the bar with words
- * (from `xl`, and the phone's drawer) writes the section's name beside its mark.
+ * (from `xl`, and the phone's drawer) writes the section's name beside its mark. `inDrawer`: the phone's drawer, which
+ * closes over the change, so the page changes at once under it (T1).
  */
-export function SectionSwitcher({ forumCount, onChoose, withName = false }: { forumCount: number; onChoose?: () => void; withName?: boolean }) {
+export function SectionSwitcher({ forumCount, onChoose, withName = false, inDrawer = false }: { forumCount: number; onChoose?: () => void; withName?: boolean; inDrawer?: boolean }) {
   const { section, active, sections, chooseSection } = useSection();
   const forumDot = forumCount > 0 && section !== 'forum';
 
@@ -33,7 +34,7 @@ export function SectionSwitcher({ forumCount, onChoose, withName = false }: { fo
         checked: s.id === section,
         badge: s.id === 'forum' ? forumCount : undefined,
         onSelect: () => {
-          chooseSection(s.id);
+          chooseSection(s.id, { still: inDrawer });
           onChoose?.();
         },
       }))}

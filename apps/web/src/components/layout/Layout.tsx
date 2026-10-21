@@ -227,8 +227,8 @@ export function Layout() {
       )}
 
       <main
-        // `vlx-page`: the one part a section change's View Transition animates (index.css, T1); the sidebar stays still.
-        className="vlx-page flex-1 flex flex-col min-w-0 h-full overflow-hidden relative"
+        // `isolate`: a stacking context of its own, as it has always been (gotcha 22).
+        className="isolate flex-1 flex flex-col min-w-0 h-full overflow-hidden relative"
         // The practice's columns (`h-app-row`) are the viewport less this bar.
         style={showSearchBar ? { ['--search-bar-height' as string]: SEARCH_BAR_HEIGHT } : undefined}
       >
@@ -283,8 +283,9 @@ export function Layout() {
           </div>
         )}
 
-        {/* Content Area */}
-        <div className="flex-1 overflow-y-auto w-full h-full">
+        {/* Content Area. `vlx-page`: the one part a section change's View Transition animates (index.css, T1); the
+            sidebar, the floating buttons and the search bar stay still. */}
+        <div className="vlx-page flex-1 overflow-y-auto w-full h-full">
           <div data-testid="layout-content" className={cn(
             'max-w-7xl mx-auto p-4 md:p-8',
             // The button is about 42 px from top-4: 4.5rem clears it (md: again, or md:p-8 wins).

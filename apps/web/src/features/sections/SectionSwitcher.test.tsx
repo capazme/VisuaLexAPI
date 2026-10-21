@@ -129,6 +129,25 @@ describe('SectionSwitcher (spec S3)', () => {
     }
   });
 
+  it('in the phone\'s drawer asks for no View Transition: the drawer closing is the change (T1)', () => {
+    const start = vi.fn();
+    Object.defineProperty(document, 'startViewTransition', { configurable: true, value: start });
+    try {
+      render(
+        <MemoryRouter initialEntries={['/dossier']}>
+          <Where />
+          <SectionSwitcher forumCount={0} inDrawer />
+        </MemoryRouter>,
+      );
+      fireEvent.click(trigger());
+      fireEvent.click(screen.getByRole('menuitemradio', { name: /Forum/ }));
+      expect(screen.getByTestId('where')).toHaveTextContent('/forum');
+      expect(start).not.toHaveBeenCalled();
+    } finally {
+      Reflect.deleteProperty(document, 'startViewTransition');
+    }
+  });
+
   it('fetches the code of the other sections\' homes when it opens, so the change finds them there (T1)', () => {
     const gymnasium = vi.spyOn(SECTION_HOME_CODE, 'gymnasium').mockResolvedValue(undefined);
     renderSwitcher('/forum');

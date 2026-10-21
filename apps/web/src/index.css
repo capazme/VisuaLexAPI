@@ -1339,12 +1339,17 @@
 }
 
 /* Changing section (T1): the page's content fades out (100 ms), then the new one fades in rising by 5 px (140 ms):
-   240 ms, no overlap, nothing over the screen (`features/sections/sectionTransition.ts`). The sidebar and the rest of
-   the screen hold still; the groups do not move either, or their default 250 ms would outlast the change. A tap goes
+   240 ms, no overlap, nothing over the screen (`features/sections/sectionTransition.ts`). The sidebar, the floating
+   buttons, the search bar and the rest of the screen hold still; the groups do not move either, or their default 250 ms would outlast the change. A tap goes
    through the pictures to the page under them (it also ends the change). Entering from the sign-in page there is no
    old page to wait for. */
-.vlx-page { view-transition-name: vlx-page; }
+/* Named only while a transition runs (`lib/pageTransition.ts`): a name makes a stacking context (gotcha 22). The root
+   does not blend: its two pictures are not cross-faded, the new one covers the old (the default `plus-lighter` would
+   add them, the old sidebar's entries showing through the new). */
+.vlx-page-changing .vlx-page { view-transition-name: vlx-page; }
 ::view-transition { pointer-events: none; }
+::view-transition-old(root),
+::view-transition-new(root) { mix-blend-mode: normal; }
 ::view-transition-old(root),
 ::view-transition-new(root),
 ::view-transition-group(root),

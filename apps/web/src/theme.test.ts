@@ -478,6 +478,11 @@ describe('the section change (T1)', () => {
     expect(rise).toBeLessThanOrEqual(6);
     // The groups' default animation lasts 250 ms: it must not, or the change would outlast its budget.
     expect(css).toMatch(/::view-transition-group\(root\),\s*::view-transition-group\(vlx-page\)\s*\{\s*animation:\s*none/);
+    // The root's two pictures are not added (the default `plus-lighter`): the new one covers the old.
+    expect(css).toMatch(/::view-transition-old\(root\),\s*::view-transition-new\(root\)\s*\{\s*mix-blend-mode:\s*normal/);
+    // Named only while a transition runs: at rest the content area is no stacking context (gotcha 22).
+    expect(css).toMatch(/\.vlx-page-changing \.vlx-page\s*\{\s*view-transition-name:\s*vlx-page/);
+    expect(css).not.toMatch(/(^|\})\s*\.vlx-page\s*\{/);
     // A tap goes through to the page; from the sign-in page, with no old page, the new one does not wait.
     expect(css).toMatch(/::view-transition\s*\{\s*pointer-events:\s*none/);
     expect(css).toMatch(/::view-transition-new\(vlx-page\):only-child\s*\{\s*animation-delay:\s*0ms/);

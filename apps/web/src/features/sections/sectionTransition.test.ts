@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { waitFor } from '@testing-library/react';
 import { HOLD_MAX, playSectionTransition } from './sectionTransition';
+import { PAGE_CHANGING } from '../../lib/pageTransition';
 
 function reducedMotion(reduce: boolean) {
   window.matchMedia = ((query: string) => ({ matches: reduce && query.includes('reduce'), media: query, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
@@ -111,18 +112,22 @@ describe('playSectionTransition (T1)', () => {
     expect(title()).toHaveFocus();
   });
 
-  it('is brought to its end by a tap or a key, and stops listening once it is over', async () => {
+  it('is brought to its end by a tap, or by a key, and stops listening once it is over', async () => {
     reducedMotion(false);
     const { state } = stubViewTransition();
     playSectionTransition({ section: 'gymnasium', swap: newPage });
     window.dispatchEvent(new Event('pointerdown'));
     expect(state.skip).toHaveBeenCalledOnce();
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab' }));
-    expect(state.skip).toHaveBeenCalledTimes(2);
+    expect(state.skip).toHaveBeenCalledOnce();
 
+    const second = stubViewTransition();
+    playSectionTransition({ section: 'gymnasium', swap: newPage });
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab' }));
+    expect(second.state.skip).toHaveBeenCalledOnce();
     await new Promise((resolve) => setTimeout(resolve, 0));
     window.dispatchEvent(new Event('pointerdown'));
-    expect(state.skip).toHaveBeenCalledTimes(2);
+    expect(second.state.skip).toHaveBeenCalledOnce();
   });
 
   it('the returned function finishes it too; ended before its update ran, it still swaps but takes no focus', async () => {
@@ -188,5 +193,76 @@ describe('playSectionTransition (T1)', () => {
     draw();
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(field).toHaveFocus();
+  });
+
+  it('lets go of the keys as soon as a tap ends it, before the browser has finished', () => {
+    reducedMotion(false);
+    const { state } = stubViewTransition();
+    state.skip.mockImplementation(() => {});
+    playSectionTransition({ section: 'gymnasium', swap: newPage });
+    window.dispatchEvent(new Event('pointerdown'));
+    expect(state.skip).toHaveBeenCalledOnce();
+    const enter = new KeyboardEvent('keydown', { key: 'Enter', cancelable: true });
+    window.dispatchEvent(enter);
+    expect(enter.defaultPrevented).toBe(false);
+    expect(state.skip).toHaveBeenCalledOnce();
+  });
+
+  it('drops the change when the browser goes Back before the page changed: no swap over where the user went', async () => {
+    reducedMotion(false);
+    const { state } = stubViewTransition();
+    const swap = vi.fn(newPage);
+    playSectionTransition({ section: 'gymnasium', swap });
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    expect(state.skip).toHaveBeenCalledOnce();
+    await updateRuns();
+    expect(swap).not.toHaveBeenCalled();
+  });
+
+  it('after the swap, Back ends the change and no title takes the focus, not even after the hold', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    reducedMotion(false);
+    const { state } = stubViewTransition();
+    // The dossier list said Gymnasium already: the heading the hold would take.
+    document.querySelector('main')!.innerHTML = '<h2 data-section-title="gymnasium" tabindex="-1">I tuoi dossier di studio</h2>';
+    const swap = vi.fn();
+    playSectionTransition({ section: 'gymnasium', swap });
+    await updateRuns();
+    expect(swap).toHaveBeenCalledOnce();
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    expect(state.skip).toHaveBeenCalledOnce();
+    vi.advanceTimersByTime(HOLD_MAX * 2);
+    expect(title()).not.toHaveFocus();
+  });
+
+  it('under reduced motion, Back stops the wait for the title too', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    reducedMotion(true);
+    document.querySelector('main')!.innerHTML = '<h2 data-section-title="opus" tabindex="-1">I tuoi dossier di lavoro</h2>';
+    playSectionTransition({ section: 'opus', swap: () => {} });
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    vi.advanceTimersByTime(HOLD_MAX * 2);
+    expect(title()).not.toHaveFocus();
+  });
+
+  it('plays no transition of its own when still (the phone\'s drawer closes over it): the page changes at once', async () => {
+    reducedMotion(false);
+    const { start } = stubViewTransition();
+    const swap = vi.fn(newPage);
+    playSectionTransition({ section: 'gymnasium', swap, still: true });
+    expect(start).not.toHaveBeenCalled();
+    expect(swap).toHaveBeenCalledOnce();
+    await waitFor(() => expect(title()).toHaveFocus());
+  });
+
+  it('names the content area for the transition only, and lets it go once the transition is over', async () => {
+    reducedMotion(false);
+    const { state } = stubViewTransition();
+    playSectionTransition({ section: 'gymnasium', swap: newPage });
+    expect(document.documentElement).toHaveClass(PAGE_CHANGING);
+    state.end();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(document.documentElement).not.toHaveClass(PAGE_CHANGING);
   });
 });

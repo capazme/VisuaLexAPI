@@ -1,3 +1,4 @@
+import { canTransitionPage, startPageTransition } from '../../lib/pageTransition';
 import type { SectionId } from './sections';
 
 /**
@@ -27,7 +28,9 @@ export function prefersReducedMotion(): boolean {
  *
  * A heading that already said `section` before the swap is not taken at once: the dossier list's says the kind it
  * last listed, so from the Forum it may read `gymnasium` while Gymnasium's own page is on its way. It is taken only if
- * it is still there after `HOLD_MAX` (the page did not change: the same address). Returns the way to stop.
+ * it is still there after `HOLD_MAX` (the page did not change: the same address). The browser's Back (or Forward)
+ * stops it: the user went elsewhere, and the title of the section they left must not take the focus. Returns the way
+ * to start and the way to stop.
  */
 function watchTitle(section: SectionId, found: (title: HTMLElement) => void): { start: () => void; stop: () => void } {
   const selector = titleOf(section);
@@ -40,6 +43,7 @@ function watchTitle(section: SectionId, found: (title: HTMLElement) => void): { 
     observer = null;
     window.clearTimeout(lingering);
     window.clearTimeout(giveUp);
+    window.removeEventListener('popstate', stop);
   };
   const take = (title: HTMLElement) => {
     stop();
@@ -52,6 +56,7 @@ function watchTitle(section: SectionId, found: (title: HTMLElement) => void): { 
   };
   const start = () => {
     if (look()) return;
+    window.addEventListener('popstate', stop);
     observer = new MutationObserver(() => void look());
     observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-section-title'] });
     lingering = window.setTimeout(() => {
@@ -80,38 +85,47 @@ export interface SectionTransition {
    * transition, so it may come a frame or more later: its title says when it is there.
    */
   swap: () => void;
+  /**
+   * No transition of its own: the phone's drawer, which closes over the change, is the transition. The content's
+   * picture would be drawn over the drawer and its veil while they slide away.
+   */
+  still?: boolean;
 }
 
 /**
  * The section change (T1): the page's content fades out, the new one fades in rising by a few pixels — 240 ms once
- * the new page is there, through the browser's View Transition on `vlx-page` (`index.css`); nothing covers the
- * screen, and a tap goes through to the page. The switcher's mark changes colour and the sidebar's new entries fade
- * in on their own (`SectionSwitcher`, `useEntriesEntrance`). A tap or a key during it brings it to its end. The focus
- * goes to the new page's title. Under reduced motion, or without View Transitions, the page changes at once. Returns
- * the way to finish it.
+ * the new page is there, through the browser's View Transition on `vlx-page`, the layout's content area (`index.css`,
+ * `lib/pageTransition`); nothing covers the screen, and a tap goes through to the page. The switcher's mark changes
+ * colour and the sidebar's new entries fade in on their own (`SectionSwitcher`, `useEntriesEntrance`). A tap or a key
+ * during it brings it to its end; the browser's Back drops it, with no swap if the page had not changed yet. The focus
+ * goes to the new page's title. Under reduced motion, without View Transitions, or `still`, the page changes at once.
+ * Returns the way to finish it.
  */
-export function playSectionTransition({ section, swap }: SectionTransition): () => void {
+export function playSectionTransition({ section, swap, still = false }: SectionTransition): () => void {
   const leftOn = document.activeElement;
 
-  // Typed as always there; older browsers lack it.
-  if (prefersReducedMotion() || typeof document.startViewTransition !== 'function') {
+  if (still || prefersReducedMotion() || !canTransitionPage()) {
     const title = watchTitle(section, (found) => focusTitleUnlessMoved(found, leftOn));
     swap();
     title.start();
     return title.stop;
   }
 
+  /** Ended by the next choice: the update still swaps, and nothing waits for this title. */
   let ended = false;
+  /** Ended by Back: the update does not even swap, which would navigate over where the user went. */
+  let abandoned = false;
   let resolveUpdate = () => {};
   const title = watchTitle(section, (found) => {
     resolveUpdate();
     focusTitleUnlessMoved(found, leftOn);
   });
   // The browser keeps the old page's picture until the update settles: settle it when the new title is there. The
-  // update runs a frame later, so a change already ended by then only swaps.
-  const transition = document.startViewTransition(
+  // update runs a frame later: a change the next choice already ended only swaps, one Back dropped does not.
+  const transition = startPageTransition(
     () =>
       new Promise<void>((resolve) => {
+        if (abandoned) return resolve();
         swap();
         if (ended) return resolve();
         resolveUpdate = resolve;
@@ -120,20 +134,34 @@ export function playSectionTransition({ section, swap }: SectionTransition): () 
       }),
   );
 
-  /** A tap or a key: the change is over at once. The keys that end it are its own: they do not press the switcher again. */
-  const finish = (event?: Event) => {
+  const release = () => {
+    window.removeEventListener('pointerdown', finish, true);
+    window.removeEventListener('keydown', finish, true);
+  };
+  /**
+   * A tap or a key: the change is over at once, and lets go of the keys. The keys that end it are its own: they do not
+   * press the switcher again.
+   */
+  function finish(event?: Event) {
     if (event instanceof KeyboardEvent && KEYS_TAKEN.has(event.key)) {
       event.preventDefault();
       event.stopPropagation();
     }
+    release();
     transition.skipTransition();
-  };
-  const end = () => {
-    window.removeEventListener('pointerdown', finish, true);
-    window.removeEventListener('keydown', finish, true);
-  };
+  }
+  function abandon() {
+    abandoned = true;
+    finish();
+    title.stop();
+  }
   window.addEventListener('pointerdown', finish, true);
   window.addEventListener('keydown', finish, true);
+  window.addEventListener('popstate', abandon);
+  const end = () => {
+    release();
+    window.removeEventListener('popstate', abandon);
+  };
   transition.finished.then(end, end);
   // A change ended before it drew rejects these: nothing to report.
   transition.ready.catch(() => {});
@@ -142,7 +170,6 @@ export function playSectionTransition({ section, swap }: SectionTransition): () 
   return () => {
     ended = true;
     finish();
-    end();
     title.stop();
   };
 }

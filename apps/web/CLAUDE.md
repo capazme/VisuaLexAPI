@@ -163,9 +163,14 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `#tour-section-switcher`, on `ui/MenuButton` with `menuitemradio` entries, a dot for the Forum's news from
   another section). **The section change** (T1, which replaced S2's halftone on the owner's word, 21 October 2026: light, and never
   over the page): `chooseSection(id)` plays `sectionTransition.ts`, a View Transition on `vlx-page` only (`index.css`) —
-  the content fades out in 100 ms, then the new one fades in rising by 5 px in 140 ms, `--ease-out`: 240 ms, no overlap,
-  nothing drawn over the screen; the root and the groups do not animate (a group's default 250 ms would outlast the
-  change, `theme.test.ts` checks the budget), and `::view-transition` takes no pointer, so a tap reaches the page. The
+  the layout's content area, not `<main>`, so the floating buttons and the search bar hold still. It is named only
+  while a transition runs (`lib/pageTransition.ts`, the class `vlx-page-changing` on the root; the sign-in page's
+  entrance goes through it too): a `view-transition-name` makes a stacking context (gotcha 22), and `<main>` keeps
+  its own with `isolate`. The content fades out in 100 ms, then the new one fades in rising by 5 px in 140 ms,
+  `--ease-out`: 240 ms, no overlap, nothing drawn over the screen; the root and the groups do not animate (a group's
+  default 250 ms would outlast the change, `theme.test.ts` checks the budget), the root's pictures do not blend
+  (`mix-blend-mode: normal`: the default `plus-lighter` adds old and new, the old sidebar's entries showing through
+  the new, a light page washed out), and `::view-transition` takes no pointer, so a tap reaches the page. The
   240 ms start once the new page is there: the router renders a navigation in a transition (`flushSync` would not make
   it synchronous), so the old page's picture holds for the new title, at most `HOLD_MAX` (150 ms), watched by a
   `MutationObserver` — the browser draws no frame, so no `requestAnimationFrame`, while the update is pending. A heading
@@ -174,9 +179,14 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (`SECTION_HOME_CODE`, `MenuButton`'s `onOpen`), or the first change would hold and fade into «Caricamento…». The
   switcher's mark passes to the new hue in 200 ms (`transition-colors duration-200`), the change's one touch of colour;
   the sidebar's new entries fade in, the first six 20 ms apart, the old ones simply go (`useEntriesEntrance`, Web
-  Animations, opacity only, never on the sidebar's first draw), and the active dot does not slide from the old
-  section's entries (a `LayoutGroup` per section). A tap or a key during it brings it to its end (`skipTransition`;
-  Enter, Space and Esc are taken, so they do not press the switcher again); a second choice ends the first. The focus goes to the
+  Animations, opacity only, never on the sidebar's first draw). The section's entries are a `LayoutGroup` of their
+  own, so the active dot does not slide from the old section's entries — nor, since, between «Ricerca» or «Analizza
+  documento» and a section's entry: it appears there. A tap or a key during it brings it to its end (`skipTransition`;
+  Enter, Space and Esc are taken, so they do not press the switcher again, and let go as soon as it is skipped); a
+  second choice ends the first; the browser's Back drops it — no swap if the update had not run, and the wait for
+  the title stops, so the section just left's title takes no focus. Chosen in the phone's drawer (`SectionSwitcher
+  inDrawer`) the page changes at once, with no transition: the drawer closing over it is the change, and the content's
+  picture would be drawn over the drawer and its veil. The focus goes to the
   new page's title unless the user moved it meanwhile: each section's home marks its heading
   `data-section-title="<section id>"` with `tabIndex={-1}` and `FOCUS_RING`, so a keyboard user sees where the focus
   went (Gymnasium's `h1`, the dossier list's `h1` — `opus` or
