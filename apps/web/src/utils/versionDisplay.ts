@@ -1,4 +1,4 @@
-import type { ArticleData, ArticleValidity, NormaVisitata, SearchParams, ValidityState } from '../types';
+import type { ArticleData, ArticleUpcoming, ArticleValidity, NormaVisitata, SearchParams, ValidityState } from '../types';
 import { addDaysToIsoDate, formatDateDashed, formatDateForCitation, formatDateForDisplay, parseItalianDate, withPreposition } from './dateUtils';
 
 /**
@@ -98,13 +98,14 @@ export function isEuropeanAct(tipoAtto: string | null | undefined): boolean {
 }
 
 export interface VersionChip {
-  tone: ValidityState;
+  /** `upcoming`: the text in force today, which a later text will repeal or change (G-355). */
+  tone: ValidityState | 'upcoming';
   label: string;
   title: string;
 }
 
 export type BannerAction = 'go_current' | 'copy_citation' | 'open_next_day' | 'pick_date';
-export type BannerKind = 'historical' | 'not_yet' | 'unreliable' | 'current_in_window';
+export type BannerKind = 'historical' | 'not_yet' | 'unreliable' | 'current_in_window' | 'upcoming';
 
 export interface VersionBanner {
   kind: BannerKind;
@@ -216,6 +217,31 @@ function bannerFor(
 }
 
 /**
+ * The article that will change (G-355, V1): the text served is today's and the source has already published a later
+ * one. Beside the text, informing only: the later text is not served yet (G-357 will).
+ */
+function upcomingBanner(upcoming: ArticleUpcoming): VersionBanner {
+  const from = withPreposition('dal', formatDateForCitation(upcoming.valid_from));
+  const day = from.charAt(0).toUpperCase() + from.slice(1);
+  return {
+    kind: 'upcoming',
+    title: `${day} questo articolo ${upcoming.change === 'abrogated' ? 'è abrogato' : 'cambia'}.`,
+    body: 'Qui leggi il testo in vigore oggi.',
+    actions: [],
+  };
+}
+
+function upcomingChip(upcoming: ArticleUpcoming, today: VersionChip | null): VersionChip {
+  const day = formatDateDashed(upcoming.valid_from);
+  const what = upcoming.change === 'abrogated' ? 'è abrogato' : 'cambia';
+  return {
+    tone: 'upcoming',
+    label: `Cambia dal ${day}`,
+    title: `${today ? `${today.label}. ` : ''}Dal ${day} questo articolo ${what}. ${SOURCE_NOTE}`,
+  };
+}
+
+/**
  * What to show for a text: the chip, the banner, and what is switched off.
  *
  * `validity` is what the source said about the text that came back (absent when
@@ -226,6 +252,7 @@ function bannerFor(
 export function describeVersion(
   validity: ArticleValidity | undefined,
   request: VersionRequest | null | undefined,
+  upcoming?: ArticleUpcoming,
 ): VersionDisplay {
   const asked = requestIsHistorical(request);
   const requestedDay = textOf(request?.data_versione);
@@ -248,9 +275,14 @@ export function describeVersion(
   const notYet = validity?.state === 'not_yet';
   const canCite = !notYet && !unreliable;
 
+  const chip = validity ? chipFor(validity) : null;
+  const banner = validity ? bannerFor(validity, requestedDay, canCite) : null;
+  // A later text announced only beside today's: a text asked for by date or as the original says nothing of it.
+  const willChange = Boolean(upcoming?.valid_from) && !asked && !banner && validity?.state !== 'abrogated' && validity?.state !== 'not_yet';
+
   return {
-    chip: validity ? chipFor(validity) : null,
-    banner: validity ? bannerFor(validity, requestedDay, canCite) : null,
+    chip: willChange ? upcomingChip(upcoming!, chip) : chip,
+    banner: willChange ? upcomingBanner(upcoming!) : banner,
     textVisible: !notYet,
     readOnly,
     canCite,

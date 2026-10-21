@@ -125,6 +125,17 @@ describe('ArticleTabContent — the text in force', () => {
     expect(container.querySelector('mark')).not.toBeNull();
   });
 
+  it('says beside the text, never in it, that the article will be repealed, and keeps every tool (V1, G-355)', () => {
+    const TODAY: ArticleValidity = { ...CURRENT, valid_to: '2026-12-31' };
+    show(article(TODAY, { versione: 'vigente', data_versione: '' }, { upcoming: { change: 'abrogated', valid_from: '2027-01-01', version_number: 9 } }));
+    const banner = screen.getByText('Dal 1° gennaio 2027 questo articolo è abrogato.').closest('[role="status"]')!;
+    expect(banner).toHaveTextContent('Qui leggi il testo in vigore oggi.');
+    // Rule 23: the text root holds article_text alone.
+    expect(document.querySelector('.vlx-b')!.parentElement!.contains(banner)).toBe(false);
+    expect(screen.getByRole('button', { name: 'Cambia dal 01-01-2027' })).toBeInTheDocument();
+    expect(screen.getAllByTitle('Apri note')[0]).toBeEnabled();
+  });
+
   it('claims nothing when the source stated nothing', () => {
     show(article(undefined, { versione: 'vigente' }));
     expect(screen.queryByText(/In vigore dal|Testo storico|Vigente/)).not.toBeInTheDocument();

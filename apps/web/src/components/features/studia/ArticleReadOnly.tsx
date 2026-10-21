@@ -50,7 +50,7 @@ export function ArticleReadOnly({ norma, showToast }: ArticleReadOnlyProps) {
 
   const current = settled?.key === requestKey ? settled : null;
   const article = current && 'article' in current ? current.article : undefined;
-  const display = article ? describeVersion(article.validity, norma) : null;
+  const display = article ? describeVersion(article.validity, norma, article.upcoming) : null;
 
   const rawText = article?.article_text || '';
   const structure = useMemo(() => parseArticleStructure(rawText), [rawText]);

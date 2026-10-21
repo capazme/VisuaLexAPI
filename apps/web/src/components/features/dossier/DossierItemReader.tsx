@@ -108,7 +108,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
   useEffect(() => {
     if (article) onArticle?.(article);
   }, [article, onArticle]);
-  const display = article ? describeVersion(article.validity, norma) : null;
+  const display = article ? describeVersion(article.validity, norma, article.upcoming) : null;
   const readOnly = display?.readOnly ?? false;
   const historical = requestIsHistorical(norma);
   const citeLocked = historical && !display?.canCite;

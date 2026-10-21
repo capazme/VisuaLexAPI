@@ -107,3 +107,54 @@ describe('VersionBanner — a date inside the text in force', () => {
         expect(screen.queryByRole('button')).not.toBeInTheDocument();
     });
 });
+
+describe('VersionBanner — an article that will change (V1, G-355)', () => {
+    // As the server answers after #276: today's text, its window ending the day before the later one.
+    const TODAY: ArticleValidity = {
+        state: 'current', valid_from: '1986-07-01', valid_to: '2026-12-31', version_number: 1, act_updated: null, request_in_window: null,
+    };
+    const later = (change: 'abrogated' | 'amended') => ({ change, valid_from: '2027-01-01', version_number: 2 });
+    const undated = { versione: 'vigente' };
+
+    it('says the article is repealed from that day, written in full, and that the text is today\'s', () => {
+        const display = describeVersion(TODAY, undated, later('abrogated'));
+        render(<VersionBanner banner={display.banner!} />);
+        expect(screen.getByRole('status')).toHaveTextContent('Dal 1° gennaio 2027 questo articolo è abrogato.Qui leggi il testo in vigore oggi.');
+        expect(screen.queryByText(/2027-01-01/)).toBeNull();
+        expect(screen.queryByRole('button')).toBeNull();
+    });
+
+    it('says it changes, when amended', () => {
+        render(<VersionBanner banner={describeVersion(TODAY, undated, later('amended')).banner!} />);
+        expect(screen.getByRole('status')).toHaveTextContent('Dal 1° gennaio 2027 questo articolo cambia.');
+    });
+
+    it('elides the preposition before 8 and 11, as every date of the app', () => {
+        const title = (valid_from: string) => describeVersion(TODAY, undated, { change: 'amended', valid_from, version_number: null }).banner!.title;
+        expect(title('2027-08-08')).toBe("Dall'8 agosto 2027 questo articolo cambia.");
+        expect(title('2027-03-11')).toBe("Dall'11 marzo 2027 questo articolo cambia.");
+    });
+
+    it('marks the chip «Cambia dal …» in the same tone, and keeps today\'s window in its title', () => {
+        const chip = describeVersion(TODAY, undated, later('abrogated')).chip!;
+        expect(chip).toMatchObject({ tone: 'upcoming', label: 'Cambia dal 01-01-2027' });
+        expect(chip.title).toContain('In vigore dal 01-07-1986');
+        expect(chip.title).toContain('è abrogato');
+    });
+
+    it('shows nothing without `upcoming`, as before', () => {
+        const display = describeVersion(TODAY, undated);
+        expect(display.banner).toBeNull();
+        expect(display.chip?.tone).toBe('current');
+    });
+
+    it('says nothing of it on a text asked for by date or as the original, which the server does not mark', () => {
+        expect(describeVersion(TODAY, { versione: 'vigente', data_versione: '2020-01-01' }, later('abrogated')).banner?.kind).not.toBe('upcoming');
+        expect(describeVersion(TODAY, { versione: 'originale' }, later('abrogated')).banner).toBeNull();
+    });
+
+    it('changes nothing else: today\'s text can be annotated, cited and copied', () => {
+        const display = describeVersion(TODAY, undated, later('abrogated'));
+        expect(display).toMatchObject({ readOnly: false, canCite: true, canCopyOrSave: true, textVisible: true });
+    });
+});

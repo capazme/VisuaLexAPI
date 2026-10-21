@@ -35,6 +35,11 @@ export interface ArticleData {
     /** What the source's own page says about the text it served; absent when it cannot be read. */
     validity?: ArticleValidity;
     /**
+     * A later text the source has already published for an article served as today's (G-355): absent when there is
+     * none. The text served stays today's, its `validity.valid_to` the day before.
+     */
+    upcoming?: ArticleUpcoming;
+    /**
      * What was ASKED for, not what came back: `isHistorical` is true for a date or for the
      * original text, even when the answer turns out to be the text in force. What came back is
      * `validity`.
@@ -46,6 +51,13 @@ export interface ArticleData {
 }
 
 export type ValidityState = 'current' | 'historical' | 'not_yet' | 'abrogated';
+
+/** What a later text does to the article, and from which day (ISO): the server's `upcoming` (G-355). */
+export interface ArticleUpcoming {
+    change: 'abrogated' | 'amended';
+    valid_from: string;
+    version_number: number | null;
+}
 
 /**
  * The window of days a Normattiva page states for the text it served (dates in

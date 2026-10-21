@@ -225,7 +225,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // What the source says about the text that came back, and what that switches
     // off. A past text is a reading: notes, highlights and discussions are keyed
     // by article, not by version, so they would attach to the wrong words.
-    const display = useMemo(() => describeVersion(data.validity, norma_data), [data.validity, norma_data]);
+    const display = useMemo(() => describeVersion(data.validity, norma_data, data.upcoming), [data.validity, norma_data, data.upcoming]);
     const readOnly = display.readOnly;
     // The study cards anchor to the text in force only.
     const cardsHistorical = readOnly || !!versionInfo?.isHistorical;
