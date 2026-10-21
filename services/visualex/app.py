@@ -27,6 +27,7 @@ from visualex_api.services.normattiva_scraper import NormattivaScraper
 from visualex_api.services.eurlex_scraper import EurlexScraper
 from visualex_api.services.pdfextractor import extract_pdf, cleanup_browser_pool, is_allowed_pdf_urn
 from visualex_api.services.akn_parser import normalize_article_key
+from visualex_api.tools.article_suffixes import other_ordinal_spelling
 from visualex_api.services import act_dates, massimario_portal
 from visualex_api.services.normattiva_validity import (
     read_validity,
@@ -530,7 +531,12 @@ class NormaController:
 
                         # For each requested article, check where it exists
                         for article in articles:
-                            article_normalized = article.strip().lower()
+                            # Canonical keys on both sides, either spelling of the ordinal: the
+                            # tree writes "21 nonies" and the request "21-nonies", and a raw
+                            # comparison never found a suffixed article in its annex, so the
+                            # request went to the dispositivo and Normattiva answered its art. 1.
+                            wanted = normalize_article_key(article.strip())
+                            wanted_keys = {wanted, other_ordinal_spelling(wanted)} - {None}
                             found_in_dispositivo = False
                             found_in_annex = None
                             best_annex = None
@@ -543,7 +549,7 @@ class NormaController:
 
                                 # Check if article exists in this section
                                 article_exists = any(
-                                    art.strip().lower() == article_normalized
+                                    normalize_article_key(art) in wanted_keys
                                     for art in article_numbers
                                 )
 
@@ -584,7 +590,7 @@ class NormaController:
             cleaned_article = article.strip().replace(' ', '-') if ' ' in article.strip() else article.strip()
             log.info("Processing article", article=cleaned_article)
 
-            exists = await self._article_exists_in_tree(norma, cleaned_article, scope)
+            cleaned_article, exists = await self._source_spelling(norma, cleaned_article, scope)
             if exists is False:
                 log.info("Requested article is not in the act",
                          article=cleaned_article, norma=str(norma))
@@ -619,6 +625,31 @@ class NormaController:
 
         log.info("Created NormaVisitata instances", norma_visitata_list=[nv.to_dict() for nv in norma_visitata_list])
         return norma_visitata_list
+
+    async def _source_spelling(self, norma, article, annex):
+        """`article` as the act spells its ordinal, and whether the act holds it.
+
+        Returns `(article, exists)`, `exists` as `_article_exists_in_tree` answers it.
+
+        Two spellings circulate for 9, 15, 16, 18, 19 and 20 («novies» / «nonies», …) and
+        Normattiva uses one per act: «391 novies» in the c.p.p., «21 nonies» in l.
+        241/1990. Asked with the other one, the article was «non presente» (and its URN,
+        `~art391nonies`, is not the act's). Only an article whose ordinal has another
+        spelling is looked up, in the tree the existence check reads anyway; when the act
+        holds the other spelling and not the one asked, the act's is used, so the URN and
+        the stored norm are the act's. Anything else, the tree unreadable included, keeps
+        what was asked. One existence check for any other article, at most two for one
+        whose ordinal has two spellings (a tree that failed is not cached).
+        """
+        exists = await self._article_exists_in_tree(norma, article, annex)
+        if exists is not False:
+            return article, exists
+        other = other_ordinal_spelling(normalize_article_key(article))
+        if other is not None and await self._article_exists_in_tree(norma, other, annex):
+            log.info("Article asked with the other spelling of its ordinal",
+                     asked=article, act_spelling=other)
+            return other, True
+        return article, exists
 
     async def _article_exists_in_tree(self, norma, article, annex):
         """Whether `article` is in the act's article tree.

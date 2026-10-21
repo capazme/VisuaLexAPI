@@ -399,3 +399,113 @@ class TestWhereElseInTheAct:
                 pytest.raises(ResourceNotFoundError) as refused:
             await _controller().create_norma_visitata_from_data({"act_type": "preleggi", "article": "40"})
         assert "si trova" not in str(refused.value)
+
+
+class TestOtherSpellingOfTheOrdinal:
+    """«nonies» and «novies» are one ordinal, and Normattiva writes one per act: «391 novies»
+    in the c.p.p. (captured 2026-10-21), «21 nonies» in l. 241/1990. Asked with the other
+    spelling, the article used to be «non presente» (Luca, «391-nonies» through the MCP)."""
+
+    CPP_TREE = ([{"numero": "391", "allegato": None}, {"numero": "391 octies", "allegato": None},
+                 {"numero": "391 novies", "allegato": None}, {"numero": "391 decies", "allegato": None}],
+                4, {})
+    L241_TREE = ([{"numero": "21 octies", "allegato": None}, {"numero": "21 nonies", "allegato": None}],
+                 2, {})
+
+    @staticmethod
+    async def _found(tree, act, article):
+        with patch("app.get_tree", new=AsyncMock(return_value=tree)):
+            found = await _controller().create_norma_visitata_from_data({**act, "article": article})
+        return [nv.numero_articolo for nv in found]
+
+    CPP = {"act_type": "decreto del presidente della repubblica", "act_number": "447", "date": "1988-09-22"}
+    L241 = {"act_type": "legge", "act_number": "241", "date": "1990-08-07"}
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("asked", ["391-nonies", "391 nonies", "391nonies", "391-novies"])
+    async def test_the_cpp_spelling_is_used(self, asked):
+        assert await self._found(self.CPP_TREE, self.CPP, asked) == ["391-novies"]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("asked", ["21-novies", "21-nonies"])
+    async def test_the_l241_spelling_is_used(self, asked):
+        assert await self._found(self.L241_TREE, self.L241, asked) == ["21-nonies"]
+
+    @pytest.mark.asyncio
+    async def test_the_url_names_the_acts_spelling(self):
+        with patch("app.get_tree", new=AsyncMock(return_value=self.CPP_TREE)):
+            found = await _controller().create_norma_visitata_from_data({**self.CPP, "article": "391-nonies"})
+        assert found[0].urn.endswith("~art391novies")
+
+    @pytest.mark.asyncio
+    async def test_an_article_in_neither_spelling_is_still_missing(self):
+        from visualex_api.tools.exceptions import ResourceNotFoundError
+
+        with patch("app.get_tree", new=AsyncMock(return_value=self.CPP_TREE)), \
+                pytest.raises(ResourceNotFoundError):
+            await _controller().create_norma_visitata_from_data({**self.CPP, "article": "392-nonies"})
+
+    @pytest.mark.asyncio
+    async def test_an_unreadable_tree_keeps_what_was_asked(self):
+        with patch("app.get_tree", new=AsyncMock(return_value="Errore di rete")), \
+                patch("app.fetch_act_index", new=AsyncMock(return_value=None)):
+            found = await _controller().create_norma_visitata_from_data({**self.CPP, "article": "391-nonies"})
+        assert [nv.numero_articolo for nv in found] == ["391-nonies"]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("article,expected", [
+        ("391-octies", ("391-octies", True)), ("391", ("391", True)), ("2043", ("2043", False))])
+    async def test_an_ordinal_with_one_spelling_is_checked_once(self, article, expected):
+        tree = AsyncMock(return_value=self.CPP_TREE)
+        with patch("app.get_tree", new=tree):
+            assert await _controller()._source_spelling("https://x", article, None) == expected
+        assert tree.await_count == 1
+
+    @pytest.mark.asyncio
+    async def test_an_unreadable_tree_is_not_asked_twice_for_one_spelling(self):
+        tree = AsyncMock(side_effect=RuntimeError("down"))
+        with patch("app.get_tree", new=tree):
+            assert await _controller()._source_spelling("https://x", "391-octies", None) == ("391-octies", None)
+        assert tree.await_count == 1
+
+    # An act with an annex: «21 nonies» only in annex 1, with the metadata the smart lookup reads.
+    ANNEX_TREE = (
+        [{"numero": "1", "allegato": None}, {"numero": "21 nonies", "allegato": "1"}],
+        2,
+        {"annexes": [
+            {"number": None, "label": "Dispositivo", "article_count": 1, "article_numbers": ["1"]},
+            {"number": "1", "label": "Allegato 1", "article_count": 1, "article_numbers": ["21 nonies"]},
+        ]},
+    )
+    ACT = {"act_type": "decreto legislativo", "act_number": "5", "date": "2020-01-01"}
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("asked", ["21-nonies", "21 nonies", "21-novies"])
+    async def test_a_suffixed_article_only_in_an_annex_is_read_there(self, asked):
+        """The smart lookup compared raw strings: «21-nonies» never met the tree's «21
+        nonies», the request went to the dispositivo and Normattiva answered its art. 1."""
+        with patch("app.get_tree", new=AsyncMock(return_value=self.ANNEX_TREE)):
+            found = await _controller().create_norma_visitata_from_data({**self.ACT, "article": asked})
+        assert [(nv.numero_articolo, nv.allegato) for nv in found] == [("21-nonies", "1")]
+        assert found[0].urn.endswith(":1~art21nonies")
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("annex", ["", "2"])
+    async def test_the_other_spelling_is_looked_for_only_in_the_part_named(self, annex):
+        from visualex_api.tools.exceptions import ResourceNotFoundError
+
+        with patch("app.get_tree", new=AsyncMock(return_value=self.ANNEX_TREE)), \
+                pytest.raises(ResourceNotFoundError):
+            await _controller().create_norma_visitata_from_data({**self.ACT, "article": "21-novies", "annex": annex})
+
+
+@pytest.mark.parametrize("key,other", [
+    ("391-nonies", "391-novies"), ("21-novies", "21-nonies"),
+    ("25-quindecies", "25-quinquiesdecies"), ("25-sexiesdecies", "25-sexdecies"),
+    ("518-duodevicies", "518-octiesdecies"), ("25-undevicies", "25-noviesdecies"),
+    ("1-vicies", "1-vices"), ("25-quindecies.1", "25-quinquiesdecies.1"),
+    ("2-bis", None), ("2043", None), ("391-novies-x", None),
+])
+def test_other_ordinal_spelling(key, other):
+    from visualex_api.tools.article_suffixes import other_ordinal_spelling
+    assert other_ordinal_spelling(key) == other
