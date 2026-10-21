@@ -165,19 +165,25 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   over the page): `chooseSection(id)` plays `sectionTransition.ts`, a View Transition on `vlx-page` only (`index.css`) —
   the content fades out in 100 ms, then the new one fades in rising by 5 px in 140 ms, `--ease-out`: 240 ms, no overlap,
   nothing drawn over the screen; the root and the groups do not animate (a group's default 250 ms would outlast the
-  change, `theme.test.ts` checks the budget). The router renders a navigation in a transition (`flushSync` would not
-  make it synchronous), so the update waits for the new title, at most `HOLD_MAX` (150 ms), through a
-  `MutationObserver` — the browser draws no frame, so no `requestAnimationFrame`, while the update is pending. The
+  change, `theme.test.ts` checks the budget), and `::view-transition` takes no pointer, so a tap reaches the page. The
+  240 ms start once the new page is there: the router renders a navigation in a transition (`flushSync` would not make
+  it synchronous), so the old page's picture holds for the new title, at most `HOLD_MAX` (150 ms), watched by a
+  `MutationObserver` — the browser draws no frame, so no `requestAnimationFrame`, while the update is pending. A heading
+  that already named the section before the swap (the dossier list's says the kind it last listed) is not taken until
+  that hold is over. The pages loaded on demand (Gymnasium's, Academia's) are fetched when the switcher opens
+  (`SECTION_HOME_CODE`, `MenuButton`'s `onOpen`), or the first change would hold and fade into «Caricamento…». The
   switcher's mark passes to the new hue in 200 ms (`transition-colors duration-200`), the change's one touch of colour;
   the sidebar's new entries fade in, the first six 20 ms apart, the old ones simply go (`useEntriesEntrance`, Web
-  Animations, opacity only, never on the sidebar's first draw). A tap or a key during it brings it to its end
-  (`skipTransition`); a second choice ends the first. The focus goes to the
+  Animations, opacity only, never on the sidebar's first draw), and the active dot does not slide from the old
+  section's entries (a `LayoutGroup` per section). A tap or a key during it brings it to its end (`skipTransition`;
+  Enter, Space and Esc are taken, so they do not press the switcher again); a second choice ends the first. The focus goes to the
   new page's title unless the user moved it meanwhile: each section's home marks its heading
   `data-section-title="<section id>"` with `tabIndex={-1}` and `FOCUS_RING`, so a keyboard user sees where the focus
   went (Gymnasium's `h1`, the dossier list's `h1` — `opus` or
   `gymnasium` by the kind it lists, since the same element stays from one to the other —, «Dossier pubblici», the
-  MERL-T hub); a new home marks its own. Under reduced motion, or without View Transitions, the page changes at once
-  and nothing moves. Choosing the section one is in goes to its home
+  MERL-T hub); a new home marks its own. Under reduced motion the page changes at once and nothing moves; without View
+  Transitions the page changes at once, and only the mark and the sidebar's entries move. Choosing the section one is
+  in goes to its home
   with no change shown. The sidebar: the Corpus entries for everyone — «Ricerca»
   (a link to `/` that puts the cursor in the search page's field, `focusSearchField`, with no window over it —
   the owner, 13 Oct 2026; its hover label carries ⌘K, the palette; the quick norms' dot sits under it;

@@ -1,6 +1,7 @@
 import { MenuButton } from '../../components/ui/MenuButton';
 import { cn } from '../../lib/utils';
 import { useSection } from './useSection';
+import { SECTION_HOME_CODE } from './sections';
 
 /**
  * The switcher at the top of the sidebar, where the open book was (spec S3): the active section's
@@ -18,6 +19,8 @@ export function SectionSwitcher({ forumCount, onChoose, withName = false }: { fo
       align="left"
       menuClassName="w-72"
       className={withName ? 'w-full' : undefined}
+      // A failed fetch is the route's to report, when it is visited.
+      onOpen={() => sections.forEach((s) => s.id !== section && SECTION_HOME_CODE[s.id]?.().catch(() => {}))}
       triggerClassName={cn(
         'relative rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800',
         // The mark sits where it sits in the rail (4 px in from a 44 px control), so widening the bar moves no icon.

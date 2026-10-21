@@ -28,6 +28,16 @@ export const SECTION_TITLES = {
   opus: 'Opus: la tua officina giuridica',
 } as const satisfies Partial<Record<SectionId, string>>;
 
+/**
+ * The code of a section's home where it is loaded on demand (`App.tsx`'s `lazy` routes): fetched when the switcher
+ * opens, so the change (T1) finds the page there instead of fading into «Caricamento…». The same modules as the
+ * routes', so the same files.
+ */
+export const SECTION_HOME_CODE: Partial<Record<SectionId, () => Promise<unknown>>> = {
+  gymnasium: () => Promise.all([import('../../components/features/studia/StudiaPage'), import('../../components/features/studia/ReviewHome')]),
+  academia: () => import('../../pages/MerltHubPage'),
+};
+
 const under = (pathname: string, root: string) => pathname === root || pathname.startsWith(`${root}/`);
 
 /** The section a page belongs to, or null for a Corpus page, which keeps the last section (S1). */

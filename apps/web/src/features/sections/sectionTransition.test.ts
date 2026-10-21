@@ -7,23 +7,26 @@ function reducedMotion(reduce: boolean) {
 }
 
 /**
- * A View Transition as the browser runs it, for what the change asks of it: the update is called, `finished` settles
- * when the test says (`end`), `skipTransition` settles it at once. `updated` is the update's own promise.
+ * A View Transition as the browser runs it, for what the change asks of it: the update is called a moment later
+ * (`updated` is its promise), `finished` settles when the test says (`end`), `skipTransition` settles it at once.
  */
 function stubViewTransition() {
   const state = { updated: null as Promise<void> | null, skip: vi.fn(), end: () => {} };
   const start = vi.fn((update: () => Promise<void>) => {
-    state.updated = update();
+    const updateCallbackDone = Promise.resolve().then(() => (state.updated = update()));
     const finished = new Promise<void>((resolve) => {
       state.end = resolve;
       state.skip.mockImplementation(() => resolve());
     });
-    return { finished, skipTransition: state.skip };
+    return { finished, skipTransition: state.skip, ready: updateCallbackDone, updateCallbackDone };
   });
   // jsdom has no View Transitions: the stub is the document's own, removed after each test.
   Object.defineProperty(document, 'startViewTransition', { configurable: true, value: start });
   return { start, state };
 }
+
+/** Lets the stubbed browser call the update. */
+const updateRuns = () => Promise.resolve().then(() => Promise.resolve());
 
 /** The page the swap draws: a title of the new section, as a section's home marks it. */
 function newPage() {
@@ -68,6 +71,7 @@ describe('playSectionTransition (T1)', () => {
     const swap = vi.fn(() => { draw = newPage; });
     playSectionTransition({ section: 'gymnasium', swap });
     expect(start).toHaveBeenCalledOnce();
+    await updateRuns();
     expect(swap).toHaveBeenCalledOnce();
 
     let settled = false;
@@ -96,6 +100,7 @@ describe('playSectionTransition (T1)', () => {
     const { state } = stubViewTransition();
     let draw = () => {};
     playSectionTransition({ section: 'gymnasium', swap: () => { draw = newPage; } });
+    await updateRuns();
     let settled = false;
     void state.updated!.then(() => { settled = true; });
     vi.advanceTimersByTime(HOLD_MAX);
@@ -120,16 +125,57 @@ describe('playSectionTransition (T1)', () => {
     expect(state.skip).toHaveBeenCalledTimes(2);
   });
 
-  it('the returned function finishes it too', () => {
+  it('the returned function finishes it too; ended before its update ran, it still swaps but takes no focus', async () => {
     reducedMotion(false);
     const { state } = stubViewTransition();
     const swap = vi.fn(newPage);
     const finish = playSectionTransition({ section: 'gymnasium', swap });
     finish();
     expect(state.skip).toHaveBeenCalledOnce();
-    expect(swap).toHaveBeenCalledOnce();
     window.dispatchEvent(new Event('pointerdown'));
     expect(state.skip).toHaveBeenCalledOnce();
+    await updateRuns();
+    expect(swap).toHaveBeenCalledOnce();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(title()).not.toHaveFocus();
+  });
+
+  it('takes the Enter that ends it, so the switcher it was typed on does not open again', () => {
+    reducedMotion(false);
+    stubViewTransition();
+    playSectionTransition({ section: 'gymnasium', swap: newPage });
+    const enter = new KeyboardEvent('keydown', { key: 'Enter', cancelable: true });
+    window.dispatchEvent(enter);
+    expect(enter.defaultPrevented).toBe(true);
+    const tab = new KeyboardEvent('keydown', { key: 'Tab', cancelable: true });
+    window.dispatchEvent(tab);
+    expect(tab.defaultPrevented).toBe(false);
+  });
+
+  it('does not stop on a heading that already said the section: the dossier list from the Forum, before Gymnasium\'s page', async () => {
+    reducedMotion(false);
+    stubViewTransition();
+    document.querySelector('main')!.innerHTML = '<h2 data-section-title="gymnasium" tabindex="-1">I tuoi dossier di studio</h2>';
+    const stale = title();
+    let draw = () => {};
+    playSectionTransition({ section: 'gymnasium', swap: () => { draw = newPage; } });
+    await updateRuns();
+    await Promise.resolve();
+    expect(stale).not.toHaveFocus();
+    draw();
+    await waitFor(() => expect(title()).toHaveFocus());
+    expect(title()).not.toBe(stale);
+  });
+
+  it('takes that heading after the hold if the page did not change (the same address)', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    reducedMotion(true);
+    document.querySelector('main')!.innerHTML = '<h2 data-section-title="opus" tabindex="-1">I tuoi dossier di lavoro</h2>';
+    playSectionTransition({ section: 'opus', swap: () => {} });
+    await Promise.resolve();
+    expect(title()).not.toHaveFocus();
+    vi.advanceTimersByTime(HOLD_MAX);
+    expect(title()).toHaveFocus();
   });
 
   it('leaves the focus where the user moved it while the title was on its way', async () => {

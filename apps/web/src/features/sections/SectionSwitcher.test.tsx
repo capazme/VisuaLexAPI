@@ -7,6 +7,7 @@ vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ devMode: account.devMo
 
 import { SectionSwitcher } from './SectionSwitcher';
 import { sectionStore } from './useSection';
+import { SECTION_HOME_CODE } from './sections';
 
 function Where() {
   return <span data-testid="where">{useLocation().pathname}</span>;
@@ -108,8 +109,8 @@ describe('SectionSwitcher (spec S3)', () => {
   it('goes to the home of the section it is in without a change to show', () => {
     // The spy says whether a change asked the browser for a View Transition at all.
     const start = vi.fn((update: () => Promise<void>) => {
-      void update();
-      return { finished: Promise.resolve(), skipTransition: vi.fn() };
+      const done = update();
+      return { finished: Promise.resolve(), skipTransition: vi.fn(), ready: done, updateCallbackDone: done };
     });
     Object.defineProperty(document, 'startViewTransition', { configurable: true, value: start });
     try {
@@ -126,6 +127,15 @@ describe('SectionSwitcher (spec S3)', () => {
     } finally {
       Reflect.deleteProperty(document, 'startViewTransition');
     }
+  });
+
+  it('fetches the code of the other sections\' homes when it opens, so the change finds them there (T1)', () => {
+    const gymnasium = vi.spyOn(SECTION_HOME_CODE, 'gymnasium').mockResolvedValue(undefined);
+    renderSwitcher('/forum');
+    expect(gymnasium).not.toHaveBeenCalled();
+    fireEvent.click(trigger());
+    expect(gymnasium).toHaveBeenCalledOnce();
+    gymnasium.mockRestore();
   });
 
   it('changes the mark\'s colour in 200 ms, stilled under reduced motion (T1)', () => {

@@ -68,7 +68,7 @@ describe('useEntriesEntrance (T1)', () => {
     expect(delays).toEqual([0, 1, 2, 3, 4, 5, 5, 5].map((step) => step * CASCADE_STEP_MS));
     for (const [keyframes, options] of animate.mock.calls) {
       // Opacity only: nothing moves.
-      expect(keyframes).toEqual([{ opacity: 0 }, { opacity: 1 }]);
+      expect(keyframes).toEqual([{ opacity: 0, offset: 0 }]);
       expect(options).toMatchObject({ duration: ENTRY_FADE_MS, fill: 'backwards' });
       expect(options.delay + options.duration).toBeLessThan(250);
     }

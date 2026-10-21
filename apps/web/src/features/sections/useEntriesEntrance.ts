@@ -14,11 +14,14 @@ export const CASCADE_ENTRIES = 6;
  */
 const ENTRIES = ':scope > :not([role="group"]), :scope > [role="group"] > *';
 
-/** Fades in the group's entries, the first six 20 ms apart: 240 ms at most. Nothing moves, nothing is held after. */
+/**
+ * Fades in the group's entries, the first six 20 ms apart: 240 ms at most. One keyframe, at the start (alone it would
+ * be the end), so each ends at its own opacity; nothing moves, nothing is held after.
+ */
 export function fadeInEntries(group: HTMLElement) {
   group.querySelectorAll<HTMLElement>(ENTRIES).forEach((entry, index) => {
     if (typeof entry.animate !== 'function') return;
-    entry.animate([{ opacity: 0 }, { opacity: 1 }], {
+    entry.animate([{ opacity: 0, offset: 0 }], {
       duration: ENTRY_FADE_MS,
       delay: Math.min(index, CASCADE_ENTRIES - 1) * CASCADE_STEP_MS,
       easing: 'ease-out',

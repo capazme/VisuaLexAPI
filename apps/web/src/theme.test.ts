@@ -478,6 +478,9 @@ describe('the section change (T1)', () => {
     expect(rise).toBeLessThanOrEqual(6);
     // The groups' default animation lasts 250 ms: it must not, or the change would outlast its budget.
     expect(css).toMatch(/::view-transition-group\(root\),\s*::view-transition-group\(vlx-page\)\s*\{\s*animation:\s*none/);
+    // A tap goes through to the page; from the sign-in page, with no old page, the new one does not wait.
+    expect(css).toMatch(/::view-transition\s*\{\s*pointer-events:\s*none/);
+    expect(css).toMatch(/::view-transition-new\(vlx-page\):only-child\s*\{\s*animation-delay:\s*0ms/);
     const reduced = css.split('@media (prefers-reduced-motion: reduce)').slice(1).join(' ');
     expect(reduced).toMatch(/::view-transition-new\(\*\)\s*\{\s*animation:\s*none\s*!important/);
   }, 30000);

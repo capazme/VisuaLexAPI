@@ -35,6 +35,8 @@ export interface MenuButtonProps {
   menuClassName?: string;
   /** Classes for the wrapper around the trigger and the list (a trigger as wide as its column). */
   className?: string;
+  /** Called each time the menu opens (the section switcher fetches the code of the pages it leads to). */
+  onOpen?: () => void;
 }
 
 /**
@@ -42,7 +44,7 @@ export interface MenuButtonProps {
  * and End move, Escape and Tab close, focus returns to the trigger, a click
  * outside closes. Clicks never reach the card it sits in. The dossier's menus.
  */
-export function MenuButton({ label, items, children, triggerClassName, align = 'right', placement = 'below', heading, menuClassName, className }: MenuButtonProps) {
+export function MenuButton({ label, items, children, triggerClassName, align = 'right', placement = 'below', heading, menuClassName, className, onOpen }: MenuButtonProps) {
   // null = closed; otherwise which item takes the focus once the menu is drawn.
   const [openAt, setOpenAt] = useState<'first' | 'last' | null>(null);
   const open = openAt !== null;
@@ -65,6 +67,7 @@ export function MenuButton({ label, items, children, triggerClassName, align = '
   useEffect(() => {
     if (openAt === 'first') focusItem(enabled[0]);
     else if (openAt === 'last') focusItem(enabled[enabled.length - 1]);
+    if (openAt !== null) onOpen?.();
     // Focus once per opening; `enabled` is derived from `items` on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openAt]);

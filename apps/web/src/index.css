@@ -1340,14 +1340,18 @@
 
 /* Changing section (T1): the page's content fades out (100 ms), then the new one fades in rising by 5 px (140 ms):
    240 ms, no overlap, nothing over the screen (`features/sections/sectionTransition.ts`). The sidebar and the rest of
-   the screen hold still; the groups do not move either, or their default 250 ms would outlast the change. */
+   the screen hold still; the groups do not move either, or their default 250 ms would outlast the change. A tap goes
+   through the pictures to the page under them (it also ends the change). Entering from the sign-in page there is no
+   old page to wait for. */
 .vlx-page { view-transition-name: vlx-page; }
+::view-transition { pointer-events: none; }
 ::view-transition-old(root),
 ::view-transition-new(root),
 ::view-transition-group(root),
 ::view-transition-group(vlx-page) { animation: none; }
 ::view-transition-old(vlx-page) { animation: vlx-page-out 100ms var(--ease-out) both; }
 ::view-transition-new(vlx-page) { animation: vlx-page-in 140ms var(--ease-out) 100ms both; }
+::view-transition-new(vlx-page):only-child { animation-delay: 0ms; }
 @keyframes vlx-page-out { to { opacity: 0; } }
 @keyframes vlx-page-in { from { opacity: 0; translate: 0 5px; } }
 @media (prefers-reduced-motion: reduce) {
