@@ -48,7 +48,7 @@ describe('the primary colour scale', () => {
 describe('the page frame (W2)', () => {
   it('compiles the room a header leaves for the Focus button, from `lg`', async () => {
     const css = await compile([FOCUS_BUTTON_CLEARANCE]);
-    expect(css).toMatch(/padding-right:\s*clamp\(0px,\s*calc\(2\.625rem - \(100vw - var\(--sidebar-width,\s*0px\) - 80rem\) \/ 2\),\s*2\.625rem\)/);
+    expect(css).toMatch(/padding-right:\s*clamp\(0px,\s*calc\(2\.75rem - \(100vw - var\(--sidebar-width,\s*0px\) - 80rem\) \/ 2\),\s*2\.75rem\)/);
     expect(css).toContain('@media (width >= 64rem)');
   }, 30000);
 });
