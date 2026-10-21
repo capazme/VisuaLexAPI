@@ -131,6 +131,17 @@ class TestAfterARestart:
         assert result["upcoming"]["change"] == "abrogated"
 
     @pytest.mark.parametrize("endpoint", ARTICLE_ENDPOINTS)
+    async def test_an_expired_page_of_today_is_read_again_and_states_its_window(self, controller, brocardi, endpoint):
+        scraper = scraper_serving()
+        scraper.cache = StoringCache({BASE: LATER})   # today's page expired
+        scraper.request_document = AsyncMock(return_value=TODAY_PAGE)
+        [result] = await ask(controller, endpoint, requested(), scraper=scraper)
+        scraper.request_document.assert_awaited_once_with(f"{BASE}!vig=2026-10-21", source="normattiva")
+        assert result["article_text"].startswith("Art. 3\nContratti verbali")
+        assert result["validity"]["valid_to"] == "2026-12-31"
+        assert result["upcoming"]["change"] == "abrogated"
+
+    @pytest.mark.parametrize("endpoint", ARTICLE_ENDPOINTS)
     async def test_a_page_that_is_there_but_unreadable_costs_no_request(self, controller, brocardi, endpoint):
         scraper = scraper_serving()
         scraper.cache = StoringCache({BASE: "<html>no window</html>"})

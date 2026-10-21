@@ -1,6 +1,7 @@
 import os
 import re
 import logging
+from urllib.parse import urlparse
 from .logging_config import log_handlers
 from .text_op import normalize_act_type, parse_date
 from .map import EURLEX, codice_urn
@@ -220,9 +221,50 @@ def _safe_filename(name):
     return safe or "document.pdf"
 
 
+_VERSION_IN_URN = re.compile(r"!vig=\d{4}-\d{2}-\d{2}|@originale")
+
+
+def pdf_urn_in_force(urn, today):
+    """
+    The URN an export reads: an undated one at `today` (ISO, Europe/Rome).
+
+    Normattiva answers an undated URN with its latest version, also one not in force
+    yet, as it does for an article's text (owner, G-355): the export asks for the
+    text in force today instead. A dated URN, or one for the original, is read as asked.
+    """
+    if _VERSION_IN_URN.search(urn):
+        return urn
+    if "!vig=" in urn:
+        return urn.replace("!vig=", f"!vig={today}", 1)
+    return f"{urn}!vig={today}"
+
+
+def _exported_urn(urn):
+    """
+    The URN a Normattiva address names, from its query alone: `https://www.normattiva.it/
+    uri-res/N2Ls?urn:nir:…`, or a bare `urn:nir:…`.
+
+    The browser reads the path too, and resolves its `..`: a name read from anywhere in
+    the address let `…/x/stato:legge:1990-08-07;241~/../../uri-res/N2Ls?urn:nir:stato:
+    decreto.legislativo:2001-06-08;231` cache the d.lgs. 231/2001 as the l. 241/1990, for
+    everyone. Any other path, a path parameter or a fragment is refused (ValueError).
+    """
+    if urn.startswith("urn:nir:"):
+        return urn
+    parsed = urlparse(urn)
+    if (parsed.path != "/uri-res/N2Ls" or parsed.params or parsed.fragment
+            or not parsed.query.startswith("urn:nir:")):
+        raise ValueError("Invalid URN format")
+    return parsed.query
+
+
 def urn_to_filename(urn):
     """
-    Converts a URN to a filename.
+    Converts a URN to a filename: the act (type, date, number, annex) and its version.
+
+    The article is left out: the export is the act's. Until 21 October 2026 the name was
+    the number and the year alone, so acts of different types with the same number and
+    year, and an act's versions, shared one cached file.
 
     Arguments:
     urn -- The URN string
@@ -231,21 +273,16 @@ def urn_to_filename(urn):
     str -- The generated filename: always a bare file name, safe to join to a directory
     """
     logging.info(f"Converting URN to filename: {urn}")
+    exported = _exported_urn(urn)
     try:
-        act_type_section = urn.split('stato:')[1].split('~')[0]
+        act = exported.split('stato:')[1].split('~')[0]
     except IndexError:
         logging.error("Invalid URN format")
         raise ValueError("Invalid URN format")
-    
-    if ':' in act_type_section and ';' in act_type_section:
-        type_and_date, number = act_type_section.split(';')
-        year = type_and_date.split(':')[1].split('-')[0]
-        filename = _safe_filename(f"{number}_{year}.pdf")
-        logging.info(f"Generated filename: {filename}")
-        return filename
-
-    act_type = act_type_section.split('/')[-1]
-    filename = _safe_filename(f"{act_type.capitalize()}.pdf")
+    act = _VERSION_IN_URN.sub("", act).replace("!vig=", "")
+    version = _VERSION_IN_URN.search(exported)
+    marker = version.group(0).replace("!vig=", "_vig_").replace("@", "_") if version else ""
+    filename = _safe_filename(f"{act}{marker}.pdf".replace(":", "_").replace(";", "_"))
     logging.info(f"Generated filename: {filename}")
     return filename
 

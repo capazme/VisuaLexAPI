@@ -26,7 +26,8 @@ from visualex_api.tools.exceptions import (
 from visualex_api.services.normattiva_scraper import NormattivaScraper
 from visualex_api.services.eurlex_scraper import EurlexScraper
 from visualex_api.services.pdfextractor import PDFExtractor, cleanup_browser_pool, extract_pdf, is_allowed_pdf_urn
-from visualex_api.tools.urngenerator import complete_request_date, pdf_cache_path
+from visualex_api.tools.urngenerator import complete_request_date, pdf_cache_path, pdf_urn_in_force
+from visualex_api.services.normattiva_validity import today_in_rome
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import article_input_error, parse_article_input
 from visualex_api.tools.cache_warmup import warmup_cache_background
@@ -806,10 +807,14 @@ class NormaController:
                 raise ValidationError('URN missing')
             if not is_allowed_pdf_urn(urn):
                 raise ValidationError('URN non valido: sono ammessi solo URL normattiva.it')
-            urn = urn.strip()
+            # An undated URN is exported as the text in force today (G-355).
+            urn = pdf_urn_in_force(urn.strip(), today_in_rome().isoformat())
 
             logger.info("Received data for export_pdf", extra={"urn": urn})
-            pdf_path = pdf_cache_path(urn, os.path.join(os.getcwd(), "download"))
+            try:
+                pdf_path = pdf_cache_path(urn, os.path.join(os.getcwd(), "download"))
+            except ValueError:
+                raise ValidationError('URN non valido: serve un indirizzo /uri-res/N2Ls?urn:nir:… di normattiva.it')
 
             # Check if the PDF already exists
             file_exists = await asyncio.to_thread(os.path.exists, pdf_path)
@@ -841,12 +846,9 @@ class NormaController:
             if not exists_extracted or size_extracted == 0:
                 raise ExtractionError("Extracted PDF is empty or does not exist")
 
-            # Cache the PDF if needed
+            # Move the PDF to its cache name if needed (a copy left a second file behind)
             if extracted_pdf_path != pdf_path:
-                def copy_file(src, dst):
-                    with open(src, 'rb') as fsrc, open(dst, 'wb') as fdst:
-                        fdst.write(fsrc.read())
-                await asyncio.to_thread(copy_file, extracted_pdf_path, pdf_path)
+                await asyncio.to_thread(os.replace, extracted_pdf_path, pdf_path)
                 logger.info(f"PDF cached: {pdf_path}")
             else:
                 logger.info("Using extracted PDF as cache")

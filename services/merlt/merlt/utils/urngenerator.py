@@ -202,27 +202,33 @@ def _append_version_info(
     """
     Appends version information to the URN.
 
+    A date always asks for the text in force on that day, with or without «vigente»
+    and over «originale» (owner, G-353), as the API's append_version_info does: a
+    date with no version used to reach Normattiva without it and came back as
+    today's text. A date that cannot be read is logged and left out.
+
     Args:
         urn: The URN with article info
-        version: Version type ("originale" or "vigente")
-        version_date: Date for vigente version
+        version: Version type ("originale" or "vigente"), read stripped and lower-cased
+        version_date: Date of the version
 
     Returns:
         URN with version info appended
     """
+    if isinstance(version, str):
+        version = version.strip().lower()
+    if isinstance(version_date, str) and version_date.strip():
+        try:
+            urn += "!vig=" + parse_date(version_date)
+            log.debug(f"Appended version info: {urn}")
+            return urn
+        except ValueError:
+            log.warning(f"Could not parse version_date: {version_date}")
     if version == "originale":
         urn += "@originale"
     elif version == "vigente":
         urn += "!vig="
-        if version_date:
-            try:
-                formatted_version_date = parse_date(version_date)
-                urn += formatted_version_date
-            except ValueError:
-                log.warning(f"Could not parse version_date: {version_date}")
-
-        log.debug(f"Appended version info: {urn}")
-
+    log.debug(f"Appended version info: {urn}")
     return urn
 
 
