@@ -5,8 +5,8 @@ import { cn } from '../../../../lib/utils';
 import { ease, spring } from '../../../../lib/motion';
 import type { GiornoAttivita } from '../../../../types/studia';
 import { dayDate, describeDay, formatCount, formatDate } from './layout';
-import { FOCUS_RING, INK_TEXT, MUTED_TEXT, SUCCESS_TEXT } from './tokens';
-import { STATE_WORDS, TREND_PERIODS, curvePaths, dayMonth, pointLabel, shortDate, trendScale, trendSeries, type TrendPeriod, type TrendSeries } from './trend';
+import { FOCUS_RING, INK_TEXT, MUTED_TEXT } from './tokens';
+import { STATE_WORDS, TREND_PERIODS, curvePaths, dayMonth, pointLabel, shortDate, trendScale, trendSeries, weekInProgress, type TrendPeriod, type TrendSeries } from './trend';
 
 /**
  * «Il tuo andamento» (G7), in place of the calendar: the reviews of a period as a line — by day for 7 and 30 days, by
@@ -45,6 +45,8 @@ const PAD = { left: 44, right: 64, top: 14, bottom: 30 };
 const DRAW_S = 0.9;
 const BEND_S = 0.5;
 const FADE_S = 0.15;
+/** A rise, in green that reads at 14 px: 4.5:1 on the card in both themes (`theme.test.ts`). */
+const RISE_TEXT = 'text-green-700 dark:text-green-400';
 
 const monthName = new Intl.DateTimeFormat('it-IT', { month: 'short', timeZone: 'UTC' });
 
@@ -141,22 +143,24 @@ export function ReviewTrend({ calendario, today, obiettivo, hue, narrowed = fals
   });
   const bend = still || resized ? { duration: 0 } : { duration: BEND_S, ease: ease.inOut };
 
-  // The opening: the line draws from the left while the total counts up; once for the page. The clip's width is an
-  // attribute (a transform inside a clip path is not drawn alike everywhere), the plot's once drawn.
+  // The opening: the line draws from the left while the total counts up; once for the page. What moves is the share
+  // drawn (0 to 1); the clip's width (an attribute: a transform inside a clip path is not drawn alike everywhere) is
+  // that share of the plot's width as it is now — the card is measured after the first render, while it draws.
   const [opened] = useState(() => intro && !still);
-  const drawnW = useMotionValue(opened ? 0 : plotW + 8);
-  const drawing = useRef(opened);
+  const drawn = useMotionValue(opened ? 0 : 1);
+  const plotWidth = useMotionValue(plotW);
+  useLayoutEffect(() => {
+    plotWidth.set(plotW);
+  }, [plotW, plotWidth]);
+  const drawnW = useTransform([drawn, plotWidth], ([share, w]: number[]) => share * (w + 8));
   useEffect(() => {
     if (!opened) return;
     onIntro?.();
-    const controls = animate(drawnW, plotW + 8, { duration: DRAW_S, ease: ease.out, onComplete: () => (drawing.current = false) });
+    const controls = animate(drawn, 1, { duration: DRAW_S, ease: ease.out });
     return () => controls.stop();
     // Once, on opening.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  useEffect(() => {
-    if (!drawing.current) drawnW.set(plotW + 8);
-  }, [plotW, drawnW]);
 
   // The cursor: the point chosen, by index; the line is full up to it and lighter after.
   const [active, setActive] = useState<number | null>(null);
@@ -213,8 +217,11 @@ export function ReviewTrend({ calendario, today, obiettivo, hue, narrowed = fals
     setActive(Math.max(0, Math.min(n - 1, next)));
   };
 
-  // The total counts up once, on opening, from its first value; after that its new values fade in.
-  const [openingTotal] = useState(() => `${period}-${series.total}`);
+  // The total counts up once, on opening, from its first value; after that its new values fade in — also back on the
+  // same period and value, which counts nothing again.
+  const totalKey = `${period}-${series.total}`;
+  const [openingTotal, setOpeningTotal] = useState<string | null>(totalKey);
+  if (openingTotal !== null && openingTotal !== totalKey) setOpeningTotal(null);
   const choosePeriod = (next: TrendPeriod) => {
     onPeriod(next);
     setActive(null);
@@ -253,7 +260,7 @@ export function ReviewTrend({ calendario, today, obiettivo, hue, narrowed = fals
           <p className={cn('font-serif text-4xl font-medium leading-none tabular-nums', INK_TEXT)}>
             <AnimatePresence mode="popLayout" initial={false}>
               <motion.span key={`${period}-${series.total}`} className="inline-block" initial={still ? false : { opacity: 0 }} animate={{ opacity: 1 }} exit={still ? undefined : { opacity: 0 }} transition={{ duration: FADE_S }}>
-                <Total value={series.total} count={opened && `${period}-${series.total}` === openingTotal} />
+                <Total value={series.total} count={opened && totalKey === openingTotal} />
               </motion.span>
             </AnimatePresence>
           </p>
@@ -263,7 +270,7 @@ export function ReviewTrend({ calendario, today, obiettivo, hue, narrowed = fals
               <>
                 {' · '}
                 {/* Up in green, down in ink: Gymnasium does not scold. */}
-                <span className={cn('font-medium', series.change > 0 ? SUCCESS_TEXT : 'text-slate-600 dark:text-slate-300')}>{changeWords(series.change, words.before)}</span>
+                <span className={cn('font-medium', series.change > 0 ? RISE_TEXT : 'text-slate-600 dark:text-slate-300')}>{changeWords(series.change, words.before)}</span>
               </>
             )}
           </p>
@@ -440,7 +447,9 @@ export function ReviewTrend({ calendario, today, obiettivo, hue, narrowed = fals
             <tbody>
               {[...series.points].reverse().map((p) => (
                 <tr key={p.giorno} className="border-t border-slate-100 dark:border-slate-800">
-                  <th scope="row" className="py-1.5 pr-4 font-normal">{series.byWeek ? formatDate(p.giorno) : shortDate.format(dayDate(p.giorno))}</th>
+                  <th scope="row" className="py-1.5 pr-4 font-normal">
+                    {series.byWeek ? `${formatDate(p.giorno)}${weekInProgress(p) ? ' · in corso' : ''}` : shortDate.format(dayDate(p.giorno))}
+                  </th>
                   <td className="py-1.5 pr-4">{formatCount(p.ripassi)}</td>
                   {!series.byWeek && <td className={cn('py-1.5', MUTED_TEXT)}>{(p.stato && STATE_WORDS[p.stato]) ?? ''}</td>}
                 </tr>

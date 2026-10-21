@@ -294,6 +294,9 @@ describe('the Inchiostro palette', () => {
       return (hi + 0.05) / (lo + 0.05);
     };
     const white = [1, 1, 1];
+    // The trend's rise, words at 14 px (G7): AA, 4.5:1, on the tile in both themes.
+    expect(ratio(linear('green-700'), white)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(linear('green-400'), linear('ink-900'))).toBeGreaterThanOrEqual(4.5);
     // The trend's line and its cursor's dot on the tile (white; dark: slate 900): 3:1, a graphic (WCAG 1.4.11) (G7).
     expect(ratio(linear('primary-600'), white)).toBeGreaterThanOrEqual(3);
     expect(ratio(linear('primary-400'), linear('ink-900'))).toBeGreaterThanOrEqual(3);

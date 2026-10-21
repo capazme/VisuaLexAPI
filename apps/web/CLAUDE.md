@@ -977,8 +977,9 @@ trend's points and the coming days' columns are the exception the progress spec 
 trend, the states and the coming days are the chosen subject's read; the summary and «Per materia» stay the whole
 day's. **The trend** (`ReviewTrend`, pure parts in `trend.ts`): the reviews of a period as a line — 7 days, 30 days
 (it opens there) or six months, the server's 26 weeks summed by week (`trendSeries`) —, the period's total in
-Newsreader and its change on the period before of the same length (green up, ink down, never red; none when that
-period had no reviews, none for six months); a monotone cubic curve (`resampleMonotone`: no peak between two days,
+Newsreader and its change on the period before, over whole days — today, only begun, out of both: the days up to
+yesterday against as many before them (green 700 up, 4.5:1; ink down, never red; none when those had no reviews,
+none for six months); a monotone cubic curve (`resampleMonotone`: no peak between two days,
 never under zero) resampled to `CURVE_SAMPLES` (175) points so one period's curve bends into another's
 (`curvePaths`) — 174 steps share out over the gaps of 7, 30 and 26 points, so every point is a sample and the curve
 passes through each value exactly;
@@ -997,7 +998,8 @@ are tabs (arrows, Home, End, the selection follows the focus). The SVG is drawn 
 (`ResizeObserver`), its words the interface's text laid over it at `text-xs`, never SVG `<text>`
 (`typeScale.test.tsx`). The period and the opening are the page's (`ProgressPage`): a subject not read yet shows the
 skeleton and mounts the chart again, on the same period and with no second opening. Opening: the line draws from the
-left (the clip's width, an attribute) in 900 ms while the total counts up; another period, or a subject already read:
+left (a share drawn from 0 to 1, times the plot's width as it is, so a card measured after the first render draws
+whole) in 900 ms while the total counts up, once — back on the same period and value it does not count again; another period, or a subject already read:
 the curve bends in 500 ms, the pill slides (`layoutId` in its own `LayoutGroup`), the numbers fade; a resize redraws
 at once; reduced motion draws everything at once. A newcomer (no day, no record) reads
 the first-day sentence in place of the chart. The coming days' scale is the interface's text in a column beside the drawing, on whole-number

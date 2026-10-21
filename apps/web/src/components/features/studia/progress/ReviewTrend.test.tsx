@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { GiornoAttivita } from '../../../../types/studia';
 import { addDays } from './layout';
 import { ReviewTrend, type ReviewTrendProps } from './ReviewTrend';
@@ -28,8 +28,8 @@ describe('ReviewTrend (G7)', () => {
     renderTrend();
     expect(screen.getByRole('tab', { name: '30 giorni' })).toHaveAttribute('aria-selected', 'true');
     expect(chart()).toHaveAccessibleName('Ripassi al giorno negli ultimi 30 giorni: 168 ripassi in tutto; obiettivo 10 al giorno');
-    // 168 against 200: down, in ink, never in red.
-    const change = screen.getByText('−16% sui 30 giorni prima');
+    // Over whole days: 156 up to yesterday against 200 in the 29 before: down, in ink, never in red.
+    const change = screen.getByText('−22% sui 30 giorni prima');
     expect(change).toHaveClass('text-slate-600');
     expect(change.className).not.toMatch(/red/);
     expect(screen.getByText('obiettivo')).toBeInTheDocument();
@@ -37,9 +37,10 @@ describe('ReviewTrend (G7)', () => {
   });
 
   it('says a rise in green, and nothing when the period before had no reviews', () => {
-    const { rerender } = render(<Trend calendario={[day(TODAY, 12), day(addDays(TODAY, -8), 6)]} today={TODAY} obiettivo={10} />);
+    const { rerender } = render(<Trend calendario={[day(addDays(TODAY, -1), 12), day(addDays(TODAY, -8), 6)]} today={TODAY} obiettivo={10} />);
     fireEvent.click(screen.getByRole('tab', { name: '7 giorni' }));
-    expect(screen.getByText('+100% sui 7 giorni prima')).toHaveClass('text-green-600');
+    // Green that reads at 14 px: 4.5:1 (green 700; dark: green 400).
+    expect(screen.getByText('+100% sui 7 giorni prima')).toHaveClass('text-green-700');
     rerender(<Trend calendario={[day(TODAY, 12)]} today={TODAY} obiettivo={10} />);
     expect(screen.queryByText(/giorni prima/)).toBeNull();
   });
@@ -123,5 +124,39 @@ describe('ReviewTrend (G7)', () => {
     renderTrend();
     const label = screen.getByText('obiettivo');
     expect(label.style.left).toBe(`${44 + (640 - 44 - 64) + 6}px`);
+  });
+
+  it('draws to the card\'s real width when it is measured after the opening began (G7, the review)', async () => {
+    const width = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => 1166 });
+    try {
+      const { container } = render(<ReviewTrend calendario={calendario} today={TODAY} obiettivo={10} period="30g" onPeriod={() => {}} intro />);
+      const clip = () => container.querySelector('[id$="-drawn"] rect')!;
+      // 1166 less the margins (44 and 64), and the 8 px past the line's caps.
+      await waitFor(() => expect(parseFloat(clip().getAttribute('width') ?? '0')).toBe(1066), { timeout: 3000 });
+    } finally {
+      if (width) Object.defineProperty(HTMLElement.prototype, 'clientWidth', width);
+    }
+  });
+
+  it('counts the total up on opening only: back on the same period, the value is there at once', async () => {
+    function Page() {
+      const [period, setPeriod] = useState<TrendPeriod>('30g');
+      return <ReviewTrend calendario={calendario} today={TODAY} obiettivo={10} period={period} onPeriod={setPeriod} intro />;
+    }
+    render(<Page />);
+    const total = () => document.querySelector('p.font-serif')!;
+    await waitFor(() => expect(total()).toHaveTextContent('168'), { timeout: 3000 });
+    fireEvent.click(screen.getByRole('tab', { name: '7 giorni' }));
+    fireEvent.click(screen.getByRole('tab', { name: '30 giorni' }));
+    expect(total()).toHaveTextContent('168');
+  });
+
+  it('names this week, still going, in the six months\' table', () => {
+    renderTrend();
+    fireEvent.click(screen.getByRole('tab', { name: '6 mesi' }));
+    const rows = within(screen.getByRole('table')).getAllByRole('row');
+    expect(rows[1]).toHaveTextContent('19 ottobre 2026 · in corso');
+    expect(rows[2]).not.toHaveTextContent('in corso');
   });
 });

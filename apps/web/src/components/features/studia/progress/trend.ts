@@ -36,7 +36,11 @@ export interface TrendSeries {
   /** By week (six months) or by day. */
   byWeek: boolean;
   total: number;
-  /** The change on the period before of the same length, in whole percent; null when that period has no reviews. */
+  /**
+   * The change on the period before, in whole percent, over whole days: today, only begun, is left out of both (in the
+   * morning a steady week would read «−14%»), so it is the days up to yesterday against as many before them; null when
+   * those had no reviews.
+   */
   change: number | null;
   /**
    * The days not done, at their place along the period (0 the first point, 1 the last): ticks under the axis. By week,
@@ -92,13 +96,17 @@ export function trendSeries(calendario: GiornoAttivita[], today: string, period:
     points.push({ giorno, ripassi: day?.ripassi ?? 0, day, stato: calendarDayState({ giorno, day, column: 0, row: 0 }, today, firstDay) });
   }
   const total = points.reduce((n, p) => n + p.ripassi, 0);
-  const before = sumDays(byDay, addDays(start, -days), addDays(start, -1));
+  // Whole days only: the `days - 1` up to yesterday, against the `days - 1` before them.
+  const whole = days - 1;
+  const yesterday = addDays(today, -1);
+  const recent = sumDays(byDay, addDays(yesterday, -(whole - 1)), yesterday);
+  const before = sumDays(byDay, addDays(yesterday, -(2 * whole - 1)), addDays(yesterday, -whole));
   return {
     period,
     points,
     byWeek: false,
     total,
-    change: before > 0 ? Math.round(((total - before) / before) * 100) : null,
+    change: before > 0 ? Math.round(((recent - before) / before) * 100) : null,
     missed: points.flatMap((p, i) => (p.stato === 'saltato' ? [days > 1 ? i / (days - 1) : 0] : [])),
     goal,
   };
@@ -194,6 +202,9 @@ export function curvePaths(values: number[], width: number, height: number, top:
   return { line, area: `${line}L${width.toFixed(2)},${height.toFixed(2)}L0.00,${height.toFixed(2)}Z` };
 }
 
+/** This week, still going: its point ends today, before its Sunday. */
+export const weekInProgress = (point: TrendPoint) => point.fino !== undefined && point.fino < addDays(point.giorno, 6);
+
 /** «mar 14 ott». */
 export const shortDate = new Intl.DateTimeFormat('it-IT', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
 /** «14 ott». */
@@ -211,7 +222,7 @@ export const STATE_WORDS: Partial<Record<NonNullable<TrendPoint['stato']>, strin
 
 /** The cursor's label: «mar 14 ott · 12 ripassi · obiettivo raggiunto», «settimana dal 6 ott · 54 ripassi». */
 export function pointLabel(point: TrendPoint, byWeek: boolean): string {
-  if (byWeek) return `${point.fino && point.fino < addDays(point.giorno, 6) ? 'settimana in corso' : `settimana dal ${dayMonth.format(dayDate(point.giorno))}`} · ${reviews(point.ripassi)}`;
+  if (byWeek) return `${weekInProgress(point) ? 'settimana in corso' : `settimana dal ${dayMonth.format(dayDate(point.giorno))}`} · ${reviews(point.ripassi)}`;
   const state = point.stato ? STATE_WORDS[point.stato] : undefined;
   return [shortDate.format(dayDate(point.giorno)), reviews(point.ripassi), state].filter(Boolean).join(' · ');
 }

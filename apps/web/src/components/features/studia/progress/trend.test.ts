@@ -19,13 +19,20 @@ describe('trendSeries (G7)', () => {
     expect(s.byWeek).toBe(false);
   });
 
-  it('compares with the period before of the same length, and says nothing when that one had no reviews', () => {
-    const now = [day(TODAY, 12), day(addDays(TODAY, -1), 12)];
-    expect(trendSeries([...now, day(addDays(TODAY, -8), 20)], TODAY, '7g', 10).change).toBe(20);
-    expect(trendSeries([...now, day(addDays(TODAY, -8), 30)], TODAY, '7g', 10).change).toBe(-20);
-    expect(trendSeries(now, TODAY, '7g', 10).change).toBeNull();
-    // A day out of both periods counts for neither.
-    expect(trendSeries([...now, day(addDays(TODAY, -14), 50)], TODAY, '7g', 10).change).toBeNull();
+  it('compares whole days: up to yesterday against as many before, today left out of both (G7)', () => {
+    const steady = (from: number, to: number, n: number) => Array.from({ length: to - from + 1 }, (_, i) => day(addDays(TODAY, -(from + i)), n));
+    // Ten a day for weeks, and this morning only two so far: steady, not «−14%».
+    expect(trendSeries([...steady(1, 40, 10), day(TODAY, 2)], TODAY, '7g', 10).change).toBe(0);
+    expect(trendSeries([...steady(1, 70, 10), day(TODAY, 2)], TODAY, '30g', 10).change).toBe(0);
+    // Twelve a day over the last six whole days against ten over the six before: +20%.
+    expect(trendSeries([...steady(1, 6, 12), ...steady(7, 12, 10)], TODAY, '7g', 10).change).toBe(20);
+    expect(trendSeries([...steady(1, 6, 8), ...steady(7, 12, 10)], TODAY, '7g', 10).change).toBe(-20);
+    // Nothing in the days before: no change to tell.
+    expect(trendSeries(steady(0, 6, 12), TODAY, '7g', 10).change).toBeNull();
+    // A day before both stretches counts for neither.
+    expect(trendSeries([...steady(1, 6, 12), day(addDays(TODAY, -13), 50)], TODAY, '7g', 10).change).toBeNull();
+    // The total stays the period's, today included.
+    expect(trendSeries([...steady(1, 6, 12), day(TODAY, 2)], TODAY, '7g', 10).total).toBe(74);
   });
 
   it('draws six months by week, Monday to Sunday, this week up to today, with seven days\' goal', () => {
