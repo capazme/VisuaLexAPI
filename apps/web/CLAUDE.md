@@ -181,11 +181,11 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (`PAGE_TITLE`: Newsreader, 28 px on a phone, 30 px from `md`), the sentence under it (`line`, at a reading
   measure), the main action on its right from `md` and under it on a phone (`action`), and no icon beside the title;
   a header with an action pads its right side from `lg` just enough to stay clear of `Layout`'s fixed Focus button
-  (`FOCUS_BUTTON_CLEARANCE`, from `--sidebar-width` and `100vw`: up to 42 px, nothing once the window is about
-  1560 px wide — between 1024 and 1550 px the button covered «Svuota cronologia» and «Gestisci»);
+  (`FOCUS_BUTTON_CLEARANCE`, from `--sidebar-width` and `100vw`: up to 44 px, the button's width, nothing once the
+  window is about 1590 px wide — between 1024 and 1550 px the button covered «Svuota cronologia» and «Gestisci»);
   `section` marks a section's home for the switcher's focus (`data-section-title`, `tabIndex={-1}`, `FOCUS_RING`).
   It draws the dossier list, «Dossier pubblici», Community, Gymnasium (every view but the lesson, through
-  `StudiaPage`), «Analizza documento», «Collega un'app AI» (its body keeps a column of 768 px: it reads as text, the
+  `StudiaPage`), Opus's planner (`OpusPage`, its views in a 768 px column), «Analizza documento», «Collega un'app AI» (its body keeps a column of 768 px: it reads as text, the
   title does not move), the Cronologia and the MERL-T hub; «Cestino» and the MERL-T pages under a way back
   («Torna ai Dossier», «MERL-T») write their `h1` with `PAGE_TITLE`. A dossier's own page (its name, its star and
   its actions), Impostazioni (a dialog, not a page), the Scrivania, the lesson, the reader and the practice, the
@@ -229,9 +229,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `data-section-title="<section id>"` with `tabIndex={-1}` and `FOCUS_RING` (`PageFrame`'s `section`), so a keyboard user sees where the focus
   went — and only a keyboard user: the browser counts a focus the script gives after a focused menu entry as visible,
   so a choice made with a pointer (`MenuItem.onSelect`'s click, `detail` above 0) marks the title
-  `data-pointer-focus`, which `index.css` draws with no ring, until it loses the focus (Gymnasium's `h1`, the dossier list's `h1` — `opus` or
-  `gymnasium` by the kind it lists, since the same element stays from one to the other —, «Dossier pubblici», the
-  MERL-T hub); a new home marks its own. Under reduced motion the page changes at once and nothing moves; without View
+  `data-pointer-focus`, which `index.css` draws with no ring, until it loses the focus (Gymnasium's `h1`, Opus's — the planner's, `OpusPage`, on «Oggi» —, the dossier list's
+  `h1` — `opus` or `gymnasium` by the kind it lists, since the same element stays from one to the other —, «Dossier
+  pubblici», the MERL-T hub); a new home marks its own. Under reduced motion the page changes at once and nothing moves; without View
   Transitions the page changes at once, and only the mark and the sidebar's entries move. Choosing the section one is
   in goes to its home
   with no change shown. The sidebar: the Corpus entries for everyone — «Ricerca»
@@ -428,7 +428,8 @@ Personal tasks, filed under a dossier or in the inbox, with a planned date and a
 (maps the snake_case answer once). Wording: no string may suggest a computed deadline (`plannerStyle.test.ts`
 checks the files; «termine calcolato» comes with wave 2 and its warning), and no Todoist names, icons or texts.
 
-- **Pages**: `OpusPage` (the section's title, the view, «Cestino dei compiti»), `OpusViews`: `TodayView` (the
+- **Pages**: `OpusPage` (in `PageFrame` with `section="opus"`: the section's title, which the switcher focuses,
+  «Cestino dei compiti» as its action, the view in a 768 px column), `OpusViews`: `TodayView` (the
   missed deadlines under «Termini scaduti» — a past deadline is always there, whatever the planned date —, then the
   tasks planned before today whose deadline is not past or absent under «In ritardo», then «Oggi»: `splitToday`;
   the owner's choice after the first pass, 20 October 2026), `UpcomingView` (today and six days, a task
