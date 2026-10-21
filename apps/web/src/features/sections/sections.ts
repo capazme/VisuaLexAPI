@@ -12,13 +12,15 @@ export interface Section {
   icon: LucideIcon;
   /** Where choosing the section leads (S4). */
   home: string;
+  /** The name of that page, in the split button's «Vai a Gymnasium: Oggi» (S6). */
+  homeName: string;
 }
 
 export const SECTIONS: readonly Section[] = [
-  { id: 'opus', name: 'Opus', line: 'Dossier di lavoro e strumenti per la professione', icon: Briefcase, home: '/dossier' },
-  { id: 'gymnasium', name: 'Gymnasium', line: 'Schede, ripasso, esami e concorsi', icon: GraduationCap, home: '/studia/ripasso' },
-  { id: 'academia', name: 'Academia', line: 'Grafo, feedback e validazione', icon: Landmark, home: '/merlt' },
-  { id: 'forum', name: 'Forum', line: 'Dossier pubblici e community', icon: Users, home: '/forum' },
+  { id: 'opus', name: 'Opus', line: 'Dossier di lavoro e strumenti per la professione', icon: Briefcase, home: '/dossier', homeName: 'Dossier' },
+  { id: 'gymnasium', name: 'Gymnasium', line: 'Schede, ripasso, esami e concorsi', icon: GraduationCap, home: '/studia/ripasso', homeName: 'Oggi' },
+  { id: 'academia', name: 'Academia', line: 'Grafo, feedback e validazione', icon: Landmark, home: '/merlt', homeName: 'Assistente' },
+  { id: 'forum', name: 'Forum', line: 'Dossier pubblici e community', icon: Users, home: '/forum', homeName: 'Dossier pubblici' },
 ];
 
 /** The sections' titles with their phrase («Nome: …»), chosen by the owner on 19 October 2026; the one place to change
@@ -37,6 +39,9 @@ export const SECTION_HOME_CODE: Partial<Record<SectionId, () => Promise<unknown>
   gymnasium: () => Promise.all([import('../../components/features/studia/StudiaPage'), import('../../components/features/studia/ReviewHome')]),
   academia: () => import('../../pages/MerltHubPage'),
 };
+
+/** The split button's left part (S6): «Vai a Gymnasium: Oggi», «Vai ad Academia: Assistente». */
+export const goToLabel = (section: Section) => `Vai ${section.name.startsWith('A') ? 'ad' : 'a'} ${section.name}: ${section.homeName}`;
 
 const under = (pathname: string, root: string) => pathname === root || pathname.startsWith(`${root}/`);
 
