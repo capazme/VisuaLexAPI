@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { studiaService } from '../../../services/studiaService';
 import { invalidateArticleCards } from '../../../utils/articleCardsCache';
-import type { Giudizio, Materia, Scheda } from '../../../types/studia';
+import type { Giudizio, Materia, Scheda, XpEsito } from '../../../types/studia';
 
 /** Cards asked for at a time; the server allows 1–20. */
 const PAGE = 10;
@@ -12,6 +12,12 @@ export type QueueStatus = 'loading' | 'ready' | 'empty' | 'forbidden' | 'error';
 
 /** What became of a vote: the view says it in words. */
 export type VoteOutcome = 'voted' | 'gone' | 'already' | 'forbidden' | 'failed';
+
+/** A vote's outcome, and on a vote stored the points it earned (Gymnasium XP spec §3.5: for the act, whatever the verdict). */
+export interface VoteResult {
+  outcome: VoteOutcome;
+  xp?: XpEsito;
+}
 
 interface QueueState {
   /** The subject these cards answer (`''` for all); another subject in use means they are not this one's. */
@@ -109,20 +115,20 @@ export function useValidationQueue(materia: Materia | undefined, validator: bool
     if (left <= RUNNING_LOW && !state.dry) void read(generation.current);
   };
 
-  const vote = async (giudizio: Giudizio, motivazione?: string): Promise<VoteOutcome> => {
-    if (!current || voting) return 'failed';
+  const vote = async (giudizio: Giudizio, motivazione?: string): Promise<VoteResult> => {
+    if (!current || voting) return { outcome: 'failed' };
     const cardId = current.id;
     // This render's `read` and `advance` answer the subject the vote was cast for. If the subject
     // changes (or the queue starts over) while the vote is on its way, they must not write again.
     const gen = generation.current;
     setVoting(true);
     try {
-      await studiaService.vote(cardId, giudizio, motivazione);
+      const answer = await studiaService.vote(cardId, giudizio, motivazione);
       // The community's counts under the article have moved.
       invalidateArticleCards();
       if (gen === generation.current) advance(cardId);
       else handled.current.add(cardId);
-      return 'voted';
+      return answer.xp ? { outcome: 'voted', xp: answer.xp } : { outcome: 'voted' };
     } catch (error) {
       const code = statusOf(error);
       if (code === 403) {
@@ -131,14 +137,14 @@ export function useValidationQueue(materia: Materia | undefined, validator: bool
         generation.current += 1;
         reading.current = false;
         setState({ key: keyNow.current, cards: [], dry: true, failure: 'forbidden' });
-        return 'forbidden';
+        return { outcome: 'forbidden' };
       }
       if (code === 404 || code === 409) {
         if (gen === generation.current) advance(cardId);
         else handled.current.add(cardId);
-        return code === 404 ? 'gone' : 'already';
+        return { outcome: code === 404 ? 'gone' : 'already' };
       }
-      return 'failed';
+      return { outcome: 'failed' };
     } finally {
       setVoting(false);
     }

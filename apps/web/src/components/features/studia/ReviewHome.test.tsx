@@ -11,6 +11,7 @@ vi.mock('../../../services/studiaService', () => ({
 import { studiaService } from '../../../services/studiaService';
 import { appStore } from '../../../store/useAppStore';
 import { ReviewHome } from './ReviewHome';
+import { serverMissions, xpFields } from './__fixtures__/xp';
 
 const progress = vi.mocked(studiaService.progress);
 const percorso = vi.mocked(studiaService.percorso);
@@ -40,6 +41,7 @@ function answer(dovute: number, nuove: number, over: Partial<Progressi['oggi']> 
     })),
     calendario: [{ giorno: '2026-10-18', ripassi: 12, nuove: 2, sbagliate: 1, valido: true, riposo: false }],
     prossimi: Array.from({ length: 14 }, (_, i) => ({ giorno: `2026-10-${19 + i}`, schede: i === 0 ? dovute : 2 })),
+    ...xpFields(),
   };
 }
 
@@ -103,7 +105,7 @@ describe('ReviewHome', () => {
     expect(numbers).toEqual(['3', '5', '2']);
     expect(within(band).getAllByRole('term').map((dt) => dt.textContent)).toEqual(['Nuove', 'In apprendimento', 'Consolidate']);
     // The long calendar and the coming days live on /studia/progressi (G3): no sheet repeats them here.
-    expect(screen.queryByRole('heading', { name: 'Il tuo calendario' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Il tuo andamento' })).toBeNull();
     expect(within(band).queryByRole('button', { name: 'Il tuo mese' })).toBeNull();
     await userEvent.setup().click(within(band).getByRole('link', { name: 'Tutti i progressi' }));
     expect(screen.getByTestId('where')).toHaveTextContent('/studia/progressi');
@@ -702,6 +704,12 @@ describe('ReviewHome', () => {
     function midDay(over: Partial<Progressi['oggi']> = {}): Progressi {
       const data = answer(10, 8, { ripassi: 9, ...over });
       data.calendario = [...data.calendario, { giorno: '2026-10-19', ripassi: 9, nuove: 2, sbagliate: 0, valido: false, riposo: false }];
+      // The server's missions (G1c): 7 due cards reviewed of 17, 2 new of 5, the goal credited once met.
+      data.missioni = serverMissions({
+        dovute: { progresso: { fatte: 7, di: 17 } },
+        nuove: { progresso: { fatte: 2, di: 5 } },
+        obiettivo: data.oggi.raggiunto ? { stato: 'fatta', progresso: { fatte: 10, di: 10 } } : { progresso: { fatte: data.oggi.ripassi, di: 10 } },
+      });
       return data;
     }
 
@@ -716,11 +724,16 @@ describe('ReviewHome', () => {
         'Impara 5 schede nuove',
         'Raggiungi l’obiettivo di oggi',
       ]);
-      // 7 due cards reviewed (9 reviews less 2 first ones) of 17; 2 new of 5; the goal met.
+      // The server's counts: 7 due cards of 17, 2 new of 5, the goal credited.
       expect(rows[0]).toHaveTextContent('7 di 17');
       expect(rows[1]).toHaveTextContent('2 di 5');
       // Past the goal the count stops at it; the ring keeps the real count.
       expect(rows[2]).toHaveTextContent('10 di 10');
+      // Each with its points, earned ones in ink with a «+» (G1c), said in words.
+      expect(rows[0]).toHaveTextContent('20 XP');
+      expect(rows[0]).toHaveTextContent('vale 20 punti');
+      expect(rows[2]).toHaveTextContent('+10 XP');
+      expect(rows[2]).toHaveTextContent('10 punti guadagnati');
       expect(screen.getByRole('img', { name: 'Obiettivo di oggi: 11 di 10 ripassi, raggiunto' })).toBeInTheDocument();
       expect(rows[2]).toHaveTextContent('compiuta');
       expect(within(card).getByText('1 di 3')).toBeInTheDocument();
@@ -746,6 +759,7 @@ describe('ReviewHome', () => {
 
     it('says when a mission has nothing to do today, offers the community cards, and leaves it out of the summary', async () => {
       const data = answer(4, 0, { ripassi: 3 });
+      data.missioni = serverMissions({ nuove: { stato: 'vuota', progresso: undefined } });
       progress.mockResolvedValue(data);
       renderHome();
       const card = await screen.findByRole('region', { name: 'Le missioni di oggi' });
@@ -757,6 +771,29 @@ describe('ReviewHome', () => {
       const panel = screen.getByRole('region', { name: 'Impostazioni dello studio' });
       expect(await within(panel).findByRole('button', { name: 'Schede della comunità · 0 di 5' })).toHaveAttribute('aria-expanded', 'true');
       expect(within(panel).getAllByRole('switch')).toHaveLength(5);
+    });
+
+    it('says that the daily quota stops «Impara 5», and offers to change it (L-27 choice 5)', async () => {
+      const data = midDay();
+      data.missioni = serverMissions({ nuove: { motivo: 'quota', progresso: { fatte: 1, di: 5 } } });
+      progress.mockResolvedValue(data);
+      renderHome();
+      const row = (await screen.findByRole('list', { name: 'Missioni di oggi' })).querySelector('[data-missione="nuove"]') as HTMLElement;
+      expect(row).toHaveTextContent('Le nuove al giorno che hai scelto non bastano: alzale per arrivare a 5.');
+      expect(within(row).getByRole('button', { name: 'Cambia le nuove al giorno' })).toBeInTheDocument();
+    });
+
+    it('says the day counts for the streak while the mission still wants its 10 reviews', async () => {
+      const data = answer(4, 2, { ripassi: 6, obiettivo: 5, raggiunto: true });
+      data.missioni = serverMissions({ obiettivo: { progresso: { fatte: 6, di: 10 } } });
+      localStorage.setItem('visualex.studia.festeggiato', '2026-10-19');
+      progress.mockResolvedValue(data);
+      renderHome();
+      const row = (await screen.findByRole('list', { name: 'Missioni di oggi' })).querySelector('[data-missione="obiettivo"]') as HTMLElement;
+      expect(row).toHaveTextContent('6 di 10');
+      expect(row).toHaveTextContent('da fare');
+      expect(within(row).getByText('Il giorno conta per la serie; per i punti della missione servono 10 ripassi.')).not.toHaveClass('sr-only');
+      localStorage.removeItem('visualex.studia.festeggiato');
     });
 
     it('never shows one subject’s counts under another’s name while the new read travels', async () => {
@@ -841,18 +878,31 @@ describe('ReviewHome', () => {
   });
 
   describe('the full list (Gymnasium spec §5.1)', () => {
-    it('lists the day, the week and the long run; what the server must record is «In arrivo» and cannot be ticked', async () => {
-      progress.mockResolvedValue(answer(3, 0));
+    it('lists the day, the week and the long run as the server decides them; only «caso» is «In arrivo» (G1c)', async () => {
+      const data = answer(3, 0);
+      data.missioni = serverMissions({ 'materia-ferma': { stato: 'aperta', progresso: { fatte: 2, di: 5 }, materia: 'DIRITTO_PENALE' } });
+      progress.mockResolvedValue(data);
       renderHome();
       const list = await screen.findByRole('region', { name: 'Tutte le missioni' });
       for (const group of ['Giornaliere', 'Settimanali', 'A lungo termine']) {
         expect(within(list).getByRole('heading', { name: group })).toBeInTheDocument();
       }
       const coming = within(list).getAllByText('In arrivo', { selector: 'span' });
-      expect(coming).toHaveLength(4);
-      expect(within(list).getByText('Scrivi una scheda')).toBeInTheDocument();
+      expect(coming).toHaveLength(1);
+      expect(coming[0].closest('li')).toHaveAttribute('data-missione', 'caso');
+      // A mission still to come shows no points: it cannot be earned.
+      expect(coming[0].closest('li')).not.toHaveTextContent('XP');
+      expect(within(list).getByText('Proponi una scheda')).toBeInTheDocument();
       expect(within(list).getByText('Una settimana di serie')).toBeInTheDocument();
       expect(within(list).getByText('Consolida 50 schede')).toBeInTheDocument();
+      const stale = list.querySelector('[data-missione="materia-ferma"]') as HTMLElement;
+      expect(stale).toHaveTextContent('2 di 5');
+      expect(stale).toHaveTextContent('Diritto penale');
+      expect(stale).toHaveTextContent('15 XP');
+      expect(list.querySelector('[data-missione="settimana"]')).toHaveTextContent('3 di 7');
+      // «caso» aside, a `vuota` keeps what it counted beside «Niente oggi».
+      expect(list.querySelector('[data-missione="materia-ferma"]')).not.toHaveTextContent('Niente oggi');
+      expect(list.querySelector('[data-missione="consolida"]')).toHaveTextContent('100 XP');
       // Today's three are above, in «Le missioni di oggi», and only there (G6).
       expect(within(list).getByText(/Le tre di oggi sono qui sopra/)).toBeInTheDocument();
       for (const title of ['Ripassa le schede dovute', 'Raggiungi l’obiettivo di oggi']) expect(within(list).queryByText(title)).toBeNull();
@@ -860,14 +910,14 @@ describe('ReviewHome', () => {
       // Nothing to tick: no checkbox, no button.
       expect(within(list).queryAllByRole('checkbox')).toEqual([]);
       expect(within(list).queryAllByRole('button')).toEqual([]);
-      // No points and no level until the server keeps them.
-      expect(document.body.textContent).not.toMatch(/\bXP\b|punti esperienza|livello/i);
-      // The validation mission is a validator's.
+      // The validation mission is a validator's: the server lists it.
       expect(within(list).queryByText('Convalida due schede della comunità')).toBeNull();
     });
 
-    it('offers the validation mission to a validator', async () => {
-      progress.mockResolvedValue(answer(3, 0));
+    it('offers the validation mission when the server lists it (a validator’s)', async () => {
+      const data = answer(3, 0);
+      data.missioni = serverMissions({ convalida: { stato: 'vuota', progresso: { fatte: 1, di: 2 } } }, { validator: true });
+      progress.mockResolvedValue(data);
       render(
         <MemoryRouter initialEntries={['/studia/ripasso']}>
           <Routes>
@@ -879,6 +929,10 @@ describe('ReviewHome', () => {
       );
       const list = await screen.findByRole('region', { name: 'Tutte le missioni' });
       expect(within(list).getByText('Convalida due schede della comunità')).toBeInTheDocument();
+      // One vote cast, nothing left to vote on: «1 di 2» stays beside «Niente oggi».
+      const convalida = list.querySelector('[data-missione="convalida"]') as HTMLElement;
+      expect(convalida).toHaveTextContent('1 di 2');
+      expect(convalida).toHaveTextContent('Niente oggi');
     });
   });
 });
@@ -891,6 +945,7 @@ describe('the motions of «Oggi» (S2)', () => {
   function newOnesDone(): Progressi {
     const data = answer(10, 8, { ripassi: 9 });
     data.calendario = [...data.calendario, { giorno: '2026-10-19', ripassi: 9, nuove: 5, sbagliate: 0, valido: false, riposo: false }];
+    data.missioni = serverMissions({ nuove: { stato: 'fatta', progresso: { fatte: 5, di: 5 } } });
     return data;
   }
   const today = () => within(screen.getByRole('list', { name: 'Missioni di oggi' }));

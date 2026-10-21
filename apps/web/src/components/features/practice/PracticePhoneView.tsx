@@ -7,11 +7,11 @@ import { cn } from '../../../lib/utils';
 import { practiceCountLine, practiceCounts, type Practice } from '../../../utils/practice';
 import { Modal } from '../../ui/Modal';
 import { MenuButton } from '../../ui/MenuButton';
-import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { PracticeColumn } from './PracticeColumn';
 import { ReadingFullScreen } from './ReadingFullScreen';
 import { PracticeEmpty, PracticeNameInput, PracticeStreamingBar, type PracticeStreaming } from './PracticeParts';
-import { CLOSE_PRACTICE_MESSAGE, fromPracticePair, practicePair, scrollParentOf } from './practiceView';
+import { fromPracticePair, practicePair, scrollParentOf } from './practiceView';
+import { closePracticeWithUndo } from './practiceUndo';
 import { usePracticeSaveActions, type PracticeSaveActions } from './usePracticeSaveActions';
 
 export interface PracticePhoneViewProps {
@@ -286,8 +286,6 @@ function PracticeListRow({ practice, rowClass, editing, onEditingChange, onPicke
   const isActive = useAppStore((s) => s.activePracticeId === practice.id);
   const setActivePractice = useAppStore((s) => s.setActivePractice);
   const renamePractice = useAppStore((s) => s.renamePractice);
-  const closePractice = useAppStore((s) => s.closePractice);
-  const [confirmClose, setConfirmClose] = useState(false);
   const counts = practiceCountLine(practiceCounts(practice));
 
   return (
@@ -322,23 +320,11 @@ function PracticeListRow({ practice, rowClass, editing, onEditingChange, onPicke
         triggerClassName="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
         items={[
           { label: 'Rinomina', icon: Pencil, onSelect: () => onEditingChange(true) },
-          { label: 'Chiudi la pratica', icon: X, danger: true, separatorBefore: true, onSelect: () => setConfirmClose(true) },
+          { label: 'Chiudi la pratica', icon: X, danger: true, separatorBefore: true, onSelect: () => closePracticeWithUndo(practice.id) },
         ]}
       >
         <MoreHorizontal size={18} aria-hidden />
       </MenuButton>
-      <ConfirmDialog
-        open={confirmClose}
-        variant="danger"
-        title={`Chiudere la pratica «${practice.label}»?`}
-        message={CLOSE_PRACTICE_MESSAGE}
-        confirmLabel="Chiudi la pratica"
-        onConfirm={() => {
-          setConfirmClose(false);
-          closePractice(practice.id);
-        }}
-        onCancel={() => setConfirmClose(false)}
-      />
     </div>
   );
 }

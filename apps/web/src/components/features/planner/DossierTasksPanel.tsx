@@ -3,6 +3,7 @@ import { BLOCK_HEADING, TILE } from '../studia/progress/tokens';
 import { cn } from '../../../lib/utils';
 import { QuickAddField } from './QuickAddField';
 import { TaskList } from './TaskList';
+import { TaskSheetScope } from './TaskSheetScope';
 import { TaskListSkeleton, TaskViewError, TruncatedNote } from './TaskViewStates';
 import { useTaskView } from './useTaskView';
 
@@ -31,10 +32,15 @@ export function DossierTasksPanel({ dossierId }: { dossierId: string }) {
         {state.status === 'error' && <TaskViewError onRetry={state.reload} />}
         {state.answer === null ? (
           state.status === 'loading' && <TaskListSkeleton rows={2} />
-        ) : tasks.length === 0 ? (
-          <p className="px-1 text-sm text-slate-600 dark:text-slate-400">Nessun compito in questo dossier.</p>
         ) : (
-          <TaskList label="Compiti del dossier" tasks={tasks} today={today} optimistic={state.optimistic} showDossier={false} />
+          // Mounted on an empty list too: a sheet open on the last task stays open when it moves to another dossier.
+          <TaskSheetScope tasks={tasks} today={today} optimistic={state.optimistic}>
+            {tasks.length === 0 ? (
+              <p className="px-1 text-sm text-slate-600 dark:text-slate-400">Nessun compito in questo dossier.</p>
+            ) : (
+              <TaskList label="Compiti del dossier" tasks={tasks} today={today} optimistic={state.optimistic} showDossier={false} />
+            )}
+          </TaskSheetScope>
         )}
         {state.answer?.truncated && <TruncatedNote />}
       </div>

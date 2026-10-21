@@ -94,4 +94,36 @@ describe('Modal', () => {
     );
     expect(screen.getByRole('button', { name: 'Chiudi' })).toHaveClass('min-h-[44px]', 'min-w-[44px]', 'md:min-h-0', 'md:min-w-0');
   });
+
+  it('takes its name from a header of its own, and the whole screen on a phone when asked', () => {
+    render(
+      <Modal isOpen onClose={() => {}} labelledBy="proprio" showCloseButton={false} phoneFullScreen>
+        <h2 id="proprio">Intestazione propria</h2>
+      </Modal>,
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Intestazione propria' });
+    expect(dialog).toHaveClass('max-sm:h-full', 'max-sm:rounded-none');
+    expect(dialog.parentElement).toHaveClass('max-sm:p-0');
+  });
+
+  it('keeps Shift+Tab inside from an element outside its list, the dialog\'s own wrapper', () => {
+    render(
+      <Modal isOpen onClose={() => {}} labelledBy="h" showCloseButton={false}>
+        <div tabIndex={-1} data-testid="wrapper">
+          <h2 id="h">Scheda</h2>
+          <button type="button">primo</button>
+          <button type="button">ultimo</button>
+        </div>
+      </Modal>,
+    );
+    // jsdom lays nothing out: every element is «visible» to the trap, as in a browser.
+    const offsetParent = vi.spyOn(HTMLElement.prototype, 'offsetParent', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.parentElement;
+    });
+    const wrapper = screen.getByTestId('wrapper');
+    wrapper.focus();
+    fireEvent.keyDown(wrapper, { key: 'Tab', shiftKey: true });
+    expect(screen.getByRole('button', { name: 'ultimo' })).toHaveFocus();
+    offsetParent.mockRestore();
+  });
 });

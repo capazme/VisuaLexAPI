@@ -41,6 +41,8 @@ vi.mock('../workspace/LazyStudyMode', () => ({
 
 import { appStore, useAppStore } from '../../../store/useAppStore';
 import { PracticeActBlock } from './PracticeActBlock';
+import { registerUndoToastListener, type UndoToast } from '../../../hooks/useUndoableAction';
+import { resetNotifications } from '../../ui/notifications/notifications';
 import { articleRowKey, practiceArticleKey } from '../../../utils/practice';
 import { CC_RD, L24, article } from '../../../utils/__fixtures__/savedWorkspaces';
 
@@ -221,19 +223,24 @@ function L241(): Norma {
 }
 
 describe('PracticeActBlock: «⋯»', () => {
-  it("«Rimuovi l'atto» asks first; cancelling keeps it, confirming takes it off", () => {
+  it("«Rimuovi l'atto» takes it off at once, with no confirmation; «Annulla» puts it back (K1a)", async () => {
     const { practiceId, actId } = setUp(L24, [article(L24, '5')]);
-    render(<Block practiceId={practiceId} actId={actId} />);
-    fireEvent.click(screen.getByRole('button', { name: /Azioni su l\. 8 marzo 2017, n\. 24/ }));
-    fireEvent.click(screen.getByRole('menuitem', { name: "Rimuovi l'atto" }));
-    const dialog = screen.getByRole('alertdialog');
-    expect(dialog).toHaveTextContent(/non saranno toccati/);
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Annulla' }));
-    expect(s().practices[0].acts).toHaveLength(1);
-    fireEvent.click(screen.getByRole('button', { name: /Azioni su/ }));
-    fireEvent.click(screen.getByRole('menuitem', { name: "Rimuovi l'atto" }));
-    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Rimuovi' }));
-    expect(s().practices[0].acts).toHaveLength(0);
+    let shown: UndoToast | null = null;
+    const unregister = registerUndoToastListener((t) => { shown = t; });
+    try {
+      render(<Block practiceId={practiceId} actId={actId} />);
+      fireEvent.click(screen.getByRole('button', { name: /Azioni su l\. 8 marzo 2017, n\. 24/ }));
+      fireEvent.click(screen.getByRole('menuitem', { name: "Rimuovi l'atto" }));
+      expect(screen.queryByRole('alertdialog')).toBeNull();
+      expect(s().practices[0].acts).toHaveLength(0);
+      await act(async () => {});
+      expect(shown!.message).toBe('Atto tolto dalla pratica');
+      await act(async () => { await shown!.onUndo(); });
+      expect(s().practices[0].acts.map((a) => a.id)).toEqual([actId]);
+    } finally {
+      unregister();
+      resetNotifications();
+    }
   });
 
   it("«Sposta in un'altra pratica» lists the other practices and moves the act", () => {

@@ -229,6 +229,9 @@
     --category-other: 220 9% 46%;
     /* Gymnasium's procedura penale (studia/progress/tokens.ts): the violet it always had */
     --category-penal-procedure: 270 60% 62%;
+    /* A subject's hue drawn as a line on the light card (G7, «Il tuo andamento»): a fifth darker, so every hue keeps
+       3:1 on white (amministrativo is 2.1:1 as it is); `theme.test.ts` checks it. */
+    --vlx-trend-shade: black 20%;
 
     /* Text highlight tokens — light theme */
     --hl-yellow-bg: 48 96% 89%;
@@ -287,6 +290,8 @@
     --category-eu: 158 64% 52%;
     --category-other: 218 11% 65%;
     --category-penal-procedure: 270 60% 70%;
+    /* On the dark card the hues already clear 3:1: no shade. */
+    --vlx-trend-shade: transparent 0%;
 
     /* Text highlight tokens — dark theme (inverted: dark saturated bg, light fg) */
     --hl-yellow-bg: 21 91% 30%;
