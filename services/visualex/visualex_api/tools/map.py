@@ -53,16 +53,16 @@ NORMATTIVA_URN_CODICI = {
     "codice penale": "regio.decreto:1930-10-19;1398:1",
     "codice di procedura civile": "regio.decreto:1940-10-28;1443:1",
     "disposizioni per l'attuazione del Codice di procedura civile e disposizioni transitorie": "regio.decreto:1941-12-18;1368:1",
-    "codici penali militari di pace e di guerra": "relazione.e.regio.decreto:1941-02-20;303",
+    "codici penali militari di pace e di guerra": "regio.decreto:1941-02-20;303:1",
     "disposizioni di coordinamento, transitorie e di attuazione dei Codici penali militari di pace e di guerra": "regio.decreto:1941-09-09;1023",
     "codice civile": "regio.decreto:1942-03-16;262:2",
     "preleggi": "regio.decreto:1942-03-16;262:1",
     "disposizioni per l'attuazione del Codice civile e disposizioni transitorie": "regio.decreto:1942-03-30;318:1",
     "codice della navigazione": "regio.decreto:1942-03-30;327:1",
-    "approvazione del Regolamento per l'esecuzione del Codice della navigazione (Navigazione marittima)": "decreto.del.presidente.della.repubblica:1952-02-15;328",
+    "approvazione del Regolamento per l'esecuzione del Codice della navigazione (Navigazione marittima)": "decreto.del.presidente.della.repubblica:1952-02-15;328:1",
     "codice postale e delle telecomunicazioni": "decreto.del.presidente.della.repubblica:1973-03-29;156:1",
     "codice di procedura penale": "decreto.del.presidente.della.repubblica:1988-09-22;447",
-    "norme di attuazione, di coordinamento e transitorie del codice di procedura penale": "decreto.legislativo:1989-07-28;271",
+    "norme di attuazione, di coordinamento e transitorie del codice di procedura penale": "decreto.legislativo:1989-07-28;271:1",
     "regolamento per l'esecuzione del codice di procedura penale": "decreto.ministeriale:1989-09-30;334",
     "codice della strada": "decreto.legislativo:1992-04-30;285",
     "regolamento di esecuzione e di attuazione del nuovo codice della strada.": "decreto.del.presidente.della.repubblica:1992-12-16;495",
@@ -81,7 +81,7 @@ NORMATTIVA_URN_CODICI = {
     "codice delle pari opportunità": "decreto.legislativo:2006-04-11;198",
     "codice dell'ordinamento militare": "decreto.legislativo:2010-03-15;66",
     "codice del processo amministrativo": "decreto.legislativo:2010-07-02;104:2",
-    "codice del turismo": "decreto.legislativo:2011-05-23;79",
+    "codice del turismo": "decreto.legislativo:2011-05-23;79:1",
     "codice antimafia": "decreto.legislativo:2011-09-06;159",
     "codice di giustizia contabile": "decreto.legislativo:2016-08-26;174:1",
     "codice del Terzo settore": "decreto.legislativo:2017-07-03;117",
@@ -89,6 +89,12 @@ NORMATTIVA_URN_CODICI = {
     "codice della crisi d'impresa e dell'insolvenza": "decreto.legislativo:2019-01-12;14"
 }
 
+
+# Rows of the table that name more than one code: their default annex is one of
+# them, and another annex is another code of the same row («di guerra» is annex 2
+# of r.d. 303/1941), so an article missing from the default one is refused naming
+# that annex and saying where the article is, as for an annex the caller named.
+CODE_ROWS_OF_SEVERAL_CODES = frozenset({"codici penali militari di pace e di guerra"})
 
 _URN_CODICI_LOWER = {_k.lower(): _v for _k, _v in NORMATTIVA_URN_CODICI.items()}
 
