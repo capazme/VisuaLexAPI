@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
 const account = vi.hoisted(() => ({ devMode: false }));
@@ -288,7 +288,65 @@ describe('SectionSwitcher (spec S3)', () => {
       }
     });
 
-    it('under reduced motion, or with no Web Animations, closes at once after the choice', () => {
+    it('closes 200 ms after the first frame drawn after the choice, rolling up', () => {
+      vi.useFakeTimers();
+      const animate = vi.fn(() => ({ cancel: vi.fn(), reverse: vi.fn(), finished: new Promise(() => {}), addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+      Element.prototype.animate = animate as unknown as typeof Element.prototype.animate;
+      try {
+        renderSplit('/dossier');
+        fireEvent.click(arrow());
+        const menu = screen.getByRole('menu');
+        const rolledUp = () => animate.mock.contexts.some((el, i) => el === menu && String((animate.mock.calls[i] as unknown as Keyframe[][])[0][1].clipPath).includes('100%'));
+        fireEvent.click(screen.getByRole('menuitemradio', { name: /Forum/ }), { detail: 1 });
+        act(() => vi.advanceTimersByTime(32 + 190));
+        expect(rolledUp()).toBe(false);
+        act(() => vi.advanceTimersByTime(30));
+        expect(rolledUp()).toBe(true);
+      } finally {
+        delete (Element.prototype as Partial<Element>).animate;
+        vi.useRealTimers();
+      }
+    });
+
+    it('opened again while it rolls up, turns back instead of unrolling from the top, the arrow pressed', () => {
+      const reverse = vi.fn();
+      const animate = vi.fn(() => ({ cancel: vi.fn(), reverse, finished: new Promise(() => {}), addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+      Element.prototype.animate = animate as unknown as typeof Element.prototype.animate;
+      try {
+        renderSplit('/dossier');
+        fireEvent.click(arrow());
+        fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+        // Rolling up: still drawn, no longer expanded.
+        expect(screen.getByRole('menu')).toBeInTheDocument();
+        expect(arrow()).toHaveAttribute('aria-expanded', 'false');
+        const unrolls = animate.mock.calls.length;
+        fireEvent.click(arrow());
+        expect(reverse).toHaveBeenCalledOnce();
+        expect(animate.mock.calls.length).toBe(unrolls);
+        expect(arrow()).toHaveAttribute('aria-expanded', 'true');
+        expect(screen.getByRole('menuitemradio', { name: /Opus/ })).toHaveFocus();
+      } finally {
+        delete (Element.prototype as Partial<Element>).animate;
+      }
+    });
+
+    it('under reduced motion moves nothing and closes at once after the choice', () => {
+      const animate = vi.fn();
+      Element.prototype.animate = animate as unknown as typeof Element.prototype.animate;
+      Object.defineProperty(window, 'matchMedia', { configurable: true, value: () => ({ matches: true }) });
+      try {
+        renderSplit('/dossier');
+        fireEvent.click(arrow());
+        fireEvent.click(screen.getByRole('menuitemradio', { name: /Forum/ }), { detail: 1 });
+        expect(screen.queryByRole('menu')).toBeNull();
+        expect(animate).not.toHaveBeenCalled();
+      } finally {
+        delete (Element.prototype as Partial<Element>).animate;
+        Reflect.deleteProperty(window, 'matchMedia');
+      }
+    });
+
+    it('with no Web Animations closes at once after the choice', () => {
       renderSplit('/dossier');
       fireEvent.click(arrow());
       fireEvent.click(screen.getByRole('menuitemradio', { name: /Forum/ }), { detail: 1 });

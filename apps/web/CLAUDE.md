@@ -238,7 +238,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   new page's title unless the user moved it meanwhile: each section's home marks its heading
   `data-section-title="<section id>"` with `tabIndex={-1}` and `FOCUS_RING` (`PageFrame`'s `section`), so a keyboard user sees where the focus
   went — and only a keyboard user: the browser counts a focus the script gives after a focused menu entry as visible,
-  so a choice made with a pointer (`MenuItem.onSelect`'s click, `detail` above 0) marks the title
+  so a choice made with a pointer (the entry's click in `SectionSwitcher`, `detail` above 0) marks the title
   `data-pointer-focus`, which `index.css` draws with no ring, until it loses the focus (Gymnasium's `h1`, the dossier list's `h1` — `opus` or
   `gymnasium` by the kind it lists, since the same element stays from one to the other —, «Dossier pubblici», the
   MERL-T hub); a new home marks its own. Under reduced motion the page changes at once and nothing moves; without View
@@ -1667,7 +1667,9 @@ Duplicating any of these is a defect, not a shortcut.
   tied, none) and never the top-level map, which can be an annex's (d.lgs.
   196/2003). The index window and the dossier use it.
 - `components/ui/MenuButton.tsx` — the one menu button (arrows, Home/End,
-  Escape/Tab, focus return, click outside; clicks never reach the card).
+  Escape/Tab, focus return, click outside; clicks never reach the card). Two menus keep their own keyboard,
+  for a reason: the sidebar's user menu (portalled, placed from the avatar) and the section switcher (S6: a menu
+  that stays a moment after the choice, rolls up, and can be turned back).
 - `hooks/useAnnexNavigation.ts` — shared tree fetch + annex switch + load article.
 - `utils/deepLinks.ts` — `buildSearchDeepLink(params, articleId)` /
   `parseSearchDeepLink(value)`: the `?norma=` share link (base64url JSON with

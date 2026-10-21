@@ -5,7 +5,7 @@ import { Z_INDEX } from '../../constants/zIndex';
 import { useSection } from './useSection';
 import { SECTION_HOME_CODE, SECTIONS, goToLabel, type Section, type SectionId } from './sections';
 import { prefersReducedMotion } from './sectionTransition';
-import { SECTION_MENU_MS, rollName, rollUpMenu, slideCheck, unrollMenu } from './sectionMenuMotion';
+import { SECTION_MENU_MS, rollName, rollUpMenu, slideCheck, unrollMenu, type RollingUp } from './sectionMenuMotion';
 
 /** Closed; open; chosen (the check arrives, nothing more can be chosen); rolling back up. */
 type Phase = 'closed' | 'open' | 'chosen' | 'closing';
@@ -50,9 +50,13 @@ export function SectionSwitcher({ forumCount, onChoose, withName = false, inDraw
   const [focusAt, setFocusAt] = useState<'first' | 'last'>('first');
   // The entry just chosen: the check goes there at once, before the page has swapped.
   const [chosen, setChosen] = useState<SectionId | null>(null);
+  // The section the menu was opened on, written in bold while it is open.
+  const [openedOn, setOpenedOn] = useState<SectionId>(section);
   const arrowRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const closing = useRef<Animation | null>(null);
+  const closing = useRef<RollingUp | null>(null);
+  // Opened again while it rolled up: it turns back from where it is, and does not unroll from the top.
+  const turnedBack = useRef(false);
   // The close that follows a choice, on its way: a new opening or a close by hand calls it off.
   const closeLater = useRef<() => void>(() => {});
   const menuId = useId();
@@ -72,12 +76,13 @@ export function SectionSwitcher({ forumCount, onChoose, withName = false, inDraw
     closing.current = rollUpMenu(menuRef.current, finishClosing);
   };
   const open = (at: 'first' | 'last') => {
-    // Opened again while it rolled up: it unrolls from where it is drawn.
     closeLater.current();
-    closing.current?.cancel();
+    turnedBack.current = closing.current !== null;
+    closing.current?.turnBack();
     closing.current = null;
     setFocusAt(at);
     setChosen(null);
+    setOpenedOn(section);
     setPhase('open');
     // A failed fetch is the route's to report, when it is visited.
     sections.forEach((s) => s.id !== section && SECTION_HOME_CODE[s.id]?.().catch(() => {}));
@@ -88,7 +93,11 @@ export function SectionSwitcher({ forumCount, onChoose, withName = false, inDraw
     const menu = menuRef.current;
     if (phase !== 'open' || !menu) return;
     const entries = [...menu.querySelectorAll<HTMLElement>('[role="menuitemradio"]')];
-    unrollMenu(menu, entries);
+    if (!turnedBack.current) {
+      const checkedAt = entries.findIndex((entry) => entry.getAttribute('aria-checked') === 'true');
+      unrollMenu(menu, entries, menu.querySelector<HTMLElement>('[data-testid="section-check"]'), Math.max(checkedAt, 0));
+    }
+    turnedBack.current = false;
     (focusAt === 'first' ? entries[0] : entries[entries.length - 1])?.focus();
   }, [phase, focusAt]);
 
@@ -187,7 +196,7 @@ export function SectionSwitcher({ forumCount, onChoose, withName = false, inDraw
             <ChevronDown
               aria-hidden
               className={cn(
-                'h-4 w-4 transition-transform ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none',
+                'h-4 w-4 transition-transform ease-out motion-reduce:transition-none',
                 phase === 'open' || phase === 'chosen' ? 'rotate-180 duration-[260ms]' : 'duration-[180ms]',
               )}
             />
@@ -204,6 +213,7 @@ export function SectionSwitcher({ forumCount, onChoose, withName = false, inDraw
           id={menuId}
           sections={sections}
           checked={chosen ?? section}
+          current={openedOn}
           forumCount={forumCount}
           inDrawer={inDrawer}
           chosen={phase !== 'open'}
@@ -230,8 +240,9 @@ function RollingName({ section }: { section: SectionId }) {
     if (!names.leaving) return;
     const frame = requestAnimationFrame(() => {
       if (!box.current || !coming.current) return;
+      // A roll that ends after a newer one began leaves the newer one alone.
       rollName(box.current, leaving.current, coming.current, leaving.current?.offsetWidth ?? 0, () =>
-        setNames((current) => ({ ...current, leaving: null })),
+        setNames((current) => (current.now === names.now ? { ...current, leaving: null } : current)),
       );
     });
     return () => cancelAnimationFrame(frame);
@@ -245,7 +256,8 @@ function RollingName({ section }: { section: SectionId }) {
           {nameOf(names.leaving)}
         </span>
       )}
-      <span ref={coming} key={names.now} className="truncate whitespace-nowrap">
+      {/* Not truncated: while the box widens to a longer name, an ellipsis would show in the first frames. */}
+      <span ref={coming} key={names.now} className="whitespace-nowrap">
         {nameOf(names.now)}
       </span>
     </span>
@@ -257,6 +269,11 @@ interface SectionMenuProps {
   id: string;
   sections: Section[];
   checked: SectionId;
+  /**
+   * The section the menu opened on, in bold, and so while it is open: a change of weight on the choice would lay the
+   * page out again while the new one is drawn. The check says the choice.
+   */
+  current: SectionId;
   forumCount: number;
   inDrawer: boolean;
   /** Chosen, or rolling up: nothing more can be chosen in it. */
@@ -269,10 +286,7 @@ interface SectionMenuProps {
  * The menu of the sections (WAI-ARIA menu, `menuitemradio` entries): arrows, Home and End move, Escape closes and
  * gives the focus back to the arrow, Tab closes. One check, on the entry checked, slides when it changes.
  */
-function SectionMenu({ ref, id, sections, checked, forumCount, inDrawer, chosen, onChoose, onClose }: SectionMenuProps) {
-  // The section the menu opened on is written in bold, and stays so: a change of weight on the choice would lay the
-  // page out again while the new one is drawn. The check says the choice.
-  const [current] = useState(checked);
+function SectionMenu({ ref, id, sections, checked, current, forumCount, inDrawer, chosen, onChoose, onClose }: SectionMenuProps) {
   const check = useRef<HTMLSpanElement>(null);
   const lines = useRef(new Map<SectionId, HTMLSpanElement>());
   const placed = useRef<number | null>(null);

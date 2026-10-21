@@ -7,12 +7,14 @@ function animated() {
   const listeners: (() => void)[] = [];
   const animation = {
     cancel: vi.fn(),
+    reverse: vi.fn(),
     finished: Promise.resolve(),
     addEventListener: (_: string, listener: () => void) => listeners.push(listener),
+    removeEventListener: (_: string, listener: () => void) => listeners.splice(listeners.indexOf(listener), 1),
   };
   const animate = vi.fn(() => animation);
   Object.defineProperty(element, 'animate', { value: animate });
-  return { element, animate, finish: () => listeners.forEach((l) => l()) };
+  return { element, animate, animation, finish: () => [...listeners].forEach((l) => l()) };
 }
 
 const reduced = (on: boolean) =>
@@ -33,6 +35,24 @@ describe('the split button\'s motions (S6)', () => {
     expect(String(frames[0].clipPath)).toMatch(/^inset\((\S+ ){3}\S+\)$/);
     expect(String(frames[1].clipPath)).toMatch(/^inset\((\S+ ){3}\S+\)$/);
     expect(entries.map((e) => (e.animate.mock.calls[0] as unknown as [Keyframe[], KeyframeAnimationOptions])[1].delay)).toEqual([0, 40, 80]);
+  });
+
+  it('brings the check in with the entry it sits on', () => {
+    const menu = animated();
+    const check = animated();
+    unrollMenu(menu.element, [animated().element, animated().element, animated().element], check.element, 2);
+    expect((check.animate.mock.calls[0] as unknown as [Keyframe[], KeyframeAnimationOptions])[1].delay).toBe(80);
+  });
+
+  it('turns a roll-up back, from where it is, without saying the menu went', () => {
+    const menu = animated();
+    const done = vi.fn();
+    rollUpMenu(menu.element, done)!.turnBack();
+    expect(menu.animation.reverse).toHaveBeenCalledOnce();
+    menu.finish();
+    expect(done).not.toHaveBeenCalled();
+    // Back open, it lets go of the clip.
+    expect(menu.animation.cancel).toHaveBeenCalledOnce();
   });
 
   it('rolls the menu up and says when it is out of sight; under reduced motion at once', () => {
