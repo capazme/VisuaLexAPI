@@ -514,9 +514,12 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   at least `ripassiAlGiorno` reviews, or the whole day's queue finished). `lingo/studyDays.ts`
   writes it and nothing else does: `recordGradeDay`, inside the grade's transaction after the
   log row (the row created `ON CONFLICT DO NOTHING`, then locked `FOR UPDATE`, so racing grades
-  of one user both count); `markQueueFinished`, when a read of the session (not narrowed to a
+  of one user both count; `ripassi_dovuti` counts the grades of a card already due, which
+  Gymnasium's «dovute» reads, G-334); `markQueueFinished`, when a read of the session (not narrowed to a
   subject) or of the progress finds the queue finished, so a day with nothing to do counts;
-  `recountToday`, when the goal changes (past days stay as stored). The trash never touches the
+  `recountToday`, when the goal changes (past days stay as stored); `countVoteDay`, in the vote's
+  transaction, for `voti` (the day's validation votes, Gymnasium XP below; it changes nothing for the
+  streak, and the calendar leaves out a row with no review that did not count). The trash never touches the
   rows, so trashing a studied card does not rewrite a past day. `lingo/todayQueue.ts`
   `queueFinished` is the one definition of a finished queue (nothing due in the whole scope, no
   new slot or no new card left), and it is false for someone who never reviewed a card in scope.
@@ -532,6 +535,33 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   columns are `TIMESTAMP` without a zone holding UTC, and `AT TIME ZONE 'Europe/Rome'` alone
   reads them as Rome time (off by one or two hours). A `DATE` column travels through Prisma as
   UTC midnight: `dayToDate` / `dateToDay`, never `romeDay`.
+- **Gymnasium XP and levels** (spec `docs/superpowers/specs/2026-10-20-gymnasium-xp-levels-design.md`,
+  plan `docs/superpowers/plans/2026-10-20-gymnasium-xp-levels.md`; migration `20261026100000_lingo_xp_ledger`).
+  `LingoCreditoXp` (`lingo_crediti_xp`) is an append-only ledger: one row per mission credited per period
+  (`G:<day>`, `S:<Monday>` for the week, `U` once), its points at the time, the kind and id of the event
+  (`REVISIONE` the log row, `PROPOSTA` the card, `VOTO` the vote, `LETTURA` none) and the subject where one
+  applies. `@@unique([utenteId, missione, periodo])` makes a mission pay once per period, `@@unique([missione,
+  fonteId])` makes a card earn «scrivi» once in its life; the CHECKs (points 1–1000, the period's shape by
+  mission, an id for every event but a read) are in the migration. Nothing updates or deletes a row: only the
+  account's cascade removes one, the trash never touches it. `lingo/missions.ts` holds the catalogue (the web's
+  ids and order, the draft's values) and `settleMissions`, **the one writer**: inside the caller's
+  transaction, under `SAVEPOINT xp` with `SET LOCAL lock_timeout = '1s'` (an error or a long wait rolls back to
+  the savepoint, logs the error's name only, and answers no credit: XP never fails the event), then the user's
+  two-key advisory lock (`LINGO_XP_LOCK_CLASS`, `hashtext(user)`), then the daily safety net
+  (`XP_DAILY_CEILING` = 300, above the catalogue's 255). Each mission is decided from stored facts only (the
+  stored day, the log, the review states, the scopes) in Rome days of the server's clock; the user's quota and
+  goal cannot lower «Impara 5» or the goal's 10 reviews. Callers, all of the user's session and none in the
+  delegated table (`tests/lingoXp.security.test.ts` pins both): the grade (after `recordGradeDay`), the proposal,
+  the vote (after `countVoteDay`, before the card's state changes; `validationRule.ts` never reads XP, G-253,
+  G-318), `readProgress` and the unnarrowed session read when it marks the queue finished — the two reads in a
+  transaction that takes `users` `FOR KEY SHARE` first, or the credit's insert deadlocks with an account
+  deletion. Lock order: cards, today's day row, the XP lock. `lingo/levels.ts` is the curve (100 + 25·(n − 1),
+  no ceiling, integers; only ever gentler after release); the level is never stored, `lingo/xpLedger.ts`
+  `levelNow` computes it. Answers: the grade (recorded only), the proposal and the vote carry `xp: { crediti,
+  livello, nuovoLivello }` (the vote's answer is `{ stato, xp }`, the proposal's the card plus `xp`);
+  `GET /progressi` carries `livello`, `missioni` (never narrowed by `materia`; `convalida` only for a validator,
+  `caso` always `in-arrivo`) and `crediti`, the credits that read wrote. The export carries the ledger as
+  `data.lingoCreditiXp` without the events' ids. No MCP tool reads or writes XP.
 - **The read by institute** — `GET /api/lingo/srs/percorso?materia=` (`lingo/percorso.ts`; spec
   `docs/superpowers/specs/2026-10-19-gymnasium-restyle-design.md` §6, G5). Answers `[{ materia, istituto, nuove, apprendimento, consolidate, dovute }]`, sorted by
   subject then institute, over exactly the cards the session may offer (`reviewScope`: one's own
@@ -572,7 +602,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   later) cascade from the user and from the card, `LingoPreferenzeStudio`
   (`lingo_preferenze_studio`) from the user; the export carries the log as `data.lingoRipassi` (not the derived state)
   and the preferences as `data.lingoPreferenze` (null when never saved), and the stored study days
-  as `data.lingoGiornate` (`giorno` as 'YYYY-MM-DD'); `LingoGiornataStudio` cascades from the user.
+  as `data.lingoGiornate` (`giorno` as 'YYYY-MM-DD', with `voti` and `ripassiDovuti`); `LingoGiornataStudio` cascades from the user,
+  as do the XP credits (`data.lingoCreditiXp`: mission, period, day, points, kind of event, subject).
 - **The planner's tasks** (Opus, wave 1; the task model answered in the owners' notes, answers
   1–4, 7, 11, 13): `Task` (`tasks`, migration `20261025100001_planner_tasks`: a new table and two
   enums, nothing else; CHECKs for priority 1–4, a time only with its date, a positive duration, no

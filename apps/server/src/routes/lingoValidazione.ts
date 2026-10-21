@@ -6,6 +6,10 @@ import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { hasNoNul } from '../lingo/noNul';
 import { serialize } from '../lingo/serializeCard';
+import { settleMissions } from '../lingo/missions';
+import { romeDay } from '../lingo/studyDay';
+import { countVoteDay } from '../lingo/studyDays';
+import { votableWhere } from '../lingo/validationQueue';
 import { stateAfterVotes } from '../lingo/validationRule';
 import { leggiSoglie } from '../lingo/validationSettings';
 
@@ -44,14 +48,7 @@ router.get('/coda', async (req, res) => {
   const me = req.user!.id;
   const voter = await prisma.user.findUnique({ where: { id: me }, select: { lingoValidatore: true } });
   if (!voter?.lingoValidatore) throw new AppError(403, NOT_VALIDATOR);
-  const where: Prisma.LingoCardWhereInput = {
-    stato: 'PROPOSTA_COMMUNITY',
-    // A card whose author's account is gone has a null author: it is still to be validated.
-    // (`autoreId: { not }` alone would drop it, as SQL's <> does with NULL.)
-    OR: [{ autoreId: null }, { autoreId: { not: me } }],
-    validazioni: { none: { utenteId: me } },
-    ...(materia ? { materia } : {}),
-  };
+  const where: Prisma.LingoCardWhereInput = { ...votableWhere(me), ...(materia ? { materia } : {}) };
   const cards = await prisma.lingoCard.findMany({
     where,
     include: { ancore: true },
@@ -66,7 +63,7 @@ router.post('/:cardId', async (req, res) => {
   const { cardId } = req.params;
   const me = req.user!.id;
   try {
-    const stato = await prisma.$transaction(async (tx) => {
+    const outcome = await prisma.$transaction(async (tx) => {
       const voter = await tx.user.findUnique({ where: { id: me }, select: { lingoValidatore: true } });
       if (!voter?.lingoValidatore) throw new AppError(403, NOT_VALIDATOR);
       // The row is locked: two votes on the same card, or a vote and a withdrawal, take turns.
@@ -76,7 +73,13 @@ router.post('/:cardId', async (req, res) => {
       if (card.autore_id === me) throw new AppError(403, 'Non puoi validare una tua scheda.');
       const already = await tx.lingoValidazioneCard.findFirst({ where: { cardId, utenteId: me } });
       if (already) throw new AppError(409, 'Hai già votato questa scheda.');
-      await tx.lingoValidazioneCard.create({ data: { cardId, utenteId: me, giudizio, motivazione: motivazione || null } });
+      const vote = await tx.lingoValidazioneCard.create({ data: { cardId, utenteId: me, giudizio, motivazione: motivazione || null }, select: { id: true } });
+      // The day's votes are counted here, never read back from the votes (a withdrawal or an archive deletes them),
+      // and the mission settled before the card's state changes (Gymnasium XP spec §3.5). The vote rule below reads
+      // neither: every vote weighs the same (G-253, G-318).
+      const today = romeDay(new Date());
+      await countVoteDay(tx, me, today);
+      const xp = await settleMissions(tx, me, today, { tipo: 'voto', votoId: vote.id });
       const votes = await tx.lingoValidazioneCard.findMany({ where: { cardId }, select: { giudizio: true } });
       // Read after the card's lock, not before: a change of the thresholds that committed first is seen here.
       const soglie = await leggiSoglie(tx);
@@ -85,9 +88,9 @@ router.post('/:cardId', async (req, res) => {
       // account gone nobody could see or delete it, so it goes now, with its votes and anchors.
       if (next === 'ARCHIVIATA' && card.autore_id === null) await tx.lingoCard.delete({ where: { id: cardId } });
       else if (next !== card.stato) await tx.lingoCard.update({ where: { id: cardId }, data: { stato: next } });
-      return next;
+      return { stato: next, xp };
     });
-    res.json({ stato });
+    res.json(outcome);
   } catch (error) {
     // The unique key (card, validator) is the last word on a duplicate vote.
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw new AppError(409, 'Hai già votato questa scheda.');

@@ -437,7 +437,7 @@ async function othersIn(contents: unknown[], own: { id: string; email: string })
  */
 export const exportAccountData = async (req: Request, res: Response) => {
   const userId = req.user!.id;
-  const [user, folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments, lingoCards, lingoValidazioni, lingoAccettazioni, lingoRipassi, lingoPreferenze, lingoGiornate, merltConsenso, merltConsensoStorico, tasks] = await Promise.all([
+  const [user, folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments, lingoCards, lingoValidazioni, lingoAccettazioni, lingoRipassi, lingoPreferenze, lingoGiornate, lingoCreditiXp, merltConsenso, merltConsensoStorico, tasks] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, username: true, createdAt: true, updatedAt: true } }),
     prisma.folder.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
     prisma.bookmark.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
@@ -474,8 +474,15 @@ export const exportAccountData = async (req: Request, res: Response) => {
     prisma.lingoPreferenzeStudio.findUnique({ where: { utenteId: userId }, select: { nuoveAlGiorno: true, ripassiAlGiorno: true, materieComunita: true } }),
     prisma.lingoGiornataStudio.findMany({
       where: { utenteId: userId },
-      select: { giorno: true, ripassi: true, nuove: true, sbagliate: true, codaFinita: true, valido: true },
+      select: { giorno: true, ripassi: true, ripassiDovuti: true, nuove: true, sbagliate: true, codaFinita: true, valido: true, voti: true },
       orderBy: { giorno: 'asc' },
+    }),
+    // Gymnasium's XP ledger (spec 2026-10-20-gymnasium-xp-levels §8): what was credited, when and why. Not the
+    // event's id (a review log row, a card, a vote): the export already carries those rows themselves.
+    prisma.lingoCreditoXp.findMany({
+      where: { utenteId: userId },
+      select: { missione: true, periodo: true, giorno: true, punti: true, fonte: true, materia: true },
+      orderBy: [{ giorno: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
     }),
     // The MERL-T consent and its history, with the notice version each choice was made under.
     // What MERL-T itself collected is downloaded from Impostazioni › Dati MERL-T (`GET /api/merlt/data/export`).
@@ -543,6 +550,7 @@ export const exportAccountData = async (req: Request, res: Response) => {
       // stored study days ('YYYY-MM-DD', Rome days: a DATE travels as UTC midnight).
       lingoRipassi, lingoPreferenze,
       lingoGiornate: lingoGiornate.map(({ giorno, ...day }) => ({ giorno: dateToDay(giorno), ...day })),
+      lingoCreditiXp: lingoCreditiXp.map(({ giorno, ...credit }) => ({ ...credit, giorno: dateToDay(giorno) })),
       merltConsenso, merltConsensoStorico,
       // Rome civil days as 'YYYY-MM-DD' and times as 'HH:MM' (a DATE or a TIME travels as a UTC instant).
       tasks: tasks.map(({ plannedDate, plannedTime, dueDate, dueTime, ...task }) => ({
