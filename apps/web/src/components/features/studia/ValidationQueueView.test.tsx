@@ -414,7 +414,7 @@ describe('«Da validare», a subject change while a vote is on its way', () => {
     render(<ValidationQueueView />);
     await screen.findByText('Domanda c1?');
     await userEvent.click(screen.getByRole('button', { name: 'Approvata' }));
-    expect(await screen.findByText('Voto registrato · +20 XP')).toBeInTheDocument();
+    expect(await screen.findByText('Voto registrato · +20 punti')).toBeInTheDocument();
     expect(JSON.parse(localStorage.getItem('visualex.studia.visto')!)).toMatchObject({ xp: 20 });
     localStorage.removeItem('visualex.studia.visto');
   });
@@ -430,7 +430,7 @@ describe('«Da validare», a subject change while a vote is on its way', () => {
     expect(await screen.findByText('Voto registrato')).toBeInTheDocument();
     await userEvent.click(await screen.findByRole('button', { name: 'Approvata' }));
     expect(await screen.findByText('Hai già votato questa scheda: passo alla prossima.')).toBeInTheDocument();
-    expect(screen.queryByText(/XP/)).toBeNull();
+    expect(screen.queryByText(/punti/)).toBeNull();
     localStorage.removeItem('visualex.studia.visto');
   });
 

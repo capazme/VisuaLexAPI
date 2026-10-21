@@ -159,7 +159,7 @@ export function useReviewSession(materia?: Materia, { istituto, paused = false, 
             const gain = gainOf(++gains.current, outcome.xp);
             if (gain) setXpGain(gain);
             // The lesson shows what it earned: «Oggi» need not show it again.
-            recordXpSeen(outcome.xp.livello);
+            recordXpSeen(outcome.xp);
           }
         }
         // The session may have been read again while the post was on its way.

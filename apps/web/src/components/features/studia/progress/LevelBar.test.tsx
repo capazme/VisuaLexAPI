@@ -1,9 +1,18 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { LevelBar } from './LevelBar';
 
+const motion = vi.hoisted(() => ({ reduce: false }));
+vi.mock('framer-motion', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('framer-motion')>()),
+  useReducedMotion: () => motion.reduce,
+}));
+
 const SEEN = 'visualex.studia.visto';
-afterEach(() => localStorage.removeItem(SEEN));
+afterEach(() => {
+  localStorage.removeItem(SEEN);
+  motion.reduce = false;
+});
 
 describe('the level bar (Gymnasium XP spec §4, G1c)', () => {
   it('says the level, what the next one still asks and today’s points, in words for a screen reader', () => {
@@ -34,5 +43,19 @@ describe('the level bar (Gymnasium XP spec §4, G1c)', () => {
     render(<LevelBar livello={{ livello: 2, totale: 110, nelLivello: 10, perIlProssimo: 125, oggi: 20 }} />);
     expect(screen.queryByTestId('xp-gain')).toBeNull();
     expect(screen.queryByText(/Nuovo livello/)).toBeNull();
+  });
+
+  it('presses a new level in, and under reduced motion draws it at rest, still announced', async () => {
+    localStorage.setItem(SEEN, JSON.stringify({ xp: 90, livello: 1 }));
+    const { unmount } = render(<LevelBar livello={{ livello: 2, totale: 110, nelLivello: 10, perIlProssimo: 125, oggi: 20 }} />);
+    expect(screen.getByText('Livello 2').style.opacity).toBe('0');
+    unmount();
+    motion.reduce = true;
+    localStorage.setItem(SEEN, JSON.stringify({ xp: 90, livello: 1 }));
+    render(<LevelBar livello={{ livello: 2, totale: 110, nelLivello: 10, perIlProssimo: 125, oggi: 20 }} />);
+    const level = screen.getByText('Livello 2');
+    expect(level.style.opacity).not.toBe('0');
+    expect(level.style.transform).not.toMatch(/scale/);
+    await waitFor(() => expect(screen.getByText('Nuovo livello: sei al livello 2.')).toBeInTheDocument());
   });
 });

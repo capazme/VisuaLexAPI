@@ -37,6 +37,23 @@ describe('«+20 XP» (G1c)', () => {
     expect(region).toHaveTextContent('');
   });
 
+  it('says the same points twice when they are earned twice in a row', async () => {
+    vi.useFakeTimers();
+    const { rerender } = render(<XpGain gain={{ id: 1, punti: 20 }} />);
+    const region = document.querySelector('[aria-live="polite"]')!;
+    await act(async () => {
+      vi.advanceTimersByTime(20);
+    });
+    expect(region).toHaveTextContent('Hai guadagnato 20 punti.');
+    rerender(<XpGain gain={{ id: 2, punti: 20 }} />);
+    // Emptied for a frame, then said again.
+    expect(region).toHaveTextContent('');
+    await act(async () => {
+      vi.advanceTimersByTime(20);
+    });
+    expect(region).toHaveTextContent('Hai guadagnato 20 punti.');
+  });
+
   it('draws nothing without a gain', () => {
     render(<XpGain gain={null} />);
     expect(screen.queryByTestId('xp-gain')).toBeNull();

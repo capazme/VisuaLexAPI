@@ -9,7 +9,7 @@ import type { AncoraScheda, RilievoValidatore, Scheda, TestoDaAccettare } from '
 import { AcceptTextDialog } from './AcceptTextDialog';
 import { StateChip } from './StateChip';
 import { recordXpSeen } from './progress/seenProgress';
-import { gainLabel, gainOf } from './progress/xpGains';
+import { gainOf, gainWords } from './progress/xpGains';
 import { FOCUS_RING, INK_BUTTON, MUTED_TEXT, SECONDARY_BUTTON, TILE } from './progress/tokens';
 import { MATERIA_LABEL, TIPO_LABEL, anchorLabel } from './studiaLabels';
 
@@ -102,8 +102,8 @@ export function CardDetail({ card, onBack, onEdit, onDelete, onOpenAnchor, onCha
       setAsked(null);
       // The points ride on the message (G1c), once per card in its life: a card proposed again earns none.
       const gain = gainOf(card.id, outcome.xp);
-      if (outcome.xp) recordXpSeen(outcome.xp.livello);
-      onChanged(gain ? `Scheda proposta alla comunità · ${gainLabel(gain)}` : 'Scheda proposta alla comunità', 'success');
+      if (outcome.xp) recordXpSeen(outcome.xp);
+      onChanged(gain ? `Scheda proposta alla comunità · ${gainWords(gain)}` : 'Scheda proposta alla comunità', 'success');
     } catch (error) {
       setAsked(null);
       onChanged(proposeFailure(error), 'error');

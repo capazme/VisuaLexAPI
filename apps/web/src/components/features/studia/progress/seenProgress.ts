@@ -1,6 +1,19 @@
 import { useEffect, useState } from 'react';
+import type { XpEsito } from '../../../../types/studia';
 
 const STORAGE_KEY = 'visualex.studia.visto';
+
+/**
+ * Forgets what this browser drew, at a sign-in and a sign-out (`useAuth`): the record is the browser's, not the
+ * user's, and the next person on it must not read the last one's points as «+N XP» or their level (G-316).
+ */
+export function forgetSeenProgress() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Private mode: nothing was kept.
+  }
+}
 
 /**
  * What this browser last drew of the progress (S2): the streak, today's reviews and missions done, and the points and
@@ -99,11 +112,19 @@ export function useFreshMissions(giorno: string, done: readonly string[]): Reado
 }
 
 /**
- * Records the points and the level as drawn by a surface that showed their growth itself (the lesson's «+20 XP», a
- * proposal's or a vote's message), so «Oggi» does not show the same growth again.
+ * Records what a surface showed itself (the lesson's «+20 XP», a proposal's or a vote's message), so «Oggi» does not
+ * show it again: only this event's credits, and the level only when this event crossed it. Credits written silently
+ * before (a session read's) stay for «Oggi» to show, and a level they crossed to be pressed in there.
  */
-export function recordXpSeen(livello: { totale: number; livello: number }) {
-  writeSeen({ xp: livello.totale, livello: livello.livello });
+export function recordXpSeen(xp: XpEsito) {
+  const seen = readSeen();
+  const earned = xp.crediti.reduce((sum, credit) => sum + credit.punti, 0);
+  const before = seen?.xp;
+  const level = seen?.livello;
+  writeSeen({
+    xp: isCount(before) ? Math.min(before + earned, xp.livello.totale) : xp.livello.totale,
+    livello: xp.nuovoLivello || !isCount(level) ? xp.livello.livello : level,
+  });
 }
 
 /**
@@ -111,27 +132,28 @@ export function recordXpSeen(livello: { totale: number; livello: number }) {
  * the points earned since, and `levelUp`, a level this browser has not yet shown. Null and false when nothing grew,
  * or when nothing was ever stored (a first visit, or the first since points exist). Records what it is given.
  */
-export function useXpGrowth(totale: number | undefined, livello: number | undefined): { gain: number | null; levelUp: boolean } {
+export function useXpGrowth(totale: number, livello: number): { gain: number | null; levelUp: boolean } {
   const [state, setState] = useState(() => {
-    const seen = totale === undefined ? null : readSeen();
+    const seen = readSeen();
+    const before = seen?.xp;
+    const level = seen?.livello;
     return {
       totale,
       livello,
-      gain: isCount(seen?.xp) && totale !== undefined && seen.xp < totale ? totale - seen.xp : null,
-      levelUp: isCount(seen?.livello) && livello !== undefined && seen.livello < livello,
+      gain: isCount(before) && before < totale ? totale - before : null,
+      levelUp: isCount(level) && level < livello,
     };
   });
   if (state.totale !== totale || state.livello !== livello) {
-    const grew = (before: number | undefined, after: number | undefined) => before !== undefined && after !== undefined && after > before;
     setState({
       totale,
       livello,
-      gain: grew(state.totale, totale) ? totale! - state.totale! : null,
-      levelUp: grew(state.livello, livello),
+      gain: totale > state.totale ? totale - state.totale : null,
+      levelUp: livello > state.livello,
     });
   }
   useEffect(() => {
-    if (totale !== undefined && livello !== undefined) writeSeen({ xp: totale, livello });
+    writeSeen({ xp: totale, livello });
   }, [totale, livello]);
   return { gain: state.gain, levelUp: state.levelUp };
 }

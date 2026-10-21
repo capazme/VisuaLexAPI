@@ -26,7 +26,9 @@ export function LevelBar({ livello, className }: { livello: XpLivello; className
   return (
     <div data-testid="level-bar" className={cn('grid gap-2', className)}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        {/* Keyed by the level: one reached while the page is open is pressed in too. */}
         <motion.p
+          key={livello.livello}
           initial={levelUp && !reduce ? { scale: 1.5, opacity: 0 } : false}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: dur.scene, ease: ease.out, delay: 0.2 }}

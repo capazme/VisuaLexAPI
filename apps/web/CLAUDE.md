@@ -907,7 +907,8 @@ the list, from it they sit in the band's sticky box, read after the band. The do
    `<text>`. `CARD_STATES`, in `tokens.ts`, are the band's, the road's and the page's.
 3. **«Tutte le missioni»** (`missions/MissionList`): daily, weekly, long-term, without today's three, which item 1
    shows just above («Le tre di oggi sono qui sopra», G6): every mission the server lists that is not `principale`, with
-   its state, count, line and points — «convalida» only when the server lists it (a validator's) —; «caso», announced
+   its state, count, line and points — «convalida» only when the server lists it (a validator's); a `vuota` keeps its
+   count beside «Niente oggi» («1 di 2») —; «caso», announced
    and not yet recorded, is listed with «In arrivo», no count, no points and nothing to tick.
 4. «Cosa ripassi», `SubjectChips` (the subject narrows the first mission's action and the session it starts, kept in
    `localStorage` under `visualex.studia.ripasso.materia` by `progress/rememberedSubject.ts`, which «Progressi» shares:
@@ -957,8 +958,10 @@ line says it to a screen reader). The confetti step by elapsed time (`confetti.t
 **The small motions** (S2): the tally's new mark (the count pops with it), today's count landing in the ring
 (`GoalRing`'s `vlx-digit-land`: the new digit falls into place and takes on its weight, 360 ms, over its own place held
 unseen at the final weight, so «di 10» beside it does not move; reaching the goal, the ring closes as it settles) and a mission's ink play **only for what grew since this browser last drew it** —
-`progress/seenProgress.ts` (`useStreakGrowth`, `useReviewsGrowth`, `useFreshMissions`) keeps the streak and today's
-reviews and missions under `visualex.studia.visto`, a convenience like the celebration's, never a number's source; with
+`progress/seenProgress.ts` (`useStreakGrowth`, `useReviewsGrowth`, `useFreshMissions`, `useXpGrowth`, `recordXpSeen`) keeps
+the streak, today's reviews and missions, and the points and the level under `visualex.studia.visto` — forgotten at
+every sign-in and sign-out (`forgetSeenProgress`, `useAuth`), so the next person on the browser never reads the last
+one's points or level —, a convenience like the celebration's, never a number's source; with
 nothing stored nothing plays, and what a view draws it records (the dense strip draws no tally and leaves the streak's
 growth to «Oggi»). None of them takes a key or the focus or delays a card, and under reduced motion each is drawn at
 its end at once. The celebration is unchanged.
@@ -966,11 +969,13 @@ its end at once. The celebration is unchanged.
 not recorded and the proposal's 409 carry none). The lesson shows it as `progress/XpGain` — an ink chip hung under the
 progress bar's end, out of the flow, rising 6 px and gone in 1.8 s (`XP_GAIN_MS`; under reduced motion it only appears),
 no focus, no pointer, never holding the next card, said in its own polite live region a frame after it is drawn
-(«Hai guadagnato 20 punti. Sei al livello 5.») — and names the level an event crossed (`nuovoLivello`); a proposal and a
-vote add it to their message («Scheda proposta alla comunità · +25 XP», «Voto registrato · +20 XP»). Each records what it
-showed (`recordXpSeen`), so «Oggi» does not show it again: there `LevelBar` shows only what grew since this browser last
+(«Hai guadagnato 20 punti. Sei al livello 5.», emptied for that frame so the same words twice are heard twice) — and
+names the level an event crossed (`nuovoLivello`); a proposal and a vote add it to their message in words a screen
+reader reads («Scheda proposta alla comunità · +25 punti», «Voto registrato · +20 punti»). Each records only what it
+showed (`recordXpSeen`: the event's credits, the level only when it crossed it), so «Oggi» does not show it again: there `LevelBar` shows only what grew since this browser last
 drew it (`useXpGrowth`, `xp` and `livello` under `visualex.studia.visto`, kept across days) — the credits a read wrote, or
-another device's — and presses in, once, a level not yet shown here, announced politely; nothing on a first visit. The
+another device's — and presses in, once (also one reached while the page is open), a level not yet shown here, announced
+politely, at rest under reduced motion; nothing on a first visit. The
 points a session read credits silently («obiettivo» on an empty queue) show at the next progress read as `fatta` and in the
 level, never as «+XP» in the lesson (spec §5.3).
 

@@ -55,4 +55,14 @@ describe('useAuth — logout', () => {
     await waitFor(() => expect(next.result.current.status).toBe('ready'));
     expect(studiaService.forArticle).toHaveBeenCalledTimes(2);
   });
+
+  it('forgets what Gymnasium last drew here: the last reader’s points and level (G-316)', async () => {
+    localStorage.setItem('visualex.studia.visto', JSON.stringify({ xp: 900, livello: 7 }));
+    const { result } = renderHook(() => useAuth());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    act(() => { result.current.logout(); });
+
+    expect(localStorage.getItem('visualex.studia.visto')).toBeNull();
+  });
 });

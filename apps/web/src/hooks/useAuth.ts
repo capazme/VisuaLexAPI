@@ -12,6 +12,7 @@ import { clearDecisionSearchCache } from '../utils/decisionSearchCache';
 import { clearEuCaseLawCache } from '../utils/euCaseLawCache';
 import { clearArticleCardsCache } from '../utils/articleCardsCache';
 import { clearConsentRead } from '../features/merlt/consent/consentRead';
+import { forgetSeenProgress } from '../components/features/studia/progress/seenProgress';
 
 interface AuthState {
   user: UserResponse | null;
@@ -116,6 +117,8 @@ export function useAuth() {
 
     try {
       await authService.login({ email, password });
+      // What this browser drew of Gymnasium was the last person's (their points, their level).
+      forgetSeenProgress();
       const user = await authService.getCurrentUser();
 
       setState({
@@ -151,6 +154,7 @@ export function useAuth() {
     clearEuCaseLawCache();
     clearArticleCardsCache();
     clearConsentRead();
+    forgetSeenProgress();
     setState({
       user: null,
       loading: false,

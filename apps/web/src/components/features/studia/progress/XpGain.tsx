@@ -3,7 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { dur, ease } from '../../../../lib/motion';
 import { cn } from '../../../../lib/utils';
 import { INK_BORDER, INK_TEXT } from './tokens';
-import { XP_GAIN_MS, gainLabel, gainSentence, useMountedFrame, type XpGainValue } from './xpGains';
+import { XP_GAIN_MS, gainLabel, gainSentence, type XpGainValue } from './xpGains';
 
 /**
  * «+20 XP» (G1c): a small ink chip that rises a few pixels into place, stays `XP_GAIN_MS` and fades; under reduced
@@ -12,21 +12,28 @@ import { XP_GAIN_MS, gainLabel, gainSentence, useMountedFrame, type XpGainValue 
  */
 export function XpGain({ gain, className }: { gain: XpGainValue | null; className?: string }) {
   const reduce = useReducedMotion() ?? false;
-  const mounted = useMountedFrame();
   const [gone, setGone] = useState<XpGainValue['id'] | null>(null);
+  // The gain the region speaks: set a frame after a new one is drawn, so the region is empty in between and the same
+  // words, twice in a row, are heard twice.
+  const [spoken, setSpoken] = useState<XpGainValue['id'] | null>(null);
   const id = gain?.id ?? null;
   useEffect(() => {
     if (id === null) return;
+    const frame = requestAnimationFrame(() => setSpoken(id));
     const timer = window.setTimeout(() => setGone(id), XP_GAIN_MS);
-    return () => window.clearTimeout(timer);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+    };
   }, [id]);
   const shown = gain !== null && gone !== gain.id ? gain : null;
   return (
     <>
       <span aria-live="polite" className="sr-only">
-        {shown && mounted ? gainSentence(shown) : ''}
+        {shown && spoken === shown.id ? gainSentence(shown) : ''}
       </span>
-      <AnimatePresence>
+      {/* `popLayout`: a chip leaving never stands beside the one coming in. */}
+      <AnimatePresence mode="popLayout">
         {shown && (
           <motion.span
             key={shown.id}

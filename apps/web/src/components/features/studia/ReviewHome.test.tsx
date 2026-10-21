@@ -900,6 +900,8 @@ describe('ReviewHome', () => {
       expect(stale).toHaveTextContent('Diritto penale');
       expect(stale).toHaveTextContent('15 XP');
       expect(list.querySelector('[data-missione="settimana"]')).toHaveTextContent('3 di 7');
+      // «caso» aside, a `vuota` keeps what it counted beside «Niente oggi».
+      expect(list.querySelector('[data-missione="materia-ferma"]')).not.toHaveTextContent('Niente oggi');
       expect(list.querySelector('[data-missione="consolida"]')).toHaveTextContent('100 XP');
       // Today's three are above, in «Le missioni di oggi», and only there (G6).
       expect(within(list).getByText(/Le tre di oggi sono qui sopra/)).toBeInTheDocument();
@@ -914,7 +916,7 @@ describe('ReviewHome', () => {
 
     it('offers the validation mission when the server lists it (a validator’s)', async () => {
       const data = answer(3, 0);
-      data.missioni = serverMissions({}, { validator: true });
+      data.missioni = serverMissions({ convalida: { stato: 'vuota', progresso: { fatte: 1, di: 2 } } }, { validator: true });
       progress.mockResolvedValue(data);
       render(
         <MemoryRouter initialEntries={['/studia/ripasso']}>
@@ -927,6 +929,10 @@ describe('ReviewHome', () => {
       );
       const list = await screen.findByRole('region', { name: 'Tutte le missioni' });
       expect(within(list).getByText('Convalida due schede della comunità')).toBeInTheDocument();
+      // One vote cast, nothing left to vote on: «1 di 2» stays beside «Niente oggi».
+      const convalida = list.querySelector('[data-missione="convalida"]') as HTMLElement;
+      expect(convalida).toHaveTextContent('1 di 2');
+      expect(convalida).toHaveTextContent('Niente oggi');
     });
   });
 });

@@ -39,6 +39,11 @@ export function gainSentence(gain: XpGainValue): string {
   return `Hai guadagnato ${gain.punti} ${gain.punti === 1 ? 'punto' : 'punti'}.${gain.livello ? ` Sei al livello ${gain.livello}.` : ''}`;
 }
 
+/** «+20 punti» (and «livello 5»): a message's words, which a screen reader reads as they are (the toast). */
+export function gainWords(gain: XpGainValue): string {
+  return `+${gain.punti} ${gain.punti === 1 ? 'punto' : 'punti'}${gain.livello ? ` · livello ${gain.livello}` : ''}`;
+}
+
 /** «+20 XP» (and «Livello 5»), the words of the chip. */
 export function gainLabel(gain: XpGainValue): string {
   return `+${gain.punti} XP${gain.livello ? ` · Livello ${gain.livello}` : ''}`;

@@ -79,7 +79,17 @@ export function MissionList({ data, loading }: MissionListProps) {
                   <MissionRow
                     key={mission.id}
                     mission={mission}
-                    aside={mission.status === 'in-arrivo' ? <Tag>In arrivo</Tag> : mission.status === 'vuota' ? <Tag>Niente oggi</Tag> : undefined}
+                    aside={
+                      mission.status === 'in-arrivo' ? (
+                        <Tag>In arrivo</Tag>
+                      ) : mission.status === 'vuota' ? (
+                        // A `vuota` keeps what it counted: «convalida» with one vote and nothing left to vote on, «1 di 2».
+                        <>
+                          {mission.progress && <span className="shrink-0 text-sm tabular-nums text-slate-600 dark:text-slate-300">{`${mission.progress.done} di ${mission.progress.of}`}</span>}
+                          <Tag>Niente oggi</Tag>
+                        </>
+                      ) : undefined
+                    }
                   />
                 ))}
             </ul>
