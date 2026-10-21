@@ -1,221 +1,208 @@
-import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, X, Calendar } from 'lucide-react';
+import { useRef, type FocusEvent } from 'react';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { Sparkles, X } from 'lucide-react';
 import { useVersionCheck } from '../../hooks/useVersionCheck';
 import { Modal } from './Modal';
 import { cn } from '../../lib/utils';
-import type { ChangelogEntry } from '../../config/versionConfig';
 import { spring } from '../../lib/motion';
+import { ACTIVE, FOCUS_RING, TRANSITION } from '../../constants/interactions';
+import { newsSince, parseNote, type Inline, type VersionNews } from '../../content/novita/releaseNotes';
 import { focusPage } from '../../utils/focusPage';
 
 /**
- * Changelog notification component
- *
- * Shows a toast when a new version is detected, with option to view full changelog.
- * Automatically saves the version to localStorage when dismissed.
+ * The version's news (R1): a toast when the app is at a version this browser has not seen, and «Vedi»
+ * opens the notes for the people who use VisuaLex (`content/novita/`) — the new version's, and those of
+ * the versions skipped since the last visit, the newest first. `/version` gives the number only.
+ * Dismissed (the X, or the window closed), the version is remembered and the toast does not come back.
+ * The component stays mounted, so the toast and the window leave with their motion; the focus goes back
+ * to where it was before it entered the toast, which is gone by then — or, when it came from nowhere (a click on «Vedi»
+ * with the focus on the body), to the page's `<main>` (`focusPage`), not the body. A screen reader hears the news from
+ * a status region present from the first render (a region that arrives with its text is often not read).
  */
 export function ChangelogNotification() {
-  const {
-    currentVersion,
-    hasNewVersion,
-    changelog,
-    dismissNotification,
-    showChangelog,
-    setShowChangelog,
-  } = useVersionCheck();
+  const { currentVersion, hasNewVersion, lastSeenVersion, dismissNotification, showChangelog, setShowChangelog } =
+    useVersionCheck();
+  const still = useReducedMotion();
+  // Where the focus was before it entered the toast: «Vedi» and the X go with it.
+  const returnFocusRef = useRef<HTMLElement | null>(null);
 
-  // Don't render if no new version
-  if (!hasNewVersion || !currentVersion) {
-    return null;
-  }
+  const shown = hasNewVersion && currentVersion !== null;
+  const news = currentVersion ? newsSince(lastSeenVersion, currentVersion) : [];
+  const away = still ? { opacity: 0 } : { opacity: 0, y: 20, scale: 0.95 };
 
-  const handleViewChangelog = () => {
-    setShowChangelog(true);
+  const rememberFocus = (event: FocusEvent<HTMLDivElement>) => {
+    const from = event.relatedTarget;
+    // The body is no place to give it back to (Bill, 21 Oct 2026): `dismiss` then gives it to the page.
+    if (from instanceof HTMLElement && from !== document.body && !event.currentTarget.contains(from)) returnFocusRef.current = from;
   };
 
-  const handleCloseModal = () => {
-    setShowChangelog(false);
+  // Whatever had the focus — «Vedi», the X, the window's own buttons — is leaving; the window's return of the
+  // focus (to «Vedi», already gone) runs as it closes, so this one comes after it. With nowhere to go back to, the
+  // page takes it: what holds it now is still leaving.
+  const dismiss = () => {
     dismissNotification();
-  };
-
-  const handleDismissToast = () => {
-    dismissNotification();
-    focusPage();
+    const back = returnFocusRef.current;
+    window.setTimeout(() => (back?.isConnected ? back.focus() : focusPage()), 0);
   };
 
   return (
     <>
-      {/* Toast Notification */}
+      <div role="status" className="sr-only">
+        {shown && !showChangelog ? `Novità in v${currentVersion}` : ''}
+      </div>
+
       <AnimatePresence>
-        {!showChangelog && (
+        {shown && !showChangelog && (
           <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            initial={away}
+            animate={still ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
+            exit={away}
             transition={spring.snappy}
             className={cn(
-              'fixed z-[60] flex items-center gap-3 px-4 py-3 rounded-xl border max-w-[90vw] md:max-w-md',
+              'fixed z-[60] flex items-center gap-3 py-2 pl-4 pr-2 rounded-xl border w-max max-w-[calc(100vw-2rem)] md:max-w-md',
               'bottom-4 left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:bottom-8 md:right-8',
-              'bg-white dark:bg-slate-900 border-blue-200 dark:border-blue-900/30',
-              'text-slate-800 dark:text-slate-100 shadow-lg shadow-blue-500/10'
+              'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800',
+              'text-slate-900 dark:text-slate-100 shadow-lg'
             )}
-            role="alert"
+            onFocus={rememberFocus}
           >
-            {/* Icon */}
-            <div className="shrink-0 w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
-              <Sparkles size={18} className="text-blue-500" />
+            <div
+              className="shrink-0 size-9 rounded-lg bg-toga-50 dark:bg-toga-900/30 flex items-center justify-center"
+              aria-hidden="true"
+            >
+              <Sparkles size={18} className="text-toga-600 dark:text-toga-300" />
             </div>
 
-            {/* Content */}
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-sm">Novità in v{currentVersion}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                Scopri le ultime modifiche
-              </p>
+              <p className="text-xs text-slate-600 dark:text-slate-400 truncate">Scopri le ultime modifiche</p>
             </div>
 
-            {/* Actions */}
             <button
-              onClick={handleViewChangelog}
+              type="button"
+              onClick={() => setShowChangelog(true)}
               className={cn(
-                'shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium',
-                'bg-blue-500 hover:bg-blue-600 text-white',
-                'transition-colors'
+                'shrink-0 min-h-11 px-4 rounded-lg text-sm font-medium',
+                'bg-toga-600 text-white hover:bg-toga-700',
+                'dark:bg-toga-400 dark:text-ink-950 dark:hover:bg-toga-300',
+                TRANSITION,
+                FOCUS_RING,
+                ACTIVE
               )}
             >
               Vedi
             </button>
 
             <button
-              onClick={handleDismissToast}
+              type="button"
+              onClick={dismiss}
               className={cn(
-                'shrink-0 p-1.5 rounded-lg transition-colors',
-                'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200',
-                'hover:bg-slate-100 dark:hover:bg-slate-800'
+                'shrink-0 inline-flex size-11 items-center justify-center rounded-lg',
+                'text-slate-500 hover:text-slate-800 hover:bg-slate-100',
+                'dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800',
+                TRANSITION,
+                FOCUS_RING
               )}
               aria-label="Chiudi notifica"
             >
-              <X size={16} />
+              <X size={18} aria-hidden="true" />
             </button>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Changelog Modal */}
       <Modal
-        isOpen={showChangelog}
-        onClose={handleCloseModal}
-        title={`Novità in v${currentVersion}`}
+        isOpen={shown && showChangelog}
+        onClose={dismiss}
+        title={news.length > 1 ? 'Novità dalla tua ultima visita' : `Novità in v${currentVersion}`}
         size="md"
-        onReturnFocusLost={focusPage}
       >
-        <ChangelogContent changelog={changelog} />
+        <ReleaseNews news={news} />
       </Modal>
     </>
   );
 }
 
-/**
- * Italian label for the kinds of change worth naming. Anything else - a merge
- * that landed a branch, a subject with no prefix - is shown without a label:
- * the summary already says what happened.
- */
-const TYPE_BADGES: Record<string, { label: string; className: string }> = {
-  feat: {
-    label: 'Novità',
-    className: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
-  },
-  fix: {
-    label: 'Correzione',
-    className: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
-  },
-  perf: {
-    label: 'Prestazioni',
-    className: 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300',
-  },
-};
-
-/**
- * Changelog content for the modal.
- *
- * The server hands over what landed in this version, already stripped of
- * housekeeping and reverted work (visualex_api/tools/changelog.py). Here we
- * only render it: no hashes, no author - this is the reader's changelog, not
- * the technical panel in Impostazioni.
- *
- * Exported for its own test.
- */
-export function ChangelogContent({ changelog }: { changelog: ChangelogEntry[] }) {
-  if (!changelog || changelog.length === 0) {
-    return (
-      <p className="text-slate-500 dark:text-slate-400 text-center py-4">
-        Nessun changelog disponibile
-      </p>
-    );
-  }
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr || dateStr === 'unknown') return 'N/D';
-    try {
-      const date = new Date(dateStr);
-      return date.toLocaleDateString('it-IT', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-      });
-    } catch {
-      return dateStr;
-    }
-  };
-
+function InlineText({ parts }: { parts: Inline[] }) {
   return (
-    <div className="space-y-3">
-      <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
-        Le modifiche entrate in questa versione:
-      </p>
+    <>
+      {parts.map((part, index) =>
+        part.kind === 'strong' ? (
+          <strong key={index} className="font-semibold text-slate-900 dark:text-slate-50">
+            {part.text}
+          </strong>
+        ) : part.kind === 'em' ? (
+          <em key={index}>{part.text}</em>
+        ) : part.kind === 'code' ? (
+          <code
+            key={index}
+            className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[0.9em] text-slate-800 dark:bg-slate-800 dark:text-slate-200"
+          >
+            {part.text}
+          </code>
+        ) : (
+          part.text
+        )
+      )}
+    </>
+  );
+}
 
-      <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-2">
-        {changelog.map((entry, index) => {
-          const badge = entry.type ? TYPE_BADGES[entry.type] : undefined;
+/** One release's note as text, its groups headed one level under `level`. */
+function NoteBody({ note, level }: { note: string | null; level: 3 | 4 }) {
+  if (note === null) {
+    return <p className="text-[15px] leading-relaxed text-slate-700 dark:text-slate-300">Correzioni e miglioramenti</p>;
+  }
+  const Heading = level === 3 ? 'h3' : 'h4';
+  return (
+    <div className="space-y-2 text-[15px] leading-relaxed text-slate-700 [overflow-wrap:anywhere] dark:text-slate-300">
+      {parseNote(note).map((block, index) =>
+        block.kind === 'heading' ? (
+          <Heading
+            key={index}
+            className="pt-3 text-sm font-semibold text-slate-900 first:pt-0 dark:text-slate-50"
+          >
+            {block.text}
+          </Heading>
+        ) : block.kind === 'list' ? (
+          <ul key={index} className="list-disc space-y-1.5 pl-5 marker:text-slate-400 dark:marker:text-slate-500">
+            {block.items.map((item, i) => (
+              <li key={i}>
+                <InlineText parts={item} />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p key={index}>
+            <InlineText parts={block.content} />
+          </p>
+        )
+      )}
+    </div>
+  );
+}
 
-          return (
-            <div
-              key={entry.hash || index}
-              className={cn(
-                'p-3 rounded-lg border',
-                'bg-slate-50 dark:bg-slate-800/50',
-                'border-slate-200 dark:border-slate-700'
-              )}
-            >
-              {/* What changed */}
-              <p className="text-sm text-slate-800 dark:text-slate-200 mb-2 leading-relaxed">
-                {badge && (
-                  <span
-                    className={cn(
-                      'inline-block mr-2 px-1.5 py-0.5 rounded align-middle',
-                      'text-[10px] font-semibold uppercase tracking-wide',
-                      badge.className
-                    )}
-                  >
-                    {badge.label}
-                  </span>
-                )}
-                {entry.summary || entry.message}
-              </p>
-
-              {/* Where, and when */}
-              <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
-                {entry.scope && <span className="font-medium">{entry.scope}</span>}
-                {entry.date && (
-                  <span className="flex items-center gap-1">
-                    <Calendar size={12} />
-                    {formatDate(entry.date)}
-                  </span>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+/**
+ * The window's body: one version's note, or — when the reader skipped some — each version under its own
+ * heading, the newest first. Exported for its test.
+ */
+export function ReleaseNews({ news }: { news: VersionNews[] }) {
+  if (news.length === 1) {
+    return <NoteBody note={news[0].note} level={3} />;
+  }
+  return (
+    <div className="divide-y divide-slate-200 dark:divide-slate-800">
+      {news.map(({ version, note }) => (
+        <section key={version} aria-labelledby={`novita-${version}`} className="py-5 first:pt-0 last:pb-0">
+          <h3
+            id={`novita-${version}`}
+            className="mb-3 font-serif text-xl font-medium text-slate-900 dark:text-slate-50"
+          >
+            Versione {version}
+          </h3>
+          <NoteBody note={note} level={4} />
+        </section>
+      ))}
     </div>
   );
 }
