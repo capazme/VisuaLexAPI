@@ -33,6 +33,7 @@ import { MenuToggle, PhoneTopBar } from './PhoneTopBar';
 import { phoneBarTitle } from './phoneBarTitle';
 import { useHideOnScroll } from './useHideOnScroll';
 import { PlannerHost } from '../features/planner/PlannerHost';
+import { useMediaQuery } from '../../hooks/useIsDesktop';
 
 export function Layout() {
   const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel, openCommandPalette } = useAppStore(useShallow(s => ({
@@ -86,19 +87,23 @@ export function Layout() {
     if (!active || active === document.body || drawerRef.current?.contains(active)) menuToggleRef.current?.focus({ preventScroll: true });
   };
   // Esc closes the drawer and gives the focus to the button that opened it, wherever the focus was (opening it from the
-  // bar leaves the focus on that button). An Esc a control inside took (the user menu, the section switcher) or a
-  // dialog over the drawer (the palette, ⌘K) is theirs.
+  // bar leaves the focus on that button). An Esc a control inside took (the user menu, the section switcher) or an
+  // overlay over the drawer (a modal dialog, a sheet, the palette) is theirs. Only while the drawer is drawn: a window
+  // widened past `lg` with it open hides it by CSS and keeps the state, and its Esc belongs to the page (gotcha 26).
+  const drawerDrawn = !useMediaQuery('(min-width: 1024px)');
   useEffect(() => {
-    if (!sidebarOpen) return;
+    if (!sidebarOpen || !drawerDrawn) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || e.defaultPrevented || document.querySelector('[aria-modal="true"]')) return;
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      // Two queries: jsdom's selector engine misses `[data-find-overlay]` after `[aria-modal="true"]` in one list.
+      if (document.querySelector('[aria-modal="true"]') || document.querySelector('[data-find-overlay]')) return;
       e.preventDefault();
       setSidebarOpen(false);
       menuToggleRef.current?.focus({ preventScroll: true });
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [sidebarOpen]);
+  }, [sidebarOpen, drawerDrawn]);
   const menuToggle = {
     buttonRef: menuToggleRef,
     open: sidebarOpen,

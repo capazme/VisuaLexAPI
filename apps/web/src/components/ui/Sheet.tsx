@@ -26,6 +26,15 @@ export interface SheetProps {
  * browser while it covers the workspace. A press outside dismisses it only with `closeOnBackdrop`:
  * otherwise closing is the X (or Esc, when allowed) and what the content offers.
  */
+/** A ref read as the sheet closes: an opener gone meanwhile (a row the sheet removed) gives nothing, not a detached node. */
+function whileConnected(element: HTMLElement): { readonly current: HTMLElement | null } {
+  return {
+    get current() {
+      return element.isConnected ? element : null;
+    },
+  };
+}
+
 export function Sheet({ title, onClose, initialFocusRef, closeOnEscape = false, closeOnBackdrop = false, className, children }: SheetProps) {
   const { refs, context } = useFloating({ open: true });
   const role = useRole(context, { role: 'dialog' });
@@ -69,7 +78,7 @@ export function Sheet({ title, onClose, initialFocusRef, closeOnEscape = false, 
         aria-hidden
         onClick={closeOnBackdrop ? onClose : undefined}
       />
-      <FloatingFocusManager context={context} modal initialFocus={initialFocusRef ?? 0} returnFocus={opener ? { current: opener } : true}>
+      <FloatingFocusManager context={context} modal initialFocus={initialFocusRef ?? 0} returnFocus={opener ? whileConnected(opener) : true}>
         <motion.div
           // eslint-disable-next-line react-hooks/refs -- floating-ui exposes a stable setter, not a ref.current read
           ref={refs.setFloating}

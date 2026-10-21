@@ -311,7 +311,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   sits where the bar is; the closed drawer is `inert`, and whatever closes it from inside (an entry, a link, the
   backdrop) gives the focus to the bar's menu button, where a dialog an entry opens gives it back; Esc closes it
   wherever the focus is (opening it leaves the focus on the button) and gives the focus to that button, unless a control
-  inside took the key (the user menu, the section switcher) or a modal dialog is over it. That button is
+  inside took the key (the user menu, the section switcher) or an overlay is over it (`aria-modal`, `data-find-overlay`:
+  a sheet, the palette); only below `lg`, so a window widened with the drawer open leaves Esc to the page. That button is
   `data-focus-parked`: a section chosen in the drawer still focuses its new title (`sectionTransition.ts` does not
   take the parked focus for a move by the user).
   There is no «Ricerca Veloce», no

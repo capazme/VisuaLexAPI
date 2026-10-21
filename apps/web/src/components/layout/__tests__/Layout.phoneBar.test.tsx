@@ -106,6 +106,27 @@ describe('Layout — the phone\'s bar and the keyboard', () => {
     expect(toggle).toHaveFocus();
   });
 
+  it('leaves Esc to the page once the window is wide enough to hide the drawer', () => {
+    window.matchMedia = ((query: string) => ({ ...original(query), matches: query === '(min-width: 1024px)' })) as typeof window.matchMedia;
+    const { bar } = page();
+    const toggle = within(bar).getByRole('button', { name: 'Apri il menu' });
+    fireEvent.click(toggle);
+    const taken = !fireEvent.keyDown(toggle, { key: 'Escape' });
+    expect(taken).toBe(false);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('leaves an Esc to a sheet or an overlay over the drawer', () => {
+    const { bar } = page();
+    fireEvent.click(within(bar).getByRole('button', { name: 'Apri il menu' }));
+    const sheet = document.createElement('div');
+    sheet.setAttribute('data-find-overlay', '');
+    document.body.appendChild(sheet);
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    sheet.remove();
+    expect(within(bar).getByRole('button', { name: 'Chiudi il menu' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
   it('leaves an Esc a control inside the drawer took', () => {
     const { bar } = page();
     fireEvent.click(within(bar).getByRole('button', { name: 'Apri il menu' }));
