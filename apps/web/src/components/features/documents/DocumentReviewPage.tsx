@@ -135,9 +135,9 @@ export function DocumentReviewPage() {
    * after a frame, so the words are on screen while it runs), the check, then the text. A refusal stays on the row.
    * `thrown`: let go on the box, so the sheets land and one flies to the row.
    */
-  const handleFile = async (file: File, thrown = false) => {
+  const handleFile = async (file: File, thrown = false, others = 0) => {
     const id = ++readingRef.current;
-    const base: DocumentJob = { id, name: file.name, bytes: file.size, kind: documentKind(file.name), stage: 'reading' };
+    const base: DocumentJob = { id, name: file.name, bytes: file.size, kind: documentKind(file.name), stage: 'reading', others };
     setJob(base);
     if (thrown) {
       setLandings((n) => n + 1);
@@ -169,7 +169,7 @@ export function DocumentReviewPage() {
   });
 
   // A file over the window, from `dragover` alone (`dragenter`/`dragleave` fire between children too): over the box or
-  // elsewhere, and where on the box; with no event for 200 ms it has gone. Let go anywhere but on the box, the browser
+  // elsewhere, and where on the box; with no event for `DRAG_REST_MS` it has gone. Let go anywhere but on the box, the browser
   // would open it in place of the app: refused over the whole window (the margins and the sidebar too).
   useEffect(() => {
     let rest = 0;
@@ -201,8 +201,10 @@ export function DocumentReviewPage() {
         if (event.dataTransfer) event.dataTransfer.dropEffect = 'none';
         return;
       }
-      const file = event.dataTransfer?.files?.[0];
-      if (file) void handleFileRef.current(file, true);
+      const files = event.dataTransfer?.files;
+      const file = files?.[0];
+      // One file at a time: the others are not lost in silence, the row says so.
+      if (file) void handleFileRef.current(file, true, Math.max(0, (files?.length ?? 1) - 1));
     };
     window.addEventListener('dragover', over);
     window.addEventListener('drop', drop);

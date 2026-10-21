@@ -54,6 +54,9 @@ export function DocumentRow({ job, onDismiss, markRef, hidden = false }: { job: 
           </span>
           <span className="shrink-0 text-xs tabular-nums text-slate-500 dark:text-slate-400">{formatSize(job.bytes)}</span>
         </span>
+        {(job.others ?? 0) > 0 && (
+          <span className="text-xs text-slate-600 dark:text-slate-400">Letto il primo dei {(job.others ?? 0) + 1} file: uno alla volta</span>
+        )}
         {failed ? (
           <span className="text-sm text-red-800 dark:text-red-200">{job.error}</span>
         ) : (

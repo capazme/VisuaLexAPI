@@ -29,5 +29,7 @@ export interface DocumentJob {
   kind: DocumentKind;
   stage: DocumentStage;
   error?: string;
+  /** Files let go with it and not read: one at a time, and the row says so. */
+  others?: number;
 }
 

@@ -165,7 +165,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   enter 40 ms apart, none of it under reduced motion. **The box** (`DropZone`, D6, a native `<button>`: the click,
   Enter and Space open the picker) follows a file from `dragover` alone — `dragenter`/`dragleave` fire between
   children —, on `window`: `idle`, `page` (a file over the window), `over` (over the box, which leans the sheets
-  towards the pointer), back to `idle` 200 ms after the last event. Its frame is an SVG measured on the box: dashes
+  towards the pointer), back to `idle` 400 ms after the last event (the HTML standard lets a still pointer send a
+  `dragover` only every 350 ± 200 ms; the brief's 200 could rest the box under a file still held). Its frame is an SVG measured on the box: dashes
   that turn slowly (`vlx-dash`, `stroke-dashoffset`), in ink and faster over the window, one line over the box —
   three strokes shown by their opacity, as the tinted ground: only transforms, opacity and the dash offset move;
   three sheets in a pile fan out, then open wide (Framer Motion, `spring.gentle`); let go, they settle and a wave
@@ -175,8 +176,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   citazioni…» (the search after a frame, so the words are on screen) over a bar that slides — no percentage it
   does not know —, the check for 450 ms, then the text; a refusal turns it red, shakes it once (`vlx-shake`, 300 ms)
   with its reason, and ✕ slides it away. «Il file resta nel tuo browser» is in the box in every state; a phone
-  says «Tocca per scegliere un documento». A polite live region says «Documento in lettura», «Cerco le citazioni»,
-  «Pronto», the refusal, then the count. Under reduced motion the dashes stand, the sheets change place without
+  says «Tocca per scegliere un documento». A polite live region says «Documento in lettura» (the search for citations is too short
+  to say), «Pronto», the refusal, then the count. Several files let go at once: the first is read, and its row says
+  «Letto il primo dei N file: uno alla volta». Under reduced motion the dashes stand, the sheets change place without
   moving, and nothing is thrown, bounced or shaken. While `/documents` is open it refuses a file
   dropped **anywhere in the window** but on its box (the same `dragover`/`drop` listeners on `window`, so the
   browser does not open the file in place of the app): a drop zone added elsewhere on the page, or in

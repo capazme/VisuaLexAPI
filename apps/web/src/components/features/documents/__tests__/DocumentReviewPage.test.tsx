@@ -66,7 +66,7 @@ describe('DocumentReviewPage — before a document', () => {
     fireEvent.dragOver(zone, { dataTransfer });
     expect(zone).toHaveAttribute('data-phase', 'over');
     expect(zone).toHaveTextContent('Rilascia per leggerlo');
-    // No event for 200 ms: the file went away.
+    // No event for 400 ms (`DRAG_REST_MS`): the file went away.
     await waitFor(() => expect(zone).toHaveAttribute('data-phase', 'idle'));
     expect(zone).toHaveTextContent('Scegli un documento');
     // A child of the box is the box: no `dragleave` to fool it.
@@ -101,6 +101,44 @@ describe('DocumentReviewPage — before a document', () => {
     expect(await screen.findByRole('heading', { level: 2, name: 'svelto.txt' })).toBeInTheDocument();
     await act(async () => finish('art. 2043 c.c.'));
     expect(screen.queryByRole('heading', { level: 2, name: 'lento.txt' })).toBeNull();
+  });
+
+  it('reads the first of several files let go, and says the others were not read (D6)', async () => {
+    render(<DocumentReviewPage />);
+    const zone = screen.getByRole('button', { name: /Scegli un documento/ });
+    const files = [testFile([PARERE], 'primo.txt'), testFile(['x'], 'secondo.txt'), testFile(['y'], 'terzo.txt')];
+    fireEvent.drop(zone, { dataTransfer: { types: ['Files'], files, dropEffect: 'none' } });
+    expect(screen.getByText('Letto il primo dei 3 file: uno alla volta')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 2, name: 'primo.txt' })).toBeInTheDocument();
+  });
+
+  it('a text or a link dragged over the page changes nothing, and is not taken', () => {
+    render(<DocumentReviewPage />);
+    const zone = screen.getByRole('button', { name: /Scegli un documento/ });
+    for (const types of [['text/plain'], ['text/uri-list', 'text/plain']]) {
+      const over = new Event('dragover', { bubbles: true, cancelable: true });
+      Object.defineProperty(over, 'dataTransfer', { value: { types, files: [], dropEffect: 'none' } });
+      zone.dispatchEvent(over);
+      expect(over.defaultPrevented).toBe(false);
+      expect(zone).toHaveAttribute('data-phase', 'idle');
+    }
+  });
+
+  it('lets go of its window listeners and its timer when the page goes', () => {
+    const removed = vi.spyOn(window, 'removeEventListener');
+    const cleared = vi.spyOn(window, 'clearTimeout');
+    const { unmount } = render(<DocumentReviewPage />);
+    fireEvent.dragOver(screen.getByRole('button', { name: /Scegli un documento/ }), { dataTransfer: { types: ['Files'], files: [], dropEffect: 'none' } });
+    unmount();
+    expect(removed.mock.calls.map(([type]) => type)).toEqual(expect.arrayContaining(['dragover', 'drop']));
+    expect(cleared).toHaveBeenCalled();
+    // A file over the window after the page went is no business of it: nothing prevented.
+    const later = new Event('dragover', { bubbles: true, cancelable: true });
+    Object.defineProperty(later, 'dataTransfer', { value: { types: ['Files'], files: [], dropEffect: 'none' } });
+    window.dispatchEvent(later);
+    expect(later.defaultPrevented).toBe(false);
+    removed.mockRestore();
+    cleared.mockRestore();
   });
 
   it('keeps the promise in sight in every state: the file stays in the browser', () => {
