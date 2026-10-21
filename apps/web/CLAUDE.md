@@ -189,7 +189,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   picture would be drawn over the drawer and its veil. The focus goes to the
   new page's title unless the user moved it meanwhile: each section's home marks its heading
   `data-section-title="<section id>"` with `tabIndex={-1}` and `FOCUS_RING`, so a keyboard user sees where the focus
-  went (Gymnasium's `h1`, the dossier list's `h1` — `opus` or
+  went — and only a keyboard user: the browser counts a focus the script gives after a focused menu entry as visible,
+  so a choice made with a pointer (`MenuItem.onSelect`'s click, `detail` above 0) marks the title
+  `data-pointer-focus`, which `index.css` draws with no ring, until it loses the focus (Gymnasium's `h1`, the dossier list's `h1` — `opus` or
   `gymnasium` by the kind it lists, since the same element stays from one to the other —, «Dossier pubblici», the
   MERL-T hub); a new home marks its own. Under reduced motion the page changes at once and nothing moves; without View
   Transitions the page changes at once, and only the mark and the sidebar's entries move. Choosing the section one is

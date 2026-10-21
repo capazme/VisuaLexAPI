@@ -70,11 +70,22 @@ function watchTitle(section: SectionId, found: (title: HTMLElement) => void): { 
 
 /**
  * The focus goes to the title only if nobody moved it meanwhile: it is still where the choice left it (the switcher)
- * or nowhere. A click into a field, or a Tab, while a lazy page's title was on its way keeps its focus.
+ * or nowhere. A click into a field, or a Tab, while a lazy page's title was on its way keeps its focus. Chosen with a
+ * pointer, the title shows no ring (`data-pointer-focus`, `index.css`) until it loses the focus; from the keyboard it
+ * does, so the user sees where the focus went.
  */
-function focusTitleUnlessMoved(title: HTMLElement, leftOn: Element | null) {
+function focusTitleUnlessMoved(title: HTMLElement, leftOn: Element | null, byPointer: boolean) {
   const active = document.activeElement;
-  if (active === leftOn || active === null || active === document.body) title.focus({ preventScroll: true });
+  if (active !== leftOn && active !== null && active !== document.body) return;
+  if (byPointer) {
+    title.setAttribute('data-pointer-focus', '');
+    title.addEventListener('blur', () => title.removeAttribute('data-pointer-focus'), { once: true });
+  } else {
+    title.removeAttribute('data-pointer-focus');
+  }
+  title.focus({ preventScroll: true });
+  // A title that could not take the focus keeps no mark, or a later focus from the keyboard would show no ring.
+  if (document.activeElement !== title) title.removeAttribute('data-pointer-focus');
 }
 
 export interface SectionTransition {
@@ -90,6 +101,8 @@ export interface SectionTransition {
    * picture would be drawn over the drawer and its veil while they slide away.
    */
   still?: boolean;
+  /** Chosen with a pointer (a click whose `detail` is not 0): the title takes the focus without its ring. */
+  byPointer?: boolean;
 }
 
 /**
@@ -101,11 +114,11 @@ export interface SectionTransition {
  * goes to the new page's title. Under reduced motion, without View Transitions, or `still`, the page changes at once.
  * Returns the way to finish it.
  */
-export function playSectionTransition({ section, swap, still = false }: SectionTransition): () => void {
+export function playSectionTransition({ section, swap, still = false, byPointer = false }: SectionTransition): () => void {
   const leftOn = document.activeElement;
 
   if (still || prefersReducedMotion() || !canTransitionPage()) {
-    const title = watchTitle(section, (found) => focusTitleUnlessMoved(found, leftOn));
+    const title = watchTitle(section, (found) => focusTitleUnlessMoved(found, leftOn, byPointer));
     swap();
     title.start();
     return title.stop;
@@ -118,7 +131,7 @@ export function playSectionTransition({ section, swap, still = false }: SectionT
   let resolveUpdate = () => {};
   const title = watchTitle(section, (found) => {
     resolveUpdate();
-    focusTitleUnlessMoved(found, leftOn);
+    focusTitleUnlessMoved(found, leftOn, byPointer);
   });
   // The browser keeps the old page's picture until the update settles: settle it when the new title is there. The
   // update runs a frame later: a change the next choice already ended only swaps, one Back dropped does not.

@@ -490,6 +490,23 @@ describe('the section change (T1)', () => {
     expect(reduced).toMatch(/::view-transition-new\(\*\)\s*\{\s*animation:\s*none\s*!important/);
   }, 30000);
 
+  it('draws no ring on a title focused after a choice made with a pointer, over the utilities\' ring', async () => {
+    const css = await compile(FOCUS_RING.split(' '));
+    expect(css).toMatch(/\[data-pointer-focus\]:focus\s*\{\s*outline:\s*none;\s*box-shadow:\s*none/);
+    // Outside every layer, so it wins over `focus-visible:ring-2` (in the utilities layer) whatever the order.
+    const rule = css.indexOf('[data-pointer-focus]:focus');
+    const layers = [...css.matchAll(/@layer [\w-]+\s*\{/g)];
+    for (const layer of layers) {
+      let depth = 0;
+      let at = layer.index! + layer[0].length - 1;
+      for (; at < css.length; at += 1) {
+        if (css[at] === '{') depth += 1;
+        else if (css[at] === '}' && (depth -= 1) === 0) break;
+      }
+      expect(rule < layer.index! || rule > at, layer[0]).toBe(true);
+    }
+  }, 30000);
+
   it('compiles the mark\'s colour change, 200 ms, and stills it under reduced motion', async () => {
     const css = await compile(['transition-colors', 'duration-200', 'ease-out', 'motion-reduce:transition-none']);
     expect(css).toMatch(/\.duration-200\s*\{[^}]*transition-duration:\s*200ms/);

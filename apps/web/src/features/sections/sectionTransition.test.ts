@@ -265,4 +265,18 @@ describe('playSectionTransition (T1)', () => {
     await Promise.resolve();
     expect(document.documentElement).not.toHaveClass(PAGE_CHANGING);
   });
+
+  it('chosen with a pointer, focuses the title without its ring until it loses the focus; from the keyboard, with it', async () => {
+    reducedMotion(true);
+    playSectionTransition({ section: 'gymnasium', swap: newPage, byPointer: true });
+    await waitFor(() => expect(title()).toHaveFocus());
+    expect(title()).toHaveAttribute('data-pointer-focus');
+    title().blur();
+    expect(title()).not.toHaveAttribute('data-pointer-focus');
+
+    document.body.innerHTML = '<main><h2 data-section-title="opus" tabindex="-1">I tuoi dossier di lavoro</h2></main>';
+    playSectionTransition({ section: 'gymnasium', swap: newPage });
+    await waitFor(() => expect(title()).toHaveFocus());
+    expect(title()).not.toHaveAttribute('data-pointer-focus');
+  });
 });

@@ -104,6 +104,27 @@ describe('SectionSwitcher (spec S3)', () => {
     fireEvent.keyDown(trigger(), { key: 'ArrowDown' });
     fireEvent.click(screen.getByRole('menuitemradio', { name: /Gymnasium/ }), { detail: 0 });
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Gymnasium: la tua palestra giuridica' })).toHaveFocus());
+    // From the keyboard the ring shows where the focus went.
+    expect(screen.getByRole('heading', { name: 'Gymnasium: la tua palestra giuridica' })).not.toHaveAttribute('data-pointer-focus');
+  });
+
+  it('chosen with the mouse, the new title takes the focus without its ring (T1)', async () => {
+    render(
+      <MemoryRouter initialEntries={['/studia/ripasso']}>
+        <SectionSwitcher forumCount={0} />
+        <main>
+          <Routes>
+            <Route path="/studia/ripasso" element={<h1 data-section-title="gymnasium" tabIndex={-1}>Gymnasium: la tua palestra giuridica</h1>} />
+            <Route path="/dossier" element={<h2 data-section-title="opus" tabIndex={-1}>I tuoi dossier di lavoro</h2>} />
+          </Routes>
+        </main>
+      </MemoryRouter>,
+    );
+    fireEvent.click(trigger(), { detail: 1 });
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Opus/ }), { detail: 1 });
+    const heading = await screen.findByRole('heading', { name: 'I tuoi dossier di lavoro' });
+    await waitFor(() => expect(heading).toHaveFocus());
+    expect(heading).toHaveAttribute('data-pointer-focus');
   });
 
   it('goes to the home of the section it is in without a change to show', () => {

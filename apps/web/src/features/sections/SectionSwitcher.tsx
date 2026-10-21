@@ -33,8 +33,9 @@ export function SectionSwitcher({ forumCount, onChoose, withName = false, inDraw
         icon: s.icon,
         checked: s.id === section,
         badge: s.id === 'forum' ? forumCount : undefined,
-        onSelect: () => {
-          chooseSection(s.id, { still: inDrawer });
+        // A key's click (Enter, Space) has `detail` 0.
+        onSelect: (event) => {
+          chooseSection(s.id, { still: inDrawer, byPointer: event.detail > 0 });
           onChoose?.();
         },
       }))}
