@@ -10,7 +10,12 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
   `brocardi_scraper.py` (switched off, below), `pdfextractor.py` (Playwright pool),
   `http_client.py` (the shared throttled aiohttp client — TLS verification on;
   `request(..., max_retries=n)` lowers the retry budget for a caller that paces
-  itself, `None` keeps `HTTP_MAX_RETRIES`).
+  itself, `None` keeps `HTTP_MAX_RETRIES`; once the budget is spent it gives up at once,
+  without the backoff or the `Retry-After` no attempt would follow — but a rate-limit
+  answer (429/503) that states a `Retry-After` pauses its `source` for that wait, so the
+  next request to the same source, from any caller, waits it out first, or is refused at
+  once (429) when more than `MAX_PAUSE_WAIT` (30 s) is left; our own backoff never pauses
+  the source; the pause lives in the client instance).
   - `brocardi_scraper.py` is **switched off**: Brocardi is no longer a source
     (D-078). No route calls it, no answer carries `brocardi_info` or
     `brocardi_error` (a client's `show_brocardi_info` is ignored),
@@ -93,7 +98,10 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     index the web opens no longer fetch the same page three times. A EUR-Lex tree reads the
     page from the scraper's own copy (namespace `eurlex`, same URL) and leaves the page it
     visited there, only when it parsed into articles: one browser visit serves the tree, the
-    rubriche and the articles (`tests/test_tree_variants.py`)
+    rubriche and the articles (`tests/test_tree_variants.py`). The Normattiva page comes
+    through the shared client (its rate limit and host check, one attempt as before), and
+    no URL is visited, by the client or the browser, unless `is_allowed` and its host is
+    Normattiva's or EUR-Lex's (`_source_of`): `POST /fetch_tree` passes the caller's URL here
   - `text_op.py` — text parsing **and** date handling (see Date System)
   - `article_suffixes.py` — the ordinal table (`bis` … `vicies`) every
     article-number regex reads, longest-first so a short entry cannot claim the
@@ -134,11 +142,13 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     and `suggest_acts()` offers near misses. Chained after the exact-match paths
     in `alias_resolver` and `nl_parser`, so nothing that resolved before changes.
   - `egress.py` — `ALLOWED_HOSTS` plus `is_allowed(url)`, checked in
-    `ThrottledHttpClient.request`. `tests/test_egress_allowlist.py` fails the
+    `ThrottledHttpClient.request`; it refuses a backslash, a control character,
+    credentials before the host and a scheme other than http(s), which Chromium would
+    read as another host than `urlparse` does. `tests/test_egress_allowlist.py` fails the
     build when a URL literal names an undeclared host. The runtime check covers
     every `ThrottledHttpClient` (the shared one and the decision readers' own)
-    and nothing else — `SECURITY.md` lists the three paths it does not cover
-    (treextractor's own session, Playwright, redirect targets).
+    and treextractor's check before a browser — `SECURITY.md` lists what it does not
+    cover (the EUR-Lex scraper's and the PDF export's Playwright, redirect targets).
   - `tls.py` — the verifying SSL context for Italgiure, which serves an incomplete chain:
     the missing intermediate ships in `tools/certs/` and is trusted only under its SHA-256
     pin. Never "simplify" it into turning verification off (`tests/test_tls_italgiure.py`
@@ -179,7 +189,13 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     per-instance** — single-instance deployment only. Status at
     `GET /api/circuit-breakers`
   - `redis_cache.py` + `cache_manager.py` — Redis cache with automatic
-    filesystem fallback; startup warns when Redis is disabled or missing
+    filesystem fallback; startup warns when Redis is disabled or missing. The filesystem
+    cache deletes an expired entry only when its key is read again, so a namespace nobody
+    sweeps only grows. The Normattiva pages (2.6 MB for an article of a code) are pruned at
+    start and every six hours with the decision caches (`prune_normattiva_cache`): the
+    pages not read for 30 days go, then the least recently read down to 2 GB (the owner's
+    rule, G-338). A read refreshes the file's modification time, which is what `prune`
+    reads; the TTL still counts from the write
 
 **Timing harness** — `scripts/collector_timing.py` runs a fixed list of real requests
 in-process, cold then warm, and prints where each one's time goes (network per host, our

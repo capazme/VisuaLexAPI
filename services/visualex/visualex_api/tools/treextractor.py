@@ -1,16 +1,19 @@
 import asyncio
-import aiohttp
 from bs4 import BeautifulSoup
 import logging
 import re
+from urllib.parse import urlparse
 from aiocache import cached, Cache
 from aiocache.serializers import JsonSerializer
 from playwright.async_api import async_playwright
 
 from .cache import PersistentCache
 from .cache_manager import get_cache_manager
+from .egress import is_allowed
+from .exceptions import DocumentNotFoundError, NetworkError
 from .logging_config import log_handlers
 from ..services.akn_parser import normalize_article_key
+from ..services.http_client import http_client
 
 # Configurazione del logging
 logging.basicConfig(level=logging.INFO,
@@ -80,6 +83,16 @@ async def _eurlex_page(normurn):
     return await _fetch_with_playwright(normurn), False
 
 
+def _source_of(normurn):
+    """"normattiva" or "eurlex" by the URL's host (the hosts every URL the app builds uses),
+    else None: a word in the path or the query decides nothing."""
+    try:
+        host = urlparse(normurn).hostname
+    except ValueError:
+        return None
+    return {"www.normattiva.it": "normattiva", "eur-lex.europa.eu": "eurlex"}.get(host)
+
+
 def _no_tree(result):
     """A failure (a blocked page, a timeout) or an empty tree: (message or [], 0[, {}]). Never kept
     in memory, as the persistent cache never keeps it: the next caller asks the source again
@@ -123,8 +136,9 @@ async def get_tree(normurn, link=False, details=False, return_metadata=False):
         return cached_result.get("result", []), cached_result.get("count", 0)
 
     # Use different fetch methods based on source
-    is_eurlex = "eur-lex" in normurn
-    is_normattiva = "normattiva" in normurn
+    source = _source_of(normurn)
+    is_eurlex = source == "eurlex"
+    is_normattiva = source == "normattiva"
 
     # One Normattiva page, one download: every (details, return_metadata) variant is read
     # from the widest tree of that page. The existence check, a range and the index the web
@@ -157,6 +171,15 @@ async def _tree_from_page(normurn, link, details, return_metadata, is_eurlex, eu
     def failure(message):
         return (message, 0, {}, from_copy) if return_metadata else (message, 0, from_copy)
 
+    # `normurn` comes from the caller (POST /fetch_tree): only a declared host is visited, by
+    # the browser as by the client, and only Normattiva's or EUR-Lex's host.
+    if not is_allowed(normurn):
+        logging.error(f"Tree refused for an undeclared host: {normurn[:80]}")
+        return failure(f"Host non consentito: {normurn[:80]}")
+    if not is_eurlex and _source_of(normurn) != "normattiva":
+        logging.warning(f"Unrecognized norm URN format: {normurn}")
+        return failure("Unrecognized norm URN format")
+
     try:
         if is_eurlex:
             # EUR-Lex requires Playwright to bypass WAF
@@ -165,18 +188,14 @@ async def _tree_from_page(normurn, link, details, return_metadata, is_eurlex, eu
             else:
                 text = await _fetch_with_playwright(normurn)
         else:
-            # Normattiva and others use simple HTTP
-            # Certificate verification enabled (aiohttp default).
-            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector()) as session:
-                async with session.get(normurn, timeout=30) as response:
-                    response.raise_for_status()
-                    text = await response.text()
-    except aiohttp.ClientError as e:
-        logging.error(f"HTTP error while fetching page: {e}", exc_info=True)
+            # Normattiva through the shared client, as its article pages: its rate limit and
+            # its host check. One attempt, as when the tree had a session of its own: the
+            # retry budget toward the source is not raised here.
+            text = (await http_client.request("GET", normurn, source="normattiva",
+                                              max_retries=0)).text
+    except (NetworkError, DocumentNotFoundError) as e:
+        logging.error(f"HTTP error while fetching page: {e}")
         return failure(f"Failed to retrieve the page: {e}")
-    except asyncio.TimeoutError:
-        logging.error("Request timed out")
-        return failure("Request timed out")
     except Exception as e:
         logging.error(f"Unexpected error: {e}", exc_info=True)
         return failure(f"Unexpected error: {e}")
@@ -187,7 +206,7 @@ async def _tree_from_page(normurn, link, details, return_metadata, is_eurlex, eu
 
     soup = BeautifulSoup(text, 'html.parser')
 
-    if "normattiva" in normurn:
+    if not is_eurlex:
         result, count, metadata = await _parse_normattiva_tree(
             soup, normurn, link, True, return_metadata=True)
         if count > 0:
@@ -195,15 +214,12 @@ async def _tree_from_page(normurn, link, details, return_metadata, is_eurlex, eu
                                   {"result": result, "count": count, "metadata": metadata})
             logging.info(f"Stored full tree in persistent cache: {normurn[:50]}, {count} articles")
         return _narrow(result, count, metadata, details, return_metadata) + (from_copy,)
-    elif is_eurlex:
+    else:
         # No annexes on EUR-Lex, but the parse does yield article titles.
         result, count, metadata = await _parse_eurlex_tree(soup, normurn, link, details)
         if count > 0 and not from_copy and len(text) >= _EURLEX_MIN_PAGE:
             # A page that parsed into articles is the act's: kept where the scraper reads it.
             await get_cache_manager().get_persistent("eurlex").set(normurn, text)
-    else:
-        logging.warning(f"Unrecognized norm URN format: {normurn}")
-        return failure("Unrecognized norm URN format")
 
     # Store in persistent cache for future restarts
     if count > 0:
