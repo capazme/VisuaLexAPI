@@ -69,9 +69,10 @@ function Stack({ position, entries, still, shortcutFor }: { position: 'top' | 'b
   return (
     <div
       className={cn(
-        // On a phone the width less a 16 px gutter; from `md` at the right, as wide as a sentence.
+        // On a phone the width less a 16 px gutter; from `md` at the right, as wide as a sentence, and at the bottom over
+        // the feedback button (`FeedbackButton`: 46 px, 24 px from the edge, from `md`), which it covered.
         'absolute inset-x-4 md:inset-x-auto md:right-8 md:w-[26rem]',
-        position === 'bottom' ? 'bottom-4 md:bottom-8' : 'top-4',
+        position === 'bottom' ? 'bottom-4 md:bottom-[5.5rem]' : 'top-4',
       )}
     >
       <LayoutGroup id={`notifications-${position}`}>

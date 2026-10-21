@@ -417,7 +417,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   timing (its «Chiudi» in ink-500, dark ink-400: over 3:1, since it is often the one way out); both only fade under reduced motion (`useReducedMotion`). The notifications (K1a,
   `components/ui/notifications/`): every `Toast` while `isVisible` and every `showUndoToast` is an entry of one
   store (`notifications.ts`), drawn by `NotificationHost` (mounted once in `Layout`, in the toast band): a stack at
-  the bottom (at the top for `position="top"`), three at most per edge — the newest first, a fourth closes the oldest
+  the bottom (at the top for `position="top"`; from `md` at the right, its foot over the feedback button, which it
+  covered), three at most per edge — the newest first, a fourth closes the oldest
   plain one first (an «Annulla» or a notification that stays until closed goes only when nothing else can; one pushed
   out stands), the others move with `spring.gentle`; a list named «Notifiche», read from a
   polite and an assertive live region that `notify` sets when one arrives (a closing one never makes an older one read
@@ -428,8 +429,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   of weight (Geist's axis); the clip is let go once open, so a focus ring is never cut. Each entry's time is a
   `countdown.ts`, held by a mouse over it, the focus in it, a finger on it and a hidden tab; «Annulla»'s 5 s is the
   line at the bottom drawing back between two ticks, which grow while it is held. Run out (or taken back), it closes
-  into the line, which draws back to the centre; ✕, Esc from inside it and a swipe to the side (a coarse pointer;
-  a short one springs back) fold it and slide it away. «Annulla» closes it at once — nothing in a closing
+  into the line, which draws back to the centre; ✕, Esc from inside it and a swipe to the side (a finger, or the
+  mouse dragging it; a short one springs back) fold it and slide it away. «Annulla» closes it at once — nothing in a closing
   notification takes a click (`inert`) — awaits the undo and draws «Ripristinato» in its place for 1.5 s (`undoneSlots`: the place is kept when the undo
   outlasts the exit); the focus of a notification closed from the keyboard (Esc, or a key's click, `detail` 0, or a
   `:focus-visible` button) goes to the next one still open — never after a mouse click or a swipe, where it would

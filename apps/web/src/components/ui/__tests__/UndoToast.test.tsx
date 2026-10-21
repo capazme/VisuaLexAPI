@@ -16,6 +16,14 @@ const list = () => screen.getByRole('list');
 const cards = () => within(list()).queryAllByRole('listitem');
 
 describe('NotificationHost (K1a)', () => {
+  it('keeps the bottom stack over the feedback button from `md` (46 px, 24 px from the edge): it covered it', async () => {
+    render(<NotificationHost />);
+    await act(async () => { notify({ message: 'Salvato', type: 'success', duration: 3000 }); });
+    const stack = list().parentElement as HTMLElement;
+    expect(stack.className).toContain('md:bottom-[5.5rem]');
+    expect(stack.className).not.toContain('md:bottom-8');
+  });
+
   it('answers «Annulla» while the time runs, then says «Ripristinato» in the same place', async () => {
     const undo = vi.fn();
     render(<NotificationHost />);

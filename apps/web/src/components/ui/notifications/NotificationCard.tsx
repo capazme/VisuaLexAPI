@@ -48,10 +48,7 @@ const ICON_INK: Record<NotificationType, string> = {
 /** The line is the app's ink, red for an error. */
 const LINE_INK = (type: NotificationType) => (type === 'error' ? 'bg-red-600 dark:bg-red-400' : 'bg-primary-600 dark:bg-primary-400');
 
-/** Whether a finger is the pointer: a swipe to the side closes the notification there. */
-const coarsePointer = () => typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
-
-/** How far, or how fast, a swipe has to go to close it; a shorter one goes back to its place. */
+/** How far, or how fast, a swipe (a finger, or the mouse dragging it) has to go to close it; a shorter one goes back. */
 const SWIPE_PX = 80;
 const SWIPE_SPEED = 500;
 
@@ -217,8 +214,9 @@ export function NotificationCard({ entry, still, standalone = false, shortcut, o
     <motion.div
       ref={scope}
       data-card
-      drag={!closing && !standalone && coarsePointer() ? 'x' : false}
-      // Swiped away, it leaves from where the finger let it go.
+      // A finger or the mouse, as the reviewer expected of a stack at the side of the screen.
+      drag={!closing && !standalone ? 'x' : false}
+      // Swiped away, it leaves from where the pointer let it go.
       dragSnapToOrigin={!closing}
       dragElastic={0.4}
       onDragEnd={onDragEnd}
