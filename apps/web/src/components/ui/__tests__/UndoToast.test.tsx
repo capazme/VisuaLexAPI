@@ -260,14 +260,48 @@ describe('NotificationHost (K1a)', () => {
       expect(cards().map((c) => c.textContent)).toEqual([expect.stringContaining('Ripristinato'), expect.stringContaining('Primo rimosso')]);
     });
 
-    it('says it in the live region', async () => {
+    it('says in the live region, once the undo has run, what it put back', async () => {
       platform('Win32');
       await two();
-      let said = '';
-      const unsubscribe = notificationStore.subscribe((s) => { if (s.announced.polite?.message.startsWith('Annullato')) said = s.announced.polite.message; });
       await act(async () => { document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true })); });
-      unsubscribe();
-      expect(said).toBe('Annullato: Secondo rimosso');
+      // The DOM, not the store: one message in the region, the one that stays.
+      expect(screen.getByRole('status')).toHaveTextContent(/^Ripristinato: Secondo rimosso$/);
+    });
+
+    it('undoes once for a held key, never the whole stack', async () => {
+      platform('Win32');
+      const { undoOld, undoNew } = await two();
+      await act(async () => { document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true })); });
+      await act(async () => { document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, repeat: true, bubbles: true, cancelable: true })); });
+      expect(undoNew).toHaveBeenCalledTimes(1);
+      expect(undoOld).not.toHaveBeenCalled();
+    });
+
+    it('does nothing under a dialog: an undo behind it would go unseen', async () => {
+      platform('Win32');
+      const { undoNew } = await two();
+      const dialog = document.createElement('div');
+      dialog.setAttribute('aria-modal', 'true');
+      document.body.append(dialog);
+      await act(async () => { document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true })); });
+      dialog.remove();
+      expect(undoNew).not.toHaveBeenCalled();
+    });
+
+    it('hands the focus in the notification it undoes to the next one', async () => {
+      platform('Win32');
+      await two();
+      const card = (text: string) => cards().find((c) => c.textContent?.includes(text))!;
+      act(() => within(card('Secondo rimosso')).getByRole('button', { name: 'Annulla' }).focus());
+      await act(async () => { document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true })); });
+      expect(card('Primo rimosso')).toContainElement(document.activeElement as HTMLElement);
+    });
+
+    it('is read by its place on a keyboard that writes no Latin letter', async () => {
+      platform('Win32');
+      const { undoNew } = await two();
+      await act(async () => { document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'я', code: 'KeyZ', ctrlKey: true, bubbles: true, cancelable: true })); });
+      expect(undoNew).toHaveBeenCalled();
     });
 
     it('writes «· Ctrl+Z» beside the newest «Annulla» only, and declares it', async () => {

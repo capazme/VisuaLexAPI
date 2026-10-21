@@ -12,9 +12,13 @@ export const undoShortcutLabel = (mac = isMacPlatform()) => (mac ? '⌘Z' : 'Ctr
 /** For `aria-keyshortcuts`. */
 export const undoShortcutKeys = (mac = isMacPlatform()) => (mac ? 'Meta+Z' : 'Control+Z');
 
-/** The key is the shortcut: Z with ⌘ on a Mac, with Ctrl elsewhere; no Shift (that is redo), no Alt. */
-export function isUndoShortcut(event: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey'>, mac = isMacPlatform()): boolean {
-  if (event.key.toLowerCase() !== 'z' || event.shiftKey || event.altKey) return false;
+/**
+ * The key is the shortcut: Z with ⌘ on a Mac, with Ctrl elsewhere; no Shift (that is redo), no Alt. On a keyboard that
+ * writes no Latin letter (Cyrillic, Greek) the key is read by its place, Z's.
+ */
+export function isUndoShortcut(event: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey'> & { code?: string }, mac = isMacPlatform()): boolean {
+  const isZ = event.key.toLowerCase() === 'z' || (event.code === 'KeyZ' && !/^[a-z]$/i.test(event.key));
+  if (!isZ || event.shiftKey || event.altKey) return false;
   return mac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
 }
 

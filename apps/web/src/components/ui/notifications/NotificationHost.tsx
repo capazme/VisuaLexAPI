@@ -3,6 +3,7 @@ import { LayoutGroup, motion, useReducedMotion } from 'framer-motion';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { spring } from '../../../lib/motion';
+import { isWorkspaceCovered } from '../../../utils/findWindowControl';
 import { NotificationCard } from './NotificationCard';
 import { isEditableTarget, isUndoShortcut, undoShortcutKeys, undoShortcutLabel } from './undoShortcut';
 import {
@@ -34,12 +35,24 @@ export function NotificationHost() {
   // anything editable, where it stays the browser's own undo, nor when something else took the key first.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || !isUndoShortcut(event) || isEditableTarget(event.target)) return;
+      // Not under a dialog or an overlay (the «?» dialog, the palette): an undo behind it would go unseen. A held key
+      // undoes once, not the whole stack.
+      if (event.defaultPrevented || event.repeat || !isUndoShortcut(event) || isEditableTarget(event.target) || isWorkspaceCovered()) return;
       const entry = latestUndoable();
       if (!entry) return;
       event.preventDefault();
-      announce(`Annullato: ${entry.message}`);
-      void undoNotification(entry.id);
+      // The focus in the notification undone goes to the next one, as after Esc: it would be lost on the closing one.
+      const card = document.querySelector(`[data-notification-id="${entry.id}"]`);
+      if (card?.contains(document.activeElement)) {
+        const next = [...(card.closest('ol')?.querySelectorAll<HTMLElement>('[data-card]:not([inert])') ?? [])].find((c) => c !== card);
+        next?.querySelector<HTMLElement>('button:not([disabled])')?.focus();
+      }
+      // Said once the undo has run, and with what it undid: «Ripristinato» alone, said by its notification, names nothing.
+      const saidBefore = notificationStore.getState().announced.polite?.id;
+      void undoNotification(entry.id).then(() => {
+        const said = notificationStore.getState().announced.polite;
+        if (said && said.id !== saidBefore && said.message === 'Ripristinato') announce(`Ripristinato: ${entry.message}`);
+      });
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);

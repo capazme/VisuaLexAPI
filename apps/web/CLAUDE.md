@@ -430,7 +430,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `countdown.ts`, held by a mouse over it, the focus in it, a finger on it and a hidden tab; «Annulla»'s 5 s is the
   line at the bottom drawing back between two ticks, which grow while it is held. Run out (or taken back), it closes
   into the line, which draws back to the centre; ✕, Esc from inside it and a swipe to the side (a finger, or the
-  mouse dragging it; a short one springs back) fold it and slide it away. «Annulla» closes it at once — nothing in a closing
+  mouse dragging it from anywhere but a button, which it presses instead; a short one springs back, and a press that
+  moved it is no click; started in `onPointerDown` with `dragListener` off, so the words stay selectable by a double
+  or triple click) fold it and slide it away. «Annulla» closes it at once — nothing in a closing
   notification takes a click (`inert`) — awaits the undo and draws «Ripristinato» in its place for 1.5 s (`undoneSlots`: the place is kept when the undo
   outlasts the exit); the focus of a notification closed from the keyboard (Esc, or a key's click, `detail` 0, or a
   `:focus-visible` button) goes to the next one still open — never after a mouse click or a swipe, where it would
@@ -442,8 +444,11 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   back. Its «Annulla» and ✕ are 44 px at every width. **Ctrl+Z (⌘Z on a Mac)** runs the newest «Annulla» still on screen
   (L-36; `undoShortcut.ts`, the host's `keydown` on `window`): never in a field, a list, an editor or anything
   editable (`isEditableTarget`: there it is the browser's own undo), never with Shift (redo), never when something
-  took the key first, and with no «Annulla» on screen the key goes by; the live region says «Annullato: …», then
-  «Ripristinato» comes as after a click. That notification writes the key beside its «Annulla» («Annulla · Ctrl+Z»,
+  took the key first, never under a dialog or an overlay (`isWorkspaceCovered`: an undo behind it would go unseen),
+  once for a held key (`repeat`), Z read by its place on a keyboard that writes no Latin letter; with no «Annulla» on
+  screen the key goes by. «Ripristinato» comes as after a click, and once the undo has run the live region says
+  «Ripristinato: <what was undone>» in its place (one message: two in a row on an atomic region, the first is lost);
+  the focus in the notification undone goes to the next one, as after Esc. That notification writes the key beside its «Annulla» («Annulla · Ctrl+Z»,
   seen, not in the name; `aria-keyshortcuts`) where the pointer is not coarse; the shortcuts' list has it.
   `registerUndoToastListener` hands the newest «Annulla» on screen to a test. `Tooltip` waits 500 ms under a pointer, opens at once and
   without motion within 300 ms of another closing, and at once on keyboard focus.
