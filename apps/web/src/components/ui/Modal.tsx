@@ -24,6 +24,10 @@ export interface ModalProps {
   showCloseButton?: boolean;
   className?: string;
   contentClassName?: string;
+  /** The id of the element that names the dialog, for one that draws its own header (no `title`). */
+  labelledBy?: string;
+  /** Below `sm` the panel takes the whole screen, with no margin or rounding (the planner's task sheet). */
+  phoneFullScreen?: boolean;
   children?: ReactNode;
 }
 
@@ -63,6 +67,8 @@ export function Modal({
   showCloseButton = true,
   className,
   contentClassName,
+  labelledBy,
+  phoneFullScreen = false,
   children,
 }: ModalProps) {
   const reactId = useId();
@@ -115,7 +121,9 @@ export function Modal({
       const last = focusable[focusable.length - 1];
       const active = document.activeElement;
       if (e.shiftKey) {
-        if (active === first || !dialog.contains(active)) {
+        // From an element outside the list (the dialog itself, a wrapper focused with tabIndex -1) the browser would
+        // step out of the dialog backwards: the last element takes it.
+        if (active === first || !focusable.includes(active as HTMLElement)) {
           e.preventDefault();
           last.focus();
         }
@@ -170,12 +178,12 @@ export function Modal({
             aria-hidden="true"
           />
 
-          <div className={cn('fixed inset-0 flex items-center justify-center p-4 pointer-events-none', Z_INDEX.modal)}>
+          <div className={cn('fixed inset-0 flex items-center justify-center p-4 pointer-events-none', phoneFullScreen && 'max-sm:p-0', Z_INDEX.modal)}>
             <motion.div
               ref={dialogRef}
               role={role}
               aria-modal="true"
-              aria-labelledby={titleId}
+              aria-labelledby={titleId ?? labelledBy}
               aria-describedby={descriptionId}
               initial={hidden}
               animate={{ opacity: 1, scale: 1 }}
@@ -189,6 +197,7 @@ export function Modal({
                 'border border-slate-200 dark:border-slate-800',
                 'max-h-[90vh] flex flex-col',
                 sizeStyles[size],
+                phoneFullScreen && 'max-sm:h-full max-sm:max-h-none max-sm:max-w-none max-sm:rounded-none max-sm:border-0',
                 className
               )}
             >

@@ -100,8 +100,6 @@ export function PlannerHost({ enabled }: { enabled: boolean }) {
     <>
       {quickAdd && (
         <TaskDialog
-          mode="create"
-          today={today}
           defaults={{ ...(quickAdd.dossierId ? { dossierId: quickAdd.dossierId } : {}), ...(forToday ? { plannedDate: today } : {}) }}
           onClose={() => plannerStore.getState().closeQuickAdd()}
           onCreated={(task) => {

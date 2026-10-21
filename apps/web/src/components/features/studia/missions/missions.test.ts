@@ -1,128 +1,113 @@
 import { describe, expect, it } from 'vitest';
-import type { Progressi } from '../../../../types/studia';
+import type { MissioneId, MissioneServer, Progressi } from '../../../../types/studia';
+import { serverMissions, xpFields } from '../__fixtures__/xp';
 import { allMissions, goalLine, missionOrder, missionSummary, todayMissions, type Mission } from './missions';
 
-/** A read of the whole day: today's row of the calendar holds the reviews and the first reviews done so far. */
-function day(over: {
-  dovute?: number;
-  nuove?: number;
-  ripassi?: number;
-  obiettivo?: number;
-  raggiunto?: boolean;
-  fatti?: { ripassi: number; nuove: number } | null;
-  consolidate?: number;
-  serie?: number;
-  record?: number;
-} = {}): Progressi {
-  const fatti = over.fatti === undefined ? { ripassi: 9, nuove: 2 } : over.fatti;
+type Over = Partial<Record<MissioneId, Partial<MissioneServer>>>;
+
+/** A read of the whole day, with the server's missions (G1c): the web computes none, it words them. */
+function day(
+  over: {
+    dovute?: number;
+    nuove?: number;
+    ripassi?: number;
+    obiettivo?: number;
+    raggiunto?: boolean;
+    serie?: number;
+    record?: number;
+    missioni?: Over;
+    validator?: boolean;
+  } = {},
+): Progressi {
   return {
     oggi: {
       giorno: '2026-10-19',
-      ripassi: over.ripassi ?? fatti?.ripassi ?? 0,
+      ripassi: over.ripassi ?? 9,
       obiettivo: over.obiettivo ?? 10,
       raggiunto: over.raggiunto ?? false,
       dovute: over.dovute ?? 10,
       nuove: over.nuove ?? 8,
     },
     serie: { attuale: over.serie ?? 4, record: over.record ?? 9, ultimiGiorni: [] },
-    stati: { nuove: 30, apprendimento: 12, consolidate: over.consolidate ?? 7 },
+    stati: { nuove: 30, apprendimento: 12, consolidate: 7 },
     materie: [],
-    calendario: [
-      { giorno: '2026-10-18', ripassi: 14, nuove: 5, sbagliate: 1, valido: true, riposo: false },
-      ...(fatti ? [{ giorno: '2026-10-19', ripassi: fatti.ripassi, nuove: fatti.nuove, sbagliate: 0, valido: false, riposo: false }] : []),
-    ],
+    calendario: [],
     prossimi: [],
+    ...xpFields(),
+    missioni: serverMissions(over.missioni, { validator: over.validator }),
   };
 }
 
-const byId = (missions: ReturnType<typeof todayMissions>, id: string) => missions.find((m) => m.id === id)!;
+const byId = (missions: Mission[], id: string) => missions.find((m) => m.id === id)!;
 
-describe('todayMissions (Gymnasium spec §5.1)', () => {
-  it('gives the three of the day, in order: the due cards, five new ones, the goal', () => {
-    expect(todayMissions(day()).map((m) => m.title)).toEqual([
-      'Ripassa le schede dovute',
-      'Impara 5 schede nuove',
-      'Raggiungi l’obiettivo di oggi',
-    ]);
-    expect(todayMissions(day()).every((m) => m.group === 'giornaliera')).toBe(true);
+describe('todayMissions (Gymnasium spec §5.1, from the server: G1c)', () => {
+  it('are the three the server marks main, in its order, with their titles', () => {
+    expect(todayMissions(day()).map((m) => m.title)).toEqual(['Ripassa le schede dovute', 'Impara 5 schede nuove', 'Raggiungi l’obiettivo di oggi']);
+    expect(todayMissions(day()).every((m) => m.group === 'giornaliera' && m.main)).toBe(true);
   });
 
-  it('counts the due cards reviewed today (reviews less first reviews) of those plus the ones still due', () => {
-    // 9 reviews today, 2 of them first reviews: 7 due cards done, 10 still due.
-    const dovute = byId(todayMissions(day()), 'dovute');
-    expect(dovute.progress).toEqual({ done: 7, of: 17 });
-    expect(dovute.status).toBe('aperta');
+  it('take the server’s state, count and value, never a count of their own', () => {
+    const missions = todayMissions(day({ missioni: { dovute: { stato: 'aperta', progresso: { fatte: 7, di: 17 } } } }));
+    expect(byId(missions, 'dovute')).toMatchObject({ status: 'aperta', progress: { done: 7, of: 17 }, points: 20 });
+    expect(byId(missions, 'nuove').points).toBe(15);
+    expect(byId(missions, 'obiettivo').points).toBe(10);
   });
 
-  it('is done when no due card is left and some were reviewed', () => {
-    expect(byId(todayMissions(day({ dovute: 0 })), 'dovute')).toMatchObject({ status: 'fatta', progress: { done: 7, of: 7 } });
+  it('are done when the server says so, and only then (a credit exists)', () => {
+    // The day's counts look finished, but the server has not credited it: still open.
+    expect(byId(todayMissions(day({ dovute: 0 })), 'dovute').status).toBe('aperta');
+    expect(byId(todayMissions(day({ missioni: { dovute: { stato: 'fatta', progresso: { fatte: 4, di: 4 } } } })), 'dovute').status).toBe('fatta');
   });
 
-  it('has nothing to do when no card was due today, and says so', () => {
-    const dovute = byId(todayMissions(day({ dovute: 0, nuove: 0, fatti: { ripassi: 3, nuove: 3 } })), 'dovute');
-    expect(dovute.status).toBe('vuota');
-    expect(dovute.progress).toBeUndefined();
-    expect(dovute.note).toBe('Nessuna scheda dovuta oggi.');
+  it('say why the due cards have nothing to do, and where the page leads', () => {
+    const vuota = { dovute: { stato: 'vuota' as const, progresso: undefined } };
+    expect(byId(todayMissions(day({ dovute: 0, nuove: 4, missioni: vuota })), 'dovute').note).toBe('Nessuna scheda dovuta oggi: si parte dalle nuove.');
+    expect(byId(todayMissions(day({ dovute: 0, nuove: 0, missioni: vuota })), 'dovute').note).toBe('Nessuna scheda dovuta oggi.');
+    expect(byId(todayMissions(day({ dovute: 0, nuove: 4, missioni: { dovute: { stato: 'fatta' } } })), 'dovute').note).toBe('Le dovute sono fatte: restano le nuove.');
+    expect(byId(todayMissions(day()), 'dovute').note).toBeUndefined();
   });
 
-  it('says where «Inizia» leads when no due card is left and new ones wait', () => {
-    expect(byId(todayMissions(day({ dovute: 0, nuove: 4, fatti: { ripassi: 3, nuove: 3 } })), 'dovute').note).toBe('Nessuna scheda dovuta oggi: si parte dalle nuove.');
-    expect(byId(todayMissions(day({ dovute: 0, nuove: 4 })), 'dovute')).toMatchObject({ status: 'fatta', note: 'Le dovute sono fatte: restano le nuove.' });
-    expect(byId(todayMissions(day({ dovute: 0, nuove: 0 })), 'dovute').note).toBeUndefined();
-  });
-
-  it('reads no row of today as nothing done yet', () => {
-    const missions = todayMissions(day({ fatti: null }));
-    expect(byId(missions, 'dovute').progress).toEqual({ done: 0, of: 10 });
-    expect(byId(missions, 'nuove').progress).toEqual({ done: 0, of: 5 });
-  });
-
-  it('counts the first reviews of today against five, done at five or more', () => {
-    expect(byId(todayMissions(day()), 'nuove')).toMatchObject({ status: 'aperta', progress: { done: 2, of: 5 } });
-    // Past the target the count stops at it: «5 di 5», never «6 di 5».
-    expect(byId(todayMissions(day({ fatti: { ripassi: 12, nuove: 6 } })), 'nuove')).toMatchObject({ status: 'fatta', progress: { done: 5, of: 5 } });
-  });
-
-  it('asks only what today allows when five new cards cannot be had', () => {
-    // One learned, one left (the daily quota or the cards in scope): the mission is two.
-    const two = byId(todayMissions(day({ nuove: 1, fatti: { ripassi: 4, nuove: 1 } })), 'nuove');
-    expect(two).toMatchObject({ title: 'Impara 2 schede nuove', status: 'aperta', progress: { done: 1, of: 2 } });
-    const one = byId(todayMissions(day({ nuove: 1, fatti: { ripassi: 4, nuove: 0 } })), 'nuove');
-    expect(one.title).toBe('Impara 1 scheda nuova');
-  });
-
-  it('has nothing to do when no new card can be learned today', () => {
-    const nuove = byId(todayMissions(day({ nuove: 0, fatti: { ripassi: 4, nuove: 0 } })), 'nuove');
-    expect(nuove).toMatchObject({ title: 'Impara 5 schede nuove', status: 'vuota', note: 'Nessuna scheda nuova da imparare oggi.' });
-    expect(nuove.progress).toBeUndefined();
-  });
-
-  it('takes the goal from the server: its count, and done when the day counts', () => {
-    expect(byId(todayMissions(day({ ripassi: 6 })), 'obiettivo')).toMatchObject({ status: 'aperta', progress: { done: 6, of: 10 } });
-    expect(byId(todayMissions(day({ ripassi: 13, raggiunto: true })), 'obiettivo').progress).toEqual({ done: 10, of: 10 });
-    // The day counts with the queue finished under the goal too: the server says so.
-    expect(byId(todayMissions(day({ ripassi: 4, raggiunto: true, serie: 3 })), 'obiettivo')).toMatchObject({
-      status: 'fatta',
-      progress: { done: 4, of: 10 },
-      note: 'Hai finito le schede del giorno: il giorno conta. Serie: 3 giorni.',
+  it('name the new cards’ target from the server: five, or fewer when fewer are left', () => {
+    expect(byId(todayMissions(day()), 'nuove').title).toBe('Impara 5 schede nuove');
+    expect(byId(todayMissions(day({ missioni: { nuove: { progresso: { fatte: 1, di: 3 } } } })), 'nuove').title).toBe('Impara 3 schede nuove');
+    expect(byId(todayMissions(day({ missioni: { nuove: { progresso: { fatte: 0, di: 1 } } } })), 'nuove').title).toBe('Impara 1 scheda nuova');
+    expect(byId(todayMissions(day({ missioni: { nuove: { stato: 'vuota', progresso: undefined } } })), 'nuove')).toMatchObject({
+      title: 'Impara 5 schede nuove',
+      note: 'Nessuna scheda nuova da imparare oggi.',
     });
   });
 
-  it('carries the goal line under the goal', () => {
+  it('say that the daily quota stops «Impara 5» (motivo: quota, L-27 choice 5)', () => {
+    const nuove = byId(todayMissions(day({ missioni: { nuove: { motivo: 'quota', progresso: { fatte: 1, di: 5 } } } })), 'nuove');
+    expect(nuove.note).toBe('Le nuove al giorno che hai scelto non bastano: alzale per arrivare a 5.');
+  });
+
+  it('keep the goal’s line, and say when the day counts for the streak under the mission’s 10 reviews', () => {
     expect(byId(todayMissions(day({ ripassi: 6, dovute: 10 })), 'obiettivo').note).toBe('Ancora 4 ripassi per tenere viva la serie.');
+    // A goal of 5 met with 6 reviews: the streak counts, the mission wants 10.
+    const under = day({ ripassi: 6, obiettivo: 5, raggiunto: true, missioni: { obiettivo: { progresso: { fatte: 6, di: 10 } } } });
+    expect(byId(todayMissions(under), 'obiettivo')).toMatchObject({
+      status: 'aperta',
+      note: 'Il giorno conta per la serie; per i punti della missione servono 10 ripassi.',
+    });
+    const done = day({ ripassi: 12, raggiunto: true, serie: 3, missioni: { obiettivo: { stato: 'fatta', progresso: { fatte: 10, di: 10 } } } });
+    expect(byId(todayMissions(done), 'obiettivo')).toMatchObject({ status: 'fatta', note: 'Obiettivo raggiunto. Serie: 3 giorni.' });
+    // Earned with the queue finished under the 10 (the server's rule): the line says why.
+    const finished = day({ ripassi: 4, raggiunto: true, serie: 3, missioni: { obiettivo: { stato: 'fatta', progresso: { fatte: 10, di: 10 } } } });
+    expect(byId(todayMissions(finished), 'obiettivo').note).toBe('Hai finito le schede del giorno: il giorno conta. Serie: 3 giorni.');
   });
 });
 
 describe('goalLine', () => {
-  it('says the goal is reached, with the streak', () => {
+  it('says the goal reached, with the streak', () => {
     expect(goalLine(day({ ripassi: 10, raggiunto: true, serie: 1 }))).toEqual({ text: 'Obiettivo raggiunto. Serie: 1 giorno.', met: true });
   });
 
-  it('asks to finish the day when fewer cards are left than the goal wants', () => {
+  it('asks to finish the day’s cards when they are fewer than the reviews missing', () => {
     expect(goalLine(day({ ripassi: 2, dovute: 1, nuove: 1 })).text).toBe('Finisci le schede di oggi per tenere viva la serie.');
   });
 
-  it('speaks of the first day to someone with no streak yet', () => {
+  it('speaks of the first day to a newcomer', () => {
     expect(goalLine(day({ ripassi: 9, serie: 0, record: 0 })).text).toBe('Ancora 1 ripasso per il primo giorno della serie.');
   });
 });
@@ -130,50 +115,50 @@ describe('goalLine', () => {
 describe('missionSummary', () => {
   it('counts the missions done of those that have something to do today', () => {
     expect(missionSummary(todayMissions(day()))).toEqual({ done: 0, of: 3 });
-    expect(missionSummary(todayMissions(day({ dovute: 0, raggiunto: true })))).toEqual({ done: 2, of: 3 });
+    expect(missionSummary(todayMissions(day({ missioni: { dovute: { stato: 'fatta' }, obiettivo: { stato: 'fatta' } } })))).toEqual({ done: 2, of: 3 });
     // No card due today: two missions, not three.
-    expect(missionSummary(todayMissions(day({ dovute: 0, fatti: { ripassi: 3, nuove: 3 } })))).toEqual({ done: 0, of: 2 });
+    expect(missionSummary(todayMissions(day({ missioni: { dovute: { stato: 'vuota' } } })))).toEqual({ done: 0, of: 2 });
   });
 });
 
 describe('allMissions', () => {
-  it('lists the day, the week and the long run; what the server must record is «In arrivo», with no count', () => {
-    const missions = allMissions(day(), { validator: false });
+  it('lists the server’s catalogue in its order: the day, the week, the long run', () => {
+    const missions = allMissions(day());
     expect(missions.filter((m) => m.group === 'giornaliera').map((m) => m.id)).toEqual(['dovute', 'nuove', 'obiettivo', 'materia-ferma', 'scrivi', 'caso']);
     expect(missions.filter((m) => m.group === 'settimanale').map((m) => m.id)).toEqual(['settimana']);
     expect(missions.filter((m) => m.group === 'lungo').map((m) => m.id)).toEqual(['consolida']);
-    for (const id of ['materia-ferma', 'scrivi', 'caso', 'settimana']) {
-      const mission = missions.find((m) => m.id === id)!;
-      expect(mission.status).toBe('in-arrivo');
-      expect(mission.progress).toBeUndefined();
-    }
+    expect(missions.find((m) => m.id === 'caso')).toMatchObject({ status: 'in-arrivo', points: 40, title: 'Risolvi un caso breve' });
+    expect(missions.find((m) => m.id === 'caso')?.progress).toBeUndefined();
   });
 
-  it('offers the validation mission to a validator only', () => {
-    expect(allMissions(day(), { validator: false }).some((m) => m.id === 'convalida')).toBe(false);
-    expect(allMissions(day(), { validator: true }).find((m) => m.id === 'convalida')).toMatchObject({ status: 'in-arrivo' });
-  });
-
-  it('counts the consolidated cards towards fifty', () => {
-    expect(allMissions(day({ consolidate: 7 }), { validator: false }).find((m) => m.id === 'consolida')).toMatchObject({
-      title: 'Consolida 50 schede',
-      status: 'aperta',
-      progress: { done: 7, of: 50 },
+  it('lists the validation mission when the server lists it (a validator’s only)', () => {
+    expect(allMissions(day()).some((m) => m.id === 'convalida')).toBe(false);
+    expect(allMissions(day({ validator: true, missioni: { convalida: { stato: 'vuota' } } })).find((m) => m.id === 'convalida')).toMatchObject({
+      title: 'Convalida due schede della comunità',
+      status: 'vuota',
+      note: 'Nessuna scheda da validare, ora.',
     });
-    expect(allMissions(day({ consolidate: 61 }), { validator: false }).find((m) => m.id === 'consolida')?.status).toBe('fatta');
   });
 
-  it('carries no points and no level: none is shown until the server keeps them', () => {
-    for (const mission of allMissions(day(), { validator: true })) {
-      expect(Object.keys(mission).sort()).toEqual(expect.arrayContaining(['group', 'id', 'status', 'title']));
-      expect(mission).not.toHaveProperty('xp');
-      expect(`${mission.title} ${mission.note ?? ''}`).not.toMatch(/\bXP\b|punti|livell/i);
+  it('names «Proponi una scheda» (G-314) and the subject left still (materia-ferma)', () => {
+    const missions = allMissions(day({ missioni: { 'materia-ferma': { stato: 'aperta', progresso: { fatte: 2, di: 5 }, materia: 'DIRITTO_PENALE' } } }));
+    expect(missions.find((m) => m.id === 'scrivi')).toMatchObject({ title: 'Proponi una scheda', status: 'aperta', points: 25 });
+    expect(missions.find((m) => m.id === 'materia-ferma')).toMatchObject({ note: 'Diritto penale', progress: { done: 2, of: 5 } });
+  });
+
+  it('counts the consolidated cards towards fifty, as the server counts them', () => {
+    expect(allMissions(day()).find((m) => m.id === 'consolida')).toMatchObject({ title: 'Consolida 50 schede', status: 'aperta', progress: { done: 12, of: 50 }, points: 100 });
+  });
+
+  it('never words a mission as a weight of a vote (G-318)', () => {
+    for (const mission of allMissions(day({ validator: true }))) {
+      expect(`${mission.title} ${mission.note ?? ''}`).not.toMatch(/peso|autorit|voto/i);
     }
   });
 });
 
 describe('missionOrder (S2)', () => {
-  const m = (id: Mission['id'], status: Mission['status']): Mission => ({ id, group: 'giornaliera', title: id, status });
+  const m = (id: Mission['id'], status: Mission['status']): Mission => ({ id, group: 'giornaliera', title: id, status, main: true, points: 10 });
 
   it('slides a mission done under those still open', () => {
     expect(missionOrder([m('dovute', 'aperta'), m('nuove', 'fatta'), m('obiettivo', 'aperta')]).map((x) => x.id)).toEqual(['dovute', 'obiettivo', 'nuove']);

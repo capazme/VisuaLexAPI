@@ -16,6 +16,7 @@ import { ReviewCard } from './ReviewCard';
 import { Sheet } from '../../ui/Sheet';
 import { MATERIA_LABEL, anchorLabel, normaFromAnchor, searchParamsFromAnchor } from './studiaLabels';
 import { SessionCelebration } from './progress/Celebration';
+import { XpGain } from './progress/XpGain';
 import { SessionEndProgress } from './progress/SessionEndProgress';
 import { cardsLeft, instituteCardsLeft } from './progress/today';
 import { usePercorso } from './progress/usePercorso';
@@ -247,7 +248,7 @@ export function ReviewSession() {
     else navigate(HOME_PATH);
   }, [navigate]);
 
-  const { current, revealed, reveal, grade, remaining, done, summary, practice, step, loading, loadError, saveError, skipped, saving, reload, goalMet } =
+  const { current, revealed, reveal, grade, remaining, done, summary, practice, step, loading, loadError, saveError, skipped, saving, reload, goalMet, xpGain } =
     useReviewSession(materia, { istituto, paused: confirmStop, onEscape: handleEscape });
   const { note, noteKey, recordGrade } = useGradeNote({ step, current, revealed, practice, saving, skipped, paused: confirmStop });
   // The grade that made the day count plays the celebration, once a day for this browser (spec decision 10).
@@ -372,7 +373,7 @@ export function ReviewSession() {
         {goalMet ? `Obiettivo di oggi raggiunto · serie di ${goalMet.serie} ${goalMet.serie === 1 ? 'giorno' : 'giorni'}` : ''}
       </p>
       <header className="relative shrink-0 px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
-        <div className={cn(COLUMN, 'flex items-center gap-3')}>
+        <div className={cn(COLUMN, 'relative flex items-center gap-3')}>
           <button
             type="button"
             onClick={leave}
@@ -389,6 +390,12 @@ export function ReviewSession() {
           </button>
           <LessonProgress done={total - remaining} total={total} />
           {showCard && <p className="sr-only">{remaining === 1 ? 'Resta 1' : `Restano ${remaining}`}</p>}
+          {/* «+20 XP» sits over the bar's end, inside the header's row and out of the flow: the bar never shrinks for it,
+              it never reaches the card, and the card never waits. While the goal's notice covers the row it waits, and
+              comes once the notice has gone (a gain already shown is never shown again). */}
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center">
+            <XpGain gain={celebrating ? null : xpGain} />
+          </div>
         </div>
         {/* Over the header's row, as on the old page: beside the card, never on it. */}
         {celebrating && (
