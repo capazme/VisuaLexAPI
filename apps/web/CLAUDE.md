@@ -430,17 +430,22 @@ checks the files; «termine calcolato» comes with wave 2 and its warning), and 
 
 - **Pages**: `OpusPage` (in `PageFrame` with `section="opus"`: the section's title, which the switcher focuses,
   «Cestino dei compiti» as its action, the view the frame's width, P2b), `OpusViews`: `TodayView` (Gymnasium's day
-  on one line, read only, that opens Gymnasium's «Oggi» — `StudyTodayRow`, from `/lingo/srs/sessione`, absent with
-  nothing to review or Gymnasium off; not a task —, then by date: the
+  on one line that opens Gymnasium's «Oggi» — `StudyTodayRow`, «Gymnasium: il ripasso di oggi», absent with Gymnasium
+  off; not a task, and it reads nothing: Gymnasium's session and progress reads mark the day and settle the missions
+  when the queue is done, and opening Opus must not count toward the streak; its counts wait for a read that only
+  counts —, then by date (the «Oggi» group always, with its «+ Aggiungi compito», even when only late tasks are
+  listed): the
   missed deadlines under «Termini scaduti» — a past deadline is always there, whatever the planned date —, then the
   tasks planned before today whose deadline is not past or absent under «In ritardo», then «Oggi»: `splitToday`;
   the owner's choice after the first pass, 20 October 2026; or, by «Raggruppa: per dossier», one group per dossier
   by title, the inbox last — the choice kept in this browser, `localStorage`), `UpcomingView` (P2c: the week's strip, `WeekStrip`, sticky
   under the phone's bar — the month, a menu when the seven days span two; «‹ Oggi ›»; Monday to Sunday, the chosen
   day `aria-pressed` and underlined, today a filled ring and `aria-current="date"`, a day out of reach drawn but
-  disabled; a day chosen scrolls to its block, smoothly unless reduced motion — then one block per day of the chosen
-  week in reach, «21 ott · Oggi · mercoledì» (`blockHeading`), an empty day too, each with «+ Aggiungi compito» for
-  that day; a task once, under its planned date when in range, else its deadline: `groupUpcoming`. The server answers
+  disabled; a day chosen scrolls the content scroller alone so its block's heading stops under the strip where it
+  sticks, smoothly unless reduced motion — never `scrollIntoView`, which also scrolls the layout's `overflow: hidden`
+  ancestors once the scroller is at its end and slides the whole page up with no way back — then one block per day of
+  the chosen week in reach, «21 ott · Oggi · mercoledì» (`blockHeading`), an empty day too, each with «+ Aggiungi
+  compito» for that day, its rows not repeating the day (`TaskList.dayShown`: only a time); a task once, under its planned date when in range, else its deadline: `groupUpcoming`. The server answers
   today and six days, `view=upcoming`, with no range: the weeks are the one or two those days touch, until
   `/api/tasks` takes one), `InboxView` (no dossier),
   `TaskTrashView` (`view=trash`: a task's trash is `deletedAt` on the row, not a `TrashEntry`, so it is not in the
@@ -461,7 +466,8 @@ checks the files; «termine calcolato» comes with wave 2 and its warning), and 
   «Normale» the default and not shown; the tick's ring carries it too, in colour and in line, `PRIORITY_TICK`: thick
   and tinted red, tinted amber, dashed ink, thin — not a red-orange-blue scale with the last unmarked, which is another
   app's look —, the labels (first letter capitalised, as the dossiers' tags: `tagLabel`; stored as typed), the dossier at the line's right end in grey (a link; not in the dossier's own
-  panel), a thin rule under the row, «⋯» (Modifica, Aggiungi un sottocompito, Sposta nel cestino). `TaskList` nests subtasks one level under a
+  panel; it and the subtasks' counter lay their 44 px over the gaps from `md`, and take the line's height on a phone,
+  where they would overlap the title's target), a thin rule under the row, «⋯» (Modifica, Aggiungi un sottocompito, Sposta nel cestino). `TaskList` nests subtasks one level under a
   parent in the same list (`nestTasks`; deeper ones under the top ancestor); the arrows, Home and End move between
   the rows' ticks across every list of the page (`moveBetweenRows`, `data-task-lists`). A row that leaves (ticked,
   trashed) first hands the focus to the next row's tick, else the previous one's, else the view's heading
@@ -495,7 +501,9 @@ checks the files; «termine calcolato» comes with wave 2 and its warning), and 
   priority's colour, `MenuItem.iconClassName`), Etichette (chips, Enter or a comma adds), Ripetizione last. No field
   for what the server does not keep (reminders, an assignee, a place, comments). A change saves when it is made —
   a choice at once, a typed field (title, description, a date, a time) when it is left or at Enter, a date half typed
-  (`validity.badInput`) put back, never saved as cleared — one `PUT` at a time per sheet, the changes made meanwhile
+  (`validity.badInput`) put back, never saved as cleared; Esc in a field with a change not saved (the title, the
+  description, a date, a time, a label being typed) gives the change up and keeps the sheet open, the next Esc closes
+  it — one `PUT` at a time per sheet, the changes made meanwhile
   merged and sent after it, so the server never ends on an older value than the sheet shows; `draftProblem` refuses
   first what the server would refuse, and a refusal puts the sheet back to the last saved copy and says why in the
   server's words. The scope keeps the sheet's saved copy (`onSaved`), so a task moved out of the view (to a dossier,
@@ -2223,3 +2231,10 @@ meant to stay split; add new features as new files, not inside the shells:
     floating-ui's positioning `transform`, and what breaks them on an element that also writes
     a translate or scale class of its own (the keyframe replaces it while it runs): none does
     today. `theme.test.ts` compiles `TRANSITION` and checks its rule.
+
+34. **`scrollIntoView` scrolls every ancestor that can scroll, `overflow: hidden` ones included.** The page's
+    content scroller sits inside `Layout`'s `main` and root, both `overflow: hidden`: when the scroller is already at
+    its end, `scrollIntoView({ block: 'start' })` goes on to scroll them, and the whole page — the sticky week strip of
+    «Prossimi giorni» with it — slides up with no scrollbar to bring it back (seen in a headless pass at 390 and 1366
+    px, 21 October 2026). To bring a block under a sticky row, scroll the scroller alone (`scrollParentOf`, then
+    `scrollTo` with the row's `top` and height subtracted), as `UpcomingView` does.

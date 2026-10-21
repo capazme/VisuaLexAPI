@@ -12,6 +12,7 @@ import { restoreTask } from './taskActions';
 import { blockHeading, dayHeading, groupUpcoming, longDay, splitToday, UPCOMING_DAYS, weekStart } from './taskDates';
 import type { TaskDraft } from './taskDraft';
 import { TaskList } from './TaskList';
+import { scrollParentOf } from '../practice/practiceView';
 import { TaskSheetScope } from './TaskSheetScope';
 import { InlineAddTask, TaskGroup } from './TaskGroup';
 import { StudyTodayRow } from './StudyTodayRow';
@@ -172,11 +173,10 @@ export function TodayView() {
                 <TaskList label="In ritardo" tasks={late} today={day} optimistic={optimistic} subtasksOpen />
               </TaskGroup>
             )}
-            {rest.length > 0 && (
-              <TaskGroup foldKey="today:today" heading="Oggi" count={rest.length} add={add}>
-                <TaskList label="Oggi" tasks={rest} today={day} optimistic={optimistic} subtasksOpen />
-              </TaskGroup>
-            )}
+            {/* Always, with its «+ Aggiungi compito», even when only late tasks are listed. */}
+            <TaskGroup foldKey="today:today" heading="Oggi" count={rest.length} add={add}>
+              {rest.length > 0 && <TaskList label="Oggi" tasks={rest} today={day} optimistic={optimistic} subtasksOpen />}
+            </TaskGroup>
           </>
         );
       }}
@@ -194,10 +194,19 @@ export function UpcomingView() {
   const [chosen, setChosen] = useState<string | null>(null);
   const select = (day: string) => {
     setChosen(day);
-    // After the block is drawn: a day of another week appears with its week.
+    // After the block is drawn (a day of another week appears with its week), the content scroller alone moves, so
+    // the block's heading stops just under the strip where it sticks (its `top`, the phone's bar, and its height).
+    // Not `scrollIntoView`: it also scrolls the layout's `overflow: hidden` ancestors when the scroller is at its end,
+    // and the whole page, strip and all, slides up with no way back (seen in a headless pass at 390 and 1366 px).
     requestAnimationFrame(() => {
+      const block = document.getElementById(`opus-day-${day}`);
+      const scroller = block && scrollParentOf(block);
+      if (!block || !scroller) return;
+      const strip = document.querySelector<HTMLElement>('[data-week-strip]');
+      const clear = (strip ? (parseFloat(getComputedStyle(strip).top) || 0) + strip.offsetHeight : 0) + 12;
+      const top = block.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop - clear;
       const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? true;
-      document.getElementById(`opus-day-${day}`)?.scrollIntoView({ block: 'start', behavior: still ? 'auto' : 'smooth' });
+      scroller.scrollTo?.({ top: Math.max(0, top), behavior: still ? 'auto' : 'smooth' });
     });
   };
   const lastOf = (today: string) => addDaysToIsoDate(today, UPCOMING_DAYS - 1);
@@ -237,7 +246,7 @@ export function UpcomingView() {
               count={listed.length}
               add={{ view: 'upcoming', today, defaults: { plannedDate: day } }}
             >
-              {listed.length > 0 && <TaskList label={dayHeading(day, today)} tasks={listed} today={today} optimistic={optimistic} subtasksOpen />}
+              {listed.length > 0 && <TaskList label={dayHeading(day, today)} tasks={listed} today={today} optimistic={optimistic} subtasksOpen dayShown={day} />}
             </TaskGroup>
           );
         });

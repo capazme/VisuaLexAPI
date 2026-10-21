@@ -52,8 +52,7 @@ export function TaskGroup({ anchorId, foldKey, heading, count, add, actions = []
     ...actions,
   ];
   return (
-    // Clear of the week's strip, which sticks at the top, when the view scrolls to it.
-    <section id={anchorId} aria-labelledby={`${id}-heading`} className="min-w-0 scroll-mt-40">
+    <section id={anchorId} aria-labelledby={`${id}-heading`} className="min-w-0">
       <div className="flex items-center gap-1 border-b border-slate-300 dark:border-slate-700">
         <h3 id={`${id}-heading`} className={cn(GROUP_HEADING, 'min-w-0 flex-1')}>
           <button

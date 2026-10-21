@@ -60,6 +60,8 @@ export function TaskSheet(props: TaskSheetProps) {
   const bodyRef = useRef<HTMLDivElement>(null);
   // The field to add a subtask: where the focus starts when the sheet was opened for one.
   const addFieldRef = useRef<HTMLInputElement>(null);
+  // Chosen once: a new ref would make the window give the focus back behind it and take it again 50 ms later.
+  const [initialFocus] = useState<React.RefObject<HTMLElement | null>>(() => (props.focus === 'subtask' ? addFieldRef : bodyRef));
   // The task's list (its dossier's, or the inbox): its subtasks, a subtask's parent, and a copy of the task newer
   // than the view's when the sheet has saved it (a subtask opened here is in no view).
   const family = useTaskView(props.task.dossierId ? 'dossier' : 'inbox', props.task.dossierId ?? undefined);
@@ -98,7 +100,7 @@ export function TaskSheet(props: TaskSheetProps) {
       phoneFullScreen
       className="max-w-[65rem] sm:h-[min(52rem,90vh)]"
       contentClassName="flex min-h-0 flex-col overflow-hidden p-0"
-      initialFocusRef={props.focus === 'subtask' ? addFieldRef : bodyRef}
+      initialFocusRef={initialFocus}
     >
       <div ref={bodyRef} tabIndex={-1} onKeyDown={onKeyDown} className="flex min-h-0 flex-1 flex-col focus-visible:outline-none">
         <header className="flex shrink-0 items-center gap-1 border-b border-slate-200 py-1 pl-3 pr-1 dark:border-slate-800 md:pl-5">

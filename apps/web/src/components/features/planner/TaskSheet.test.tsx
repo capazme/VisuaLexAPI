@@ -276,10 +276,49 @@ describe('the task sheet', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Aggiungi un sottocompito' }));
     const sheet = await screen.findByRole('dialog', { name: 'Compito a' });
     await waitFor(() => expect(within(sheet).getByLabelText('Nuovo sottocompito')).toHaveFocus());
+    // The focus never goes behind the sheet while it moves on (the window's 50 ms of first focus included).
+    const seen: (Element | null)[] = [];
+    const watch = () => seen.push(document.activeElement);
+    document.addEventListener('focus', watch, true);
     fireEvent.click(within(sheet).getByRole('button', { name: 'Compito successivo' }));
     const next = await screen.findByRole('dialog', { name: 'Compito b' });
     expect(within(next).queryByLabelText('Nuovo sottocompito')).toBeNull();
+    await act(() => new Promise((resolve) => setTimeout(resolve, 120)));
+    document.removeEventListener('focus', watch, true);
+    expect(seen.filter((el) => !next.contains(el))).toEqual([]);
+    expect(next.contains(document.activeElement)).toBe(true);
     expect(within(next).getByRole('button', { name: 'Aggiungi un sottocompito' })).toBeInTheDocument();
+  });
+
+  it('ticks a repeating task from the sheet with its occurrence, and «Annulla» puts its date back', async () => {
+    const weekly = task('w', { plannedDate: TODAY, recurrence: 'FREQ=WEEKLY' });
+    service.complete.mockResolvedValue({ task: weekly, recurred: { previousPlannedDate: TODAY, plannedDate: '2026-10-27' } });
+    service.update.mockResolvedValue(weekly);
+    const sheet = await openSheet([weekly], 'Compito w', 'today');
+    fireEvent.click(within(sheet).getByRole('checkbox', { name: 'Segna come fatto: Compito w' }));
+    await waitFor(() => expect(service.complete).toHaveBeenCalledWith('w', TODAY));
+    await waitFor(() => expect(toasts[toasts.length - 1]?.message).toBe('Fatto: torna mar 27 ott'));
+    await act(async () => toasts[toasts.length - 1]!.onUndo());
+    expect(service.update).toHaveBeenCalledWith('w', { plannedDate: TODAY });
+  });
+
+  it('gives up a date or a label not saved at the first Esc, and closes at the second', async () => {
+    const a = task('a', { plannedDate: TODAY });
+    const sheet = await openSheet([a], 'Compito a', 'today');
+    const day = within(sheet).getByLabelText('Data pianificata');
+    fireEvent.change(day, { target: { value: '2026-10-25' } });
+    fireEvent.keyDown(day, { key: 'Escape' });
+    expect(day).toHaveValue(TODAY);
+    expect(screen.getByRole('dialog', { name: 'Compito a' })).toBeInTheDocument();
+    const labels = within(sheet).getByLabelText('Etichette');
+    fireEvent.change(labels, { target: { value: 'udienza' } });
+    fireEvent.keyDown(labels, { key: 'Escape' });
+    expect(labels).toHaveValue('');
+    expect(screen.getByRole('dialog', { name: 'Compito a' })).toBeInTheDocument();
+    // Nothing typed is pending: this Esc closes.
+    fireEvent.keyDown(labels, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(service.update).not.toHaveBeenCalled();
   });
 
   it('ticks the task from the sheet, which closes', async () => {

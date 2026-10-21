@@ -18,10 +18,12 @@ interface Props {
    * list (the inbox, a dossier) they wait behind the row's counter.
    */
   subtasksOpen?: boolean;
+  /** The day the list's block names («Prossimi giorni»): the rows do not repeat it. */
+  dayShown?: string;
 }
 
 /** A view's tasks as rows, subtasks one level under their parent, open or folded in place; a row opens the sheet. */
-export function TaskList({ tasks, today, optimistic, showDossier = true, label, subtasksOpen = false }: Props) {
+export function TaskList({ tasks, today, optimistic, showDossier = true, label, subtasksOpen = false, dayShown }: Props) {
   const sheet = useTaskSheet();
   // The rows whose subtasks are the other way round from the list's default.
   const [flipped, setFlipped] = useState<ReadonlySet<string>>(new Set());
@@ -54,13 +56,14 @@ export function TaskList({ tasks, today, optimistic, showDossier = true, label, 
             task={task}
             today={today}
             showDossier={showDossier}
+            dayShown={dayShown}
             subtasks={children.length > 0 ? { count: children.length, open, onToggle: () => toggle(task.id) } : undefined}
             {...actions}
           >
             {children.length > 0 && open && (
               <ul aria-label={`Sottocompiti di ${task.title}`} className="ml-6 grid min-w-0 grid-cols-1 border-l border-slate-200 pl-2 dark:border-slate-800">
                 {children.map((child) => (
-                  <TaskRow key={child.id} task={child} today={today} showDossier={false} {...actions} />
+                  <TaskRow key={child.id} task={child} today={today} showDossier={false} dayShown={dayShown} {...actions} />
                 ))}
               </ul>
             )}

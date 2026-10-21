@@ -1,5 +1,4 @@
 import { addDaysToIsoDate } from '../../../utils/dateUtils';
-import { estimateLabel } from '../studia/studiaLabels';
 import { RECURRENCE_RULES, type RecurrenceFrom, type RecurrenceRule, type Task, type TaskPriority } from '../../../types/tasks';
 
 /**
@@ -186,13 +185,4 @@ export function recurrenceLine(rule: RecurrenceRule): string {
 /** The count beside «Oggi» in the bar, in words for its name. */
 export function todayCountLabel(count: number): string {
   return count === 1 ? '1 compito per oggi o scaduto' : `${count} compiti per oggi o scaduti`;
-}
-
-/** «12 da ripassare, 8 nuove», the words of Gymnasium's own home. */
-export function studyLine(due: number, fresh: number): string {
-  const parts: string[] = [];
-  if (due > 0) parts.push(`${due} da ripassare`);
-  if (fresh > 0) parts.push(`${fresh} ${fresh === 1 ? 'nuova' : 'nuove'}`);
-  const estimate = estimateLabel(due + fresh);
-  return `Gymnasium: ${parts.join(', ')}${estimate ? ` · ${estimate}` : ''}`;
 }

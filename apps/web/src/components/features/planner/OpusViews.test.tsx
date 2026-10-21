@@ -251,11 +251,13 @@ describe('«Oggi»', () => {
 });
 
 describe('«Oggi» in groups', () => {
-  it("shows Gymnasium's day on one line that opens it, and nothing when there is nothing to review", async () => {
-    study.session.mockResolvedValue({ conteggi: { dovute: 12, nuove: 8 }, cards: [] });
+  it("leads to Gymnasium's day on one line, and reads nothing of Gymnasium's (its reads mark the day)", async () => {
     service.list.mockResolvedValue(answer([]));
     renderAt(<TodayView />);
-    expect(await screen.findByRole('link', { name: 'Gymnasium: 12 da ripassare, 8 nuove · circa 7 minuti' })).toHaveAttribute('href', '/studia/ripasso');
+    expect(await screen.findByRole('link', { name: 'Gymnasium: il ripasso di oggi' })).toHaveAttribute('href', '/studia/ripasso');
+    await screen.findByText('Nessun compito per oggi');
+    // The session's read settles the day and the missions on the server: opening Opus must not.
+    expect(study.session).not.toHaveBeenCalled();
     // Not a task: no tick.
     expect(screen.queryByRole('checkbox')).toBeNull();
   });
@@ -275,6 +277,13 @@ describe('«Oggi» in groups', () => {
     expect(screen.queryByRole('checkbox', { name: /Compito a/ })).toBeNull();
     // Folded for the session.
     expect(plannerStore.getState().folded['today:today']).toBe(true);
+  });
+
+  it('keeps «Oggi» and its «+ Aggiungi compito» when only late tasks are listed', async () => {
+    service.list.mockResolvedValue(answer([task('a', { plannedDate: '2026-10-19' })]));
+    renderAt(<TodayView />);
+    const today = await screen.findByRole('region', { name: /^Oggi\s*,\s*0 compiti$/ });
+    expect(within(today).getByRole('button', { name: 'Aggiungi compito' })).toBeInTheDocument();
   });
 
   it('groups by dossier when asked, the inbox last, and remembers the choice', async () => {
@@ -322,6 +331,8 @@ describe('the other views', () => {
     // The dossier at the row's right end.
     expect(within(screen.getByRole('list', { name: 'Giovedì 22 ottobre' })).getByRole('link', { name: /Ricorso Rossi/ })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Aggiungi compito' })).toHaveLength(6);
+    // The block names the day: the row does not repeat it.
+    expect(within(screen.getByRole('list', { name: 'Giovedì 22 ottobre' })).queryByText(/giovedì/)).toBeNull();
   });
 
   it('chooses the month from a menu when the seven days span two', async () => {

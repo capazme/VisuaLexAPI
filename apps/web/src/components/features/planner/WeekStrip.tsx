@@ -40,9 +40,9 @@ export function WeekStrip({ today, last, selected, counts, onSelect }: Props) {
     if (!months.some((m) => m.label === label)) months.push({ label, day });
   }
   const month = monthLabel(selected);
-
   return (
-    <div className={cn('sticky top-[var(--phone-bar-offset,0px)] -mx-1 space-y-2 bg-slate-50 px-1 pb-1 pt-2 transition-[top] duration-200 ease-out motion-reduce:transition-none dark:bg-slate-950', Z_INDEX.sticky)}>
+    // `data-week-strip`: the view scrolls a day's block to just under it (`UpcomingView`).
+    <div data-week-strip className={cn('sticky top-[var(--phone-bar-offset,0px)] -mx-1 space-y-2 bg-slate-50 px-1 pb-1 pt-2 transition-[top] duration-200 ease-out motion-reduce:transition-none dark:bg-slate-950', Z_INDEX.sticky)}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         {months.length > 1 ? (
           <MenuButton

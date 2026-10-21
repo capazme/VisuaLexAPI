@@ -22,6 +22,8 @@ interface Props extends TaskRowActions {
   today: string;
   /** Off in the dossier's own panel, where every task is that dossier's. */
   showDossier: boolean;
+  /** The day the row's block already names («Prossimi giorni»): its planned day is not repeated, only its time. */
+  dayShown?: string;
   /** The subtasks listed under it, and whether they are open (the counter opens and folds them). */
   subtasks?: { count: number; open: boolean; onToggle: () => void };
   children?: React.ReactNode;
@@ -37,10 +39,11 @@ const time = (value: string | null) => (value ? ` · ${value}` : '');
  * words, the labels — with the dossier at its right end, in grey; and «⋯». The list moves between rows with the arrows
  * (`TaskList`).
  */
-export function TaskRow({ task, today, showDossier, subtasks, onTick, onOpen, onTrash, children }: Props) {
+export function TaskRow({ task, today, showDossier, dayShown, subtasks, onTick, onOpen, onTrash, children }: Props) {
   const dossierTitle = useAppStore((s) => (task.dossierId ? s.dossiers.find((d) => d.id === task.dossierId)?.title : undefined));
   const due = task.dueDate ? countdown(task.dueDate, today) : null;
-  const hasSigns = Boolean(task.plannedDate || due || (subtasks && subtasks.count > 0) || task.recurrence || task.priority < 4 || task.labels.length > 0 || (showDossier && task.dossierId));
+  const plannedShown = task.plannedDate !== null && !(task.plannedDate === dayShown && !task.plannedTime);
+  const hasSigns = Boolean(plannedShown || due || (subtasks && subtasks.count > 0) || task.recurrence || task.priority < 4 || task.labels.length > 0 || (showDossier && task.dossierId));
 
   return (
     <li data-task-row data-task-id={task.id} className="relative min-w-0">
@@ -68,12 +71,21 @@ export function TaskRow({ task, today, showDossier, subtasks, onTick, onOpen, on
           )}
           {hasSigns && (
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-              {task.plannedDate && (
+              {task.plannedDate && plannedShown && (
                 <span className={cn(META, DAY_TONE[dayTone(task.plannedDate, today)])}>
                   <CalendarDays size={12} aria-hidden />
-                  <span className="sr-only">Data pianificata: </span>
-                  {rowDay(task.plannedDate, today)}
-                  {time(task.plannedTime)}
+                  {task.plannedDate === dayShown ? (
+                    <>
+                      <span className="sr-only">Ora pianificata: </span>
+                      {task.plannedTime}
+                    </>
+                  ) : (
+                    <>
+                      <span className="sr-only">Data pianificata: </span>
+                      {rowDay(task.plannedDate, today)}
+                      {time(task.plannedTime)}
+                    </>
+                  )}
                 </span>
               )}
               {due && task.dueDate && (
@@ -91,8 +103,9 @@ export function TaskRow({ task, today, showDossier, subtasks, onTick, onOpen, on
                   type="button"
                   aria-expanded={subtasks.open}
                   onClick={subtasks.onToggle}
-                  // 44 px tall for a finger, its extra height laid over the gaps (the line stays its height).
-                  className={cn(META, '-my-3.5 min-h-[44px] rounded px-1 hover:text-slate-900 dark:hover:text-slate-100', FOCUS_RING)}
+                  // 44 px tall for a finger, its extra height laid over the gaps (the line stays its height) where a
+                  // pointer is precise; on a phone the line takes the height, so no target overlaps the title's.
+                  className={cn(META, '-my-3.5 min-h-[44px] rounded px-1 max-md:my-0 hover:text-slate-900 dark:hover:text-slate-100', FOCUS_RING)}
                 >
                   <ChevronRight size={12} aria-hidden className={cn('transition-transform motion-reduce:transition-none', subtasks.open && 'rotate-90')} />
                   <ListTree size={12} aria-hidden />
@@ -122,8 +135,8 @@ export function TaskRow({ task, today, showDossier, subtasks, onTick, onOpen, on
               {showDossier && task.dossierId && (
                 <Link
                   to={`/dossier?dossier=${encodeURIComponent(task.dossierId)}`}
-                  // At the line's right end; 44 px tall for a finger, its extra height laid over the gaps.
-                  className={cn(META, '-my-3.5 ml-auto min-h-[44px] max-w-full rounded hover:text-slate-900 hover:underline dark:hover:text-slate-100 sm:max-w-[45%]', FOCUS_RING)}
+                  // At the line's right end; 44 px tall for a finger, laid over the gaps where a pointer is precise.
+                  className={cn(META, '-my-3.5 max-md:my-0 ml-auto min-h-[44px] max-w-full rounded hover:text-slate-900 hover:underline dark:hover:text-slate-100 sm:max-w-[45%]', FOCUS_RING)}
                 >
                   <span className="sr-only">Dossier: </span>
                   <span className="truncate">{dossierTitle ?? 'Dossier'}</span>

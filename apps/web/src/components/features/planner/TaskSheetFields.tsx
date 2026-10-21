@@ -34,7 +34,11 @@ function FieldRow({ label, labelFor, labelId, children }: { label: string; label
   );
 }
 
-/** A typed value saved when the field is left or at Enter, never while it is half typed. */
+/**
+ * A typed value saved when the field is left or at Enter, never while it is half typed. Esc with a change not saved
+ * gives it up and keeps the sheet open, as the title and the description do; the next Esc closes the sheet (the
+ * sheet's window would otherwise close before the field is left, and the change be lost without a word).
+ */
 function useTyped(value: string, onCommit: (value: string) => boolean | void) {
   const [text, setText] = useState(value);
   const [seen, setSeen] = useState(value);
@@ -60,6 +64,11 @@ function useTyped(value: string, onCommit: (value: string) => boolean | void) {
       if (e.key === 'Enter') {
         e.preventDefault();
         commit(e.currentTarget);
+      } else if (e.key === 'Escape' && (e.currentTarget.value !== value || e.currentTarget.validity.badInput)) {
+        e.preventDefault();
+        setText(value);
+        // A half-typed date keeps its own segments: emptying the value is not enough to draw the saved one again.
+        e.currentTarget.value = value;
       }
     },
   };
@@ -233,6 +242,10 @@ export function TaskSheetFields({ task, today, onSave }: Props) {
             if (e.key === 'Enter' || e.key === ',') {
               e.preventDefault();
               if (newLabel.trim()) addLabels();
+            } else if (e.key === 'Escape' && newLabel) {
+              // Gives up the label being typed; the next Esc closes the sheet.
+              e.preventDefault();
+              setNewLabel('');
             }
           }}
           onBlur={() => {
