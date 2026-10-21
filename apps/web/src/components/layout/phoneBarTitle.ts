@@ -4,6 +4,10 @@
  * the section's name. The search page has no title: its bar is the search field.
  */
 const PAGES: ReadonlyArray<readonly [RegExp, string]> = [
+  [/^\/opus\/oggi(\/|$)/, 'Oggi'],
+  [/^\/opus\/prossimi(\/|$)/, 'Prossimi giorni'],
+  [/^\/opus\/ingresso(\/|$)/, "Lista d'ingresso"],
+  [/^\/opus\/cestino(\/|$)/, 'Cestino dei compiti'],
   [/^\/studia\/ripasso(\/|$)/, 'Oggi'],
   [/^\/studia\/progressi(\/|$)/, 'Progressi'],
   [/^\/studia\/schede(\/|$)/, 'Le mie schede'],
