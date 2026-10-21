@@ -99,6 +99,26 @@ describe('ChangelogNotification', () => {
     expect(within(screen.getByRole('dialog')).getByText('Correzioni e miglioramenti')).toBeInTheDocument();
   });
 
+  it('gives the focus back to where it was before the toast once the window closes', async () => {
+    localStorage.setItem(VERSION_STORAGE_KEY, '1.9.0');
+    answer('1.9.1');
+    render(
+      <>
+        <button type="button">Prima</button>
+        <ChangelogNotification />
+      </>
+    );
+    await screen.findByRole('button', { name: 'Vedi' });
+    screen.getByRole('button', { name: 'Prima' }).focus();
+
+    await userEvent.tab();
+    expect(screen.getByRole('button', { name: 'Vedi' })).toHaveFocus();
+    await userEvent.keyboard('{Enter}');
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Chiudi' }));
+
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Prima' })).toHaveFocus());
+  });
+
   it('remembers the version once the window is closed, and says nothing on a first visit', async () => {
     localStorage.setItem(VERSION_STORAGE_KEY, '1.9.0');
     answer('1.9.1');

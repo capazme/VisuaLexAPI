@@ -1,3 +1,4 @@
+import { useRef, type FocusEvent } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Sparkles, X } from 'lucide-react';
 import { useVersionCheck } from '../../hooks/useVersionCheck';
@@ -12,28 +13,42 @@ import { newsSince, parseNote, type Inline, type VersionNews } from '../../conte
  * opens the notes for the people who use VisuaLex (`content/novita/`) — the new version's, and those of
  * the versions skipped since the last visit, the newest first. `/version` gives the number only.
  * Dismissed (the X, or the window closed), the version is remembered and the toast does not come back.
+ * The component stays mounted, so the toast and the window leave with their motion; the focus goes back
+ * to where it was before it entered the toast, which is gone by then. A screen reader hears the news from
+ * a status region present from the first render (a region that arrives with its text is often not read).
  */
 export function ChangelogNotification() {
   const { currentVersion, hasNewVersion, lastSeenVersion, dismissNotification, showChangelog, setShowChangelog } =
     useVersionCheck();
   const still = useReducedMotion();
+  // Where the focus was before it entered the toast: «Vedi» and the X go with it.
+  const returnFocusRef = useRef<HTMLElement | null>(null);
 
-  if (!hasNewVersion || !currentVersion) {
-    return null;
-  }
-
-  const news = newsSince(lastSeenVersion, currentVersion);
+  const shown = hasNewVersion && currentVersion !== null;
+  const news = currentVersion ? newsSince(lastSeenVersion, currentVersion) : [];
   const away = still ? { opacity: 0 } : { opacity: 0, y: 20, scale: 0.95 };
 
-  const handleCloseModal = () => {
-    setShowChangelog(false);
+  const rememberFocus = (event: FocusEvent<HTMLDivElement>) => {
+    const from = event.relatedTarget;
+    if (from instanceof HTMLElement && !event.currentTarget.contains(from)) returnFocusRef.current = from;
+  };
+
+  // Whatever had the focus — «Vedi», the X, the window's own buttons — is leaving; the window's return of the
+  // focus (to «Vedi», already gone) runs as it closes, so this one comes after it.
+  const dismiss = () => {
     dismissNotification();
+    const back = returnFocusRef.current;
+    if (back) window.setTimeout(() => back.isConnected && back.focus(), 0);
   };
 
   return (
     <>
+      <div role="status" className="sr-only">
+        {shown && !showChangelog ? `Novità in v${currentVersion}` : ''}
+      </div>
+
       <AnimatePresence>
-        {!showChangelog && (
+        {shown && !showChangelog && (
           <motion.div
             initial={away}
             animate={still ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
@@ -45,7 +60,7 @@ export function ChangelogNotification() {
               'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800',
               'text-slate-900 dark:text-slate-100 shadow-lg'
             )}
-            role="status"
+            onFocus={rememberFocus}
           >
             <div
               className="shrink-0 size-9 rounded-lg bg-toga-50 dark:bg-toga-900/30 flex items-center justify-center"
@@ -76,7 +91,7 @@ export function ChangelogNotification() {
 
             <button
               type="button"
-              onClick={dismissNotification}
+              onClick={dismiss}
               className={cn(
                 'shrink-0 inline-flex size-11 items-center justify-center rounded-lg',
                 'text-slate-500 hover:text-slate-800 hover:bg-slate-100',
@@ -93,8 +108,8 @@ export function ChangelogNotification() {
       </AnimatePresence>
 
       <Modal
-        isOpen={showChangelog}
-        onClose={handleCloseModal}
+        isOpen={shown && showChangelog}
+        onClose={dismiss}
         title={news.length > 1 ? 'Novità dalla tua ultima visita' : `Novità in v${currentVersion}`}
         size="md"
       >

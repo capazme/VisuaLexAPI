@@ -6,9 +6,11 @@
  * back empty and the window said «Nessun changelog disponibile».
  *
  * A note is plain Markdown, and only this much of it: a line that is all bold (`**Accesso**`) heads a
- * group, `- ` starts an item (an indented line continues it), anything else is a paragraph; inside a line,
- * `**bold**`, `*italic*` and `` `code` ``. No `#` headings — the window names the version itself — no
- * links, no HTML: what is not understood is drawn as written, as text.
+ * group, `- ` starts an item (the lines after it continue it, up to a blank line), anything else is a
+ * paragraph; inside a line, `**bold**`, `*italic*` and `` `code` ``. No `#` headings — the window names the
+ * version itself —, no numbered lists, no links, no HTML: what is not understood is drawn as written, as
+ * text. Not `features/merlt/ner/qaMarkdown`: that one keeps offsets into a stripped text for the Q&A's
+ * citations, reads `#` headings and has no code spans, and lives with MERL-T.
  */
 
 import { compareVersions } from '../../config/versionConfig';
@@ -108,17 +110,16 @@ export function parseNote(note: string): NoteBlock[] {
       (items ??= []).push(item[1]);
       continue;
     }
-    if (items && /^\s/.test(raw)) {
-      items[items.length - 1] += ` ${line}`;
-      continue;
-    }
     const heading = HEADING.exec(line);
     if (heading) {
       flush();
       blocks.push({ kind: 'heading', text: heading[1] });
       continue;
     }
-    if (items) flush();
+    if (items) {
+      items[items.length - 1] += ` ${line}`;
+      continue;
+    }
     paragraph.push(line);
   }
   flush();

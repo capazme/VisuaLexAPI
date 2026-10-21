@@ -22,10 +22,12 @@ describe('the release notes kept with the web app', () => {
     expect(Object.keys(RELEASE_NOTES).sort()).toEqual(notes.map((name) => name.replace(/\.md$/, '')).sort());
   });
 
-  it('writes no # heading (the window names the version) and never names the doctrine source by name', () => {
+  it('writes no # heading (the window names the version), no numbered list, and never «Brocardi»', () => {
     for (const name of notes) {
       const text = readFileSync(resolve(folder, name), 'utf8');
       expect(text, name).not.toMatch(/^\s*#/m);
+      expect(text, name).not.toMatch(/^\s*\d+[.)]\s/m);
+      // a note says «una fonte esterna di dottrina»
       expect(text, name).not.toMatch(/brocardi/i);
     }
   });
@@ -65,9 +67,9 @@ describe('parseNote', () => {
     ]);
   });
 
-  it('joins an indented line to its item, and a heading right after a list ends it', () => {
-    expect(parseNote('- primo\n  segue\n**Dopo**\n- altro')).toEqual([
-      { kind: 'list', items: [[{ kind: 'text', text: 'primo segue' }]] },
+  it('joins the lines after an item to it, and a heading right after a list ends it', () => {
+    expect(parseNote('- primo\n  segue\nancora\n**Dopo**\n- altro')).toEqual([
+      { kind: 'list', items: [[{ kind: 'text', text: 'primo segue ancora' }]] },
       { kind: 'heading', text: 'Dopo' },
       { kind: 'list', items: [[{ kind: 'text', text: 'altro' }]] },
     ]);
@@ -96,7 +98,7 @@ describe('parseNote', () => {
               : [block.content.map((part) => part.text).join('')]
         )
         .join('');
-      const written = note.replace(/\*\*|`|^- /gm, '').replace(/\s+/g, '');
+      const written = note.replace(/^[-*]\s+/gm, '').replace(/\*\*|\*|`/g, '').replace(/\s+/g, '');
       expect(drawn.replace(/\s+/g, ''), version).toBe(written);
     }
   });
