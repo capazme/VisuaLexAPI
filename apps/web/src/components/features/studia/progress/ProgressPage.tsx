@@ -7,6 +7,7 @@ import { ActivityCalendar, ActivityCalendarSkeleton } from './ActivityCalendar';
 import { CardStatesBar, CardStatesBarSkeleton } from './CardStatesBar';
 import { DueForecast, DueForecastSkeleton } from './DueForecast';
 import { GoalRing } from './GoalRing';
+import { LevelBar } from './LevelBar';
 import { formatCount, recentReviews } from './layout';
 import { rememberedMateria, rememberMateria } from './rememberedSubject';
 import { StreakBadge } from './StreakBadge';
@@ -49,18 +50,24 @@ function Block({ id, title, busy, stale, note, children }: BlockProps) {
   );
 }
 
-/** The streak, today's goal and the reviews of the last 30 days: the pieces of «Oggi», drawn once (Gymnasium spec §5.3). */
+/**
+ * The streak, today's goal, the reviews of the last 30 days and the level: the pieces of «Oggi», drawn once (Gymnasium
+ * spec §5.3; the level since G1c).
+ */
 function Summary({ data }: { data: Progressi }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-10 gap-y-5">
-      <StreakBadge compact attuale={data.serie.attuale} record={data.serie.record} ultimiGiorni={data.serie.ultimiGiorni} />
-      <div className="shrink-0">
-        <GoalRing compact giorno={data.oggi.giorno} ripassi={data.oggi.ripassi} obiettivo={data.oggi.obiettivo} raggiunto={data.oggi.raggiunto} />
+    <div className="grid gap-6">
+      <div className="flex flex-wrap items-center gap-x-10 gap-y-5">
+        <StreakBadge compact attuale={data.serie.attuale} record={data.serie.record} ultimiGiorni={data.serie.ultimiGiorni} />
+        <div className="shrink-0">
+          <GoalRing compact giorno={data.oggi.giorno} ripassi={data.oggi.ripassi} obiettivo={data.oggi.obiettivo} raggiunto={data.oggi.raggiunto} />
+        </div>
+        <p className="grid gap-1 md:ml-auto">
+          <span className={cn('font-serif text-4xl font-medium leading-none tabular-nums', INK_TEXT)}>{formatCount(recentReviews(data.materie))}</span>
+          <span className={cn('text-sm', MUTED_TEXT)}>{recentReviews(data.materie) === 1 ? 'ripasso' : 'ripassi'} negli ultimi 30 giorni</span>
+        </p>
       </div>
-      <p className="grid gap-1 md:ml-auto">
-        <span className={cn('font-serif text-4xl font-medium leading-none tabular-nums', INK_TEXT)}>{formatCount(recentReviews(data.materie))}</span>
-        <span className={cn('text-sm', MUTED_TEXT)}>{recentReviews(data.materie) === 1 ? 'ripasso' : 'ripassi'} negli ultimi 30 giorni</span>
-      </p>
+      <LevelBar livello={data.livello} className="lg:max-w-md" />
     </div>
   );
 }
@@ -71,20 +78,21 @@ function SummarySkeleton() {
       <div className={cn(PULSE, 'h-10 w-40')} />
       <div className={cn(PULSE, 'h-10 w-24')} />
       <div className={cn(PULSE, 'h-[3.75rem] w-44 md:ml-auto')} />
+      <div className={cn(PULSE, 'h-[4.5rem] w-full lg:max-w-md')} />
     </div>
   );
 }
 
 /**
  * «Progressi», `/studia/progressi` (Gymnasium spec §5.3, G3): everything the home no longer shows, in the sections'
- * full-width frame (G6) — the summary (the streak, today's goal, the reviews of 30 days), the subject chips, «Il tuo
+ * full-width frame (G6) — the summary (the streak, today's goal, the reviews of 30 days, the level), the subject chips, «Il tuo
  * calendario» across the page (its legend beside it from `lg`), «Le schede per stato» and «I prossimi 14 giorni» side by side from `lg`, and «Per
  * materia» in two columns from `lg`; one column below. The same read as «Oggi» (`useProgress` over `GET
  * /lingo/srs/progressi`): the whole day's for the summary and the subjects, and, while a subject is chosen, that
  * subject's for the calendar, the states and the coming days — the summary stays the whole day's (the streak and the
  * goal are), and the subjects list all five. The subject is the one «Oggi» remembers. While the first read travels
  * every block holds its final size; a failed read says so with «Riprova» and keeps what was on screen; a new read of
- * the same subject leaves the last answer on screen, dimmed. No points and no level (they wait for the server).
+ * the same subject leaves the last answer on screen, dimmed. The level is the summary's (G1c), the whole day's.
  */
 export function ProgressPage() {
   const desktop = useIsDesktop();

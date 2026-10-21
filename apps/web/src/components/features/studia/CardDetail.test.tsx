@@ -109,6 +109,27 @@ describe('CardDetail, proposing', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
+  it('says the points the proposal earned, and records them as seen (G1c)', async () => {
+    const user = userEvent.setup();
+    const livello = { livello: 1, totale: 25, nelLivello: 25, perIlProssimo: 100, oggi: 25 };
+    propose.mockResolvedValue({ ...card('PROPOSTA_COMMUNITY'), xp: { crediti: [{ missione: 'scrivi', punti: 25 }], livello, nuovoLivello: false } });
+    const { onChanged } = renderDetail(card('BOZZA_PERSONALE'));
+    await user.click(screen.getByRole('button', { name: 'Proponi alla comunità' }));
+    await waitFor(() => expect(onChanged).toHaveBeenCalledWith('Scheda proposta alla comunità · +25 XP', 'success'));
+    expect(JSON.parse(localStorage.getItem('visualex.studia.visto')!)).toMatchObject({ xp: 25, livello: 1 });
+    localStorage.removeItem('visualex.studia.visto');
+  });
+
+  it('says no points for a card proposed again, which earns none in its life', async () => {
+    const user = userEvent.setup();
+    const livello = { livello: 1, totale: 25, nelLivello: 25, perIlProssimo: 100, oggi: 25 };
+    propose.mockResolvedValue({ ...card('PROPOSTA_COMMUNITY'), xp: { crediti: [], livello, nuovoLivello: false } });
+    const { onChanged } = renderDetail(card('BOZZA_PERSONALE'));
+    await user.click(screen.getByRole('button', { name: 'Proponi alla comunità' }));
+    await waitFor(() => expect(onChanged).toHaveBeenCalledWith('Scheda proposta alla comunità', 'success'));
+    localStorage.removeItem('visualex.studia.visto');
+  });
+
   it('proposes at once when the current notice is already accepted', async () => {
     const user = userEvent.setup();
     propose.mockResolvedValue(card('PROPOSTA_COMMUNITY'));

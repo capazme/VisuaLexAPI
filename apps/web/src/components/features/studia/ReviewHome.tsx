@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
 import { useMediaQuery } from '../../../hooks/useIsDesktop';
 import type { Materia } from '../../../types/studia';
 import { MATERIA_LABEL } from './studiaLabels';
-import type { StudiaOutletContext } from './StudiaPage';
 import { MissionList } from './missions/MissionList';
 import { TodayMissions } from './missions/TodayMissions';
 import { ConfettiBurst } from './progress/Celebration';
@@ -48,7 +47,6 @@ export function ReviewHome() {
   // The chips move, not their copy: one place or the other, so the document never holds them twice.
   const wide = useMediaQuery(XL);
   const chipsBeside = split && wide;
-  const validator = useOutletContext<StudiaOutletContext | undefined>()?.validator === true;
   const [materia, setMateria] = useState<Materia | undefined>(rememberedMateria);
   const day = useProgress(undefined);
   const narrowed = useProgress(materia, materia !== undefined);
@@ -151,7 +149,7 @@ export function ReviewHome() {
       )}
 
       <div className={cn('min-w-0 empty:hidden', split && LEFT)}>
-        <MissionList data={data} loading={loading && data === null} validator={validator} />
+        <MissionList data={data} loading={loading && data === null} />
       </div>
 
       {!chipsBeside && subjects}

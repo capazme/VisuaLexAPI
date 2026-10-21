@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { studiaService } from '../../../services/studiaService';
 import type { Materia, OggiDelVoto, SchedaDiRipasso, Voto } from '../../../types/studia';
+import { recordXpSeen } from './progress/seenProgress';
+import { gainOf, type XpGainValue } from './progress/xpGains';
 
 const MAX_DURATION_MS = 3_600_000;
 
@@ -70,6 +72,9 @@ export function useReviewSession(materia?: Materia, { istituto, paused = false, 
   // Today's goal as the last recorded grade left it, and the grade that made the day count (Studia progress spec §5.3).
   const [today, setToday] = useState<OggiDelVoto | null>(null);
   const [goalMet, setGoalMet] = useState<OggiDelVoto | null>(null);
+  // What the last recorded grade earned, numbered so the same points earned twice show twice (G1c).
+  const [xpGain, setXpGain] = useState<XpGainValue | null>(null);
+  const gains = useRef(0);
   // How many times the queue has moved on: a card that comes straight back is a new step.
   const [step, setStep] = useState(0);
 
@@ -150,6 +155,12 @@ export function useReviewSession(materia?: Materia, { istituto, paused = false, 
             setToday(outcome.oggi);
             if (outcome.oggi.appenaRaggiunto) setGoalMet(outcome.oggi);
           }
+          if (outcome.xp) {
+            const gain = gainOf(++gains.current, outcome.xp);
+            if (gain) setXpGain(gain);
+            // The lesson shows what it earned: «Oggi» need not show it again.
+            recordXpSeen(outcome.xp.livello);
+          }
         }
         // The session may have been read again while the post was on its way.
         if (queueRef.current[0]?.card.id === card.id) {
@@ -228,5 +239,7 @@ export function useReviewSession(materia?: Materia, { istituto, paused = false, 
     today,
     /** The answer of the grade that made the day count, while this session lasts; null until then. */
     goalMet,
+    /** What the last grade that earned points earned («+20 XP»); null until one does. */
+    xpGain,
   };
 }

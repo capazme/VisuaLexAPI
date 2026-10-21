@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import { useFreshMissions, useReviewsGrowth, useStreakGrowth } from './seenProgress';
+import { recordXpSeen, useFreshMissions, useReviewsGrowth, useStreakGrowth, useXpGrowth } from './seenProgress';
 
 const KEY = 'visualex.studia.visto';
 const stored = () => JSON.parse(localStorage.getItem(KEY) ?? 'null');
@@ -80,6 +80,37 @@ describe('what this browser last drew of the progress (S2)', () => {
       localStorage.setItem(KEY, '{not json');
       expect([...renderHook(() => useFreshMissions('2026-10-19', ['nuove'])).result.current]).toEqual([]);
       expect(stored()).toEqual({ giorno: '2026-10-19', missioni: ['nuove'] });
+    });
+  });
+
+  describe('the points and the level (G1c)', () => {
+    it('plays nothing on a first visit, nor the first since points exist, and records them', () => {
+      expect(renderHook(() => useXpGrowth(40, 1)).result.current).toEqual({ gain: null, levelUp: false });
+      expect(stored()).toMatchObject({ xp: 40, livello: 1 });
+      store({ serie: 4 });
+      expect(renderHook(() => useXpGrowth(40, 1)).result.current).toEqual({ gain: null, levelUp: false });
+    });
+
+    it('gives the points earned since this browser drew them, and a level not yet shown, once', () => {
+      store({ xp: 90, livello: 1 });
+      expect(renderHook(() => useXpGrowth(110, 2)).result.current).toEqual({ gain: 20, levelUp: true });
+      expect(renderHook(() => useXpGrowth(110, 2)).result.current).toEqual({ gain: null, levelUp: false });
+    });
+
+    it('follows a growth while on screen (a new read), and keeps them across a new day', () => {
+      store({ xp: 10, livello: 1 });
+      const { result, rerender } = renderHook(({ t }) => useXpGrowth(t, 1), { initialProps: { t: 10 } });
+      expect(result.current.gain).toBeNull();
+      rerender({ t: 35 });
+      expect(result.current.gain).toBe(25);
+      renderHook(() => useReviewsGrowth('2026-10-20', 3));
+      expect(stored()).toMatchObject({ xp: 35, livello: 1, giorno: '2026-10-20' });
+    });
+
+    it('takes what another surface showed itself (the lesson, a vote), so «Oggi» does not show it again', () => {
+      store({ xp: 10, livello: 1 });
+      recordXpSeen({ totale: 130, livello: 2 });
+      expect(renderHook(() => useXpGrowth(130, 2)).result.current).toEqual({ gain: null, levelUp: false });
     });
   });
 });

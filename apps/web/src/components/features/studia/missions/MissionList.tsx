@@ -2,7 +2,7 @@ import { cn } from '../../../../lib/utils';
 import type { Progressi } from '../../../../types/studia';
 import { BLOCK_HEADING, MUTED_TEXT, TILE } from '../progress/tokens';
 import { MissionRow } from './MissionMark';
-import { allMissions, todayMissions, type MissionGroup } from './missions';
+import { allMissions, type MissionGroup } from './missions';
 
 const GROUPS: { group: MissionGroup; label: string }[] = [
   { group: 'giornaliera', label: 'Giornaliere' },
@@ -10,7 +10,7 @@ const GROUPS: { group: MissionGroup; label: string }[] = [
   { group: 'lungo', label: 'A lungo termine' },
 ];
 
-/** The rows of each group, before the read: the day's without today's three (the validator's mission is not known yet). */
+/** The rows of each group, before the read: the day's without today's three (whether the validator's is listed is the read's). */
 const SKELETON_ROWS: Record<MissionGroup, number> = { giornaliera: 3, settimanale: 1, lungo: 1 };
 
 export interface MissionListProps {
@@ -18,8 +18,6 @@ export interface MissionListProps {
   data: Progressi | null;
   /** The first read is travelling. */
   loading: boolean;
-  /** The validation mission is listed for a validator only. */
-  validator: boolean;
 }
 
 /** A small label at the end of a mission's line, in place of its count. */
@@ -34,11 +32,12 @@ function Tag({ children }: { children: string }) {
 
 /**
  * «Tutte le missioni» (Gymnasium spec §5.1), third on the page: the day's, the week's and the long run's, without the
- * day's three, which «Le missioni di oggi» shows just above (G6: drawn twice, they made the page long). Those the
- * web counts show their state; those the server must record first are listed with «In arrivo», never ticked. No
- * points and no level until the server keeps them. A failed read leaves the list out: the missions say so above.
+ * day's three, which «Le missioni di oggi» shows just above (G6: drawn twice, they made the page long). Each as the
+ * server decides it (G1c), with its state, its count where it has one, its line and its points; one announced and
+ * not yet recorded («caso») is listed with «In arrivo», never ticked. «convalida» is listed when the server lists it
+ * (a validator's only). A failed read leaves the list out: the missions say so above.
  */
-export function MissionList({ data, loading, validator }: MissionListProps) {
+export function MissionList({ data, loading }: MissionListProps) {
   if (!data) {
     // The list's shape is known before the read: its places at their final size, so nothing below jumps.
     return loading ? (
@@ -58,8 +57,7 @@ export function MissionList({ data, loading, validator }: MissionListProps) {
       </div>
     ) : null;
   }
-  const today = new Set(todayMissions(data).map((mission) => mission.id));
-  const missions = allMissions(data, { validator }).filter((mission) => !today.has(mission.id));
+  const missions = allMissions(data).filter((mission) => !mission.main);
   return (
     <section aria-labelledby="studia-tutte" className="space-y-3">
       <div className="space-y-1">
@@ -80,8 +78,7 @@ export function MissionList({ data, loading, validator }: MissionListProps) {
                 .map((mission) => (
                   <MissionRow
                     key={mission.id}
-                    // The notes are today's missions' (above): here the title, the state and the count.
-                    mission={{ ...mission, note: undefined }}
+                    mission={mission}
                     aside={mission.status === 'in-arrivo' ? <Tag>In arrivo</Tag> : mission.status === 'vuota' ? <Tag>Niente oggi</Tag> : undefined}
                   />
                 ))}

@@ -3,7 +3,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { Check } from 'lucide-react';
 import { ease, spring } from '../../../../lib/motion';
 import { cn } from '../../../../lib/utils';
-import { INK_BG, INK_BORDER, MUTED_TEXT, ON_INK } from '../progress/tokens';
+import { INK_BG, INK_BORDER, INK_TEXT, MUTED_TEXT, ON_INK } from '../progress/tokens';
 import { STATUS_LABEL, type Mission, type MissionStatus } from './missions';
 
 /**
@@ -60,6 +60,19 @@ export function MissionMark({ status, drip = false }: { status: MissionStatus; d
   );
 }
 
+/**
+ * What a mission is worth (Gymnasium XP spec §9): «20 XP» beside its count, «+20 XP» in ink once earned. Said in words
+ * to a screen reader. Never on a mission still to come, which cannot be earned.
+ */
+function MissionPoints({ points, earned }: { points: number; earned: boolean }) {
+  return (
+    <p className={cn('shrink-0 text-xs font-medium tabular-nums', earned ? INK_TEXT : MUTED_TEXT)}>
+      <span aria-hidden>{`${earned ? '+' : ''}${points} XP`}</span>
+      <span className="sr-only">{earned ? `${points} punti guadagnati` : `vale ${points} punti`}</span>
+    </p>
+  );
+}
+
 export interface MissionRowProps {
   mission: Mission;
   /** A thin bar of the share under the title (today's missions; the full list keeps to the words). */
@@ -79,7 +92,7 @@ export interface MissionRowProps {
   layout?: boolean;
 }
 
-/** One mission: its mark, its title and state, «8 di 18» (and the bar), its note, and its action. */
+/** One mission: its mark, its title and state, «8 di 18» and its points (and the bar), its note, and its action. */
 export function MissionRow({ mission, bar = false, quietNote = false, aside, children, ink, layout = false }: MissionRowProps) {
   const { progress } = mission;
   // A mission done is full, also the goal the server counted with the queue finished under it.
@@ -115,7 +128,10 @@ export function MissionRow({ mission, bar = false, quietNote = false, aside, chi
             {mission.title}
             <span className="sr-only">{`: ${STATUS_LABEL[mission.status]}`}</span>
           </p>
-          {aside ?? (progress && <p className="shrink-0 text-sm tabular-nums text-slate-600 dark:text-slate-300">{`${progress.done} di ${progress.of}`}</p>)}
+          <div className="flex shrink-0 items-baseline gap-x-3">
+            {aside ?? (progress && <p className="shrink-0 text-sm tabular-nums text-slate-600 dark:text-slate-300">{`${progress.done} di ${progress.of}`}</p>)}
+            {mission.status !== 'in-arrivo' && <MissionPoints points={mission.points} earned={mission.status === 'fatta'} />}
+          </div>
         </div>
         {bar && progress && (
           <span aria-hidden className="block h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
