@@ -122,7 +122,7 @@ export function MissionRow({ mission, bar = false, quietNote = false, aside, chi
             <span className={cn('block h-full rounded-full transition-[width] duration-500 ease-out motion-reduce:transition-none', INK_BG)} style={{ width: `${share * 100}%` }} />
           </span>
         )}
-        {mission.note && <p className={cn('text-sm', MUTED_TEXT, quietNote && 'sr-only')}>{mission.note}</p>}
+        {mission.note && <p className={cn('max-w-prose text-sm', MUTED_TEXT, quietNote && 'sr-only')}>{mission.note}</p>}
         {children}
       </div>
     </motion.li>

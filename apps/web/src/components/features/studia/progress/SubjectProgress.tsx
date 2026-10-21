@@ -23,7 +23,8 @@ const reviews = (n: number) => (n === 0 ? 'Nessun ripasso negli ultimi 30 giorni
  */
 export function SubjectProgress({ materie, selected, onSelect }: SubjectProgressProps) {
   return (
-    <ul className="grid gap-2">
+    // Two columns from `lg` (G6): the page is the frame's full width.
+    <ul className="grid gap-2 lg:grid-cols-2">
       {orderStops(materie).map((row) => {
         const total = totalCards(row);
         const on = selected === row.materia;
@@ -34,7 +35,7 @@ export function SubjectProgress({ materie, selected, onSelect }: SubjectProgress
               aria-pressed={on}
               onClick={() => onSelect(on ? undefined : row.materia)}
               className={cn(
-                'grid min-h-[44px] w-full gap-2 rounded-xl text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60',
+                'grid h-full min-h-[44px] w-full content-start gap-2 rounded-xl text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60',
                 FOCUS_RING,
                 // The chosen one's border is twice as thick and its padding a pixel less, so nothing moves.
                 on ? cn('border-2 bg-slate-50 p-[11px] dark:bg-slate-800/60', INK_BORDER) : 'border border-slate-200 p-3 dark:border-slate-800',

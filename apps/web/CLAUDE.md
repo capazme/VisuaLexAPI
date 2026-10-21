@@ -174,7 +174,22 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `DecisionTextView`: a court decision's text; `DecisionReadingSurface`: the same text with the
   reader's marks and the norms it cites as links; `DecisionDownloads`: its two PDF buttons; `DecisionResultList`, the Cassazione's decisions for an
   article or a topic, `EuCaseLawBlock`, the Union's courts' decisions that cite an article of a regulation or a directive, and `DecisionSearchTabView`, a topic search's window (or the phone's reader); design `docs/superpowers/specs/2026-10-01-sentenze-design.md`).
-- `components/layout/` — `Layout`, `Sidebar`, `ReaderLayout`. **The sections** (D-076, spec
+- `components/layout/` — `Layout`, `Sidebar`, `ReaderLayout`, `PageFrame`. **The page frame** (W2, 21 Oct 2026):
+  `PageFrame` is the frame of every section page — the layout's own width (`Layout`'s `max-w-7xl` and its padding: a
+  1216 px column at 1920 px) with nothing narrower inside, the `h1` at the column's left edge in one size
+  (`PAGE_TITLE`: Newsreader, 28 px on a phone, 30 px from `md`), the sentence under it (`line`, at a reading
+  measure), the main action on its right from `md` and under it on a phone (`action`), and no icon beside the title;
+  a header with an action pads its right side from `lg` just enough to stay clear of `Layout`'s fixed Focus button
+  (`FOCUS_BUTTON_CLEARANCE`, from `--sidebar-width` and `100vw`: up to 42 px, nothing once the window is about
+  1560 px wide — between 1024 and 1550 px the button covered «Svuota cronologia» and «Gestisci»);
+  `section` marks a section's home for the switcher's focus (`data-section-title`, `tabIndex={-1}`, `FOCUS_RING`).
+  It draws the dossier list, «Dossier pubblici», Community, Gymnasium (every view but the lesson, through
+  `StudiaPage`), «Analizza documento», «Collega un'app AI» (its body keeps a column of 768 px: it reads as text, the
+  title does not move), the Cronologia and the MERL-T hub; «Cestino» and the MERL-T pages under a way back
+  («Torna ai Dossier», «MERL-T») write their `h1` with `PAGE_TITLE`. A dossier's own page (its name, its star and
+  its actions), Impostazioni (a dialog, not a page), the Scrivania, the lesson, the reader and the practice, the
+  login and «Crediti» (public, outside the layout) stay out. `PageFrame.test.tsx` reads the section pages' files
+  and fails on a title of their own, an icon in an `h1` or a root narrowed with `mx-auto max-w-…`. **The sections** (D-076, spec
   `docs/superpowers/specs/2026-10-18-sections-switcher-design.md`): Corpus is the common core and no section;
   over it Opus, Gymnasium (the code's `studia`), Academia (development mode only) and Forum, in
   `features/sections/` (`sections.ts`: names, lines, icons, home addresses, `sectionForPath`; `useSection`: the
@@ -208,7 +223,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   inDrawer`) the page changes at once, with no transition: the drawer closing over it is the change, and the content's
   picture would be drawn over the drawer and its veil. The focus goes to the
   new page's title unless the user moved it meanwhile: each section's home marks its heading
-  `data-section-title="<section id>"` with `tabIndex={-1}` and `FOCUS_RING`, so a keyboard user sees where the focus
+  `data-section-title="<section id>"` with `tabIndex={-1}` and `FOCUS_RING` (`PageFrame`'s `section`), so a keyboard user sees where the focus
   went — and only a keyboard user: the browser counts a focus the script gives after a focused menu entry as visible,
   so a choice made with a pointer (`MenuItem.onSelect`'s click, `detail` above 0) marks the title
   `data-pointer-focus`, which `index.css` draws with no ring, until it loses the focus (Gymnasium's `h1`, the dossier list's `h1` — `opus` or
@@ -731,8 +746,14 @@ palestra giuridica» — the section switcher keeps «Gymnasium»; spec
 `docs/superpowers/specs/2026-10-13-studia-progress-design.md`, direction D «Registro vivo»). Reads: `useProgress` over
 `GET /lingo/srs/progressi` (the last answer of the same subject stays on screen while a new one travels — dimmed
 under the road only —, an answer is never shown for another subject, and an older one never overwrites a newer one) — once for the whole day, which draws the missions, the statistics and the road, and once more
-for the subject chosen, made only while one is (`useProgress(materia, enabled)`), which draws the first mission's action. One column, 768 px, centred at every width (on this page `StudiaPage` narrows to it too, so the
-heading and its rule are the column's width), in the order the owner fixed:
+for the subject chosen, made only while one is (`useProgress(materia, enabled)`), which draws the first mission's action. The page is in
+the sections' frame (`layout/PageFrame`, G6: the layout's full width, the heading at its left edge; the 768 px column
+of G1 is gone). One column up to `xl`, and in Focus mode (its 896 px frame would leave the band too narrow); from `xl` (1280 px) two, a grid of `7fr` and `5fr`: on the left the missions,
+the list and the road, on the right the statistics and, under them, «Cosa ripassi», `sticky` at `top-8` with `self-start` over all the rows
+(`row-span-full`; a fourth row of `1fr` takes what the right column has beyond the left, so it never stretches the
+left's rows). The chips move by `useMediaQuery('(min-width: 1280px)')`, never as a hidden copy: below `xl` they follow
+the list, from it they sit in the band's sticky box, read after the band. The document keeps the order the owner fixed
+— missions, statistics, list — and the grid only places the band; inside the tiles a sentence stops at `max-w-prose`. In that order:
 1. **«Le missioni di oggi»** (`missions/TodayMissions`): the day's three missions, one under the other, each with its
    mark (drawn, never pressed), «8 di 18» and a thin bar, and the summary «2 di 3» over those with something to do
    today. They are **computed in the web**, pure, by `missions/missions.ts` (`todayMissions`, `missionSummary`,
@@ -763,17 +784,28 @@ heading and its rule are the column's width), in the order the owner fixed:
 2. **«I tuoi progressi»** (`progress/StatsBand`), one band: `StreakBadge compact` (the «§», the count with the bundle
    of five being filled as tally marks beside it, `StreakTally` — the fifth is the stroke across the four in the
    section's hue —, «Il primo giorno comincia oggi» or «giorni di fila · record N») and `GoalRing compact` (40 px, «5 di 10»), the gear «Impostazioni dello
-   studio» (`progress/StudySettings`: `SettingsGear` and `StudySettingsSheet`, `StudyPreferences open` in a `ui/Sheet`
-   capped at `max-w-lg` from `md`, not closed by Esc or the backdrop), the current week (`layout.ts` `currentWeek`: Monday
+   studio» (`progress/StudySettings`: `SettingsGear` with `aria-controls`, and `StudySettingsPanel` — G6, the owner's
+   «si estende il tab»: `StudyPreferences open` inside the card under its heading, no window and no veil, its height
+   in `dur.pop` on `ease.out` through Framer Motion, at once under reduced motion; the gear again or Esc inside closes it
+   and the focus goes back to the gear; while it is open the band is not sticky, so its foot can be scrolled to; the
+   missions' «Cambia…» buttons open it and focus it, «Accendi le schede della comunità» with the subjects open; the
+   strip over «Le mie schede» and «Da validare» keeps `StudySettingsSheet`, a `ui/Sheet` capped at `max-w-lg` from
+   `md`, not closed by Esc or the backdrop). `StudyPreferences` saves a number when its field is left or on Enter (an
+   unchanged one is not sent; «Salvato» beside it, no «Salva»), keeps the community's subjects one level down, closed
+   («Schede della comunità · N di 5»), and sends its saves one after the other, a switch held only while its own
+   save travels, so a switch pressed right after a number is neither lost nor overwritten. Then the current week (`layout.ts` `currentWeek`: Monday
    to Sunday from the server's today and `serie.ultimiGiorni`, seven boxes with «LMMGVSD», a day to come dotted, and the
    days before the first one the calendar holds `vuoto`, never missed; each state in words for a screen reader,
    `DAY_STATE_LABEL`), then the cards by state as three numbers in Newsreader with their names in Geist (a `dl`) and the
-   bar. «Tutti i progressi», a link (44 px, full width on a phone), leads to `/studia/progressi`: the long calendar, the
+   bar. From `xl` the band is the right column, about 400 to 490 px: `aside` adds the `xl:` classes that stack it as on a phone (the
+   week and «Tutti i progressi» at the column's width, the numbers at `text-3xl`, the three states in columns as wide as
+   their words, so «In apprendimento» keeps one line). «Tutti i progressi», a link (44 px, full width on a phone), leads to `/studia/progressi`: the long calendar, the
    coming days and the subjects live there alone (G3 removed the «Il tuo mese» sheet, so no chart is drawn twice).
    **No text on «Oggi» or «Progressi» is under 11 px** (the stamp's date included; the compact stamp is the session's):
    `typeScale.test.tsx` reads the files of `missions/` and `progress/` and fails on a `text-[Npx]` under 11 or an SVG
    `<text>`. `CARD_STATES`, in `tokens.ts`, are the band's, the road's and the page's.
-3. **«Tutte le missioni»** (`missions/MissionList`): daily, weekly, long-term. What the web counts shows its state;
+3. **«Tutte le missioni»** (`missions/MissionList`): daily, weekly, long-term, without today's three, which item 1
+   shows just above («Le tre di oggi sono qui sopra», G6). What the web counts shows its state;
    what the server must record (a subject left for 7 days, writing a card, validating two — a validator's only, from the
    outlet's `validator` —, a short case, a week of streak) is listed with «In arrivo», with no count and nothing to tick.
 4. «Cosa ripassi», `SubjectChips` (the subject narrows the first mission's action and the session it starts, kept in
@@ -814,7 +846,7 @@ hand-drawn SVG laid out by the pure `progress/layout.ts`, which walks the server
 the browser's zone. **The celebration** (`progress/Celebration.tsx`): once a day per browser
 (`useCelebratedToday`, `visualex.studia.festeggiato`, written when a celebration *starts*, so leaving halfway or a new
 read never replays it; a convenience, never the streak's source) — on the home when
-today counts with at least one review (confetti of «§» and «✓» from the stamp in the goal's row over the missions and the band, `confetti.ts` pure, on a canvas,
+today counts with at least one review (confetti of «§» and «✓» from the stamp in the goal's row over the missions and the band — an absolute box on their grid rows, rows 1–2 below `xl` and row 1 across both columns from it —, `confetti.ts` pure, on a canvas,
 and the stamp «Obiettivo raggiunto» pressed in; the stamp stays at rest afterwards), and in the session on the grade
 whose answer says `oggi.appenaRaggiunto` (`SessionCelebration`: a notice placed over the lesson's header row (the close button and the progress bar), never over the card
 or the grades; 1.5 s; no focus, no pointer, the keys untouched; an `aria-live`
@@ -833,16 +865,18 @@ its end at once. The celebration is unchanged.
 **«Progressi», the page of the data** (`progress/ProgressPage`, `/studia/progressi`, the sidebar's «Progressi» in
 «Studia» after Oggi; Gymnasium spec §5.3, G3). The same read as «Oggi» — `useProgress(undefined)` for the whole day and
 `useProgress(materia, enabled)` while a subject is chosen —, no route of its own on the server. Under the area's heading
-(`StudiaPage` narrows it to the same 768 px column as «Oggi», and draws no strip over it) the page heading «I tuoi
-progressi», then, one column at every width: **the summary** (`StreakBadge compact`, `GoalRing compact` and the reviews
+(in the sections' full-width frame, as «Oggi», G6; `StudiaPage` draws no strip over it) the page heading «I tuoi
+progressi», then: **the summary** (`StreakBadge compact`, `GoalRing compact` and the reviews
 of the last 30 days in a large number, `recentReviews`: the sum of `materie[].ripassi30`; always the whole day's, as
 the streak and the goal are); **the subject chips** (`SubjectChips`, 44 px at every width — Oggi's too —, the subject «Oggi» remembers, and a line saying
-what it narrows); **«Il tuo calendario»** (`ActivityCalendar`, 26 weeks on a computer and 12 on a phone by
-`useIsDesktop`); **«Le schede per stato»** (`CardStatesBar`: the bar's segments are buttons as before, each a 44 px box at every width with its colour
+what it narrows); **«Il tuo calendario»** (`ActivityCalendar`, across the page: 26 weeks on a computer and 12 on a phone by
+`useIsDesktop` — the server keeps 26, `CALENDAR_WEEKS`, so a wider page shows no more —; from `lg` the drawing takes three
+quarters and the legend and the day's line a column beside it, the line holding five lines' room); then, side by side
+from `lg`, **«Le schede per stato»** (`CardStatesBar`: the bar's segments are buttons as before, each a 44 px box at every width with its colour
 drawn 28 px tall inside on a computer, and under it the
 three states by name, count and share — `shares` rounds by the largest remainder so the three add up to 100, and a state
 with cards that rounds to none reads «<1%», never «0%»); **«I prossimi 14 giorni»** (`DueForecast`); **«Per materia»**
-(`SubjectProgress`: the five subjects in the road's order, `orderStops`, each an `aria-pressed` button that narrows the
+(`SubjectProgress`, two columns from `lg`: the five subjects in the road's order, `orderStops`, each an `aria-pressed` button that narrows the
 page — pressed again it clears —, its share consolidated, a bar of the three states and the states in words,
 `stopStates`, and the reviews of 30 days; no «N da ripassare», which the progress read does not carry by subject). Every control on the page is 44 px tall at every width
 (`ProgressPage.test.tsx` guards its files against an `md:` height, as `contribuisci.test.ts` does Contribuisci's); the
@@ -1844,10 +1878,12 @@ meant to stay split; add new features as new files, not inside the shells:
   from what the dossier kept, `addKnownDecisions`, so «Salva come dossier» saves them back) land in
   the practices.
 - `features/history/` — `HistoryView.tsx`, `DecisionHistoryRow.tsx` (a decision's row) plus
-  `NormaChangesSection.tsx` (see History above). The card's title is the page's `h1` («Cronologia» on a phone,
-  «Cronologia Ricerche» from `md`, one hidden by CSS); on `/dossier` it is the visible title of the list, of the
-  open dossier and of «Cestino», and what sits under it is `h2` (a dossier's card; an open dossier's notes, acts,
-  «Giurisprudenza» and «Rimossi di recente»).
+  `NormaChangesSection.tsx` (see History above). The page is in the sections' frame (W2): one `h1`, «Cronologia», on
+  every width, with the one search field (`#tour-history-search`, «/» focuses it) and «Svuota cronologia» beside it
+  — until W2 a phone's and a computer's header were both drawn, one hidden by CSS, and «/» focused the hidden field
+  on a phone; the saved norms that changed come under the title, then the card. On `/dossier` the `h1` is the visible
+  title of the list, of the open dossier and of «Cestino», and what sits under it is `h2` (a dossier's card; an open
+  dossier's notes, acts, «Giurisprudenza» and «Rimossi di recente»).
 - `features/documents/` — `DocumentReviewPage.tsx` (the page), `DocumentText.tsx`, `CitationList.tsx`,
   `citationGroups.ts`, `documentFile.ts`; invented sample files for the tests in `__tests__/fixtures.ts`.
 
