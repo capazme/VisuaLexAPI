@@ -45,7 +45,14 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     the fingerprints a codice's in-memory index is a few hundred KB.
     `AKN_ENABLED=false` disables the whole path and is read at call time.
     `normalize_article_key` in `akn_parser.py` is the pure canonicaliser for
-    article numbers and needs no network.
+    article numbers and needs no network; `comparable_article_key` is the same with an
+    ordinal split in two words joined («135 sex decies», as the tree and the codice del
+    consumo's export write it, is «135-sexdecies»), for comparing two spellings only —
+    the keys `/fetch_rubriche` and the fingerprints answer keep the split. A component
+    act's rubrica is read in brackets, or, in a part that writes them in brackets,
+    without them when an amendment rewrote it so (`_unbracketed_rubrica`; the codice
+    civile: 2840 of 3249 before, 3039 since 21 October 2026, the rest repealed, notices, or
+    articles with no rubrica).
   - `normattiva_validity.py` — what a Normattiva article page says about its own
     validity: the window ("Testo in vigore dal … al …"), the version number, the
     act's last update, and a state (`current`, `historical`, `not_yet`,
@@ -109,7 +116,12 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     `citation_linker`, `alias_resolver` and `services/akn_parser`; mirrored by
     `apps/web/src/utils/articleSuffixes.ts`. Nine private copies each stopped at
     `decies`, so "art. 25-terdecies" resolved to art. 25-ter — an article that
-    exists, which is why nothing looked broken
+    exists, which is why nothing looked broken. `ORDINAL_SPELLINGS` pairs the two
+    spellings of 9, 15, 16, 18, 19 and 20 (`other_ordinal_spelling`): Normattiva uses one
+    per act («391 novies» c.p.p., «21 nonies» l. 241/1990), so `create_norma_visitata_from_data`
+    takes the act's spelling when the other one was asked (`_source_spelling`) and the URN
+    is the act's; `normalize_article_key` keeps the spelling it is given, since its keys
+    are what `/fetch_rubriche` and the fingerprints answer
   - `sys_op.py` — `PlaywrightManager` singleton (browser pooling), reached through
     `get_playwright_manager()`
   - `config.py` — rate limiting, cache size, Redis (`REDIS_ENABLED`, `REDIS_URL`)
@@ -336,7 +348,25 @@ cannot be read): `{state, valid_from, valid_to, version_number, act_updated,
 request_in_window}`, dates in ISO form. It is the source's own statement of which
 version came back; `norma_data.data_versione` is only the date the caller sent. A
 `version_date` after today (Europe/Rome) is a 400 — Normattiva would answer with the
-current text and say nothing.
+current text and say nothing — and so is one that cannot be read as a date.
+
+A date always asks for the text in force on that day, with or without «vigente» and
+over «originale» (owner, G-353; `append_version_info` writes `!vig=<day>`, and the AKN
+fallback reads the export at that day, never the original from today's). A request
+with no date is the text in force: Normattiva answers it with its latest version, also
+one not in force yet (art. 3 d.P.R. 131/1986 on 21 October 2026: repealed from 1
+January 2027). When the page's window starts after today (`starts_after_today`), the
+handlers read the article at today (`!vig=<today>`) and serve that text, its `url` and
+its `validity`, with the later version in `upcoming` (owner, G-355;
+`NormaController._document_in_force`): `{change: "abrogated" | "amended", valid_from,
+version_number}`, absent otherwise. `norma_data` stays the request's (no date), so the
+key notes and highlights are stored under does not move. The first page stands as before,
+its `validity` saying when it starts, when today's cannot be read and when nothing is in
+force today (today's page is `not_yet`, an article inserted from a later day, or itself
+starts after today). The text comes from the scraper's memory and the page from the
+persistent cache, which can expire first after a restart: for an undated request whose
+page has left the cache it is read once more, so a later version is never served
+unrecognised (and a watched norm does not flip between two texts).
 
 Root `app.py` maps failures through `_error_response`, so the status now carries
 meaning: `ValidationError` → 400 (missing `act_type`/`article`, malformed article
