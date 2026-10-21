@@ -94,4 +94,15 @@ describe('Modal', () => {
     );
     expect(screen.getByRole('button', { name: 'Chiudi' })).toHaveClass('min-h-[44px]', 'min-w-[44px]', 'md:min-h-0', 'md:min-w-0');
   });
+
+  it('takes its name from a header of its own, and the whole screen on a phone when asked', () => {
+    render(
+      <Modal isOpen onClose={() => {}} labelledBy="proprio" showCloseButton={false} phoneFullScreen>
+        <h2 id="proprio">Intestazione propria</h2>
+      </Modal>,
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Intestazione propria' });
+    expect(dialog).toHaveClass('max-sm:h-full', 'max-sm:rounded-none');
+    expect(dialog.parentElement).toHaveClass('max-sm:p-0');
+  });
 });

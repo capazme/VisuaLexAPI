@@ -9,7 +9,7 @@ import { tagLabel } from '../../../utils/tagLabel';
 import { LinkedText } from './LinkedText';
 import { TaskCheckbox } from './TaskCheckbox';
 import { countdown, PRIORITY_LABEL, RECURRENCE_LABEL, shortDay } from './taskDates';
-import { DEADLINE_TONE, ICON_BUTTON, META, PRIORITY_STRIPE, PRIORITY_TEXT } from './plannerStyles';
+import { DEADLINE_TONE, ICON_BUTTON, META, PRIORITY_TEXT } from './plannerStyles';
 
 export interface TaskRowActions {
   onTick: (task: Task) => void;
@@ -36,19 +36,23 @@ const time = (value: string | null) => (value ? ` · ${value}` : '');
  */
 export function TaskRow({ task, today, showDossier, isChild = false, onTick, onOpen, onTrash, children }: Props) {
   const dossierTitle = useAppStore((s) => (task.dossierId ? s.dossiers.find((d) => d.id === task.dossierId)?.title : undefined));
-  const stripe = PRIORITY_STRIPE[task.priority];
   const due = task.dueDate ? countdown(task.dueDate, today) : null;
   const plannedLate = task.plannedDate !== null && task.plannedDate < today;
 
   return (
     <li data-task-row data-task-id={task.id} className="relative min-w-0">
       <div className="group relative flex items-start gap-1 rounded-xl py-1 pl-1 pr-1 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40">
-        {stripe && <span aria-hidden className={cn('absolute bottom-2 left-0 top-2 w-1 rounded-full', stripe)} />}
-        <TaskCheckbox label={`Segna come fatto: ${task.title}`} onTick={() => onTick(task)} focusTarget />
+        <TaskCheckbox
+          label={`Segna come fatto: ${task.title}${task.priority < 4 ? `, priorità ${PRIORITY_LABEL[task.priority].toLowerCase()}` : ''}`}
+          priority={task.priority}
+          onTick={() => onTick(task)}
+          focusTarget
+        />
 
         <div className="min-w-0 flex-1 pb-2.5">
           <button
             type="button"
+            data-task-title
             onClick={() => onOpen(task)}
             className={cn('flex min-h-[44px] w-full items-center rounded py-2.5 text-left text-[15px] leading-snug text-slate-900 [overflow-wrap:anywhere] hover:underline hover:underline-offset-2 dark:text-slate-50', FOCUS_RING)}
           >

@@ -161,14 +161,15 @@ describe('«Oggi»', () => {
     await waitFor(() => expect(service.list).toHaveBeenCalledTimes(2));
   });
 
-  it('gives the focus to a neighbour when a task trashed from its dialog leaves', async () => {
+  it('gives the focus to a neighbour when a task trashed from its sheet leaves', async () => {
     service.list.mockResolvedValue(answer([task('a', { plannedDate: TODAY }), task('b', { plannedDate: TODAY })]));
     service.trash.mockResolvedValue({ taskCount: 1 });
     renderAt(<TodayView />);
     fireEvent.click(await screen.findByRole('button', { name: 'Compito a' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Modifica compito' });
+    const sheet = await screen.findByRole('dialog', { name: 'Compito a' });
     service.list.mockResolvedValue(answer([task('b', { plannedDate: TODAY })]));
-    fireEvent.click(within(dialog).getByRole('button', { name: /Sposta nel cestino/ }));
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Altre azioni sul compito' }));
+    fireEvent.click(within(sheet).getByRole('menuitem', { name: 'Sposta nel cestino' }));
     await waitFor(() => expect(screen.getByRole('checkbox', { name: /Compito b/ })).toHaveFocus());
   });
 

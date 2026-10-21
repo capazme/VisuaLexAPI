@@ -436,11 +436,12 @@ checks the files; «termine calcolato» comes with wave 2 and its warning), and 
   once, under its planned date when in range, else its deadline: `groupUpcoming`), `InboxView` (no dossier),
   `TaskTrashView` (`view=trash`: a task's trash is `deletedAt` on the row, not a `TrashEntry`, so it is not in the
   dossiers' `TrashPage`; «Ripristina», 30 days). «Today» is the server's day (`TaskViewAnswer.today`), never the browser's.
-- **The row** (`TaskRow`): a real checkbox (Space ticks it), the title as a button (opens `TaskDialog`), then the
+- **The row** (`TaskRow`): a real checkbox (Space ticks it), the title as a button (opens the task's sheet), then the
   deadline first and bordered with its count (`countdown`: «scaduto da 2 giorni», «scade oggi», «manca 1 giorno»,
   «mancano 3 giorni»), the planned day, the repetition, the priority in words (1 «Urgente» is the most urgent, 4
-  «Normale» the default and not shown) with a 4 px stripe — red, amber, ink: not a red-orange-blue scale with the
-  last unmarked, which is another app's look —, the labels (first letter capitalised, as the dossiers' tags: `tagLabel`; stored as typed), the dossier (a link; not in the dossier's own
+  «Normale» the default and not shown; the tick's ring carries it too, in colour and in line, `PRIORITY_TICK`: thick
+  and tinted red, tinted amber, dashed ink, thin — not a red-orange-blue scale with the last unmarked, which is another
+  app's look —, the labels (first letter capitalised, as the dossiers' tags: `tagLabel`; stored as typed), the dossier (a link; not in the dossier's own
   panel), «⋯» (Modifica, Aggiungi un sottocompito, Sposta nel cestino). `TaskList` nests subtasks one level under a
   parent in the same list (`nestTasks`; deeper ones under the top ancestor); the arrows, Home and End move between
   the rows' ticks across every list of the page (`moveBetweenRows`, `data-task-lists`). A row that leaves (ticked,
@@ -458,13 +459,28 @@ checks the files; «termine calcolato» comes with wave 2 and its warning), and 
   client): `useTaskView` and the count log a status only.
 - **Adding**: `QuickAddField` at the top of each view (a title and Enter; «Dettagli» for dates, priority and dossier;
   a line says where the task goes; a task that will not show in the view is announced); «c» (as in «compito») from anywhere opens
-  `TaskDialog` in `create` mode (`PlannerHost`, mounted by `Layout`; not in a field, with a modifier, or under a dialog,
+  `TaskDialog` (`PlannerHost`, mounted by `Layout`; not in a field, with a modifier, or under a dialog,
   a menu or a `data-find-overlay`), with the dossier chosen on `/dossier?dossier=` and today's date on «Oggi» and
   «Prossimi giorni»; a task the page will not list is announced, as from the field; listed in the «?» dialog. No date
   is read from the words (wave 2). The origin follows the dossier's kind (`studio` or `lavoro`).
-- **The dialog** (`TaskDialog`, a `ui/Modal`): every field (`TaskFields`; a repetition and a deadline switch each
-  other off, and the times need their dates), the subtasks of a top-level task (read from its dossier's or the inbox's
-  view) with a field to add one, «Sposta nel cestino». `taskDraft.ts` checks what the server would refuse before
+- **The task's sheet** (`TaskSheet`, P2a; a `ui/Modal` with its own header, `labelledBy`, the whole screen below
+  `sm`, `phoneFullScreen`): the path (the dossier, a link, or «Lista d'ingresso»; a subtask's parent, which opens it),
+  «Compito precedente» and «Compito successivo» (and j, k, not in a field or a menu: `aria-keyshortcuts`), «⋯»
+  (Aggiungi un sottocompito, Sposta nel cestino), «Chiudi». On the left the tick, the title (edited where it stands:
+  Enter or leaving it saves, Esc gives up the edit before it closes the sheet) and the description (its links live
+  while read; «Modifica la descrizione» or a click on its words opens the field, leaving it saves), then the open
+  subtasks (ticked there, each opening in the sheet; «N da fare»: the server lists open tasks only, so no «3/5») and
+  «Aggiungi un sottocompito». On the right, under the title on a phone, `TaskSheetFields` in the brief's order:
+  Dossier (`DossierPicker`, a combobox that searches the titles; a subtask's is its parent's, shown), Data
+  pianificata, Termine finale with its count, Priorità (a `MenuButton` of four `menuitemradio`, a flag in the
+  priority's colour, `MenuItem.iconClassName`), Etichette (chips, Enter or a comma adds), Ripetizione last. No field
+  for what the server does not keep (reminders, an assignee, a place, comments). Every change saves at once
+  (`PUT`, the latest answer wins); `draftProblem` refuses first what the server would refuse, and a refusal puts the
+  field back and says why in the server's words. `TaskSheetScope` wraps a view's lists (`data-task-lists`): one
+  sheet per view, the arrows step through the rows as they stand on the page (a folded group or subtask is skipped;
+  a task saved out of the view steps from its old place), and closing gives the focus to the task's row, else the row
+  now in its place. `TaskDialog` is the new task only («c»): every field (`TaskFields`; a repetition and a deadline
+  switch each other off, and the times need their dates). `taskDraft.ts` checks what the server would refuse before
   sending and builds the input (a subtask's dossier is never sent: it is its parent's).
 - **The dossier's panel** (`DossierTasksPanel`, after the header of `DossierDetailView`): its open tasks and the quick
   add with the dossier fixed.
@@ -474,10 +490,9 @@ checks the files; «termine calcolato» comes with wave 2 and its warning), and 
   count's, every two minutes) or the tab comes back into view, every view mounted reads again, and the quick add,
   keyed on the day, proposes the new one. A page left open overnight no longer files the morning's first task under
   yesterday.
-- **Focus after the dialog**: a task trashed from its dialog, or saved out of the view, leaves after the dialog gave
-  its row the focus back; `focusWhenRowLeaves` watches for a few seconds and hands the focus to the row's neighbour
-  (or the heading) when no row of the task is left. A subtask ticked in the dialog hands it to the next subtask, else
-  the field to add one.
+- **Focus after the sheet**: a task saved out of the view leaves after the sheet gave its row the focus back;
+  `focusWhenRowLeaves` watches for a few seconds and hands the focus to the row's neighbour (or the heading) when no
+  row of the task is left. A subtask ticked in the sheet hands it to the next subtask, else the field to add one.
 - **Origin**: a task's origin follows its dossier's kind when it is created or moved to another dossier (`studio`
   for a dossier di studio, else `lavoro`; a `forum` origin is kept); a subtask takes its parent's.
 - Style: Gymnasium's tokens (`studia/progress/tokens.ts`) and `plannerStyles.ts`; every control 44 px at every width
@@ -1977,7 +1992,7 @@ meant to stay split; add new features as new files, not inside the shells:
   from what the dossier kept, `addKnownDecisions`, so «Salva come dossier» saves them back) land in
   the practices.
 - `features/planner/` — Opus's planner: pages and views (`OpusPage`, `OpusViews`), the row and its list, the
-  dialog and its fields, the quick add, `PlannerHost` (mounted by `Layout`), the dossier's panel; the pure helpers
+  task sheet (`TaskSheet`, `TaskSheetFields`, `DossierPicker`, `TaskSheetScope`), the new task's dialog, the quick add, `PlannerHost` (mounted by `Layout`), the dossier's panel; the pure helpers
   (`taskDates`, `taskTree`, `taskDraft`, `splitLinks`, `moveBetweenRows`) apart from the components. See «The planner».
 - `features/history/` — `HistoryView.tsx`, `DecisionHistoryRow.tsx` (a decision's row) plus
   `NormaChangesSection.tsx` (see History above). The page is in the sections' frame (W2): one `h1`, «Cronologia», on

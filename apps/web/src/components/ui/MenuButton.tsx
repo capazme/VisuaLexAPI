@@ -8,6 +8,8 @@ export interface MenuItem {
   /** The click that chose it: a key's (Enter, Space) has `detail` 0. */
   onSelect: (event: ReactMouseEvent<HTMLButtonElement>) => void;
   icon?: LucideIcon;
+  /** The icon's own colour (a priority's flag), when it says more than the label's. */
+  iconClassName?: string;
   danger?: boolean;
   disabled?: boolean;
   separatorBefore?: boolean;
@@ -171,7 +173,7 @@ export function MenuButton({ label, items, children, triggerClassName, align = '
                     : 'text-slate-700 hover:bg-slate-100 focus-visible:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700 dark:focus-visible:bg-slate-700',
                 )}
               >
-                {item.icon && <item.icon size={16} aria-hidden className={cn('shrink-0', item.description && 'self-start mt-0.5')} />}
+                {item.icon && <item.icon size={16} aria-hidden className={cn('shrink-0', item.description && 'self-start mt-0.5', item.iconClassName)} />}
                 {item.description ? (
                   <span className="flex min-w-0 flex-col">
                     <span className={cn(item.checked && 'font-semibold')}>{item.label}</span>

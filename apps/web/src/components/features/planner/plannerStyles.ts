@@ -18,15 +18,23 @@ export const FIELD_HINT = 'text-xs text-slate-600 dark:text-slate-400';
 export const ICON_BUTTON = `inline-grid min-h-[44px] min-w-[44px] place-items-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-50 ${FOCUS_RING}`;
 
 /**
- * The leading stripe of a task with a priority above the default (the colour markers' convention): never the only
- * sign. Red and amber for the two urgent ones, ink for «Media»: not a red-orange-blue scale with the last unmarked,
- * which is another app's look.
+ * The tick's ring by priority, in colour and in line, so the colour is never the only sign: «Urgente» thick and
+ * tinted, «Alta» tinted, «Media» dashed in ink, «Normale» thin. Red and amber for the two urgent ones, ink for
+ * «Media»: not a red-orange-blue scale with the last unmarked, which is another app's look.
  */
-export const PRIORITY_STRIPE: Record<TaskPriority, string | null> = {
-  1: 'bg-red-600 dark:bg-red-400',
-  2: 'bg-amber-500 dark:bg-amber-400',
-  3: 'bg-slate-400 dark:bg-slate-500',
-  4: null,
+export const PRIORITY_TICK: Record<TaskPriority, string> = {
+  1: 'border-[3px] border-red-600 bg-red-50 dark:border-red-400 dark:bg-red-950/50',
+  2: 'border-2 border-amber-600 bg-amber-50 dark:border-amber-400 dark:bg-amber-950/50',
+  3: 'border-2 border-dashed border-primary-800 bg-white dark:border-primary-300 dark:bg-slate-900',
+  4: 'border-[1.5px] border-slate-500 bg-white dark:border-slate-400 dark:bg-slate-900',
+};
+
+/** A priority's flag in its menu and on the sheet: filled in the tick's colour, «Normale» an empty outline. */
+export const PRIORITY_FLAG: Record<TaskPriority, string> = {
+  1: 'fill-current text-red-600 dark:text-red-400',
+  2: 'fill-current text-amber-600 dark:text-amber-400',
+  3: 'fill-current text-primary-800 dark:text-primary-300',
+  4: 'text-slate-500 dark:text-slate-400',
 };
 
 export const PRIORITY_TEXT: Record<TaskPriority, string> = {

@@ -9,7 +9,7 @@ import { restoreTask } from './taskActions';
 import { dayHeading, longDay, splitToday, groupUpcoming } from './taskDates';
 import type { TaskDraft } from './taskDraft';
 import { TaskList } from './TaskList';
-import { moveBetweenRows } from './moveBetweenRows';
+import { TaskSheetScope } from './TaskSheetScope';
 import { TaskListSkeleton, TaskViewEmpty, TaskViewError, TruncatedNote } from './TaskViewStates';
 import { useTaskView } from './useTaskView';
 
@@ -51,9 +51,9 @@ function ViewFrame({ view, heading, line, defaults, children, empty }: FrameProp
         ) : tasks.length === 0 ? (
           <TaskViewEmpty {...empty} />
         ) : (
-          <div data-task-lists onKeyDown={moveBetweenRows} className="min-w-0 space-y-6">
+          <TaskSheetScope tasks={tasks} today={today} optimistic={state.optimistic} className="space-y-6">
             {children(tasks, today, state.optimistic)}
-          </div>
+          </TaskSheetScope>
         )}
         {state.answer?.truncated && <TruncatedNote />}
       </div>
