@@ -2,7 +2,7 @@ import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type Keyb
 import { AnimatePresence, LayoutGroup, animate, motion, useMotionValue, useReducedMotion, useSpring, useTransform } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
-import { ease } from '../../../../lib/motion';
+import { ease, spring } from '../../../../lib/motion';
 import type { GiornoAttivita } from '../../../../types/studia';
 import { dayDate, describeDay, formatCount, formatDate } from './layout';
 import { FOCUS_RING, INK_TEXT, MUTED_TEXT, SUCCESS_TEXT } from './tokens';
@@ -163,8 +163,9 @@ export function ReviewTrend({ calendario, today, obiettivo, hue, narrowed = fals
   const chosen = active !== null && active < n ? active : null;
   const target = useMotionValue(plotW);
   const targetY = useMotionValue(plotH);
-  const followX = useSpring(target, { stiffness: 420, damping: 38 });
-  const followY = useSpring(targetY, { stiffness: 420, damping: 38 });
+  // The app's quick spring (`lib/motion.ts`), never one typed here.
+  const followX = useSpring(target, spring.snappy);
+  const followY = useSpring(targetY, spring.snappy);
   // Under reduced motion the cursor jumps.
   const springX = still ? target : followX;
   const springY = still ? targetY : followY;
