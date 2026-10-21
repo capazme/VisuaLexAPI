@@ -10,11 +10,31 @@ from ..tools.norma import NormaVisitata
 from ..tools.sys_op import BaseScraper
 from ..tools.cache_manager import get_cache_manager
 from ..tools.exceptions import DocumentNotFoundError, ParsingError
+from ..tools.text_op import parse_date
 from ..tools.selectors import NormattivaSelectors
 from .akn_fetch import fetch_act_article
 
 # Configure structured logger
 log = structlog.get_logger()
+
+
+def _akn_vigenza(version_date) -> "str | None":
+    """The request's day as the AKN export's `dataVigenza` (YYYYMMDD), or None for
+    the text in force today (also when the day cannot be read)."""
+    if not (isinstance(version_date, str) and version_date.strip()):
+        return None
+    try:
+        return parse_date(version_date).replace("-", "")
+    except Exception:  # noqa: BLE001 - an unreadable day was refused before the request
+        return None
+
+
+def _asks_for_original(normavisitata) -> bool:
+    """A request for the original text: «originale» and no day (a day wins, G-353)."""
+    version = normavisitata.versione
+    day = normavisitata.data_versione
+    return (isinstance(version, str) and version.strip().lower() == "originale"
+            and not (isinstance(day, str) and day.strip()))
 
 
 class NormattivaScraper(BaseScraper):
@@ -58,8 +78,14 @@ class NormattivaScraper(BaseScraper):
                 # transliterates accents and carries a markdown heading — so it
                 # is served only when the alternative is an error, and the
                 # caller marks it as such.
+                # The export is read at the day the request names (G-353: a date is
+                # always the text in force on it); it has no original text, so a
+                # request for the original gets the error rather than today's text.
+                if _asks_for_original(normavisitata):
+                    raise ParsingError(f"Impossibile estrarre il testo dell'articolo da {urn}")
                 akn_text = await fetch_act_article(
-                    normavisitata.norma, normavisitata.numero_articolo
+                    normavisitata.norma, normavisitata.numero_articolo,
+                    _akn_vigenza(normavisitata.data_versione),
                 )
                 if akn_text:
                     log.info("Served article text from the AKN export",

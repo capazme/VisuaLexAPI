@@ -331,6 +331,43 @@ def is_historical_request(version: Any, version_date: Any) -> bool:
     return isinstance(version_date, str) and bool(version_date.strip())
 
 
+class Upcoming(TypedDict):
+    """The wire shape: `upcoming` next to `validity` when the text served is today's
+    and the source has already published a later one (G-355)."""
+
+    change: str                      # "abrogated" or "amended"
+    valid_from: str                  # ISO day the later text comes into force
+    version_number: Optional[int]
+
+
+def starts_after_today(validity: Optional[Validity], today: Optional[date] = None) -> bool:
+    """Whether the page's text comes into force after today (Europe/Rome).
+
+    Normattiva answers an undated request with its latest version, also one that is
+    not in force yet: art. 3 d.P.R. 131/1986, read on 21 October 2026, came back
+    repealed from 1 January 2027. Such a page is `abrogated` or `current` by its own
+    words; this is the question its window answers.
+    """
+    valid_from = (validity or {}).get("valid_from")
+    if not valid_from:
+        return False
+    return valid_from > (today or _today_in_rome()).isoformat()
+
+
+def upcoming_change(validity: Validity) -> Upcoming:
+    """What a later text does to the article: repeal it, or change it."""
+    return {
+        "change": "abrogated" if validity.get("state") == "abrogated" else "amended",
+        "valid_from": validity["valid_from"],
+        "version_number": validity.get("version_number"),
+    }
+
+
+def today_in_rome() -> date:
+    """Today in Rome: the day the source's windows are read against."""
+    return _today_in_rome()
+
+
 def _today_in_rome() -> date:
     try:
         return datetime.now(ZoneInfo("Europe/Rome")).date()
@@ -345,11 +382,15 @@ def reject_future_version_date(version_date: Any, today: Optional[date] = None) 
 
     Normattiva answers a future date with the current text and says nothing, so
     the reader would be shown today's text under a date it was not asked for.
-    A value that is not a readable date is left to the existing parsing path.
+    A value that is not a readable date is refused too: since a date always asks for
+    the text in force on that day (G-353), it is read for every request, and one
+    that cannot be read would fail later as a 500.
     """
+    if not (isinstance(version_date, str) and version_date.strip()):
+        return
     day = _iso_day(version_date)
     if day is None:
-        return
+        raise ValidationError(f"version_date non valida: {version_date.strip()[:40]}")
     if date.fromisoformat(day) > (today or _today_in_rome()):
         raise ValidationError(
             "version_date non può essere futura: Normattiva restituirebbe il testo attuale, "
