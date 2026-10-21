@@ -70,7 +70,9 @@ export function TaskSheetScope({ tasks, today, optimistic, className, children }
     [],
   );
 
-  const current = open ? (tasks.find((t) => t.id === open.task.id) ?? open.task) : null;
+  // The newer of the view's copy and the sheet's own (saved there, or a subtask in no view).
+  const listed = open ? tasks.find((t) => t.id === open.task.id) : undefined;
+  const current = open ? (listed && listed.updatedAt >= open.task.updatedAt ? listed : open.task) : null;
 
   const step = (direction: -1 | 1) => {
     if (!open || !current) return;
@@ -82,6 +84,8 @@ export function TaskSheetScope({ tasks, today, optimistic, className, children }
     const id = ids[target];
     const task = id ? tasks.find((t) => t.id === id) : undefined;
     if (task) setOpen(reach(task, ids, target));
+    // Nothing that way any more (the last row has left): the arrow says so.
+    else setOpen({ ...open, neighbours: { ...open.neighbours, [direction > 0 ? 'next' : 'previous']: false } });
   };
 
   const close = () => {
@@ -128,6 +132,7 @@ export function TaskSheetScope({ tasks, today, optimistic, className, children }
           onOpenTask={(task) => setOpen({ ...open, task, focus: undefined })}
           onDone={(task, parent) => leave(task, parent, (t) => void completeWithUndo(t, today, optimistic))}
           onTrash={(task, parent) => leave(task, parent, (t) => void trashWithUndo(t, optimistic))}
+          onSaved={(saved) => setOpen((o) => (o && o.task.id === saved.id ? { ...o, task: saved } : o))}
           onClose={close}
         />
       )}

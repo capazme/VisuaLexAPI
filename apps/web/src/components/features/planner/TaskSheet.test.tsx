@@ -151,17 +151,23 @@ describe('the task sheet', () => {
     const sheet = await openSheet([a], 'Compito a', 'today');
     const day = within(sheet).getByLabelText('Data pianificata');
     fireEvent.change(day, { target: { value: '2026-10-22' } });
+    // Saved when the field is left, not while it is typed.
+    expect(service.update).not.toHaveBeenCalled();
+    fireEvent.blur(day);
     expect(await within(sheet).findByRole('alert')).toHaveTextContent('Una data va scritta');
-    expect(day).toHaveValue(TODAY);
+    await waitFor(() => expect(day).toHaveValue(TODAY));
   });
 
   it('refuses before sending what the server would refuse: a repeating task keeps its planned date', async () => {
     const a = task('a', { plannedDate: TODAY, recurrence: 'FREQ=WEEKLY' });
     const sheet = await openSheet([a], 'Compito a', 'today');
     expect(within(sheet).getByLabelText('Termine finale')).toBeDisabled();
-    fireEvent.change(within(sheet).getByLabelText('Data pianificata'), { target: { value: '' } });
+    const day = within(sheet).getByLabelText('Data pianificata');
+    fireEvent.change(day, { target: { value: '' } });
+    fireEvent.blur(day);
     expect(await within(sheet).findByRole('alert')).toHaveTextContent('Una ripetizione richiede la data pianificata.');
     expect(service.update).not.toHaveBeenCalled();
+    expect(day).toHaveValue(TODAY);
   });
 
   it('lists the open subtasks, adds one, and opens one in the sheet with its parent in the path', async () => {
@@ -216,6 +222,64 @@ describe('the task sheet', () => {
     fireEvent.keyDown(document, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     await waitFor(() => expect(screen.getByRole('button', { name: 'Compito b' })).toHaveFocus());
+  });
+
+  it('puts a refused title back', async () => {
+    const a = task('a');
+    service.update.mockRejectedValue({ status: 400, message: 'Il testo contiene un carattere non valido.' });
+    const sheet = await openSheet([a], 'Compito a');
+    const title = within(sheet).getByLabelText('Titolo');
+    fireEvent.focus(title);
+    fireEvent.change(title, { target: { value: 'Nuovo titolo' } });
+    fireEvent.blur(title);
+    expect(await within(sheet).findByRole('alert')).toHaveTextContent('carattere non valido');
+    await waitFor(() => expect(title).toHaveValue('Compito a'));
+  });
+
+  it('sends one write at a time, the changes made meanwhile together after it', async () => {
+    const a = task('a');
+    let land!: (value: Task) => void;
+    service.update.mockReturnValueOnce(new Promise((r) => (land = r))).mockImplementation(saved(a));
+    const sheet = await openSheet([a], 'Compito a');
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Priorità: Normale' }));
+    fireEvent.click(within(sheet).getByRole('menuitemradio', { name: 'Urgente' }));
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Priorità: Urgente' }));
+    fireEvent.click(within(sheet).getByRole('menuitemradio', { name: 'Alta' }));
+    const labels = within(sheet).getByLabelText('Etichette');
+    fireEvent.change(labels, { target: { value: 'udienza' } });
+    fireEvent.keyDown(labels, { key: 'Enter' });
+    expect(service.update).toHaveBeenCalledTimes(1);
+    await act(async () => land({ ...a, priority: 1, updatedAt: '2026-10-01T10:00:01.000Z' }));
+    await waitFor(() => expect(service.update).toHaveBeenCalledTimes(2));
+    expect(service.update.mock.calls[1]).toEqual(['a', { priority: 2, labels: ['udienza'] }]);
+    expect(within(sheet).getByRole('button', { name: 'Priorità: Alta' })).toBeInTheDocument();
+  });
+
+  it('keeps a task moved out of the inbox current in its sheet', async () => {
+    const a = task('a');
+    service.update.mockImplementation(saved(a));
+    const sheet = await openSheet([a], 'Compito a');
+    // What the inbox lists once the task has gone to a dossier.
+    service.list.mockResolvedValue(answer([]));
+    fireEvent.click(within(sheet).getByRole('button', { name: "Dossier Lista d'ingresso" }));
+    fireEvent.keyDown(within(sheet).getByRole('combobox', { name: 'Cerca un dossier' }), { key: 'ArrowDown' });
+    fireEvent.keyDown(within(sheet).getByRole('combobox', { name: 'Cerca un dossier' }), { key: 'Enter' });
+    await waitFor(() => expect(service.update).toHaveBeenCalledWith('a', { dossierId: 'd2', origin: 'studio' }));
+    const path = within(screen.getByRole('dialog', { name: 'Compito a' })).getByRole('navigation', { name: 'Dove si trova il compito' });
+    await waitFor(() => expect(within(path).getByRole('link', { name: 'Esame di diritto civile' })).toBeInTheDocument());
+  });
+
+  it('opened from «Aggiungi un sottocompito», gives the field the focus, and the next task does not inherit it', async () => {
+    service.list.mockResolvedValue(answer([task('a'), task('b')]));
+    renderAt(<InboxView />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Azioni: Compito a' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Aggiungi un sottocompito' }));
+    const sheet = await screen.findByRole('dialog', { name: 'Compito a' });
+    await waitFor(() => expect(within(sheet).getByLabelText('Nuovo sottocompito')).toHaveFocus());
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Compito successivo' }));
+    const next = await screen.findByRole('dialog', { name: 'Compito b' });
+    expect(within(next).queryByLabelText('Nuovo sottocompito')).toBeNull();
+    expect(within(next).getByRole('button', { name: 'Aggiungi un sottocompito' })).toBeInTheDocument();
   });
 
   it('ticks the task from the sheet, which closes', async () => {

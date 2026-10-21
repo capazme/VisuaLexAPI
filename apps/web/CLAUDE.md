@@ -493,12 +493,18 @@ checks the files; «termine calcolato» comes with wave 2 and its warning), and 
   Dossier (`DossierPicker`, a combobox that searches the titles; a subtask's is its parent's, shown), Data
   pianificata, Termine finale with its count, Priorità (a `MenuButton` of four `menuitemradio`, a flag in the
   priority's colour, `MenuItem.iconClassName`), Etichette (chips, Enter or a comma adds), Ripetizione last. No field
-  for what the server does not keep (reminders, an assignee, a place, comments). Every change saves at once
-  (`PUT`, the latest answer wins); `draftProblem` refuses first what the server would refuse, and a refusal puts the
-  field back and says why in the server's words. `TaskSheetScope` wraps a view's lists (`data-task-lists`): one
+  for what the server does not keep (reminders, an assignee, a place, comments). A change saves when it is made —
+  a choice at once, a typed field (title, description, a date, a time) when it is left or at Enter, a date half typed
+  (`validity.badInput`) put back, never saved as cleared — one `PUT` at a time per sheet, the changes made meanwhile
+  merged and sent after it, so the server never ends on an older value than the sheet shows; `draftProblem` refuses
+  first what the server would refuse, and a refusal puts the sheet back to the last saved copy and says why in the
+  server's words. The scope keeps the sheet's saved copy (`onSaved`), so a task moved out of the view (to a dossier,
+  from the inbox) stays current in its sheet. `TaskSheetScope` wraps a view's lists (`data-task-lists`): one
   sheet per view, the arrows step through the rows as they stand on the page (a folded group or subtask is skipped;
   a task saved out of the view steps from its old place), and closing gives the focus to the task's row, else the row
-  now in its place. `TaskDialog` is the new task only («c»): every field (`TaskFields`; a repetition and a deadline
+  now in its place. Opened from «Aggiungi un sottocompito», the field to add one has the focus (`initialFocusRef`),
+  and the request stays with that task. `Modal`'s Tab trap sends Shift+Tab from an element outside its list (the
+  sheet's wrapper, `tabIndex -1`) to the last one, not out of the dialog. `TaskDialog` is the new task only («c»): every field (`TaskFields`; a repetition and a deadline
   switch each other off, and the times need their dates). `taskDraft.ts` checks what the server would refuse before
   sending and builds the input (a subtask's dossier is never sent: it is its parent's).
 - **The dossier's panel** (`DossierTasksPanel`, after the header of `DossierDetailView`): its open tasks and the quick

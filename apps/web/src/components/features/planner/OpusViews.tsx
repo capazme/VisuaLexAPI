@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FolderOpen, ListFilter, RotateCcw } from 'lucide-react';
+import { ChevronRight, FolderOpen, ListFilter, RotateCcw } from 'lucide-react';
 import { MenuButton } from '../../ui/MenuButton';
 import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
@@ -40,7 +40,7 @@ interface FrameProps {
   /** Beside the heading: the view's options («Raggruppa»). */
   options?: ReactNode;
   /** Above the rows, under the quick add: Gymnasium's day on «Oggi», the week's strip on «Prossimi giorni». */
-  before?: ReactNode | ((today: string) => ReactNode);
+  before?: ReactNode | ((today: string, tasks: Task[]) => ReactNode);
   children: (tasks: Task[], today: string, optimistic: ReturnType<typeof useTaskView>['optimistic']) => ReactNode;
   /** What an empty view says; without it the view draws its groups all the same (the days of the week). */
   empty?: { title: string; line?: string };
@@ -67,16 +67,15 @@ function ViewFrame({ view, heading, line, defaults, options, before, children, e
       </div>
       {/* Keyed on the day: a page left open overnight proposes the new day, not the one it was opened on. */}
       {defaults && <QuickAddField key={today} view={view} today={today} defaults={defaults(today)} />}
-      {typeof before === 'function' ? before(today) : before}
+      {typeof before === 'function' ? before(today, tasks) : before}
       <div aria-busy={state.status === 'loading'} className={cn('space-y-6', state.status === 'loading' && state.answer && 'opacity-60 transition-opacity')}>
         {state.status === 'error' && <TaskViewError onRetry={state.reload} />}
         {state.answer === null ? (
           state.status === 'loading' && <TaskListSkeleton />
-        ) : tasks.length === 0 && empty ? (
-          <TaskViewEmpty {...empty} />
         ) : (
+          // Mounted on an empty view too: a sheet open on the last task stays open when the task leaves the view.
           <TaskSheetScope tasks={tasks} today={today} optimistic={state.optimistic} className="space-y-8">
-            {children(tasks, today, state.optimistic)}
+            {tasks.length === 0 && empty ? <TaskViewEmpty {...empty} /> : children(tasks, today, state.optimistic)}
           </TaskSheetScope>
         )}
         {state.answer?.truncated && <TruncatedNote />}
@@ -210,13 +209,24 @@ export function UpcomingView() {
       heading="Prossimi giorni"
       line={(today) => `I compiti pianificati o in scadenza da oggi a ${longDay(lastOf(today), today)}.`}
       defaults={(day) => ({ plannedDate: day })}
-      before={(today) => <WeekStrip today={today} last={lastOf(today)} selected={selectedFor(today)} onSelect={select} />}
+      before={(today, tasks) => (
+        <WeekStrip
+          today={today}
+          last={lastOf(today)}
+          selected={selectedFor(today)}
+          counts={new Map(groupUpcoming(tasks, today).map((group) => [group.day, group.tasks.length]))}
+          onSelect={select}
+        />
+      )}
     >
       {(tasks, today, optimistic) => {
         const byDay = new Map(groupUpcoming(tasks, today).map((group) => [group.day, group.tasks]));
         const monday = weekStart(selectedFor(today));
         const days = Array.from({ length: 7 }, (_, i) => addDaysToIsoDate(monday, i)).filter((day) => day >= today && day <= lastOf(today));
-        return days.map((day) => {
+        // The server's seven days that run into the next week: said under this one, not left behind the arrow.
+        const nextMonday = addDaysToIsoDate(monday, 7);
+        const later = [...byDay.entries()].filter(([day]) => day >= nextMonday).reduce((n, [, list]) => n + list.length, 0);
+        const blocks = days.map((day) => {
           const listed = byDay.get(day) ?? [];
           return (
             <TaskGroup
@@ -231,6 +241,17 @@ export function UpcomingView() {
             </TaskGroup>
           );
         });
+        return (
+          <>
+            {blocks}
+            {later > 0 && (
+              <button type="button" onClick={() => select(nextMonday)} className={cn(QUIET_BUTTON, 'mx-0 inline-flex items-center gap-1.5')}>
+                La settimana dopo: {later === 1 ? '1 compito' : `${later} compiti`} fino a {longDay(lastOf(today), today)}
+                <ChevronRight size={16} aria-hidden />
+              </button>
+            )}
+          </>
+        );
       }}
     </ViewFrame>
   );

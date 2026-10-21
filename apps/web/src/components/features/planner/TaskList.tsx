@@ -60,7 +60,7 @@ export function TaskList({ tasks, today, optimistic, showDossier = true, label, 
             {children.length > 0 && open && (
               <ul aria-label={`Sottocompiti di ${task.title}`} className="ml-6 grid min-w-0 grid-cols-1 border-l border-slate-200 pl-2 dark:border-slate-800">
                 {children.map((child) => (
-                  <TaskRow key={child.id} task={child} today={today} showDossier={false} isChild {...actions} />
+                  <TaskRow key={child.id} task={child} today={today} showDossier={false} {...actions} />
                 ))}
               </ul>
             )}

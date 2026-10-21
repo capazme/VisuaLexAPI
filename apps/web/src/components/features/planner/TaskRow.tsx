@@ -22,8 +22,6 @@ interface Props extends TaskRowActions {
   today: string;
   /** Off in the dossier's own panel, where every task is that dossier's. */
   showDossier: boolean;
-  /** A subtask: indented under its parent, and it takes no subtasks of its own (one level). */
-  isChild?: boolean;
   /** The subtasks listed under it, and whether they are open (the counter opens and folds them). */
   subtasks?: { count: number; open: boolean; onToggle: () => void };
   children?: React.ReactNode;
@@ -39,7 +37,7 @@ const time = (value: string | null) => (value ? ` · ${value}` : '');
  * words, the labels — with the dossier at its right end, in grey; and «⋯». The list moves between rows with the arrows
  * (`TaskList`).
  */
-export function TaskRow({ task, today, showDossier, isChild = false, subtasks, onTick, onOpen, onTrash, children }: Props) {
+export function TaskRow({ task, today, showDossier, subtasks, onTick, onOpen, onTrash, children }: Props) {
   const dossierTitle = useAppStore((s) => (task.dossierId ? s.dossiers.find((d) => d.id === task.dossierId)?.title : undefined));
   const due = task.dueDate ? countdown(task.dueDate, today) : null;
   const hasSigns = Boolean(task.plannedDate || due || (subtasks && subtasks.count > 0) || task.recurrence || task.priority < 4 || task.labels.length > 0 || (showDossier && task.dossierId));
@@ -141,7 +139,8 @@ export function TaskRow({ task, today, showDossier, isChild = false, subtasks, o
           triggerClassName={ICON_BUTTON}
           items={[
             { label: 'Modifica', icon: Pencil, onSelect: () => onOpen(task) },
-            ...(isChild ? [] : [{ label: 'Aggiungi un sottocompito', icon: Plus, onSelect: () => onOpen(task, 'subtask') }]),
+            // One level: a subtask takes none, whether it is drawn under its parent or as a row of its own.
+            ...(task.parentId ? [] : [{ label: 'Aggiungi un sottocompito', icon: Plus, onSelect: () => onOpen(task, 'subtask') }]),
             { label: 'Sposta nel cestino', icon: Trash2, danger: true, separatorBefore: true, onSelect: () => onTrash(task) },
           ]}
         >

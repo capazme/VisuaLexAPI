@@ -48,6 +48,11 @@ export function DossierPicker({ value, onChange, labelId }: Props) {
     return () => document.removeEventListener('mousedown', onDown);
   }, [open]);
 
+  // The option the arrows reach is kept in sight in the list, which scrolls.
+  useEffect(() => {
+    if (open) document.getElementById(`${id}-option-${active}`)?.scrollIntoView?.({ block: 'nearest' });
+  }, [open, active, id]);
+
   const close = (focusTrigger: boolean) => {
     setOpen(false);
     setQuery('');

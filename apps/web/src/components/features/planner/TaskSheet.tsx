@@ -30,6 +30,8 @@ export interface TaskSheetProps {
   /** The task's own tick: the sheet hands it back, since its row is the view's. */
   onDone: (task: Task, parent: Task | null) => void;
   onTrash: (task: Task, parent: Task | null) => void;
+  /** The server's copy after a change saved here: the view's copy may be in no list any more (moved to a dossier). */
+  onSaved: (task: Task) => void;
   onClose: () => void;
   /** Opened from «Aggiungi un sottocompito»: the field to add one takes the focus. */
   focus?: 'subtask';
@@ -47,14 +49,17 @@ function typing(target: EventTarget | null): boolean {
  * A task in full, in a window over the list (`ui/Modal`, the whole screen on a phone): its path (dossier, and the
  * parent for a subtask), the arrows to the task before and after it in the view it was opened from (and j, k), «⋯»,
  * the close. On the left the tick, the title and the description, edited where they stand, and the subtasks; on the
- * right the fields (`TaskSheetFields`), under the title on a phone. Every change saves at once and waits for the
- * server; a refusal puts the field back and says why in the server's words. No field for what the server does not
- * keep yet (reminders, an assignee, comments).
+ * right the fields (`TaskSheetFields`), under the title on a phone. A change saves when it is made — a choice at
+ * once, a typed field when it is left or at Enter — one write at a time, the changes made meanwhile sent together
+ * after it; a refusal puts the sheet back to the last saved copy and says why in the server's words. No field for
+ * what the server does not keep yet (reminders, an assignee, comments).
  */
 export function TaskSheet(props: TaskSheetProps) {
   const { neighbours, onStep, onClose, onOpenTask, onTrash } = props;
   const headingId = useId();
   const bodyRef = useRef<HTMLDivElement>(null);
+  // The field to add a subtask: where the focus starts when the sheet was opened for one.
+  const addFieldRef = useRef<HTMLInputElement>(null);
   // The task's list (its dossier's, or the inbox): its subtasks, a subtask's parent, and a copy of the task newer
   // than the view's when the sheet has saved it (a subtask opened here is in no view).
   const family = useTaskView(props.task.dossierId ? 'dossier' : 'inbox', props.task.dossierId ?? undefined);
@@ -63,7 +68,9 @@ export function TaskSheet(props: TaskSheetProps) {
   const task = fresh && fresh.updatedAt > props.task.updatedAt ? fresh : props.task;
   const dossierTitle = useAppStore((s) => (task.dossierId ? s.dossiers.find((d) => d.id === task.dossierId)?.title : undefined));
   const parent = task.parentId ? listed.find((t) => t.id === task.parentId) ?? null : null;
-  const [addRequest, setAddRequest] = useState(props.focus === 'subtask' ? 1 : 0);
+  // «Aggiungi un sottocompito» asked for this task: a request for another one (the arrows moved on) is not this one's.
+  const [request, setRequest] = useState({ id: props.task.id, n: props.focus === 'subtask' ? 1 : 0 });
+  const addRequest = request.id === task.id ? request.n : 0;
 
   const step = (direction: -1 | 1) => {
     if (direction === -1 ? !neighbours.previous : !neighbours.next) return;
@@ -91,7 +98,7 @@ export function TaskSheet(props: TaskSheetProps) {
       phoneFullScreen
       className="max-w-[65rem] sm:h-[min(52rem,90vh)]"
       contentClassName="flex min-h-0 flex-col overflow-hidden p-0"
-      initialFocusRef={bodyRef}
+      initialFocusRef={props.focus === 'subtask' ? addFieldRef : bodyRef}
     >
       <div ref={bodyRef} tabIndex={-1} onKeyDown={onKeyDown} className="flex min-h-0 flex-1 flex-col focus-visible:outline-none">
         <header className="flex shrink-0 items-center gap-1 border-b border-slate-200 py-1 pl-3 pr-1 dark:border-slate-800 md:pl-5">
@@ -134,7 +141,7 @@ export function TaskSheet(props: TaskSheetProps) {
             label="Altre azioni sul compito"
             triggerClassName={ICON_BUTTON}
             items={[
-              ...(task.parentId ? [] : [{ label: 'Aggiungi un sottocompito', icon: Plus, onSelect: () => setAddRequest((n) => n + 1) }]),
+              ...(task.parentId ? [] : [{ label: 'Aggiungi un sottocompito', icon: Plus, onSelect: () => setRequest((r) => ({ id: task.id, n: r.id === task.id ? r.n + 1 : 1 })) }]),
               { label: 'Sposta nel cestino', icon: Trash2, danger: true, separatorBefore: !task.parentId, onSelect: () => onTrash(task, parent) },
             ]}
           >
@@ -144,7 +151,7 @@ export function TaskSheet(props: TaskSheetProps) {
             <X size={18} aria-hidden />
           </button>
         </header>
-        <SheetBody key={task.id} {...props} task={task} headingId={headingId} listed={listed} familyFailed={family.status === 'error'} familyOptimistic={family.optimistic} parent={parent} addRequest={addRequest} />
+        <SheetBody key={task.id} {...props} task={task} headingId={headingId} listed={listed} familyFailed={family.status === 'error'} familyOptimistic={family.optimistic} parent={parent} addRequest={addRequest} addFieldRef={addFieldRef} />
       </div>
     </Modal>
   );
@@ -157,40 +164,64 @@ interface BodyProps extends TaskSheetProps {
   familyOptimistic: Optimistic;
   parent: Task | null;
   addRequest: number;
+  addFieldRef: React.RefObject<HTMLInputElement | null>;
 }
 
 /** One task's body, drawn again for each task the arrows open (its edits are its own). */
-function SheetBody({ task, today, headingId, listed, familyFailed, familyOptimistic, parent, addRequest, onOpenTask, onDone }: BodyProps) {
-  // What the sheet shows: the last answer of its own writes, or what was typed while a write travels, until a newer
-  // copy of the task comes from the view.
+function SheetBody({ task, today, headingId, listed, familyFailed, familyOptimistic, parent, addRequest, addFieldRef, onOpenTask, onDone, onSaved }: BodyProps) {
+  // What the sheet shows: what was changed here while the writes travel, then the server's answer, until a newer copy
+  // of the task comes from the view.
   const [local, setLocal] = useState<Task | null>(null);
-  const shown = local && local.updatedAt >= task.updatedAt ? local : task;
+  const [writing, setWriting] = useState(false);
+  const shown = local && (writing || local.updatedAt >= task.updatedAt) ? local : task;
   const [error, setError] = useState<string | null>(null);
-  const ticket = useRef(0);
+  // One write at a time: the changes made while one travels wait here, merged, and go together after it, so the
+  // server never ends on an older value than the sheet shows.
+  const queue = useRef<{ sending: boolean; pending: TaskInput | null; saved: Task }>({ sending: false, pending: null, saved: task });
   const subtasks = listed.filter((t) => t.parentId === task.id);
+
+  const flush = () => {
+    const q = queue.current;
+    if (q.sending || !q.pending) return;
+    const input = q.pending;
+    q.pending = null;
+    q.sending = true;
+    taskService.update(task.id, input).then(
+      (updated) => {
+        q.sending = false;
+        q.saved = updated;
+        onSaved(updated);
+        plannerStore.getState().changed();
+        if (q.pending) flush();
+        else {
+          setLocal(updated);
+          setWriting(false);
+        }
+      },
+      (failure: { status?: number }) => {
+        q.sending = false;
+        q.pending = null;
+        setLocal(q.saved);
+        setWriting(false);
+        setError(failureMessage(failure, 'Non riesco a salvare la modifica. Riprova.'));
+        if (failure?.status !== undefined && failure.status >= 400 && failure.status < 500) plannerStore.getState().changed();
+      },
+    );
+  };
 
   const save: SheetSave = (patch, input: TaskInput) => {
     const next = { ...shown, ...patch };
     const problem = draftProblem(draftFromTask(next));
     if (problem) {
       setError(problem);
-      return;
+      return false;
     }
     setError(null);
     setLocal(next);
-    const mine = ++ticket.current;
-    taskService.update(task.id, input).then(
-      (updated) => {
-        if (mine === ticket.current) setLocal(updated);
-        plannerStore.getState().changed();
-      },
-      (failure: { status?: number }) => {
-        if (mine !== ticket.current) return;
-        setLocal(null);
-        setError(failureMessage(failure, 'Non riesco a salvare la modifica. Riprova.'));
-        if (failure?.status !== undefined && failure.status >= 400 && failure.status < 500) plannerStore.getState().changed();
-      },
-    );
+    setWriting(true);
+    queue.current.pending = { ...(queue.current.pending ?? {}), ...input };
+    flush();
+    return true;
   };
 
   return (
@@ -229,6 +260,7 @@ function SheetBody({ task, today, headingId, listed, familyFailed, familyOptimis
               failed={familyFailed}
               optimistic={familyOptimistic}
               addRequest={addRequest}
+              inputRef={addFieldRef}
               onOpenTask={onOpenTask}
             />
           )}
@@ -241,7 +273,14 @@ function SheetBody({ task, today, headingId, listed, familyFailed, familyOptimis
 /** The title, edited where it stands: Enter or leaving it saves; Esc puts back what was there. */
 function TitleField({ value, onCommit }: { value: string; onCommit: (title: string) => void }) {
   const [text, setText] = useState(value);
+  const [editing, setEditing] = useState(false);
+  const [seen, setSeen] = useState(value);
   const ref = useRef<HTMLTextAreaElement>(null);
+  // A title that changed under the field (a refusal put it back, a newer copy came): shown, unless it is being typed.
+  if (value !== seen) {
+    setSeen(value);
+    if (!editing) setText(value);
+  }
   // As tall as its lines: a long title wraps, never scrolls.
   useLayoutEffect(() => {
     const el = ref.current;
@@ -277,7 +316,11 @@ function TitleField({ value, onCommit }: { value: string; onCommit: (title: stri
           setText(value);
         }
       }}
-      onBlur={commit}
+      onFocus={() => setEditing(true)}
+      onBlur={() => {
+        setEditing(false);
+        commit();
+      }}
       className={cn(
         'block w-full resize-none overflow-hidden rounded-md bg-transparent px-1 py-1.5 font-serif text-2xl font-medium leading-snug text-slate-900 hover:bg-slate-50 dark:text-slate-50 dark:hover:bg-slate-800/50',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
@@ -372,6 +415,8 @@ interface SubtasksProps {
   failed: boolean;
   optimistic: Optimistic;
   addRequest: number;
+  /** The field to add one (the sheet gives it the focus when it was opened for one). */
+  inputRef: React.RefObject<HTMLInputElement | null>;
   onOpenTask: (task: Task) => void;
 }
 
@@ -379,11 +424,10 @@ interface SubtasksProps {
  * A task's open subtasks (one level), ticked here as in a list, each opening in the sheet, and «Aggiungi un
  * sottocompito». The server lists open tasks only: how many were done is not known here (no «3/5»).
  */
-function Subtasks({ parent, subtasks, today, failed, optimistic, addRequest, onOpenTask }: SubtasksProps) {
+function Subtasks({ parent, subtasks, today, failed, optimistic, addRequest, inputRef, onOpenTask }: SubtasksProps) {
   const id = useId();
   const listRef = useRef<HTMLUListElement>(null);
   const addButtonRef = useRef<HTMLButtonElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
   const [adding, setAdding] = useState(addRequest > 0);
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
@@ -397,7 +441,7 @@ function Subtasks({ parent, subtasks, today, failed, optimistic, addRequest, onO
   }
   useEffect(() => {
     if (adding) inputRef.current?.focus();
-  }, [adding, addRequest]);
+  }, [adding, addRequest, inputRef]);
 
   // The ticked subtask leaves: the focus goes to the next one, else the previous one, else the field to add one.
   const tick = (child: Task) => {

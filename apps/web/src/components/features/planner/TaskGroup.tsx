@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ChevronDown, MoreHorizontal, Plus, type LucideIcon } from 'lucide-react';
 import { MenuButton } from '../../ui/MenuButton';
 import { cn } from '../../../lib/utils';
@@ -43,6 +43,7 @@ export function TaskGroup({ anchorId, foldKey, heading, count, add, actions = []
   const id = useId();
   const folded = plannerStore((s) => Boolean(s.folded[foldKey]));
   const [adding, setAdding] = useState(0);
+  const spent = useCallback(() => setAdding(0), []);
   const menu = [
     ...(add ? [{ label: 'Aggiungi un compito', icon: Plus, onSelect: () => {
       if (folded) plannerStore.getState().toggleFolded(foldKey);
@@ -58,7 +59,7 @@ export function TaskGroup({ anchorId, foldKey, heading, count, add, actions = []
           <button
             type="button"
             aria-expanded={!folded}
-            aria-controls={`${id}-rows`}
+            aria-controls={folded ? undefined : `${id}-rows`}
             onClick={() => plannerStore.getState().toggleFolded(foldKey)}
             className={cn('-ml-1 flex min-h-[44px] w-full items-center gap-1.5 rounded px-1 text-left', FOCUS_RING)}
           >
@@ -82,7 +83,7 @@ export function TaskGroup({ anchorId, foldKey, heading, count, add, actions = []
       {!folded && (
         <div id={`${id}-rows`}>
           {children}
-          {add && <InlineAddTask {...add} openRequest={adding} />}
+          {add && <InlineAddTask {...add} openRequest={adding} onOpened={spent} />}
         </div>
       )}
     </section>
@@ -93,7 +94,7 @@ export function TaskGroup({ anchorId, foldKey, heading, count, add, actions = []
  * «+ Aggiungi compito» where the list ends: a title and Enter, with the group's day or dossier; the field stays open
  * for the next one, Esc closes it. A task the view will not list is announced, as from the field at the top.
  */
-export function InlineAddTask({ view, today, defaults, openRequest = 0 }: GroupAdd & { openRequest?: number }) {
+export function InlineAddTask({ view, today, defaults, openRequest = 0, onOpened }: GroupAdd & { openRequest?: number; onOpened?: () => void }) {
   const id = useId();
   const [open, setOpen] = useState(openRequest > 0);
   const [lastRequest, setLastRequest] = useState(openRequest);
@@ -107,11 +108,14 @@ export function InlineAddTask({ view, today, defaults, openRequest = 0 }: GroupA
   // The group's «⋯» asked for the field: open it (a prop that changed, read during render).
   if (openRequest !== lastRequest) {
     setLastRequest(openRequest);
-    setOpen(true);
+    if (openRequest > 0) setOpen(true);
   }
   useEffect(() => {
-    if (open) inputRef.current?.focus();
-  }, [open, lastRequest]);
+    if (!open) return;
+    inputRef.current?.focus();
+    // The request is spent: folding and opening the group again does not open the field by itself.
+    if (lastRequest > 0) onOpened?.();
+  }, [open, lastRequest, onOpened]);
 
   const close = () => {
     setOpen(false);

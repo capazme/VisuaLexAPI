@@ -352,8 +352,11 @@ describe('the other views', () => {
     fireEvent.change(within(friday).getByLabelText('Nuovo compito'), { target: { value: 'Udienza' } });
     fireEvent.submit(within(friday).getByLabelText('Nuovo compito'));
     await waitFor(() => expect(service.create.mock.calls[0][0]).toMatchObject({ title: 'Udienza', plannedDate: '2026-10-23' }));
+    // Monday 26 is in the server's seven days: said under this week, and its dot on nothing here.
+    expect(screen.getByRole('button', { name: /La settimana dopo: 1 compito fino a lunedì 26 ottobre/ })).toBeInTheDocument();
     // The next week: only Monday 26 is in the server's seven days.
     fireEvent.click(screen.getByRole('button', { name: 'Settimana successiva' }));
+    expect(screen.getByRole('button', { name: 'lunedì 26 ottobre, 1 compito' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['26 ott · lunedì, 1 compito']);
     expect(screen.getByRole('button', { name: 'Settimana successiva' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Oggi' }));

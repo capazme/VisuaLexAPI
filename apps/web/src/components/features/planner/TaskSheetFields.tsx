@@ -10,8 +10,8 @@ import { countdown, PRIORITY_LABEL, RECURRENCE_FROM_LABEL, RECURRENCE_LABEL } fr
 import { parseLabels } from './taskDraft';
 import { DEADLINE_TONE, FIELD, FIELD_HINT, ICON_BUTTON, PRIORITY_FLAG } from './plannerStyles';
 
-/** A change from the sheet: what to show at once, and what to send. */
-export type SheetSave = (shown: Partial<Task>, input: TaskInput) => void;
+/** A change from the sheet: what to show at once, and what to send; false when it is refused before sending. */
+export type SheetSave = (shown: Partial<Task>, input: TaskInput) => boolean;
 
 interface Props {
   task: Task;
@@ -34,7 +34,41 @@ function FieldRow({ label, labelFor, labelId, children }: { label: string; label
   );
 }
 
-/** A day and its time, side by side; clearing the day clears the time, which waits for a day. */
+/** A typed value saved when the field is left or at Enter, never while it is half typed. */
+function useTyped(value: string, onCommit: (value: string) => boolean | void) {
+  const [text, setText] = useState(value);
+  const [seen, setSeen] = useState(value);
+  // The saved value changed under the field (a refusal, a newer copy): shown.
+  if (value !== seen) {
+    setSeen(value);
+    setText(value);
+  }
+  const commit = (input: HTMLInputElement) => {
+    // A date or a time left half typed reads '' with `badInput`: it is put back, not saved as cleared.
+    if (input.validity.badInput) {
+      setText(value);
+      return;
+    }
+    // Refused before sending (a repeating task keeps its planned date): the saved value comes back.
+    if (input.value !== value && onCommit(input.value) === false) setText(value);
+  };
+  return {
+    value: text,
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => setText(e.target.value),
+    onBlur: (e: React.FocusEvent<HTMLInputElement>) => commit(e.currentTarget),
+    onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        commit(e.currentTarget);
+      }
+    },
+  };
+}
+
+/**
+ * A day and its time, side by side, each saved when it is left or at Enter; clearing the day clears the time, which
+ * waits for a day.
+ */
 function DayAndTime({ day, time, dayLabel, timeLabel, disabled, describedBy, onDay, onTime, id }: {
   day: string | null;
   time: string | null;
@@ -42,10 +76,12 @@ function DayAndTime({ day, time, dayLabel, timeLabel, disabled, describedBy, onD
   timeLabel: string;
   disabled?: boolean;
   describedBy?: string;
-  onDay: (day: string) => void;
-  onTime: (time: string) => void;
+  onDay: (day: string) => boolean;
+  onTime: (time: string) => boolean;
   id: string;
 }) {
+  const dayField = useTyped(day ?? '', onDay);
+  const timeField = useTyped(time ?? '', onTime);
   return (
     <div className="flex min-w-0 gap-2">
       <input
@@ -53,17 +89,15 @@ function DayAndTime({ day, time, dayLabel, timeLabel, disabled, describedBy, onD
         type="date"
         aria-label={dayLabel}
         aria-describedby={describedBy}
-        value={day ?? ''}
         disabled={disabled}
-        onChange={(e) => onDay(e.target.value)}
+        {...dayField}
         className={cn(FIELD, 'min-w-0 flex-1 px-2')}
       />
       <input
         type="time"
         aria-label={timeLabel}
-        value={time ?? ''}
         disabled={disabled || !day}
-        onChange={(e) => onTime(e.target.value)}
+        {...timeField}
         className={cn(FIELD, 'w-[6.5rem] shrink-0 px-2')}
       />
     </div>

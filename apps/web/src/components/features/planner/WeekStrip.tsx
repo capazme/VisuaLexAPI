@@ -12,6 +12,8 @@ interface Props {
   /** The last day the view can show (the server's window ends there). */
   last: string;
   selected: string;
+  /** How many tasks each day in reach holds: a dot under the day, and the count in its name. */
+  counts: ReadonlyMap<string, number>;
   /** A day chosen in the strip, the month menu, the arrows or «Oggi»: the view scrolls to its block. */
   onSelect: (day: string) => void;
 }
@@ -21,10 +23,10 @@ const clamp = (day: string, first: string, last: string) => (day < first ? first
 /**
  * The week of «Prossimi giorni» (P2c): the month (a menu when the days the view can show span two), «‹ Oggi ›» for
  * the week before and after and today, and the strip Monday to Sunday — the chosen day marked, today with a filled
- * ring of its own; a day the view cannot show (past, or past the server's seven days) is drawn but cannot be chosen.
+ * ring of its own, a dot under a day with tasks; a day the view cannot show (past, or past the server's seven days) is drawn but cannot be chosen.
  * It stays under the bar at the top while the days scroll.
  */
-export function WeekStrip({ today, last, selected, onSelect }: Props) {
+export function WeekStrip({ today, last, selected, counts, onSelect }: Props) {
   const monday = weekStart(selected);
   const days = Array.from({ length: 7 }, (_, i) => addDaysToIsoDate(monday, i));
   const previous = addDaysToIsoDate(monday, -7);
@@ -77,6 +79,7 @@ export function WeekStrip({ today, last, selected, onSelect }: Props) {
           const reachable = day >= today && day <= last;
           const chosen = day === selected;
           const isToday = day === today;
+          const count = reachable ? counts.get(day) ?? 0 : 0;
           return (
             <li key={day} className="min-w-0">
               <button
@@ -84,7 +87,7 @@ export function WeekStrip({ today, last, selected, onSelect }: Props) {
                 disabled={!reachable}
                 aria-pressed={chosen}
                 aria-current={isToday ? 'date' : undefined}
-                aria-label={`${longDay(day, today)}${isToday ? ', oggi' : ''}`}
+                aria-label={`${longDay(day, today)}${isToday ? ', oggi' : ''}${count > 0 ? `, ${count === 1 ? '1 compito' : `${count} compiti`}` : ''}`}
                 onClick={() => onSelect(day)}
                 className={cn(
                   'relative flex min-h-[52px] w-full flex-col items-center justify-center gap-0.5 rounded-t-lg text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400 disabled:hover:bg-transparent dark:text-slate-300 dark:hover:bg-slate-800 dark:disabled:text-slate-600',
@@ -101,6 +104,7 @@ export function WeekStrip({ today, last, selected, onSelect }: Props) {
                 >
                   {date}
                 </span>
+                <span aria-hidden className={cn('h-1 w-1 rounded-full', count > 0 ? 'bg-slate-500 dark:bg-slate-400' : 'bg-transparent')} />
                 {chosen && <span aria-hidden className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary-700 dark:bg-primary-300" />}
               </button>
             </li>

@@ -121,7 +121,9 @@ export function Modal({
       const last = focusable[focusable.length - 1];
       const active = document.activeElement;
       if (e.shiftKey) {
-        if (active === first || !dialog.contains(active)) {
+        // From an element outside the list (the dialog itself, a wrapper focused with tabIndex -1) the browser would
+        // step out of the dialog backwards: the last element takes it.
+        if (active === first || !focusable.includes(active as HTMLElement)) {
           e.preventDefault();
           last.focus();
         }

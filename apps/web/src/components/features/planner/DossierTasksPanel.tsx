@@ -32,11 +32,14 @@ export function DossierTasksPanel({ dossierId }: { dossierId: string }) {
         {state.status === 'error' && <TaskViewError onRetry={state.reload} />}
         {state.answer === null ? (
           state.status === 'loading' && <TaskListSkeleton rows={2} />
-        ) : tasks.length === 0 ? (
-          <p className="px-1 text-sm text-slate-600 dark:text-slate-400">Nessun compito in questo dossier.</p>
         ) : (
+          // Mounted on an empty list too: a sheet open on the last task stays open when it moves to another dossier.
           <TaskSheetScope tasks={tasks} today={today} optimistic={state.optimistic}>
-            <TaskList label="Compiti del dossier" tasks={tasks} today={today} optimistic={state.optimistic} showDossier={false} />
+            {tasks.length === 0 ? (
+              <p className="px-1 text-sm text-slate-600 dark:text-slate-400">Nessun compito in questo dossier.</p>
+            ) : (
+              <TaskList label="Compiti del dossier" tasks={tasks} today={today} optimistic={state.optimistic} showDossier={false} />
+            )}
           </TaskSheetScope>
         )}
         {state.answer?.truncated && <TruncatedNote />}
