@@ -19,8 +19,8 @@ export interface StatsBandProps {
   onToggleSettings: () => void;
   onCloseSettings: () => void;
   onSettingsChanged: () => void;
-  /** The community's subjects open with the settings (a mission asked for them). */
-  communityOpen?: boolean;
+  /** Each new value opens the community's subjects with the settings (a mission asked for them). */
+  communityRequest?: number;
   /** The celebration: the streak's count pops. */
   celebrate?: boolean;
   /** «Oggi»'s right column from `xl` (G6): the pieces stack as on a phone. */
@@ -118,7 +118,7 @@ function StateNumbers({ stati, aside }: { stati: ConteggiStati; aside: boolean }
 /** The panel's id: the gear and the missions' «Cambia…» buttons control it. */
 export const STUDY_SETTINGS_PANEL = 'studia-impostazioni';
 
-export function StatsBand({ data, loading, settingsOpen, onToggleSettings, onCloseSettings, onSettingsChanged, communityOpen = false, celebrate = false, aside = false }: StatsBandProps) {
+export function StatsBand({ data, loading, settingsOpen, onToggleSettings, onCloseSettings, onSettingsChanged, communityRequest = 0, celebrate = false, aside = false }: StatsBandProps) {
   const gear = useRef<HTMLButtonElement>(null);
   // Esc inside the panel: closed, and the focus back on the gear that opened it.
   const close = () => {
@@ -134,7 +134,7 @@ export function StatsBand({ data, loading, settingsOpen, onToggleSettings, onClo
         <SettingsGear ref={gear} open={settingsOpen} onClick={onToggleSettings} controls={STUDY_SETTINGS_PANEL} />
       </div>
       {/* Under the heading, inside the card, which grows downward; never a window over the page. */}
-      <StudySettingsPanel id={STUDY_SETTINGS_PANEL} open={settingsOpen} onClose={close} onChanged={onSettingsChanged} communityOpen={communityOpen} aside={aside} />
+      <StudySettingsPanel id={STUDY_SETTINGS_PANEL} open={settingsOpen} onClose={close} onChanged={onSettingsChanged} communityRequest={communityRequest} aside={aside} />
 
       {data ? (
         <>

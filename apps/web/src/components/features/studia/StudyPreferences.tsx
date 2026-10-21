@@ -10,8 +10,8 @@ export interface StudyPreferencesProps {
   onChanged: () => void;
   /** Drawn open, with no disclosure of its own: the panel the gear opens in «Oggi»'s band, or the strip's sheet (Gymnasium spec §4). */
   open?: boolean;
-  /** The community's subjects start open (a mission's «Accendi le schede della comunità» led here). */
-  communityOpen?: boolean;
+  /** Each new value opens the community's subjects (a mission's «Accendi le schede della comunità» led here); 0 asks nothing. */
+  communityRequest?: number;
   /** The switches' list: one column, or two where the panel is wide. */
   listClassName?: string;
 }
@@ -116,12 +116,18 @@ function GoalField({ label, hint, value, onSave }: GoalFieldProps) {
  * subject for the community's validated cards (all off at first; each toggle is sent at once). The saves go one after
  * the other, so a switch pressed right after a number is neither lost nor overwritten by the number's answer.
  */
-export function StudyPreferences({ onChanged, open: alwaysOpen = false, communityOpen = false, listClassName }: StudyPreferencesProps) {
+export function StudyPreferences({ onChanged, open: alwaysOpen = false, communityRequest = 0, listClassName }: StudyPreferencesProps) {
   const panelId = useId();
   const communityId = useId();
   const [disclosed, setOpen] = useState(false);
   const open = alwaysOpen || disclosed;
-  const [community, setCommunity] = useState(communityOpen);
+  const [community, setCommunity] = useState(communityRequest > 0);
+  // A new request opens the subjects, whatever the reader left them as (state adjusted while rendering, not in an effect).
+  const [answered, setAnswered] = useState(communityRequest);
+  if (communityRequest !== answered) {
+    setAnswered(communityRequest);
+    if (communityRequest > 0) setCommunity(true);
+  }
   const [preferences, setPreferences] = useState<PreferenzeStudio | null>(null);
   // A switch is held only while a switch's own save travels: its next state is computed from what is on screen.
   const [switching, setSwitching] = useState(false);

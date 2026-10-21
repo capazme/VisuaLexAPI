@@ -1,5 +1,5 @@
-import type { KeyboardEvent, Ref } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { useState, type KeyboardEvent, type Ref } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Settings2 } from 'lucide-react';
 import { Sheet } from '../../../ui/Sheet';
 import { dur, ease } from '../../../../lib/motion';
@@ -59,8 +59,8 @@ export interface StudySettingsPanelProps {
   /** Esc inside it: the band closes it and gives the focus back to the gear. */
   onClose: () => void;
   onChanged: () => void;
-  /** The community's subjects start open. */
-  communityOpen?: boolean;
+  /** Each new value opens the community's subjects. */
+  communityRequest?: number;
   /** The card is «Oggi»'s right column from `xl`: the switches in one column there, in two from `md` elsewhere. */
   aside?: boolean;
 }
@@ -68,37 +68,38 @@ export interface StudySettingsPanelProps {
 /**
  * The study settings in place, inside «I tuoi progressi» under its heading (the owner, 21 October 2026: «si estende il
  * tab»): no window and no veil; the card grows downward, its height in `dur.pop` on `ease.out`, at once under reduced
- * motion. Esc inside it closes it.
+ * motion. Esc inside it closes it. Mounted closed with the band, so the settings are read before the gear is pressed and
+ * the height grows once, to its full size (read on opening, they arrived halfway and the card jumped); closed it is
+ * `hidden` and `inert`, once its height has gone.
  */
-export function StudySettingsPanel({ id, open, onClose, onChanged, communityOpen = false, aside = false }: StudySettingsPanelProps) {
+export function StudySettingsPanel({ id, open, onClose, onChanged, communityRequest = 0, aside = false }: StudySettingsPanelProps) {
   const reduce = useReducedMotion() ?? false;
+  // Still drawn while it closes; `hidden` once the height has reached 0.
+  const [shown, setShown] = useState(open);
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== 'Escape') return;
     event.stopPropagation();
     onClose();
   };
   return (
-    <AnimatePresence initial={false}>
-      {open && (
-        <motion.div
-          key="panel"
-          id={id}
-          role="region"
-          aria-label="Impostazioni dello studio"
-          tabIndex={-1}
-          onKeyDown={onKeyDown}
-          initial={{ height: 0, opacity: 0 }}
-          animate={{ height: 'auto', opacity: 1 }}
-          exit={{ height: 0, opacity: 0 }}
-          transition={{ duration: reduce ? 0 : dur.pop, ease: ease.out }}
-          // The height moves only while it opens or closes; the controls' rings stay inside its edge.
-          className="-mx-1 overflow-hidden px-1 focus:outline-none"
-        >
-          <div className="border-t border-slate-200 pb-1 pt-4 dark:border-slate-800">
-            <StudyPreferences open communityOpen={communityOpen} onChanged={onChanged} listClassName={cn('md:grid-cols-2', aside && 'xl:grid-cols-1')} />
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <motion.div
+      id={id}
+      role="region"
+      aria-label="Impostazioni dello studio"
+      tabIndex={-1}
+      hidden={!open && !shown}
+      inert={!open}
+      onKeyDown={onKeyDown}
+      initial={false}
+      animate={open ? { height: 'auto', opacity: 1 } : { height: 0, opacity: 0 }}
+      transition={{ duration: reduce ? 0 : dur.pop, ease: ease.out }}
+      onAnimationComplete={() => setShown(open)}
+      // The height moves only while it opens or closes; the controls' rings stay inside its edge.
+      className="-mx-1 overflow-hidden px-1 focus:outline-none"
+    >
+      <div className="border-t border-slate-200 pb-1 pt-4 dark:border-slate-800">
+        <StudyPreferences open communityRequest={communityRequest} onChanged={onChanged} listClassName={cn('md:grid-cols-2', aside && 'xl:grid-cols-1')} />
+      </div>
+    </motion.div>
   );
 }

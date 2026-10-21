@@ -56,7 +56,7 @@ export function ReviewHome() {
   const action = materia ? narrowed : day;
   const data = day.data;
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [communityOpen, setCommunityOpen] = useState(false);
+  const [communityRequest, setCommunityRequest] = useState(0);
   // A mission's «Cambia…» opens the settings and takes the reader there: the panel takes the focus once drawn.
   const [focusSettings, setFocusSettings] = useState(0);
   useEffect(() => {
@@ -65,7 +65,7 @@ export function ReviewHome() {
     return () => cancelAnimationFrame(frame);
   }, [focusSettings]);
   const openSettingsFor = (target?: 'comunita') => {
-    setCommunityOpen(target === 'comunita');
+    if (target === 'comunita') setCommunityRequest((n) => n + 1);
     setSettingsOpen(true);
     setFocusSettings((n) => n + 1);
   };
@@ -133,13 +133,10 @@ export function ReviewHome() {
           data={data}
           loading={loading && data === null}
           settingsOpen={settingsOpen}
-          onToggleSettings={() => {
-            setCommunityOpen(false);
-            setSettingsOpen((open) => !open);
-          }}
+          onToggleSettings={() => setSettingsOpen((open) => !open)}
           onCloseSettings={() => setSettingsOpen(false)}
           onSettingsChanged={reload}
-          communityOpen={communityOpen}
+          communityRequest={communityRequest}
           celebrate={celebrate}
         />
         {chipsBeside && <div className="mt-8">{subjects}</div>}
