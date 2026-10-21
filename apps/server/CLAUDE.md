@@ -153,14 +153,16 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `trash_entries` and deletes them in one transaction, the dossier row locked
   (`FOR UPDATE`; for the cards, `trashLingoCards` locks the author's rows in id order,
   so a `PATCH` in flight finishes before the payload is read and one that comes
-  after finds no card): `POST /dossiers/:id/trash {itemIds}` (the entries the user
-  saw: a dossier that changed answers 409), `/dossiers/:id/trash-items`,
+  after finds no card): `POST /dossiers/:id/trash {itemIds, taskCount}` (the entries the user
+  saw and the number of planner tasks the dialog told them, both required: a dossier that changed
+  answers 409; every dossier answer carries `task_count` for that dialog, a count and never a title), `/dossiers/:id/trash-items`,
   `/lingo/cards/trash` — `/dossiers/:id/trash` is for exchanged tokens only; the
   card trash and `trash-items` are open to the web app too (a session's `trash-items` takes
   up to 5000 ids, an exchanged token's 1 to 50), and so are the web app's own deletions: `DELETE /dossiers/:id` moves
   the whole dossier there (owner, 13 October 2026, question 160: before, it was gone at
-  once), whatever it holds (`trashDossier` with no `seenItemIds`), answering
-  `{ trashId, itemCount }` for the page's «Annulla»; `DELETE /dossiers/:id/items/:itemId`
+  once), whatever it holds (`trashDossier` with no `seen`; its planner tasks go with it in the
+  payload, listed as `taskCount`, and come back on restore with their ids), answering
+  `{ trashId, itemCount, taskCount }` for the page's «Annulla»; `DELETE /dossiers/:id/items/:itemId`
   moves that one entry (question 181, «ok come raccomandi»), answering
   `{ trashId, moved, notFound }`, as `trash-items` does for a selection: one trash entry per action,
   restored with the entries' ids, a note's `aboutItemId` and `createdBy`. Nothing the web app reaches
@@ -172,7 +174,13 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   Restore brings every column back with the original ids — for a card, also the author's
   review state and log (`LingoStatoRipasso`, `LingoRevisioneSRS`), which the card's deletion
   would otherwise cascade away; an entry from before carries none and restores as it was; entries 30 days,
-  then swept (awaited, at most every ten minutes). No route reachable by an
+  then swept (awaited, at most every ten minutes). A restore deletes its entry first and restores the
+  payload that deletion returns: one purged, swept or restored meanwhile is waited for and answers 404,
+  as a second restore does (two at once: 200 and 404); ids taken again (P2002) are a 409. A dossier's
+  restore locks its published copy before the entry, the order of the admin's withdraw and republish
+  (the copy, then the entry they rewrite), so the two never deadlock and a block written meanwhile
+  comes back with the dossier. Entries restored into a dossier lock it, their own or the one the user
+  picks: their own gone meanwhile answers the 409 that asks where, a picked one 404 `Dossier not found`. No route reachable by an
   exchanged token deletes for good.
 - **`POST /api/dossiers/:id/norms`** — 1 to 50 references in free text
   (`norms/resolveReference.ts`): `parse_query`, then `fetch_norma_data` (the
@@ -223,7 +231,9 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   only when the snapshot names no article.
 - `src/middleware/errorHandler.ts` — the only place a status is decided for an
   unhandled throw. `AppError` carries its own; a Zod `ZodError` becomes **400**
-  naming the offending fields; everything else is a 500. Controllers therefore
+  naming the offending fields; the JSON parser's own refusals (a malformed or too large body) keep
+  their 4xx with a fixed `detail`, logged by type only — their error carries the raw body; everything
+  else is a 500. Controllers therefore
   call `schema.parse()` and let it throw — 41 sites across 13 controllers — and
   must not catch it to hand-roll a status. The body is
   `{ detail: string, errors?: [{ field, message }] }`: `detail` stays a plain
@@ -504,9 +514,12 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   at least `ripassiAlGiorno` reviews, or the whole day's queue finished). `lingo/studyDays.ts`
   writes it and nothing else does: `recordGradeDay`, inside the grade's transaction after the
   log row (the row created `ON CONFLICT DO NOTHING`, then locked `FOR UPDATE`, so racing grades
-  of one user both count); `markQueueFinished`, when a read of the session (not narrowed to a
+  of one user both count; `ripassi_dovuti` counts the grades of a card already due, which
+  Gymnasium's «dovute» reads, G-334); `markQueueFinished`, when a read of the session (not narrowed to a
   subject) or of the progress finds the queue finished, so a day with nothing to do counts;
-  `recountToday`, when the goal changes (past days stay as stored). The trash never touches the
+  `recountToday`, when the goal changes (past days stay as stored); `countVoteDay`, in the vote's
+  transaction, for `voti` (the day's validation votes, Gymnasium XP below; it changes nothing for the
+  streak, and the calendar leaves out a row with no review that did not count). The trash never touches the
   rows, so trashing a studied card does not rewrite a past day. `lingo/todayQueue.ts`
   `queueFinished` is the one definition of a finished queue (nothing due in the whole scope, no
   new slot or no new card left), and it is false for someone who never reviewed a card in scope.
@@ -522,6 +535,33 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   columns are `TIMESTAMP` without a zone holding UTC, and `AT TIME ZONE 'Europe/Rome'` alone
   reads them as Rome time (off by one or two hours). A `DATE` column travels through Prisma as
   UTC midnight: `dayToDate` / `dateToDay`, never `romeDay`.
+- **Gymnasium XP and levels** (spec `docs/superpowers/specs/2026-10-20-gymnasium-xp-levels-design.md`,
+  plan `docs/superpowers/plans/2026-10-20-gymnasium-xp-levels.md`; migration `20261026100000_lingo_xp_ledger`).
+  `LingoCreditoXp` (`lingo_crediti_xp`) is an append-only ledger: one row per mission credited per period
+  (`G:<day>`, `S:<Monday>` for the week, `U` once), its points at the time, the kind and id of the event
+  (`REVISIONE` the log row, `PROPOSTA` the card, `VOTO` the vote, `LETTURA` none) and the subject where one
+  applies. `@@unique([utenteId, missione, periodo])` makes a mission pay once per period, `@@unique([missione,
+  fonteId])` makes a card earn «scrivi» once in its life; the CHECKs (points 1–1000, the period's shape by
+  mission, an id for every event but a read) are in the migration. Nothing updates or deletes a row: only the
+  account's cascade removes one, the trash never touches it. `lingo/missions.ts` holds the catalogue (the web's
+  ids and order, the draft's values) and `settleMissions`, **the one writer**: inside the caller's
+  transaction, under `SAVEPOINT xp` with `SET LOCAL lock_timeout = '1s'` (an error or a long wait rolls back to
+  the savepoint, logs the error's name only, and answers no credit: XP never fails the event), then the user's
+  two-key advisory lock (`LINGO_XP_LOCK_CLASS`, `hashtext(user)`), then the daily safety net
+  (`XP_DAILY_CEILING` = 300, above the catalogue's 255). Each mission is decided from stored facts only (the
+  stored day, the log, the review states, the scopes) in Rome days of the server's clock; the user's quota and
+  goal cannot lower «Impara 5» or the goal's 10 reviews. Callers, all of the user's session and none in the
+  delegated table (`tests/lingoXp.security.test.ts` pins both): the grade (after `recordGradeDay`), the proposal,
+  the vote (after `countVoteDay`, before the card's state changes; `validationRule.ts` never reads XP, G-253,
+  G-318), `readProgress` and the unnarrowed session read when it marks the queue finished — the two reads in a
+  transaction that takes `users` `FOR KEY SHARE` first, or the credit's insert deadlocks with an account
+  deletion. Lock order: cards, today's day row, the XP lock. `lingo/levels.ts` is the curve (100 + 25·(n − 1),
+  no ceiling, integers; only ever gentler after release); the level is never stored, `lingo/xpLedger.ts`
+  `levelNow` computes it. Answers: the grade (recorded only), the proposal and the vote carry `xp: { crediti,
+  livello, nuovoLivello }` (the vote's answer is `{ stato, xp }`, the proposal's the card plus `xp`);
+  `GET /progressi` carries `livello`, `missioni` (never narrowed by `materia`; `convalida` only for a validator,
+  `caso` always `in-arrivo`) and `crediti`, the credits that read wrote. The export carries the ledger as
+  `data.lingoCreditiXp` without the events' ids. No MCP tool reads or writes XP.
 - **The read by institute** — `GET /api/lingo/srs/percorso?materia=` (`lingo/percorso.ts`; spec
   `docs/superpowers/specs/2026-10-19-gymnasium-restyle-design.md` §6, G5). Answers `[{ materia, istituto, nuove, apprendimento, consolidate, dovute }]`, sorted by
   subject then institute, over exactly the cards the session may offer (`reviewScope`: one's own
@@ -562,7 +602,58 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   later) cascade from the user and from the card, `LingoPreferenzeStudio`
   (`lingo_preferenze_studio`) from the user; the export carries the log as `data.lingoRipassi` (not the derived state)
   and the preferences as `data.lingoPreferenze` (null when never saved), and the stored study days
-  as `data.lingoGiornate` (`giorno` as 'YYYY-MM-DD'); `LingoGiornataStudio` cascades from the user.
+  as `data.lingoGiornate` (`giorno` as 'YYYY-MM-DD', with `voti` and `ripassiDovuti`); `LingoGiornataStudio` cascades from the user,
+  as do the XP credits (`data.lingoCreditiXp`: mission, period, day, points, kind of event, subject).
+- **The planner's tasks** (Opus, wave 1; the task model answered in the owners' notes, answers
+  1–4, 7, 11, 13): `Task` (`tasks`, migration `20261025100001_planner_tasks`: a new table and two
+  enums, nothing else; CHECKs for priority 1–4, a time only with its date, a positive duration, no
+  self-parent). The owner's alone (`userId`); `assigneeId` stays null until sharing (wave 4) and no
+  route writes it, nor `durationMinutes`. `dossierId` null = the inbox; a subtask always sits in its
+  parent's dossier, and a task moved to another dossier takes its subtasks and loses their entries.
+  `dossierItemId` is an entry of the same dossier: `SET NULL` when the entry goes (trash included,
+  not restored with it) and cleared by `moveDossierItem`. Planned date and deadline are two
+  Europe/Rome civil days (`DATE`, through `dayToDate`/`dateToDay`) with an optional `TIME`
+  ('HH:MM'); «today» is `romeDay`. The deadline is what the user wrote: nothing computes one (wave
+  2), and no wording may suggest it. Repetition (`tasks/recurrence.ts`): a closed RRULE subset —
+  daily, working days (`FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR`, read as Monday–Friday minus the national
+  holidays of `tasks/italianHolidays.ts`: fixed dates, Easter Monday, 4 October from 2026), weekly,
+  monthly, yearly; it needs a planned date and refuses a deadline. Monthly and yearly keep their day
+  (`recurrenceDay`, the planned date's day when the user sets the rule, its origin or a new day; a
+  write leaving the rule and its origin unchanged, with a date where the kept day lands in its month —
+  the day, or the month's last when shorter: `landsOnDay`; for a yearly one, in the same month —, keeps
+  it, so the web's «Annulla», which puts a tick's `previousPlannedDate` back with a `PUT`, never turns a
+  31st into the 28th. The server cannot tell that from a user moving a 31st to 30 April meaning «the
+  30th from now on»: it keeps the 31st, and the 30th of a month of 31 days sets the 30th): a month without it takes its last day for that
+  occurrence only (31 January → 28 February → 31 March), and a yearly 29 February is the 28th in
+  common years and the 29th in leap years. Ticking a repeating task moves its planned date to the first occurrence after today
+  (`pianificata`) or one step from today (`completamento`) and leaves it open; `{ plannedDate }` in
+  the tick's body is the occurrence seen, required for a repeating task (400 without), a stale one
+  409, so a double tick never moves it twice. Any other tick closes the task and its open
+  subtasks at one instant, and reopening reopens what closed at that instant. Routes
+  (`routes/tasks.ts`, `/api/tasks`, session only — not in the delegated table): `GET
+  ?view=today|upcoming|inbox|dossier|trash[&dossierId]` (`today`: planned or due today or before;
+  `upcoming`: planned or due today to +6; open tasks only; at most 1000, `truncated`), `GET`/`PUT
+  /:id`, `POST /`, `POST /:id/complete`, `/:id/reopen`, `POST /reorder { taskIds }` (one list at a
+  time — same dossier, same parent — else 400; one `UPDATE … FROM unnest … WITH ORDINALITY`, never a
+  loop of updates inside the interactive transaction's 5 s), `DELETE /:id`
+  (to the trash: `deletedAt` on the task and its subtasks, swept after 30 days; a live subtask of a
+  swept parent stays, detached) and `POST
+  /:id/restore` (what went at that instant; a subtask whose parent is still there comes back on
+  its own). A task that changes list (dossier or parent) or comes back from the trash goes after the
+  last one of its list. A named parent is locked before it is read as live; a re-parenting takes a
+  per-user advisory lock first, so two at once cannot close a loop; a move between dossiers locks
+  both dossier rows before the task. `trashDossier` locks the dossier, then its tasks, before reading
+  the payload, so a write in flight lands in it and one that comes after finds no task; a dossier's
+  restore leaves alone a task of its payload that is live again elsewhere. A database error in the
+  dossier trash or a restore is logged by kind and code only (`quietly`): those queries carry names
+  and titles. Everything is scoped by `userId` in `tasks/tasks.ts`: another user's task, dossier,
+  entry or parent is a 404 (`tests/tasks.idor.test.ts`). **A title may name a client**: no message
+  repeats one, closed values answer without echoing, and the router's own error handler logs a
+  database error by kind and code only, never Prisma's message. `serializeTask` is the one answer
+  shape. The account export carries them as `data.tasks`: the user's own, the trashed ones too
+  (days 'YYYY-MM-DD', times 'HH:MM'), never `assigneeId` (another person's id from wave 4) — the
+  export's rule, no other person's id, name or text. They cascade with the account, and a task
+  assigned to a deleted account loses its assignee.
 - **Search history** (`controllers/historyController.ts`, `/api/history`): a row is a
   norm (`act_type`) or a court decision (`decision_key`), never both and never neither: the
   `search_history_one_kind` CHECK (migration `20261015100000`, not in Prisma's model) holds it

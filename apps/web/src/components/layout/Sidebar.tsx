@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, type FocusEvent, type Keyboar
 import { createPortal } from 'react-dom';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from 'framer-motion';
-import { Search, Folder, FolderOpen, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Scale, Network, Bot, ScrollText, MessageSquarePlus, Repeat, ChartColumn, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, type LucideIcon } from 'lucide-react';
+import { Search, Folder, FolderOpen, CalendarCheck, CalendarDays, Inbox, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Scale, Network, Bot, ScrollText, MessageSquarePlus, Repeat, ChartColumn, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { isMerltEnabled } from '../../features/merlt/featureFlag';
 import { isMerltGraphEnabled } from '../../features/merlt/graph/featureFlag';
@@ -20,6 +20,8 @@ import { serviceHealthLabel, serviceHealthNeedsNotice } from '../../utils/servic
 import { Z_INDEX } from '../../constants/zIndex';
 import { spring } from '../../lib/motion';
 import type { SidebarLayout } from './sidebarWidth';
+import { plannerStore } from '../features/planner/plannerStore';
+import { todayCountLabel } from '../features/planner/taskDates';
 
 interface SidebarProps {
   theme: string;
@@ -47,6 +49,8 @@ interface NavItemProps {
   onClick?: () => void;
   id?: string;
   badgeCount?: number;
+  /** What the count counts, for the name: «Oggi, 3 compiti per oggi o scaduti». Without it, «N notifiche». */
+  badgeLabel?: string;
   /** Active on its own address only, not under it: «Dossier pubblici» (`/forum`) beside «Community» (`/forum/community`). */
   end?: boolean;
   /** The keyboard shortcut that does the same, shown in the hover label (not part of the name). */
@@ -78,13 +82,13 @@ function normaChangesLabel(count: number): string {
   return count === 1 ? '1 norma salvata cambiata' : `${count} norme salvate cambiate`;
 }
 
-/** A count drawn on a control; the control's name says what it counts. */
+/** A count drawn on a control; the control's name says what it counts. 11 px on red 600: no smaller, and AA. */
 function CountBadge({ count, className }: { count: number; className?: string }) {
   return (
     <span
       aria-hidden
       className={cn(
-        'min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-semibold leading-none',
+        'min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-600 text-white text-[11px] font-semibold leading-none',
         className,
       )}
     >
@@ -165,7 +169,7 @@ function useSidebarLabel() {
   return { shown, hide, handlers };
 }
 
-function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint, layout, end }: NavItemProps) {
+function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, badgeLabel, hint, layout, end }: NavItemProps) {
   const { shown: showTooltip, hide, handlers } = useSidebarLabel();
   // State, not a ref object: the tooltip reads the element while rendering (gotcha 13).
   const [linkEl, setLinkEl] = useState<HTMLAnchorElement | null>(null);
@@ -178,7 +182,7 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint, layout,
   // tooltip is `hidden md:block` and shows on hover, so a screen reader and a
   // keyboard user got an unnamed link. The count rides the name because a badge
   // announced on its own arrives without saying what it counts.
-  const accessibleName = showBadge ? `${label}, ${badgeCount} notifiche` : label;
+  const accessibleName = showBadge ? `${label}, ${badgeLabel ?? `${badgeCount} notifiche`}` : label;
 
   return (
     <NavLink
@@ -322,6 +326,8 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
   const { section, active } = useSection();
   const sectionEntries = useEntriesEntrance(section);
   const { count: forumNotifications } = useForumNotifications(!!user);
+  // Overdue plus today's tasks (`PlannerHost` reads them): beside «Oggi» in Opus.
+  const todayCount = plannerStore((s) => s.todayCount) ?? 0;
   // Cronologia lives in the user menu (the owner, 13 Oct 2026); the saved norms that changed are
   // counted on the avatar and beside the entry («ok come raccomandi»).
   const normaChanges = forumNotifications.normaChanges ?? 0;
@@ -491,7 +497,13 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
               </p>
             )}
             {section === 'opus' && (
-              <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" layout={layout} />
+              <>
+                {/* The planner's views, then the dossiers (the planner, wave 1). */}
+                <NavItem to="/opus/oggi" icon={CalendarCheck} label="Oggi" onClick={closeMobile} badgeCount={todayCount} badgeLabel={todayCountLabel(todayCount)} layout={layout} />
+                <NavItem to="/opus/prossimi" icon={CalendarDays} label="Prossimi giorni" onClick={closeMobile} layout={layout} />
+                <NavItem to="/opus/ingresso" icon={Inbox} label="Lista d'ingresso" onClick={closeMobile} layout={layout} />
+                <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" layout={layout} />
+              </>
             )}
             {section === 'academia' && showAssistant && (
               <>

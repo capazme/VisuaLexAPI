@@ -15,6 +15,7 @@ describe('account data controls', () => {
     expect(response.body.data.lingoRipassi).toEqual([]);
     expect(response.body.data.lingoPreferenze).toBeNull();
     expect(response.body.data.lingoGiornate).toEqual([]);
+    expect(response.body.data.lingoCreditiXp).toEqual([]);
   });
 
   it('exports the study days and the review goal', async () => {
@@ -22,7 +23,23 @@ describe('account data controls', () => {
     await prisma.lingoGiornataStudio.create({ data: { utenteId: alice.id, giorno: new Date('2026-10-19T00:00:00Z'), ripassi: 12, nuove: 3, sbagliate: 2, valido: true } });
     const response = await request(app).get('/api/auth/export').set(authHeader(alice));
     expect(response.body.data.lingoPreferenze).toEqual({ nuoveAlGiorno: 20, ripassiAlGiorno: 15, materieComunita: [] });
-    expect(response.body.data.lingoGiornate).toEqual([{ giorno: '2026-10-19', ripassi: 12, nuove: 3, sbagliate: 2, codaFinita: false, valido: true }]);
+    expect(response.body.data.lingoGiornate).toEqual([{ giorno: '2026-10-19', ripassi: 12, ripassiDovuti: 0, nuove: 3, sbagliate: 2, codaFinita: false, valido: true, voti: 0 }]);
+  });
+
+  it('exports the XP credits, without the events’ ids, and deletes them with the account', async () => {
+    const bob = await createTestUser('account-xp-bob');
+    const day = (d: string) => new Date(`${d}T00:00:00Z`);
+    await prisma.lingoCreditoXp.create({ data: { utenteId: alice.id, missione: 'SCRIVI', periodo: 'G:2026-10-20', giorno: day('2026-10-20'), punti: 25, fonte: 'PROPOSTA', fonteId: 'card-1', materia: 'DIRITTO_PENALE' } });
+    await prisma.lingoCreditoXp.create({ data: { utenteId: alice.id, missione: 'SETTIMANA', periodo: 'S:2026-10-12', giorno: day('2026-10-18'), punti: 50, fonte: 'LETTURA' } });
+    await prisma.lingoCreditoXp.create({ data: { utenteId: bob.id, missione: 'DOVUTE', periodo: 'G:2026-10-20', giorno: day('2026-10-20'), punti: 20, fonte: 'LETTURA' } });
+    const response = await request(app).get('/api/auth/export').set(authHeader(alice));
+    expect(response.body.data.lingoCreditiXp).toEqual([
+      { missione: 'SETTIMANA', periodo: 'S:2026-10-12', giorno: '2026-10-18', punti: 50, fonte: 'LETTURA', materia: null },
+      { missione: 'SCRIVI', periodo: 'G:2026-10-20', giorno: '2026-10-20', punti: 25, fonte: 'PROPOSTA', materia: 'DIRITTO_PENALE' },
+    ]);
+    const deleted = await request(app).delete('/api/auth/account').set(authHeader(alice)).send({ password: 'test-password', confirmation: 'ELIMINA ACCOUNT' });
+    expect(deleted.status).toBe(204);
+    expect(await prisma.lingoCreditoXp.findMany({ select: { utenteId: true } })).toEqual([{ utenteId: bob.id }]);
   });
 
   it('requires the current password and exact confirmation before deletion', async () => {
