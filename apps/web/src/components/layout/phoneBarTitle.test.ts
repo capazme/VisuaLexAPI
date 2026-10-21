@@ -3,6 +3,10 @@ import { phoneBarTitle } from './phoneBarTitle';
 
 describe('phoneBarTitle', () => {
   it.each([
+    ['/opus/oggi', 'Oggi'],
+    ['/opus/prossimi', 'Prossimi giorni'],
+    ['/opus/ingresso', "Lista d'ingresso"],
+    ['/opus/cestino', 'Cestino dei compiti'],
     ['/studia/ripasso', 'Oggi'],
     ['/studia/progressi', 'Progressi'],
     ['/studia/schede', 'Le mie schede'],
@@ -20,7 +24,7 @@ describe('phoneBarTitle', () => {
     expect(phoneBarTitle(path, 'Opus')).toBe(title);
   });
 
-  it.each(['/merlt/contribuisci', '/pagina-che-non-esiste', '/dossierx'])('falls back to the section on %s', (path) => {
+  it.each(['/merlt/contribuisci', '/pagina-che-non-esiste', '/dossierx', '/opus'])('falls back to the section on %s', (path) => {
     expect(phoneBarTitle(path, 'Academia')).toBe('Academia');
   });
 });

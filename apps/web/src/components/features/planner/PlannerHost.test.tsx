@@ -8,13 +8,11 @@ vi.mock('../../../services/taskService', () => ({ taskService: service }));
 
 import { PlannerHost } from './PlannerHost';
 import { DossierTasksPanel } from './DossierTasksPanel';
-import { TaskDialog } from './TaskDialog';
 import { plannerStore } from './plannerStore';
 import { splitLinks } from './splitLinks';
 import { appStore } from '../../../store/useAppStore';
 
 const TODAY = '2026-10-20';
-const noOptimistic = { hide: () => {}, show: () => {}, landed: () => {} };
 
 function task(id: string, fields: Partial<Task> = {}): Task {
   return {
@@ -121,63 +119,6 @@ describe('«c», the quick add from anywhere', () => {
     act(() => plannerStore.getState().changed());
     await waitFor(() => expect(plannerStore.getState().todayCount).toBe(1));
     expect(service.list).toHaveBeenCalledWith('today');
-  });
-});
-
-describe('editing a task', () => {
-  it('saves every field and lists its subtasks, which it can add', async () => {
-    const parent = task('p', { dossierId: 'd1', plannedDate: TODAY, labels: ['udienza'] });
-    service.list.mockResolvedValue({ today: TODAY, tasks: [parent, task('s', { parentId: 'p', dossierId: 'd1' })], truncated: false });
-    service.update.mockResolvedValue(parent);
-    service.create.mockResolvedValue(task('s2', { parentId: 'p' }));
-    const onClose = vi.fn();
-    render(<MemoryRouter><TaskDialog mode="edit" task={parent} today={TODAY} optimistic={noOptimistic} onClose={onClose} /></MemoryRouter>);
-    const dialog = screen.getByRole('dialog', { name: 'Modifica compito' });
-    expect(await within(dialog).findByText('Compito s')).toBeInTheDocument();
-    expect(service.list).toHaveBeenCalledWith('dossier', 'd1');
-    fireEvent.change(within(dialog).getByLabelText('Nuovo sottocompito'), { target: { value: 'Bozza' } });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Aggiungi il sottocompito' }));
-    await waitFor(() => expect(service.create).toHaveBeenCalledWith({ title: 'Bozza', parentId: 'p', origin: 'lavoro' }));
-    fireEvent.change(within(dialog).getByLabelText('Descrizione'), { target: { value: 'Vedi https://example.org/atto.' } });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Salva' }));
-    await waitFor(() => expect(service.update).toHaveBeenCalled());
-    expect(service.update.mock.calls[0]).toEqual(['p', expect.objectContaining({ description: 'Vedi https://example.org/atto.', labels: ['udienza'], dossierId: 'd1' })]);
-    await waitFor(() => expect(onClose).toHaveBeenCalled());
-  });
-
-  it("takes the dossier's kind as its origin when it moves to another dossier", async () => {
-    const parent = task('p', { dossierId: 'd1' });
-    service.update.mockResolvedValue(parent);
-    render(<MemoryRouter><TaskDialog mode="edit" task={parent} today={TODAY} optimistic={noOptimistic} onClose={vi.fn()} /></MemoryRouter>);
-    fireEvent.change(screen.getByLabelText('Dossier'), { target: { value: 'd2' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Salva' }));
-    await waitFor(() => expect(service.update.mock.calls[0][1]).toMatchObject({ dossierId: 'd2', origin: 'studio' }));
-  });
-
-  it('hands the focus to the next subtask when one is ticked, then to the field', async () => {
-    const parent = task('p');
-    service.list.mockResolvedValue({ today: TODAY, tasks: [parent, task('s1', { parentId: 'p' }), task('s2', { parentId: 'p' })], truncated: false });
-    const complete = vi.fn().mockResolvedValue({ task: parent, recurred: null });
-    (service as unknown as { complete: typeof complete }).complete = complete;
-    render(<MemoryRouter><TaskDialog mode="edit" task={parent} today={TODAY} optimistic={noOptimistic} onClose={vi.fn()} /></MemoryRouter>);
-    const first = await screen.findByRole('checkbox', { name: /Compito s1/ });
-    // What the server lists once s1 is done.
-    service.list.mockResolvedValue({ today: TODAY, tasks: [parent, task('s2', { parentId: 'p' })], truncated: false });
-    first.focus();
-    fireEvent.click(first);
-    expect(screen.getByRole('checkbox', { name: /Compito s2/ })).toHaveFocus();
-    // s1 has left: s2 is the last one, and the focus goes to the field.
-    await waitFor(() => expect(screen.queryByRole('checkbox', { name: /Compito s1/ })).toBeNull());
-    fireEvent.click(screen.getByRole('checkbox', { name: /Compito s2/ }));
-    expect(screen.getByLabelText('Nuovo sottocompito')).toHaveFocus();
-  });
-
-  it("shows the server's refusal in the dialog", async () => {
-    const parent = task('p');
-    service.update.mockRejectedValue({ status: 400, message: 'Un compito con un termine finale non si ripete: togli la ripetizione o il termine.' });
-    render(<MemoryRouter><TaskDialog mode="edit" task={parent} today={TODAY} optimistic={noOptimistic} onClose={vi.fn()} /></MemoryRouter>);
-    fireEvent.click(screen.getByRole('button', { name: 'Salva' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent(/non si ripete/);
   });
 });
 
