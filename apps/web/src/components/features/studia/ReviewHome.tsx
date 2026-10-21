@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
+import { useMediaQuery } from '../../../hooks/useIsDesktop';
 import type { Materia } from '../../../types/studia';
 import { MATERIA_LABEL } from './studiaLabels';
 import type { StudiaOutletContext } from './StudiaPage';
@@ -28,11 +29,14 @@ import { BLOCK_HEADING } from './progress/tokens';
  * «today» is.
  */
 /**
- * From `xl` two columns (G6): the grid, the left column's place, the band's (sticky over every row) and the confetti's
- * box over the first row of both. Applied only out of Focus mode, which narrows the frame to 896 px: there the band
- * would be about 220 px wide inside, too narrow for the week.
+ * From `xl` two columns (G6), seven twelfths and five: the grid, the left column's place, the right column's (the band
+ * and the subject chips, sticky over every row) and the confetti's box over the first row of both. Applied only out of
+ * Focus mode, which narrows the frame to 896 px: there the band would be too narrow for the week. The left holds three
+ * rows (missions, list, road); the fourth, `1fr`, takes what the right column has beyond them.
  */
-const SPLIT = 'xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] xl:grid-rows-[auto_auto_auto_auto_1fr] xl:pb-0';
+const SPLIT = 'xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] xl:grid-rows-[auto_auto_auto_1fr] xl:pb-0';
+/** Tailwind's `xl`: from here «Cosa ripassi» is drawn in the right column, under the band. */
+const XL = '(min-width: 1280px)';
 const LEFT = 'xl:col-start-1';
 const BAND = 'xl:sticky xl:top-8 xl:col-start-2 xl:row-span-full xl:mt-0 xl:self-start';
 const BURST = 'xl:col-span-full xl:row-end-2';
@@ -40,6 +44,9 @@ const BURST = 'xl:col-span-full xl:row-end-2';
 export function ReviewHome() {
   const navigate = useNavigate();
   const split = !useAppStore((s) => s.settings.focusMode);
+  // The chips move, not their copy: one place or the other, so the document never holds them twice.
+  const wide = useMediaQuery(XL);
+  const chipsBeside = split && wide;
   const validator = useOutletContext<StudiaOutletContext | undefined>()?.validator === true;
   const [materia, setMateria] = useState<Materia | undefined>(rememberedMateria);
   const day = useProgress(undefined);
@@ -70,6 +77,17 @@ export function ReviewHome() {
   const loading = day.status === 'loading';
   const subject = materia && MATERIA_LABEL[materia];
 
+  // «Cosa ripassi»: after the list up to `xl`, in the reading order the owner fixed; from `xl` under the band, where
+  // the right column had room and the left a long page (G6).
+  const subjects = (
+    <section aria-labelledby="studia-cosa" className="min-w-0 space-y-3">
+      <h3 id="studia-cosa" className={BLOCK_HEADING}>
+        Cosa ripassi
+      </h3>
+      <SubjectChips selected={materia} onSelect={choose} />
+    </section>
+  );
+
   return (
     // One column on a phone and a tablet; from `xl` two (G6): the missions, the list, the chips and the road on the
     // left, two thirds, and the statistics on the right, kept in sight under the heading while the page scrolls. The
@@ -93,7 +111,7 @@ export function ReviewHome() {
           stampRef={stampRef}
         />
       </div>
-      {/* Under the missions on a phone, 16 px apart as before; beside everything from `xl`, sticky. */}
+      {/* Under the missions on a phone, 16 px apart as before; beside everything from `xl`, sticky, with the chips. */}
       <div className={cn('-mt-4 min-w-0', split && BAND)}>
         <StatsBand
           aside={split}
@@ -103,6 +121,7 @@ export function ReviewHome() {
           onOpenSettings={() => setSettingsOpen(true)}
           celebrate={celebrate}
         />
+        {chipsBeside && <div className="mt-8">{subjects}</div>}
       </div>
       {/* The confetti start from the stamp, in the goal's row, and fall over the missions and the statistics, never
           further: an absolute box placed on their rows (the grid's area is its containing block), out of the flow, so
@@ -117,12 +136,7 @@ export function ReviewHome() {
         <MissionList data={data} loading={loading && data === null} validator={validator} />
       </div>
 
-      <section aria-labelledby="studia-cosa" className={cn('min-w-0 space-y-3', split && LEFT)}>
-        <h3 id="studia-cosa" className={BLOCK_HEADING}>
-          Cosa ripassi
-        </h3>
-        <SubjectChips selected={materia} onSelect={choose} />
-      </section>
+      {!chipsBeside && subjects}
 
       <div className={cn('min-w-0 transition-opacity', split && LEFT, loading && data !== null && 'opacity-60')} aria-busy={loading}>
         {data ? (

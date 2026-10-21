@@ -386,8 +386,31 @@ describe('ReviewHome', () => {
       expect(follows(missions, stats) && follows(stats, list) && follows(list, subjects)).toBe(true);
       // The grid places them; the document keeps the order on every width.
       expect(stats.parentElement).toHaveClass('xl:col-start-2', 'xl:row-span-full', 'xl:sticky', 'xl:self-start');
-      for (const left of [missions.parentElement!, list.parentElement!, subjects]) expect(left).toHaveClass('xl:col-start-1');
-      expect(stats.parentElement?.parentElement?.className).toMatch(/xl:grid-cols-\[minmax\(0,2fr\)_minmax\(0,1fr\)\]/);
+      for (const left of [missions.parentElement!, list.parentElement!]) expect(left).toHaveClass('xl:col-start-1');
+      expect(stats.parentElement?.parentElement?.className).toMatch(/xl:grid-cols-\[minmax\(0,7fr\)_minmax\(0,5fr\)\]/);
+      // Below `xl` the chips follow the list, in the flow.
+      expect(stats.parentElement).not.toContainElement(subjects);
+    });
+
+    it('draws «Cosa ripassi» under the statistics from `xl`, in their column, once (G6)', async () => {
+      const real = window.matchMedia;
+      window.matchMedia = ((query: string) => ({
+        matches: query === '(min-width: 1280px)', media: query, onchange: null,
+        addEventListener: () => {}, removeEventListener: () => {}, addListener: () => {}, removeListener: () => {}, dispatchEvent: () => false,
+      })) as unknown as typeof window.matchMedia;
+      try {
+        progress.mockResolvedValue(answer(18, 8));
+        renderHome();
+        const stats = await screen.findByRole('region', { name: 'I tuoi progressi' });
+        const subjects = screen.getAllByRole('region', { name: 'Cosa ripassi' });
+        expect(subjects).toHaveLength(1);
+        expect(stats.parentElement).toContainElement(subjects[0]);
+        // In the document after the statistics, before the list.
+        const list = screen.getByRole('region', { name: 'Tutte le missioni' });
+        expect(subjects[0].compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      } finally {
+        window.matchMedia = real;
+      }
     });
 
     it('stays one column in Focus mode, whose narrower frame would squeeze the band (G6)', async () => {
@@ -797,6 +820,10 @@ describe('ReviewHome', () => {
       expect(within(list).getByText('Scrivi una scheda')).toBeInTheDocument();
       expect(within(list).getByText('Una settimana di serie')).toBeInTheDocument();
       expect(within(list).getByText('Consolida 50 schede')).toBeInTheDocument();
+      // Today's three are above, in «Le missioni di oggi», and only there (G6).
+      expect(within(list).getByText(/Le tre di oggi sono qui sopra/)).toBeInTheDocument();
+      for (const title of ['Ripassa le schede dovute', 'Raggiungi l’obiettivo di oggi']) expect(within(list).queryByText(title)).toBeNull();
+      expect(within(list).queryByText(/^Impara \d+ schede nuove$/)).toBeNull();
       // Nothing to tick: no checkbox, no button.
       expect(within(list).queryAllByRole('checkbox')).toEqual([]);
       expect(within(list).queryAllByRole('button')).toEqual([]);

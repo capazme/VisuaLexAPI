@@ -21,8 +21,18 @@ export interface StatsBandProps {
   aside?: boolean;
 }
 
-/** In the right column from `xl`: the week and the link at the column's width, the numbers a step smaller. */
-const ASIDE = { week: 'xl:ml-0 xl:w-full', row: 'xl:w-full xl:gap-1.5', number: 'xl:text-3xl', link: 'xl:w-full' } as const;
+/**
+ * In the right column from `xl`: the week and the link at the column's width, the numbers a step smaller, and the three
+ * states in columns as wide as their words, spread across, so «In apprendimento» stays on one line under its number.
+ */
+const ASIDE = {
+  week: 'xl:ml-0 xl:w-full',
+  row: 'xl:w-full xl:gap-1.5',
+  numbers: 'xl:grid-cols-[repeat(3,auto)] xl:justify-between',
+  label: 'xl:whitespace-nowrap',
+  number: 'xl:text-3xl',
+  link: 'xl:w-full',
+} as const;
 
 /** A box of the week: ticked for a day that counted, dashed for a rest, empty for a missed one, outlined for today. */
 function boxClass(day: WeekDay, today: boolean): string {
@@ -66,12 +76,12 @@ function StateNumbers({ stati, aside }: { stati: ConteggiStati; aside: boolean }
   const total = totalCards(stati);
   return (
     <div className="grid gap-3">
-      <dl className="grid grid-cols-3 gap-3">
+      <dl className={cn('grid grid-cols-3 gap-3', aside && ASIDE.numbers)}>
         {CARD_STATES.map((state) => (
           // The number above its name: `dt` first in the document, drawn second; packed to the top, so the three
           // numbers stay on one line when a name takes two.
           <div key={state.key} className="flex flex-col-reverse justify-end gap-1">
-            <dt className={cn('flex items-center gap-1.5 text-sm leading-tight', MUTED_TEXT)}>
+            <dt className={cn('flex items-center gap-1.5 text-sm leading-tight', aside && ASIDE.label, MUTED_TEXT)}>
               <span aria-hidden className={cn('inline-block h-2.5 w-2.5 shrink-0 rounded-sm', state.swatch)} />
               {state.label}
             </dt>

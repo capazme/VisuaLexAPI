@@ -121,9 +121,9 @@ brief to copy. The look is Inchiostro (paper, ink, toga) with the Gymnasium hue.
 *Corrected on 21 October (G6).* G1 drew Oggi as one column of 768 px, centred, at every width (L-22). The
 owner then asked for Gymnasium to use the width as Opus and the Forum do: Oggi and Progressi sit in the
 sections' frame (`PageFrame`, the layout's own 1280 px frame and its 1216 px column, the heading at its left
-edge), and from `xl` (1280 px) Oggi has two columns — on the left, about two thirds, the missions with
-«Inizia», «Tutte le missioni», «Cosa ripassi» and the road; on the right, about one third, the statistics
-(item 2), `sticky` under the heading while the page scrolls. Below `xl`, and in Focus mode (896 px), it is one column, in the order
+edge), and from `xl` (1280 px) Oggi has two columns — on the left, seven twelfths, the missions with
+«Inizia», «Tutte le missioni» and the road; on the right, five twelfths, the statistics (item 2) and under
+them «Cosa ripassi» (item 4), together `sticky` under the heading while the page scrolls. Below `xl`, and in Focus mode (896 px), it is one column, in the order
 below. The document keeps that order on every width — missions, statistics, list — so a screen reader and
 the keyboard meet the statistics second; the grid places them. Inside the tiles a sentence wraps at about
 65 characters (`max-w-prose`) rather than widen with the column.
@@ -162,7 +162,8 @@ scratch, in one type language with the rest of Inchiostro. From top to bottom, i
    The long calendar and «Prossimi 14 giorni» leave the page. *Corrected for G3:* G1b opened them in a sheet,
    «Il tuo mese»; G3 replaced it with a link, «Tutti i progressi», to `/studia/progressi`, so the data are in one
    place and no chart is drawn twice.
-3. **The full list of missions**, «Tutte le missioni»: daily, weekly and long-term. Those the web can count
+3. **The full list of missions**, «Tutte le missioni»: daily, weekly and long-term. *Since G6* it leaves out
+   today's three, which item 1 shows just above, and says so («Le tre di oggi sono qui sopra»). Those the web can count
    show their state; those that need the server to record them (a subject left for seven days, writing a
    card, validating, a case, a week of streak) are listed with «In arrivo» and cannot be ticked. **No experience points and no level**
    are shown until the server keeps them: a count in the browser would be lost on another device and could

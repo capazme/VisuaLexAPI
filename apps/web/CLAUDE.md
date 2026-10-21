@@ -712,11 +712,12 @@ palestra giuridica» — the section switcher keeps «Gymnasium»; spec
 under the road only —, an answer is never shown for another subject, and an older one never overwrites a newer one) — once for the whole day, which draws the missions, the statistics and the road, and once more
 for the subject chosen, made only while one is (`useProgress(materia, enabled)`), which draws the first mission's action. The page is in
 the sections' frame (`layout/PageFrame`, G6: the layout's full width, the heading at its left edge; the 768 px column
-of G1 is gone). One column up to `xl`, and in Focus mode (its 896 px frame would leave the band about 220 px); from `xl` (1280 px) two, a grid of `2fr` and `1fr`: on the left the missions,
-the list, the chips and the road, on the right the statistics, `sticky` at `top-8` with `self-start` over all the rows
-(`row-span-full`; a fifth row of `1fr` takes what the band has beyond the left column, so it never stretches the
-left's rows). The document keeps the order the owner fixed on every width — the grid only places the band — and inside
-the tiles a sentence stops at `max-w-prose`. In that order:
+of G1 is gone). One column up to `xl`, and in Focus mode (its 896 px frame would leave the band too narrow); from `xl` (1280 px) two, a grid of `7fr` and `5fr`: on the left the missions,
+the list and the road, on the right the statistics and, under them, «Cosa ripassi», `sticky` at `top-8` with `self-start` over all the rows
+(`row-span-full`; a fourth row of `1fr` takes what the right column has beyond the left, so it never stretches the
+left's rows). The chips move by `useMediaQuery('(min-width: 1280px)')`, never as a hidden copy: below `xl` they follow
+the list, from it they sit in the band's sticky box, read after the band. The document keeps the order the owner fixed
+— missions, statistics, list — and the grid only places the band; inside the tiles a sentence stops at `max-w-prose`. In that order:
 1. **«Le missioni di oggi»** (`missions/TodayMissions`): the day's three missions, one under the other, each with its
    mark (drawn, never pressed), «8 di 18» and a thin bar, and the summary «2 di 3» over those with something to do
    today. They are **computed in the web**, pure, by `missions/missions.ts` (`todayMissions`, `missionSummary`,
@@ -752,13 +753,15 @@ the tiles a sentence stops at `max-w-prose`. In that order:
    to Sunday from the server's today and `serie.ultimiGiorni`, seven boxes with «LMMGVSD», a day to come dotted, and the
    days before the first one the calendar holds `vuoto`, never missed; each state in words for a screen reader,
    `DAY_STATE_LABEL`), then the cards by state as three numbers in Newsreader with their names in Geist (a `dl`) and the
-   bar. From `xl` the band is the right column, about 300 to 400 px: `aside` adds the `xl:` classes that stack it as on a phone (the
-   week and «Tutti i progressi» at the column's width, the numbers at `text-3xl`). «Tutti i progressi», a link (44 px, full width on a phone), leads to `/studia/progressi`: the long calendar, the
+   bar. From `xl` the band is the right column, about 400 to 490 px: `aside` adds the `xl:` classes that stack it as on a phone (the
+   week and «Tutti i progressi» at the column's width, the numbers at `text-3xl`, the three states in columns as wide as
+   their words, so «In apprendimento» keeps one line). «Tutti i progressi», a link (44 px, full width on a phone), leads to `/studia/progressi`: the long calendar, the
    coming days and the subjects live there alone (G3 removed the «Il tuo mese» sheet, so no chart is drawn twice).
    **No text on «Oggi» or «Progressi» is under 11 px** (the stamp's date included; the compact stamp is the session's):
    `typeScale.test.tsx` reads the files of `missions/` and `progress/` and fails on a `text-[Npx]` under 11 or an SVG
    `<text>`. `CARD_STATES`, in `tokens.ts`, are the band's, the road's and the page's.
-3. **«Tutte le missioni»** (`missions/MissionList`): daily, weekly, long-term. What the web counts shows its state;
+3. **«Tutte le missioni»** (`missions/MissionList`): daily, weekly, long-term, without today's three, which item 1
+   shows just above («Le tre di oggi sono qui sopra», G6). What the web counts shows its state;
    what the server must record (a subject left for 7 days, writing a card, validating two — a validator's only, from the
    outlet's `validator` —, a short case, a week of streak) is listed with «In arrivo», with no count and nothing to tick.
 4. «Cosa ripassi», `SubjectChips` (the subject narrows the first mission's action and the session it starts, kept in
