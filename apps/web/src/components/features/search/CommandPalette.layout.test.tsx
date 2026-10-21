@@ -97,18 +97,34 @@ describe('CommandPalette — where it opens', () => {
 });
 
 describe('CommandPalette — the field and the steps', () => {
-  it('says under the field what it takes, and marks the step in use', async () => {
+  it('says under the field what it takes, and names the act chosen in the field: a crumb that goes back (R2)', async () => {
     asDesktop(true);
     const user = userEvent.setup();
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
 
     expect(screen.getByText('Scrivi una citazione: art. 2043 c.c., l. 241/1990, Cass. civ. 10787/2024')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Atto' })).toHaveAttribute('aria-current', 'step');
+    expect(screen.queryByRole('navigation', { name: 'Passi della ricerca' })).toBeNull();
 
     await user.click(screen.getByRole('option', { name: 'Codice civile · c.c.' }));
-    expect(screen.getByText('Articolo').parentElement).toHaveAttribute('aria-current', 'step');
-    expect(screen.getByRole('button', { name: 'Atto' })).not.toHaveAttribute('aria-current');
     expect(screen.getByText("Scrivi il numero dell'articolo: 2043, 1-bis")).toBeInTheDocument();
+    const crumb = screen.getByRole('button', { name: 'Torna indietro: Codice civile' });
+    expect(crumb).toHaveTextContent('Codice civile');
+    await user.click(crumb);
+    expect(screen.getByPlaceholderText(/art 2043 cc/i)).toBeInTheDocument();
+  });
+
+  it('goes back a step with Backspace on an empty field (R2)', async () => {
+    asDesktop(true);
+    const user = userEvent.setup();
+    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    await user.click(screen.getByRole('option', { name: 'Codice civile · c.c.' }));
+    const box = screen.getByRole('textbox', { name: "Numero dell'articolo" });
+    // «1» by default: the first Backspace empties it, the second goes back.
+    await user.click(box);
+    await user.keyboard('{End}{Backspace}');
+    expect(box).toHaveValue('');
+    await user.keyboard('{Backspace}');
+    expect(screen.getByPlaceholderText(/art 2043 cc/i)).toBeInTheDocument();
   });
 
   it('searches the article typed, as before', async () => {
@@ -237,8 +253,9 @@ describe('CommandPalette — the keys', () => {
     await user.keyboard('{Enter}');
 
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    // still on the first step: Enter did not reach cmdk's list
-    expect(screen.getByRole('button', { name: 'Atto' })).toHaveAttribute('aria-current', 'step');
+    // still on the first step: Enter did not reach cmdk's list (no act in the field's crumb)
+    expect(screen.getByPlaceholderText(/art 2043 cc/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Torna indietro/ })).toBeNull();
   });
 
   it('on a computer, the row chosen as it opens is the first act, favourites or not: Enter picks it', async () => {
@@ -250,7 +267,8 @@ describe('CommandPalette — the keys', () => {
     await waitFor(() => expect(screen.getByRole('option', { name: 'Costituzione · Cost.' })).toHaveAttribute('aria-selected', 'true'));
     await user.keyboard('{Enter}');
     // Costituzione asks for its article
-    expect(screen.getByText('Articolo').parentElement).toHaveAttribute('aria-current', 'step');
+    expect(screen.getByRole('button', { name: 'Torna indietro: Costituzione' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: "Numero dell'articolo" })).toBeInTheDocument();
   });
 
   it('tells a screen reader what the box was read as, a norm too', async () => {
@@ -315,5 +333,20 @@ describe('CommandPalette — on a phone, the order', () => {
     appStore.setState({ quickNorms: [], customAliases: [] });
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
     expect(optionNames()[0]).toBe('Costituzione · Cost.');
+  });
+});
+
+describe('CommandPalette — on a phone, the focus back (R2)', () => {
+  it('gives the focus back to what opened it as it closes: the sheet does not', () => {
+    asDesktop(false);
+    const opener = document.createElement('button');
+    document.body.append(opener);
+    opener.focus();
+    const { rerender } = render(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+    rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    expect(opener).not.toHaveFocus();
+    rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+    expect(opener).toHaveFocus();
+    opener.remove();
   });
 });

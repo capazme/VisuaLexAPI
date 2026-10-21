@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -15,6 +15,7 @@ vi.mock('../../../hooks/useTour', () => ({
 import { CommandPalette } from './CommandPalette';
 import { appStore } from '../../../store/useAppStore';
 import { isWorkspaceCovered } from '../../../utils/findWindowControl';
+import { subscribeSearchField, type SearchFieldRequest } from '../../../utils/searchFieldControl';
 
 /**
  * The palette parses the query on the client, against the ~40 acts in
@@ -68,7 +69,7 @@ describe('CommandPalette — act names the client does not carry', () => {
     expect(fetch).toHaveBeenCalledWith('/parse_query', expect.objectContaining({ method: 'POST' }));
 
     // Resolved: the hint flips from "completa" to "ricerca".
-    await waitFor(() => expect(screen.getByText(/Invio Ricerca/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Invio cerca/i)).toBeInTheDocument());
   });
 
   it('does not ask the server for a query the client already resolved', async () => {
@@ -82,7 +83,7 @@ describe('CommandPalette — act names the client does not carry', () => {
     // could have fired, and a slow typist (a loaded machine) could fire it on a half-typed query.
     await settle();
 
-    await waitFor(() => expect(screen.getByText(/Invio Ricerca/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Invio cerca/i)).toBeInTheDocument());
     // Scoped to /parse_query on purpose: the palette also fetches the alias
     // catalog on open, and that call is unrelated to citation resolution.
     expect(fetch).not.toHaveBeenCalledWith('/parse_query', expect.anything());
@@ -100,7 +101,7 @@ describe('CommandPalette — act names the client does not carry', () => {
 
     // A backend that stopped answering must not be silent (CLAUDE.md gotcha 18).
     await waitFor(() => expect(errors.length).toBeGreaterThan(0));
-    expect(screen.queryByText(/Invio Ricerca/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Invio cerca/i)).not.toBeInTheDocument();
   });
 });
 
@@ -125,7 +126,7 @@ describe('CommandPalette — the annex a citation names', () => {
 
     await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 1 tusl (All. A)');
     await settle();
-    await waitFor(() => expect(screen.getByText(/Invio Ricerca/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Invio cerca/i)).toBeInTheDocument());
     await user.keyboard('{Enter}');
 
     expect(onSearch).toHaveBeenCalledWith(expect.objectContaining({ act_number: '81', annex: 'A' }));
@@ -336,7 +337,7 @@ describe('CommandPalette — a decision named in the box', () => {
     // a norm query is answered by the server first, then the box turns into a decision
     await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 18 statuto dei lavoratori');
     await settle();
-    await waitFor(() => expect(screen.getByText(/Invio Ricerca/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Invio cerca/i)).toBeInTheDocument());
     await user.clear(screen.getByPlaceholderText(/art 2043 cc/i));
     await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'Cass. civ. 99999/2024');
     await user.keyboard('{Enter}');
@@ -363,7 +364,7 @@ describe('CommandPalette — a decision named in the box', () => {
     const user = userEvent.setup();
     renderPalette();
     await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 2043 cc');
-    await waitFor(() => expect(screen.getByText(/Invio Ricerca/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Invio cerca/i)).toBeInTheDocument());
     expect(screen.queryByText(/Sentenza →/)).toBeNull();
   });
 
@@ -534,13 +535,78 @@ describe('CommandPalette — sizes on a phone (the owner\'s pass of 20 October 2
     expect(sizes.filter((px) => px < 11)).toEqual([]);
   });
 
-  it('gives the steps «Atto» and «Articolo» and «Gestisci» 44 px on a phone, and names the close button', () => {
+  it('gives the crumb and «Gestisci» 44 px on a phone, and names the close button', async () => {
     appStore.setState({ quickNorms: [] });
     renderPalette();
-    const atto = screen.getByRole('button', { name: 'Atto' });
-    expect(atto).toHaveClass('min-h-[44px]', 'md:min-h-0');
-    expect(screen.getByText('Articolo').parentElement).toHaveClass('min-h-[44px]', 'md:min-h-0');
     expect(screen.getByRole('button', { name: 'Gestisci' })).toHaveClass('min-h-[44px]', 'md:min-h-0');
+    fireEvent.click(screen.getByRole('option', { name: 'Codice civile · c.c.' }));
+    expect(await screen.findByRole('button', { name: 'Torna indietro: Codice civile' })).toHaveClass('min-h-[44px]');
     expect(screen.getByRole('button', { name: 'Chiudi' })).toHaveClass('min-h-[44px]', 'min-w-[44px]');
+  });
+});
+
+describe('CommandPalette — the search page\'s field\'s rules, now its own (R2)', () => {
+  const original = appStore.getState();
+
+  it('waits for the server when Enter comes first, then searches the act it named', async () => {
+    const user = fakeTimeUser();
+    const onSearch = renderPalette();
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 18 statuto dei lavoratori{Enter}');
+    expect(onSearch).not.toHaveBeenCalled();
+    expect(screen.getByRole('status')).toHaveTextContent('la ricerca parte appena lo trovo');
+    await settle();
+    await waitFor(() => expect(onSearch).toHaveBeenCalledTimes(1));
+    expect(onSearch.mock.calls[0][0]).toMatchObject({ act_type: 'legge', act_number: '300', article: '18' });
+  });
+
+  it('a new Enter is needed once the words changed while it waited, even back to the same words', async () => {
+    const user = fakeTimeUser();
+    const onSearch = renderPalette();
+    const box = screen.getByPlaceholderText(/art 2043 cc/i);
+    await user.type(box, 'art 18 statuto dei lavoratori{Enter}');
+    await user.type(box, 'x{Backspace}');
+    await settle();
+    await waitFor(() => expect(screen.getByText(/Invio cerca/i)).toBeInTheDocument());
+    expect(onSearch).not.toHaveBeenCalled();
+  });
+
+  it('counts an alias once, when Enter runs it, not again as its steps are completed', async () => {
+    const trackAliasUsage = vi.fn();
+    appStore.setState({
+      trackAliasUsage,
+      customAliases: [
+        { id: 'a1', trigger: 'mioatto', expandTo: 'legge 241/1990', type: 'reference', searchParams: { act_type: 'legge', act_number: '241', date: '1990-08-07' }, usageCount: 0, createdAt: '' },
+      ],
+    } as never);
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ recognized: false }) })));
+    const user = fakeTimeUser();
+    const onSearch = renderPalette();
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'mioatto');
+    await settle();
+    await user.keyboard('{Enter}');
+    expect(trackAliasUsage).toHaveBeenCalledTimes(1);
+    await user.type(await screen.findByPlaceholderText(/^Articolo/i), '3{Enter}');
+    expect(onSearch).toHaveBeenCalledTimes(1);
+    expect(trackAliasUsage).toHaveBeenCalledTimes(1);
+    appStore.setState({ trackAliasUsage: original.trackAliasUsage, customAliases: original.customAliases } as never);
+  });
+
+  it('gives its words back to the field when it closes with no choice, and empties the field after one', async () => {
+    const heard: SearchFieldRequest[] = [];
+    const unsubscribe = subscribeSearchField((request) => heard.push(request));
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const { rerender } = render(<CommandPalette isOpen onClose={onClose} onSearch={vi.fn()} />);
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 2043 cc');
+    rerender(<CommandPalette isOpen={false} onClose={onClose} onSearch={vi.fn()} />);
+    expect(heard).toEqual([{ text: 'art 2043 cc', open: false }]);
+
+    rerender(<CommandPalette isOpen onClose={onClose} onSearch={vi.fn()} />);
+    await user.clear(screen.getByPlaceholderText(/art 2043 cc/i));
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 2043 cc{Enter}');
+    expect(onClose).toHaveBeenCalled();
+    rerender(<CommandPalette isOpen={false} onClose={onClose} onSearch={vi.fn()} />);
+    expect(heard.at(-1)).toEqual({ text: '', open: false });
+    unsubscribe();
   });
 });

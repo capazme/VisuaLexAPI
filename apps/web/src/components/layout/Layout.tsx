@@ -32,6 +32,7 @@ import { sectionStore } from '../../features/sections/useSection';
 import { MenuToggle, PhoneTopBar } from './PhoneTopBar';
 import { phoneBarTitle } from './phoneBarTitle';
 import { useHideOnScroll } from './useHideOnScroll';
+import { openSearchMenu } from '../../utils/searchFieldControl';
 import { PlannerHost } from '../features/planner/PlannerHost';
 
 export function Layout() {
@@ -157,7 +158,8 @@ export function Layout() {
 
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        openCommandPalette();
+        // The search page's field grows into the menu with its words; elsewhere the menu opens empty (R2).
+        openSearchMenu();
       }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'b') {
         e.preventDefault();
