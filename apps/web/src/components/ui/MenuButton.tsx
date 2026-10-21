@@ -1,12 +1,11 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Check, type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Z_INDEX } from '../../constants/zIndex';
 
 export interface MenuItem {
   label: string;
-  /** The click that chose it (a keyboard's has `detail` 0 and no pointer position). */
-  onSelect: (event: ReactMouseEvent<HTMLButtonElement>) => void;
+  onSelect: () => void;
   icon?: LucideIcon;
   danger?: boolean;
   disabled?: boolean;
@@ -157,7 +156,7 @@ export function MenuButton({ label, items, children, triggerClassName, align = '
                 aria-checked={item.checked}
                 disabled={item.disabled}
                 tabIndex={-1}
-                onClick={(event) => { close(true); item.onSelect(event); }}
+                onClick={() => { close(true); item.onSelect(); }}
                 className={cn(
                   'flex min-h-[44px] w-full items-center gap-2 px-3 py-2 text-left text-sm md:min-h-0',
                   'focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40',

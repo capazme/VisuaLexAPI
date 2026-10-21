@@ -161,25 +161,23 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   active section — from the address on `/studia/*`, `/forum`, `/merlt*`, `/grafo`, else the last one, kept in the
   browser under `visualex-section`, Opus by default; `SectionSwitcher`: the menu button at the top of the sidebar,
   `#tour-section-switcher`, on `ui/MenuButton` with `menuitemradio` entries, a dot for the Forum's news from
-  another section). **The section change** (S2, «la stampa a mezzatinta»): `chooseSection(id, origin)` plays
-  `sectionTransition.ts` — a canvas over the whole screen (`Z_INDEX.sectionTransition`, `pointer-events: none`, removed
-  at its end) where a halftone on a grid turned 45° prints the new section's hue (`--vlx-section-<id>` in `index.css`,
-  `sectionHue`) from the tap (`MenuItem.onSelect` receives the click; a key's click starts from the entry's middle), the
-  route changes under the full colour, and the page comes out through the holes of the same screen once its title is
-  there — the router renders a navigation in a transition, so the colour holds for it, at most 400 ms (`flushSync` would
-  not make it synchronous) —, then the title's ink dries (`vlx-ink-drying`); the geometry and the timing are pure in
-  `halftone.ts` (about 700 ms, kept a few frames under 750; sparser and shorter below 768 px). A frame's cost is the
-  wave's ring: the part already solid is one filled shape and its dots are not drawn (`solidRadiusWhileCovering`,
-  `openRadiusWhileRevealing`); a large screen draws a sparser grid (`MAX_DOTS`) on a canvas of at most
-  `MAX_CANVAS_PIXELS` (`canvasRatio`). A tap or a key during it brings it to its end (Enter, Space and Esc are taken,
-  so they do not press the switcher again); the browser's Back while the colour prints drops the change, with no
-  swap. The focus goes to the
+  another section). **The section change** (T1, which replaced S2's halftone on the owner's word, 21 October 2026: light, and never
+  over the page): `chooseSection(id)` plays `sectionTransition.ts`, a View Transition on `vlx-page` only (`index.css`) —
+  the content fades out in 100 ms, then the new one fades in rising by 5 px in 140 ms, `--ease-out`: 240 ms, no overlap,
+  nothing drawn over the screen; the root and the groups do not animate (a group's default 250 ms would outlast the
+  change, `theme.test.ts` checks the budget). The router renders a navigation in a transition (`flushSync` would not
+  make it synchronous), so the update waits for the new title, at most `HOLD_MAX` (150 ms), through a
+  `MutationObserver` — the browser draws no frame, so no `requestAnimationFrame`, while the update is pending. The
+  switcher's mark passes to the new hue in 200 ms (`transition-colors duration-200`), the change's one touch of colour;
+  the sidebar's new entries fade in, the first six 20 ms apart, the old ones simply go (`useEntriesEntrance`, Web
+  Animations, opacity only, never on the sidebar's first draw). A tap or a key during it brings it to its end
+  (`skipTransition`); a second choice ends the first. The focus goes to the
   new page's title unless the user moved it meanwhile: each section's home marks its heading
   `data-section-title="<section id>"` with `tabIndex={-1}` and `FOCUS_RING`, so a keyboard user sees where the focus
   went (Gymnasium's `h1`, the dossier list's `h1` — `opus` or
   `gymnasium` by the kind it lists, since the same element stays from one to the other —, «Dossier pubblici», the
-  MERL-T hub); a new home marks its own. Under reduced motion the page changes at once; where no canvas can be drawn,
-  the View Transition on `vlx-page`, held until the title is there. Choosing the section one is in goes to its home
+  MERL-T hub); a new home marks its own. Under reduced motion, or without View Transitions, the page changes at once
+  and nothing moves. Choosing the section one is in goes to its home
   with no change shown. The sidebar: the Corpus entries for everyone — «Ricerca»
   (a link to `/` that puts the cursor in the search page's field, `focusSearchField`, with no window over it —
   the owner, 13 Oct 2026; its hover label carries ⌘K, the palette; the quick norms' dot sits under it;
@@ -1636,7 +1634,7 @@ negative margins matching the parent padding, add `border-b border-current/10`,
 and raise it to `z-20`.
 
 **Stacking** — use the bands in `constants/zIndex.ts` (`pinnedBar` 35, `sidebar` 50, `lesson` 70 — Gymnasium's lesson over the shell —, `dock` 80 — the bar of practices —,
-overlay band 1000+, and `sectionTransition` 2000 over everything: the section change's canvas, which takes no click), never a bare literal. See gotcha 22 before assuming a
+overlay band 1000+), never a bare literal. See gotcha 22 before assuming a
 z-index will be honoured. An overlay above `findWindow` (110) that covers the
 workspace carries `aria-modal="true"` (a real modal dialog) or `data-find-overlay`,
 or Cmd/Ctrl+F opens the find window hidden under it.

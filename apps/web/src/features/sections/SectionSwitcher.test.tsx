@@ -106,22 +106,33 @@ describe('SectionSwitcher (spec S3)', () => {
   });
 
   it('goes to the home of the section it is in without a change to show', () => {
-    // jsdom has no canvas: the spy says whether a change asked for one at all.
-    const getContext = vi.spyOn(HTMLCanvasElement.prototype, 'getContext');
+    // The spy says whether a change asked the browser for a View Transition at all.
+    const start = vi.fn((update: () => Promise<void>) => {
+      void update();
+      return { finished: Promise.resolve(), skipTransition: vi.fn() };
+    });
+    Object.defineProperty(document, 'startViewTransition', { configurable: true, value: start });
     try {
       renderSwitcher('/studia/schede');
       fireEvent.click(trigger());
       fireEvent.click(screen.getByRole('menuitemradio', { name: /Gymnasium/ }));
       expect(screen.getByTestId('where')).toHaveTextContent('/studia/ripasso');
-      expect(getContext).not.toHaveBeenCalled();
+      expect(start).not.toHaveBeenCalled();
 
-      // Another section does ask for one: the spy would see a change start.
+      // Another section does ask for one.
       fireEvent.click(trigger());
       fireEvent.click(screen.getByRole('menuitemradio', { name: /Forum/ }));
-      expect(getContext).toHaveBeenCalledOnce();
+      expect(start).toHaveBeenCalledOnce();
     } finally {
-      getContext.mockRestore();
+      Reflect.deleteProperty(document, 'startViewTransition');
     }
+  });
+
+  it('changes the mark\'s colour in 200 ms, stilled under reduced motion (T1)', () => {
+    renderSwitcher('/forum');
+    const mark = trigger().querySelector('.vlx-section-mark');
+    expect(mark).toHaveAttribute('data-section', 'forum');
+    expect(mark).toHaveClass('transition-colors', 'duration-200', 'motion-reduce:transition-none');
   });
 
   it('draws no dot inside the Forum, where its own entry counts', () => {

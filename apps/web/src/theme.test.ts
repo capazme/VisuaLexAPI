@@ -429,35 +429,62 @@ describe('the scrollbars in dark mode', () => {
   }, 30000);
 });
 
-describe('the section change and Gymnasium\'s small motions (S2)', () => {
-  it('declares every section\'s hue, the wash, the wet ink and the mission inks in the light theme and in the dark one', () => {
-    // The halftone reads `--vlx-section-<id>` by name (`sectionHue`): an undeclared one would print nothing.
+describe('Gymnasium\'s small motions (S2)', () => {
+  it('declares every section\'s hue, the wash and the mission inks in the light theme and in the dark one', () => {
+    // The switcher's mark and Gymnasium's motions read `--vlx-section-<id>` by name: an undeclared one draws nothing.
     const source = readFileSync(CSS_PATH, 'utf8');
-    for (const name of ['opus', 'gymnasium', 'academia', 'forum'].map((id) => `--vlx-section-${id}`).concat('--vlx-gymnasium-wash', '--vlx-wet-ink', '--vlx-todo-ink', '--vlx-done-ink')) {
+    for (const name of ['opus', 'gymnasium', 'academia', 'forum'].map((id) => `--vlx-section-${id}`).concat('--vlx-gymnasium-wash', '--vlx-todo-ink', '--vlx-done-ink')) {
       expect(source.match(new RegExp(`${name}:`, 'g')) ?? [], name).toHaveLength(2);
     }
   });
 
-  it('compiles the lesson bar\'s spring, its delay, the head and the halftone\'s band', async () => {
+  it('compiles the lesson bar\'s spring, its delay and the head', async () => {
     const css = await compile([
       'motion-safe:ease-(--ease-catch)',
       'motion-safe:delay-[70ms]',
       'motion-safe:duration-150',
       'motion-safe:duration-300',
-      'z-[2000]',
       'vlx-lesson-head',
     ]);
     expect(css).toMatch(/transition-timing-function:\s*var\(--ease-catch\)/);
     expect(css).toMatch(/--ease-catch:\s*linear\(0,/);
     expect(css).toMatch(/transition-delay:\s*70ms/);
-    expect(css).toMatch(/z-index:\s*2000/);
     expect(css).toMatch(/\.vlx-lesson-head\s*\{\s*background:\s*var\(--vlx-gymnasium-wash\)/);
   }, 30000);
 
-  it('draws the drying ink, the inked mission and the landing digit, and stills them all under reduced motion', async () => {
+  it('draws the inked mission and the landing digit, and stills them under reduced motion', async () => {
     const css = await compile([]);
-    for (const name of ['vlx-ink-dry', 'vlx-ink-through', 'vlx-digit-land']) expect(css).toMatch(new RegExp(`@keyframes ${name}`));
+    for (const name of ['vlx-ink-through', 'vlx-digit-land']) expect(css).toMatch(new RegExp(`@keyframes ${name}`));
     const reduced = css.split('@media (prefers-reduced-motion: reduce)').slice(1).join(' ');
-    for (const rule of ['.vlx-ink-drying', '.vlx-mission-inking', '.vlx-digit-land']) expect(reduced).toContain(rule);
+    for (const rule of ['.vlx-mission-inking', '.vlx-digit-land']) expect(reduced).toContain(rule);
+  }, 30000);
+});
+
+describe('the section change (T1)', () => {
+  const ms = (css: string, rule: RegExp) => {
+    const match = css.match(rule);
+    expect(match, String(rule)).not.toBeNull();
+    return match!.slice(1).map(Number);
+  };
+
+  it('fades the page out, then in rising by a few pixels, in under 250 ms, with no overlap and nothing else moving', async () => {
+    const css = await compile([]);
+    const [out] = ms(css, /::view-transition-old\(vlx-page\)\s*\{\s*animation:\s*vlx-page-out\s+(\d+)ms/);
+    const [into, delay] = ms(css, /::view-transition-new\(vlx-page\)\s*\{\s*animation:\s*vlx-page-in\s+(\d+)ms\s+var\(--ease-out\)\s+(\d+)ms/);
+    expect(delay).toBeGreaterThanOrEqual(out);
+    expect(delay + into).toBeLessThan(250);
+    const [rise] = ms(css, /@keyframes vlx-page-in\s*\{\s*from\s*\{\s*opacity:\s*0;\s*translate:\s*0\s+(\d+)px/);
+    expect(rise).toBeGreaterThanOrEqual(4);
+    expect(rise).toBeLessThanOrEqual(6);
+    // The groups' default animation lasts 250 ms: it must not, or the change would outlast its budget.
+    expect(css).toMatch(/::view-transition-group\(root\),\s*::view-transition-group\(vlx-page\)\s*\{\s*animation:\s*none/);
+    const reduced = css.split('@media (prefers-reduced-motion: reduce)').slice(1).join(' ');
+    expect(reduced).toMatch(/::view-transition-new\(\*\)\s*\{\s*animation:\s*none\s*!important/);
+  }, 30000);
+
+  it('compiles the mark\'s colour change, 200 ms, and stills it under reduced motion', async () => {
+    const css = await compile(['transition-colors', 'duration-200', 'ease-out', 'motion-reduce:transition-none']);
+    expect(css).toMatch(/\.duration-200\s*\{[^}]*transition-duration:\s*200ms/);
+    expect(css).toMatch(/\.motion-reduce\\:transition-none\s*\{\s*@media \(prefers-reduced-motion: reduce\)\s*\{\s*transition-property:\s*none/);
   }, 30000);
 });

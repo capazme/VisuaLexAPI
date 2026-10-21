@@ -8,6 +8,7 @@ import { isMerltEnabled } from '../../features/merlt/featureFlag';
 import { isMerltGraphEnabled } from '../../features/merlt/graph/featureFlag';
 import { SectionSwitcher } from '../../features/sections/SectionSwitcher';
 import { useSection } from '../../features/sections/useSection';
+import { useEntriesEntrance } from '../../features/sections/useEntriesEntrance';
 import { useAppStore } from '../../store/useAppStore';
 import { focusSearchField } from '../../utils/searchFieldControl';
 import { useAuth } from '../../hooks/useAuth';
@@ -315,6 +316,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
   const quickNorms = useAppStore((s) => s.quickNorms);
   const { user, isAdmin, isValidator, logout } = useAuth();
   const { section, active } = useSection();
+  const sectionEntries = useEntriesEntrance(section);
   const { count: forumNotifications } = useForumNotifications(!!user);
   // Cronologia lives in the user menu (the owner, 13 Oct 2026); the saved norms that changed are
   // counted on the avatar and beside the entry («ok come raccomandi»).
@@ -456,8 +458,8 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
           <div className="-mt-1 ml-3 w-5 h-1 rounded-full bg-amber-500/60" title={`${quickNorms.length} preferiti`} />
         )}
         <NavItem to="/documents" icon={FileSearch} label="Analizza documento" onClick={closeMobile} layout={layout} />
-        {/* The active section's entries, after the Corpus ones above (sections spec S6). */}
-        <div role="group" aria-label={active.name} className="mt-1 flex w-full flex-col items-start gap-3 md:gap-2 border-t border-slate-100 dark:border-slate-800/50 pt-3 md:pt-2">
+        {/* The active section's entries, after the Corpus ones above (sections spec S6); a new section's fade in (T1). */}
+        <div ref={sectionEntries} role="group" aria-label={active.name} className="mt-1 flex w-full flex-col items-start gap-3 md:gap-2 border-t border-slate-100 dark:border-slate-800/50 pt-3 md:pt-2">
           {section === 'gymnasium' && (
             <>
               {/* Studying, then writing and validating (Gymnasium spec §4). */}

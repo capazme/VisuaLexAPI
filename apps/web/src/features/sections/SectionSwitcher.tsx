@@ -1,14 +1,6 @@
-import type { MouseEvent } from 'react';
 import { MenuButton } from '../../components/ui/MenuButton';
 import { cn } from '../../lib/utils';
 import { useSection } from './useSection';
-
-/** Where the entry was chosen: the pointer's place, or the entry's middle for a key (a click with `detail` 0). */
-function tapPoint(event: MouseEvent<HTMLButtonElement>): { x: number; y: number } {
-  if (event.detail > 0) return { x: event.clientX, y: event.clientY };
-  const box = event.currentTarget.getBoundingClientRect();
-  return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
-}
 
 /**
  * The switcher at the top of the sidebar, where the open book was (spec S3): the active section's
@@ -37,14 +29,15 @@ export function SectionSwitcher({ forumCount, onChoose, withName = false }: { fo
         icon: s.icon,
         checked: s.id === section,
         badge: s.id === 'forum' ? forumCount : undefined,
-        onSelect: (event) => {
-          chooseSection(s.id, tapPoint(event));
+        onSelect: () => {
+          chooseSection(s.id);
           onChoose?.();
         },
       }))}
     >
-      {/* The section's own hue lives only here and on page headers' hairline (spec 2026-10-18-redesign-inchiostro §4.1). */}
-      <span aria-hidden data-section={section} className="vlx-section-mark grid h-9 w-9 place-items-center rounded-[10px] text-white transition-colors">
+      {/* The section's own hue lives only here and on page headers' hairline (spec 2026-10-18-redesign-inchiostro §4.1).
+          On a change of section it passes to the new hue in 200 ms, the change's one touch of colour (T1). */}
+      <span aria-hidden data-section={section} className="vlx-section-mark grid h-9 w-9 place-items-center rounded-[10px] text-white transition-colors duration-200 ease-out motion-reduce:transition-none">
         <active.icon className="h-5 w-5" strokeWidth={1.75} />
       </span>
       {withName && (

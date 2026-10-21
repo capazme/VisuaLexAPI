@@ -7,7 +7,7 @@ import { useDevMode } from '../devMode/useDevMode';
 import { isStudiaEnabled } from '../studia/featureFlag';
 import type { DossierKind } from '../../types';
 import { SECTIONS, sectionForPath, type Section, type SectionId } from './sections';
-import { playSectionTransition, sectionHue } from './sectionTransition';
+import { playSectionTransition } from './sectionTransition';
 
 /**
  * The last section the user was in, kept in the browser (spec S1): no migration, and a new device
@@ -77,8 +77,7 @@ export function useSection() {
   const wanted = fromPath ?? stored;
   const section = sections.some((s) => s.id === wanted) ? wanted : 'opus';
 
-  /** `origin`: where the tap was, in the viewport; the halftone prints from there. */
-  const chooseSection = (id: SectionId, origin: { x: number; y: number } | null = null) => {
+  const chooseSection = (id: SectionId) => {
     finishRunning?.();
     finishRunning = null;
     const go = () => {
@@ -90,9 +89,9 @@ export function useSection() {
       go();
       return;
     }
-    // By hand under the colour: the app's BrowserRouter ignores navigate's `viewTransition` option, which needs a
-    // data router. The router renders the new page in a transition: the screen holds until its title is there.
-    finishRunning = playSectionTransition({ section: id, origin, color: sectionHue(id), swap: go });
+    // By hand: the app's BrowserRouter ignores navigate's `viewTransition` option, which needs a data router. The
+    // router renders the new page in a transition: the old page's picture holds until its title is there.
+    finishRunning = playSectionTransition({ section: id, swap: go });
   };
 
   return { section, active: SECTIONS.find((s) => s.id === section)!, sections, chooseSection };
