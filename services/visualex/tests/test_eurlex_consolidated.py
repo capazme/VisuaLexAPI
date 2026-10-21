@@ -207,6 +207,25 @@ class TestConsolidatedArticleText:
         assert text.startswith("Articolo 1")
         assert "Oggetto e finalità" in text
 
+    async def test_oj_missing_article_is_not_served_as_a_longer_number(self):
+        # "Articolo 17" starts with "Articolo 1": a page without art. 1 used to
+        # answer a request for it with art. 17 (inventory row 3.1).
+        soup = soup_of("gdpr_oj_trimmed.html")
+        soup.find("p", class_="oj-ti-art", string="Articolo 1").decompose()
+        with pytest.raises(DocumentNotFoundError):
+            await EurlexScraper().extract_article_text(soup, "1")
+        text17 = await EurlexScraper().extract_article_text(soup, "17")
+        assert text17.startswith("Articolo 17")
+
+    async def test_oj_missing_article_in_a_class_less_page(self):
+        # The legacy page reaches the eli-subdivision strategy last; the same
+        # guard holds there.
+        html = ('<html><body><div class="eli-subdivision">'
+                '<p>Articolo 17</p><p>Diritto alla cancellazione</p>'
+                '</div></body></html>')
+        with pytest.raises(DocumentNotFoundError):
+            await EurlexScraper().extract_article_text(BeautifulSoup(html, "html.parser"), "1")
+
     async def test_inline_amendment_markers_are_not_text(self):
         soup = soup_of("eprivacy_consolidated_20091219.html")
         scraper = EurlexScraper()
