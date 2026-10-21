@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode, type RefObject } from 'react';
+import { useEffect, useState, type ReactNode, type RefObject } from 'react';
 import { FloatingFocusManager, FloatingPortal, useFloating, useInteractions, useRole } from '@floating-ui/react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { X } from 'lucide-react';
@@ -33,6 +33,13 @@ export function Sheet({ title, onClose, initialFocusRef, closeOnEscape = false, 
   // `Modal`'s timing (spec §6.2), rising from the edge it lives on; under reduced motion a fade.
   const still = useReducedMotion();
   const panel = { duration: dur.panel, ease: ease.drawer };
+  // What had the focus as the sheet opened (the bar's magnifier, a row's button) gets it back as it closes. Taken
+  // while the sheet is first drawn: a field inside with `autoFocus` (the palette's box) takes the focus in the commit,
+  // before the focus manager records what had it, which then returned the focus to a field already gone — the body.
+  const [opener] = useState(() => {
+    const active = document.activeElement;
+    return active instanceof HTMLElement && active !== document.body ? active : null;
+  });
 
   // The page behind does not scroll under the sheet, as under `Modal`.
   useEffect(() => {
@@ -62,7 +69,7 @@ export function Sheet({ title, onClose, initialFocusRef, closeOnEscape = false, 
         aria-hidden
         onClick={closeOnBackdrop ? onClose : undefined}
       />
-      <FloatingFocusManager context={context} modal initialFocus={initialFocusRef ?? 0}>
+      <FloatingFocusManager context={context} modal initialFocus={initialFocusRef ?? 0} returnFocus={opener ? { current: opener } : true}>
         <motion.div
           // eslint-disable-next-line react-hooks/refs -- floating-ui exposes a stable setter, not a ref.current read
           ref={refs.setFloating}

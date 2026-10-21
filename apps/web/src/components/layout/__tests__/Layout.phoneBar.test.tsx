@@ -116,6 +116,16 @@ describe('Layout — the phone\'s bar and the keyboard', () => {
     expect(within(bar).getByRole('button', { name: 'Chiudi il menu' })).toHaveAttribute('aria-expanded', 'true');
   });
 
+  it('focuses the magnifier it opens the search menu from, which Safari\'s click does not, so the menu gives it back', () => {
+    const { bar } = page();
+    const lens = within(bar).getByRole('button', { name: 'Apri il menu di ricerca' });
+    // fireEvent's click, like Safari's, moves no focus.
+    fireEvent.click(lens);
+    expect(lens).toHaveFocus();
+    expect(appStore.getState().commandPaletteOpen).toBe(true);
+    act(() => appStore.getState().closeCommandPalette());
+  });
+
   it('parks the focus on a button a section\'s new title may still take', () => {
     const { bar } = page();
     expect(within(bar).getByRole('button', { name: 'Apri il menu' })).toHaveAttribute('data-focus-parked');

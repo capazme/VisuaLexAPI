@@ -294,7 +294,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   has one bar at the top. On the search page it is the field's bar (56 px below `lg`, 72 from it), with `MenuToggle`
   beside the field; on every other page `PhoneTopBar` (`layout/PhoneTopBar.tsx`): `MenuToggle` at the left (44 px, the
   services' dot), the page's name in Newsreader in the middle (`phoneBarTitle.ts`: the menu's word for the page, else
-  the section's name), the magnifier on the right, which opens the search menu (the palette); on the page's paper with a
+  the section's name), the magnifier on the right, which opens the search menu (the palette) and takes the focus on a
+  click (Safari's does not give it), so the menu gives it back as it closes; on the page's paper with a
   hairline, absolutely placed over the content area (`Z_INDEX.floating`), which starts under it (`pt-[calc(4.5rem+env(safe-area-inset-top))]`,
   repeated at `md`), and whose `scroll-padding-top` stops what the focus or an anchor scrolls to under it (WCAG 2.4.11).
   Below `md` it slides away scrolling down and comes back scrolling up or near the top (`useHideOnScroll`, which listens
@@ -416,7 +417,10 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   height of 36 px on a desktop and 44 px on a phone; `loading` keeps the label and puts a spinner in the
   icon's place (`aria-busy`), `status="error" | "success"` shows the outcome of the last press. `Modal`
   enters in `dur.panel` on `ease.drawer`, growing from 0.97, and `Sheet` rises from its edge on the same
-  timing (its «Chiudi» in ink-500, dark ink-400: over 3:1, since it is often the one way out); both only fade under reduced motion (`useReducedMotion`). `Toast` takes `spring.snappy`, rises
+  timing (its «Chiudi» in ink-500, dark ink-400: over 3:1, since it is often the one way out); both only fade under reduced motion (`useReducedMotion`).
+  `Sheet` gives the focus back to what had it as it opened, taken while it is first drawn: a field inside with
+  `autoFocus` (the palette's box) takes the focus before the focus manager records what had it, and the focus went to
+  the body as the sheet closed. `Toast` takes `spring.snappy`, rises
   from the edge it lives on and pauses its time while `document.hidden`; the undo toast's countdown lives
   in `useUndoableAction` and does not pause. One undo toast at a time: `showUndoToast` dismisses the one on
   screen (it resolves as kept) before it shows its own — two countdowns used to take turns on the one container,

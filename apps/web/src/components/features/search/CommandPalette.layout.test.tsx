@@ -87,6 +87,20 @@ describe('CommandPalette — where it opens', () => {
     expect(panel.className).toMatch(/top-16/);
   });
 
+  it('on a phone, gives the focus back to what opened it (the bar\'s magnifier) when it closes', async () => {
+    asDesktop(false);
+    const opener = document.createElement('button');
+    opener.textContent = 'Apri il menu di ricerca';
+    document.body.appendChild(opener);
+    opener.focus();
+    const { rerender } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    await waitFor(() => expect(document.activeElement).not.toBe(opener));
+
+    rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+    await waitFor(() => expect(opener).toHaveFocus());
+    opener.remove();
+  });
+
   it('on a phone, is a sheet with its «Chiudi», and shows no keys', () => {
     asDesktop(false);
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
