@@ -16,17 +16,21 @@ import { cn } from '../../lib/utils';
 import { Z_INDEX } from '../../constants/zIndex';
 import { FindWindow } from '../features/search/FindWindow';
 import { GlobalSearch } from '../features/search/GlobalSearch';
-import { SearchField, SEARCH_BAR_HEIGHT } from '../features/search/SearchField';
+import { SearchField } from '../features/search/SearchField';
 import { closeFindWindow, isWorkspaceCovered, openFindWindow } from '../../utils/findWindowControl';
 const CompareView = lazy(() => import('../features/compare/CompareView').then(m => ({ default: m.CompareView })));
 import { useTour } from '../../hooks/useTour';
 import { useConsentIfProvided } from '../../features/merlt/consent/useConsent';
 import { useAuth } from '../../hooks/useAuth';
 import { useServiceHealth } from '../../hooks/useServiceHealth';
-import { ServiceHealthDot } from '../ui/ServiceHealthMenuEntry';
 import { serviceHealthLabel, serviceHealthNeedsNotice } from '../../utils/serviceHealth';
 import { PluginSlot } from '../../plugins/PluginSlot';
 import { spring } from '../../lib/motion';
+import { SECTIONS, sectionForPath } from '../../features/sections/sections';
+import { sectionStore } from '../../features/sections/useSection';
+import { MenuToggle, PhoneTopBar } from './PhoneTopBar';
+import { phoneBarTitle } from './phoneBarTitle';
+import { useHideOnScroll } from './useHideOnScroll';
 
 export function Layout() {
   const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel, openCommandPalette } = useAppStore(useShallow(s => ({
@@ -59,14 +63,23 @@ export function Layout() {
   // The search page's field sits above its content, outside the scroller, so it is always on screen
   // (spec 2026-10-13-fixed-search-design.md); Focus mode hides it, ⌘K still opens the palette.
   const showSearchBar = onSearchPage && !settings.focusMode;
-  // Below lg the menu button floats at the top left over the content: every page starts under it,
-  // except the search page, whose field sits beside it.
-  const headerBesideMenuButton = onSearchPage;
+  // Below lg a bar sits at the top of every page (M1): the search page's is its field, with the menu button beside it;
+  // every other page has `PhoneTopBar` over its content area, and starts under it. Focus mode draws neither.
+  const showPhoneBar = !onSearchPage && !settings.focusMode;
+  const storedSection = sectionStore((s) => s.section);
+  const sectionName = SECTIONS.find((s) => s.id === (sectionForPath(pathname) ?? storedSection))?.name ?? 'VisuaLex';
+  const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
+  const phoneBar = useHideOnScroll(scroller, { enabled: showPhoneBar && !sidebarOpen, resetKey: pathname });
   // The services' probe, once for both copies of the sidebar and running with the menu closed (S1): its
   // status is the user menu's «Stato dei servizi», and a fault is a dot on the user button and, on a
   // phone, on the button that opens the drawer, whose names say it.
   const serviceHealth = useServiceHealth();
   const servicesNotice = serviceHealthNeedsNotice(serviceHealth.snapshot.overall);
+  const menuToggle = {
+    open: sidebarOpen,
+    onToggle: () => setSidebarOpen(!sidebarOpen),
+    notice: servicesNotice ? serviceHealthLabel(serviceHealth.snapshot.overall).toLowerCase() : undefined,
+  };
 
   // Leaving the search page closes the window: its matches are in practices no longer on screen.
   useEffect(() => {
@@ -227,10 +240,17 @@ export function Layout() {
       )}
 
       <main
-        // `isolate`: a stacking context of its own, as it has always been (gotcha 22).
-        className="isolate flex-1 flex flex-col min-w-0 h-full overflow-hidden relative"
-        // The practice's columns (`h-app-row`) are the viewport less this bar.
-        style={showSearchBar ? { ['--search-bar-height' as string]: SEARCH_BAR_HEIGHT } : undefined}
+        className={cn(
+          // `isolate`: a stacking context of its own, as it has always been (gotcha 22).
+          'isolate flex-1 flex flex-col min-w-0 h-full overflow-hidden relative',
+          // The practice's columns (`h-app-row`) are the viewport less the search bar: 56 px below lg (and the iPhone's
+          // top edge), 72 from it.
+          showSearchBar && '[--search-bar-height:calc(3.5rem+env(safe-area-inset-top))] lg:[--search-bar-height:4.5rem]',
+          // Where a page's sticky row pins (`top-[var(--phone-bar-offset,0px)]`, «Le mie schede»'s filters): under the
+          // phone's bar while it is on screen, at the top once it has slid away, and at the top from lg.
+          showPhoneBar && 'max-lg:[--phone-bar-offset:calc(3.5rem+env(safe-area-inset-top))]',
+          showPhoneBar && phoneBar.hidden && 'max-md:[--phone-bar-offset:0px]',
+        )}
       >
         {/* Floating Focus Toggle */}
         <motion.button
@@ -240,6 +260,8 @@ export function Layout() {
           id="tour-focus-toggle"
           className={cn(
             'hidden md:block fixed top-4 right-4 z-50 p-2.5 rounded-xl transition-colors',
+            // Between md and lg it sits inside the bar's right end, centred on its 56 px.
+            !settings.focusMode && 'max-lg:right-1 max-lg:top-[calc(env(safe-area-inset-top)+0.4375rem)]',
             'shadow-sm border',
             settings.focusMode
               ? 'bg-primary-600 text-white border-transparent hover:bg-primary-700'
@@ -250,46 +272,41 @@ export function Layout() {
           {settings.focusMode ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
         </motion.button>
 
-        {/* Mobile Menu Button */}
-        {!settings.focusMode && (
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            aria-label={`${sidebarOpen ? 'Chiudi il menu' : 'Apri il menu'}${servicesNotice ? `, ${serviceHealthLabel(serviceHealth.snapshot.overall).toLowerCase()}` : ''}`}
-            aria-expanded={sidebarOpen}
-            className="lg:hidden fixed top-4 left-4 z-50 p-2.5 rounded-xl backdrop-blur-xl shadow-lg bg-white/80 dark:bg-slate-900/80 text-slate-600 dark:text-slate-300 border border-slate-200/50 dark:border-slate-700/50"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <line x1="3" y1="12" x2="21" y2="12" />
-              <line x1="3" y1="6" x2="21" y2="6" />
-              <line x1="3" y1="18" x2="21" y2="18" />
-            </svg>
-            {servicesNotice && <ServiceHealthDot className="absolute right-1.5 top-1.5" />}
-          </motion.button>
+        {showPhoneBar && (
+          <PhoneTopBar
+            menu={menuToggle}
+            title={phoneBarTitle(pathname, sectionName)}
+            hidden={phoneBar.hidden}
+            onReveal={phoneBar.reveal}
+            onSearch={openCommandPalette}
+          />
         )}
 
         {showSearchBar && (
           <div
             data-testid="search-bar"
-            style={{ height: SEARCH_BAR_HEIGHT }}
-            // Below lg the menu button floats at the top left: the field starts beside it. From md the
-            // Focus toggle floats at the top right: the field ends before it. Positioned in the dropdown
-            // band, so the line under the field paints over the practice's sticky headings (its blur
-            // makes the bar a stacking context, gotcha 22) and under the floating buttons.
-            className={cn('relative flex flex-shrink-0 items-center justify-center border-b', Z_INDEX.dropdown, 'border-slate-200 bg-white/80 pl-[4.5rem] pr-4 backdrop-blur-xl md:pr-[4.5rem] lg:pl-8 dark:border-slate-800 dark:bg-slate-900/80')}
+            // The phone's bar on this page (M1): 56 px below lg, the menu button beside the field and the iPhone's top
+            // edge above it; 72 px from lg. From md the Focus toggle floats at the top right: the field ends before it.
+            // Positioned in the dropdown band, so the line under the field paints over the practice's sticky headings
+            // (its blur makes the bar a stacking context, gotcha 22) and under the floating buttons.
+            className={cn(
+              'relative flex h-[var(--search-bar-height)] flex-shrink-0 items-center justify-center gap-1 border-b', Z_INDEX.dropdown,
+              'border-slate-200 bg-white/80 pl-1 pr-4 pt-[env(safe-area-inset-top)] backdrop-blur-xl md:pr-[3.25rem] lg:pl-8 lg:pr-[4.5rem] lg:pt-0 dark:border-slate-800 dark:bg-slate-900/80',
+            )}
           >
+            <MenuToggle {...menuToggle} />
             <SearchField />
           </div>
         )}
 
         {/* Content Area. `vlx-page`: the one part a section change's View Transition animates (index.css, T1); the
             sidebar, the floating buttons and the search bar stay still. */}
-        <div className="vlx-page flex-1 overflow-y-auto w-full h-full">
+        <div ref={setScroller} className="vlx-page flex-1 overflow-y-auto w-full h-full">
           <div data-testid="layout-content" className={cn(
             'max-w-7xl mx-auto p-4 md:p-8',
-            // The button is about 42 px from top-4: 4.5rem clears it (md: again, or md:p-8 wins).
-            !settings.focusMode && !headerBesideMenuButton && 'pt-[4.5rem] md:pt-[4.5rem] lg:pt-8',
+            // Under the phone's bar, 56 px and the iPhone's top edge, with the page's 16 px of air (md: again, or
+            // md:p-8 wins).
+            showPhoneBar && 'pt-[calc(4.5rem+env(safe-area-inset-top))] md:pt-[calc(4.5rem+env(safe-area-inset-top))] lg:pt-8',
             settings.focusMode && 'max-w-4xl py-12'
           )}>
             <Outlet />
