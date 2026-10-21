@@ -94,9 +94,7 @@ export function Layout() {
   useEffect(() => {
     if (!sidebarOpen || !drawerDrawn) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || e.defaultPrevented) return;
-      // Two queries: jsdom's selector engine misses `[data-find-overlay]` after `[aria-modal="true"]` in one list.
-      if (document.querySelector('[aria-modal="true"]') || document.querySelector('[data-find-overlay]')) return;
+      if (e.key !== 'Escape' || e.defaultPrevented || isWorkspaceCovered()) return;
       e.preventDefault();
       setSidebarOpen(false);
       menuToggleRef.current?.focus({ preventScroll: true });

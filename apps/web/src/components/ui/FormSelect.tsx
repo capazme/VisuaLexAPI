@@ -48,8 +48,8 @@ export const FormSelect = forwardRef<HTMLSelectElement, FormSelectProps>(
     };
 
     const sizeStyles = {
-      // 16 px below md on every size: Safari on an iPhone zooms into a smaller select (`FIELD_TEXT`).
-      sm: 'py-1.5 text-base md:text-xs',
+      // At least 16 px below md on every size: Safari on an iPhone zooms into a smaller select (`FIELD_TEXT`).
+      sm: 'py-1.5 text-[length:max(1rem,16px)] md:text-xs',
       md: cn('py-2.5', FIELD_TEXT),
       lg: 'py-3 text-base',
     };

@@ -1953,11 +1953,14 @@ re-applying a saturated background behind the text.
 `TOUCH_TARGET_RESPONSIVE` in `constants/interactions.ts` covers the height only
 (`min-h-[44px] md:min-h-0`); icon-only buttons need the width too, so they carry
 `min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0` explicitly — as the dossier
-row's star and remove buttons do. A text field or a select is 16 px below `md`
-(`FIELD_TEXT`, `text-base md:text-sm`, in `constants/interactions.ts`): Safari on an
-iPhone zooms the page into a field under 16 px as it takes the focus. `ui/Input` and
-`ui/FormSelect` carry it; a field written by hand takes it (the searches of «Le mie
-schede» and of the Cronologia; `ui/__tests__/fieldText.test.tsx`).
+row's star and remove buttons do. A text field or a select is at least 16 px below
+`md` (`FIELD_TEXT`, `text-[length:max(1rem,16px)] md:text-sm`, in `constants/interactions.ts`):
+Safari on an iPhone zooms the page into a field under 16 px as it takes the focus, and
+`text-base` is not enough — the text size «piccolo» makes 1 rem 14 px. `ui/Input` and
+`ui/FormSelect` carry it, and so do the searches of «Le mie schede» and of the Cronologia
+(`ui/__tests__/fieldText.test.tsx`); many fields written by hand do not yet (the find
+window, the dossier's search, the index filter, the case-law filters, the dossier pickers,
+the notes): a field written by hand takes it, and a `text-*` class after it in `cn` undoes it.
 
 ## Common Patterns
 
