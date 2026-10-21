@@ -26,7 +26,7 @@ from visualex_api.tools.norma import Norma, NormaVisitata
 from visualex_api.services.normattiva_scraper import NormattivaScraper
 from visualex_api.services.eurlex_scraper import EurlexScraper
 from visualex_api.services.pdfextractor import extract_pdf, cleanup_browser_pool, is_allowed_pdf_urn
-from visualex_api.services.akn_parser import normalize_article_key
+from visualex_api.services.akn_parser import comparable_article_key
 from visualex_api.services import act_dates, massimario_portal
 from visualex_api.services.normattiva_validity import (
     read_validity,
@@ -631,7 +631,9 @@ class NormaController:
         a bare act URL is also accepted, for the tree-only path.
 
         Article numbers are canonicalised on both sides with the AKN parser's
-        `normalize_article_key`: the tree API and the scraper disagree on the
+        `comparable_article_key` (`normalize_article_key`, with an ordinal split in
+        two words joined: the tree's "135 sex decies" is the request's
+        "135-sexdecies"): the tree API and the scraper disagree on the
         separator ("1-bis" vs "1 bis"). That normaliser reads the ordinal from
         the shared table in `tools/article_suffixes.py` and falls back to "any
         alphabetic tail" for anything the table does not list, which is
@@ -666,19 +668,19 @@ class NormaController:
             index = await fetch_act_index(norma)
             if index is not None:
                 log.info("Tree unusable, answered from the AKN index", **log_ctx)
-                wanted = normalize_article_key(article)
-                return any(normalize_article_key(k) == wanted for k in index.keys)
+                wanted = comparable_article_key(article)
+                return any(comparable_article_key(k) == wanted for k in index.keys)
             log.warning("Tree unusable and no AKN index, skipping existence check",
                         **log_ctx)
             return None
 
-        wanted = normalize_article_key(article)
+        wanted = comparable_article_key(article)
         for entry in articles:
             if not isinstance(entry, dict):
                 continue  # section/annex labels are bare strings
             if annex is not None and str(entry.get('allegato') or '') != str(annex):
                 continue
-            if normalize_article_key(entry.get('numero', '')) == wanted:
+            if comparable_article_key(entry.get('numero', '')) == wanted:
                 return True
         return False
 
@@ -700,10 +702,10 @@ class NormaController:
         articles = tree_result[0] if isinstance(tree_result, (tuple, list)) and len(tree_result) == 3 else tree_result
         if isinstance(articles, str) or not articles:
             return ''
-        wanted = normalize_article_key(article)
+        wanted = comparable_article_key(article)
         parts = []
         for entry in articles:
-            if not isinstance(entry, dict) or normalize_article_key(entry.get('numero', '')) != wanted:
+            if not isinstance(entry, dict) or comparable_article_key(entry.get('numero', '')) != wanted:
                 continue
             part = str(entry.get('allegato') or '')
             if part != str(annex) and part not in parts:

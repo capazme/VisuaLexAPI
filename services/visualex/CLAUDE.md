@@ -45,7 +45,14 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     the fingerprints a codice's in-memory index is a few hundred KB.
     `AKN_ENABLED=false` disables the whole path and is read at call time.
     `normalize_article_key` in `akn_parser.py` is the pure canonicaliser for
-    article numbers and needs no network.
+    article numbers and needs no network; `comparable_article_key` is the same with an
+    ordinal split in two words joined («135 sex decies», as the tree and the codice del
+    consumo's export write it, is «135-sexdecies»), for comparing two spellings only —
+    the keys `/fetch_rubriche` and the fingerprints answer keep the split. A component
+    act's rubrica is read in brackets, or, in a part that writes them in brackets,
+    without them when an amendment rewrote it so (`_unbracketed_rubrica`; the codice
+    civile: 2840 of 3249 before, 3039 since 21 October 2026, the rest repealed, notices, or
+    articles with no rubrica).
   - `normattiva_validity.py` — what a Normattiva article page says about its own
     validity: the window ("Testo in vigore dal … al …"), the version number, the
     act's last update, and a state (`current`, `historical`, `not_yet`,
