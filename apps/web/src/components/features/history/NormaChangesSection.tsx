@@ -59,7 +59,7 @@ export function NormaChangesSection({ onOpen }: NormaChangesSectionProps) {
   return (
     <section
       aria-labelledby="norma-changes-title"
-      className="mb-4 rounded-lg border border-amber-200 bg-amber-50/60 shadow-sm dark:border-amber-900/40 dark:bg-amber-950/20"
+      className="rounded-lg border border-amber-200 bg-amber-50/60 shadow-sm dark:border-amber-900/40 dark:bg-amber-950/20"
     >
       <div className="flex items-center justify-between gap-3 border-b border-amber-200/70 px-4 py-3 dark:border-amber-900/40">
         <h2 id="norma-changes-title" className="flex items-center gap-2 font-bold text-slate-900 dark:text-white">

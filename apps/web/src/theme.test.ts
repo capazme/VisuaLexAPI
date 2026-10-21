@@ -7,6 +7,7 @@ import { ACTIVE, FOCUS_RING, HIDDEN_SCROLLBAR, HOVER_LIFT, TRANSITION } from './
 import { subjectHue } from './components/features/studia/progress/tokens';
 import { MATERIA_LABEL } from './components/features/studia/studiaLabels';
 import type { Materia } from './types/studia';
+import { FOCUS_BUTTON_CLEARANCE } from './components/layout/PageFrame';
 
 /**
  * Tailwind failures are silent: a class whose token the theme never declares
@@ -41,6 +42,14 @@ describe('the primary colour scale', () => {
     expect(css).toContain('.bg-primary');
     expect(css).toContain('.ring-ring');
     expect(css).toContain('.bg-background');
+  }, 30000);
+});
+
+describe('the page frame (W2)', () => {
+  it('compiles the room a header leaves for the Focus button, from `lg`', async () => {
+    const css = await compile([FOCUS_BUTTON_CLEARANCE]);
+    expect(css).toMatch(/padding-right:\s*clamp\(0px,\s*calc\(2\.625rem - \(100vw - var\(--sidebar-width,\s*0px\) - 80rem\) \/ 2\),\s*2\.625rem\)/);
+    expect(css).toContain('@media (width >= 64rem)');
   }, 30000);
 });
 

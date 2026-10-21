@@ -35,7 +35,7 @@ import { actsSummary, layoutDossier } from './dossierLayout';
 import { deleteDossierMessage, deleteDossierWithUndo } from './deleteDossierWithUndo';
 import { hasTagCategory, tagCategories, tagLabel } from '../../../utils/tagLabel';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
-import { FOCUS_RING } from '../../../constants/interactions';
+import { PageFrame } from '../../layout/PageFrame';
 
 type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -255,10 +255,13 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
   };
 
   return (
-    <div className="animate-in fade-in duration-200">
-      <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 mb-6">
-        <h1 data-section-title={sectionKind === 'studio' ? 'gymnasium' : 'opus'} tabIndex={-1} className={`${FOCUS_RING} rounded-sm font-serif text-3xl font-medium tracking-tight text-slate-900 dark:text-slate-50`}>{sectionKind ? `I tuoi ${kindLabel(sectionKind).toLowerCase()}` : 'I tuoi Dossier'}</h1>
-        <div className="flex gap-2">
+    <PageFrame
+      title={sectionKind ? `I tuoi ${kindLabel(sectionKind).toLowerCase()}` : 'I tuoi Dossier'}
+      // The same element from one kind to the other: the switcher's focus lands on it for Opus and for Gymnasium.
+      section={sectionKind === 'studio' ? 'gymnasium' : 'opus'}
+      className="animate-in fade-in duration-200"
+      action={
+        <>
           {trashCount > 0 && onOpenTrash && (
             <button
               type="button"
@@ -286,8 +289,9 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
           >
             <FolderPlus size={20} /> Nuovo Dossier
           </button>
-        </div>
-      </div>
+        </>
+      }
+    >
 
       <input
         ref={fileInputRef}
@@ -300,7 +304,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
 
       {/* The search, then the two menus: one row on a computer; on a phone the search on its own row and the
           menus side by side under it, half each (D1). */}
-      <div className="mb-6 flex flex-col md:flex-row gap-3 md:gap-4">
+      <div className="flex flex-col md:flex-row gap-3 md:gap-4">
         <div id="tour-dossier-search" className="relative flex-1 min-w-0 md:min-w-[14rem]">
           <Search size={18} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
@@ -562,6 +566,6 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
           onConfirm={handleConfirmJsonImport}
         />
       )}
-    </div>
+    </PageFrame>
   );
 }

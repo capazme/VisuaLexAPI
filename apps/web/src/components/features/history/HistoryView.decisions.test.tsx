@@ -50,11 +50,12 @@ describe('HistoryView — decisions', () => {
     expect(screen.getByTestId('where').textContent).toBe('/');
   });
 
-  it('names the page with an h1 (one per breakpoint, the other hidden by CSS)', async () => {
+  it('names the page with one h1 in the sections\' frame, with one search field (W2)', async () => {
     getHistory.mockResolvedValue([norm]);
     mount();
     await screen.findAllByText(/Art\. 3/);
-    expect(screen.getAllByRole('heading', { level: 1 }).map((h) => h.textContent?.trim())).toEqual(['Cronologia', 'Cronologia Ricerche']);
+    expect(screen.getAllByRole('heading', { level: 1 }).map((h) => h.textContent?.trim())).toEqual(['Cronologia']);
+    expect(screen.getAllByRole('textbox', { name: 'Cerca nella cronologia' })).toHaveLength(1);
   });
 
   it('leaves a norm row as it was', async () => {
