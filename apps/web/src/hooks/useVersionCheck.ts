@@ -7,13 +7,17 @@ import {
   VERSION_FETCH_TIMEOUT,
   compareVersions,
   type VersionInfo,
-  type ChangelogEntry,
 } from '../config/versionConfig';
+import { hasReleaseNote } from '../content/novita/releaseNotes';
 
 interface UseVersionCheckState {
   currentVersion: string | null;
   hasNewVersion: boolean;
-  changelog: ChangelogEntry[];
+  /**
+   * The version this browser last saw, when it differs from the current one: the window lists the notes
+   * after it (`newsSince`). Null on a first visit and when nothing is new.
+   */
+  lastSeenVersion: string | null;
   isLoading: boolean;
   error: string | null;
 }
@@ -30,15 +34,18 @@ interface UseVersionCheckReturn extends UseVersionCheckState {
  * Behavior:
  * - Fetches /version on mount
  * - First visit: saves version silently (no notification)
- * - New version detected: sets hasNewVersion = true
- * - dismissNotification: saves current version to localStorage
+ * - New version detected: sets hasNewVersion = true and keeps the version last seen
+ * - The text of the news is the web's own (`content/novita/`); /version gives only the number
+ * - dismissNotification: saves current version to localStorage, only when this bundle has its note: a tab
+ *   from before a deploy is told the new number but carries the old notes, and the note must still be shown
+ *   once the page is reloaded
  * - Throttled: won't check more than once per session within throttle window
  */
 export function useVersionCheck(): UseVersionCheckReturn {
   const [state, setState] = useState<UseVersionCheckState>({
     currentVersion: null,
     hasNewVersion: false,
-    changelog: [],
+    lastSeenVersion: null,
     isLoading: true,
     error: null,
   });
@@ -76,7 +83,7 @@ export function useVersionCheck(): UseVersionCheckReturn {
           setState({
             currentVersion: data.version,
             hasNewVersion: false,
-            changelog: data.changelog || [],
+            lastSeenVersion: null,
             isLoading: false,
             error: null,
           });
@@ -89,7 +96,7 @@ export function useVersionCheck(): UseVersionCheckReturn {
         setState({
           currentVersion: data.version,
           hasNewVersion: isNewer,
-          changelog: data.changelog || [],
+          lastSeenVersion: isNewer ? lastSeenVersion : null,
           isLoading: false,
           error: null,
         });
@@ -113,7 +120,7 @@ export function useVersionCheck(): UseVersionCheckReturn {
   }, []);
 
   const dismissNotification = useCallback(() => {
-    if (state.currentVersion) {
+    if (state.currentVersion && hasReleaseNote(state.currentVersion)) {
       localStorage.setItem(VERSION_STORAGE_KEY, state.currentVersion);
     }
     setState((s) => ({ ...s, hasNewVersion: false }));
