@@ -48,6 +48,7 @@ from visualex_api.services.decisions.resolver import (
     sweep_decision_caches,
 )
 from visualex_api.tools.urngenerator import complete_request_date, pdf_cache_path
+from visualex_api.tools.cache_manager import prune_normattiva_cache
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import article_input_error, parse_article_input, normalize_act_type
 from visualex_api.tools.map import codice_urn, extract_codice_details
@@ -192,7 +193,7 @@ class NormaController:
         self.app = Quart(__name__)
         self.app = cors(self.app, allow_origin=ALLOWED_ORIGINS)
         self.fetch_queue = RateLimitedTaskQueue(FETCH_QUEUE_WORKERS, FETCH_QUEUE_DELAY)
-        self._decision_sweep: asyncio.Task | None = None
+        self._cache_sweep: asyncio.Task | None = None
 
         # Middleware per registrare il tempo di inizio della richiesta
         self.app.before_request(self.record_start_time)
@@ -211,27 +212,32 @@ class NormaController:
 
     async def start_background_services(self):
         await self.fetch_queue.start()
-        self._decision_sweep = asyncio.create_task(self._sweep_decision_caches())
+        self._cache_sweep = asyncio.create_task(self._sweep_caches())
         log.info("Background services started")
 
     async def stop_background_services(self):
         await self.fetch_queue.stop()
-        if self._decision_sweep is not None:
-            self._decision_sweep.cancel()
-            await asyncio.gather(self._decision_sweep, return_exceptions=True)
-            self._decision_sweep = None
+        if self._cache_sweep is not None:
+            self._cache_sweep.cancel()
+            await asyncio.gather(self._cache_sweep, return_exceptions=True)
+            self._cache_sweep = None
         await cleanup_browser_pool()
         log.info("Background services stopped and browser pool cleaned up")
 
-    async def _sweep_decision_caches(self):
+    async def _sweep_caches(self):
         """Expired court-decision cache entries are deleted at start and then every
         DECISION_CACHE_SWEEP_SECONDS: the filesystem cache deletes one only when its key is
-        read again. A failed sweep is logged and the next one runs on time."""
+        read again. The Normattiva pages are pruned on the same beat (cache_manager's rule).
+        A failed sweep is logged and the next one runs on time."""
         while True:
             try:
                 await sweep_decision_caches()
             except Exception:
                 log.exception("Decision cache sweep failed")
+            try:
+                await prune_normattiva_cache()
+            except Exception:
+                log.exception("Normattiva cache prune failed")
             await asyncio.sleep(DECISION_CACHE_SWEEP_SECONDS)
 
 
