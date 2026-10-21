@@ -203,6 +203,28 @@ describe('CaseLawSection — «Cerca sentenze sul tema dell’articolo»', () =>
     }
   });
 
+  it('is not offered for a generic rubric, which alone would find every act\'s decisions', async () => {
+    for (const topic of [
+      'Definizioni', 'OGGETTO.', ' Ambito di applicazione ', 'Entrata in vigore', 'Abrogazioni', 'Finalita',
+      'Oggetto e ambito di applicazione', 'Finalità e oggetto', 'Definizioni e ambito di applicazione.', 'Abrogazione',
+    ]) {
+      const view = show({ topic });
+      await userEvent.click(toggle());
+      expect(topicLink(), topic).toBeNull();
+      // the rest of the section stays
+      expect(screen.getByRole('button', { name: 'Cerca nell’archivio della Cassazione' })).toBeInTheDocument();
+      view.unmount();
+      window.sessionStorage.clear();
+    }
+  });
+
+  it('is offered for a rubric that only starts like a generic one', async () => {
+    show({ topic: 'Oggetto del contratto' });
+    await userEvent.click(toggle());
+    await userEvent.click(topicLink()!);
+    expect(openTopicSearch).toHaveBeenCalledExactlyOnceWith({ tema: 'Oggetto del contratto' }, 'Tema: Oggetto del contratto', { besideId: 'tab-1' });
+  });
+
   it('is not offered on an act of the Union, whose case law is not the Cassazione\'s', async () => {
     show({ topic: 'Liceità del trattamento', norma: { tipo_atto: 'regolamento ue', data: '2016', numero_atto: '679', numero_articolo: '6' } });
     await userEvent.click(toggle());

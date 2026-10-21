@@ -11,6 +11,7 @@ import { clearDecisionCache } from '../utils/decisionFetchCache';
 import { clearDecisionSearchCache } from '../utils/decisionSearchCache';
 import { clearEuCaseLawCache } from '../utils/euCaseLawCache';
 import { clearArticleCardsCache } from '../utils/articleCardsCache';
+import { clearConsentRead } from '../features/merlt/consent/consentRead';
 
 interface AuthState {
   user: UserResponse | null;
@@ -149,6 +150,7 @@ export function useAuth() {
     clearDecisionSearchCache();
     clearEuCaseLawCache();
     clearArticleCardsCache();
+    clearConsentRead();
     setState({
       user: null,
       loading: false,

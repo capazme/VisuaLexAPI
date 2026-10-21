@@ -317,6 +317,50 @@ describe('«Da validare», the queue', () => {
     );
     expect(await screen.findByText('Questa sezione è riservata ai validatori di VisuaLex Gymnasium')).toBeInTheDocument();
     expect(screen.queryByText('Non sei più tra i validatori')).toBeNull();
+    // The account already said so: no request the server would refuse.
+    expect(queue).not.toHaveBeenCalled();
+  });
+
+  it('reads the queue when the account could not be read, and lets the server decide', async () => {
+    const area = (
+      <MemoryRouter initialEntries={['/studia/valida']}>
+        <Routes>
+          <Route path="/studia" element={<Outlet context={{ validator: null }} />}>
+            <Route path="valida" element={<ValidationQueueView />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+    // A validator whose /auth/me failed still gets the cards.
+    const first = render(area);
+    expect(await screen.findByText('Domanda c1?')).toBeInTheDocument();
+    first.unmount();
+
+    // Someone who is not one gets the server's refusal, worded as before the account was asked.
+    queue.mockRejectedValue(rejection(403));
+    render(area);
+    expect(await screen.findByText('Questa sezione è riservata ai validatori di VisuaLex Gymnasium')).toBeInTheDocument();
+    expect(queue).toHaveBeenCalledTimes(2);
+  });
+
+  it('waits for the account before reading the queue, and reads it for a validator', async () => {
+    const area = (validator: boolean | undefined) => (
+      <MemoryRouter initialEntries={['/studia/valida']}>
+        <Routes>
+          <Route path="/studia" element={<Outlet context={{ validator }} />}>
+            <Route path="valida" element={<ValidationQueueView />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+    const { rerender } = render(area(undefined));
+    expect(screen.getByText('Carico le schede…')).toBeInTheDocument();
+    await act(async () => {});
+    expect(queue).not.toHaveBeenCalled();
+
+    rerender(area(true));
+    expect(await screen.findByText('Domanda c1?')).toBeInTheDocument();
+    expect(queue).toHaveBeenCalledTimes(1);
   });
 
   it('says the user is no longer a validator, and stops, on a 403 from the queue', async () => {

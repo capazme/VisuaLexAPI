@@ -13,6 +13,9 @@ export interface SearchFieldRequest {
 
 type Listener = (request: SearchFieldRequest) => void;
 
+/** The id of the field's form (the field and «Opzioni»): the palette drops from it on a computer. */
+export const SEARCH_FIELD_FORM_ID = 'search-field-form';
+
 let listener: Listener | null = null;
 let pending: { request: SearchFieldRequest; at: number } | null = null;
 

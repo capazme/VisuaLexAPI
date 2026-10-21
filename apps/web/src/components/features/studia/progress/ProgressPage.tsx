@@ -36,12 +36,13 @@ interface BlockProps {
 /** A block of the page: a tile with its heading in Newsreader (one type language, Gymnasium spec §5.1). */
 function Block({ id, title, busy, stale, note, children }: BlockProps) {
   return (
-    <section aria-labelledby={id} aria-busy={busy} className={cn(TILE, 'grid gap-4 p-5 md:p-6')}>
+    // `content-start`: beside a taller block (G6) the room left goes under the content, never between its rows.
+    <section aria-labelledby={id} aria-busy={busy} className={cn(TILE, 'grid content-start gap-4 p-4 md:p-6')}>
       <div className="grid gap-1">
         <h3 id={id} className={BLOCK_HEADING}>
           {title}
         </h3>
-        {note && <p className={cn('text-sm', MUTED_TEXT)}>{note}</p>}
+        {note && <p className={cn('max-w-prose text-sm', MUTED_TEXT)}>{note}</p>}
       </div>
       <div className={cn('min-w-0 transition-opacity', stale && 'opacity-60')}>{children}</div>
     </section>
@@ -54,7 +55,7 @@ function Summary({ data }: { data: Progressi }) {
     <div className="flex flex-wrap items-center gap-x-10 gap-y-5">
       <StreakBadge compact attuale={data.serie.attuale} record={data.serie.record} ultimiGiorni={data.serie.ultimiGiorni} />
       <div className="shrink-0">
-        <GoalRing compact ripassi={data.oggi.ripassi} obiettivo={data.oggi.obiettivo} raggiunto={data.oggi.raggiunto} />
+        <GoalRing compact giorno={data.oggi.giorno} ripassi={data.oggi.ripassi} obiettivo={data.oggi.obiettivo} raggiunto={data.oggi.raggiunto} />
       </div>
       <p className="grid gap-1 md:ml-auto">
         <span className={cn('font-serif text-4xl font-medium leading-none tabular-nums', INK_TEXT)}>{formatCount(recentReviews(data.materie))}</span>
@@ -75,9 +76,10 @@ function SummarySkeleton() {
 }
 
 /**
- * «Progressi», `/studia/progressi` (Gymnasium spec §5.3, G3): everything the home no longer shows, one column at every
- * width — the summary (the streak, today's goal, the reviews of 30 days), the subject chips, «Il tuo calendario», «Le
- * schede per stato», «I prossimi 14 giorni» and «Per materia». The same read as «Oggi» (`useProgress` over `GET
+ * «Progressi», `/studia/progressi` (Gymnasium spec §5.3, G3): everything the home no longer shows, in the sections'
+ * full-width frame (G6) — the summary (the streak, today's goal, the reviews of 30 days), the subject chips, «Il tuo
+ * calendario» across the page (its legend beside it from `lg`), «Le schede per stato» and «I prossimi 14 giorni» side by side from `lg`, and «Per
+ * materia» in two columns from `lg`; one column below. The same read as «Oggi» (`useProgress` over `GET
  * /lingo/srs/progressi`): the whole day's for the summary and the subjects, and, while a subject is chosen, that
  * subject's for the calendar, the states and the coming days — the summary stays the whole day's (the streak and the
  * goal are), and the subjects list all five. The subject is the one «Oggi» remembers. While the first read travels
@@ -119,7 +121,7 @@ export function ProgressPage() {
 
       {failed && (
         // No alert: the page says it where the numbers would be, and the button reads again.
-        <div className={cn(TILE, 'flex flex-wrap items-center justify-between gap-3 p-5')}>
+        <div className={cn(TILE, 'flex flex-wrap items-center justify-between gap-3 p-4 md:p-5')}>
           <p className="text-sm text-slate-800 dark:text-slate-100">Non riesco a leggere i tuoi progressi.</p>
           <button type="button" onClick={reload} className={SECONDARY_BUTTON}>
             Riprova
@@ -129,13 +131,13 @@ export function ProgressPage() {
 
       {!nothing && (
         <>
-          <section aria-label="Riepilogo" aria-busy={dayBusy} className={cn(TILE, 'p-5 md:p-6 transition-opacity', dayBusy && day.data !== null && 'opacity-60')}>
+          <section aria-label="Riepilogo" aria-busy={dayBusy} className={cn(TILE, 'p-4 md:p-6 transition-opacity', dayBusy && day.data !== null && 'opacity-60')}>
             {day.data ? <Summary data={day.data} /> : <SummarySkeleton />}
           </section>
 
           <div className="grid gap-2">
             <SubjectChips selected={materia} onSelect={choose} />
-            {materia && <p className={cn('text-sm', MUTED_TEXT)}>Calendario, schede per stato e prossimi giorni: solo {MATERIA_LABEL[materia]}.</p>}
+            {materia && <p className={cn('max-w-prose text-sm', MUTED_TEXT)}>Calendario, schede per stato e prossimi giorni: solo {MATERIA_LABEL[materia]}.</p>}
           </div>
 
           <Block
@@ -149,19 +151,22 @@ export function ProgressPage() {
             {scoped((data) => <ActivityCalendar calendario={data.calendario} today={data.oggi.giorno} weeks={weeks} hue={hue} narrowed={materia !== undefined} />, <ActivityCalendarSkeleton weeks={weeks} />)}
           </Block>
 
-          <Block id="studia-stati" title="Le schede per stato" busy={scopeBusy} stale={scopeBusy && scope.data !== null}>
-            {scoped((data) => <CardStatesBar stati={data.stati} />, <CardStatesBarSkeleton />)}
-          </Block>
+          {/* Side by side from `lg`, as tall as each other: full width, the forecast's drawing grew to 320 px. */}
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Block id="studia-stati" title="Le schede per stato" busy={scopeBusy} stale={scopeBusy && scope.data !== null}>
+              {scoped((data) => <CardStatesBar stati={data.stati} />, <CardStatesBarSkeleton />)}
+            </Block>
 
-          <Block id="studia-prossimi" title="I prossimi 14 giorni" busy={scopeBusy} stale={scopeBusy && scope.data !== null}>
-            {scoped((data) => <DueForecast prossimi={data.prossimi} hue={hue} />, <DueForecastSkeleton />)}
-          </Block>
+            <Block id="studia-prossimi" title="I prossimi 14 giorni" busy={scopeBusy} stale={scopeBusy && scope.data !== null}>
+              {scoped((data) => <DueForecast prossimi={data.prossimi} hue={hue} />, <DueForecastSkeleton />)}
+            </Block>
+          </div>
 
           <Block id="studia-materie" title="Per materia" busy={dayBusy} stale={dayBusy && day.data !== null}>
             {day.data ? (
               <SubjectProgress materie={day.data.materie} selected={materia} onSelect={choose} />
             ) : (
-              <div aria-hidden className="grid gap-2">
+              <div aria-hidden className="grid gap-2 lg:grid-cols-2">
                 {[0, 1, 2, 3, 4].map((n) => (
                   <div key={n} className={cn(PULSE, 'h-28 rounded-xl')} />
                 ))}

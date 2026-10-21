@@ -1,14 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useOutletContext } from 'react-router-dom';
 
-vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ isValidator: false }) }));
+const auth = vi.hoisted(() => ({ value: { isValidator: false, loading: false, user: { id: 'u1' } as { id: string } | null } }));
+vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => auth.value }));
 vi.mock('../../../services/studiaService', () => ({
   studiaService: { progress: vi.fn(() => new Promise(() => {})), preferences: vi.fn(() => new Promise(() => {})) },
 }));
 
 import { Z_INDEX } from '../../../constants/zIndex';
-import { StudiaPage } from './StudiaPage';
+import { StudiaPage, type StudiaOutletContext } from './StudiaPage';
+
+function Validator() {
+  return <p data-testid="validator">{String(useOutletContext<StudiaOutletContext>().validator)}</p>;
+}
 
 function at(path: string) {
   return render(
@@ -26,6 +31,29 @@ function at(path: string) {
     </MemoryRouter>,
   );
 }
+
+describe('StudiaPage — what it tells its views about the account', () => {
+  it.each([
+    [{ isValidator: true, loading: false, user: { id: 'u1' } }, 'true'],
+    [{ isValidator: false, loading: false, user: { id: 'u1' } }, 'false'],
+    [{ isValidator: false, loading: true, user: null }, 'undefined'],
+    // `/auth/me` failed: useAuth says isValidator false, which must not read as «not a validator».
+    [{ isValidator: false, loading: false, user: null }, 'null'],
+  ])('%o → validator %s', (value, expected) => {
+    auth.value = value;
+    render(
+      <MemoryRouter initialEntries={['/studia/valida']}>
+        <Routes>
+          <Route path="/studia" element={<StudiaPage />}>
+            <Route path="valida" element={<Validator />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId('validator').textContent).toBe(expected);
+    auth.value = { isValidator: false, loading: false, user: { id: 'u1' } };
+  });
+});
 
 describe('StudiaPage', () => {
   it('heads the view with the section name, leaving its links to the sidebar and the menu button to the layout', () => {
@@ -51,15 +79,15 @@ describe('StudiaPage', () => {
     expect(screen.getByRole('button', { name: 'Impostazioni dello studio' })).toBeInTheDocument();
   });
 
-  it.each(['/studia/ripasso', '/studia/progressi'])('centres %s as one column, the heading and its rule at the column\'s width; the other views keep theirs', (path) => {
-    const { container, unmount } = at(path);
+  it.each(['/studia/ripasso', '/studia/progressi', '/studia/schede', '/studia/valida'])('draws %s in the sections\' frame, the layout\'s full width with nothing narrower (G6, W2)', (path) => {
+    const { container } = at(path);
     const page = container.firstElementChild as HTMLElement;
-    expect(page).toHaveClass('mx-auto', 'max-w-3xl');
-    expect(page).toContainElement(screen.getByRole('heading', { level: 1, name: 'Gymnasium: la tua palestra giuridica' }));
-    unmount();
-    const view = at('/studia/schede');
-    expect(view.container.firstElementChild).toHaveClass('mx-auto', 'max-w-6xl');
-    view.unmount();
+    expect(page.className).not.toMatch(/\bmax-w-|\bmx-auto\b/);
+    const heading = screen.getByRole('heading', { level: 1, name: 'Gymnasium: la tua palestra giuridica' });
+    expect(page).toContainElement(heading);
+    // The section switcher puts the focus on it.
+    expect(heading).toHaveAttribute('data-section-title', 'gymnasium');
+    expect(heading).toHaveAttribute('tabindex', '-1');
   });
 
   it('draws the session as the lesson, a screen of its own over the shell, with no heading of the area (Gymnasium spec §5.4)', () => {

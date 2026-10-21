@@ -42,24 +42,45 @@ function endSentence({ reviewed, again, nextDue }: ReviewSummary): string {
   return `Hai ripassato ${schede(reviewed)}, ${redo}.${next}`;
 }
 
+/** The bar's tremble when the ink arrives: a pixel down and back, as the ink settles (under 400 ms in all). */
+const PLUCK: Keyframe[] = [{ translate: '0 0' }, { translate: '0 1px' }, { translate: '0 -0.5px' }, { translate: '0 0' }];
+
 /**
  * The lesson's progress (Gymnasium spec §5.4): `done / (done + remaining)`, where done are the cards out of the
- * queue — a «Di nuovo» stays in it, so the bar holds still and the note says «Torna in coda». It eases to each
- * grade (`motion-safe:` only: under reduced motion it jumps). Before the queue is read it is an empty track.
+ * queue — a «Di nuovo» stays in it, so the bar holds still and the note says «Torna in coda». At each grade that
+ * moves it the head runs ahead in the section's hue, the ink catches up a moment later on a spring and the bar
+ * trembles by a pixel (S2; inspired by Animorio's «I passi con la linea che avanza», written from scratch): 370 ms,
+ * taking no key and no focus. Under reduced motion it jumps (`motion-safe:` only, no tremble). Before the queue is
+ * read it is an empty track.
  */
 function LessonProgress({ done, total }: { done: number; total: number }) {
   const share = total > 0 ? done / total : 0;
+  const track = useRef<HTMLDivElement>(null);
+  const lastDone = useRef(done);
+  useEffect(() => {
+    const grew = done > lastDone.current;
+    lastDone.current = done;
+    const el = track.current;
+    if (!grew || !el || typeof el.animate !== 'function' || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    el.animate(PLUCK, { duration: 110, delay: 260, easing: 'ease-out' });
+  }, [done]);
+  const width = { width: `${share * 100}%` };
   return (
     <div
+      ref={track}
       {...(total > 0
         ? { role: 'progressbar', 'aria-label': 'Avanzamento del ripasso', 'aria-valuemin': 0, 'aria-valuemax': total, 'aria-valuenow': done, 'aria-valuetext': `${done} di ${schede(total)}` }
         : { 'aria-hidden': true })}
-      className="h-3 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800"
+      className="relative h-3 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800"
     >
+      <div aria-hidden className="vlx-lesson-head absolute inset-y-0 left-0 rounded-full motion-safe:transition-[width] motion-safe:duration-150 motion-safe:ease-out" style={width} />
       <div
         data-testid="lesson-progress-fill"
-        className={cn('h-full rounded-full motion-safe:transition-[width] motion-safe:duration-500 motion-safe:ease-out', INK_BG)}
-        style={{ width: `${share * 100}%` }}
+        className={cn(
+          'absolute inset-y-0 left-0 rounded-full motion-safe:transition-[width] motion-safe:delay-[70ms] motion-safe:duration-300 motion-safe:ease-(--ease-catch)',
+          INK_BG,
+        )}
+        style={width}
       />
     </div>
   );

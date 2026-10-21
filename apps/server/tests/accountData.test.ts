@@ -61,6 +61,104 @@ describe('account data controls', () => {
     ]);
   });
 
+  it('exports the user’s glossa with the others’ replies as a count, without their id or text', async () => {
+    const bob = await createTestUser('account-bob');
+    const thread = await prisma.articleThread.create({
+      data: { normaKey: 'codice_civile', articleId: '1453', title: 'La mia glossa', body: 'Testo di Alice', userId: alice.id },
+    });
+    await prisma.articleComment.create({ data: { threadId: thread.id, body: 'Risposta di Bob', userId: bob.id } });
+    await prisma.articleComment.create({ data: { threadId: thread.id, body: 'Risposta di Alice', userId: alice.id } });
+
+    const response = await request(app).get('/api/auth/export').set(authHeader(alice));
+
+    expect(response.status).toBe(200);
+    const { threads, comments } = response.body.data;
+    expect(threads).toHaveLength(1);
+    expect(threads[0]).toMatchObject({ id: thread.id, title: 'La mia glossa', body: 'Testo di Alice', userId: alice.id, repliesFromOthers: 1 });
+    expect(threads[0]).not.toHaveProperty('comments');
+    expect(comments).toEqual([expect.objectContaining({ threadId: thread.id, body: 'Risposta di Alice', userId: alice.id })]);
+    const exported = JSON.stringify(response.body);
+    expect(exported).not.toContain(bob.id);
+    expect(exported).not.toContain('Risposta di Bob');
+  });
+
+  it('marks the rows taken from another user without naming them', async () => {
+    const bob = await createTestUser('account-bob');
+    const taken = { userId: alice.id, originalAuthorId: bob.id };
+    await prisma.annotation.create({ data: { ...taken, normaKey: 'k::art::1', content: 'Nota presa' } });
+    await prisma.annotation.create({ data: { userId: alice.id, normaKey: 'k::art::1', content: 'Nota mia' } });
+    await prisma.highlight.create({ data: { ...taken, normaKey: 'k::art::1', text: 'testo', startOffset: 0, endOffset: 5 } });
+    await prisma.dossier.create({ data: { ...taken, name: 'Dossier preso' } });
+    await prisma.quickNorm.create({ data: { ...taken, label: 'Norma presa', searchParams: { act_type: 'codice civile' } } });
+    await prisma.customAlias.create({ data: { ...taken, trigger: 'cc', aliasType: 'shortcut', expandTo: 'codice civile' } });
+
+    const response = await request(app).get('/api/auth/export').set(authHeader(alice));
+
+    expect(response.status).toBe(200);
+    const { annotations, highlights, dossiers, quickNorms, customAliases } = response.body.data;
+    expect(annotations.map((a: { content: string; fromAnotherUser: boolean }) => [a.content, a.fromAnotherUser])).toEqual([
+      ['Nota presa', true],
+      ['Nota mia', false],
+    ]);
+    for (const rows of [highlights, dossiers, quickNorms, customAliases]) {
+      expect(rows).toEqual([expect.objectContaining({ userId: alice.id, fromAnotherUser: true })]);
+      expect(rows[0]).not.toHaveProperty('originalAuthorId');
+    }
+    expect(JSON.stringify(response.body)).not.toContain(bob.id);
+  });
+
+  it('drops the original author from an archived environment’s content, at any depth', async () => {
+    const bob = await createTestUser('account-bob');
+    const content = {
+      dossiers: [{ title: 'D', items: [{ type: 'note', data: 'n', originalAuthor: { id: bob.id, username: bob.username } }] }],
+      annotations: [
+        { text: 'Nota presa', originalAuthor: { id: bob.id, username: bob.username } },
+        { text: 'Nota mia', originalAuthor: null },
+      ],
+      quickNorms: [{ label: 'Q', originalAuthorId: bob.id }],
+    };
+    await prisma.environment.create({ data: { userId: alice.id, name: 'Archivio', author: alice.username, content } });
+
+    const response = await request(app).get('/api/auth/export').set(authHeader(alice));
+
+    expect(response.status).toBe(200);
+    const [env] = response.body.data.environments;
+    expect(env).toMatchObject({ name: 'Archivio', author: alice.username });
+    expect(env.content).toEqual({
+      dossiers: [{ title: 'D', items: [{ type: 'note', data: 'n', fromAnotherUser: true }] }],
+      annotations: [{ text: 'Nota presa', fromAnotherUser: true }, { text: 'Nota mia' }],
+      quickNorms: [{ label: 'Q', fromAnotherUser: true }],
+    });
+    const exported = JSON.stringify(response.body);
+    expect(exported).not.toContain(bob.id);
+    expect(exported).not.toContain(bob.username);
+  });
+
+  it('leaves out an archived environment’s author unless it is the user’s own username', async () => {
+    const bob = await createTestUser('account-bob');
+    await prisma.environment.create({ data: { userId: alice.id, name: 'Dal Forum', author: bob.username, content: {} } });
+    await prisma.environment.create({ data: { userId: alice.id, name: 'A mano', author: 'Studio Rossi', content: {} } });
+
+    const response = await request(app).get('/api/auth/export').set(authHeader(alice));
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.environments.map((e: { name: string; author: string | null }) => [e.name, e.author])).toEqual([
+      ['Dal Forum', null],
+      ['A mano', null],
+    ]);
+    expect(JSON.stringify(response.body)).not.toContain(bob.username);
+  });
+
+  it('keeps a `__proto__` key of an archived environment’s content as data', async () => {
+    // Written in SQL: Prisma's own input serialisation would drop the key before it reached the row.
+    const env = await prisma.environment.create({ data: { userId: alice.id, name: 'Strano', content: {} } });
+    await prisma.$executeRaw`UPDATE environments SET content = '{"__proto__":{"nota":"mia"},"b":2}'::jsonb WHERE id = ${env.id}`;
+
+    const response = await request(app).get('/api/auth/export').set(authHeader(alice));
+
+    expect(response.body.data.environments[0].content).toEqual(JSON.parse('{"__proto__":{"nota":"mia"},"b":2}'));
+  });
+
   it('has empty lists for a user who never voted or accepted', async () => {
     const response = await request(app).get('/api/auth/export').set(authHeader(alice));
     expect(response.body.data.lingoValidazioni).toEqual([]);

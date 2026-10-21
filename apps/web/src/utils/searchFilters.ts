@@ -34,3 +34,20 @@ export function defaultSearchFilters(): SearchFilters {
     onlyHistorical: false,
   };
 }
+
+/**
+ * How many of the palette's filters narrow a search: the source, «Solo versioni storiche», and the
+ * years (one filter, from either end or both).
+ */
+export function countActiveFilters(filters: SearchFilters): number {
+  return (filters.source !== 'all' ? 1 : 0)
+    + (filters.onlyHistorical ? 1 : 0)
+    + (filters.yearFrom !== undefined || filters.yearTo !== undefined ? 1 : 0);
+}
+
+/** The filters' state in words, beside their disclosure: «Nessun filtro», «1 filtro attivo», «2 filtri attivi». */
+export function activeFiltersLabel(filters: SearchFilters): string {
+  const count = countActiveFilters(filters);
+  if (count === 0) return 'Nessun filtro';
+  return count === 1 ? '1 filtro attivo' : `${count} filtri attivi`;
+}

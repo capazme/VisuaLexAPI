@@ -52,7 +52,7 @@ beforeEach(() => {
 afterEach(() => localStorage.removeItem(STORAGE_KEY));
 
 describe('ProgressPage (Gymnasium spec §5.3)', () => {
-  it('reads the progress once, and draws the summary and the four blocks in order, one column', async () => {
+  it('reads the progress once, and draws the summary and the four blocks in order', async () => {
     progress.mockResolvedValue(answer());
     renderPage();
     expect(screen.getByRole('heading', { level: 2, name: 'I tuoi progressi' })).toBeInTheDocument();
@@ -66,6 +66,18 @@ describe('ProgressPage (Gymnasium spec §5.3)', () => {
     expect(progress).toHaveBeenCalledWith(undefined);
     // No points and no level: the server will keep them.
     expect(document.body.textContent).not.toMatch(/punti|livello|\bXP\b/i);
+  });
+
+  it('uses the frame\'s full width (G6): the calendar across it, the states and the coming days side by side, the subjects in two columns', async () => {
+    progress.mockResolvedValue(answer());
+    renderPage();
+    await screen.findByRole('region', { name: 'Riepilogo' });
+    const block = (name: string) => screen.getByRole('region', { name });
+    const pair = block('Le schede per stato').parentElement!;
+    expect(pair).toBe(block('I prossimi 14 giorni').parentElement);
+    expect(pair).toHaveClass('grid', 'lg:grid-cols-2');
+    expect(block('Il tuo calendario').parentElement).not.toBe(pair);
+    expect(within(block('Per materia')).getByRole('list')).toHaveClass('lg:grid-cols-2');
   });
 
   it('spans 26 weeks on a computer and 12 on a phone', async () => {

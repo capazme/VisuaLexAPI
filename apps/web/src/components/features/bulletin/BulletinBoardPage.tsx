@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Upload, FolderOpen, Package, Lightbulb } from 'lucide-react';
+import { Search, Upload, Package, Lightbulb } from 'lucide-react';
 import { AddToMyDossiersDialog } from './AddToMyDossiersDialog';
 import { PublishDossierPicker } from './PublishDossierPicker';
 import { ReportModal } from './ReportModal';
@@ -24,6 +24,7 @@ import { customAliasService } from '../../../services/customAliasService';
 import { notificationService } from '../../../services/notificationService';
 import { publishMerltEvent, MERLT_EVENT_TYPES } from '../../../features/merlt/merltEventBus';
 import type { SharedEnvironment, EnvironmentCategory, SharedEnvironmentListResponse, EnvironmentSuggestion, StudyImportReport } from '../../../types';
+import { PageFrame } from '../../layout/PageFrame';
 
 type TabType = 'explore' | 'my' | 'suggestions';
 
@@ -397,18 +398,11 @@ export function BulletinBoardPage() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="font-serif text-3xl font-medium tracking-tight text-slate-900 dark:text-slate-50 flex items-center gap-2">
-            <FolderOpen className="text-primary-600 dark:text-primary-400" size={28} aria-hidden />
-            Dossier pubblici
-          </h1>
-          <p className="text-slate-600 dark:text-slate-400 mt-1">
-            I dossier di studio pubblicati dalla comunità
-          </p>
-        </div>
+    <PageFrame
+      title="Dossier pubblici"
+      line="I dossier di studio pubblicati dalla comunità"
+      section="forum"
+      action={
         <button
           id="tour-forum-publish"
           onClick={() => setShowPublishModal(true)}
@@ -417,7 +411,8 @@ export function BulletinBoardPage() {
           <Upload size={18} />
           Pubblica un dossier
         </button>
-      </div>
+      }
+    >
 
       {/* Tab Navigation */}
       <div id="tour-forum-tabs" className="flex max-w-full gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg w-fit">
@@ -654,6 +649,6 @@ export function BulletinBoardPage() {
           action={toast.action}
         />
       )}
-    </div>
+    </PageFrame>
   );
 }

@@ -339,6 +339,19 @@ describe('Brocardi out of the saved practices (D-078)', () => {
     localStorage.removeItem(options().name);
   });
 
+  it('saves an article arriving with them (a staggered release) without them, with no reload in between', () => {
+    localStorage.removeItem(options().name);
+    appStore.setState({ practices: [], activePracticeId: null });
+    appStore.getState().addArticlesToPractice(null, CC_RD, [legacy('2043') as never]);
+    expect(savedFields(appStore.getState())).not.toContain('brocardi_info');
+    expect(savedFields(appStore.getState())).not.toContain('brocardi_error');
+    expect(appStore.getState().practices[0].acts[0].articles).toEqual([article(CC_RD, '2043')]);
+    const stored = localStorage.getItem(options().name);
+    expect(stored).toContain('"practices"');
+    expect(stored).not.toContain('brocardi');
+    localStorage.removeItem(options().name);
+  });
+
   it('leaves the old flags of a saved search inert where they sit: the article keeps whatever else it was saved with', () => {
     const saved = { ...article(CC_RD, '2043'), show_brocardi_info: true, hasBrocardi: true };
     const state = reload({

@@ -12,6 +12,135 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.9.2] - 2026-10-21
+
+The look of VisuaLex, on the computer and on the phone; faster reading of the
+sources; dependency security fixes. No migration.
+
+### Look and navigation
+
+- Moving between sections is a short fade under 250 ms, the section's mark
+  changing colour, instead of the ink transition; instant with reduced motion.
+- One frame for section pages: the title in the same place and size from
+  Dossier to the Forum, Analizza documento and Cronologia; the fixed Focus button
+  never covers a page's action.
+- On the phone: the same top bar on every page, hiding while you scroll down and
+  coming back up, never hidden while the focus is in it; the feedback entry in
+  the user menu; filters on one row; titles of one size.
+
+### Gymnasium
+
+- «Oggi» uses the full width: today's missions and every other mission on the
+  left, the progress and the subjects to review on the right.
+- The study settings open inside the «I tuoi progressi» card.
+- «Progressi» at full width; the cards by state and the next 14 days side by
+  side.
+
+### Release notes
+
+- The «Novità» window always shows the new version's note, and those of any
+  version skipped; the notes now live in `apps/web/src/content/novita/`.
+
+### Sources and caching
+
+- The act tree is downloaded once per page and an EUR-Lex act visited once by
+  the browser; the Normattiva tree goes through the shared HTTP client, which
+  pauses a source after a stated `Retry-After`.
+- The Normattiva cache is pruned (2 GB, 30 days) and its expired pages are
+  removed at start and every six hours.
+
+### Security
+
+- `@modelcontextprotocol/sdk` 1.32.0 in the server and the MCP server, and the
+  `follow-redirects` and `launch-editor` advisories fixed (production was not
+  using the affected parts of the SDK).
+
+## [1.9.1] - 2026-10-20
+
+Sign in and sign up on one page, Analizza documento redrawn, the account export
+without other users' data, and the minor findings of the 1.9 test. No
+migration.
+
+### Account and privacy
+
+- «Accedi» and «Registrati» on one page with two tabs and a short animation;
+  the registration form in the new design; the page holds still when the tab
+  changes, «Crediti» stays at the foot, the list under the subtitle is gone.
+- The account export holds no other user's id, name or text: replies, votes,
+  imported content, the search parameters of accepted proposals and person
+  objects inside hand-imported data are filtered, with a two-user test.
+
+### Analizza documento
+
+- Redrawn: a drop area, a reading text with the citations marked, the citations
+  grouped by act and counted, an empty state with examples; the document never
+  leaves the browser.
+
+### Search and navigation
+
+- The search menu in the new design: a panel under the field on a computer, a
+  sheet on a phone, the steps as a trail, acts in a column with their
+  abbreviation and filtered by word start as you type, favourites and aliases
+  «a portata di mano», a recognised citation as one strong row that opens the
+  article; a named dialog that keeps and returns the focus.
+- Moving between sections (Corpus, Opus, Gymnasium, Forum) prints a short ink
+  transition, and Gymnasium's marks, digits and missions move when they change;
+  every animation is off with reduced motion and none takes a key or the focus.
+
+### Minor findings after 1.9
+
+- 44 px targets on the Forum's cards, in the search menu and in the welcome
+  tour, whose buttons now speak Italian («Chiudi»); an `h1` on «Dossier» and
+  «Cronologia».
+- With MERL-T off the consent is read once per session; the validation queue is
+  asked only for validators.
+
+## [1.9.0] - 2026-10-20
+
+The rest of the 1.9 redesign: Gymnasium complete, the pages for credits and for
+mcp-legal-it, and a third-party doctrine source out of the web app (D-078). No
+migration.
+
+### Gymnasium
+
+- The lesson: the review session is a screen of its own, with a progress bar,
+  the card in serif, one action at the foot («Mostra risposta», then the four
+  grades with their intervals), a short note after each grade («Torna tra 3
+  giorni») and an ending with the streak, «Torna a Oggi» and «Continua».
+- «Contribuisci»: «+ Nuova scheda» in «Le mie schede» writes a card with no
+  article, its references typed and checked against Normattiva; shown only
+  while the sources answer.
+- The road gains its institutes: each subject opens its institute stops, with
+  how many cards are due, and a review session can be limited to one institute
+  (server: `GET /api/lingo/srs/sessione?materia=…&istituto=…`, optional).
+- «Progressi», `/studia/progressi`: streak and record, a calendar of the past
+  months, the cards by state, the next 14 days, progress by subject; it takes
+  the place of the «Il tuo mese» sheet on «Oggi».
+
+### Third-party doctrine out of the web app (D-078)
+
+- No more doctrine, massime, relations, glossary or footnotes from that source,
+  in the reader, beside it, in Study Mode or in the export; the palette loses
+  «Includi dottrina» and «Solo articoli con dottrina».
+- Saved practices drop that source's fields when they are read and when they
+  are written; highlights and notes made on the old sections stay the reader's,
+  listed as «Sezione non più disponibile», and can be removed.
+- «Cerca sentenze sul tema dell'articolo» under «Giurisprudenza» searches the
+  Cassazione by the article's rubric, except for EU acts, notices and a short
+  list of generic rubrics.
+
+### Credits and connected AI applications
+
+- «Crediti», `/crediti`, public: the sources with their holders, licences and
+  attribution lines, the fonts and the libraries; linked from the user menu and
+  the login.
+- «Collega un'app AI» adds mcp-legal-it: the Claude Code plugin, the Claude
+  Desktop extension and the terminal, with the first-launch notes.
+
+### Navigation
+
+- The services' status moves into the user menu; the pill over the page is gone.
+
 ## [1.8.5] - 2026-10-19
 
 The first part of the 1.9 redesign, released early at the owners' request (G-305).

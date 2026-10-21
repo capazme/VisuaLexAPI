@@ -148,6 +148,7 @@ describe('DossierListView — a card counts its decisions', () => {
 
 describe('DossierListView — the trash', () => {
   it('shows «Cestino (n)» only when the trash holds something', () => {
+    viewport.desktop = true;
     const onOpenTrash = vi.fn();
     appStore.setState({ dossiers: [dossier([CIVIL])], practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [] });
     const { rerender } = render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} trashCount={0} onOpenTrash={onOpenTrash} /></MemoryRouter>);
@@ -164,13 +165,13 @@ describe('DossierListView — dossiers di lavoro and di studio', () => {
     { ...dossier([PENAL]), id: 's', title: 'Diritto penale', kind: 'studio', published: { sharedEnvironmentId: 'e1', version: 2, isActive: true, updatedAt: '2026-10-14' } },
     { ...dossier([]), id: 'o', title: 'Senza tipo' },
   ];
-  const titles = () => screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+  const titles = () => screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
 
   it("lists the section's kind: Opus the dossiers di lavoro (one with no kind among them), Gymnasium those di studio (sections spec S7)", () => {
     appStore.setState({ dossiers: kinds });
     sectionStore.setState({ section: 'opus', dossierKind: 'lavoro' });
     const { unmount } = render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
-    expect(screen.getByRole('heading', { level: 2, name: 'I tuoi dossier di lavoro' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'I tuoi dossier di lavoro' })).toBeInTheDocument();
     expect(titles().sort()).toEqual(['Pratica Rossi', 'Senza tipo']);
     // The kind filter is gone: the section is the filter.
     expect(screen.queryByRole('group', { name: 'Tipo di dossier' })).toBeNull();
@@ -178,7 +179,7 @@ describe('DossierListView — dossiers di lavoro and di studio', () => {
 
     sectionStore.setState({ section: 'gymnasium', dossierKind: 'studio' });
     render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
-    expect(screen.getByRole('heading', { level: 2, name: 'I tuoi dossier di studio' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'I tuoi dossier di studio' })).toBeInTheDocument();
     expect(titles()).toEqual(['Diritto penale']);
     expect(screen.getAllByText('Di studio', { selector: 'span' })).toHaveLength(1);
     expect(screen.getByText('Pubblicato nel Forum')).toBeInTheDocument();
@@ -197,7 +198,7 @@ describe('DossierListView — dossiers di lavoro and di studio', () => {
       appStore.setState({ dossiers: kinds });
       render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
       expect(titles()).toHaveLength(3);
-      expect(screen.getByRole('heading', { level: 2, name: 'I tuoi Dossier' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1, name: 'I tuoi Dossier' })).toBeInTheDocument();
     } finally {
       vi.unstubAllEnvs();
     }
@@ -213,7 +214,7 @@ describe('DossierListView — the category menu (D1)', () => {
     tagged('c', 'Registro trattamenti', ['gdpr']),
     tagged('d', 'Valutazione d\'impatto', ['GDPR', 'cancellazione']),
   ];
-  const titles = () => screen.queryAllByRole('heading', { level: 3 }).map((h) => h.textContent).sort();
+  const titles = () => screen.queryAllByRole('heading', { level: 2 }).map((h) => h.textContent).sort();
   const renderList = () => render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
 
   it('lists the categories capitalised and in alphabetical order, «Tutte le categorie» first, one for «gdpr» and «GDPR»', () => {
@@ -307,5 +308,39 @@ describe('DossierListView — the category menu (D1)', () => {
     expect(field).toHaveAttribute('aria-keyshortcuts', '/');
     fireEvent.keyDown(window, { key: '/' });
     expect(field).toHaveFocus();
+  });
+});
+
+// On a phone the title keeps its row (M1): «⋯» with «Importa» and «Cestino», and «+» for a new dossier, beside it.
+describe('DossierListView — the heading on a phone', () => {
+  const page = (trashCount = 0, onOpenTrash = vi.fn()) => {
+    appStore.setState({ dossiers: [dossier([CIVIL])], practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [] });
+    render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} trashCount={trashCount} onOpenTrash={onOpenTrash} /></MemoryRouter>);
+  };
+
+  it('puts «⋯» and «+» beside the title, 44 px each, and no row of buttons under it', () => {
+    page();
+    const header = screen.getByRole('heading', { level: 1 }).closest('header')!;
+    expect(header).toHaveClass('flex-row', 'items-start', 'justify-between');
+    const create = screen.getByRole('button', { name: 'Nuovo dossier' });
+    expect(create).toHaveAttribute('id', 'tour-dossier-create');
+    expect(create).toHaveClass('h-11', 'w-11');
+    expect(screen.getByRole('button', { name: 'Altre azioni sui dossier' })).toHaveClass('h-11', 'w-11');
+    expect(screen.queryByRole('button', { name: 'Importa dossier da file JSON' })).toBeNull();
+  });
+
+  it('holds «Importa» in «⋯», and «Cestino (n)» when the trash holds something', () => {
+    const onOpenTrash = vi.fn();
+    page(2, onOpenTrash);
+    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni sui dossier' }));
+    expect(screen.getAllByRole('menuitem').map((e) => e.textContent?.trim())).toEqual(['Importa da file JSON', 'Cestino (2)']);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Cestino (2)' }));
+    expect(onOpenTrash).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens the new dossier from «+»', () => {
+    page();
+    fireEvent.click(screen.getByRole('button', { name: 'Nuovo dossier' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 });

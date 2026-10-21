@@ -32,7 +32,7 @@ export function StudyStrip({ data, loading, onSettingsChanged, dense = false }: 
           <StreakBadge compact dense={dense} attuale={data.serie.attuale} record={data.serie.record} ultimiGiorni={data.serie.ultimiGiorni} />
           {/* The ring's «5 di 10» never wraps: the streak's line gives way first. */}
           <div className="shrink-0">
-            <GoalRing compact ripassi={data.oggi.ripassi} obiettivo={data.oggi.obiettivo} raggiunto={data.oggi.raggiunto} />
+            <GoalRing compact giorno={data.oggi.giorno} ripassi={data.oggi.ripassi} obiettivo={data.oggi.obiettivo} raggiunto={data.oggi.raggiunto} />
           </div>
         </>
       ) : (
@@ -43,7 +43,7 @@ export function StudyStrip({ data, loading, onSettingsChanged, dense = false }: 
           </>
         )
       )}
-      <SettingsGear open={settingsOpen} onOpen={() => setSettingsOpen(true)} />
+      <SettingsGear open={settingsOpen} onClick={() => setSettingsOpen(true)} />
       {settingsOpen && <StudySettingsSheet onClose={() => setSettingsOpen(false)} onChanged={onSettingsChanged} />}
     </div>
   );

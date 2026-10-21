@@ -9,6 +9,7 @@ vi.mock('../../../services/studiaService', () => ({
 }));
 
 import { studiaService } from '../../../services/studiaService';
+import { appStore } from '../../../store/useAppStore';
 import { ReviewHome } from './ReviewHome';
 
 const progress = vi.mocked(studiaService.progress);
@@ -70,6 +71,8 @@ beforeEach(() => {
   localStorage.removeItem(STORAGE_KEY);
   // jsdom draws nothing: a celebration's burst ends at once, as it does without a canvas.
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+  // Framer Motion restores the scroll after measuring the settings panel's `height: auto`; jsdom has no `scrollTo`.
+  vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
 });
 afterEach(() => {
   localStorage.removeItem(STORAGE_KEY);
@@ -253,7 +256,8 @@ describe('ReviewHome', () => {
     await user.click(screen.getByRole('button', { name: 'Impostazioni dello studio' }));
     progress.mockResolvedValue(answer(3, 12));
     savePreferences.mockResolvedValue({ nuoveAlGiorno: 20, ripassiAlGiorno: 10, materieComunita: ['DIRITTO_CIVILE'] });
-    await user.click(await screen.findByRole('switch', { name: 'Diritto civile' }));
+    await user.click(await screen.findByRole('button', { name: /^Schede della comunità · / }));
+    await user.click(screen.getByRole('switch', { name: 'Diritto civile' }));
     expect(savePreferences).toHaveBeenCalledWith({ materieComunita: ['DIRITTO_CIVILE'] });
     expect(await screen.findByText('Oggi: 3 da ripassare, 12 nuove')).toBeInTheDocument();
     expect(progress).toHaveBeenCalledTimes(2);
@@ -374,6 +378,58 @@ describe('ReviewHome', () => {
   });
 
   describe('«Oggi» (Gymnasium spec §5.1)', () => {
+    it('keeps the reading order — missions, statistics, list, subjects — and from `xl` sets the statistics in a sticky column of their own (G6)', async () => {
+      progress.mockResolvedValue(answer(18, 8));
+      renderHome();
+      const missions = await screen.findByRole('region', { name: 'Le missioni di oggi' });
+      const stats = screen.getByRole('region', { name: 'I tuoi progressi' });
+      const list = screen.getByRole('region', { name: 'Tutte le missioni' });
+      const subjects = screen.getByRole('region', { name: 'Cosa ripassi' });
+      const follows = (a: Element, b: Element) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+      expect(follows(missions, stats) && follows(stats, list) && follows(list, subjects)).toBe(true);
+      // The grid places them; the document keeps the order on every width.
+      expect(stats.parentElement).toHaveClass('xl:col-start-2', 'xl:row-span-full', 'xl:sticky', 'xl:self-start');
+      for (const left of [missions.parentElement!, list.parentElement!]) expect(left).toHaveClass('xl:col-start-1');
+      expect(stats.parentElement?.parentElement?.className).toMatch(/xl:grid-cols-\[minmax\(0,7fr\)_minmax\(0,5fr\)\]/);
+      // Below `xl` the chips follow the list, in the flow.
+      expect(stats.parentElement).not.toContainElement(subjects);
+    });
+
+    it('draws «Cosa ripassi» under the statistics from `xl`, in their column, once (G6)', async () => {
+      const real = window.matchMedia;
+      window.matchMedia = ((query: string) => ({
+        matches: query === '(min-width: 1280px)', media: query, onchange: null,
+        addEventListener: () => {}, removeEventListener: () => {}, addListener: () => {}, removeListener: () => {}, dispatchEvent: () => false,
+      })) as unknown as typeof window.matchMedia;
+      try {
+        progress.mockResolvedValue(answer(18, 8));
+        renderHome();
+        const stats = await screen.findByRole('region', { name: 'I tuoi progressi' });
+        const subjects = screen.getAllByRole('region', { name: 'Cosa ripassi' });
+        expect(subjects).toHaveLength(1);
+        expect(stats.parentElement).toContainElement(subjects[0]);
+        // In the document after the statistics, before the list.
+        const list = screen.getByRole('region', { name: 'Tutte le missioni' });
+        expect(subjects[0].compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      } finally {
+        window.matchMedia = real;
+      }
+    });
+
+    it('stays one column in Focus mode, whose narrower frame would squeeze the band (G6)', async () => {
+      const before = appStore.getState().settings;
+      appStore.setState({ settings: { ...before, focusMode: true } });
+      try {
+        progress.mockResolvedValue(answer(18, 8));
+        renderHome();
+        const stats = await screen.findByRole('region', { name: 'I tuoi progressi' });
+        expect(stats.parentElement?.className).not.toMatch(/xl:/);
+        expect(stats.parentElement?.parentElement?.className).not.toMatch(/xl:grid-cols/);
+      } finally {
+        appStore.setState({ settings: before });
+      }
+    });
+
     it('says what today costs, «circa N minuti», from the cards due and new', async () => {
       progress.mockResolvedValue(answer(18, 8));
       renderHome();
@@ -423,20 +479,42 @@ describe('ReviewHome', () => {
       expect(screen.getByTestId('where')).toHaveTextContent('/studia/ripasso/sessione');
     });
 
-    it('opens the study settings in a sheet from the gear, and closes it', async () => {
+    it('opens the study settings inside «I tuoi progressi», with no window, and closes them from the gear or with Esc (G6)', async () => {
       progress.mockResolvedValue(answer(1, 1));
       renderHome();
       const user = userEvent.setup();
       const gear = await screen.findByRole('button', { name: 'Impostazioni dello studio' });
-      expect(gear).toHaveAttribute('aria-haspopup', 'dialog');
+      expect(gear).not.toHaveAttribute('aria-haspopup');
+      expect(gear).toHaveAttribute('aria-controls', 'studia-impostazioni');
       await user.click(gear);
-      const sheet = screen.getByRole('dialog', { name: 'Impostazioni dello studio' });
       expect(gear).toHaveAttribute('aria-expanded', 'true');
-      // The content of the settings, open, with no disclosure of its own.
-      expect(await within(sheet).findByLabelText('Ripassi al giorno')).toBeInTheDocument();
-      expect(within(sheet).queryByRole('button', { name: 'Impostazioni dello studio' })).toBeNull();
-      await user.click(within(sheet).getByRole('button', { name: 'Chiudi' }));
       expect(screen.queryByRole('dialog')).toBeNull();
+      const panel = screen.getByRole('region', { name: 'Impostazioni dello studio' });
+      expect(panel).toHaveAttribute('id', 'studia-impostazioni');
+      expect(screen.getByRole('region', { name: 'I tuoi progressi' })).toContainElement(panel);
+      // The content of the settings, open, with no disclosure of its own; the community one level down, closed.
+      expect(await within(panel).findByLabelText('Ripassi al giorno')).toBeInTheDocument();
+      expect(within(panel).getByRole('button', { name: 'Schede della comunità · 0 di 5' })).toHaveAttribute('aria-expanded', 'false');
+      // The gear again closes them.
+      await user.click(gear);
+      await waitFor(() => expect(screen.queryByRole('region', { name: 'Impostazioni dello studio' })).toBeNull());
+      expect(gear).toHaveAttribute('aria-expanded', 'false');
+      // Esc inside closes them and gives the focus back to the gear.
+      await user.click(gear);
+      await user.click(await screen.findByLabelText('Ripassi al giorno'));
+      await user.keyboard('{Escape}');
+      await waitFor(() => expect(screen.queryByRole('region', { name: 'Impostazioni dello studio' })).toBeNull());
+      expect(gear).toHaveFocus();
+    });
+
+    it('lets the band scroll with the page while the settings are open (G6)', async () => {
+      progress.mockResolvedValue(answer(1, 1));
+      renderHome();
+      const user = userEvent.setup();
+      const stats = await screen.findByRole('region', { name: 'I tuoi progressi' });
+      expect(stats.parentElement).toHaveClass('xl:sticky');
+      await user.click(screen.getByRole('button', { name: 'Impostazioni dello studio' }));
+      expect(stats.parentElement).not.toHaveClass('xl:sticky');
     });
 
     it('says «Oggi» once over the action: no label above the sentence that starts with it', async () => {
@@ -603,7 +681,8 @@ describe('ReviewHome', () => {
       expect(percorso).toHaveBeenCalledTimes(2);
       await user.click(screen.getByRole('button', { name: 'Impostazioni dello studio' }));
       savePreferences.mockResolvedValue({ nuoveAlGiorno: 20, ripassiAlGiorno: 10, materieComunita: ['DIRITTO_CIVILE'] });
-      await user.click(await screen.findByRole('switch', { name: 'Diritto civile' }));
+      await user.click(await screen.findByRole('button', { name: /^Schede della comunità · / }));
+      await user.click(screen.getByRole('switch', { name: 'Diritto civile' }));
       await waitFor(() => expect(percorso).toHaveBeenCalledTimes(3));
     });
 
@@ -650,17 +729,19 @@ describe('ReviewHome', () => {
       localStorage.removeItem('visualex.studia.festeggiato');
     });
 
-    it('opens the study settings from a mission, which sets its target', async () => {
+    it('opens the study settings from a mission, which sets its target, and takes the focus there (G6)', async () => {
       progress.mockResolvedValue(midDay());
       renderHome();
       const user = userEvent.setup();
-      await user.click(await screen.findByRole('button', { name: 'Cambia l’obiettivo' }));
-      expect(screen.getByRole('dialog', { name: 'Impostazioni dello studio' })).toBeInTheDocument();
-      // The page behind the sheet is hidden from the accessibility tree while it is open.
-      expect(screen.getByRole('button', { name: 'Impostazioni dello studio', hidden: true })).toHaveAttribute('aria-expanded', 'true');
-      await user.click(screen.getByRole('button', { name: 'Chiudi' }));
+      const goal = await screen.findByRole('button', { name: 'Cambia l’obiettivo' });
+      expect(goal).toHaveAttribute('aria-controls', 'studia-impostazioni');
+      await user.click(goal);
+      const panel = screen.getByRole('region', { name: 'Impostazioni dello studio' });
+      await waitFor(() => expect(panel).toHaveFocus());
+      expect(screen.getByRole('button', { name: 'Impostazioni dello studio' })).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.queryByRole('dialog')).toBeNull();
       await user.click(screen.getByRole('button', { name: 'Cambia le nuove al giorno' }));
-      expect(screen.getByRole('dialog', { name: 'Impostazioni dello studio' })).toBeInTheDocument();
+      expect(screen.getByRole('region', { name: 'Impostazioni dello studio' })).toBeInTheDocument();
     });
 
     it('says when a mission has nothing to do today, offers the community cards, and leaves it out of the summary', async () => {
@@ -671,6 +752,11 @@ describe('ReviewHome', () => {
       expect(within(card).getByText('Nessuna scheda nuova da imparare oggi.')).toBeInTheDocument();
       expect(within(card).getByRole('button', { name: 'Accendi le schede della comunità' })).toBeInTheDocument();
       expect(within(card).getByText('0 di 2')).toBeInTheDocument();
+      // It opens the settings at the community's subjects, already open (G6).
+      await userEvent.setup().click(within(card).getByRole('button', { name: 'Accendi le schede della comunità' }));
+      const panel = screen.getByRole('region', { name: 'Impostazioni dello studio' });
+      expect(await within(panel).findByRole('button', { name: 'Schede della comunità · 0 di 5' })).toHaveAttribute('aria-expanded', 'true');
+      expect(within(panel).getAllByRole('switch')).toHaveLength(5);
     });
 
     it('never shows one subject’s counts under another’s name while the new read travels', async () => {
@@ -767,6 +853,10 @@ describe('ReviewHome', () => {
       expect(within(list).getByText('Scrivi una scheda')).toBeInTheDocument();
       expect(within(list).getByText('Una settimana di serie')).toBeInTheDocument();
       expect(within(list).getByText('Consolida 50 schede')).toBeInTheDocument();
+      // Today's three are above, in «Le missioni di oggi», and only there (G6).
+      expect(within(list).getByText(/Le tre di oggi sono qui sopra/)).toBeInTheDocument();
+      for (const title of ['Ripassa le schede dovute', 'Raggiungi l’obiettivo di oggi']) expect(within(list).queryByText(title)).toBeNull();
+      expect(within(list).queryByText(/^Impara \d+ schede nuove$/)).toBeNull();
       // Nothing to tick: no checkbox, no button.
       expect(within(list).queryAllByRole('checkbox')).toEqual([]);
       expect(within(list).queryAllByRole('button')).toEqual([]);
@@ -790,5 +880,63 @@ describe('ReviewHome', () => {
       const list = await screen.findByRole('region', { name: 'Tutte le missioni' });
       expect(within(list).getByText('Convalida due schede della comunità')).toBeInTheDocument();
     });
+  });
+});
+
+describe('the motions of «Oggi» (S2)', () => {
+  const SEEN = 'visualex.studia.visto';
+  afterEach(() => localStorage.removeItem(SEEN));
+
+  /** Today: 9 reviews, 5 of them new cards (the mission of the new ones done), the goal still open. */
+  function newOnesDone(): Progressi {
+    const data = answer(10, 8, { ripassi: 9 });
+    data.calendario = [...data.calendario, { giorno: '2026-10-19', ripassi: 9, nuove: 5, sbagliate: 0, valido: false, riposo: false }];
+    return data;
+  }
+  const today = () => within(screen.getByRole('list', { name: 'Missioni di oggi' }));
+  const order = () => today().getAllByRole('listitem').map((li) => li.getAttribute('data-missione'));
+
+  it('runs the ink of a mission done since it was last drawn, then slides it under the open ones', async () => {
+    localStorage.setItem(SEEN, JSON.stringify({ serie: 4, giorno: '2026-10-19', ripassi: 9, missioni: [] }));
+    progress.mockResolvedValue(newOnesDone());
+    renderHome();
+    await screen.findByRole('list', { name: 'Missioni di oggi' });
+    expect(order()).toEqual(['dovute', 'nuove', 'obiettivo']);
+    const title = today().getByText('Impara 5 schede nuove');
+    expect(title).toHaveClass('vlx-mission-inking');
+    await waitFor(() => expect(order()).toEqual(['dovute', 'obiettivo', 'nuove']), { timeout: 3000 });
+    expect(today().getByText('Impara 5 schede nuove')).toHaveClass('vlx-mission-done');
+    expect(JSON.parse(localStorage.getItem(SEEN)!).missioni).toEqual(['nuove']);
+  });
+
+  it('draws a mission already seen done at rest, under the open ones, with no ink running', async () => {
+    localStorage.setItem(SEEN, JSON.stringify({ serie: 4, giorno: '2026-10-19', ripassi: 9, missioni: ['nuove'] }));
+    progress.mockResolvedValue(newOnesDone());
+    renderHome();
+    await screen.findByRole('list', { name: 'Missioni di oggi' });
+    expect(order()).toEqual(['dovute', 'obiettivo', 'nuove']);
+    expect(today().getByText('Impara 5 schede nuove')).toHaveClass('vlx-mission-done');
+    expect(today().getByText('Impara 5 schede nuove')).not.toHaveClass('vlx-mission-inking');
+  });
+
+  it('draws the new tally mark and lands the count only for what grew since this browser drew it', async () => {
+    localStorage.setItem(SEEN, JSON.stringify({ serie: 3, giorno: '2026-10-19', ripassi: 7, missioni: [] }));
+    progress.mockResolvedValue(answer(10, 8, { ripassi: 9 }, 4));
+    const { unmount } = renderHome();
+    const tally = await screen.findByTestId('streak-tally');
+    expect(tally).toHaveAttribute('data-marks', '4');
+    const ring = within(screen.getByRole('img', { name: /^Obiettivo di oggi: 9 di 10/ }));
+    const landing = ring.getByTestId('goal-count-landing');
+    expect(landing).toHaveClass('vlx-digit-land', 'absolute');
+    // Its place is held at the final weight, unseen, so « di 10» does not move while it lands.
+    const [held] = ring.getAllByText('9').filter((el) => el !== landing);
+    expect(held).toHaveClass('invisible', 'font-semibold');
+    unmount();
+
+    // Seen now: the next visit draws them at rest.
+    renderHome();
+    const again = within(await screen.findByRole('img', { name: /^Obiettivo di oggi: 9 di 10/ }));
+    expect(again.getByText('9')).not.toHaveClass('vlx-digit-land');
+    expect(again.queryByTestId('goal-count-landing')).toBeNull();
   });
 });

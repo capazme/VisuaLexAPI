@@ -1,4 +1,3 @@
-import { flushSync } from 'react-dom';
 import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { create } from 'zustand';
@@ -8,6 +7,7 @@ import { useDevMode } from '../devMode/useDevMode';
 import { isStudiaEnabled } from '../studia/featureFlag';
 import type { DossierKind } from '../../types';
 import { SECTIONS, sectionForPath, type Section, type SectionId } from './sections';
+import { playSectionTransition } from './sectionTransition';
 
 /**
  * The last section the user was in, kept in the browser (spec S1): no migration, and a new device
@@ -57,6 +57,9 @@ function availableSections(devMode: boolean): Section[] {
   return SECTIONS.filter((s) => (s.id !== 'academia' || devMode) && (s.id !== 'gymnasium' || isStudiaEnabled()));
 }
 
+/** The section change on screen, if one is: a second choice brings it to its end first. */
+let finishRunning: (() => void) | null = null;
+
 export function useSection() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
@@ -74,15 +77,25 @@ export function useSection() {
   const wanted = fromPath ?? stored;
   const section = sections.some((s) => s.id === wanted) ? wanted : 'opus';
 
-  const chooseSection = (id: SectionId) => {
-    setSection(id);
-    const go = () => navigate(SECTIONS.find((s) => s.id === id)!.home);
-    // A View Transition where the browser has one (index.css animates `vlx-page`, spec §6.3.2). By hand:
-    // the app's BrowserRouter ignores navigate's `viewTransition` option, which needs a data router.
-    const doc = document as Document & { startViewTransition?: (cb: () => void) => unknown };
-    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    if (doc.startViewTransition && !reduce) doc.startViewTransition(() => flushSync(go));
-    else go();
+  /**
+   * `still`: chosen in the phone's drawer, whose closing is the change; `byPointer`: chosen with a pointer, so the new
+   * title takes the focus without its ring (`playSectionTransition`).
+   */
+  const chooseSection = (id: SectionId, { still = false, byPointer = false }: { still?: boolean; byPointer?: boolean } = {}) => {
+    finishRunning?.();
+    finishRunning = null;
+    const go = () => {
+      setSection(id);
+      navigate(SECTIONS.find((s) => s.id === id)!.home);
+    };
+    // The section's own home again: no change of section to show.
+    if (id === section) {
+      go();
+      return;
+    }
+    // By hand: the app's BrowserRouter ignores navigate's `viewTransition` option, which needs a data router. The
+    // router renders the new page in a transition: the old page's picture holds until its title is there.
+    finishRunning = playSectionTransition({ section: id, swap: go, still, byPointer });
   };
 
   return { section, active: SECTIONS.find((s) => s.id === section)!, sections, chooseSection };

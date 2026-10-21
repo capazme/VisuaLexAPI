@@ -651,6 +651,45 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `docs/merlt/claude-notes.md`). Reached from the Settings modal. The export's
   history rows include `decisionKey` (raw Prisma fields, as the rest of the export); its
   discussion threads keep a release's time but not the releasing admin's id.
+  The export holds only what the user wrote or what is about them, never another
+  person's id, name or text (G-306): under a thread the others' replies are a
+  count, `repliesFromOthers` (the user's own replies are in `data.comments`); a
+  note, highlight, dossier, quick norm or alias taken from someone else carries
+  `fromAnotherUser: true` instead of `originalAuthorId`, and an archived
+  environment's content has its `originalAuthor`/`originalAuthorId` keys turned
+  into the same flag. Its `authorId`, `username`, `user_id`, `email` and the like
+  (`IDENTITY_KEYS` in `authController.ts`; case, `_` and `-` folded), at any depth,
+  stay only when they hold the user's own id, username or email (a person object,
+  `user`, `owner`, `suggester`, `reporter`, goes whole): an environment imported
+  by hand may be someone else's file. Persons are also read by shape
+  (`personKind`): an object whose own `id` is another user's, beside a name, goes
+  whole; an id beside `username`, `email`, `displayName`, `fullName` and the like,
+  or another user's id beside a name in an object with no `id` of its own, loses
+  its ids and names, whatever they are called; the user's own record stays, and so
+  does an object with the user's own id beside a name (`{ name, userId, folderId }`).
+  Any `originalAuthor…` key is the web's attribution and becomes `fromAnotherUser`
+  (never inside a search's `searchParams`: the row's own flag says it). Another user's
+  id or email (the export's ids and emails are looked up among the users) goes
+  under any key, or is covered by `[altro utente]` inside a longer text. Not
+  caught: a deleted user's id under a key no rule reads, and another user's
+  username under such a key (a bare word cannot be told from a username). Taken
+  too, in a file the user imported by hand: an `IDENTITY_KEYS` key that names no
+  user (a doctrine's `author`, a client's `email`, a source's `displayName`) unless
+  it holds the user's own identity, and the ids and names of an object that pairs a
+  `PERSON_KEYS` key with an id not the user's (`{ id: 'src-1', displayName: 'Gazzetta' }`
+  loses both), and a key that only starts like the attribution (`originalAuthority`
+  goes, and leaves a `fromAnotherUser`). A taken proposal's texts (a quick norm's `label`, an
+  alias's `expandTo` and `description`) travel as they are, like a taken note's
+  text: the user took them and may have changed them. A dossier entry's and a snapshot's `content`, and a quick
+  norm's or an alias's `searchParams` (a proposal's JSON, stored as it came), are
+  read the same way (a dossier imported from a link keeps a note entry as the
+  client sent it). An archived environment's `author`
+  travels only when it is the user's own username (a Forum download stored its
+  publisher's), else `null`. `tests/accountData.test.ts`, and
+  `tests/accountExport.otherUser.test.ts`: a second user touches the first one's
+  world everywhere (replies, votes, reports, suggestions taken, declined and
+  pending, a Forum download, Gymnasium votes and reviews, notifications) and the
+  whole serialized export must hold none of their id, username, email or text.
 - **`GET /api/health/detailed`** — a `SELECT 1`, for the frontend's health
   banner. The Python `/health/detailed` is the one that probes the sources
   (see Key API Endpoints).
