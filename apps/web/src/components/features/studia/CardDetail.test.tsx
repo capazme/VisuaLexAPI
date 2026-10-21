@@ -115,7 +115,7 @@ describe('CardDetail, proposing', () => {
     propose.mockResolvedValue({ ...card('PROPOSTA_COMMUNITY'), xp: { crediti: [{ missione: 'scrivi', punti: 25 }], livello, nuovoLivello: false } });
     const { onChanged } = renderDetail(card('BOZZA_PERSONALE'));
     await user.click(screen.getByRole('button', { name: 'Proponi alla comunità' }));
-    await waitFor(() => expect(onChanged).toHaveBeenCalledWith('Scheda proposta alla comunità · +25 punti', 'success'));
+    await waitFor(() => expect(onChanged).toHaveBeenCalledWith('Scheda proposta alla comunità · hai guadagnato 25 punti', 'success'));
     expect(JSON.parse(localStorage.getItem('visualex.studia.visto')!)).toMatchObject({ xp: 25, livello: 1 });
     localStorage.removeItem('visualex.studia.visto');
   });

@@ -390,9 +390,11 @@ export function ReviewSession() {
           </button>
           <LessonProgress done={total - remaining} total={total} />
           {showCard && <p className="sr-only">{remaining === 1 ? 'Resta 1' : `Restano ${remaining}`}</p>}
-          {/* «+20 XP» hangs under the bar's end, out of the flow: the bar never shrinks for it, the card never waits. */}
-          <div className="pointer-events-none absolute right-0 top-full mt-1">
-            <XpGain gain={xpGain} />
+          {/* «+20 XP» sits over the bar's end, inside the header's row and out of the flow: the bar never shrinks for it,
+              it never reaches the card, and the card never waits. While the goal's notice covers the row it waits, and
+              comes once the notice has gone (a gain already shown is never shown again). */}
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center">
+            <XpGain gain={celebrating ? null : xpGain} />
           </div>
         </div>
         {/* Over the header's row, as on the old page: beside the card, never on it. */}

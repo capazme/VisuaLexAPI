@@ -22,8 +22,12 @@ describe('the level bar (Gymnasium XP spec §4, G1c)', () => {
     expect(bar).toHaveTextContent('Ancora 138 XP per il livello 5');
     expect(bar).toHaveTextContent('oggi +45 XP');
     expect(screen.getByText('Ancora 138 punti per il livello 5. Oggi 45 punti.')).toHaveClass('sr-only');
-    // The bar is the text's picture: 37 of 175.
-    const fill = bar.querySelector('span[aria-hidden] > span') as HTMLElement;
+    // The bar is the text's picture: 37 of 175, named and valued as the lesson's bar is.
+    const progress = screen.getByRole('progressbar', { name: 'Livello 4' });
+    expect(progress).toHaveAttribute('aria-valuenow', '37');
+    expect(progress).toHaveAttribute('aria-valuemax', '175');
+    expect(progress).toHaveAttribute('aria-valuetext', '37 punti di 175 per il livello 5');
+    const fill = progress.firstElementChild as HTMLElement;
     expect(fill.style.width).toBe(`${(37 / 175) * 100}%`);
     // Nothing grew on a first visit.
     expect(screen.queryByTestId('xp-gain')).toBeNull();

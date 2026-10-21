@@ -39,9 +39,12 @@ export function gainSentence(gain: XpGainValue): string {
   return `Hai guadagnato ${gain.punti} ${gain.punti === 1 ? 'punto' : 'punti'}.${gain.livello ? ` Sei al livello ${gain.livello}.` : ''}`;
 }
 
-/** «+20 punti» (and «livello 5»): a message's words, which a screen reader reads as they are (the toast). */
+/**
+ * «hai guadagnato 20 punti» (and «sei al livello 5»): a message's words, which a screen reader reads as they are (the
+ * toast). They say who earns the points: after a vote, «+20 punti» would read as what the vote gave the card (G-318).
+ */
 export function gainWords(gain: XpGainValue): string {
-  return `+${gain.punti} ${gain.punti === 1 ? 'punto' : 'punti'}${gain.livello ? ` · livello ${gain.livello}` : ''}`;
+  return `hai guadagnato ${gain.punti} ${gain.punti === 1 ? 'punto' : 'punti'}${gain.livello ? `, sei al livello ${gain.livello}` : ''}`;
 }
 
 /** «+20 XP» (and «Livello 5»), the words of the chip. */

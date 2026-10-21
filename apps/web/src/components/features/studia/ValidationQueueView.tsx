@@ -151,8 +151,8 @@ export function ValidationQueueView() {
     // The card stays (the vote failed, or the user was stopped): the keyboard stays where it is.
     if (outcome === 'failed' || outcome === 'forbidden') votedOn.current = null;
     const message = OUTCOME_TOAST[outcome];
-    // The points of the vote ride on its message (G1c), in words a screen reader reads: «Voto registrato · +20 punti».
-    // Never a word on what it weighs.
+    // The points ride on the vote's message (G1c), saying who earns them: «Voto registrato · hai guadagnato 20 punti».
+    // Never a word that reads as what the vote weighs or gave the card (G-318).
     const gain = gainOf(Date.now(), xp);
     if (xp) recordXpSeen(xp);
     if (message) setToast(gain ? { ...message, message: `${message.message} · ${gainWords(gain)}` } : message);

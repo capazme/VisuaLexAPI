@@ -516,6 +516,22 @@ describe('the points of a grade in the session (G1c)', () => {
     expect(JSON.parse(localStorage.getItem('visualex.studia.visto')!)).toMatchObject({ xp: 120, livello: 2 });
   });
 
+  it('waits for the goal’s notice when the same grade closes the goal, and never stands over it', async () => {
+    const closing = { ...earning, oggi: { giorno: '2026-10-19', ripassi: 10, obiettivo: 10, raggiunto: true, appenaRaggiunto: true, serie: 3 } };
+    review.mockResolvedValueOnce(closing);
+    renderSession([card('a'), card('b')]);
+    await show();
+    await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
+    expect(await screen.findByText('Serie di 3 giorni')).toBeInTheDocument();
+    expect(screen.queryByTestId('xp-gain')).toBeNull();
+    // The notice gone, the chip comes, in the header's row.
+    await waitFor(() => expect(screen.queryByText('Serie di 3 giorni')).toBeNull(), { timeout: 3000 });
+    const chip = await screen.findByTestId('xp-gain');
+    expect(chip).toHaveTextContent('+20 XP');
+    expect(chip.parentElement?.className).toContain('inset-y-0');
+    expect(chip.parentElement?.className).not.toContain('top-full');
+  });
+
   it('names the level a grade crosses', async () => {
     review.mockResolvedValueOnce({ ...earning, xp: { ...earning.xp, nuovoLivello: true } });
     renderSession([card('a'), card('b')]);

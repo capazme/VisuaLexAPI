@@ -960,20 +960,24 @@ line says it to a screen reader). The confetti step by elapsed time (`confetti.t
 unseen at the final weight, so «di 10» beside it does not move; reaching the goal, the ring closes as it settles) and a mission's ink play **only for what grew since this browser last drew it** —
 `progress/seenProgress.ts` (`useStreakGrowth`, `useReviewsGrowth`, `useFreshMissions`, `useXpGrowth`, `recordXpSeen`) keeps
 the streak, today's reviews and missions, and the points and the level under `visualex.studia.visto` — forgotten at
-every sign-in and sign-out (`forgetSeenProgress`, `useAuth`), so the next person on the browser never reads the last
+every sign-in, sign-up and sign-out (`forgetSeenProgress`, `useAuth`), so the next person on the browser never reads the last
 one's points or level —, a convenience like the celebration's, never a number's source; with
 nothing stored nothing plays, and what a view draws it records (the dense strip draws no tally and leaves the streak's
 growth to «Oggi»). None of them takes a key or the focus or delays a card, and under reduced motion each is drawn at
 its end at once. The celebration is unchanged.
 **«+20 XP» and a new level** (G1c): what a grade, a proposal or a vote earned comes in its answer (`xp: XpEsito`; a grade
-not recorded and the proposal's 409 carry none). The lesson shows it as `progress/XpGain` — an ink chip hung under the
-progress bar's end, out of the flow, rising 6 px and gone in 1.8 s (`XP_GAIN_MS`; under reduced motion it only appears),
+not recorded and the proposal's 409 carry none). The lesson shows it as `progress/XpGain` — an ink chip over the progress
+bar's end, inside the header's row and out of the flow (never on the card; while the goal's notice covers the row it
+waits for the notice to go), rising 6 px and gone in 1.8 s (`XP_GAIN_MS`; under reduced motion it only appears),
 no focus, no pointer, never holding the next card, said in its own polite live region a frame after it is drawn
 («Hai guadagnato 20 punti. Sei al livello 5.», emptied for that frame so the same words twice are heard twice) — and
 names the level an event crossed (`nuovoLivello`); a proposal and a vote add it to their message in words a screen
-reader reads («Scheda proposta alla comunità · +25 punti», «Voto registrato · +20 punti»). Each records only what it
+reader reads, saying who earns them — after a vote a bare «+20 punti» would read as what the vote gave the card, a
+weight the owners excluded (G-318) — («Scheda proposta alla comunità · hai guadagnato 25 punti», «Voto registrato · hai
+guadagnato 20 punti»). Each records only what it
 showed (`recordXpSeen`: the event's credits, the level only when it crossed it), so «Oggi» does not show it again: there `LevelBar` shows only what grew since this browser last
-drew it (`useXpGrowth`, `xp` and `livello` under `visualex.studia.visto`, kept across days) — the credits a read wrote, or
+drew it (`useXpGrowth`, `xp` and `livello` under `visualex.studia.visto`, kept across days; the bar is a `progressbar` named
+«Livello N» with its value in words) — the credits a read wrote, or
 another device's — and presses in, once (also one reached while the page is open), a level not yet shown here, announced
 politely, at rest under reduced motion; nothing on a first visit. The
 points a session read credits silently («obiettivo» on an empty queue) show at the next progress read as `fatta` and in the

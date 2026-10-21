@@ -89,6 +89,8 @@ export function useAuth() {
 
       // Auto-login after registration
       await authService.login({ email, password });
+      // What this browser drew of Gymnasium was the last person's (their points, their level).
+      forgetSeenProgress();
       const currentUser = await authService.getCurrentUser();
 
       setState({
