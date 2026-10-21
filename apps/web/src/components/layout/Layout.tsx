@@ -336,6 +336,10 @@ export function Layout() {
           ref={setScroller}
           className={cn(
             'vlx-page flex-1 overflow-y-auto w-full h-full',
+            // A page that grows past the window («Oggi», «Progressi», «Collega un'app AI», as it loads) drew its 8 px bar
+            // and moved the centred column 4 px to the left: the room is kept. Not on the search page, whose practice row
+            // is the scroller's height (`h-app-row`) and would only lose 8 px to an empty gutter.
+            !onSearchPage && '[scrollbar-gutter:stable]',
             // What the keyboard's focus or an anchor scrolls to stops under the phone's bar, not behind it (WCAG 2.4.11).
             showPhoneBar && 'max-lg:scroll-pt-[calc(3.5rem+env(safe-area-inset-top)+0.5rem)]',
           )}

@@ -44,3 +44,18 @@ describe('Layout — the document never scrolls', () => {
     expect(scroller.firstElementChild).toHaveClass('md:p-8');
   });
 });
+
+// A page that grows past the window drew its bar and moved the centred column sideways by half of it.
+describe('Layout — the scrollbar moves nothing', () => {
+  it('keeps the bar\'s room on a page that scrolls', () => {
+    const { container } = at('/studia/progressi');
+    const scroller = container.querySelector('main .overflow-y-auto') as HTMLElement;
+    expect(scroller).toHaveClass('[scrollbar-gutter:stable]');
+  });
+
+  it('keeps none on the search page, whose practice row is the scroller\'s height', () => {
+    const { container } = at('/');
+    const scroller = container.querySelector('main .overflow-y-auto') as HTMLElement;
+    expect(scroller).not.toHaveClass('[scrollbar-gutter:stable]');
+  });
+});
