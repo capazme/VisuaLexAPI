@@ -66,10 +66,10 @@ describe('CommandPalette — where it opens', () => {
     expect(screen.getByRole('dialog', { name: 'Menu di ricerca' })).toContainElement(screen.getByRole('combobox'));
   });
 
-  it('on a computer, gives the focus back to what had it («Opzioni») when it closes', async () => {
+  it('on a computer, gives the focus back to what had it (the search page\'s field) when it closes', async () => {
     asDesktop(true);
     const opener = document.createElement('button');
-    opener.textContent = 'Opzioni';
+    opener.textContent = 'Cerca una norma, una sentenza o un tema';
     document.body.appendChild(opener);
     opener.focus();
     const { rerender } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
