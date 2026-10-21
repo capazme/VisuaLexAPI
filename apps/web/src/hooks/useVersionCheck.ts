@@ -7,13 +7,16 @@ import {
   VERSION_FETCH_TIMEOUT,
   compareVersions,
   type VersionInfo,
-  type ChangelogEntry,
 } from '../config/versionConfig';
 
 interface UseVersionCheckState {
   currentVersion: string | null;
   hasNewVersion: boolean;
-  changelog: ChangelogEntry[];
+  /**
+   * The version this browser last saw, when it differs from the current one: the window lists the notes
+   * after it (`newsSince`). Null on a first visit and when nothing is new.
+   */
+  lastSeenVersion: string | null;
   isLoading: boolean;
   error: string | null;
 }
@@ -30,7 +33,8 @@ interface UseVersionCheckReturn extends UseVersionCheckState {
  * Behavior:
  * - Fetches /version on mount
  * - First visit: saves version silently (no notification)
- * - New version detected: sets hasNewVersion = true
+ * - New version detected: sets hasNewVersion = true and keeps the version last seen
+ * - The text of the news is the web's own (`content/novita/`); /version gives only the number
  * - dismissNotification: saves current version to localStorage
  * - Throttled: won't check more than once per session within throttle window
  */
@@ -38,7 +42,7 @@ export function useVersionCheck(): UseVersionCheckReturn {
   const [state, setState] = useState<UseVersionCheckState>({
     currentVersion: null,
     hasNewVersion: false,
-    changelog: [],
+    lastSeenVersion: null,
     isLoading: true,
     error: null,
   });
@@ -76,7 +80,7 @@ export function useVersionCheck(): UseVersionCheckReturn {
           setState({
             currentVersion: data.version,
             hasNewVersion: false,
-            changelog: data.changelog || [],
+            lastSeenVersion: null,
             isLoading: false,
             error: null,
           });
@@ -89,7 +93,7 @@ export function useVersionCheck(): UseVersionCheckReturn {
         setState({
           currentVersion: data.version,
           hasNewVersion: isNewer,
-          changelog: data.changelog || [],
+          lastSeenVersion: isNewer ? lastSeenVersion : null,
           isLoading: false,
           error: null,
         });

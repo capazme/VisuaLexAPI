@@ -125,6 +125,19 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   fragment and focuses the entry, since the router renders after the browser looked for it —, external
   links in a new tab with `rel="noopener noreferrer"`, every text breaking anywhere rather than widen a
   phone's page. Reached from the login's foot and the user menu's «Crediti».
+- **The version's news** (R1, 21 Oct 2026): `ui/ChangelogNotification` (mounted by `Layout`) toasts «Novità in
+  vX.Y.Z» when `/version` names a version this browser has not seen (`useVersionCheck`, the last one kept in
+  `localStorage`; nothing on a first visit), and «Vedi» opens the notes for the people who use VisuaLex, which
+  are the web's own: `content/novita/<X.Y.Z>.md`, one per release, the Italian note of the GitHub release
+  without its title, read by `content/novita/releaseNotes.ts` (`newsSince`: the new version, and the versions
+  with a note skipped since the last visit, the newest first, each under «Versione X.Y.Z»; a version with no
+  note says «Correzioni e miglioramenti»). `/version` gives the number only: its `changelog` comes from
+  `git log`, which the production image does not carry, so it is always empty there (the technical panel in
+  Impostazioni still lists it). A note is plain Markdown and only this much: a bold line heads a group, `- `
+  an item, `**bold**`, `*italic*`, `` `code` ``, drawn as React text (no HTML, no links, no `#` heading).
+  The release pull request adds the note with `version.txt` (`docs/git-workflow.md`): `releaseNotes.test.ts`
+  fails when `version.txt` names a version with no note, on a file not named after a version, on a `#`
+  heading, and on a note that names the doctrine source by name («una fonte esterna di dottrina»).
 - `store/useAppStore.ts` — Zustand + Immer, the single global store.
 - `types/index.ts` — shared types. `services/` — one file per backend entity.
 - `components/features/` — `search`, `workspace`, `dossier`,
