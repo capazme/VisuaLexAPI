@@ -9,9 +9,9 @@ import { Z_INDEX } from '../../constants/zIndex';
  * the previous one) so we only ever render at most one toast.
  *
  * Mount once at the layout level — it reads directly from the store. Despite its name it carries
- * any transient error the app raises with `pushSyncError`. It sits in the toast band of the z-index
- * scale (the `Toast` alone is `z-[60]`, under every overlay): a zero-size fixed layer holds the
- * toast's own fixed box, so an error raised while the command palette is open still shows.
+ * any transient error the app raises with `pushSyncError`. In the app it is an entry of the notification stack
+ * (`NotificationHost`, in the toast band, at the top); the zero-size fixed layer in the toast band holds the toast's
+ * own fixed box only where no stack is mounted (the `Toast` alone is `z-[60]`, under every overlay).
  */
 export function SyncErrorToast() {
   const lastSyncError = useAppStore((s) => s.lastSyncError);

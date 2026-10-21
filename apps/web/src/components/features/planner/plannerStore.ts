@@ -11,7 +11,7 @@ export interface PlannerNotice {
  * What the planner's surfaces share, and nothing the server owns: the tasks are server state, read per view
  * (`useTaskView`), never kept here (gotcha 17). `version` goes up after every write, and every view mounted, the
  * bar's count among them, reads again. The quick-add dialog and the notice live in `PlannerHost`, mounted by
- * `Layout`, so the key and the toast work on every page (gotcha 27).
+ * `Layout`, so the key and the toast work on every page (gotcha 27). A folded group stays folded while the app is open.
  */
 export const plannerStore = create<{
   version: number;
@@ -32,6 +32,9 @@ export const plannerStore = create<{
   notice: PlannerNotice | null;
   notify: (message: string, type?: PlannerNotice['type']) => void;
   clearNotice: () => void;
+  /** The groups folded on the views («Termini scaduti», a day, a dossier), by their key, for the session. */
+  folded: Readonly<Record<string, true>>;
+  toggleFolded: (key: string) => void;
 }>()((set) => ({
   version: 0,
   changed: () => set((s) => ({ version: s.version + 1 })),
@@ -45,6 +48,14 @@ export const plannerStore = create<{
   notice: null,
   notify: (message, type = 'success') => set((s) => ({ notice: { message, type, id: (s.notice?.id ?? 0) + 1 } })),
   clearNotice: () => set({ notice: null }),
+  folded: {},
+  toggleFolded: (key) =>
+    set((s) => {
+      const folded = { ...s.folded };
+      if (folded[key]) delete folded[key];
+      else folded[key] = true;
+      return { folded };
+    }),
 }));
 
 /** A server refusal's own words (Italian, and never a title: `routes/tasks.ts`), else ours. */

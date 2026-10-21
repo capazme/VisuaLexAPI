@@ -9,7 +9,8 @@ import { QUIET_BUTTON } from '../studia/progress/tokens';
  * Opus's page (the planner, wave 1): the section's title, «Opus: la tua officina giuridica», over its views —
  * «Oggi» (Opus's home), «Prossimi giorni», «Lista d'ingresso» — which are the sidebar's entries in this section, as
  * Gymnasium's are; «Dossier» stays an entry of Opus. In the sections' frame (`PageFrame`, W2), its title the one the
- * section switcher focuses (T1); the views keep a column at a reading measure. The tasks' trash is a view of its
+ * section switcher focuses (T1); the views take the frame's width, the lists' rows with room for the dossier at their
+ * right end (P2b). The tasks' trash is a view of its
  * own: a task's trash is on the task, not among the dossiers' (`/api/trash`).
  */
 export function OpusPage() {
@@ -26,7 +27,7 @@ export function OpusPage() {
         </Link>
       )}
     >
-      <div className="flex w-full max-w-3xl flex-col gap-4">
+      <div className="flex w-full min-w-0 flex-col gap-4">
         <Outlet />
       </div>
     </PageFrame>

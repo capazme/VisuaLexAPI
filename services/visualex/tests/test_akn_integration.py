@@ -103,6 +103,40 @@ class TestTextFallback:
         assert "dall'AKN" not in text
 
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("version,day,vigenza", [
+        (None, "2010-01-01", "20100101"),        # a date without «vigente» (G-353)
+        ("vigente", "2010-01-01", "20100101"),
+        ("originale", "2010-01-01", "20100101"),  # a day wins over the original
+        ("vigente", None, None),                  # the text in force: today's export
+        (None, None, None),
+    ])
+    async def test_the_akn_fallback_is_read_at_the_day_asked(self, cold_scraper, version, day, vigenza):
+        from visualex_api.tools.norma import Norma, NormaVisitata
+
+        nv = NormaVisitata(norma=Norma(tipo_atto="legge", data="1990-08-07", numero_atto="241"),
+                           numero_articolo="3", versione=version, data_versione=day)
+        akn = AsyncMock(return_value="### Art. 3. testo dall'AKN")
+        with patch.object(cold_scraper, "request_document", new=AsyncMock(return_value="<html>broken</html>")), \
+             patch("visualex_api.services.normattiva_scraper.fetch_act_article", new=akn):
+            await cold_scraper.get_document(nv)
+        assert akn.await_args.args[2] == vigenza
+
+    @pytest.mark.asyncio
+    async def test_the_original_is_never_served_from_todays_export(self, cold_scraper):
+        from visualex_api.tools.exceptions import ParsingError
+        from visualex_api.tools.norma import Norma, NormaVisitata
+
+        nv = NormaVisitata(norma=Norma(tipo_atto="legge", data="1990-08-07", numero_atto="241"),
+                           numero_articolo="3", versione="originale")
+        akn = AsyncMock(return_value="### Art. 3. testo di oggi")
+        with patch.object(cold_scraper, "request_document", new=AsyncMock(return_value="<html>broken</html>")), \
+             patch("visualex_api.services.normattiva_scraper.fetch_act_article", new=akn), \
+             pytest.raises(ParsingError):
+            await cold_scraper.get_document(nv)
+        akn.assert_not_awaited()
+
+
 class TestFallbackFiresOnExtractorFailure:
     """The failure the fallback was built for: a selector break inside one of
     the four extractors.

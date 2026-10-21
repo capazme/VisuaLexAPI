@@ -4,13 +4,8 @@ import { parseItalianDate } from '../../../utils/dateUtils';
 import { resolveAct } from '../../../utils/actUrn';
 import { isEuropeanAct } from '../../../utils/versionDisplay';
 import { extractArticleIdsFromTree, type TreeNode } from '../../../utils/treeUtils';
-import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { legalFetch } from '../../../services/legalFetch';
 
-// Above this threshold we ask for explicit confirmation before importing —
-// selecting "all" on a large code (e.g. CC ~2900 articles) is almost always a
-// misclick and floods the dossier.
-const BULK_IMPORT_CONFIRM_THRESHOLD = 100;
 
 interface ActIdentity { tipo_atto: string; data: string; numero_atto: string }
 
@@ -52,7 +47,6 @@ export function TreeNavigatorModal({ onClose, onImport, initialAct }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [tree, setTree] = useState<TreeEntry[]>([]);
   const [selectedArticles, setSelectedArticles] = useState<Set<string>>(new Set());
-  const [confirmBulkImportOpen, setConfirmBulkImportOpen] = useState(false);
 
   // Only the latest search may fill the list: an older answer arriving late
   // would otherwise label one act's articles with another's identity.
@@ -146,14 +140,6 @@ export function TreeNavigatorModal({ onClose, onImport, initialAct }: Props) {
     if (!resolvedAct) return;
     onImport(articles, resolvedAct);
     onClose();
-  };
-
-  const handleImport = () => {
-    if (selectedArticles.size > BULK_IMPORT_CONFIRM_THRESHOLD) {
-      setConfirmBulkImportOpen(true);
-      return;
-    }
-    runImport();
   };
 
   return (
@@ -272,7 +258,7 @@ export function TreeNavigatorModal({ onClose, onImport, initialAct }: Props) {
             Annulla
           </button>
           <button
-            onClick={handleImport}
+            onClick={runImport}
             disabled={selectedArticles.size === 0}
             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2"
           >
@@ -280,17 +266,6 @@ export function TreeNavigatorModal({ onClose, onImport, initialAct }: Props) {
           </button>
         </div>
 
-        <ConfirmDialog
-          open={confirmBulkImportOpen}
-          title={`Importare ${selectedArticles.size} articoli?`}
-          message="Stai per aggiungere un numero elevato di articoli al dossier. L'operazione è reversibile ma potresti preferire una selezione più mirata."
-          confirmLabel="Importa comunque"
-          onConfirm={() => {
-            setConfirmBulkImportOpen(false);
-            runImport();
-          }}
-          onCancel={() => setConfirmBulkImportOpen(false)}
-        />
       </div>
     </div>
   );

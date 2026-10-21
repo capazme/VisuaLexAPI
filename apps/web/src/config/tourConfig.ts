@@ -51,7 +51,7 @@ export const WELCOME_STEPS: DriveStep[] = [
         element: '#tour-section-switcher',
         popover: {
             title: 'Le sezioni',
-            description: 'Da questa icona passi da una sezione all\'altra: Opus per il lavoro, Gymnasium per lo studio, il Forum per la comunità. La barra laterale cambia con la sezione.',
+            description: 'Da qui passi da una sezione all\'altra: Opus per il lavoro, Gymnasium per lo studio, il Forum per la comunità. Dove la barra scrive il nome della sezione, il nome riporta alla sua pagina principale e la freccia accanto apre le altre. La barra laterale cambia con la sezione.',
             side: 'right',
             align: 'start',
         }
