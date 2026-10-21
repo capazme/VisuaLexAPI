@@ -95,7 +95,8 @@ export function DossierPicker({ value, onChange, labelId }: Props) {
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-labelledby={`${labelId} ${id}-current`}
-        onClick={() => (open ? close(false) : (setActive(0), setOpen(true)))}
+        // The list opens on the dossier chosen now (with no words typed, `options` lists them all).
+        onClick={() => (open ? close(false) : (setActive(Math.max(0, options.findIndex((o) => o.id === value))), setOpen(true)))}
         className={cn(
           'flex min-h-[44px] w-full min-w-0 items-center gap-2 rounded-lg px-2 text-left text-sm text-slate-900 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-800',
           FOCUS_RING,

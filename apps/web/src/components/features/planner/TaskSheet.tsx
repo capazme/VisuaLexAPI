@@ -231,7 +231,7 @@ function SheetBody({ task, today, headingId, listed, familyFailed, familyOptimis
           {error}
         </p>
       )}
-      <div className="grid min-h-full grid-cols-1 md:grid-cols-[minmax(0,1fr)_17.5rem]">
+      <div className="grid min-h-full grid-cols-1 md:grid-cols-[minmax(0,1fr)_17.5rem] md:grid-rows-[auto_1fr]">
         <div className="min-w-0 px-2 pt-4 md:px-4 md:pt-6">
           <div className="flex items-start gap-1">
             <TaskCheckbox
