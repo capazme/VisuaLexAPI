@@ -214,6 +214,13 @@ def _cons_lines(element) -> list[str]:
     return lines
 
 
+def _heads_article(text, pattern) -> bool:
+    """True when `text` opens with the heading `pattern` ("Articolo 1") and the
+    number ends there: "Articolo 17" does not head article 1, or a request for a
+    missing art. 1 would be served art. 17."""
+    return text.startswith(pattern) and not text[len(pattern):len(pattern) + 1].isdigit()
+
+
 def _cons_find_title(soup, article):
     wanted = normalize_article_key(str(article))
     for marker in soup.find_all("p", class_=_CONS_ARTICLE_CLASS):
@@ -412,7 +419,7 @@ class EurlexScraper(BaseScraper):
 
         # Strategy 1: Look for <p class="ti-art"> (original selector)
         for pattern in search_patterns:
-            article_section = soup.find(lambda tag: tag.name == 'p' and 'ti-art' in tag.get('class', []) and tag.get_text(strip=True).startswith(pattern))
+            article_section = soup.find(lambda tag: tag.name == 'p' and 'ti-art' in tag.get('class', []) and _heads_article(tag.get_text(strip=True), pattern))
             if article_section:
                 log.debug(f"Found article with ti-art class using pattern: {pattern}")
                 break
@@ -420,7 +427,7 @@ class EurlexScraper(BaseScraper):
         # Strategy 2: Look for any element with class containing 'art' or 'title'
         if not article_section:
             for pattern in search_patterns:
-                article_section = soup.find(lambda tag: tag.get('class') and any('art' in c.lower() or 'title' in c.lower() for c in tag.get('class', [])) and tag.get_text(strip=True).startswith(pattern))
+                article_section = soup.find(lambda tag: tag.get('class') and any('art' in c.lower() or 'title' in c.lower() for c in tag.get('class', [])) and _heads_article(tag.get_text(strip=True), pattern))
                 if article_section:
                     log.debug(f"Found article with art/title class using pattern: {pattern}")
                     break
@@ -436,7 +443,7 @@ class EurlexScraper(BaseScraper):
         if not article_section:
             subdivisions = soup.find_all('div', class_=lambda c: c and 'eli-subdivision' in c)
             for subdiv in subdivisions:
-                title_elem = subdiv.find(['p', 'span', 'div'], string=lambda s: s and any(s.strip().startswith(p) for p in search_patterns))
+                title_elem = subdiv.find(['p', 'span', 'div'], string=lambda s: s and any(_heads_article(s.strip(), p) for p in search_patterns))
                 if title_elem:
                     article_section = subdiv
                     log.debug("Found article in eli-subdivision")
