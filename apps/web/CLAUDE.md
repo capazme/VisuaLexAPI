@@ -197,9 +197,20 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   over it Opus, Gymnasium (the code's `studia`), Academia (development mode only) and Forum, in
   `features/sections/` (`sections.ts`: names, lines, icons, home addresses, `sectionForPath`; `useSection`: the
   active section — from the address on `/opus/*`, `/studia/*`, `/forum`, `/merlt*`, `/grafo`, else the last one, kept in the
-  browser under `visualex-section`, Opus by default; `SectionSwitcher`: the menu button at the top of the sidebar,
-  `#tour-section-switcher`, on `ui/MenuButton` with `menuitemradio` entries, a dot for the Forum's news from
-  another section). **The section change** (T1, which replaced S2's halftone on the owner's word, 21 October 2026: light, and never
+  browser under `visualex-section`, Opus by default; `SectionSwitcher`: at the top of the sidebar,
+  `#tour-section-switcher`, a menu of `menuitemradio` entries with its own keyboard (arrows, Home/End, Enter/Space,
+  Esc back to the arrow, Tab, a click outside), a dot for the Forum's news from another section, Opus's count of today's tasks on its entry; where the bar writes
+  the section's name — from `xl` and in the phone's drawer — a split button (S6): the mark and the name go to the
+  section's home («Vai a Gymnasium: Oggi», `goToLabel`, `homeName`), an arrow after a thin rule opens the menu; in
+  the rail one button, the mark, opens it. Its motions are `sectionMenuMotion.ts`, Web Animations: the menu unrolls
+  from the top in 260 ms (an `inset` clip with the same four lengths at both ends, a scale from 0.97), the arrow
+  turns, the entries come in 40 ms apart; the page changes on the click; one check slides to the entry chosen (180 ms) and the
+  menu closes by itself 200 ms later in 180 ms, while the name rolls to the new one and the button takes its width
+  (220 ms) — all counted from the first frame drawn after the choice, since T1's hold draws nothing until the new page
+  is there, and measured there, never in the commit (a forced layout, or a change of weight or attribute on the menu
+  at the click, cost the change 20–35 ms on the slow machine); under reduced motion nothing moves and the menu goes at
+  once; in the drawer it is the drawer's width less 32 px, with entries of 56 px, and goes at once with the choice,
+  the drawer closing over it). **The section change** (T1, which replaced S2's halftone on the owner's word, 21 October 2026: light, and never
   over the page): `chooseSection(id)` plays `sectionTransition.ts`, a View Transition on `vlx-page` only (`index.css`) —
   the layout's content area, not `<main>`, so the bars at the top and the floating buttons hold still. It is named only
   while a transition runs (`lib/pageTransition.ts`, the class `vlx-page-changing` on the root; the sign-in page's
@@ -214,7 +225,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `MutationObserver` — the browser draws no frame, so no `requestAnimationFrame`, while the update is pending. A heading
   that already named the section before the swap (the dossier list's says the kind it last listed) is not taken until
   that hold is over. The pages loaded on demand (Gymnasium's, Academia's) are fetched when the switcher opens
-  (`SECTION_HOME_CODE`, `MenuButton`'s `onOpen`), or the first change would hold and fade into «Caricamento…». The
+  (`SECTION_HOME_CODE`, when the menu opens), or the first change would hold and fade into «Caricamento…». The
   switcher's mark passes to the new hue in 200 ms (`transition-colors duration-200`), the change's one touch of colour;
   the sidebar's new entries fade in, the first six 20 ms apart, the old ones simply go (`useEntriesEntrance`, Web
   Animations, opacity only, never on the sidebar's first draw). The section's entries are a `LayoutGroup` of their
@@ -228,7 +239,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   new page's title unless the user moved it meanwhile: each section's home marks its heading
   `data-section-title="<section id>"` with `tabIndex={-1}` and `FOCUS_RING` (`PageFrame`'s `section`), so a keyboard user sees where the focus
   went — and only a keyboard user: the browser counts a focus the script gives after a focused menu entry as visible,
-  so a choice made with a pointer (`MenuItem.onSelect`'s click, `detail` above 0) marks the title
+  so a choice made with a pointer (the entry's click in `SectionSwitcher`, `detail` above 0) marks the title
   `data-pointer-focus`, which `index.css` draws with no ring, until it loses the focus (Gymnasium's `h1`, Opus's — the planner's, `OpusPage`, on «Oggi» —, the dossier list's
   `h1` — `opus` or `gymnasium` by the kind it lists, since the same element stays from one to the other —, «Dossier
   pubblici», the MERL-T hub); a new home marks its own. Under reduced motion the page changes at once and nothing moves; without View
@@ -1686,8 +1697,10 @@ Duplicating any of these is a defect, not a shortcut.
   of the text in force starts with, D8), `labelFromParams` (the parsers'
   previews), `normFromUrn` (a Normattiva URN or an ELI read back into a norm; the
   preleggi are never the codice civile). `actTypes.ts` holds the tables; its
-  `CODES_TABLE` is a copy of the API's `NORMATTIVA_URN_CODICI`, and the golden test
-  fails when the two differ. Never write a norm's label inline: a new surface
+  `CODES_TABLE` is a copy of the API's `NORMATTIVA_URN_CODICI`, and `ANNEXED_ACTS` of the
+  API's table of acts whose text is their annex (the TULPS), and the golden test fails when
+  either differs. A code's default annex, and such an act's annex, are never named in a
+  label (G-350, G-351). Never write a norm's label inline: a new surface
   picks one of these.
 - `utils/sources/normEntry.ts` — `rebuildNormEntry`: a norm from someone else (a shared
   environment, a file, a share link) rebuilt from closed values — a known act type, fixed forms,
@@ -1754,7 +1767,9 @@ Duplicating any of these is a defect, not a shortcut.
   tied, none) and never the top-level map, which can be an annex's (d.lgs.
   196/2003). The index window and the dossier use it.
 - `components/ui/MenuButton.tsx` — the one menu button (arrows, Home/End,
-  Escape/Tab, focus return, click outside; clicks never reach the card).
+  Escape/Tab, focus return, click outside; clicks never reach the card). Two menus keep their own keyboard,
+  for a reason: the sidebar's user menu (portalled, placed from the avatar) and the section switcher (S6: a menu
+  that stays a moment after the choice, rolls up, and can be turned back).
 - `hooks/useAnnexNavigation.ts` — shared tree fetch + annex switch + load article.
 - `utils/deepLinks.ts` — `buildSearchDeepLink(params, articleId)` /
   `parseSearchDeepLink(value)`: the `?norma=` share link (base64url JSON with
