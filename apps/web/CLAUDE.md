@@ -1958,7 +1958,8 @@ row's star and remove buttons do. A text field or a select is at least 16 px bel
 Safari on an iPhone zooms the page into a field under 16 px as it takes the focus, and
 `text-base` is not enough — the text size «piccolo» makes 1 rem 14 px. `ui/Input` and
 `ui/FormSelect` carry it, and so do the searches of «Le mie schede» and of the Cronologia
-(`ui/__tests__/fieldText.test.tsx`); many fields written by hand do not yet (the find
+(`ui/__tests__/fieldText.test.tsx`), the search page's field and the palette's fields (its box
+is `max(1.125rem,16px)`); about sixty fields written by hand do not yet (the find
 window, the dossier's search, the index filter, the case-law filters, the dossier pickers,
 the notes): a field written by hand takes it, and a `text-*` class after it in `cn` undoes it.
 

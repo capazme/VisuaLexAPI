@@ -316,6 +316,19 @@ describe('CommandPalette — the field and its line', () => {
     expect(box).toHaveClass('focus-visible:ring-0', 'focus-visible:ring-offset-0');
     expect(box.parentElement).toHaveClass('border', 'focus-within:ring-2');
   });
+
+  it('never draws a field under 16 px, so Safari on an iPhone does not zoom into it, with the text size «piccolo» too', async () => {
+    asDesktop(false);
+    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    expect(screen.getByRole('combobox')).toHaveClass('text-[length:max(1.125rem,16px)]');
+    await userEvent.setup().click(screen.getByRole('button', { name: /Filtri avanzati/ }));
+    const years = screen.getAllByRole('spinbutton');
+    expect(years.length).toBeGreaterThan(0);
+    for (const year of years) {
+      expect(year).toHaveClass('text-[length:max(1rem,16px)]', 'md:text-sm');
+      expect(year).not.toHaveClass('text-base');
+    }
+  });
 });
 
 describe('CommandPalette — on a phone, the order', () => {
