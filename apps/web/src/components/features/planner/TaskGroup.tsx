@@ -21,6 +21,8 @@ export interface GroupAdd {
 }
 
 interface Props {
+  /** The section's id, for a link or a scroll to it (a day of «Prossimi giorni»). */
+  anchorId?: string;
   /** The group's key in `plannerStore.folded`, for the session: «today:missed», «upcoming:2026-10-22», «today:dossier:…». */
   foldKey: string;
   heading: string;
@@ -37,7 +39,7 @@ interface Props {
  * the heading's own words, its state `aria-expanded`): the arrow, the name, the count, «⋯»; then its rows and «+
  * Aggiungi compito». Folding is instant: nothing moves, under reduced motion or not, but the arrow's turn.
  */
-export function TaskGroup({ foldKey, heading, count, add, actions = [], children }: Props) {
+export function TaskGroup({ anchorId, foldKey, heading, count, add, actions = [], children }: Props) {
   const id = useId();
   const folded = plannerStore((s) => Boolean(s.folded[foldKey]));
   const [adding, setAdding] = useState(0);
@@ -49,7 +51,8 @@ export function TaskGroup({ foldKey, heading, count, add, actions = [], children
     ...actions,
   ];
   return (
-    <section aria-labelledby={`${id}-heading`} className="min-w-0">
+    // Clear of the week's strip, which sticks at the top, when the view scrolls to it.
+    <section id={anchorId} aria-labelledby={`${id}-heading`} className="min-w-0 scroll-mt-40">
       <div className="flex items-center gap-1 border-b border-slate-300 dark:border-slate-700">
         <h3 id={`${id}-heading`} className={cn(GROUP_HEADING, 'min-w-0 flex-1')}>
           <button

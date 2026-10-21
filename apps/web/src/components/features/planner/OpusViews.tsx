@@ -4,17 +4,18 @@ import { FolderOpen, ListFilter, RotateCcw } from 'lucide-react';
 import { MenuButton } from '../../ui/MenuButton';
 import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
-import { todayInRome } from '../../../utils/dateUtils';
+import { addDaysToIsoDate, todayInRome } from '../../../utils/dateUtils';
 import type { Task, TaskView } from '../../../types/tasks';
 import { BLOCK_HEADING, QUIET_BUTTON, SECONDARY_BUTTON } from '../studia/progress/tokens';
 import { QuickAddField } from './QuickAddField';
 import { restoreTask } from './taskActions';
-import { dayHeading, longDay, splitToday, groupUpcoming } from './taskDates';
+import { blockHeading, dayHeading, groupUpcoming, longDay, splitToday, UPCOMING_DAYS, weekStart } from './taskDates';
 import type { TaskDraft } from './taskDraft';
 import { TaskList } from './TaskList';
 import { TaskSheetScope } from './TaskSheetScope';
 import { InlineAddTask, TaskGroup } from './TaskGroup';
 import { StudyTodayRow } from './StudyTodayRow';
+import { WeekStrip } from './WeekStrip';
 import { TaskListSkeleton, TaskViewEmpty, TaskViewError, TruncatedNote } from './TaskViewStates';
 import { useTaskView } from './useTaskView';
 
@@ -38,10 +39,11 @@ interface FrameProps {
   defaults?: (today: string) => Partial<TaskDraft>;
   /** Beside the heading: the view's options («Raggruppa»). */
   options?: ReactNode;
-  /** Above the rows, under the quick add: Gymnasium's day on «Oggi». */
-  before?: ReactNode;
+  /** Above the rows, under the quick add: Gymnasium's day on «Oggi», the week's strip on «Prossimi giorni». */
+  before?: ReactNode | ((today: string) => ReactNode);
   children: (tasks: Task[], today: string, optimistic: ReturnType<typeof useTaskView>['optimistic']) => ReactNode;
-  empty: { title: string; line?: string };
+  /** What an empty view says; without it the view draws its groups all the same (the days of the week). */
+  empty?: { title: string; line?: string };
 }
 
 /**
@@ -65,12 +67,12 @@ function ViewFrame({ view, heading, line, defaults, options, before, children, e
       </div>
       {/* Keyed on the day: a page left open overnight proposes the new day, not the one it was opened on. */}
       {defaults && <QuickAddField key={today} view={view} today={today} defaults={defaults(today)} />}
-      {before}
+      {typeof before === 'function' ? before(today) : before}
       <div aria-busy={state.status === 'loading'} className={cn('space-y-6', state.status === 'loading' && state.answer && 'opacity-60 transition-opacity')}>
         {state.status === 'error' && <TaskViewError onRetry={state.reload} />}
         {state.answer === null ? (
           state.status === 'loading' && <TaskListSkeleton />
-        ) : tasks.length === 0 ? (
+        ) : tasks.length === 0 && empty ? (
           <TaskViewEmpty {...empty} />
         ) : (
           <TaskSheetScope tasks={tasks} today={today} optimistic={state.optimistic} className="space-y-8">
@@ -183,29 +185,53 @@ export function TodayView() {
   );
 }
 
-/** «Prossimi giorni»: today and the six days after it, day by day. */
+/**
+ * «Prossimi giorni» (P2c): the week's strip, then one block per day of the chosen week that the view can show — its
+ * heading («22 ott · Domani · giovedì»), its tasks, «+ Aggiungi compito» for that day — even an empty one. A task
+ * sits under its planned date when that is in the seven days, else under its deadline (`groupUpcoming`). The server
+ * answers today and the six days after it (`view=upcoming`), so the weeks are the one or two those days touch.
+ */
 export function UpcomingView() {
+  const [chosen, setChosen] = useState<string | null>(null);
+  const select = (day: string) => {
+    setChosen(day);
+    // After the block is drawn: a day of another week appears with its week.
+    requestAnimationFrame(() => {
+      const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? true;
+      document.getElementById(`opus-day-${day}`)?.scrollIntoView({ block: 'start', behavior: still ? 'auto' : 'smooth' });
+    });
+  };
+  const lastOf = (today: string) => addDaysToIsoDate(today, UPCOMING_DAYS - 1);
+  // A day chosen before midnight, now past or out of reach, gives way to today.
+  const selectedFor = (today: string) => (chosen && chosen >= today && chosen <= lastOf(today) ? chosen : today);
   return (
     <ViewFrame
       view="upcoming"
       heading="Prossimi giorni"
-      line="I compiti pianificati o in scadenza nei prossimi 7 giorni."
+      line={(today) => `I compiti pianificati o in scadenza da oggi a ${longDay(lastOf(today), today)}.`}
       defaults={(day) => ({ plannedDate: day })}
-      empty={{ title: 'Nessun compito nei prossimi 7 giorni' }}
+      before={(today) => <WeekStrip today={today} last={lastOf(today)} selected={selectedFor(today)} onSelect={select} />}
     >
-      {(tasks, day, optimistic) =>
-        groupUpcoming(tasks, day).map((group) => (
-          <TaskGroup
-            key={group.day}
-            foldKey={`upcoming:${group.day}`}
-            heading={dayHeading(group.day, day)}
-            count={group.tasks.length}
-            add={{ view: 'upcoming', today: day, defaults: { plannedDate: group.day } }}
-          >
-            <TaskList label={dayHeading(group.day, day)} tasks={group.tasks} today={day} optimistic={optimistic} subtasksOpen />
-          </TaskGroup>
-        ))
-      }
+      {(tasks, today, optimistic) => {
+        const byDay = new Map(groupUpcoming(tasks, today).map((group) => [group.day, group.tasks]));
+        const monday = weekStart(selectedFor(today));
+        const days = Array.from({ length: 7 }, (_, i) => addDaysToIsoDate(monday, i)).filter((day) => day >= today && day <= lastOf(today));
+        return days.map((day) => {
+          const listed = byDay.get(day) ?? [];
+          return (
+            <TaskGroup
+              key={day}
+              anchorId={`opus-day-${day}`}
+              foldKey={`upcoming:${day}`}
+              heading={blockHeading(day, today)}
+              count={listed.length}
+              add={{ view: 'upcoming', today, defaults: { plannedDate: day } }}
+            >
+              {listed.length > 0 && <TaskList label={dayHeading(day, today)} tasks={listed} today={today} optimistic={optimistic} subtasksOpen />}
+            </TaskGroup>
+          );
+        });
+      }}
     </ViewFrame>
   );
 }

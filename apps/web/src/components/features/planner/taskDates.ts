@@ -51,6 +51,37 @@ export function dayHeading(day: string, today: string): string {
   return capitalise(long);
 }
 
+const blockFormat = new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+const weekdayName = new Intl.DateTimeFormat('it-IT', { weekday: 'long', timeZone: 'UTC' });
+const weekdayShort = new Intl.DateTimeFormat('it-IT', { weekday: 'short', timeZone: 'UTC' });
+const monthYearFormat = new Intl.DateTimeFormat('it-IT', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+
+/** A day's block in «Prossimi giorni»: «21 ott · Oggi · mercoledì», «22 ott · Domani · giovedì», «23 ott · venerdì». */
+export function blockHeading(day: string, today: string): string {
+  const offset = daysBetween(today, day);
+  const date = blockFormat.format(new Date(utc(day))).replace(/\./g, '');
+  const name = weekdayName.format(new Date(utc(day)));
+  if (offset === 0) return `${date} · Oggi · ${name}`;
+  if (offset === 1) return `${date} · Domani · ${name}`;
+  return `${date} · ${name}`;
+}
+
+/** The Monday of a day's week (the Italian week starts on Monday). */
+export function weekStart(day: string): string {
+  const weekday = new Date(utc(day)).getUTCDay();
+  return addDaysToIsoDate(day, -((weekday + 6) % 7));
+}
+
+/** A day in the week's strip: «lun» and «19». */
+export function stripDay(day: string): { weekday: string; date: number } {
+  return { weekday: weekdayShort.format(new Date(utc(day))).replace(/\./g, ''), date: Number(day.slice(8, 10)) };
+}
+
+/** «ottobre 2026». */
+export function monthLabel(day: string): string {
+  return monthYearFormat.format(new Date(utc(day)));
+}
+
 export type DayTone = 'late' | 'today' | 'tomorrow' | 'week' | 'later';
 
 /** How a planned day reads on a row: late, today, tomorrow, later this week, or further. */
@@ -62,8 +93,6 @@ export function dayTone(day: string, today: string): DayTone {
   return offset <= 6 ? 'week' : 'later';
 }
 
-const weekdayFormat = new Intl.DateTimeFormat('it-IT', { weekday: 'long', timeZone: 'UTC' });
-
 /**
  * A planned day on a row: «Oggi», «Domani», the weekday for the rest of the week («venerdì»), else as `shortDay`;
  * a past one says how late it is in words («Ieri · in ritardo di 1 giorno»), never by its colour alone.
@@ -71,7 +100,7 @@ const weekdayFormat = new Intl.DateTimeFormat('it-IT', { weekday: 'long', timeZo
 export function rowDay(day: string, today: string): string {
   const offset = daysBetween(today, day);
   if (offset < 0) return `${shortDay(day, today)} · in ritardo di ${-offset} ${offset === -1 ? 'giorno' : 'giorni'}`;
-  if (offset >= 2 && offset <= 6) return weekdayFormat.format(new Date(utc(day)));
+  if (offset >= 2 && offset <= 6) return weekdayName.format(new Date(utc(day)));
   return shortDay(day, today);
 }
 

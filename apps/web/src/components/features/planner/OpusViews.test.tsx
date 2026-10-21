@@ -305,12 +305,59 @@ describe('«Oggi» in groups', () => {
 });
 
 describe('the other views', () => {
-  it('«Prossimi giorni» groups by day', async () => {
-    service.list.mockResolvedValue(answer([task('a', { plannedDate: '2026-10-22' }), task('b', { dueDate: TODAY })]));
+  it('«Prossimi giorni» draws a block for each day of the week it can show, an empty one too', async () => {
+    service.list.mockResolvedValue(answer([task('a', { plannedDate: '2026-10-22', dossierId: 'd1' }), task('b', { dueDate: TODAY })]));
     renderAt(<UpcomingView />);
     await screen.findByRole('list', { name: 'Oggi · martedì 20 ottobre' });
-    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Oggi · martedì 20 ottobre, 1 compito', 'Giovedì 22 ottobre, 1 compito']);
+    // 20 October is a Tuesday: Monday has passed; the server's seven days run to Monday 26.
+    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
+      '20 ott · Oggi · martedì, 1 compito',
+      '21 ott · Domani · mercoledì, 0 compiti',
+      '22 ott · giovedì, 1 compito',
+      '23 ott · venerdì, 0 compiti',
+      '24 ott · sabato, 0 compiti',
+      '25 ott · domenica, 0 compiti',
+    ]);
     expect(screen.getByText('Termine finale: scade oggi')).toBeInTheDocument();
+    // The dossier at the row's right end.
+    expect(within(screen.getByRole('list', { name: 'Giovedì 22 ottobre' })).getByRole('link', { name: /Ricorso Rossi/ })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Aggiungi compito' })).toHaveLength(6);
+  });
+
+  it('chooses the month from a menu when the seven days span two', async () => {
+    service.list.mockResolvedValue({ today: '2026-10-28', tasks: [], truncated: false });
+    renderAt(<UpcomingView />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Mese: ottobre 2026' }));
+    expect(screen.getAllByRole('menuitemradio').map((item) => item.textContent)).toEqual(['ottobre 2026', 'novembre 2026']);
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'novembre 2026' }));
+    expect(screen.getByRole('button', { name: 'Mese: novembre 2026' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'domenica 1 novembre' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it("walks the week's strip: today marked, the days out of reach not chosen, the next week, back to today", async () => {
+    service.list.mockResolvedValue(answer([task('m', { plannedDate: '2026-10-26' })]));
+    service.create.mockResolvedValue(task('n', { plannedDate: '2026-10-23' }));
+    renderAt(<UpcomingView />);
+    const strip = await screen.findByRole('list', { name: /^Settimana da lunedì 19 ottobre a domenica 25 ottobre$/ });
+    expect(screen.getByText('ottobre 2026')).toBeInTheDocument();
+    expect(within(strip).getByRole('button', { name: 'lunedì 19 ottobre' })).toBeDisabled();
+    expect(within(strip).getByRole('button', { name: 'martedì 20 ottobre, oggi' })).toHaveAttribute('aria-current', 'date');
+    expect(within(strip).getByRole('button', { name: 'martedì 20 ottobre, oggi' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Settimana precedente' })).toBeDisabled();
+    // A day of the week: chosen, and its block gets «+ Aggiungi compito» for that day.
+    fireEvent.click(within(strip).getByRole('button', { name: 'venerdì 23 ottobre' }));
+    expect(within(strip).getByRole('button', { name: 'venerdì 23 ottobre' })).toHaveAttribute('aria-pressed', 'true');
+    const friday = screen.getByRole('region', { name: /^23 ott · venerdì/ });
+    fireEvent.click(within(friday).getByRole('button', { name: 'Aggiungi compito' }));
+    fireEvent.change(within(friday).getByLabelText('Nuovo compito'), { target: { value: 'Udienza' } });
+    fireEvent.submit(within(friday).getByLabelText('Nuovo compito'));
+    await waitFor(() => expect(service.create.mock.calls[0][0]).toMatchObject({ title: 'Udienza', plannedDate: '2026-10-23' }));
+    // The next week: only Monday 26 is in the server's seven days.
+    fireEvent.click(screen.getByRole('button', { name: 'Settimana successiva' }));
+    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['26 ott · lunedì, 1 compito']);
+    expect(screen.getByRole('button', { name: 'Settimana successiva' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Oggi' }));
+    expect(screen.getAllByRole('heading', { level: 3 })[0]).toHaveTextContent('20 ott · Oggi · martedì');
   });
 
   it("the inbox adds a task with no date and no dossier", async () => {
