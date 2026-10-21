@@ -664,11 +664,17 @@ class TestRejectFutureVersionDate:
     TODAY = date(2026, 10, 1)
 
     @pytest.mark.parametrize("value", [
-        None, "", "2026-10-01", "2000-01-01", "1 ottobre 2026",
-        "ieri", "2026-02-31", "31 febbraio 2019", 20261002,
+        None, "", "   ", "2026-10-01", "2000-01-01", "1 ottobre 2026", 20261002,
     ])
-    def test_today_the_past_and_what_the_existing_parser_judges_pass(self, value):
+    def test_no_date_today_and_the_past_pass(self, value):
         reject_future_version_date(value, today=self.TODAY)
+
+    @pytest.mark.parametrize("value", ["ieri", "2026-02-31", "31 febbraio 2019"])
+    def test_a_date_that_cannot_be_read_is_refused(self, value):
+        # A date is read for every request since G-353 (it always asks for the text in
+        # force on that day): one that cannot be read is a 400 here, not a 500 later.
+        with pytest.raises(ValidationError, match="non valida"):
+            reject_future_version_date(value, today=self.TODAY)
 
     @pytest.mark.parametrize("value", ["2026-10-02", "2999-01-01", "2 ottobre 2026", " 2026-10-02 "])
     def test_a_later_day_is_refused_with_the_reason(self, value):
