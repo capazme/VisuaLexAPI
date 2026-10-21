@@ -189,6 +189,7 @@ def _is_default_annex(norm: Mapping[str, Any], annex: str) -> bool:
     row = codice_urn(_text(norm, "tipo_atto"))
     return bool(row) and row.endswith(f":{annex}")
 
+
 def cite_act(norm: Mapping[str, Any]) -> str:
     """The act alone: "l. 7 agosto 1990, n. 241", "c.c.", "reg. (UE) 2016/679"."""
     return _act(norm)[0]
