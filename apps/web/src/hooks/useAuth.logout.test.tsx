@@ -4,11 +4,14 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 vi.mock('../services/authService', () => ({
   isAuthenticated: () => false,
   logout: vi.fn(),
+  login: vi.fn(),
+  register: vi.fn(),
   getCurrentUser: vi.fn(),
 }));
 vi.mock('../services/decisionService', () => ({ fetchDecision: vi.fn() }));
 vi.mock('../services/studiaService', () => ({ studiaService: { forArticle: vi.fn() } }));
 
+import * as authService from '../services/authService';
 import { fetchDecision } from '../services/decisionService';
 import { studiaService } from '../services/studiaService';
 import { useArticleCards } from '../components/features/studia/useArticleCards';
@@ -54,5 +57,28 @@ describe('useAuth — logout', () => {
     expect(next.result.current.status).toBe('loading');
     await waitFor(() => expect(next.result.current.status).toBe('ready'));
     expect(studiaService.forArticle).toHaveBeenCalledTimes(2);
+  });
+
+  it('forgets what Gymnasium last drew here: the last reader’s points and level (G-316)', async () => {
+    localStorage.setItem('visualex.studia.visto', JSON.stringify({ xp: 900, livello: 7 }));
+    const { result } = renderHook(() => useAuth());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    act(() => { result.current.logout(); });
+
+    expect(localStorage.getItem('visualex.studia.visto')).toBeNull();
+  });
+
+  it('forgets it too at a sign-in and a sign-up: a new person on this browser', async () => {
+    vi.mocked(authService.getCurrentUser).mockResolvedValue({ id: 'u2' } as never);
+    vi.spyOn(appStore.getState(), 'fetchUserData').mockResolvedValue(undefined as never);
+    const { result } = renderHook(() => useAuth());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    localStorage.setItem('visualex.studia.visto', JSON.stringify({ xp: 900, livello: 7 }));
+    await act(async () => { await result.current.login('b@example.test', 'pw'); });
+    expect(localStorage.getItem('visualex.studia.visto')).toBeNull();
+    localStorage.setItem('visualex.studia.visto', JSON.stringify({ xp: 900, livello: 7 }));
+    await act(async () => { await result.current.register('c@example.test', 'c', 'pw'); });
+    expect(localStorage.getItem('visualex.studia.visto')).toBeNull();
   });
 });

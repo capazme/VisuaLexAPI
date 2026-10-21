@@ -930,21 +930,23 @@ left's rows). The chips move by `useMediaQuery('(min-width: 1280px)')`, never as
 the list, from it they sit in the band's sticky box, read after the band. The document keeps the order the owner fixed
 — missions, statistics, list — and the grid only places the band; inside the tiles a sentence stops at `max-w-prose`. In that order:
 1. **«Le missioni di oggi»** (`missions/TodayMissions`): the day's three missions, one under the other, each with its
-   mark (drawn, never pressed), «8 di 18» and a thin bar, and the summary «2 di 3» over those with something to do
-   today. They are **computed in the web**, pure, by `missions/missions.ts` (`todayMissions`, `missionSummary`,
-   `allMissions`, `goalLine`) from the whole day's read: «Ripassa le schede dovute», the due cards reviewed today (today's
-   calendar row, reviews less first reviews) of those plus `oggi.dovute`; «Impara 5 schede nuove», today's first reviews
-   of five, or of what today allows (`oggi.nuove`, the quota and the cards left; `NEW_CARDS_TARGET`); «Raggiungi l'obiettivo
-   di oggi», `oggi.ripassi` of `oggi.obiettivo`, done when the server says `raggiunto`, the goal line under it. A mission
-   with nothing to do today says so and leaves the summary; a count past its target stops at it («5 di 5»; the ring keeps
-   the real count), and a goal the server counted with the queue finished under it says why. A mission done reads done
+   mark (drawn, never pressed), «8 di 18», its points («20 XP», «+20 XP» in ink once earned, said as «vale 20 punti» /
+   «20 punti guadagnati») and a thin bar, and the summary «2 di 3» over those with something to do today. **The server
+   decides them** (G1c, Gymnasium XP spec `docs/superpowers/specs/2026-10-20-gymnasium-xp-levels-design.md` §5.3): the
+   progress read carries `missioni` (`MissioneServer`: state, `progresso`, `punti`, `principale`, `motivo`, `materia`), each
+   `fatta` if and only if its credit exists, and `missions/missions.ts` (`missionFrom`, `allMissions`, `todayMissions` —
+   the three `principale` —, `missionSummary`, `goalLine`) only words them: the Italian titles («Impara 5 schede nuove»,
+   or the server's lower target when fewer new cards are left; «Proponi una scheda», G-314), and the lines under them
+   (`motivo: 'quota'`: «Le nuove al giorno che hai scelto non bastano: alzale per arrivare a 5.» — the quota never lowers
+   the target, L-27 choice 5; a goal met for the streak under the mission's 10 reviews says so; the subject of
+   «materia-ferma»). Nothing is counted in the browser. A mission
+   with nothing to do today (`vuota`) says so and leaves the summary; a goal the server counted with the queue finished
+   under it says why. A mission done reads done
    (`.vlx-mission-done`: a quieter ink, struck through in the section's hue) and slides under those still open
    (`missionOrder`), except the due cards', which carries the action and stays first; done since this browser last drew
    it, a drop of ink falls into its box and the ink crosses its words first (`MissionMark`'s `drip`,
    `.vlx-mission-inking`, `MISSION_INK_MS`), then it moves (a moving row keeps its padding wherever it lands; the
-   list's `-mb-4` takes the last one's back). «Tutte le missioni» keeps to the words. When the server records
-   missions, only `missions.ts`
-   changes. **No points and no level are shown** until the server keeps them. The first mission carries the action:
+   list's `-mb-4` takes the last one's back). «Tutte le missioni» keeps to the words. The first mission carries the action:
    «Oggi: 18 da ripassare, 8 nuove» (a part that is zero left out; «Oggi in Diritto penale: …» when a subject is chosen),
    «circa N minuti» (`estimateLabel` in `studiaLabels.ts`, `ceil(cards × SECONDS_PER_CARD / 60)`, 20 s a card, an
    estimate) and **«Inizia»**, the page's one primary button (44 px, full width on a phone; «Continua» once the goal is
@@ -958,7 +960,11 @@ the list, from it they sit in the band's sticky box, read after the band. The do
    cards); `todayState` and `nextDueDay` decide it, pure, in `progress/today.ts`.
 2. **«I tuoi progressi»** (`progress/StatsBand`), one band: `StreakBadge compact` (the «§», the count with the bundle
    of five being filled as tally marks beside it, `StreakTally` — the fifth is the stroke across the four in the
-   section's hue —, «Il primo giorno comincia oggi» or «giorni di fila · record N») and `GoalRing compact` (40 px, «5 di 10»), the gear «Impostazioni dello
+   section's hue —, «Il primo giorno comincia oggi» or «giorni di fila · record N») and `GoalRing compact` (40 px, «5 di 10»); under them and
+   the week, **the level** (`progress/LevelBar`, G1c: «Livello 4», «oggi +45 XP», a quiet bar of `nelLivello` of `perIlProssimo` and
+   «Ancora 138 XP per il livello 5», all from the read's `livello`, which the server computes; the user's alone, G-316 — never
+   in the Forum, a public dossier or anything another user sees —, no title, L-27 choice 3, and never a weight of a vote,
+   G-318); the gear «Impostazioni dello
    studio» (`progress/StudySettings`: `SettingsGear` with `aria-controls`, and `StudySettingsPanel` — G6, the owner's
    «si estende il tab»: `StudyPreferences open` inside the card under its heading, no window and no veil, its height
    in `dur.pop` on `ease.out` through Framer Motion, at once under reduced motion; the gear again or Esc inside closes it
@@ -980,9 +986,10 @@ the list, from it they sit in the band's sticky box, read after the band. The do
    `typeScale.test.tsx` reads the files of `missions/` and `progress/` and fails on a `text-[Npx]` under 11 or an SVG
    `<text>`. `CARD_STATES`, in `tokens.ts`, are the band's, the road's and the page's.
 3. **«Tutte le missioni»** (`missions/MissionList`): daily, weekly, long-term, without today's three, which item 1
-   shows just above («Le tre di oggi sono qui sopra», G6). What the web counts shows its state;
-   what the server must record (a subject left for 7 days, writing a card, validating two — a validator's only, from the
-   outlet's `validator` —, a short case, a week of streak) is listed with «In arrivo», with no count and nothing to tick.
+   shows just above («Le tre di oggi sono qui sopra», G6): every mission the server lists that is not `principale`, with
+   its state, count, line and points — «convalida» only when the server lists it (a validator's); a `vuota` keeps its
+   count beside «Niente oggi» («1 di 2») —; «caso», announced
+   and not yet recorded, is listed with «In arrivo», no count, no points and nothing to tick.
 4. «Cosa ripassi», `SubjectChips` (the subject narrows the first mission's action and the session it starts, kept in
    `localStorage` under `visualex.studia.ripasso.materia` by `progress/rememberedSubject.ts`, which «Progressi» shares:
    one choice for the area); `SubjectRoad`, «Il percorso», one stop per
@@ -1031,11 +1038,30 @@ line says it to a screen reader). The confetti step by elapsed time (`confetti.t
 **The small motions** (S2): the tally's new mark (the count pops with it), today's count landing in the ring
 (`GoalRing`'s `vlx-digit-land`: the new digit falls into place and takes on its weight, 360 ms, over its own place held
 unseen at the final weight, so «di 10» beside it does not move; reaching the goal, the ring closes as it settles) and a mission's ink play **only for what grew since this browser last drew it** —
-`progress/seenProgress.ts` (`useStreakGrowth`, `useReviewsGrowth`, `useFreshMissions`) keeps the streak and today's
-reviews and missions under `visualex.studia.visto`, a convenience like the celebration's, never a number's source; with
+`progress/seenProgress.ts` (`useStreakGrowth`, `useReviewsGrowth`, `useFreshMissions`, `useXpGrowth`, `recordXpSeen`) keeps
+the streak, today's reviews and missions, and the points and the level under `visualex.studia.visto` — forgotten at
+every sign-in, sign-up and sign-out (`forgetSeenProgress`, `useAuth`), so the next person on the browser never reads the last
+one's points or level —, a convenience like the celebration's, never a number's source; with
 nothing stored nothing plays, and what a view draws it records (the dense strip draws no tally and leaves the streak's
 growth to «Oggi»). None of them takes a key or the focus or delays a card, and under reduced motion each is drawn at
 its end at once. The celebration is unchanged.
+**«+20 XP» and a new level** (G1c): what a grade, a proposal or a vote earned comes in its answer (`xp: XpEsito`; a grade
+not recorded and the proposal's 409 carry none). The lesson shows it as `progress/XpGain` — an ink chip over the progress
+bar's end, inside the header's row and out of the flow (never on the card; while the goal's notice covers the row it
+waits for the notice to go), rising 6 px and gone in 1.8 s (`XP_GAIN_MS`; under reduced motion it only appears),
+no focus, no pointer, never holding the next card, said in its own polite live region a frame after it is drawn
+(«Hai guadagnato 20 punti. Sei al livello 5.», emptied for that frame so the same words twice are heard twice) — and
+names the level an event crossed (`nuovoLivello`); a proposal and a vote add it to their message in words a screen
+reader reads, saying who earns them — after a vote a bare «+20 punti» would read as what the vote gave the card, a
+weight the owners excluded (G-318) — («Scheda proposta alla comunità · hai guadagnato 25 punti», «Voto registrato · hai
+guadagnato 20 punti»). Each records only what it
+showed (`recordXpSeen`: the event's credits, the level only when it crossed it), so «Oggi» does not show it again: there `LevelBar` shows only what grew since this browser last
+drew it (`useXpGrowth`, `xp` and `livello` under `visualex.studia.visto`, kept across days; the bar is a `progressbar` named
+«Livello N» with its value in words) — the credits a read wrote, or
+another device's — and presses in, once (also one reached while the page is open), a level not yet shown here, announced
+politely, at rest under reduced motion; nothing on a first visit. The
+points a session read credits silently («obiettivo» on an empty queue) show at the next progress read as `fatta` and in the
+level, never as «+XP» in the lesson (spec §5.3).
 
 **«Progressi», the page of the data** (`progress/ProgressPage`, `/studia/progressi`, the sidebar's «Progressi» in
 «Studia» after Oggi; Gymnasium spec §5.3, G3). The same read as «Oggi» — `useProgress(undefined)` for the whole day and
@@ -1077,7 +1103,7 @@ digits whole as Italian writes them). States: while the first read travels every
 (`ActivityCalendarSkeleton`, `DueForecastSkeleton`, `CardStatesBarSkeleton`); «Il primo giorno comincia oggi» over the
 calendar only for someone with no record (an empty calendar after 26 weeks away is not a first day); a failed read says «Non riesco a leggere i
 tuoi progressi.» with «Riprova» (44 px, no alert) and keeps what was on screen; a new read of the same subject leaves
-the last answer, dimmed. No points and no level.
+the last answer, dimmed. The summary ends with the level (`LevelBar`, G1c), the whole day's.
 
 **Study cards under the article** (`studia/ArticleCardsRow`, behind `VITE_FEATURE_STUDIA`): one quiet
 row after the discussion panel and «Chiedi su questo articolo», outside `ArticleBody` and its text root

@@ -1,15 +1,32 @@
 import { useEffect, useState } from 'react';
+import type { XpEsito } from '../../../../types/studia';
 
 const STORAGE_KEY = 'visualex.studia.visto';
 
 /**
- * What this browser last drew of the progress (S2): the streak, and today's reviews and missions done. Gymnasium's
- * small motions play only for what grew since — a tally mark when the streak grows, a digit when the count does, the
- * ink when a mission is done — never at every visit. A convenience of this browser, never a number's source: the
- * numbers drawn are always the read's. With nothing stored (a first visit, private mode) nothing plays.
+ * Forgets what this browser drew, at a sign-in and a sign-out (`useAuth`): the record is the browser's, not the
+ * user's, and the next person on it must not read the last one's points as «+N XP» or their level (G-316).
+ */
+export function forgetSeenProgress() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Private mode: nothing was kept.
+  }
+}
+
+/**
+ * What this browser last drew of the progress (S2): the streak, today's reviews and missions done, and the points and
+ * the level (G1c). Gymnasium's small motions play only for what grew since — a tally mark when the streak grows, a
+ * digit when the count does, the ink when a mission is done, «+20 XP» and a new level — never at every visit. A
+ * convenience of this browser, never a number's source: the numbers drawn are always the read's. With nothing stored
+ * (a first visit, private mode) nothing plays.
  */
 interface Seen {
   serie?: number;
+  /** The total of points and the level last drawn: not a day's, they never start over. */
+  xp?: number;
+  livello?: number;
   /** The server's day of `ripassi` and `missioni`; another day starts them over. */
   giorno?: string;
   ripassi?: number;
@@ -29,7 +46,7 @@ function readSeen(): Seen | null {
 /** Merges `patch` into what is stored; a patch for another day drops the day's values first. */
 function writeSeen(patch: Seen) {
   const stored = readSeen() ?? {};
-  const base = patch.giorno !== undefined && stored.giorno !== patch.giorno ? { serie: stored.serie } : stored;
+  const base = patch.giorno !== undefined && stored.giorno !== patch.giorno ? { serie: stored.serie, xp: stored.xp, livello: stored.livello } : stored;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...base, ...patch }));
   } catch {
@@ -92,4 +109,51 @@ export function useFreshMissions(giorno: string, done: readonly string[]): Reado
     writeSeen({ giorno, missioni: key ? key.split(' ') : [] });
   }, [giorno, key]);
   return state.fresh;
+}
+
+/**
+ * Records what a surface showed itself (the lesson's «+20 XP», a proposal's or a vote's message), so «Oggi» does not
+ * show it again: only this event's credits, and the level only when this event crossed it. Credits written silently
+ * before (a session read's) stay for «Oggi» to show, and a level they crossed to be pressed in there.
+ */
+export function recordXpSeen(xp: XpEsito) {
+  const seen = readSeen();
+  const earned = xp.crediti.reduce((sum, credit) => sum + credit.punti, 0);
+  const before = seen?.xp;
+  const level = seen?.livello;
+  writeSeen({
+    xp: isCount(before) ? Math.min(before + earned, xp.livello.totale) : xp.livello.totale,
+    livello: xp.nuovoLivello || !isCount(level) ? xp.livello.livello : level,
+  });
+}
+
+/**
+ * The points and the level drawn before, when they were lower (stored, or the previous values while mounted): `gain`,
+ * the points earned since, and `levelUp`, a level this browser has not yet shown. Null and false when nothing grew,
+ * or when nothing was ever stored (a first visit, or the first since points exist). Records what it is given.
+ */
+export function useXpGrowth(totale: number, livello: number): { gain: number | null; levelUp: boolean } {
+  const [state, setState] = useState(() => {
+    const seen = readSeen();
+    const before = seen?.xp;
+    const level = seen?.livello;
+    return {
+      totale,
+      livello,
+      gain: isCount(before) && before < totale ? totale - before : null,
+      levelUp: isCount(level) && level < livello,
+    };
+  });
+  if (state.totale !== totale || state.livello !== livello) {
+    setState({
+      totale,
+      livello,
+      gain: totale > state.totale ? totale - state.totale : null,
+      levelUp: livello > state.livello,
+    });
+  }
+  useEffect(() => {
+    writeSeen({ xp: totale, livello });
+  }, [totale, livello]);
+  return { gain: state.gain, levelUp: state.levelUp };
 }

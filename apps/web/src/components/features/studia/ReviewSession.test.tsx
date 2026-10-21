@@ -24,6 +24,7 @@ import type { Progressi, SchedaDiRipasso } from '../../../types/studia';
 import { SESSION_NOTICE_MS } from './progress/Celebration';
 import { GRADE_NOTE_MS } from './useGradeNote';
 import { ReviewSession } from './ReviewSession';
+import { xpFields } from './__fixtures__/xp';
 
 const session = vi.mocked(studiaService.session);
 const review = vi.mocked(studiaService.review);
@@ -40,6 +41,7 @@ const progressAnswer = (ripassi: number, raggiunto: boolean, serie: number): Pro
   materie: [],
   calendario: [],
   prossimi: [],
+  ...xpFields(),
 });
 
 const CIVILE_URN = 'urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453';
@@ -491,6 +493,64 @@ describe('the review session', () => {
     session.mockResolvedValue({ conteggi: { dovute: 1, nuove: 0 }, cards: [card('a')] });
     await userEvent.setup().click(screen.getByRole('button', { name: 'Riprova' }));
     expect(await screen.findByText('Domanda a?')).toBeInTheDocument();
+  });
+});
+
+describe('the points of a grade in the session (G1c)', () => {
+  const level = { livello: 2, totale: 120, nelLivello: 20, perIlProssimo: 125, oggi: 30 };
+  const earning = { registrata: true, prossimoRipasso: '2026-10-21', scheduledDays: 2, xp: { crediti: [{ missione: 'dovute' as const, punti: 20 }], livello: level, nuovoLivello: false } };
+  const nothing = { registrata: true, prossimoRipasso: '2026-10-21', scheduledDays: 2, xp: { crediti: [], livello: level, nuovoLivello: false } };
+  afterEach(() => localStorage.removeItem('visualex.studia.visto'));
+
+  it('shows «+20 XP» under the bar and says it politely, without holding the next card', async () => {
+    review.mockResolvedValueOnce(earning);
+    renderSession([card('a'), card('b')]);
+    await show();
+    await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
+    // The next card is there at once, the chip beside the bar.
+    expect(await screen.findByText('Domanda b?')).toBeInTheDocument();
+    expect(screen.getByTestId('xp-gain')).toHaveTextContent('+20 XP');
+    expect(screen.getByTestId('xp-gain').closest('header')).not.toBeNull();
+    await waitFor(() => expect(screen.getByText('Hai guadagnato 20 punti.')).toBeInTheDocument());
+    // The lesson showed it: «Oggi» will not show it again.
+    expect(JSON.parse(localStorage.getItem('visualex.studia.visto')!)).toMatchObject({ xp: 120, livello: 2 });
+  });
+
+  it('waits for the goal’s notice when the same grade closes the goal, and never stands over it', async () => {
+    const closing = { ...earning, oggi: { giorno: '2026-10-19', ripassi: 10, obiettivo: 10, raggiunto: true, appenaRaggiunto: true, serie: 3 } };
+    review.mockResolvedValueOnce(closing);
+    renderSession([card('a'), card('b')]);
+    await show();
+    await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
+    expect(await screen.findByText('Serie di 3 giorni')).toBeInTheDocument();
+    expect(screen.queryByTestId('xp-gain')).toBeNull();
+    // The notice gone, the chip comes, in the header's row.
+    await waitFor(() => expect(screen.queryByText('Serie di 3 giorni')).toBeNull(), { timeout: 3000 });
+    const chip = await screen.findByTestId('xp-gain');
+    expect(chip).toHaveTextContent('+20 XP');
+    expect(chip.parentElement?.className).toContain('inset-y-0');
+    expect(chip.parentElement?.className).not.toContain('top-full');
+  });
+
+  it('names the level a grade crosses', async () => {
+    review.mockResolvedValueOnce({ ...earning, xp: { ...earning.xp, nuovoLivello: true } });
+    renderSession([card('a'), card('b')]);
+    await show();
+    await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
+    expect(await screen.findByTestId('xp-gain')).toHaveTextContent('+20 XP · Livello 2');
+    await waitFor(() => expect(screen.getByText('Hai guadagnato 20 punti. Sei al livello 2.')).toBeInTheDocument());
+  });
+
+  it('shows nothing for a grade that earned nothing, or was not recorded', async () => {
+    review.mockResolvedValueOnce(nothing).mockResolvedValueOnce({ registrata: false, prossimoRipasso: '2026-10-21', scheduledDays: 2 });
+    renderSession([card('a'), card('b'), card('c')]);
+    const user = userEvent.setup();
+    await show();
+    await user.click(screen.getByRole('button', { name: /Bene/ }));
+    await show();
+    await user.click(screen.getByRole('button', { name: /Bene/ }));
+    expect(await screen.findByText('Domanda c?')).toBeInTheDocument();
+    expect(screen.queryByTestId('xp-gain')).toBeNull();
   });
 });
 
