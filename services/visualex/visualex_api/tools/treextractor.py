@@ -235,6 +235,11 @@ async def _tree_from_page(normurn, link, details, return_metadata, is_eurlex, eu
     return result, count, from_copy
 
 
+# "art. 1" in the tree's links, or "art 1" without the dot, as some annexes write it
+# (d.lgs. 36/2023, Allegato I.4): the dotless ones used to be dropped from the tree.
+_ARTICLE_LABEL_PREFIX = re.compile(r'^\s*art(?:\.\s*|\s+)', re.IGNORECASE)
+
+
 async def _parse_normattiva_tree(soup, normurn, link, details, return_metadata=False):
     """
     Parsa la struttura dell'albero degli articoli per Normattiva.
@@ -363,7 +368,7 @@ async def _parse_normattiva_tree(soup, normurn, link, details, return_metadata=F
         if a_tag and a_tag.find_parent('li') == li:
             text_content = a_tag.get_text(separator=" ", strip=True)
             # Rimuove "art. ", spazi e punti finali
-            article_num = re.sub(r'^\s*art\.\s*', '', text_content, flags=re.IGNORECASE).strip().rstrip('.')
+            article_num = _ARTICLE_LABEL_PREFIX.sub('', text_content).strip().rstrip('.')
 
             # Skip invalid article numbers (e.g., "orig", empty strings, non-article text)
             if not article_num or not re.match(r'^[\dIVXLCDM]', article_num, re.IGNORECASE):
@@ -425,7 +430,7 @@ def _extract_normattiva_article(a_tag, normurn, link, attachment_number=None):
     """
     # Rimuove eventuali prefissi come "art. " e spazi
     text_content = a_tag.get_text(separator=" ", strip=True)
-    text_content = re.sub(r'^\s*art\.\s*', '', text_content, flags=re.IGNORECASE)
+    text_content = _ARTICLE_LABEL_PREFIX.sub('', text_content)
 
     article_data = {
         "numero": text_content,

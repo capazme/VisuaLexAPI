@@ -197,7 +197,8 @@ function UndoToastCard({ toast, still }: { toast: UndoToast; still: boolean | nu
       <button
         onClick={toast.onUndo}
         disabled={!present}
-        className="shrink-0 px-3 py-1.5 text-sm font-medium bg-blue-500 hover:bg-blue-600 text-white rounded-md transition-colors flex items-center gap-1.5"
+        // 44 px at every width (the planner's tick and deletion lean on this «Annulla»).
+        className="shrink-0 min-h-[44px] px-3 py-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors flex items-center gap-1.5"
       >
         <Undo2 size={14} />
         Annulla
@@ -205,7 +206,7 @@ function UndoToastCard({ toast, still }: { toast: UndoToast; still: boolean | nu
       <button
         onClick={toast.onDismiss}
         disabled={!present}
-        className="shrink-0 hover:bg-slate-800 dark:hover:bg-slate-200 p-1 rounded-md transition-colors text-slate-400 dark:text-slate-500"
+        className="shrink-0 grid place-items-center min-h-[44px] min-w-[44px] hover:bg-slate-800 dark:hover:bg-slate-200 p-1 rounded-md transition-colors text-slate-300 dark:text-slate-600"
         aria-label="Chiudi notifica"
       >
         <X size={16} />

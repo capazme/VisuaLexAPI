@@ -154,9 +154,12 @@ describe('the study-card routes', () => {
     const reader = await delegated(alice, 'dossier:read');
     const quota = async () => (await request(app).get('/api/oauth/quota').set(reader)).body.points.remaining;
     const before = await quota();
-    await create(write, [{ ...CARD, ancore: [{ riferimento: 'art. 1453 c.c.' }, { riferimento: 'art. 1455 c.c.' }, { riferimento: 'art. 1453 c.c.' }] }]);
+    const created = await create(write, [{ ...CARD, ancore: [{ riferimento: 'art. 1453 c.c.' }, { riferimento: 'art. 1455 c.c.' }, { riferimento: 'art. 1453 c.c.' }] }]);
     // Two distinct references, two points each.
     expect(before - (await quota())).toBe(4);
+    // A card written by a connected application earns no XP: only the proposal, in the user's session, does (Gymnasium XP spec §8).
+    expect(created.body.results.map((r: { outcome: string }) => r.outcome)).toEqual(['created']);
+    expect(await prisma.lingoCreditoXp.count()).toBe(0);
   });
 
   describe('review findings on PR 5', () => {

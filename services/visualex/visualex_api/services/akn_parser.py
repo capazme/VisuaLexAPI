@@ -154,8 +154,12 @@ def _restore_accents(text: str) -> str:
 
 
 # "… professione forense. (13G00018)", and the older acts' "(030U1398)": the
-# Gazzetta's code for the act, which a heading does not need.
-_GAZZETTA_CODE = re.compile(r"\s*\.?\s*\((?:\d{2}[A-Z]\d{5}|\d{3}[A-Z]\d{4})\)\s*$")
+# Gazzetta's code for the act, which a heading does not need. One possessive run of
+# whitespace on each side of the optional full stop, and a match that never starts
+# inside a run (`(?<!\s)`): `\s*\.?\s*` searched a title ending in a long run of
+# spaces in cubic time (2,000 spaces: 3 s). Defensive today: `presentable_title`
+# collapses whitespace before it, so no long run reaches it there.
+_GAZZETTA_CODE = re.compile(r"(?<!\s)(?:\s*+\.)?\s*+\((?:\d{2}[A-Z]\d{5}|\d{3}[A-Z]\d{4})\)\s*$")
 # A final full stop, unless it closes an abbreviation ("c.p.c.", "S.p.A.").
 _FINAL_STOP = re.compile(r"(?<!\.[A-Za-z])\.$")
 
@@ -311,14 +315,17 @@ def normalize_article_key(numero_articolo: str) -> str:
     # ("2409 octiesdecies" c.c., "25 undevicies" d.lgs. 231/2001), and the short
     # list this used to carry left "25terdecies" to the fallback below, which
     # cannot tell a suffix from a rubrica.
+    # One run of whitespace, then at most a dash and another run: `\s*[-\s]?\s*`
+    # split a long run every way it could ("1" + 8,000 spaces + "x": 3 s), and a
+    # number comes from a request.
     suffix_alt = ARTICLE_SUFFIX_ALTERNATION
-    m = re.match(rf"^(\d+)\s*[-\s]?\s*({suffix_alt})$", key)
+    m = re.match(rf"^(\d+)\s*+(?:-\s*+)?({suffix_alt})$", key)
     if m:
         return f"{m.group(1)}-{m.group(2)}"
 
     # Plain number (possibly with trailing punctuation/spaces).
     m = re.match(r"^(\d+)\b", key)
-    if m and re.fullmatch(rf"\d+(?:\s*[-\s]\s*(?:{suffix_alt}))?", key):
+    if m and re.fullmatch(rf"\d+(?:(?=[-\s])\s*+(?:-\s*+)?(?:{suffix_alt}))?", key):
         return key.replace(" ", "-")
 
     # Fallback: collapse internal whitespace to dashes, strip stray chars.

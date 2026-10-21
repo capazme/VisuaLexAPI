@@ -69,6 +69,7 @@ const SECTION_PAGES = [
   'components/features/bulletin/BulletinBoardPage.tsx',
   'components/features/bulletin/ForumCommunityPage.tsx',
   'components/features/studia/StudiaPage.tsx',
+  'components/features/planner/OpusPage.tsx',
   'components/features/documents/DocumentReviewPage.tsx',
   'features/connections/ConnectAiAppPage.tsx',
   'components/features/history/HistoryView.tsx',

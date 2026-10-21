@@ -32,6 +32,7 @@ import { sectionStore } from '../../features/sections/useSection';
 import { MenuToggle, PhoneTopBar } from './PhoneTopBar';
 import { phoneBarTitle } from './phoneBarTitle';
 import { useHideOnScroll } from './useHideOnScroll';
+import { PlannerHost } from '../features/planner/PlannerHost';
 
 export function Layout() {
   const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel, openCommandPalette } = useAppStore(useShallow(s => ({
@@ -273,9 +274,10 @@ export function Layout() {
           onClick={() => updateSettings({ focusMode: !settings.focusMode })}
           id="tour-focus-toggle"
           className={cn(
-            'hidden md:block fixed top-4 right-4 z-50 p-2.5 rounded-xl transition-colors',
+            // 44 px, the touch target (it was 42: a 20 px icon in 10 px of padding and a 1 px border).
+            'hidden md:grid place-items-center h-11 w-11 fixed top-4 right-4 z-50 rounded-xl transition-colors',
             // Between md and lg it sits inside the bar's right end, centred on its 56 px.
-            !settings.focusMode && 'max-lg:right-1 max-lg:top-[calc(env(safe-area-inset-top)+0.4375rem)]',
+            !settings.focusMode && 'max-lg:right-1 max-lg:top-[calc(env(safe-area-inset-top)+0.375rem)]',
             'shadow-sm border',
             settings.focusMode
               ? 'bg-primary-600 text-white border-transparent hover:bg-primary-700'
@@ -362,6 +364,9 @@ export function Layout() {
 
       {/* The palette (⌘K) and the managers it opens, on every page */}
       <GlobalSearch />
+
+      {/* The planner's quick add («c»), its toast and the count beside «Oggi», on every page */}
+      <PlannerHost enabled={isAuthenticated} />
 
       {/* Find in the text (Cmd/Ctrl+F, the reading toolbars' magnifier) */}
       <FindWindow />
