@@ -64,7 +64,7 @@ export function MissionList({ data, loading, validator }: MissionListProps) {
         <h3 id="studia-tutte" className={BLOCK_HEADING}>
           Tutte le missioni
         </h3>
-        <p className={cn('text-sm', MUTED_TEXT)}>Le missioni «In arrivo» non si possono ancora compiere.</p>
+        <p className={cn('max-w-prose text-sm', MUTED_TEXT)}>Le missioni «In arrivo» non si possono ancora compiere.</p>
       </div>
       <div className={cn(TILE, 'divide-y divide-slate-100 px-5 dark:divide-slate-800 md:px-6')}>
         {GROUPS.map(({ group, label }) => (

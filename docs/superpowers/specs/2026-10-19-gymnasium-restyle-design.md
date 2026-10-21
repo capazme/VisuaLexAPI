@@ -121,7 +121,17 @@ brief to copy. The look is Inchiostro (paper, ink, toga) with the Gymnasium hue.
 *Rewritten on 19 October for G1b.* G1 built Oggi as a strip, one action card, the chips, the road and the
 progress panels at the bottom. The front-end owner then fixed the order of the page — «1. prossime
 missioni; 2. Stats; 3. elenco completo delle missioni» — and asked for the progress to be drawn again from
-scratch, in one type language with the rest of Inchiostro. From top to bottom, one column at every width:
+scratch, in one type language with the rest of Inchiostro. From top to bottom, in this reading order:
+
+*Corrected on 21 October (G6).* G1 drew Oggi as one column of 768 px, centred, at every width (L-22). The
+owner then asked for Gymnasium to use the width as Opus and the Forum do: Oggi and Progressi sit in the
+sections' frame (`PageFrame`, the layout's own 1280 px frame and its 1216 px column, the heading at its left
+edge), and from `xl` (1280 px) Oggi has two columns — on the left, about two thirds, the missions with
+«Inizia», «Tutte le missioni», «Cosa ripassi» and the road; on the right, about one third, the statistics
+(item 2), `sticky` under the heading while the page scrolls. Below `xl` it is one column, in the order
+below. The document keeps that order on every width — missions, statistics, list — so a screen reader and
+the keyboard meet the statistics second; the grid places them. Inside the tiles a sentence wraps at about
+65 characters (`max-w-prose`) rather than widen with the column.
 
 0. **The heading** of the area: «Gymnasium: la tua palestra giuridica» (the short name «Gymnasium» stays
    in the section switcher).
@@ -198,8 +208,14 @@ coming days, the cards by state in full (the home keeps three numbers), and the 
 interaction and accessibility (progress spec §6.3, §6.5); they are restyled, not rewritten.
 
 *Built on 19 October (G3).* The sidebar's «Progressi» sits in «Studia» after Oggi; the page reads what Oggi reads
-(`GET /lingo/srs/progressi`, no new route). Under the area's heading and the page heading «I tuoi progressi», one
-column at every width, as Oggi:
+(`GET /lingo/srs/progressi`, no new route). Under the area's heading and the page heading «I tuoi progressi», in
+this order:
+
+*Corrected on 21 October (G6).* The page is in the sections' full-width frame, as Oggi: the calendar spans it,
+«Le schede per stato» and «I prossimi 14 giorni» stand side by side from `xl`, «Per materia» is a grid of two
+columns from `lg`; one column below. The calendar still shows 26 weeks: the server keeps no more
+(`CALENDAR_WEEKS`), so a wider page does not show more weeks; from `xl` its legend and the day's line sit in a
+column beside the drawing, which takes three quarters of the width, so the cells do not swell.
 
 1. **The summary**: the streak (the «§», the count, the record), today's goal (the ring) and the reviews of the last
    30 days in a large number (the sum of `materie[].ripassi30`). The pieces are Oggi's (`StreakBadge`, `GoalRing`),

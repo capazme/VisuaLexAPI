@@ -62,13 +62,13 @@ const RETRY = cn('min-h-[44px] rounded px-1 font-sans text-base font-medium unde
 function Unread({ onRetry, onStart }: { onRetry: () => void; onStart: () => void }) {
   return (
     <div className="grid justify-items-stretch gap-3 md:justify-items-start">
-      <p role="alert" className={cn('font-serif text-xl leading-snug md:text-2xl', INK_TEXT)}>
+      <p role="alert" className={cn('max-w-prose font-serif text-xl leading-snug md:text-2xl', INK_TEXT)}>
         Non riesco a leggere i tuoi progressi.{' '}
         <button type="button" onClick={onRetry} className={RETRY}>
           Riprova
         </button>
       </p>
-      <p className={cn('-mt-1 text-sm', MUTED_TEXT)}>Puoi ripassare lo stesso: il ripasso legge le sue schede.</p>
+      <p className={cn('-mt-1 max-w-prose text-sm', MUTED_TEXT)}>Puoi ripassare lo stesso: il ripasso legge le sue schede.</p>
       <button type="button" onClick={onStart} className={PRIMARY}>
         Inizia
       </button>
@@ -102,19 +102,19 @@ function TodayAction({ action, actionFailed, subject, onRetry, onAllSubjects, on
   return (
     <div className="grid justify-items-stretch gap-3 pt-1 md:justify-items-start">
       <div className="grid gap-1">
-        <p className={cn('font-serif text-xl leading-snug md:text-2xl', INK_TEXT)} aria-live="polite">
+        <p className={cn('max-w-prose font-serif text-xl leading-snug md:text-2xl', INK_TEXT)} aria-live="polite">
           {state === 'done' && (filtered ? 'Niente da ripassare in questa materia, per oggi.' : 'Hai finito per oggi.')}
           {state === 'todo' && todoSentence(action, subject)}
         </p>
         {state === 'todo' && <p className={cn('text-sm', MUTED_TEXT)}>{estimateLabel(cards)}</p>}
         {state === 'done' && (
-          <p className={cn('text-sm', MUTED_TEXT)}>{next ? `Le prossime schede: ${next}.` : 'Nessuna scheda in programma nei prossimi 14 giorni.'}</p>
+          <p className={cn('max-w-prose text-sm', MUTED_TEXT)}>{next ? `Le prossime schede: ${next}.` : 'Nessuna scheda in programma nei prossimi 14 giorni.'}</p>
         )}
       </div>
 
       {/* A read after the first failed: what is on screen is the last answer. */}
       {actionFailed && (
-        <p role="alert" className="text-sm text-red-700 dark:text-red-400">
+        <p role="alert" className="max-w-prose text-sm text-red-700 dark:text-red-400">
           Non riesco a leggere i tuoi progressi.{' '}
           <button type="button" onClick={onRetry} className={cn(RETRY, 'text-sm')}>
             Riprova

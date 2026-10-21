@@ -36,7 +36,7 @@ export function InstituteStops({ materia, percorso, onRetry }: InstituteStopsPro
     if (percorso.status === 'error') {
       return (
         <div className="grid gap-1">
-          <p className={cn('text-sm', MUTED_TEXT)}>Non riesco a leggere gli istituti di questa materia.</p>
+          <p className={cn('max-w-prose text-sm', MUTED_TEXT)}>Non riesco a leggere gli istituti di questa materia.</p>
           <button type="button" onClick={onRetry} className={QUIET_BUTTON}>
             Riprova<span className="sr-only"> gli istituti di {label}</span>
           </button>
@@ -55,7 +55,7 @@ export function InstituteStops({ materia, percorso, onRetry }: InstituteStopsPro
 
   const stops = orderInstitutes(percorso.data, materia);
   if (stops.length === 0) {
-    return <p className={cn('text-sm', MUTED_TEXT)}>Nessun istituto da mostrare in questa materia, per ora.</p>;
+    return <p className={cn('max-w-prose text-sm', MUTED_TEXT)}>Nessun istituto da mostrare in questa materia, per ora.</p>;
   }
   const shown = all ? stops : stops.slice(0, INSTITUTES_SHOWN);
 
@@ -63,7 +63,7 @@ export function InstituteStops({ materia, percorso, onRetry }: InstituteStopsPro
     <div className={cn('grid gap-1 transition-opacity', percorso.status === 'loading' && 'opacity-60')} aria-busy={percorso.status === 'loading'}>
       {percorso.status === 'error' && (
         <div className="grid gap-1">
-          <p className={cn('text-sm', MUTED_TEXT)}>Non riesco ad aggiornare gli istituti: restano quelli letti prima.</p>
+          <p className={cn('max-w-prose text-sm', MUTED_TEXT)}>Non riesco ad aggiornare gli istituti: restano quelli letti prima.</p>
           <button type="button" onClick={onRetry} className={QUIET_BUTTON}>
             Riprova<span className="sr-only"> gli istituti di {label}</span>
           </button>

@@ -374,6 +374,21 @@ describe('ReviewHome', () => {
   });
 
   describe('«Oggi» (Gymnasium spec §5.1)', () => {
+    it('keeps the reading order — missions, statistics, list, subjects — and from `xl` sets the statistics in a sticky column of their own (G6)', async () => {
+      progress.mockResolvedValue(answer(18, 8));
+      renderHome();
+      const missions = await screen.findByRole('region', { name: 'Le missioni di oggi' });
+      const stats = screen.getByRole('region', { name: 'I tuoi progressi' });
+      const list = screen.getByRole('region', { name: 'Tutte le missioni' });
+      const subjects = screen.getByRole('region', { name: 'Cosa ripassi' });
+      const follows = (a: Element, b: Element) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+      expect(follows(missions, stats) && follows(stats, list) && follows(list, subjects)).toBe(true);
+      // The grid places them; the document keeps the order on every width.
+      expect(stats.parentElement).toHaveClass('xl:col-start-2', 'xl:row-span-full', 'xl:sticky', 'xl:self-start');
+      for (const left of [missions.parentElement!, list.parentElement!, subjects]) expect(left).toHaveClass('xl:col-start-1');
+      expect(stats.parentElement?.parentElement?.className).toMatch(/xl:grid-cols-\[minmax\(0,2fr\)_minmax\(0,1fr\)\]/);
+    });
+
     it('says what today costs, «circa N minuti», from the cards due and new', async () => {
       progress.mockResolvedValue(answer(18, 8));
       renderHome();

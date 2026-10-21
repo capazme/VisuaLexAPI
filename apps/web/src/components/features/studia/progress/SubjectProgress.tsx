@@ -23,7 +23,8 @@ const reviews = (n: number) => (n === 0 ? 'Nessun ripasso negli ultimi 30 giorni
  */
 export function SubjectProgress({ materie, selected, onSelect }: SubjectProgressProps) {
   return (
-    <ul className="grid gap-2">
+    // Two columns from `lg` (G6): the page is the frame's full width.
+    <ul className="grid gap-2 lg:grid-cols-2">
       {orderStops(materie).map((row) => {
         const total = totalCards(row);
         const on = selected === row.materia;

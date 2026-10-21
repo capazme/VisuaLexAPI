@@ -18,7 +18,7 @@ import { useProgress } from './progress/useProgress';
 import { BLOCK_HEADING } from './progress/tokens';
 
 /**
- * «Oggi», Gymnasium's home (Gymnasium spec §5.1), in the order the owner fixed: today's missions (the first carries
+ * «Oggi», Gymnasium's home (Gymnasium spec §5.1), in the sections' full-width frame, in the order the owner fixed: today's missions (the first carries
  * «Inizia»), the statistics (streak, goal, the current week, the cards by state; «Tutti i progressi» leads to
  * `/studia/progressi`), the full list of missions, then «Cosa ripassi» (the subject chips) and the road. The missions
  * and the statistics are the whole day's (`useProgress(undefined)`); a subject chosen narrows the first mission's
@@ -59,12 +59,14 @@ export function ReviewHome() {
   const subject = materia && MATERIA_LABEL[materia];
 
   return (
-    // One column at a reading measure, centred with the area's heading (`StudiaPage`).
-    <section className="space-y-8 pb-8">
+    // One column on a phone and a tablet; from `xl` two (G6): the missions, the list, the chips and the road on the
+    // left, two thirds, and the statistics on the right, kept in sight under the heading while the page scrolls. The
+    // document's order stays the reading order the owner fixed — missions, statistics, list — so a screen reader and
+    // the keyboard meet the band second on every width; the grid places it. The fifth row, `1fr`, takes what the band
+    // has beyond the left column, so a short left column never stretches its own rows.
+    <section className="relative grid gap-8 pb-8 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] xl:grid-rows-[auto_auto_auto_auto_1fr] xl:pb-0">
       <h2 className="sr-only">Oggi</h2>
-      {/* The confetti start from the stamp, in the goal's row, and fall over the missions and the statistics, never further. */}
-      {/* A grid, not `space-y`: the burst mounted after the band would give it a margin and move the page. */}
-      <div className="relative grid gap-4">
+      <div className="min-w-0 xl:col-start-1">
         <TodayMissions
           day={data}
           dayFailed={day.status === 'error'}
@@ -78,6 +80,9 @@ export function ReviewHome() {
           celebrate={celebrate}
           stampRef={stampRef}
         />
+      </div>
+      {/* Under the missions on a phone, 16 px apart as before; beside everything from `xl`, sticky. */}
+      <div className="-mt-4 min-w-0 xl:sticky xl:top-8 xl:col-start-2 xl:row-span-full xl:mt-0 xl:self-start">
         <StatsBand
           data={data}
           loading={loading && data === null}
@@ -85,21 +90,28 @@ export function ReviewHome() {
           onOpenSettings={() => setSettingsOpen(true)}
           celebrate={celebrate}
         />
-        {celebrate && data && (
+      </div>
+      {/* The confetti start from the stamp, in the goal's row, and fall over the missions and the statistics, never
+          further: an absolute box placed on their rows (the grid's area is its containing block), out of the flow, so
+          mounting it moves nothing. */}
+      {celebrate && data && (
+        <div aria-hidden className="pointer-events-none absolute inset-0 col-start-1 row-start-1 row-end-3 xl:col-span-full xl:row-end-2">
           <ConfettiBurst originRef={stampRef} onStart={() => markCelebrated(data.oggi.giorno)} onDone={() => setBurstDone(data.oggi.giorno)} />
-        )}
+        </div>
+      )}
+
+      <div className="min-w-0 empty:hidden xl:col-start-1">
+        <MissionList data={data} loading={loading && data === null} validator={validator} />
       </div>
 
-      <MissionList data={data} loading={loading && data === null} validator={validator} />
-
-      <section aria-labelledby="studia-cosa" className="space-y-3">
+      <section aria-labelledby="studia-cosa" className="min-w-0 space-y-3 xl:col-start-1">
         <h3 id="studia-cosa" className={BLOCK_HEADING}>
           Cosa ripassi
         </h3>
         <SubjectChips selected={materia} onSelect={choose} />
       </section>
 
-      <div className={cn('transition-opacity', loading && data !== null && 'opacity-60')} aria-busy={loading}>
+      <div className={cn('min-w-0 transition-opacity xl:col-start-1', loading && data !== null && 'opacity-60')} aria-busy={loading}>
         {data ? (
           <SubjectRoad materie={data.materie} selected={materia} percorso={percorso} onRetryPercorso={percorso.reload} />
         ) : loading ? (

@@ -695,8 +695,13 @@ palestra giuridica» — the section switcher keeps «Gymnasium»; spec
 `docs/superpowers/specs/2026-10-13-studia-progress-design.md`, direction D «Registro vivo»). Reads: `useProgress` over
 `GET /lingo/srs/progressi` (the last answer of the same subject stays on screen while a new one travels — dimmed
 under the road only —, an answer is never shown for another subject, and an older one never overwrites a newer one) — once for the whole day, which draws the missions, the statistics and the road, and once more
-for the subject chosen, made only while one is (`useProgress(materia, enabled)`), which draws the first mission's action. One column, 768 px, centred at every width (on this page `StudiaPage` narrows to it too, so the
-heading and its rule are the column's width), in the order the owner fixed:
+for the subject chosen, made only while one is (`useProgress(materia, enabled)`), which draws the first mission's action. The page is in
+the sections' frame (`layout/PageFrame`, G6: the layout's full width, the heading at its left edge; the 768 px column
+of G1 is gone). One column up to `xl`; from `xl` (1280 px) two, a grid of `2fr` and `1fr`: on the left the missions,
+the list, the chips and the road, on the right the statistics, `sticky` at `top-8` with `self-start` over all the rows
+(`row-span-full`; a fifth row of `1fr` takes what the band has beyond the left column, so it never stretches the
+left's rows). The document keeps the order the owner fixed on every width — the grid only places the band — and inside
+the tiles a sentence stops at `max-w-prose`. In that order:
 1. **«Le missioni di oggi»** (`missions/TodayMissions`): the day's three missions, one under the other, each with its
    mark (drawn, never pressed), «8 di 18» and a thin bar, and the summary «2 di 3» over those with something to do
    today. They are **computed in the web**, pure, by `missions/missions.ts` (`todayMissions`, `missionSummary`,
@@ -732,7 +737,8 @@ heading and its rule are the column's width), in the order the owner fixed:
    to Sunday from the server's today and `serie.ultimiGiorni`, seven boxes with «LMMGVSD», a day to come dotted, and the
    days before the first one the calendar holds `vuoto`, never missed; each state in words for a screen reader,
    `DAY_STATE_LABEL`), then the cards by state as three numbers in Newsreader with their names in Geist (a `dl`) and the
-   bar. «Tutti i progressi», a link (44 px, full width on a phone), leads to `/studia/progressi`: the long calendar, the
+   bar. From `xl` the band is the right column, about 300 to 400 px: its `xl:` classes stack it as on a phone (the
+   week and «Tutti i progressi» at the column's width, the numbers at `text-3xl`). «Tutti i progressi», a link (44 px, full width on a phone), leads to `/studia/progressi`: the long calendar, the
    coming days and the subjects live there alone (G3 removed the «Il tuo mese» sheet, so no chart is drawn twice).
    **No text on «Oggi» or «Progressi» is under 11 px** (the stamp's date included; the compact stamp is the session's):
    `typeScale.test.tsx` reads the files of `missions/` and `progress/` and fails on a `text-[Npx]` under 11 or an SVG
@@ -778,7 +784,7 @@ hand-drawn SVG laid out by the pure `progress/layout.ts`, which walks the server
 the browser's zone. **The celebration** (`progress/Celebration.tsx`): once a day per browser
 (`useCelebratedToday`, `visualex.studia.festeggiato`, written when a celebration *starts*, so leaving halfway or a new
 read never replays it; a convenience, never the streak's source) — on the home when
-today counts with at least one review (confetti of «§» and «✓» from the stamp in the goal's row over the missions and the band, `confetti.ts` pure, on a canvas,
+today counts with at least one review (confetti of «§» and «✓» from the stamp in the goal's row over the missions and the band — an absolute box on their grid rows, rows 1–2 below `xl` and row 1 across both columns from it —, `confetti.ts` pure, on a canvas,
 and the stamp «Obiettivo raggiunto» pressed in; the stamp stays at rest afterwards), and in the session on the grade
 whose answer says `oggi.appenaRaggiunto` (`SessionCelebration`: a notice placed over the lesson's header row (the close button and the progress bar), never over the card
 or the grades; 1.5 s; no focus, no pointer, the keys untouched; an `aria-live`
@@ -797,16 +803,18 @@ its end at once. The celebration is unchanged.
 **«Progressi», the page of the data** (`progress/ProgressPage`, `/studia/progressi`, the sidebar's «Progressi» in
 «Studia» after Oggi; Gymnasium spec §5.3, G3). The same read as «Oggi» — `useProgress(undefined)` for the whole day and
 `useProgress(materia, enabled)` while a subject is chosen —, no route of its own on the server. Under the area's heading
-(`StudiaPage` narrows it to the same 768 px column as «Oggi», and draws no strip over it) the page heading «I tuoi
-progressi», then, one column at every width: **the summary** (`StreakBadge compact`, `GoalRing compact` and the reviews
+(in the sections' full-width frame, as «Oggi», G6; `StudiaPage` draws no strip over it) the page heading «I tuoi
+progressi», then: **the summary** (`StreakBadge compact`, `GoalRing compact` and the reviews
 of the last 30 days in a large number, `recentReviews`: the sum of `materie[].ripassi30`; always the whole day's, as
 the streak and the goal are); **the subject chips** (`SubjectChips`, 44 px at every width — Oggi's too —, the subject «Oggi» remembers, and a line saying
-what it narrows); **«Il tuo calendario»** (`ActivityCalendar`, 26 weeks on a computer and 12 on a phone by
-`useIsDesktop`); **«Le schede per stato»** (`CardStatesBar`: the bar's segments are buttons as before, each a 44 px box at every width with its colour
+what it narrows); **«Il tuo calendario»** (`ActivityCalendar`, across the page: 26 weeks on a computer and 12 on a phone by
+`useIsDesktop` — the server keeps 26, `CALENDAR_WEEKS`, so a wider page shows no more —; from `xl` the drawing takes three
+quarters and the legend and the day's line a column beside it, the line holding five lines' room); then, side by side
+from `xl`, **«Le schede per stato»** (`CardStatesBar`: the bar's segments are buttons as before, each a 44 px box at every width with its colour
 drawn 28 px tall inside on a computer, and under it the
 three states by name, count and share — `shares` rounds by the largest remainder so the three add up to 100, and a state
 with cards that rounds to none reads «<1%», never «0%»); **«I prossimi 14 giorni»** (`DueForecast`); **«Per materia»**
-(`SubjectProgress`: the five subjects in the road's order, `orderStops`, each an `aria-pressed` button that narrows the
+(`SubjectProgress`, two columns from `lg`: the five subjects in the road's order, `orderStops`, each an `aria-pressed` button that narrows the
 page — pressed again it clears —, its share consolidated, a bar of the three states and the states in words,
 `stopStates`, and the reviews of 30 days; no «N da ripassare», which the progress read does not carry by subject). Every control on the page is 44 px tall at every width
 (`ProgressPage.test.tsx` guards its files against an `md:` height, as `contribuisci.test.ts` does Contribuisci's); the
