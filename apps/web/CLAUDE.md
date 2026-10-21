@@ -134,7 +134,10 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   several under «Novità dalla tua ultima visita», each headed «Versione X.Y.Z»; a version with no note says
   «Correzioni e miglioramenti»). The component stays mounted, so the toast and the window leave with their
   motion, and once they go the focus returns to where it was before it entered the toast; a screen reader
-  hears «Novità in vX.Y.Z» from a status region drawn from the first render. `/version` gives the number only: its `changelog` comes from
+  hears «Novità in vX.Y.Z» from a status region drawn from the first render. The number comes from the server
+  and the note from the bundle, so the version is marked seen only when the bundle has its note
+  (`hasReleaseNote`): a tab opened before a deploy shows «Correzioni e miglioramenti», and after a reload the
+  real note. A note is the GitHub release's text word for word. `/version` gives the number only: its `changelog` comes from
   `git log`, which the production image does not carry, so it is always empty there (the technical panel in
   Impostazioni still lists it). A note is plain Markdown and only this much: a bold line heads a group, `- `
   an item, `**bold**`, `*italic*`, `` `code` ``, drawn as React text (no HTML, no links, no `#` heading, no

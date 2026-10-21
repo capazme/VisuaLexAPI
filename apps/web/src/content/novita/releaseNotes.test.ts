@@ -87,8 +87,9 @@ describe('parseNote', () => {
     ]);
   });
 
-  it('keeps every character of the real notes, marks aside', () => {
-    for (const [version, note] of Object.entries(RELEASE_NOTES)) {
+  it('keeps every character of the real notes, marks aside, and a lone asterisk as written', () => {
+    const samples = { ...RELEASE_NOTES, sample: '**Gruppo**\n- uno * due, *tre* e `/x`\n* quattro **cinque**\n\n2 * 3' };
+    for (const [version, note] of Object.entries(samples)) {
       const drawn = parseNote(note)
         .flatMap((block) =>
           block.kind === 'heading'
@@ -98,7 +99,13 @@ describe('parseNote', () => {
               : [block.content.map((part) => part.text).join('')]
         )
         .join('');
-      const written = note.replace(/^[-*]\s+/gm, '').replace(/\*\*|\*|`/g, '').replace(/\s+/g, '');
+      // Only what the parser reads as markup goes: the item's marker, and a mark's pair of delimiters.
+      const written = note
+        .replace(/^[-*]\s+/gm, '')
+        .replace(/\*\*([^*]+?)\*\*/g, '$1')
+        .replace(/`([^`]+)`/g, '$1')
+        .replace(/\*([^*\s](?:[^*]*?[^*\s])?)\*/g, '$1')
+        .replace(/\s+/g, '');
       expect(drawn.replace(/\s+/g, ''), version).toBe(written);
     }
   });

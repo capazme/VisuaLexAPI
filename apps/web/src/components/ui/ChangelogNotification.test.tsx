@@ -5,6 +5,13 @@ import { ChangelogNotification, ReleaseNews } from './ChangelogNotification';
 import { VERSION_CHECK_SESSION_KEY, VERSION_STORAGE_KEY } from '../../config/versionConfig';
 import { RELEASE_NOTES } from '../../content/novita/releaseNotes';
 
+// Reduced motion, switched per test: Framer's own hook, read by the toast and by `Modal`.
+const motionPreference = vi.hoisted(() => ({ reduced: false }));
+vi.mock('framer-motion', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('framer-motion')>()),
+  useReducedMotion: () => motionPreference.reduced,
+}));
+
 describe('ReleaseNews', () => {
   it('draws one version’s note as headings, items and marks, with no version heading', () => {
     render(<ReleaseNews news={[{ version: '1.9.1', note: '**Accesso**\n- La **pagina** nuova, `/crediti`.' }]} />);
@@ -60,6 +67,7 @@ describe('ChangelogNotification', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    motionPreference.reduced = false;
   });
 
   it('shows the new version’s own note, though /version sends no changelog', async () => {
@@ -89,14 +97,37 @@ describe('ChangelogNotification', () => {
     ]);
   });
 
-  it('says «Correzioni e miglioramenti» for a version released with no note', async () => {
+  it('says «Correzioni e miglioramenti» for a version this bundle has no note of, and does not mark it seen', async () => {
+    // A tab opened before a deploy: the server names the new version, the bundle has the old notes.
     localStorage.setItem(VERSION_STORAGE_KEY, '99.0.0');
     answer('99.0.1');
     render(<ChangelogNotification />);
 
     await userEvent.click(await screen.findByRole('button', { name: 'Vedi' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('Correzioni e miglioramenti')).toBeInTheDocument();
 
-    expect(within(screen.getByRole('dialog')).getByText('Correzioni e miglioramenti')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Chiudi' }));
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(localStorage.getItem(VERSION_STORAGE_KEY)).toBe('99.0.0');
+  });
+
+  it('only fades the toast in under reduced motion, where it otherwise rises and grows', async () => {
+    const toastOf = async () => (await screen.findByRole('button', { name: 'Vedi' })).parentElement as HTMLElement;
+    localStorage.setItem(VERSION_STORAGE_KEY, '1.9.0');
+    answer('1.9.1');
+
+    const moving = render(<ChangelogNotification />);
+    expect((await toastOf()).style.transform).toMatch(/translateY|scale/);
+    moving.unmount();
+
+    forget();
+    localStorage.setItem(VERSION_STORAGE_KEY, '1.9.0');
+    motionPreference.reduced = true;
+    render(<ChangelogNotification />);
+    const toast = await toastOf();
+    expect(toast.style.transform).not.toMatch(/translateY|scale/);
+    expect(toast.style.opacity).toBe('0');
   });
 
   it('gives the focus back to where it was before the toast once the window closes', async () => {

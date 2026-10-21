@@ -30,6 +30,15 @@ export const RELEASE_NOTES: Record<string, string> = Object.fromEntries(
     .filter(([version]) => VERSION_PATTERN.test(version))
 );
 
+/**
+ * Whether this bundle carries the version's note. The number comes from the server and the note from the
+ * bundle: a tab opened before a deploy is told of a version whose note it does not have, and must not mark
+ * that version as seen, or the note would never be shown once the page is reloaded (`useVersionCheck`).
+ */
+export function hasReleaseNote(version: string, notes: Record<string, string> = RELEASE_NOTES): boolean {
+  return Boolean(notes[version]?.trim());
+}
+
 export interface VersionNews {
   version: string;
   /** The note's text, or null when the release has none: the window then says «Correzioni e miglioramenti». */
@@ -52,7 +61,7 @@ export function newsSince(
   );
   return [current, ...between.sort((a, b) => compareVersions(b, a))].map((version) => ({
     version,
-    note: notes[version]?.trim() ? notes[version] : null,
+    note: hasReleaseNote(version, notes) ? notes[version] : null,
   }));
 }
 
