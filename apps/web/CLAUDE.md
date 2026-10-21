@@ -185,7 +185,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   window is about 1590 px wide — between 1024 and 1550 px the button covered «Svuota cronologia» and «Gestisci»);
   `section` marks a section's home for the switcher's focus (`data-section-title`, `tabIndex={-1}`, `FOCUS_RING`).
   It draws the dossier list, «Dossier pubblici», Community, Gymnasium (every view but the lesson, through
-  `StudiaPage`), Opus's planner (`OpusPage`, its views in a 768 px column), «Analizza documento», «Collega un'app AI» (its body keeps a column of 768 px: it reads as text, the
+  `StudiaPage`), Opus's planner (`OpusPage`, its views the frame's width), «Analizza documento», «Collega un'app AI» (its body keeps a column of 768 px: it reads as text, the
   title does not move), the Cronologia and the MERL-T hub; «Cestino» and the MERL-T pages under a way back
   («Torna ai Dossier», «MERL-T») write their `h1` with `PAGE_TITLE`. A dossier's own page (its name, its star and
   its actions), Impostazioni (a dialog, not a page), the Scrivania, the lesson, the reader and the practice, the
@@ -429,20 +429,33 @@ Personal tasks, filed under a dossier or in the inbox, with a planned date and a
 checks the files; «termine calcolato» comes with wave 2 and its warning), and no Todoist names, icons or texts.
 
 - **Pages**: `OpusPage` (in `PageFrame` with `section="opus"`: the section's title, which the switcher focuses,
-  «Cestino dei compiti» as its action, the view in a 768 px column), `OpusViews`: `TodayView` (the
+  «Cestino dei compiti» as its action, the view the frame's width, P2b), `OpusViews`: `TodayView` (Gymnasium's day
+  on one line, read only, that opens Gymnasium's «Oggi» — `StudyTodayRow`, from `/lingo/srs/sessione`, absent with
+  nothing to review or Gymnasium off; not a task —, then by date: the
   missed deadlines under «Termini scaduti» — a past deadline is always there, whatever the planned date —, then the
   tasks planned before today whose deadline is not past or absent under «In ritardo», then «Oggi»: `splitToday`;
-  the owner's choice after the first pass, 20 October 2026), `UpcomingView` (today and six days, a task
+  the owner's choice after the first pass, 20 October 2026; or, by «Raggruppa: per dossier», one group per dossier
+  by title, the inbox last — the choice kept in this browser, `localStorage`), `UpcomingView` (today and six days, a task
   once, under its planned date when in range, else its deadline: `groupUpcoming`), `InboxView` (no dossier),
   `TaskTrashView` (`view=trash`: a task's trash is `deletedAt` on the row, not a `TrashEntry`, so it is not in the
   dossiers' `TrashPage`; «Ripristina», 30 days). «Today» is the server's day (`TaskViewAnswer.today`), never the browser's.
-- **The row** (`TaskRow`): a real checkbox (Space ticks it), the title as a button (opens the task's sheet), then the
-  deadline first and bordered with its count (`countdown`: «scaduto da 2 giorni», «scade oggi», «manca 1 giorno»,
-  «mancano 3 giorni»), the planned day, the repetition, the priority in words (1 «Urgente» is the most urgent, 4
+- **Groups** (`TaskGroup`, P2b): a view's groups fold and open by their heading (the accordion pattern: the toggle
+  in the `h3`, `aria-expanded`), with the count and «⋯» («Aggiungi un compito», a dossier's «Apri il dossier»);
+  folded for the session (`plannerStore.folded`, by key), instantly — only the arrow turns, and not under reduced
+  motion. Under the rows «+ Aggiungi compito» (`InlineAddTask`: a title and Enter, with the group's day or dossier,
+  open for the next one, Esc closes); the inbox has one under its list. Groups are by date or by dossier only
+  (the views the server answers); by person comes with wave 4.
+- **The row** (`TaskRow`, two levels, P2b): a real checkbox (Space ticks it), the title as a button (opens the
+  task's sheet), the description in one grey line, then a line of signs: the planned day in its colour and in words
+  (`rowDay`, `dayTone`, `DAY_TONE`: «Oggi» green, «Domani» amber, the weekday in the accent, a past one red with
+  «in ritardo di N giorni»), the deadline bordered with its count (`countdown`: «scaduto da 2 giorni», «scade oggi»,
+  «manca 1 giorno», «mancano 3 giorni»), the subtasks' counter (a button that opens and folds them in place; they
+  start open in «Oggi» and «Prossimi giorni», where each is listed because it is due, folded in a list:
+  `TaskList.subtasksOpen`), the repetition, the priority in words (1 «Urgente» is the most urgent, 4
   «Normale» the default and not shown; the tick's ring carries it too, in colour and in line, `PRIORITY_TICK`: thick
   and tinted red, tinted amber, dashed ink, thin — not a red-orange-blue scale with the last unmarked, which is another
-  app's look —, the labels (first letter capitalised, as the dossiers' tags: `tagLabel`; stored as typed), the dossier (a link; not in the dossier's own
-  panel), «⋯» (Modifica, Aggiungi un sottocompito, Sposta nel cestino). `TaskList` nests subtasks one level under a
+  app's look —, the labels (first letter capitalised, as the dossiers' tags: `tagLabel`; stored as typed), the dossier at the line's right end in grey (a link; not in the dossier's own
+  panel), a thin rule under the row, «⋯» (Modifica, Aggiungi un sottocompito, Sposta nel cestino). `TaskList` nests subtasks one level under a
   parent in the same list (`nestTasks`; deeper ones under the top ancestor); the arrows, Home and End move between
   the rows' ticks across every list of the page (`moveBetweenRows`, `data-task-lists`). A row that leaves (ticked,
   trashed) first hands the focus to the next row's tick, else the previous one's, else the view's heading

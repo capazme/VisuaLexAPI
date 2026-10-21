@@ -13,6 +13,8 @@ const service = vi.hoisted(() => ({
   restore: vi.fn(),
 }));
 vi.mock('../../../services/taskService', () => ({ taskService: service }));
+const study = vi.hoisted(() => ({ session: vi.fn() }));
+vi.mock('../../../services/studiaService', () => ({ studiaService: study }));
 
 import { InboxView, TodayView } from './OpusViews';
 import { plannerStore } from './plannerStore';
@@ -40,7 +42,8 @@ let unregister: () => void;
 
 beforeEach(() => {
   Object.values(service).forEach((fn) => fn.mockReset());
-  plannerStore.setState({ version: 0, todayCount: null, today: null, notice: null, quickAdd: null });
+  study.session.mockReset().mockResolvedValue({ conteggi: { dovute: 0, nuove: 0 }, cards: [] });
+  plannerStore.setState({ version: 0, todayCount: null, today: null, notice: null, quickAdd: null, folded: {} });
   appStore.setState({
     dossiers: [
       { id: 'd1', title: 'Ricorso Rossi', createdAt: '', items: [], kind: 'lavoro' },

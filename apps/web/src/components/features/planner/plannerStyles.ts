@@ -1,5 +1,5 @@
 import { FOCUS_RING } from '../studia/progress/tokens';
-import type { CountdownTone } from './taskDates';
+import type { CountdownTone, DayTone } from './taskDates';
 import type { TaskPriority } from '../../../types/tasks';
 
 /**
@@ -54,3 +54,12 @@ export const DEADLINE_TONE: Record<CountdownTone, string> = {
 
 /** A quiet piece of a task's line: a day, a repetition, a label, the dossier. */
 export const META = 'inline-flex min-w-0 items-center gap-1 text-xs text-slate-600 dark:text-slate-400';
+
+/** A planned day's colour on a row (`dayTone`); the words say the same (`rowDay`). */
+export const DAY_TONE: Record<DayTone, string> = {
+  late: 'font-medium text-red-700 dark:text-red-300',
+  today: 'text-emerald-700 dark:text-emerald-300',
+  tomorrow: 'text-amber-800 dark:text-amber-300',
+  week: 'text-primary-700 dark:text-primary-300',
+  later: 'text-slate-600 dark:text-slate-400',
+};

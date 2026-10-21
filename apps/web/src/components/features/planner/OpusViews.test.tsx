@@ -13,6 +13,8 @@ const service = vi.hoisted(() => ({
   restore: vi.fn(),
 }));
 vi.mock('../../../services/taskService', () => ({ taskService: service }));
+const study = vi.hoisted(() => ({ session: vi.fn() }));
+vi.mock('../../../services/studiaService', () => ({ studiaService: study }));
 
 import { InboxView, TaskTrashView, TodayView, UpcomingView } from './OpusViews';
 import { plannerStore } from './plannerStore';
@@ -38,7 +40,8 @@ let unregister: () => void;
 
 beforeEach(() => {
   Object.values(service).forEach((fn) => fn.mockReset());
-  plannerStore.setState({ version: 0, todayCount: null, today: null, notice: null, quickAdd: null });
+  study.session.mockReset().mockResolvedValue({ conteggi: { dovute: 0, nuove: 0 }, cards: [] });
+  plannerStore.setState({ version: 0, todayCount: null, today: null, notice: null, quickAdd: null, folded: {} });
   appStore.setState({ dossiers: [{ id: 'd1', title: 'Ricorso Rossi', createdAt: '', items: [], kind: 'lavoro' }] });
   toasts = [];
   unregister = registerUndoToastListener((t) => toasts.push(t));
@@ -244,6 +247,60 @@ describe('«Oggi»', () => {
     expect(screen.queryByRole('checkbox', { name: /Compito s/ })).toBeNull();
     await act(async () => toasts[toasts.length - 1]!.onUndo());
     expect(service.restore).toHaveBeenCalledWith('p');
+  });
+});
+
+describe('«Oggi» in groups', () => {
+  it("shows Gymnasium's day on one line that opens it, and nothing when there is nothing to review", async () => {
+    study.session.mockResolvedValue({ conteggi: { dovute: 12, nuove: 8 }, cards: [] });
+    service.list.mockResolvedValue(answer([]));
+    renderAt(<TodayView />);
+    expect(await screen.findByRole('link', { name: 'Gymnasium: 12 da ripassare, 8 nuove · circa 7 minuti' })).toHaveAttribute('href', '/studia/ripasso');
+    // Not a task: no tick.
+    expect(screen.queryByRole('checkbox')).toBeNull();
+  });
+
+  it('folds a group by its heading, and adds a task under it with its day', async () => {
+    service.list.mockResolvedValue(answer([task('a', { plannedDate: TODAY })]));
+    service.create.mockResolvedValue(task('n', { plannedDate: TODAY }));
+    renderAt(<TodayView />);
+    const toggle = await screen.findByRole('button', { name: /^Oggi\s*,\s*1 compito$/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi compito' }));
+    fireEvent.change(screen.getAllByLabelText('Nuovo compito')[1], { target: { value: 'Telefonare' } });
+    fireEvent.submit(screen.getAllByLabelText('Nuovo compito')[1]);
+    await waitFor(() => expect(service.create.mock.calls[0][0]).toMatchObject({ title: 'Telefonare', plannedDate: TODAY, dossierId: null }));
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('checkbox', { name: /Compito a/ })).toBeNull();
+    // Folded for the session.
+    expect(plannerStore.getState().folded['today:today']).toBe(true);
+  });
+
+  it('groups by dossier when asked, the inbox last, and remembers the choice', async () => {
+    service.list.mockResolvedValue(answer([task('a', { plannedDate: TODAY }), task('b', { plannedDate: TODAY, dossierId: 'd1' })]));
+    renderAt(<TodayView />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Raggruppa: per data' }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Per dossier' }));
+    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Ricorso Rossi, 1 compito', "Lista d'ingresso, 1 compito"]);
+    expect(localStorage.getItem('visualex-opus-today-grouping')).toBe('dossier');
+    localStorage.removeItem('visualex-opus-today-grouping');
+  });
+
+  it("writes a row on two levels: the description in one line, the day in words, the subtasks' count that opens them", async () => {
+    service.list.mockResolvedValue(answer([
+      task('p', { description: 'Sentire il cliente', plannedDate: '2026-10-23', dossierId: 'd1' }),
+      task('s', { parentId: 'p', dossierId: 'd1' }),
+    ]));
+    renderAt(<InboxView />);
+    expect(await screen.findByText('Sentire il cliente')).toBeInTheDocument();
+    expect(screen.getByText('venerdì')).toBeInTheDocument();
+    // In a list the subtasks wait behind the counter.
+    const counter = screen.getByRole('button', { name: '1 sottocompito' });
+    expect(counter).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('checkbox', { name: /Compito s/ })).toBeNull();
+    fireEvent.click(counter);
+    expect(screen.getByRole('checkbox', { name: /Compito s/ })).toBeInTheDocument();
   });
 });
 

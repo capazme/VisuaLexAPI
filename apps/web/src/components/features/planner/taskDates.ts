@@ -1,4 +1,5 @@
 import { addDaysToIsoDate } from '../../../utils/dateUtils';
+import { estimateLabel } from '../studia/studiaLabels';
 import { RECURRENCE_RULES, type RecurrenceFrom, type RecurrenceRule, type Task, type TaskPriority } from '../../../types/tasks';
 
 /**
@@ -48,6 +49,30 @@ export function dayHeading(day: string, today: string): string {
   if (offset === 0) return `Oggi · ${long}`;
   if (offset === 1) return `Domani · ${long}`;
   return capitalise(long);
+}
+
+export type DayTone = 'late' | 'today' | 'tomorrow' | 'week' | 'later';
+
+/** How a planned day reads on a row: late, today, tomorrow, later this week, or further. */
+export function dayTone(day: string, today: string): DayTone {
+  const offset = daysBetween(today, day);
+  if (offset < 0) return 'late';
+  if (offset === 0) return 'today';
+  if (offset === 1) return 'tomorrow';
+  return offset <= 6 ? 'week' : 'later';
+}
+
+const weekdayFormat = new Intl.DateTimeFormat('it-IT', { weekday: 'long', timeZone: 'UTC' });
+
+/**
+ * A planned day on a row: «Oggi», «Domani», the weekday for the rest of the week («venerdì»), else as `shortDay`;
+ * a past one says how late it is in words («Ieri · in ritardo di 1 giorno»), never by its colour alone.
+ */
+export function rowDay(day: string, today: string): string {
+  const offset = daysBetween(today, day);
+  if (offset < 0) return `${shortDay(day, today)} · in ritardo di ${-offset} ${offset === -1 ? 'giorno' : 'giorni'}`;
+  if (offset >= 2 && offset <= 6) return weekdayFormat.format(new Date(utc(day)));
+  return shortDay(day, today);
 }
 
 export type CountdownTone = 'overdue' | 'today' | 'soon' | 'later';
@@ -132,4 +157,13 @@ export function recurrenceLine(rule: RecurrenceRule): string {
 /** The count beside «Oggi» in the bar, in words for its name. */
 export function todayCountLabel(count: number): string {
   return count === 1 ? '1 compito per oggi o scaduto' : `${count} compiti per oggi o scaduti`;
+}
+
+/** «12 da ripassare, 8 nuove», the words of Gymnasium's own home. */
+export function studyLine(due: number, fresh: number): string {
+  const parts: string[] = [];
+  if (due > 0) parts.push(`${due} da ripassare`);
+  if (fresh > 0) parts.push(`${fresh} ${fresh === 1 ? 'nuova' : 'nuove'}`);
+  const estimate = estimateLabel(due + fresh);
+  return `Gymnasium: ${parts.join(', ')}${estimate ? ` · ${estimate}` : ''}`;
 }
