@@ -2026,6 +2026,12 @@ meant to stay split; add new features as new files, not inside the shells:
    include the dotted sub-number (`270-bis.1`, `171-octies.1`), the slash
    (`314/2`) and multi-token ordinals (`135-sex-decies`), on both the server
    normaliser and the archive (`tools/archivio-normativo/archivio_normativo/hierarchy.py`).
+   The web's comparisons go through `normalizeArticleId` (`utils/treeUtils.ts`, never a
+   key that is stored or sent), which joins a two-word ordinal the table holds joined, as
+   the API's `comparable_article_key` does («135 sex decies», «135sexdecies» and
+   «135-sexdecies» are one: the dossier's row of that article had no title, since
+   `/fetch_rubriche` keys it `135-sex-decies`), and puts the dash in a suffix written
+   against its number («2bis»). `TreeViewPanel`'s private copy is gone: do not make another.
 10. **Popover positioning vs entry animation** — floating-ui positions with an
     inline `transform`; an `animate-in zoom-in-95` on the *same* element
     overwrites it and the popover flies from (0,0). Split across two elements.
