@@ -105,7 +105,7 @@ describe('ReviewHome', () => {
     expect(numbers).toEqual(['3', '5', '2']);
     expect(within(band).getAllByRole('term').map((dt) => dt.textContent)).toEqual(['Nuove', 'In apprendimento', 'Consolidate']);
     // The long calendar and the coming days live on /studia/progressi (G3): no sheet repeats them here.
-    expect(screen.queryByRole('heading', { name: 'Il tuo calendario' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Il tuo andamento' })).toBeNull();
     expect(within(band).queryByRole('button', { name: 'Il tuo mese' })).toBeNull();
     await userEvent.setup().click(within(band).getByRole('link', { name: 'Tutti i progressi' }));
     expect(screen.getByTestId('where')).toHaveTextContent('/studia/progressi');
