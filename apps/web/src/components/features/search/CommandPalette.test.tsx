@@ -4,11 +4,11 @@ import userEvent from '@testing-library/user-event';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const tour = vi.hoisted(() => ({ onComplete: undefined as undefined | ((t: string) => void) }));
+const tour = vi.hoisted(() => ({ onComplete: undefined as undefined | ((t: string) => void), tryStartTour: vi.fn() }));
 vi.mock('../../../hooks/useTour', () => ({
   useTour: (options?: { onComplete?: (t: string) => void }) => {
     tour.onComplete = options?.onComplete;
-    return { tryStartTour: vi.fn(), startTour: vi.fn(), hasSeenTour: () => true };
+    return { tryStartTour: tour.tryStartTour, startTour: vi.fn(), hasSeenTour: () => true };
   },
 }));
 
@@ -589,6 +589,49 @@ describe('CommandPalette — the search page\'s field\'s rules, now its own (R2)
     expect(onSearch).toHaveBeenCalledTimes(1);
     expect(trackAliasUsage).toHaveBeenCalledTimes(1);
     appStore.setState({ trackAliasUsage: original.trackAliasUsage, customAliases: original.customAliases } as never);
+  });
+
+  it('does not search once closed: Esc during the wait drops it', async () => {
+    const user = fakeTimeUser();
+    const onSearch = vi.fn();
+    const { rerender } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={onSearch} />);
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 18 statuto dei lavoratori{Enter}');
+    rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={onSearch} />);
+    await settle();
+    expect(onSearch).not.toHaveBeenCalled();
+  });
+
+  it('leaves Enter to the row the arrows chose, even while the server is still reading the words', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ recognized: false }) })));
+    const user = fakeTimeUser();
+    const onSearch = renderPalette();
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'procedura');
+    await user.keyboard('{ArrowDown}{Enter}');
+    // An act was picked: its next step, not a wait that would end in a topic search.
+    expect(await screen.findByRole('button', { name: /^Torna indietro:/ })).toBeInTheDocument();
+    await settle();
+    expect(onSearch).not.toHaveBeenCalled();
+  });
+
+  it('starts its tour only on an empty opening: opened with words, the tour would take the letters that follow', () => {
+    tour.tryStartTour.mockClear();
+    appStore.setState({ commandPaletteQuery: 'art 2' } as never);
+    const { unmount } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    expect(tour.tryStartTour).not.toHaveBeenCalled();
+    unmount();
+    appStore.setState({ commandPaletteQuery: null } as never);
+    renderPalette();
+    expect(tour.tryStartTour).toHaveBeenCalledWith('commandPalette');
+  });
+
+  it('opened again right after a close, starts at its first step with no old words', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    await user.click(screen.getByRole('option', { name: 'Codice civile · c.c.' }));
+    rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+    rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    expect(screen.getByPlaceholderText(/art 2043 cc/i)).toHaveValue('');
+    expect(screen.queryByRole('button', { name: /^Torna indietro:/ })).toBeNull();
   });
 
   it('gives its words back to the field when it closes with no choice, and empties the field after one', async () => {

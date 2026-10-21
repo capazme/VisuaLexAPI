@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('../../../hooks/useTour', () => ({
@@ -125,6 +125,27 @@ describe('CommandPalette — the field and the steps', () => {
     expect(box).toHaveValue('');
     await user.keyboard('{Backspace}');
     expect(screen.getByPlaceholderText(/art 2043 cc/i)).toBeInTheDocument();
+  });
+
+  it('a held Backspace stops at an empty field, and the date gives way to the number first (R2)', async () => {
+    asDesktop(true);
+    const user = userEvent.setup();
+    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    await user.click(screen.getByRole('option', { name: /^Legge · l\./ }));
+    const number = screen.getByRole('textbox', { name: "Numero dell'atto" });
+    await user.type(number, '241');
+    const date = screen.getByRole('textbox', { name: "Anno o data dell'atto" });
+    await user.click(date);
+    await user.keyboard('{Backspace}');
+    expect(number).toHaveFocus();
+    // Held: repeated keydowns on an empty field go nowhere.
+    await user.clear(number);
+    fireEvent.keyDown(number, { key: 'Backspace', repeat: true });
+    expect(screen.getByRole('textbox', { name: "Numero dell'atto" })).toBeInTheDocument();
+    // The crumb is named by what it shows, number and year included on the article's step.
+    await user.type(number, '241');
+    await user.type(date, '1990{Enter}');
+    expect(screen.getByRole('button', { name: /^Torna indietro: .*241\/1990$/ })).toBeInTheDocument();
   });
 
   it('searches the article typed, as before', async () => {

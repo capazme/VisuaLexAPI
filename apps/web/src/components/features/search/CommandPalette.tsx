@@ -144,6 +144,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   // can take that focus, so when the tour ends the box gets it back. Only if the box is still there:
   // the ref is empty once the palette has closed or moved on to another step.
   const boxRef = useRef<HTMLInputElement>(null);
+  const numberRef = useRef<HTMLInputElement>(null);
   const { tryStartTour } = useTour({
     theme: settings.theme as 'light' | 'dark',
     onComplete: (tour) => {
@@ -159,6 +160,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   // Enter pressed while the server was still naming the act: the words it was pressed on (the field's rule, R2).
   const [waitingFor, setWaitingFor] = useState<string | null>(null);
+  // The arrows moved the chosen row since the words last changed: Enter is then cmdk's, for the row chosen.
+  const [moved, setMoved] = useState(false);
   // A choice made in this opening: closed after it, the search page's field is emptied; closed without one (Esc, a
   // click outside, ✕), the words go back to it — one field (R2).
   const [chose, setChose] = useState(false);
@@ -191,12 +194,14 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     if (isOpen && commandPaletteQuery !== null) takeCommandPaletteQuery();
   }, [isOpen, commandPaletteQuery, takeCommandPaletteQuery]);
 
-  // Trigger Command Palette tour on first open
+  // The palette's tour on its first opening — an empty one: opened with words or a key typed on the search page's
+  // field (R2), the tour would take the focus and the letters that follow.
+  const startTourIfEmpty = useEffectEvent(() => {
+    if (!inputValue.trim()) tryStartTour('commandPalette');
+  });
   useEffect(() => {
-    if (isOpen) {
-      tryStartTour('commandPalette');
-    }
-  }, [isOpen, tryStartTour]);
+    if (isOpen) startTourIfEmpty();
+  }, [isOpen]);
 
   // Sorted custom aliases for display (by usage, then alphabetically)
   const sortedAliases = useMemo(() => {
@@ -411,8 +416,9 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     else if (topic) handleSearchTopic();
   });
   useEffect(() => {
-    if (waitingFor !== null && waitingFor === inputValue && !resolvingRemotely) runWhenAnswered();
-  }, [waitingFor, inputValue, resolvingRemotely]);
+    // Not once closed: Esc during the wait drops it (the reset clears it 200 ms later).
+    if (isOpen && waitingFor !== null && waitingFor === inputValue && !resolvingRemotely) runWhenAnswered();
+  }, [isOpen, waitingFor, inputValue, resolvingRemotely]);
   const waiting = waitingFor !== null && waitingFor === inputValue;
 
   /** One step back: the article to the details (when the act has them) or to the act, the details to the act. */
@@ -422,7 +428,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   }, [step, selectedAct]);
   /** Backspace on an empty field goes back a step, as in the field's crumb (R2). */
   const backOnEmpty = (event: ReactKeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Backspace' && event.currentTarget.value === '') {
+    // A held key does not run through the steps: it empties the field and stops there.
+    if (event.key === 'Backspace' && event.currentTarget.value === '' && !event.repeat) {
       event.preventDefault();
       stepBack();
     }
@@ -471,6 +478,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
 
   /** The act as a lawyer names it (`paletteActName`: case-insensitive, the raw value when unknown). */
   const selectedActLabel = useMemo(() => paletteActName(selectedAct), [selectedAct]);
+  /** The crumb in the field, and its name: the act, with its number and year on the article's step. */
+  const crumbText = `${selectedActLabel}${step === 'input_article' && actNumber ? ` ${actNumber}${actDate ? `/${actDate.slice(-4)}` : ''}` : ''}`;
 
   // On a computer the palette drops from the search page's field, as wide as the field, over it;
   // where no field is on screen (another page, Focus mode) it hangs at the top, centred. The form is
@@ -512,6 +521,16 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     if (isOpen) {
       setOpener(document.activeElement instanceof HTMLElement ? document.activeElement : null);
       setChose(false);
+      // Opened again before the reset after a close (200 ms): it starts at its first step all the same, with no
+      // words but those handed over.
+      setStep('select_act');
+      setSelectedAct('');
+      setArticle('1');
+      setActNumber('');
+      setActDate('');
+      setWaitingFor(null);
+      setMoved(false);
+      if (commandPaletteQuery === null) setInputValue('');
     }
   }
   const { getFloatingProps } = useInteractions([role]);
@@ -597,21 +616,25 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
               onValueChange={(value) => {
                 // A change of the words drops a wait: a new Enter is needed, even back on the same words.
                 setWaitingFor(null);
+                setMoved(false);
                 setInputValue(value);
               }}
+              enterKeyHint="search"
               aria-describedby="command-palette-help"
               placeholder="Atto o citazione, es. art 2043 cc"
               className="h-full w-full min-w-0 bg-transparent text-lg font-medium text-ink-900 outline-none placeholder:font-normal placeholder:text-ink-500 focus-visible:ring-0 focus-visible:ring-offset-0 dark:text-ink-50 dark:placeholder:text-ink-400"
               onKeyDown={(e) => {
                 // The field's order (R2): a decision, then the server still naming the act (the search runs when it
-                // answers), then a norm.
-                if (e.key === 'Enter' && decisionRef) {
+                // answers), then a norm — unless the arrows chose another row, which Enter then picks.
+                if (['ArrowDown', 'ArrowUp', 'Home', 'End', 'PageDown', 'PageUp'].includes(e.key)) setMoved(true);
+                if (e.key !== 'Enter' || moved) return;
+                if (decisionRef) {
                   e.preventDefault();
                   handleOpenDecision();
-                } else if (e.key === 'Enter' && resolvingRemotely) {
+                } else if (resolvingRemotely) {
                   e.preventDefault();
                   setWaitingFor(inputValue);
-                } else if (e.key === 'Enter' && parsedCitation) {
+                } else if (parsedCitation) {
                   e.preventDefault();
                   handleCitationSearch();
                 }
@@ -625,10 +648,10 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
           <button
             type="button"
             onClick={stepBack}
-            aria-label={`Torna indietro: ${selectedActLabel}`}
+            aria-label={`Torna indietro: ${crumbText}`}
             className={cn('inline-flex min-h-[44px] max-w-[45%] shrink-0 items-center gap-1 rounded-md bg-ink-100 px-2 text-sm font-medium text-ink-800 hover:bg-ink-200 md:min-h-9 dark:bg-ink-800 dark:text-ink-100 dark:hover:bg-ink-700', FOCUS_RING)}
           >
-            <span className="truncate">{selectedActLabel}{step === 'input_article' && actNumber ? ` ${actNumber}${actDate ? `/${actDate.slice(-4)}` : ''}` : ''}</span>
+            <span className="truncate">{crumbText}</span>
             <ChevronRight size={14} aria-hidden className="shrink-0" />
           </button>
         )}
@@ -636,6 +659,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
           <div className="flex min-w-0 flex-1 gap-2 py-1">
             <input
               type="text"
+              ref={numberRef}
               aria-label="Numero dell'atto"
               placeholder="Numero, es. 241"
               value={actNumber}
@@ -651,7 +675,14 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
               onChange={(e) => setActDate(e.target.value)}
               placeholder="Anno o data"
               className={cn(FIELD_INPUT, 'flex-1')}
-              onKeyDown={(e) => (e.key === 'Enter' ? handleSubmitDetails() : backOnEmpty(e))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSubmitDetails();
+                // Backspace on an empty date goes back to the number first, while it holds one.
+                else if (e.key === 'Backspace' && e.currentTarget.value === '' && actNumber && !e.repeat) {
+                  e.preventDefault();
+                  numberRef.current?.focus();
+                } else backOnEmpty(e);
+              }}
             />
           </div>
         )}

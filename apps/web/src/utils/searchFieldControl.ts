@@ -61,6 +61,8 @@ export function focusSearchFieldOrPalette(text?: string): void {
 
 /** ⌘K: the field grows into the menu with its words when it is on screen; else the menu opens empty. */
 export function openSearchMenu(): void {
+  // Already open: nothing, as before R2 (the field's words would overwrite what is being typed in the box).
+  if (appStore.getState().commandPaletteOpen) return;
   if (listener) listener({});
   else appStore.getState().openCommandPalette();
 }

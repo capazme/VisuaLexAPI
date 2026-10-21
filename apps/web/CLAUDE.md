@@ -320,8 +320,12 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   height. It is the door to the search menu (R2, brief of 21 Oct 2026: one field, no «Opzioni»): a button
   (`#tour-search-field`, `aria-haspopup="dialog"`) that shows the words and opens the palette with them
   (`openCommandPaletteWith`, or `openCommandPalette` when empty) on a click, on the focus Tab brings (a Tab pressed
-  within 400 ms, taken once: the focus the palette gives back as it closes opens nothing), on a key typed on it (the
-  key goes on after its words), on the arrows, and on ⌘K (`openSearchMenu`, `Layout`). Esc on it empties its words.
+  within 400 ms, outside the open palette, taken once: the focus the palette gives back as it closes opens nothing), on
+  a character typed on it (AltGr's too; the character goes on after its words), on the arrows, and on ⌘K
+  (`openSearchMenu`, `Layout`; nothing while the palette is open). Esc on it empties its words. On a phone the sheet does
+  not give the focus back, so the palette gives it to what opened it as it closes; the field focuses itself on a click
+  (Safari and a tap do not focus a button). The palette's own tour starts only on an empty opening: opened with words,
+  it would take the letters that follow.
   Everything else is the palette's: what the box reads, the first row, Enter, the steps. The palette closing with no
   choice (Esc, a click outside, ✕) at its first step gives its words back to the field
   (`returnWordsToSearchField`); a choice empties it. No practice is closed.
@@ -333,11 +337,13 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   line (12 px) or what the box was read as, which is the field's old preview line: «Sentenza → …», «tramite alias →
   …», «Invio cerca» / «Invio completa», «Cerco l’atto…» while the server names it, a topic's line. Enter in the box
   follows the field's order: a decision, then a wait while the server is still naming the act (the line says «la
-  ricerca parte appena lo trovo», and the search runs once it answers; any change of the words drops the wait, so a
-  new Enter is needed), then a norm (a ready one searched, another taken to its next step; an alias counted once,
-  there), then a topic. The steps after the act («Dettagli», «Articolo») are subpages: the act chosen is a crumb
-  in the field (`Torna indietro: <act>`, 44 px on a phone) that goes back a step, and so does Backspace in an empty
-  field; there is no trail of steps under the box. Then two columns on a computer and one on a phone, in this
+  ricerca parte appena lo trovo», and the search runs once it answers, never after a close; any change of the words
+  drops the wait, so a new Enter is needed), then a norm (a ready one searched, another taken to its next step; an alias counted once,
+  there), then a topic — unless the arrows chose another row since the words changed: Enter is then that row's.
+  Opened again within the 200 ms of the reset after a close, it starts at its first step all the same. The steps after the act («Dettagli», «Articolo») are subpages: the act chosen is a crumb
+  in the field (`Torna indietro: <what it shows>`, the act, and its number and year on the article's step; 44 px on a
+  phone) that goes back a step, and so does Backspace in an empty field (not a held one; on an empty date it goes to
+  the number first); there is no trail of steps under the box. Then two columns on a computer and one on a phone, in this
   order: «Scegli l'atto» (`paletteActs.ts`: every act of `ACT_TYPES` named in full with the source convention's
   abbreviation, «Codice civile · c.c.», in 44 px rows under group headings in Geist 12 px) and «A portata di mano»
   (Preferiti, I tuoi alias with the presets' line, «In dotazione» while typing; six of each at rest, then «Tutti i
@@ -363,8 +369,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   from the side it moved to; the chosen row's tint is one element carried from row to row (`layoutId`); under
   reduced motion everything only fades. This reverses spec `2026-10-18-redesign-inchiostro` §6.1 («no open or close
   animation») for the palette, as the brief asked. There is no «ultimi atti aperti»: the web keeps no list of the
-  acts opened (the search history is the server's, read by its page alone). `utils/searchFieldControl.ts` reaches it: `focusSearchField({ text?, focus? }, { wait? })` opens the
-  menu from the field (with `focus`, only puts the cursor on it) and says whether the field took
+  acts opened (the search history is the server's, read by its page alone). `utils/searchFieldControl.ts` reaches it: `focusSearchField({ text?, open?, focus? }, { wait? })` opens the
+  menu from the field (with `focus`, only puts the cursor on it; with `open: false`, only sets its words, as
+  `returnWordsToSearchField` does) and says whether the field took
   the request, and the sidebar's «Ricerca», which navigates first, asks it to wait (2 s) for the field to mount;
   the empty page's button and examples and the empty practice use `focusSearchFieldOrPalette`, which opens the
   palette with the same words when no field is on screen (Focus mode).

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Search } from 'lucide-react';
 import { cn } from '../../../lib/utils';
-import { useAppStore } from '../../../store/useAppStore';
+import { appStore, useAppStore } from '../../../store/useAppStore';
 import { PALETTE_SHORTCUT, SEARCH_FIELD_FORM_ID, subscribeSearchField } from '../../../utils/searchFieldControl';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 
@@ -54,7 +54,8 @@ export function SearchField() {
   // Which key brought the focus: Tab opens the menu, the menu's giving the focus back does not.
   useEffect(() => {
     const onKey = (event: globalThis.KeyboardEvent) => {
-      if (event.key === 'Tab') tabAt.current = Date.now();
+      // Not a Tab inside the open menu: Esc right after it gives the focus back here, which must open nothing.
+      if (event.key === 'Tab' && !appStore.getState().commandPaletteOpen) tabAt.current = Date.now();
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
@@ -62,7 +63,9 @@ export function SearchField() {
 
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     // A letter typed on the field goes on in the menu, after its words; Enter, Space and the arrows open it.
-    if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+    // AltGr (Ctrl and Alt on Windows) writes «@», «#», «[» on an Italian keyboard: a character too.
+    const writes = !event.metaKey && (!event.ctrlKey || event.getModifierState('AltGraph'));
+    if (event.key.length === 1 && writes && !event.nativeEvent.isComposing) {
       event.preventDefault();
       open(valueRef.current + event.key);
     } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {

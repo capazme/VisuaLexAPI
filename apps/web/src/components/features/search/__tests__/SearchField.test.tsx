@@ -136,3 +136,32 @@ describe('SearchField — the door to the search menu (R2)', () => {
     expect(openCommandPalette).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('SearchField — what the review found (R2)', () => {
+  it('⌘K with the menu already open does nothing: the field\'s words would overwrite the box', () => {
+    renderField();
+    act(() => returnWordsToSearchField('gdpr'));
+    appStore.setState({ commandPaletteOpen: true });
+    act(() => openSearchMenu());
+    expect(openCommandPaletteWith).not.toHaveBeenCalled();
+    expect(openCommandPalette).not.toHaveBeenCalled();
+  });
+
+  it('a Tab pressed inside the open menu does not count: the focus given back right after opens nothing', () => {
+    renderField();
+    appStore.setState({ commandPaletteOpen: true });
+    fireEvent.keyDown(window, { key: 'Tab' });
+    appStore.setState({ commandPaletteOpen: false });
+    act(() => field().focus());
+    expect(openCommandPalette).not.toHaveBeenCalled();
+  });
+
+  it('a character written with AltGr opens the menu with it; a Ctrl shortcut does not', () => {
+    renderField();
+    fireEvent.keyDown(field(), { key: '@', ctrlKey: true, altKey: true, modifierAltGraph: true } as never);
+    expect(openCommandPaletteWith).toHaveBeenLastCalledWith('@');
+    openCommandPaletteWith.mockClear();
+    fireEvent.keyDown(field(), { key: 'c', ctrlKey: true });
+    expect(openCommandPaletteWith).not.toHaveBeenCalled();
+  });
+});
