@@ -1,0 +1,24 @@
+import { describe, expect, it } from 'vitest';
+import { citeNorm, shortNorm } from '../normLabels';
+
+// A code's annex is the code itself (the c.c. is Allegato 2 of r.d. 262/1942): never named,
+// also for a code cited by its decree (G-350, G-351).
+describe('a code’s default annex is never named', () => {
+  it('the codice del turismo', () => {
+    const norm = { tipo_atto: 'codice del turismo', allegato: '1', numero_articolo: '5' };
+    expect(citeNorm(norm)).toBe('art. 5, d.lgs. 23 maggio 2011, n. 79');
+    expect(shortNorm(norm)).toBe('art. 5 d.lgs. 79/2011');
+  });
+
+  it('the c.p.a.', () => {
+    expect(citeNorm({ tipo_atto: 'codice del processo amministrativo', allegato: '2', numero_articolo: '29' }))
+      .toBe('art. 29, d.lgs. 2 luglio 2010, n. 104');
+  });
+
+  it('an annex other than the default, or of an act that is not a code, is named', () => {
+    expect(citeNorm({ tipo_atto: 'codice del processo amministrativo', allegato: '1', numero_articolo: '29' }))
+      .toBe('art. 29, d.lgs. 2 luglio 2010, n. 104 (Allegato 1)');
+    expect(citeNorm({ tipo_atto: 'decreto legislativo', numero_atto: '81', data: '2008-04-09', allegato: 'A', numero_articolo: '1' }))
+      .toBe('art. 1, d.lgs. 9 aprile 2008, n. 81 (Allegato A)');
+  });
+});

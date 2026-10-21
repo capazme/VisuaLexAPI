@@ -55,7 +55,7 @@ from visualex_api.tools.urngenerator import complete_request_date, pdf_cache_pat
 from visualex_api.tools.cache_manager import prune_normattiva_cache
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import article_input_error, parse_article_input, normalize_act_type
-from visualex_api.tools.map import codice_urn, extract_codice_details
+from visualex_api.tools.map import CODE_ROWS_OF_SEVERAL_CODES, codice_urn, extract_codice_details
 from visualex_api.tools.nl_parser import parse_nl_query
 from visualex_api.tools.sources import cite_act, cite_article
 from visualex_api.tools.alias_resolver import resolve_alias
@@ -523,6 +523,10 @@ class NormaController:
                 if annex_match:
                     annex_value = annex_match.group(1)
                     log.info("Using default annex from codice URN", codice=normalized_type, default_annex=annex_value)
+                    if normalized_type.lower() in CODE_ROWS_OF_SEVERAL_CODES:
+                        # The row names two codes: the war code's article is not
+                        # «non presente» in the codici penali militari, it is in annex 2.
+                        asked_annex = annex_value
 
         log.info("Final annex value before smart lookup", annex=annex_value, explicit_dispositivo=explicit_dispositivo)
 

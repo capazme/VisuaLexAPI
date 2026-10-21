@@ -81,8 +81,10 @@ function act(norm: LabelledNorm, short: boolean): { act: string; joiner: string 
 function annex(norm: LabelledNorm, short: boolean): string {
   const value = text(norm.allegato);
   const kind = key(norm.tipo_atto);
-  // A code's annex is the code itself (c.c. is Allegato 2 of r.d. 262/1942): never named.
+  // A code's annex is the code itself (c.c. is Allegato 2 of r.d. 262/1942): never named,
+  // also for a code cited by its decree (the codice del turismo is «d.lgs. 23 maggio 2011, n. 79»).
   if (!value || NAMED_ACTS[kind] || EU_ACTS[kind]) return '';
+  if ((CODES_BY_NAME.get(kind) ?? '').endsWith(`:${value}`)) return '';
   return short ? ` (All. ${value})` : ` (Allegato ${value})`;
 }
 
