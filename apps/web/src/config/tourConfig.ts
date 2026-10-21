@@ -208,7 +208,7 @@ export const DOSSIER_STEPS: DriveStep[] = [
 export const HISTORY_STEPS: DriveStep[] = [
     {
         popover: {
-            title: 'Cronologia Ricerche',
+            title: 'Cronologia',
             description: 'Qui trovi tutte le tue ricerche passate. Nulla va perso, puoi sempre recuperare ciò che hai consultato.',
             side: 'over',
             align: 'center',

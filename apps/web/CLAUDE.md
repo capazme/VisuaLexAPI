@@ -159,6 +159,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   1216 px column at 1920 px) with nothing narrower inside, the `h1` at the column's left edge in one size
   (`PAGE_TITLE`: Newsreader, 28 px on a phone, 30 px from `md`), the sentence under it (`line`, at a reading
   measure), the main action on its right from `md` and under it on a phone (`action`), and no icon beside the title;
+  a header with an action pads its right side from `lg` just enough to stay clear of `Layout`'s fixed Focus button
+  (`FOCUS_BUTTON_CLEARANCE`, from `--sidebar-width` and `100vw`: up to 42 px, nothing once the window is about
+  1560 px wide — between 1024 and 1550 px the button covered «Svuota cronologia» and «Gestisci»);
   `section` marks a section's home for the switcher's focus (`data-section-title`, `tabIndex={-1}`, `FOCUS_RING`).
   It draws the dossier list, «Dossier pubblici», Community, Gymnasium (every view but the lesson, through
   `StudiaPage`), «Analizza documento», «Collega un'app AI» (its body keeps a column of 768 px: it reads as text, the
@@ -822,7 +825,7 @@ the streak and the goal are); **the subject chips** (`SubjectChips`, 44 px at ev
 what it narrows); **«Il tuo calendario»** (`ActivityCalendar`, across the page: 26 weeks on a computer and 12 on a phone by
 `useIsDesktop` — the server keeps 26, `CALENDAR_WEEKS`, so a wider page shows no more —; from `lg` the drawing takes three
 quarters and the legend and the day's line a column beside it, the line holding five lines' room); then, side by side
-from `xl`, **«Le schede per stato»** (`CardStatesBar`: the bar's segments are buttons as before, each a 44 px box at every width with its colour
+from `lg`, **«Le schede per stato»** (`CardStatesBar`: the bar's segments are buttons as before, each a 44 px box at every width with its colour
 drawn 28 px tall inside on a computer, and under it the
 three states by name, count and share — `shares` rounds by the largest remainder so the three add up to 100, and a state
 with cards that rounds to none reads «<1%», never «0%»); **«I prossimi 14 giorni»** (`DueForecast`); **«Per materia»**

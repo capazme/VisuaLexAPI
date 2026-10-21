@@ -75,7 +75,7 @@ describe('ProgressPage (Gymnasium spec §5.3)', () => {
     const block = (name: string) => screen.getByRole('region', { name });
     const pair = block('Le schede per stato').parentElement!;
     expect(pair).toBe(block('I prossimi 14 giorni').parentElement);
-    expect(pair).toHaveClass('grid', 'xl:grid-cols-2');
+    expect(pair).toHaveClass('grid', 'lg:grid-cols-2');
     expect(block('Il tuo calendario').parentElement).not.toBe(pair);
     expect(within(block('Per materia')).getByRole('list')).toHaveClass('lg:grid-cols-2');
   });

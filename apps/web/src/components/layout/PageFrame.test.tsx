@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { PAGE_TITLE, PageFrame } from './PageFrame';
+import { FOCUS_BUTTON_CLEARANCE, PAGE_TITLE, PageFrame } from './PageFrame';
 
 describe('PageFrame (W2)', () => {
   it('takes the layout\'s width, with nothing narrower, and heads it with the title, the sentence and the action', () => {
@@ -20,6 +20,22 @@ describe('PageFrame (W2)', () => {
     expect(screen.getByText('I dossier di studio pubblicati dalla comunità')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Pubblica un dossier' })).toBeInTheDocument();
     expect(screen.getByText('corpo')).toBeInTheDocument();
+  });
+
+  it('keeps a header with an action clear of the Focus button, and only such a header', () => {
+    const { unmount } = render(
+      <PageFrame title="Cronologia" action={<button type="button">Svuota cronologia</button>}>
+        <p>corpo</p>
+      </PageFrame>,
+    );
+    expect(screen.getByRole('banner')).toHaveClass(FOCUS_BUTTON_CLEARANCE);
+    unmount();
+    render(
+      <PageFrame title="Community">
+        <p>corpo</p>
+      </PageFrame>,
+    );
+    expect(screen.getByRole('banner')).not.toHaveClass(FOCUS_BUTTON_CLEARANCE);
   });
 
   it('marks a section\'s home title for the section switcher\'s focus, and no other', () => {

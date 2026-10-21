@@ -78,7 +78,7 @@ function SummarySkeleton() {
 /**
  * «Progressi», `/studia/progressi` (Gymnasium spec §5.3, G3): everything the home no longer shows, in the sections'
  * full-width frame (G6) — the summary (the streak, today's goal, the reviews of 30 days), the subject chips, «Il tuo
- * calendario» across the page (its legend beside it from `lg`), «Le schede per stato» and «I prossimi 14 giorni» side by side from `xl`, and «Per
+ * calendario» across the page (its legend beside it from `lg`), «Le schede per stato» and «I prossimi 14 giorni» side by side from `lg`, and «Per
  * materia» in two columns from `lg`; one column below. The same read as «Oggi» (`useProgress` over `GET
  * /lingo/srs/progressi`): the whole day's for the summary and the subjects, and, while a subject is chosen, that
  * subject's for the calendar, the states and the coming days — the summary stays the whole day's (the streak and the
@@ -151,8 +151,8 @@ export function ProgressPage() {
             {scoped((data) => <ActivityCalendar calendario={data.calendario} today={data.oggi.giorno} weeks={weeks} hue={hue} narrowed={materia !== undefined} />, <ActivityCalendarSkeleton weeks={weeks} />)}
           </Block>
 
-          {/* Side by side from `xl`, as tall as each other. */}
-          <div className="grid gap-6 xl:grid-cols-2">
+          {/* Side by side from `lg`, as tall as each other: full width, the forecast's drawing grew to 320 px. */}
+          <div className="grid gap-6 lg:grid-cols-2">
             <Block id="studia-stati" title="Le schede per stato" busy={scopeBusy} stale={scopeBusy && scope.data !== null}>
               {scoped((data) => <CardStatesBar stati={data.stati} />, <CardStatesBarSkeleton />)}
             </Block>

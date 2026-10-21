@@ -6,6 +6,15 @@ import { cn } from '../../lib/utils';
 /** A page's title: Newsreader, 28 px on a phone and 30 px from `md`, the same on every section page. */
 export const PAGE_TITLE = 'font-serif text-[28px] font-medium leading-tight tracking-tight text-slate-900 md:text-3xl dark:text-slate-50';
 
+/**
+ * Room on the right of a header with an action, for `Layout`'s Focus button (`fixed top-4 right-4`, about 42 px, from
+ * `md`; below `lg` the page starts under it). The action must end 66 px from the window's right edge (the button's 58
+ * and 8 of air); the frame leaves it `(C − 1280) / 2 + 32`, where C is the content column (`100vw` less
+ * `--sidebar-width`, less a scrollbar of up to 15 px): so the header pads `42 − (C − 1280) / 2` px, between 0 and 42 —
+ * nothing from a window of about 1560 px with the wide sidebar, 42 px up to a 1280 px column.
+ */
+export const FOCUS_BUTTON_CLEARANCE = 'lg:pr-[clamp(0px,calc(2.625rem_-_(100vw_-_var(--sidebar-width,0px)_-_80rem)_/_2),2.625rem)]';
+
 export interface PageFrameProps {
   title: ReactNode;
   /** The sentence under the title. */
@@ -29,7 +38,7 @@ export interface PageFrameProps {
 export function PageFrame({ title, line, action, section, titleId, className, children }: PageFrameProps) {
   return (
     <div className={cn('flex w-full min-w-0 flex-col gap-6', className)}>
-      <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <header className={cn('flex flex-col gap-4 md:flex-row md:items-center md:justify-between', action && FOCUS_BUTTON_CLEARANCE)}>
         <div className="min-w-0">
           <h1 id={titleId} data-section-title={section} tabIndex={section ? -1 : undefined} className={cn(PAGE_TITLE, section && cn(FOCUS_RING, 'rounded-sm'))}>
             {title}
