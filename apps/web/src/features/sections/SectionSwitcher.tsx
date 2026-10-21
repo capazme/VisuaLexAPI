@@ -382,7 +382,7 @@ function SectionMenu({ ref, id, sections, checked, current, forumCount, opusCoun
             </span>
             {badge > 0 && (
               <span className="ml-auto flex shrink-0 self-start pt-0.5">
-                <span aria-hidden className="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[11px] font-semibold leading-none">
+                <span aria-hidden className="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-600 text-white text-[11px] font-semibold leading-none">
                   {badge > 99 ? '99+' : badge}
                 </span>
                 <span className="sr-only">, {badgeLabel}</span>
