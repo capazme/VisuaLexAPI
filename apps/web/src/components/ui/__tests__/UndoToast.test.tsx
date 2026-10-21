@@ -218,4 +218,96 @@ describe('NotificationHost (K1a)', () => {
     });
     expect(closed).toEqual(['Semplice']);
   });
+
+  describe('Ctrl+Z (⌘Z on a Mac) runs the newest «Annulla» still on screen (L-36)', () => {
+    const platform = (value: string) => Object.defineProperty(navigator, 'platform', { configurable: true, get: () => value });
+    afterEach(() => Reflect.deleteProperty(navigator, 'platform'));
+
+    async function two() {
+      const undoOld = vi.fn();
+      const undoNew = vi.fn();
+      render(<NotificationHost />);
+      let older: Promise<boolean> | undefined;
+      let newer: Promise<boolean> | undefined;
+      await act(async () => {
+        older = showUndoToast({ action: () => 'a', undo: undoOld, message: 'Primo rimosso' });
+      });
+      await act(async () => {
+        newer = showUndoToast({ action: () => 'b', undo: undoNew, message: 'Secondo rimosso' });
+      });
+      return { undoOld, undoNew, older: older!, newer: newer! };
+    }
+
+    it('undoes the newest, says so, and leaves the older one', async () => {
+      platform('Win32');
+      const { undoOld, undoNew, newer } = await two();
+      const event = new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true });
+      await act(async () => { document.body.dispatchEvent(event); });
+      expect(event.defaultPrevented).toBe(true);
+      await expect(newer).resolves.toBe(false);
+      expect(undoNew).toHaveBeenCalledWith('b');
+      expect(undoOld).not.toHaveBeenCalled();
+      endExits();
+      // Said, then «Ripristinato» in its place.
+      expect(cards().map((c) => c.textContent)).toEqual([expect.stringContaining('Ripristinato'), expect.stringContaining('Primo rimosso')]);
+    });
+
+    it('says it in the live region', async () => {
+      platform('Win32');
+      await two();
+      let said = '';
+      const unsubscribe = notificationStore.subscribe((s) => { if (s.announced.polite?.message.startsWith('Annullato')) said = s.announced.polite.message; });
+      await act(async () => { document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true })); });
+      unsubscribe();
+      expect(said).toBe('Annullato: Secondo rimosso');
+    });
+
+    it('writes «· Ctrl+Z» beside the newest «Annulla» only, and declares it', async () => {
+      platform('Win32');
+      await two();
+      const card = (text: string) => cards().find((c) => c.textContent?.includes(text))!;
+      const newest = within(card('Secondo rimosso')).getByRole('button', { name: 'Annulla' });
+      expect(newest).toHaveTextContent('Annulla· Ctrl+Z');
+      expect(newest).toHaveAttribute('aria-keyshortcuts', 'Control+Z');
+      expect(within(card('Primo rimosso')).getByRole('button', { name: 'Annulla' })).not.toHaveTextContent('Ctrl+Z');
+    });
+
+    it('is ⌘Z on a Mac', async () => {
+      platform('MacIntel');
+      const { undoNew } = await two();
+      expect(within(cards()[0]).getByRole('button', { name: 'Annulla' })).toHaveTextContent('⌘Z');
+      await act(async () => { document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true })); });
+      expect(undoNew).not.toHaveBeenCalled();
+      await act(async () => { document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', metaKey: true, bubbles: true, cancelable: true })); });
+      expect(undoNew).toHaveBeenCalled();
+    });
+
+    it('stays the browser\'s undo in a field or anything editable, and with Shift', async () => {
+      platform('Win32');
+      const { undoNew, undoOld } = await two();
+      const field = document.createElement('input');
+      const editor = document.createElement('div');
+      editor.setAttribute('contenteditable', 'true');
+      document.body.append(field, editor);
+      for (const target of [field, editor]) {
+        const event = new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true });
+        await act(async () => { target.dispatchEvent(event); });
+        expect(event.defaultPrevented).toBe(false);
+      }
+      await act(async () => { document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true })); });
+      expect(undoNew).not.toHaveBeenCalled();
+      expect(undoOld).not.toHaveBeenCalled();
+      field.remove();
+      editor.remove();
+    });
+
+    it('does nothing, and lets the key go, with no «Annulla» on screen', async () => {
+      platform('Win32');
+      render(<NotificationHost />);
+      act(() => { notify({ type: 'info', message: 'Salvato', duration: 0 }); });
+      const event = new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true });
+      document.body.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+    });
+  });
 });

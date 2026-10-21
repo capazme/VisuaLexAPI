@@ -427,8 +427,13 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   after saying so; a practice's or an act's with nothing left to put back says «Non ripristinabile: …»). At logout
   (`clearUserData`) every notification goes, `dropped`: an «Annulla» resolves as not standing and runs no undo, so an
   action held until the notification is gone (a large import) is not carried out. Plain toasts stay 3 s. Under reduced motion it fades, already open, and the time line still draws
-  back. Its «Annulla» and ✕ are 44 px at every width. `registerUndoToastListener` hands the newest «Annulla» on screen
-  to a test. `Tooltip` waits 500 ms under a pointer, opens at once and
+  back. Its «Annulla» and ✕ are 44 px at every width. **Ctrl+Z (⌘Z on a Mac)** runs the newest «Annulla» still on screen
+  (L-36; `undoShortcut.ts`, the host's `keydown` on `window`): never in a field, a list, an editor or anything
+  editable (`isEditableTarget`: there it is the browser's own undo), never with Shift (redo), never when something
+  took the key first, and with no «Annulla» on screen the key goes by; the live region says «Annullato: …», then
+  «Ripristinato» comes as after a click. That notification writes the key beside its «Annulla» («Annulla · Ctrl+Z»,
+  seen, not in the name; `aria-keyshortcuts`) where the pointer is not coarse; the shortcuts' list has it.
+  `registerUndoToastListener` hands the newest «Annulla» on screen to a test. `Tooltip` waits 500 ms under a pointer, opens at once and
   without motion within 300 ms of another closing, and at once on keyboard focus.
   Interaction tokens live in `constants/interactions.ts`, stacking bands in
   `constants/zIndex.ts`. Compose these rather than hand-rolling Tailwind: `TRANSITION` names the

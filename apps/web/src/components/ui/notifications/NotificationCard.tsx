@@ -61,6 +61,8 @@ export interface NotificationCardProps {
   still: boolean;
   /** Alone, outside a stack (a `Toast` where no stack is mounted, as in a component's test): no swipe. */
   standalone?: boolean;
+  /** The newest «Annulla»: the key that runs it, written beside it («Annulla · Ctrl+Z») and declared to assistive tech. */
+  shortcut?: { label: string; keys: string };
   onUndo: () => void;
   onDismiss: () => void;
   onHold: (reason: HoldReason, on: boolean) => void;
@@ -68,7 +70,7 @@ export interface NotificationCardProps {
   onExited: () => void;
 }
 
-export function NotificationCard({ entry, still, standalone = false, onUndo, onDismiss, onHold, onExited }: NotificationCardProps) {
+export function NotificationCard({ entry, still, standalone = false, shortcut, onUndo, onDismiss, onHold, onExited }: NotificationCardProps) {
   const [scope, animate] = useAnimate<HTMLDivElement>();
   const swipedTo = useRef(1);
   const timeLine = useRef<AnimationPlaybackControls | null>(null);
@@ -261,6 +263,7 @@ export function NotificationCard({ entry, still, standalone = false, onUndo, onD
               data-word
               onClick={(event) => handOff(onUndo, byKeys(event))}
               disabled={closing}
+              aria-keyshortcuts={shortcut?.keys}
               className={cn(
                 'min-h-[44px] shrink-0 rounded-lg px-3 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/30',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
@@ -268,6 +271,8 @@ export function NotificationCard({ entry, still, standalone = false, onUndo, onD
               )}
             >
               Annulla
+              {/* Seen, not part of the name («Annulla»): `aria-keyshortcuts` says the key. */}
+              {shortcut && <span aria-hidden className="ml-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">· {shortcut.label}</span>}
             </button>
           )}
           {entry.action && (

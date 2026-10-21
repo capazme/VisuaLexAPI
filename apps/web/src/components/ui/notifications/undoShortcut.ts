@@ -1,0 +1,26 @@
+/**
+ * Ctrl+Z (⌘Z on a Mac) runs the newest «Annulla» still on screen (L-36): pure parts, for `NotificationHost` and its
+ * tests. Inside a field, an editor or anything editable the key is the browser's own undo, never this.
+ */
+
+/** A Mac (or an iPad with a keyboard): ⌘, not Ctrl. */
+export const isMacPlatform = () => typeof navigator !== 'undefined' && /mac|iphone|ipad/i.test(navigator.platform ?? '');
+
+/** What the notification writes beside its «Annulla»: «⌘Z» or «Ctrl+Z». */
+export const undoShortcutLabel = (mac = isMacPlatform()) => (mac ? '⌘Z' : 'Ctrl+Z');
+
+/** For `aria-keyshortcuts`. */
+export const undoShortcutKeys = (mac = isMacPlatform()) => (mac ? 'Meta+Z' : 'Control+Z');
+
+/** The key is the shortcut: Z with ⌘ on a Mac, with Ctrl elsewhere; no Shift (that is redo), no Alt. */
+export function isUndoShortcut(event: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey'>, mac = isMacPlatform()): boolean {
+  if (event.key.toLowerCase() !== 'z' || event.shiftKey || event.altKey) return false;
+  return mac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
+}
+
+/** Where the key undoes typing: a field, a list to choose from, an editor, anything editable. */
+export function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  return target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [role="combobox"]') !== null;
+}

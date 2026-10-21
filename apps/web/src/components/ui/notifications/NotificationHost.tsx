@@ -4,8 +4,11 @@ import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { spring } from '../../../lib/motion';
 import { NotificationCard } from './NotificationCard';
+import { isEditableTarget, isUndoShortcut, undoShortcutKeys, undoShortcutLabel } from './undoShortcut';
 import {
+  announce,
   closeNotification,
+  latestUndoable,
   holdNotification,
   notificationStore,
   registerNotificationHost,
@@ -27,6 +30,24 @@ export function NotificationHost() {
   const still = useReducedMotion() ?? false;
   useEffect(() => registerNotificationHost(), []);
 
+  // Ctrl+Z (⌘Z on a Mac) runs the newest «Annulla» still on screen (L-36), and says so; never in a field, an editor or
+  // anything editable, where it stays the browser's own undo, nor when something else took the key first.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || !isUndoShortcut(event) || isEditableTarget(event.target)) return;
+      const entry = latestUndoable();
+      if (!entry) return;
+      event.preventDefault();
+      announce(`Annullato: ${entry.message}`);
+      void undoNotification(entry.id);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  // The notification the shortcut would undo writes it beside its «Annulla», where a keyboard is likely.
+  const keyboard = typeof window.matchMedia !== 'function' || !window.matchMedia('(pointer: coarse)').matches;
+  const shortcutFor = keyboard ? latestUndoable(entries)?.id : undefined;
+
   return (
     <div className={cn('pointer-events-none fixed inset-0', Z_INDEX.toast)}>
       {/* Read on arrival only (`announced`); a new element per notification, so the same words twice are read twice. */}
@@ -37,13 +58,13 @@ export function NotificationHost() {
         {announced.assertive && <span key={announced.assertive.id}>{announced.assertive.message}</span>}
       </p>
       {(['bottom', 'top'] as const).map((position) => (
-        <Stack key={position} position={position} entries={entries.filter((e) => e.position === position)} still={still} />
+        <Stack key={position} position={position} entries={entries.filter((e) => e.position === position)} still={still} shortcutFor={shortcutFor} />
       ))}
     </div>
   );
 }
 
-function Stack({ position, entries, still }: { position: 'top' | 'bottom'; entries: NotificationEntry[]; still: boolean }) {
+function Stack({ position, entries, still, shortcutFor }: { position: 'top' | 'bottom'; entries: NotificationEntry[]; still: boolean; shortcutFor?: number }) {
   if (entries.length === 0) return null;
   return (
     <div
@@ -61,6 +82,7 @@ function Stack({ position, entries, still }: { position: 'top' | 'bottom'; entri
               <NotificationCard
                 entry={entry}
                 still={still}
+                shortcut={entry.id === shortcutFor ? { label: undoShortcutLabel(), keys: undoShortcutKeys() } : undefined}
                 onUndo={() => undoNotification(entry.id)}
                 onDismiss={() => closeNotification(entry.id, 'dismiss')}
                 onHold={(reason, on) => holdNotification(entry.id, reason, on)}
