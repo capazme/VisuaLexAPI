@@ -54,7 +54,7 @@ ARTICLE_SUFFIX_ALTERNATION = "|".join(
 )
 
 # The two spellings of one ordinal. An act uses one of them, and a request may use the
-# other: Luca's «391-nonies» c.p.p. was «non presente» because Normattiva writes «391
+# other: «391-nonies» c.p.p., asked through the MCP, was «non presente» because Normattiva writes «391
 # novies» there, while it writes «21 nonies» in l. 241/1990. Only for comparing what was
 # asked with what the act holds (`other_ordinal_spelling`): `normalize_article_key` keeps
 # the spelling it was given, because its keys are what /fetch_rubriche and the

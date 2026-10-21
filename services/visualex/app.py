@@ -528,6 +528,13 @@ class NormaController:
                     if tree_metadata and 'annexes' in tree_metadata and tree_count > 0:
                         annexes = tree_metadata['annexes']
                         log.info("Smart lookup: found annexes", annex_count=len(annexes))
+                        # Each part's numbers as canonical keys, once: normalising them for
+                        # every requested article cost ~0.6 s of blocking CPU on a range of
+                        # 100 articles of a code.
+                        part_keys = [
+                            {normalize_article_key(art) for art in annex_info.get('article_numbers', [])}
+                            for annex_info in annexes
+                        ]
 
                         # For each requested article, check where it exists
                         for article in articles:
@@ -542,16 +549,12 @@ class NormaController:
                             best_annex = None
                             best_annex_count = 0
 
-                            for annex_info in annexes:
+                            for annex_info, keys in zip(annexes, part_keys):
                                 annex_num = annex_info.get('number')  # None for dispositivo
-                                article_numbers = annex_info.get('article_numbers', [])
                                 article_count = annex_info.get('article_count', 0)
 
                                 # Check if article exists in this section
-                                article_exists = any(
-                                    normalize_article_key(art) in wanted_keys
-                                    for art in article_numbers
-                                )
+                                article_exists = not keys.isdisjoint(wanted_keys)
 
                                 if article_exists:
                                     if annex_num is None:

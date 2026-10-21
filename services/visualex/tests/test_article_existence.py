@@ -404,7 +404,7 @@ class TestWhereElseInTheAct:
 class TestOtherSpellingOfTheOrdinal:
     """«nonies» and «novies» are one ordinal, and Normattiva writes one per act: «391 novies»
     in the c.p.p. (captured 2026-10-21), «21 nonies» in l. 241/1990. Asked with the other
-    spelling, the article used to be «non presente» (Luca, «391-nonies» through the MCP)."""
+    spelling, the article used to be «non presente» («391-nonies» asked through the MCP)."""
 
     CPP_TREE = ([{"numero": "391", "allegato": None}, {"numero": "391 octies", "allegato": None},
                  {"numero": "391 novies", "allegato": None}, {"numero": "391 decies", "allegato": None}],
