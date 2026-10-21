@@ -16,7 +16,7 @@ export interface ReadingFullScreenProps {
  * a topic search of a practice — over the whole content area, with «‹ Pratica» (44 px) to return to
  * the table. The body is the light window's (`ReadingWindowBody`), so the reading, the compact
  * toolbar and the find window's registration are the window's own. It sits under the search page's
- * field, which clears the layout's fixed menu button; the column is not mounted under it (gotcha 26),
+ * field, the phone's bar with the menu button beside it; the column is not mounted under it (gotcha 26),
  * so one subject has one reading surface.
  */
 export function ReadingFullScreen({ onCrossReference }: ReadingFullScreenProps) {

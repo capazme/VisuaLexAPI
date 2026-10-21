@@ -11,6 +11,7 @@ import {
   ExternalLink,
   Upload,
   BookOpen,
+  Plus,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { appStore, useAppStore } from '../../../store/useAppStore';
@@ -35,7 +36,7 @@ import { actsSummary, layoutDossier } from './dossierLayout';
 import { deleteDossierMessage, deleteDossierWithUndo } from './deleteDossierWithUndo';
 import { hasTagCategory, tagCategories, tagLabel } from '../../../utils/tagLabel';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
-import { FOCUS_RING } from '../../../constants/interactions';
+import { PageFrame } from '../../layout/PageFrame';
 
 type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -255,10 +256,15 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
   };
 
   return (
-    <div className="animate-in fade-in duration-200">
-      <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 mb-6">
-        <h1 data-section-title={sectionKind === 'studio' ? 'gymnasium' : 'opus'} tabIndex={-1} className={`${FOCUS_RING} rounded-sm font-serif text-3xl font-medium tracking-tight text-slate-900 dark:text-slate-50`}>{sectionKind ? `I tuoi ${kindLabel(sectionKind).toLowerCase()}` : 'I tuoi Dossier'}</h1>
-        <div className="flex gap-2">
+    <PageFrame
+      title={sectionKind ? `I tuoi ${kindLabel(sectionKind).toLowerCase()}` : 'I tuoi Dossier'}
+      // The same element from one kind to the other: the switcher's focus lands on it for Opus and for Gymnasium.
+      section={sectionKind === 'studio' ? 'gymnasium' : 'opus'}
+      className="animate-in fade-in duration-200"
+      // On a phone the title keeps its row with «⋯» (Importa, Cestino) and «+» beside it (M1); from md the three buttons.
+      actionBeside={!isDesktop}
+      action={isDesktop ? (
+        <>
           {trashCount > 0 && onOpenTrash && (
             <button
               type="button"
@@ -286,8 +292,30 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
           >
             <FolderPlus size={20} /> Nuovo Dossier
           </button>
-        </div>
-      </div>
+        </>
+      ) : (
+        <>
+          <MenuButton
+            label="Altre azioni sui dossier"
+            items={[
+              { label: 'Importa da file JSON', icon: Upload, onSelect: triggerFileImport },
+              ...(trashCount > 0 && onOpenTrash ? [{ label: `Cestino (${trashCount})`, icon: Trash2, onSelect: onOpenTrash }] : []),
+            ]}
+            triggerClassName="h-11 w-11 justify-center border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+          >
+            <MoreHorizontal size={20} aria-hidden />
+          </MenuButton>
+          <button
+            id="tour-dossier-create"
+            onClick={() => setIsModalOpen(true)}
+            aria-label="Nuovo dossier"
+            className="dossier-create-button inline-flex h-11 w-11 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+          >
+            <Plus size={22} aria-hidden />
+          </button>
+        </>
+      )}
+    >
 
       <input
         ref={fileInputRef}
@@ -300,7 +328,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
 
       {/* The search, then the two menus: one row on a computer; on a phone the search on its own row and the
           menus side by side under it, half each (D1). */}
-      <div className="mb-6 flex flex-col md:flex-row gap-3 md:gap-4">
+      <div className="flex flex-col md:flex-row gap-3 md:gap-4">
         <div id="tour-dossier-search" className="relative flex-1 min-w-0 md:min-w-[14rem]">
           <Search size={18} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
@@ -562,6 +590,6 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
           onConfirm={handleConfirmJsonImport}
         />
       )}
-    </div>
+    </PageFrame>
   );
 }

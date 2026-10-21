@@ -24,6 +24,7 @@ import { BookMark } from '../ui/BookMark';
 import { FOCUS_RING } from '../../constants/interactions';
 import { useAuth } from '../../hooks/useAuth';
 import { authPageTab, isLoginPage } from '../../utils/returnTo';
+import { canTransitionPage, startPageTransition } from '../../lib/pageTransition';
 import { focusField } from './authForm';
 import { LoginForm } from './LoginForm';
 import { RegisterForm } from './RegisterForm';
@@ -45,8 +46,7 @@ function prefersReducedMotion(): boolean {
 function enter(go: () => void) {
   if (prefersReducedMotion()) return go();
   window.setTimeout(() => {
-    const doc = document as Document & { startViewTransition?: (cb: () => void) => unknown };
-    if (doc.startViewTransition) doc.startViewTransition(go);
+    if (canTransitionPage()) startPageTransition(go);
     else go();
   }, ENTRY_MS);
 }

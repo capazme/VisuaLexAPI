@@ -48,7 +48,7 @@ export const Z_INDEX = {
 
   /**
    * Gymnasium's lesson (`studia/LessonFrame`): a screen of its own over the shell — the sidebar, the
-   * floating buttons (the menu button with its services dot), the feedback button and the plain toasts (`z-[60]`) — and under
+   * phone's bar at the top (the menu button with its services dot), the floating buttons, the feedback button and the plain toasts (`z-[60]`) — and under
    * the overlay band, so its article sheet, its confirmation and its toast still cover it.
    */
   lesson: 'z-[70]',
@@ -103,12 +103,6 @@ export const Z_INDEX = {
   /** User menu popup */
   menuPanel: 'z-[1510]',
 
-  /** Settings modal — on top of everything that takes a click */
+  /** Settings modal — ALWAYS on top of everything */
   settings: 'z-[1900]',
-
-  /**
-   * The section change's halftone (`features/sections/sectionTransition.ts`): a canvas over the whole screen for
-   * under a second, which never takes a click (`pointer-events: none`) and is removed at its end.
-   */
-  sectionTransition: 'z-[2000]',
 } as const;

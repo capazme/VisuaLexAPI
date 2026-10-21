@@ -5,6 +5,7 @@ Provides a singleton pattern for managing caches across all services.
 Uses Redis when available and enabled, falling back to filesystem cache.
 """
 
+import asyncio
 from typing import Any, Dict, Optional
 import structlog
 
@@ -20,6 +21,15 @@ CacheBackend = Any  # PersistentCache or RedisCache — same async get/set inter
 # reader. The citation fragments are indexed late (weeks), so a fresher list would not be a more
 # complete one.
 EU_CASE_LAW_TTL = 3 * 24 * 3600
+
+# The Normattiva pages: an article page of a code weighs 2.6 MB on disk, and the filesystem cache
+# deletes an entry only when its key is read again, so the folder only grew (5.6 GB in
+# development, 20 October 2026). The owner's rules (21 October 2026): the expired pages go, as
+# for the decisions (G-344; `get` would refuse them anyway), then the pages not read for 30 days
+# and the least recently read ones down to 2 GB, a ceiling for a longer PERSISTENT_CACHE_TTL or a
+# busy day (G-338).
+NORMATTIVA_CACHE_MAX_IDLE = 30 * 24 * 3600
+NORMATTIVA_CACHE_MAX_BYTES = 2 * 1024 ** 3
 
 
 _redis_fallback_warned = False
@@ -166,6 +176,23 @@ class CacheManager:
         self._warmup_complete = True
         self.stats["warmup_count"] = count
         log.info("Cache warmup marked complete", count=count)
+
+
+async def prune_normattiva_cache(manager: Optional["CacheManager"] = None) -> int:
+    """Apply the Normattiva cache's rules: the expired pages, then NORMATTIVA_CACHE_MAX_IDLE and
+    NORMATTIVA_CACHE_MAX_BYTES. Return how many pages went. Only the "normattiva" namespace:
+    the other caches keep their own lifetimes. A backend without `prune` (Redis) expires its
+    keys itself. The app runs this at start and with the decision caches' sweep."""
+    cache = (manager or get_cache_manager()).get_persistent("normattiva")
+    prune = getattr(cache, "prune", None)
+    if prune is None:
+        return 0
+    expired, expired_bytes = await asyncio.to_thread(cache.sweep_expired_counted)
+    removed, freed, kept = await asyncio.to_thread(
+        prune, NORMATTIVA_CACHE_MAX_IDLE, NORMATTIVA_CACHE_MAX_BYTES)
+    log.info("Normattiva cache pruned", expired=expired, removed=removed,
+             freed_mb=round((expired_bytes + freed) / 2 ** 20), kept_mb=round(kept / 2 ** 20))
+    return expired + removed
 
 
 _cache_manager: Optional[CacheManager] = None

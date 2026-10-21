@@ -79,15 +79,15 @@ describe('StudiaPage', () => {
     expect(screen.getByRole('button', { name: 'Impostazioni dello studio' })).toBeInTheDocument();
   });
 
-  it.each(['/studia/ripasso', '/studia/progressi'])('centres %s as one column, the heading and its rule at the column\'s width; the other views keep theirs', (path) => {
-    const { container, unmount } = at(path);
+  it.each(['/studia/ripasso', '/studia/progressi', '/studia/schede', '/studia/valida'])('draws %s in the sections\' frame, the layout\'s full width with nothing narrower (G6, W2)', (path) => {
+    const { container } = at(path);
     const page = container.firstElementChild as HTMLElement;
-    expect(page).toHaveClass('mx-auto', 'max-w-3xl');
-    expect(page).toContainElement(screen.getByRole('heading', { level: 1, name: 'Gymnasium: la tua palestra giuridica' }));
-    unmount();
-    const view = at('/studia/schede');
-    expect(view.container.firstElementChild).toHaveClass('mx-auto', 'max-w-6xl');
-    view.unmount();
+    expect(page.className).not.toMatch(/\bmax-w-|\bmx-auto\b/);
+    const heading = screen.getByRole('heading', { level: 1, name: 'Gymnasium: la tua palestra giuridica' });
+    expect(page).toContainElement(heading);
+    // The section switcher puts the focus on it.
+    expect(heading).toHaveAttribute('data-section-title', 'gymnasium');
+    expect(heading).toHaveAttribute('tabindex', '-1');
   });
 
   it('draws the session as the lesson, a screen of its own over the shell, with no heading of the area (Gymnasium spec §5.4)', () => {

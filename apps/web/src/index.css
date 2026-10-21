@@ -1266,9 +1266,9 @@
 .dark .driver-popover.visualex-tour-popover .driver-popover-arrow-side-left { border-left-color: var(--color-ink-900); }
 .dark .driver-popover.visualex-tour-popover .driver-popover-arrow-side-right { border-right-color: var(--color-ink-900); }
 
-/* Section hue (spec §4.1): the switcher's mark, and nothing else that carries meaning. The same hues print the
-   section change's halftone (`sectionHue`, S2) and colour Gymnasium's small motions (the tally's stroke, the
-   mission's drop, the lesson bar's head); none of those carries meaning either. */
+/* Section hue (spec §4.1): the switcher's mark, and nothing else that carries meaning. The same hues colour
+   Gymnasium's small motions (the tally's stroke, the mission's drop, the lesson bar's head); none of those carries
+   meaning either. On a change of section the mark passes to the new hue (`SectionSwitcher`, T1). */
 :root {
   --vlx-section-opus: var(--color-toga-600);
   --vlx-section-gymnasium: oklch(31% 0.09 268);
@@ -1276,8 +1276,6 @@
   --vlx-section-forum: oklch(55% 0.08 190);
   /* The lesson bar's head runs ahead of the ink: the section's hue, lighter where the ink is dark. */
   --vlx-gymnasium-wash: oklch(64% 0.1 268);
-  /* The title's ink while it is wet (S2): blacker than the heading's own in light, whiter in dark. */
-  --vlx-wet-ink: var(--color-ink-950);
 }
 .dark {
   --vlx-section-opus: var(--color-toga-500);
@@ -1285,29 +1283,11 @@
   --vlx-section-academia: oklch(60% 0.09 70);
   --vlx-section-forum: oklch(58% 0.08 190);
   --vlx-gymnasium-wash: oklch(45% 0.11 268);
-  --vlx-wet-ink: #fff;
 }
 .vlx-section-mark { background: var(--vlx-section-opus); }
 .vlx-section-mark[data-section="gymnasium"] { background: var(--vlx-section-gymnasium); }
 .vlx-section-mark[data-section="academia"] { background: var(--vlx-section-academia); }
 .vlx-section-mark[data-section="forum"] { background: var(--vlx-section-forum); }
-
-/* Changing section (S2): a halftone over the screen (`features/sections/sectionTransition.ts`), then the new page's
-   title's ink dries — wet, a little blurred and heavier, then as it is. The delay and the length come from the
-   script; the `backwards` fill keeps the title wet while the screen lets it through. */
-.vlx-ink-drying {
-  animation: vlx-ink-dry var(--vlx-ink-dry, 260ms) var(--ease-out) var(--vlx-ink-delay, 0ms) backwards;
-}
-@keyframes vlx-ink-dry {
-  from {
-    color: var(--vlx-wet-ink);
-    filter: blur(0.7px);
-    text-shadow: 0 0 0.5px currentColor, 0 0 1px currentColor;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .vlx-ink-drying { animation: none; }
-}
 
 /* Gymnasium's small motions (S2). Each plays once for what grew since this browser last drew it
    (`progress/seenProgress.ts`); under reduced motion none moves and the final state is drawn at once. */
@@ -1358,15 +1338,37 @@
   .vlx-digit-land { animation: none; }
 }
 
-/* Where no canvas can be drawn, the browser's View Transition (spec §6.3.2): the page leaves rising and fading, the
-   next one arrives from below; the sidebar and the rest of the screen hold still. */
-.vlx-page { view-transition-name: vlx-page; }
+/* Changing section (T1): the page's content fades out (100 ms), then the new one fades in rising by 5 px (140 ms):
+   240 ms, no overlap, nothing over the screen (`features/sections/sectionTransition.ts`). The sidebar, the floating
+   buttons, the search bar and the rest of the screen hold still; the groups do not move either, or their default
+   250 ms would outlast the change. A tap goes through the pictures to the page under them (it also ends the change).
+   Entering from the sign-in page there is no old page to wait for. */
+/* Named only while a transition runs (`lib/pageTransition.ts`): a name makes a stacking context (gotcha 22). The root
+   does not blend: its two pictures are not cross-faded, the new one covers the old (the default `plus-lighter` would
+   add them, the old sidebar's entries showing through the new). */
+.vlx-page-changing .vlx-page { view-transition-name: vlx-page; }
+/* The phone's bar (M1) lies over the content area: named too, so the page's picture does not paint over it; it holds
+   still, its two pictures not blended. */
+.vlx-page-changing .vlx-phone-bar { view-transition-name: vlx-phone-bar; }
+::view-transition-old(vlx-phone-bar),
+::view-transition-new(vlx-phone-bar) { mix-blend-mode: normal; animation: none; }
+::view-transition-group(vlx-phone-bar) { animation: none; }
+::view-transition { pointer-events: none; }
 ::view-transition-old(root),
-::view-transition-new(root) { animation: none; }
-::view-transition-old(vlx-page) { animation: vlx-page-out 160ms var(--ease-out) both; }
-::view-transition-new(vlx-page) { animation: vlx-page-in 240ms var(--ease-out) 40ms both; }
-@keyframes vlx-page-out { to { opacity: 0; translate: 0 -8px; } }
-@keyframes vlx-page-in { from { opacity: 0; translate: 0 8px; } }
+::view-transition-new(root) { mix-blend-mode: normal; }
+::view-transition-old(root),
+::view-transition-new(root),
+::view-transition-group(root),
+::view-transition-group(vlx-page) { animation: none; }
+::view-transition-old(vlx-page) { animation: vlx-page-out 100ms var(--ease-out) both; }
+::view-transition-new(vlx-page) { animation: vlx-page-in 140ms var(--ease-out) 100ms both; }
+::view-transition-new(vlx-page):only-child { animation-delay: 0ms; }
+@keyframes vlx-page-out { to { opacity: 0; } }
+@keyframes vlx-page-in { from { opacity: 0; translate: 0 5px; } }
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
+/* The new section's title takes the focus after the change; chosen with a pointer it shows no ring. The browser
+   counts that focus, given by the script after a focused menu entry, as visible, so `FOCUS_RING`'s `:focus-visible`
+   alone would draw it. Unlayered, so it wins over the utilities; the attribute goes with the focus. */
+[data-pointer-focus]:focus { outline: none; box-shadow: none; }

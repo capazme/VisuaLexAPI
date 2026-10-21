@@ -88,7 +88,7 @@ if (typeof Element !== 'undefined' && !Element.prototype.scrollIntoView) {
 }
 
 // jsdom has no canvas: its getContext logs «Not implemented» and answers null. Answer null quietly, as a browser
-// that cannot draw would; the celebration and the section change then skip their drawing, and a test of a drawing
+// that cannot draw would; the celebration then skips its drawing, and a test of a drawing
 // spies on it with a context of its own.
 if (typeof HTMLCanvasElement !== 'undefined') {
   HTMLCanvasElement.prototype.getContext = (() => null) as typeof HTMLCanvasElement.prototype.getContext

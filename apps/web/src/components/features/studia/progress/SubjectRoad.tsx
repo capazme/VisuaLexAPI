@@ -170,7 +170,7 @@ export function SubjectRoadUnread() {
       <h3 id="studia-percorso" className={BLOCK_HEADING}>
         Il percorso
       </h3>
-      <p className={cn('text-sm', MUTED_TEXT)}>Non riesco a leggere il tuo percorso: le materie tornano appena riesco a leggerle.</p>
+      <p className={cn('max-w-prose text-sm', MUTED_TEXT)}>Non riesco a leggere il tuo percorso: le materie tornano appena riesco a leggerle.</p>
     </section>
   );
 }

@@ -260,6 +260,25 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     expect(handlers.closeMobile).toHaveBeenCalled();
     expect(hrefs()).toEqual(['/', '/documents', '/forum', '/forum/community']);
   });
+
+  it('fades in the new section\'s entries only, never the Corpus ones above them (T1)', () => {
+    // jsdom has no Web Animations: the spy records which elements fade in.
+    const animate = vi.fn();
+    Element.prototype.animate = animate as unknown as typeof Element.prototype.animate;
+    try {
+      renderSidebar('/');
+      expect(animate).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole('button', { name: /^Sezione:/ }));
+      fireEvent.click(screen.getByRole('menuitemradio', { name: /Forum/ }));
+      const faded = animate.mock.contexts as HTMLElement[];
+      expect(faded.length).toBeGreaterThan(0);
+      const forum = screen.getByRole('group', { name: 'Forum' });
+      for (const entry of faded) expect(forum).toContainElement(entry);
+      expect(faded).toContain(screen.getByRole('link', { name: 'Community' }));
+    } finally {
+      delete (Element.prototype as Partial<Element>).animate;
+    }
+  });
 });
 
 describe('Sidebar — Cronologia in the user menu (the owner, 13 Oct 2026)', () => {
@@ -346,6 +365,59 @@ describe('Sidebar — the user menu (spec D2)', () => {
     expect(screen.getByTestId('where')).toHaveTextContent('/crediti');
     expect(handlers.closeMobile).toHaveBeenCalled();
     expect(screen.queryByRole('menu', { name: 'Menu utente' })).toBeNull();
+  });
+
+  it('holds «Invia un commento» on a phone, after «Crediti», and opens the form from it (M1)', () => {
+    const openFeedback = vi.fn();
+    render(
+      <MemoryRouter>
+        <Sidebar theme="light" isOpen serviceHealth={serviceHealth} {...handlers} openFeedback={openFeedback} layout="drawer" />
+      </MemoryRouter>,
+    );
+    openUserMenu();
+    const names = screen.getAllByRole('menuitem').map((e) => e.textContent?.trim());
+    expect(names.indexOf('Invia un commento')).toBe(names.indexOf('Crediti') + 1);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Invia un commento' }));
+    expect(openFeedback).toHaveBeenCalledTimes(1);
+    expect(handlers.closeMobile).toHaveBeenCalled();
+    expect(screen.queryByRole('menu', { name: 'Menu utente' })).toBeNull();
+  });
+
+  it('takes the closed drawer out of reach (inert), and only the drawer', () => {
+    const { container, rerender } = render(
+      <MemoryRouter>
+        <Sidebar theme="light" isOpen={false} serviceHealth={serviceHealth} {...handlers} layout="drawer" />
+      </MemoryRouter>,
+    );
+    expect(container.querySelector('aside')).toHaveAttribute('inert');
+    rerender(
+      <MemoryRouter>
+        <Sidebar theme="light" isOpen serviceHealth={serviceHealth} {...handlers} layout="drawer" />
+      </MemoryRouter>,
+    );
+    expect(container.querySelector('aside')).not.toHaveAttribute('inert');
+    rerender(
+      <MemoryRouter>
+        <Sidebar theme="light" isOpen={false} serviceHealth={serviceHealth} {...handlers} layout="rail" />
+      </MemoryRouter>,
+    );
+    expect(container.querySelector('aside')).not.toHaveAttribute('inert');
+  });
+
+  it('leaves «Invia un commento» to the floating button from md', () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({ ...original(query), matches: query === '(min-width: 768px)' })) as typeof window.matchMedia;
+    try {
+      render(
+        <MemoryRouter>
+          <Sidebar theme="light" isOpen serviceHealth={serviceHealth} {...handlers} openFeedback={vi.fn()} />
+        </MemoryRouter>,
+      );
+      openUserMenu();
+      expect(screen.queryByRole('menuitem', { name: 'Invia un commento' })).toBeNull();
+    } finally {
+      window.matchMedia = original;
+    }
   });
 
   it('opens the shortcuts', () => {

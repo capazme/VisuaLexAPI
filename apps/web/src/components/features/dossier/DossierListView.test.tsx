@@ -148,6 +148,7 @@ describe('DossierListView — a card counts its decisions', () => {
 
 describe('DossierListView — the trash', () => {
   it('shows «Cestino (n)» only when the trash holds something', () => {
+    viewport.desktop = true;
     const onOpenTrash = vi.fn();
     appStore.setState({ dossiers: [dossier([CIVIL])], practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [] });
     const { rerender } = render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} trashCount={0} onOpenTrash={onOpenTrash} /></MemoryRouter>);
@@ -307,5 +308,39 @@ describe('DossierListView — the category menu (D1)', () => {
     expect(field).toHaveAttribute('aria-keyshortcuts', '/');
     fireEvent.keyDown(window, { key: '/' });
     expect(field).toHaveFocus();
+  });
+});
+
+// On a phone the title keeps its row (M1): «⋯» with «Importa» and «Cestino», and «+» for a new dossier, beside it.
+describe('DossierListView — the heading on a phone', () => {
+  const page = (trashCount = 0, onOpenTrash = vi.fn()) => {
+    appStore.setState({ dossiers: [dossier([CIVIL])], practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [] });
+    render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} trashCount={trashCount} onOpenTrash={onOpenTrash} /></MemoryRouter>);
+  };
+
+  it('puts «⋯» and «+» beside the title, 44 px each, and no row of buttons under it', () => {
+    page();
+    const header = screen.getByRole('heading', { level: 1 }).closest('header')!;
+    expect(header).toHaveClass('flex-row', 'items-start', 'justify-between');
+    const create = screen.getByRole('button', { name: 'Nuovo dossier' });
+    expect(create).toHaveAttribute('id', 'tour-dossier-create');
+    expect(create).toHaveClass('h-11', 'w-11');
+    expect(screen.getByRole('button', { name: 'Altre azioni sui dossier' })).toHaveClass('h-11', 'w-11');
+    expect(screen.queryByRole('button', { name: 'Importa dossier da file JSON' })).toBeNull();
+  });
+
+  it('holds «Importa» in «⋯», and «Cestino (n)» when the trash holds something', () => {
+    const onOpenTrash = vi.fn();
+    page(2, onOpenTrash);
+    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni sui dossier' }));
+    expect(screen.getAllByRole('menuitem').map((e) => e.textContent?.trim())).toEqual(['Importa da file JSON', 'Cestino (2)']);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Cestino (2)' }));
+    expect(onOpenTrash).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens the new dossier from «+»', () => {
+    page();
+    fireEvent.click(screen.getByRole('button', { name: 'Nuovo dossier' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 });

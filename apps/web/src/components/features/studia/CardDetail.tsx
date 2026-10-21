@@ -129,7 +129,7 @@ export function CardDetail({ card, onBack, onEdit, onDelete, onOpenAnchor, onCha
   const [source, ...others] = anchors;
 
   return (
-    <article aria-label="Scheda" className={cn(TILE, 'space-y-5 p-5 md:p-6')}>
+    <article aria-label="Scheda" className={cn(TILE, 'space-y-5 p-4 md:p-6')}>
       <div className="flex flex-wrap items-center gap-2">
         {onBack && (
           <button type="button" onClick={onBack} className={BACK}>

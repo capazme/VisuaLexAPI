@@ -12,7 +12,8 @@ import { focusSearchFieldOrPalette } from '../../../utils/searchFieldControl';
 import { dossierRecency } from '../dossier/dossierUtils';
 import { kindLabel } from '../dossier/dossierKinds';
 import { greeting } from './scrivaniaGreeting';
-import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
+import { HIDDEN_SCROLLBAR, TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
+import { cn } from '../../../lib/utils';
 
 const EXAMPLES = ['Art. 2043 c.c.', 'Art. 5 GDPR', 'Art. 1 Costituzione'];
 
@@ -26,12 +27,13 @@ const ROW =
 
 export function Scrivania() {
   const navigate = useNavigate();
-  const { dossiers, quickNorms, selectQuickNorm, triggerSearch, openQuickNormsManager } = useAppStore(useShallow((s) => ({
+  const { dossiers, quickNorms, selectQuickNorm, triggerSearch, openQuickNormsManager, focusMode } = useAppStore(useShallow((s) => ({
     dossiers: s.dossiers,
     quickNorms: s.quickNorms,
     selectQuickNorm: s.selectQuickNorm,
     triggerSearch: s.triggerSearch,
     openQuickNormsManager: s.openQuickNormsManager,
+    focusMode: s.settings.focusMode,
   })));
 
   const now = new Date();
@@ -40,7 +42,17 @@ export function Scrivania() {
   const recent = [...dossiers].sort((a, b) => dossierRecency(b) - dossierRecency(a)).slice(0, 4);
 
   return (
-    <div id="tour-main-content" className="w-full min-h-full bg-slate-50 px-6 pb-24 pt-14 dark:bg-slate-950 md:pt-20">
+    <div
+      id="tour-main-content"
+      className={cn(
+        'w-full min-h-full bg-slate-50 px-6 pb-24 pt-14 dark:bg-slate-950 md:pt-20',
+        // On a phone (M1): the page's 16 px margin (the layout's; the reader's column's 16 taken back, and none of its own), and the
+        // block centred in the window under the search bar when it is shorter than it (the layout's padding taken off:
+        // 1rem above and below, 3rem in Focus mode, which draws no search bar).
+        'max-md:-mx-4 max-md:w-auto max-md:flex max-md:flex-col max-md:justify-center max-md:px-0 max-md:py-8',
+        focusMode ? 'max-md:min-h-[calc(100dvh-6rem)]' : 'max-md:min-h-[calc(100dvh-var(--search-bar-height,0px)-2rem)]',
+      )}
+    >
       <div className="mx-auto w-full max-w-[760px]">
         <p className={`text-sm font-medium first-letter:uppercase text-slate-500 dark:text-slate-400 ${ENTER}`} style={stagger(0)}>{day}</p>
         <h1 className={`mt-2 font-serif text-5xl font-medium tracking-tight text-slate-900 dark:text-slate-50 md:text-6xl ${ENTER}`} style={stagger(1)}>
@@ -54,19 +66,35 @@ export function Scrivania() {
           >
             Inizia una ricerca
           </button>
-          <span className="text-sm text-slate-500 dark:text-slate-400">
+          {/* A keyboard's shortcut: not on a touch screen. */}
+          <span className="text-sm text-slate-500 [@media(pointer:coarse)]:hidden dark:text-slate-400">
             o premi <kbd className="rounded border border-slate-300 px-1.5 py-0.5 font-mono text-xs text-slate-600 dark:border-slate-700 dark:text-slate-300">⌘K</kbd> da qualsiasi pagina
           </span>
         </div>
 
-        <div className={`mt-5 flex flex-wrap items-baseline gap-x-5 gap-y-2 ${ENTER}`} style={stagger(3)} aria-label="Esempi di ricerca">
-          <span className="text-sm text-slate-500 dark:text-slate-400">Prova</span>
+        {/* On a phone three pills in a row that scrolls sideways, «Prova» first, never one left alone on a line (M1), with
+            room above and below for their focus ring (the row clips); from md the links in a line. */}
+        <div
+          className={cn(
+            'mt-5 flex items-center gap-2 overflow-x-auto max-md:-mx-4 max-md:px-4 max-md:py-1 md:flex-wrap md:items-baseline md:gap-x-5 md:gap-y-2 md:overflow-visible',
+            HIDDEN_SCROLLBAR,
+            ENTER,
+          )}
+          style={stagger(3)}
+          role="group"
+          aria-label="Esempi di ricerca"
+        >
+          <span className="shrink-0 text-sm text-slate-500 dark:text-slate-400">Prova</span>
           {EXAMPLES.map((example) => (
             <button
               key={example}
               // The example goes into the field, ready to search with Enter or to be changed.
               onClick={() => focusSearchFieldOrPalette(example)}
-              className={`${TOUCH_TARGET_RESPONSIVE} font-serif text-lg text-primary-700 underline decoration-primary-300 decoration-1 underline-offset-4 transition-colors hover:decoration-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-300 dark:decoration-primary-700`}
+              className={cn(
+                TOUCH_TARGET_RESPONSIVE,
+                'shrink-0 whitespace-nowrap font-serif text-lg text-primary-700 underline decoration-primary-300 decoration-1 underline-offset-4 transition-colors hover:decoration-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-300 dark:decoration-primary-700',
+                'max-md:rounded-full max-md:border max-md:border-slate-300 max-md:bg-white max-md:px-4 max-md:no-underline dark:max-md:border-slate-700 dark:max-md:bg-slate-900',
+              )}
             >
               {example}
             </button>

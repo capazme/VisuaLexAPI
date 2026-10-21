@@ -41,7 +41,7 @@ export function ForumMyEnvironmentsView({
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {[...Array(3)].map((_, i) => (
           <div
             key={i}
@@ -85,7 +85,7 @@ export function ForumMyEnvironmentsView({
       <p className="text-sm text-slate-500 dark:text-slate-400">
         {environments.length} {environments.length === 1 ? 'dossier pubblicato' : 'dossier pubblicati'}
       </p>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {environments.map((env) => {
           const current = restored[env.id] ?? env;
           return (
