@@ -240,7 +240,11 @@ export function MyCardsView() {
   };
 
   // No confirmation: the card goes to the trash for 30 days and the notification's «Annulla» takes it back out (K1a).
+  // One trash call per card: a double click on «Elimina» must not send a second one.
+  const deleting = useRef<string | null>(null);
   const deleteCard = async (card: Scheda) => {
+    if (deleting.current === card.id) return;
+    deleting.current = card.id;
     try {
       const outcome = await studiaService.trash([card.id]);
       setRestartActs(true);
@@ -282,6 +286,8 @@ export function MyCardsView() {
       void refresh();
     } catch {
       setToast({ message: 'Non sono riuscito a spostare la scheda nel cestino. Riprova.', type: 'error' });
+    } finally {
+      deleting.current = null;
     }
   };
 

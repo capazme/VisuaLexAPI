@@ -72,6 +72,7 @@ export function NotificationCard({ entry, still, standalone = false, onUndo, onD
   const [scope, animate] = useAnimate<HTMLDivElement>();
   const swipedTo = useRef(1);
   const timeLine = useRef<AnimationPlaybackControls | null>(null);
+  const entrance = useRef<AnimationPlaybackControls | null>(null);
   const exited = useRef(false);
   const Icon = ICONS[entry.type];
   const closing = entry.closing !== null;
@@ -81,12 +82,12 @@ export function NotificationCard({ entry, still, standalone = false, onUndo, onD
     const root = scope.current;
     if (!root) return;
     if (still) {
-      void animate(root, { opacity: [0, 1] }, { duration: NOTIFICATION_S.fade });
+      entrance.current = animate(root, { opacity: [0, 1] }, { duration: NOTIFICATION_S.fade });
       return;
     }
     const half = root.offsetWidth / 2;
     const out = { ease: ease.out };
-    void animate([
+    entrance.current = animate([
       ['[data-line]', { scaleX: [0, 1] }, { duration: NOTIFICATION_S.line, ...out }],
       ['[data-tick="start"]', { x: [half, 0] }, { duration: NOTIFICATION_S.line, at: 0, ...out }],
       ['[data-tick="end"]', { x: [-half, 0] }, { duration: NOTIFICATION_S.line, at: 0, ...out }],
@@ -94,7 +95,9 @@ export function NotificationCard({ entry, still, standalone = false, onUndo, onD
       // The line rides the slit's lower edge, onto the border: a translate by half the card's height, on the clip's
       // own timeline (a `top` ran on the main thread, ahead of the clip).
       ['[data-rule]', { y: ['0%', '50%'] }, { duration: NOTIFICATION_S.open, at: '<', ...out }],
-      ['[data-word]', { opacity: [0, 1], y: [6, 0], fontWeight: [400, 500] }, { duration: NOTIFICATION_S.word, delay: stagger(NOTIFICATION_S.stagger), at: `-${NOTIFICATION_S.open - 0.1}`, ...out }],
+      ['[data-word]', { opacity: [0, 1], y: [6, 0] }, { duration: NOTIFICATION_S.word, delay: stagger(NOTIFICATION_S.stagger), at: `-${NOTIFICATION_S.open - 0.1}`, ...out }],
+      // The message gains a touch of weight as it rises (Geist's own axis), ending at its class's 500.
+      ['[data-message]', { fontWeight: [400, 500] }, { duration: NOTIFICATION_S.word, at: '<', ...out }],
       // Open, the line gives way to the time line (or to the border), and the clip is let go: a focus ring must not
       // be cut.
       ['[data-rule]', { opacity: 0 }, { duration: 0.12, at: NOTIFICATION_S.line + NOTIFICATION_S.open }],
@@ -119,13 +122,16 @@ export function NotificationCard({ entry, still, standalone = false, onUndo, onD
     return () => timeLine.current?.stop();
   }, [entry.undoable, entry.clock, entry.duration, closing, animate, scope]);
 
-  // The exit, by why it goes.
+  // The exit, by why it goes. Stopped before its end (StrictMode's second mount, in development), it runs again: a
+  // stopped animation never settles, and the entry would stay drawn for ever.
   useEffect(() => {
     if (!closing || exited.current) return;
     exited.current = true;
     const root = scope.current;
     const done = () => onExited();
     if (!root) return done();
+    // An entrance still on its way would take its values back from the exit, which would then never settle.
+    entrance.current?.stop();
     timeLine.current?.stop();
     if (still) {
       animate(root, { opacity: 0 }, { duration: NOTIFICATION_S.fade }).then(done, done);
@@ -146,16 +152,32 @@ export function NotificationCard({ entry, still, standalone = false, onUndo, onD
       ['[data-tick="start"]', { x: half }, { duration: NOTIFICATION_S.retract, at: '<', ease: ease.out }],
       ['[data-tick="end"]', { x: -half }, { duration: NOTIFICATION_S.retract, at: '<', ease: ease.out }],
     ]).then(done, done);
+    return () => {
+      exited.current = false;
+    };
     // On the first frame it is closing; `entry.closing` does not change after.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [closing]);
+
+  /**
+   * Closed from inside (Esc, ✕, «Annulla» by the keyboard), it would take the focus down with it: the focus goes to
+   * the next notification of the stack still open, if there is one.
+   */
+  const handOff = (then: () => void) => () => {
+    const root = scope.current;
+    if (root?.contains(document.activeElement)) {
+      const next = [...(root.closest('ol')?.querySelectorAll<HTMLElement>('[data-card]:not([inert])') ?? [])].find((card) => card !== root);
+      next?.querySelector<HTMLElement>('button:not([disabled])')?.focus();
+    }
+    then();
+  };
 
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.key !== 'Escape' || closing) return;
     // The notification's Esc, not the page's: a dialog under it stays open.
     event.preventDefault();
     event.stopPropagation();
-    onDismiss();
+    handOff(onDismiss)();
   };
 
   const onPointerDown = (event: ReactPointerEvent) => {
@@ -173,15 +195,17 @@ export function NotificationCard({ entry, still, standalone = false, onUndo, onD
   const onDragEnd = (_: unknown, info: PanInfo) => {
     if (Math.abs(info.offset.x) < SWIPE_PX && Math.abs(info.velocity.x) < SWIPE_SPEED) return;
     swipedTo.current = info.offset.x < 0 ? -1 : 1;
-    onDismiss();
+    handOff(onDismiss)();
   };
 
   const word = 'opacity-0 motion-reduce:opacity-100';
   return (
     <motion.div
       ref={scope}
+      data-card
       drag={!closing && !standalone && coarsePointer() ? 'x' : false}
-      dragSnapToOrigin
+      // Swiped away, it leaves from where the finger let it go.
+      dragSnapToOrigin={!closing}
       dragElastic={0.4}
       onDragEnd={onDragEnd}
       inert={closing || undefined}
@@ -208,21 +232,22 @@ export function NotificationCard({ entry, still, standalone = false, onUndo, onD
 
       <div
         data-body
-        className="relative rounded-xl border border-slate-200 bg-white text-slate-800 shadow-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+        // The page's paper, a thin border, ink: the typography does the work (K1a).
+        className="relative rounded-xl border border-slate-200 bg-background text-slate-800 shadow-lg dark:border-slate-700 dark:text-slate-100"
         style={{ clipPath: still ? undefined : SLIT_SHUT }}
       >
         <div className="flex items-center gap-2 py-1.5 pl-4 pr-1.5">
           <span data-word aria-hidden className={cn('shrink-0', word, ICON_INK[entry.type])}>
             <Icon size={18} />
           </span>
-          <p data-word className={cn('min-w-0 flex-1 py-2 text-sm leading-snug', word)}>
+          <p data-word data-message className={cn('min-w-0 flex-1 py-2 text-sm font-medium leading-snug', word)}>
             {entry.message}
           </p>
           {entry.undoable && (
             <button
               type="button"
               data-word
-              onClick={onUndo}
+              onClick={handOff(onUndo)}
               disabled={closing}
               className={cn(
                 'min-h-[44px] shrink-0 rounded-lg px-3 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/30',
@@ -251,7 +276,7 @@ export function NotificationCard({ entry, still, standalone = false, onUndo, onD
           <button
             type="button"
             data-word
-            onClick={onDismiss}
+            onClick={handOff(onDismiss)}
             disabled={closing}
             aria-label="Chiudi notifica"
             className={cn(

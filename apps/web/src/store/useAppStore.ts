@@ -17,7 +17,7 @@ import type { DecisionIdentity, DecisionReference, DecisionSearchQuery } from '.
 import { decisionPath, formatDecisionShort, identityOf } from '../utils/decisionLinks';
 import {
     addArticles, articleRowKey, besideAfterOpen, besideRefFor, DEFAULT_PRACTICE_LABEL, DEFAULT_SEARCH_LABEL, decisionRowKey,
-    findPracticeArticle, holdsSubject, labelOr, mergeDecisionEntries, practiceArticleKey,
+    findPracticeArticle, holdsSubject, labelOr, MAX_BESIDE, mergeDecisionEntries, practiceArticleKey,
     practiceLabel, sameBesideSubject, sameDecision, sanitizePractices, subjectOfRef, type BesideRef, type Practice,
     type PracticeAct, type PracticeDecision, type PracticeSubject,
 } from '../utils/practice';
@@ -268,10 +268,11 @@ interface AppState {
     /** Takes the act off the table with its rows, its reveal, its windows and the structure window it owned. */
     removePracticeAct: (practiceId: string, actId: string) => void;
     /**
-     * «Annulla» after `removePracticeAct` (K1a): the act back at `index` in its practice, with the windows it had beside
-     * and its open rows. Ignored when the practice is gone or holds the act again.
+     * «Annulla» after `removePracticeAct` (K1a): the act back at `index` in its practice with its open rows, and the
+     * windows it had beside back at their places while the row has room (two). The same act added again meanwhile
+     * (under a new id) takes the removed articles instead of a second copy of the act. Ignored when the practice is gone.
      */
-    restorePracticeAct: (practiceId: string, act: PracticeAct, index: number, beside: BesideRef[], rows: Record<string, true>) => void;
+    restorePracticeAct: (practiceId: string, act: PracticeAct, index: number, beside: { ref: BesideRef; index: number }[], rows: Record<string, true>) => void;
     /**
      * «Sposta in un'altra pratica» (T13): the act keeps its id, its articles and its open rows. Into
      * a practice that already holds the act (`actKeyOf`) it joins that act, whose id it takes, and
@@ -821,8 +822,18 @@ const appStore = createStore<AppState>()(
             restorePracticeAct: (practiceId, act, index, beside, rows) => set((state) => {
                 const practice = state.practices.find((p) => p.id === practiceId);
                 if (!practice || practice.acts.some((a) => a.id === act.id)) return;
+                const again = practice.acts.find((a) => a.key === act.key);
+                if (again) {
+                    // Added again meanwhile: the removed articles join it; its own windows and rows stay as they are.
+                    practice.acts = addArticles(practice.acts, act.norma, act.articles, () => again.id).acts;
+                    return;
+                }
                 practice.acts.splice(Math.min(index, practice.acts.length), 0, act);
-                practice.beside.push(...beside);
+                for (const { ref, index: at } of [...beside].sort((a, b) => a.index - b.index)) {
+                    if (practice.beside.length >= MAX_BESIDE) break;
+                    if (practice.beside.some((b) => b.id === ref.id || sameBesideSubject(b, ref))) continue;
+                    practice.beside.splice(Math.min(at, practice.beside.length), 0, ref);
+                }
                 Object.assign(state.practiceRows, rows);
             }),
 

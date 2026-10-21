@@ -23,7 +23,7 @@ describe('NotificationHost (K1a)', () => {
     await act(async () => {
       outcome = showUndoToast({ action: () => 'rimosso', undo, message: 'Elemento rimosso' });
     });
-    expect(screen.getByRole('region', { name: 'Notifiche' })).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Notifiche' })).toBeInTheDocument();
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Annulla' }));
     });
@@ -133,5 +133,56 @@ describe('NotificationHost (K1a)', () => {
       </>,
     );
     expect(screen.getByRole('alert')).toHaveTextContent('Non salvato');
+  });
+
+  it('reads a notification when it arrives, never an older one again when a newer one closes', () => {
+    render(<NotificationHost />);
+    let newer = 0;
+    act(() => {
+      notify({ type: 'success', message: 'Primo', duration: 0 });
+      newer = notify({ type: 'success', message: 'Secondo', duration: 0 });
+    });
+    expect(screen.getByRole('status')).toHaveTextContent('Secondo');
+    act(() => closeNotification(newer, 'dismiss'));
+    endExits();
+    expect(screen.getByRole('status')).toHaveTextContent('Secondo');
+    expect(screen.getByRole('status')).not.toHaveTextContent('Primo');
+  });
+
+  it('draws «Ripristinato» in the undone one\'s place even when the undo outlasts its exit', async () => {
+    render(<NotificationHost />);
+    let finish = () => {};
+    const slow = new Promise<void>((r) => { finish = r; });
+    await act(async () => {
+      void showUndoToast({ action: () => 1, undo: vi.fn(), message: 'Più vecchia' });
+    });
+    await act(async () => {
+      void showUndoToast({ action: () => 2, undo: () => slow, message: 'Da annullare' });
+    });
+    await act(async () => {
+      void showUndoToast({ action: () => 3, undo: vi.fn(), message: 'Più nuova' });
+    });
+    fireEvent.click(within(cards()[1]).getByRole('button', { name: 'Annulla' }));
+    endExits();
+    expect(cards().map((c) => c.textContent)).toEqual([expect.stringContaining('Più nuova'), expect.stringContaining('Più vecchia')]);
+    await act(async () => { finish(); await slow; });
+    expect(cards().map((c) => c.textContent)).toEqual([
+      expect.stringContaining('Più nuova'),
+      expect.stringContaining('Ripristinato'),
+      expect.stringContaining('Più vecchia'),
+    ]);
+  });
+
+  it('closed from the keyboard, gives the focus to the next notification still open', async () => {
+    render(<NotificationHost />);
+    await act(async () => {
+      void showUndoToast({ action: () => 1, undo: vi.fn(), message: 'Prima' });
+      notify({ type: 'info', message: 'Seconda', duration: 0 });
+    });
+    const card = (text: string) => cards().find((c) => c.textContent?.includes(text))!;
+    const close = within(card('Seconda')).getByRole('button', { name: 'Chiudi notifica' });
+    act(() => close.focus());
+    fireEvent.keyDown(close, { key: 'Escape' });
+    expect(within(card('Prima')).getByRole('button', { name: 'Annulla' })).toHaveFocus();
   });
 });

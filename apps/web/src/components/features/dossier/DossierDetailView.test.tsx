@@ -472,7 +472,7 @@ describe('DossierDetailView — an import from the act\'s index (K1a)', () => {
   it('more than a hundred ask no question, and write nothing until the notification is gone', async () => {
     const addToDossier = await importing(150);
     expect(screen.queryByRole('alertdialog')).toBeNull();
-    await waitFor(() => expect(toast?.message).toBe('Importo 150 articoli nel dossier'));
+    await waitFor(() => expect(toast?.message).toBe('150 articoli verranno importati nel dossier'));
     expect(addToDossier).not.toHaveBeenCalled();
     await act(async () => { toast?.onDismiss(); });
     await waitFor(() => expect(addToDossier).toHaveBeenCalledTimes(150));
@@ -483,5 +483,14 @@ describe('DossierDetailView — an import from the act\'s index (K1a)', () => {
     await waitFor(() => expect(toast).not.toBeNull());
     await act(async () => { await toast?.onUndo(); });
     expect(addToDossier).not.toHaveBeenCalled();
+  });
+
+  it('writes nothing into a dossier deleted while it waited, and says so', async () => {
+    const addToDossier = await importing(150);
+    await waitFor(() => expect(toast).not.toBeNull());
+    appStore.setState({ dossiers: [] });
+    await act(async () => { toast?.onDismiss(); });
+    expect(addToDossier).not.toHaveBeenCalled();
+    expect(appStore.getState().lastSyncError?.message).toBe('Nessun articolo importato: il dossier «Ricorso Rossi» non c’è più.');
   });
 });

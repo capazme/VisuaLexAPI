@@ -408,7 +408,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   store (`notifications.ts`), drawn by `NotificationHost` (mounted once in `Layout`, in the toast band): a stack at
   the bottom (at the top for `position="top"`), three at most per edge — the newest first, a fourth closes the oldest
   (an «Annulla» pushed out stands), the others move with `spring.gentle`; a list named «Notifiche», read from a
-  polite and an assertive live region. Where no host is mounted (a component's test) a `Toast` draws itself alone at
+  polite and an assertive live region that `notify` sets when one arrives (a closing one never makes an older one read
+  again). Where no host is mounted (a component's test) a `Toast` draws itself alone at
   its edge (`role="alert"` on its fixed box, as before). The card (`NotificationCard`, Framer Motion's `useAnimate`)
   is drawn from a line: the line grows from the centre with a tick at each end (300 ms), opens like a slit
   (an `inset` clip with the same lengths at both ends, 350 ms), and the words rise from it 60 ms apart with a touch
@@ -417,7 +418,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   line at the bottom drawing back between two ticks, which grow while it is held. Run out (or taken back), it closes
   into the line, which draws back to the centre; ✕, Esc from inside it and a swipe to the side (a coarse pointer;
   a short one springs back) fold it and slide it away. «Annulla» closes it at once — nothing in a closing
-  notification takes a click (`inert`) — awaits the undo and draws «Ripristinato» in its place for 1.5 s; an undo
+  notification takes a click (`inert`) — awaits the undo and draws «Ripristinato» in its place for 1.5 s (`undoneSlots`: the place is kept when the undo
+  outlasts the exit); the focus of a notification closed from the keyboard goes to the next one still open; an undo
   that throws has reported its failure and gets no «Ripristinato» (the dossier, entry, card and task undos rethrow
   after saying so). Plain toasts stay 3 s. Under reduced motion it fades, already open, and the time line still draws
   back. Its «Annulla» and ✕ are 44 px at every width. `registerUndoToastListener` hands the newest «Annulla» on screen
@@ -1781,7 +1783,8 @@ coherent.
 people (K1a, the owner's L-35): an action whose «Annulla» puts everything back on the
 server (the 30-day trash, or a write held until the notification is gone, as an import
 of more than 100 articles from an act's index) asks nothing and offers «Annulla»
-(`showUndoToast`); browser-only state (the practices) likewise. Otherwise never
+(`showUndoToast`); browser-only state (the practices) likewise. A held write checks, when it runs, that
+its target is still there (the import does not write into a dossier deleted meanwhile). Otherwise never
 `window.confirm`: use `components/ui/ConfirmDialog` with `variant="danger"`, and word
 the message so it names the scope *and* what is not touched ("Segnalibri e dossier non
 saranno toccati").
@@ -1950,7 +1953,9 @@ meant to stay split; add new features as new files, not inside the shells:
   active practice. The practice list (a tap on the name) has «⋯» per practice: Rinomina, and Chiudi la
   pratica, at once with «Annulla» (`practiceUndo.ts`, K1a: the practice back at its index with its rows and its being
   active; «Chiudi tutte» and «Rimuovi l'atto» the same way, through the store's `reopenPractices` and
-  `restorePracticeAct`, which leave alone what was opened meanwhile);
+  `restorePracticeAct`: what was opened meanwhile stays, the windows come back only while the row has room for two,
+  and the same act added again meanwhile takes the removed articles instead of a second copy; the structure window
+  and the phone's reader are not brought back);
   `PracticeParts` (the migration's notice, taken once and mounted by `SearchPanel` over both layouts, in
   the toast band; the empty practice; the name editor); `practiceView.ts` (helpers kept out of the
   component files). `ReadingRow` (the table and the active practice's windows beside it, `ReadingWindow` each, on widths

@@ -55,15 +55,28 @@ interface Handlers {
   onClose?: (reason: CloseReason) => void;
 }
 
+/** What the live regions read: the latest notification to arrive, by its politeness, and only on arrival. */
+export interface Announcement {
+  id: number;
+  message: string;
+}
+
 interface NotificationsState {
   entries: NotificationEntry[];
+  /** Set by `notify` and nothing else: a notification closing never makes an older one read again. */
+  announced: { polite: Announcement | null; assertive: Announcement | null };
   /** The stacks on screen (`NotificationHost`): with none, a notification closes without an exit to wait for. */
   hosts: number;
 }
 
-export const notificationStore = create<NotificationsState>()(() => ({ entries: [], hosts: 0 }));
+export const notificationStore = create<NotificationsState>()(() => ({ entries: [], announced: { polite: null, assertive: null }, hosts: 0 }));
 
 const handlers = new Map<number, Handlers>();
+/**
+ * Where an undone notification stood: the id of the one drawn just before it (older), or null when it was the oldest.
+ * «Ripristinato» takes that place even when the undo outlasted the exit and the notification is gone from the list.
+ */
+const undoneSlots = new Map<number, number | null>();
 let nextId = 1;
 
 const patch = (id: number, change: Partial<NotificationEntry>) =>
@@ -81,6 +94,10 @@ export function closeNotification(id: number, reason: CloseReason) {
   if (!entry || entry.closing) return;
   const own = handlers.get(id);
   own?.countdown?.stop();
+  if (reason === 'undo') {
+    const entries = notificationStore.getState().entries;
+    undoneSlots.set(id, entries[entries.findIndex((e) => e.id === id) - 1]?.id ?? null);
+  }
   if (notificationStore.getState().hosts === 0) removeNotification(id);
   else patch(id, { closing: reason });
   own?.onClose?.(reason);
@@ -123,11 +140,11 @@ export function notify(input: NotificationInput): number {
   const live = notificationStore.getState().entries.filter((e) => e.position === position && !e.closing && e.id !== input.after);
   live.slice(0, Math.max(0, live.length - STACK_MAX + 1)).forEach((e) => closeNotification(e.id, 'evicted'));
 
-  notificationStore.setState((s) => {
-    const at = input.after === undefined ? -1 : s.entries.findIndex((e) => e.id === input.after);
-    if (at < 0) return { entries: [...s.entries, entry] };
-    return { entries: [...s.entries.slice(0, at + 1), entry, ...s.entries.slice(at + 1)] };
-  });
+  const politeness = input.ariaLive ?? (input.type === 'error' ? 'assertive' : 'polite');
+  notificationStore.setState((s) => ({
+    entries: placeAfter(s.entries, entry, input.after),
+    announced: politeness === 'off' ? s.announced : { ...s.announced, [politeness]: { id, message: input.message } },
+  }));
 
   if (input.duration > 0) {
     own.countdown = startCountdown(
@@ -143,6 +160,24 @@ export function notify(input: NotificationInput): number {
   return id;
 }
 
+/**
+ * `entry` drawn where `after` is (just after it in the list, which the stack shows newest first), or where `after`
+ * stood if it is gone already (`undoneSlots`); else at the end, the newest.
+ */
+function placeAfter(entries: NotificationEntry[], entry: NotificationEntry, after: number | undefined): NotificationEntry[] {
+  if (after === undefined) return [...entries, entry];
+  let at = entries.findIndex((e) => e.id === after);
+  if (at < 0 && undoneSlots.has(after)) {
+    const before = undoneSlots.get(after);
+    at = before === null ? -1 : entries.findIndex((e) => e.id === before);
+    if (before !== null && at < 0) return [...entries, entry];
+  } else if (at < 0) {
+    return [...entries, entry];
+  }
+  undoneSlots.delete(after);
+  return [...entries.slice(0, at + 1), entry, ...entries.slice(at + 1)];
+}
+
 /** A stack on screen counts itself while it is mounted (`NotificationHost`). */
 export function registerNotificationHost(): () => void {
   notificationStore.setState((s) => ({ hosts: s.hosts + 1 }));
@@ -153,5 +188,6 @@ export function registerNotificationHost(): () => void {
 export function resetNotifications() {
   handlers.forEach((h) => h.countdown?.stop());
   handlers.clear();
-  notificationStore.setState({ entries: [] });
+  undoneSlots.clear();
+  notificationStore.setState({ entries: [], announced: { polite: null, assertive: null } });
 }

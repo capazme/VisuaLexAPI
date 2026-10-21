@@ -5,7 +5,8 @@ import { appStore } from '../../../store/useAppStore';
  * Closing a practice, all of them, or taking an act off the table, with «Annulla» instead of a confirmation (K1a): the
  * practices are the browser's working table, not data on the server (spec D6), so «Annulla» puts back exactly what was
  * there — the practices at their places with their open rows and the active one, the act at its place with the windows
- * it had beside. What was opened meanwhile stays.
+ * it had beside while the row has room. What was opened meanwhile stays; the same act added again meanwhile takes the
+ * removed articles. The structure window and the phone's reader one of them held are not brought back.
  */
 
 const rowsUnder = (prefix: string) =>
@@ -40,7 +41,9 @@ export function removePracticeActWithUndo(practiceId: string, actId: string): vo
   const act = practice?.acts.find((a) => a.id === actId);
   if (!practice || !act) return;
   const at = practice.acts.indexOf(act);
-  const beside = practice.beside.filter((b) => b.kind === 'article' && b.actId === actId);
+  const beside = practice.beside
+    .map((ref, index) => ({ ref, index }))
+    .filter(({ ref }) => ref.kind === 'article' && ref.actId === actId);
   const rows = rowsUnder(`${practiceId}/${actId}/`);
   void showUndoToast({
     action: () => appStore.getState().removePracticeAct(practiceId, actId),

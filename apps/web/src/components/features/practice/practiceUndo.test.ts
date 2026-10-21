@@ -68,4 +68,28 @@ describe('practiceUndo (K1a)', () => {
     expect(s().practices[0].acts[0].id).toBe(first);
     expect(s().practices[0].beside).toEqual([window]);
   });
+
+  it('the same act added again meanwhile takes the removed articles: no second copy', async () => {
+    const p = s().createPractice('Pratica');
+    const first = s().addArticlesToPractice(p, L24, [article(L24, '5')]).actId;
+    removePracticeActWithUndo(p, first);
+    s().addArticlesToPractice(p, L24, [article(L24, '6')]);
+    await settle();
+    await shown!.onUndo();
+    expect(s().practices[0].acts).toHaveLength(1);
+    expect(s().practices[0].acts[0].articles.map((a) => a.norma_data.numero_articolo)).toEqual(['5', '6']);
+  });
+
+  it('its windows come back only while the row has room for two', async () => {
+    const p = s().createPractice('Pratica');
+    const first = s().addArticlesToPractice(p, L24, [article(L24, '5'), article(L24, '6')]).actId;
+    const win = (n: string) => ({ id: `w${n}`, kind: 'article' as const, actId: first, articleKey: practiceArticleKey(article(L24, n)) });
+    appStore.setState((st) => ({ practices: st.practices.map((x) => ({ ...x, beside: [win('5'), win('6')] })) }));
+    removePracticeActWithUndo(p, first);
+    const other = { id: 'd1', kind: 'decision' as const, decisionId: 'cass-1' };
+    appStore.setState((st) => ({ practices: st.practices.map((x) => ({ ...x, beside: [other as never] })) }));
+    await settle();
+    await shown!.onUndo();
+    expect(s().practices[0].beside).toHaveLength(2);
+  });
 });

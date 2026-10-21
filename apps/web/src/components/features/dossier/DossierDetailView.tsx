@@ -38,7 +38,7 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { useAppStore } from '../../../store/useAppStore';
+import { appStore, useAppStore } from '../../../store/useAppStore';
 import { EmptyState } from '../../ui/EmptyState';
 import type { Dossier, DossierItem, DossierKind } from '../../../types';
 import {
@@ -346,8 +346,14 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     // Many articles at once («seleziona tutti» on a code is most often a slip, and floods the dossier): no question
     // first, but nothing written until the notification's time is out — «Annulla» leaves the dossier as it was (K1a).
     if (articles.length > BULK_IMPORT_WAIT) {
-      void showUndoToast({ action: () => undefined, undo: () => {}, message: `Importo ${articles.length} articoli nel dossier` }).then((stands) => {
-        if (stands) importArticles(articles, normInfo);
+      void showUndoToast({ action: () => undefined, undo: () => {}, message: `${articles.length} articoli verranno importati nel dossier` }).then((stands) => {
+        if (!stands) return;
+        // The dossier deleted meanwhile (it is in the trash): nothing to write into.
+        if (!appStore.getState().dossiers.some((d) => d.id === dossier.id)) {
+          appStore.getState().pushSyncError(`Nessun articolo importato: il dossier «${dossier.title}» non c’è più.`);
+          return;
+        }
+        importArticles(articles, normInfo);
       });
       return;
     }
