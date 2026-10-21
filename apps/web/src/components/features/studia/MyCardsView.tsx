@@ -4,10 +4,11 @@ import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { studiaService } from '../../../services/studiaService';
-import { useAppStore } from '../../../store/useAppStore';
+import { appStore, useAppStore } from '../../../store/useAppStore';
 import { invalidateArticleCards } from '../../../utils/articleCardsCache';
 import type { AncoraScheda, Scheda } from '../../../types/studia';
-import { ConfirmDialog } from '../../ui/ConfirmDialog';
+import { showUndoToast } from '../../../hooks/useUndoableAction';
+import { trashService } from '../../../services/trashService';
 import { Toast } from '../../ui/Toast';
 import { CardDetail, type CardDetailProps } from './CardDetail';
 import { CardFilters } from './CardFilters';
@@ -222,7 +223,6 @@ export function MyCardsView() {
     focusAfterCreate.current = false;
     newCardButton.current?.focus();
   }, [formOpen]);
-  const [toDelete, setToDelete] = useState<Scheda | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
 
   const openAnchor = (anchor: AncoraScheda) => {
@@ -239,16 +239,37 @@ export function MyCardsView() {
     navigate(`${LIST_PATH}/${encodeURIComponent(savedId)}`);
   };
 
-  const confirmDelete = async () => {
-    const card = toDelete;
-    setToDelete(null);
-    if (!card) return;
+  // No confirmation: the card goes to the trash for 30 days and the notification's «Annulla» takes it back out (K1a).
+  // One trash call per card: a double click on «Elimina» must not send a second one.
+  const deleting = useRef<string | null>(null);
+  const deleteCard = async (card: Scheda) => {
+    if (deleting.current === card.id) return;
+    deleting.current = card.id;
     try {
       const outcome = await studiaService.trash([card.id]);
       setRestartActs(true);
       // The cards under an article are read again where they are shown next.
       if (outcome.moved.length > 0) invalidateArticleCards();
-      if (outcome.moved.includes(card.id)) {
+      if (outcome.moved.includes(card.id) && outcome.trashId) {
+        const trashId = outcome.trashId;
+        void showUndoToast({
+          action: () => trashId,
+          undo: async (id) => {
+            try {
+              await trashService.restore(id);
+            } catch (error) {
+              console.error('Failed to restore a deleted card:', card.id, error);
+              // The page may be gone by now (the notification is the app's): the app's error line, not this page's toast.
+              appStore.getState().pushSyncError('Non riesco a ripristinare la scheda ora: è nel Cestino, ripristinala da lì.');
+              throw error;
+            }
+            invalidateArticleCards();
+            setRestartActs(true);
+            void refresh();
+          },
+          message: 'Scheda nel cestino',
+        });
+      } else if (outcome.moved.includes(card.id)) {
         setToast({ message: 'Scheda nel cestino', type: 'success' });
       } else if (outcome.notDeletable.includes(card.id)) {
         setToast({ message: 'Questa scheda non si può eliminare nello stato in cui si trova. Ho aggiornato l’elenco.', type: 'error' });
@@ -266,6 +287,8 @@ export function MyCardsView() {
       void refresh();
     } catch {
       setToast({ message: 'Non sono riuscito a spostare la scheda nel cestino. Riprova.', type: 'error' });
+    } finally {
+      deleting.current = null;
     }
   };
 
@@ -339,7 +362,7 @@ export function MyCardsView() {
                 card={selected}
                 onBack={desktop ? undefined : () => navigate(LIST_PATH)}
                 onEdit={() => setForm({ mode: { kind: 'edit', card: selected }, open: true })}
-                onDelete={() => setToDelete(selected)}
+                onDelete={() => void deleteCard(selected)}
                 onOpenAnchor={openAnchor}
                 onChanged={handleChanged}
               />
@@ -373,15 +396,6 @@ export function MyCardsView() {
           onSaved={handleSaved}
         />
       )}
-      <ConfirmDialog
-        open={toDelete !== null}
-        variant="danger"
-        title="Eliminare questa scheda?"
-        message="La scheda va nel cestino per 30 giorni. Le altre schede non sono toccate."
-        confirmLabel="Elimina"
-        onConfirm={() => void confirmDelete()}
-        onCancel={() => setToDelete(null)}
-      />
       <div className={cn('fixed left-0 top-0', Z_INDEX.toast)}>
         <Toast message={toast?.message ?? ''} type={toast?.type ?? 'success'} isVisible={toast !== null} onClose={() => setToast(null)} />
       </div>

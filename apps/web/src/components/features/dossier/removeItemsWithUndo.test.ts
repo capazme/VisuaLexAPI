@@ -10,7 +10,7 @@ import { trashService } from '../../../services/trashService';
 import { registerUndoToastListener, type UndoToast } from '../../../hooks/useUndoableAction';
 import { appStore } from '../../../store/useAppStore';
 import type { Dossier, DossierItem } from '../../../types';
-import { removeItemsWithUndo, removeSelectionMessage } from './removeItemsWithUndo';
+import { removeItemsWithUndo } from './removeItemsWithUndo';
 
 const svc = vi.mocked(dossierService);
 const trash = vi.mocked(trashService);
@@ -104,10 +104,5 @@ describe('entries removed from a dossier on the web app (question 181)', () => {
     expect(svc.trashItems).not.toHaveBeenCalled();
     expect(ids()).toEqual(['a', 'b', 'c']);
     expect(toast).toBeNull();
-  });
-
-  it('the confirmation of a multiple removal says where they go and what is not touched', () => {
-    expect(removeSelectionMessage).toContain('andranno nel cestino, dove restano 30 giorni e si possono ripristinare');
-    expect(removeSelectionMessage).toContain('non saranno toccati');
   });
 });

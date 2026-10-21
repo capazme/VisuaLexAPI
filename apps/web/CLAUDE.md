@@ -197,9 +197,20 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   over it Opus, Gymnasium (the code's `studia`), Academia (development mode only) and Forum, in
   `features/sections/` (`sections.ts`: names, lines, icons, home addresses, `sectionForPath`; `useSection`: the
   active section — from the address on `/opus/*`, `/studia/*`, `/forum`, `/merlt*`, `/grafo`, else the last one, kept in the
-  browser under `visualex-section`, Opus by default; `SectionSwitcher`: the menu button at the top of the sidebar,
-  `#tour-section-switcher`, on `ui/MenuButton` with `menuitemradio` entries, a dot for the Forum's news from
-  another section). **The section change** (T1, which replaced S2's halftone on the owner's word, 21 October 2026: light, and never
+  browser under `visualex-section`, Opus by default; `SectionSwitcher`: at the top of the sidebar,
+  `#tour-section-switcher`, a menu of `menuitemradio` entries with its own keyboard (arrows, Home/End, Enter/Space,
+  Esc back to the arrow, Tab, a click outside), a dot for the Forum's news from another section, Opus's count of today's tasks on its entry; where the bar writes
+  the section's name — from `xl` and in the phone's drawer — a split button (S6): the mark and the name go to the
+  section's home («Vai a Gymnasium: Oggi», `goToLabel`, `homeName`), an arrow after a thin rule opens the menu; in
+  the rail one button, the mark, opens it. Its motions are `sectionMenuMotion.ts`, Web Animations: the menu unrolls
+  from the top in 260 ms (an `inset` clip with the same four lengths at both ends, a scale from 0.97), the arrow
+  turns, the entries come in 40 ms apart; the page changes on the click; one check slides to the entry chosen (180 ms) and the
+  menu closes by itself 200 ms later in 180 ms, while the name rolls to the new one and the button takes its width
+  (220 ms) — all counted from the first frame drawn after the choice, since T1's hold draws nothing until the new page
+  is there, and measured there, never in the commit (a forced layout, or a change of weight or attribute on the menu
+  at the click, cost the change 20–35 ms on the slow machine); under reduced motion nothing moves and the menu goes at
+  once; in the drawer it is the drawer's width less 32 px, with entries of 56 px, and goes at once with the choice,
+  the drawer closing over it). **The section change** (T1, which replaced S2's halftone on the owner's word, 21 October 2026: light, and never
   over the page): `chooseSection(id)` plays `sectionTransition.ts`, a View Transition on `vlx-page` only (`index.css`) —
   the layout's content area, not `<main>`, so the bars at the top and the floating buttons hold still. It is named only
   while a transition runs (`lib/pageTransition.ts`, the class `vlx-page-changing` on the root; the sign-in page's
@@ -214,7 +225,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `MutationObserver` — the browser draws no frame, so no `requestAnimationFrame`, while the update is pending. A heading
   that already named the section before the swap (the dossier list's says the kind it last listed) is not taken until
   that hold is over. The pages loaded on demand (Gymnasium's, Academia's) are fetched when the switcher opens
-  (`SECTION_HOME_CODE`, `MenuButton`'s `onOpen`), or the first change would hold and fade into «Caricamento…». The
+  (`SECTION_HOME_CODE`, when the menu opens), or the first change would hold and fade into «Caricamento…». The
   switcher's mark passes to the new hue in 200 ms (`transition-colors duration-200`), the change's one touch of colour;
   the sidebar's new entries fade in, the first six 20 ms apart, the old ones simply go (`useEntriesEntrance`, Web
   Animations, opacity only, never on the sidebar's first draw). The section's entries are a `LayoutGroup` of their
@@ -228,7 +239,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   new page's title unless the user moved it meanwhile: each section's home marks its heading
   `data-section-title="<section id>"` with `tabIndex={-1}` and `FOCUS_RING` (`PageFrame`'s `section`), so a keyboard user sees where the focus
   went — and only a keyboard user: the browser counts a focus the script gives after a focused menu entry as visible,
-  so a choice made with a pointer (`MenuItem.onSelect`'s click, `detail` above 0) marks the title
+  so a choice made with a pointer (the entry's click in `SectionSwitcher`, `detail` above 0) marks the title
   `data-pointer-focus`, which `index.css` draws with no ring, until it loses the focus (Gymnasium's `h1`, Opus's — the planner's, `OpusPage`, on «Oggi» —, the dossier list's
   `h1` — `opus` or `gymnasium` by the kind it lists, since the same element stays from one to the other —, «Dossier
   pubblici», the MERL-T hub); a new home marks its own. Under reduced motion the page changes at once and nothing moves; without View
@@ -403,11 +414,32 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   height of 36 px on a desktop and 44 px on a phone; `loading` keeps the label and puts a spinner in the
   icon's place (`aria-busy`), `status="error" | "success"` shows the outcome of the last press. `Modal`
   enters in `dur.panel` on `ease.drawer`, growing from 0.97, and `Sheet` rises from its edge on the same
-  timing (its «Chiudi» in ink-500, dark ink-400: over 3:1, since it is often the one way out); both only fade under reduced motion (`useReducedMotion`). `Toast` takes `spring.snappy`, rises
-  from the edge it lives on and pauses its time while `document.hidden`; the undo toast's countdown lives
-  in `useUndoableAction` and does not pause. One undo toast at a time: `showUndoToast` dismisses the one on
-  screen (it resolves as kept) before it shows its own — two countdowns used to take turns on the one container,
-  and two tasks ticked in a row flickered between their messages. Its «Annulla» and close are 44 px at every width. `Tooltip` waits 500 ms under a pointer, opens at once and
+  timing (its «Chiudi» in ink-500, dark ink-400: over 3:1, since it is often the one way out); both only fade under reduced motion (`useReducedMotion`). The notifications (K1a,
+  `components/ui/notifications/`): every `Toast` while `isVisible` and every `showUndoToast` is an entry of one
+  store (`notifications.ts`), drawn by `NotificationHost` (mounted once in `Layout`, in the toast band): a stack at
+  the bottom (at the top for `position="top"`), three at most per edge — the newest first, a fourth closes the oldest
+  plain one first (an «Annulla» or a notification that stays until closed goes only when nothing else can; one pushed
+  out stands), the others move with `spring.gentle`; a list named «Notifiche», read from a
+  polite and an assertive live region that `notify` sets when one arrives (a closing one never makes an older one read
+  again). Where no host is mounted (a component's test) a `Toast` draws itself alone at
+  its edge (`role="alert"` on its fixed box, as before). The card (`NotificationCard`, Framer Motion's `useAnimate`)
+  is drawn from a line: the line grows from the centre with a tick at each end (300 ms), opens like a slit
+  (an `inset` clip with the same lengths at both ends, 350 ms), and the words rise from it 60 ms apart with a touch
+  of weight (Geist's axis); the clip is let go once open, so a focus ring is never cut. Each entry's time is a
+  `countdown.ts`, held by a mouse over it, the focus in it, a finger on it and a hidden tab; «Annulla»'s 5 s is the
+  line at the bottom drawing back between two ticks, which grow while it is held. Run out (or taken back), it closes
+  into the line, which draws back to the centre; ✕, Esc from inside it and a swipe to the side (a coarse pointer;
+  a short one springs back) fold it and slide it away. «Annulla» closes it at once — nothing in a closing
+  notification takes a click (`inert`) — awaits the undo and draws «Ripristinato» in its place for 1.5 s (`undoneSlots`: the place is kept when the undo
+  outlasts the exit); the focus of a notification closed from the keyboard (Esc, or a key's click, `detail` 0, or a
+  `:focus-visible` button) goes to the next one still open — never after a mouse click or a swipe, where it would
+  hold the next one's time for ever; an undo
+  that throws has reported its failure and gets no «Ripristinato» (the dossier, entry, card and task undos rethrow
+  after saying so; a practice's or an act's with nothing left to put back says «Non ripristinabile: …»). At logout
+  (`clearUserData`) every notification goes, `dropped`: an «Annulla» resolves as not standing and runs no undo, so an
+  action held until the notification is gone (a large import) is not carried out. Plain toasts stay 3 s. Under reduced motion it fades, already open, and the time line still draws
+  back. Its «Annulla» and ✕ are 44 px at every width. `registerUndoToastListener` hands the newest «Annulla» on screen
+  to a test. `Tooltip` waits 500 ms under a pointer, opens at once and
   without motion within 300 ms of another closing, and at once on keyboard focus.
   Interaction tokens live in `constants/interactions.ts`, stacking bands in
   `constants/zIndex.ts`. Compose these rather than hand-rolling Tailwind: `TRANSITION` names the
@@ -1455,10 +1487,11 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   restores that entry and reads the dossier back (`refreshDossier`, not quiet); a refusal puts the
   entries back where they were with a sync error and no toast. An entry still saved (a temporary id in
   `pendingDossierItemIds`) refuses the whole removal with «Riprova tra un istante»: nothing is half removed.
-  The multiple selection's confirmation says they go to the trash for 30 days. Nothing the web
+  A multiple selection is removed with no confirmation, like the rest: «Annulla» is the way back (K1a). Nothing the web
   reaches deletes an entry for good any more (`removeFromDossier` and `restoreDossierItem`, which
   re-created entries under new ids, are gone). Study cards go through it too: «Elimina» on a draft or an archived card in
-  «Le mie schede» (`studiaService.trash`).
+  «Le mie schede» (`studiaService.trash`) moves it at once, and the notification's «Annulla» restores the trash entry
+  (`trashService.restore`) and lists it again (K1a).
   A decision in the trash is named by the server's citation.
 - **What another application changes shows without a reload** (`useDossierRefresh`, mounted by
   `DossierPage`): the open dossier (`refreshDossier(id, { quiet: true })`) or the list
@@ -1712,8 +1745,10 @@ Duplicating any of these is a defect, not a shortcut.
   of the text in force starts with, D8), `labelFromParams` (the parsers'
   previews), `normFromUrn` (a Normattiva URN or an ELI read back into a norm; the
   preleggi are never the codice civile). `actTypes.ts` holds the tables; its
-  `CODES_TABLE` is a copy of the API's `NORMATTIVA_URN_CODICI`, and the golden test
-  fails when the two differ. Never write a norm's label inline: a new surface
+  `CODES_TABLE` is a copy of the API's `NORMATTIVA_URN_CODICI`, and `ANNEXED_ACTS` of the
+  API's table of acts whose text is their annex (the TULPS), and the golden test fails when
+  either differs. A code's default annex, and such an act's annex, are never named in a
+  label (G-350, G-351). Never write a norm's label inline: a new surface
   picks one of these.
 - `utils/sources/normEntry.ts` — `rebuildNormEntry`: a norm from someone else (a shared
   environment, a file, a share link) rebuilt from closed values — a known act type, fixed forms,
@@ -1780,7 +1815,9 @@ Duplicating any of these is a defect, not a shortcut.
   tied, none) and never the top-level map, which can be an annex's (d.lgs.
   196/2003). The index window and the dossier use it.
 - `components/ui/MenuButton.tsx` — the one menu button (arrows, Home/End,
-  Escape/Tab, focus return, click outside; clicks never reach the card).
+  Escape/Tab, focus return, click outside; clicks never reach the card). Two menus keep their own keyboard,
+  for a reason: the sidebar's user menu (portalled, placed from the avatar) and the section switcher (S6: a menu
+  that stays a moment after the choice, rolls up, and can be turned back).
 - `hooks/useAnnexNavigation.ts` — shared tree fetch + annex switch + load article.
 - `utils/deepLinks.ts` — `buildSearchDeepLink(params, articleId)` /
   `parseSearchDeepLink(value)`: the `?norma=` share link (base64url JSON with
@@ -1810,10 +1847,16 @@ Duplicating any of these is a defect, not a shortcut.
 Non-obvious rules baked into the codebase. Follow them so new surfaces stay
 coherent.
 
-**Destructive confirmations** — never `window.confirm`. Use
-`components/ui/ConfirmDialog` with `variant="danger"`, and word the message so it
-names the scope *and* what is not touched ("Segnalibri e dossier non saranno
-toccati").
+**Destructive confirmations** — only for what cannot be undone or reaches other
+people (K1a, the owner's L-35): an action whose «Annulla» puts everything back on the
+server (the 30-day trash, or a write held until the notification is gone, as an import
+of more than 100 articles from an act's index) asks nothing and offers «Annulla»
+(`showUndoToast`); browser-only state (the practices) likewise. A held write checks, when it runs, that
+its target is still there (the import does not write into a dossier deleted meanwhile), and while it waits the
+browser asks before the page is left (`beforeunload`). Otherwise never
+`window.confirm`: use `components/ui/ConfirmDialog` with `variant="danger"`, and word
+the message so it names the scope *and* what is not touched ("Segnalibri e dossier non
+saranno toccati").
 
 **Keyboard-accessible collapsibles** — a `div` that toggles on click needs
 `role="button"`, `tabIndex={0}`, `aria-expanded`, a dynamic `aria-label`
@@ -1977,7 +2020,11 @@ meant to stay split; add new features as new files, not inside the shells:
   (`SearchPanel`), a reload starts on the table; every reveal of a row, the act's index and any other
   practice coming on screen (`activate`) clear it in their own update, and it is drawn only for the
   active practice. The practice list (a tap on the name) has «⋯» per practice: Rinomina, and Chiudi la
-  pratica behind the chip's danger confirmation;
+  pratica, at once with «Annulla» (`practiceUndo.ts`, K1a: the practice back at its index with its rows and its being
+  active; «Chiudi tutte» and «Rimuovi l'atto» the same way, through the store's `reopenPractices` and
+  `restorePracticeAct`: what was opened meanwhile stays, the windows come back only while the row has room for two,
+  and the same act added again meanwhile takes the removed articles instead of a second copy; the structure window
+  and the phone's reader are not brought back);
   `PracticeParts` (the migration's notice, taken once and mounted by `SearchPanel` over both layouts, in
   the toast band; the empty practice; the name editor); `practiceView.ts` (helpers kept out of the
   component files). `ReadingRow` (the table and the active practice's windows beside it, `ReadingWindow` each, on widths

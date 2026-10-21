@@ -2,10 +2,6 @@ import { showUndoToast } from '../../../hooks/useUndoableAction';
 import { trashService } from '../../../services/trashService';
 import { appStore } from '../../../store/useAppStore';
 
-/** The confirmation: where the dossier goes and what it does not touch (UI conventions). */
-export const deleteDossierMessage = (title: string) =>
-  `«${title}» andrà nel cestino, dove resta 30 giorni e si può ripristinare. Gli articoli salvati nei segnalibri o in altri dossier non saranno toccati.`;
-
 /** The toast after a dossier is deleted: where it went, and «Annulla». */
 export const deletedDossierMessage = (title: string) => `Dossier «${title}» spostato nel cestino`;
 
@@ -35,6 +31,8 @@ export function deleteDossierWithUndo(
       } catch (err) {
         console.error('Failed to restore a deleted dossier:', dossier.id, err);
         appStore.getState().pushSyncError(`Impossibile ripristinare «${dossier.title}» ora: è nel Cestino, ripristinalo da lì.`);
+        // Said: no «Ripristinato» after it.
+        throw err;
       }
     },
     message: deletedDossierMessage(dossier.title),

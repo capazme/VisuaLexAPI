@@ -34,3 +34,33 @@ def test_no_version_leaves_the_urn_alone():
 
 def test_an_unknown_word_leaves_the_urn_alone():
     assert append_version_info("u", "altro", None) == "u"
+
+
+# G-353 (owner): a date always asks for the text in force on that day. Without
+# «vigente» the date was dropped and Normattiva answered with today's text, which
+# the reader then showed as the past one (the timing harness's cc_1284_historical).
+import pytest  # noqa: E402
+
+from visualex_api.tools.urngenerator import generate_urn  # noqa: E402
+
+
+@pytest.mark.parametrize("version", [None, "", "  ", "vigente", "Vigente", "altro"])
+def test_a_date_is_the_text_in_force_on_that_day(version):
+    assert append_version_info("u", version, "2010-01-01") == "u!vig=2010-01-01"
+
+
+@pytest.mark.parametrize("version", ["originale", " Originale "])
+def test_a_date_wins_over_originale_as_the_web_reads_it(version):
+    assert append_version_info("u", version, "2010-01-01") == "u!vig=2010-01-01"
+
+
+@pytest.mark.parametrize("blank", [None, "", "   "])
+def test_a_blank_date_is_no_date(blank):
+    assert append_version_info("u", None, blank) == "u"
+    assert append_version_info("u", "vigente", blank) == "u!vig="
+    assert append_version_info("u", "originale", blank) == "u@originale"
+
+
+def test_the_article_urn_carries_the_date_without_a_version():
+    urn = generate_urn("codice civile", article="1284", annex="2", version=None, version_date="2010-01-01")
+    assert urn.endswith(";262:2~art1284!vig=2010-01-01")

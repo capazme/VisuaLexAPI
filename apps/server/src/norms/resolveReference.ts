@@ -25,6 +25,7 @@
  * "missing" or "not recognised".
  */
 
+import { ARTICLE_ORDINAL_SUFFIXES } from '../utils/articleSuffixes';
 import { citeArticle } from './citation';
 
 export type ReferenceOutcome = 'resolved' | 'not_recognised' | 'does_not_exist' | 'ambiguous' | 'unavailable';
@@ -103,9 +104,18 @@ export async function mapLimited<T, R>(items: T[], limit: number, task: (item: T
 const SEVERAL_ARTICLES = /[,;]|\s(e|ed)\s|^\d+\s*-\s*\d+$/i;
 const NOT_PRESENT = /non presente/i;
 
+const ORDINALS: ReadonlySet<string> = new Set(ARTICLE_ORDINAL_SUFFIXES);
+const SPLIT_ORDINAL = /^(\d+)-([a-z]+)-([a-z]+)\b(.*)$/;
+
 // "2645-bis", "2645 bis", "2645bis" → "2645-bis": the fingerprints, the tree and the norm write it differently.
-export const articleKey = (article: string): string =>
-  article.toLowerCase().trim().replace(/[\s-]+/g, '-').replace(/^(\d+)([a-z])/, '$1-$2');
+// An ordinal split in two words is one when the table holds it joined: Normattiva's tree (and the
+// codice del consumo's AKN export) writes "135 sex decies", its URN "135sexdecies", and a reference
+// either, so both read "135-sexdecies"; "135 vicies semel" stays two words.
+export const articleKey = (article: string): string => {
+  const key = article.toLowerCase().trim().replace(/[\s-]+/g, '-').replace(/^(\d+)([a-z])/, '$1-$2');
+  const split = SPLIT_ORDINAL.exec(key);
+  return split && ORDINALS.has(split[2] + split[3]) ? `${split[1]}-${split[2]}${split[3]}${split[4]}` : key;
+};
 
 /** Steps 1 and 2 for one reference: what it names, or why not. */
 async function identify(reference: string): Promise<Resolution> {
