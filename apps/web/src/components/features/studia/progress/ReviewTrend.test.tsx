@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { GiornoAttivita } from '../../../../types/studia';
 import { addDays } from './layout';
-import { ReviewTrend } from './ReviewTrend';
+import { ReviewTrend, type ReviewTrendProps } from './ReviewTrend';
+import type { TrendPeriod } from './trend';
 
 const TODAY = '2026-10-21';
 const day = (giorno: string, ripassi: number, over: Partial<GiornoAttivita> = {}): GiornoAttivita => ({ giorno, ripassi, nuove: 0, sbagliate: 0, valido: ripassi >= 10, riposo: false, ...over });
@@ -14,7 +16,12 @@ const calendario = [
 ];
 
 const chart = () => screen.getByRole('group', { name: /^Ripassi / });
-const renderTrend = (props: Partial<Parameters<typeof ReviewTrend>[0]> = {}) => render(<ReviewTrend calendario={calendario} today={TODAY} obiettivo={10} {...props} />);
+/** The page's part: it keeps the period. */
+function Trend(props: Omit<ReviewTrendProps, 'period' | 'onPeriod' | 'intro'>) {
+  const [period, setPeriod] = useState<TrendPeriod>('30g');
+  return <ReviewTrend {...props} period={period} onPeriod={setPeriod} intro={false} />;
+}
+const renderTrend = (props: Partial<ReviewTrendProps> = {}) => render(<Trend calendario={calendario} today={TODAY} obiettivo={10} {...props} />);
 
 describe('ReviewTrend (G7)', () => {
   it('opens on 30 days: their total, their change on the 30 before, the goal line', () => {
@@ -30,10 +37,10 @@ describe('ReviewTrend (G7)', () => {
   });
 
   it('says a rise in green, and nothing when the period before had no reviews', () => {
-    const { rerender } = render(<ReviewTrend calendario={[day(TODAY, 12), day(addDays(TODAY, -8), 6)]} today={TODAY} obiettivo={10} />);
+    const { rerender } = render(<Trend calendario={[day(TODAY, 12), day(addDays(TODAY, -8), 6)]} today={TODAY} obiettivo={10} />);
     fireEvent.click(screen.getByRole('tab', { name: '7 giorni' }));
     expect(screen.getByText('+100% sui 7 giorni prima')).toHaveClass('text-green-600');
-    rerender(<ReviewTrend calendario={[day(TODAY, 12)]} today={TODAY} obiettivo={10} />);
+    rerender(<Trend calendario={[day(TODAY, 12)]} today={TODAY} obiettivo={10} />);
     expect(screen.queryByText(/giorni prima/)).toBeNull();
   });
 
@@ -87,6 +94,34 @@ describe('ReviewTrend (G7)', () => {
 
   it('draws one subject in its hue', () => {
     renderTrend({ hue: 'hsl(var(--category-civil))', narrowed: true });
-    expect(document.querySelector('[data-line]')).toHaveStyle({ stroke: 'hsl(var(--category-civil))' });
+    // A fifth darker on the light card (`--vlx-trend-shade`), the wash in the hue itself.
+    expect((document.querySelector('[data-line]') as SVGElement).style.stroke).toBe('color-mix(in oklab, hsl(var(--category-civil)), var(--vlx-trend-shade))');
+  });
+
+  it('speaks the day to a screen reader from the keyboard only, not under a moving pointer', () => {
+    // jsdom has no PointerEvent: a mouse event with a pointer type stands for it.
+    class TestPointerEvent extends MouseEvent {
+      pointerType: string;
+      constructor(type: string, init: PointerEventInit = {}) {
+        super(type, init);
+        this.pointerType = init.pointerType ?? 'mouse';
+      }
+    }
+    Object.defineProperty(window, 'PointerEvent', { configurable: true, value: TestPointerEvent });
+    renderTrend();
+    const group = chart();
+    const readout = document.getElementById(group.getAttribute('aria-describedby')!)!;
+    fireEvent.pointerMove(group.querySelector('rect[fill="transparent"]')!, { clientX: 0, pointerType: 'mouse' });
+    expect(screen.getByText(/^mar 22 set · /)).toBeInTheDocument();
+    expect(readout).toBeEmptyDOMElement();
+    fireEvent.keyDown(group, { key: 'ArrowRight' });
+    expect(readout).toHaveTextContent(/^mercoledì 23 settembre/);
+    Reflect.deleteProperty(window, 'PointerEvent');
+  });
+
+  it('puts the goal\'s name at the end of its line, in the margin, over no point', () => {
+    renderTrend();
+    const label = screen.getByText('obiettivo');
+    expect(label.style.left).toBe(`${44 + (640 - 44 - 64) + 6}px`);
   });
 });

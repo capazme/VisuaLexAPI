@@ -5,6 +5,7 @@ import { MATERIA_LABEL } from '../studiaLabels';
 import { CardStatesBar, CardStatesBarSkeleton } from './CardStatesBar';
 import { DueForecast, DueForecastSkeleton } from './DueForecast';
 import { ReviewTrend, ReviewTrendSkeleton } from './ReviewTrend';
+import type { TrendPeriod } from './trend';
 import { GoalRing } from './GoalRing';
 import { formatCount, recentReviews } from './layout';
 import { rememberedMateria, rememberMateria } from './rememberedSubject';
@@ -84,6 +85,10 @@ function SummarySkeleton() {
  */
 export function ProgressPage() {
   const [materia, setMateria] = useState<Materia | undefined>(rememberedMateria);
+  // The trend's period and its opening are the page's: a subject read anew mounts the chart again, on the same period
+  // and without playing the opening a second time.
+  const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>('30g');
+  const [trendOpened, setTrendOpened] = useState(false);
   const day = useProgress(undefined);
   const narrowed = useProgress(materia, materia !== undefined);
   // The trend, the states and the coming days: the subject's read while one is chosen, else the day's.
@@ -141,7 +146,17 @@ export function ProgressPage() {
                 data.calendario.length === 0 && day.data?.serie.record === 0 ? (
                   <p className={cn('max-w-prose text-sm', MUTED_TEXT)}>Il primo giorno comincia oggi: qui si disegnano i ripassi di ogni giorno.</p>
                 ) : (
-                  <ReviewTrend calendario={data.calendario} today={data.oggi.giorno} obiettivo={data.oggi.obiettivo} hue={hue} narrowed={materia !== undefined} />
+                  <ReviewTrend
+                    calendario={data.calendario}
+                    today={data.oggi.giorno}
+                    obiettivo={data.oggi.obiettivo}
+                    hue={hue}
+                    narrowed={materia !== undefined}
+                    period={trendPeriod}
+                    onPeriod={setTrendPeriod}
+                    intro={!trendOpened}
+                    onIntro={() => setTrendOpened(true)}
+                  />
                 ),
               <ReviewTrendSkeleton />,
             )}

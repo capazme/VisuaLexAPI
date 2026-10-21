@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { GiornoAttivita } from '../../../../types/studia';
 import { addDays } from './layout';
-import { CURVE_SAMPLES, curvePaths, resampleMonotone, trendScale, trendSeries } from './trend';
+import { CURVE_SAMPLES, curvePaths, pointLabel, resampleMonotone, trendScale, trendSeries } from './trend';
 
 const day = (giorno: string, ripassi: number, over: Partial<GiornoAttivita> = {}): GiornoAttivita => ({ giorno, ripassi, nuove: 0, sbagliate: 0, valido: ripassi >= 10, riposo: false, ...over });
 // Wednesday 21 October 2026.
@@ -36,6 +36,9 @@ describe('trendSeries (G7)', () => {
     expect(s.points[24]).toMatchObject({ giorno: addDays(monday, -7), ripassi: 7 });
     expect(s.goal).toBe(70);
     expect(s.change).toBeNull();
+    // This week is still going: its label says so.
+    expect(pointLabel(s.points[25], true)).toBe('settimana in corso · 8 ripassi');
+    expect(pointLabel(s.points[24], true)).toBe('settimana dal 12 ott · 7 ripassi');
     expect(s.byWeek).toBe(true);
   });
 
@@ -44,6 +47,13 @@ describe('trendSeries (G7)', () => {
     // Days −6…−4 come before the first day: nothing missed. −2 is missed, −1 did not count; today is still open.
     expect(s.missed).toEqual([4 / 6, 5 / 6]);
     expect(s.points.map((p) => p.stato)).toEqual(['vuoto', 'vuoto', 'vuoto', 'fatto', 'saltato', 'saltato', 'oggi']);
+  });
+
+  it('on six months, one tick on each week with a day not done', () => {
+    // Studied from 10 weeks back, every day but two days of the week before last and one of last week.
+    const studied = Array.from({ length: 70 }, (_, i) => addDays(TODAY, -i)).filter((d) => ![addDays(TODAY, -10), addDays(TODAY, -11), addDays(TODAY, -4)].includes(d));
+    const s = trendSeries(studied.map((d) => day(d, 12)), TODAY, '6m', 10);
+    expect(s.missed).toEqual([23 / 25, 24 / 25]);
   });
 
   it('a rest keeps the streak and is not a missed day', () => {
@@ -72,17 +82,21 @@ describe('resampleMonotone', () => {
     const values = [0, 12, 0, 0, 30, 2];
     const samples = resampleMonotone(values);
     expect(samples).toHaveLength(CURVE_SAMPLES);
-    expect(Math.min(...samples)).toBeGreaterThanOrEqual(0);
-    expect(Math.max(...samples)).toBeLessThanOrEqual(30);
+    expect(Math.min(...samples.map((s) => s.value))).toBeGreaterThanOrEqual(0);
+    expect(Math.max(...samples.map((s) => s.value))).toBeLessThanOrEqual(30);
     // The flat stretch between two days at zero stays at zero.
-    const third = samples.slice(Math.ceil((2 / 5) * (CURVE_SAMPLES - 1)), Math.floor((3 / 5) * (CURVE_SAMPLES - 1)) + 1);
-    expect(third.every((v) => v === 0)).toBe(true);
+    const third = samples.filter((s) => s.x >= 2 / 5 && s.x <= 3 / 5);
+    expect(third.every((s) => s.value === 0)).toBe(true);
   });
 
-  it('passes through every day', () => {
-    const values = [3, 9, 4, 4, 10, 1, 7];
-    const samples = resampleMonotone(values, 61);
-    values.forEach((v, i) => expect(samples[i * 10]).toBeCloseTo(v, 6));
+  it.each([7, 30, 26])('passes through every one of %i points, at its place', (n) => {
+    const values = Array.from({ length: n }, (_, i) => (i * 37) % 23);
+    const samples = resampleMonotone(values);
+    expect(samples).toHaveLength(CURVE_SAMPLES);
+    values.forEach((v, i) => {
+      const hit = samples.find((s) => Math.abs(s.x - i / (n - 1)) < 1e-9);
+      expect(hit?.value, `point ${i}`).toBe(v);
+    });
   });
 });
 

@@ -35,7 +35,7 @@ describe('the type scale of «Oggi»', () => {
     const days = Array.from({ length: 14 }, (_, i) => ({ giorno: `2026-10-${String(19 + i).padStart(2, '0')}`, schede: i }));
     const { container } = render(
       <>
-        <ReviewTrend calendario={[]} today="2026-10-19" obiettivo={10} />
+        <ReviewTrend calendario={[]} today="2026-10-19" obiettivo={10} period="30g" onPeriod={() => {}} intro={false} />
         <DueForecast prossimi={days} />
       </>,
     );

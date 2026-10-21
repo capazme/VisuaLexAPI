@@ -38,7 +38,10 @@ export interface TrendSeries {
   total: number;
   /** The change on the period before of the same length, in whole percent; null when that period has no reviews. */
   change: number | null;
-  /** The days not done, at their place along the period (0 the first day, 1 the last): ticks under the axis. */
+  /**
+   * The days not done, at their place along the period (0 the first point, 1 the last): ticks under the axis. By week,
+   * one tick on a week that had any: 180 ticks of a day would run together on a phone.
+   */
   missed: number[];
   /** The goal a point reaches: the day's, or seven days' for a week. */
   goal: number;
@@ -67,7 +70,7 @@ export function trendSeries(calendario: GiornoAttivita[], today: string, period:
       const fino = sunday > today ? today : sunday;
       points.push({ giorno, fino, ripassi: sumDays(byDay, giorno, fino) });
     }
-    const span = (Date.parse(today) - Date.parse(start)) / 86_400_000;
+    const missedWeeks = new Set(missedDays(byDay, start, today, firstDay).map((giorno) => Math.floor((Date.parse(giorno) - Date.parse(start)) / (7 * 86_400_000))));
     return {
       period,
       points,
@@ -75,7 +78,7 @@ export function trendSeries(calendario: GiornoAttivita[], today: string, period:
       total: points.reduce((n, p) => n + p.ripassi, 0),
       // The server keeps 26 weeks: there is no period before to compare with.
       change: null,
-      missed: missedDays(byDay, start, today, firstDay).map((giorno) => (span > 0 ? (Date.parse(giorno) - Date.parse(start)) / 86_400_000 / span : 0)),
+      missed: [...missedWeeks].sort((a, b) => a - b).map((week) => week / (TREND_WEEKS - 1)),
       goal: goal * 7,
     };
   }
@@ -121,18 +124,24 @@ export function trendScale(values: number[], goal: number): number[] {
   return [0, step, step * 2, step * 3];
 }
 
-/** How many points every curve is drawn with: one period's bends into another's point by point. */
-export const CURVE_SAMPLES = 97;
+/**
+ * How many points every curve is drawn with: one period's bends into another's point by point. 175 = 1 + 174, and 174
+ * steps share out over the 6 gaps of a week (29 each), the 29 of a month (6 each) and the 25 of six months (6 or 7):
+ * every day, every week, falls on a sample, so the curve passes through each value exactly.
+ */
+export const CURVE_SAMPLES = 175;
 
 /**
- * The values at `CURVE_SAMPLES` evenly spaced places along the points, through a monotone cubic curve (Fritsch and
- * Carlson): between two points it never goes above the higher nor below the lower, so it invents no peak, never goes
- * under zero, and a flat stretch stays flat.
+ * The samples of a curve through `values`: `samples` places along it, each gap between two points cut into whole
+ * steps (the first gaps one step more when they do not share out evenly), so each point is a sample; `x` from 0 (the
+ * first point) to 1 (the last). Through a monotone cubic curve (Fritsch and Carlson): between two points it never goes
+ * above the higher nor below the lower, so it invents no peak, never goes under zero, and a flat stretch stays flat.
  */
-export function resampleMonotone(values: number[], samples = CURVE_SAMPLES): number[] {
+export function resampleMonotone(values: number[], samples = CURVE_SAMPLES): { x: number; value: number }[] {
   const n = values.length;
-  if (n === 0) return Array.from({ length: samples }, () => 0);
-  if (n === 1) return Array.from({ length: samples }, () => values[0]);
+  const flat = (value: number) => Array.from({ length: samples }, (_, s) => ({ x: s / (samples - 1), value }));
+  if (n === 0) return flat(0);
+  if (n === 1) return flat(values[0]);
   const slopes = values.slice(1).map((v, i) => v - values[i]);
   const tangents = values.map((_, i) => {
     if (i === 0) return slopes[0];
@@ -156,23 +165,31 @@ export function resampleMonotone(values: number[], samples = CURVE_SAMPLES): num
       tangents[i + 1] = (3 * b * slopes[i]) / h;
     }
   }
-  return Array.from({ length: samples }, (_, s) => {
-    const x = (s / (samples - 1)) * (n - 1);
-    const i = Math.min(n - 2, Math.floor(x));
-    const t = x - i;
+  const gaps = n - 1;
+  const base = Math.floor((samples - 1) / gaps);
+  const extra = samples - 1 - base * gaps;
+  const at = (i: number, t: number) => {
     const t2 = t * t;
     const t3 = t2 * t;
     const value =
       (2 * t3 - 3 * t2 + 1) * values[i] + (t3 - 2 * t2 + t) * tangents[i] + (-2 * t3 + 3 * t2) * values[i + 1] + (t3 - t2) * tangents[i + 1];
     // A float's last digit is no reason to go under zero.
-    return Math.max(0, value);
-  });
+    return { x: (i + t) / gaps, value: Math.max(0, value) };
+  };
+  const out: { x: number; value: number }[] = [];
+  for (let i = 0; i < gaps; i += 1) {
+    const steps = base + (i < extra ? 1 : 0);
+    // Each gap starts on its point exactly.
+    out.push({ x: i / gaps, value: values[i] });
+    for (let k = 1; k < steps; k += 1) out.push(at(i, k / steps));
+  }
+  out.push({ x: 1, value: values[n - 1] });
+  return out;
 }
 
 /** The line and the area under it, as paths of `CURVE_SAMPLES` points in a box `width` × `height` over a scale to `top`. */
 export function curvePaths(values: number[], width: number, height: number, top: number): { line: string; area: string } {
-  const samples = resampleMonotone(values);
-  const at = samples.map((v, s) => `${((s / (samples.length - 1)) * width).toFixed(2)},${(height - (v / top) * height).toFixed(2)}`);
+  const at = resampleMonotone(values).map(({ x, value }) => `${(x * width).toFixed(2)},${(height - (value / top) * height).toFixed(2)}`);
   const line = `M${at.join('L')}`;
   return { line, area: `${line}L${width.toFixed(2)},${height.toFixed(2)}L0.00,${height.toFixed(2)}Z` };
 }
@@ -194,7 +211,7 @@ export const STATE_WORDS: Partial<Record<NonNullable<TrendPoint['stato']>, strin
 
 /** The cursor's label: «mar 14 ott · 12 ripassi · obiettivo raggiunto», «settimana dal 6 ott · 54 ripassi». */
 export function pointLabel(point: TrendPoint, byWeek: boolean): string {
-  if (byWeek) return `settimana dal ${dayMonth.format(dayDate(point.giorno))} · ${reviews(point.ripassi)}`;
+  if (byWeek) return `${point.fino && point.fino < addDays(point.giorno, 6) ? 'settimana in corso' : `settimana dal ${dayMonth.format(dayDate(point.giorno))}`} · ${reviews(point.ripassi)}`;
   const state = point.stato ? STATE_WORDS[point.stato] : undefined;
   return [shortDate.format(dayDate(point.giorno)), reviews(point.ripassi), state].filter(Boolean).join(' · ');
 }

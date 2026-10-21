@@ -979,19 +979,27 @@ day's. **The trend** (`ReviewTrend`, pure parts in `trend.ts`): the reviews of a
 (it opens there) or six months, the server's 26 weeks summed by week (`trendSeries`) —, the period's total in
 Newsreader and its change on the period before of the same length (green up, ink down, never red; none when that
 period had no reviews, none for six months); a monotone cubic curve (`resampleMonotone`: no peak between two days,
-never under zero) resampled to `CURVE_SAMPLES` points so one period's curve bends into another's (`curvePaths`);
+never under zero) resampled to `CURVE_SAMPLES` (175) points so one period's curve bends into another's
+(`curvePaths`) — 174 steps share out over the gaps of 7, 30 and 26 points, so every point is a sample and the curve
+passes through each value exactly;
 the area a wash of the line's colour through `currentColor` in the gradient's stops (`stop-color` reads no variable
 as an attribute); a round scale of four ticks (`trendScale`: steps of 1, 2, 2.5, 5 × 10ⁿ, covering the goal); the
-goal a dashed line named «obiettivo» (×7 by week); the days not done (`calendarDayState` `saltato`, after the first
-day studied) small ticks under the axis. A cursor follows the pointer or a finger (`touch-action: pan-y`: the page
+goal a dashed line named «obiettivo» (×7 by week) at its end, in the right margin, over no point; the days not done
+(`calendarDayState` `saltato`, after the first day studied) small ticks under the axis, one per week with any on six
+months; this week, still going, says «settimana in corso». A subject's line and dot take its hue a fifth darker on
+the light card (`color-mix` with `--vlx-trend-shade`, `index.css`; amministrativo is 2.1:1 on white as it is), its
+wash the hue itself; `theme.test.ts` checks the twelve hues at 3:1. A cursor follows the pointer or a finger (`touch-action: pan-y`: the page
 still scrolls) with a spring, the line full up to it and lighter after, its label «mar 14 ott · 12 ripassi ·
 obiettivo raggiunto» (`pointLabel`); one tab stop, the arrows by point, Home and End, a hidden live line
-(`describeDay`, or «Settimana dal …» by week); «Vedi i numeri», a `<details>` with the period's table; the periods
+(`describeDay`, or «Settimana dal …» by week) that speaks for the keyboard only (a moving pointer would flood a screen
+reader); «Vedi i numeri», a `<details>` with the period's table; the periods
 are tabs (arrows, Home, End, the selection follows the focus). The SVG is drawn in the card's real pixels
 (`ResizeObserver`), its words the interface's text laid over it at `text-xs`, never SVG `<text>`
-(`typeScale.test.tsx`). Opening: the line draws from the left (a clip scaled from 0) in 900 ms while the total counts
-up; another period or subject: the curve bends in 500 ms, the pill slides (`layoutId` in its own `LayoutGroup`), the
-numbers fade; a resize redraws at once; reduced motion draws everything at once. A newcomer (no day, no record) reads
+(`typeScale.test.tsx`). The period and the opening are the page's (`ProgressPage`): a subject not read yet shows the
+skeleton and mounts the chart again, on the same period and with no second opening. Opening: the line draws from the
+left (the clip's width, an attribute) in 900 ms while the total counts up; another period, or a subject already read:
+the curve bends in 500 ms, the pill slides (`layoutId` in its own `LayoutGroup`), the numbers fade; a resize redraws
+at once; reduced motion draws everything at once. A newcomer (no day, no record) reads
 the first-day sentence in place of the chart. The coming days' scale is the interface's text in a column beside the drawing, on whole-number
 lines (`scaleLines`), the days in a row under it; today's column is tinted and its label set apart; a day with nothing
 due is a hollow mark on the base. Counts go through `formatCount` (`Intl.NumberFormat('it-IT')`: «12.345», four

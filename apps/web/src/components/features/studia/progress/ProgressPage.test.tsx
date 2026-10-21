@@ -42,7 +42,7 @@ function renderPage() {
   );
 }
 
-const trend = () => screen.getByRole('group', { name: /^Ripassi al giorno/ });
+const trend = () => screen.getByRole('group', { name: /^Ripassi (al giorno|a settimana)/ });
 
 beforeEach(() => {
   progress.mockReset();
@@ -214,6 +214,17 @@ describe('ProgressPage (Gymnasium spec §5.3)', () => {
     await user.click(penal);
     expect(await screen.findByRole('group', { name: /: 14 ripassi in tutto;/ })).toBeInTheDocument();
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+  });
+
+  it('keeps the trend\'s period when another subject is read (G7)', async () => {
+    progress.mockImplementation(async (materia?: Materia) => (materia ? answer({ reviews: 3 }) : answer()));
+    renderPage();
+    await screen.findByRole('group', { name: /: 14 ripassi in tutto;/ });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('tab', { name: '6 mesi' }));
+    await user.click(within(screen.getByRole('group', { name: 'Materia' })).getByRole('button', { name: 'Diritto penale' }));
+    expect(await screen.findByRole('group', { name: /^Ripassi a settimana negli ultimi 6 mesi: 3 ripassi in tutto;/ })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: '6 mesi' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('opens on the subject «Oggi» remembers', async () => {
