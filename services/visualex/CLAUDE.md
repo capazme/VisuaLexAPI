@@ -116,7 +116,12 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     `citation_linker`, `alias_resolver` and `services/akn_parser`; mirrored by
     `apps/web/src/utils/articleSuffixes.ts`. Nine private copies each stopped at
     `decies`, so "art. 25-terdecies" resolved to art. 25-ter — an article that
-    exists, which is why nothing looked broken
+    exists, which is why nothing looked broken. `ORDINAL_SPELLINGS` pairs the two
+    spellings of 9, 15, 16, 18, 19 and 20 (`other_ordinal_spelling`): Normattiva uses one
+    per act («391 novies» c.p.p., «21 nonies» l. 241/1990), so `create_norma_visitata_from_data`
+    takes the act's spelling when the other one was asked (`_source_spelling`) and the URN
+    is the act's; `normalize_article_key` keeps the spelling it is given, since its keys
+    are what `/fetch_rubriche` and the fingerprints answer
   - `sys_op.py` — `PlaywrightManager` singleton (browser pooling), reached through
     `get_playwright_manager()`
   - `config.py` — rate limiting, cache size, Redis (`REDIS_ENABLED`, `REDIS_URL`)

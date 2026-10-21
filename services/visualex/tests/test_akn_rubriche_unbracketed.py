@@ -142,3 +142,22 @@ class TestRepeatedNumberIsLinear:
     def test_same_lines(self, line, matches):
         from visualex_api.services.akn_parser import _REPEATED_NUMBER
         assert bool(_REPEATED_NUMBER.fullmatch(line)) is matches
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("asked", ["135-sexdecies", "135 sex decies", "135-sexiesdecies"])
+async def test_a_split_ordinal_only_in_an_annex_is_read_there(asked):
+    """The smart lookup compares the same keys as the existence check: the tree's
+    «135 sex decies» in annex 1 is the request's «135-sexdecies» (or its other
+    spelling), so the request goes to the annex, not to the dispositivo's art. 1."""
+    from app import NormaController
+    tree = ([{"numero": "1", "allegato": None}, {"numero": "135 sex decies", "allegato": "1"}], 2,
+            {"annexes": [
+                {"number": None, "label": "Dispositivo", "article_count": 1, "article_numbers": ["1"]},
+                {"number": "1", "label": "Allegato 1", "article_count": 1, "article_numbers": ["135 sex decies"]},
+            ]})
+    ctrl = NormaController.__new__(NormaController)
+    with patch("app.get_tree", new=AsyncMock(return_value=tree)):
+        found = await ctrl.create_norma_visitata_from_data(
+            {"act_type": "decreto legislativo", "act_number": "5", "date": "2020-01-01", "article": asked})
+    assert [nv.allegato for nv in found] == ["1"]
