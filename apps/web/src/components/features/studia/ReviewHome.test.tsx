@@ -71,6 +71,8 @@ beforeEach(() => {
   localStorage.removeItem(STORAGE_KEY);
   // jsdom draws nothing: a celebration's burst ends at once, as it does without a canvas.
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+  // Framer Motion restores the scroll after measuring the settings panel's `height: auto`; jsdom has no `scrollTo`.
+  vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
 });
 afterEach(() => {
   localStorage.removeItem(STORAGE_KEY);
@@ -254,7 +256,8 @@ describe('ReviewHome', () => {
     await user.click(screen.getByRole('button', { name: 'Impostazioni dello studio' }));
     progress.mockResolvedValue(answer(3, 12));
     savePreferences.mockResolvedValue({ nuoveAlGiorno: 20, ripassiAlGiorno: 10, materieComunita: ['DIRITTO_CIVILE'] });
-    await user.click(await screen.findByRole('switch', { name: 'Diritto civile' }));
+    await user.click(await screen.findByRole('button', { name: /^Schede della comunità · / }));
+    await user.click(screen.getByRole('switch', { name: 'Diritto civile' }));
     expect(savePreferences).toHaveBeenCalledWith({ materieComunita: ['DIRITTO_CIVILE'] });
     expect(await screen.findByText('Oggi: 3 da ripassare, 12 nuove')).toBeInTheDocument();
     expect(progress).toHaveBeenCalledTimes(2);
@@ -476,20 +479,42 @@ describe('ReviewHome', () => {
       expect(screen.getByTestId('where')).toHaveTextContent('/studia/ripasso/sessione');
     });
 
-    it('opens the study settings in a sheet from the gear, and closes it', async () => {
+    it('opens the study settings inside «I tuoi progressi», with no window, and closes them from the gear or with Esc (G6)', async () => {
       progress.mockResolvedValue(answer(1, 1));
       renderHome();
       const user = userEvent.setup();
       const gear = await screen.findByRole('button', { name: 'Impostazioni dello studio' });
-      expect(gear).toHaveAttribute('aria-haspopup', 'dialog');
+      expect(gear).not.toHaveAttribute('aria-haspopup');
+      expect(gear).toHaveAttribute('aria-controls', 'studia-impostazioni');
       await user.click(gear);
-      const sheet = screen.getByRole('dialog', { name: 'Impostazioni dello studio' });
       expect(gear).toHaveAttribute('aria-expanded', 'true');
-      // The content of the settings, open, with no disclosure of its own.
-      expect(await within(sheet).findByLabelText('Ripassi al giorno')).toBeInTheDocument();
-      expect(within(sheet).queryByRole('button', { name: 'Impostazioni dello studio' })).toBeNull();
-      await user.click(within(sheet).getByRole('button', { name: 'Chiudi' }));
       expect(screen.queryByRole('dialog')).toBeNull();
+      const panel = screen.getByRole('region', { name: 'Impostazioni dello studio' });
+      expect(panel).toHaveAttribute('id', 'studia-impostazioni');
+      expect(screen.getByRole('region', { name: 'I tuoi progressi' })).toContainElement(panel);
+      // The content of the settings, open, with no disclosure of its own; the community one level down, closed.
+      expect(await within(panel).findByLabelText('Ripassi al giorno')).toBeInTheDocument();
+      expect(within(panel).getByRole('button', { name: 'Schede della comunità · 0 di 5' })).toHaveAttribute('aria-expanded', 'false');
+      // The gear again closes them.
+      await user.click(gear);
+      await waitFor(() => expect(screen.queryByRole('region', { name: 'Impostazioni dello studio' })).toBeNull());
+      expect(gear).toHaveAttribute('aria-expanded', 'false');
+      // Esc inside closes them and gives the focus back to the gear.
+      await user.click(gear);
+      await user.click(await screen.findByLabelText('Ripassi al giorno'));
+      await user.keyboard('{Escape}');
+      await waitFor(() => expect(screen.queryByRole('region', { name: 'Impostazioni dello studio' })).toBeNull());
+      expect(gear).toHaveFocus();
+    });
+
+    it('lets the band scroll with the page while the settings are open (G6)', async () => {
+      progress.mockResolvedValue(answer(1, 1));
+      renderHome();
+      const user = userEvent.setup();
+      const stats = await screen.findByRole('region', { name: 'I tuoi progressi' });
+      expect(stats.parentElement).toHaveClass('xl:sticky');
+      await user.click(screen.getByRole('button', { name: 'Impostazioni dello studio' }));
+      expect(stats.parentElement).not.toHaveClass('xl:sticky');
     });
 
     it('says «Oggi» once over the action: no label above the sentence that starts with it', async () => {
@@ -656,7 +681,8 @@ describe('ReviewHome', () => {
       expect(percorso).toHaveBeenCalledTimes(2);
       await user.click(screen.getByRole('button', { name: 'Impostazioni dello studio' }));
       savePreferences.mockResolvedValue({ nuoveAlGiorno: 20, ripassiAlGiorno: 10, materieComunita: ['DIRITTO_CIVILE'] });
-      await user.click(await screen.findByRole('switch', { name: 'Diritto civile' }));
+      await user.click(await screen.findByRole('button', { name: /^Schede della comunità · / }));
+      await user.click(screen.getByRole('switch', { name: 'Diritto civile' }));
       await waitFor(() => expect(percorso).toHaveBeenCalledTimes(3));
     });
 
@@ -703,17 +729,19 @@ describe('ReviewHome', () => {
       localStorage.removeItem('visualex.studia.festeggiato');
     });
 
-    it('opens the study settings from a mission, which sets its target', async () => {
+    it('opens the study settings from a mission, which sets its target, and takes the focus there (G6)', async () => {
       progress.mockResolvedValue(midDay());
       renderHome();
       const user = userEvent.setup();
-      await user.click(await screen.findByRole('button', { name: 'Cambia l’obiettivo' }));
-      expect(screen.getByRole('dialog', { name: 'Impostazioni dello studio' })).toBeInTheDocument();
-      // The page behind the sheet is hidden from the accessibility tree while it is open.
-      expect(screen.getByRole('button', { name: 'Impostazioni dello studio', hidden: true })).toHaveAttribute('aria-expanded', 'true');
-      await user.click(screen.getByRole('button', { name: 'Chiudi' }));
+      const goal = await screen.findByRole('button', { name: 'Cambia l’obiettivo' });
+      expect(goal).toHaveAttribute('aria-controls', 'studia-impostazioni');
+      await user.click(goal);
+      const panel = screen.getByRole('region', { name: 'Impostazioni dello studio' });
+      await waitFor(() => expect(panel).toHaveFocus());
+      expect(screen.getByRole('button', { name: 'Impostazioni dello studio' })).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.queryByRole('dialog')).toBeNull();
       await user.click(screen.getByRole('button', { name: 'Cambia le nuove al giorno' }));
-      expect(screen.getByRole('dialog', { name: 'Impostazioni dello studio' })).toBeInTheDocument();
+      expect(screen.getByRole('region', { name: 'Impostazioni dello studio' })).toBeInTheDocument();
     });
 
     it('says when a mission has nothing to do today, offers the community cards, and leaves it out of the summary', async () => {
@@ -724,6 +752,11 @@ describe('ReviewHome', () => {
       expect(within(card).getByText('Nessuna scheda nuova da imparare oggi.')).toBeInTheDocument();
       expect(within(card).getByRole('button', { name: 'Accendi le schede della comunità' })).toBeInTheDocument();
       expect(within(card).getByText('0 di 2')).toBeInTheDocument();
+      // It opens the settings at the community's subjects, already open (G6).
+      await userEvent.setup().click(within(card).getByRole('button', { name: 'Accendi le schede della comunità' }));
+      const panel = screen.getByRole('region', { name: 'Impostazioni dello studio' });
+      expect(await within(panel).findByRole('button', { name: 'Schede della comunità · 0 di 5' })).toHaveAttribute('aria-expanded', 'true');
+      expect(within(panel).getAllByRole('switch')).toHaveLength(5);
     });
 
     it('never shows one subject’s counts under another’s name while the new read travels', async () => {

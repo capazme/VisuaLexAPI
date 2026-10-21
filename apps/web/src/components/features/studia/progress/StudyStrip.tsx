@@ -43,7 +43,7 @@ export function StudyStrip({ data, loading, onSettingsChanged, dense = false }: 
           </>
         )
       )}
-      <SettingsGear open={settingsOpen} onOpen={() => setSettingsOpen(true)} />
+      <SettingsGear open={settingsOpen} onClick={() => setSettingsOpen(true)} />
       {settingsOpen && <StudySettingsSheet onClose={() => setSettingsOpen(false)} onChanged={onSettingsChanged} />}
     </div>
   );

@@ -27,8 +27,10 @@ export interface TodayMissionsProps {
   onAllSubjects: () => void;
   /** «Inizia» and «Continua»: they stay usable when the progress cannot be read (the session reads its own cards). */
   onStart: () => void;
-  /** The study settings, which set the targets of the new cards and of the goal. */
-  onOpenSettings: () => void;
+  /** Opens the study settings in «I tuoi progressi» (G6), at the community's subjects when asked. */
+  onOpenSettings: (target?: 'comunita') => void;
+  /** The id of the settings' panel, which the «Cambia…» buttons control. */
+  settingsPanel?: string;
   /** The stamp is pressed in now (the celebration, once a day; the caller decides). */
   celebrate: boolean;
   /** Where the celebration's confetti start: the stamp, in the goal's row, so they start where the eye is. */
@@ -184,7 +186,7 @@ function MissionsOfToday({ day, missions, children }: { day: Progressi; missions
  * While the first read travels the card holds its size; a failed read says so and keeps «Inizia»; with no card
  * at all, how to begin.
  */
-export function TodayMissions({ day, dayFailed, action, actionFailed, onRetry, subject, onAllSubjects, onStart, onOpenSettings, celebrate, stampRef }: TodayMissionsProps) {
+export function TodayMissions({ day, dayFailed, action, actionFailed, onRetry, subject, onAllSubjects, onStart, onOpenSettings, settingsPanel, celebrate, stampRef }: TodayMissionsProps) {
   const state = todayState(day, dayFailed, false);
   const missions = day && (state === 'todo' || state === 'done') ? todayMissions(day) : null;
   const summary = missions ? missionSummary(missions) : null;
@@ -233,7 +235,7 @@ export function TodayMissions({ day, dayFailed, action, actionFailed, onRetry, s
             </Link>{' '}
             e scegli «+ Nuova scheda» sotto il testo: le missioni partono dalla prima scheda.
           </p>
-          <button type="button" aria-haspopup="dialog" onClick={onOpenSettings} className={QUIET_BUTTON}>
+          <button type="button" aria-controls={settingsPanel} onClick={() => onOpenSettings('comunita')} className={QUIET_BUTTON}>
             Oppure accendi le schede della comunità
           </button>
         </div>
@@ -248,7 +250,7 @@ export function TodayMissions({ day, dayFailed, action, actionFailed, onRetry, s
                 <TodayAction action={action} actionFailed={actionFailed || dayFailed} subject={subject} onRetry={onRetry} onAllSubjects={onAllSubjects} onStart={onStart} met={met} />
               )}
               {mission.id === 'nuove' && mission.status !== 'fatta' && (
-                <button type="button" aria-haspopup="dialog" onClick={onOpenSettings} className={QUIET_BUTTON}>
+                <button type="button" aria-controls={settingsPanel} onClick={() => onOpenSettings(mission.status === 'vuota' ? 'comunita' : undefined)} className={QUIET_BUTTON}>
                   {mission.status === 'vuota' ? 'Accendi le schede della comunità' : 'Cambia le nuove al giorno'}
                 </button>
               )}
@@ -258,7 +260,7 @@ export function TodayMissions({ day, dayFailed, action, actionFailed, onRetry, s
                     <GoalStamp giorno={day.oggi.giorno} serie={day.serie.attuale} press={celebrate} className="ml-1 mt-1" />
                   </div>
                 ) : (
-                  <button type="button" aria-haspopup="dialog" onClick={onOpenSettings} className={QUIET_BUTTON}>
+                  <button type="button" aria-controls={settingsPanel} onClick={() => onOpenSettings()} className={QUIET_BUTTON}>
                     Cambia l’obiettivo
                   </button>
                 ))}

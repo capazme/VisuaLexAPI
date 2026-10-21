@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
@@ -9,8 +9,7 @@ import type { StudiaOutletContext } from './StudiaPage';
 import { MissionList } from './missions/MissionList';
 import { TodayMissions } from './missions/TodayMissions';
 import { ConfettiBurst } from './progress/Celebration';
-import { StatsBand } from './progress/StatsBand';
-import { StudySettingsSheet } from './progress/StudySettings';
+import { STUDY_SETTINGS_PANEL, StatsBand } from './progress/StatsBand';
 import { SubjectChips } from './progress/SubjectChips';
 import { SubjectRoad, SubjectRoadSkeleton, SubjectRoadUnread } from './progress/SubjectRoad';
 import { rememberedMateria, rememberMateria } from './progress/rememberedSubject';
@@ -38,7 +37,9 @@ const SPLIT = 'xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] xl:grid-rows-[auto_aut
 /** Tailwind's `xl`: from here «Cosa ripassi» is drawn in the right column, under the band. */
 const XL = '(min-width: 1280px)';
 const LEFT = 'xl:col-start-1';
-const BAND = 'xl:sticky xl:top-8 xl:col-start-2 xl:row-span-full xl:mt-0 xl:self-start';
+const BAND = 'xl:col-start-2 xl:row-span-full xl:mt-0 xl:self-start';
+/** Sticky only while the settings are closed: open, the column may be taller than the window, and its foot must scroll into reach. */
+const STICK = 'xl:sticky xl:top-8';
 const BURST = 'xl:col-span-full xl:row-end-2';
 
 export function ReviewHome() {
@@ -55,6 +56,19 @@ export function ReviewHome() {
   const action = materia ? narrowed : day;
   const data = day.data;
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [communityOpen, setCommunityOpen] = useState(false);
+  // A mission's «Cambia…» opens the settings and takes the reader there: the panel takes the focus once drawn.
+  const [focusSettings, setFocusSettings] = useState(0);
+  useEffect(() => {
+    if (focusSettings === 0) return;
+    const frame = requestAnimationFrame(() => document.getElementById(STUDY_SETTINGS_PANEL)?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [focusSettings]);
+  const openSettingsFor = (target?: 'comunita') => {
+    setCommunityOpen(target === 'comunita');
+    setSettingsOpen(true);
+    setFocusSettings((n) => n + 1);
+  };
   const stampRef = useRef<HTMLDivElement>(null);
   const { celebratedBefore, markCelebrated } = useCelebratedToday();
   // The day whose burst has run its course on this page.
@@ -106,19 +120,26 @@ export function ReviewHome() {
           subject={subject}
           onAllSubjects={() => choose(undefined)}
           onStart={start}
-          onOpenSettings={() => setSettingsOpen(true)}
+          onOpenSettings={openSettingsFor}
+          settingsPanel={STUDY_SETTINGS_PANEL}
           celebrate={celebrate}
           stampRef={stampRef}
         />
       </div>
       {/* Under the missions on a phone, 16 px apart as before; beside everything from `xl`, sticky, with the chips. */}
-      <div className={cn('-mt-4 min-w-0', split && BAND)}>
+      <div className={cn('-mt-4 min-w-0', split && BAND, split && !settingsOpen && STICK)}>
         <StatsBand
           aside={split}
           data={data}
           loading={loading && data === null}
           settingsOpen={settingsOpen}
-          onOpenSettings={() => setSettingsOpen(true)}
+          onToggleSettings={() => {
+            setCommunityOpen(false);
+            setSettingsOpen((open) => !open);
+          }}
+          onCloseSettings={() => setSettingsOpen(false)}
+          onSettingsChanged={reload}
+          communityOpen={communityOpen}
           celebrate={celebrate}
         />
         {chipsBeside && <div className="mt-8">{subjects}</div>}
@@ -147,8 +168,6 @@ export function ReviewHome() {
           <SubjectRoadUnread />
         )}
       </div>
-
-      {settingsOpen && <StudySettingsSheet onClose={() => setSettingsOpen(false)} onChanged={reload} />}
     </section>
   );
 }

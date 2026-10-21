@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Check } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
@@ -5,7 +6,7 @@ import type { ConteggiStati, Progressi } from '../../../../types/studia';
 import { GoalRing } from './GoalRing';
 import { currentWeek, formatDayLong, totalCards, type WeekDay } from './layout';
 import { StreakBadge } from './StreakBadge';
-import { SettingsGear } from './StudySettings';
+import { SettingsGear, StudySettingsPanel } from './StudySettings';
 import { BLOCK_HEADING, CARD_STATES, DAY_STATE_LABEL, INK_BG, INK_BORDER, INK_TEXT, MUTED_TEXT, ON_INK, SECONDARY_BUTTON, TILE } from './tokens';
 
 export interface StatsBandProps {
@@ -13,8 +14,13 @@ export interface StatsBandProps {
   data: Progressi | null;
   /** The first read is travelling: the band holds its places. */
   loading: boolean;
+  /** The study settings, open in the card under its heading (G6). */
   settingsOpen: boolean;
-  onOpenSettings: () => void;
+  onToggleSettings: () => void;
+  onCloseSettings: () => void;
+  onSettingsChanged: () => void;
+  /** The community's subjects open with the settings (a mission asked for them). */
+  communityOpen?: boolean;
   /** The celebration: the streak's count pops. */
   celebrate?: boolean;
   /** «Oggi»'s right column from `xl` (G6): the pieces stack as on a phone. */
@@ -105,18 +111,30 @@ function StateNumbers({ stati, aside }: { stati: ConteggiStati; aside: boolean }
  * `md`; as «Oggi»'s right column from `xl` (`aside`, G6), about 300 to 400 px, it stacks them as on a phone (the week
  * and «Tutti i progressi» at the column's width): the streak, today's goal and the gear; the current week as
  * seven boxes; the cards by state as three numbers with their bar; «Tutti i progressi», a link to `/studia/progressi`,
- * where the long calendar, the coming days and the subjects live (G3: the data in one place). While the first read travels it holds its final size; a failed read leaves the
+ * where the long calendar, the coming days and the subjects live (G3: the data in one place). The gear opens the study
+ * settings in the card, under the heading (G6). While the first read travels it holds its final size; a failed read leaves the
  * heading and the gear (the missions say it failed, with «Riprova»).
  */
-export function StatsBand({ data, loading, settingsOpen, onOpenSettings, celebrate = false, aside = false }: StatsBandProps) {
+/** The panel's id: the gear and the missions' «Cambia…» buttons control it. */
+export const STUDY_SETTINGS_PANEL = 'studia-impostazioni';
+
+export function StatsBand({ data, loading, settingsOpen, onToggleSettings, onCloseSettings, onSettingsChanged, communityOpen = false, celebrate = false, aside = false }: StatsBandProps) {
+  const gear = useRef<HTMLButtonElement>(null);
+  // Esc inside the panel: closed, and the focus back on the gear that opened it.
+  const close = () => {
+    onCloseSettings();
+    gear.current?.focus();
+  };
   return (
     <section aria-labelledby="studia-progressi" aria-busy={loading} className={cn(TILE, 'grid gap-5 p-5 md:p-6')}>
       <div className="flex items-center gap-3">
         <h3 id="studia-progressi" className={BLOCK_HEADING}>
           I tuoi progressi
         </h3>
-        <SettingsGear open={settingsOpen} onOpen={onOpenSettings} />
+        <SettingsGear ref={gear} open={settingsOpen} onClick={onToggleSettings} controls={STUDY_SETTINGS_PANEL} />
       </div>
+      {/* Under the heading, inside the card, which grows downward; never a window over the page. */}
+      <StudySettingsPanel id={STUDY_SETTINGS_PANEL} open={settingsOpen} onClose={close} onChanged={onSettingsChanged} communityOpen={communityOpen} aside={aside} />
 
       {data ? (
         <>
