@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { cn } from '../../../lib/utils';
+import { useAppStore } from '../../../store/useAppStore';
 import type { Materia } from '../../../types/studia';
 import { MATERIA_LABEL } from './studiaLabels';
 import type { StudiaOutletContext } from './StudiaPage';
@@ -26,8 +27,19 @@ import { BLOCK_HEADING } from './progress/tokens';
  * subject come from a third, `usePercorso` (G5), on which nothing above the road waits. The server decides what
  * «today» is.
  */
+/**
+ * From `xl` two columns (G6): the grid, the left column's place, the band's (sticky over every row) and the confetti's
+ * box over the first row of both. Applied only out of Focus mode, which narrows the frame to 896 px: there the band
+ * would be about 220 px wide inside, too narrow for the week.
+ */
+const SPLIT = 'xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] xl:grid-rows-[auto_auto_auto_auto_1fr] xl:pb-0';
+const LEFT = 'xl:col-start-1';
+const BAND = 'xl:sticky xl:top-8 xl:col-start-2 xl:row-span-full xl:mt-0 xl:self-start';
+const BURST = 'xl:col-span-full xl:row-end-2';
+
 export function ReviewHome() {
   const navigate = useNavigate();
+  const split = !useAppStore((s) => s.settings.focusMode);
   const validator = useOutletContext<StudiaOutletContext | undefined>()?.validator === true;
   const [materia, setMateria] = useState<Materia | undefined>(rememberedMateria);
   const day = useProgress(undefined);
@@ -64,9 +76,9 @@ export function ReviewHome() {
     // document's order stays the reading order the owner fixed — missions, statistics, list — so a screen reader and
     // the keyboard meet the band second on every width; the grid places it. The fifth row, `1fr`, takes what the band
     // has beyond the left column, so a short left column never stretches its own rows.
-    <section className="relative grid gap-8 pb-8 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] xl:grid-rows-[auto_auto_auto_auto_1fr] xl:pb-0">
+    <section className={cn('relative grid gap-8 pb-8', split && SPLIT)}>
       <h2 className="sr-only">Oggi</h2>
-      <div className="min-w-0 xl:col-start-1">
+      <div className={cn('min-w-0', split && LEFT)}>
         <TodayMissions
           day={data}
           dayFailed={day.status === 'error'}
@@ -82,8 +94,9 @@ export function ReviewHome() {
         />
       </div>
       {/* Under the missions on a phone, 16 px apart as before; beside everything from `xl`, sticky. */}
-      <div className="-mt-4 min-w-0 xl:sticky xl:top-8 xl:col-start-2 xl:row-span-full xl:mt-0 xl:self-start">
+      <div className={cn('-mt-4 min-w-0', split && BAND)}>
         <StatsBand
+          aside={split}
           data={data}
           loading={loading && data === null}
           settingsOpen={settingsOpen}
@@ -95,23 +108,23 @@ export function ReviewHome() {
           further: an absolute box placed on their rows (the grid's area is its containing block), out of the flow, so
           mounting it moves nothing. */}
       {celebrate && data && (
-        <div aria-hidden className="pointer-events-none absolute inset-0 col-start-1 row-start-1 row-end-3 xl:col-span-full xl:row-end-2">
+        <div aria-hidden className={cn('pointer-events-none absolute inset-0 col-start-1 row-start-1 row-end-3', split && BURST)}>
           <ConfettiBurst originRef={stampRef} onStart={() => markCelebrated(data.oggi.giorno)} onDone={() => setBurstDone(data.oggi.giorno)} />
         </div>
       )}
 
-      <div className="min-w-0 empty:hidden xl:col-start-1">
+      <div className={cn('min-w-0 empty:hidden', split && LEFT)}>
         <MissionList data={data} loading={loading && data === null} validator={validator} />
       </div>
 
-      <section aria-labelledby="studia-cosa" className="min-w-0 space-y-3 xl:col-start-1">
+      <section aria-labelledby="studia-cosa" className={cn('min-w-0 space-y-3', split && LEFT)}>
         <h3 id="studia-cosa" className={BLOCK_HEADING}>
           Cosa ripassi
         </h3>
         <SubjectChips selected={materia} onSelect={choose} />
       </section>
 
-      <div className={cn('min-w-0 transition-opacity xl:col-start-1', loading && data !== null && 'opacity-60')} aria-busy={loading}>
+      <div className={cn('min-w-0 transition-opacity', split && LEFT, loading && data !== null && 'opacity-60')} aria-busy={loading}>
         {data ? (
           <SubjectRoad materie={data.materie} selected={materia} percorso={percorso} onRetryPercorso={percorso.reload} />
         ) : loading ? (

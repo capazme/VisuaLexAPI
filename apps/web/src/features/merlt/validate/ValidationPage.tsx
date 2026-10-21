@@ -194,7 +194,7 @@ export function ValidationPage() {
   return (
     <div className="space-y-6">
       <header>
-        <Link to="/merlt" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700">
+        <Link to="/merlt" className="mb-2 inline-flex min-h-[44px] items-center gap-1 rounded text-sm text-slate-500 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0 dark:text-slate-400 dark:hover:text-slate-200">
           <ArrowLeft size={14} /> MERL-T
         </Link>
         <h1 className={PAGE_TITLE}>Validazione community</h1>

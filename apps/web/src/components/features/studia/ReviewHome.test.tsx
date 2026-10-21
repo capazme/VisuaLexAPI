@@ -9,6 +9,7 @@ vi.mock('../../../services/studiaService', () => ({
 }));
 
 import { studiaService } from '../../../services/studiaService';
+import { appStore } from '../../../store/useAppStore';
 import { ReviewHome } from './ReviewHome';
 
 const progress = vi.mocked(studiaService.progress);
@@ -387,6 +388,20 @@ describe('ReviewHome', () => {
       expect(stats.parentElement).toHaveClass('xl:col-start-2', 'xl:row-span-full', 'xl:sticky', 'xl:self-start');
       for (const left of [missions.parentElement!, list.parentElement!, subjects]) expect(left).toHaveClass('xl:col-start-1');
       expect(stats.parentElement?.parentElement?.className).toMatch(/xl:grid-cols-\[minmax\(0,2fr\)_minmax\(0,1fr\)\]/);
+    });
+
+    it('stays one column in Focus mode, whose narrower frame would squeeze the band (G6)', async () => {
+      const before = appStore.getState().settings;
+      appStore.setState({ settings: { ...before, focusMode: true } });
+      try {
+        progress.mockResolvedValue(answer(18, 8));
+        renderHome();
+        const stats = await screen.findByRole('region', { name: 'I tuoi progressi' });
+        expect(stats.parentElement?.className).not.toMatch(/xl:/);
+        expect(stats.parentElement?.parentElement?.className).not.toMatch(/xl:grid-cols/);
+      } finally {
+        appStore.setState({ settings: before });
+      }
     });
 
     it('says what today costs, «circa N minuti», from the cards due and new', async () => {

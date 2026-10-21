@@ -709,7 +709,7 @@ palestra giuridica» — the section switcher keeps «Gymnasium»; spec
 under the road only —, an answer is never shown for another subject, and an older one never overwrites a newer one) — once for the whole day, which draws the missions, the statistics and the road, and once more
 for the subject chosen, made only while one is (`useProgress(materia, enabled)`), which draws the first mission's action. The page is in
 the sections' frame (`layout/PageFrame`, G6: the layout's full width, the heading at its left edge; the 768 px column
-of G1 is gone). One column up to `xl`; from `xl` (1280 px) two, a grid of `2fr` and `1fr`: on the left the missions,
+of G1 is gone). One column up to `xl`, and in Focus mode (its 896 px frame would leave the band about 220 px); from `xl` (1280 px) two, a grid of `2fr` and `1fr`: on the left the missions,
 the list, the chips and the road, on the right the statistics, `sticky` at `top-8` with `self-start` over all the rows
 (`row-span-full`; a fifth row of `1fr` takes what the band has beyond the left column, so it never stretches the
 left's rows). The document keeps the order the owner fixed on every width — the grid only places the band — and inside
@@ -749,7 +749,7 @@ the tiles a sentence stops at `max-w-prose`. In that order:
    to Sunday from the server's today and `serie.ultimiGiorni`, seven boxes with «LMMGVSD», a day to come dotted, and the
    days before the first one the calendar holds `vuoto`, never missed; each state in words for a screen reader,
    `DAY_STATE_LABEL`), then the cards by state as three numbers in Newsreader with their names in Geist (a `dl`) and the
-   bar. From `xl` the band is the right column, about 300 to 400 px: its `xl:` classes stack it as on a phone (the
+   bar. From `xl` the band is the right column, about 300 to 400 px: `aside` adds the `xl:` classes that stack it as on a phone (the
    week and «Tutti i progressi» at the column's width, the numbers at `text-3xl`). «Tutti i progressi», a link (44 px, full width on a phone), leads to `/studia/progressi`: the long calendar, the
    coming days and the subjects live there alone (G3 removed the «Il tuo mese» sheet, so no chart is drawn twice).
    **No text on «Oggi» or «Progressi» is under 11 px** (the stamp's date included; the compact stamp is the session's):
@@ -820,7 +820,7 @@ progressi», then: **the summary** (`StreakBadge compact`, `GoalRing compact` an
 of the last 30 days in a large number, `recentReviews`: the sum of `materie[].ripassi30`; always the whole day's, as
 the streak and the goal are); **the subject chips** (`SubjectChips`, 44 px at every width — Oggi's too —, the subject «Oggi» remembers, and a line saying
 what it narrows); **«Il tuo calendario»** (`ActivityCalendar`, across the page: 26 weeks on a computer and 12 on a phone by
-`useIsDesktop` — the server keeps 26, `CALENDAR_WEEKS`, so a wider page shows no more —; from `xl` the drawing takes three
+`useIsDesktop` — the server keeps 26, `CALENDAR_WEEKS`, so a wider page shows no more —; from `lg` the drawing takes three
 quarters and the legend and the day's line a column beside it, the line holding five lines' room); then, side by side
 from `xl`, **«Le schede per stato»** (`CardStatesBar`: the bar's segments are buttons as before, each a 44 px box at every width with its colour
 drawn 28 px tall inside on a computer, and under it the

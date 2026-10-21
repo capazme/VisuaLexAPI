@@ -17,7 +17,12 @@ export interface StatsBandProps {
   onOpenSettings: () => void;
   /** The celebration: the streak's count pops. */
   celebrate?: boolean;
+  /** «Oggi»'s right column from `xl` (G6): the pieces stack as on a phone. */
+  aside?: boolean;
 }
+
+/** In the right column from `xl`: the week and the link at the column's width, the numbers a step smaller. */
+const ASIDE = { week: 'xl:ml-0 xl:w-full', row: 'xl:w-full xl:gap-1.5', number: 'xl:text-3xl', link: 'xl:w-full' } as const;
 
 /** A box of the week: ticked for a day that counted, dashed for a rest, empty for a missed one, outlined for today. */
 function boxClass(day: WeekDay, today: boolean): string {
@@ -33,11 +38,11 @@ function boxClass(day: WeekDay, today: boolean): string {
 }
 
 /** The current week, Monday to Sunday, each box with its letter; the states are also words, for a screen reader. */
-function WeekRow({ data }: { data: Progressi }) {
+function WeekRow({ data, aside }: { data: Progressi; aside: boolean }) {
   // The calendar is sorted by day: its first row is the first day studied in the window, none for a newcomer.
   const week = currentWeek(data.oggi.giorno, data.serie.ultimiGiorni, data.calendario[0]?.giorno);
   return (
-    <ol aria-label="Questa settimana" className="grid w-full grid-cols-7 gap-1.5 md:w-auto md:gap-2 xl:w-full xl:gap-1.5">
+    <ol aria-label="Questa settimana" className={cn('grid w-full grid-cols-7 gap-1.5 md:w-auto md:gap-2', aside && ASIDE.row)}>
       {week.map((day) => {
         const today = day.giorno === data.oggi.giorno;
         return (
@@ -57,7 +62,7 @@ function WeekRow({ data }: { data: Progressi }) {
 }
 
 /** The cards by state: three large numbers in the reader's serif, their names in the interface's sans, the bar under. */
-function StateNumbers({ stati }: { stati: ConteggiStati }) {
+function StateNumbers({ stati, aside }: { stati: ConteggiStati; aside: boolean }) {
   const total = totalCards(stati);
   return (
     <div className="grid gap-3">
@@ -70,7 +75,7 @@ function StateNumbers({ stati }: { stati: ConteggiStati }) {
               <span aria-hidden className={cn('inline-block h-2.5 w-2.5 shrink-0 rounded-sm', state.swatch)} />
               {state.label}
             </dt>
-            <dd className={cn('font-serif text-3xl font-medium leading-none tabular-nums md:text-4xl xl:text-3xl', INK_TEXT)}>{stati[state.key]}</dd>
+            <dd className={cn('font-serif text-3xl font-medium leading-none tabular-nums md:text-4xl', aside && ASIDE.number, INK_TEXT)}>{stati[state.key]}</dd>
           </div>
         ))}
       </dl>
@@ -87,13 +92,13 @@ function StateNumbers({ stati }: { stati: ConteggiStati }) {
 
 /**
  * «I tuoi progressi», one band (Gymnasium spec §5.1). Up to `xl` it spans the page and lays its pieces out in a row from
- * `md`; from `xl` it is «Oggi»'s right column (G6), about 300 to 400 px, and stacks them as on a phone (the week and
- * «Tutti i progressi» at the column's width): the streak, today's goal and the gear; the current week as
+ * `md`; as «Oggi»'s right column from `xl` (`aside`, G6), about 300 to 400 px, it stacks them as on a phone (the week
+ * and «Tutti i progressi» at the column's width): the streak, today's goal and the gear; the current week as
  * seven boxes; the cards by state as three numbers with their bar; «Tutti i progressi», a link to `/studia/progressi`,
  * where the long calendar, the coming days and the subjects live (G3: the data in one place). While the first read travels it holds its final size; a failed read leaves the
  * heading and the gear (the missions say it failed, with «Riprova»).
  */
-export function StatsBand({ data, loading, settingsOpen, onOpenSettings, celebrate = false }: StatsBandProps) {
+export function StatsBand({ data, loading, settingsOpen, onOpenSettings, celebrate = false, aside = false }: StatsBandProps) {
   return (
     <section aria-labelledby="studia-progressi" aria-busy={loading} className={cn(TILE, 'grid gap-5 p-5 md:p-6')}>
       <div className="flex items-center gap-3">
@@ -110,12 +115,12 @@ export function StatsBand({ data, loading, settingsOpen, onOpenSettings, celebra
             <div className="shrink-0">
               <GoalRing compact giorno={data.oggi.giorno} ripassi={data.oggi.ripassi} obiettivo={data.oggi.obiettivo} raggiunto={data.oggi.raggiunto} />
             </div>
-            <div className="w-full md:ml-auto md:w-auto xl:ml-0 xl:w-full">
-              <WeekRow data={data} />
+            <div className={cn('w-full md:ml-auto md:w-auto', aside && ASIDE.week)}>
+              <WeekRow data={data} aside={aside} />
             </div>
           </div>
-          <StateNumbers stati={data.stati} />
-          <Link to="/studia/progressi" className={cn(SECONDARY_BUTTON, 'inline-flex w-full items-center justify-center md:w-auto md:justify-self-start xl:w-full')}>
+          <StateNumbers stati={data.stati} aside={aside} />
+          <Link to="/studia/progressi" className={cn(SECONDARY_BUTTON, 'inline-flex w-full items-center justify-center md:w-auto md:justify-self-start', aside && ASIDE.link)}>
             Tutti i progressi
           </Link>
         </>
@@ -125,10 +130,10 @@ export function StatsBand({ data, loading, settingsOpen, onOpenSettings, celebra
           <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
             <div className="h-10 w-40 rounded-lg bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
             <div className="h-10 w-24 rounded-lg bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
-            <div className="h-14 w-full rounded-lg bg-slate-100 motion-safe:animate-pulse md:ml-auto md:w-72 xl:ml-0 xl:w-full dark:bg-slate-800" />
+            <div className={cn('h-14 w-full rounded-lg bg-slate-100 motion-safe:animate-pulse md:ml-auto md:w-72 dark:bg-slate-800', aside && ASIDE.week)} />
           </div>
           <div className="h-[4.5rem] rounded-lg bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
-          <div className="h-11 w-full rounded-xl bg-slate-100 motion-safe:animate-pulse md:w-36 xl:w-full dark:bg-slate-800" />
+          <div className={cn('h-11 w-full rounded-xl bg-slate-100 motion-safe:animate-pulse md:w-36 dark:bg-slate-800', aside && ASIDE.link)} />
         </div>
       ) : (
         <p className={cn('text-sm', MUTED_TEXT)}>I numeri tornano appena riesco a leggerli.</p>

@@ -30,8 +30,8 @@ const TO_COME = 'stroke-slate-500 dark:stroke-slate-400';
 /** The tile's ground, drawn under a mark on a subject's hue: no hue lets the ink mark fade (dark mode, the deep steps). */
 const HALO = 'stroke-white dark:stroke-slate-900';
 
-/** From `xl`: the drawing in the first column, over two rows; the legend and the day's line in the second. */
-const SIDE_BY_SIDE = 'xl:grid-cols-[minmax(0,3fr)_minmax(14rem,1fr)] xl:content-start xl:gap-x-8';
+/** From `lg`: the drawing in the first column, over two rows; the legend and the day's line in the second. */
+const SIDE_BY_SIDE = 'lg:grid-cols-[minmax(0,3fr)_minmax(14rem,1fr)] lg:content-start lg:gap-x-8';
 
 /** A point of the drawing as a share of its box, for the labels laid over it. */
 const share = (value: number, of: number) => `${(value / of) * 100}%`;
@@ -131,7 +131,7 @@ export function ActivityCalendar({ calendario, today, weeks, hue, narrowed = fal
       : `Calendario dei ripassi dal ${formatDate(first)} a oggi: ${plural(totals.reviews, 'ripasso', 'ripassi')} in ${plural(totals.days, 'giorno', 'giorni')}`;
 
   return (
-    // From `xl` the page's full width (G6): the drawing on the left, three quarters, the legend and the day's line in a
+    // From `lg` the page's full width (G6): the drawing on the left, three quarters, the legend and the day's line in a
     // column beside it, so 26 weeks across the page do not swell into cells of 40 px.
     <div className={cn('grid gap-3', SIDE_BY_SIDE)}>
       <div
@@ -140,7 +140,7 @@ export function ActivityCalendar({ calendario, today, weeks, hue, narrowed = fal
         aria-label={summary}
         aria-describedby={readoutId}
         onKeyDown={move}
-        className={cn('rounded-md xl:row-span-2', FOCUS_RING)}
+        className={cn('rounded-md lg:row-span-2', FOCUS_RING)}
       >
         {/* The labels are the interface's text laid over the drawing, not SVG text: a drawing scaled to its width
             would scale them too, under 11 px on a narrow one (Gymnasium spec §5.1, one type language). */}
@@ -203,7 +203,7 @@ export function ActivityCalendar({ calendario, today, weeks, hue, narrowed = fal
           </svg>
         </div>
       </div>
-      <ul aria-label="Legenda del calendario" className={cn('flex flex-wrap items-center gap-x-4 gap-y-2 text-xs xl:flex-col xl:items-start', MUTED_TEXT)}>
+      <ul aria-label="Legenda del calendario" className={cn('flex flex-wrap items-center gap-x-4 gap-y-2 text-xs lg:flex-col lg:items-start', MUTED_TEXT)}>
         <li className="flex items-center gap-1">
           {/* Drawn as «meno ▢▢▢▢▢ più ripassi»; said as one sentence. */}
           <span aria-hidden className="flex items-center gap-1">
@@ -256,9 +256,9 @@ export function ActivityCalendar({ calendario, today, weeks, hue, narrowed = fal
         </li>
       </ul>
       {/* Room for its longest day («Oggi, mercoledì 30 settembre: 9999 ripassi, 200 nuove, 1450 sbagliate, obiettivo
-          raggiunto»): three lines on a phone, two from `md`, five in the column beside the drawing from `xl`, so
+          raggiunto»): three lines on a phone, two from `md`, five in the column beside the drawing from `lg`, so
           choosing a day never moves the page. */}
-      <p id={readoutId} aria-live="polite" className={cn('min-h-[3.75rem] text-sm tabular-nums md:min-h-10 xl:min-h-[6.25rem]', chosen ? 'text-slate-800 dark:text-slate-100' : MUTED_TEXT)}>
+      <p id={readoutId} aria-live="polite" className={cn('min-h-[3.75rem] text-sm tabular-nums md:min-h-10 lg:min-h-[6.25rem]', chosen ? 'text-slate-800 dark:text-slate-100' : MUTED_TEXT)}>
         {chosen ? describeDay(chosen, today, firstDay, narrowed) : 'Passa sopra un giorno o toccalo per i dettagli; con la tastiera, le frecce ti spostano tra i giorni.'}
       </p>
     </div>
@@ -269,9 +269,9 @@ export function ActivityCalendar({ calendario, today, weeks, hue, narrowed = fal
 export function ActivityCalendarSkeleton({ weeks }: { weeks: number }) {
   return (
     <div aria-hidden className={cn('grid gap-3', SIDE_BY_SIDE)}>
-      <div className="w-full rounded-md bg-slate-100 motion-safe:animate-pulse xl:row-span-2 dark:bg-slate-800" style={{ aspectRatio: `${LEFT + weeks * PITCH} / ${TOP + 7 * PITCH}` }} />
-      <div className="h-10 md:h-4 xl:h-[8.5rem]" />
-      <div className="min-h-[3.75rem] md:min-h-10 xl:min-h-[6.25rem]" />
+      <div className="w-full rounded-md bg-slate-100 motion-safe:animate-pulse lg:row-span-2 dark:bg-slate-800" style={{ aspectRatio: `${LEFT + weeks * PITCH} / ${TOP + 7 * PITCH}` }} />
+      <div className="h-10 md:h-4 lg:h-[8.5rem]" />
+      <div className="min-h-[3.75rem] md:min-h-10 lg:min-h-[6.25rem]" />
     </div>
   );
 }

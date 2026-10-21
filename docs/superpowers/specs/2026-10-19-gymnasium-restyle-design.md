@@ -128,7 +128,7 @@ owner then asked for Gymnasium to use the width as Opus and the Forum do: Oggi a
 sections' frame (`PageFrame`, the layout's own 1280 px frame and its 1216 px column, the heading at its left
 edge), and from `xl` (1280 px) Oggi has two columns — on the left, about two thirds, the missions with
 «Inizia», «Tutte le missioni», «Cosa ripassi» and the road; on the right, about one third, the statistics
-(item 2), `sticky` under the heading while the page scrolls. Below `xl` it is one column, in the order
+(item 2), `sticky` under the heading while the page scrolls. Below `xl`, and in Focus mode (896 px), it is one column, in the order
 below. The document keeps that order on every width — missions, statistics, list — so a screen reader and
 the keyboard meet the statistics second; the grid places them. Inside the tiles a sentence wraps at about
 65 characters (`max-w-prose`) rather than widen with the column.
@@ -214,7 +214,7 @@ this order:
 *Corrected on 21 October (G6).* The page is in the sections' full-width frame, as Oggi: the calendar spans it,
 «Le schede per stato» and «I prossimi 14 giorni» stand side by side from `xl`, «Per materia» is a grid of two
 columns from `lg`; one column below. The calendar still shows 26 weeks: the server keeps no more
-(`CALENDAR_WEEKS`), so a wider page does not show more weeks; from `xl` its legend and the day's line sit in a
+(`CALENDAR_WEEKS`), so a wider page does not show more weeks; from `lg` its legend and the day's line sit in a
 column beside the drawing, which takes three quarters of the width, so the cells do not swell.
 
 1. **The summary**: the streak (the «§», the count, the record), today's goal (the ring) and the reviews of the last

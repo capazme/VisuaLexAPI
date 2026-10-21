@@ -36,7 +36,8 @@ interface BlockProps {
 /** A block of the page: a tile with its heading in Newsreader (one type language, Gymnasium spec §5.1). */
 function Block({ id, title, busy, stale, note, children }: BlockProps) {
   return (
-    <section aria-labelledby={id} aria-busy={busy} className={cn(TILE, 'grid gap-4 p-5 md:p-6')}>
+    // `content-start`: beside a taller block (G6) the room left goes under the content, never between its rows.
+    <section aria-labelledby={id} aria-busy={busy} className={cn(TILE, 'grid content-start gap-4 p-5 md:p-6')}>
       <div className="grid gap-1">
         <h3 id={id} className={BLOCK_HEADING}>
           {title}
@@ -77,7 +78,7 @@ function SummarySkeleton() {
 /**
  * «Progressi», `/studia/progressi` (Gymnasium spec §5.3, G3): everything the home no longer shows, in the sections'
  * full-width frame (G6) — the summary (the streak, today's goal, the reviews of 30 days), the subject chips, «Il tuo
- * calendario» across the page, «Le schede per stato» and «I prossimi 14 giorni» side by side from `xl`, and «Per
+ * calendario» across the page (its legend beside it from `lg`), «Le schede per stato» and «I prossimi 14 giorni» side by side from `xl`, and «Per
  * materia» in two columns from `lg`; one column below. The same read as «Oggi» (`useProgress` over `GET
  * /lingo/srs/progressi`): the whole day's for the summary and the subjects, and, while a subject is chosen, that
  * subject's for the calendar, the states and the coming days — the summary stays the whole day's (the streak and the
