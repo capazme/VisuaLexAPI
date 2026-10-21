@@ -20,7 +20,7 @@ from __future__ import annotations
 import re
 from typing import Any, Mapping, Optional
 
-from merlt.utils.map import NORMATTIVA_URN_CODICI
+from merlt.utils.map import ANNEXED_ACTS, NORMATTIVA_URN_CODICI
 from merlt.utils.urn_labels import article_number_from_urn
 
 NORMATTIVA_RESOLVER = "https://www.normattiva.it/uri-res/N2Ls?"
@@ -244,6 +244,9 @@ def _annex(norm: Mapping[str, Any], joined: str, short: bool) -> str:
     # A code's annex is the code itself, also for a code cited by its decree (the codice
     # del turismo is «d.lgs. 23 maggio 2011, n. 79», never «… (Allegato 1)»).
     if (_CODES_BY_NAME.get(_key(_text(norm, "tipo_atto"))) or "").endswith(f":{annex}"):
+        return ""
+    real, date, number = _real_type(norm)
+    if ANNEXED_ACTS.get(f"{real.replace(' ', '.')}:{date};{number}") == annex:
         return ""
     return f" (All. {annex})" if short else f" (Allegato {annex})"
 

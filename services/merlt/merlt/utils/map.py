@@ -52,6 +52,13 @@ def extract_codice_details(codice_name: str) -> dict | None:
 # Maps Italian legal code names to their URN identifiers
 # ============================================================================
 
+# Acts cited by type, date and number whose text is an annex of the decree: the annex is
+# the act's default and the act itself (the TULPS, annex 1 of r.d. 773/1931; G-351). A copy
+# of the API's ANNEXED_ACTS (visualex_api/tools/map.py).
+ANNEXED_ACTS = {
+    "regio.decreto:1931-06-18;773": "1",
+}
+
 NORMATTIVA_URN_CODICI = {
     "costituzione": "costituzione",
     "codice penale": "regio.decreto:1930-10-19;1398:1",

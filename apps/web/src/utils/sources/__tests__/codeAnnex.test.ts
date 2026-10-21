@@ -22,3 +22,15 @@ describe('a code’s default annex is never named', () => {
       .toBe('art. 1, d.lgs. 9 aprile 2008, n. 81 (Allegato A)');
   });
 });
+
+// The TULPS is annex 1 of r.d. 773/1931 (G-351): keyed by it, never named.
+describe('an act whose text is its annex', () => {
+  const tulps = { tipo_atto: 'regio decreto', numero_atto: '773', data: '1931-06-18', allegato: '1', numero_articolo: '86' };
+  it('names no annex', () => {
+    expect(citeNorm(tulps)).toBe('art. 86, r.d. 18 giugno 1931, n. 773');
+    expect(shortNorm(tulps)).toBe('art. 86 r.d. 773/1931');
+  });
+  it('names another annex', () => {
+    expect(citeNorm({ ...tulps, allegato: '2' })).toBe('art. 86, r.d. 18 giugno 1931, n. 773 (Allegato 2)');
+  });
+});

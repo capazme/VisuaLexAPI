@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from visualex_api.services import act_dates
-from visualex_api.tools.map import codice_urn
+from visualex_api.tools.map import act_default_annex, codice_urn
 from visualex_api.tools.nl_parser import parse_nl_query
 from visualex_api.tools.sources import _TYPES, cite_article, eu_identity, normalize_norm_urn
 from visualex_api.tools.text_op import normalize_act_type
@@ -39,11 +39,16 @@ _LABELS = [
 ]
 
 
-def _default_annex(act_type: str) -> str | None:
-    """The annex a code carries in its URN, as create_norma_visitata_from_data adds it."""
+def _default_annex(act_type: str, date: str | None = None, number: str | None = None) -> str | None:
+    """The annex a code carries in its URN, or the annex that is an act's text (the TULPS),
+    as create_norma_visitata_from_data adds it."""
     fragment = codice_urn(normalize_act_type(act_type)) or ""
     match = re.search(r";\d+:(\d+)$", fragment)
-    return match.group(1) if match else None
+    if match:
+        return match.group(1)
+    if date and number:
+        return act_default_annex(f"{_urn_kind(act_type)}:{date};{number}")
+    return None
 
 
 def _urn_kind(act_type: str) -> str:
@@ -59,7 +64,7 @@ def _identity(params: dict, date: str | None) -> str:
     celex = eu_identity(act_type, date, number, article)
     if celex:
         return celex
-    annex = params.get("annex") or _default_annex(act_type)
+    annex = params.get("annex") or _default_annex(act_type, date, number)
     return normalize_norm_urn(generate_urn(act_type, date, number, article, annex))
 
 

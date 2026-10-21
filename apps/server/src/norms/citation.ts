@@ -12,7 +12,7 @@
  * of the web app's `utils/sources/normLabels.ts`; both are pinned to
  * `conventions/sources/golden.json`.
  */
-import { ACT_TYPES, CODES_TABLE, EU_ACTS, NAMED_ACTS } from './actTypes';
+import { ACT_TYPES, ANNEXED_ACTS, CODES_TABLE, EU_ACTS, NAMED_ACTS } from './actTypes';
 
 export interface CitableNorm {
   tipo_atto: string;
@@ -64,6 +64,12 @@ function realType(norm: CitableAct): { type: string; date: string; number: strin
   return { type: type || key(norm.tipo_atto), date, number };
 }
 
+/** Whether `annex` is the text of an act cited by type, date and number (`ANNEXED_ACTS`: the TULPS). */
+function isAnnexedActText(norm: CitableAct, annex: string): boolean {
+  const { type, date, number } = realType(norm);
+  return ANNEXED_ACTS[`${type.replace(/ /g, '.')}:${date};${number}`] === annex;
+}
+
 // The act, and how an article joins it: a code, the Constitution and a treaty follow the
 // article with a space ("art. 1284 c.c."), every other act with a comma (short: a space).
 function actOf(norm: CitableAct, short: boolean): { act: string; joiner: string } {
@@ -99,6 +105,7 @@ function annexOf(norm: CitableAct, short: boolean): string {
   // also for a code cited by its decree (the codice del turismo is «d.lgs. 23 maggio 2011, n. 79»).
   if (!value || NAMED_ACTS[kind] || EU_ACTS[kind]) return '';
   if ((CODES_BY_NAME.get(kind) ?? '').endsWith(`:${value}`)) return '';
+  if (isAnnexedActText(norm, value)) return '';
   return short ? ` (All. ${value})` : ` (Allegato ${value})`;
 }
 
