@@ -60,6 +60,10 @@ POISONING = [
     "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1990-08-07;241#stato:legge:1990;1",
     "https://www.normattiva.it/uri-res/N2Ls?q=urn:nir:stato:legge:1990-08-07;241",
     "https://www.normattiva.it/",
+    # The same act, another version: the name must be the version the page is.
+    "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1990-08-07;241~art1&x=!vig=2020-01-01",
+    "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1990-08-07;241!vig=2020-01-01!vig=2026-10-21",
+    "urn:nir:stato:legge:1990-08-07;241@originale!vig=2020-01-01",
 ]
 
 
@@ -123,7 +127,11 @@ TRAVERSAL = [
 
 @pytest.mark.parametrize("urn", TRAVERSAL)
 def test_no_part_of_the_urn_becomes_a_directory(urn, tmp_path):
-    name = urn_to_filename(urn)
+    # Most of these are no URN at all, refused outright; what passes is a bare file name.
+    try:
+        name = urn_to_filename(urn)
+    except ValueError:
+        return
     assert name == os.path.basename(name)
     assert "/" not in name and "\\" not in name and "\x00" not in name
     assert not name.startswith(".")
@@ -136,26 +144,32 @@ async def test_the_export_never_writes_outside_the_download_folder(tmp_path, mon
     work = tmp_path / "work"
     (work / "download").mkdir(parents=True)
     monkeypatch.chdir(work)
+    asked = []
 
     async def fake_extract(urn):
-        target = work / "download" / "suggested.pdf"
+        asked.append(urn)
+        target = work / "download" / "export-1.pdf"
         target.write_bytes(b"%PDF-1.4 test")
         return str(target)
 
     monkeypatch.setattr(app_module, "extract_pdf", fake_extract)
     client = NormaController().app.test_client()
 
+    # Not a URN: refused before the browser, nothing written.
     response = await client.post("/export_pdf", json={"urn": BASE + "legge:1990-08-07;../../evil"})
+    assert response.status_code == 400
+    assert asked == [] and list(tmp_path.rglob("*evil*")) == []
 
+    # A URN with a leading dot in its number: a bare, visible file inside the download folder.
+    response = await client.post("/export_pdf", json={"urn": BASE + "legge:1990-08-07;.hidden"})
     assert response.status_code == 200
     assert (await response.get_data()).startswith(b"%PDF")
-    outside = [p for p in tmp_path.rglob("*evil*") if p.parent != work / "download"]
-    assert outside == []  # nothing above the download folder, nor next to it
-    assert len(list((work / "download").glob("*evil*"))) == 1
+    assert [p.name for p in (work / "download").iterdir()] == ["legge_1990-08-07_.hidden_vig_2026-10-21.pdf"]
 
     # The second request is served from that cache, from the same folder.
-    again = await client.post("/export_pdf", json={"urn": BASE + "legge:1990-08-07;../../evil"})
+    again = await client.post("/export_pdf", json={"urn": BASE + "legge:1990-08-07;.hidden"})
     assert again.status_code == 200
+    assert len(asked) == 1
 
 
 @pytest.mark.parametrize("server", ["root", "api"])

@@ -328,7 +328,7 @@ POST unless noted, JSON bodies.
   docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md §2.1
 - `/export_pdf` — PDF via Playwright (rejects non-Normattiva URNs — SSRF guard). An
   undated URN is exported as the text in force today, `!vig=<today>` in Europe/Rome
-  (`pdf_urn_in_force`, G-355); a dated one or `@originale` as asked. The file is cached in
+  (`export_url`, G-355); a dated one or `@originale` as asked. The file is cached in
   `download/` under the act's type, date, number, annex and version (`urn_to_filename`;
   until 21 October 2026 the number and the year alone, so acts and versions shared a file),
   and the PDFs there older than two days are deleted on the six-hour sweep
@@ -626,7 +626,9 @@ Breaking one of these breaks the product. Read before editing.
     directly inside `download/`. The name is read from the query of a `/uri-res/N2Ls`
     address alone (`_exported_urn`; any other path, a path parameter or a fragment is a 400):
     the browser reads the path too and resolves its `..`, so a name read from anywhere in
-    the address let one act be cached, for everyone, under another's name. Each export
+    the address let one act be cached, for everyone, under another's name. The query is
+    read whole against a strict grammar (`_EXPORTABLE_URN`: one URN, one version marker)
+    and the browser opens the address rebuilt from it (`export_url`). Each export
     downloads to a name of its own (`export-<uuid>.pdf`) and is moved to the cache name, so
     two exports at once never take each other's file. Any new path derived from a request
     goes through the same kind of gate; `tests/test_pdf_cache_path.py` lists the attempts.

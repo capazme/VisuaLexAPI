@@ -239,23 +239,46 @@ def pdf_urn_in_force(urn, today):
     return f"{urn}!vig={today}"
 
 
+# A Normattiva URN as generate_urn writes it, and nothing more: authority, type, date,
+# number, annex, article, one version marker. Read whole (fullmatch), ASCII only.
+_EXPORTABLE_URN = re.compile(
+    r"urn:nir:[a-z]+(?:\.[a-z]+)*:[a-z]+(?:\.[a-z]+)*(?::\d{4}(?:-\d{2}-\d{2})?)?"
+    r"(?:;[0-9A-Za-z.-]+)?(?::[0-9A-Za-z]+)?(?:~art[0-9A-Za-z.-]+)?"
+    r"(?:!vig=(?:\d{4}-\d{2}-\d{2})?|@originale)?",
+    re.ASCII,
+)
+_N2LS = "https://www.normattiva.it/uri-res/N2Ls?"
+
+
 def _exported_urn(urn):
     """
     The URN a Normattiva address names, from its query alone: `https://www.normattiva.it/
-    uri-res/N2Ls?urn:nir:…`, or a bare `urn:nir:…`.
+    uri-res/N2Ls?urn:nir:…`, or a bare `urn:nir:…`, read whole against `_EXPORTABLE_URN`.
 
     The browser reads the path too, and resolves its `..`: a name read from anywhere in
     the address let `…/x/stato:legge:1990-08-07;241~/../../uri-res/N2Ls?urn:nir:stato:
     decreto.legislativo:2001-06-08;231` cache the d.lgs. 231/2001 as the l. 241/1990, for
-    everyone. Any other path, a path parameter or a fragment is refused (ValueError).
+    everyone. Any other path, a path parameter, a fragment, or a query with anything more
+    (a second version marker, another parameter) is refused (ValueError).
     """
-    if urn.startswith("urn:nir:"):
-        return urn
-    parsed = urlparse(urn)
-    if (parsed.path != "/uri-res/N2Ls" or parsed.params or parsed.fragment
-            or not parsed.query.startswith("urn:nir:")):
+    if not urn.startswith("urn:nir:"):
+        parsed = urlparse(urn)
+        if parsed.path != "/uri-res/N2Ls" or parsed.params or parsed.fragment:
+            raise ValueError("Invalid URN format")
+        urn = parsed.query
+    if not _EXPORTABLE_URN.fullmatch(urn):
         raise ValueError("Invalid URN format")
-    return parsed.query
+    return urn
+
+
+def export_url(urn, today):
+    """
+    The address an export opens and caches under: Normattiva's, rebuilt from the URN the
+    caller's address names (`_exported_urn`, ValueError otherwise), at `today` when it is
+    undated (`pdf_urn_in_force`). The browser never opens what the caller wrote, so the
+    page it loads and the cache name it is stored under are read from the same URN.
+    """
+    return _N2LS + pdf_urn_in_force(_exported_urn(urn), today)
 
 
 def urn_to_filename(urn):

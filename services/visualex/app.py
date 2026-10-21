@@ -51,7 +51,7 @@ from visualex_api.services.decisions.resolver import (
     get_resolver,
     sweep_decision_caches,
 )
-from visualex_api.tools.urngenerator import complete_request_date, pdf_cache_path, pdf_urn_in_force
+from visualex_api.tools.urngenerator import complete_request_date, export_url, pdf_cache_path
 from visualex_api.tools.cache_manager import prune_normattiva_cache
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import article_input_error, parse_article_input, normalize_act_type
@@ -1847,15 +1847,15 @@ class NormaController:
                 return jsonify({'error': 'URN mancante'}), 400
             if not is_allowed_pdf_urn(urn):
                 return jsonify({'error': 'URN non valido: sono ammessi solo URL normattiva.it'}), 400
-            # An undated URN is exported as the text in force today (G-355).
-            urn = pdf_urn_in_force(urn.strip(), today_in_rome().isoformat())
+            # Normattiva's address rebuilt from the URN, an undated one at today (G-355).
+            try:
+                urn = export_url(urn.strip(), today_in_rome().isoformat())
+            except ValueError:
+                return jsonify({'error': 'URN non valido: serve un indirizzo /uri-res/N2Ls?urn:nir:… di normattiva.it'}), 400
 
             log.info("Received data for export_pdf", data=data)
             # The same folder extract_pdf downloads into: the cached copy is a file in it.
-            try:
-                pdf_path = pdf_cache_path(urn, os.path.join(os.getcwd(), "download"))
-            except ValueError:
-                return jsonify({'error': 'URN non valido: serve un indirizzo /uri-res/N2Ls?urn:nir:… di normattiva.it'}), 400
+            pdf_path = pdf_cache_path(urn, os.path.join(os.getcwd(), "download"))
 
             # Check if PDF already exists in cache
             file_exists = await asyncio.to_thread(os.path.exists, pdf_path)
