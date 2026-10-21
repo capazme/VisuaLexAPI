@@ -227,7 +227,7 @@ export function Layout() {
       )}
 
       <main
-        // `vlx-page`: the one part a section change animates (index.css, spec §6.3.2); the sidebar stays still.
+        // `vlx-page`: what a section change's View Transition animates where no halftone can be drawn (index.css, S2).
         className="vlx-page flex-1 flex flex-col min-w-0 h-full overflow-hidden relative"
         // The practice's columns (`h-app-row`) are the viewport less this bar.
         style={showSearchBar ? { ['--search-bar-height' as string]: SEARCH_BAR_HEIGHT } : undefined}

@@ -95,7 +95,8 @@ async def fetch_element(kind: str, element_id: str) -> dict[str, Any]:
             )
             if attempt == INVALID_RETRIES:
                 raise
-            await asyncio.sleep(INVALID_PAUSE * (attempt + 1))
+            # never sooner than the portal asked (the client gives up without waiting it out)
+            await asyncio.sleep(max(INVALID_PAUSE * (attempt + 1), exc.retry_after or 0))
             continue
         if "Request Rejected" in text[:500]:
             raise RateLimitExceededError("il firewall del portale ha rifiutato la richiesta")

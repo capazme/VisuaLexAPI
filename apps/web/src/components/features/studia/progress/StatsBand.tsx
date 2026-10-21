@@ -106,7 +106,7 @@ export function StatsBand({ data, loading, settingsOpen, onOpenSettings, celebra
           <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
             <StreakBadge compact attuale={data.serie.attuale} record={data.serie.record} ultimiGiorni={data.serie.ultimiGiorni} pop={celebrate} />
             <div className="shrink-0">
-              <GoalRing compact ripassi={data.oggi.ripassi} obiettivo={data.oggi.obiettivo} raggiunto={data.oggi.raggiunto} />
+              <GoalRing compact giorno={data.oggi.giorno} ripassi={data.oggi.ripassi} obiettivo={data.oggi.obiettivo} raggiunto={data.oggi.raggiunto} />
             </div>
             <div className="w-full md:ml-auto md:w-auto">
               <WeekRow data={data} />
