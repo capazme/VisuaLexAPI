@@ -150,7 +150,7 @@ describe('ChangelogNotification', () => {
     await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Prima' })).toHaveFocus());
   });
 
-  // Bill, 21 Oct 2026: «Vedi» pressed with the focus on the body (a click) had nowhere to give it back, and it fell to
+  // The owners' review, 21 Oct 2026: «Vedi» pressed with the focus on the body (a click) had nowhere to give it back, and it fell to
   // the body; the page's <main> takes it, focusable only while it holds it.
   it('gives the focus to the page\'s <main> when it came from nowhere, once the window closes', async () => {
     localStorage.setItem(VERSION_STORAGE_KEY, '1.9.0');

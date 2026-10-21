@@ -32,7 +32,7 @@ export function ChangelogNotification() {
 
   const rememberFocus = (event: FocusEvent<HTMLDivElement>) => {
     const from = event.relatedTarget;
-    // The body is no place to give it back to (Bill, 21 Oct 2026): `dismiss` then gives it to the page.
+    // The body is no place to give it back to (the owners' review, 21 Oct 2026): `dismiss` then gives it to the page.
     if (from instanceof HTMLElement && from !== document.body && !event.currentTarget.contains(from)) returnFocusRef.current = from;
   };
 
