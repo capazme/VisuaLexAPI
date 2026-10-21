@@ -81,7 +81,6 @@ describe('DocumentReviewPage — before a document', () => {
 
   it('throws the ink sheet to the row when a file is let go on the box, not when it is chosen (D6)', async () => {
     const { container } = render(<DocumentReviewPage />);
-    const zone = screen.getByRole('button', { name: /Scegli un documento/ });
     const flying = () => document.body.querySelector(':scope > div.fixed[aria-hidden]');
     await userEvent.upload(input(container), testFile([PARERE], 'scelto.txt'));
     expect(flying()).toBeNull();
@@ -90,7 +89,18 @@ describe('DocumentReviewPage — before a document', () => {
     const again = await screen.findByRole('button', { name: /Scegli un documento/ });
     fireEvent.drop(again, { dataTransfer: { types: ['Files'], files: [testFile([PARERE], 'lasciato.txt')], dropEffect: 'none' } });
     expect(flying()).not.toBeNull();
-    void zone;
+  });
+
+  it('a file chosen while another is read wins: the older answer is dropped', async () => {
+    const { container } = render(<DocumentReviewPage />);
+    const slow = testFile(['art. 2043 c.c.'], 'lento.txt');
+    let finish: (text: string) => void = () => {};
+    Object.assign(slow, { text: () => new Promise<string>(resolve => { finish = resolve; }) });
+    await userEvent.upload(input(container), slow);
+    await userEvent.upload(input(container), testFile([PARERE], 'svelto.txt'));
+    expect(await screen.findByRole('heading', { level: 2, name: 'svelto.txt' })).toBeInTheDocument();
+    await act(async () => finish('art. 2043 c.c.'));
+    expect(screen.queryByRole('heading', { level: 2, name: 'lento.txt' })).toBeNull();
   });
 
   it('keeps the promise in sight in every state: the file stays in the browser', () => {

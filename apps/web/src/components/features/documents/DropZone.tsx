@@ -23,6 +23,8 @@ export interface DropZoneProps {
   onChoose: () => void;
   /** The sheet that flies to the document's row (`SheetFlight`): where it starts. */
   sheetRef: Ref<HTMLDivElement>;
+  /** It is flying: the ink sheet is not in the pile meanwhile, so it is never seen twice. */
+  flying: boolean;
 }
 
 /** The three sheets' places: closed in a pile, fanned out, open wide. The middle one is the ink one, on top. */
@@ -68,7 +70,7 @@ const Sheet = forwardRef<HTMLDivElement, { ink?: boolean }>(function Sheet({ ink
  * the frame. The words say what to do, and that the file stays in the browser, in every state. Under reduced motion the
  * dashes stand still and the sheets change place without moving.
  */
-export const DropZone = forwardRef<HTMLButtonElement, DropZoneProps>(function DropZone({ phase, lean, landings, touch, busy, onChoose, sheetRef }, ref) {
+export const DropZone = forwardRef<HTMLButtonElement, DropZoneProps>(function DropZone({ phase, lean, landings, touch, busy, onChoose, sheetRef, flying }, ref) {
   const still = useReducedMotion() ?? false;
   const frame = useRef<HTMLSpanElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -98,14 +100,14 @@ export const DropZone = forwardRef<HTMLButtonElement, DropZoneProps>(function Dr
       aria-busy={busy || undefined}
       data-phase={phase}
       className={cn(
-        'relative flex min-h-48 w-full flex-col items-center justify-center overflow-hidden rounded-[10px] bg-white px-6 py-8 text-center dark:bg-slate-900',
+        'group relative flex min-h-48 w-full flex-col items-center justify-center overflow-hidden rounded-[10px] bg-white px-6 py-8 text-center dark:bg-slate-900',
         // Inset: the wrapper that closes upwards clips whatever is drawn outside the box.
         FOCUS_RING,
         'focus-visible:ring-inset focus-visible:ring-offset-0',
       )}
     >
-      {/* The ground tinted while a file is near, by its opacity; a lighter one under a mouse at rest. */}
-      <span aria-hidden className={cn('pointer-events-none absolute inset-0 bg-primary-50/70 transition-opacity duration-200 dark:bg-primary-950/40', phase === 'idle' ? 'opacity-0' : 'opacity-100')} />
+      {/* The ground tinted while a file is near, by its opacity; half of it under a mouse at rest. */}
+      <span aria-hidden className={cn('pointer-events-none absolute inset-0 bg-primary-50/70 transition-opacity duration-200 dark:bg-primary-950/40', phase === 'idle' ? 'opacity-0 group-hover:opacity-50' : 'opacity-100')} />
       {/* The frame: dashes that turn, and the line they join into over the box. Drawn, never read. */}
       <span ref={frame} aria-hidden className="pointer-events-none absolute inset-0">
         {size.width > 0 && (
@@ -127,8 +129,9 @@ export const DropZone = forwardRef<HTMLButtonElement, DropZoneProps>(function Dr
                 strokeDasharray="8 6"
                 className={cn(
                   'transition-opacity duration-200',
-                  kind === 'rest' ? 'vlx-dash stroke-slate-300 dark:stroke-slate-700' : 'vlx-dash-run stroke-primary-600 dark:stroke-primary-400',
-                  (kind === 'rest' ? phase === 'idle' : phase === 'page') ? 'opacity-100' : 'opacity-0',
+                  kind === 'rest' ? 'stroke-slate-300 dark:stroke-slate-700' : 'stroke-primary-600 dark:stroke-primary-400',
+                  // Each turns only while it is shown.
+                  (kind === 'rest' ? phase === 'idle' : phase === 'page') ? cn('opacity-100', kind === 'rest' ? 'vlx-dash' : 'vlx-dash-run') : 'opacity-0',
                 )}
               />
             ))}
@@ -146,7 +149,8 @@ export const DropZone = forwardRef<HTMLButtonElement, DropZoneProps>(function Dr
           </svg>
         )}
         {/* The wave, once per drop: from the frame inwards, fading. */}
-        <AnimatePresence>
+        {/* Not on the box's first draw: back after «Scegli un altro documento», nothing was let go. */}
+        <AnimatePresence initial={false}>
           {!still && landings > 0 && (
             <motion.span
               key={landings}
@@ -166,19 +170,29 @@ export const DropZone = forwardRef<HTMLButtonElement, DropZoneProps>(function Dr
         animate={{ x: phase === 'over' ? lean.x : 0, y: phase === 'over' ? lean.y : 0 }}
         transition={still ? { duration: 0 } : spring.snappy}
       >
-        {[0, 2, 1].map((index) => (
-          <motion.span key={index} className="absolute" initial={false} animate={places[index]} transition={move} style={{ zIndex: index === 1 ? 2 : 1 }}>
-            <Sheet ink={index === 1} ref={index === 1 ? sheetRef : undefined} />
-          </motion.span>
-        ))}
+        {/* Let go, the pile comes down from a little higher and settles with a bounce (each drop, `key`). */}
+        <motion.span
+          key={landings}
+          className="relative grid h-full w-full place-items-center"
+          initial={landings > 0 && !still ? { y: -12 } : false}
+          animate={{ y: 0 }}
+          transition={spring.gentle}
+        >
+          {[0, 2, 1].map((index) => (
+            <motion.span key={index} className={cn('absolute', index === 1 && flying && 'opacity-0')} initial={false} animate={places[index]} transition={move} style={{ zIndex: index === 1 ? 2 : 1 }}>
+              <Sheet ink={index === 1} ref={index === 1 ? sheetRef : undefined} />
+            </motion.span>
+          ))}
+        </motion.span>
       </motion.span>
 
       {/* The children let the drag through, so moving over one is still being over the box. */}
       {/* Positioned, so they are drawn over the tinted ground (itself positioned). */}
       <span className="pointer-events-none relative font-serif text-xl text-slate-900 dark:text-slate-50">{title}</span>
       <span className="pointer-events-none relative mt-1.5 text-sm text-slate-600 dark:text-slate-400">{line}</span>
-      {/* The page's promise, in every state: VisuaLex never sends the file anywhere. */}
-      <span className="pointer-events-none relative mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-emerald-800 dark:text-emerald-300">
+      {/* The page's promise, in every state: VisuaLex never sends the file anywhere. Seen, not part of the button's
+          name: the page's badge says it to a screen reader. */}
+      <span aria-hidden className="pointer-events-none relative mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-emerald-800 dark:text-emerald-300">
         <ShieldCheck aria-hidden size={14} />
         Il file resta nel tuo browser
       </span>

@@ -1301,6 +1301,8 @@
 .vlx-shake { animation: vlx-shake 300ms var(--ease-out) 1; }
 @media (prefers-reduced-motion: reduce) {
   .vlx-dash, .vlx-dash-run, .vlx-bar-slide, .vlx-shake { animation: none; }
+  /* A still quarter would read as a share: the whole track, faint, says «at work» and no amount. */
+  .vlx-bar-slide { width: 100%; opacity: 0.45; }
 }
 
 /* Gymnasium's small motions (S2). Each plays once for what grew since this browser last drew it

@@ -32,8 +32,12 @@ interface LoadedDocument {
 
 /** How long the check stays on the row before the text comes (D6): the time to see it. */
 const DONE_MS = 450;
-/** A file over the window with no `dragover` for this long has gone: the box rests again. */
-const DRAG_REST_MS = 200;
+/**
+ * A file over the window with no `dragover` for this long has gone: the box rests again. The brief asks about 200 ms;
+ * the HTML standard lets a browser send `dragover` only every 350 ms ± 200 while the pointer is still, so a shorter
+ * wait could set the box at rest under a file still held over it.
+ */
+const DRAG_REST_MS = 400;
 
 /** A phone: no dragging there (D6). */
 const isTouch = () => typeof window.matchMedia === 'function' && window.matchMedia('(hover: none) and (pointer: coarse)').matches;
@@ -180,7 +184,10 @@ export function DocumentReviewPage() {
       if (box && zone) {
         const r = zone.getBoundingClientRect();
         const clamp = (v: number, m: number) => Math.max(-m, Math.min(m, v));
-        setLean({ x: clamp(((event.clientX - (r.left + r.width / 2)) / Math.max(1, r.width)) * 24, 8), y: clamp(((event.clientY - (r.top + r.height / 2)) / Math.max(1, r.height)) * 16, 5) });
+        const x = Math.round(clamp(((event.clientX - (r.left + r.width / 2)) / Math.max(1, r.width)) * 24, 8));
+        const y = Math.round(clamp(((event.clientY - (r.top + r.height / 2)) / Math.max(1, r.height)) * 16, 5));
+        // A pointer held still sends the same place over and over: no new render for it.
+        setLean((was) => (was.x === x && was.y === y ? was : { x, y }));
       }
       window.clearTimeout(rest);
       rest = window.setTimeout(() => setPhase('idle'), DRAG_REST_MS);
@@ -279,9 +286,10 @@ export function DocumentReviewPage() {
         onChange={event => { const file = event.target.files?.[0]; if (file) void handleFile(file); event.target.value = ''; }}
       />
 
-      {/* What happens, said once: «Documento in lettura», «Cerco le citazioni», «Pronto», a refusal, then the count. */}
+      {/* What happens, said once: «Documento in lettura» (the search for citations is too short to say), «Pronto», a
+          refusal, then the count. */}
       <p className="sr-only" aria-live="polite">
-        {job?.stage === 'error' ? job.error : job?.stage === 'reading' ? 'Documento in lettura' : job?.stage === 'searching' ? 'Cerco le citazioni' : job?.stage === 'done' ? 'Pronto' : loaded ? countLabel : ''}
+        {job?.stage === 'error' ? job.error : job?.stage === 'reading' || job?.stage === 'searching' ? 'Documento in lettura' : job?.stage === 'done' ? 'Pronto' : loaded ? countLabel : ''}
       </p>
 
       {/* One after the other: the box closes, then the result comes. Both at once would lay the columns out
@@ -296,7 +304,8 @@ export function DocumentReviewPage() {
             exit={reduceMotion ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, height: 0 }}
             transition={{ duration: dur.panel, ease: ease.drawer }}
           >
-            <div className="flex flex-col gap-3 pb-1">
+            {/* Positioned: a row that leaves while another comes is laid over it (`popLayout`). */}
+            <div className="relative flex flex-col gap-3 pb-1">
               <DropZone
                 ref={zoneElement}
                 phase={phase}
@@ -306,9 +315,11 @@ export function DocumentReviewPage() {
                 busy={job !== null && job.stage !== 'error'}
                 onChoose={() => fileInputRef.current?.click()}
                 sheetRef={sheetRef}
+                flying={flight !== null}
               />
-              {/* The document's row; a refusal slides away with its ✕. */}
-              <AnimatePresence initial={false}>
+              {/* The document's row; a refusal slides away with its ✕. A new row takes the old one's place at once
+                  (`popLayout`), so the sheet thrown to it lands where it stays. */}
+              <AnimatePresence initial={false} mode="popLayout">
                 {job && (
                   <motion.div
                     key={job.id}
@@ -372,7 +383,7 @@ export function DocumentReviewPage() {
           </motion.div>
         )}
       </AnimatePresence>
-      {flight && <SheetFlight from={flight} target={markRef} onDone={() => setFlight(null)} />}
+      {flight && <SheetFlight key={landings} from={flight} target={markRef} onDone={() => setFlight(null)} />}
     </PageFrame>
   );
 }
