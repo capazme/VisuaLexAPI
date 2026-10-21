@@ -10,7 +10,7 @@ import { SettingsModal } from '../ui/SettingsModal';
 import { FeedbackButton } from '../ui/FeedbackButton';
 import { FeedbackModal } from '../ui/FeedbackModal';
 import { ChangelogNotification } from '../ui/ChangelogNotification';
-import { UndoToastContainer } from '../ui/Toast';
+import { NotificationHost } from '../ui/Toast';
 import { SyncErrorToast } from '../ui/SyncErrorToast';
 import { KeyboardShortcutsModal } from '../ui/KeyboardShortcutsModal';
 import { cn } from '../../lib/utils';
@@ -370,7 +370,7 @@ export function Layout() {
       <ChangelogNotification />
 
       {/* Global Undo Toast Container */}
-      <UndoToastContainer />
+      <NotificationHost />
 
       {/* MERL-T global plugin slot — Layout-level side-effect mounts
           (forum-signal tracker, etc.). Renders null but keeps subscribers

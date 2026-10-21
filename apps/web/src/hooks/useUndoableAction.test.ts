@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { registerUndoToastListener, showUndoToast, type UndoToast } from './useUndoableAction';
+import { notificationStore, resetNotifications } from '../components/ui/notifications/notifications';
 
 describe('showUndoToast', () => {
   let seen: Array<UndoToast | null>;
@@ -12,66 +13,78 @@ describe('showUndoToast', () => {
   });
   afterEach(() => {
     unregister();
+    resetNotifications();
     vi.useRealTimers();
   });
 
-  const show = (undo = vi.fn()) => {
-    const done = showUndoToast({ action: () => 'result', undo, message: 'Elemento rimosso' });
+  const show = (undo = vi.fn(), message = 'Elemento rimosso') => {
+    const done = showUndoToast({ action: () => 'result', undo, message });
     return { done, undo };
   };
   const lastToast = () => seen[seen.length - 1];
 
-  it('counts down and dismisses by itself when nothing is clicked', async () => {
+  it('runs out by itself after 5 seconds when nothing is clicked: the action stands', async () => {
     const { done } = show();
     await vi.advanceTimersByTimeAsync(0);
     expect(lastToast()?.message).toBe('Elemento rimosso');
     expect(lastToast()?.timeRemaining).toBe(5000);
-    await vi.advanceTimersByTimeAsync(1000);
-    expect(lastToast()?.timeRemaining).toBe(4000);
-    await vi.advanceTimersByTimeAsync(4000);
+    await vi.advanceTimersByTimeAsync(4999);
+    expect(lastToast()).not.toBeNull();
+    await vi.advanceTimersByTimeAsync(1);
     expect(lastToast()).toBeNull();
     await expect(done).resolves.toBe(true);
   });
 
-  it('says nothing more once undone: no ghost toast after the listener got null', async () => {
+  it('undone, awaits the undo and says «Ripristinato» for a moment', async () => {
     const { done, undo } = show();
     await vi.advanceTimersByTimeAsync(300);
     await lastToast()?.onUndo();
     expect(undo).toHaveBeenCalledWith('result');
     expect(lastToast()).toBeNull();
-    const count = seen.length;
-    await vi.advanceTimersByTimeAsync(200);
-    expect(seen).toHaveLength(count);
-    await vi.advanceTimersByTimeAsync(6000);
-    expect(seen).toHaveLength(count);
     await expect(done).resolves.toBe(false);
+    const restored = notificationStore.getState().entries.find((e) => e.message === 'Ripristinato');
+    expect(restored?.duration).toBe(1500);
+    expect(restored?.undoable).toBe(false);
   });
 
-  it('says nothing more once dismissed: no ghost toast after the listener got null', async () => {
+  it('an undo that fails says nothing more: it reported its own failure', async () => {
+    const { done } = show(vi.fn().mockRejectedValue(new Error('offline')));
+    await vi.advanceTimersByTimeAsync(0);
+    await lastToast()?.onUndo();
+    await expect(done).resolves.toBe(false);
+    expect(notificationStore.getState().entries.some((e) => e.message === 'Ripristinato')).toBe(false);
+  });
+
+  it('dismissed, keeps the action and runs no undo', async () => {
     const { done, undo } = show();
     await vi.advanceTimersByTimeAsync(300);
     lastToast()?.onDismiss();
     expect(undo).not.toHaveBeenCalled();
     expect(lastToast()).toBeNull();
-    const count = seen.length;
-    await vi.advanceTimersByTimeAsync(200);
-    expect(seen).toHaveLength(count);
     await vi.advanceTimersByTimeAsync(6000);
-    expect(seen).toHaveLength(count);
     await expect(done).resolves.toBe(true);
   });
 
-  it('a second toast replaces the first, which is kept, and they never take turns on screen', async () => {
-    const first = show();
+  it('a second stands beside the first: each keeps its own time and its own «Annulla» (K1a)', async () => {
+    const first = show(vi.fn(), 'Elemento rimosso');
     await vi.advanceTimersByTimeAsync(500);
-    const second = showUndoToast({ action: () => 'other', undo: vi.fn(), message: 'Compito completato' });
+    const second = show(vi.fn(), 'Compito completato');
     await vi.advanceTimersByTimeAsync(0);
-    await expect(first.done).resolves.toBe(true);
-    const from = seen.length;
-    await vi.advanceTimersByTimeAsync(1000);
-    expect(seen.slice(from).every((t) => t?.message === 'Compito completato')).toBe(true);
+    expect(lastToast()?.message).toBe('Compito completato');
     await lastToast()?.onUndo();
+    await expect(second.done).resolves.toBe(false);
     expect(first.undo).not.toHaveBeenCalled();
-    await expect(second).resolves.toBe(false);
+    // The first is the newest «Annulla» on screen again, and runs out on its own time.
+    expect(lastToast()?.message).toBe('Elemento rimosso');
+    await vi.advanceTimersByTimeAsync(4500);
+    await expect(first.done).resolves.toBe(true);
+  });
+
+  it('dropped at logout, resolves as not standing and runs no undo: a held action is not carried out', async () => {
+    const { done, undo } = show();
+    await vi.advanceTimersByTimeAsync(0);
+    resetNotifications();
+    await expect(done).resolves.toBe(false);
+    expect(undo).not.toHaveBeenCalled();
   });
 });
