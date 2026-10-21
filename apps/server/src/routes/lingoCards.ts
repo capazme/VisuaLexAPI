@@ -6,6 +6,7 @@ import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { createLingoCard } from '../lingo/cards';
 import { canTransition } from '../lingo/cardStates';
+import { settleMissions } from '../lingo/missions';
 import { hasNoNul } from '../lingo/noNul';
 import { cardInputSchema, planCards } from '../lingo/planCards';
 import { REVIEWABLE_OWN_STATES } from '../lingo/reviewQueue';
@@ -195,13 +196,15 @@ router.post('/:id/proponi', async (req, res) => {
       data: { stato: 'PROPOSTA_COMMUNITY', propostaTestoId: current.id },
       include: { ancore: true },
     });
-    return { card };
+    // «Proponi una scheda» (G-314), in the proposal's transaction: once per card in its life (Gymnasium XP spec §3.4).
+    const xp = await settleMissions(tx, req.user!.id, romeDay(new Date()), { tipo: 'proposta', cardId: card.id, materia: card.materia });
+    return { card, xp };
   });
   if ('richiedeTesto' in outcome) {
     res.status(409).json({ detail: 'Prima di proporre la scheda devi accettare il testo.', richiedeTesto: outcome.richiedeTesto });
     return;
   }
-  res.json(serialize(outcome.card));
+  res.json({ ...serialize(outcome.card), xp: outcome.xp });
 });
 
 router.post('/:id/ritira', async (req, res) => {

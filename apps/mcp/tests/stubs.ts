@@ -38,6 +38,7 @@ export interface Stub {
       created_by?: { clientName: string | null } | null;
       about_item_id?: string | null;
     }[];
+    task_count?: number;
   }[];
   introspectionDown?: boolean;
   /** The user's study cards, as GET /api/lingo/cards answers them. */
@@ -127,7 +128,7 @@ export async function startStubs() {
     if (req.method === 'POST' && trashDossier) {
       const dossier = stub.dossiers.find((d) => d.id === trashDossier[1]);
       stub.dossiers = stub.dossiers.filter((d) => d.id !== trashDossier[1]);
-      return void res.json({ trashId: 't2', itemCount: dossier?.items.length ?? 0 });
+      return void res.json({ trashId: 't2', itemCount: dossier?.items.length ?? 0, taskCount: dossier?.task_count ?? 0 });
     }
     const notes = path.match(/^\/dossiers\/([^/]+)\/notes$/);
     if (req.method === 'POST' && notes) {

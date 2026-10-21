@@ -93,6 +93,8 @@ interface ApiDossier {
   created_at?: string;
   updated_at?: string;
   items?: ApiDossierItem[];
+  /** The planner tasks that go to the trash with it (a count, never a title); absent from an older server. */
+  task_count?: number;
 }
 
 /** Data for the model, as JSON text: never an instruction. */
@@ -344,7 +346,7 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
     {
       title: 'Elimina un dossier',
       description:
-        `Sposta nel cestino un intero dossier con le sue voci. Prima chiede conferma all’utente con una finestra che il modello non può compilare; ` +
+        `Sposta nel cestino un intero dossier con le sue voci e i suoi compiti. Prima chiede conferma all’utente con una finestra che il modello non può compilare; ` +
         `il dossier resta ripristinabile da VisuaLex per ${TRASH_DAYS} giorni. Serve il permesso di eliminare, che l’utente concede nelle impostazioni di VisuaLex.`,
       inputSchema: { dossier: z.string().min(1).max(200).describe('Id del dossier, o il suo nome esatto') },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
@@ -356,17 +358,18 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
         if (!canAsk(server)) throw new ToolError(CANNOT_ASK);
         const found = await findDossier(config, caller, dossier);
         const items = found.items ?? [];
-        const message = deletionMessage({ dossierName: found.name, dossierId: found.id, lines: items.map((item) => entryLine(item, items)), kinds: items.map((item) => item.item_type), total: items.length, wholeDossier: true });
+        const taskCount = found.task_count ?? 0;
+        const message = deletionMessage({ dossierName: found.name, dossierId: found.id, lines: items.map((item) => entryLine(item, items)), kinds: items.map((item) => item.item_type), total: items.length, wholeDossier: true, tasks: taskCount });
         const answer = await confirmWithUser(server, message, { relatedRequestId: extra.requestId, timeoutMs: config.confirmationTimeoutMs, signal: extra.signal });
         if (answer === 'unsupported') throw new ToolError(CANNOT_ASK);
         if (answer !== 'confirmed') return data({ esito: 'annullata', messaggio: NOT_CONFIRMED[answer] });
-        // The entries shown travel with the move: the server refuses it if the dossier changed meanwhile.
-        const moved = await callApi<{ itemCount: number }>(config, caller, DELETE_SCOPE, `/dossiers/${encodeURIComponent(found.id)}/trash`, {
+        // The entries and the number of tasks shown travel with the move: the server refuses it if the dossier changed meanwhile.
+        const moved = await callApi<{ itemCount: number; taskCount?: number }>(config, caller, DELETE_SCOPE, `/dossiers/${encodeURIComponent(found.id)}/trash`, {
           method: 'POST',
-          body: { itemIds: items.map((item) => item.id) },
+          body: { itemIds: items.map((item) => item.id), taskCount },
           unreachable: UNREACHABLE_AFTER_CONFIRM,
         });
-        return data({ dossier_nel_cestino: found.name, voci: moved.itemCount, ripristinabili_fino_al: restorableUntil() });
+        return data({ dossier_nel_cestino: found.name, voci: moved.itemCount, compiti: moved.taskCount ?? taskCount, ripristinabili_fino_al: restorableUntil() });
       }),
   );
 

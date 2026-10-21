@@ -17,6 +17,8 @@ export interface MenuItem {
   checked?: boolean;
   /** A count drawn beside the label and read with it. */
   badge?: number;
+  /** What the count counts, read in its place: «3 compiti per oggi o scaduti». Without it, «N notifiche». */
+  badgeLabel?: string;
 }
 
 export interface MenuButtonProps {
@@ -182,10 +184,10 @@ export function MenuButton({ label, items, children, triggerClassName, align = '
                   <span className="ml-auto flex shrink-0 items-center gap-2 self-start">
                     {(item.badge ?? 0) > 0 && (
                       <>
-                        <span aria-hidden className="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-semibold leading-none">
+                        <span aria-hidden className="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-600 text-white text-[11px] font-semibold leading-none">
                           {(item.badge ?? 0) > 99 ? '99+' : item.badge}
                         </span>
-                        <span className="sr-only">, {item.badge} notifiche</span>
+                        <span className="sr-only">, {item.badgeLabel ?? `${item.badge} notifiche`}</span>
                       </>
                     )}
                     {/* The checked item says so in more than its weight; `aria-checked` says it to a screen reader. */}

@@ -5,6 +5,8 @@ import { Z_INDEX } from '../../constants/zIndex';
 import { useSection } from './useSection';
 import { SECTION_HOME_CODE, SECTIONS, goToLabel, type Section, type SectionId } from './sections';
 import { prefersReducedMotion } from './sectionTransition';
+import { plannerStore } from '../../components/features/planner/plannerStore';
+import { todayCountLabel } from '../../components/features/planner/taskDates';
 import { SECTION_MENU_MS, rollName, rollUpMenu, slideCheck, unrollMenu, type RollingUp } from './sectionMenuMotion';
 
 /** Closed; open; chosen (the check arrives, nothing more can be chosen); rolling back up. */
@@ -44,6 +46,8 @@ export function SectionSwitcher({ forumCount, onChoose, withName = false, inDraw
   const { section, active, sections, chooseSection } = useSection();
   const forumDot = forumCount > 0 && section !== 'forum';
   const news = forumDot ? ', nuove attività nel Forum' : '';
+  // Opus's count (overdue plus today's tasks) rides its entry, as the Forum's does; no dot: it is a to-do, not news.
+  const opusCount = plannerStore((s) => s.todayCount) ?? 0;
 
   const [phase, setPhase] = useState<Phase>('closed');
   // Which entry takes the focus once the menu is drawn.
@@ -215,6 +219,7 @@ export function SectionSwitcher({ forumCount, onChoose, withName = false, inDraw
           checked={chosen ?? section}
           current={openedOn}
           forumCount={forumCount}
+          opusCount={opusCount}
           inDrawer={inDrawer}
           chosen={phase !== 'open'}
           onChoose={choose}
@@ -275,6 +280,7 @@ interface SectionMenuProps {
    */
   current: SectionId;
   forumCount: number;
+  opusCount: number;
   inDrawer: boolean;
   /** Chosen, or rolling up: nothing more can be chosen in it. */
   chosen: boolean;
@@ -286,7 +292,7 @@ interface SectionMenuProps {
  * The menu of the sections (WAI-ARIA menu, `menuitemradio` entries): arrows, Home and End move, Escape closes and
  * gives the focus back to the arrow, Tab closes. One check, on the entry checked, slides when it changes.
  */
-function SectionMenu({ ref, id, sections, checked, current, forumCount, inDrawer, chosen, onChoose, onClose }: SectionMenuProps) {
+function SectionMenu({ ref, id, sections, checked, current, forumCount, opusCount, inDrawer, chosen, onChoose, onClose }: SectionMenuProps) {
   const check = useRef<HTMLSpanElement>(null);
   const lines = useRef(new Map<SectionId, HTMLSpanElement>());
   const placed = useRef<number | null>(null);
@@ -343,7 +349,8 @@ function SectionMenu({ ref, id, sections, checked, current, forumCount, inDrawer
     >
       {sections.map((s) => {
         const isChecked = s.id === checked;
-        const badge = s.id === 'forum' ? forumCount : 0;
+        const badge = s.id === 'forum' ? forumCount : s.id === 'opus' ? opusCount : 0;
+        const badgeLabel = s.id === 'opus' ? todayCountLabel(badge) : `${badge} notifiche`;
         return (
           <button
             key={s.id}
@@ -378,7 +385,7 @@ function SectionMenu({ ref, id, sections, checked, current, forumCount, inDrawer
                 <span aria-hidden className="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[11px] font-semibold leading-none">
                   {badge > 99 ? '99+' : badge}
                 </span>
-                <span className="sr-only">, {badge} notifiche</span>
+                <span className="sr-only">, {badgeLabel}</span>
               </span>
             )}
           </button>

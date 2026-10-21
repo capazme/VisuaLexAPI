@@ -1,0 +1,121 @@
+import { useId, useState, type FormEvent } from 'react';
+import { Plus, SlidersHorizontal } from 'lucide-react';
+import { cn } from '../../../lib/utils';
+import { useAppStore } from '../../../store/useAppStore';
+import { taskService } from '../../../services/taskService';
+import type { TaskView } from '../../../types/tasks';
+import { INK_BUTTON } from '../studia/progress/tokens';
+import { belongsTo, draftProblem, emptyDraft, inputFromDraft, MAX_TITLE, type TaskDraft } from './taskDraft';
+import { PRIORITY_LABEL, shortDay } from './taskDates';
+import { failureMessage, plannerStore } from './plannerStore';
+import { TaskFields } from './TaskFields';
+import { FIELD_HINT, ICON_BUTTON } from './plannerStyles';
+
+interface Props {
+  /** The view it sits on: a task that will not show there is announced. */
+  view: TaskView;
+  today: string;
+  /** What a new task starts with: today's date on «Oggi», the dossier in its panel. */
+  defaults: Partial<TaskDraft>;
+  /** The dossier panel's: the dossier is fixed. */
+  dossierLocked?: boolean;
+}
+
+/** Where a new task is going, in a line under the field. */
+function summary(draft: TaskDraft, today: string, dossierTitle: string | undefined): string {
+  const parts: string[] = [];
+  parts.push(draft.plannedDate ? `Per ${shortDay(draft.plannedDate, today).toLowerCase()}` : 'Senza data');
+  if (draft.dueDate) parts.push(`termine finale ${shortDay(draft.dueDate, today).toLowerCase()}`);
+  if (draft.priority < 4) parts.push(`priorità ${PRIORITY_LABEL[draft.priority].toLowerCase()}`);
+  parts.push(draft.dossierId ? `nel dossier «${dossierTitle ?? '…'}»` : "nella lista d'ingresso");
+  return parts.join(' · ');
+}
+
+/**
+ * The field at the top of each view: a title and Enter. «Dettagli» opens the dates, the priority and the dossier;
+ * the full set (labels, repetition, description) is the task's dialog. No date is read from the words (wave 2).
+ */
+export function QuickAddField({ view, today, defaults, dossierLocked = false }: Props) {
+  const id = useId();
+  const [draft, setDraft] = useState<TaskDraft>(() => emptyDraft(defaults));
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const dossierTitle = useAppStore((s) => (draft.dossierId ? s.dossiers.find((d) => d.id === draft.dossierId)?.title : undefined));
+  const dossierKind = useAppStore((s) => (draft.dossierId ? s.dossiers.find((d) => d.id === draft.dossierId)?.kind : undefined));
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (busy || !draft.title.trim()) return;
+    const problem = draftProblem(draft);
+    if (problem) {
+      setError(problem);
+      setOpen(true);
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const created = await taskService.create(inputFromDraft(draft, { withDossier: true, origin: dossierKind === 'studio' ? 'studio' : 'lavoro' }));
+      setDraft((current) => ({ ...current, title: '' }));
+      plannerStore.getState().changed();
+      if (!belongsTo(created, view, today, defaults.dossierId || undefined)) plannerStore.getState().notify('Compito aggiunto: non è in questa vista', 'info');
+    } catch (failure) {
+      setError(failureMessage(failure, 'Non riesco ad aggiungere il compito. Riprova.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form
+      onSubmit={submit}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape' && draft.title && e.target instanceof HTMLInputElement && e.target.id === `${id}-title`) {
+          e.preventDefault();
+          setDraft((current) => ({ ...current, title: '' }));
+        }
+      }}
+      className="rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+    >
+      <div className="flex items-center gap-1 p-1.5">
+        <Plus size={18} aria-hidden className="ml-2 shrink-0 text-slate-500 dark:text-slate-400" />
+        <label htmlFor={`${id}-title`} className="sr-only">Nuovo compito</label>
+        <input
+          id={`${id}-title`}
+          value={draft.title}
+          maxLength={MAX_TITLE}
+          onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+          placeholder="Aggiungi un compito"
+          aria-describedby={`${id}-summary`}
+          autoComplete="off"
+          className="min-h-[44px] min-w-0 flex-1 rounded-lg bg-transparent px-2 text-base text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 md:text-sm dark:text-slate-100 dark:placeholder:text-slate-400"
+        />
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={`${id}-details`}
+          onClick={() => setOpen((v) => !v)}
+          className={cn(ICON_BUTTON, 'gap-1.5 px-2 sm:inline-flex sm:px-3', open && 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-50')}
+        >
+          <SlidersHorizontal size={16} aria-hidden />
+          <span className="sr-only sm:not-sr-only sm:text-sm sm:font-medium">Dettagli</span>
+        </button>
+        <button type="submit" disabled={busy || !draft.title.trim()} className={cn(INK_BUTTON, 'shrink-0 px-3 sm:px-4')}>
+          {busy ? 'Aggiungo…' : <>Aggiungi<span className="sr-only"> il compito</span></>}
+        </button>
+      </div>
+      <p id={`${id}-summary`} className={cn(FIELD_HINT, 'px-4 pb-2')}>{summary(draft, today, dossierTitle)}</p>
+      {open && (
+        <div id={`${id}-details`} className="border-t border-slate-200 p-3 dark:border-slate-800">
+          <TaskFields draft={draft} onChange={setDraft} dossierLocked={dossierLocked} />
+        </div>
+      )}
+      {error && (
+        <p role="alert" className="border-t border-slate-200 px-4 py-2 text-sm text-red-800 dark:border-slate-800 dark:text-red-200">
+          {error}
+        </p>
+      )}
+    </form>
+  );
+}

@@ -8,6 +8,7 @@ vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ devMode: account.devMo
 import { SectionSwitcher } from './SectionSwitcher';
 import { sectionStore } from './useSection';
 import { SECTION_HOME_CODE } from './sections';
+import { plannerStore } from '../../components/features/planner/plannerStore';
 
 function Where() {
   return <span data-testid="where">{useLocation().pathname}</span>;
@@ -115,14 +116,15 @@ describe('SectionSwitcher (spec S3)', () => {
         <main>
           <Routes>
             <Route path="/studia/ripasso" element={<h1 data-section-title="gymnasium" tabIndex={-1}>Gymnasium: la tua palestra giuridica</h1>} />
-            <Route path="/dossier" element={<h2 data-section-title="opus" tabIndex={-1}>I tuoi dossier di lavoro</h2>} />
+            {/* Opus's home is the planner's «Oggi». */}
+            <Route path="/opus/oggi" element={<h1 data-section-title="opus" tabIndex={-1}>Opus: la tua officina giuridica</h1>} />
           </Routes>
         </main>
       </MemoryRouter>,
     );
     fireEvent.click(trigger(), { detail: 1 });
     fireEvent.click(screen.getByRole('menuitemradio', { name: /Opus/ }), { detail: 1 });
-    const heading = await screen.findByRole('heading', { name: 'I tuoi dossier di lavoro' });
+    const heading = await screen.findByRole('heading', { name: 'Opus: la tua officina giuridica' });
     await waitFor(() => expect(heading).toHaveFocus());
     expect(heading).toHaveAttribute('data-pointer-focus');
   });
@@ -183,6 +185,18 @@ describe('SectionSwitcher (spec S3)', () => {
     const mark = trigger().querySelector('.vlx-section-mark');
     expect(mark).toHaveAttribute('data-section', 'forum');
     expect(mark).toHaveClass('transition-colors', 'duration-200', 'motion-reduce:transition-none');
+  });
+
+  it("counts Opus's tasks for today on its entry, with no dot (planner)", () => {
+    plannerStore.setState({ todayCount: 2 });
+    try {
+      renderSwitcher('/forum');
+      expect(screen.queryByTestId('forum-dot')).toBeNull();
+      fireEvent.click(trigger());
+      expect(screen.getByRole('menuitemradio', { name: /Opus.*2 compiti per oggi o scaduti/ })).toBeInTheDocument();
+    } finally {
+      plannerStore.setState({ todayCount: null });
+    }
   });
 
   it('draws no dot inside the Forum, where its own entry counts', () => {

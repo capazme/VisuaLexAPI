@@ -140,6 +140,13 @@ async function seedBobEverywhere(alice: TestUser, bob: TestUser) {
   const notice = await prisma.lingoTestoVersione.findFirstOrThrow({ where: { chiave: 'PROPOSTA_SCHEDA', versione: 1 } });
   await prisma.lingoAccettazioneTesto.create({ data: { utenteId: alice.id, testoId: notice.id } });
   await prisma.lingoAccettazioneTesto.create({ data: { utenteId: bob.id, testoId: notice.id } });
+  // Gymnasium XP: Alice's credit for her vote on Bob's card, Bob's for his vote on hers and his own proposal.
+  const theirVote = await prisma.lingoValidazioneCard.findFirstOrThrow({ where: { utenteId: bob.id } });
+  const herVote = await prisma.lingoValidazioneCard.findFirstOrThrow({ where: { utenteId: alice.id } });
+  const today = new Date('2026-10-20T00:00:00Z');
+  await prisma.lingoCreditoXp.create({ data: { utenteId: alice.id, missione: 'CONVALIDA', periodo: 'G:2026-10-20', giorno: today, punti: 20, fonte: 'VOTO', fonteId: herVote.id } });
+  await prisma.lingoCreditoXp.create({ data: { utenteId: bob.id, missione: 'CONVALIDA', periodo: 'G:2026-10-20', giorno: today, punti: 20, fonte: 'VOTO', fonteId: theirVote.id } });
+  await prisma.lingoCreditoXp.create({ data: { utenteId: bob.id, missione: 'SCRIVI', periodo: 'G:2026-10-20', giorno: today, punti: 25, fonte: 'PROPOSTA', fonteId: bobCard.id, materia: 'DIRITTO_CIVILE' } });
 
   // Notifications and Bob's own rows on the same norms as Alice's.
   const watch = await prisma.normaWatch.create({ data: { userId: bob.id, normaKey: 'codice_civile::art::1453', normaData: { note: said('norma seguita') } } });
@@ -175,6 +182,8 @@ describe('the account export, against a second user who touches everything', () 
       'Dossier proposto e accolto', 'Voce accolta', 'Dossier pubblicato', 'Nota pubblicata', 'Nota mia', 'Nota presa', alice.id, alice.email]) {
       expect(exported).toContain(hers);
     }
+    // Her XP: her own credit, not Bob's, and no event's id (a vote's id would name a row about Bob's card).
+    expect(response.body.data.lingoCreditiXp).toEqual([{ missione: 'CONVALIDA', periodo: 'G:2026-10-20', giorno: '2026-10-20', punti: 20, fonte: 'VOTO', materia: null }]);
   });
 
   it('keeps the user’s own identity in hand-imported content and drops the other’s, at any depth', async () => {

@@ -15,6 +15,8 @@ import { AdminRoute } from './components/auth/AdminRoute';
 import { DecisionAddress } from './components/features/decisions/DecisionAddress';
 import { isStudiaEnabled } from './features/studia/featureFlag';
 import { DevRoute } from './features/devMode/DevRoute';
+import { OpusPage } from './components/features/planner/OpusPage';
+import { InboxView, TaskTrashView, TodayView, UpcomingView } from './components/features/planner/OpusViews';
 
 // Lazy load admin page + MERL-T surfaces (route-level code splitting)
 import { lazy, Suspense } from 'react';
@@ -114,6 +116,14 @@ function App() {
         >
           <Route index element={<SearchPage />} />
           <Route path="dossier" element={<DossierPage />} />
+          {/* Opus's planner (wave 1): «Oggi» is the section's home; «Dossier» stays at /dossier. */}
+          <Route path="opus" element={<OpusPage />}>
+            <Route index element={<Navigate to="oggi" replace />} />
+            <Route path="oggi" element={<TodayView />} />
+            <Route path="prossimi" element={<UpcomingView />} />
+            <Route path="ingresso" element={<InboxView />} />
+            <Route path="cestino" element={<TaskTrashView />} />
+          </Route>
           <Route path="history" element={<HistoryView />} />
           <Route path="environments" element={<EnvironmentsRedirect />} />
           {/* The Forum's two areas: «Dossier pubblici» at its old address, «Community» a placeholder. */}

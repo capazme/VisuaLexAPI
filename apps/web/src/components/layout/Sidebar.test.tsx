@@ -15,6 +15,10 @@ import { Sidebar, SIDEBAR_SMALL_TEXT, SIDEBAR_TOGGLE_TEXT } from './Sidebar';
 import { appStore } from '../../store/useAppStore';
 import { subscribeSearchField } from '../../utils/searchFieldControl';
 import { sectionStore } from '../../features/sections/useSection';
+import { plannerStore } from '../features/planner/plannerStore';
+
+/** Opus's entries: the planner's three views, then the dossiers. */
+const OPUS_HREFS = ['/', '/documents', '/opus/oggi', '/opus/prossimi', '/opus/ingresso', '/dossier'];
 import type { ServiceHealthState } from '../../services/healthService';
 
 /** `Layout`'s one probe of the services, handed to the sidebar (S1). */
@@ -175,10 +179,25 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     }
   });
 
-  it('Opus: the dossiers', () => {
+  it("Opus: the planner's views, then the dossiers", () => {
     renderSidebar('/');
-    expect(hrefs()).toEqual(['/', '/documents', '/dossier']);
-    expect(screen.getByRole('group', { name: 'Opus' })).toContainElement(screen.getByRole('link', { name: 'Dossier' }));
+    expect(hrefs()).toEqual(OPUS_HREFS);
+    const opus = screen.getByRole('group', { name: 'Opus' });
+    expect(within(opus).getAllByRole('link').map((a) => a.getAttribute('aria-label'))).toEqual(['Oggi', 'Prossimi giorni', "Lista d'ingresso", 'Dossier']);
+  });
+
+  it('counts the overdue and today\'s tasks beside «Oggi», and says it in words (row 16)', () => {
+    plannerStore.setState({ todayCount: 3 });
+    try {
+      renderSidebar('/opus/oggi');
+      const today = screen.getByRole('link', { name: 'Oggi, 3 compiti per oggi o scaduti' });
+      expect(today).toHaveAttribute('aria-current', 'page');
+      expect(today).toHaveTextContent('3');
+      cleanupAndRender('/opus/oggi', () => plannerStore.setState({ todayCount: 0 }));
+      expect(screen.getByRole('link', { name: 'Oggi' })).not.toHaveTextContent(/\d/);
+    } finally {
+      plannerStore.setState({ todayCount: null });
+    }
   });
 
   it('Gymnasium: «Studia» holds Oggi, Progressi and the dossiers, «Contribuisci» Le mie schede and, for a validator only, «Da validare» (Gymnasium spec §4)', () => {
@@ -225,7 +244,7 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     expect(hrefs()).toEqual(['/', '/documents', '/merlt', '/grafo']);
     // Without the mode the section is not offered: a stored Academia falls back to Opus.
     cleanupAndRender('/', () => { account.devMode = false; sectionStore.setState({ section: 'academia' }); });
-    expect(hrefs()).toEqual(['/', '/documents', '/dossier']);
+    expect(hrefs()).toEqual(OPUS_HREFS);
     expect(screen.queryByRole('link', { name: /Grafo|Assistente/ })).toBeNull();
   });
 
@@ -242,12 +261,12 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     vi.stubEnv('VITE_FEATURE_STUDIA', 'false');
     sectionStore.setState({ section: 'gymnasium' });
     renderSidebar('/');
-    expect(hrefs()).toEqual(['/', '/documents', '/dossier']);
+    expect(hrefs()).toEqual(OPUS_HREFS);
   });
 
   it("is the same list in the phone's copy, closed off-canvas or open (spec D8)", () => {
     renderSidebar('/', { isOpen: false });
-    expect(hrefs()).toEqual(['/', '/documents', '/dossier']);
+    expect(hrefs()).toEqual(OPUS_HREFS);
     openUserMenu();
     expect(screen.getByRole('menuitem', { name: /Impostazioni/ })).toBeInTheDocument();
   });

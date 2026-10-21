@@ -17,14 +17,14 @@ export interface Section {
 }
 
 export const SECTIONS: readonly Section[] = [
-  { id: 'opus', name: 'Opus', line: 'Dossier di lavoro e strumenti per la professione', icon: Briefcase, home: '/dossier', homeName: 'Dossier' },
+  { id: 'opus', name: 'Opus', line: 'Dossier di lavoro e strumenti per la professione', icon: Briefcase, home: '/opus/oggi', homeName: 'Oggi' },
   { id: 'gymnasium', name: 'Gymnasium', line: 'Schede, ripasso, esami e concorsi', icon: GraduationCap, home: '/studia/ripasso', homeName: 'Oggi' },
   { id: 'academia', name: 'Academia', line: 'Grafo, feedback e validazione', icon: Landmark, home: '/merlt', homeName: 'Assistente' },
   { id: 'forum', name: 'Forum', line: 'Dossier pubblici e community', icon: Users, home: '/forum', homeName: 'Dossier pubblici' },
 ];
 
 /** The sections' titles with their phrase («Nome: …»), chosen by the owner on 19 October 2026; the one place to change
- *  them. The Forum's is the Community page's `h1`; Opus's is not shown yet: its page takes it in its own change. */
+ *  them. The Forum's is the Community page's `h1`, Opus's the planner's (`planner/OpusPage`). */
 export const SECTION_TITLES = {
   forum: 'Forum: il luogo del dibattito giuridico',
   opus: 'Opus: la tua officina giuridica',
@@ -47,6 +47,7 @@ const under = (pathname: string, root: string) => pathname === root || pathname.
 
 /** The section a page belongs to, or null for a Corpus page, which keeps the last section (S1). */
 export function sectionForPath(pathname: string): SectionId | null {
+  if (under(pathname, '/opus')) return 'opus';
   if (under(pathname, '/studia')) return 'gymnasium';
   if (under(pathname, '/forum')) return 'forum';
   if (under(pathname, '/merlt') || under(pathname, '/grafo')) return 'academia';
