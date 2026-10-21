@@ -317,6 +317,12 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   its author, and an annotation event never carries the note's words (the owner, 18 October 2026, «c»).
 - `components/ui/` — shared primitives: `Button`, `IconButton`, `Input`, `Card`,
   `Modal`, `ConfirmDialog`, `Toast`, `EmptyState`, `Sheet` (a phone's bottom sheet), plus feature-flavoured modals.
+  `FilePickerInput` is the file input behind a button that opens the system's file picker («Analizza
+  documento»'s box, the dossier list's «Importa»): the button calls the input's `click()` in its own click
+  or key handler, never after an `await` or a timer (the browser refuses a picker that lost the gesture);
+  the input is the button's sibling, never its child, hidden by `sr-only` (not `display: none`) and out of
+  the tab order, and its value is cleared before the file is handed on, so the same file can be chosen
+  twice. A new file picker uses it (the MERL-T pages' two still carry their own).
   `Modal` is portaled to `document.body`, so a dialog opened inside a reading window
   (transformed, stacked) is not confined to it; each open `Modal` is on a module-level
   stack and only the top-most handles Tab (the focus trap) and Esc, so a dialog opened

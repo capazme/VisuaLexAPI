@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import userEvent from '@testing-library/user-event';
 
 // The toast is a stub that shows its type: what is pinned here is the message and the type DossierPage picks.
 vi.mock('../../ui/Toast', async (importOriginal) => ({
@@ -75,5 +76,51 @@ describe('DossierPage: share links', () => {
     const old = `/dossier?import=${encodeURIComponent(btoa(JSON.stringify({ title: 'Perché', items: [note] })))}`;
     const { importDossier } = await importWith([note], { id: 'srv', imported: 1, failed: 0 }, old);
     expect(vi.mocked(importDossier).mock.calls[0]).toMatchObject([{ title: 'Perché' }]);
+  });
+});
+
+describe('DossierPage: «Importa» opens the file picker', () => {
+  const picker = () => document.querySelector<HTMLInputElement>('[data-testid="dossier-import-input"]')!;
+  const importButton = () => screen.findByRole('button', { name: 'Importa dossier da file JSON' });
+
+  function renderList() {
+    appStore.setState({ dossiers: [], importDossier: vi.fn(async () => ({ id: 'srv', imported: 1, failed: 0 })) });
+    render(<MemoryRouter initialEntries={['/dossier']}><DossierPage /></MemoryRouter>);
+  }
+
+  it('starts the picker itself on a click, with Enter and with Space, from an input beside the button', async () => {
+    renderList();
+    const click = vi.spyOn(HTMLInputElement.prototype, 'click');
+    try {
+      const button = await importButton();
+      await userEvent.click(button);
+      button.focus();
+      await userEvent.keyboard('{Enter}');
+      await userEvent.keyboard(' ');
+      expect(click).toHaveBeenCalledTimes(3);
+      expect(click.mock.contexts.every(context => context === picker())).toBe(true);
+      // No dialog comes before the picker: the import's preview opens on the file read.
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(button.contains(picker())).toBe(false);
+      expect(picker()).toHaveClass('sr-only');
+      expect(picker()).not.toHaveClass('hidden');
+    } finally {
+      click.mockRestore();
+    }
+  });
+
+  it('opens the preview of the file chosen, and again for the same file chosen twice', async () => {
+    renderList();
+    await importButton();
+    const json = JSON.stringify({ title: 'Dal file', items: [note] });
+    // jsdom's File has no text().
+    const file = Object.assign(new File([json], 'dossier.json', { type: 'application/json' }), { text: async () => json });
+    await userEvent.upload(picker(), file);
+    expect(await screen.findByRole('heading', { name: 'Dal file' })).toBeInTheDocument();
+    expect(picker().value).toBe('');
+    await userEvent.click(screen.getByRole('button', { name: 'Annulla' }));
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Dal file' })).toBeNull());
+    await userEvent.upload(picker(), file);
+    expect(await screen.findByRole('heading', { name: 'Dal file' })).toBeInTheDocument();
   });
 });

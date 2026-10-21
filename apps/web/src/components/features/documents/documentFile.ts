@@ -6,8 +6,16 @@
 /** 15 MB: the limit the page announces. */
 export const MAX_DOCUMENT_BYTES = 15 * 1024 * 1024;
 
-/** What the hidden input offers; a PDF is accepted only to explain why it cannot be read. */
-export const DOCUMENT_ACCEPT = '.txt,.md,.markdown,.html,.htm,.docx,.pdf';
+/**
+ * What the picker offers, by extension and by type (some pickers filter by type alone); a type may bring in
+ * a few more extensions, which `readDocumentFile` refuses by name. A PDF is accepted only to explain why
+ * it cannot be read.
+ */
+export const DOCUMENT_ACCEPT = [
+  '.txt', '.md', '.markdown', '.html', '.htm', '.docx', '.pdf',
+  'text/plain', 'text/markdown', 'text/html',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/pdf',
+].join(',');
 
 export type DocumentReading = { ok: true; text: string } | { ok: false; error: string };
 

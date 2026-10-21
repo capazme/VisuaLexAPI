@@ -52,6 +52,47 @@ describe('DocumentReviewPage — before a document', () => {
     expect(zone.className).toMatch(/min-h-48/);
   });
 
+  it('opens the picker on a click on the box, from an input beside it that is laid out', async () => {
+    const { container } = render(<DocumentReviewPage />);
+    const click = vi.spyOn(HTMLInputElement.prototype, 'click');
+    try {
+      const zone = screen.getByRole('button', { name: /Scegli un documento/ });
+      await userEvent.click(zone);
+      expect(click).toHaveBeenCalledTimes(1);
+      expect(click.mock.contexts[0]).toBe(input(container));
+      // Beside the box, never inside it: the input's click would climb back to the box.
+      expect(zone.contains(input(container))).toBe(false);
+      // Hidden from sight, not `display: none`.
+      expect(input(container)).toHaveClass('sr-only');
+      expect(input(container)).not.toHaveClass('hidden');
+      expect(input(container)).toHaveAttribute('tabindex', '-1');
+    } finally {
+      click.mockRestore();
+    }
+  });
+
+  it('offers the formats the box names, by extension and by type', () => {
+    const { container } = render(<DocumentReviewPage />);
+    const accept = input(container).accept.split(',');
+    for (const format of ['.txt', '.md', '.markdown', '.html', '.htm', '.docx', 'text/plain', 'text/markdown', 'text/html',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document']) {
+      expect(accept).toContain(format);
+    }
+  });
+
+  it('reads the same file again when it is chosen a second time', async () => {
+    const { container } = render(<DocumentReviewPage />);
+    const file = testFile([PARERE], 'parere.txt');
+    await userEvent.upload(input(container), file);
+    expect(await screen.findByRole('heading', { level: 2, name: 'parere.txt' })).toBeInTheDocument();
+    // Cleared once read: the browser fires no change for the file the field already holds.
+    expect(input(container).value).toBe('');
+    await userEvent.click(screen.getByRole('button', { name: 'Scegli un altro documento' }));
+    await screen.findByRole('button', { name: /Scegli un documento/ });
+    await userEvent.upload(input(container), file);
+    expect(await screen.findByRole('heading', { level: 2, name: 'parere.txt' })).toBeInTheDocument();
+  });
+
   it('changes the box while a file is over it, and reads the file let go on it', async () => {
     render(<DocumentReviewPage />);
     const zone = screen.getByRole('button', { name: /Scegli un documento/ });

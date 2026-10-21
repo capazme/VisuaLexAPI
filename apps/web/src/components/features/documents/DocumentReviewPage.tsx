@@ -11,6 +11,7 @@ import { AlertCircle, FileText, Loader2, RotateCcw, ShieldCheck, Upload } from '
 import { extractCitations, type CitationMatch } from '../../../utils/citationMatcher';
 import { useAppStore } from '../../../store/useAppStore';
 import { Button } from '../../ui/Button';
+import { FilePickerInput } from '../../ui/FilePickerInput';
 import { FOCUS_RING, TRANSITION } from '../../../constants/interactions';
 import { dur, ease } from '../../../lib/motion';
 import { cn } from '../../../lib/utils';
@@ -226,14 +227,7 @@ export function DocumentReviewPage() {
         </p>
       </header>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept={DOCUMENT_ACCEPT}
-        className="hidden"
-        data-testid="document-input"
-        onChange={event => { const file = event.target.files?.[0]; if (file) void handleFile(file); event.target.value = ''; }}
-      />
+      <FilePickerInput ref={fileInputRef} accept={DOCUMENT_ACCEPT} data-testid="document-input" onFile={file => void handleFile(file)} />
 
       <p className="sr-only" aria-live="polite">{slowReading ? 'Leggo il documento…' : loaded ? countLabel : ''}</p>
 

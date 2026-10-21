@@ -19,6 +19,7 @@ import { DossierModal } from '../../ui/DossierModal';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { EmptyState } from '../../ui/EmptyState';
 import { MenuButton } from '../../ui/MenuButton';
+import { FilePickerInput } from '../../ui/FilePickerInput';
 import {
   formatTimestampLong, computeNormaGroups, computeItemCounts, decisionCitationOf, importReport, importToastType, searchParamsFromGroup,
   tabLabelForGroup, validateImportedDossier, type ImportCheck, type NormaGroup,
@@ -222,10 +223,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
     return () => window.removeEventListener('keydown', onKey);
   }, [isModalOpen, editingDossier, deletingDossier, importing, openPickerGroups]);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = ''; // reset so the same file can be picked again
-    if (!file) return;
+  const importFile = async (file: File) => {
     try {
       const text = await file.text();
       // A file is untrusted: its decision items are checked, and what cannot be imported is listed.
@@ -269,6 +267,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
             </button>
           )}
           <button
+            type="button"
             onClick={triggerFileImport}
             className="flex-1 md:flex-none bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 px-4 py-3 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
             title="Importa da file JSON (i)"
@@ -289,14 +288,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
         </div>
       </div>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="application/json,.json"
-        onChange={handleFileChange}
-        className="hidden"
-        aria-hidden
-      />
+      <FilePickerInput ref={fileInputRef} accept="application/json,.json" data-testid="dossier-import-input" onFile={file => void importFile(file)} />
 
       {/* The search, then the two menus: one row on a computer; on a phone the search on its own row and the
           menus side by side under it, half each (D1). */}
