@@ -21,6 +21,9 @@ export interface PageFrameProps {
   line?: ReactNode;
   /** The page's main action, beside the title from `md`, under it on a phone. */
   action?: ReactNode;
+  /** The action stays beside the title on a phone too, at its first line: icon buttons only (the dossier list's «⋯»
+   *  and «+», M1). */
+  actionBeside?: boolean;
   /** A section's home: the title is where the section switcher puts the focus (`sectionTransition.ts`). */
   section?: SectionId;
   /** The title's id, for a landmark it names. */
@@ -35,10 +38,14 @@ export interface PageFrameProps {
  * sentence under it, the action on its right, and no icon beside it. A page whose body reads as long text narrows
  * the body, never the title. Outside it: the Scrivania, the lesson, the reader and the practice, the login.
  */
-export function PageFrame({ title, line, action, section, titleId, className, children }: PageFrameProps) {
+export function PageFrame({ title, line, action, actionBeside = false, section, titleId, className, children }: PageFrameProps) {
   return (
     <div className={cn('flex w-full min-w-0 flex-col gap-6', className)}>
-      <header className={cn('flex flex-col gap-4 md:flex-row md:items-center md:justify-between', action && FOCUS_BUTTON_CLEARANCE)}>
+      <header className={cn(
+        'flex gap-4 md:flex-row md:items-center md:justify-between',
+        actionBeside ? 'flex-row items-start justify-between' : 'flex-col',
+        action && FOCUS_BUTTON_CLEARANCE,
+      )}>
         <div className="min-w-0">
           <h1 id={titleId} data-section-title={section} tabIndex={section ? -1 : undefined} className={cn(PAGE_TITLE, section && cn(FOCUS_RING, 'rounded-sm'))}>
             {title}

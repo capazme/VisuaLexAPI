@@ -6,6 +6,7 @@ import { StudyPacksBand } from './StudyPacksBand';
 import { FORUM_CATEGORIES } from '../../../utils/forumCategories';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
 import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
+import { cn } from '../../../lib/utils';
 import type { SharedEnvironment, EnvironmentCategory, StudyImportReport } from '../../../types';
 
 export type SortOption = 'newest' | 'popular' | 'mostDownloaded';
@@ -15,6 +16,9 @@ const SORT_OPTIONS: { value: SortOption; label: string; icon: React.ReactNode }[
   { value: 'popular', label: 'Più popolari', icon: <TrendingUp size={14} /> },
   { value: 'mostDownloaded', label: 'Più aggiunti', icon: <Users size={14} /> },
 ];
+
+/** The category and order buttons: half the row each on a phone (44 px tall), their own width from `sm`. */
+const FILTER_BUTTON = 'flex w-full min-h-[44px] items-center gap-2 px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors sm:min-w-[180px] sm:px-4 sm:text-base md:min-h-0';
 
 const CATEGORY_OPTIONS: ReadonlyArray<{ value: EnvironmentCategory | 'all'; label: string }> = [
   { value: 'all', label: 'Tutte le categorie' },
@@ -82,10 +86,11 @@ export function ForumExploreView({
 
   return (
     <>
-      {/* Filters */}
-      <div id="tour-forum-filters" className="flex flex-col sm:flex-row gap-3">
+      {/* Filters: one row from sm; on a phone the search across the page and under it the category and the order, half
+          each, with the refresh beside them (M1). */}
+      <div id="tour-forum-filters" className="flex flex-wrap gap-2 sm:flex-nowrap sm:gap-3">
         {/* Search */}
-        <form onSubmit={onSearchSubmit} className="flex-1 relative">
+        <form onSubmit={onSearchSubmit} className="relative basis-full sm:basis-auto sm:flex-1">
           <Search
             size={18}
             className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
@@ -101,20 +106,25 @@ export function ForumExploreView({
         </form>
 
         {/* Category Filter */}
-        <div className="relative">
+        <div className="relative min-w-0 flex-1 sm:flex-none">
           <button
             onClick={() => {
               setShowCategoryDropdown(!showCategoryDropdown);
               setShowSortDropdown(false);
             }}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors min-w-[180px]"
+            aria-label={`Categoria: ${selectedCategory.label}`}
+            aria-expanded={showCategoryDropdown}
+            className={FILTER_BUTTON}
           >
-            <Filter size={16} />
-            <span className="flex-1 text-left">{selectedCategory.label}</span>
-            <ChevronDown size={16} />
+            <Filter size={16} aria-hidden className="hidden shrink-0 sm:block" />
+            {/* «Tutte» on a phone, as the dossier list's menu: half the row does not hold «Tutte le categorie». */}
+            <span className="min-w-0 flex-1 truncate text-left">
+              {category === 'all' ? <><span className="sm:hidden">Tutte</span><span className="hidden sm:inline">{selectedCategory.label}</span></> : selectedCategory.label}
+            </span>
+            <ChevronDown size={16} aria-hidden className="shrink-0" />
           </button>
           {showCategoryDropdown && (
-            <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 py-1 z-20">
+            <div className="absolute top-full left-0 mt-1 w-max min-w-full bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 py-1 z-20">
               {CATEGORY_OPTIONS.map((option) => (
                 <button
                   key={option.value}
@@ -136,20 +146,22 @@ export function ForumExploreView({
         </div>
 
         {/* Sort */}
-        <div className="relative">
+        <div className="relative min-w-0 flex-1 sm:flex-none">
           <button
             onClick={() => {
               setShowSortDropdown(!showSortDropdown);
               setShowCategoryDropdown(false);
             }}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors min-w-[160px]"
+            aria-label={`Ordine: ${selectedSort.label}`}
+            aria-expanded={showSortDropdown}
+            className={cn(FILTER_BUTTON, 'sm:min-w-[160px]')}
           >
-            {selectedSort.icon}
-            <span className="flex-1 text-left">{selectedSort.label}</span>
-            <ChevronDown size={16} />
+            <span aria-hidden className="hidden shrink-0 sm:block">{selectedSort.icon}</span>
+            <span className="min-w-0 flex-1 truncate text-left">{selectedSort.label}</span>
+            <ChevronDown size={16} aria-hidden className="shrink-0" />
           </button>
           {showSortDropdown && (
-            <div className="absolute top-full right-0 mt-1 w-full bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 py-1 z-20">
+            <div className="absolute top-full right-0 mt-1 w-max min-w-full bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 py-1 z-20">
               {SORT_OPTIONS.map((option) => (
                 <button
                   key={option.value}
@@ -176,7 +188,7 @@ export function ForumExploreView({
           onClick={onRefresh}
           disabled={loading}
           aria-label="Aggiorna l'elenco"
-          className="flex min-h-[44px] min-w-[44px] items-center justify-center p-2.5 md:min-h-0 md:min-w-0 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+          className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center p-2.5 md:min-h-0 md:min-w-0 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
         >
           <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
         </button>

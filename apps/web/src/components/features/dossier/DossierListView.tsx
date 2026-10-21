@@ -11,6 +11,7 @@ import {
   ExternalLink,
   Upload,
   BookOpen,
+  Plus,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { appStore, useAppStore } from '../../../store/useAppStore';
@@ -260,7 +261,9 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
       // The same element from one kind to the other: the switcher's focus lands on it for Opus and for Gymnasium.
       section={sectionKind === 'studio' ? 'gymnasium' : 'opus'}
       className="animate-in fade-in duration-200"
-      action={
+      // On a phone the title keeps its row with «⋯» (Importa, Cestino) and «+» beside it (M1); from md the three buttons.
+      actionBeside={!isDesktop}
+      action={isDesktop ? (
         <>
           {trashCount > 0 && onOpenTrash && (
             <button
@@ -290,7 +293,28 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
             <FolderPlus size={20} /> Nuovo Dossier
           </button>
         </>
-      }
+      ) : (
+        <>
+          <MenuButton
+            label="Altre azioni sui dossier"
+            items={[
+              { label: 'Importa da file JSON', icon: Upload, onSelect: triggerFileImport },
+              ...(trashCount > 0 && onOpenTrash ? [{ label: `Cestino (${trashCount})`, icon: Trash2, onSelect: onOpenTrash }] : []),
+            ]}
+            triggerClassName="h-11 w-11 justify-center border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+          >
+            <MoreHorizontal size={20} aria-hidden />
+          </MenuButton>
+          <button
+            id="tour-dossier-create"
+            onClick={() => setIsModalOpen(true)}
+            aria-label="Nuovo dossier"
+            className="dossier-create-button inline-flex h-11 w-11 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+          >
+            <Plus size={22} aria-hidden />
+          </button>
+        </>
+      )}
     >
 
       <input
