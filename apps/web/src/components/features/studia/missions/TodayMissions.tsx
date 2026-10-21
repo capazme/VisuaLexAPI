@@ -162,14 +162,15 @@ function MissionsOfToday({ day, missions, children }: { day: Progressi; missions
     // `-mb-4`: the last row's bottom padding, which a moving row keeps (`MissionRow`'s `layout`).
     <ol aria-label="Missioni di oggi" className={cn('divide-y divide-slate-100 dark:divide-slate-800', !reduce && '-mb-4')}>
       {missionOrder(missions, new Set(running)).map((mission) => (
-        // Met by the count, the stamp says it to the eye; met with the queue finished under it, the line says why.
+        // Met by the count and earned, the stamp says it to the eye; met with the queue finished under it, or under the
+        // mission's 10 reviews, the line says why.
         <MissionRow
           key={mission.id}
           mission={mission}
           bar
           ink={running.includes(mission.id) ? 'drip' : 'still'}
           layout={!reduce}
-          quietNote={mission.id === 'obiettivo' && met && day.oggi.ripassi >= day.oggi.obiettivo}
+          quietNote={mission.id === 'obiettivo' && mission.status === 'fatta' && met && day.oggi.ripassi >= day.oggi.obiettivo}
         >
           {children(mission)}
         </MissionRow>

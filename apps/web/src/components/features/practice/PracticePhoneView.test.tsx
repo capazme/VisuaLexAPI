@@ -41,7 +41,6 @@ import { appStore } from '../../../store/useAppStore';
 import { PracticePhoneView } from './PracticePhoneView';
 import { L24, L241, article } from '../../../utils/__fixtures__/savedWorkspaces';
 import { besideRefFor, practiceArticleKey } from '../../../utils/practice';
-import { CLOSE_PRACTICE_MESSAGE } from './practiceView';
 
 const REF = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 12345, anno: 2020 };
 
@@ -449,8 +448,8 @@ describe('PracticePhoneView: the full-screen reader and the practice list (spec 
     await waitFor(() => expect(within(dialog).getByRole('button', { name: /^Rossi c\. Bianchi/ })).toBeInTheDocument());
   });
 
-  it('«Chiudi la pratica» in the list asks first (the danger confirmation), then closes it with its reader if it had one', async () => {
-    const { practiceId, articleKey, actId } = withArticleAndDecision();
+  it('«Chiudi la pratica» in the list closes it at once, with no confirmation, and the other becomes active (K1a)', () => {
+    const { practiceId } = withArticleAndDecision();
     const keep = s().createPractice('Resta');
     s().setActivePractice(practiceId);
     render(view());
@@ -458,25 +457,9 @@ describe('PracticePhoneView: the full-screen reader and the practice list (spec 
     const label = s().practices.find((p) => p.id === practiceId)?.label ?? '';
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Le tue pratiche' })).getByRole('button', { name: `Altre azioni per la pratica ${label}` }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Chiudi la pratica' }));
-    const confirm = await screen.findByRole('alertdialog');
-    expect(confirm).toHaveTextContent(CLOSE_PRACTICE_MESSAGE);
-    expect(s().practices).toHaveLength(2); // nothing closed yet
-    fireEvent.click(within(confirm).getByRole('button', { name: 'Chiudi la pratica' }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
     expect(s().practices.map((p) => p.id)).toEqual([keep]);
     expect(s().activePracticeId).toBe(keep);
-    void articleKey; void actId;
-  });
-
-  it('declining the confirmation closes nothing', async () => {
-    withArticleAndDecision();
-    render(view());
-    fireEvent.click(screen.getByTitle('Elenco delle pratiche'));
-    const label = s().practices[0].label;
-    fireEvent.click(within(screen.getByRole('dialog', { name: 'Le tue pratiche' })).getByRole('button', { name: `Altre azioni per la pratica ${label}` }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Chiudi la pratica' }));
-    const confirm = await screen.findByRole('alertdialog');
-    fireEvent.click(within(confirm).getByRole('button', { name: 'Annulla' }));
-    expect(s().practices).toHaveLength(1);
   });
 
   it('no extracted article is drawn, and no topic band: a practice with only a desktop window is empty here', () => {

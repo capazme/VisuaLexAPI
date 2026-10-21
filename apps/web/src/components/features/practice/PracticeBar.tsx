@@ -15,7 +15,7 @@ import { useAppStore } from '../../../store/useAppStore';
 import { useCompare } from '../../../hooks/useCompare';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
-import { ConfirmDialog } from '../../ui/ConfirmDialog';
+import { closeAllPracticesWithUndo } from './practiceUndo';
 import { PracticeChip } from './PracticeChip';
 
 const NEW_PRACTICE_LABEL = 'Nuova pratica';
@@ -35,15 +35,13 @@ const HEADER_BUTTON =
 export function PracticeBar({ onHeightChange }: { onHeightChange?: (height: number | null) => void } = {}) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [barNode, setBarNode] = useState<HTMLDivElement | null>(null);
-  const [closeAllOpen, setCloseAllOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const ids = useAppStore(useShallow((s) => s.practices.map((p) => p.id)));
   const activePracticeId = useAppStore((s) => s.activePracticeId);
   const commandPaletteOpen = useAppStore((s) => s.commandPaletteOpen);
-  const { createPractice, reorderPractices, closeAllPractices } = useAppStore(useShallow((s) => ({
+  const { createPractice, reorderPractices } = useAppStore(useShallow((s) => ({
     createPractice: s.createPractice,
     reorderPractices: s.reorderPractices,
-    closeAllPractices: s.closeAllPractices,
   })));
   const { isOpen: isCompareOpen } = useCompare();
 
@@ -117,7 +115,7 @@ export function PracticeBar({ onHeightChange }: { onHeightChange?: (height: numb
                 </button>
                 <button
                   type="button"
-                  onClick={() => setCloseAllOpen(true)}
+                  onClick={closeAllPracticesWithUndo}
                   aria-label="Chiudi tutte le pratiche"
                   title="Chiudi tutte"
                   className={cn(HEADER_BUTTON, 'hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30')}
@@ -154,18 +152,6 @@ export function PracticeBar({ onHeightChange }: { onHeightChange?: (height: numb
           </nav>
         )}
       </div>
-      <ConfirmDialog
-        open={closeAllOpen}
-        variant="danger"
-        title="Chiudere tutte le pratiche?"
-        message={`${ids.length === 1 ? 'La pratica aperta verrà tolta' : `Le ${ids.length} pratiche aperte verranno tolte`} dal tavolo. Dossier, segnalibri, note ed evidenziazioni non saranno toccati.`}
-        confirmLabel="Chiudi tutte"
-        onConfirm={() => {
-          setCloseAllOpen(false);
-          closeAllPractices();
-        }}
-        onCancel={() => setCloseAllOpen(false)}
-      />
     </>
   );
 }

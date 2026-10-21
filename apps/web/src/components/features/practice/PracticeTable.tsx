@@ -4,9 +4,9 @@ import { appStore, useAppStore } from '../../../store/useAppStore';
 import { useTour } from '../../../hooks/useTour';
 import type { ArticleData } from '../../../types';
 import { MenuButton } from '../../ui/MenuButton';
-import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { practiceCountLine, practiceCounts, type Practice } from '../../../utils/practice';
-import { CLOSE_PRACTICE_MESSAGE, isEmptyPractice } from './practiceView';
+import { isEmptyPractice } from './practiceView';
+import { closePracticeWithUndo } from './practiceUndo';
 import { usePracticeSaveActions } from './usePracticeSaveActions';
 import { PracticeColumn } from './PracticeColumn';
 import { PracticeEmpty, PracticeNameInput, PracticeStreamingBar, type PracticeStreaming } from './PracticeParts';
@@ -55,9 +55,7 @@ export function PracticeTable({ onViewPdf, onCrossReference, streaming }: Practi
 
 function PracticeHeader({ practice }: { practice: Practice }) {
   const renamePractice = useAppStore((s) => s.renamePractice);
-  const closePractice = useAppStore((s) => s.closePractice);
   const [editing, setEditing] = useState(false);
-  const [confirmClose, setConfirmClose] = useState(false);
   const countLine = practiceCountLine(practiceCounts(practice));
   const save = usePracticeSaveActions(practice.id);
 
@@ -100,24 +98,12 @@ function PracticeHeader({ practice }: { practice: Practice }) {
         items={[
           { label: 'Rinomina', icon: Pencil, onSelect: () => setEditing(true) },
           ...save.items,
-          { label: 'Chiudi la pratica', icon: X, danger: true, separatorBefore: true, onSelect: () => setConfirmClose(true) },
+          { label: 'Chiudi la pratica', icon: X, danger: true, separatorBefore: true, onSelect: () => closePracticeWithUndo(practice.id) },
         ]}
       >
         <MoreHorizontal size={18} aria-hidden />
       </MenuButton>
       {save.overlay}
-      <ConfirmDialog
-        open={confirmClose}
-        variant="danger"
-        title={`Chiudere la pratica «${practice.label}»?`}
-        message={CLOSE_PRACTICE_MESSAGE}
-        confirmLabel="Chiudi la pratica"
-        onConfirm={() => {
-          setConfirmClose(false);
-          closePractice(practice.id);
-        }}
-        onCancel={() => setConfirmClose(false)}
-      />
     </header>
   );
 }

@@ -19,6 +19,7 @@ import type {
   TappaIstituto,
   TestoCorrente,
   TestoDaAccettare,
+  XpEsito,
 } from '../types/studia';
 
 /**
@@ -118,10 +119,10 @@ export const studiaService = {
 
   /**
    * One vote on a proposed card; the reason is required unless the verdict is `APPROVATA`. Answers the
-   * card's state after the vote. 403 (no longer a validator), 404 (no longer proposed) and 409
-   * (already voted) reject as they come.
+   * card's state after the vote and the points the vote earned (`xp`). 403 (no longer a validator), 404
+   * (no longer proposed) and 409 (already voted) reject as they come.
    */
-  async vote(cardId: string, giudizio: Giudizio, motivazione?: string): Promise<{ stato: StatoScheda }> {
+  async vote(cardId: string, giudizio: Giudizio, motivazione?: string): Promise<{ stato: StatoScheda; xp?: XpEsito }> {
     const response = await apiClient.post(`/lingo/validazione/${encodeURIComponent(cardId)}`, motivazione === undefined ? { giudizio } : { giudizio, motivazione });
     return response.data;
   },

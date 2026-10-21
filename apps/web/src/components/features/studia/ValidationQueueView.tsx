@@ -11,6 +11,8 @@ import { ArticleReadOnly } from './ArticleReadOnly';
 import { MATERIA_LABEL, anchorLabel, cardTitle, normaFromAnchor } from './studiaLabels';
 import { useValidationQueue, type VoteOutcome } from './useValidationQueue';
 import { VoteBar } from './VoteBar';
+import { recordXpSeen } from './progress/seenProgress';
+import { gainOf, gainWords } from './progress/xpGains';
 import type { StudiaOutletContext } from './StudiaPage';
 import { BLOCK_HEADING, FOCUS_RING, INK_TEXT, MUTED_TEXT, TILE } from './progress/tokens';
 
@@ -145,11 +147,15 @@ export function ValidationQueueView() {
 
   const cast: Parameters<typeof VoteBar>[0]['onVote'] = async (giudizio, motivazione) => {
     votedOn.current = card?.id ?? null;
-    const outcome = await vote(giudizio, motivazione);
+    const { outcome, xp } = await vote(giudizio, motivazione);
     // The card stays (the vote failed, or the user was stopped): the keyboard stays where it is.
     if (outcome === 'failed' || outcome === 'forbidden') votedOn.current = null;
     const message = OUTCOME_TOAST[outcome];
-    if (message) setToast(message);
+    // The points ride on the vote's message (G1c), saying who earns them: «Voto registrato · hai guadagnato 20 punti».
+    // Never a word that reads as what the vote weighs or gave the card (G-318).
+    const gain = gainOf(Date.now(), xp);
+    if (xp) recordXpSeen(xp);
+    if (message) setToast(gain ? { ...message, message: `${message.message} · ${gainWords(gain)}` } : message);
   };
 
   return (

@@ -8,6 +8,7 @@ import { DueForecast, DueForecastSkeleton } from './DueForecast';
 import { ReviewTrend, ReviewTrendSkeleton } from './ReviewTrend';
 import type { TrendPeriod } from './trend';
 import { GoalRing } from './GoalRing';
+import { LevelBar } from './LevelBar';
 import { rememberedMateria, rememberMateria } from './rememberedSubject';
 import { StreakBadge } from './StreakBadge';
 import { SubjectChips } from './SubjectChips';
@@ -46,16 +47,20 @@ function Block({ id, title, busy, stale, note, children }: BlockProps) {
 }
 
 /**
- * The streak and today's goal: the pieces of «Oggi», drawn once (Gymnasium spec §5.3). The reviews of 30 days are
- * the trend's own total (G7, Bill): two counts of one thing, from two tables of the server, read as two answers.
+ * The streak, today's goal and the level: the pieces of «Oggi», drawn once (Gymnasium spec §5.3; the level since G1c).
+ * The reviews of 30 days are the trend's own total (G7, Bill): two counts of one thing, from two tables of the
+ * server, read as two answers.
  */
 function Summary({ data }: { data: Progressi }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-10 gap-y-5">
-      <StreakBadge compact attuale={data.serie.attuale} record={data.serie.record} ultimiGiorni={data.serie.ultimiGiorni} />
-      <div className="shrink-0">
-        <GoalRing compact giorno={data.oggi.giorno} ripassi={data.oggi.ripassi} obiettivo={data.oggi.obiettivo} raggiunto={data.oggi.raggiunto} />
+    <div className="grid gap-6">
+      <div className="flex flex-wrap items-center gap-x-10 gap-y-5">
+        <StreakBadge compact attuale={data.serie.attuale} record={data.serie.record} ultimiGiorni={data.serie.ultimiGiorni} />
+        <div className="shrink-0">
+          <GoalRing compact giorno={data.oggi.giorno} ripassi={data.oggi.ripassi} obiettivo={data.oggi.obiettivo} raggiunto={data.oggi.raggiunto} />
+        </div>
       </div>
+      <LevelBar livello={data.livello} className="lg:max-w-md" />
     </div>
   );
 }
@@ -65,21 +70,22 @@ function SummarySkeleton() {
     <div aria-hidden className="flex flex-wrap items-center gap-x-10 gap-y-5">
       <div className={cn(PULSE, 'h-10 w-40')} />
       <div className={cn(PULSE, 'h-10 w-24')} />
+      <div className={cn(PULSE, 'h-[4.5rem] w-full lg:max-w-md')} />
     </div>
   );
 }
 
 /**
  * «Progressi», `/studia/progressi` (Gymnasium spec §5.3, G3): everything the home no longer shows, in the sections'
- * full-width frame (G6) — the summary (the streak, today's goal, the reviews of 30 days), the subject chips, «Il tuo
- * andamento» across the page (G7: the reviews as a line over 7 days, 30 days or six months, which replaced the
- * calendar), «Le schede per stato» and «I prossimi 14 giorni» side by side from `lg`, and «Per
+ * full-width frame (G6) — the summary (the streak, today's goal, the level), the subject chips, «Il tuo andamento»
+ * across the page (G7: the reviews as a line over 7 days, 30 days or six months, which replaced the calendar), «Le
+ * schede per stato» and «I prossimi 14 giorni» side by side from `lg`, and «Per
  * materia» in two columns from `lg`; one column below. The same read as «Oggi» (`useProgress` over `GET
  * /lingo/srs/progressi`): the whole day's for the summary and the subjects, and, while a subject is chosen, that
  * subject's for the trend, the states and the coming days — the summary stays the whole day's (the streak and the
  * goal are), and the subjects list all five. The subject is the one «Oggi» remembers. While the first read travels
  * every block holds its final size; a failed read says so with «Riprova» and keeps what was on screen; a new read of
- * the same subject leaves the last answer on screen, dimmed. No points and no level (they wait for the server).
+ * the same subject leaves the last answer on screen, dimmed. The level is the summary's (G1c), the whole day's.
  */
 export function ProgressPage() {
   const [materia, setMateria] = useState<Materia | undefined>(rememberedMateria);

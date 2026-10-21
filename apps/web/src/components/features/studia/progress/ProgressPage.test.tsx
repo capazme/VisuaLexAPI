@@ -12,6 +12,7 @@ vi.mock('../../../../hooks/useIsDesktop', () => ({ useIsDesktop: () => desktop.v
 
 import { studiaService } from '../../../../services/studiaService';
 import { ProgressPage } from './ProgressPage';
+import { xpFields } from '../__fixtures__/xp';
 
 const progress = vi.mocked(studiaService.progress);
 const STORAGE_KEY = 'visualex.studia.ripasso.materia';
@@ -31,6 +32,7 @@ function answer(over: { reviews?: number; newcomer?: boolean; stati?: Progressi[
     materie: SUBJECTS.map((materia, i) => ({ materia, nuove: 0, apprendimento: newcomer ? 0 : i, consolidate: 0, ripassi30: newcomer ? 0 : 100 * i })),
     calendario: newcomer ? [] : [{ giorno: '2026-10-12', ripassi: over.reviews ?? 14, nuove: 0, sbagliate: 0, valido: true, riposo: false }],
     prossimi: Array.from({ length: 14 }, (_, i) => ({ giorno: `2026-10-${19 + i}`, schede: newcomer ? 0 : i + 1 })),
+    ...xpFields(),
   };
 }
 
@@ -64,8 +66,9 @@ describe('ProgressPage (Gymnasium spec §5.3)', () => {
     expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Il tuo andamento', 'Le schede per stato', 'I prossimi 14 giorni', 'Per materia']);
     expect(progress).toHaveBeenCalledTimes(1);
     expect(progress).toHaveBeenCalledWith(undefined);
-    // No points and no level: the server will keep them.
-    expect(document.body.textContent).not.toMatch(/punti|livello|\bXP\b/i);
+    // The level, the user's alone (G1c): the summary's, the whole day's.
+    expect(within(summary).getByTestId('level-bar')).toHaveTextContent('Livello 1');
+    expect(within(summary).getByText('Ancora 100 punti per il livello 2.')).toBeInTheDocument();
   });
 
   it('uses the frame\'s full width (G6): the calendar across it, the states and the coming days side by side, the subjects in two columns', async () => {
