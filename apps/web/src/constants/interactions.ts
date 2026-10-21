@@ -28,6 +28,11 @@ export const HOVER_LIFT = '[@media(hover:hover)_and_(pointer:fine)]:hover:-trans
 export const HIDDEN_SCROLLBAR = '[scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
 
 /** Mobile touch target minimum size - use on interactive elements */
+// A field's text: 16 px below md, 14 px from it. Safari on an iPhone zooms the page into a field whose text is under
+// 16 px as it takes the focus, and the page stays zoomed. Every text field and select takes it (`ui/Input`,
+// `ui/FormSelect` and the fields written by hand).
+export const FIELD_TEXT = 'text-base md:text-sm';
+
 export const TOUCH_TARGET = 'min-h-[44px] min-w-[44px]';
 
 /** Mobile touch target with desktop override */

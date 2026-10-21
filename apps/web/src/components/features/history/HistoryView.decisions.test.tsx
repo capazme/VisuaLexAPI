@@ -56,6 +56,8 @@ describe('HistoryView — decisions', () => {
     await screen.findAllByText(/Art\. 3/);
     expect(screen.getAllByRole('heading', { level: 1 }).map((h) => h.textContent?.trim())).toEqual(['Cronologia']);
     expect(screen.getAllByRole('textbox', { name: 'Cerca nella cronologia' })).toHaveLength(1);
+    // 16 px on a phone, or Safari on an iPhone zooms the page into it (`FIELD_TEXT`).
+    expect(screen.getByRole('textbox', { name: 'Cerca nella cronologia' })).toHaveClass('text-base', 'md:text-sm');
   });
 
   it('leaves a norm row as it was', async () => {

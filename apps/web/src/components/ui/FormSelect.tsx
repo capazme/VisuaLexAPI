@@ -1,7 +1,7 @@
 import { forwardRef, type SelectHTMLAttributes, type ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { FOCUS_RING, DISABLED, TRANSITION } from '../../constants/interactions';
+import { FOCUS_RING, DISABLED, TRANSITION, FIELD_TEXT } from '../../constants/interactions';
 
 export interface FormSelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'size'> {
   /** Label text */
@@ -48,8 +48,9 @@ export const FormSelect = forwardRef<HTMLSelectElement, FormSelectProps>(
     };
 
     const sizeStyles = {
-      sm: 'py-1.5 text-xs',
-      md: 'py-2.5 text-sm',
+      // 16 px below md on every size: Safari on an iPhone zooms into a smaller select (`FIELD_TEXT`).
+      sm: 'py-1.5 text-base md:text-xs',
+      md: cn('py-2.5', FIELD_TEXT),
       lg: 'py-3 text-base',
     };
 

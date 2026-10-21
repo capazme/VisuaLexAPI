@@ -1953,7 +1953,11 @@ re-applying a saturated background behind the text.
 `TOUCH_TARGET_RESPONSIVE` in `constants/interactions.ts` covers the height only
 (`min-h-[44px] md:min-h-0`); icon-only buttons need the width too, so they carry
 `min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0` explicitly — as the dossier
-row's star and remove buttons do.
+row's star and remove buttons do. A text field or a select is 16 px below `md`
+(`FIELD_TEXT`, `text-base md:text-sm`, in `constants/interactions.ts`): Safari on an
+iPhone zooms the page into a field under 16 px as it takes the focus. `ui/Input` and
+`ui/FormSelect` carry it; a field written by hand takes it (the searches of «Le mie
+schede» and of the Cronologia; `ui/__tests__/fieldText.test.tsx`).
 
 ## Common Patterns
 
