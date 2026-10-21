@@ -49,3 +49,15 @@ describe('Layout — page headers clear the floating menu button below lg', () =
     for (const cls of INSET) expect(screen.getByTestId('layout-content')).not.toHaveClass(cls);
   });
 });
+
+describe('Layout — what a section change animates (T1)', () => {
+  it('names the content area only, so the floating buttons and the search bar hold still; <main> keeps its stacking context', () => {
+    at('/dossier');
+    const area = screen.getByTestId('layout-content').parentElement!;
+    expect(area).toHaveClass('vlx-page');
+    expect(document.querySelectorAll('.vlx-page')).toHaveLength(1);
+    const main = document.querySelector('main')!;
+    expect(main).not.toHaveClass('vlx-page');
+    expect(main).toHaveClass('isolate');
+  });
+});

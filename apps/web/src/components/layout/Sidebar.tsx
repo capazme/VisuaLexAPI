@@ -1,13 +1,14 @@
 import { useState, useRef, useEffect, useCallback, type FocusEvent, type KeyboardEvent, type PointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from 'framer-motion';
 import { Search, Folder, FolderOpen, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Scale, Network, Bot, ScrollText, Repeat, ChartColumn, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { isMerltEnabled } from '../../features/merlt/featureFlag';
 import { isMerltGraphEnabled } from '../../features/merlt/graph/featureFlag';
 import { SectionSwitcher } from '../../features/sections/SectionSwitcher';
 import { useSection } from '../../features/sections/useSection';
+import { useEntriesEntrance } from '../../features/sections/useEntriesEntrance';
 import { useAppStore } from '../../store/useAppStore';
 import { focusSearchField } from '../../utils/searchFieldControl';
 import { useAuth } from '../../hooks/useAuth';
@@ -315,6 +316,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
   const quickNorms = useAppStore((s) => s.quickNorms);
   const { user, isAdmin, isValidator, logout } = useAuth();
   const { section, active } = useSection();
+  const sectionEntries = useEntriesEntrance(section);
   const { count: forumNotifications } = useForumNotifications(!!user);
   // Cronologia lives in the user menu (the owner, 13 Oct 2026); the saved norms that changed are
   // counted on the avatar and beside the entry («ok come raccomandi»).
@@ -438,7 +440,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
           menu button sits at the top left, over this place: the switcher goes under it. Every column keeps
           10 px of side padding, so a 44 px control in the 64 px rail sits where it sits in the wide bar. */}
       <div id="tour-section-switcher" className="flex items-center px-2.5 pt-[4.5rem] pb-2 lg:p-0 lg:px-2.5 lg:h-16 border-b border-slate-100 dark:border-slate-800/50">
-        <SectionSwitcher forumCount={forumNotifications.total} onChoose={closeMobile} withName={words} />
+        <SectionSwitcher forumCount={forumNotifications.total} onChoose={closeMobile} withName={words} inDrawer={layout === 'drawer'} />
       </div>
 
       {/* Navigation */}
@@ -456,46 +458,49 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
           <div className="-mt-1 ml-3 w-5 h-1 rounded-full bg-amber-500/60" title={`${quickNorms.length} preferiti`} />
         )}
         <NavItem to="/documents" icon={FileSearch} label="Analizza documento" onClick={closeMobile} layout={layout} />
-        {/* The active section's entries, after the Corpus ones above (sections spec S6). */}
-        <div role="group" aria-label={active.name} className="mt-1 flex w-full flex-col items-start gap-3 md:gap-2 border-t border-slate-100 dark:border-slate-800/50 pt-3 md:pt-2">
-          {section === 'gymnasium' && (
-            <>
-              {/* Studying, then writing and validating (Gymnasium spec §4). */}
-              <NavGroup name="Studia" heading layout={layout}>
-                <NavItem to="/studia/ripasso" icon={Repeat} label="Oggi" onClick={closeMobile} layout={layout} />
-                <NavItem to="/studia/progressi" icon={ChartColumn} label="Progressi" onClick={closeMobile} layout={layout} />
-                <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" layout={layout} />
-              </NavGroup>
-              {layout === 'rail' && <div aria-hidden className="mx-auto h-px w-6 bg-slate-200 dark:bg-slate-700" />}
-              <NavGroup name="Contribuisci" heading layout={layout}>
-                <NavItem to="/studia/schede" icon={Layers} label="Le mie schede" onClick={closeMobile} layout={layout} />
-                {isValidator && <NavItem to="/studia/valida" icon={ClipboardCheck} label="Da validare" onClick={closeMobile} layout={layout} />}
-              </NavGroup>
-            </>
-          )}
-          {(section === 'opus' || section === 'forum' || (section === 'academia' && showAssistant)) && words && (
-            <p aria-hidden className={cn("w-full truncate whitespace-nowrap px-3 pt-1 text-[11px] font-semibold uppercase tracking-[0.08em]", SIDEBAR_SMALL_TEXT)}>
-              {active.name}
-            </p>
-          )}
-          {section === 'opus' && (
-            <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" layout={layout} />
-          )}
-          {section === 'academia' && showAssistant && (
-            <>
-              <NavItem to="/merlt" icon={Scale} label="Assistente" onClick={closeMobile} layout={layout} />
-              {/* Slice 4 Decision A: /grafo is the Q&A surface; the hub stays at /merlt. */}
-              {showGraph && <NavItem to="/grafo" icon={Network} label="Grafo" onClick={closeMobile} layout={layout} />}
-            </>
-          )}
-          {/* The section keeps its name; its areas are named apart, so «Forum» is not written twice. */}
-          {section === 'forum' && (
-            <>
-              <NavItem to="/forum" end icon={FolderOpen} label="Dossier pubblici" onClick={closeMobile} badgeCount={forumNotifications.total} layout={layout} />
-              <NavItem to="/forum/community" icon={MessagesSquare} label="Community" onClick={closeMobile} layout={layout} />
-            </>
-          )}
-        </div>
+        {/* The active section's entries, after the Corpus ones above (sections spec S6); a new section's fade in (T1).
+            Each section names its own active dot, so the dot does not slide from the old section's entries. */}
+        <LayoutGroup id={section}>
+          <div ref={sectionEntries} role="group" aria-label={active.name} className="mt-1 flex w-full flex-col items-start gap-3 md:gap-2 border-t border-slate-100 dark:border-slate-800/50 pt-3 md:pt-2">
+            {section === 'gymnasium' && (
+              <>
+                {/* Studying, then writing and validating (Gymnasium spec §4). */}
+                <NavGroup name="Studia" heading layout={layout}>
+                  <NavItem to="/studia/ripasso" icon={Repeat} label="Oggi" onClick={closeMobile} layout={layout} />
+                  <NavItem to="/studia/progressi" icon={ChartColumn} label="Progressi" onClick={closeMobile} layout={layout} />
+                  <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" layout={layout} />
+                </NavGroup>
+                {layout === 'rail' && <div aria-hidden className="mx-auto h-px w-6 bg-slate-200 dark:bg-slate-700" />}
+                <NavGroup name="Contribuisci" heading layout={layout}>
+                  <NavItem to="/studia/schede" icon={Layers} label="Le mie schede" onClick={closeMobile} layout={layout} />
+                  {isValidator && <NavItem to="/studia/valida" icon={ClipboardCheck} label="Da validare" onClick={closeMobile} layout={layout} />}
+                </NavGroup>
+              </>
+            )}
+            {(section === 'opus' || section === 'forum' || (section === 'academia' && showAssistant)) && words && (
+              <p aria-hidden className={cn("w-full truncate whitespace-nowrap px-3 pt-1 text-[11px] font-semibold uppercase tracking-[0.08em]", SIDEBAR_SMALL_TEXT)}>
+                {active.name}
+              </p>
+            )}
+            {section === 'opus' && (
+              <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" layout={layout} />
+            )}
+            {section === 'academia' && showAssistant && (
+              <>
+                <NavItem to="/merlt" icon={Scale} label="Assistente" onClick={closeMobile} layout={layout} />
+                {/* Slice 4 Decision A: /grafo is the Q&A surface; the hub stays at /merlt. */}
+                {showGraph && <NavItem to="/grafo" icon={Network} label="Grafo" onClick={closeMobile} layout={layout} />}
+              </>
+            )}
+            {/* The section keeps its name; its areas are named apart, so «Forum» is not written twice. */}
+            {section === 'forum' && (
+              <>
+                <NavItem to="/forum" end icon={FolderOpen} label="Dossier pubblici" onClick={closeMobile} badgeCount={forumNotifications.total} layout={layout} />
+                <NavItem to="/forum/community" icon={MessagesSquare} label="Community" onClick={closeMobile} layout={layout} />
+              </>
+            )}
+          </div>
+        </LayoutGroup>
       </motion.nav>
 
       {/* User Menu, and on the desktop from `xl` the control that narrows or widens the bar. On a phone the
