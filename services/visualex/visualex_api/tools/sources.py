@@ -17,7 +17,7 @@ from __future__ import annotations
 import re
 from typing import Any, Mapping, Optional
 
-from .map import codice_urn, extract_codice_details
+from .map import act_default_annex, codice_urn, extract_codice_details
 
 NORMATTIVA_RESOLVER = "https://www.normattiva.it/uri-res/N2Ls?"
 
@@ -185,9 +185,14 @@ def _act(norm: Mapping[str, Any]) -> tuple[str, str]:
 
 
 def _is_default_annex(norm: Mapping[str, Any], annex: str) -> bool:
-    """Whether `annex` is the annex the codes table keys the norm's code by."""
+    """Whether `annex` is the annex the norm's act is keyed by: a code's (the codes table),
+    or an act's whose text is its annex (ANNEXED_ACTS, the TULPS)."""
     row = codice_urn(_text(norm, "tipo_atto"))
-    return bool(row) and row.endswith(f":{annex}")
+    if row:
+        return row.endswith(f":{annex}")
+    kind = _key(_text(norm, "tipo_atto_reale") or _text(norm, "tipo_atto")).replace(" ", ".")
+    act = f"{kind}:{_text(norm, 'data')};{_text(norm, 'numero_atto')}"
+    return act_default_annex(act) == annex
 
 
 def cite_act(norm: Mapping[str, Any]) -> str:

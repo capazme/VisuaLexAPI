@@ -143,9 +143,9 @@
     },
     {
       "id": "rd-773-1931-86",
-      "note": "A regio decreto that is not a code.",
-      "input": {"tipo_atto": "regio decreto", "numero_atto": "773", "data": "1931-06-18", "numero_articolo": "86"},
-      "identity": {"article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1931-06-18;773~art86", "status": "current"}},
+      "note": "A regio decreto whose text is its annex: the testo unico delle leggi di pubblica sicurezza is annex 1 of r.d. 773/1931, so the article is keyed by the annex (;773:1, G-351) and the annex is never named in the label, as for a code.",
+      "input": {"tipo_atto": "regio decreto", "numero_atto": "773", "data": "1931-06-18", "allegato": "1", "numero_articolo": "86"},
+      "identity": {"article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1931-06-18;773:1~art86", "status": "current"}},
       "labels": {"citation": {"value": "art. 86, r.d. 18 giugno 1931, n. 773", "status": "decided"}, "short": {"value": "art. 86 r.d. 773/1931", "status": "decided"}, "act_heading": {"value": "r.d. 18 giugno 1931, n. 773", "status": "decided"}, "authority": {"value": "Re", "status": "proposed"}}
     },
     {

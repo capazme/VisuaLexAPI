@@ -130,7 +130,13 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     from the reviewable `_ATTI_DENOMINATI_SPEC` rows) and `codice_urn(name)`,
     the **case-insensitive** lookup into `NORMATTIVA_URN_CODICI` — six keys
     carry capitals ("codice del Terzo settore"), so a bare `in` test missed
-    them and those codici lost their default annex
+    them and those codici lost their default annex. `ANNEXED_ACTS` (with
+    `act_default_annex`) does the same for an act cited by type, date and number whose text
+    is its annex: the TULPS is annex 1 of r.d. 773/1931 (G-351), so «r.d. 773/1931, art. 86»
+    is stored and keyed with `allegato: "1"` and its URN is `…;773:1~art86`. A code's
+    default annex and such an act's annex are never named in a citation (`sources.py`, and
+    the server's, the web's and MERL-T's copies); the TS mirrors and MERL-T's copy of
+    `ANNEXED_ACTS` are pinned to this one by their tests
   - `map.py` also holds `BROCARDI_CODICI` (label → page, one row per source at
     brocardi.it/fonti.html) and `find_brocardi_url(tipo, numero, data)`, which
     `brocardi_scraper.do_know` asks — unused since Brocardi was switched off (D-078). The lookup is **by identity**: every label

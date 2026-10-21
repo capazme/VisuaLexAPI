@@ -96,6 +96,24 @@ NORMATTIVA_URN_CODICI = {
 # that annex and saying where the article is, as for an annex the caller named.
 CODE_ROWS_OF_SEVERAL_CODES = frozenset({"codici penali militari di pace e di guerra"})
 
+# Acts cited by type, date and number whose text is an annex of the decree, keyed like a
+# code of the table above: the annex is the act's default and the act itself, never named
+# in a citation. The r.d. 18 giugno 1931, n. 773 approves the testo unico delle leggi di
+# pubblica sicurezza (TULPS) as its annex 1: «…;773~art86» is not the TULPS's art. 86,
+# «…;773:1~art86» is (G-351). Mirrored by ANNEXED_ACTS in the web's and the server's
+# actTypes.ts and in MERL-T's utils/map.py.
+ANNEXED_ACTS = {
+    "regio.decreto:1931-06-18;773": "1",
+}
+
+
+def act_default_annex(act: str) -> "str | None":
+    """The annex that is the act's text, for an act URN such as
+    «regio.decreto:1931-06-18;773» (with or without «urn:nir:stato:» or the resolver
+    before it), or None."""
+    tail = (act or "").split("urn:nir:stato:")[-1].split("~")[0].strip().lower()
+    return ANNEXED_ACTS.get(tail)
+
 _URN_CODICI_LOWER = {_k.lower(): _v for _k, _v in NORMATTIVA_URN_CODICI.items()}
 
 

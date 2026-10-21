@@ -113,3 +113,12 @@ export const CODES_TABLE: Readonly<Record<string, string>> = {
   'codice della protezione civile': 'decreto.legislativo:2018-01-02;1',
   "codice della crisi d'impresa e dell'insolvenza": 'decreto.legislativo:2019-01-12;14',
 };
+
+/**
+ * Acts cited by type, date and number whose text is an annex of the decree: the annex is the
+ * act's default and the act itself, never named in a citation (the TULPS is annex 1 of
+ * r.d. 773/1931; G-351). A copy of the API's `ANNEXED_ACTS` (visualex_api/tools/map.py).
+ */
+export const ANNEXED_ACTS: Readonly<Record<string, string>> = {
+  'regio.decreto:1931-06-18;773': '1',
+};
