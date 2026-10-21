@@ -2,10 +2,6 @@ import { showUndoToast } from '../../../hooks/useUndoableAction';
 import { trashService } from '../../../services/trashService';
 import { appStore } from '../../../store/useAppStore';
 
-/** The confirmation of a multiple removal: where the entries go and what it does not touch (UI conventions). */
-export const removeSelectionMessage =
-  'Verranno rimossi da questo dossier e andranno nel cestino, dove restano 30 giorni e si possono ripristinare. Gli articoli originali salvati nei segnalibri o in altri dossier non saranno toccati.';
-
 /**
  * Removes entries from a dossier on the web app: the server moves them, as ONE trash entry, to
  * the trash for 30 days (owner, 13 October 2026, question 181), and the toast's «Annulla»
@@ -43,6 +39,8 @@ export function removeItemsWithUndo(
       } catch (err) {
         console.error('Failed to restore removed dossier entries:', dossierId, err);
         appStore.getState().pushSyncError('Impossibile ripristinare ora: gli elementi sono nel Cestino, ripristinali da lì.');
+        // Said: no «Ripristinato» after it.
+        throw err;
       }
     },
     message,

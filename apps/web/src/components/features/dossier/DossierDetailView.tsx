@@ -38,16 +38,16 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { useAppStore } from '../../../store/useAppStore';
-import { ConfirmDialog } from '../../ui/ConfirmDialog';
+import { appStore, useAppStore } from '../../../store/useAppStore';
 import { EmptyState } from '../../ui/EmptyState';
 import type { Dossier, DossierItem, DossierKind } from '../../../types';
 import {
   formatTimestampLong, computeNormaGroups, decisionCitationOf, encodeDossierShare, searchParamsFromNorma, shareableDossier, type NormaGroup,
 } from './dossierUtils';
 import { dossierItemOrder, layoutDossier, type ActBlock } from './dossierLayout';
-import { deleteDossierMessage, deleteDossierWithUndo } from './deleteDossierWithUndo';
-import { removeItemsWithUndo, removeSelectionMessage } from './removeItemsWithUndo';
+import { deleteDossierWithUndo } from './deleteDossierWithUndo';
+import { showUndoToast } from '../../../hooks/useUndoableAction';
+import { removeItemsWithUndo } from './removeItemsWithUndo';
 import { DossierActBlock } from './DossierActBlock';
 import { DossierNotesSection } from './DossierNotesSection';
 import { DossierDecisionsSection } from './DossierDecisionsSection';
@@ -89,6 +89,9 @@ interface Props {
   trash?: ReturnType<typeof useTrash>;
 }
 
+/** Above this many articles an import from the act's index waits for the notification's «Annulla» (K1a). */
+const BULK_IMPORT_WAIT = 100;
+
 export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) {
   const {
     dossiers,
@@ -112,8 +115,6 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   // undefined = closed; null = open on a blank form; an act = open on that act's index.
   const [treeNavigatorAct, setTreeNavigatorAct] = useState<{ tipo_atto: string; numero_atto: string; data: string } | null | undefined>(undefined);
   const [foldedActs, setFoldedActs] = useState<Set<string>>(new Set());
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
   const [itemSearchQuery, setItemSearchQuery] = useState('');
   const [openPickerGroups, setOpenPickerGroups] = useState<NormaGroup[] | null>(null);
   // The note being written: about the dossier (no article), or about one article.
@@ -255,9 +256,9 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     removeItemsWithUndo(dossier.id, [item.id], 'Elemento rimosso', trashChanged);
   };
 
-  const confirmBulkDelete = () => {
+  // No confirmation: the entries go to the trash and the notification's «Annulla» puts them back (K1a).
+  const deleteSelection = () => {
     if (selectedItems.size === 0) return;
-    setBulkDeleteConfirmOpen(false);
     const ids = dossier.items.filter((i) => selectedItems.has(i.id)).map((i) => i.id);
     clearSelection();
     if (ids.length === 0) return;
@@ -339,6 +340,32 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   };
 
   const handleTreeImport = (
+    articles: { numero: string; urn?: string }[],
+    normInfo: { tipo_atto: string; data: string; numero_atto: string },
+  ) => {
+    // Many articles at once («seleziona tutti» on a code is most often a slip, and floods the dossier): no question
+    // first, but nothing written until the notification's time is out — «Annulla» leaves the dossier as it was (K1a).
+    if (articles.length > BULK_IMPORT_WAIT) {
+      // Nothing is written yet: leaving the page (or reloading it) would lose the import, so the browser asks first.
+      // The notification's time stops while the tab is hidden, so the import waits for the user to come back.
+      const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+      window.addEventListener('beforeunload', warn);
+      void showUndoToast({ action: () => undefined, undo: () => {}, message: `${articles.length} articoli verranno importati nel dossier` }).then((stands) => {
+        window.removeEventListener('beforeunload', warn);
+        if (!stands) return;
+        // The dossier deleted meanwhile (it is in the trash): nothing to write into.
+        if (!appStore.getState().dossiers.some((d) => d.id === dossier.id)) {
+          appStore.getState().pushSyncError(`Nessun articolo importato: il dossier «${dossier.title}» non c’è più.`);
+          return;
+        }
+        importArticles(articles, normInfo);
+      });
+      return;
+    }
+    importArticles(articles, normInfo);
+  };
+
+  const importArticles = (
     articles: { numero: string; urn?: string }[],
     normInfo: { tipo_atto: string; data: string; numero_atto: string },
   ) => {
@@ -529,7 +556,11 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
                 { label: 'Modifica', icon: Edit2, onSelect: () => setEditingDossier(dossier) },
                 { label: dossier.isPinned ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti', icon: Star, onSelect: () => toggleDossierPin(dossier.id) },
                 { label: showBulkActions ? 'Annulla selezione' : 'Seleziona elementi', icon: CheckSquare, onSelect: () => { setShowBulkActions((v) => !v); clearSelection(); } },
-                { label: 'Elimina dossier', icon: Trash2, danger: true, separatorBefore: true, onSelect: () => setConfirmDeleteOpen(true) },
+                { label: 'Elimina dossier', icon: Trash2, danger: true, separatorBefore: true, onSelect: () => {
+                  // No confirmation: the dossier goes to the trash and the notification's «Annulla» restores it (K1a).
+                  deleteDossierWithUndo(dossier, trashChanged);
+                  onBack();
+                } },
               ]}
             >
               <MoreHorizontal size={18} />
@@ -596,7 +627,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
                 <FolderInput size={16} />
                 <span className="md:inline">Sposta</span>
               </button>
-              <button onClick={() => setBulkDeleteConfirmOpen(true)} className="flex-1 md:flex-none px-4 py-2 md:px-3 md:py-1.5 text-sm bg-red-50 dark:bg-red-900/30 text-red-600 rounded-md hover:bg-red-100 dark:hover:bg-red-900/50 flex items-center justify-center gap-1 min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500">
+              <button onClick={deleteSelection} className="flex-1 md:flex-none px-4 py-2 md:px-3 md:py-1.5 text-sm bg-red-50 dark:bg-red-900/30 text-red-600 rounded-md hover:bg-red-100 dark:hover:bg-red-900/50 flex items-center justify-center gap-1 min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500">
                 <Trash2 size={16} />
                 <span className="md:inline">Elimina</span>
               </button>
@@ -756,30 +787,6 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         decisions={fullLayout.decisions}
         progress={pdfProgress}
         onExport={(options) => void handleExportPdf(options)}
-      />
-
-      <ConfirmDialog
-        open={confirmDeleteOpen}
-        variant="danger"
-        title="Eliminare questo dossier?"
-        message={deleteDossierMessage(dossier.title)}
-        confirmLabel="Elimina"
-        onConfirm={() => {
-          setConfirmDeleteOpen(false);
-          deleteDossierWithUndo(dossier, trashChanged);
-          onBack();
-        }}
-        onCancel={() => setConfirmDeleteOpen(false)}
-      />
-
-      <ConfirmDialog
-        open={bulkDeleteConfirmOpen}
-        variant="danger"
-        title={selectedItems.size === 1 ? 'Eliminare l’elemento selezionato?' : `Eliminare ${selectedItems.size} elementi?`}
-        message={removeSelectionMessage}
-        confirmLabel="Elimina"
-        onConfirm={confirmBulkDelete}
-        onCancel={() => setBulkDeleteConfirmOpen(false)}
       />
 
       {openPickerGroups && (
