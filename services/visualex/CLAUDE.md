@@ -334,7 +334,8 @@ POST unless noted, JSON bodies.
 `/fetch_article_text` and `/fetch_all_data` (Normattiva only; absent when the page
 cannot be read): `{state, valid_from, valid_to, version_number, act_updated,
 request_in_window}`, dates in ISO form. It is the source's own statement of which
-version came back; `norma_data.data_versione` is only the date the caller sent. A
+version came back; `norma_data.data_versione` is only the date the caller sent (except for
+`upcoming: true`, below, where it is the later text's first day). A
 `version_date` after today (Europe/Rome) is a 400 — Normattiva would answer with the
 current text and say nothing — and so is one that cannot be read as a date.
 
@@ -346,13 +347,27 @@ one not in force yet (art. 3 d.P.R. 131/1986 on 21 October 2026: repealed from 1
 January 2027). When the page's window starts after today (`starts_after_today`), the
 handlers read the article at today (`!vig=<today>`) and serve that text, its `url` and
 its `validity`, with the later version in `upcoming` (owner, G-355;
-`NormaController._document_in_force`): `{change: "abrogated" | "amended", valid_from,
-version_number}`, absent otherwise. `norma_data` stays the request's (no date), so the
-key notes and highlights are stored under does not move. The first page stands as before,
-its `validity` saying when it starts, when today's cannot be read and when nothing is in
-force today (today's page is `not_yet`, an article inserted from a later day, or itself
-starts after today). The text comes from the scraper's memory and the page from the
-persistent cache, which can expire first after a restart: for an undated request whose
+`NormaController._document_in_force`): `{change: "abrogated" | "amended" | "inserted",
+valid_from, version_number}`, absent otherwise. `norma_data` stays the request's (no
+date), so the key notes and highlights are stored under does not move. When nothing is
+in force today (today's page is `not_yet`: an article inserted from a later day) the
+later text is served as before, with `upcoming.change` `"inserted"` and `not_in_force:
+true` (G-358): it is the text that will come into force, so the request's key stays. The
+first page stands as before, its `validity` saying when it starts, when today's cannot
+be read or itself starts after today. The later text of an article can be asked for
+explicitly with `upcoming: true` (G-357; alone, or with a `version_date` after today, which
+is otherwise a 400): the undated page, always with `not_in_force: true`, `upcoming`
+describing it (`change` `null` when today's page cannot be read, since an amendment then
+cannot be told from an insertion), its `validity` with `request_in_window: true`, and
+`norma_data` dated to the day it comes into force (`versione: "vigente"`, `data_versione:
+valid_from`; `norma_data.urn` stays the undated page's, as `url`), so it reads as a text at
+a day, never as the text in force. None published, none in force on the day named, or a
+page that cannot be read is the article's error, in a 200 like any other («Nessuna
+versione non ancora in vigore …», «… entra in vigore il …», «Non riesco a leggere la
+vigenza …»). `upcoming` with «originale», or with a day up to today, is a 400. A web that
+reopens a saved text dated after today must send `upcoming: true` with it, and must not
+cache the answer under the key of an undated request. The text comes from
+the scraper's memory and the page from the persistent cache, which can expire first after a restart: for an undated request whose
 page has left the cache it is read once more, so a later version is never served
 unrecognised (and a watched norm does not flip between two texts).
 
@@ -602,7 +617,8 @@ Breaking one of these breaks the product. Read before editing.
     same kind of gate; `tests/test_pdf_cache_path.py` lists the attempts.
 
 31. **The window a page states is the only statement of which version came back.**
-    `NormaVisitata.data_versione` is the date the caller *sent*, echoed. Normattiva
+    `NormaVisitata.data_versione` is the date the caller *sent*, echoed (a request for the
+    later text, `upcoming: true`, answers its first day instead). Normattiva
     answers a date after today with the current text and no sign (hence
     `reject_future_version_date`), and a date before an article existed with a page
     whose text reads "NON ANCORA ESISTENTE O VIGENTE". Read the window from the page

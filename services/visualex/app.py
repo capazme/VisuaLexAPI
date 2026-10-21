@@ -29,6 +29,7 @@ from visualex_api.services.pdfextractor import extract_pdf, cleanup_browser_pool
 from visualex_api.services.akn_parser import normalize_article_key
 from visualex_api.services import act_dates, massimario_portal
 from visualex_api.services.normattiva_validity import (
+    read_upcoming_request,
     read_validity,
     reject_future_version_date,
     starts_after_today,
@@ -191,6 +192,14 @@ class RateLimitedTaskQueue:
                     await asyncio.sleep(self.spacing)
 
 
+def _upcoming_of(data):
+    """`(asked, until)`: whether the request asks for the text not in force yet (G-357)
+    and the later day it names, if any (checked before, in create_norma_visitata_from_data)."""
+    if data.get('upcoming') is not True:
+        return False, None
+    return True, read_upcoming_request(data.get('version'), data.get('version_date'))
+
+
 def _asks_for_text_in_force(nv) -> bool:
     """A request with no date and not for the original: the text in force."""
     day = nv.data_versione
@@ -271,6 +280,7 @@ class NormaController:
         # not the NDJSON the frontend parses.
         try:
             normavisitate = await self.create_norma_visitata_from_data(data)
+            upcoming_asked, until = _upcoming_of(data)
         except Exception as exc:
             return self._error_response(exc, 'stream_article_text')
         log.info("NormaVisitata instances created", normavisitate=[nv.to_dict() for nv in normavisitate])
@@ -284,7 +294,8 @@ class NormaController:
                     continue
 
                 try:
-                    article_text, url, validity, upcoming = await self._document_in_force(scraper, nv)
+                    article_text, url, validity, extra = await self._document_in_force(
+                        scraper, nv, upcoming_asked, until)
                     result = {
                         'article_text': article_text,
                         'norma_data': nv.to_dict(),
@@ -292,8 +303,7 @@ class NormaController:
                     }
                     if validity:
                         result['validity'] = validity
-                    if upcoming:
-                        result['upcoming'] = upcoming
+                    result.update(extra)
 
                 except Exception as exc:
                     result = {'error': str(exc), 'norma_data': nv.to_dict()}
@@ -431,8 +441,14 @@ class NormaController:
 
         # Normattiva answers a date after today with the current text and says
         # nothing. Refused here, before any network call, so that no door skips
-        # it: every handler that reads an article starts from this method.
-        reject_future_version_date(data.get('version_date'))
+        # it: every handler that reads an article starts from this method. A request
+        # that asks explicitly for the text not in force yet (`upcoming: true`, G-357)
+        # may name a later day; it is read undated, the latest version.
+        upcoming_asked = data.get('upcoming') is True
+        if upcoming_asked:
+            read_upcoming_request(data.get('version'), data.get('version_date'))
+        else:
+            reject_future_version_date(data.get('version_date'))
 
         act_type = data.get('act_type')
         act_number = data.get('act_number')
@@ -607,7 +623,7 @@ class NormaController:
                 norma=norma,
                 numero_articolo=cleaned_article,
                 versione=data.get('version'),
-                data_versione=data.get('version_date'),
+                data_versione=None if upcoming_asked else data.get('version_date'),
                 allegato=annex_value
             ))
             log.info("NormaVisitata instance created", norma_visitata=norma_visitata_list[-1])
@@ -738,18 +754,24 @@ class NormaController:
         else:
             return normattiva_scraper
 
-    async def _document_in_force(self, scraper, nv):
-        """The article's text with its validity: `(text, url, validity, upcoming)`.
+    async def _document_in_force(self, scraper, nv, upcoming_asked=False, until=None):
+        """The article's text and what goes with it: `(text, url, validity, extra)`, where
+        `extra` holds the keys to add to the answer (`upcoming`, `not_in_force`, and for an
+        explicit request a dated `norma_data`).
 
         A request with no date asks for the text in force, but Normattiva answers it
         with its latest version, also one not in force yet (art. 3 d.P.R. 131/1986 on
         21 October 2026: repealed from 1 January 2027). When the page's window starts
         after today (Europe/Rome), the text in force today is read instead (`!vig=` with
-        today) and the later one is described in `upcoming` (owner, G-355). A request
-        with a date or for the original is served as asked (G-353: a date is always the
-        text in force on that day). The norm keeps the request's identity, so its notes
-        and highlights are keyed as before; if the second read fails the first page is
-        served as it was, its validity saying when it starts.
+        today) and the later one is described in `upcoming` (owner, G-355). When nothing
+        is in force today (an article inserted from a later day) the later text is served
+        as before, marked `not_in_force` with `upcoming.change` "inserted" (G-358). A
+        request for the later text (`upcoming_asked`, G-357) gets it, always marked
+        `not_in_force` and with `norma_data` dated to the day it comes into force, so it
+        reads as a text at a day and never as the text in force. A request with a date or
+        for the original is served as asked (G-353). The norm keeps the request's
+        identity otherwise, so its notes and highlights are keyed as before; if the second
+        read fails the first page is served as it was, its validity saying when it starts.
         """
         article_text, url = await scraper.get_document(nv)
         validity = await self._validity_for(scraper, nv, url)
@@ -760,8 +782,31 @@ class NormaController:
             # after a restart the page can expire first, and without it a later version
             # would go out unrecognised. Read it once more.
             validity = await self._validity_for(scraper, nv, url)
-        if not (validity and _asks_for_text_in_force(nv) and starts_after_today(validity)):
-            return article_text, url, validity, None
+        later = bool(validity and _asks_for_text_in_force(nv) and starts_after_today(validity))
+        if upcoming_asked:
+            return await self._later_version(scraper, nv, article_text, url, validity, later, until)
+        if not later:
+            return article_text, url, validity, {}
+        today = await self._text_today(scraper, nv)
+        if today is None:
+            return article_text, url, validity, {}
+        text_today, url_today, validity_today = today
+        if validity_today and validity_today.get('state') == 'not_yet':
+            # Nothing is in force today: the article is inserted from the later day.
+            log.info("Article inserted from a later day", url=str(url)[:120])
+            return article_text, url, validity, {
+                'upcoming': upcoming_change(validity, inserted=True), 'not_in_force': True,
+            }
+        if validity_today and starts_after_today(validity_today):
+            # The source ignored the day: the first page stands, as before.
+            return article_text, url, validity, {}
+        log.info("Served the text in force today instead of a later version",
+                 later_from=validity.get('valid_from'), url=str(url_today)[:120])
+        return text_today, url_today, validity_today, {'upcoming': upcoming_change(validity)}
+
+    async def _text_today(self, scraper, nv):
+        """`(text, url, validity)` of the article at today, its validity judged against an
+        undated request; None when it cannot be read."""
         in_force = NormaVisitata(
             norma=nv.norma, allegato=nv.allegato, numero_articolo=nv.numero_articolo,
             versione='vigente', data_versione=today_in_rome().isoformat(),
@@ -769,20 +814,35 @@ class NormaController:
         try:
             text_today, url_today = await scraper.get_document(in_force)
         except Exception as exc:  # noqa: BLE001 - the page already read still stands
-            log.warning("Text in force today could not be read; serving the later version",
-                        url=str(url)[:120], error=str(exc))
-            return article_text, url, validity, None
-        # The validity of today's page, judged against what was asked: no date.
-        validity_today = await self._validity_for(scraper, nv, url_today)
-        if validity_today and (validity_today.get('state') == 'not_yet' or starts_after_today(validity_today)):
-            # Nothing is in force today (an article inserted from a later day), or the
-            # source ignored the day: the first page stands, as before (G-355 left open).
-            log.info("No text in force today; serving the later version as it was",
-                     url=str(url)[:120], today_state=validity_today.get('state'))
-            return article_text, url, validity, None
-        log.info("Served the text in force today instead of a later version",
-                 later_from=validity.get('valid_from'), url=str(url_today)[:120])
-        return text_today, url_today, validity_today, upcoming_change(validity)
+            log.warning("Text in force today could not be read", error=str(exc))
+            return None
+        return text_today, url_today, await self._validity_for(scraper, nv, url_today)
+
+    async def _later_version(self, scraper, nv, article_text, url, validity, later, until):
+        """The text not in force yet, asked for explicitly (G-357), or the article's error
+        saying there is none (or none in force on the day named), or that the page cannot be
+        read: then nothing is known, and nothing is claimed."""
+        if validity is None:
+            raise ResourceNotFoundError(f"Non riesco a leggere la vigenza di {nv} su Normattiva")
+        if not later:
+            raise ResourceNotFoundError(f"Nessuna versione non ancora in vigore per {nv}")
+        valid_from = validity['valid_from']
+        if until and valid_from > until:
+            raise ResourceNotFoundError(
+                f"La versione non ancora in vigore di {nv} entra in vigore il {valid_from}")
+        today = await self._text_today(scraper, nv)
+        upcoming = upcoming_change(validity, inserted=bool(today and today[2] and today[2].get('state') == 'not_yet'))
+        if (today is None or today[2] is None) and upcoming['change'] == 'amended':
+            # Today's page could not be read: an amendment cannot be told from an insertion.
+            upcoming['change'] = None
+        norma_data = dict(nv.to_dict(), versione='vigente', data_versione=valid_from)
+        # The day the text is dated to is its own first day: the window holds it.
+        served_validity = dict(validity, request_in_window=True)
+        return article_text, url, served_validity, {
+            'norma_data': norma_data,
+            'upcoming': upcoming,
+            'not_in_force': True,
+        }
 
     @staticmethod
     async def _page_left_the_cache(scraper, url):
@@ -970,6 +1030,7 @@ class NormaController:
             add_to_history(data)
 
             normavisitate = await self.create_norma_visitata_from_data(data)
+            upcoming_asked, until = _upcoming_of(data)
             log.info("NormaVisitata instances created", normavisitate=[nv.to_dict() for nv in normavisitate])
 
             async def fetch_text(nv):
@@ -979,7 +1040,8 @@ class NormaController:
                     return {'error': 'Unsupported act type', 'norma_data': nv.to_dict()}
 
                 try:
-                    article_text, url, validity, upcoming = await self._document_in_force(scraper, nv)
+                    article_text, url, validity, extra = await self._document_in_force(
+                        scraper, nv, upcoming_asked, until)
                     log.info("Document fetched successfully", article_text=article_text, url=url)
                     result = {
                         'article_text': article_text,
@@ -988,8 +1050,7 @@ class NormaController:
                     }
                     if validity:
                         result['validity'] = validity
-                    if upcoming:
-                        result['upcoming'] = upcoming
+                    result.update(extra)
                     return result
                 except Exception as exc:
                     log.error("Error fetching article text", error=str(exc))
@@ -1404,6 +1465,7 @@ class NormaController:
             add_to_history(data)
 
             normavisitate = await self.create_norma_visitata_from_data(data)
+            upcoming_asked, until = _upcoming_of(data)
 
             async def fetch_data(nv):
                 scraper = self.get_scraper_for_norma(nv)
@@ -1412,7 +1474,8 @@ class NormaController:
                     return {'error': 'Unsupported act type', 'norma_data': nv.to_dict()}
 
                 try:
-                    article_text, url, validity, upcoming = await self._document_in_force(scraper, nv)
+                    article_text, url, validity, extra = await self._document_in_force(
+                        scraper, nv, upcoming_asked, until)
                     result = {
                         'article_text': article_text,
                         'url': url,
@@ -1420,8 +1483,7 @@ class NormaController:
                     }
                     if validity:
                         result['validity'] = validity
-                    if upcoming:
-                        result['upcoming'] = upcoming
+                    result.update(extra)
                     return result
                 except Exception as exc:
                     log.error("Error fetching all data", error=str(exc))
