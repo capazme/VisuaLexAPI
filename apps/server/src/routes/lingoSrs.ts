@@ -79,16 +79,22 @@ router.get('/sessione', async (req, res) => {
   const scope = reviewScope(userId, materieComunita, materia, istituto);
 
   const due = dueWhere(userId, scope, today);
-  const [dovute, dueRows, introduced] = await Promise.all([
+  const [dovute, dueStates, introduced] = await Promise.all([
     prisma.lingoStatoRipasso.count({ where: due }),
-    prisma.lingoStatoRipasso.findMany({
-      where: due,
-      include: { card: { include: { ancore: true } } },
-      orderBy: [{ dueAt: 'asc' }, { cardId: 'asc' }],
-      take: MAX_DUE_PER_SESSION,
-    }),
+    prisma.lingoStatoRipasso.findMany({ where: due, orderBy: [{ dueAt: 'asc' }, { cardId: 'asc' }], take: MAX_DUE_PER_SESSION }),
     introducedToday(prisma, userId, today),
   ]);
+  // The cards apart, by id: one gone since the states were read (its author's trash, the account's deletion) is
+  // left out. Read as the state's relation, Prisma's second statement found no card and the session was a 500
+  // (tests/lingoCardGoneMidRead.test.ts).
+  const dueCards = new Map(
+    (await prisma.lingoCard.findMany({ where: { id: { in: dueStates.map((state) => state.cardId) } }, include: { ancore: true } }))
+      .map((card) => [card.id, card]),
+  );
+  const dueRows = dueStates.flatMap((state) => {
+    const card = dueCards.get(state.cardId);
+    return card ? [{ ...state, card }] : [];
+  });
 
   const newSlots = Math.max(0, nuoveAlGiorno - introduced);
   const newCards = newSlots === 0

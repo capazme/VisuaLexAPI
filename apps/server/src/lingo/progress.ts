@@ -2,7 +2,7 @@ import { LingoMateria, Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { maturity } from './cardMaturity';
 import { readMissions, settleMissions, type MissioneLetta, type XpCredito } from './missions';
-import { reviewScope } from './reviewQueue';
+import { reviewedCardsQuery, reviewScope } from './reviewQueue';
 import { computeStreak, type DayState } from './streak';
 import { countedDays, dateToDay, dayToDate, markQueueFinished, romeDayStartSql } from './studyDays';
 import { readPreferences } from './studyPreferences';
@@ -88,21 +88,20 @@ export async function readProgress(userId: string, materia?: LingoMateria): Prom
   const streak = computeStreak(await countedDays(prisma, userId), today, raggiunto);
 
   // The cards by state, by subject, and the coming days, from the review states in scope.
-  const [states, fresh] = await Promise.all([
-    prisma.lingoStatoRipasso.findMany({
-      where: { utenteId: userId, card: scopeAll },
-      select: { dueAt: true, lastReviewAt: true, card: { select: { materia: true } } },
-    }),
+  const [reviewedCards, fresh] = await Promise.all([
+    prisma.lingoCard.findMany(reviewedCardsQuery(userId, scopeAll, { materia: true })),
     prisma.lingoCard.groupBy({ by: ['materia'], where: newCardsWhere(userId, scopeAll), _count: { _all: true } }),
   ]);
   const bySubject = new Map(SUBJECTS.map((s) => [s, zeroCounts()]));
   for (const group of fresh) bySubject.get(group.materia)!.nuove = group._count._all;
   const forecast = new Array<number>(FORECAST_DAYS).fill(0);
-  for (const state of states) {
-    bySubject.get(state.card.materia)![maturity(state.lastReviewAt, state.dueAt)] += 1;
-    if (materia && state.card.materia !== materia) continue;
-    const ahead = Math.max(0, daysBetween(today, romeDay(state.dueAt))); // overdue counts today
-    if (ahead < FORECAST_DAYS) forecast[ahead] += 1;
+  for (const { materia: subject, statiRipasso } of reviewedCards) {
+    for (const state of statiRipasso) {
+      bySubject.get(subject)![maturity(state.lastReviewAt, state.dueAt)] += 1;
+      if (materia && subject !== materia) continue;
+      const ahead = Math.max(0, daysBetween(today, romeDay(state.dueAt))); // overdue counts today
+      if (ahead < FORECAST_DAYS) forecast[ahead] += 1;
+    }
   }
   const stati = zeroCounts();
   for (const [subject, counts] of bySubject) {
