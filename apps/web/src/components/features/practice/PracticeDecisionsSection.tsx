@@ -20,9 +20,10 @@ export function PracticeDecisionsSection({ practiceId }: { practiceId: string })
   if (ordered.length === 0) return null;
 
   return (
-    <section aria-labelledby={headingId} className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
-      <h3 id={headingId} className="px-1 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-        Giurisprudenza ({ordered.length})
+    // A section of the page as an act is (R3): its title in the reader's serif and a hairline, no card.
+    <section aria-labelledby={headingId}>
+      <h3 id={headingId} className="border-b border-slate-200 py-2 font-serif text-[22px] font-medium leading-tight text-slate-900 dark:border-slate-800 dark:text-white">
+        Giurisprudenza <span className="font-sans text-sm font-normal text-slate-600 dark:text-slate-400">({ordered.length})</span>
       </h3>
       <div>
         {ordered.map((entry) => (
