@@ -93,7 +93,21 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   card's top sits where the card would be centred above the foot, so a form that grows (an error) grows
   downwards and the tabs never move, and the colophon is centred against the card (text left-aligned; on a
   phone centred above it), so it follows half of such a growth; its title is 48 px up to `lg` and 68 px from it
-  (between 768 and 1023 px the column beside the card is about 200 px). The register form fits a window 768 px high
+  (between 768 and 1023 px the column beside the card is about 200 px).
+  **The wordmark** (A2, `SegmentWordmark` over the pure `segments.ts`; inspired by Animorio's «logo dai sette segmenti»,
+  written from scratch with SVG, an SVG filter and Framer Motion): once per opening, «VISUALEX» on eight seven-segment
+  cells slanted by 7° (V with its two lower strokes converging to the bottom's middle and no bottom bar — a narrow U
+  read «11» beside the I —, X an H) lights up in steps, each cell through one wrong drawing to its letter
+  (0.9 s), holds (0.4 s), and melts into the real wordmark — the segments round and join (`feGaussianBlur` cut by
+  `feColorMatrix`, the blur back to 0 before the filter goes), the Newsreader copy takes its weight from 300, the slant
+  goes back to nothing (0.8 s) —, then the open book fades in (2.1 s and the book's 0.3 s in all). The `h1` is
+  «VisuaLex» throughout (the display and the melting copy `aria-hidden`), its box is the real wordmark's from the first
+  frame, nothing takes the focus; a click on it plays it again once it has ended; under reduced motion it only fades
+  in. Measured at 60 fps in Chromium at every width (not
+  on a phone). The weight comes by two copies cross-faded (300, then the wordmark's own, `weightClass`), never a weight
+  animated; on WebKit (`isWebKit` in `segments.ts`: Safari on a Mac, every browser on an iPhone or an iPad — Chrome,
+  Firefox and Edge there are WebKit too —, an iPad with a Mac's user agent and touch points) the filter is left out and
+  the melt is the cross-fade alone, the brief's fallback. The register form fits a window 768 px high
   inside (1366×768, 1470×753 measured as viewports; a 768 px screen with a browser's bars scrolls a little) by
   its spacing (`space-y-4` between fields, `space-y-1.5` inside one), the sign-in form spaced the same. While a sign-in or a
   sign-up is on its way the tabs hold still (`aria-disabled`): its answer would land on the hidden form. A
