@@ -148,8 +148,16 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   entry —, OFL-1.1 as their `@fontsource-variable` packages say: the test reads the packages, and fails
   when `main.tsx` loads a typeface no entry covers). Normattiva carries the site's
   conditions, never the open data's CC BY 4.0; the Corte costituzionale «CC BY-SA 3.0» with no version.
-  `/crediti` is `pages/CreditsPage`: public (outside `ProtectedRoute`), one column, a section per group
-  (`CREDIT_GROUPS`), an `article` per entry whose `id` is the anchor — the page scrolls to the address's
+  `/crediti` is `pages/CreditsPage`: public (outside `ProtectedRoute`), a page to consult in the frame's whole width
+  (U1d): the opening at a reading measure, then from 1024 px an index «In questa pagina» (`nav`, 220 px, sticky,
+  `aria-current="location"` on the group being read, from the scroll — `creditsIndex.ts`'s `groupAt`: the last section
+  past 30 % of the window, the last at the page's end; a group an address or the index reached stays marked while the
+  page stays there (`groupOf`: `/crediti#cerdef` marks «Autorità e registri», not the last group the page's end would);
+  marked by weight and a bar, not a tint alone; the same item pressed again goes there again) beside the sources, on a
+  phone rows that wrap, every group in sight, the bar under the place being read (`min-w-0`, or the grid item widens
+  the page); a section per group
+  (`CREDIT_GROUPS`, its `id` the group's, `/crediti#giurisprudenza`), the entries as cards of equal height, two a row
+  from 1280 px; an `article` per entry whose `id` is the anchor — the page scrolls to the address's
   fragment and focuses the entry, since the router renders after the browser looked for it —, external
   links in a new tab with `rel="noopener noreferrer"`, every text breaking anywhere rather than widen a
   phone's page. Reached from the login's foot and the user menu's «Crediti».
@@ -238,8 +246,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   canvas under the frame's header); «Cestino» and the MERL-T pages under a way back
   («Torna ai Dossier», «MERL-T») write their `h1` with `PAGE_TITLE`. A dossier's own page is in the frame since S7c
   (`DossierDetailView`: its name the title, under «Torna ai Dossier»; see «Dossier»). Impostazioni (a dialog, not a page), the Scrivania, the lesson, the reader and the practice, the
-  login stay out; «Crediti», public and outside the layout, is in the frame since M1 (the column's width and padding, the
-  text in its 672 px column). On a phone `actionBeside` keeps icon-only actions on the title's row (the dossier list's
+  login stay out; «Crediti», public and outside the layout, is in the frame since M1 (the column's width and padding;
+  since U1d its whole width, an index beside the sources). On a phone `actionBeside` keeps icon-only actions on the title's row (the dossier list's
   «⋯» and «+»). `PageFrame.test.tsx` reads the section pages' files
   and fails on a title of their own, an icon in an `h1` or a root narrowed with `mx-auto max-w-…`. `Layout`'s content
   area keeps the scrollbar's room (`scrollbar-gutter: stable`) on every page but the search page: a page that grew past
