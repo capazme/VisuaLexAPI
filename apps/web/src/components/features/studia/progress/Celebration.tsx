@@ -129,9 +129,9 @@ export function GoalStamp({ giorno, serie, press, compact = false, className }: 
         className,
       )}
     >
-      <span className={cn('block font-bold', compact ? 'text-[10px]' : 'text-xs md:text-sm')}>Obiettivo raggiunto</span>
-      {/* At its size on «Oggi» no text under 11 px (G1b); the compact stamp is the session's (G2). */}
-      <span className={cn('block tracking-wide', compact ? 'text-[8px]' : 'text-xs')}>
+      <span className={cn('block font-bold', compact ? 'text-[11px]' : 'text-xs md:text-sm')}>Obiettivo raggiunto</span>
+      {/* No text under 11 px, the compact stamp included (Y1). */}
+      <span className={cn('block tracking-wide', compact ? 'text-[11px]' : 'text-xs')}>
         {formatDate(giorno)} · giorno {serie}
       </span>
     </motion.div>

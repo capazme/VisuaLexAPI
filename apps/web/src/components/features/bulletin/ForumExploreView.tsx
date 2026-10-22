@@ -124,7 +124,7 @@ export function ForumExploreView({
             <ChevronDown size={16} aria-hidden className="shrink-0" />
           </button>
           {showCategoryDropdown && (
-            <div className="absolute top-full left-0 mt-1 w-max min-w-full bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 py-1 z-20">
+            <div className="absolute top-full left-0 mt-1 w-max min-w-full bg-white dark:bg-slate-800 rounded-lg shadow-md border border-slate-200 dark:border-slate-700 py-1 z-20">
               {CATEGORY_OPTIONS.map((option) => (
                 <button
                   key={option.value}
@@ -161,7 +161,7 @@ export function ForumExploreView({
             <ChevronDown size={16} aria-hidden className="shrink-0" />
           </button>
           {showSortDropdown && (
-            <div className="absolute top-full right-0 mt-1 w-max min-w-full bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 py-1 z-20">
+            <div className="absolute top-full right-0 mt-1 w-max min-w-full bg-white dark:bg-slate-800 rounded-lg shadow-md border border-slate-200 dark:border-slate-700 py-1 z-20">
               {SORT_OPTIONS.map((option) => (
                 <button
                   key={option.value}

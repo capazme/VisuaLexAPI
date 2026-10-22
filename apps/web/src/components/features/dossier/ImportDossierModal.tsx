@@ -16,7 +16,7 @@ export function ImportDossierModal({ dossier, discarded, onClose, onConfirm }: P
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl max-w-lg w-full p-6">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg max-w-lg w-full p-6">
         <div className="flex items-center gap-3 mb-4">
           <div className="p-3 bg-primary-100 dark:bg-primary-900/30 rounded-lg">
             <FolderInput className="text-primary-600" size={24} />

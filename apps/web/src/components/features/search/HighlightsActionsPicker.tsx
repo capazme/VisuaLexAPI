@@ -82,7 +82,7 @@ export function HighlightsActionsPicker({
                     <div
                         style={{ transformOrigin: getTransformOrigin(placement) }}
                         className={cn(
-                            'flex items-center rounded-lg shadow-2xl overflow-hidden',
+                            'flex items-center rounded-lg shadow-md overflow-hidden',
                             'bg-slate-900 dark:bg-slate-800 border border-slate-700/60',
                             'animate-in fade-in zoom-in-95 duration-150',
                         )}

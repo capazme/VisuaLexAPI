@@ -317,7 +317,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
                       {isSearching ? 'Cercando...' : 'Cerca'}
                     </button>
                   ) : (
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">
+                    <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase">
                       Completa la ricerca
                     </span>
                   )}
@@ -383,7 +383,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
                 </div>
               )}
 
-              <p className="text-[10px] text-slate-400">
+              <p className="text-[11px] text-slate-600 dark:text-slate-400">
                 {version === 'vigente' && 'Testo attualmente in vigore'}
                 {version === 'originale' && 'Testo originale alla data di pubblicazione'}
                 {version === 'data' && 'Testo vigente alla data specificata'}
@@ -400,8 +400,8 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
                   <p>• <code className="bg-white dark:bg-slate-700 px-1 rounded">art 1 cost</code> - Costituzione</p>
                   <p>• <code className="bg-white dark:bg-slate-700 px-1 rounded">d.lgs 50/2016 art 36</code> - Decreto legislativo</p>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-2 pt-2 border-t border-slate-200 dark:border-slate-700">
-                  Premi <kbd className="px-1 py-0.5 bg-white dark:bg-slate-700 rounded text-[9px] font-bold">Enter</kbd> per cercare
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+                  Premi <kbd className="px-1 py-0.5 bg-white dark:bg-slate-700 rounded text-[11px] font-bold">Enter</kbd> per cercare
                 </p>
               </div>
             )}
@@ -541,7 +541,7 @@ export function CompareView() {
           exit={{ opacity: 0, y: 20, scale: 0.98 }}
           transition={spring.snappy}
           className={cn(
-            "bg-white dark:bg-slate-900 shadow-2xl overflow-hidden flex flex-col",
+            "bg-white dark:bg-slate-900 shadow-lg overflow-hidden flex flex-col",
             fullscreen
               ? "fixed inset-0 rounded-none"
               : "fixed inset-4 md:inset-8 lg:inset-12 rounded-2xl"

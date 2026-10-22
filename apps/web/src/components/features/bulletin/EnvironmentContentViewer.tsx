@@ -433,7 +433,7 @@ export function EnvironmentContentViewer({
               </span>
               {count > 0 && (
                 <span className={`
-                  px-1.5 py-0.5 rounded-full text-[10px] font-bold
+                  px-1.5 py-0.5 rounded-full text-[11px] font-bold
                   ${isActive
                     ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300'
                     : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'

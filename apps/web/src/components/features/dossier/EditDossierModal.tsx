@@ -23,7 +23,7 @@ export function EditDossierModal({ dossier, onClose, onSave }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-md border border-slate-200 dark:border-slate-800">
+      <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-lg w-full max-w-md border border-slate-200 dark:border-slate-800">
         <div className="p-6">
           <h3 className="font-semibold text-lg text-slate-900 dark:text-white mb-4">Modifica Dossier</h3>
           <div className="space-y-4">

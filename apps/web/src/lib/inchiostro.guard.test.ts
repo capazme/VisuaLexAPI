@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
-// Inchiostro's colours (Y1), kept from coming back one file at a time: an action and the focus are `primary-*` (toga),
-// the rest `slate-*` (ink), a section its hue (`--vlx-section-*`). `blue-*` and `indigo-*` are aliases of toga that
-// only hid where the old blue still stood; `purple-*` and `violet-*` are hues of no section.
+// Inchiostro everywhere (Y1), kept from coming back one file at a time. Colours: an action and the focus are
+// `primary-*` (toga), the rest `slate-*` (ink), a section its hue (`--vlx-section-*`); `blue-*` and `indigo-*` are
+// aliases of toga that only hid where the old blue still stood, `purple-*` and `violet-*` hues of no section. Sizes: no
+// text under 11 px. Elevation: cards `shadow-sm` or a border, menus and popovers `shadow-md`, windows `shadow-lg`, never
+// `xl` or `2xl`. Flat paper: no gradient but the loading skeleton's shimmer.
 const src = join(__dirname, '..'); // apps/web/src
 
 function sources(dir: string): string[] {
@@ -33,15 +35,33 @@ const KEYS: Record<string, string> = {
     'the same kinds counted before a suggestion is sent: the aliases\' purple',
 };
 
+/** Every `file:line` of the sources (outside `allowed`) where `pattern` matches. */
+function hits(pattern: RegExp, allowed: string[] = []): string[] {
+  return sources(src)
+    .map((file) => relative(src, file))
+    .filter((file) => !allowed.includes(file))
+    .flatMap((file) => readFileSync(join(src, file), 'utf8').split('\n')
+      .map((line, i) => (pattern.test(line) ? `${file}:${i + 1}` : null))
+      .filter((hit): hit is string => hit !== null));
+}
+
+describe('Inchiostro\'s sizes, elevation and paper', () => {
+  it('no text is written under 11 px', () => {
+    expect(hits(/\btext-\[(?:[0-9]|10)(?:\.\d+)?px\]/)).toEqual([]);
+  });
+
+  it('no shadow is `xl` or `2xl`', () => {
+    expect(hits(/\bshadow-(?:xl|2xl)\b/)).toEqual([]);
+  });
+
+  it('no gradient, but the loading skeleton\'s shimmer', () => {
+    expect(hits(/\bbg-(?:gradient|linear|radial|conic)-/, [join('components', 'ui', 'Skeleton.tsx')])).toEqual([]);
+  });
+});
+
 describe('Inchiostro\'s colours', () => {
   it('no file writes blue, indigo, purple or violet by hand, outside the colour keys', () => {
-    const offenders = sources(src)
-      .map((file) => relative(src, file))
-      .filter((file) => !(file in KEYS))
-      .flatMap((file) => readFileSync(join(src, file), 'utf8').split('\n')
-        .map((line, i) => (HAND_COLOUR.test(line) ? `${file}:${i + 1}` : null))
-        .filter((hit): hit is string => hit !== null));
-    expect(offenders).toEqual([]);
+    expect(hits(HAND_COLOUR, Object.keys(KEYS))).toEqual([]);
   });
 
   it('every colour key still uses its hue: a key that no longer needs it leaves the list', () => {

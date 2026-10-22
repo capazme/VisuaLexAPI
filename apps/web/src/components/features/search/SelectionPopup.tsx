@@ -265,7 +265,7 @@ export function SelectionPopup({
       onMouseDown={(e) => e.stopPropagation()}
     >
       {/* Main popup */}
-      <div className="bg-slate-900 dark:bg-slate-800 text-white rounded-lg shadow-2xl border border-slate-700 overflow-hidden">
+      <div className="bg-slate-900 dark:bg-slate-800 text-white rounded-lg shadow-md border border-slate-700 overflow-hidden">
         {showColorPicker ? (
           /* Color picker view */
           <div className="p-2 flex items-center gap-1">

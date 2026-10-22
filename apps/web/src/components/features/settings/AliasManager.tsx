@@ -408,7 +408,7 @@ export function AliasManager() {
                                     {preset.date ? `/${preset.date}` : ''}
                                 </span>
                                 {overriddenPresets.has(trigger) && (
-                                    <span className="shrink-0 px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[10px] font-bold uppercase">
+                                    <span className="shrink-0 px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[11px] font-bold uppercase">
                                         sovrascritto
                                     </span>
                                 )}

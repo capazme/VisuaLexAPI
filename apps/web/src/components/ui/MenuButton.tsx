@@ -143,7 +143,7 @@ export function MenuButton({ label, items, children, triggerClassName, align = '
           onKeyDown={onMenuKey}
           className={cn(
             Z_INDEX.dropdown,
-            'absolute w-56 rounded-lg border border-slate-200 bg-white py-1 shadow-xl dark:border-slate-700 dark:bg-slate-800',
+            'absolute w-56 rounded-lg border border-slate-200 bg-white py-1 shadow-md dark:border-slate-700 dark:bg-slate-800',
             placement === 'above' ? 'bottom-full mb-1' : 'mt-1',
             align === 'right' ? 'right-0' : 'left-0',
             menuClassName,

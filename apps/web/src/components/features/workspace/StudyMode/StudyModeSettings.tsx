@@ -71,7 +71,7 @@ export function StudyModeSettings({
             exit={{ opacity: 0, scale: 0.95, y: -10 }}
             transition={spring.snappy}
             className={cn(
-              "fixed z-40 rounded-xl shadow-2xl border overflow-hidden",
+              "fixed z-40 rounded-xl shadow-md border overflow-hidden",
               // Mobile: nearly full width, centered horizontally
               "left-4 right-4 top-16 w-auto",
               // Desktop: fixed width and position
@@ -95,7 +95,7 @@ export function StudyModeSettings({
             <div className="p-4 space-y-6">
               {/* Theme Selection */}
               <div>
-                <label className={cn("text-[10px] font-bold uppercase tracking-wider mb-3 block opacity-70", styles.muted)}>
+                <label className={cn("text-[11px] font-bold uppercase tracking-wider mb-3 block opacity-70", styles.muted)}>
                   Tema
                 </label>
                 <div className="flex gap-2">
@@ -141,7 +141,7 @@ export function StudyModeSettings({
               {/* Font Size */}
               <div id="tour-study-typography">
                 <div className="flex items-center justify-between mb-3">
-                  <label className={cn("text-[10px] font-bold uppercase tracking-wider opacity-70", styles.muted)}>
+                  <label className={cn("text-[11px] font-bold uppercase tracking-wider opacity-70", styles.muted)}>
                     Dimensione testo
                   </label>
                   <span className={cn("text-xs font-mono font-medium opacity-70", styles.text)}>
@@ -189,7 +189,7 @@ export function StudyModeSettings({
               {/* Line Height */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <label className={cn("text-[10px] font-bold uppercase tracking-wider opacity-70", styles.muted)}>
+                  <label className={cn("text-[11px] font-bold uppercase tracking-wider opacity-70", styles.muted)}>
                     Interlinea
                   </label>
                   <span className={cn("text-xs font-mono font-medium opacity-70", styles.text)}>

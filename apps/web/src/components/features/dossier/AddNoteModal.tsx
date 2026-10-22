@@ -63,7 +63,7 @@ export function AddNoteModal({ onClose, onSave, heading = 'Aggiungi una nota al 
       className={cn(Z_INDEX.modal, 'fixed inset-0 flex items-center justify-center p-4')}
     >
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-lg border border-slate-200 dark:border-slate-800 flex flex-col">
+      <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-lg w-full max-w-lg border border-slate-200 dark:border-slate-800 flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
           <h3 id="add-note-heading" className="font-semibold text-lg text-slate-900 dark:text-white flex items-center gap-2">
             <StickyNote size={20} className="text-yellow-500 flex-shrink-0" />

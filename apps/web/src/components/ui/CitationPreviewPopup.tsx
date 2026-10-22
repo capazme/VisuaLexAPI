@@ -74,7 +74,7 @@ export function CitationPreviewPopup({
       title={citation ? formatCitationLabel(citation) : null}
       badge={
         citation && citation.confidence < 0.8 ? (
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 shrink-0">
+          <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 shrink-0">
             ~
           </span>
         ) : null

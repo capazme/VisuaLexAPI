@@ -141,7 +141,7 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
     };
 
     const FONT_SIZE_OPTIONS: Array<{ value: 'small' | 'medium' | 'large' | 'xlarge'; label: string; sizeClass: string }> = [
-        { value: 'small', label: 'Piccolo', sizeClass: 'text-[10px]' },
+        { value: 'small', label: 'Piccolo', sizeClass: 'text-[11px]' },
         { value: 'medium', label: 'Medio', sizeClass: 'text-xs' },
         { value: 'large', label: 'Grande', sizeClass: 'text-sm' },
         { value: 'xlarge', label: 'Molto grande', sizeClass: 'text-base' },
@@ -416,7 +416,7 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                                                         {commit.message}
                                                     </p>
                                                 </div>
-                                                <p className="text-slate-400 dark:text-slate-500 mt-0.5 text-[10px]">
+                                                <p className="text-slate-600 dark:text-slate-400 mt-0.5 text-[11px]">
                                                     {commit.author} · {formatDate(commit.date)}
                                                 </p>
                                             </div>

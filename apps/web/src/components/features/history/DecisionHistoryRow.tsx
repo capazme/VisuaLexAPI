@@ -55,7 +55,7 @@ export function DecisionHistoryRow({ item, variant, onDelete, id }: {
             <Gavel size={16} aria-hidden className="text-slate-500 flex-shrink-0" />
             <span className="min-w-0">
               <span className="block font-semibold text-sm text-slate-900 dark:text-white truncate">{label}</span>
-              {when && <span className="block text-[10px] text-slate-400 dark:text-slate-500" title={new Date(item.created_at).toLocaleString('it-IT')}>{when}</span>}
+              {when && <span className="block text-[11px] text-slate-600 dark:text-slate-400" title={new Date(item.created_at).toLocaleString('it-IT')}>{when}</span>}
             </span>
           </button>
         ) : (

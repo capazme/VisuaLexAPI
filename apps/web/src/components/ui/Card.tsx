@@ -30,7 +30,7 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
       ),
       elevated: cn(
         'bg-white dark:bg-slate-800',
-        'shadow-lg border border-transparent dark:border-slate-700'
+        'shadow-sm border border-slate-200 dark:border-slate-700'
       ),
       'glass-elevated': cn(
         'bg-white/80 dark:bg-slate-900/80',

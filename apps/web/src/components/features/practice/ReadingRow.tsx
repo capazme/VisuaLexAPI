@@ -234,7 +234,7 @@ export function ReadingRow(props: PracticeTableProps) {
           data-testid="reading-row-overlay"
           style={{ left: RAIL_WIDTH, width: `min(56rem, calc(100% - ${RAIL_WIDTH}px))` }}
           className={cn(
-            'absolute top-0 h-app-row overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3 shadow-xl dark:border-slate-700 dark:bg-slate-900',
+            'absolute top-0 h-app-row overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3 shadow-lg dark:border-slate-700 dark:bg-slate-900',
             Z_INDEX.dropdown,
           )}
         >

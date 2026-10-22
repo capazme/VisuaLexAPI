@@ -429,7 +429,7 @@ export function HistoryView() {
                                             <Calendar size={12} className="text-primary-600 dark:text-primary-400" />
                                             <span className="text-xs font-bold text-primary-600 dark:text-primary-400">{label}</span>
                                         </div>
-                                        <div className="flex-1 h-px bg-gradient-to-r from-primary-200 dark:from-primary-800 to-transparent" />
+                                        <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
                                     </div>
 
                                     {/* Desktop: full date label */}
@@ -438,7 +438,7 @@ export function HistoryView() {
                                             <Calendar size={14} className="text-primary-600 dark:text-primary-400" />
                                             <span className="text-sm font-bold text-primary-600 dark:text-primary-400">{label}</span>
                                         </div>
-                                        <div className="flex-1 h-px bg-gradient-to-r from-primary-200 dark:from-primary-800 to-transparent" />
+                                        <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
                                     </div>
 
                                     {/* Timeline items */}
@@ -480,7 +480,7 @@ export function HistoryView() {
                                                             </p>
                                                             {item.created_at && (
                                                                 <p
-                                                                    className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5"
+                                                                    className="text-[11px] text-slate-600 dark:text-slate-400 mt-0.5"
                                                                     title={new Date(item.created_at).toLocaleString('it-IT')}
                                                                 >
                                                                     {formatDistanceToNow(new Date(item.created_at), { addSuffix: true, locale: it })}
@@ -581,7 +581,7 @@ export function HistoryView() {
                                                                             right: menuPos.right,
                                                                             zIndex: 50,
                                                                         }}
-                                                                        className="w-56 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 py-1"
+                                                                        className="w-56 bg-white dark:bg-slate-800 rounded-lg shadow-md border border-slate-200 dark:border-slate-700 py-1"
                                                                     >
                                                                         {/* QuickNorm */}
                                                                         <button
@@ -614,7 +614,7 @@ export function HistoryView() {
 
                                                                             {/* Sub-menu dossier */}
                                                                             {showDossierList === item.id && (
-                                                                                <div className="absolute left-full top-0 ml-1 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 py-1 max-h-64 overflow-y-auto">
+                                                                                <div className="absolute left-full top-0 ml-1 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-md border border-slate-200 dark:border-slate-700 py-1 max-h-64 overflow-y-auto">
                                                                                     {dossiers.length === 0 ? (
                                                                                         <p className="px-3 py-2 text-sm text-slate-500">Nessun dossier</p>
                                                                                     ) : (
@@ -703,7 +703,7 @@ export function HistoryView() {
             {/* New-dossier inline modal */}
             {createDossierFor && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-md p-5">
+                    <div className="bg-white dark:bg-slate-900 rounded-xl shadow-lg w-full max-w-md p-5">
                         <div className="flex items-start justify-between mb-3">
                             <h2 className="text-base font-semibold text-slate-900 dark:text-white">
                                 Crea nuovo dossier
