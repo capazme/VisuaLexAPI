@@ -256,7 +256,7 @@ export function StudyModeSummary({
                 </p>
               )}
               {item.createdAt && (
-                <p className={cn('text-[10px] mt-1.5 opacity-50 tabular-nums', styles.muted)}>
+                <p className={cn('text-[11px] mt-1.5 opacity-50 tabular-nums', styles.muted)}>
                   {formatShortDate(item.createdAt)}
                 </p>
               )}

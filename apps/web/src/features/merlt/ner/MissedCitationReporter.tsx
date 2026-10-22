@@ -91,7 +91,7 @@ export function MissedCitationReporter({ anchorRect, selectedText, onSubmit, onC
           <div
             style={{ transformOrigin }}
             className={cn(
-              'w-[300px] max-w-[calc(100vw-24px)] rounded-lg border border-primary-200 bg-white shadow-xl dark:border-primary-900/60 dark:bg-slate-900',
+              'w-[300px] max-w-[calc(100vw-24px)] rounded-lg border border-primary-200 bg-white shadow-md dark:border-primary-900/60 dark:bg-slate-900',
               'animate-in fade-in zoom-in-95 duration-150',
             )}
           >

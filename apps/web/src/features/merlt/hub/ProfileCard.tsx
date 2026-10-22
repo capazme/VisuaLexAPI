@@ -69,7 +69,7 @@ export function ProfileCard({ profile }: ProfileCardProps) {
               {helpOpen && (
                 <div
                   role="tooltip"
-                  className="absolute left-1/2 top-full z-20 mt-2 w-64 -translate-x-1/2 rounded-lg border border-slate-200 bg-white p-3 text-[13px] text-slate-700 shadow-lg dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                  className="absolute left-1/2 top-full z-20 mt-2 w-64 -translate-x-1/2 rounded-lg border border-slate-200 bg-white p-3 text-[13px] text-slate-700 shadow-md dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
                 >
                   Il peso del tuo voto misura quanto le tue valutazioni influenzano il sistema.
                   Cresce quando validi proposte e contribuisci con appunti di qualità, e riflette

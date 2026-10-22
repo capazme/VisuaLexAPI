@@ -17,7 +17,7 @@ export function PDFViewer({ isOpen, onClose, pdfUrl, isLoading }: PDFViewerProps
     <div data-find-overlay="" className={cn('fixed inset-0 flex items-center justify-center p-4 sm:p-6', Z_INDEX.modal)}>
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
       
-      <div className="relative bg-slate-900 rounded-xl shadow-2xl w-full h-full max-w-6xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-800">
+      <div className="relative bg-slate-900 rounded-xl shadow-lg w-full h-full max-w-6xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-800">
         <div className="flex items-center justify-between px-6 py-4 bg-slate-900 border-b border-slate-800 shrink-0">
           <h3 className="text-white font-bold flex items-center gap-3">
             <div className="bg-red-500/20 text-red-400 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
@@ -51,7 +51,7 @@ export function PDFViewer({ isOpen, onClose, pdfUrl, isLoading }: PDFViewerProps
         <div className="flex-1 relative bg-slate-950/50 flex items-center justify-center">
           {isLoading ? (
             <div className="text-center text-white">
-              <Loader2 size={40} className="animate-spin mx-auto mb-4 text-blue-500" />
+              <Loader2 size={40} className="animate-spin mx-auto mb-4 text-primary-500" />
               <p className="text-slate-400">Generazione PDF in corso...</p>
             </div>
           ) : pdfUrl ? (

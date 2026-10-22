@@ -433,7 +433,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   about 280 ms on `ease.out` (no bounce; a curve, not a spring); the clip is set before the first paint, so the panel
   never flashes open, and the growth starts once the first frame is drawn (mounting the rows is a long frame, which an
   animation started before it would spend unseen); Web Animations with no fill, so once grown nothing holds the clip and
-  the card's `shadow-xl` shows. The content fades in as it grows; the first four groups come 30 ms apart, rising 4 px.
+  the card's `shadow-lg` shows. The content fades in as it grows; the first four groups come 30 ms apart, rising 4 px.
   Closing (Esc, a click outside, a choice), the same way back in about 200 ms from wherever it is (a growth cut short
   included), the panel taking no pointer meanwhile; opened again before it went, it grows back from there. Without Web
   Animations the panel is drawn at once. While the box filters, a row filtered out fades and pops out of its list
@@ -1159,7 +1159,7 @@ places the right column; inside the tiles a sentence stops at `max-w-prose`. In 
    bar of the three colours. From `xl` the band is the top of the right column, about 400 to 490 px: `aside` adds the `xl:` classes that stack it as on a phone (the
    week at the column's width). «Tutti i progressi →», a text link (44 px, not a button across the column, G8), leads to `/studia/progressi`: the trend, the
    coming days and the subjects' data live there alone (G3 removed the «Il tuo mese» sheet, so no chart is drawn twice).
-   **No text on «Oggi» or «Progressi» is under 11 px** (the stamp's date included; the compact stamp is the session's):
+   **No text on «Oggi» or «Progressi» is under 11 px** (the stamp's date included, and since Y1 the session's compact stamp too):
    `typeScale.test.tsx` reads the files of `missions/` and `progress/` and fails on a `text-[Npx]` under 11 or an SVG
    `<text>`. `CARD_STATES`, in `tokens.ts`, are the band's, the institutes' and the page's.
 4. **«Le tue materie»** (`progress/SubjectList`, G8), under the band in the same box: it took the place of «Cosa ripassi»
@@ -2183,6 +2183,16 @@ resolves differently. Only if the inline style references no variable, fall back
 to a single narrowly-scoped `!important` with a comment justifying why every
 other route fails.
 
+**Inchiostro everywhere** (Y1, `lib/inchiostro.guard.test.ts` reads the sources): an action and the focus are
+`primary-*` (toga), everything else `slate-*` (ink), a section its hue (`--vlx-section-*`); no `blue-*`, `indigo-*`,
+`purple-*` or `violet-*` (the first two were aliases of toga, the others hues of no section) but in the colour keys the
+test lists with their reason (the courts' chips, the kinds of a suggestion's items); no text
+under 11 px (px, a length or rem); elevation by kind — cards `shadow-sm` or a border, menus and popovers `shadow-md`,
+windows and dialogs `shadow-lg`, never `xl` or `2xl`; in the dark `index.css` draws `shadow-md` and up as a hairline and a
+drop —; flat paper, no gradient but the skeleton's shimmer and the comparison's hatch (`GapCell`); `index.css`'s
+`@apply` is read too. `Button` presses to 0.97 in
+120 ms; a hover that moves or grows something sits under `[@media(hover:hover)_and_(pointer:fine)]` (`HOVER_LIFT`).
+
 **Colour markers** — for a list mirroring something already coloured in the
 article body, use a 4px stripe down the card's leading edge rather than
 re-applying a saturated background behind the text.
@@ -2380,7 +2390,9 @@ meant to stay split; add new features as new files, not inside the shells:
   target is written nowhere in the sources, and checks the search tour against the search page. The popover
   (`visualex-tour-popover` in `index.css`) draws every button 44 px with a focus ring — the label centred by its
   line height, since driver.js writes `display` on the buttons inline —, and `useTour` renames
-  driver.js's «×» «Chiudi» in `onPopoverRender` (driver.js writes «Close» and has no option for it; `TOUR_UI`).
+  driver.js's «×» «Chiudi» in `onPopoverRender` (driver.js writes «Close» and has no option for it; `TOUR_UI`). A tour is closed, unseen (asked again next time), when the window
+  passes to another layout (768 and 1024 px) or the element of its step is no longer drawn: driver.js redrew the veil at
+  its old size (Y1); and a focus driver.js gives its buttons with no key pressed shows no ring (`data-pointer-focus`).
   `SearchPanel` mounts them (imported statically: the table is the app's main surface; `PDFViewer`, Study Mode and
   `CompareView` stay behind `lazy()`), one layout per breakpoint (`useIsDesktop`); a decision opened from any link lands in its practice
   and opens beside on the desktop (the window a link was clicked in is never the one a third window

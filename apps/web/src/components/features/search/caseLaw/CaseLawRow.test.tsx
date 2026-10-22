@@ -64,7 +64,7 @@ describe('CaseLawRow', () => {
   it('colours the chip by court, one key for every source', () => {
     show(<CaseLawRow label="Cass. civ." /> );
     show(<CaseLawRow label="Corte cost." />);
-    expect(screen.getByText('Cass. civ.')).toHaveClass('bg-blue-100');
+    expect(screen.getByText('Cass. civ.')).toHaveClass('bg-primary-100');
     expect(screen.getByText('Corte cost.')).toHaveClass('bg-purple-100');
   });
 });

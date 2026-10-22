@@ -104,6 +104,7 @@ describe('the practice row\'s columns', () => {
 
 describe('the Inchiostro palette', () => {
   it('aliases the Tailwind scales the app writes to ink and toga', async () => {
+    // The aliases stay in the theme (an old class still renders in toga); the guard test keeps them out of the sources.
     const css = await compile(['bg-ink-500', 'bg-toga-600', 'text-slate-500', 'bg-blue-600', 'ring-indigo-500', 'bg-primary-600']);
     expect(css).toContain('.bg-ink-500');
     expect(css).toContain('.bg-toga-600');
@@ -369,7 +370,7 @@ describe('the tours (driver.js)', () => {
     const close = rule('.driver-popover.visualex-tour-popover .driver-popover-close-btn');
     expect(close).toMatch(/width:\s*44px/);
     expect(close).toMatch(/height:\s*44px/);
-    expect(css).toMatch(/\.driver-popover-close-btn:focus-visible\s*\{\s*outline:\s*2px solid/);
+    expect(css).toMatch(/\.driver-popover-close-btn:focus-visible:not\(\[data-pointer-focus\]\)\s*\{\s*outline:\s*2px solid/);
   });
 });
 
@@ -536,6 +537,28 @@ describe('the section change (T1)', () => {
     expect(css).toMatch(/::view-transition-new\(vlx-page\):only-child\s*\{\s*animation-delay:\s*0ms/);
     const reduced = css.split('@media (prefers-reduced-motion: reduce)').slice(1).join(' ');
     expect(reduced).toMatch(/::view-transition-new\(\*\)\s*\{\s*animation:\s*none\s*!important/);
+  }, 30000);
+
+  it('draws the tour\'s focus ring only for a focus not given with no key pressed (Y1)', () => {
+    const css = readFileSync(CSS_PATH, 'utf8');
+    const rule = css.match(/([^{}]*)\{\s*outline:\s*2px solid var\(--color-toga-500\);\s*outline-offset:\s*2px;\s*\}/)![1];
+    for (const selector of rule.replace(/\/\*[\s\S]*?\*\//g, '').split(',').map((part) => part.trim())) {
+      expect(selector).toMatch(/:focus-visible:not\(\[data-pointer-focus\]\)$/);
+    }
+  });
+
+  it('gives a menu or a popover a hairline and a drop in the dark, as the floating surfaces (Y1)', async () => {
+    const css = await compile(['shadow-md', 'shadow-lg']);
+    expect(css).toMatch(/\.dark \.shadow-md\s*\{\s*--tw-shadow:\s*0 0 0 1px var\(--color-ink-700\)/);
+    expect(css).toMatch(/\.dark :is\(\.shadow-lg, \.shadow-xl, \.shadow-2xl\)\s*\{\s*--tw-shadow:/);
+  }, 30000);
+
+  it('keeps a focus ring over a shadow in the dark: the dark rules set `--tw-shadow`, never `box-shadow` (Y1)', async () => {
+    const css = await compile(['shadow-md', 'shadow-lg', 'focus-visible:ring-2']);
+    // Outside the layers a `box-shadow` on `.dark .shadow-*` replaced the ring of `focus-visible:ring-2` (WCAG 2.4.7).
+    expect(css).not.toMatch(/\.dark[^{}]*\.shadow-[^{}]*\{[^}]*box-shadow:/);
+    // The utility composes the rings before the shadow, so the dark `--tw-shadow` keeps the ring.
+    expect(css).toMatch(/\.shadow-md\s*\{[^}]*box-shadow:[^;]*var\(--tw-ring-shadow\)[^;]*var\(--tw-shadow\)/);
   }, 30000);
 
   it('draws no ring on a title focused after a choice made with a pointer, over the utilities\' ring', async () => {

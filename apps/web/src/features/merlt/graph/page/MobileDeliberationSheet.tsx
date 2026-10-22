@@ -83,7 +83,7 @@ export function MobileDeliberationSheet({
           role="dialog"
           aria-modal="true"
           aria-label="Dibattito sul grafo"
-          className="fixed inset-x-0 bottom-0 z-50 flex h-[55vh] flex-col rounded-t-2xl border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] shadow-xl dark:border-slate-700 dark:bg-slate-900"
+          className="fixed inset-x-0 bottom-0 z-50 flex h-[55vh] flex-col rounded-t-2xl border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] shadow-lg dark:border-slate-700 dark:bg-slate-900"
         >
           <div className="relative flex min-h-11 shrink-0 items-center justify-center px-3">
             <span className="h-1 w-10 rounded-full bg-slate-300 dark:bg-slate-600" aria-hidden="true" />

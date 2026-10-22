@@ -378,7 +378,7 @@ export function StudyMode({
         data-find-overlay=""
         style={isFullscreen ? undefined : windowStyle}
         className={cn(
-          "fixed z-[130] flex flex-col shadow-2xl overflow-hidden",
+          "fixed z-[130] flex flex-col shadow-lg overflow-hidden",
           isFullscreen && "inset-0",
           !isFullscreen && "rounded-2xl border",
           isDragging && "cursor-grabbing select-none",

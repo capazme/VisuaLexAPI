@@ -80,7 +80,7 @@ export function PracticeChip({ practiceId, isActive, editing, onEditingChange }:
           )}>
             {practice.label}
           </span>
-          <span className="block truncate text-[10px] font-medium text-slate-500 dark:text-slate-400">{countLine}</span>
+          <span className="block truncate text-[11px] font-medium text-slate-600 dark:text-slate-400">{countLine}</span>
         </button>
       )}
       <MenuButton

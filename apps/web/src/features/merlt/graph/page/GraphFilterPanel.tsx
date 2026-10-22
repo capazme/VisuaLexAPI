@@ -42,7 +42,7 @@ export function GraphFilterPanel({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="w-full overflow-hidden rounded-lg border border-slate-200 bg-white/95 shadow-lg backdrop-blur dark:border-slate-700 dark:bg-slate-900/95">
+    <div className="w-full overflow-hidden rounded-lg border border-slate-200 bg-white/95 shadow-md backdrop-blur dark:border-slate-700 dark:bg-slate-900/95">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
