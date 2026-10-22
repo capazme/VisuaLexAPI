@@ -100,7 +100,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   frame, nothing takes the focus; a click on it plays it again once it has ended; under reduced motion it only fades
   in. Measured at 60 fps in Chromium at every width (not
   on a phone). The weight comes by two copies cross-faded (300, then the wordmark's own, `weightClass`), never a weight
-  animated; on Safari (`filterHolds`) the filter is left out and the melt is the cross-fade alone, the brief's fallback. The register form fits a window 768 px high
+  animated; on WebKit (`isWebKit` in `segments.ts`: Safari on a Mac, every browser on an iPhone or an iPad — Chrome,
+  Firefox and Edge there are WebKit too —, an iPad with a Mac's user agent and touch points) the filter is left out and
+  the melt is the cross-fade alone, the brief's fallback. The register form fits a window 768 px high
   inside (1366×768, 1470×753 measured as viewports; a 768 px screen with a browser's bars scrolls a little) by
   its spacing (`space-y-4` between fields, `space-y-1.5` inside one), the sign-in form spaced the same. While a sign-in or a
   sign-up is on its way the tabs hold still (`aria-disabled`): its answer would land on the hidden form. A

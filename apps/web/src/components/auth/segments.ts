@@ -114,3 +114,15 @@ export function cellLines(index: number): Record<Segment, SegmentLine> {
     g: { x1: x0 + m, y1: y0 + half, x2: x0 + w - m, y2: y0 + half },
   };
 }
+
+/**
+ * WebKit, where the fusion filter is redrawn on the CPU at every frame while its blur changes (A2's fallback: the melt
+ * is the cross-fade alone): Safari on a Mac; every browser on an iPhone, an iPad or an iPod — Chrome, Firefox and Edge
+ * there are WebKit too (CriOS, FxiOS, EdgiOS) —; an iPad that says it is a Mac (iPadOS's desktop user agent, with
+ * touch points).
+ */
+export function isWebKit(userAgent: string, maxTouchPoints = 0): boolean {
+  if (/iP(hone|ad|od)/.test(userAgent)) return true;
+  if (/Macintosh/.test(userAgent) && maxTouchPoints > 1) return true;
+  return /Safari/.test(userAgent) && !/Chrome|Chromium|Android|Edg/.test(userAgent);
+}

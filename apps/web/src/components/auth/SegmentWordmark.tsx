@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { animate, motion, useReducedMotion } from 'framer-motion';
 import { ease } from '../../lib/motion';
 import { cn } from '../../lib/utils';
-import { cellAt, cellLines, changeTimes, DONE_AT, MELT_AT, SEGMENTS, TIMING, VIEW_H, VIEW_W, WORD } from './segments';
+import { cellAt, cellLines, changeTimes, DONE_AT, isWebKit, MELT_AT, SEGMENTS, TIMING, VIEW_H, VIEW_W, WORD } from './segments';
 
 type Phase = 'lighting' | 'melting' | 'done';
 
@@ -17,6 +17,9 @@ interface SegmentWordmarkProps {
 
 const MELT_S = TIMING.meltFor / 1000;
 
+/** The fusion filter is drawn here: not on WebKit (`isWebKit`), where the melt is the cross-fade alone. */
+const filterHolds = () => typeof navigator === 'undefined' || !isWebKit(navigator.userAgent, navigator.maxTouchPoints ?? 0);
+
 /**
  * «VisuaLex» drawn first as a seven-segment display (A2), inspired by Animorio's «logo dai sette segmenti», written from
  * scratch with SVG, an SVG filter and Framer Motion: eight cells slanted by 7° light up in short steps, each through one
@@ -26,13 +29,6 @@ const MELT_S = TIMING.meltFor / 1000;
  * screen reader throughout (the display and the melting copy are `aria-hidden`), and its box is the real wordmark's
  * from the first frame: the column never changes size. Under reduced motion the wordmark only fades in.
  */
-/**
- * Safari (macOS and iOS, every iOS browser): the fusion filter is redrawn on the CPU at every frame while its blur
- * changes; there the melt is the cross-fade alone (the brief's fallback).
- */
-const filterHolds = () =>
-  typeof navigator === 'undefined' || !/^((?!chrome|chromium|android|crios|fxios|edg).)*safari/i.test(navigator.userAgent);
-
 export function SegmentWordmark({ className, weightClass, onSettled }: SegmentWordmarkProps) {
   const still = Boolean(useReducedMotion());
   const filterId = `vlx-goo-${useId().replace(/:/g, '')}`;
@@ -95,7 +91,7 @@ export function SegmentWordmark({ className, weightClass, onSettled }: SegmentWo
   return (
     // A click plays it again (a pointer's nicety: the display says nothing a keyboard user misses); no selection on
     // the double click that may come with it.
-    <h1 className={cn(className, weightClass, 'relative select-none')} onClick={replay}>
+    <h1 className={cn(className, weightClass, 'relative', drawing && 'select-none')} onClick={replay}>
       {/* The real wordmark: its box from the first frame, shown once the display has melted into it. */}
       <motion.span
         className="inline-block"
