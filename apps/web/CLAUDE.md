@@ -2079,10 +2079,17 @@ meant to stay split; add new features as new files, not inside the shells:
   of the archive (`ArchivedEnvironmentsSection` under «I miei pubblicati»: «Ambienti salvati (archivio)», «Recupera
   i dossier» through `POST /environments/:id/recover`, «Esporta JSON», «Elimina»; absent for a user with none; no
   environment is created any more) and an old share link (`SharedLinkImport`, reading `?import=`, through `POST
-  /dossiers/import-study`, quick norms and aliases left out). «Dossier di studio pronti» (`StudyPacksBand`, over
-  `utils/studyPacks.ts`: the 20 packs of `data/exampleEnvironments.ts`, each a pack's dossiers plus «‹pack›:
-  articoli chiave») follows Explore's category and adds a pack through `import-study`; the empty dossier list
-  points to it. One list of categories, `utils/forumCategories.ts`. `EnvironmentContentViewer` (the tree of a
+  /dossiers/import-study`, quick norms and aliases left out). Explore shows **the community's dossiers first** (S7a,
+  the Forum's reason): a grid of `SharedEnvironmentCard`s, one column, two from `md`, three from `xl`, a row's cards one
+  height (`h-full`), each an `article` with its title in Newsreader 18 px, one plain line «● Civile · v1 · autore · 2
+  giorni fa» (the category's hue from its token `--category-*`, never a hand-written colour; a long username cut, whole
+  on hover), two tags then «+N», «Mi piace» a heart with its number (`aria-pressed`, named «Mi piace: N») and one action,
+  «Aggiungi ai miei dossier», outlined; the count of additions is the order «Più aggiunti»' and «I più aggiunti»' (the
+  widget, last on the page), not a number on every card. Then «Pronti da VisuaLex» (`StudyPacksBand`, over
+  `utils/studyPacks.ts`: the 20 packs of `data/exampleEnvironments.ts`, each a pack's dossiers plus «‹pack›: articoli
+  chiave»): one row of compact cards that scrolls sideways, every pack in it, after the grid on a computer and after the
+  community's first two dossiers on a phone (`useIsDesktop`, one place or the other); it follows Explore's category and
+  adds a pack through `import-study`; the empty dossier list points to it. One list of categories, `utils/forumCategories.ts`. `EnvironmentContentViewer` (the tree of a
   content's dossiers, quick norms, aliases, notes and highlights), `useLeftOutNotice` and `annotationLabels` serve
   the suggestions. The suggestion flow adds `SuggestionReviewDialog`, `EditSuggestionDialog`,
   `SuggestionItemCard` (all five itemTypes), `AliasConflictDialog`,

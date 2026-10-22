@@ -266,7 +266,7 @@ export const FORUM_STEPS: DriveStep[] = [
     {
         popover: {
             title: 'Dossier pubblici',
-            description: 'I dossier di studio pubblicati dalla comunità: aggiungili ai tuoi dossier, pubblica i tuoi e suggerisci contenuti agli altri. In cima trovi i dossier di studio pronti di VisuaLex.',
+            description: 'I dossier di studio pubblicati dalla comunità: aggiungili ai tuoi dossier, pubblica i tuoi e suggerisci contenuti agli altri. Dopo i dossier della comunità trovi quelli pronti di VisuaLex.',
             side: 'over',
             align: 'center',
         }
