@@ -293,7 +293,7 @@ export function AuthPage() {
               </p>
             </header>
 
-            <main ref={cardRef} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-6 shadow-lg sm:p-8 dark:border-slate-800 dark:bg-slate-900">
+            <main ref={cardRef} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8 dark:border-slate-800 dark:bg-slate-900">
               <div
                 role="tablist"
                 aria-label="Accedi o registrati"

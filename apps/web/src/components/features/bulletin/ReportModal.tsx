@@ -62,7 +62,7 @@ export function ReportModal({ environmentId, onClose, onReported }: ReportModalP
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-md overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg w-full max-w-md overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">

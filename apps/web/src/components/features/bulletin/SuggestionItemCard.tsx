@@ -8,13 +8,13 @@ const HIGHLIGHT_SWATCH_BG: Record<string, string> = {
   yellow: 'bg-yellow-300',
   green: 'bg-green-300',
   red: 'bg-red-300',
-  blue: 'bg-blue-300',
+  blue: 'bg-primary-300',
 };
 
 const ITEM_TYPE_META: Record<SuggestionItemType, { icon: typeof FileText; label: string; colorClass: string }> = {
   annotation: { icon: FileText, label: 'Nota', colorClass: 'text-amber-600 dark:text-amber-400' },
   highlight: { icon: Highlighter, label: 'Evidenziazione', colorClass: 'text-yellow-600 dark:text-yellow-400' },
-  dossier: { icon: Folder, label: 'Dossier', colorClass: 'text-indigo-600 dark:text-indigo-400' },
+  dossier: { icon: Folder, label: 'Dossier', colorClass: 'text-primary-600 dark:text-primary-400' },
   quickNorm: { icon: Zap, label: 'Norma veloce', colorClass: 'text-emerald-600 dark:text-emerald-400' },
   alias: { icon: Link2, label: 'Alias', colorClass: 'text-purple-600 dark:text-purple-400' },
 };

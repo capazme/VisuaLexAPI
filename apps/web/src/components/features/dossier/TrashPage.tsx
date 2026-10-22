@@ -27,7 +27,7 @@ export function TrashPage({ trash, onBack, showToast }: Props) {
     <div>
       <button
         onClick={onBack}
-        className="mb-4 inline-flex min-h-[44px] items-center gap-2 rounded text-sm text-slate-500 hover:text-blue-600 md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+        className="mb-4 inline-flex min-h-[44px] items-center gap-2 rounded text-sm text-slate-500 hover:text-primary-600 md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
       >
         <ArrowLeft size={16} /> Torna ai Dossier
       </button>

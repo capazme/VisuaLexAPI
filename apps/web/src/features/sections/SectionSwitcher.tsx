@@ -12,7 +12,7 @@ import { SECTION_MENU_MS, rollName, rollUpMenu, slideCheck, unrollMenu, type Rol
 /** Closed; open; chosen (the check arrives, nothing more can be chosen); rolling back up. */
 type Phase = 'closed' | 'open' | 'chosen' | 'closing';
 
-const FOCUS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500';
+const FOCUS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
 const HOVER = 'hover:bg-slate-100 dark:hover:bg-slate-800';
 
 /**

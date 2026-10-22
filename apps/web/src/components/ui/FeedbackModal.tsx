@@ -14,7 +14,7 @@ interface FeedbackModalProps {
 const feedbackTypes: { value: FeedbackType; label: string; icon: React.ElementType; color: string }[] = [
   { value: 'bug', label: 'Bug', icon: Bug, color: 'text-red-500' },
   { value: 'suggestion', label: 'Suggerimento', icon: Lightbulb, color: 'text-amber-500' },
-  { value: 'other', label: 'Altro', icon: HelpCircle, color: 'text-blue-500' },
+  { value: 'other', label: 'Altro', icon: HelpCircle, color: 'text-primary-500' },
 ];
 
 export function FeedbackModal({ isOpen, onClose, onSuccess }: FeedbackModalProps) {
