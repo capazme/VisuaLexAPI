@@ -57,7 +57,8 @@ describe('SharedEnvironmentCard «Ai miei dossier»', () => {
 
   it('gives «Mi piace» and «Aggiungi ai miei dossier» a 44 px touch target on a phone', () => {
     renderCard(base);
-    expect(screen.getByRole('button', { name: /Mi piace/ })).toHaveClass('min-h-[44px]', 'min-w-[44px]', 'md:min-h-0');
+    // 44 px on a phone; on a computer as tall as the action beside it (36 px), not the heart's 18.
+    expect(screen.getByRole('button', { name: /Mi piace/ })).toHaveClass('min-h-[44px]', 'min-w-[44px]', 'md:min-h-9');
     expect(screen.getByRole('button', { name: /Aggiungi «Ricorso Rossi» ai miei dossier/ })).toHaveClass('min-h-[44px]', 'md:min-h-0');
   });
 });
@@ -80,13 +81,20 @@ describe('SharedEnvironmentCard — its shape (S7a)', () => {
     const line = within(card).getByText('Civile').parentElement!;
     expect(line).toHaveClass('text-sm');
     expect(line.className).not.toMatch(/uppercase/);
-    expect(line).toHaveTextContent('Civile·v1·autore·2 giorni fa');
+    expect(line).toHaveTextContent('Civile· v1· autore· 2 giorni fa');
+    // A narrow card wraps it between the parts, never inside one, and cuts a long username.
+    expect(line).toHaveClass('flex-wrap');
+    expect(within(line).getByTitle('autore')).toHaveClass('truncate', 'min-w-0');
   });
 
   it('shows two tags at most, then «+N»', () => {
     renderCard({ ...base, tags: ['appello', 'gdpr', 'locazione', 'mora'] });
     const tags = within(screen.getByRole('list', { name: 'Etichette' })).getAllByRole('listitem');
-    expect(tags.map((tag) => tag.textContent)).toEqual(['Appello', 'Gdpr', '+2e altre 2']);
+    expect(tags.map((tag) => tag.textContent)).toHaveLength(3);
+    expect(tags.slice(0, 2).map((tag) => tag.textContent)).toEqual(['Appello', 'Gdpr']);
+    // «+2» to the eye, «e altre 2» to a screen reader.
+    expect(within(tags[2]).getByText('+2')).toHaveAttribute('aria-hidden');
+    expect(within(tags[2]).getByText('e altre 2')).toHaveClass('sr-only');
   });
 
   it('draws «Mi piace» as a heart with its number, pressed when liked, and passes the card on', async () => {
@@ -107,6 +115,18 @@ describe('SharedEnvironmentCard — its shape (S7a)', () => {
     expect(add.className).not.toMatch(/bg-primary-600/);
     // Only the like, the action and the «⋯» menu: no counter of views or downloads drawn as bare numbers.
     expect(screen.getAllByRole('button')).toHaveLength(3);
+    // On the narrowest card its words are cut rather than pushed out of it; the like is as tall as it on a computer.
+    expect(within(add).getByText('Aggiungi ai miei dossier')).toHaveClass('truncate');
+    expect(add).toHaveClass('min-w-0');
+    expect(screen.getByRole('button', { name: /Mi piace/ })).toHaveClass('md:min-h-9');
+  });
+
+  it('marks a withdrawn card by its dashed edge and its badge, with no opacity that would trap its menu', () => {
+    renderCard({ ...base, isActive: false });
+    const card = screen.getByRole('article', { name: 'Ricorso Rossi' });
+    expect(card).toHaveClass('border-dashed');
+    expect(card.className).not.toMatch(/opacity-/);
+    expect(within(card).getByText('Ritirato')).toBeInTheDocument();
   });
 
   it('takes the category\'s hue from its token, not a hand-written colour', () => {

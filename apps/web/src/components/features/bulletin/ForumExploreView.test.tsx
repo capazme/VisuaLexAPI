@@ -1,5 +1,6 @@
 import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
+import { createPortal } from 'react-dom';
 import { ForumExploreView } from './ForumExploreView';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
 import type { SharedEnvironment } from '../../../types';
@@ -34,6 +35,40 @@ function makeEnv(id: string, title: string, downloadCount: number): SharedEnviro
 }
 
 const noop = () => {};
+
+/** The view inside a scroller of the test's, as the layout's content area holds it. */
+function ForumExploreViewIn({ into }: { into: HTMLElement }) {
+  return createPortal(
+    <ForumExploreView
+      environments={[]}
+      pagination={{ page: 1, pages: 1, total: 0 }}
+      loading={false}
+      likingIds={new Set()}
+      searchQuery=""
+      setSearchQuery={noop}
+      category="all"
+      setCategory={noop}
+      sort="newest"
+      setSort={noop}
+      showCategoryDropdown={false}
+      setShowCategoryDropdown={noop}
+      showSortDropdown={false}
+      setShowSortDropdown={noop}
+      onSearchSubmit={(e) => e.preventDefault()}
+      onRefresh={noop}
+      onPaginate={noop}
+      onLike={noop}
+      onImport={noop}
+      onReport={noop}
+      onSuggest={noop}
+      onPublishClick={noop}
+      onPacksAdded={noop}
+      onPacksError={noop}
+      onResetFilters={noop}
+    />,
+    into,
+  );
+}
 
 function renderView(overrides: Partial<React.ComponentProps<typeof ForumExploreView>> = {}) {
   return render(
@@ -207,6 +242,54 @@ describe('ForumExploreView - the order of the page', () => {
     expect(screen.getAllByRole('region', { name: 'Pronti da VisuaLex' })).toHaveLength(1);
     // The tour's first card is still the first.
     expect(cards[0]).toHaveAttribute('id', 'tour-forum-card');
+  });
+
+  it('keeps the strip in its place on a phone while a new read travels: never mounted again', () => {
+    setDesktop(false);
+    const { rerender } = renderView({ environments: five, pagination: { page: 1, pages: 1, total: 5 } });
+    const packs = screen.getByRole('region', { name: 'Pronti da VisuaLex' });
+    const props = (loading: boolean) => ({
+      environments: five, pagination: { page: 1, pages: 1, total: 5 }, loading, likingIds: new Set<string>(), searchQuery: '',
+      setSearchQuery: noop, category: 'all' as const, setCategory: noop, sort: 'newest' as const, setSort: noop,
+      showCategoryDropdown: false, setShowCategoryDropdown: noop, showSortDropdown: false, setShowSortDropdown: noop,
+      onSearchSubmit: (e: React.FormEvent) => e.preventDefault(), onRefresh: noop, onPaginate: noop, onLike: noop,
+      onImport: noop, onReport: noop, onSuggest: noop, onPublishClick: noop, onPacksAdded: noop, onPacksError: noop,
+      onResetFilters: noop,
+    });
+    rerender(<ForumExploreView {...props(true)} />);
+    expect(screen.getByRole('region', { name: 'Pronti da VisuaLex' })).toBe(packs);
+    rerender(<ForumExploreView {...props(false)} />);
+    expect(screen.getByRole('region', { name: 'Pronti da VisuaLex' })).toBe(packs);
+  });
+
+  it('heads the community\'s dossiers, for a screen reader, and «I più aggiunti» at the same level as the packs', async () => {
+    setDesktop(false);
+    listMock.mockResolvedValue({ data: [makeEnv('t1', 'Uno', 4)], pagination: { page: 1, limit: 3, total: 1, pages: 1 } });
+    renderView({ environments: five, pagination: { page: 1, pages: 1, total: 5 } });
+    expect(screen.getByRole('heading', { level: 2, name: 'Dalla comunità' })).toHaveClass('sr-only');
+    // The cards after the strip are not read as its part.
+    const more = screen.getByRole('heading', { level: 2, name: 'Altri dossier della comunità' });
+    const packs = screen.getByRole('region', { name: 'Pronti da VisuaLex' });
+    expect(follows(packs, more) && follows(more, screen.getAllByRole('article')[2])).toBe(true);
+    expect(await screen.findByRole('heading', { level: 2, name: 'I più aggiunti' })).toBeInTheDocument();
+  });
+
+  it('brings «Pronti da VisuaLex» to the top of the content and focuses it, from /forum#pronti', () => {
+    setDesktop(true);
+    window.history.replaceState(null, '', '/forum#pronti');
+    const scrollTo = vi.fn();
+    const scroller = document.createElement('div');
+    scroller.style.overflowY = 'auto';
+    scroller.scrollTo = scrollTo as unknown as typeof scroller.scrollTo;
+    document.body.append(scroller);
+    try {
+      render(<ForumExploreViewIn into={scroller} />);
+      expect(scrollTo).toHaveBeenCalledTimes(1);
+      expect(document.activeElement).toBe(document.getElementById('pronti'));
+    } finally {
+      scroller.remove();
+      window.history.replaceState(null, '', '/');
+    }
   });
 
   it('shows the packs once, after the empty Forum', () => {

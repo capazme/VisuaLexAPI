@@ -20,6 +20,10 @@ describe('StudyPacksBand', () => {
     expect(items).toHaveLength(STUDY_PACKS.length);
     expect(items[0].parentElement).toHaveClass('flex', 'overflow-x-auto', 'snap-x');
     expect(items[0]).toHaveClass('w-56', 'shrink-0', 'snap-start');
+    // The row takes the focus itself, so the keyboard scrolls it past packs that hold no button.
+    const row = screen.getByRole('list', { name: 'Pronti da VisuaLex' });
+    expect(row).toHaveAttribute('tabindex', '0');
+    expect(row).toHaveAttribute('id', 'pronti');
     // No «Mostra tutti»: the row holds them all.
     expect(screen.queryByRole('button', { name: /^Mostra tutti/ })).toBeNull();
   });

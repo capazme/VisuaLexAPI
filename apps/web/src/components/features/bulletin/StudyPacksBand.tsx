@@ -52,8 +52,14 @@ export function StudyPacksBand({ category, onAdded, onError }: Props) {
         </h2>
         <span className="text-sm text-slate-600 dark:text-slate-400">dossier di studio da aggiungere ai tuoi</span>
       </div>
-      {/* One row that scrolls sideways, each card snapping to the start; the cards keep one width and one height. */}
-      <ul className="-mx-1 flex snap-x gap-3 overflow-x-auto px-1 pb-3 pt-1">
+      {/* One row that scrolls sideways, each card snapping to the start; the cards keep one width and one height. It takes
+          the focus itself, so the arrows scroll it even past the packs already added, which hold no button. */}
+      <ul
+        id="pronti"
+        tabIndex={0}
+        aria-labelledby="study-packs"
+        className="-mx-1 flex snap-x gap-3 overflow-x-auto rounded-xl px-1 pb-3 pt-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+      >
         {packs.map((pack) => {
           const added = addedNow.has(pack.key) || packAlreadyAdded(pack, dossiers);
           return (

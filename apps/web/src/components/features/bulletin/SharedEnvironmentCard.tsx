@@ -30,6 +30,12 @@ interface SharedEnvironmentCardProps {
 /** A category's hue, from the category palette's tokens (light and dark): the card's leading stripe and the meta line's dot. */
 const categoryHue = (c: EnvironmentCategory) => `hsl(var(--category-${c}))`;
 
+/**
+ * The grid of the cards, Explore's and «I miei pubblicati»' (S7a): one column, two from `md`, three from `xl`; a row's
+ * cards one height (each `h-full`).
+ */
+export const CARD_GRID = 'grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-3';
+
 /** The tags shown on a card (S7a): two, then «+N». */
 const TAGS_SHOWN = 2;
 
@@ -93,8 +99,12 @@ export function SharedEnvironmentCard({
       id={isFirst ? 'tour-forum-card' : undefined}
       aria-labelledby={titleId}
       className={cn(
-        'group relative flex h-full flex-col rounded-xl border bg-white transition-colors dark:bg-slate-900',
-        isWithdrawn ? 'border-slate-300 opacity-75 dark:border-slate-600' : 'border-slate-200 dark:border-slate-700',
+        'group relative flex h-full flex-col rounded-xl border',
+        // Withdrawn: a dashed edge on a quieter paper, and the badge — no opacity, which would trap the «⋯» menu in a
+        // stacking context of its own and fade the text under AA.
+        isWithdrawn
+          ? 'border-dashed border-slate-400 bg-slate-50 dark:border-slate-600 dark:bg-slate-900/60'
+          : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900',
       )}
     >
       {/* The category's hue down the leading edge, from its token; no clipping on the card, so the «⋯» menu can hang out. */}
@@ -236,22 +246,28 @@ export function SharedEnvironmentCard({
           </div>
         </div>
 
-        {/* The category, the version, the author and how long ago, in one line of plain text. */}
-        {/* One line, never wrapped: only the username gives way, cut, whole on hover. */}
-        <p className="mt-1 flex min-w-0 items-center gap-x-1.5 whitespace-nowrap text-sm text-slate-600 dark:text-slate-400">
-          <span aria-hidden className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: hue }} />
-          <span>{categoryLabel(environment.category)}</span>
-          <span aria-hidden>·</span>
-          <span>v{environment.currentVersion}</span>
-          <span aria-hidden>·</span>
-          <span className="min-w-0 truncate" title={environment.user.username}>
-            {environment.user.username}
+        {/* The category, the version, the author and how long ago, in plain text: one line where the card has room; a
+            narrow card wraps it between the parts, each «·» kept with what follows it, and a long username is cut,
+            whole on hover. */}
+        <p className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm text-slate-600 dark:text-slate-400">
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+            <span aria-hidden className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: hue }} />
+            {categoryLabel(environment.category)}
+          </span>
+          <span className="whitespace-nowrap">
+            <span aria-hidden>· </span>v{environment.currentVersion}
+          </span>
+          <span className="flex min-w-0 max-w-full whitespace-nowrap">
+            <span aria-hidden className="shrink-0">·&nbsp;</span>
+            <span className="min-w-0 truncate" title={environment.user.username}>
+              {environment.user.username}
+            </span>
           </span>
           {timeAgoRelative && (
-            <>
-              <span aria-hidden>·</span>
-              <span title={timeAbsolute}>{timeAgoRelative}</span>
-            </>
+            <span className="whitespace-nowrap" title={timeAbsolute}>
+              <span aria-hidden>· </span>
+              {timeAgoRelative}
+            </span>
           )}
         </p>
         {environment.description && (
@@ -274,8 +290,8 @@ export function SharedEnvironmentCard({
           </ul>
         )}
 
-        {/* At the foot: «Mi piace» as its heart and count, then the card's one action, outlined. How many added it is
-            the order «Più aggiunti»' and «I più aggiunti»', not a third number on every card. */}
+        {/* At the foot: «Mi piace» as its heart and count, then the card's one action, outlined. How many added a dossier
+            is what the order «Più aggiunti» sorts by and «I più aggiunti» lists, not a third number on every card. */}
         {/* As tall as the action, on a card without one too (the user's own), so every foot lines up. */}
         <div className="mt-auto flex min-h-[3.375rem] items-center gap-2 pt-4">
           <button
@@ -287,6 +303,8 @@ export function SharedEnvironmentCard({
             className={cn(
               'inline-flex min-w-[44px] shrink-0 items-center justify-center gap-1.5 rounded-lg px-2 text-sm tabular-nums transition-colors disabled:opacity-50 md:min-w-0',
               TOUCH_TARGET_RESPONSIVE,
+              // On a computer as tall as the action beside it, not the heart's 18 px.
+              'md:min-h-9',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900',
               environment.userLiked
                 ? 'text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20'
@@ -302,13 +320,14 @@ export function SharedEnvironmentCard({
               onClick={() => onImport(environment)}
               aria-label={`Aggiungi «${environment.title}» ai miei dossier`}
               className={cn(
-                'ml-auto inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-primary-600 px-3 py-2 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-50 dark:border-primary-400 dark:text-primary-300 dark:hover:bg-primary-900/30',
+                'ml-auto inline-flex min-w-0 items-center justify-center gap-1.5 rounded-lg border border-primary-600 px-3 py-2 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-50 dark:border-primary-400 dark:text-primary-300 dark:hover:bg-primary-900/30',
                 TOUCH_TARGET_RESPONSIVE,
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900',
               )}
             >
-              <FolderPlus size={16} aria-hidden />
-              Aggiungi ai miei dossier
+              <FolderPlus size={16} aria-hidden className="shrink-0" />
+              {/* One line: on the narrowest card (320 px) the words are cut rather than pushed out of it. */}
+              <span className="truncate">Aggiungi ai miei dossier</span>
             </button>
           )}
         </div>

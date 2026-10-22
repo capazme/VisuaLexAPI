@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { scrollParentOf } from '../practice/practiceView';
 import { Search, Upload, Filter, ChevronDown, RefreshCw, Users, TrendingUp, Clock, Download, Trophy, X as XIcon } from 'lucide-react';
-import { SharedEnvironmentCard } from './SharedEnvironmentCard';
+import { CARD_GRID, SharedEnvironmentCard } from './SharedEnvironmentCard';
 import { EmptyState } from '../../ui/EmptyState';
 import { StudyPacksBand } from './StudyPacksBand';
 import { FORUM_CATEGORIES } from '../../../utils/forumCategories';
@@ -12,8 +13,8 @@ import type { SharedEnvironment, EnvironmentCategory, StudyImportReport } from '
 
 export type SortOption = 'newest' | 'popular' | 'mostDownloaded';
 
-/** The community's dossiers (S7a): one column on a phone, two from `md`, three from `xl`; a row's cards one height. */
-const GRID = 'grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-3';
+/** The community's dossiers (S7a): the cards' grid. */
+const GRID = CARD_GRID;
 /** On a phone VisuaLex's packs come after this many of the community's dossiers. */
 const PHONE_CARDS_BEFORE_PACKS = 2;
 
@@ -109,7 +110,80 @@ export function ForumExploreView({
       ))}
     </div>
   );
-  const packsInGrid = !desktop && environments.length > PHONE_CARDS_BEFORE_PACKS;
+  // No dossier: what to do about it, a search to clear or a dossier to publish.
+  const emptyState = hasFilter ? (
+    <EmptyState
+      variant="search"
+      title="Nessun dossier pubblicato corrisponde ai filtri"
+      description={
+        searchQuery && category !== 'all'
+          ? `Nessun risultato per "${searchQuery}" nella categoria ${selectedCategory.label.toLowerCase()}.`
+          : searchQuery
+          ? `Nessun risultato per "${searchQuery}".`
+          : `Nessun dossier pubblicato nella categoria "${selectedCategory.label}".`
+      }
+      action={
+        <button
+          onClick={onResetFilters}
+          className={`inline-flex ${TOUCH_TARGET_RESPONSIVE} items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg transition-colors`}
+        >
+          <XIcon size={16} />
+          Azzera filtri
+        </button>
+      }
+    />
+  ) : (
+    <EmptyState
+      variant="generic"
+      title="Ancora nessun dossier nel Forum"
+      description="Pubblica un tuo dossier di studio: gli altri lo aggiungono ai loro dossier."
+      action={
+        <button
+          onClick={onPublishClick}
+          className={`inline-flex ${TOUCH_TARGET_RESPONSIVE} items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors`}
+        >
+          <Upload size={16} />
+          Pubblica un dossier
+        </button>
+      }
+    />
+  );
+  // «Pronti da VisuaLex» from elsewhere (the empty dossier list, `/forum#pronti`): once the dossiers are read and the
+  // strip has its place, the content scroller alone brings it to the top (never `scrollIntoView`, gotcha 34), and the
+  // strip takes the focus, so the keyboard is there too.
+  // The address's fragment, read from the window: the router writes it there, and this view needs no router of its own.
+  const broughtToPacks = useRef(false);
+  useEffect(() => {
+    if (window.location.hash !== '#pronti' || loading || broughtToPacks.current) return;
+    const strip = document.getElementById('pronti');
+    const scroller = strip && scrollParentOf(strip);
+    if (!strip || !scroller) return;
+    broughtToPacks.current = true;
+    const heading = strip.closest('section') ?? strip;
+    // Under the phone's bar, which the scroller's `scroll-padding-top` measures, and 16 px of air.
+    const padding = parseFloat(getComputedStyle(scroller).scrollPaddingTop) || 0;
+    const top = heading.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop - padding - 16;
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    scroller.scrollTo({ top: Math.max(0, top), behavior: reduce ? 'auto' : 'smooth' });
+    strip.focus({ preventScroll: true });
+  }, [loading]);
+  const skeleton = (count: number) => (
+    <div aria-hidden className={GRID}>
+      {[...Array(count)].map((_, i) => (
+        <div key={i} className="overflow-hidden rounded-xl border border-slate-200 bg-white motion-safe:animate-pulse dark:border-slate-700 dark:bg-slate-900">
+          <div className="space-y-3 p-4">
+            <div className="h-5 w-3/4 rounded bg-slate-100 dark:bg-slate-800" />
+            <div className="h-4 w-1/2 rounded bg-slate-100 dark:bg-slate-800" />
+            <div className="h-4 w-full rounded bg-slate-100 dark:bg-slate-800" />
+            <div className="mt-4 flex gap-2">
+              <div className="h-10 w-12 rounded bg-slate-100 dark:bg-slate-800" />
+              <div className="h-10 flex-1 rounded bg-slate-100 dark:bg-slate-800" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <>
@@ -239,73 +313,22 @@ export function ForumExploreView({
         </p>
       )}
 
-      {/* Grid */}
-      {loading ? (
-        <div className={GRID}>
-          {[...Array(6)].map((_, i) => (
-            <div
-              key={i}
-              className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden animate-pulse"
-            >
-              <div className="h-10 bg-slate-100 dark:bg-slate-700" />
-              <div className="p-4 space-y-3">
-                <div className="h-5 bg-slate-100 dark:bg-slate-700 rounded w-3/4" />
-                <div className="h-4 bg-slate-100 dark:bg-slate-700 rounded w-full" />
-                <div className="h-4 bg-slate-100 dark:bg-slate-700 rounded w-1/2" />
-                <div className="flex gap-2 mt-4">
-                  <div className="h-10 bg-slate-100 dark:bg-slate-700 rounded flex-1" />
-                  <div className="h-10 bg-slate-100 dark:bg-slate-700 rounded flex-1" />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : environments.length === 0 ? (
-        hasFilter ? (
-          <EmptyState
-            variant="search"
-            title="Nessun dossier pubblicato corrisponde ai filtri"
-            description={
-              searchQuery && category !== 'all'
-                ? `Nessun risultato per "${searchQuery}" nella categoria ${selectedCategory.label.toLowerCase()}.`
-                : searchQuery
-                ? `Nessun risultato per "${searchQuery}".`
-                : `Nessun dossier pubblicato nella categoria "${selectedCategory.label}".`
-            }
-            action={
-              <button
-                onClick={onResetFilters}
-                className={`inline-flex ${TOUCH_TARGET_RESPONSIVE} items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg transition-colors`}
-              >
-                <XIcon size={16} />
-                Azzera filtri
-              </button>
-            }
-          />
-        ) : (
-          <EmptyState
-            variant="generic"
-            title="Ancora nessun dossier nel Forum"
-            description="Pubblica un tuo dossier di studio: gli altri lo aggiungono ai loro dossier."
-            action={
-              <button
-                onClick={onPublishClick}
-                className={`inline-flex ${TOUCH_TARGET_RESPONSIVE} items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors`}
-              >
-                <Upload size={16} />
-                Pubblica un dossier
-              </button>
-            }
-          />
-        )
-      ) : packsInGrid ? (
+      {/* The community's dossiers: on a phone their first two, VisuaLex's packs, then the rest — in fixed places, so the
+          strip is never mounted again (an addition on its way keeps its state) while a new read travels. */}
+      <h2 id="forum-community-dossiers" className="sr-only">
+        Dalla comunità
+      </h2>
+      {loading
+        ? skeleton(desktop ? 6 : PHONE_CARDS_BEFORE_PACKS)
+        : environments.length === 0
+          ? emptyState
+          : cards(desktop ? environments : environments.slice(0, PHONE_CARDS_BEFORE_PACKS))}
+      {!desktop && packs}
+      {!desktop && (loading || environments.length > PHONE_CARDS_BEFORE_PACKS) && (
         <>
-          {cards(environments.slice(0, PHONE_CARDS_BEFORE_PACKS))}
-          {packs}
-          {cards(environments.slice(PHONE_CARDS_BEFORE_PACKS), PHONE_CARDS_BEFORE_PACKS)}
+          <h2 className="sr-only">Altri dossier della comunità</h2>
+          {loading ? skeleton(4) : cards(environments.slice(PHONE_CARDS_BEFORE_PACKS), PHONE_CARDS_BEFORE_PACKS)}
         </>
-      ) : (
-        cards(environments)
       )}
 
       {/* Pagination */}
@@ -331,8 +354,8 @@ export function ForumExploreView({
         </div>
       )}
 
-      {/* VisuaLex's packs after the community's dossiers (unless placed among them on a phone), then the most added. */}
-      {!packsInGrid && packs}
+      {/* On a computer VisuaLex's packs after the community's dossiers and their pages; then the most added. */}
+      {desktop && packs}
       <TopEnvironmentsWidget onImport={onImport} />
     </>
   );
@@ -376,10 +399,10 @@ function TopEnvironmentsWidget({ onImport }: TopEnvironmentsWidgetProps) {
 
   if (state.status === 'loading') {
     return (
-      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4">
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
         <div className="flex items-center gap-2 mb-3">
           <Trophy size={16} className="text-amber-500" />
-          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">I più aggiunti</h3>
+          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">I più aggiunti</h2>
         </div>
         <div className="space-y-2">
           {[...Array(3)].map((_, i) => (
@@ -395,10 +418,10 @@ function TopEnvironmentsWidget({ onImport }: TopEnvironmentsWidgetProps) {
   if (items.length === 0) return null;
 
   return (
-    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4">
+    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
       <div className="flex items-center gap-2 mb-3">
         <Trophy size={16} className="text-amber-500" />
-        <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">I più aggiunti</h3>
+        <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">I più aggiunti</h2>
       </div>
       <ul className="space-y-1">
         {items.map((env, idx) => (
@@ -406,7 +429,7 @@ function TopEnvironmentsWidget({ onImport }: TopEnvironmentsWidgetProps) {
             <button
               type="button"
               onClick={() => onImport(env)}
-              className={`w-full flex items-center gap-3 px-2 py-1.5 rounded-lg text-left hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-800 ${TOUCH_TARGET_RESPONSIVE}`}
+              className={`w-full flex items-center gap-3 px-2 py-1.5 rounded-lg text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${TOUCH_TARGET_RESPONSIVE}`}
             >
               <span className="w-5 shrink-0 text-sm font-bold text-amber-700 dark:text-amber-400 text-center">{idx + 1}</span>
               <span className="flex-1 min-w-0 truncate text-sm font-medium text-slate-800 dark:text-slate-200">
