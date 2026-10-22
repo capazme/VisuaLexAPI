@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -10,8 +10,8 @@ import { describe, expect, it } from 'vitest';
  *   the nearest positioned box beyond it as its own, the strip clips none of them, and the page widens to the last;
  * - a subject's name cut short.
  */
-// The suite runs from `apps/web`, as `theme.test.ts` assumes.
-const DIR = resolve(process.cwd(), 'src/components/features/studia');
+// This folder, wherever the suite runs from (as `motion.guard.test.ts` finds `src`).
+const DIR = __dirname;
 
 function sources(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -21,25 +21,33 @@ function sources(dir: string): string[] {
   });
 }
 
-/** Every class string of a file: the quoted strings that carry Tailwind classes. */
-const classStrings = (source: string) => [...source.matchAll(/(['"`])((?:(?!\1).)*?\b(?:overflow-x-auto|grid)\b(?:(?!\1).)*?)\1/g)].map((m) => m[2]);
+/** A strip that scrolls: `overflow(-x)-auto` or `-scroll`, at any width (`md:overflow-x-auto` too). */
+const SCROLLS = /(?:^|\s)(?:[a-z0-9-]+:)*overflow(?:-x)?-(?:auto|scroll)(?=\s|$)/;
+
+/** Every class string of a file that makes a strip scroll: a quoted string, or a `cn(…)` call's strings together. */
+function scrollingClasses(source: string): string[] {
+  const calls = [...source.matchAll(/cn\(([\s\S]*?)\)/g)].map((m) => [...m[1].matchAll(/(['"`])([^'"`]*)\1/g)].map((q) => q[2]).join(' '));
+  const strings = [...source.matchAll(/className="([^"]*)"/g)].map((m) => m[1]);
+  return [...calls, ...strings].filter((classes) => SCROLLS.test(classes));
+}
 
 describe('Gymnasium on a phone', () => {
   it.each(sources(DIR).map((path) => relative(DIR, path)))('%s: every strip that scrolls sideways is the box of what it holds', (file) => {
-    const strips = classStrings(readFileSync(join(DIR, file), 'utf8')).filter((classes) => /(?:^|\s)overflow-x-auto(?:\s|$)/.test(classes));
-    for (const classes of strips) expect(classes).toMatch(/(?:^|\s)relative(?:\s|$)/);
+    for (const classes of scrollingClasses(readFileSync(join(DIR, file), 'utf8'))) expect(classes).toMatch(/(?:^|\s)relative(?:\s|$)/);
   });
 
   it('gives «Oggi»\'s grids a column below xl, so no implicit track grows', () => {
     const home = readFileSync(join(DIR, 'ReviewHome.tsx'), 'utf8');
-    expect(home).toMatch(/'relative grid grid-cols-1 gap-6 pb-8'/);
-    expect(home).toMatch(/'grid min-w-0 grid-cols-1 gap-6'/);
+    // Every grid «Oggi» lays out declares its columns (below `xl` one, `grid-cols-1`).
+    const grids = [...home.matchAll(/className=\{cn\('([^']*)'/g)].map((m) => m[1]).filter((classes) => /(?:^|\s)grid(?:\s|$)/.test(classes));
+    expect(grids.length).toBeGreaterThanOrEqual(2);
+    for (const classes of grids) expect(classes).toMatch(/(?:^|\s)grid-cols-1(?:\s|$)/);
   });
 
   it('never cuts a subject\'s name in «Le tue materie»', () => {
     const list = readFileSync(join(DIR, 'progress/SubjectList.tsx'), 'utf8');
     const name = list.match(/<span data-subject-name className="([^"]+)"/)![1];
     expect(name).not.toMatch(/truncate|line-clamp|whitespace-nowrap/);
-    expect(name).toContain('[overflow-wrap:anywhere]');
+    expect(name).toContain('break-words');
   });
 });

@@ -105,17 +105,19 @@ export function SubjectList({ materie, loading, reloading, selected, onSelect, p
                 // `backwards` fill (the utility's): each row waits unseen for its turn, then rests where it is.
                 // From `md` a row: the choice takes what «Ripassa» leaves, all of it for a subject with no card, so every row
                 // ends where «Tutte le materie» does (a grid's empty column kept its 8 px gap).
-                className={cn(ITEM, 'grid gap-1.5 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 md:flex md:items-center md:gap-2')}
+                // On a phone the strip makes every card as tall as the tallest: its rows keep their own height (`content-start`).
+                className={cn(ITEM, 'grid gap-1.5 max-md:content-start motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 md:flex md:items-center md:gap-2')}
                 style={{ animationDelay: `${(index + 1) * STAGGER_MS}ms` }}
               >
                 <button type="button" aria-pressed={on} onClick={() => onSelect(stop.materia)} className={cn(CHOICE, on ? PRESSED : IDLE, 'flex-wrap md:min-w-0 md:flex-1 md:flex-nowrap')}>
                   <span aria-hidden className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: subjectHue(stop.materia) }} />
-                  {/* Never cut: «Diritto processuale civile» goes on two lines in a phone's 240 px card (G8b). */}
-                  <span data-subject-name className="min-w-0 flex-1 [overflow-wrap:anywhere]">{label}</span>
+                  {/* Never cut (G8b): on a phone the name has the card's width — the counts go to a line of their own —
+                      and wraps between words, hyphenated in Italian if a word is too long. */}
+                  <span data-subject-name className="min-w-0 flex-1 break-words hyphens-auto">{label}</span>
                   {total === 0 ? (
-                    <span className={cn('shrink-0 text-xs font-normal', MUTED_TEXT)}>Nessuna scheda</span>
+                    <span className={cn('shrink-0 text-xs font-normal max-md:basis-full max-md:pl-[18px]', MUTED_TEXT)}>Nessuna scheda</span>
                   ) : (
-                    <span className="flex shrink-0 items-center gap-2.5">
+                    <span className="flex shrink-0 items-center gap-2.5 max-md:basis-full max-md:pl-[18px]">
                       {due ? (
                         <span className={cn('text-sm tabular-nums', dovute > 0 ? cn('font-semibold', INK_TEXT) : cn('font-normal', MUTED_TEXT))}>
                           <span aria-hidden>{`${formatCount(dovute)} oggi`}</span>
