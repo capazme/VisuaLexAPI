@@ -434,7 +434,7 @@ export function ReviewTrend({ calendario, today, obiettivo, hue, narrowed = fals
           <ChevronRight aria-hidden size={16} className="transition-transform group-open:rotate-90 motion-reduce:transition-none" />
           Vedi i numeri
         </summary>
-        <div className="max-h-80 overflow-auto">
+        <div className="relative max-h-80 overflow-auto">
           <table className="w-full text-left tabular-nums">
             <caption className="sr-only">Ripassi {words.summary}</caption>
             <thead>

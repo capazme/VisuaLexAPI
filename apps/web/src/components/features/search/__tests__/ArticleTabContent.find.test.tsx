@@ -1,7 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
-import userEvent from '@testing-library/user-event';
 import type { ArticleData, ArticleValidity, Highlight, NormaVisitata } from '../../../../types';
 
 const { listPassages, listDiscussions, checkNorma } = vi.hoisted(() => ({
@@ -32,7 +31,7 @@ vi.mock('../../../../plugins/PluginSlot', () => ({ PluginSlot: () => null }));
 
 import { ArticleTabContent } from '../ArticleTabContent';
 import { FindWindow } from '../FindWindow';
-import { closeFindWindow } from '../../../../utils/findWindowControl';
+import { closeFindWindow, openFindWindow } from '../../../../utils/findWindowControl';
 import { appStore } from '../../../../store/useAppStore';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../../utils/normaKeys';
 import { fixtureText, ARTICLE_FIXTURES } from '../../../../utils/__fixtures__/articleTexts';
@@ -99,7 +98,21 @@ beforeEach(() => {
 const ACCENTED = ARTICLE_FIXTURES.find((f) => f.text.includes('può'))!;
 
 const typeQuery = (value: string) => fireEvent.change(screen.getByRole('searchbox', { name: 'Cerca nel testo' }), { target: { value } });
-const magnifier = () => screen.getAllByRole('button', { name: 'Cerca nel testo' })[0];
+/** The article's «⋯» (R3; the phone row's, the first drawn: jsdom lays nothing out, so it is the one «on screen»). */
+const more = (root: HTMLElement = document.body) => within(root).getAllByRole('button', { name: 'Altre azioni sull’articolo' })[0];
+/** Opens that «⋯» and returns its find entry («Cerca nel testo», or «Chiudi la ricerca nel testo» while open here). */
+function findEntry(root?: HTMLElement) {
+  const trigger = more(root);
+  fireEvent.click(trigger);
+  return within(document.getElementById(trigger.getAttribute('aria-controls')!)!).getByRole('menuitem', { name: /ricerca nel testo|Cerca nel testo/ });
+}
+const toggleFind = (root?: HTMLElement) => fireEvent.click(findEntry(root));
+/** What the entry says, the menu closed again: whether the window is open on this text. */
+function findSays(root?: HTMLElement) {
+  const label = findEntry(root).textContent;
+  fireEvent.click(more(root));
+  return label;
+}
 const drawn = (name = 'vlx-find') => registry.get(name)?.ranges.length ?? 0;
 
 /** A practice holding `articles` of the act of `NORMA`; it becomes the active one. */
@@ -123,7 +136,7 @@ function showInTab(data: ArticleData) {
   return { tabId, ...view };
 }
 
-describe('ArticleTabContent — the magnifier opens the find window', () => {
+describe('ArticleTabContent — «Cerca nel testo» opens the find window', () => {
   afterEach(() => {
     act(() => closeFindWindow());
     appStore.setState(NO_PRACTICES);
@@ -132,10 +145,10 @@ describe('ArticleTabContent — the magnifier opens the find window', () => {
   it('opens the window, not a box under the toolbar, and finds a word typed without its accent', async () => {
     showInTab(article({ article_text: ACCENTED.text }));
     expect(screen.queryByRole('search')).not.toBeInTheDocument();
-    fireEvent.click(magnifier());
+    toggleFind();
     const window_ = screen.getByRole('search');
     expect(window_.closest('.glass-toolbar')).toBeNull();
-    expect(magnifier()).toHaveAttribute('aria-pressed', 'true');
+    expect(findSays()).toBe('Chiudi la ricerca nel testo');
     expect(screen.getByRole('button', { name: 'Questa pratica' })).toHaveAttribute('aria-pressed', 'true');
     typeQuery('puo');
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/^1 di \d+$/));
@@ -144,7 +157,7 @@ describe('ArticleTabContent — the magnifier opens the find window', () => {
 
   it('finds the accented word typed with its accent too', async () => {
     showInTab(article({ article_text: ACCENTED.text }));
-    fireEvent.click(magnifier());
+    toggleFind();
     typeQuery('può');
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/^1 di \d+$/));
   });
@@ -153,9 +166,9 @@ describe('ArticleTabContent — the magnifier opens the find window', () => {
     showInTab(article({ article_text: ACCENTED.text }));
     // each of the two words is on the page, outside the text root
     expect(screen.getByText('Giurisprudenza')).toBeInTheDocument();
-    expect(document.body.textContent).toContain('Allegato');
-    fireEvent.click(magnifier());
-    for (const word of ['Giurisprudenza', 'Allegato']) {
+    expect(document.body.textContent).toContain('Al dossier');
+    toggleFind();
+    for (const word of ['Giurisprudenza', 'dossier']) {
       typeQuery(word);
       await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Nessun risultato'));
       expect(drawn()).toBe(0);
@@ -165,47 +178,46 @@ describe('ArticleTabContent — the magnifier opens the find window', () => {
   it('does not find the loading placeholder', async () => {
     showInTab(article({ article_text: '' }));
     expect(screen.getByText('Caricamento testo...')).toBeInTheDocument();
-    fireEvent.click(magnifier());
+    toggleFind();
     typeQuery('caricamento');
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Nessun risultato'));
   });
 
-  it('draws no magnifier while the text is not shown', () => {
+  it('offers no «Cerca nel testo» while the text is not shown', () => {
     const notYet: ArticleValidity = { state: 'not_yet', valid_from: null, valid_to: null, version_number: null, act_updated: null, request_in_window: true };
     showInTab(article({ article_text: ACCENTED.text, validity: notYet }));
-    expect(screen.queryByRole('button', { name: 'Cerca nel testo' })).not.toBeInTheDocument();
+    fireEvent.click(more());
+    expect(screen.getAllByRole('menuitem').length).toBeGreaterThan(0);
+    expect(screen.queryByRole('menuitem', { name: /ricerca nel testo|Cerca nel testo/ })).not.toBeInTheDocument();
   });
 
-  it('the magnifier again closes it, clearing the highlights and returning focus to the button', async () => {
+  it('the entry again closes it, clearing the highlights and giving the focus to the «⋯» it was chosen from', async () => {
     showInTab(article({ article_text: ACCENTED.text }));
-    fireEvent.click(magnifier());
+    toggleFind();
     typeQuery('puo');
     await waitFor(() => expect(drawn('vlx-find-current')).toBe(1));
-    // As in a browser: the pointer goes down on the button, which takes the focus from the field.
-    const button = magnifier();
-    fireEvent.pointerDown(button);
-    button.focus();
-    fireEvent.click(button);
+    expect(screen.getByRole('searchbox')).toHaveFocus();
+    toggleFind();
     expect(screen.queryByRole('search')).not.toBeInTheDocument();
     expect(registry.has('vlx-find-current')).toBe(false);
-    expect(magnifier()).toHaveAttribute('aria-pressed', 'false');
-    expect(document.activeElement).toBe(button);
+    expect(document.activeElement).toBe(more());
+    expect(findSays()).toBe('Cerca nel testo');
   });
 
-  it('keeps focus on the magnifier when it closes the window with the field still holding focus', async () => {
-    showInTab(article({ article_text: ACCENTED.text }));
-    const button = magnifier();
-    fireEvent.click(button);
-    expect(screen.getByRole('searchbox')).toHaveFocus();
-    fireEvent.click(button);
-    expect(screen.queryByRole('search')).not.toBeInTheDocument();
-    expect(document.activeElement).toBe(button);
+  it('on a window open on the practice with no text pointed at (Cmd/Ctrl+F), points it here rather than close it', () => {
+    const { tabId } = showInTab(article({ article_text: ACCENTED.text }));
+    act(() => openFindWindow({ tabId }));
+    expect(screen.getByRole('search')).toBeInTheDocument();
+    expect(findSays()).toBe('Cerca nel testo');
+    toggleFind();
+    expect(screen.getByRole('search')).toBeInTheDocument();
+    expect(findSays()).toBe('Chiudi la ricerca nel testo');
   });
 
-  it('Esc closes it and gives the focus back to the magnifier that opened it', async () => {
+  it('Esc closes it and gives the focus back to the «⋯» it was opened from', async () => {
     showInTab(article({ article_text: ACCENTED.text }));
-    const button = magnifier();
-    fireEvent.click(button);
+    const button = more();
+    toggleFind();
     typeQuery('puo');
     await waitFor(() => expect(drawn('vlx-find-current')).toBe(1));
     fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'Escape' });
@@ -214,10 +226,10 @@ describe('ArticleTabContent — the magnifier opens the find window', () => {
     expect(button).toHaveFocus();
   });
 
-  it('leaves the other toolbar buttons where they were', () => {
+  it('leaves the other tools where they are', () => {
     show(article());
-    for (const title of ['Apri note', 'Gestisci evidenziazioni', 'Copia', 'Altre azioni', 'Aggiungi a norme rapide']) {
-      expect(screen.getAllByTitle(title).length).toBeGreaterThan(0);
+    for (const name of [/^Note/, /^Evidenziazioni/, 'Al dossier', 'Altre azioni sull’articolo']) {
+      expect(screen.getAllByRole('button', { name }).length).toBeGreaterThan(0);
     }
   });
 });
@@ -265,7 +277,7 @@ describe('ArticleTabContent — the find window\'s text root', () => {
 });
 
 
-describe('ArticleTabContent — a magnifier that was not pressed opens the window on its text', () => {
+describe('ArticleTabContent — «Cerca nel testo» on another text opens the window there', () => {
   const NORMA_B: NormaVisitata = { ...NORMA, numero_articolo: '1285', urn: 'urn:nir:stato:regio.decreto:1942-03-16;262:2~art1285' };
 
   afterEach(() => {
@@ -285,20 +297,19 @@ describe('ArticleTabContent — a magnifier that was not pressed opens the windo
         <FindWindow />
       </MemoryRouter>,
     );
-    const mag = (id: string) => within(screen.getByTestId(id)).getAllByRole('button', { name: 'Cerca nel testo' })[0];
+    const root = (id: string) => screen.getByTestId(id);
 
-    // B is the active practice; open on it, then go to A's magnifier.
-    fireEvent.click(mag('b'));
-    expect(mag('b')).toHaveAttribute('aria-pressed', 'true');
-    expect(mag('a')).toHaveAttribute('aria-pressed', 'false');
+    // B is the active practice; open on it, then go to A's «⋯».
+    toggleFind(root('b'));
+    expect(findSays(root('b'))).toBe('Chiudi la ricerca nel testo');
+    expect(findSays(root('a'))).toBe('Cerca nel testo');
 
-    fireEvent.pointerDown(mag('a'));
     act(() => appStore.getState().setActivePractice(tabA)); // the practice switched on the bar
-    fireEvent.click(mag('a'));
+    toggleFind(root('a'));
 
     expect(screen.getByRole('search')).toBeInTheDocument();
-    expect(mag('a')).toHaveAttribute('aria-pressed', 'true');
-    expect(mag('b')).toHaveAttribute('aria-pressed', 'false');
+    expect(findSays(root('a'))).toBe('Chiudi la ricerca nel testo');
+    expect(findSays(root('b'))).toBe('Cerca nel testo');
   });
 
   it('on another article of the active practice: opens on that text instead of closing', () => {
@@ -312,50 +323,19 @@ describe('ArticleTabContent — a magnifier that was not pressed opens the windo
         <FindWindow />
       </MemoryRouter>,
     );
-    const mag = (id: string) => within(screen.getByTestId(id)).getAllByRole('button', { name: 'Cerca nel testo' })[0];
+    const root = (id: string) => screen.getByTestId(id);
 
-    fireEvent.click(mag('a'));
-    expect(mag('a')).toHaveAttribute('aria-pressed', 'true');
-    expect(mag('b')).toHaveAttribute('aria-pressed', 'false');
+    toggleFind(root('a'));
+    expect(findSays(root('a'))).toBe('Chiudi la ricerca nel testo');
+    expect(findSays(root('b'))).toBe('Cerca nel testo');
 
-    fireEvent.pointerDown(mag('b'));
-    fireEvent.click(mag('b'));
+    toggleFind(root('b'));
     expect(screen.getByRole('search')).toBeInTheDocument();
-    expect(mag('b')).toHaveAttribute('aria-pressed', 'true');
-    expect(mag('a')).toHaveAttribute('aria-pressed', 'false');
+    expect(findSays(root('b'))).toBe('Chiudi la ricerca nel testo');
+    expect(findSays(root('a'))).toBe('Cerca nel testo');
 
-    // Pressed on its own text, the same magnifier closes.
-    fireEvent.pointerDown(mag('b'));
-    fireEvent.click(mag('b'));
+    // Chosen on its own text, the same entry closes.
+    toggleFind(root('b'));
     expect(screen.queryByRole('search')).not.toBeInTheDocument();
-  });
-
-  it.each([
-    ['released off the button', (el: HTMLElement) => { void el; fireEvent.pointerUp(document.body); }],
-    ['cancelled', (el: HTMLElement) => fireEvent.pointerCancel(el)],
-  ])('Enter after a press %s, with the window closed since, opens it', async (_how, abort) => {
-    const user = userEvent.setup();
-    const a = article({ article_text: ACCENTED.text });
-    const tab = addPractice('A', NORMA, [a]);
-    render(
-      <MemoryRouter>
-        <ArticleTabContent data={a} readingOrigin={{ tabId: tab, blockId: 'b' }} />
-        <FindWindow />
-      </MemoryRouter>,
-    );
-    const mag = () => screen.getAllByRole('button', { name: 'Cerca nel testo' })[0];
-
-    fireEvent.click(mag());
-    expect(mag()).toHaveAttribute('aria-pressed', 'true');
-    // A press on the open magnifier that never becomes a click.
-    fireEvent.pointerDown(mag());
-    abort(mag());
-    act(() => closeFindWindow());
-    expect(screen.queryByRole('search')).not.toBeInTheDocument();
-
-    mag().focus();
-    await user.keyboard('{Enter}');
-    expect(screen.getByRole('search')).toBeInTheDocument();
-    expect(mag()).toHaveAttribute('aria-pressed', 'true');
   });
 });

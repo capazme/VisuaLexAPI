@@ -95,6 +95,12 @@ function annex(norm: LabelledNorm, short: boolean): string {
   return short ? ` (All. ${value})` : ` (Allegato ${value})`;
 }
 
+/** The annex a label names, as the convention writes it («A», «2»), or '' when none is named: never a code's own, an
+ *  act of the Union's or the text of an annexed act (the TULPS). What a surface shows as «Allegato N» (R3). */
+export function namedAnnex(norm: LabelledNorm): string {
+  return annex(norm, false) ? text(norm.allegato) : '';
+}
+
 /** «art. 2, l. 7 agosto 1990, n. 241», «art. 2043 c.c.», «art. 5, reg. (UE) 2016/679». */
 export function citeNorm(norm: LabelledNorm): string {
   const { act: cited, joiner } = act(norm, false);
