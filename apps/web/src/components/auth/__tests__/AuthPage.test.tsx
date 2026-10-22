@@ -316,17 +316,19 @@ describe('AuthPage: the wordmark written in ink', () => {
     expect(title.querySelector('svg')).toBeNull();
   });
 
-  it('lets each letter settle as the pen reaches it, the last as the mask ends (250 to 1050 ms)', () => {
+  it('lets each letter settle as the pen reaches it, the last ending with the mask (250 to 1050 ms)', () => {
     renderAuth('/login');
     const delays = [...screen.getByRole('heading', { level: 1 }).querySelectorAll<HTMLElement>('[data-ink-letter]')].map(
       (letter) => parseInt(letter.style.animationDelay, 10),
     );
     expect(delays[0]).toBe(250);
-    expect(delays.at(-1)).toBe(750);
+    // The last letter's left side is 7/8 of the word: the edge, crossing 112 % in 800 ms, reaches it at 875 ms, and
+    // its 175 ms of settling end at 1050.
+    expect(delays.at(-1)).toBe(875);
     expect(delays).toEqual([...delays].sort((a, b) => a - b));
   });
 
-  it('drops the mask once the pen has crossed the word, and only then', () => {
+  it('makes the word one text again once the pen has crossed it, and only then', () => {
     renderAuth('/login');
     const title = screen.getByRole('heading', { level: 1 });
     expect(title).toHaveClass('vlx-ink-word');
@@ -343,11 +345,24 @@ describe('AuthPage: the wordmark written in ink', () => {
     expect(title).toHaveClass('vlx-ink-word');
     end(title, 'vlx-ink-write');
     expect(title).not.toHaveClass('vlx-ink-word');
+    // No letters apart on the finished page (WebKit kerns no pair across two elements), no second copy.
+    expect(title.querySelector('[data-ink-letter]')).toBeNull();
+    expect(title.textContent).toBe('VisuaLex');
+    expect(screen.getByRole('heading', { level: 1, name: 'VisuaLex' })).toBe(title);
   });
 
-  it('fades the colophon in under reduced motion, from the first frame after it is drawn', async () => {
+  it('turns the colophon\'s opacity on after its first frames, the fade reduced motion sees', async () => {
     renderAuth('/login');
     const header = screen.getByRole('heading', { level: 1 }).closest('header')!;
+    expect(header).toHaveClass('motion-reduce:opacity-0');
     await waitFor(() => expect(header).not.toHaveClass('motion-reduce:opacity-0'));
+  });
+
+  it('never takes the word apart under reduced motion', () => {
+    reduceMotion(true);
+    renderAuth('/login');
+    const title = screen.getByRole('heading', { level: 1, name: 'VisuaLex' });
+    expect(title).not.toHaveClass('vlx-ink-word');
+    expect(title.querySelector('[data-ink-letter]')).toBeNull();
   });
 });

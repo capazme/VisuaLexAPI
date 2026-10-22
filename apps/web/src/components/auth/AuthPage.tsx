@@ -37,10 +37,11 @@ const TABS: { id: AuthTab; label: string; path: string }[] = [
   { id: 'register', label: 'Registrati', path: '/register' },
 ];
 
-// The wordmark's letters (A3): each settles as the pen's tip reaches it, the mask crossing the word from 250 to
-// 1050 ms at an even pace and a letter taking 300 ms, so the last ends with the mask.
+// The wordmark's letters (A3): each settles from the moment the pen's soft edge reaches its left side — the edge
+// crossing 112 % of the word from 250 to 1050 ms at an even pace, a letter taken as an eighth of it — over 175 ms,
+// so the last ends with the mask.
 const WORDMARK = [...'VisuaLex'];
-const inkDelay = (index: number) => Math.round(250 + (index * 500) / (WORDMARK.length - 1));
+const inkDelay = (index: number) => Math.round(250 + (800 * (index / WORDMARK.length)) / 1.12);
 
 // Entering the app (spec §6.3.1): once per session the book traces itself, then the app comes in.
 const ENTRY_MS = 720;
@@ -72,12 +73,15 @@ export function AuthPage() {
   // the form starts again empty (it stays mounted, so a new key mounts it afresh).
   const [signedUp, setSignedUp] = useState(false);
   const [registerKey, setRegisterKey] = useState(0);
-  // The wordmark written in ink (A3, `index.css`): its mask goes once the pen has crossed it, so nothing stays on
-  // the finished page; under reduced motion the colophon only fades in, `inkShown` turning its opacity on.
-  const [inked, setInked] = useState(false);
+  // The wordmark written in ink (A3, `index.css`): once the pen has crossed it the word is one text again, no mask
+  // and no letters apart (WebKit kerns no pair across two elements); under reduced motion it never comes apart, and
+  // the colophon only fades in, `inkShown` turning its opacity on after a frame drawn at 0.
+  const [inked, setInked] = useState(prefersReducedMotion);
   const [inkShown, setInkShown] = useState(false);
   useEffect(() => {
-    const frame = requestAnimationFrame(() => setInkShown(true));
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => setInkShown(true));
+    });
     return () => cancelAnimationFrame(frame);
   }, []);
   // And «Torna ad Accedi» finds a fresh sign-in form: a new key empties it, and the failure the page's
@@ -196,12 +200,18 @@ export function AuthPage() {
                   if (event.target === event.currentTarget && event.animationName === 'vlx-ink-write') setInked(true);
                 }}
               >
-                <span className="sr-only">VisuaLex</span>
-                {WORDMARK.map((letter, index) => (
-                  <span key={index} aria-hidden="true" data-ink-letter style={{ animationDelay: `${inkDelay(index)}ms` }}>
-                    {letter}
-                  </span>
-                ))}
+                {inked ? (
+                  'VisuaLex'
+                ) : (
+                  <>
+                    <span className="sr-only select-none">VisuaLex</span>
+                    {WORDMARK.map((letter, index) => (
+                      <span key={index} aria-hidden="true" data-ink-letter style={{ animationDelay: `${inkDelay(index)}ms` }}>
+                        {letter}
+                      </span>
+                    ))}
+                  </>
+                )}
               </h1>
               <p className="vlx-ink-line max-w-[34ch] font-serif text-xl leading-relaxed text-slate-600 dark:text-slate-300">
                 Le norme italiane ed europee, le sentenze che le leggono, e il tuo lavoro sopra: note, evidenziazioni, dossier.

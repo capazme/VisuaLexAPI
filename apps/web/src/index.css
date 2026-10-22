@@ -1138,7 +1138,9 @@
 }
 
 /* The book mark (ui/BookMark, and the splash in index.html): the cover traces, then the spine; while
-   something loads it breathes. Under reduced motion the global rule makes both instant. */
+   something loads it breathes. The trace only with motion allowed: the global reduced-motion rule cuts durations, not
+   delays, and the spine's 420 ms of delay with a `both` fill kept it hidden that long; under reduced motion the
+   book is drawn at once. */
 .vlx-book path {
   fill: none;
   stroke: currentColor;
@@ -1147,8 +1149,10 @@
   stroke-linejoin: round;
   stroke-dasharray: 100;
 }
-.vlx-book-draw path { animation: vlx-book-trace 600ms var(--ease-in-out) both; }
-.vlx-book-draw path:last-child { animation-duration: 260ms; animation-delay: 420ms; }
+@media (prefers-reduced-motion: no-preference) {
+  .vlx-book-draw path { animation: vlx-book-trace 600ms var(--ease-in-out) both; }
+  .vlx-book-draw path:last-child { animation-duration: 260ms; animation-delay: 420ms; }
+}
 .vlx-book-breathe { animation: vlx-book-breathe 1.4s ease-in-out 700ms infinite alternate; }
 @keyframes vlx-book-trace { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
 @keyframes vlx-book-breathe { to { opacity: 0.4; } }
@@ -1158,7 +1162,9 @@
    letter settles from a faint blur, then the line under it rises 4 px into view (1050–1250 ms). Everything fills
    backwards only, so at the end nothing is left on the page: no mask, no filter. Only with motion allowed — the
    global rule cuts the durations, not the delays, and a delayed `backwards` would hide the wordmark for 250 ms and
-   the line for a second; under reduced motion the page fades in through that rule's 150 ms opacity transition. */
+   the line for a second; under reduced motion the page fades in through that rule's 150 ms opacity transition.
+   Without `@property` (Safari before 16.4) the edge cannot be interpolated: the word stays hidden for half the
+   animation and then shows whole, the letters settling — never hidden for good, the mask going at its end. */
 @property --vlx-ink-edge { syntax: '<percentage>'; inherits: false; initial-value: 112%; }
 @media (prefers-reduced-motion: no-preference) {
   .vlx-ink-book path { animation: vlx-book-trace 450ms var(--ease-out) backwards; }
@@ -1169,7 +1175,7 @@
        its initial value (the word whole) once the timeline was set by hand. */
     animation: vlx-ink-write 1050ms linear backwards;
   }
-  .vlx-ink-word > [data-ink-letter] { animation: vlx-ink-settle 300ms var(--ease-out) backwards; }
+  .vlx-ink-word > [data-ink-letter] { animation: vlx-ink-settle 175ms var(--ease-out) backwards; }
   .vlx-ink-line { animation: vlx-ink-rise 200ms var(--ease-out) 1050ms backwards; }
 }
 @keyframes vlx-ink-write { 0%, 23.81% { --vlx-ink-edge: 0%; } to { --vlx-ink-edge: 112%; } }
