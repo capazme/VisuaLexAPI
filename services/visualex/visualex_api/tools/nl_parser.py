@@ -12,7 +12,8 @@ from typing import Optional
 
 from .act_resolver import resolve_atto
 from .article_suffixes import ARTICLE_SUFFIX_ALTERNATION
-from .map import ANNEX_SIGLE, NORMATTIVA_SEARCH, code_row_of_annex
+from .map import ANNEX_SIGLE, NORMATTIVA_SEARCH, NORMATTIVA_URN_CODICI, code_row_of_annex
+from .sources import SIGLA_BY_ANNEX
 
 # Italian month names → month number
 _MESI = {
@@ -272,15 +273,16 @@ def _extract_annex(text: str) -> tuple[str, Optional[str]]:
     return text[:m.start()] + " " + text[m.end():], annex
 
 
-# The sigla of an annex of a code's decree (G-369: «disp. att. c.p.a.», «c.p.m.g.»): the code and
-# the annex together, so the label reads back to the annex it was written from. Longest first;
-# each dot may be left out or followed by a space («disp att cpa» is not the c.p.a.), and the
-# sigla is never read inside a word.
+# The sigla of an annex of a code's decree (G-369: «disp. att. c.p.a.», «c.p.m.g.») and every code
+# sigla of more than one word («disp. att. c.c.», «cod. nav.»): the code and its annex together, so
+# a label reads back to the annex it was written from. Longest first; each dot may be left out or
+# followed by a space («disp att cpa» is not the c.p.a., «disp att cc» not the c.c.), and a sigla
+# is never read inside a word.
 _ANNEX_SIGLA_PATTERNS = [
     (re.compile(r"(?<![\w.])" + r"\.?\s*".join(re.escape(part.strip()) for part in sigla.rstrip(".").split("."))
                 + r"\.?(?![\w])"), identity)
-    for identity, sigla in sorted(ANNEX_SIGLE.items(), key=lambda item: -len(item[1]))
-    if "." in sigla
+    for identity, sigla in sorted(SIGLA_BY_ANNEX.items(), key=lambda item: -len(item[1]))
+    if "." in sigla and (identity in ANNEX_SIGLE or " " in sigla)
 ]
 
 
@@ -291,7 +293,9 @@ def _extract_annex_sigla(text: str) -> tuple[str, Optional[str], Optional[str]]:
         if match:
             row = code_row_of_annex(identity)
             if row:
-                return (text[:match.start()] + " " + text[match.end():]).strip(), row[0], row[1]
+                # A code's own row (the disp. att. c.c., the c.p.m.p.) needs no annex: its default.
+                exact = NORMATTIVA_URN_CODICI.get(row[0]) == identity
+                return (text[:match.start()] + " " + text[match.end():]).strip(), row[0], None if exact else row[1]
     return text, None, None
 
 

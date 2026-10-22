@@ -165,9 +165,9 @@ def _day(iso: str) -> Optional[str]:
     return f"{'1°' if day == 1 else day} {_MONTHS[int(match.group(2)) - 1]} {match.group(1)}"
 
 
-# The sigla of an annex by its identity («<decree>:<annex>»): the codes the table above names,
+# The sigla of an annex by its identity («<decree>:<annex>»), also read by the parser: the codes the table above names,
 # at the annex the codes table keys them by, and the annexes and acts of ANNEX_SIGLE (G-369).
-_SIGLA_BY_ANNEX = {
+SIGLA_BY_ANNEX = {
     **{urn: _NAMED[_key(name)] for name, urn in NORMATTIVA_URN_CODICI.items()
        if _key(name) in _NAMED and re.search(r";\d+:\w+$", urn)},
     **ANNEX_SIGLE,
@@ -191,13 +191,13 @@ def _annex_identity(norm: Mapping[str, Any]) -> Optional[str]:
 
 def _named(norm: Mapping[str, Any]) -> Optional[str]:
     """The act's own name («c.c.», «c.p.a.», «disp. att. c.p.a.»): by the annex it sits in
-    (`_SIGLA_BY_ANNEX`), so another annex of a code's decree is not the code; else by the
+    (`SIGLA_BY_ANNEX`), so another annex of a code's decree is not the code; else by the
     act's name, for an act the codes table keys by no annex (the c.p.p., the Constitution).
     None for anything else: the norme di attuazione of the c.p.a. without their own sigla
     would be cited by the decree with their annex."""
     identity = _annex_identity(norm)
-    if identity in _SIGLA_BY_ANNEX:
-        return _SIGLA_BY_ANNEX[identity]
+    if identity in SIGLA_BY_ANNEX:
+        return SIGLA_BY_ANNEX[identity]
     row = codice_urn(_key(_text(norm, "tipo_atto"))) or ""
     if re.search(r";\d+:\w+$", row):
         return None

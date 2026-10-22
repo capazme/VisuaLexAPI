@@ -221,7 +221,16 @@ class TestAnnexSigle:
         ("art. 1 disp att cpa", "codice del processo amministrativo", "3"),
         ("art. 2 disp. trans. c.g.c.", "codice di giustizia contabile", "3"),
         ("art. 5 cpmg", "codici penali militari di pace e di guerra", "2"),
-        ("art. 1 reg nav mar", "approvazione del Regolamento per l'esecuzione del Codice della navigazione (Navigazione marittima)", "1"),
+        # a code's own row needs no annex: its default
+        ("art. 5 c.p.m.p.", "codici penali militari di pace e di guerra", None),
+        ("art. 1 reg nav mar", "approvazione del Regolamento per l'esecuzione del Codice della navigazione (Navigazione marittima)", None),
+        ("art. 1 disp att cpp", "norme di attuazione, di coordinamento e transitorie del codice di procedura penale", None),
+        # the disposizioni di attuazione however written, never the code they implement
+        ("art. 3 disp att cc", "disposizioni per l'attuazione del Codice civile e disposizioni transitorie", None),
+        ("art. 3 disp.att.c.c.", "disposizioni per l'attuazione del Codice civile e disposizioni transitorie", None),
+        ("art. 3 disp att cpc", "disposizioni per l'attuazione del Codice di procedura civile e disposizioni transitorie", None),
+        ("art. 3 disp. att. c.p.c.", "disposizioni per l'attuazione del Codice di procedura civile e disposizioni transitorie", None),
+        ("art. 1 cod nav", "codice della navigazione", None),
     ])
     def test_the_code_and_its_annex(self, label, act_type, annex):
         params = parse_nl_query(label).to_api_params()

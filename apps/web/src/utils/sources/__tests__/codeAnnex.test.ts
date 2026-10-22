@@ -88,6 +88,15 @@ describe('an annex sigla typed into the palette', () => {
     expect([parsed?.act_type, parsed?.annex]).toEqual([actType, annex]);
   });
 
+  // The disposizioni di attuazione however written, never the code they implement.
+  it.each([
+    ['art. 3 disp att cc', "disposizioni per l'attuazione del Codice civile e disposizioni transitorie"],
+    ['art. 3 disp att cpc', "disposizioni per l'attuazione del Codice di procedura civile e disposizioni transitorie"],
+    ['art. 1 disp att cpp', 'norme di attuazione, di coordinamento e transitorie del codice di procedura penale'],
+  ])('%s', (label, actType) => {
+    expect(parseLegalCitation(label)?.act_type).toBe(actType);
+  });
+
   it('a code\'s sigla names no annex', () => {
     expect(parseLegalCitation('art. 29 c.p.a.')).toMatchObject({ act_type: 'codice del processo amministrativo' });
     expect(parseLegalCitation('art. 29 c.p.a.')?.annex).toBeUndefined();
