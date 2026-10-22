@@ -50,7 +50,7 @@ export function ArticleReadOnly({ norma, showToast }: ArticleReadOnlyProps) {
 
   const current = settled?.key === requestKey ? settled : null;
   const article = current && 'article' in current ? current.article : undefined;
-  const display = article ? describeVersion(article.validity, norma) : null;
+  const display = article ? describeVersion(article.validity, norma, article.upcoming) : null;
 
   const rawText = article?.article_text || '';
   const structure = useMemo(() => parseArticleStructure(rawText), [rawText]);
@@ -67,7 +67,7 @@ export function ArticleReadOnly({ norma, showToast }: ArticleReadOnlyProps) {
       return;
     }
     const citation = display?.canCite
-      ? formatNormCitation({ norma, validity: article?.validity, requestedDate: undefined, original: false, consultedAt: todayInRome() })
+      ? formatNormCitation({ norma, validity: display?.citeAs ?? article?.validity, requestedDate: undefined, original: false, consultedAt: todayInRome() })
       : null;
     try {
       await navigator.clipboard.writeText(withCitation(text, citation, unversionedCitation(norma, todayInRome())));

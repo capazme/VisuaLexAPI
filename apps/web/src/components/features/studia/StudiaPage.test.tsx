@@ -56,7 +56,7 @@ describe('StudiaPage — what it tells its views about the account', () => {
 });
 
 describe('StudiaPage', () => {
-  it('heads the view with the section name, leaving its links to the sidebar and the menu button to the layout', () => {
+  it('heads the view with its name, leaving its links to the sidebar and the menu button to the layout', () => {
     const { container } = render(
       <MemoryRouter initialEntries={['/studia/schede']}>
         <Routes>
@@ -67,15 +67,57 @@ describe('StudiaPage', () => {
       </MemoryRouter>,
     );
     // The layout starts the page under its menu button: the heading needs no step aside.
-    expect(screen.getByRole('heading', { level: 1, name: 'Gymnasium: la tua palestra giuridica' }).className).not.toMatch(/\bpl-/);
+    expect(screen.getByRole('heading', { level: 1, name: 'Le mie schede' }).className).not.toMatch(/\bpl-/);
     expect(container.firstElementChild?.className).not.toMatch(/\bp[xy]?-\d|md:p-\d/);
     // Ripasso, Le mie schede and Da validare are the sidebar's entries now (sections spec S6).
     expect(screen.queryAllByRole('link')).toEqual([]);
     expect(screen.getByText('vista')).toBeInTheDocument();
   });
 
-  it.each(['/studia/schede', '/studia/schede/k1', '/studia/valida'])('shows the strip, with its gear, over %s (Gymnasium spec §5.1)', (path) => {
+  it.each([
+    ['/studia/ripasso', 'Oggi'],
+    ['/studia/progressi', 'Progressi'],
+    ['/studia/schede', 'Le mie schede'],
+    ['/studia/schede/k1', 'Le mie schede'],
+    ['/studia/valida', 'Da validare'],
+  ])('titles %s with the page\'s name, «Gymnasium · la tua palestra giuridica» small over it (L-37)', (path, name) => {
     at(path);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(new RegExp(`^${name}$`));
+    expect(screen.getByText('Gymnasium · la tua palestra giuridica')).toBeInTheDocument();
+  });
+
+  it('gives «Le mie schede» a place for its action beside the title, and no other view', () => {
+    function Slot() {
+      const { actionSlot } = useOutletContext<StudiaOutletContext>();
+      return <p data-testid="slot">{actionSlot ? 'slot' : 'none'}</p>;
+    }
+    const { unmount } = render(
+      <MemoryRouter initialEntries={['/studia/schede']}>
+        <Routes>
+          <Route path="/studia" element={<StudiaPage />}>
+            <Route path="schede" element={<Slot />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId('slot')).toHaveTextContent('slot');
+    // The slot is in the header, beside the title.
+    expect(screen.getByRole('banner').querySelector('.contents')).not.toBeNull();
+    unmount();
+    render(
+      <MemoryRouter initialEntries={['/studia/valida']}>
+        <Routes>
+          <Route path="/studia" element={<StudiaPage />}>
+            <Route path="valida" element={<Slot />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId('slot')).toHaveTextContent('none');
+  });
+
+  it('shows the strip, with its gear, over «Da validare» (Gymnasium spec §5.1)', () => {
+    at('/studia/valida');
     expect(screen.getByRole('button', { name: 'Impostazioni dello studio' })).toBeInTheDocument();
   });
 
@@ -83,7 +125,7 @@ describe('StudiaPage', () => {
     const { container } = at(path);
     const page = container.firstElementChild as HTMLElement;
     expect(page.className).not.toMatch(/\bmax-w-|\bmx-auto\b/);
-    const heading = screen.getByRole('heading', { level: 1, name: 'Gymnasium: la tua palestra giuridica' });
+    const heading = screen.getByRole('heading', { level: 1 });
     expect(page).toContainElement(heading);
     // The section switcher puts the focus on it.
     expect(heading).toHaveAttribute('data-section-title', 'gymnasium');
@@ -101,7 +143,7 @@ describe('StudiaPage', () => {
     expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
   });
 
-  it.each(['/studia/ripasso', '/studia/progressi', '/studia/ripasso/sessione'])('leaves %s alone: «Oggi» and «Progressi» draw their own summary, the session is a lesson', (path) => {
+  it.each(['/studia/ripasso', '/studia/progressi', '/studia/schede', '/studia/schede/k1', '/studia/ripasso/sessione'])('leaves %s alone: «Oggi» and «Progressi» draw their own summary, «Le mie schede» none (G8), the session is a lesson', (path) => {
     at(path);
     expect(screen.queryByRole('button', { name: 'Impostazioni dello studio' })).toBeNull();
   });

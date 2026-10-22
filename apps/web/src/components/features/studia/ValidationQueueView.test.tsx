@@ -238,7 +238,7 @@ describe('«Da validare», the keyboard and the vote bar', () => {
     approve.focus();
     await userEvent.click(approve);
     await screen.findByText('Domanda c2?');
-    const heading = screen.getByRole('heading', { level: 3 });
+    const heading = screen.getByRole('heading', { level: 2 });
     expect(heading).toHaveAttribute('tabindex', '-1');
     await waitFor(() => expect(heading).toHaveFocus());
   });
@@ -250,17 +250,17 @@ describe('«Da validare», the keyboard and the vote bar', () => {
     await userEvent.type(screen.getByRole('textbox', { name: 'Scrivi il motivo' }), 'No.');
     await userEvent.click(screen.getByRole('button', { name: 'Invia' }));
     await screen.findByText('Domanda c2?');
-    await waitFor(() => expect(screen.getByRole('heading', { level: 3 })).toHaveFocus());
+    await waitFor(() => expect(screen.getByRole('heading', { level: 2 })).toHaveFocus());
   });
 
   it('does not take the keyboard away when the card is not left (the vote failed) or on the first card', async () => {
     vote.mockRejectedValueOnce(rejection(500));
     render(<ValidationQueueView />);
     await screen.findByText('Domanda c1?');
-    expect(screen.getByRole('heading', { level: 3 })).not.toHaveFocus();
+    expect(screen.getByRole('heading', { level: 2 })).not.toHaveFocus();
     await userEvent.click(screen.getByRole('button', { name: 'Approvata' }));
     await screen.findByText('Non sono riuscito a registrare il voto. Riprova.');
-    expect(screen.getByRole('heading', { level: 3 })).not.toHaveFocus();
+    expect(screen.getByRole('heading', { level: 2 })).not.toHaveFocus();
   });
 });
 

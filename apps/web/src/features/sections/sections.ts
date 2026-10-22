@@ -23,12 +23,25 @@ export const SECTIONS: readonly Section[] = [
   { id: 'forum', name: 'Forum', line: 'Dossier pubblici e community', icon: Users, home: '/forum', homeName: 'Dossier pubblici' },
 ];
 
-/** The sections' titles with their phrase («Nome: …»), chosen by the owner on 19 October 2026; the one place to change
- *  them. The Forum's is the Community page's `h1`, Opus's the planner's (`planner/OpusPage`). */
-export const SECTION_TITLES = {
-  forum: 'Forum: il luogo del dibattito giuridico',
-  opus: 'Opus: la tua officina giuridica',
+/**
+ * The sections' phrases (the owner's, 19 October 2026); the one place to change them. Since L-37 (the owner, 22 October
+ * 2026) a section page's title is the page's name — «Oggi», «Progressi», «Community» — and the phrase goes over it, small,
+ * after the section's name: «Gymnasium · la tua palestra giuridica» (`sectionKicker`, drawn by `PageFrame`'s `kicker`).
+ */
+export const SECTION_PHRASES = {
+  gymnasium: 'la tua palestra giuridica',
+  opus: 'la tua officina giuridica',
+  forum: 'il luogo del dibattito giuridico',
 } as const satisfies Partial<Record<SectionId, string>>;
+
+/** A section with a phrase. */
+export type PhrasedSection = keyof typeof SECTION_PHRASES;
+
+/** The line over a section page's title (L-37): «Opus · la tua officina giuridica». */
+export function sectionKicker(id: PhrasedSection): string {
+  const name = SECTIONS.find((section) => section.id === id)?.name ?? id;
+  return `${name} · ${SECTION_PHRASES[id]}`;
+}
 
 /**
  * The code of a section's home where it is loaded on demand (`App.tsx`'s `lazy` routes): fetched when the switcher

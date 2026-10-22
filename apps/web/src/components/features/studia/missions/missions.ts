@@ -119,6 +119,28 @@ function note(mission: MissioneServer, data: Progressi): string | undefined {
   }
 }
 
+/**
+ * A mission announced and not yet recorded, as «Tutte le missioni» names it in its one line at the foot (G8): «In
+ * arrivo: materia ferma da 7 giorni, scrivi una scheda, caso breve, una settimana di serie».
+ */
+const SOON_NAME: Record<MissionId, string> = {
+  dovute: 'le schede dovute',
+  nuove: 'schede nuove',
+  obiettivo: 'l’obiettivo del giorno',
+  'materia-ferma': 'materia ferma da 7 giorni',
+  scrivi: 'scrivi una scheda',
+  convalida: 'convalida due schede',
+  caso: 'caso breve',
+  settimana: 'una settimana di serie',
+  consolida: 'consolida 50 schede',
+};
+
+/** «In arrivo: caso breve, una settimana di serie», or null when none is still to come. */
+export function soonLine(missions: readonly Mission[]): string | null {
+  const soon = missions.filter((mission) => mission.status === 'in-arrivo').map((mission) => SOON_NAME[mission.id]);
+  return soon.length > 0 ? `In arrivo: ${soon.join(', ')}` : null;
+}
+
 /** A mission of the read, as drawn: the server's state, count and value, the web's words. */
 export function missionFrom(mission: MissioneServer, data: Progressi): Mission {
   const line = note(mission, data);
@@ -145,9 +167,9 @@ export function todayMissions(data: Progressi): Mission[] {
 }
 
 /**
- * Today's missions as drawn (S2): a mission done slides under those still open, except the due cards', which carries
- * the page's action («Inizia», «Continua», «Hai finito per oggi») and stays first. `holding`: the missions whose ink is
- * still running, which keep their place until it has.
+ * Today's missions as drawn (S2): a mission done slides under those still open, except the due cards', the day
+ * block's own count (G8), which stays first. `holding`: the missions whose ink is still running, which keep their
+ * place until it has.
  */
 export function missionOrder(missions: readonly Mission[], holding: ReadonlySet<string> = new Set()): Mission[] {
   const sinks = (m: Mission) => m.id !== 'dovute' && m.status === 'fatta' && !holding.has(m.id);
