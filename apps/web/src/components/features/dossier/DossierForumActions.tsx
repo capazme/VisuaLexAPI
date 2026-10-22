@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { EyeOff, FolderOpen, Globe, RefreshCw, Trash2, Upload } from 'lucide-react';
 import type { Dossier } from '../../../types';
 import { MenuButton } from '../../ui/MenuButton';
-import { ConfirmDialog } from '../../ui/ConfirmDialog';
+import { WireConfirm } from '../../ui/wireConfirm/WireConfirm';
 import { useAppStore } from '../../../store/useAppStore';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
 import { getErrorMessage } from '../../../utils/errors';
@@ -37,13 +37,16 @@ export function DossierForumActions({ dossier, showToast, buttonClassName }: Pro
   const published = dossier.published ?? null;
   const blocked = dossier.forumBlocked === true;
 
-  const act = async (run: () => Promise<unknown>, done: string) => {
+  /** Runs a Forum action, says how it went; whether it went. */
+  const act = async (run: () => Promise<unknown>, done: string): Promise<boolean> => {
     setBusy(true);
     try {
       await run();
       showToast(done, 'success');
+      return true;
     } catch (err) {
       showToast(getErrorMessage(err) || 'Operazione non riuscita. Riprova.', 'error');
+      return false;
     } finally {
       setBusy(false);
       await refreshDossier(dossier.id);
@@ -117,15 +120,16 @@ export function DossierForumActions({ dossier, showToast, buttonClassName }: Pro
         <span className="hidden sm:inline">{state}</span>
       </MenuButton>
       {dialog}
-      <ConfirmDialog
+      {/* It takes away others' «Mi piace» and proposals: drawn from the «Forum» button (K1b), which says the outcome. */}
+      <WireConfirm
         open={confirmDelete}
         variant="danger"
         title="Eliminare la copia pubblicata?"
         message="La copia pubblicata, i suoi «Mi piace» e le proposte ricevute vengono eliminati. Il tuo dossier resta com'è; chi l'ha già scaricato ne conserva la copia."
         confirmLabel="Elimina dai dossier pubblici"
-        onConfirm={() => {
+        onConfirm={async () => {
           setConfirmDelete(false);
-          void act(() => sharedEnvironmentService.delete(published.sharedEnvironmentId), 'Copia pubblicata eliminata');
+          return (await act(() => sharedEnvironmentService.delete(published.sharedEnvironmentId), 'Copia pubblicata eliminata')) ? 'Eliminata' : null;
         }}
         onCancel={() => setConfirmDelete(false)}
       />

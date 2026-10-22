@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link2, Unplug } from 'lucide-react';
-import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { WireConfirm } from '../../components/ui/wireConfirm/WireConfirm';
+import { OUTCOME_MS } from '../../components/ui/wireConfirm/OutcomeTick';
 import { getErrorMessage } from '../../utils/errors';
 import { connectionsService, type ConnectedApp } from './connectionsService';
 
@@ -65,18 +66,23 @@ export function ConnectedAppsSection() {
     }
   };
 
-  const confirmRevoke = async () => {
+  /** The revocation; «Revoca» says «Revocata» with its tick, and the row goes once it has said it. */
+  const confirmRevoke = async (): Promise<string | null> => {
     const app = pending;
     setPending(null);
-    if (!app) return;
+    if (!app) return null;
     try {
       await connectionsService.revoke(app.id);
-      setState((current) =>
-        current.status === 'ready' ? { status: 'ready', apps: current.apps.filter((a) => a.id !== app.id) } : current,
-      );
       setMessage(`Collegamento con ${appName(app)} revocato.`);
+      window.setTimeout(() => {
+        setState((current) =>
+          current.status === 'ready' ? { status: 'ready', apps: current.apps.filter((a) => a.id !== app.id) } : current,
+        );
+      }, OUTCOME_MS);
+      return 'Revocata';
     } catch (error: unknown) {
       setMessage(getErrorMessage(error) ?? 'Impossibile revocare il collegamento.');
+      return null;
     }
   };
 
@@ -126,7 +132,8 @@ export function ConnectedAppsSection() {
         )}
         {message && <p role="status" className="text-xs text-slate-500">{message}</p>}
       </div>
-      <ConfirmDialog
+      {/* The app loses its access at once: drawn from its button (K1b). */}
+      <WireConfirm
         open={pending !== null}
         variant="danger"
         title="Revocare il collegamento?"
@@ -136,7 +143,7 @@ export function ConnectedAppsSection() {
             : ''
         }
         confirmLabel="Revoca"
-        onConfirm={() => void confirmRevoke()}
+        onConfirm={confirmRevoke}
         onCancel={() => setPending(null)}
       />
     </div>

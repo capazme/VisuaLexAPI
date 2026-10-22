@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { BrainCircuit, Download, FileText, SlidersHorizontal, Trash2, UserX } from 'lucide-react';
-import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
+import { WireConfirm } from '../../../components/ui/wireConfirm/WireConfirm';
 import { Modal } from '../../../components/ui/Modal';
 import { TextParagraphs } from '../../../components/features/studia/TextParagraphs';
 import { deleteMerltData, exportMerltData } from '../../../services/merltService';
@@ -58,7 +58,8 @@ export function MerltDataSection() {
     }
   };
 
-  const handleErase = async () => {
+  /** The erasure; the button says «Eliminati» with its tick once MERL-T confirmed it. */
+  const handleErase = async (): Promise<string | null> => {
     setEraseOpen(false);
     setBusy(true);
     setMessage(null);
@@ -69,8 +70,10 @@ export function MerltDataSection() {
           ? 'Dati MERL-T eliminati.'
           : 'Eliminazione avviata: MERL-T non ha ancora confermato, si completa da sola appena risponde.',
       );
+      return completed ? 'Eliminati' : null;
     } catch {
       setMessage('L’eliminazione non è riuscita: riprova.');
+      return null;
     } finally {
       setBusy(false);
     }
@@ -142,13 +145,14 @@ export function MerltDataSection() {
 
       <ConsentDialog open={changeOpen} onClose={() => setChangeOpen(false)} />
       <RevokeConsentDialog open={revokeOpen} onClose={() => setRevokeOpen(false)} onDone={setMessage} />
-      <ConfirmDialog
+      {/* Cannot be undone: drawn from its button (K1b). */}
+      <WireConfirm
         open={eraseOpen}
         variant="danger"
         title="Eliminare i tuoi dati MERL-T?"
         message="Eliminiamo tutto quello che MERL-T ha raccolto su di te. I contributi già approvati dalla comunità restano, senza più alcun legame con te. La tua scelta sul consenso resta com’è: per fermare la raccolta, revocalo."
         confirmLabel="Elimina i dati"
-        onConfirm={() => void handleErase()}
+        onConfirm={handleErase}
         onCancel={() => setEraseOpen(false)}
       />
       {notice && (

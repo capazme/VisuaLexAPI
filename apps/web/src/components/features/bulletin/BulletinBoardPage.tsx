@@ -15,7 +15,8 @@ import { ForumSuggestionsView } from './ForumSuggestionsView';
 import { ArchivedEnvironmentsSection } from './ArchivedEnvironmentsSection';
 import { SharedLinkImport } from './SharedLinkImport';
 import { Toast } from '../../ui/Toast';
-import { ConfirmDialog } from '../../ui/ConfirmDialog';
+import { WireConfirm } from '../../ui/wireConfirm/WireConfirm';
+import { OUTCOME_MS } from '../../ui/wireConfirm/OutcomeTick';
 import { useTour } from '../../../hooks/useTour';
 import { useAppStore } from '../../../store/useAppStore';
 import { studyImportSentence } from '../../../utils/studyImportReport';
@@ -220,17 +221,20 @@ export function BulletinBoardPage() {
     setDeletingEnv(env);
   };
 
-  const handleDeleteConfirm = async () => {
-    if (!deletingEnv) return;
-
+  /** The deletion; the card's menu button says «Eliminata» with its tick, and the card goes once it has said it. */
+  const handleDeleteConfirm = async (): Promise<string | null> => {
+    const env = deletingEnv;
+    if (!env) return null;
+    setDeletingEnv(null);
     try {
-      await sharedEnvironmentService.delete(deletingEnv.id);
-      setMyEnvironments(prev => prev.filter(e => e.id !== deletingEnv.id));
-      setDeletingEnv(null);
+      await sharedEnvironmentService.delete(env.id);
+      window.setTimeout(() => setMyEnvironments(prev => prev.filter(e => e.id !== env.id)), OUTCOME_MS);
       showToast('Copia pubblicata eliminata', 'success');
+      return 'Eliminata';
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Errore';
       showToast(message, 'error');
+      return null;
     }
   };
 
@@ -626,10 +630,9 @@ export function BulletinBoardPage() {
         />
       )}
 
-      {/* Delete Confirmation — shared ConfirmDialog pattern. Deletes the
-          shared environment from the forum along with all its versions,
-          likes and comments. */}
-      <ConfirmDialog
+      {/* Deletes the published copy with its versions, likes and reports, which are others' too: drawn from the card's
+          menu button (K1b). */}
+      <WireConfirm
         open={deletingEnv !== null}
         variant="danger"
         title={deletingEnv ? `Eliminare «${deletingEnv.title}» dai dossier pubblici?` : 'Eliminare dai dossier pubblici?'}

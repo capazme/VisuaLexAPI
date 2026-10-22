@@ -223,6 +223,9 @@ export function SharedEnvironmentCard({
                       {onDelete && (
                         <button
                           onClick={() => {
+                            // The focus goes back to the menu's button, as `MenuButton` does: the confirmation is drawn
+                            // from it and returns the focus there (K1b).
+                            menuRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
                             onDelete(environment);
                             setShowMenu(false);
                           }}
