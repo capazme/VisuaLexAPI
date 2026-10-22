@@ -226,7 +226,7 @@ describe('the review session', () => {
       fireEvent.keyDown(document.body, { key: 'Escape' });
       const dialog = await screen.findByRole('alertdialog', { name: 'Interrompere il ripasso?' });
       // What happens, with the session's count (U1c).
-      expect(within(dialog).getByText('Non hai ancora valutato schede in questo ripasso. Le schede ti aspettano in «Oggi».')).toBeInTheDocument();
+      expect(within(dialog).getByText('Non hai ancora valutato nessuna scheda. Ti aspettano in «Oggi».')).toBeInTheDocument();
       // The dialog has the keyboard: space behind it shows nothing.
       fireEvent.keyDown(document.body, { key: ' ' });
       expect(screen.queryByText('Risposta a.')).not.toBeInTheDocument();
@@ -260,6 +260,35 @@ describe('the review session', () => {
       await userEvent.setup().keyboard('{Escape}');
       await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
       expect(screen.getByText('Domanda a?')).toBeInTheDocument();
+    });
+
+    it('gives the focus back to the card on going on, so Space shows the answer and does not ask again', async () => {
+      renderSession([card('a')]);
+      await screen.findByText('Domanda a?');
+      const user = userEvent.setup();
+      await user.keyboard('{Escape}');
+      const dialog = await screen.findByRole('alertdialog', { name: 'Interrompere il ripasso?' });
+      await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Continua il ripasso' })).toHaveFocus());
+      await user.keyboard('{Escape}');
+      await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+      expect(screen.getByRole('heading', { name: 'Domanda a?' })).toHaveFocus();
+      await user.keyboard(' ');
+      expect(await screen.findByText('Risposta a.')).toBeInTheDocument();
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    });
+
+    it('counts the cards graded, a «Di nuovo» too, its grade saved', async () => {
+      renderSession([card('a'), card('b'), card('c')]);
+      const user = userEvent.setup();
+      await show();
+      await user.click(screen.getByRole('button', { name: /Di nuovo/ }));
+      await screen.findByText('Domanda b?');
+      await show();
+      await user.click(screen.getByRole('button', { name: /Bene/ }));
+      await screen.findByText('Domanda c?');
+      await user.click(screen.getByRole('button', { name: 'Interrompi' }));
+      const dialog = await screen.findByRole('alertdialog', { name: 'Interrompere il ripasso?' });
+      expect(dialog).toHaveTextContent('Hai ripassato 2 schede: restano registrate.');
     });
   });
 

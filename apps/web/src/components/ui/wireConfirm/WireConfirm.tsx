@@ -42,6 +42,11 @@ export interface WireConfirmProps {
    */
   emphasis?: 'confirm' | 'cancel';
   /**
+   * Where the focus goes after a cancel, when not back to `origin` (read as it closes): the lesson's card after
+   * «Continua il ripasso», where Space shows the answer — on «Interrompi» it would press it again.
+   */
+  focusBack?: () => HTMLElement | null | undefined;
+  /**
    * The button the wire starts from and the focus goes back to. Pass it (`event.currentTarget`): Safari and a tap do not
    * focus a button they press. Absent, the element focused as it opens — right for a menu's entry, whose menu gives
    * the focus back to its trigger by code before the entry runs.
@@ -87,6 +92,7 @@ export function WireConfirm({
   origin,
   onOutcomeDone,
   emphasis = 'confirm',
+  focusBack,
 }: WireConfirmProps) {
   const still = Boolean(useReducedMotion());
   const id = useId();
@@ -120,8 +126,10 @@ export function WireConfirm({
     }
   }
   const outcomeDone = useRef(onOutcomeDone);
+  const focusBackRef = useRef(focusBack);
   useEffect(() => {
     outcomeDone.current = onOutcomeDone;
+    focusBackRef.current = focusBack;
   });
 
   useEffect(() => (open ? openDialog(token.current) : undefined), [open]);
@@ -155,7 +163,14 @@ export function WireConfirm({
   // Closed: the focus goes back to the button at once, not after the rewind. A button its action disabled (busy) takes
   // it once enabled again, if nothing else took it meanwhile.
   useEffect(() => {
-    if (open || !from?.isConnected) return;
+    if (open) return;
+    // Cancelled, with a place of its own to go back to.
+    const back = confirmed ? null : focusBackRef.current?.();
+    if (back?.isConnected) {
+      back.focus({ preventScroll: true });
+      return;
+    }
+    if (!from?.isConnected) return;
     if (!(from as HTMLButtonElement).disabled) {
       from.focus({ preventScroll: true });
       return;
@@ -171,7 +186,7 @@ export function WireConfirm({
       observer.disconnect();
       window.clearTimeout(timer);
     };
-  }, [open, from]);
+  }, [open, from, confirmed]);
 
   useEffect(() => {
     if (!open) return;
@@ -327,7 +342,8 @@ function WireLayer({ id, title, message, cancelLabel, confirmLabel, variant, emp
       ref={confirmRef}
       variant={emphasis === 'cancel' ? 'secondary' : variant === 'danger' ? 'danger' : 'primary'}
       size="sm"
-      className="min-h-[44px] md:min-h-9"
+      // Outlined, a dangerous confirmation keeps its red in its words, as the wire does.
+      className={cn('min-h-[44px] md:min-h-9', emphasis === 'cancel' && variant === 'danger' && 'text-red-700 dark:text-red-300')}
       onClick={onConfirm}
     >
       {confirmLabel}

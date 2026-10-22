@@ -239,6 +239,13 @@ export function ReviewSession() {
   // «Interrompi» in the header: the confirmation is drawn from it, whether it was pressed or Esc asked (U1c). Kept in
   // state (a callback ref), as the confirmation reads it while rendering.
   const [stopButton, setStopButton] = useState<HTMLButtonElement | null>(null);
+  // Going on, the focus goes back to the card (its answer once shown, else its question): on «Interrompi», Space
+  // — the answer's key, which the session leaves to a focused button — would press it again.
+  const cardColumn = useRef<HTMLDivElement>(null);
+  const backToCard = () => {
+    const places = cardColumn.current?.querySelectorAll<HTMLElement>('[tabindex="-1"]');
+    return places && places.length > 0 ? places[places.length - 1] : null;
+  };
   const [panel, setPanel] = useState<{ step: number; anchor: AncoraScheda } | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
 
@@ -337,7 +344,7 @@ export function ReviewSession() {
         <div className="flex min-h-0 flex-1">
           {/* Keyed by step, so each card starts at the top of its own scroll, however far the last answer was read. */}
           <div key={step} className="min-w-0 flex-1 overflow-y-auto">
-            <div className={cn(COLUMN, 'px-4 pb-8 pt-2 md:pt-8')}>
+            <div ref={cardColumn} className={cn(COLUMN, 'px-4 pb-8 pt-2 md:pt-8')}>
               {skippedLine}
               <ReviewCard card={current} revealed={revealed} focusKey={step} onOpenAnchor={(anchor) => setPanel({ step, anchor })} />
             </div>
@@ -418,11 +425,12 @@ export function ReviewSession() {
       <WireConfirm
         open={confirmStop}
         title="Interrompere il ripasso?"
-        message={stopMessage(total - remaining)}
+        message={stopMessage(summary.reviewed, remaining)}
         confirmLabel="Interrompi"
         cancelLabel="Continua il ripasso"
         emphasis="cancel"
         origin={stopButton}
+        focusBack={backToCard}
         onConfirm={() => navigate(HOME_PATH)}
         onCancel={() => setConfirmStop(false)}
       />
