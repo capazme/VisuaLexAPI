@@ -32,6 +32,12 @@ afterEach(() => {
 });
 
 describe('SearchField — the door to the search menu (R2)', () => {
+  it('writes its words at 16 px at least on a phone, as the box it opens, with the text size «piccolo» too', () => {
+    renderField();
+    expect(field()).toHaveClass('text-[length:max(1rem,16px)]', 'md:text-sm');
+    expect(field()).not.toHaveClass('text-base');
+  });
+
   it('is one field, with no «Opzioni»: it says it opens a dialog, and that ⌘K (Ctrl K) does too', () => {
     renderField();
     expect(field()).toHaveAttribute('aria-haspopup', 'dialog');

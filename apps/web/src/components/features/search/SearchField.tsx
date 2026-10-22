@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Search } from 'lucide-react';
 import { cn } from '../../../lib/utils';
+import { FIELD_TEXT } from '../../../constants/interactions';
 import { appStore, useAppStore } from '../../../store/useAppStore';
 import { PALETTE_SHORTCUT, SEARCH_FIELD_FORM_ID, subscribeSearchField } from '../../../utils/searchFieldControl';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
@@ -102,7 +103,9 @@ export function SearchField() {
           }}
           onKeyDown={onKeyDown}
           className={cn(
-            'relative flex h-11 w-full min-w-0 items-center rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-left text-base shadow-sm md:text-sm',
+            // The field's type size (`FIELD_TEXT`, 16 px at least on a phone, «piccolo» included), as the box it opens.
+            'relative flex h-11 w-full min-w-0 items-center rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-left shadow-sm',
+            FIELD_TEXT,
             'dark:border-slate-700 dark:bg-slate-900',
             'cursor-text hover:border-slate-300 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30 dark:hover:border-slate-600',
           )}

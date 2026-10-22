@@ -162,14 +162,15 @@ function MissionsOfToday({ day, missions, children }: { day: Progressi; missions
     // `-mb-4`: the last row's bottom padding, which a moving row keeps (`MissionRow`'s `layout`).
     <ol aria-label="Missioni di oggi" className={cn('divide-y divide-slate-100 dark:divide-slate-800', !reduce && '-mb-4')}>
       {missionOrder(missions, new Set(running)).map((mission) => (
-        // Met by the count, the stamp says it to the eye; met with the queue finished under it, the line says why.
+        // Met by the count and earned, the stamp says it to the eye; met with the queue finished under it, or under the
+        // mission's 10 reviews, the line says why.
         <MissionRow
           key={mission.id}
           mission={mission}
           bar
           ink={running.includes(mission.id) ? 'drip' : 'still'}
           layout={!reduce}
-          quietNote={mission.id === 'obiettivo' && met && day.oggi.ripassi >= day.oggi.obiettivo}
+          quietNote={mission.id === 'obiettivo' && mission.status === 'fatta' && met && day.oggi.ripassi >= day.oggi.obiettivo}
         >
           {children(mission)}
         </MissionRow>
@@ -189,7 +190,9 @@ function MissionsOfToday({ day, missions, children }: { day: Progressi; missions
 export function TodayMissions({ day, dayFailed, action, actionFailed, onRetry, subject, onAllSubjects, onStart, onOpenSettings, settingsPanel, celebrate, stampRef }: TodayMissionsProps) {
   const state = todayState(day, dayFailed, false);
   const missions = day && (state === 'todo' || state === 'done') ? todayMissions(day) : null;
-  const summary = missions ? missionSummary(missions) : null;
+  // A server without the points (#253) sends no missions: the day's action stands alone, with no «0 di 0».
+  const bare = missions !== null && missions.length === 0;
+  const summary = missions && !bare ? missionSummary(missions) : null;
   const met = day?.oggi.raggiunto ?? false;
 
   return (
@@ -241,7 +244,13 @@ export function TodayMissions({ day, dayFailed, action, actionFailed, onRetry, s
         </div>
       )}
 
-      {missions && day && (
+      {bare && (
+        <div className="mt-4">
+          <TodayAction action={action} actionFailed={actionFailed || dayFailed} subject={subject} onRetry={onRetry} onAllSubjects={onAllSubjects} onStart={onStart} met={met} />
+        </div>
+      )}
+
+      {missions && !bare && day && (
         <MissionsOfToday day={day} missions={missions}>
           {(mission) => (
             <>

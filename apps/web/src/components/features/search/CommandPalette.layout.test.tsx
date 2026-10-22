@@ -87,6 +87,20 @@ describe('CommandPalette — where it opens', () => {
     expect(panel.className).toMatch(/top-16/);
   });
 
+  it('on a phone, gives the focus back to what opened it (the bar\'s magnifier) when it closes', async () => {
+    asDesktop(false);
+    const opener = document.createElement('button');
+    opener.textContent = 'Apri il menu di ricerca';
+    document.body.appendChild(opener);
+    opener.focus();
+    const { rerender } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    await waitFor(() => expect(document.activeElement).not.toBe(opener));
+
+    rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+    await waitFor(() => expect(opener).toHaveFocus());
+    opener.remove();
+  });
+
   it('on a phone, is a sheet with its «Chiudi», and shows no keys', () => {
     asDesktop(false);
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
@@ -340,6 +354,19 @@ describe('CommandPalette — the field and its line', () => {
     const box = screen.getByRole('combobox');
     expect(box).toHaveClass('focus-visible:ring-0', 'focus-visible:ring-offset-0');
     expect(box.parentElement).toHaveClass('border', 'focus-within:ring-2');
+  });
+
+  it('never draws a field under 16 px, so Safari on an iPhone does not zoom into it, with the text size «piccolo» too', async () => {
+    asDesktop(false);
+    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    expect(screen.getByRole('combobox')).toHaveClass('text-[length:max(1.125rem,16px)]');
+    await userEvent.setup().click(screen.getByRole('button', { name: /Filtri avanzati/ }));
+    const years = screen.getAllByRole('spinbutton');
+    expect(years.length).toBeGreaterThan(0);
+    for (const year of years) {
+      expect(year).toHaveClass('text-[length:max(1rem,16px)]', 'md:text-sm');
+      expect(year).not.toHaveClass('text-base');
+    }
   });
 });
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Progressi, TappaIstituto } from '../../../../types/studia';
 import { cardsLeft, dueBySubject, dueLabel, instituteCardsLeft, instituteSessionPath, nextDueDay, orderInstitutes, orderStops, stopStates, todayState } from './today';
+import { xpFields } from '../__fixtures__/xp';
 
 type Stop = Progressi['materie'][number];
 const stop = (materia: Stop['materia'], nuove: number, apprendimento: number, consolidate = 0): Stop => ({ materia, nuove, apprendimento, consolidate, ripassi30: 0 });
@@ -84,6 +85,7 @@ function answer(over: Partial<Progressi['oggi']> = {}, prossimi: number[] = [], 
     materie: [],
     calendario: [],
     prossimi: prossimi.map((schede, i) => ({ giorno: `2026-10-${String(19 + i).padStart(2, '0')}`, schede })),
+    ...xpFields(),
   };
 }
 

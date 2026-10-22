@@ -4,6 +4,7 @@ import { Check } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import type { ConteggiStati, Progressi } from '../../../../types/studia';
 import { GoalRing } from './GoalRing';
+import { LevelBar } from './LevelBar';
 import { currentWeek, formatDayLong, totalCards, type WeekDay } from './layout';
 import { StreakBadge } from './StreakBadge';
 import { SettingsGear, StudySettingsPanel } from './StudySettings';
@@ -110,7 +111,7 @@ function StateNumbers({ stati, aside }: { stati: ConteggiStati; aside: boolean }
  * «I tuoi progressi», one band (Gymnasium spec §5.1). Up to `xl` it spans the page and lays its pieces out in a row from
  * `md`; as «Oggi»'s right column from `xl` (`aside`, G6), about 300 to 400 px, it stacks them as on a phone (the week
  * and «Tutti i progressi» at the column's width): the streak, today's goal and the gear; the current week as
- * seven boxes; the cards by state as three numbers with their bar; «Tutti i progressi», a link to `/studia/progressi`,
+ * seven boxes; the level (`LevelBar`, G1c: the user's alone); the cards by state as three numbers with their bar; «Tutti i progressi», a link to `/studia/progressi`,
  * where the long calendar, the coming days and the subjects live (G3: the data in one place). The gear opens the study
  * settings in the card, under the heading (G6). While the first read travels it holds its final size; a failed read leaves the
  * heading and the gear (the missions say it failed, with «Riprova»).
@@ -147,6 +148,7 @@ export function StatsBand({ data, loading, settingsOpen, onToggleSettings, onClo
               <WeekRow data={data} aside={aside} />
             </div>
           </div>
+          {data.livello && <LevelBar livello={data.livello} />}
           <StateNumbers stati={data.stati} aside={aside} />
           <Link to="/studia/progressi" className={cn(SECONDARY_BUTTON, 'inline-flex w-full items-center justify-center md:w-auto md:justify-self-start', aside && ASIDE.link)}>
             Tutti i progressi
@@ -160,6 +162,7 @@ export function StatsBand({ data, loading, settingsOpen, onToggleSettings, onClo
             <div className="h-10 w-24 rounded-lg bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
             <div className={cn('h-14 w-full rounded-lg bg-slate-100 motion-safe:animate-pulse md:ml-auto md:w-72 dark:bg-slate-800', aside && ASIDE.week)} />
           </div>
+          <div className="h-[4.5rem] rounded-lg bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
           <div className="h-[4.5rem] rounded-lg bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
           <div className={cn('h-11 w-full rounded-xl bg-slate-100 motion-safe:animate-pulse md:w-36 dark:bg-slate-800', aside && ASIDE.link)} />
         </div>
