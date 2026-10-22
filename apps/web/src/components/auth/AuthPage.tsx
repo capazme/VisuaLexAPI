@@ -117,39 +117,59 @@ export function AuthPage() {
   const [entering, setEntering] = useState(false);
   // Whether the last change of tab moves at all (not on the first paint, not under reduced motion).
   const [animated, setAnimated] = useState(false);
-  // The box of the forms clips only while its height moves after a change of tab (the form coming in taller than
-  // it meanwhile); at rest nothing in a form is cut.
-  const [moving, setMoving] = useState(false);
-  const movingTimer = useRef<number | undefined>(undefined);
-  useEffect(() => () => window.clearTimeout(movingTimer.current), []);
-
   const frameRef = useRef<HTMLDivElement>(null);
-  // The forms' heights and the card's chrome (its padding and its tabs), measured: the box holding the forms takes
-  // the shown one's height, and the page centres the card by its height on «Accedi» (A1c).
   const cardRef = useRef<HTMLElement>(null);
-  const [heights, setHeights] = useState<{ login: number; register: number; chrome: number } | null>(null);
+  const panelOf = (id: AuthTab) => frameRef.current?.querySelector<HTMLElement>(`#auth-panel-${id}`) ?? null;
+  const heightOf = (el: Element | null) => el?.getBoundingClientRect().height ?? 0;
+  // The box of the forms (A1c): at rest as tall as the form shown (`height: auto`, the other out of the flow), so a
+  // form that grows (an error, the password's strength) grows the card with it, nothing spilling out. Only across a
+  // change of tab is its height written, from the form leaving's to the form coming in's, and let go when the
+  // transition ends (or, should none come, a little after it).
+  const [boxHeight, setBoxHeight] = useState<number | null>(null);
+  const boxTarget = useRef<number | null>(null);
+  const boxTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(boxTimer.current), []);
+  const letBoxGo = () => {
+    window.clearTimeout(boxTimer.current);
+    boxTarget.current = null;
+    setBoxHeight(null);
+  };
+  // The page centres the card by its height on «Accedi» (`--login-card-h`): measured as it opens, when the window's
+  // width changes and when the typefaces arrive — never when a form's content changes, or an error on «Accedi» would
+  // move the card and its tabs.
+  const [centreHeight, setCentreHeight] = useState<number | null>(null);
   useLayoutEffect(() => {
-    const frame = frameRef.current;
     const card = cardRef.current;
-    if (!frame || !card) return undefined;
-    const panelOf = (id: AuthTab) => frame.querySelector<HTMLElement>(`#auth-panel-${id}`);
-    const measure = () => {
-      const login = panelOf('login')?.offsetHeight ?? 0;
-      const register = panelOf('register')?.offsetHeight ?? 0;
-      // The card less the box of the forms: its padding and its tabs, whatever height the box is passing through.
-      const chrome = card.offsetHeight - frame.offsetHeight;
-      setHeights((was) => (was && was.login === login && was.register === register && was.chrome === chrome ? was : { login, register, chrome }));
+    const frame = frameRef.current;
+    if (!card || !frame) return undefined;
+    const centre = () => {
+      // The card less the box of the forms (its padding and its tabs) plus the sign-in form.
+      setCentreHeight(heightOf(card) - heightOf(frame) + heightOf(frame.querySelector('#auth-panel-login')));
     };
-    measure();
-    if (typeof ResizeObserver === 'undefined') return undefined;
-    const observer = new ResizeObserver(measure);
-    for (const id of ['login', 'register'] as const) {
-      const panel = panelOf(id);
-      if (panel) observer.observe(panel);
-    }
-    observer.observe(card);
-    return () => observer.disconnect();
+    centre();
+    let width = window.innerWidth;
+    const onResize = () => {
+      if (window.innerWidth === width) return;
+      width = window.innerWidth;
+      centre();
+    };
+    window.addEventListener('resize', onResize);
+    let live = true;
+    document.fonts?.ready.then(() => { if (live) centre(); });
+    return () => {
+      live = false;
+      window.removeEventListener('resize', onResize);
+    };
   }, []);
+  // The second half of a change of tab: once the box holds the old height (the render of the change), the new one,
+  // which the transition then runs to.
+  useEffect(() => {
+    if (boxTarget.current === null) return undefined;
+    const frame = requestAnimationFrame(() => {
+      if (boxTarget.current !== null) setBoxHeight(boxTarget.current);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [tab]);
   const tabRefs = useRef<Record<AuthTab, HTMLButtonElement | null>>({ login: null, register: null });
   const focusFirstField = useRef(false);
   const pendingFocus = useRef<HTMLInputElement | null>(null);
@@ -173,9 +193,11 @@ export function AuthPage() {
     const moves = !prefersReducedMotion();
     setAnimated(moves);
     if (moves) {
-      setMoving(true);
-      window.clearTimeout(movingTimer.current);
-      movingTimer.current = window.setTimeout(() => setMoving(false), 260);
+      // From where the box is (halfway through another change, its height on the way) to the form coming in.
+      setBoxHeight(heightOf(frameRef.current));
+      boxTarget.current = heightOf(panelOf(next));
+      window.clearTimeout(boxTimer.current);
+      boxTimer.current = window.setTimeout(letBoxGo, 400);
     }
     if (next === 'register' && signedUp) {
       setSignedUp(false);
@@ -229,7 +251,7 @@ export function AuthPage() {
     <div
       className="h-app overflow-y-auto bg-slate-50 [scrollbar-gutter:stable] dark:bg-slate-950"
       // The card's height on «Accedi», by which the page centres it (A1c); until measured, about what it is.
-      style={heights ? ({ '--login-card-h': `${heights.chrome + heights.login}px` } as CSSProperties) : undefined}
+      style={centreHeight ? ({ '--login-card-h': `${centreHeight}px` } as CSSProperties) : undefined}
     >
       <div className="grid min-h-full grid-rows-[1fr_auto] px-4 md:px-10">
         {/* On a computer the card's top sits where the card on «Accedi» is centred above «Crediti» (its height and
@@ -315,12 +337,13 @@ export function AuthPage() {
                   px a form comes in from, inside the card; the box clips only while its height moves. */}
               <div
                 ref={frameRef}
-                className={cn(
-                  '-m-2 relative',
-                  animated && 'transition-[height] duration-[220ms] ease-out motion-reduce:transition-none',
-                  moving && 'overflow-hidden',
-                )}
-                style={heights ? { height: heights[tab] } : undefined}
+                // Always clipped, and by `clip`, which makes no scroller: the form out of the flow, taller, would
+                // otherwise hang under the card and give a low window a scroll into empty space.
+                className={cn('-m-2 relative overflow-clip', boxHeight !== null && 'transition-[height] duration-[220ms] ease-out')}
+                style={boxHeight !== null ? { height: boxHeight } : undefined}
+                onTransitionEnd={(event) => {
+                  if (event.target === event.currentTarget && event.propertyName === 'height') letBoxGo();
+                }}
               >
                 {TABS.map((t) => {
                   const shown = t.id === tab;

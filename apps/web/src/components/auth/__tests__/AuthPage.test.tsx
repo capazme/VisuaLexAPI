@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, createEvent, fireEvent, screen, waitFor, within } from '@testing-library/react';
 
 const login = vi.fn();
 let authLoading = false;
@@ -281,34 +281,60 @@ describe('AuthPage: two tabs on one page', () => {
     expect(colophon.className).toContain('md:text-left');
   });
 
+  /** The end of the box's height transition: jsdom has no `TransitionEvent`, so its `propertyName` is given by hand. */
+  const heightEnds = (el: HTMLElement) => {
+    const event = createEvent.transitionEnd(el);
+    Object.defineProperty(event, 'propertyName', { value: 'height' });
+    fireEvent(el, event);
+  };
+
   it('takes the shown form\'s height, grows on «Registrati» from a still top, and centres the page by «Accedi» (A1c)', async () => {
-    // jsdom lays nothing out: the forms' heights and the card's, given.
+    // jsdom lays nothing out: the forms' heights and the card's, given (the card: 120 of padding and tabs around its box).
     const sizes: Record<string, number> = { 'auth-panel-login': 300, 'auth-panel-register': 560 };
-    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (this: HTMLElement) {
-      if (this.id in sizes) return sizes[this.id];
-      if (this.tagName === 'MAIN') return 420; // the card: 120 of padding and tabs around a box of 300
-      if (this.querySelector?.(':scope > #auth-panel-login')) return 300;
-      return 0;
+    const shown = () => document.querySelector('[role="tabpanel"]:not([aria-hidden])')!.id;
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      let height = 0;
+      if (this.id in sizes) height = sizes[this.id];
+      else if (this.tagName === 'MAIN') height = 120 + sizes[shown()];
+      else if (this.querySelector(':scope > #auth-panel-login')) height = this.style.height ? parseFloat(this.style.height) : sizes[shown()];
+      return { height, width: 0, top: 0, left: 0, right: 0, bottom: height, x: 0, y: 0, toJSON: () => ({}) } as DOMRect;
     });
     renderAuth('/login');
     const frame = document.getElementById('auth-panel-login')!.parentElement!;
-    expect(frame.style.height).toBe('300px');
     const page = screen.getByRole('main').closest('.h-app') as HTMLElement;
+    // At rest the box is as tall as the form shown (no height written), always clipped, by `clip`: no scroller.
+    expect(frame.style.height).toBe('');
+    expect(frame).toHaveClass('overflow-clip');
     expect(page.style.getPropertyValue('--login-card-h')).toBe('420px');
     expect(page.querySelector('.md\\:pt-\\[max\\(1\\.5rem\\2c calc\\(\\(100dvh-4rem-var\\(--login-card-h\\2c 32rem\\)\\)\\/2\\)\\)\\]')).not.toBeNull();
 
     fireEvent.click(tab('Registrati'));
-    // Its own height, in 220 ms, the box clipping only while it moves; the page's centre is still «Accedi»'s.
-    expect(frame.style.height).toBe('560px');
-    expect(frame).toHaveClass('transition-[height]', 'duration-[220ms]', 'overflow-hidden');
+    // From the old height to the new, in 220 ms; the page's centre is still «Accedi»'s.
+    expect(frame.style.height).toBe('300px');
+    expect(frame).toHaveClass('transition-[height]', 'duration-[220ms]');
+    await waitFor(() => expect(frame.style.height).toBe('560px'));
     expect(page.style.getPropertyValue('--login-card-h')).toBe('420px');
-    await waitFor(() => expect(frame).not.toHaveClass('overflow-hidden'));
-    // Back halfway: one form in the flow, the other out of it and out of reach.
+    // Let go at the end of the transition: at rest again, as tall as the form shown.
+    heightEnds(frame);
+    expect(frame.style.height).toBe('');
+    expect(frame).not.toHaveClass('transition-[height]');
+
+    // A form that grows (an error on «Accedi») moves no centre: only a new width does.
     fireEvent.click(tab('Accedi'));
+    heightEnds(frame);
+    sizes['auth-panel-login'] = 360;
+    fireEvent.change(within(panel()).getByLabelText('Email'), { target: { value: 'a@b.it' } });
+    expect(page.style.getPropertyValue('--login-card-h')).toBe('420px');
+    Object.defineProperty(window, 'innerWidth', { value: window.innerWidth + 10, configurable: true });
+    act(() => { window.dispatchEvent(new Event('resize')); });
+    expect(page.style.getPropertyValue('--login-card-h')).toBe('480px');
+
+    // Back halfway: one form in the flow, the other out of it and out of reach.
     fireEvent.click(tab('Registrati'));
+    fireEvent.click(tab('Accedi'));
     expect(shownPanels()).toHaveLength(1);
-    expect(document.getElementById('auth-panel-login')).toHaveClass('absolute');
-    expect(document.getElementById('auth-panel-login')).toHaveAttribute('inert');
+    expect(document.getElementById('auth-panel-register')).toHaveClass('absolute');
+    expect(document.getElementById('auth-panel-register')).toHaveAttribute('inert');
   });
 
   it('under reduced motion the change is immediate: no form fading out, none sliding in', () => {
@@ -323,7 +349,9 @@ describe('AuthPage: two tabs on one page', () => {
     expect(document.getElementById('auth-panel-login')!.className).toContain('motion-reduce:transition-none');
     expect(screen.getByTestId('auth-tab-mark').className).toContain('motion-reduce:transition-none');
     // Nor a height that moves.
-    expect(document.getElementById('auth-panel-login')!.parentElement).not.toHaveClass('transition-[height]', 'overflow-hidden');
+    const frame = document.getElementById('auth-panel-login')!.parentElement!;
+    expect(frame).not.toHaveClass('transition-[height]');
+    expect(frame.style.height).toBe('');
   });
 
   it('keeps the way back after the login across changes of tab', async () => {
