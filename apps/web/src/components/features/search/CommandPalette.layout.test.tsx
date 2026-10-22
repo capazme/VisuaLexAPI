@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('../../../hooks/useTour', () => ({
@@ -66,10 +66,10 @@ describe('CommandPalette — where it opens', () => {
     expect(screen.getByRole('dialog', { name: 'Menu di ricerca' })).toContainElement(screen.getByRole('combobox'));
   });
 
-  it('on a computer, gives the focus back to what had it («Opzioni») when it closes', async () => {
+  it('on a computer, gives the focus back to what had it (the search page\'s field) when it closes', async () => {
     asDesktop(true);
     const opener = document.createElement('button');
-    opener.textContent = 'Opzioni';
+    opener.textContent = 'Cerca una norma, una sentenza o un tema';
     document.body.appendChild(opener);
     opener.focus();
     const { rerender } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
@@ -78,6 +78,17 @@ describe('CommandPalette — where it opens', () => {
     rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
     await waitFor(() => expect(opener).toHaveFocus());
     opener.remove();
+  });
+
+  it('is as tall as what it holds, up to its maximum: no fixed height (Bill)', () => {
+    asDesktop(true);
+    const form = document.createElement('form');
+    form.id = SEARCH_FIELD_FORM_ID;
+    document.body.append(form);
+    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    const box = screen.getByRole('dialog', { name: 'Menu di ricerca' });
+    expect(box.style.height).toBe('');
+    expect(box.querySelector(':scope > div')).toHaveClass('max-h-[var(--palette-max-h,40rem)]');
   });
 
   it('on a computer with no field on screen, hangs at the top, centred', () => {
@@ -111,18 +122,54 @@ describe('CommandPalette — where it opens', () => {
 });
 
 describe('CommandPalette — the field and the steps', () => {
-  it('says under the field what it takes, and marks the step in use', async () => {
+  it('says under the field what it takes, and names the act chosen in the field: a crumb that goes back (R2)', async () => {
     asDesktop(true);
     const user = userEvent.setup();
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
 
     expect(screen.getByText('Scrivi una citazione: art. 2043 c.c., l. 241/1990, Cass. civ. 10787/2024')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Atto' })).toHaveAttribute('aria-current', 'step');
+    expect(screen.queryByRole('navigation', { name: 'Passi della ricerca' })).toBeNull();
 
     await user.click(screen.getByRole('option', { name: 'Codice civile · c.c.' }));
-    expect(screen.getByText('Articolo').parentElement).toHaveAttribute('aria-current', 'step');
-    expect(screen.getByRole('button', { name: 'Atto' })).not.toHaveAttribute('aria-current');
     expect(screen.getByText("Scrivi il numero dell'articolo: 2043, 1-bis")).toBeInTheDocument();
+    const crumb = screen.getByRole('button', { name: 'Torna indietro: Codice civile' });
+    expect(crumb).toHaveTextContent('Codice civile');
+    await user.click(crumb);
+    expect(screen.getByPlaceholderText(/art 2043 cc/i)).toBeInTheDocument();
+  });
+
+  it('goes back a step with Backspace on the empty field it opens with, from the keyboard alone (R2, Bill)', async () => {
+    asDesktop(true);
+    const user = userEvent.setup();
+    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    // «Codice penale», Enter: the article's field, empty, has the focus.
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'codice penale{Enter}');
+    const box = await screen.findByRole('textbox', { name: "Numero dell'articolo" });
+    await waitFor(() => expect(box).toHaveFocus());
+    expect(box).toHaveValue('');
+    await user.keyboard('{Backspace}');
+    expect(screen.getByPlaceholderText(/art 2043 cc/i)).toBeInTheDocument();
+  });
+
+  it('a held Backspace stops at an empty field, and the date gives way to the number first (R2)', async () => {
+    asDesktop(true);
+    const user = userEvent.setup();
+    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    await user.click(screen.getByRole('option', { name: /^Legge · l\./ }));
+    const number = screen.getByRole('textbox', { name: "Numero dell'atto" });
+    await user.type(number, '241');
+    const date = screen.getByRole('textbox', { name: "Anno o data dell'atto" });
+    await user.click(date);
+    await user.keyboard('{Backspace}');
+    expect(number).toHaveFocus();
+    // Held: repeated keydowns on an empty field go nowhere.
+    await user.clear(number);
+    fireEvent.keyDown(number, { key: 'Backspace', repeat: true });
+    expect(screen.getByRole('textbox', { name: "Numero dell'atto" })).toBeInTheDocument();
+    // The crumb is named by what it shows, number and year included on the article's step.
+    await user.type(number, '241');
+    await user.type(date, '1990{Enter}');
+    expect(screen.getByRole('button', { name: /^Torna indietro: .*241\/1990$/ })).toBeInTheDocument();
   });
 
   it('searches the article typed, as before', async () => {
@@ -235,6 +282,7 @@ describe('CommandPalette — «Filtri avanzati»', () => {
     expect(toggle).toHaveTextContent('2 filtri attivi');
 
     await user.click(screen.getByRole('option', { name: 'Codice civile · c.c.' }));
+    await user.type(screen.getByRole('textbox', { name: "Numero dell'articolo" }), '1');
     await user.click(screen.getByRole('button', { name: "Apri l'articolo" }));
     expect(onSearch).toHaveBeenCalledWith(expect.objectContaining({ filters: expect.objectContaining({ source: 'eurlex', yearFrom: 1990 }) }));
   });
@@ -251,8 +299,9 @@ describe('CommandPalette — the keys', () => {
     await user.keyboard('{Enter}');
 
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    // still on the first step: Enter did not reach cmdk's list
-    expect(screen.getByRole('button', { name: 'Atto' })).toHaveAttribute('aria-current', 'step');
+    // still on the first step: Enter did not reach cmdk's list (no act in the field's crumb)
+    expect(screen.getByPlaceholderText(/art 2043 cc/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Torna indietro/ })).toBeNull();
   });
 
   it('on a computer, the row chosen as it opens is the first act, favourites or not: Enter picks it', async () => {
@@ -264,7 +313,8 @@ describe('CommandPalette — the keys', () => {
     await waitFor(() => expect(screen.getByRole('option', { name: 'Costituzione · Cost.' })).toHaveAttribute('aria-selected', 'true'));
     await user.keyboard('{Enter}');
     // Costituzione asks for its article
-    expect(screen.getByText('Articolo').parentElement).toHaveAttribute('aria-current', 'step');
+    expect(screen.getByRole('button', { name: 'Torna indietro: Costituzione' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: "Numero dell'articolo" })).toBeInTheDocument();
   });
 
   it('tells a screen reader what the box was read as, a norm too', async () => {
@@ -342,5 +392,20 @@ describe('CommandPalette — on a phone, the order', () => {
     appStore.setState({ quickNorms: [], customAliases: [] });
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
     expect(optionNames()[0]).toBe('Costituzione · Cost.');
+  });
+});
+
+describe('CommandPalette — on a phone, the focus back (R2)', () => {
+  it('gives the focus back to what opened it as it closes: the sheet does not', () => {
+    asDesktop(false);
+    const opener = document.createElement('button');
+    document.body.append(opener);
+    opener.focus();
+    const { rerender } = render(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+    rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    expect(opener).not.toHaveFocus();
+    rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+    expect(opener).toHaveFocus();
+    opener.remove();
   });
 });
