@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 // The Forum's count belongs to «Dossier pubblici»: only that page clears it and starts the Forum's tour.
@@ -30,21 +30,29 @@ describe('ForumCommunityPage', () => {
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
   });
 
-  it('says the area is coming, with no second title, no sample posts and no counts', () => {
+  it('says the discussions are coming, in an empty state composed for the page, with no sample posts and no counts (S7a)', () => {
     const { container } = renderPage();
-    expect(screen.queryByRole('heading', { level: 2 })).toBeNull();
-    expect(screen.getByText('Domande e discussioni tra colleghi, in arrivo.')).toBeInTheDocument();
+    const empty = screen.getByRole('region', { name: 'Le discussioni arrivano presto' });
+    expect(empty).toHaveClass('mx-auto', 'items-center', 'text-center');
+    expect(screen.getByRole('heading', { level: 2, name: 'Le discussioni arrivano presto' })).toHaveClass('font-serif');
+    // Two lines on what it will be.
+    expect(within(empty).getByText(/domande ai colleghi e discuterai le glosse/)).toBeInTheDocument();
+    expect(within(empty).getByText('Per ora il Forum raccoglie i dossier pubblicati dalla comunità.')).toBeInTheDocument();
+    // The line art, decorative, in the Forum's hue.
+    const drawing = empty.querySelector('svg')!;
+    expect(drawing).toHaveAttribute('aria-hidden', 'true');
+    expect(drawing.innerHTML).toContain('var(--vlx-section-forum)');
     expect(screen.queryByRole('list')).toBeNull();
     expect(screen.queryByRole('article')).toBeNull();
     expect(screen.queryByRole('button')).toBeNull();
     expect(container.textContent).not.toMatch(/\d/);
   });
 
-  it('leads to the public dossiers through a link of 44 px', () => {
+  it('leads to the public dossiers through one button-like link of 44 px', () => {
     renderPage();
-    const link = screen.getByRole('link', { name: 'Apri i dossier pubblici' });
+    const link = screen.getByRole('link', { name: 'Esplora i dossier pubblici' });
     expect(link).toHaveAttribute('href', '/forum');
-    expect(link).toHaveClass('min-h-[44px]', 'focus-visible:ring-2');
+    expect(link).toHaveClass('min-h-[44px]', 'bg-primary-600', 'focus-visible:ring-2');
     expect(screen.getAllByRole('link')).toHaveLength(1);
   });
 

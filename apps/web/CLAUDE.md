@@ -50,8 +50,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   403, and when `/auth/me` failed (`validator` null, never taken for «not a validator») it reads and the server decides),
   `/history`, `/forum` («Dossier pubblici»; `/environments`, the page «Ambienti» was, redirects there keeping an old
   share link's `?import=`), `/forum/community` («Community», `ForumCommunityPage`: an honest placeholder — titled
-  «Community» under the Forum's phrase (L-37), «Domande e discussioni tra colleghi, in arrivo», a link to `/forum`; no sample posts, no counts, no
-  server route), `/documents`, `/collega-app` («Collega un'app AI»,
+  «Community» under the Forum's phrase (L-37), an empty state composed for the page, «Le discussioni arrivano presto»
+  with «Esplora i dossier pubblici», see `features/bulletin/` below; no sample posts, no counts, no server route), `/documents`, `/collega-app` («Collega un'app AI»,
   `features/connections/ConnectAiAppPage`: the MCP address from `GET /api/oauth/connection` with
   «Copia», one card per client that connects today — `aiClients.ts`, the survey of 13 Oct 2026, with
   the clients our server refuses listed apart and why —, the personal-data notice (what a connected app reads: dossier
@@ -94,20 +94,23 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   downwards and the tabs never move, and the colophon is centred against the card (text left-aligned; on a
   phone centred above it), so it follows half of such a growth; its title is 48 px up to `lg` and 68 px from it
   (between 768 and 1023 px the column beside the card is about 200 px).
-  **The wordmark** (A2, `SegmentWordmark` over the pure `segments.ts`; inspired by Animorio's «logo dai sette segmenti»,
-  written from scratch with SVG, an SVG filter and Framer Motion): once per opening, «VISUALEX» on eight seven-segment
-  cells slanted by 7° (V with its two lower strokes converging to the bottom's middle and no bottom bar — a narrow U
-  read «11» beside the I —, X an H) lights up in steps, each cell through one wrong drawing to its letter
-  (0.9 s), holds (0.4 s), and melts into the real wordmark — the segments round and join (`feGaussianBlur` cut by
-  `feColorMatrix`, the blur back to 0 before the filter goes), the Newsreader copy takes its weight from 300, the slant
-  goes back to nothing (0.8 s) —, then the open book fades in (2.1 s and the book's 0.3 s in all). The `h1` is
-  «VisuaLex» throughout (the display and the melting copy `aria-hidden`), its box is the real wordmark's from the first
-  frame, nothing takes the focus; a click on it plays it again once it has ended; under reduced motion it only fades
-  in. Measured at 60 fps in Chromium at every width (not
-  on a phone). The weight comes by two copies cross-faded (300, then the wordmark's own, `weightClass`), never a weight
-  animated; on WebKit (`isWebKit` in `segments.ts`: Safari on a Mac, every browser on an iPhone or an iPad — Chrome,
-  Firefox and Edge there are WebKit too —, an iPad with a Mac's user agent and touch points) the filter is left out and
-  the melt is the cross-fade alone, the brief's fallback. The register form fits a window 768 px high
+  **The wordmark** (A3, replacing A2's seven-segment display; inspired by a signature written with a pen, written
+  from scratch in CSS, `index.css`'s `vlx-ink-*`): one face, one ink, once per opening, about 1.3 s. The book traces
+  itself (`BookMark` with `vlx-ink-book`, 450 ms); a faint, blurred copy of «VisuaLex» comes out from under a mask whose
+  soft edge (12 %) is the pen's tip — `--vlx-ink-edge`, an `@property` percentage, 250–950 ms — and the word itself
+  follows it 100 ms behind under its own (350–1050 ms), so each letter is faint and soft before it is sharp; the copy
+  fades as the ink ends, and the line under it rises 4 px into view (200 ms). The waits are inside the keyframes, not
+  delays. The word is one text throughout, the copy stacked on it in one grid cell (`aria-hidden`, not selectable):
+  never split into letters, which lose their kerning on WebKit and settled 1–3 px when joined again. On the ink's
+  `animationend`, or its `animationcancel` (listened to on the element, React has none: reduced motion turned on
+  halfway), the copy and the mask go, so the finished page is the page without the animation (the text's box
+  measured identical at every moment). On WebKit for iOS (`inkMark.ts`, `isIOSWebKit`: an iPhone, an iPod, an iPad,
+  an iPad with a Mac's user agent and touch points) the word only fades in from the left, no mask, no blur — the
+  brief's fallback for a mask that stutters. The animations sit inside `prefers-reduced-motion: no-preference` (as
+  `vlx-book-draw` does): the global reduced-motion rule cuts durations, not delays, and a delayed `backwards` would
+  have hidden the line for a second; under reduced motion nothing is written and the colophon fades in through that
+  rule's 150 ms opacity transition. Measured in Chromium only (headless, at 1920 and 390, the iOS path by its user
+  agent): not on Safari nor on a phone. The register form fits a window 768 px high
   inside (1366×768, 1470×753 measured as viewports; a 768 px screen with a browser's bars scrolls a little) by
   its spacing (`space-y-4` between fields, `space-y-1.5` inside one), the sign-in form spaced the same. While a sign-in or a
   sign-up is on its way the tabs hold still (`aria-disabled`): its answer would land on the hidden form. A
@@ -226,8 +229,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   It draws the dossier list, «Dossier pubblici», Community, Gymnasium (every view but the lesson, through
   `StudiaPage`), Opus's planner (`OpusPage`, its views the frame's width), «Analizza documento», «Collega un'app AI» (its body keeps a column of 768 px: it reads as text, the
   title does not move), the Cronologia and the MERL-T hub; «Cestino» and the MERL-T pages under a way back
-  («Torna ai Dossier», «MERL-T») write their `h1` with `PAGE_TITLE`. A dossier's own page (its name, its star and
-  its actions), Impostazioni (a dialog, not a page), the Scrivania, the lesson, the reader and the practice, the
+  («Torna ai Dossier», «MERL-T») write their `h1` with `PAGE_TITLE`. A dossier's own page is in the frame since S7c
+  (`DossierDetailView`: its name the title, under «Torna ai Dossier»; see «Dossier»). Impostazioni (a dialog, not a page), the Scrivania, the lesson, the reader and the practice, the
   login stay out; «Crediti», public and outside the layout, is in the frame since M1 (the column's width and padding, the
   text in its 672 px column). On a phone `actionBeside` keeps icon-only actions on the title's row (the dossier list's
   «⋯» and «+»). `PageFrame.test.tsx` reads the section pages' files
@@ -287,8 +290,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   Transitions the page changes at once, and only the mark and the sidebar's entries move. Choosing the section one is
   in goes to its home
   with no change shown. The sidebar: the Corpus entries for everyone — «Ricerca»
-  (a link to `/` that puts the cursor in the search page's field, `focusSearchField`, with no window over it —
-  the owner, 13 Oct 2026; its hover label carries ⌘K, the palette; the quick norms' dot sits under it;
+  (a link to `/` that puts the cursor on the search page's field, `focusSearchField({ focus: true })`, with no
+  window over it — the owner, 13 Oct 2026; the first key typed opens the search menu with it; its hover label
+  carries ⌘K, the palette; the quick norms' dot sits under it;
   `#tour-nav-search` is what the welcome and search tours point at) and «Analizza documento» —, then the active
   section's, in a group named after it: Opus, «Oggi» (the home, `/opus/oggi`, with the count of overdue and today's
   tasks, named in words: «Oggi, 3 compiti per oggi o scaduti»), «Prossimi giorni», «Lista d'ingresso» and Dossier;
@@ -368,19 +372,37 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `docs/superpowers/specs/2026-10-13-fixed-search-design.md`): `Layout` draws it on `/` (not in Focus mode) in a
   bar above the content scroller (56 px and the iPhone's top edge below `lg`, 72 from it; the phone's bar there), so it
   is always on screen, and sets `--search-bar-height` on `<main>`, which `h-app-row` subtracts and the bar takes as its
-  height. It reads what is typed with the palette's own
-  reading, `hooks/useSearchQuery` (a decision, a norm with the server's resolver as fallback, a topic): Enter opens
-  the decision, searches a ready norm (`citationSearchParams`), searches the topic, or hands a norm that still
-  lacks its number, date or article to the palette with the words (`openCommandPaletteWith`); Enter pressed while
-  the server is still naming the act waits for its answer. «Opzioni» (⌘K) opens the palette. No practice is
-  closed.
+  height. It is the door to the search menu (R2, brief of 21 Oct 2026: one field, no «Opzioni»): a button
+  (`#tour-search-field`, `aria-haspopup="dialog"`) that shows the words and opens the palette with them
+  (`openCommandPaletteWith`, or `openCommandPalette` when empty) on a click, Enter or Space, the arrows, a character
+  typed on it (AltGr's too; the character goes on after its words), words pasted on it (`onPaste`, after its words),
+  and ⌘K (`openSearchMenu`, `Layout`; nothing while the palette is open). Tab only brings the focus (a focus changes no
+  context, WCAG 3.2.1: Bill's choice). It stands for a field (`data-text-field`): «?», ⌘Z and the page's other
+  shortcuts leave it alone (`isEditableTarget`, `Layout`'s `isTyping`). Esc on it empties its words. The focus goes back to what opened
+  the palette as it closes, on a phone too; the field focuses itself on a click (Safari and a tap do not focus a
+  button). The palette's own tour starts only on an empty opening: opened with words,
+  it would take the letters that follow.
+  Everything else is the palette's: what the box reads, the first row, Enter, the steps. The palette closing with no
+  choice (Esc, a click outside, ✕) at its first step gives its words back to the field
+  (`returnWordsToSearchField`); a choice empties it. No practice is closed.
   **The palette's look** (`CommandPalette`, the search menu's brief O1, 20 Oct 2026): on a computer a panel that
   drops from the field's form (`SEARCH_FIELD_FORM_ID` in `utils/searchFieldControl.ts`; floating-ui puts its top on
-  the field's, as wide as the field and «Opzioni», one height of at most 640 px while the box filters, so it does
-  not jump at every letter), hung at the top, centred, where no field is on screen (another page, Focus mode); on a
-  phone `ui/Sheet` («Menu di ricerca», its own «Chiudi»). From the top: the box, the one strong thing, with the help
-  line (12 px) or what the box was read as; the steps «Atto › Dettagli › Articolo» as a thin trail, the one in use in
-  ink (`aria-current="step"`), each 44 px on a phone; then two columns on a computer and one on a phone, in this
+  the field's, as wide as the field, so it covers it, as tall as what it holds up to 640 px — Bill: one row is not a
+  640 px panel —, the lists scrolling inside it past that: a flex column all the way down to the columns, since a
+  percentage height finds nothing definite in a panel sized by its content), hung at the top, centred, where no field is on screen (another page, Focus mode); on a
+  phone the same panel, the page's width less 16 px each side, dropping from the bar at the top (R2: no bottom sheet
+  any more; its «Chiudi» is the field row's ✕, drawn at every width). From the top: the box, the one strong thing, with the help
+  line (12 px), or «Cerco l’atto…» while the server names it: a decision, a norm or a topic read in the box is its
+  row, the chosen one, with «↵», never a second line saying the same (Bill). Enter in the box
+  follows the field's order: a decision, then a wait while the server is still naming the act (the line says «la
+  ricerca parte appena lo trovo», and the search runs once it answers, never after a close; any change of the words
+  drops the wait, so a new Enter is needed), then a norm (a ready one searched, another taken to its next step; an alias counted once,
+  there), then a topic — unless the arrows chose another row since the words changed: Enter is then that row's.
+  Opened again within the 200 ms of the reset after a close, it starts at its first step all the same. The steps after the act («Dettagli», «Articolo») are subpages: the act chosen is a crumb
+  in the field (`Torna indietro: <what it shows>`, the act, and its number and year on the article's step; 44 px on a
+  phone) that goes back a step, and so does Backspace in an empty field (not a held one; on an empty date it goes to
+  the number first); the article's field opens empty, its placeholder saying what it takes, so Backspace there goes
+  back at once (a «1» standing in it took the first press, Bill); there is no trail of steps under the box. Then two columns on a computer and one on a phone, in this
   order: «Scegli l'atto» (`paletteActs.ts`: every act of `ACT_TYPES` named in full with the source convention's
   abbreviation, «Codice civile · c.c.», in 44 px rows under group headings in Geist 12 px) and «A portata di mano»
   (Preferiti, I tuoi alias with the presets' line, «In dotazione» while typing; six of each at rest, then «Tutti i
@@ -399,14 +421,32 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   arrows, Home and End anywhere inside it (Enter picks the chosen row): every control that is not the box keeps
   them (`keepKeys`), or Enter on «Filtri avanzati» would open the first act.
   On a computer the panel is a dialog («Menu di ricerca», `useRole` and `FloatingFocusManager`, modal): the focus
-  stays inside, and goes back to what had it as the palette opened («Opzioni», the field), as it closes rather than
+  stays inside, and goes back to what had it as the palette opened (the field), as it closes rather than
   once the fade is over (the manager sits outside the `AnimatePresence`); nothing had it, the field. cmdk replaces an
   id given to `Command.List` with its own, so the tour's `#command-palette-results` is on the acts' column;
-  `tourConfig.commandPalette.test.tsx` checks the palette's tour against the palette drawn, on both breakpoints. Motion: the panel fades in dropping 6 px (`dur.pop`) and leaves in `dur.press`; a new step slides in
-  from the side it moved to; the chosen row's tint is one element carried from row to row (`layoutId`); under
-  reduced motion everything only fades. This reverses spec `2026-10-18-redesign-inchiostro` §6.1 («no open or close
+  `tourConfig.commandPalette.test.tsx` checks the palette's tour against the palette drawn, on both breakpoints. Motion (R2, the second pull request; inspired by Animorio's «menu dei comandi», written from scratch with
+  Framer Motion and Web Animations): the field grows into the panel (`PanelGrowth`): the same place and width, the panel
+  uncovered from the field's height down to its own (`clip-path`, `calc(100% - <the field's height>)` to
+  `calc(0% - 0px)`, one template so the two ends interpolate; the corners from the field's 12 px to a card's 16), in
+  about 280 ms on `ease.out` (no bounce; a curve, not a spring); the clip is set before the first paint, so the panel
+  never flashes open, and the growth starts once the first frame is drawn (mounting the rows is a long frame, which an
+  animation started before it would spend unseen); Web Animations with no fill, so once grown nothing holds the clip and
+  the card's `shadow-xl` shows. The content fades in as it grows; the first four groups come 30 ms apart, rising 4 px.
+  Closing (Esc, a click outside, a choice), the same way back in about 200 ms from wherever it is (a growth cut short
+  included), the panel taking no pointer meanwhile; opened again before it went, it grows back from there. Without Web
+  Animations the panel is drawn at once. While the box filters, a row filtered out fades and pops out of its list
+  (`AnimatePresence mode="popLayout"`, against its own scrolling column, which is `relative`) and the rows left slide to
+  their places (`layout`, `spring.snappy`); a row leaving is `disabled` for cmdk and `aria-hidden` (Enter never picks a
+  row no longer there); the letters the box matched are drawn in toga, semibold (`Matched`, over `matchRanges` in
+  `paletteActs.ts`, one entry per UTF-16 unit; an abbreviation typed with its dots is one word). A new step slides in
+  from the side it moved to; the chosen row's tint is one element carried from row to row (`layoutId`). On a phone the
+  page under the panel holds still (the body's overflow, a backdrop that takes no touch scroll) and the panel is as tall
+  as the visual viewport leaves (the keyboard; `100dvh` does not shrink on iOS), watched only while the menu is open on a phone. Under reduced motion everything only
+  fades and nothing moves. This reverses spec `2026-10-18-redesign-inchiostro` §6.1 («no open or close
   animation») for the palette, as the brief asked. There is no «ultimi atti aperti»: the web keeps no list of the
-  acts opened (the search history is the server's, read by its page alone). `utils/searchFieldControl.ts` reaches it: `focusSearchField({ text? }, { wait? })` says whether the field took
+  acts opened (the search history is the server's, read by its page alone). `utils/searchFieldControl.ts` reaches it: `focusSearchField({ text?, open?, focus? }, { wait? })` opens the
+  menu from the field (with `focus`, only puts the cursor on it; with `open: false`, only sets its words, as
+  `returnWordsToSearchField` does) and says whether the field took
   the request, and the sidebar's «Ricerca», which navigates first, asks it to wait (2 s) for the field to mount;
   the empty page's button and examples and the empty practice use `focusSearchFieldOrPalette`, which opens the
   palette with the same words when no field is on screen (Focus mode).
@@ -455,10 +495,22 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   welcome tour waits for the screen (`Layout`). The Forum's events carry the environment, never
   its author, and an annotation event never carries the note's words (the owner, 18 October 2026, «c»).
 - `components/ui/` — shared primitives: `Button`, `IconButton`, `Input`, `Card`,
-  `Modal`, `ConfirmDialog`, `Toast`, `EmptyState`, `Sheet` (a phone's bottom sheet), plus feature-flavoured modals.
+  `Modal`, `ConfirmDialog`, `WireConfirm` (below, «Destructive confirmations»), `Toast`, `EmptyState`, `Sheet` (a
+  phone's bottom sheet), plus feature-flavoured modals.
+  `SegmentedTabs` and `SegmentedTabPanel` («linguette che scorrono», U1; first on the Forum's three tabs and its
+  suggestions' «Ricevuti · Inviati», S7a) are a
+  `tablist` over one `tabpanel`: the chosen tab's mark slides on `spring.snappy` (a `layoutId` in the row's own
+  `LayoutGroup`, still on the first drawing), the content comes in over 160 ms with a 12 px shift the way the mark
+  moved (to a tab further right, the content moves right too: U1's words), in CSS (`animate-in`, fill backwards —
+  Framer's fade ended by writing the opacity, one frame at 0 and, under reduced motion, a second fade from the global
+  150 ms opacity transition of `index.css`), the panel clipping the shift 8 px out at the sides; under reduced motion
+  the mark is drawn in place and the content changes at once (that sheet makes every animation instant); the arrows,
+  Home and End move the choice and the focus (not with Alt, Cmd or Ctrl). The older
+  `SegmentedControl` (a choice in a form: the card's kind, a relation's end) slides a pill too, without the keyboard,
+  reduced motion or a row's own `LayoutGroup`: U1 folds it in.
   `Modal` is portaled to `document.body`, so a dialog opened inside a reading window
-  (transformed, stacked) is not confined to it; each open `Modal` is on a module-level
-  stack and only the top-most handles Tab (the focus trap) and Esc, so a dialog opened
+  (transformed, stacked) is not confined to it; each open `Modal` and `WireConfirm` is on a module-level
+  stack (`ui/dialogStack.ts`) and only the top-most handles Tab (its focus trap, on `document`) and Esc, so a dialog opened
   from a dialog keeps the keyboard.
   `Button` has four variants (spec `2026-10-18-redesign-inchiostro` §5.1): `primary` (toga-600, white),
   `secondary` (paper with an ink-200 hairline), `quiet` (text only) and `danger` (red-600) — `ghost` and
@@ -1588,8 +1640,20 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   and each new annex or search blanked it while it was read. Acts reorder by drag:
   `setDossierItemOrder` saves the whole order and waits, never sending a
   temporary id, while an added item is pending
-  (`pendingDossierOrders`). Articles do not drag. The header has three actions
-  and a «⋯» (`ui/MenuButton`); «Seleziona elementi» lives there.
+  (`pendingDossierOrders`). Articles do not drag. **The page is in the planner's shape** (S7c, `dossierStyles.ts`):
+  in the sections' frame (`PageFrame`, under one 44 px «Torna ai Dossier»), the dossier's name the `h1` in the reader's
+  serif with no icon, wrapping at the column's width, its section's phrase over it (`kicker`: Gymnasium for a dossier
+  di studio, else Opus), the description under it; then the tags, one line of the facts («Tra i preferiti · Dossier di
+  lavoro · creato il … · 2 atti · 6 articoli · 3 note · 2 sentenze», `countsLine`/`countsParts` in `dossierLayout.ts`,
+  which the list's card says alike) and the header's actions in one row (D3) under the title at every width — beside it,
+  a long name was squeezed into a narrow column, and before S7c pushed the actions off the page at 1366 px: «Apri
+  tutto su Dashboard», «Aggiungi», «Esporta», the Forum's and «⋯» (`ui/MenuButton`; «Seleziona elementi» lives
+  there). Every control is 44 px at every width, as the planner's (the search is the planner's `FIELD`); the act
+  blocks, the free notes and «Giurisprudenza» are tiles (`SECTION_TILE`, no shadow) headed in the reader's serif, no
+  small capitals, and their entries rows of two levels, as the planner's tasks (`ROW`, a rule under each): a title
+  (15 px), a grey line (13 px: an article's rubric, else «Aggiunto il …», nothing when neither is known; a note's date
+  and who wrote it, under its words; a decision's «Aggiunta il …»), the signs, then the star and the removal (44 px,
+  always there) at the right; no hand-written blue.
 - **Notes**: every note a dossier gets from the web takes the notes route
   (`addNoteToDossier` → `POST /dossiers/:id/notes`), the one Claude's notes take
   through MCP. A note about an article (`aboutItemId`) sits with it: a count on
@@ -1733,7 +1797,7 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   `DossierModal` is create-only.
 - **Rows** (`DossierArticleRow`): the expand toggle lives on a header-scoped
   sub-div, never wrapping the reader or the action buttons (see gotcha 22); the
-  star keeps a 44px touch target. The accessible name carries the server's
+  star and the removal are 44 px at every width (S7c). The accessible name carries the server's
   `citation`, so two laws' art. 3 never read alike.
 - **Versions**: an item keeps the version it was added with (`versione`,
   `data_versione`), whichever button added it (`normaForDossier` for the window
@@ -2025,7 +2089,26 @@ its target is still there (the import does not write into a dossier deleted mean
 browser asks before the page is left (`beforeunload`). Otherwise never
 `window.confirm`: use `components/ui/ConfirmDialog` with `variant="danger"`, and word
 the message so it names the scope *and* what is not touched ("Segnalibri e dossier non
-saranno toccati").
+saranno toccati"). Where the action **leaves you** or **cannot be undone** and comes rarely (K1b, L-35: erasing
+the MERL-T data, revoking a connected app, deleting a published copy from the dossier's «Forum» menu or from the
+Forum's card), the confirmation is drawn from its button: `components/ui/wireConfirm/WireConfirm` (the same props,
+plus `origin`, the button: pass it, `event.currentTarget`, since Safari and a tap do not focus a button they press;
+absent, the element focused as it opens, right for a menu's entry — `MenuButton` gives the focus back to its trigger
+by code before an entry runs, the Forum's card does the same by hand). A button its action disabled (busy) gets the
+focus back once enabled again. A wire leaves the button, meets the card on the edge
+that faces it (`wirePath.ts`, pure) and draws its outline both ways; where the ends meet the card appears, its rows
+rising one after the other (about 500 ms; the lead fades once it is there). «Annulla», Esc or a click outside wind it
+back into the button (about 300 ms) and give it the focus; leaving, the card is `inert`, so an Enter during the rewind
+confirms nothing, and the layer still takes the clicks, which do not fall to the page. Its buttons answer only once
+they have risen into sight (`READY_MS`, about 500 ms; `data-ready` on the card): a double tap on a button the card then
+covers runs nothing unseen. Confirming folds the card into a line, and `onConfirm` may resolve to the outcome the button then
+says, a tick drawing itself over it (`OutcomeTick`, «Eliminata ✓», 1.6 s, seen only: each caller says the outcome in
+words where a screen reader hears it); a caller that removes the button (a row, a card) does it in `onOutcomeDone`,
+once the tick is gone, and hands the focus to a neighbour; an outcome that gives way to a newer one (two revocations in
+a row) is told over at once, so the callers keep a queue of ids, oldest first, and the words a confirmation names until
+it is gone. The outline is drawn again when the window changes. The focus opens on «Annulla» and Tab goes between the two buttons. Under reduced
+motion the card fades in already drawn, and the outcome comes once it is gone. On a phone the card is the page's
+width less 16 px each side.
 
 **Keyboard-accessible collapsibles** — a `div` that toggles on click needs
 `role="button"`, `tabIndex={0}`, `aria-expanded`, a dynamic `aria-label`
@@ -2084,15 +2167,17 @@ re-applying a saturated background behind the text.
 **Mobile-first** — interactive controls keep a 44px touch target on mobile.
 `TOUCH_TARGET_RESPONSIVE` in `constants/interactions.ts` covers the height only
 (`min-h-[44px] md:min-h-0`); icon-only buttons need the width too, so they carry
-`min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0` explicitly — as the dossier
-row's star and remove buttons do. A text field or a select is at least 16 px below
+`min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0` explicitly. The pages in the
+planner's shape keep 44 px at every width instead: the planner, and the dossier's
+page since S7c (`dossierStyles.ts`: `ROW_ICON` for a row's star and removal). A text field or a select is at least 16 px below
 `md` (`FIELD_TEXT`, `text-[length:max(1rem,16px)] md:text-sm`, in `constants/interactions.ts`):
 Safari on an iPhone zooms the page into a field under 16 px as it takes the focus, and
 `text-base` is not enough — the text size «piccolo» makes 1 rem 14 px. `ui/Input` and
-`ui/FormSelect` carry it, and so do the searches of «Le mie schede» and of the Cronologia
+`ui/FormSelect` carry it, and so do the searches of «Le mie schede» and of the Cronologia, the
+planner's `FIELD` (its tasks' fields, the dossier's search since S7c)
 (`ui/__tests__/fieldText.test.tsx`), the search page's field and the palette's fields (its box
 is `max(1.125rem,16px)`); about sixty fields written by hand do not yet (the find
-window, the dossier's search, the index filter, the case-law filters, the dossier pickers,
+window, the index filter, the case-law filters, the dossier pickers,
 the notes): a field written by hand takes it, and a `text-*` class after it in `cn` undoes it.
 
 ## Common Patterns
@@ -2121,9 +2206,13 @@ meant to stay split; add new features as new files, not inside the shells:
   `i`; the search, then two menus — the order and «Filtra per categoria», one
   category at a time, «Tutte le categorie» first («Tutte» on a phone, by `useIsDesktop`), the categories of the section's dossiers, absent when
   there are none — on one row on a computer, half and half under the search on
-  a phone; on a phone the title keeps its row with «⋯» — «Importa da file JSON», «Cestino (n)» — and «+», M1), `DossierDetailView.tsx` (sections and header), `DossierActBlock.tsx`
+  a phone; on a phone the title keeps its row with «⋯» — «Importa da file JSON», «Cestino (n)» — and «+», M1; the cards since S7c: a Newsreader title, the
+  counts in one line from `countsParts`, «Creato il …», the quick open and «⋯»
+  always there at 44 px; with no dossier, a composed empty state with
+  `DossierMark.tsx`), `DossierDetailView.tsx` (sections and header), `DossierActBlock.tsx`
   (an act and its rows), `DossierArticleRow.tsx` (row + star + expand),
-  `DossierNotesSection.tsx`, `DossierItemReader.tsx` (in-place article),
+  `DossierNotesSection.tsx`, `DossierDecisionsSection.tsx`, `dossierStyles.ts`
+  (the page's tokens, in the planner's measures), `DossierItemReader.tsx` (in-place article),
   `AddToDossierPopover.tsx`, one file per modal, shared helpers in
   `dossierUtils.ts`, `dossierLayout.ts`, `dossierPdf.ts`, `pdfExcerpts.ts`, `dossierPdfMarks.ts`, `DossierPdfDialog.tsx`, `useActDetails.ts`.
 - `features/bulletin/` — the Forum. Its area «Dossier pubblici»: «I dossier di studio pubblicati dalla comunità» (spec
@@ -2131,8 +2220,12 @@ meant to stay split; add new features as new files, not inside the shells:
   component names stay `bulletin` and `SharedEnvironment*` because they match the backend model; the route is
   `/forum`, the page's `h1` «Dossier pubblici», and what leaves it says so («Ritira dai dossier pubblici», toast
   «Dossier ritirato»; in the dossier's header «Copia pubblicata ritirata»), never «dal Forum»: the Forum is the section, which also holds «Community»
-  (`ForumCommunityPage`, `/forum/community`, a placeholder). `BulletinBoardPage.tsx` is a shell over three dumb views, the tabs «Esplora · I miei pubblicati ·
-  Suggerimenti» (`ForumExploreView`, `ForumMyEnvironmentsView`, `ForumSuggestionsView`); Explore's filters are one row
+  (`ForumCommunityPage`, `/forum/community`, a placeholder: an empty state composed for the page, S7a — centred in the
+  column, `CommunityMark`, line art in the manner of the section's mark in the Forum's hue, «Le discussioni arrivano
+  presto», two lines on what it will be, and «Esplora i dossier pubblici», a link drawn as the one button). `BulletinBoardPage.tsx` is a shell over three dumb views, the tabs «Esplora · I miei pubblicati ·
+  Suggerimenti» (`ForumTabs`, drawn by `ui/SegmentedTabs`: short labels «Esplora · Miei · Suggeriti» sharing the row in
+  equal parts below `sm`, whole from it — at 320 px the last was cut, S7a; the views, `ForumExploreView`,
+  `ForumMyEnvironmentsView`, `ForumSuggestionsView`, in its `SegmentedTabPanel`, their order in `forumSections.ts`); the titles of «Dossier pubblici» and «Community» come from `features/sections/pageNames.ts`; Explore's filters are one row
   from `sm` and, on a phone, the search across with the category («Tutte»), the order and the 44 px refresh under it, M1. «Pubblica un dossier»
   is `PublishDossierPicker` (the user's dossiers not yet in the Forum, then the dossier's own
   `PublishDossierDialog`; the Forum never publishes a workspace); «Modifica» on a published dossier
@@ -2144,10 +2237,28 @@ meant to stay split; add new features as new files, not inside the shells:
   of the archive (`ArchivedEnvironmentsSection` under «I miei pubblicati»: «Ambienti salvati (archivio)», «Recupera
   i dossier» through `POST /environments/:id/recover`, «Esporta JSON», «Elimina»; absent for a user with none; no
   environment is created any more) and an old share link (`SharedLinkImport`, reading `?import=`, through `POST
-  /dossiers/import-study`, quick norms and aliases left out). «Dossier di studio pronti» (`StudyPacksBand`, over
-  `utils/studyPacks.ts`: the 20 packs of `data/exampleEnvironments.ts`, each a pack's dossiers plus «‹pack›:
-  articoli chiave») follows Explore's category and adds a pack through `import-study`; the empty dossier list
-  points to it. One list of categories, `utils/forumCategories.ts`. `EnvironmentContentViewer` (the tree of a
+  /dossiers/import-study`, quick norms and aliases left out). Explore shows **the community's dossiers first** (S7a,
+  the Forum's reason), under a visually hidden `h2` «Dalla comunità»: a grid of `SharedEnvironmentCard`s (`CARD_GRID`,
+  «I miei pubblicati»' too: one column, two from `md`, three from `xl`, a row's cards one height, `h-full`), each an
+  `article` with its title in Newsreader 18 px, a plain line «● Civile · v1 · autore · 2 giorni fa» (the category's hue
+  from its token `--category-*`, never a hand-written colour; one line where the card has room, wrapped between its parts
+  on a narrow one, a long username cut, whole on hover), two tags then «+N», «Mi piace» a heart with its number
+  (`aria-pressed`, named «Mi piace: N»; on a computer 36 px tall) and one action, «Aggiungi ai miei dossier», outlined
+  («Aggiungi» below `sm`, as the packs' cards, its name whole); a withdrawn card is a dashed edge on a quieter paper and
+  the badge, never an opacity (it would trap the «⋯» menu in a stacking context, gotcha 22, and fade the text under AA).
+  Beside the like, small, «aggiunto da 12» (nothing at 0); the views are the author's alone, beside it in «I miei
+  pubblicati» (`showOwnerActions`), never on Explore; where a card is too narrow the action goes under them, whole. «I
+  più aggiunti» is an `h2`, last on the page. Then «Pronti da VisuaLex» (`StudyPacksBand`, over
+  `utils/studyPacks.ts`: the 20 packs of `data/exampleEnvironments.ts`, each a pack's dossiers plus «‹pack›: articoli
+  chiave»): one row of compact cards that scrolls sideways (`#pronti`, `tabIndex 0`, so the keyboard scrolls it past
+  packs already added), every pack in it — on a computer after the grid and its pages; on a phone right after the
+  community's first two dossiers (or their places while a read travels, or the empty state), in a fixed place so it is
+  never mounted again while a new read travels, the rest under a hidden `h2` «Altri dossier della comunità»
+  (`useIsDesktop`, one place or the other); it follows Explore's category and adds a pack through `import-study`; the
+  empty dossier list's «Pronti da VisuaLex» goes to `/forum#pronti`, where Explore, once read, scrolls the content
+  scroller alone to the strip under the phone's bar (`scroll-padding-top`, gotcha 34) and focuses it, once: the fragment
+  then leaves the address (`history.replaceState`, the router's state kept), so another tab and back, or a reload, do not
+  jump again. One list of categories, `utils/forumCategories.ts`. `EnvironmentContentViewer` (the tree of a
   content's dossiers, quick norms, aliases, notes and highlights), `useLeftOutNotice` and `annotationLabels` serve
   the suggestions. The suggestion flow adds `SuggestionReviewDialog`, `EditSuggestionDialog`,
   `SuggestionItemCard` (all five itemTypes), `AliasConflictDialog`,
