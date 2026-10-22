@@ -51,6 +51,9 @@ export function DossierArticleRow({
   }, []);
 
   const shownRubrica = rubrica ?? textRubrica;
+  // The grey line: the rubric, else when it was added; nothing when neither is known.
+  const added = formatTimestampLong(item.addedAt);
+  const greyLine = shownRubrica ?? (added ? `Aggiunto il ${added}` : null);
   const annex = shownAnnex(item.data);
   const isImportant = item.status === 'important';
   // "Testo al 29/12/2007": a row that holds a past text says so.
@@ -111,9 +114,7 @@ export function DossierArticleRow({
           />
           <span className="min-w-0 flex-1">
             <span className={cn(ROW_TITLE, 'block font-medium')}>art. {item.data.numero_articolo}</span>
-            <span className={cn(ROW_LINE, 'mt-0.5 line-clamp-2 block')}>
-              {shownRubrica ?? `Aggiunto il ${formatTimestampLong(item.addedAt)}`}
-            </span>
+            {greyLine && <span className={cn(ROW_LINE, 'mt-0.5 line-clamp-2 block')}>{greyLine}</span>}
           </span>
           <span className="flex flex-shrink-0 flex-wrap items-center justify-end gap-1.5 pt-0.5">
             {annex && (

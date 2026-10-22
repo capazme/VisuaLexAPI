@@ -101,6 +101,8 @@ describe('PageFrame (W2)', () => {
  */
 const SECTION_PAGES = [
   'components/features/dossier/DossierListView.tsx',
+  // A dossier's own page, in the frame since S7c: its name is the frame's title.
+  'components/features/dossier/DossierDetailView.tsx',
   'components/features/dossier/TrashPage.tsx',
   'components/features/bulletin/BulletinBoardPage.tsx',
   'components/features/bulletin/ForumCommunityPage.tsx',

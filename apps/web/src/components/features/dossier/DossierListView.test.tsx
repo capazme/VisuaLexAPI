@@ -1,5 +1,5 @@
 import { beforeEach, describe, it, expect, vi } from 'vitest';
-import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { appStore } from '../../../store/useAppStore';
 import { DossierListView } from './DossierListView';
@@ -283,12 +283,13 @@ describe('DossierListView — the category menu (D1)', () => {
     expect(values()).toEqual(['', 'penale']);
   });
 
-  it('gives both menus the same look, 44 px and half the row each on a phone', () => {
+  it('gives both menus the same look, 44 px at every width (S7c) and half the row each on a phone', () => {
     appStore.setState({ dossiers: listed });
     renderList();
     for (const name of ['Ordina i dossier', 'Filtra per categoria']) {
       expect(screen.getByRole('combobox', { name }).className).toEqual(expect.stringContaining('flex-1 min-w-0'));
-      expect(screen.getByRole('combobox', { name }).className).toEqual(expect.stringContaining('min-h-[44px] md:min-h-0'));
+      expect(screen.getByRole('combobox', { name })).toHaveClass('min-h-[44px]');
+      expect(screen.getByRole('combobox', { name }).className).not.toMatch(/md:min-h-0/);
     }
   });
 
@@ -355,5 +356,44 @@ describe('DossierListView — the heading on a phone', () => {
     page();
     fireEvent.click(screen.getByRole('button', { name: 'Nuovo dossier' }));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+});
+
+// The list in the planner's shape (S7c): the card says what it holds in one line, and an empty list is composed.
+describe('DossierListView — cards and the empty list (S7c)', () => {
+  it('says what a dossier holds in one line at the card\'s foot, with its date; its controls 44 px, always there', () => {
+    appStore.setState({ dossiers: [{
+      id: 'd1', title: 'Pratica Rossi', createdAt: '2026-08-01T10:00:00.000Z',
+      items: [
+        { id: 'b', type: 'norma', addedAt: '2026-08-01T10:00:00.000Z', data: CIVIL },
+        { id: 'n', type: 'note', addedAt: '2026-08-01T10:00:00.000Z', data: 'appunto' },
+      ],
+    }], practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [] });
+    render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
+    const card = screen.getByRole('button', { name: 'Apri dossier Pratica Rossi' });
+    expect(within(card).getByRole('heading', { level: 2, name: 'Pratica Rossi' })).toHaveClass('font-serif');
+    const line = within(card).getByText('1 nota').closest('p')!;
+    expect(line).toHaveTextContent('1 atto· 1 articolo· 1 nota');
+    expect(within(card).getByText('Creato il 1 agosto 2026')).toBeInTheDocument();
+    for (const name of ['Apri Pratica Rossi su Dashboard', 'Azioni su Pratica Rossi']) {
+      const control = within(card).getByRole('button', { name });
+      expect(control).toHaveClass('min-h-[44px]', 'min-w-[44px]');
+      expect(control.className).not.toMatch(/opacity-0/);
+    }
+    // No icon of a folder, no «N elementi» badge.
+    expect(within(card).queryByText(/elementi?$/)).toBeNull();
+  });
+
+  it('composes the empty list: line art in the section\'s hue, what a dossier is for, and two ways to begin', () => {
+    appStore.setState({ dossiers: [], practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [] });
+    sectionStore.setState({ section: 'opus', dossierKind: 'lavoro' });
+    render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
+    const empty = screen.getByRole('region', { name: 'Nessun dossier di lavoro' });
+    expect(empty).toHaveClass('mx-auto', 'items-center', 'text-center');
+    const drawing = empty.querySelector('svg')!;
+    expect(drawing).toHaveAttribute('aria-hidden', 'true');
+    expect(drawing.innerHTML).toContain('var(--vlx-section-opus)');
+    expect(within(empty).getByRole('button', { name: 'Crea il tuo primo dossier' })).toHaveClass('min-h-[44px]', 'bg-primary-600');
+    expect(within(empty).getByRole('button', { name: 'Dossier di studio pronti' })).toHaveClass('min-h-[44px]');
   });
 });

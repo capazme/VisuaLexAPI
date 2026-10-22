@@ -43,7 +43,7 @@ import type { Dossier, DossierItem, DossierKind } from '../../../types';
 import {
   formatTimestampLong, computeNormaGroups, decisionCitationOf, encodeDossierShare, searchParamsFromNorma, shareableDossier, type NormaGroup,
 } from './dossierUtils';
-import { dossierItemOrder, layoutDossier, type ActBlock } from './dossierLayout';
+import { countsLine, dossierItemOrder, layoutDossier, type ActBlock } from './dossierLayout';
 import { deleteDossierWithUndo } from './deleteDossierWithUndo';
 import { showUndoToast } from '../../../hooks/useUndoableAction';
 import { removeItemsWithUndo } from './removeItemsWithUndo';
@@ -77,8 +77,6 @@ import { HEADER_BUTTON, HEADER_ICON_BUTTON, HEADER_PRIMARY } from './dossierStyl
 import { FIELD, ICON_BUTTON } from '../planner/plannerStyles';
 
 type ToastType = 'success' | 'error' | 'info';
-
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 interface Props {
   dossier: Dossier;
@@ -183,13 +181,8 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
       onDragCancel: ({ active }: { active: { id: string | number } }) => `Spostamento di ${heading(active.id)} annullato.`,
     };
   }, [fullBlocks]);
-  const noteCount = dossier.items.filter((i) => i.type === 'note').length;
-  const countsLine = [
-    plural(fullLayout.acts.length, 'atto', 'atti'),
-    plural(fullLayout.acts.reduce((n, a) => n + a.articles.length, 0), 'articolo', 'articoli'),
-    // Every note: the free ones and those about an article.
-    ...(noteCount > 0 ? [plural(noteCount, 'nota', 'note')] : []),
-  ].join(' · ');
+  // What it holds, in one line, as the list's card says it (S7c).
+  const dossierCounts = countsLine(dossier.items);
   const visibleArticleIds = useMemo(() => layout.acts.flatMap((a) => a.articles.map((i) => i.id)), [layout]);
 
   const toggleExpanded = (id: string) => setExpandedIds((prev) => {
@@ -422,7 +415,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
       const blocks = buildPdfBlocks(dossier.items, texts, titles, { excerpts, marks, decisions });
 
       const doc = writeDossierPdf(
-        { title: dossier.title, description: dossier.description, tags: dossier.tags, countsLine, exportedOn: new Date().toLocaleDateString('it-IT') },
+        { title: dossier.title, description: dossier.description, tags: dossier.tags, countsLine: dossierCounts, exportedOn: new Date().toLocaleDateString('it-IT') },
         blocks,
       );
       doc.save(`${dossier.title.replace(/[^a-z0-9]/gi, '_')}.pdf`);
@@ -560,7 +553,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
                 <span aria-hidden className="text-slate-400">·</span>
               </span>
             )}
-            <span>{kindLabel(dossier.kind)} · creato il {formatTimestampLong(dossier.createdAt)} · {countsLine}{snapshots.length > 0 ? ` · ${snapshots.length} snapshot` : ''}</span>
+            <span>{kindLabel(dossier.kind)} · creato il {formatTimestampLong(dossier.createdAt)} · {dossierCounts}{snapshots.length > 0 ? ` · ${snapshots.length} snapshot` : ''}</span>
             {dossier.sourceSuggestionId && <AttributionChip author={dossier.originalAuthor} />}
           </p>
           <div className="pt-2">{actions}</div>

@@ -30,6 +30,7 @@ export function DossierDecisionsSection({ decisions, onRemove }: Props) {
       <ul className="mt-1">
         {decisions.map((item) => {
           const citation = decisionCitationOf(item.data);
+          const added = formatTimestampLong(item.addedAt);
           return (
             <li key={item.id} className={cn(ROW, 'flex items-start gap-1 pl-1')}>
               <div className="min-w-0 flex-1 py-1.5">
@@ -40,7 +41,7 @@ export function DossierDecisionsSection({ decisions, onRemove }: Props) {
                 >
                   <span className="[overflow-wrap:anywhere]">{citation}</span>
                 </DecisionLink>
-                <p className={cn(ROW_LINE, 'pb-1')}>Aggiunta il {formatTimestampLong(item.addedAt)}</p>
+                {added && <p className={cn(ROW_LINE, 'pb-1')}>Aggiunta il {added}</p>}
               </div>
               <button type="button" onClick={() => onRemove(item)} aria-label={`Rimuovi ${citation} dal dossier`} className={ROW_REMOVE}>
                 <Trash2 size={15} aria-hidden />
