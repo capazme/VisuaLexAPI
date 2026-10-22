@@ -31,6 +31,17 @@ describe('SettingsModal — the groups (Y1)', () => {
   });
 });
 
+describe('SettingsModal — «Carattere dell’interfaccia»', () => {
+  it('names the typeface control for what it sets, the interface\'s, not the law\'s (Bill and Luca)', () => {
+    render(view(true));
+    expect(screen.getByText('Carattere dell’interfaccia')).toBeInTheDocument();
+    const group = screen.getByRole('group', { name: 'Carattere dell’interfaccia' });
+    expect(group).toBeInTheDocument();
+    expect(screen.queryByText('Font')).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Famiglia font' })).toBeNull();
+  });
+});
+
 describe('SettingsModal — «Elimina l’account…» (Y1)', () => {
   const opener = () => screen.getByRole('button', { name: /Elimina l’account…/ });
 

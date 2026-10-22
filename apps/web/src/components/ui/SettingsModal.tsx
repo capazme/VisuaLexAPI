@@ -244,8 +244,8 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                         </div>
 
                         <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800 p-2 rounded-lg">
-                            <span className="text-sm text-slate-600 dark:text-slate-400 px-2">Font</span>
-                            <div className="flex gap-1" role="group" aria-label="Famiglia font">
+                            <span className="text-sm text-slate-600 dark:text-slate-400 px-2">Carattere dell’interfaccia</span>
+                            <div className="flex gap-1" role="group" aria-label="Carattere dell’interfaccia">
                                 {FONT_FAMILY_OPTIONS.map(({ value, label, fontClass }) => (
                                     <button
                                         key={value}
