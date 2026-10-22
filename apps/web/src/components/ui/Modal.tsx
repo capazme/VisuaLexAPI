@@ -4,6 +4,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Z_INDEX } from '../../constants/zIndex';
+import { isTopmostDialog, openDialog } from './dialogStack';
 import { dur, ease } from '../../lib/motion';
 
 export type ModalVariant = 'default' | 'danger' | 'info' | 'success';
@@ -46,10 +47,6 @@ const variantIconStyles: Record<ModalVariant, string> = {
   success: 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400',
 };
 
-// Open modals, oldest first. Each one registers its Tab trap and Esc handler on
-// `document`; with a dialog opened from another dialog, only the last one opened
-// may act, or the parent would pull the focus back from its child.
-const openModals: symbol[] = [];
 
 export function Modal({
   isOpen,
@@ -83,17 +80,9 @@ export function Modal({
   const hidden = still ? { opacity: 0 } : { opacity: 0, scale: 0.97 };
   const panel = { duration: dur.panel, ease: ease.drawer };
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const token = tokenRef.current;
-    openModals.push(token);
-    return () => {
-      const at = openModals.indexOf(token);
-      if (at !== -1) openModals.splice(at, 1);
-    };
-  }, [isOpen]);
+  useEffect(() => (isOpen ? openDialog(tokenRef.current) : undefined), [isOpen]);
 
-  const isTopmost = () => openModals[openModals.length - 1] === tokenRef.current;
+  const isTopmost = () => isTopmostDialog(tokenRef.current);
 
   useEffect(() => {
     if (!isOpen || !closeOnEscape) return;

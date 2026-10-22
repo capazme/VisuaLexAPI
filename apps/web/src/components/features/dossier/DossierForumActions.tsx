@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { EyeOff, FolderOpen, Globe, RefreshCw, Trash2, Upload } from 'lucide-react';
 import type { Dossier } from '../../../types';
 import { MenuButton } from '../../ui/MenuButton';
-import { ConfirmDialog } from '../../ui/ConfirmDialog';
+import { WireConfirm } from '../../ui/wireConfirm/WireConfirm';
 import { useAppStore } from '../../../store/useAppStore';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
 import { getErrorMessage } from '../../../utils/errors';
@@ -37,18 +37,47 @@ export function DossierForumActions({ dossier, showToast, buttonClassName }: Pro
   const published = dossier.published ?? null;
   const blocked = dossier.forumBlocked === true;
 
-  const act = async (run: () => Promise<unknown>, done: string) => {
+  /** Runs a Forum action, says how it went; whether it went. */
+  const act = async (run: () => Promise<unknown>, done: string): Promise<boolean> => {
     setBusy(true);
     try {
       await run();
       showToast(done, 'success');
+      return true;
     } catch (err) {
       showToast(getErrorMessage(err) || 'Operazione non riuscita. Riprova.', 'error');
+      return false;
     } finally {
       setBusy(false);
       await refreshDossier(dossier.id);
     }
   };
+
+  // The copy being deleted, kept while its confirmation and its tick last: the deletion makes the dossier unpublished
+  // and the «Forum» menu gives way to «Pubblica nel Forum», but the confirmation stays mounted (in both branches) to
+  // say how it went, then hands the focus to «Pubblica nel Forum».
+  const [deleting, setDeleting] = useState<NonNullable<Dossier['published']> | null>(null);
+  const publishRef = useRef<HTMLButtonElement>(null);
+  // It takes away others' «Mi piace» and proposals: drawn from the «Forum» button (K1b), which says the outcome.
+  const confirmation = (
+    <WireConfirm
+      open={confirmDelete}
+      variant="danger"
+      title="Eliminare la copia pubblicata?"
+      message="La copia pubblicata, i suoi «Mi piace» e le proposte ricevute vengono eliminati. Il tuo dossier resta com'è; chi l'ha già scaricato ne conserva la copia."
+      confirmLabel="Elimina dai dossier pubblici"
+      onConfirm={async () => {
+        setConfirmDelete(false);
+        if (!deleting) return null;
+        return (await act(() => sharedEnvironmentService.delete(deleting.sharedEnvironmentId), 'Copia pubblicata eliminata')) ? 'Eliminata' : null;
+      }}
+      onCancel={() => setConfirmDelete(false)}
+      onOutcomeDone={() => {
+        setDeleting(null);
+        if (document.activeElement === document.body || document.activeElement === null) publishRef.current?.focus({ preventScroll: true });
+      }}
+    />
+  );
 
   const dialog = dialogOpen && (
     <PublishDossierDialog
@@ -68,6 +97,7 @@ export function DossierForumActions({ dossier, showToast, buttonClassName }: Pro
     return (
       <>
         <button
+          ref={publishRef}
           type="button"
           onClick={() => setDialogOpen(true)}
           disabled={blocked || dossier.items.length === 0}
@@ -84,6 +114,7 @@ export function DossierForumActions({ dossier, showToast, buttonClassName }: Pro
           <span className="hidden sm:inline" aria-hidden>{blocked ? 'Ritirato dai dossier pubblici' : 'Pubblica nel Forum'}</span>
         </button>
         {dialog}
+        {confirmation}
       </>
     );
   }
@@ -110,25 +141,17 @@ export function DossierForumActions({ dossier, showToast, buttonClassName }: Pro
                 onSelect: () => void act(() => sharedEnvironmentService.republish(published.sharedEnvironmentId), 'Dossier di nuovo nel Forum'),
               },
           { label: 'Apri i dossier pubblici', icon: FolderOpen, onSelect: () => navigate('/forum') },
-          { label: 'Elimina dai dossier pubblici', icon: Trash2, danger: true, separatorBefore: true, disabled: busy, onSelect: () => setConfirmDelete(true) },
+          { label: 'Elimina dai dossier pubblici', icon: Trash2, danger: true, separatorBefore: true, disabled: busy, onSelect: () => {
+              setDeleting(published);
+              setConfirmDelete(true);
+            } },
         ]}
       >
         {published.isActive ? <Globe size={16} aria-hidden /> : <EyeOff size={16} aria-hidden />}
         <span className="hidden sm:inline">{state}</span>
       </MenuButton>
       {dialog}
-      <ConfirmDialog
-        open={confirmDelete}
-        variant="danger"
-        title="Eliminare la copia pubblicata?"
-        message="La copia pubblicata, i suoi «Mi piace» e le proposte ricevute vengono eliminati. Il tuo dossier resta com'è; chi l'ha già scaricato ne conserva la copia."
-        confirmLabel="Elimina dai dossier pubblici"
-        onConfirm={() => {
-          setConfirmDelete(false);
-          void act(() => sharedEnvironmentService.delete(published.sharedEnvironmentId), 'Copia pubblicata eliminata');
-        }}
-        onCancel={() => setConfirmDelete(false)}
-      />
+      {confirmation}
     </>
   );
 }

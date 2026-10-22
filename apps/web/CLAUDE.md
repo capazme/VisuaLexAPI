@@ -93,7 +93,21 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   card's top sits where the card would be centred above the foot, so a form that grows (an error) grows
   downwards and the tabs never move, and the colophon is centred against the card (text left-aligned; on a
   phone centred above it), so it follows half of such a growth; its title is 48 px up to `lg` and 68 px from it
-  (between 768 and 1023 px the column beside the card is about 200 px). The register form fits a window 768 px high
+  (between 768 and 1023 px the column beside the card is about 200 px).
+  **The wordmark** (A2, `SegmentWordmark` over the pure `segments.ts`; inspired by Animorio's «logo dai sette segmenti»,
+  written from scratch with SVG, an SVG filter and Framer Motion): once per opening, «VISUALEX» on eight seven-segment
+  cells slanted by 7° (V with its two lower strokes converging to the bottom's middle and no bottom bar — a narrow U
+  read «11» beside the I —, X an H) lights up in steps, each cell through one wrong drawing to its letter
+  (0.9 s), holds (0.4 s), and melts into the real wordmark — the segments round and join (`feGaussianBlur` cut by
+  `feColorMatrix`, the blur back to 0 before the filter goes), the Newsreader copy takes its weight from 300, the slant
+  goes back to nothing (0.8 s) —, then the open book fades in (2.1 s and the book's 0.3 s in all). The `h1` is
+  «VisuaLex» throughout (the display and the melting copy `aria-hidden`), its box is the real wordmark's from the first
+  frame, nothing takes the focus; a click on it plays it again once it has ended; under reduced motion it only fades
+  in. Measured at 60 fps in Chromium at every width (not
+  on a phone). The weight comes by two copies cross-faded (300, then the wordmark's own, `weightClass`), never a weight
+  animated; on WebKit (`isWebKit` in `segments.ts`: Safari on a Mac, every browser on an iPhone or an iPad — Chrome,
+  Firefox and Edge there are WebKit too —, an iPad with a Mac's user agent and touch points) the filter is left out and
+  the melt is the cross-fade alone, the brief's fallback. The register form fits a window 768 px high
   inside (1366×768, 1470×753 measured as viewports; a 768 px screen with a browser's bars scrolls a little) by
   its spacing (`space-y-4` between fields, `space-y-1.5` inside one), the sign-in form spaced the same. While a sign-in or a
   sign-up is on its way the tabs hold still (`aria-disabled`): its answer would land on the hidden form. A
@@ -441,10 +455,11 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   welcome tour waits for the screen (`Layout`). The Forum's events carry the environment, never
   its author, and an annotation event never carries the note's words (the owner, 18 October 2026, «c»).
 - `components/ui/` — shared primitives: `Button`, `IconButton`, `Input`, `Card`,
-  `Modal`, `ConfirmDialog`, `Toast`, `EmptyState`, `Sheet` (a phone's bottom sheet), plus feature-flavoured modals.
+  `Modal`, `ConfirmDialog`, `WireConfirm` (below, «Destructive confirmations»), `Toast`, `EmptyState`, `Sheet` (a
+  phone's bottom sheet), plus feature-flavoured modals.
   `Modal` is portaled to `document.body`, so a dialog opened inside a reading window
-  (transformed, stacked) is not confined to it; each open `Modal` is on a module-level
-  stack and only the top-most handles Tab (the focus trap) and Esc, so a dialog opened
+  (transformed, stacked) is not confined to it; each open `Modal` and `WireConfirm` is on a module-level
+  stack (`ui/dialogStack.ts`) and only the top-most handles Tab (its focus trap, on `document`) and Esc, so a dialog opened
   from a dialog keeps the keyboard.
   `Button` has four variants (spec `2026-10-18-redesign-inchiostro` §5.1): `primary` (toga-600, white),
   `secondary` (paper with an ink-200 hairline), `quiet` (text only) and `danger` (red-600) — `ghost` and
@@ -2002,7 +2017,26 @@ its target is still there (the import does not write into a dossier deleted mean
 browser asks before the page is left (`beforeunload`). Otherwise never
 `window.confirm`: use `components/ui/ConfirmDialog` with `variant="danger"`, and word
 the message so it names the scope *and* what is not touched ("Segnalibri e dossier non
-saranno toccati").
+saranno toccati"). Where the action **leaves you** or **cannot be undone** and comes rarely (K1b, L-35: erasing
+the MERL-T data, revoking a connected app, deleting a published copy from the dossier's «Forum» menu or from the
+Forum's card), the confirmation is drawn from its button: `components/ui/wireConfirm/WireConfirm` (the same props,
+plus `origin`, the button: pass it, `event.currentTarget`, since Safari and a tap do not focus a button they press;
+absent, the element focused as it opens, right for a menu's entry — `MenuButton` gives the focus back to its trigger
+by code before an entry runs, the Forum's card does the same by hand). A button its action disabled (busy) gets the
+focus back once enabled again. A wire leaves the button, meets the card on the edge
+that faces it (`wirePath.ts`, pure) and draws its outline both ways; where the ends meet the card appears, its rows
+rising one after the other (about 500 ms; the lead fades once it is there). «Annulla», Esc or a click outside wind it
+back into the button (about 300 ms) and give it the focus; leaving, the card is `inert`, so an Enter during the rewind
+confirms nothing, and the layer still takes the clicks, which do not fall to the page. Its buttons answer only once
+they have risen into sight (`READY_MS`, about 500 ms; `data-ready` on the card): a double tap on a button the card then
+covers runs nothing unseen. Confirming folds the card into a line, and `onConfirm` may resolve to the outcome the button then
+says, a tick drawing itself over it (`OutcomeTick`, «Eliminata ✓», 1.6 s, seen only: each caller says the outcome in
+words where a screen reader hears it); a caller that removes the button (a row, a card) does it in `onOutcomeDone`,
+once the tick is gone, and hands the focus to a neighbour; an outcome that gives way to a newer one (two revocations in
+a row) is told over at once, so the callers keep a queue of ids, oldest first, and the words a confirmation names until
+it is gone. The outline is drawn again when the window changes. The focus opens on «Annulla» and Tab goes between the two buttons. Under reduced
+motion the card fades in already drawn, and the outcome comes once it is gone. On a phone the card is the page's
+width less 16 px each side.
 
 **Keyboard-accessible collapsibles** — a `div` that toggles on click needs
 `role="button"`, `tabIndex={0}`, `aria-expanded`, a dynamic `aria-label`

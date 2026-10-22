@@ -97,6 +97,7 @@ export function SharedEnvironmentCard({
     // One card a dossier (S7a): as tall as its row in the grid, its one action at its foot.
     <article
       id={isFirst ? 'tour-forum-card' : undefined}
+      data-shared-env={environment.id}
       aria-labelledby={titleId}
       className={cn(
         'group relative flex h-full flex-col rounded-xl border',
@@ -201,6 +202,9 @@ export function SharedEnvironmentCard({
                       {onDelete && (
                         <button
                           onClick={() => {
+                            // The focus goes back to the menu's button, as `MenuButton` does: the confirmation is drawn
+                            // from it and returns the focus there (K1b).
+                            menuRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
                             onDelete(environment);
                             setShowMenu(false);
                           }}

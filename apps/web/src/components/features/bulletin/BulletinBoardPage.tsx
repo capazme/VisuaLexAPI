@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Upload } from 'lucide-react';
 import { AddToMyDossiersDialog } from './AddToMyDossiersDialog';
@@ -16,7 +16,7 @@ import { ForumTabs, type ForumTab } from './ForumTabs';
 import { ArchivedEnvironmentsSection } from './ArchivedEnvironmentsSection';
 import { SharedLinkImport } from './SharedLinkImport';
 import { Toast } from '../../ui/Toast';
-import { ConfirmDialog } from '../../ui/ConfirmDialog';
+import { WireConfirm } from '../../ui/wireConfirm/WireConfirm';
 import { useTour } from '../../../hooks/useTour';
 import { useAppStore } from '../../../store/useAppStore';
 import { studyImportSentence } from '../../../utils/studyImportReport';
@@ -64,6 +64,10 @@ export function BulletinBoardPage() {
   const [suggestingTo, setSuggestingTo] = useState<SharedEnvironment | null>(null);
   const [editingEnv, setEditingEnv] = useState<SharedEnvironment | null>(null);
   const [deletingEnv, setDeletingEnv] = useState<SharedEnvironment | null>(null);
+  // The deleted copy whose card waits for «Eliminata ✓» to go (K1b).
+  const deletedEnvIds = useRef<string[]>([]);
+  // The copy the confirmation names, kept while it leaves (its title does not empty under the rewind).
+  const [shownEnv, setShownEnv] = useState<SharedEnvironment | null>(null);
   const [reviewingSuggestion, setReviewingSuggestion] = useState<EnvironmentSuggestion | null>(null);
   const [editingSuggestion, setEditingSuggestion] = useState<EnvironmentSuggestion | null>(null);
   const [aliasConflict, setAliasConflict] = useState<{ itemId: string; suggestedTrigger: string; existingAliasId?: string } | null>(null);
@@ -219,20 +223,37 @@ export function BulletinBoardPage() {
   // Delete handler
   const handleDeleteClick = (env: SharedEnvironment) => {
     setDeletingEnv(env);
+    setShownEnv(env);
   };
 
-  const handleDeleteConfirm = async () => {
-    if (!deletingEnv) return;
-
+  /** The deletion; the card's menu button says «Eliminata» with its tick, and the card goes once it has said it. */
+  const handleDeleteConfirm = async (): Promise<string | null> => {
+    const env = deletingEnv;
+    if (!env) return null;
+    setDeletingEnv(null);
     try {
-      await sharedEnvironmentService.delete(deletingEnv.id);
-      setMyEnvironments(prev => prev.filter(e => e.id !== deletingEnv.id));
-      setDeletingEnv(null);
+      await sharedEnvironmentService.delete(env.id);
+      deletedEnvIds.current.push(env.id);
       showToast('Copia pubblicata eliminata', 'success');
+      return 'Eliminata';
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Errore';
       showToast(message, 'error');
+      return null;
     }
+  };
+
+  // The deleted copy's card goes once its tick has said it; the focus it held goes to the next card's menu button.
+  const dropDeletedEnv = () => {
+    // Oldest first: two deleted in a row each go when theirs has been said.
+    const id = deletedEnvIds.current.shift();
+    if (!id) return;
+    const lost = document.activeElement === document.body || document.activeElement === null
+      || document.activeElement?.closest('[data-shared-env]')?.getAttribute('data-shared-env') === id;
+    const triggers = [...document.querySelectorAll<HTMLElement>('[data-shared-env] [aria-label^="Azioni su"]')];
+    const at = triggers.findIndex((t) => t.closest('[data-shared-env]')?.getAttribute('data-shared-env') === id);
+    setMyEnvironments(prev => prev.filter(e => e.id !== id));
+    if (lost) (triggers[at + 1] ?? triggers[at - 1])?.focus({ preventScroll: true });
   };
 
   // Suggestion item handlers
@@ -589,17 +610,17 @@ export function BulletinBoardPage() {
         />
       )}
 
-      {/* Delete Confirmation — shared ConfirmDialog pattern. Deletes the
-          shared environment from the forum along with all its versions,
-          likes and comments. */}
-      <ConfirmDialog
+      {/* Deletes the published copy with its versions, likes and reports, which are others' too: drawn from the card's
+          menu button (K1b). */}
+      <WireConfirm
         open={deletingEnv !== null}
         variant="danger"
-        title={deletingEnv ? `Eliminare «${deletingEnv.title}» dai dossier pubblici?` : 'Eliminare dai dossier pubblici?'}
+        title={shownEnv ? `Eliminare «${shownEnv.title}» dai dossier pubblici?` : 'Eliminare dai dossier pubblici?'}
         message="La copia pubblicata, le sue versioni, i «Mi piace» e le segnalazioni vengono eliminati. Il tuo dossier resta com'è; chi l'ha già aggiunto ai suoi dossier ne conserva la copia."
         confirmLabel="Elimina definitivamente"
         onConfirm={handleDeleteConfirm}
         onCancel={() => setDeletingEnv(null)}
+        onOutcomeDone={dropDeletedEnv}
       />
 
       {/* Toast */}
