@@ -13,6 +13,8 @@ import { ForumExploreView, type SortOption } from './ForumExploreView';
 import { ForumMyEnvironmentsView } from './ForumMyEnvironmentsView';
 import { ForumSuggestionsView } from './ForumSuggestionsView';
 import { ForumTabs, type ForumTab } from './ForumTabs';
+import { FORUM_PANEL_ID, FORUM_TAB_ORDER } from './forumSections';
+import { SegmentedTabPanel } from '../../ui/SegmentedTabs';
 import { ArchivedEnvironmentsSection } from './ArchivedEnvironmentsSection';
 import { SharedLinkImport } from './SharedLinkImport';
 import { Toast } from '../../ui/Toast';
@@ -440,71 +442,73 @@ export function BulletinBoardPage() {
       {/* The tabs: short labels on a phone, whole from `sm` (S7a). */}
       <ForumTabs active={activeTab} onChange={setActiveTab} pendingCount={pendingCount} />
 
-      {/* Tab views */}
-      {activeTab === 'explore' && (
-        <ForumExploreView
-          environments={environments}
-          pagination={pagination}
-          loading={loading}
-          likingIds={likingIds}
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          category={category}
-          setCategory={setCategory}
-          sort={sort}
-          setSort={setSort}
-          showCategoryDropdown={showCategoryDropdown}
-          setShowCategoryDropdown={setShowCategoryDropdown}
-          showSortDropdown={showSortDropdown}
-          setShowSortDropdown={setShowSortDropdown}
-          onSearchSubmit={handleSearchSubmit}
-          onRefresh={() => fetchEnvironments(pagination.page)}
-          onPaginate={fetchEnvironments}
-          onLike={handleLike}
-          onImport={handleImportClick}
-          onReport={handleReport}
-          onSuggest={handleSuggest}
-          onPublishClick={() => setShowPublishModal(true)}
-          onPacksAdded={handleStudyDossiersAdded}
-          onPacksError={(message) => showToast(message, 'error')}
-          onResetFilters={() => {
-            setSearchQuery('');
-            setCategory('all');
-          }}
-        />
-      )}
+      {/* The view of the chosen tab, shifting the way the mark moved (U1). */}
+      <SegmentedTabPanel panelId={FORUM_PANEL_ID} order={FORUM_TAB_ORDER} value={activeTab} className="flex flex-col gap-6">
+        {activeTab === 'explore' && (
+          <ForumExploreView
+            environments={environments}
+            pagination={pagination}
+            loading={loading}
+            likingIds={likingIds}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            category={category}
+            setCategory={setCategory}
+            sort={sort}
+            setSort={setSort}
+            showCategoryDropdown={showCategoryDropdown}
+            setShowCategoryDropdown={setShowCategoryDropdown}
+            showSortDropdown={showSortDropdown}
+            setShowSortDropdown={setShowSortDropdown}
+            onSearchSubmit={handleSearchSubmit}
+            onRefresh={() => fetchEnvironments(pagination.page)}
+            onPaginate={fetchEnvironments}
+            onLike={handleLike}
+            onImport={handleImportClick}
+            onReport={handleReport}
+            onSuggest={handleSuggest}
+            onPublishClick={() => setShowPublishModal(true)}
+            onPacksAdded={handleStudyDossiersAdded}
+            onPacksError={(message) => showToast(message, 'error')}
+            onResetFilters={() => {
+              setSearchQuery('');
+              setCategory('all');
+            }}
+          />
+        )}
 
-      {activeTab === 'my' && (
-        <ForumMyEnvironmentsView
-          environments={myEnvironments}
-          loading={myEnvLoading}
-          likingIds={likingIds}
-          onLike={handleLike}
-          onImport={handleImportClick}
-          onReport={handleReport}
-          onEdit={handleEdit}
-          onDelete={handleDeleteClick}
-          onWithdraw={handleWithdraw}
-          onRepublish={handleRepublish}
-          onPublishClick={() => setShowPublishModal(true)}
-        />
-      )}
-      {activeTab === 'my' && (
-        <ArchivedEnvironmentsSection onRecovered={handleStudyDossiersAdded} onMessage={showToast} />
-      )}
+        {activeTab === 'my' && (
+          <ForumMyEnvironmentsView
+            environments={myEnvironments}
+            loading={myEnvLoading}
+            likingIds={likingIds}
+            onLike={handleLike}
+            onImport={handleImportClick}
+            onReport={handleReport}
+            onEdit={handleEdit}
+            onDelete={handleDeleteClick}
+            onWithdraw={handleWithdraw}
+            onRepublish={handleRepublish}
+            onPublishClick={() => setShowPublishModal(true)}
+          />
+        )}
+        {activeTab === 'my' && (
+          <ArchivedEnvironmentsSection onRecovered={handleStudyDossiersAdded} onMessage={showToast} />
+        )}
 
-      {activeTab === 'suggestions' && (
-        <ForumSuggestionsView
-          receivedSuggestions={receivedSuggestions}
-          sentSuggestions={sentSuggestions}
-          loading={suggestionsLoading}
-          suggestionTab={suggestionTab}
-          setSuggestionTab={setSuggestionTab}
-          pendingCount={pendingCount}
-          onOpenReview={setReviewingSuggestion}
-          onOpenEdit={setEditingSuggestion}
-        />
-      )}
+        {activeTab === 'suggestions' && (
+          <ForumSuggestionsView
+            receivedSuggestions={receivedSuggestions}
+            sentSuggestions={sentSuggestions}
+            loading={suggestionsLoading}
+            suggestionTab={suggestionTab}
+            setSuggestionTab={setSuggestionTab}
+            pendingCount={pendingCount}
+            onOpenReview={setReviewingSuggestion}
+            onOpenEdit={setEditingSuggestion}
+          />
+        )}
+      </SegmentedTabPanel>
 
       {/* Modals */}
       {showPublishModal && (

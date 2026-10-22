@@ -457,6 +457,17 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
 - `components/ui/` — shared primitives: `Button`, `IconButton`, `Input`, `Card`,
   `Modal`, `ConfirmDialog`, `WireConfirm` (below, «Destructive confirmations»), `Toast`, `EmptyState`, `Sheet` (a
   phone's bottom sheet), plus feature-flavoured modals.
+  `SegmentedTabs` and `SegmentedTabPanel` («linguette che scorrono», U1; first on the Forum's three tabs and its
+  suggestions' «Ricevuti · Inviati», S7a) are a
+  `tablist` over one `tabpanel`: the chosen tab's mark slides on `spring.snappy` (a `layoutId` in the row's own
+  `LayoutGroup`, still on the first drawing), the content comes in over 160 ms with a 12 px shift the way the mark
+  moved (to a tab further right, the content moves right too: U1's words), in CSS (`animate-in`, fill backwards —
+  Framer's fade ended by writing the opacity, one frame at 0 and, under reduced motion, a second fade from the global
+  150 ms opacity transition of `index.css`), the panel clipping the shift 8 px out at the sides; under reduced motion
+  the mark is drawn in place and the content changes at once (that sheet makes every animation instant); the arrows,
+  Home and End move the choice and the focus (not with Alt, Cmd or Ctrl). The older
+  `SegmentedControl` (a choice in a form: the card's kind, a relation's end) slides a pill too, without the keyboard,
+  reduced motion or a row's own `LayoutGroup`: U1 folds it in.
   `Modal` is portaled to `document.body`, so a dialog opened inside a reading window
   (transformed, stacked) is not confined to it; each open `Modal` and `WireConfirm` is on a module-level
   stack (`ui/dialogStack.ts`) and only the top-most handles Tab (its focus trap, on `document`) and Esc, so a dialog opened
@@ -2145,9 +2156,9 @@ meant to stay split; add new features as new files, not inside the shells:
   (`ForumCommunityPage`, `/forum/community`, a placeholder: an empty state composed for the page, S7a — centred in the
   column, `CommunityMark`, line art in the manner of the section's mark in the Forum's hue, «Le discussioni arrivano
   presto», two lines on what it will be, and «Esplora i dossier pubblici», a link drawn as the one button). `BulletinBoardPage.tsx` is a shell over three dumb views, the tabs «Esplora · I miei pubblicati ·
-  Suggerimenti» (`ForumTabs`: `aria-pressed`, short labels «Esplora · Miei · Suggeriti» sharing the row in equal parts
-  below `sm`, whole from it — at 320 px the last was cut, S7a; `ForumExploreView`, `ForumMyEnvironmentsView`,
-  `ForumSuggestionsView`); the titles of «Dossier pubblici» and «Community» come from `features/sections/pageNames.ts`; Explore's filters are one row
+  Suggerimenti» (`ForumTabs`, drawn by `ui/SegmentedTabs`: short labels «Esplora · Miei · Suggeriti» sharing the row in
+  equal parts below `sm`, whole from it — at 320 px the last was cut, S7a; the views, `ForumExploreView`,
+  `ForumMyEnvironmentsView`, `ForumSuggestionsView`, in its `SegmentedTabPanel`, their order in `forumSections.ts`); the titles of «Dossier pubblici» and «Community» come from `features/sections/pageNames.ts`; Explore's filters are one row
   from `sm` and, on a phone, the search across with the category («Tutte»), the order and the 44 px refresh under it, M1. «Pubblica un dossier»
   is `PublishDossierPicker` (the user's dossiers not yet in the Forum, then the dossier's own
   `PublishDossierDialog`; the Forum never publishes a workspace); «Modifica» on a published dossier
