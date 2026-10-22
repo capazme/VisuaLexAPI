@@ -39,7 +39,10 @@ const IDLE = 'border-slate-200 text-slate-800 hover:bg-slate-50 dark:border-slat
  * subject.
  */
 // Padded by the focus ring's 4 px all round, and the same taken back by the margins, so the scroller never cuts it.
-const LIST = cn('-m-1 flex snap-x gap-2 overflow-x-auto p-1 md:m-0 md:grid md:gap-1.5 md:overflow-visible md:p-0', HIDDEN_SCROLLBAR);
+// `relative`: the strip scrolls on a phone, and an absolute piece inside it (each card's `sr-only` words) takes the
+// nearest positioned box as its own; without it, «Oggi»'s section, so the strip clipped none of them and the page
+// scrolled sideways to the last one, 1316 px at 390 (G8b).
+const LIST = cn('relative -m-1 flex snap-x gap-2 overflow-x-auto p-1 md:m-0 md:grid md:gap-1.5 md:overflow-visible md:p-0', HIDDEN_SCROLLBAR);
 const ITEM = 'w-60 shrink-0 snap-start md:w-auto';
 
 /**
@@ -107,7 +110,8 @@ export function SubjectList({ materie, loading, reloading, selected, onSelect, p
               >
                 <button type="button" aria-pressed={on} onClick={() => onSelect(stop.materia)} className={cn(CHOICE, on ? PRESSED : IDLE, 'flex-wrap md:min-w-0 md:flex-1 md:flex-nowrap')}>
                   <span aria-hidden className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: subjectHue(stop.materia) }} />
-                  <span className="min-w-0 flex-1 truncate">{label}</span>
+                  {/* Never cut: «Diritto processuale civile» goes on two lines in a phone's 240 px card (G8b). */}
+                  <span data-subject-name className="min-w-0 flex-1 [overflow-wrap:anywhere]">{label}</span>
                   {total === 0 ? (
                     <span className={cn('shrink-0 text-xs font-normal', MUTED_TEXT)}>Nessuna scheda</span>
                   ) : (

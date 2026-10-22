@@ -84,7 +84,9 @@ function useCardDetail(card: Scheda): { card: Scheda; failed: boolean; retry: ()
  */
 function NoCardsYet({ sources, onNew }: { sources: boolean | undefined; onNew: () => void }) {
   const search = (
-    <Link to="/" className={cn('font-medium underline underline-offset-2', FOCUS_RING)}>
+    // In a sentence: its vertical padding makes the touch 44 px tall without moving a line (an inline box's padding
+    // takes no room), G8b.
+    <Link to="/" className={cn('py-3 font-medium underline underline-offset-2', FOCUS_RING)}>
       Ricerca
     </Link>
   );
