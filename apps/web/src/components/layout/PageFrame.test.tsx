@@ -101,6 +101,8 @@ describe('PageFrame (W2)', () => {
  */
 const SECTION_PAGES = [
   'components/features/dossier/DossierListView.tsx',
+  // A dossier's own page, in the frame since S7c: its name is the frame's title.
+  'components/features/dossier/DossierDetailView.tsx',
   'components/features/dossier/TrashPage.tsx',
   'components/features/bulletin/BulletinBoardPage.tsx',
   'components/features/bulletin/ForumCommunityPage.tsx',
@@ -129,18 +131,31 @@ describe('the section pages (W2)', () => {
 });
 
 /**
- * The pages' names in one list (L-37): the phone's bar and the titles of Gymnasium's views, Opus's and the dossier list
- * read `features/sections/pageNames.ts`; none keeps a list of its own.
+ * The pages' names in one list (L-37): the phone's bar and the titles of Gymnasium's views, Opus's, the dossier list and
+ * the Forum's two pages read `features/sections/pageNames.ts`; none keeps a list of its own or writes its title by hand.
  */
 describe('the pages\' names (L-37)', () => {
   it.each([
     'components/features/studia/StudiaPage.tsx',
     'components/features/planner/OpusPage.tsx',
     'components/features/dossier/DossierListView.tsx',
+    'components/features/bulletin/BulletinBoardPage.tsx',
+    'components/features/bulletin/ForumCommunityPage.tsx',
     'components/layout/phoneBarTitle.ts',
   ])('%s reads them from the one list', (file) => {
     const source = readFileSync(resolve(process.cwd(), 'src', file), 'utf8');
     expect(source).toMatch(/from '[./]+(features\/sections\/)?pageNames'|from '\.\.\/\.\.\/features\/sections\/pageNames'/);
     expect(source).not.toMatch(/function pageName\b|const PAGES\b/);
+    // A page that imports the list still takes its title from it, never a word written in its frame.
+    expect(source).not.toMatch(/<PageFrame[^>]*\btitle="/);
+  });
+
+  it.each([
+    ['components/features/bulletin/BulletinBoardPage.tsx', 'PUBLIC_DOSSIERS_PAGE'],
+    ['components/features/bulletin/ForumCommunityPage.tsx', 'COMMUNITY_PAGE'],
+    ['components/features/dossier/DossierListView.tsx', 'DOSSIER_PAGE'],
+  ])('%s is titled %s', (file, name) => {
+    const source = readFileSync(resolve(process.cwd(), 'src', file), 'utf8');
+    expect(source).toContain(`title={${name}}`);
   });
 });

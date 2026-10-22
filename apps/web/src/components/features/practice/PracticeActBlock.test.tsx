@@ -122,8 +122,9 @@ describe('PracticeActBlock: the heading (spec §3.2)', () => {
   });
 
   it('the chevron folds the block: no index, no rows', () => {
-    const { practiceId, actId } = setUp(L24, [article(L24, '5')]);
+    const { practiceId, actId } = setUp(L24, [article(L24, '5'), article(L24, '7')]);
     render(<Block practiceId={practiceId} actId={actId} />);
+    expect(screen.getByRole('list', { name: /Articoli sul tavolo/ })).toBeInTheDocument();
     const toggle = screen.getByRole('button', { expanded: true, name: /l\. 8 marzo 2017, n\. 24/ });
     fireEvent.click(toggle);
     expect(s().practices[0].acts[0].isCollapsed).toBe(true);
@@ -133,6 +134,13 @@ describe('PracticeActBlock: the heading (spec §3.2)', () => {
 });
 
 describe('PracticeActBlock: the index on top (D3)', () => {
+  it('is not drawn for an act of one article (R3): the row says it already, and the tour skips its step', () => {
+    const { practiceId, actId } = setUp(L24, [article(L24, '5')]);
+    const { container } = render(<Block practiceId={practiceId} actId={actId} />);
+    expect(screen.queryByRole('list', { name: /Articoli sul tavolo/ })).toBeNull();
+    expect(container.querySelector('.practice-act-index')).toBeNull();
+  });
+
   it('a chip says which row is open to a screen reader', () => {
     const { practiceId, actId } = setUp(L24, [article(L24, '5'), article(L24, '7')]);
     render(<Block practiceId={practiceId} actId={actId} />);
@@ -309,11 +317,25 @@ describe('PracticeActBlock: the structure window and the arrows (§6.4)', () => 
     expect(h.trees.every((t) => t.variant === 'window')).toBe(true);
   });
 
+  it('on a phone width the act\'s tools are entries of «⋯», not buttons (R3)', () => {
+    h.desktop = false;
+    const { practiceId, actId } = setUp(L24_URN, [article(L24, '5')]);
+    render(<Block practiceId={practiceId} actId={actId} />);
+    for (const name of ['Modalità studio', 'Struttura della norma', 'Esporta PDF della norma']) {
+      expect(screen.queryByRole('button', { name })).toBeNull();
+    }
+    fireEvent.click(screen.getByRole('button', { name: /^Azioni su/ }));
+    expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
+      'Modalità studio', 'Struttura della norma', 'Esporta PDF della norma', "Sposta in un'altra pratica", "Rimuovi l'atto",
+    ]);
+  });
+
   it('on a phone width Struttura opens the drawer, not the window', async () => {
     h.desktop = false;
     const { practiceId, actId } = setUp(L24_URN, [article(L24, '5')]);
     render(<Block practiceId={practiceId} actId={actId} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Struttura della norma' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Azioni su/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Struttura della norma' }));
     await waitFor(() => expect(lastTree()).toEqual(expect.objectContaining({ variant: 'drawer', isOpen: true })));
     expect(h.trees.every((t) => t.variant === 'drawer')).toBe(true);
     expect(s().structureWindow.blockId).toBeNull();
@@ -327,7 +349,6 @@ describe('PracticeActBlock: the structure window and the arrows (§6.4)', () => 
     // the palette's «Apri l'indice e sfoglia» lands on this act (`addActIndexToPractice`)
     act(() => { s().addActIndexToPractice(practiceId, L24); });
     await waitFor(() => expect(lastTree()).toEqual(expect.objectContaining({ variant: 'drawer', isOpen: true })));
-    expect(screen.getByRole('button', { name: 'Struttura della norma' })).toHaveAttribute('aria-pressed', 'true');
     act(() => { (lastTree() as unknown as { onClose: () => void }).onClose(); });
     expect(s().structureWindow.blockId).toBeNull();
     expect(lastTree()).toEqual(expect.objectContaining({ variant: 'drawer', isOpen: false }));

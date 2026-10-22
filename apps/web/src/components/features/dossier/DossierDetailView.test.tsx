@@ -507,3 +507,69 @@ describe('DossierDetailView — an import from the act\'s index (K1a)', () => {
     expect(leaving()).toBe(false);
   });
 });
+
+// A dossier's page in the planner's shape (S7c).
+describe('DossierDetailView — in the frame, in the planner\'s shape (S7c)', () => {
+  it('titles the page with the dossier\'s name in the reader\'s serif, no icon, its section\'s phrase over it', () => {
+    renderView({ ...dossier, kind: 'studio', description: 'Ricorso in appello' });
+    const title = screen.getByRole('heading', { level: 1, name: dossier.title });
+    expect(title).toHaveClass('font-serif');
+    expect(title.querySelector('svg')).toBeNull();
+    // A name of one long word wraps rather than widening the page.
+    expect(title.firstElementChild).toHaveClass('[overflow-wrap:anywhere]');
+    expect(title).toHaveAccessibleDescription('Gymnasium · la tua palestra giuridica');
+    expect(screen.getByText('Ricorso in appello')).toBeInTheDocument();
+  });
+
+  it('draws the header\'s actions in one row under the title, every one 44 px', () => {
+    renderView();
+    const open = screen.getByRole('button', { name: 'Apri tutto su Dashboard' });
+    const row = open.parentElement!;
+    for (const name of ['Aggiungi', 'Esporta', 'Altre azioni']) expect(row).toContainElement(screen.getByRole('button', { name }));
+    // Under the title, not beside it: a long name would be squeezed.
+    expect(screen.getByRole('heading', { level: 1 }).closest('header')).not.toContainElement(open);
+    expect(open).toHaveClass('min-h-[44px]');
+    expect(screen.getByRole('button', { name: 'Aggiungi' })).toHaveClass('min-h-[44px]', 'min-w-[44px]');
+    expect(screen.getByRole('button', { name: 'Altre azioni' })).toHaveClass('h-11', 'w-11');
+    for (const button of within(row).getAllByRole('button')) expect(button.className).not.toMatch(/md:min-h-0/);
+  });
+
+  it('draws an article as a row of two levels — the article, a grey line, the signs — with 44 px controls', () => {
+    renderView({
+      ...dossier,
+      items: [{ id: 'a3', type: 'norma', addedAt: '2026-10-12T08:00:00Z', actCitation: L247, data: { tipo_atto: 'legge', numero_atto: '247', data: '2012-12-31', numero_articolo: '3' } }],
+    });
+    const block = screen.getByRole('region', { name: L247 });
+    const title = within(block).getByText('art. 3');
+    // No rubric read (the act's index is mocked empty): the grey line says when it was added.
+    expect(within(block).getByText('Aggiunto il 12 ottobre 2026')).toHaveClass('text-[13px]');
+    expect(title).toHaveClass('text-[15px]');
+    expect(within(block).getByRole('button', { name: 'Segna come importante' })).toHaveClass('h-11', 'w-11');
+    expect(within(block).getByRole('button', { name: 'Rimuovi articolo dal dossier' })).toHaveClass('h-11', 'w-11');
+  });
+
+  it('writes no grey line it cannot fill: no «Aggiunto il» without a date', () => {
+    renderView();
+    expect(screen.queryByText(/^Aggiunto il\s*$/)).toBeNull();
+  });
+
+  it('draws the free notes as rows: the words, then a grey line with the date, the removal at the right', () => {
+    renderView();
+    const notes = screen.getByRole('region', { name: /Note \(1\)/ });
+    expect(within(notes).getByRole('heading', { level: 2 })).toHaveClass('font-serif');
+    expect(within(notes).getByRole('heading', { level: 2 }).className).not.toMatch(/uppercase/);
+    const words = within(notes).getByText('Verificare la decorrenza');
+    const date = within(notes).getByText('4 ottobre 2026');
+    // The date under the words, never beside them, so a phone's row keeps the note's width.
+    expect(words.compareDocumentPosition(date) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(words.parentElement).toContainElement(date);
+    expect(within(notes).getByRole('button', { name: 'Rimuovi nota' })).toHaveClass('h-11', 'w-11');
+  });
+
+  it('writes the search at 16 px at least on a phone, whatever the text size (Safari zooms under it)', () => {
+    renderView(dossier);
+    const search = screen.getByRole('textbox', { name: 'Cerca negli elementi del dossier' });
+    expect(search).toHaveClass('text-[length:max(1rem,16px)]', 'md:text-sm');
+    expect(search).not.toHaveClass('text-base');
+  });
+});

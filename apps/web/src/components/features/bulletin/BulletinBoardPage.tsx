@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Upload, Package, Lightbulb } from 'lucide-react';
+import { Upload } from 'lucide-react';
 import { AddToMyDossiersDialog } from './AddToMyDossiersDialog';
 import { PublishDossierPicker } from './PublishDossierPicker';
 import { ReportModal } from './ReportModal';
@@ -12,6 +12,9 @@ import { AliasConflictDialog } from './AliasConflictDialog';
 import { ForumExploreView, type SortOption } from './ForumExploreView';
 import { ForumMyEnvironmentsView } from './ForumMyEnvironmentsView';
 import { ForumSuggestionsView } from './ForumSuggestionsView';
+import { ForumTabs, type ForumTab } from './ForumTabs';
+import { FORUM_PANEL_ID, FORUM_TAB_ORDER } from './forumSections';
+import { SegmentedTabPanel } from '../../ui/SegmentedTabs';
 import { ArchivedEnvironmentsSection } from './ArchivedEnvironmentsSection';
 import { SharedLinkImport } from './SharedLinkImport';
 import { Toast } from '../../ui/Toast';
@@ -24,13 +27,13 @@ import { customAliasService } from '../../../services/customAliasService';
 import { notificationService } from '../../../services/notificationService';
 import { publishMerltEvent, MERLT_EVENT_TYPES } from '../../../features/merlt/merltEventBus';
 import type { SharedEnvironment, EnvironmentCategory, SharedEnvironmentListResponse, EnvironmentSuggestion, StudyImportReport } from '../../../types';
+import { PUBLIC_DOSSIERS_PAGE } from '../../../features/sections/pageNames';
 import { PageFrame } from '../../layout/PageFrame';
 
-type TabType = 'explore' | 'my' | 'suggestions';
 
 export function BulletinBoardPage() {
   // Tab state
-  const [activeTab, setActiveTab] = useState<TabType>('explore');
+  const [activeTab, setActiveTab] = useState<ForumTab>('explore');
 
   // State - Explore
   const [environments, setEnvironments] = useState<SharedEnvironment[]>([]);
@@ -420,7 +423,7 @@ export function BulletinBoardPage() {
 
   return (
     <PageFrame
-      title="Dossier pubblici"
+      title={PUBLIC_DOSSIERS_PAGE}
       kicker="forum"
       line="I dossier di studio pubblicati dalla comunità"
       section="forum"
@@ -436,113 +439,76 @@ export function BulletinBoardPage() {
       }
     >
 
-      {/* Tab Navigation */}
-      <div id="tour-forum-tabs" className="flex max-w-full gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg w-fit">
-        <button
-          onClick={() => setActiveTab('explore')}
-          className={`flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:px-4 md:min-h-0 ${
-            activeTab === 'explore'
-              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <Search size={16} className="hidden sm:block" aria-hidden />
-          Esplora
-        </button>
-        <button
-          onClick={() => setActiveTab('my')}
-          className={`flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:px-4 md:min-h-0 ${
-            activeTab === 'my'
-              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <Package size={16} className="hidden sm:block" aria-hidden />
-          I miei pubblicati
-        </button>
-        <button
-          onClick={() => setActiveTab('suggestions')}
-          className={`flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:px-4 md:min-h-0 relative ${
-            activeTab === 'suggestions'
-              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <Lightbulb size={16} className="hidden sm:block" aria-hidden />
-          Suggerimenti
-          {pendingCount > 0 && (
-            <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary-600 text-white text-xs rounded-full flex items-center justify-center">
-              {pendingCount}
-            </span>
-          )}
-        </button>
-      </div>
+      {/* The tabs: short labels on a phone, whole from `sm` (S7a). */}
+      <ForumTabs active={activeTab} onChange={setActiveTab} pendingCount={pendingCount} />
 
-      {/* Tab views */}
-      {activeTab === 'explore' && (
-        <ForumExploreView
-          environments={environments}
-          pagination={pagination}
-          loading={loading}
-          likingIds={likingIds}
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          category={category}
-          setCategory={setCategory}
-          sort={sort}
-          setSort={setSort}
-          showCategoryDropdown={showCategoryDropdown}
-          setShowCategoryDropdown={setShowCategoryDropdown}
-          showSortDropdown={showSortDropdown}
-          setShowSortDropdown={setShowSortDropdown}
-          onSearchSubmit={handleSearchSubmit}
-          onRefresh={() => fetchEnvironments(pagination.page)}
-          onPaginate={fetchEnvironments}
-          onLike={handleLike}
-          onImport={handleImportClick}
-          onReport={handleReport}
-          onSuggest={handleSuggest}
-          onPublishClick={() => setShowPublishModal(true)}
-          onPacksAdded={handleStudyDossiersAdded}
-          onPacksError={(message) => showToast(message, 'error')}
-          onResetFilters={() => {
-            setSearchQuery('');
-            setCategory('all');
-          }}
-        />
-      )}
+      {/* The view of the chosen tab, shifting the way the mark moved (U1). */}
+      <SegmentedTabPanel panelId={FORUM_PANEL_ID} order={FORUM_TAB_ORDER} value={activeTab} className="flex flex-col gap-6">
+        {activeTab === 'explore' && (
+          <ForumExploreView
+            environments={environments}
+            pagination={pagination}
+            loading={loading}
+            likingIds={likingIds}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            category={category}
+            setCategory={setCategory}
+            sort={sort}
+            setSort={setSort}
+            showCategoryDropdown={showCategoryDropdown}
+            setShowCategoryDropdown={setShowCategoryDropdown}
+            showSortDropdown={showSortDropdown}
+            setShowSortDropdown={setShowSortDropdown}
+            onSearchSubmit={handleSearchSubmit}
+            onRefresh={() => fetchEnvironments(pagination.page)}
+            onPaginate={fetchEnvironments}
+            onLike={handleLike}
+            onImport={handleImportClick}
+            onReport={handleReport}
+            onSuggest={handleSuggest}
+            onPublishClick={() => setShowPublishModal(true)}
+            onPacksAdded={handleStudyDossiersAdded}
+            onPacksError={(message) => showToast(message, 'error')}
+            onResetFilters={() => {
+              setSearchQuery('');
+              setCategory('all');
+            }}
+          />
+        )}
 
-      {activeTab === 'my' && (
-        <ForumMyEnvironmentsView
-          environments={myEnvironments}
-          loading={myEnvLoading}
-          likingIds={likingIds}
-          onLike={handleLike}
-          onImport={handleImportClick}
-          onReport={handleReport}
-          onEdit={handleEdit}
-          onDelete={handleDeleteClick}
-          onWithdraw={handleWithdraw}
-          onRepublish={handleRepublish}
-          onPublishClick={() => setShowPublishModal(true)}
-        />
-      )}
-      {activeTab === 'my' && (
-        <ArchivedEnvironmentsSection onRecovered={handleStudyDossiersAdded} onMessage={showToast} />
-      )}
+        {activeTab === 'my' && (
+          <ForumMyEnvironmentsView
+            environments={myEnvironments}
+            loading={myEnvLoading}
+            likingIds={likingIds}
+            onLike={handleLike}
+            onImport={handleImportClick}
+            onReport={handleReport}
+            onEdit={handleEdit}
+            onDelete={handleDeleteClick}
+            onWithdraw={handleWithdraw}
+            onRepublish={handleRepublish}
+            onPublishClick={() => setShowPublishModal(true)}
+          />
+        )}
+        {activeTab === 'my' && (
+          <ArchivedEnvironmentsSection onRecovered={handleStudyDossiersAdded} onMessage={showToast} />
+        )}
 
-      {activeTab === 'suggestions' && (
-        <ForumSuggestionsView
-          receivedSuggestions={receivedSuggestions}
-          sentSuggestions={sentSuggestions}
-          loading={suggestionsLoading}
-          suggestionTab={suggestionTab}
-          setSuggestionTab={setSuggestionTab}
-          pendingCount={pendingCount}
-          onOpenReview={setReviewingSuggestion}
-          onOpenEdit={setEditingSuggestion}
-        />
-      )}
+        {activeTab === 'suggestions' && (
+          <ForumSuggestionsView
+            receivedSuggestions={receivedSuggestions}
+            sentSuggestions={sentSuggestions}
+            loading={suggestionsLoading}
+            suggestionTab={suggestionTab}
+            setSuggestionTab={setSuggestionTab}
+            pendingCount={pendingCount}
+            onOpenReview={setReviewingSuggestion}
+            onOpenEdit={setEditingSuggestion}
+          />
+        )}
+      </SegmentedTabPanel>
 
       {/* Modals */}
       {showPublishModal && (
