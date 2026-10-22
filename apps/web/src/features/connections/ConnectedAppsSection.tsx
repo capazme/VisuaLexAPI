@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Link2, Unplug } from 'lucide-react';
+import { Unplug } from 'lucide-react';
 import { WireConfirm } from '../../components/ui/wireConfirm/WireConfirm';
 import { getErrorMessage } from '../../utils/errors';
 import { connectionsService, type ConnectedApp } from './connectionsService';
@@ -107,9 +107,7 @@ export function ConnectedAppsSection() {
 
   return (
     <div>
-      <label className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-1.5">
-        <Link2 size={12} aria-hidden /> Applicazioni collegate
-      </label>
+      <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Applicazioni collegate</h3>
       <div ref={listRef} tabIndex={-1} className="space-y-3 rounded-xl border border-slate-200 p-3 focus:outline-none dark:border-slate-700">
         {state.status === 'loading' && <p className="text-xs text-slate-500">Caricamento…</p>}
         {state.status === 'error' && <p className="text-xs text-red-600">{state.message}</p>}

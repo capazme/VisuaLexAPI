@@ -317,7 +317,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
                       {isSearching ? 'Cercando...' : 'Cerca'}
                     </button>
                   ) : (
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">
+                    <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase">
                       Completa la ricerca
                     </span>
                   )}
@@ -360,7 +360,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
                   className={cn(
                     "flex-1 px-3 py-2 text-xs font-bold rounded-lg transition-[color,background-color,border-color,box-shadow] flex items-center justify-center gap-1",
                     version === 'data'
-                      ? "bg-blue-500 text-white shadow-sm"
+                      ? "bg-primary-500 text-white shadow-sm"
                       : "bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600"
                   )}
                 >
@@ -372,18 +372,18 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
               {/* Date input when "data" is selected */}
               {version === 'data' && (
                 <div className="flex items-center gap-2 animate-in slide-in-from-top-2 duration-200">
-                  <Calendar size={14} className="text-blue-500 shrink-0" />
+                  <Calendar size={14} className="text-primary-500 shrink-0" />
                   <input
                     type="text"
                     value={versionDate}
                     onChange={(e) => setVersionDate(e.target.value)}
                     placeholder="es. 01/01/2020 o 2020"
-                    className="flex-1 px-3 py-2 text-sm border border-blue-200 dark:border-blue-800 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className="flex-1 px-3 py-2 text-sm border border-primary-200 dark:border-primary-800 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                   />
                 </div>
               )}
 
-              <p className="text-[10px] text-slate-400">
+              <p className="text-[11px] text-slate-600 dark:text-slate-400">
                 {version === 'vigente' && 'Testo attualmente in vigore'}
                 {version === 'originale' && 'Testo originale alla data di pubblicazione'}
                 {version === 'data' && 'Testo vigente alla data specificata'}
@@ -400,8 +400,8 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
                   <p>• <code className="bg-white dark:bg-slate-700 px-1 rounded">art 1 cost</code> - Costituzione</p>
                   <p>• <code className="bg-white dark:bg-slate-700 px-1 rounded">d.lgs 50/2016 art 36</code> - Decreto legislativo</p>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-2 pt-2 border-t border-slate-200 dark:border-slate-700">
-                  Premi <kbd className="px-1 py-0.5 bg-white dark:bg-slate-700 rounded text-[9px] font-bold">Enter</kbd> per cercare
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+                  Premi <kbd className="px-1 py-0.5 bg-white dark:bg-slate-700 rounded text-[11px] font-bold">Enter</kbd> per cercare
                 </p>
               </div>
             )}
@@ -541,7 +541,7 @@ export function CompareView() {
           exit={{ opacity: 0, y: 20, scale: 0.98 }}
           transition={spring.snappy}
           className={cn(
-            "bg-white dark:bg-slate-900 shadow-2xl overflow-hidden flex flex-col",
+            "bg-white dark:bg-slate-900 shadow-lg overflow-hidden flex flex-col",
             fullscreen
               ? "fixed inset-0 rounded-none"
               : "fixed inset-4 md:inset-8 lg:inset-12 rounded-2xl"

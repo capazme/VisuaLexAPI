@@ -28,14 +28,14 @@ const STATUS_LABEL: Record<MyContribJob['status'], string> = {
 function StatusBadge({ status }: { status: MyContribJob['status'] }): React.ReactElement {
   const config: Record<MyContribJob['status'], { icon: React.ElementType; cls: string }> = {
     pending: { icon: Clock, cls: 'text-slate-500 bg-slate-100 dark:bg-slate-800' },
-    running: { icon: Loader2, cls: 'text-blue-600 bg-blue-50 dark:bg-blue-950/40' },
+    running: { icon: Loader2, cls: 'text-primary-600 bg-primary-50 dark:bg-primary-950/40' },
     completed: { icon: CheckCircle2, cls: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40' },
     failed: { icon: AlertCircle, cls: 'text-red-600 bg-red-50 dark:bg-red-950/40' },
     timeout: { icon: AlertCircle, cls: 'text-amber-600 bg-amber-50 dark:bg-amber-950/40' },
   };
   const { icon: Icon, cls } = config[status];
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${cls}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${cls}`}>
       <Icon className={`h-3 w-3 ${status === 'running' ? 'animate-spin' : ''}`} />
       {STATUS_LABEL[status]}
     </span>
