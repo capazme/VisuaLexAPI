@@ -81,7 +81,7 @@ describe('ProgressPage (Gymnasium spec §5.3)', () => {
     const summary = await screen.findByRole('region', { name: 'Riepilogo' });
     expect(within(summary).getByRole('img', { name: 'Serie: 13 giorni di fila, record 27' })).toBeInTheDocument();
     expect(within(summary).queryByTestId('level-bar')).toBeNull();
-    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Il tuo calendario', 'Le schede per stato', 'I prossimi 14 giorni', 'Per materia']);
+    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Il tuo andamento', 'Le schede per stato', 'I prossimi 14 giorni', 'Per materia']);
   });
 
   it('uses the frame\'s full width (G6): the calendar across it, the states and the coming days side by side, the subjects in two columns', async () => {
