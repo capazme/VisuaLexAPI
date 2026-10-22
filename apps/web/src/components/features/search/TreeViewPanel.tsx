@@ -6,6 +6,7 @@ import { cn } from '../../../lib/utils';
 import type { AnnexMetadata } from '../../../types';
 import { useTour } from '../../../hooks/useTour';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
+import { normalizeArticleId } from '../../../utils/treeUtils';
 import { useAppStore } from '../../../store/useAppStore';
 import type { RubrichePart } from '../../../hooks/useAnnexNavigation';
 import { Z_INDEX } from '../../../constants/zIndex';
@@ -25,12 +26,6 @@ function clampToViewport(position: { x: number; y: number }) {
     x: Math.min(Math.max(0, position.x), maxX),
     y: Math.min(Math.max(0, position.y), maxY),
   };
-}
-
-// Normalize article ID for comparison (handles "3 bis" vs "3-bis")
-function normalizeArticleId(id: string): string {
-  if (!id) return id;
-  return id.trim().toLowerCase().replace(/\s+/g, '-');
 }
 
 /**

@@ -148,7 +148,7 @@ export function StatsBand({ data, loading, settingsOpen, onToggleSettings, onClo
               <WeekRow data={data} aside={aside} />
             </div>
           </div>
-          <LevelBar livello={data.livello} />
+          {data.livello && <LevelBar livello={data.livello} />}
           <StateNumbers stati={data.stati} aside={aside} />
           <Link to="/studia/progressi" className={cn(SECONDARY_BUTTON, 'inline-flex w-full items-center justify-center md:w-auto md:justify-self-start', aside && ASIDE.link)}>
             Tutti i progressi

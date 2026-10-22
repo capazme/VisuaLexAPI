@@ -82,6 +82,71 @@ describe('Layout — the phone\'s bar and the keyboard', () => {
     expect(within(bar).getByRole('button', { name: 'Apri il menu' })).toHaveFocus();
   });
 
+  it('closes the drawer with Esc and gives the focus to the menu button, from the button itself', () => {
+    const { bar } = page();
+    const toggle = within(bar).getByRole('button', { name: 'Apri il menu' });
+    toggle.focus();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.keyDown(toggle, { key: 'Escape' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveFocus();
+  });
+
+  it('closes the drawer with Esc and gives the focus to the menu button, from inside the drawer', () => {
+    const { bar } = page();
+    fireEvent.click(within(bar).getByRole('button', { name: 'Apri il menu' }));
+    const entry = screen.getByRole('button', { name: 'Voce del menu' });
+    entry.focus();
+
+    fireEvent.keyDown(entry, { key: 'Escape' });
+    const toggle = within(bar).getByRole('button', { name: 'Apri il menu' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveFocus();
+  });
+
+  it('leaves Esc to the page once the window is wide enough to hide the drawer', () => {
+    window.matchMedia = ((query: string) => ({ ...original(query), matches: query === '(min-width: 1024px)' })) as typeof window.matchMedia;
+    const { bar } = page();
+    const toggle = within(bar).getByRole('button', { name: 'Apri il menu' });
+    fireEvent.click(toggle);
+    const taken = !fireEvent.keyDown(toggle, { key: 'Escape' });
+    expect(taken).toBe(false);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('leaves an Esc to a sheet or an overlay over the drawer', () => {
+    const { bar } = page();
+    fireEvent.click(within(bar).getByRole('button', { name: 'Apri il menu' }));
+    const sheet = document.createElement('div');
+    sheet.setAttribute('data-find-overlay', '');
+    document.body.appendChild(sheet);
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    sheet.remove();
+    expect(within(bar).getByRole('button', { name: 'Chiudi il menu' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('leaves an Esc a control inside the drawer took', () => {
+    const { bar } = page();
+    fireEvent.click(within(bar).getByRole('button', { name: 'Apri il menu' }));
+    const entry = screen.getByRole('button', { name: 'Voce del menu' });
+    entry.addEventListener('keydown', (e) => e.preventDefault());
+
+    fireEvent.keyDown(entry, { key: 'Escape' });
+    expect(within(bar).getByRole('button', { name: 'Chiudi il menu' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('focuses the magnifier it opens the search menu from, which Safari\'s click does not, so the menu gives it back', () => {
+    const { bar } = page();
+    const lens = within(bar).getByRole('button', { name: 'Apri il menu di ricerca' });
+    // fireEvent's click, like Safari's, moves no focus.
+    fireEvent.click(lens);
+    expect(lens).toHaveFocus();
+    expect(appStore.getState().commandPaletteOpen).toBe(true);
+    act(() => appStore.getState().closeCommandPalette());
+  });
+
   it('parks the focus on a button a section\'s new title may still take', () => {
     const { bar } = page();
     expect(within(bar).getByRole('button', { name: 'Apri il menu' })).toHaveAttribute('data-focus-parked');

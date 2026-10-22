@@ -33,6 +33,7 @@ import { MenuToggle, PhoneTopBar } from './PhoneTopBar';
 import { phoneBarTitle } from './phoneBarTitle';
 import { useHideOnScroll } from './useHideOnScroll';
 import { PlannerHost } from '../features/planner/PlannerHost';
+import { useMediaQuery } from '../../hooks/useIsDesktop';
 
 export function Layout() {
   const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel, openCommandPalette } = useAppStore(useShallow(s => ({
@@ -85,6 +86,22 @@ export function Layout() {
     const active = document.activeElement;
     if (!active || active === document.body || drawerRef.current?.contains(active)) menuToggleRef.current?.focus({ preventScroll: true });
   };
+  // Esc closes the drawer and gives the focus to the button that opened it, wherever the focus was (opening it from the
+  // bar leaves the focus on that button). An Esc a control inside took (the user menu, the section switcher) or an
+  // overlay over the drawer (a modal dialog, a sheet, the palette) is theirs. Only while the drawer is drawn: a window
+  // widened past `lg` with it open hides it by CSS and keeps the state, and its Esc belongs to the page (gotcha 26).
+  const drawerDrawn = !useMediaQuery('(min-width: 1024px)');
+  useEffect(() => {
+    if (!sidebarOpen || !drawerDrawn) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented || isWorkspaceCovered()) return;
+      e.preventDefault();
+      setSidebarOpen(false);
+      menuToggleRef.current?.focus({ preventScroll: true });
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [sidebarOpen, drawerDrawn]);
   const menuToggle = {
     buttonRef: menuToggleRef,
     open: sidebarOpen,
@@ -322,6 +339,10 @@ export function Layout() {
           ref={setScroller}
           className={cn(
             'vlx-page flex-1 overflow-y-auto w-full h-full',
+            // A page that grows past the window («Oggi», «Progressi», «Collega un'app AI», as it loads) drew its 8 px bar
+            // and moved the centred column 4 px to the left: the room is kept. Not on the search page, whose practice row
+            // is the scroller's height (`h-app-row`) and would only lose 8 px to an empty gutter.
+            !onSearchPage && '[scrollbar-gutter:stable]',
             // What the keyboard's focus or an anchor scrolls to stops under the phone's bar, not behind it (WCAG 2.4.11).
             showPhoneBar && 'max-lg:scroll-pt-[calc(3.5rem+env(safe-area-inset-top)+0.5rem)]',
           )}

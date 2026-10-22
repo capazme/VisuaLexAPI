@@ -43,15 +43,6 @@ export function subjectHue(materia: Materia): string {
   return `hsl(var(${SUBJECT_TOKEN[materia]}))`;
 }
 
-/** The calendar's scale, 0 (nothing) to 4 (the busiest day), as fill classes. */
-export const HEAT_FILL = [
-  'fill-slate-100 dark:fill-slate-800',
-  'fill-primary-200 dark:fill-primary-900',
-  'fill-primary-400 dark:fill-primary-700',
-  'fill-primary-600 dark:fill-primary-500',
-  'fill-primary-900 dark:fill-primary-300',
-] as const;
-
 /** The three states, their names and their swatches: the bar here and the road's stops (Gymnasium spec §5.2). */
 export const CARD_STATES: { key: keyof ConteggiStati; label: string; swatch: string }[] = [
   { key: 'nuove', label: 'Nuove', swatch: 'bg-amber-500 dark:bg-amber-400' },

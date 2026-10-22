@@ -97,6 +97,23 @@ describe('ReviewHome', () => {
     expect(screen.getByTestId('where').textContent).not.toContain('materia');
   });
 
+  it('draws the page without the level and the missions a server without the points (#253) does not send', async () => {
+    const bare: Progressi = { ...answer(18, 20) };
+    delete bare.livello;
+    delete bare.missioni;
+    delete bare.crediti;
+    progress.mockResolvedValue(bare);
+    renderHome();
+    expect(await screen.findByText('Oggi: 18 da ripassare, 20 nuove')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Inizia' })).toBeEnabled();
+    expect(screen.getByRole('img', { name: 'Obiettivo di oggi: 6 di 10 ripassi' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Tutti i progressi' })).toBeInTheDocument();
+    expect(screen.queryByTestId('level-bar')).toBeNull();
+    // No «0 di 0» over missions that did not come, and no list of them.
+    expect(screen.queryByText(/^0 di 0/)).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Tutte le missioni' })).toBeNull();
+  });
+
   it('draws the statistics: the cards by state as three numbers, and «Tutti i progressi» leads to the page of the data', async () => {
     progress.mockResolvedValue(answer(3, 0));
     renderHome();
@@ -105,7 +122,7 @@ describe('ReviewHome', () => {
     expect(numbers).toEqual(['3', '5', '2']);
     expect(within(band).getAllByRole('term').map((dt) => dt.textContent)).toEqual(['Nuove', 'In apprendimento', 'Consolidate']);
     // The long calendar and the coming days live on /studia/progressi (G3): no sheet repeats them here.
-    expect(screen.queryByRole('heading', { name: 'Il tuo calendario' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Il tuo andamento' })).toBeNull();
     expect(within(band).queryByRole('button', { name: 'Il tuo mese' })).toBeNull();
     await userEvent.setup().click(within(band).getByRole('link', { name: 'Tutti i progressi' }));
     expect(screen.getByTestId('where')).toHaveTextContent('/studia/progressi');

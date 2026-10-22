@@ -14,7 +14,7 @@ import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { ACT_TYPES_REQUIRING_DETAILS } from '../../../constants/actTypes';
 import { useAliasCatalog, foldAlias } from '../../../hooks/useAliasCatalog';
 import { Z_INDEX } from '../../../constants/zIndex';
-import { FOCUS_RING, TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
+import { FIELD_TEXT, FOCUS_RING, TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import { activeFiltersLabel, countActiveFilters, defaultSearchFilters } from '../../../utils/searchFilters';
 import { SEARCH_FIELD_FORM_ID } from '../../../utils/searchFieldControl';
 import { citationSearchParams, useSearchQuery } from '../../../hooks/useSearchQuery';
@@ -65,12 +65,14 @@ const GROUP_WITH_HEADING = '[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading
 const COLUMN_TITLE = 'px-3 pt-3 font-serif text-base font-medium text-ink-900 dark:text-ink-50';
 const QUIET_LINE = 'px-3 py-2 text-sm text-ink-600 dark:text-ink-400';
 const FIELD_INPUT = cn(
-  'h-11 w-full min-w-0 rounded-lg border border-ink-200 bg-white px-3 text-base text-ink-900 placeholder:text-ink-500 md:text-sm',
+  'h-11 w-full min-w-0 rounded-lg border border-ink-200 bg-white px-3 text-ink-900 placeholder:text-ink-500',
+  FIELD_TEXT,
   'dark:border-ink-700 dark:bg-ink-950 dark:text-ink-50 dark:placeholder:text-ink-400',
   FOCUS_RING,
 );
 const SMALL_INPUT = cn(
-  'min-h-[44px] rounded-lg border border-ink-200 bg-white px-3 text-base text-ink-900 md:min-h-9 md:text-sm',
+  'min-h-[44px] rounded-lg border border-ink-200 bg-white px-3 text-ink-900 md:min-h-9',
+  FIELD_TEXT,
   'dark:border-ink-700 dark:bg-ink-950 dark:text-ink-50',
   FOCUS_RING,
 );
@@ -526,7 +528,9 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
               onValueChange={setInputValue}
               aria-describedby="command-palette-help"
               placeholder="Atto o citazione, es. art 2043 cc"
-              className="h-full w-full min-w-0 bg-transparent text-lg font-medium text-ink-900 outline-none placeholder:font-normal placeholder:text-ink-500 focus-visible:ring-0 focus-visible:ring-offset-0 dark:text-ink-50 dark:placeholder:text-ink-400"
+              // 18 px, and never under 16 px: with the text size «piccolo» `text-lg` was 15.75 px, and Safari on an
+              // iPhone zooms into a field under 16 px (`FIELD_TEXT`).
+              className="h-full w-full min-w-0 bg-transparent text-[length:max(1.125rem,16px)] font-medium text-ink-900 outline-none placeholder:font-normal placeholder:text-ink-500 focus-visible:ring-0 focus-visible:ring-offset-0 dark:text-ink-50 dark:placeholder:text-ink-400"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && decisionRef) {
                   e.preventDefault();
