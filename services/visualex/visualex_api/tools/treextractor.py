@@ -13,6 +13,7 @@ from .egress import is_allowed
 from .exceptions import DocumentNotFoundError, NetworkError
 from .logging_config import log_handlers
 from ..services.akn_parser import normalize_article_key
+from .article_suffixes import ARTICLE_SUFFIX_ALTERNATION
 from ..services.http_client import http_client
 
 # Configurazione del logging
@@ -505,6 +506,31 @@ def _generate_article_url(normurn, article_number, attachment_number=None):
     return new_urn
 
 
+def is_quoted_heading(element) -> bool:
+    """An article heading quoted inside the act's text, not one of its own articles.
+
+    An amending act's OJ page sets the articles it replaces or inserts in another act in a
+    table cell, the first of a run opening with «: dir. 2009/136 (six articles) quotes art.
+    21, 22, 23, 23 bis and 27 of dir. 2002/22, and they were listed and served as its own.
+    The act's own articles never sit in a table cell (checked on every EUR-Lex test page).
+    """
+    return (element.get_text(strip=True).startswith(("«", "“"))
+            or element.find_parent("td") is not None)
+
+
+# An OJ heading's number with its ordinal, read as one article: «Articolo 15 bis» is «15-bis».
+_EURLEX_HEADING_NUMBER = re.compile(
+    rf"^(?:Articolo|Article)\s+(\d+)(?:[\s\-]*+({ARTICLE_SUFFIX_ALTERNATION})(?![^\W\d_]))?", re.IGNORECASE)
+
+
+def eurlex_heading_number(text):
+    """The article an OJ heading names («15», «15-bis»), or None when it names none."""
+    match = _EURLEX_HEADING_NUMBER.match(text)
+    if not match:
+        return None
+    return f"{match.group(1)}-{match.group(2).lower()}" if match.group(2) else match.group(1)
+
+
 async def _parse_eurlex_tree(soup, normurn, link=False, details=False):
     """
     Parsa la struttura dell'albero degli articoli per Eur-Lex.
@@ -537,7 +563,6 @@ async def _parse_eurlex_tree(soup, normurn, link=False, details=False):
     title_pattern = re.compile(r'^(TITOLO|TITLE)\s+([IVXLCDM]+|\d+)', re.IGNORECASE)
     chapter_pattern = re.compile(r'^(CAPO|CHAPTER)\s+([IVXLCDM]+|\d+)', re.IGNORECASE)
     section_pattern = re.compile(r'^(SEZIONE|SECTION)\s+(\d+|\w+)', re.IGNORECASE)
-    article_pattern = re.compile(r'^(Articolo|Article)\s+(\d+)', re.IGNORECASE)
 
     # Strategia principale: cerca elementi ti-section (sezioni) e ti-art (articoli) in ordine di documento
     # Questo preserva l'ordine gerarchico: CAPO -> Sezione -> Articolo
@@ -567,9 +592,8 @@ async def _parse_eurlex_tree(soup, normurn, link=False, details=False):
 
             # Verifica se è un articolo
             elif 'ti-art' in class_str.lower():
-                article_match = article_pattern.match(text)
-                if article_match:
-                    article_num = article_match.group(2)
+                article_num = None if is_quoted_heading(elem) else eurlex_heading_number(text)
+                if article_num:
                     if article_num not in seen_articles:
                         seen_articles.add(article_num)
                         article_data = _format_eurlex_article(article_num, normurn, eli_info, link)
@@ -597,9 +621,8 @@ async def _parse_eurlex_tree(soup, normurn, link=False, details=False):
                     continue
 
             # Check for articles
-            article_match = article_pattern.match(text)
-            if article_match:
-                article_num = article_match.group(2)
+            article_num = None if is_quoted_heading(elem) else eurlex_heading_number(text)
+            if article_num:
                 if article_num not in seen_articles:
                     seen_articles.add(article_num)
                     article_data = _format_eurlex_article(article_num, normurn, eli_info, link)
@@ -727,9 +750,16 @@ def _extract_eurlex_rubriche(soup):
     rubriche = {}
     for marker in soup.find_all(class_=lambda c: c and "ti-art" in str(c).lower()
                                 and "sti-art" not in str(c).lower()):
-        match = _EURLEX_ARTICLE_NUM.match(marker.get_text(" ", strip=True))
-        if not match:
+        if is_quoted_heading(marker):
             continue
+        heading = marker.get_text(" ", strip=True)
+        number = eurlex_heading_number(heading)
+        if not number:
+            # A heading with no number in figures («Articolo unico») keeps its own word.
+            match = _EURLEX_ARTICLE_NUM.match(heading)
+            if not match:
+                continue
+            number = match.group(1)
         sibling = marker.find_next_sibling()
         if sibling is None:
             continue
@@ -738,7 +768,7 @@ def _extract_eurlex_rubriche(soup):
             continue
         title = sibling.get_text(" ", strip=True)
         if title:
-            rubriche[match.group(1)] = title
+            rubriche[number] = title
     return rubriche
 
 
@@ -790,8 +820,11 @@ def _extract_eurlex_title(soup):
     last = soup.find("p", class_="title-doc-last")
     if last is not None:
         return _eurlex_subject([last.get_text(" ", strip=True)])
-    for meta in (soup.find("meta", attrs={"name": "DC.description"}),
-                 soup.find("meta", attrs={"property": "eli:title", "lang": "it"})):
+    # The Italian expression of the act: `about` names it (…/oj/ita), the language tag alone
+    # could also sit on another resource's meta.
+    eli_title = soup.find("meta", attrs={"property": "eli:title", "lang": "it",
+                                         "about": lambda about: bool(about) and about.rstrip("/").endswith("/ita")})
+    for meta in (soup.find("meta", attrs={"name": "DC.description"}), eli_title):
         match = _EURLEX_DESCRIPTION_SUBJECT.search((meta.get("content") or "") if meta else "")
         if match:
             return " ".join(match.group(1).split())

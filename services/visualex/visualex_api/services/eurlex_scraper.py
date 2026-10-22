@@ -9,7 +9,7 @@ from ..tools.sys_op import BaseScraper
 from ..tools.exceptions import DocumentNotFoundError, NetworkError, ValidationError
 from ..tools.cache_manager import get_cache_manager
 from ..tools.selectors import EURLexSelectors
-from ..tools.treextractor import strip_amendment_markers
+from ..tools.treextractor import is_quoted_heading, strip_amendment_markers
 from .akn_parser import normalize_article_key
 from ..tools.article_suffixes import ARTICLE_SUFFIX_ALTERNATION
 
@@ -435,9 +435,12 @@ class EurlexScraper(BaseScraper):
 
         article_section = None
 
+        # A heading quoted inside the act (an amending act's replaced or inserted articles, in a
+        # table cell) is another act's article: no strategy takes it (`is_quoted_heading`).
+
         # Strategy 1: Look for <p class="ti-art"> (original selector)
         for pattern in search_patterns:
-            article_section = soup.find(lambda tag: tag.name == 'p' and 'ti-art' in tag.get('class', []) and _heads_article(tag.get_text(strip=True), pattern))
+            article_section = soup.find(lambda tag: tag.name == 'p' and 'ti-art' in tag.get('class', []) and _heads_article(tag.get_text(strip=True), pattern) and not is_quoted_heading(tag))
             if article_section:
                 log.debug(f"Found article with ti-art class using pattern: {pattern}")
                 break
@@ -445,7 +448,7 @@ class EurlexScraper(BaseScraper):
         # Strategy 2: Look for any element with class containing 'art' or 'title'
         if not article_section:
             for pattern in search_patterns:
-                article_section = soup.find(lambda tag: tag.get('class') and any('art' in c.lower() or 'title' in c.lower() for c in tag.get('class', [])) and _heads_article(tag.get_text(strip=True), pattern))
+                article_section = soup.find(lambda tag: tag.get('class') and any('art' in c.lower() or 'title' in c.lower() for c in tag.get('class', [])) and _heads_article(tag.get_text(strip=True), pattern) and not is_quoted_heading(tag))
                 if article_section:
                     log.debug(f"Found article with art/title class using pattern: {pattern}")
                     break
@@ -466,7 +469,7 @@ class EurlexScraper(BaseScraper):
                 match = article_regex.match(text)
                 return bool(match) and _number_ends_here(text[match.end():])
 
-            article_section = soup.find(lambda tag: tag.name in ['p', 'div', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'] and heads_by_regex(tag.get_text(strip=True)))
+            article_section = soup.find(lambda tag: tag.name in ['p', 'div', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'] and heads_by_regex(tag.get_text(strip=True)) and not is_quoted_heading(tag))
             if article_section:
                 log.debug("Found article using regex text match")
 
@@ -475,7 +478,7 @@ class EurlexScraper(BaseScraper):
             subdivisions = soup.find_all('div', class_=lambda c: c and 'eli-subdivision' in c)
             for subdiv in subdivisions:
                 title_elem = subdiv.find(['p', 'span', 'div'], string=lambda s: s and any(_heads_article(s.strip(), p) for p in search_patterns))
-                if title_elem:
+                if title_elem and not is_quoted_heading(title_elem):
                     article_section = subdiv
                     log.debug("Found article in eli-subdivision")
                     break

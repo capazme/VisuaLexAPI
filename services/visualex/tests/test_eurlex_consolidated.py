@@ -654,3 +654,53 @@ class TestTreeFailuresAreNotKept:
             _, count, metadata = await treextractor.get_tree(url, details=True, return_metadata=True)
         assert count > 0 and metadata["rubriche"]["1"] == "Oggetto e finalità"
         assert fetch.await_count == 2
+
+
+class TestQuotedArticles:
+    """An amending act's OJ page quotes, in table cells, the articles it replaces or inserts in
+    another act. Dir. 2009/136 has six articles; it quotes art. 21, 22, 23, 23 bis and 27 of dir.
+    2002/22 (and 14 bis, 15 bis of dir. 2002/58), which were listed in its index and served as
+    its own: art. 23 asked was art. 23 of dir. 2002/22."""
+
+    URL = "https://eur-lex.europa.eu/eli/dir/2009/136/oj/ita"
+
+    async def test_the_index_lists_the_acts_own_articles_only(self):
+        result, count, metadata = await _parse_eurlex_tree(soup_of("amending_dir_2009_136_trimmed.html"), self.URL)
+        assert [item["numero"] for item in result] == ["1", "2", "3", "4", "5", "6"]
+        assert count == 6
+        assert sorted(metadata["rubriche"], key=int) == ["1", "2", "3", "4", "5", "6"]
+        assert metadata["rubriche"]["6"] == "Destinatari"
+
+    @pytest.mark.parametrize("article", ["21", "22", "23", "27", "23 bis", "14 bis", "15 bis", "20", "37"])
+    async def test_a_quoted_article_is_not_found(self, article):
+        with pytest.raises(DocumentNotFoundError):
+            await EurlexScraper().extract_article_text(soup_of("amending_dir_2009_136_trimmed.html"), article)
+
+    @pytest.mark.parametrize("article,rubrica", [("1", "Modifiche alla direttiva 2002/22/CE (direttiva servizio universale)"),
+                                                 ("4", "Recepimento"), ("6", "Destinatari")])
+    async def test_the_acts_own_articles_are_served(self, article, rubrica):
+        text = await EurlexScraper().extract_article_text(soup_of("amending_dir_2009_136_trimmed.html"), article)
+        assert text.split("\n")[:2] == [f"Articolo\xa0{article}", rubrica]
+
+    async def test_a_page_without_tables_keeps_every_article(self):
+        # The legacy ELI page of dir. 2002/58: class-less paragraphs, no table cells, no «.
+        result, count, _ = await _parse_eurlex_tree(soup_of("eprivacy_eli_legacy_trimmed.html"),
+                                                    "https://eur-lex.europa.eu/eli/dir/2002/58/oj/ita")
+        assert [item["numero"] for item in result] == [str(n) for n in range(1, 22)]
+        text = await EurlexScraper().extract_article_text(soup_of("eprivacy_eli_legacy_trimmed.html"), "15")
+        assert text.startswith("Articolo 15")
+
+    async def test_the_index_reads_the_suffix(self):
+        # Synthetic page (fixtures/eurlex/README.md): «Articolo 15 bis» is article 15-bis, not 15.
+        result, _, metadata = await _parse_eurlex_tree(soup_of("synthetic_oj_article_15_bis.html"), self.URL)
+        assert [item["numero"] for item in result] == ["14", "15-bis", "16"]
+        assert metadata["rubriche"]["15-bis"] == "Articolo inserito"
+        text = await EurlexScraper().extract_article_text(soup_of("synthetic_oj_article_15_bis.html"), "15-bis")
+        assert text.startswith("Articolo\xa015\xa0bis")
+
+
+class TestEliTitleOfTheItalianExpression:
+    def test_the_italian_meta_of_another_resource_is_not_the_title(self):
+        soup = soup_of("eprivacy_eli_legacy_trimmed.html")
+        soup.find("meta", attrs={"property": "eli:title", "lang": "it"})["about"] = "http://data.europa.eu/eli/dir/2002/58/oj"
+        assert _extract_eurlex_title(soup) == ""
