@@ -94,20 +94,23 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   downwards and the tabs never move, and the colophon is centred against the card (text left-aligned; on a
   phone centred above it), so it follows half of such a growth; its title is 48 px up to `lg` and 68 px from it
   (between 768 and 1023 px the column beside the card is about 200 px).
-  **The wordmark** (A2, `SegmentWordmark` over the pure `segments.ts`; inspired by Animorio's «logo dai sette segmenti»,
-  written from scratch with SVG, an SVG filter and Framer Motion): once per opening, «VISUALEX» on eight seven-segment
-  cells slanted by 7° (V with its two lower strokes converging to the bottom's middle and no bottom bar — a narrow U
-  read «11» beside the I —, X an H) lights up in steps, each cell through one wrong drawing to its letter
-  (0.9 s), holds (0.4 s), and melts into the real wordmark — the segments round and join (`feGaussianBlur` cut by
-  `feColorMatrix`, the blur back to 0 before the filter goes), the Newsreader copy takes its weight from 300, the slant
-  goes back to nothing (0.8 s) —, then the open book fades in (2.1 s and the book's 0.3 s in all). The `h1` is
-  «VisuaLex» throughout (the display and the melting copy `aria-hidden`), its box is the real wordmark's from the first
-  frame, nothing takes the focus; a click on it plays it again once it has ended; under reduced motion it only fades
-  in. Measured at 60 fps in Chromium at every width (not
-  on a phone). The weight comes by two copies cross-faded (300, then the wordmark's own, `weightClass`), never a weight
-  animated; on WebKit (`isWebKit` in `segments.ts`: Safari on a Mac, every browser on an iPhone or an iPad — Chrome,
-  Firefox and Edge there are WebKit too —, an iPad with a Mac's user agent and touch points) the filter is left out and
-  the melt is the cross-fade alone, the brief's fallback. The register form fits a window 768 px high
+  **The wordmark** (A3, replacing A2's seven-segment display; inspired by a signature written with a pen, written
+  from scratch in CSS, `index.css`'s `vlx-ink-*`): one face, one ink, once per opening, about 1.3 s. The book traces
+  itself (`BookMark` with `vlx-ink-book`, 450 ms); a faint, blurred copy of «VisuaLex» comes out from under a mask whose
+  soft edge (12 %) is the pen's tip — `--vlx-ink-edge`, an `@property` percentage, 250–950 ms — and the word itself
+  follows it 100 ms behind under its own (350–1050 ms), so each letter is faint and soft before it is sharp; the copy
+  fades as the ink ends, and the line under it rises 4 px into view (200 ms). The waits are inside the keyframes, not
+  delays. The word is one text throughout, the copy stacked on it in one grid cell (`aria-hidden`, not selectable):
+  never split into letters, which lose their kerning on WebKit and settled 1–3 px when joined again. On the ink's
+  `animationend`, or its `animationcancel` (listened to on the element, React has none: reduced motion turned on
+  halfway), the copy and the mask go, so the finished page is the page without the animation (the text's box
+  measured identical at every moment). On WebKit for iOS (`inkMark.ts`, `isIOSWebKit`: an iPhone, an iPod, an iPad,
+  an iPad with a Mac's user agent and touch points) the word only fades in from the left, no mask, no blur — the
+  brief's fallback for a mask that stutters. The animations sit inside `prefers-reduced-motion: no-preference` (as
+  `vlx-book-draw` does): the global reduced-motion rule cuts durations, not delays, and a delayed `backwards` would
+  have hidden the line for a second; under reduced motion nothing is written and the colophon fades in through that
+  rule's 150 ms opacity transition. Measured in Chromium only (headless, at 1920 and 390, the iOS path by its user
+  agent): not on Safari nor on a phone. The register form fits a window 768 px high
   inside (1366×768, 1470×753 measured as viewports; a 768 px screen with a browser's bars scrolls a little) by
   its spacing (`space-y-4` between fields, `space-y-1.5` inside one), the sign-in form spaced the same. While a sign-in or a
   sign-up is on its way the tabs hold still (`aria-disabled`): its answer would land on the hidden form. A
