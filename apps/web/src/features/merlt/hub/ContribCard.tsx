@@ -1,14 +1,13 @@
-import { Link } from 'react-router-dom';
 import { UploadCloud } from 'lucide-react';
-import { Button } from '../../../components/ui/Button';
-import { HubCard, StatusPill } from './HubCard';
+import { HubAction, HubCard } from './HubCard';
+import { HUB_NOTE, HUB_TEXT } from './hubStyles';
 import type { AsyncSlice } from './useHubData';
 import type { MyContribJob } from '../contrib/contribApi';
 
 /**
  * I miei contributi card (§3.3). Shows the last extraction job status when the
- * user can contribute (`full`), else a gated affordance. "Carica appunti" →
- * /merlt/contribuisci.
+ * user can contribute (`full`), else the action says what is missing (S7b).
+ * "Carica appunti" → /merlt/contribuisci.
  */
 
 export interface ContribCardProps {
@@ -25,62 +24,40 @@ const STATUS_LABEL: Record<MyContribJob['status'], string> = {
 };
 
 const STATUS_TONE: Record<MyContribJob['status'], string> = {
-  pending: 'text-slate-500',
-  running: 'text-blue-600 dark:text-blue-400',
-  completed: 'text-emerald-600 dark:text-emerald-400',
-  failed: 'text-red-600 dark:text-red-400',
-  timeout: 'text-amber-600 dark:text-amber-400',
+  pending: 'text-slate-600 dark:text-slate-400',
+  running: 'text-primary-700 dark:text-primary-300',
+  completed: 'text-emerald-700 dark:text-emerald-400',
+  failed: 'text-red-700 dark:text-red-400',
+  timeout: 'text-amber-800 dark:text-amber-400',
 };
 
 export function ContribCard({ canContribute, lastContrib }: ContribCardProps) {
-  const pill = !canContribute ? (
-    <StatusPill tone="gated">Consenso completo</StatusPill>
-  ) : lastContrib.status === 'error' ? (
-    <StatusPill tone="error">Non raggiungibile</StatusPill>
-  ) : undefined;
+  const action = !canContribute ? (
+    <HubAction gated="Serve il consenso completo" />
+  ) : (
+    <HubAction to="/merlt/contribuisci">Carica appunti</HubAction>
+  );
 
   return (
-    <HubCard testId="hub-card-contrib" icon={UploadCloud} title="I miei contributi" pill={pill}>
+    <HubCard testId="hub-card-contrib" icon={UploadCloud} title="I miei contributi" action={action}>
       {!canContribute ? (
-        <>
-          <p className="text-sm text-slate-600 dark:text-slate-300">
-            Carica i tuoi appunti per proporre nodi al grafo (RLCF).
-          </p>
-          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-            Richiede il consenso <strong>completo</strong>.
-          </p>
-        </>
+        <p className={HUB_TEXT}>Carica i tuoi appunti per proporre nodi al grafo (RLCF).</p>
       ) : (
         <>
-          {lastContrib.status === 'loading' && <p className="text-sm text-slate-400">Caricamento…</p>}
-          {lastContrib.status === 'error' && (
-            <p className="text-sm text-slate-600 dark:text-slate-300">
-              Contributi non raggiungibili al momento.
-            </p>
-          )}
+          {lastContrib.status === 'loading' && <p className={HUB_NOTE}>Caricamento…</p>}
+          {lastContrib.status === 'error' && <p className={HUB_TEXT}>Contributi non raggiungibili al momento.</p>}
           {lastContrib.status === 'success' && lastContrib.data && (
-            <p className="text-sm text-slate-700 dark:text-slate-200">
+            <p className={HUB_TEXT}>
               Ultimo caricamento: doc #{lastContrib.data.documentId} —{' '}
-              <span className={STATUS_TONE[lastContrib.data.status]}>
-                {STATUS_LABEL[lastContrib.data.status]}
-              </span>
+              <span className={STATUS_TONE[lastContrib.data.status]}>{STATUS_LABEL[lastContrib.data.status]}</span>
               {lastContrib.data.candidatesCreated != null && (
-                <span className="text-slate-400"> ({lastContrib.data.candidatesCreated} candidati)</span>
+                <span className="text-slate-600 dark:text-slate-400"> ({lastContrib.data.candidatesCreated} candidati)</span>
               )}
             </p>
           )}
           {lastContrib.status === 'success' && !lastContrib.data && (
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Non hai ancora caricato appunti.
-            </p>
+            <p className={HUB_TEXT}>Non hai ancora caricato appunti.</p>
           )}
-          <div className="mt-auto pt-3">
-            <Link to="/merlt/contribuisci">
-              <Button variant="primary" size="sm">
-                Carica appunti
-              </Button>
-            </Link>
-          </div>
         </>
       )}
     </HubCard>

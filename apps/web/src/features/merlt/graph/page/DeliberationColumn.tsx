@@ -267,7 +267,7 @@ function PastTurnSummary({ turn }: { turn: QaTurnModel }): React.ReactElement {
         <span className="min-w-0 flex-1 truncate text-xs text-slate-500 dark:text-slate-400">{synthesis}</span>
         <span
           className={cn(
-            'shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium',
+            'shrink-0 rounded-full px-1.5 py-0.5 text-xs font-medium',
             confidenceChipClass(confidence),
           )}
         >
@@ -434,7 +434,7 @@ export function DeliberationColumn({
             onClick={onToggleCollapse}
             aria-label="Comprimi il pannello del dibattito"
             title="Comprimi il pannello"
-            className="flex shrink-0 items-center px-2.5 text-slate-400 transition-colors hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:hover:text-slate-200"
+            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center text-slate-500 transition-colors hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:hover:text-slate-200"
           >
             <PanelRightClose size={16} aria-hidden="true" />
           </button>
@@ -554,7 +554,7 @@ function CollapsedRail({
           <PanelRightOpen size={18} aria-hidden="true" />
           {badge && (
             <span className="absolute -right-1 -top-1 flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary-400 opacity-75" aria-hidden="true" />
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full motion-reduce:animate-none bg-primary-400 opacity-75" aria-hidden="true" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-primary-500" aria-hidden="true" />
               <span className="sr-only">nuova risposta</span>
             </span>
@@ -587,7 +587,7 @@ function TabButton({
       aria-selected={active}
       onClick={onClick}
       className={cn(
-        'flex flex-1 items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500',
+        'flex min-h-11 flex-1 items-center justify-center gap-1.5 px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500',
         active
           ? 'border-b-2 border-primary-500 text-primary-600 dark:text-primary-400'
           : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200',
@@ -597,7 +597,7 @@ function TabButton({
       {label}
       {badge && (
         <span className="relative ml-0.5 flex h-2 w-2">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary-400 opacity-75" aria-hidden="true" />
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full motion-reduce:animate-none bg-primary-400 opacity-75" aria-hidden="true" />
           <span className="relative inline-flex h-2 w-2 rounded-full bg-primary-500" aria-hidden="true" />
           <span className="sr-only">nuova risposta</span>
         </span>
@@ -725,19 +725,19 @@ function DibattitoTab({
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Sub-header: "Cronologia" entry point into the server-side history. */}
       {canShowHistory && (
-        <div className="flex shrink-0 items-center justify-end border-b border-slate-100 px-3 py-1.5 dark:border-slate-800/60">
+        <div className="flex shrink-0 items-center justify-end border-b border-slate-100 px-2 dark:border-slate-800/60">
           <button
             type="button"
             onClick={() => setShowHistory((v) => !v)}
             aria-pressed={showHistory}
             className={cn(
-              'flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+              'flex min-h-11 items-center gap-1.5 rounded-md px-2 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
               showHistory
                 ? 'bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300'
-                : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200',
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200',
             )}
           >
-            {showHistory ? <X size={13} /> : <History size={13} />}
+            {showHistory ? <X size={14} aria-hidden /> : <History size={14} aria-hidden />}
             {showHistory ? 'Chiudi cronologia' : 'Cronologia'}
           </button>
         </div>
@@ -1256,7 +1256,7 @@ function GraphTraversalControl({
       >
         <Route size={13} className="shrink-0" aria-hidden="true" />
         Segui il ragionamento sul grafo
-        {!hasWalk && <span className="text-[11px] font-normal italic">(nessun cammino)</span>}
+        {!hasWalk && <span className="text-xs font-normal italic">(nessun cammino)</span>}
       </button>
     </div>
   );
@@ -1503,7 +1503,7 @@ function ToolUsagesSection({ toolUsages }: { toolUsages: QaToolUsage[] }): React
                 key={`${u.toolName}-${i}`}
                 title={u.success ? undefined : (u.error ?? 'Errore non specificato')}
                 className={cn(
-                  'inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-medium',
+                  'inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs font-medium',
                   u.success
                     ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
                     : 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300',
@@ -1564,7 +1564,7 @@ function ReactStepsSection({ reactSteps }: { reactSteps: QaReactStep[] }): React
                 {s.action && (
                   <span
                     className={cn(
-                      'inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-medium',
+                      'inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs font-medium',
                       s.success
                         ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
                         : 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300',
@@ -2343,7 +2343,7 @@ function ContrastConflictView({
             Contrasto tra canoni
           </h2>
           {isDevilsAdvocate && (
-            <span className="mt-1 inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-600 dark:bg-red-950/40 dark:text-red-400">
+            <span className="mt-1 inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600 dark:bg-red-950/40 dark:text-red-400">
               Sfida deliberata{devilsAdvocateExpertLabel ? ` di ${devilsAdvocateExpertLabel}` : ''} (avvocato del diavolo)
             </span>
           )}
@@ -2374,7 +2374,7 @@ function ContrastConflictView({
 
         {/* Intensity of the contrast (drives the arc thickness on canvas). */}
         <div>
-          <p className="mb-0.5 text-[10px] uppercase tracking-wide text-slate-400">Intensità del contrasto</p>
+          <p className="mb-0.5 text-xs uppercase tracking-wide text-slate-400">Intensità del contrasto</p>
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <span className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
               <span className="block h-full rounded-full bg-red-400" style={{ width: `${Math.round(score * 100)}%` }} />
@@ -2385,14 +2385,14 @@ function ContrastConflictView({
 
         {conflict.contention_point && (
           <div>
-            <p className="mb-0.5 text-[10px] uppercase tracking-wide text-slate-400">Punto di divergenza</p>
+            <p className="mb-0.5 text-xs uppercase tracking-wide text-slate-400">Punto di divergenza</p>
             <p className="whitespace-pre-wrap text-slate-700 dark:text-slate-200">{conflict.contention_point}</p>
           </div>
         )}
 
         {conflict.excerpt_a && (
           <div>
-            <p className="mb-0.5 flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-slate-400">
+            <p className="mb-0.5 flex items-center gap-1.5 text-xs uppercase tracking-wide text-slate-400">
               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: colorA }} aria-hidden="true" />
               {expertALabel}
             </p>
@@ -2402,7 +2402,7 @@ function ContrastConflictView({
 
         {conflict.excerpt_b && (
           <div>
-            <p className="mb-0.5 flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-slate-400">
+            <p className="mb-0.5 flex items-center gap-1.5 text-xs uppercase tracking-wide text-slate-400">
               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: colorB }} aria-hidden="true" />
               {expertBLabel}
             </p>

@@ -91,13 +91,13 @@ export function MissedCitationReporter({ anchorRect, selectedText, onSubmit, onC
           <div
             style={{ transformOrigin }}
             className={cn(
-              'w-[300px] max-w-[calc(100vw-24px)] rounded-lg border border-blue-200 bg-white shadow-xl dark:border-blue-900/60 dark:bg-slate-900',
+              'w-[300px] max-w-[calc(100vw-24px)] rounded-lg border border-primary-200 bg-white shadow-xl dark:border-primary-900/60 dark:bg-slate-900',
               'animate-in fade-in zoom-in-95 duration-150',
             )}
           >
             <div className="flex items-start gap-2 px-3 pb-1 pt-2.5">
-              <Flag size={14} className="mt-0.5 shrink-0 text-blue-500" aria-hidden="true" />
-              <p className="line-clamp-2 min-w-0 flex-1 text-[11px] italic text-slate-600 dark:text-slate-300">
+              <Flag size={14} className="mt-0.5 shrink-0 text-primary-500" aria-hidden="true" />
+              <p className="line-clamp-2 min-w-0 flex-1 text-xs italic text-slate-600 dark:text-slate-300">
                 Citazione non riconosciuta: &ldquo;{selectedText}&rdquo;
               </p>
               <button

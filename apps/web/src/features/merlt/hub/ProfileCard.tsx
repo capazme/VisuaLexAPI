@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Sparkles, HelpCircle, Star } from 'lucide-react';
+import { FOCUS_RING } from '../../../constants/interactions';
 import { cn } from '../../../lib/utils';
-import { HubCard, StatusPill } from './HubCard';
+import { HubCard } from './HubCard';
+import { HUB_NOTE, HUB_TEXT } from './hubStyles';
 import { authorityToStars } from './authority';
 import type { AsyncSlice } from './useHubData';
 import type { MerltProfile } from '../../../services/merltService';
@@ -10,7 +12,8 @@ import type { MerltProfile } from '../../../services/merltService';
  * Profilo card (§3.3). Replaces the bare "Authority 0.44" with a human
  * explanation ("Il peso del tuo voto: ★★☆ — cresce validando e contribuendo")
  * plus a short "come funziona" popover. The raw number stays available on the
- * star row title and in the detail line.
+ * star row title and in the detail line. Since S7b it opens from the hub's row of
+ * links at the page's foot, not in the grid; a profile it cannot read is said in its text.
  */
 
 export interface ProfileCardProps {
@@ -25,7 +28,7 @@ function StarRow({ filled }: { filled: number }) {
           key={i}
           size={16}
           className={cn(
-            i < filled ? 'fill-amber-400 text-amber-400' : 'text-slate-300 dark:text-slate-600',
+            i < filled ? 'fill-amber-400 text-amber-500' : 'text-slate-400 dark:text-slate-500',
           )}
         />
       ))}
@@ -36,15 +39,12 @@ function StarRow({ filled }: { filled: number }) {
 export function ProfileCard({ profile }: ProfileCardProps) {
   const [helpOpen, setHelpOpen] = useState(false);
 
-  const pill =
-    profile.status === 'error' ? <StatusPill tone="error">Non disponibile</StatusPill> : undefined;
-
   return (
-    <HubCard testId="hub-card-profile" icon={Sparkles} title="Il tuo profilo" pill={pill}>
-      {profile.status === 'loading' && <p className="text-sm text-slate-400">Caricamento profilo…</p>}
+    <HubCard testId="hub-card-profile" icon={Sparkles} title="Il tuo profilo">
+      {profile.status === 'loading' && <p className={HUB_NOTE}>Caricamento profilo…</p>}
 
       {profile.status === 'error' && (
-        <p className="text-sm text-slate-600 dark:text-slate-300">
+        <p className={HUB_TEXT}>
           Dati di authority non disponibili al momento.
         </p>
       )}
@@ -52,7 +52,7 @@ export function ProfileCard({ profile }: ProfileCardProps) {
       {profile.status === 'success' && (
         <>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-slate-700 dark:text-slate-200">Il peso del tuo voto:</span>
+            <span className={HUB_TEXT}>Il peso del tuo voto:</span>
             <span title={`Authority ${profile.data.authorityScore.toFixed(2)}`}>
               <StarRow filled={authorityToStars(profile.data.authorityScore)} />
             </span>
@@ -62,14 +62,14 @@ export function ProfileCard({ profile }: ProfileCardProps) {
                 aria-label="Come funziona il peso del voto"
                 aria-expanded={helpOpen}
                 onClick={() => setHelpOpen((v) => !v)}
-                className="rounded-full p-0.5 text-slate-400 transition-colors hover:text-primary-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+                className={cn('-my-2 inline-grid h-11 w-11 place-items-center rounded-full text-slate-500 transition-colors hover:text-primary-600 dark:text-slate-400', FOCUS_RING)}
               >
-                <HelpCircle size={15} />
+                <HelpCircle size={16} aria-hidden />
               </button>
               {helpOpen && (
                 <div
                   role="tooltip"
-                  className="absolute left-1/2 top-full z-20 mt-2 w-64 -translate-x-1/2 rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-600 shadow-lg dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                  className="absolute left-1/2 top-full z-20 mt-2 w-64 -translate-x-1/2 rounded-lg border border-slate-200 bg-white p-3 text-[13px] text-slate-700 shadow-lg dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
                 >
                   Il peso del tuo voto misura quanto le tue valutazioni influenzano il sistema.
                   Cresce quando validi proposte e contribuisci con appunti di qualità, e riflette
@@ -78,7 +78,7 @@ export function ProfileCard({ profile }: ProfileCardProps) {
               )}
             </div>
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          <p className={`mt-1 ${HUB_NOTE}`}>
             Cresce validando le proposte e contribuendo.
           </p>
 
@@ -86,13 +86,13 @@ export function ProfileCard({ profile }: ProfileCardProps) {
               hover title (and the help tooltip), never as a bare stat field. */}
           <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
             <div>
-              <dt className="text-slate-500 dark:text-slate-400">Contributi</dt>
+              <dt className="text-slate-600 dark:text-slate-400">Contributi</dt>
               <dd className="font-semibold text-slate-900 dark:text-white">
                 {profile.data.totalContributions}
               </dd>
             </div>
             <div>
-              <dt className="text-slate-500 dark:text-slate-400">Livello di autorevolezza</dt>
+              <dt className="text-slate-600 dark:text-slate-400">Livello di autorevolezza</dt>
               <dd className="font-semibold text-slate-900 dark:text-white">
                 {profile.data.baselineQual}
               </dd>

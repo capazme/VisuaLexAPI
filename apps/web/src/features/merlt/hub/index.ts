@@ -1,6 +1,7 @@
 export { useHubData } from './useHubData';
 export type { AsyncSlice, HubData, HubGates, HubHealth } from './useHubData';
-export { HubCard, StatusPill } from './HubCard';
+export { HubAction, HubCard } from './HubCard';
+export { ConsentFirst } from './ConsentFirst';
 export { QaCard } from './QaCard';
 export { ValidateCard } from './ValidateCard';
 export { GraphCard } from './GraphCard';

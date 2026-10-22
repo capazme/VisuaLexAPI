@@ -114,7 +114,7 @@ export function MerltDataSection() {
               type="button"
               onClick={() => void handleExport()}
               disabled={busy}
-              className={cn(ROW, 'bg-blue-50 text-blue-700 hover:bg-blue-100 sm:col-span-2 dark:bg-blue-950/30 dark:text-blue-300')}
+              className={cn(ROW, 'bg-primary-50 text-primary-700 hover:bg-primary-100 sm:col-span-2 dark:bg-primary-950/30 dark:text-primary-300')}
             >
               <Download size={16} aria-hidden /> Scarica i miei dati
             </button>

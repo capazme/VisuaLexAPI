@@ -71,7 +71,7 @@ export function GraphTruncationChip({
           onClick={() => onLoadMore(next)}
           disabled={loading}
           aria-label="Carica più relazioni"
-          className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-600 px-2 py-0.5 text-[11px] font-semibold text-white transition-colors hover:bg-amber-700 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:bg-amber-500 dark:hover:bg-amber-400 dark:text-amber-950"
+          className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-600 px-2 py-0.5 text-xs font-semibold text-white transition-colors hover:bg-amber-700 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:bg-amber-500 dark:hover:bg-amber-400 dark:text-amber-950"
         >
           {loading ? <Loader2 size={11} className="animate-spin" /> : null}
           Carica di più

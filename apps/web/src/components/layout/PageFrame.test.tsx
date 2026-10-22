@@ -112,6 +112,8 @@ const SECTION_PAGES = [
   'pages/MerltHubPage.tsx',
   'features/merlt/contrib/ContribPage.tsx',
   'features/merlt/validate/ValidationPage.tsx',
+  // Full height, its canvas under the frame's header (S7b).
+  'features/merlt/graph/page/GraphExplorerPage.tsx',
   // Public, outside the layout, in the same frame since M1: the title at the column's edge, the text narrow.
   'pages/CreditsPage.tsx',
 ];
@@ -129,8 +131,8 @@ describe('the section pages (W2)', () => {
 });
 
 /**
- * The pages' names in one list (L-37): the phone's bar and the titles of Gymnasium's views, Opus's and the dossier list
- * read `features/sections/pageNames.ts`; none keeps a list of its own.
+ * The pages' names in one list (L-37): the phone's bar and the titles of Gymnasium's views, Opus's, the dossier list and
+ * Academia's two pages read `features/sections/pageNames.ts`; none keeps a list of its own.
  */
 describe('the pages\' names (L-37)', () => {
   it.each([
@@ -138,9 +140,11 @@ describe('the pages\' names (L-37)', () => {
     'components/features/planner/OpusPage.tsx',
     'components/features/dossier/DossierListView.tsx',
     'components/layout/phoneBarTitle.ts',
+    'pages/MerltHubPage.tsx',
+    'features/merlt/graph/page/GraphExplorerPage.tsx',
   ])('%s reads them from the one list', (file) => {
     const source = readFileSync(resolve(process.cwd(), 'src', file), 'utf8');
-    expect(source).toMatch(/from '[./]+(features\/sections\/)?pageNames'|from '\.\.\/\.\.\/features\/sections\/pageNames'/);
+    expect(source).toMatch(/from '[./]+(features\/)?(sections\/)?pageNames'/);
     expect(source).not.toMatch(/function pageName\b|const PAGES\b/);
   });
 });

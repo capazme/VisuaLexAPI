@@ -207,7 +207,7 @@ export function CandidateCard({
           {candidate.candidate_type === 'entity' && candidate.entity_type && (
             <span
               data-testid="entity-type-badge"
-              className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300"
+              className="rounded-full bg-primary-50 px-2 py-0.5 text-xs font-medium text-primary-700 dark:bg-primary-950/40 dark:text-primary-300"
             >
               {ENTITY_TYPE_LABELS[candidate.entity_type] ?? candidate.entity_type}
             </span>

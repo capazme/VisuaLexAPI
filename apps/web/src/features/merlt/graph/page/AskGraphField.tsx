@@ -65,8 +65,8 @@ export function AskGraphField({
 
   if (disabled) {
     return (
-      <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400">
-        <Lock size={14} className="shrink-0" />
+      <div className="flex min-h-[44px] items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400">
+        <Lock size={14} aria-hidden className="shrink-0" />
         <span>Per chiedere al grafo serve il consenso base.</span>
       </div>
     );
@@ -76,13 +76,13 @@ export function AskGraphField({
     <div className="rounded-lg border border-slate-200 bg-white shadow-sm focus-within:ring-2 focus-within:ring-primary-500 dark:border-slate-700 dark:bg-slate-900">
       {hasContext && (
         <div className="flex flex-wrap items-center gap-1 border-b border-slate-100 px-2 py-1.5 dark:border-slate-800">
-          <span className="mr-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+          <span className="mr-0.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
             Contesto
           </span>
           {contextItems.map((item) => (
             <span
               key={item.id}
-              className="inline-flex max-w-[10rem] items-center gap-1 rounded-full bg-primary-50 px-2 py-0.5 text-[11px] font-medium text-primary-700 dark:bg-primary-950/40 dark:text-primary-300"
+              className="inline-flex max-w-[10rem] items-center gap-1 rounded-full bg-primary-50 px-2 py-0.5 text-xs font-medium text-primary-700 dark:bg-primary-950/40 dark:text-primary-300"
             >
               <span className="truncate" title={item.label}>
                 {item.label}
@@ -102,7 +102,7 @@ export function AskGraphField({
           ))}
         </div>
       )}
-      <div className="flex items-center gap-2 px-2 py-1.5">
+      <div className="flex min-h-[42px] items-center gap-2 px-2 py-1.5">
         <MessageSquare size={16} className="shrink-0 text-primary-500" aria-hidden="true" />
         <input
           type="text"
@@ -121,7 +121,7 @@ export function AskGraphField({
         <div
           role="radiogroup"
           aria-label="Modalità di risposta"
-          className="hidden shrink-0 rounded-md border border-slate-200 p-0.5 text-[11px] dark:border-slate-700 sm:inline-flex"
+          className="hidden shrink-0 rounded-md border border-slate-200 p-0.5 text-xs dark:border-slate-700 sm:inline-flex"
         >
           {(['convergent', 'divergent'] as const).map((m) => (
             <button

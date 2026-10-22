@@ -225,7 +225,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `section` marks a section's home for the switcher's focus (`data-section-title`, `tabIndex={-1}`, `FOCUS_RING`).
   It draws the dossier list, «Dossier pubblici», Community, Gymnasium (every view but the lesson, through
   `StudiaPage`), Opus's planner (`OpusPage`, its views the frame's width), «Analizza documento», «Collega un'app AI» (its body keeps a column of 768 px: it reads as text, the
-  title does not move), the Cronologia and the MERL-T hub; «Cestino» and the MERL-T pages under a way back
+  title does not move), the Cronologia, the MERL-T hub and, since S7b, the graph («Grafo», the window's height: its
+  canvas under the frame's header); «Cestino» and the MERL-T pages under a way back
   («Torna ai Dossier», «MERL-T») write their `h1` with `PAGE_TITLE`. A dossier's own page (its name, its star and
   its actions), Impostazioni (a dialog, not a page), the Scrivania, the lesson, the reader and the practice, the
   login stay out; «Crediti», public and outside the layout, is in the frame since M1 (the column's width and padding, the
@@ -454,6 +455,21 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   the notice, «Scarica i miei dati», «Elimina i miei dati MERL-T», «Revoca il consenso». The
   welcome tour waits for the screen (`Layout`). The Forum's events carry the environment, never
   its author, and an annotation event never carries the note's words (the owner, 18 October 2026, «c»).
+- `features/merlt/hub/` and `pages/MerltHubPage.tsx` — Academia's «Assistente», consent first (S7b). With the
+  consent «Nessuno» the page opens on `ConsentFirst` («Attiva MERL-T»: what MERL-T does, what each level collects in
+  `levels.ts`'s words, «Scegli il consenso» → `ConsentDialog`). Then four cards of equal height (`HubCard`: a serif
+  title, the text, one action at its foot): Q&A, «Valida proposte», «Grafo giuridico» (only with the graph's flag),
+  «I miei contributi». An action that needs more consent is `HubAction`'s `gated`, its words («Serve il consenso
+  base», «… completo») on a disabled button, never a badge; a source the card cannot reach is said in its text; an
+  action is a `Link` or a `button`, never a button inside a link. The consent and the profile (`ConsentCard`,
+  `ProfileCard`, unchanged in what they do: change, revoke, the ladder, the vote's weight) open one at a time from a
+  row of links at the foot («Consenso e privacy · Base», «Il tuo profilo»). The ops cards stay for administrators.
+  Tokens in `hub/hubStyles.ts` (44 px, no text under 12 px). On `/grafo` (`GraphExplorerPage`) the deliberation
+  column is a rail while the graph is empty — no centre, no node or relation chosen, no question — opened by hand
+  from the rail or by whatever fills it (not stored: the stored preference is the user's collapse); on a phone the
+  «Dibattito» button sits over the home bar (`env(safe-area-inset-bottom)`). `features/merlt/academiaTokens.test.ts`
+  reads every MERL-T file and fails on a `text-[Npx]` under 12 or a hand-written `blue-`, `indigo-`, `purple-` or
+  `violet-`.
 - `components/ui/` — shared primitives: `Button`, `IconButton`, `Input`, `Card`,
   `Modal`, `ConfirmDialog`, `WireConfirm` (below, «Destructive confirmations»), `Toast`, `EmptyState`, `Sheet` (a
   phone's bottom sheet), plus feature-flavoured modals.

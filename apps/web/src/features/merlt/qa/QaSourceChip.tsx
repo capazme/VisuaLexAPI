@@ -100,12 +100,12 @@ function SourceInfo({ source, cited }: { source: QaRetrievedSource; cited?: QaSo
               )}
               <div>
                 <dt className="text-slate-400">URN</dt>
-                <dd className="break-all font-mono text-[11px] text-slate-600 dark:text-slate-300">{source.urn}</dd>
+                <dd className="break-all font-mono text-xs text-slate-600 dark:text-slate-300">{source.urn}</dd>
               </div>
               {source.node_id && (
                 <div>
                   <dt className="text-slate-400">node_id</dt>
-                  <dd className="break-all font-mono text-[11px] text-slate-500">{source.node_id}</dd>
+                  <dd className="break-all font-mono text-xs text-slate-500">{source.node_id}</dd>
                 </div>
               )}
               {source.source_url && (

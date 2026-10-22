@@ -162,8 +162,8 @@ function Section({
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{title}</span>
-        <span className="flex gap-1 text-[11px]">
+        <span className="text-xs font-medium uppercase tracking-wide text-slate-400">{title}</span>
+        <span className="flex gap-1 text-xs">
           <button
             type="button"
             onClick={() => onSetAll(false)}
