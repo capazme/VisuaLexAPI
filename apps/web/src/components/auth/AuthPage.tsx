@@ -9,16 +9,19 @@
  * in the app navigates between the two addresses while the page is open; something that did would
  * have to change the tab as well.
  *
- * The page holds still across a change of tab (A1b): both forms stay mounted in one cell of a grid, the
- * one not shown hidden by `visibility`, so the card is as tall as the taller of the two whichever is
- * open; «Crediti» is the last row of a grid as tall as the window; and the page scrolls in its own
- * box with `scrollbar-gutter: stable`, so a window too low for it does not shift sideways when a bar
- * appears. The motion, once per change of tab: the mark under the tabs slides (`transform`, 200 ms),
- * the form leaving fades (120 ms) while the one coming in fades from 8 px on the side of its tab
- * (180 ms). Under reduced motion the change is immediate. Once, as the page opens, the colophon is written in
+ * The card takes the height of the form shown (A1c, Luca, 22 Oct 2026: «il tab di accedi centrato, e poi fallo
+ * espandere verso il basso se si clicca registrati»): both forms stay mounted, so each keeps what was typed in it,
+ * but the one not shown leaves the flow (out of reach, `inert`, hidden by `visibility` once faded), and the box
+ * that holds them takes the shown one's measured height in 220 ms. The card is centred, with the colophon, by the
+ * height it has on «Accedi» (`--login-card-h`): on «Registrati» its top and its tabs hold still and it grows
+ * downwards, the page scrolling when the window is too low. «Crediti» is the last row of a grid as tall as the
+ * window; and the page scrolls in its own box with `scrollbar-gutter: stable`, so a window too low for it does not
+ * shift sideways when a bar appears. The motion, once per change of tab: the mark under the tabs slides
+ * (`transform`, 200 ms), the card's height follows (220 ms), the form leaving fades (120 ms) while the one coming
+ * in fades from 8 px on the side of its tab (180 ms). Under reduced motion the change is immediate. Once, as the page opens, the colophon is written in
  * ink (A3): the book traces itself, the wordmark comes out from under the pen's soft edge, the line rises under it.
  */
-import { useEffect, useRef, useState, type AnimationEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type AnimationEvent, type CSSProperties } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { BookMark } from '../ui/BookMark';
 import { FOCUS_RING } from '../../constants/interactions';
@@ -114,8 +117,39 @@ export function AuthPage() {
   const [entering, setEntering] = useState(false);
   // Whether the last change of tab moves at all (not on the first paint, not under reduced motion).
   const [animated, setAnimated] = useState(false);
+  // The box of the forms clips only while its height moves after a change of tab (the form coming in taller than
+  // it meanwhile); at rest nothing in a form is cut.
+  const [moving, setMoving] = useState(false);
+  const movingTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(movingTimer.current), []);
 
   const frameRef = useRef<HTMLDivElement>(null);
+  // The forms' heights and the card's chrome (its padding and its tabs), measured: the box holding the forms takes
+  // the shown one's height, and the page centres the card by its height on «Accedi» (A1c).
+  const cardRef = useRef<HTMLElement>(null);
+  const [heights, setHeights] = useState<{ login: number; register: number; chrome: number } | null>(null);
+  useLayoutEffect(() => {
+    const frame = frameRef.current;
+    const card = cardRef.current;
+    if (!frame || !card) return undefined;
+    const panelOf = (id: AuthTab) => frame.querySelector<HTMLElement>(`#auth-panel-${id}`);
+    const measure = () => {
+      const login = panelOf('login')?.offsetHeight ?? 0;
+      const register = panelOf('register')?.offsetHeight ?? 0;
+      // The card less the box of the forms: its padding and its tabs, whatever height the box is passing through.
+      const chrome = card.offsetHeight - frame.offsetHeight;
+      setHeights((was) => (was && was.login === login && was.register === register && was.chrome === chrome ? was : { login, register, chrome }));
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(measure);
+    for (const id of ['login', 'register'] as const) {
+      const panel = panelOf(id);
+      if (panel) observer.observe(panel);
+    }
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, []);
   const tabRefs = useRef<Record<AuthTab, HTMLButtonElement | null>>({ login: null, register: null });
   const focusFirstField = useRef(false);
   const pendingFocus = useRef<HTMLInputElement | null>(null);
@@ -136,7 +170,13 @@ export function AuthPage() {
       if (focus === 'field') focusField(firstField(tab), pendingFocus);
       return;
     }
-    setAnimated(!prefersReducedMotion());
+    const moves = !prefersReducedMotion();
+    setAnimated(moves);
+    if (moves) {
+      setMoving(true);
+      window.clearTimeout(movingTimer.current);
+      movingTimer.current = window.setTimeout(() => setMoving(false), 260);
+    }
     if (next === 'register' && signedUp) {
       setSignedUp(false);
       setRegisterKey((k) => k + 1);
@@ -186,19 +226,23 @@ export function AuthPage() {
   return (
     // The page is its own scroller, so the gutter it keeps for a bar is its own: a window too low for
     // the card scrolls without the page moving sideways.
-    <div className="h-app overflow-y-auto bg-slate-50 [scrollbar-gutter:stable] dark:bg-slate-950">
+    <div
+      className="h-app overflow-y-auto bg-slate-50 [scrollbar-gutter:stable] dark:bg-slate-950"
+      // The card's height on «Accedi», by which the page centres it (A1c); until measured, about what it is.
+      style={heights ? ({ '--login-card-h': `${heights.chrome + heights.login}px` } as CSSProperties) : undefined}
+    >
       <div className="grid min-h-full grid-rows-[1fr_auto] px-4 md:px-10">
-        {/* On a computer the card's top sits where the card would be centred above «Crediti» (40 rem:
-            the card, about 36 rem, and the foot): a card that grows (an error, the password's strength)
-            grows downwards, and the tabs never move; the colophon, centred against the card, follows
-            half of it. */}
-        <div className="pb-6 pt-8 md:pt-[max(1.5rem,calc((100dvh-40rem)/2))]">
-          <div className="mx-auto grid w-full max-w-4xl gap-8 md:grid-cols-[minmax(0,1fr)_420px] md:items-center md:gap-16">
+        {/* On a computer the card's top sits where the card on «Accedi» is centred above «Crediti» (its height and
+            the foot's 4 rem): «Registrati», and a form that grows (an error, the password's strength), grow
+            downwards, the tabs never move, and the colophon, centred against the card on «Accedi», holds still. */}
+        <div className="pb-6 pt-8 md:pt-[max(1.5rem,calc((100dvh-4rem-var(--login-card-h,32rem))/2))]">
+          <div className="mx-auto grid w-full max-w-4xl gap-8 md:grid-cols-[minmax(0,1fr)_420px] md:items-start md:gap-16">
             {/* The title grows only from `lg`: between 768 and 1023 px the column beside the card is about
                 200-430 px, and «VisuaLex» at 68 px is 272 px wide. */}
             <header
               className={cn(
-                'flex flex-col items-center gap-4 text-center md:items-start md:gap-5 md:text-left',
+                // On a computer as tall as the card on «Accedi», its content centred: the two on one middle line.
+                'flex flex-col items-center gap-4 text-center md:min-h-[var(--login-card-h,32rem)] md:items-start md:justify-center md:gap-5 md:text-left',
                 // Under reduced motion the global rule turns this into a 150 ms fade, the whole of the motion.
                 !inkShown && 'motion-reduce:opacity-0',
               )}
@@ -223,7 +267,7 @@ export function AuthPage() {
               </p>
             </header>
 
-            <main className="min-w-0 rounded-2xl border border-slate-200 bg-white p-6 shadow-lg sm:p-8 dark:border-slate-800 dark:bg-slate-900">
+            <main ref={cardRef} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-6 shadow-lg sm:p-8 dark:border-slate-800 dark:bg-slate-900">
               <div
                 role="tablist"
                 aria-label="Accedi o registrati"
@@ -264,11 +308,20 @@ export function AuthPage() {
                 />
               </div>
 
-              {/* Both forms in one cell: the card is as tall as the taller, whichever is shown. The one
-                  hidden keeps what was typed in it, fades out (its `visibility` follows at the end of
-                  the fade) and is out of reach meanwhile (`inert`). The panels' 8 px padding keeps the
-                  fields' focus rings, and the 8 px a form comes in from, inside the card. */}
-              <div ref={frameRef} className="-m-2 grid">
+              {/* The box of the forms takes the shown one's height (A1c), in 220 ms from a change of tab on (none on
+                  the first paint, none under reduced motion). The form hidden leaves the flow, from the box's top:
+                  it keeps what was typed in it, fades out (its `visibility` follows at the end of the fade) and is
+                  out of reach meanwhile (`inert`). The panels' 8 px padding keeps the fields' focus rings, and the 8
+                  px a form comes in from, inside the card; the box clips only while its height moves. */}
+              <div
+                ref={frameRef}
+                className={cn(
+                  '-m-2 relative',
+                  animated && 'transition-[height] duration-[220ms] ease-out motion-reduce:transition-none',
+                  moving && 'overflow-hidden',
+                )}
+                style={heights ? { height: heights[tab] } : undefined}
+              >
                 {TABS.map((t) => {
                   const shown = t.id === tab;
                   const enterFrom = t.id === 'register' ? 'slide-in-from-right-2' : 'slide-in-from-left-2';
@@ -283,12 +336,12 @@ export function AuthPage() {
                       // The fade is on the way out only: a transition on the way in would hold the panel's
                       // `visibility` at hidden for its first frame, and the focus sent to its first field
                       // would be lost.
-                      className={`col-start-1 row-start-1 p-2 ${
+                      className={`p-2 ${
                         shown
                           ? animated
                             ? `animate-in fade-in ${enterFrom}`
                             : ''
-                          : 'pointer-events-none invisible opacity-0 transition-[opacity,visibility] duration-[120ms] ease-out motion-reduce:transition-none'
+                          : 'pointer-events-none absolute inset-x-0 top-0 invisible opacity-0 transition-[opacity,visibility] duration-[120ms] ease-out motion-reduce:transition-none'
                       }`}
                     >
                       {t.id === 'login' ? (

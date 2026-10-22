@@ -82,17 +82,21 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   router state that carries the return after the login travels with it — and keeps the page mounted. The tab
   is the page's own state, read from the address when it opens: React Router 7 applies a navigation in a
   transition, so a tab read from the address would lag one render behind the click. `useAuth` runs
-  once, in the page, and `LoginForm` takes it as a prop. The page holds still across a change of tab (A1b):
-  both forms stay mounted in one cell of a grid, the one not shown `invisible` and `inert`, so the card is as
-  tall as the taller form whichever is open and each form keeps what was typed in it, and its error (after a
+  once, in the page, and `LoginForm` takes it as a prop. The card takes the height of the form shown (A1c,
+  Luca, 22 Oct 2026; it replaced A1b's card as tall as the taller form, which left «Accedi» a box of empty space):
+  both forms stay mounted, the one not shown out of the flow (`absolute` from the box's top), `invisible` and
+  `inert`, and the box that holds them takes the shown one's height, measured (`ResizeObserver`), in 220 ms from a
+  change of tab on (at once under reduced motion; clipping only while it moves); each form keeps what was typed in
+  it, and its error (after a
   sign-up, the confirmation stays until the tab changes, and back on «Registrati» a new key mounts the form
   empty; «Torna ad Accedi» finds a fresh sign-in form too, a new key, with the failure the page's `useAuth`
   still holds not shown); «Crediti»
   is the last row of a grid as tall as the window; the page is its own scroller (`h-app`) with
   `scrollbar-gutter: stable`, so a low window does not shift sideways when a bar appears; on a computer the
-  card's top sits where the card would be centred above the foot, so a form that grows (an error) grows
-  downwards and the tabs never move, and the colophon is centred against the card (text left-aligned; on a
-  phone centred above it), so it follows half of such a growth; its title is 48 px up to `lg` and 68 px from it
+  card's top sits where the card on «Accedi» is centred above the foot (`--login-card-h`, its measured height), so
+  «Registrati», or a form that grows (an error), grows downwards, the tabs never move and the page scrolls when the
+  window is too low, and the colophon is centred against the card on «Accedi» (as tall as it, `md:min-h`; text
+  left-aligned; on a phone centred above it) and holds still; its title is 48 px up to `lg` and 68 px from it
   (between 768 and 1023 px the column beside the card is about 200 px).
   **The wordmark** (A3, replacing A2's seven-segment display; inspired by a signature written with a pen, written
   from scratch in CSS, `index.css`'s `vlx-ink-*`): one face, one ink, once per opening, about 1.3 s. The book traces

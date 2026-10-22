@@ -246,11 +246,13 @@ describe('AuthPage: two tabs on one page', () => {
     expect(tab('Accedi')).not.toHaveAttribute('aria-disabled');
   });
 
-  it('holds the page still: both forms in one cell, «Crediti» in the last row, a gutter kept for the bar', () => {
+  it('holds the page still: the form hidden out of the flow, «Crediti» in the last row, a gutter kept for the bar', () => {
     renderAuth('/login');
-    // The card is as tall as the taller form whichever is shown: both sit in the same cell of a grid.
-    for (const p of allPanels()) expect(p.className).toMatch(/\bcol-start-1\b.*\brow-start-1\b/);
-    expect(allPanels()[0].parentElement!.className).toMatch(/\bgrid\b/);
+    // The card takes the shown form's height (A1c): the hidden one leaves the flow, from the box's top.
+    const hidden = document.getElementById('auth-panel-register')!;
+    expect(hidden).toHaveClass('absolute', 'inset-x-0', 'top-0');
+    expect(document.getElementById('auth-panel-login')).not.toHaveClass('absolute');
+    expect(allPanels()[0].parentElement!.className).toMatch(/\brelative\b/);
     // «Crediti» is the last row of a grid as tall as the window, not a line after the card.
     const foot = screen.getByRole('contentinfo');
     const page = foot.parentElement!;
@@ -270,11 +272,43 @@ describe('AuthPage: two tabs on one page', () => {
   it('centres the colophon against the card on a computer, above it on a phone', () => {
     renderAuth('/login');
     const colophon = screen.getByRole('banner');
-    expect(colophon.parentElement!.className).toContain('md:items-center');
+    // The card hangs from the top of its row; the colophon is as tall as the card on «Accedi» and centred in it.
+    expect(colophon.parentElement!.className).toContain('md:items-start');
+    expect(colophon).toHaveClass('md:min-h-[var(--login-card-h,32rem)]', 'md:justify-center');
     expect(colophon.className).toMatch(/(^|\s)items-center\b/);
     expect(colophon.className).toMatch(/(^|\s)text-center\b/);
     expect(colophon.className).toContain('md:items-start');
     expect(colophon.className).toContain('md:text-left');
+  });
+
+  it('takes the shown form\'s height, grows on «Registrati» from a still top, and centres the page by «Accedi» (A1c)', async () => {
+    // jsdom lays nothing out: the forms' heights and the card's, given.
+    const sizes: Record<string, number> = { 'auth-panel-login': 300, 'auth-panel-register': 560 };
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (this: HTMLElement) {
+      if (this.id in sizes) return sizes[this.id];
+      if (this.tagName === 'MAIN') return 420; // the card: 120 of padding and tabs around a box of 300
+      if (this.querySelector?.(':scope > #auth-panel-login')) return 300;
+      return 0;
+    });
+    renderAuth('/login');
+    const frame = document.getElementById('auth-panel-login')!.parentElement!;
+    expect(frame.style.height).toBe('300px');
+    const page = screen.getByRole('main').closest('.h-app') as HTMLElement;
+    expect(page.style.getPropertyValue('--login-card-h')).toBe('420px');
+    expect(page.querySelector('.md\\:pt-\\[max\\(1\\.5rem\\2c calc\\(\\(100dvh-4rem-var\\(--login-card-h\\2c 32rem\\)\\)\\/2\\)\\)\\]')).not.toBeNull();
+
+    fireEvent.click(tab('Registrati'));
+    // Its own height, in 220 ms, the box clipping only while it moves; the page's centre is still «Accedi»'s.
+    expect(frame.style.height).toBe('560px');
+    expect(frame).toHaveClass('transition-[height]', 'duration-[220ms]', 'overflow-hidden');
+    expect(page.style.getPropertyValue('--login-card-h')).toBe('420px');
+    await waitFor(() => expect(frame).not.toHaveClass('overflow-hidden'));
+    // Back halfway: one form in the flow, the other out of it and out of reach.
+    fireEvent.click(tab('Accedi'));
+    fireEvent.click(tab('Registrati'));
+    expect(shownPanels()).toHaveLength(1);
+    expect(document.getElementById('auth-panel-login')).toHaveClass('absolute');
+    expect(document.getElementById('auth-panel-login')).toHaveAttribute('inert');
   });
 
   it('under reduced motion the change is immediate: no form fading out, none sliding in', () => {
@@ -288,6 +322,8 @@ describe('AuthPage: two tabs on one page', () => {
     // Nor a fade on the way out, nor a slide of the mark.
     expect(document.getElementById('auth-panel-login')!.className).toContain('motion-reduce:transition-none');
     expect(screen.getByTestId('auth-tab-mark').className).toContain('motion-reduce:transition-none');
+    // Nor a height that moves.
+    expect(document.getElementById('auth-panel-login')!.parentElement).not.toHaveClass('transition-[height]', 'overflow-hidden');
   });
 
   it('keeps the way back after the login across changes of tab', async () => {
