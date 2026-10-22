@@ -1,8 +1,6 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { Fragment, useState, useMemo, useEffect, useRef } from 'react';
 import {
-  Folder,
   FolderPlus,
-  ChevronRight,
   Search,
   Star,
   MoreHorizontal,
@@ -29,9 +27,13 @@ import { OpenOnDashboardPicker } from './OpenOnDashboardPicker';
 import { searchesIntoOnePractice } from './openInPractice';
 import type { Dossier, DossierKind } from '../../../types';
 import { AttributionChip } from '../bulletin/AttributionChip';
-import { useDossierKind } from '../../../features/sections/useSection';
+import { sectionOfDossierKind, useDossierKind } from '../../../features/sections/useSection';
 import { kindLabel } from './dossierKinds';
-import { actsSummary, layoutDossier } from './dossierLayout';
+import { actsSummary, countsParts, layoutDossier } from './dossierLayout';
+import { ICON_BUTTON } from '../planner/plannerStyles';
+import { HEADER_BUTTON, HEADER_PRIMARY } from './dossierStyles';
+import { DossierMark } from './DossierMark';
+import { FOCUS_RING } from '../studia/progress/tokens';
 import { deleteDossierWithUndo } from './deleteDossierWithUndo';
 import { hasTagCategory, tagCategories, tagLabel } from '../../../utils/tagLabel';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
@@ -53,7 +55,7 @@ interface Props {
 type SortBy = 'date' | 'name' | 'items';
 
 // The list's two menus (order, category): one look, 44 px on a phone, where they share a row half and half.
-const LIST_MENU = 'flex-1 min-w-0 px-3 md:px-4 py-3 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500';
+const LIST_MENU = 'flex-1 min-w-0 px-3 md:px-4 py-3 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
 
 export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTrash, onTrashChanged }: Props) {
   const { dossiers, updateDossier, triggerSearch, triggerMultiSearch, importDossier } = useAppStore();
@@ -252,9 +254,9 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
       // The page's name (L-37), its section's phrase over it: the kind listed is the section's, Gymnasium's study
       // dossiers, Opus's work ones (every dossier with Gymnasium off).
       title={DOSSIER_PAGE}
-      kicker={sectionKind === 'studio' ? 'gymnasium' : 'opus'}
+      kicker={sectionOfDossierKind(sectionKind)}
       // The same element from one kind to the other: the switcher's focus lands on it for Opus and for Gymnasium.
-      section={sectionKind === 'studio' ? 'gymnasium' : 'opus'}
+      section={sectionOfDossierKind(sectionKind)}
       className="animate-in fade-in duration-200"
       // On a phone the title keeps its row with «⋯» (Importa, Cestino) and «+» beside it (M1); from md the three buttons.
       actionBeside={!isDesktop}
@@ -264,14 +266,14 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
             <button
               type="button"
               onClick={onOpenTrash}
-              className="flex-1 md:flex-none bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 px-4 py-3 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              className="flex-1 md:flex-none bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 px-4 py-3 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
             >
               <Trash2 size={18} aria-hidden /> Cestino ({trashCount})
             </button>
           )}
           <button
             onClick={triggerFileImport}
-            className="flex-1 md:flex-none bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 px-4 py-3 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="flex-1 md:flex-none bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 px-4 py-3 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
             title="Importa da file JSON (i)"
             aria-label="Importa dossier da file JSON"
             aria-keyshortcuts="i"
@@ -281,7 +283,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
           <button
             id="tour-dossier-create"
             onClick={() => setIsModalOpen(true)}
-            className="flex-1 md:flex-none dossier-create-button bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+            className="flex-1 md:flex-none dossier-create-button bg-primary-600 hover:bg-primary-700 text-white px-4 py-3 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
             title="Nuovo Dossier (n)"
             aria-keyshortcuts="n"
           >
@@ -304,7 +306,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
             id="tour-dossier-create"
             onClick={() => setIsModalOpen(true)}
             aria-label="Nuovo dossier"
-            className="dossier-create-button inline-flex h-11 w-11 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+            className="dossier-create-button inline-flex h-11 w-11 items-center justify-center rounded-lg bg-primary-600 text-white shadow-sm transition-colors hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
           >
             <Plus size={22} aria-hidden />
           </button>
@@ -334,7 +336,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
             placeholder="Cerca nei dossier…"
             aria-label="Cerca nei dossier"
             aria-keyshortcuts="/"
-            className="w-full pl-10 pr-4 py-3 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="w-full pl-10 pr-4 py-3 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
           />
         </div>
         <div className="flex gap-3 md:gap-4">
@@ -368,39 +370,36 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {filteredDossiers.length === 0 ? (
-          <div className="col-span-full">
-            <EmptyState
-              variant="dossier"
-              title={searchQuery || selectedCategory ? 'Nessun risultato' : sectionKind ? `Nessun ${kindLabel(sectionKind).toLowerCase()}` : 'Nessun dossier creato'}
-              description={
-                searchQuery || selectedCategory
-                  ? 'Prova a modificare i filtri di ricerca.'
-                  : 'I dossier ti permettono di organizzare articoli per tema, progetto o caso. Crea il tuo primo dossier, o parti da un dossier di studio pronto.'
-              }
-              action={
-                !(searchQuery || selectedCategory) && (
-                  <div className="flex flex-col items-center gap-2 sm:flex-row">
-                    <button
-                      onClick={() => setIsModalOpen(true)}
-                      className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg inline-flex items-center gap-2 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-                    >
-                      <FolderPlus size={18} />
-                      Crea il tuo primo dossier
-                    </button>
-                    {/* The ready-made study dossiers sit in the Forum (spec 2026-10-13-environments-into-forum, D12), after the
-                        community's dossiers since S7a: the address takes the reader to their strip. */}
-                    <button
-                      onClick={() => navigate('/forum#pronti')}
-                      className="px-5 py-2.5 rounded-lg inline-flex items-center gap-2 text-blue-700 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-slate-800 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-                    >
-                      <BookOpen size={18} aria-hidden />
-                      Pronti da VisuaLex
-                    </button>
-                  </div>
-                )
-              }
-            />
-          </div>
+          searchQuery || selectedCategory ? (
+            <div className="col-span-full">
+              <EmptyState variant="dossier" title="Nessun risultato" description="Prova a modificare i filtri di ricerca." />
+            </div>
+          ) : (
+            // No dossier yet: an empty state composed for the page (S7c) — line art in the
+            // section's hue, what a dossier is for, and the two ways to begin.
+            <section aria-labelledby="dossier-list-empty" className="col-span-full mx-auto flex w-full max-w-lg flex-col items-center px-2 py-10 text-center md:py-16">
+              <DossierMark hue={`var(--vlx-section-${sectionOfDossierKind(sectionKind)})`} />
+              <h2 id="dossier-list-empty" className="mt-6 font-serif text-2xl font-medium tracking-tight text-slate-900 dark:text-slate-50">
+                {sectionKind ? `Nessun ${kindLabel(sectionKind).toLowerCase()}` : 'Nessun dossier creato'}
+              </h2>
+              <p className="mt-3 text-slate-700 dark:text-slate-300">
+                Un dossier raccoglie le norme, le sentenze e le note di una pratica o di un tema di studio.
+              </p>
+              <p className="mt-2 text-slate-600 dark:text-slate-400">Crea il primo, o parti da un dossier di studio pronto.</p>
+              <div className="mt-8 flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center">
+                <button type="button" onClick={() => setIsModalOpen(true)} className={cn(HEADER_PRIMARY, 'justify-center sm:whitespace-nowrap')}>
+                  <FolderPlus size={18} aria-hidden />
+                  Crea il tuo primo dossier
+                </button>
+                {/* The ready-made study dossiers sit in the Forum (spec 2026-10-13-environments-into-forum, D12), after the
+                    community's dossiers since S7a: the address takes the reader to their strip. */}
+                <button type="button" onClick={() => navigate('/forum#pronti')} className={cn(HEADER_BUTTON, 'justify-center sm:whitespace-nowrap')}>
+                  <BookOpen size={18} aria-hidden />
+                  Pronti da VisuaLex
+                </button>
+              </div>
+            </section>
+          )
         ) : (
           filteredDossiers.map((dossier, idx) => {
             const hasNormaItems = dossier.items.some((i) => i.type === 'norma');
@@ -408,6 +407,8 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
             // The acts it holds, named as the dossier names them (spec §10).
             const acts = actsSummary(layoutDossier(dossier.items));
             return (
+              // A card (S7c): the name in the reader's serif and its two actions, the description, the acts it holds, what
+              // it holds in one line, the date; 44 px controls, always there, as the planner's.
               <div
                 key={dossier.id}
                 id={idx === 0 ? 'tour-dossier-card' : undefined}
@@ -422,44 +423,29 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                     onSelect(dossier.id);
                   }
                 }}
-                className="dossier-card bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 md:p-5 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-[color,background-color,border-color,box-shadow,scale] cursor-pointer group relative active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+                className={cn(
+                  'dossier-card group relative flex cursor-pointer flex-col rounded-xl border border-slate-200 bg-white p-4 transition-[border-color,scale] hover:border-slate-400 active:scale-[0.98] motion-reduce:active:scale-100 md:p-5 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-500',
+                  FOCUS_RING,
+                )}
               >
-                <div className="flex justify-between items-start mb-3 md:mb-4 gap-2">
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <Folder className="text-blue-500" size={28} />
-                    {dossier.isPinned && (
-                      <Star size={14} className="text-yellow-500 fill-yellow-500" aria-label="Preferito" />
-                    )}
-                  </div>
-                  <div
-                    id={idx === 0 ? 'tour-dossier-card-actions' : undefined}
-                    className="flex items-center gap-1 flex-shrink-0"
-                  >
-                    <span className="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs px-2 py-1 rounded-full whitespace-nowrap">
-                      {dossier.items.length} {dossier.items.length === 1 ? 'elemento' : 'elementi'}
-                    </span>
+                <div className="flex items-start gap-2">
+                  <h2 className="min-w-0 flex-1 break-words pt-2 font-serif text-lg font-medium leading-snug tracking-tight text-slate-900 line-clamp-2 md:text-xl dark:text-slate-50">
+                    {dossier.title}
+                  </h2>
+                  <div id={idx === 0 ? 'tour-dossier-card-actions' : undefined} className="-mr-2 -mt-1 flex shrink-0 items-center">
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); handleQuickOpen(dossier); }}
                       disabled={!hasNormaItems}
                       title={hasNormaItems ? 'Apri su Dashboard' : 'Nessun articolo da aprire'}
                       aria-label={`Apri ${dossier.title} su Dashboard`}
-                      className={cn(
-                        'p-1.5 rounded text-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500',
-                        'disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent',
-                        // Desktop: hover/focus-within reveal, mobile: always visible.
-                        'md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 max-md:opacity-100',
-                      )}
+                      className={cn(ICON_BUTTON, 'disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent')}
                     >
-                      <ExternalLink size={16} />
+                      <ExternalLink size={16} aria-hidden />
                     </button>
                     <MenuButton
                       label={`Azioni su ${dossier.title}`}
-                      triggerClassName={cn(
-                        'p-1.5 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700',
-                        // Desktop: hover/focus-within reveal, mobile: always visible so it's tappable.
-                        'md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 max-md:opacity-100 aria-expanded:md:opacity-100',
-                      )}
+                      triggerClassName={ICON_BUTTON}
                       items={[
                         { label: 'Apri su Dashboard', icon: ExternalLink, onSelect: () => handleQuickOpen(dossier), disabled: !hasNormaItems },
                         { label: 'Rinomina / Modifica', icon: Edit2, onSelect: () => setEditingDossier(dossier) },
@@ -470,68 +456,63 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                     </MenuButton>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                  <h2 className="font-serif text-lg md:text-xl font-medium leading-snug tracking-tight text-slate-900 dark:text-slate-50 group-hover:text-primary-700 dark:group-hover:text-primary-300 transition-colors line-clamp-2">
-                    {dossier.title}
-                  </h2>
-                  {dossier.sourceSuggestionId && (
-                    <AttributionChip author={dossier.originalAuthor} className="ml-1" />
-                  )}
-                </div>
-                {(dossier.kind === 'studio' || dossier.published?.isActive) && (
-                  <div className="mb-1 flex flex-wrap gap-1.5">
+                {(dossier.isPinned || dossier.kind === 'studio' || dossier.published?.isActive || dossier.sourceSuggestionId) && (
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    {dossier.isPinned && (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-800 dark:text-amber-300">
+                        <Star size={12} aria-hidden className="fill-current" /> Preferito
+                      </span>
+                    )}
                     {dossier.kind === 'studio' && (
-                      <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                      <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
                         Di studio
                       </span>
                     )}
                     {dossier.published?.isActive && (
-                      <span className="inline-flex items-center gap-1 rounded bg-violet-50 px-1.5 py-0.5 text-xs font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                      <span className="rounded bg-primary-50 px-1.5 py-0.5 text-xs font-medium text-primary-800 dark:bg-primary-900/30 dark:text-primary-200">
                         Pubblicato nel Forum
                       </span>
                     )}
+                    {dossier.sourceSuggestionId && <AttributionChip author={dossier.originalAuthor} />}
                   </div>
                 )}
                 {/* No placeholder for a missing description: an empty line says nothing (spec §5.3.3). */}
                 {dossier.description && (
-                  <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 line-clamp-2">
-                    {dossier.description}
-                  </p>
+                  <p className="mt-2 line-clamp-2 text-sm text-slate-600 dark:text-slate-400">{dossier.description}</p>
                 )}
                 {dossier.tags && dossier.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2 md:mt-3">
+                  <div className="mt-2 flex flex-wrap gap-1">
                     {dossier.tags.slice(0, 3).map((tag) => (
-                      <span key={tag} className="text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded truncate max-w-[100px]">
+                      <span key={tag} className="max-w-[10rem] truncate rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                         {tagLabel(tag)}
                       </span>
                     ))}
                     {dossier.tags.length > 3 && (
-                      <span className="text-xs text-slate-400">+{dossier.tags.length - 3}</span>
+                      <span className="text-xs text-slate-600 dark:text-slate-400">+{dossier.tags.length - 3}</span>
                     )}
                   </div>
                 )}
-                {acts && (
-                  <p className="mt-2 md:mt-3 text-sm text-slate-700 dark:text-slate-300 line-clamp-2">{acts}</p>
-                )}
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                  {counts.note > 0 && (
-                    <span>
-                      {counts.note} {counts.note === 1 ? 'nota' : 'note'}
-                    </span>
-                  )}
-                  {counts.sentenze > 0 && (
-                    <span>{counts.sentenze} {counts.sentenze === 1 ? 'sentenza' : 'sentenze'}</span>
-                  )}
-                  {counts.important > 0 && (
-                    <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400"
-                          title={`${counts.important} element${counts.important === 1 ? 'o' : 'i'} importanti`}>
-                      <Star size={11} className="fill-amber-400 text-amber-400" /> {counts.important}
-                    </span>
-                  )}
-                </p>
-                <div className="mt-3 md:mt-4 pt-3 md:pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center">
-                  <span className="text-xs text-slate-400">{formatTimestampLong(dossier.createdAt)}</span>
-                  <ChevronRight size={18} className="text-slate-400 group-hover:text-blue-500 transition-colors flex-shrink-0" />
+                {acts && <p className="mt-3 line-clamp-2 text-sm text-slate-800 dark:text-slate-200">{acts}</p>}
+                {/* What it holds, in one line, and the date, at the card's foot. */}
+                <div className="mt-auto pt-3">
+                  <p className="flex flex-wrap items-center gap-x-1.5 text-sm text-slate-600 dark:text-slate-400">
+                    {countsParts(dossier.items).map((part, index) => (
+                      // «·» and its spaces are in the text, for a screen reader and a copy; the line's gap draws them.
+                      <Fragment key={part}>
+                        {index > 0 && ' · '}
+                        <span className="whitespace-nowrap">{part}</span>
+                      </Fragment>
+                    ))}
+                    {counts.important > 0 && (
+                      <span className="inline-flex items-center gap-1 whitespace-nowrap text-amber-800 dark:text-amber-300">
+                        {' · '}
+                        <Star size={12} aria-hidden className="fill-current" />
+                        {counts.important}
+                        <span className="sr-only">{counts.important === 1 ? ' importante' : ' importanti'}</span>
+                      </span>
+                    )}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">Creato il {formatTimestampLong(dossier.createdAt)}</p>
                 </div>
               </div>
             );

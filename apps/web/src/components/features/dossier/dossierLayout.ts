@@ -209,3 +209,25 @@ export function actsSummary(layout: DossierLayout, max = 3): string {
   if (names.length <= max) return names.join(' · ');
   return `${names.slice(0, max).join(' · ')} e altri ${names.length - max}`;
 }
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/**
+ * What a dossier holds, in one line (S7c): «2 atti · 6 articoli · 3 note · 2 sentenze» — the acts and their articles
+ * always, the notes (free and about an article) and the decisions when there are some. The list's card and the
+ * dossier's page say it alike; `countsParts` gives the parts, for a line that draws each apart.
+ */
+export function countsParts(items: DossierItem[]): string[] {
+  const layout = layoutDossier(items);
+  const notes = items.filter((item) => item.type === 'note').length;
+  return [
+    plural(layout.acts.length, 'atto', 'atti'),
+    plural(layout.acts.reduce((n, act) => n + act.articles.length, 0), 'articolo', 'articoli'),
+    ...(notes > 0 ? [plural(notes, 'nota', 'note')] : []),
+    ...(layout.decisions.length > 0 ? [plural(layout.decisions.length, 'sentenza', 'sentenze')] : []),
+  ];
+}
+
+export function countsLine(items: DossierItem[]): string {
+  return countsParts(items).join(' · ');
+}

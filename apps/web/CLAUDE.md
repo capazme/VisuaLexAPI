@@ -229,8 +229,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   It draws the dossier list, «Dossier pubblici», Community, Gymnasium (every view but the lesson, through
   `StudiaPage`), Opus's planner (`OpusPage`, its views the frame's width), «Analizza documento», «Collega un'app AI» (its body keeps a column of 768 px: it reads as text, the
   title does not move), the Cronologia and the MERL-T hub; «Cestino» and the MERL-T pages under a way back
-  («Torna ai Dossier», «MERL-T») write their `h1` with `PAGE_TITLE`. A dossier's own page (its name, its star and
-  its actions), Impostazioni (a dialog, not a page), the Scrivania, the lesson, the reader and the practice, the
+  («Torna ai Dossier», «MERL-T») write their `h1` with `PAGE_TITLE`. A dossier's own page is in the frame since S7c
+  (`DossierDetailView`: its name the title, under «Torna ai Dossier»; see «Dossier»). Impostazioni (a dialog, not a page), the Scrivania, the lesson, the reader and the practice, the
   login stay out; «Crediti», public and outside the layout, is in the frame since M1 (the column's width and padding, the
   text in its 672 px column). On a phone `actionBeside` keeps icon-only actions on the title's row (the dossier list's
   «⋯» and «+»). `PageFrame.test.tsx` reads the section pages' files
@@ -1631,8 +1631,20 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   and each new annex or search blanked it while it was read. Acts reorder by drag:
   `setDossierItemOrder` saves the whole order and waits, never sending a
   temporary id, while an added item is pending
-  (`pendingDossierOrders`). Articles do not drag. The header has three actions
-  and a «⋯» (`ui/MenuButton`); «Seleziona elementi» lives there.
+  (`pendingDossierOrders`). Articles do not drag. **The page is in the planner's shape** (S7c, `dossierStyles.ts`):
+  in the sections' frame (`PageFrame`, under one 44 px «Torna ai Dossier»), the dossier's name the `h1` in the reader's
+  serif with no icon, wrapping at the column's width, its section's phrase over it (`kicker`: Gymnasium for a dossier
+  di studio, else Opus), the description under it; then the tags, one line of the facts («Tra i preferiti · Dossier di
+  lavoro · creato il … · 2 atti · 6 articoli · 3 note · 2 sentenze», `countsLine`/`countsParts` in `dossierLayout.ts`,
+  which the list's card says alike) and the header's actions in one row (D3) under the title at every width — beside it,
+  a long name was squeezed into a narrow column, and before S7c pushed the actions off the page at 1366 px: «Apri
+  tutto su Dashboard», «Aggiungi», «Esporta», the Forum's and «⋯» (`ui/MenuButton`; «Seleziona elementi» lives
+  there). Every control is 44 px at every width, as the planner's (the search is the planner's `FIELD`); the act
+  blocks, the free notes and «Giurisprudenza» are tiles (`SECTION_TILE`, no shadow) headed in the reader's serif, no
+  small capitals, and their entries rows of two levels, as the planner's tasks (`ROW`, a rule under each): a title
+  (15 px), a grey line (13 px: an article's rubric, else «Aggiunto il …», nothing when neither is known; a note's date
+  and who wrote it, under its words; a decision's «Aggiunta il …»), the signs, then the star and the removal (44 px,
+  always there) at the right; no hand-written blue.
 - **Notes**: every note a dossier gets from the web takes the notes route
   (`addNoteToDossier` → `POST /dossiers/:id/notes`), the one Claude's notes take
   through MCP. A note about an article (`aboutItemId`) sits with it: a count on
@@ -1776,7 +1788,7 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   `DossierModal` is create-only.
 - **Rows** (`DossierArticleRow`): the expand toggle lives on a header-scoped
   sub-div, never wrapping the reader or the action buttons (see gotcha 22); the
-  star keeps a 44px touch target. The accessible name carries the server's
+  star and the removal are 44 px at every width (S7c). The accessible name carries the server's
   `citation`, so two laws' art. 3 never read alike.
 - **Versions**: an item keeps the version it was added with (`versione`,
   `data_versione`), whichever button added it (`normaForDossier` for the window
@@ -2146,15 +2158,17 @@ re-applying a saturated background behind the text.
 **Mobile-first** — interactive controls keep a 44px touch target on mobile.
 `TOUCH_TARGET_RESPONSIVE` in `constants/interactions.ts` covers the height only
 (`min-h-[44px] md:min-h-0`); icon-only buttons need the width too, so they carry
-`min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0` explicitly — as the dossier
-row's star and remove buttons do. A text field or a select is at least 16 px below
+`min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0` explicitly. The pages in the
+planner's shape keep 44 px at every width instead: the planner, and the dossier's
+page since S7c (`dossierStyles.ts`: `ROW_ICON` for a row's star and removal). A text field or a select is at least 16 px below
 `md` (`FIELD_TEXT`, `text-[length:max(1rem,16px)] md:text-sm`, in `constants/interactions.ts`):
 Safari on an iPhone zooms the page into a field under 16 px as it takes the focus, and
 `text-base` is not enough — the text size «piccolo» makes 1 rem 14 px. `ui/Input` and
-`ui/FormSelect` carry it, and so do the searches of «Le mie schede» and of the Cronologia
+`ui/FormSelect` carry it, and so do the searches of «Le mie schede» and of the Cronologia, the
+planner's `FIELD` (its tasks' fields, the dossier's search since S7c)
 (`ui/__tests__/fieldText.test.tsx`), the search page's field and the palette's fields (its box
 is `max(1.125rem,16px)`); about sixty fields written by hand do not yet (the find
-window, the dossier's search, the index filter, the case-law filters, the dossier pickers,
+window, the index filter, the case-law filters, the dossier pickers,
 the notes): a field written by hand takes it, and a `text-*` class after it in `cn` undoes it.
 
 ## Common Patterns
@@ -2183,9 +2197,13 @@ meant to stay split; add new features as new files, not inside the shells:
   `i`; the search, then two menus — the order and «Filtra per categoria», one
   category at a time, «Tutte le categorie» first («Tutte» on a phone, by `useIsDesktop`), the categories of the section's dossiers, absent when
   there are none — on one row on a computer, half and half under the search on
-  a phone; on a phone the title keeps its row with «⋯» — «Importa da file JSON», «Cestino (n)» — and «+», M1), `DossierDetailView.tsx` (sections and header), `DossierActBlock.tsx`
+  a phone; on a phone the title keeps its row with «⋯» — «Importa da file JSON», «Cestino (n)» — and «+», M1; the cards since S7c: a Newsreader title, the
+  counts in one line from `countsParts`, «Creato il …», the quick open and «⋯»
+  always there at 44 px; with no dossier, a composed empty state with
+  `DossierMark.tsx`), `DossierDetailView.tsx` (sections and header), `DossierActBlock.tsx`
   (an act and its rows), `DossierArticleRow.tsx` (row + star + expand),
-  `DossierNotesSection.tsx`, `DossierItemReader.tsx` (in-place article),
+  `DossierNotesSection.tsx`, `DossierDecisionsSection.tsx`, `dossierStyles.ts`
+  (the page's tokens, in the planner's measures), `DossierItemReader.tsx` (in-place article),
   `AddToDossierPopover.tsx`, one file per modal, shared helpers in
   `dossierUtils.ts`, `dossierLayout.ts`, `dossierPdf.ts`, `pdfExcerpts.ts`, `dossierPdfMarks.ts`, `DossierPdfDialog.tsx`, `useActDetails.ts`.
 - `features/bulletin/` — the Forum. Its area «Dossier pubblici»: «I dossier di studio pubblicati dalla comunità» (spec
