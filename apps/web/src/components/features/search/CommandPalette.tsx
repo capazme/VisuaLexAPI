@@ -196,8 +196,11 @@ function PanelGrowth({ still, fromHeight, className, children }: { still: boolea
   useEffect(() => {
     remove.current = safeToRemove;
   });
-  // The closing on its way, for a new opening to take over from where it is.
+  // The closing on its way (or just finished, its end held), for a new opening to take over from where it is.
   const closing = useRef<Animation | null>(null);
+  // An opening whose growth has not started yet (a close or StrictMode's second run before its first frames): when
+  // the panel comes back it is still an opening, with its groups' entrance, though a clip is already set.
+  const opening = useRef(false);
   // The part hidden at the bottom, as a share of the panel and a length: the panel's own height is set by floating-ui
   // after it mounts, so it is never measured here. One template, so the two ends interpolate.
   const clipFor = (share: number, px: number, radius: number) => `inset(0px 0px calc(${share}% - ${px}px) 0px round ${radius}px)`;
@@ -213,44 +216,59 @@ function PanelGrowth({ still, fromHeight, className, children }: { still: boolea
     const el = ref.current;
     if (!el || !isPresent) return;
     el.style.pointerEvents = '';
-    if (still) {
-      const fade = canAnimate(el) ? el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: dur.pop * 1000, easing: curve }) : null;
-      return () => fade?.cancel();
-    }
-    // Coming back before it went (the layout effects run before the closing's cleanup): from where the closing is.
+    // Coming back before it went (the layout effects run before the closing's cleanup), or before its removal once
+    // it ended: from where the closing is.
+    let left: { clipPath: string; opacity: string } | null = null;
     if (closing.current) {
-      el.style.clipPath = getComputedStyle(el).clipPath;
+      const now = getComputedStyle(el);
+      left = { clipPath: now.clipPath, opacity: now.opacity };
       closing.current.onfinish = null;
       closing.current.cancel();
       closing.current = null;
     }
-    // An opening (nothing left by a closing): set before the first paint, or the panel would flash open meanwhile.
-    const from = el.style.clipPath && el.style.clipPath !== 'none' ? el.style.clipPath : asField;
+    if (still) {
+      el.style.clipPath = '';
+      opening.current = false;
+      const fade = canAnimate(el)
+        ? el.animate([{ opacity: left ? Number(left.opacity) : 0 }, { opacity: 1 }], { duration: dur.pop * 1000, easing: curve })
+        : null;
+      return () => fade?.cancel();
+    }
+    if (left && left.clipPath && left.clipPath !== 'none') el.style.clipPath = left.clipPath;
+    // An opening (nothing left by a closing or a growth cut short): set before the first paint, or the panel would
+    // flash open meanwhile.
+    const held = el.style.clipPath && el.style.clipPath !== 'none' ? el.style.clipPath : '';
+    const isOpening = opening.current || !held;
+    const from = held || asField;
     if (!canAnimate(el)) {
       el.style.clipPath = '';
       return;
     }
     el.style.clipPath = from;
+    opening.current = isOpening;
     // Started once the first frame is drawn: mounting the menu's rows is a long frame, and an animation started before
-    // it would run its time out unseen, the panel appearing whole.
+    // it would run its time out unseen, the panel appearing whole — and so is the render that brings it back during a
+    // closing: started there, it was nine tenths over by the first frame drawn.
     let grow: Animation | null = null;
     let groups: Animation[] = [];
+    const start = () => {
+      // The groups come one after the other as it grows: the first four, 30 ms apart, rising 4 px — on an opening only.
+      opening.current = false;
+      groups = isOpening
+        ? [...el.querySelectorAll<HTMLElement>('[cmdk-group]')].slice(0, GROUPS_ENTERING).map((group, i) =>
+          group.animate(
+            [{ opacity: 0, transform: 'translateY(4px)' }, { opacity: 1, transform: 'none' }],
+            { duration: dur.pop * 1000, delay: GROUPS_AT_MS + i * GROUP_STAGGER_MS, easing: curve, fill: 'backwards' },
+          ))
+        : [];
+      grow = el.animate([{ clipPath: from }, { clipPath: asPanel }], { duration: GROW_S * 1000, easing: curve });
+      // Grown, the clip goes: the card's own shadow shows.
+      grow.onfinish = () => {
+        el.style.clipPath = '';
+      };
+    };
     let frame = requestAnimationFrame(() => {
-      frame = requestAnimationFrame(() => {
-        // The groups come one after the other as it grows: the first four, 30 ms apart, rising 4 px — on an opening only.
-        groups = from === asField
-          ? [...el.querySelectorAll<HTMLElement>('[cmdk-group]')].slice(0, GROUPS_ENTERING).map((group, i) =>
-            group.animate(
-              [{ opacity: 0, transform: 'translateY(4px)' }, { opacity: 1, transform: 'none' }],
-              { duration: dur.pop * 1000, delay: GROUPS_AT_MS + i * GROUP_STAGGER_MS, easing: curve, fill: 'backwards' },
-            ))
-          : [];
-        grow = el.animate([{ clipPath: from }, { clipPath: asPanel }], { duration: GROW_S * 1000, easing: curve });
-        // Grown, the clip goes: the card's own shadow shows.
-        grow.onfinish = () => {
-          el.style.clipPath = '';
-        };
-      });
+      frame = requestAnimationFrame(start);
     });
     return () => {
       cancelAnimationFrame(frame);
@@ -279,17 +297,15 @@ function PanelGrowth({ still, fromHeight, className, children }: { still: boolea
     const run = still
       ? el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: dur.press * 1000, fill: 'forwards' })
       : el.animate([{ clipPath: now && now !== 'none' ? now : asPanel }, { clipPath: asField }], { duration: SHRINK_S * 1000, easing: `cubic-bezier(${ease.inOut.join(', ')})`, fill: 'forwards' });
-    run.onfinish = () => {
-      closing.current = null;
-      remove.current?.();
-    };
+    // Its end is held (`forwards`) until the panel goes: kept in the ref, so a panel brought back before its removal
+    // drops it (a finished closing left on it would clip the panel to the field once the new growth is over).
+    run.onfinish = () => remove.current?.();
     closing.current = run;
     return () => {
-      // Taken over by a new opening already (see the growth), or gone with the panel.
-      if (closing.current !== run) return;
+      // Taken over by a new opening already (see the growth: a second cancel does nothing), or gone with the panel.
       run.onfinish = null;
       run.cancel();
-      closing.current = null;
+      if (closing.current === run) closing.current = null;
     };
     // Once per closing: the field's height and the curves are read as it starts.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `asField`/`asPanel` are strings rebuilt each render
@@ -713,6 +729,14 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     ],
     whileElementsMounted: autoUpdate,
   });
+  // The field gone while the menu is open (another page, Focus mode): what `size` wrote on the box goes with it, or
+  // the panel hung at the top would keep the field's width and height.
+  useLayoutEffect(() => {
+    if (anchor || !isDesktop) return;
+    const box = refs.floating.current;
+    box?.style.removeProperty('width');
+    box?.style.removeProperty('--palette-max-h');
+  }, [anchor, isDesktop, refs]);
   const role = useRole(context, { role: 'dialog' });
   // What had the focus as the palette opened (the field, a button elsewhere): it gets it back.
   // Taken during render as the palette opens (own state, no effect), before the box takes the focus.

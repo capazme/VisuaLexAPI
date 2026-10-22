@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('../../../hooks/useTour', () => ({
@@ -162,7 +162,9 @@ describe('CommandPalette — growing out of the field (R2)', () => {
   it('opened again while it closes grows back from where the closing is, and one closing runs one animation', async () => {
     asDesktop(true);
     const AS_FIELD = 'inset(0px 0px calc(100% - 44px) 0px round 12px)';
+    const AT_CLOSE = 'inset(0px 0px calc(20% - 8px) 0px round 15px)';
     const MIDWAY = 'inset(0px 0px calc(60% - 26px) 0px round 14px)';
+    let caught = AT_CLOSE;
     const runs: { keyframes: Keyframe[]; animation: Animation }[] = [];
     Object.defineProperty(HTMLElement.prototype, 'animate', {
       value: vi.fn((keyframes: Keyframe[]) => {
@@ -180,7 +182,7 @@ describe('CommandPalette — growing out of the field (R2)', () => {
       if (!(el instanceof HTMLElement) || !el.classList.contains('shadow-xl')) return style;
       return new Proxy(style, {
         get: (target, key) => {
-          if (key === 'clipPath') return MIDWAY;
+          if (key === 'clipPath') return caught;
           const value = Reflect.get(target, key);
           return typeof value === 'function' ? value.bind(target) : value;
         },
@@ -198,13 +200,15 @@ describe('CommandPalette — growing out of the field (R2)', () => {
 
       rerender(<CommandPalette isOpen={false} onClose={onClose} onSearch={vi.fn()} />);
       expect(closings()).toHaveLength(1);
-      expect(closings()[0].keyframes[0]).toEqual({ clipPath: MIDWAY });
+      expect(closings()[0].keyframes[0]).toEqual({ clipPath: AT_CLOSE });
       // Renders while it closes start no second closing.
       rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
       rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
       expect(closings()).toHaveLength(1);
 
       const closing = closings()[0].animation;
+      // Halfway back: the browser now reads another clip than the one the closing started from.
+      caught = MIDWAY;
       rerender(<CommandPalette isOpen onClose={onClose} onSearch={vi.fn()} />);
       const panel = screen.getByRole('dialog', { name: 'Menu di ricerca' }).querySelector<HTMLElement>('.rounded-2xl')!;
       // Taken over where it was: the closing stopped, the clip held there, never the field's or the panel's.
@@ -217,6 +221,65 @@ describe('CommandPalette — growing out of the field (R2)', () => {
     } finally {
       Reflect.deleteProperty(HTMLElement.prototype, 'animate');
     }
+  });
+
+  it('a closing that ended is dropped when the panel comes back before it went, and under reduced motion it fades back from where it was', async () => {
+    asDesktop(true);
+    const runs: { keyframes: Keyframe[]; animation: Animation }[] = [];
+    Object.defineProperty(HTMLElement.prototype, 'animate', {
+      value: vi.fn((keyframes: Keyframe[]) => {
+        const animation = { cancel: vi.fn(), onfinish: null, playState: 'running' } as unknown as Animation;
+        runs.push({ keyframes, animation });
+        return animation;
+      }),
+      configurable: true,
+      writable: true,
+    });
+    const computed = window.getComputedStyle.bind(window);
+    vi.spyOn(window, 'getComputedStyle').mockImplementation((el: Element, pseudo?: string | null) => {
+      const style = computed(el, pseudo);
+      if (!(el instanceof HTMLElement) || !el.classList.contains('shadow-xl')) return style;
+      return new Proxy(style, {
+        get: (target, key) => {
+          if (key === 'opacity') return '0.4';
+          const value = Reflect.get(target, key);
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      });
+    });
+    try {
+      motionPref.reduced = true;
+      const { rerender } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+      rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+      const fadeOut = runs.find((run) => run.keyframes.at(-1)?.opacity === 0)!;
+      expect(fadeOut).toBeDefined();
+      // It ended, and the panel is asked back in the same breath as its removal.
+      act(() => {
+        (fadeOut.animation.onfinish as unknown as () => void)?.();
+        rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+      });
+      expect(fadeOut.animation.cancel).toHaveBeenCalled();
+      const panel = screen.getByRole('dialog', { name: 'Menu di ricerca' }).querySelector<HTMLElement>('.rounded-2xl')!;
+      expect(panel.style.clipPath).toBe('');
+      expect(runs.at(-1)?.keyframes).toEqual([{ opacity: 0.4 }, { opacity: 1 }]);
+    } finally {
+      Reflect.deleteProperty(HTMLElement.prototype, 'animate');
+    }
+  });
+
+  it('lets go of the field\'s width and height when the field goes while it is open', async () => {
+    asDesktop(true);
+    const form = document.createElement('form');
+    form.id = SEARCH_FIELD_FORM_ID;
+    document.body.append(form);
+    const { rerender } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    const box = screen.getByRole('dialog', { name: 'Menu di ricerca' });
+    await waitFor(() => expect(box.style.getPropertyValue('--palette-max-h')).not.toBe(''));
+    expect(box.style.width).not.toBe('');
+    form.remove();
+    rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    expect(box.style.width).toBe('');
+    expect(box.style.getPropertyValue('--palette-max-h')).toBe('');
   });
 
   it('without Web Animations draws the panel at once, never left clipped to the field', () => {
