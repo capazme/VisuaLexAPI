@@ -94,9 +94,10 @@ export function reportFindWindowScope(tabId: string | null, targetKey: string | 
 }
 
 /** Whether the window is open on `tabId` and, when it was pointed at one text, on `targetKey`. */
-export function isFindWindowScopedTo(tabId: string | undefined, targetKey?: string): boolean {
+export function isFindWindowScopedTo(tabId: string | undefined, targetKey?: string, exact = false): boolean {
   if (tabId === undefined || scopedTabId !== tabId) return false;
-  return targetKey === undefined || pointedKey === null || pointedKey === targetKey;
+  // `exact`: pointed at this very text, not only open on its practice with no text pointed at.
+  return targetKey === undefined || pointedKey === targetKey || (!exact && pointedKey === null);
 }
 
 export function subscribeFindWindowScope(listener: () => void): () => void {

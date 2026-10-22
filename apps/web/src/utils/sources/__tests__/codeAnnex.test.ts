@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { citeNorm, shortNorm } from '../normLabels';
+import { citeNorm, namedAnnex, shortNorm } from '../normLabels';
 
 // A code's annex is the code itself (the c.c. is Allegato 2 of r.d. 262/1942): never named,
 // also for a code cited by its decree (G-350, G-351).
@@ -32,5 +32,20 @@ describe('an act whose text is its annex', () => {
   });
   it('names another annex', () => {
     expect(citeNorm({ ...tulps, allegato: '2' })).toBe('art. 86, r.d. 18 giugno 1931, n. 773 (Allegato 2)');
+  });
+});
+
+// What the reader's toolbar shows as «Allegato N» (R3): the same rule as the labels.
+describe('namedAnnex', () => {
+  it('names an annex the labels name', () => {
+    expect(namedAnnex({ tipo_atto: 'decreto legislativo', numero_atto: '81', data: '2008-04-09', allegato: 'A' })).toBe('A');
+    expect(namedAnnex({ tipo_atto: 'codice del processo amministrativo', allegato: '1' })).toBe('1');
+  });
+
+  it('names none for a code\'s own annex, by name or by decree, nor for the TULPS', () => {
+    expect(namedAnnex({ tipo_atto: 'codice civile', allegato: '2' })).toBe('');
+    expect(namedAnnex({ tipo_atto: 'codice del processo amministrativo', allegato: '2' })).toBe('');
+    expect(namedAnnex({ tipo_atto: 'regio decreto', numero_atto: '773', data: '1931-06-18', allegato: '1' })).toBe('');
+    expect(namedAnnex({ tipo_atto: 'legge', numero_atto: '241', data: '1990-08-07' })).toBe('');
   });
 });
