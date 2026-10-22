@@ -69,7 +69,7 @@ export function IngestionRunForm({ onStarted }: IngestionRunFormProps) {
             value={source}
             onChange={(e) => setSource(e.target.value as IngestionSource)}
             disabled={submitting}
-            className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50"
+            className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none disabled:opacity-50"
           >
             <option value="visualex_tree">Albero VisuaLex</option>
             <option value="italia_corpus">italia-corpus</option>
@@ -88,7 +88,7 @@ export function IngestionRunForm({ onStarted }: IngestionRunFormProps) {
             disabled={submitting}
             maxLength={300}
             placeholder='es. "Codice civile — Libro IV"'
-            className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50"
+            className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none disabled:opacity-50"
             required
           />
         </div>
@@ -105,7 +105,7 @@ export function IngestionRunForm({ onStarted }: IngestionRunFormProps) {
           rows={2}
           className={cn(
             'w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-mono',
-            'focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50'
+            'focus:ring-2 focus:ring-primary-500 outline-none disabled:opacity-50'
           )}
           required
         />

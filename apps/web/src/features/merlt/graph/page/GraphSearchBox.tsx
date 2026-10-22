@@ -152,7 +152,7 @@ export function GraphSearchBox({ onSelect, placeholder }: GraphSearchBoxProps): 
         <ul
           id="graph-search-listbox"
           role="listbox"
-          className="absolute z-40 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
+          className="absolute z-40 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-slate-200 bg-white py-1 shadow-md dark:border-slate-700 dark:bg-slate-800"
         >
           {results.map((item, i) => (
             <li
@@ -183,7 +183,7 @@ export function GraphSearchBox({ onSelect, placeholder }: GraphSearchBoxProps): 
       {showDropdown && state.phase === 'success' && results.length === 0 && (
         <div
           role="status"
-          className="absolute z-40 mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 shadow-lg dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"
+          className="absolute z-40 mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 shadow-md dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"
         >
           Nessun risultato per «{state.term}»
         </div>
@@ -192,7 +192,7 @@ export function GraphSearchBox({ onSelect, placeholder }: GraphSearchBoxProps): 
       {showDropdown && state.phase === 'error' && (
         <div
           role="alert"
-          className="absolute z-40 mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 shadow-lg dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"
+          className="absolute z-40 mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 shadow-md dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"
         >
           Ricerca non disponibile — riprova.
         </div>

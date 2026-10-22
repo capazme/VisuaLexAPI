@@ -28,7 +28,7 @@ function DossierIllustration() {
       <rect x="30" y="62" width="55" height="4" rx="2" className="fill-slate-300 dark:fill-slate-600" />
       <rect x="30" y="72" width="35" height="4" rx="2" className="fill-slate-300 dark:fill-slate-600" />
       {/* Plus icon */}
-      <circle cx="85" cy="80" r="15" className="fill-blue-500" />
+      <circle cx="85" cy="80" r="15" className="fill-primary-500" />
       <path d="M85 73V87M78 80H92" stroke="white" strokeWidth="3" strokeLinecap="round" />
     </svg>
   );
@@ -56,8 +56,8 @@ function HistoryIllustration() {
       ))}
       {/* Clock hands */}
       <line x1="60" y1="60" x2="60" y2="35" className="stroke-slate-600 dark:stroke-slate-300" strokeWidth="3" strokeLinecap="round" />
-      <line x1="60" y1="60" x2="78" y2="60" className="stroke-blue-500" strokeWidth="3" strokeLinecap="round" />
-      <circle cx="60" cy="60" r="4" className="fill-blue-500" />
+      <line x1="60" y1="60" x2="78" y2="60" className="stroke-primary-500" strokeWidth="3" strokeLinecap="round" />
+      <circle cx="60" cy="60" r="4" className="fill-primary-500" />
       {/* Search sparkle */}
       <path d="M95 25L97 30L102 28L97 32L99 37L95 33L91 37L93 32L88 28L93 30L95 25Z" className="fill-amber-400" />
     </svg>
@@ -79,11 +79,11 @@ function EnvironmentIllustration() {
       {/* Pin marker */}
       <path
         d="M75 40C75 48.284 67.5 58 67.5 58C67.5 58 60 48.284 60 40C60 31.716 63.358 25 67.5 25C71.642 25 75 31.716 75 40Z"
-        className="fill-blue-500"
+        className="fill-primary-500"
       />
       <circle cx="67.5" cy="38" r="4" className="fill-white" />
       {/* Connection lines */}
-      <path d="M30 80L45 70M90 35L78 42" className="stroke-blue-400 stroke-dashed" strokeWidth="1.5" strokeDasharray="3 3" />
+      <path d="M30 80L45 70M90 35L78 42" className="stroke-primary-400 stroke-dashed" strokeWidth="1.5" strokeDasharray="3 3" />
     </svg>
   );
 }
@@ -100,10 +100,10 @@ function SearchIllustration() {
       <rect x="32" y="62" width="25" height="4" rx="2" className="fill-slate-300 dark:fill-slate-600" />
       <rect x="32" y="72" width="35" height="4" rx="2" className="fill-slate-300 dark:fill-slate-600" />
       {/* Magnifying glass */}
-      <circle cx="78" cy="70" r="18" className="fill-white dark:fill-slate-900 stroke-blue-500" strokeWidth="4" />
-      <line x1="91" y1="83" x2="102" y2="94" className="stroke-blue-500" strokeWidth="5" strokeLinecap="round" />
+      <circle cx="78" cy="70" r="18" className="fill-white dark:fill-slate-900 stroke-primary-500" strokeWidth="4" />
+      <line x1="91" y1="83" x2="102" y2="94" className="stroke-primary-500" strokeWidth="5" strokeLinecap="round" />
       {/* Search highlight */}
-      <circle cx="78" cy="70" r="8" className="fill-blue-100 dark:fill-blue-900/30" />
+      <circle cx="78" cy="70" r="8" className="fill-primary-100 dark:fill-primary-900/30" />
     </svg>
   );
 }
@@ -147,7 +147,7 @@ function GenericIllustration() {
       <path d="M60 20L60 100" className="stroke-slate-300 dark:stroke-slate-600" strokeWidth="2" />
       <path d="M20 40L60 60L100 40" className="stroke-slate-300 dark:stroke-slate-600" strokeWidth="2" />
       {/* Sparkle */}
-      <path d="M85 25L87 30L92 28L87 32L89 37L85 33L81 37L83 32L78 28L83 30L85 25Z" className="fill-blue-400" />
+      <path d="M85 25L87 30L92 28L87 32L89 37L85 33L81 37L83 32L78 28L83 30L85 25Z" className="fill-primary-400" />
     </svg>
   );
 }
@@ -159,9 +159,9 @@ function ThreadsIllustration() {
       <rect x="15" y="25" width="60" height="35" rx="8" className="fill-slate-100 dark:fill-slate-800 stroke-slate-300 dark:stroke-slate-600" strokeWidth="2" />
       <rect x="22" y="36" width="35" height="4" rx="2" className="fill-slate-300 dark:fill-slate-600" />
       <rect x="22" y="45" width="45" height="4" rx="2" className="fill-slate-300 dark:fill-slate-600" />
-      <rect x="45" y="60" width="60" height="35" rx="8" className="fill-blue-50 dark:fill-blue-900/30 stroke-blue-300 dark:stroke-blue-700" strokeWidth="2" />
-      <rect x="52" y="71" width="40" height="4" rx="2" className="fill-blue-200 dark:fill-blue-800" />
-      <rect x="52" y="80" width="30" height="4" rx="2" className="fill-blue-200 dark:fill-blue-800" />
+      <rect x="45" y="60" width="60" height="35" rx="8" className="fill-primary-50 dark:fill-primary-900/30 stroke-primary-300 dark:stroke-primary-700" strokeWidth="2" />
+      <rect x="52" y="71" width="40" height="4" rx="2" className="fill-primary-200 dark:fill-primary-800" />
+      <rect x="52" y="80" width="30" height="4" rx="2" className="fill-primary-200 dark:fill-primary-800" />
       {/* Upvote arrow */}
       <path d="M30 85L33 80L36 85" className="stroke-slate-400 dark:stroke-slate-500" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
@@ -176,10 +176,10 @@ function NotificationsIllustration() {
       <rect x="52" y="80" width="16" height="8" rx="4" className="fill-slate-300 dark:fill-slate-600" />
       <line x1="60" y1="12" x2="60" y2="20" className="stroke-slate-400 dark:stroke-slate-500" strokeWidth="2" strokeLinecap="round" />
       {/* Notification dot */}
-      <circle cx="78" cy="32" r="10" className="fill-blue-500" />
+      <circle cx="78" cy="32" r="10" className="fill-primary-500" />
       <text x="78" y="36" textAnchor="middle" className="fill-white" fontSize="12" fontWeight="bold">3</text>
       {/* Sound waves */}
-      <path d="M88 48C92 44 92 38 88 34" className="stroke-blue-300 dark:stroke-blue-600" strokeWidth="2" strokeLinecap="round" fill="none" />
+      <path d="M88 48C92 44 92 38 88 34" className="stroke-primary-300 dark:stroke-primary-600" strokeWidth="2" strokeLinecap="round" fill="none" />
     </svg>
   );
 }

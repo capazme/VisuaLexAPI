@@ -585,7 +585,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
               aria-label="Menu utente"
               onKeyDown={onMenuKeyDown}
               style={{ bottom: menuPosition.bottom, left: menuPosition.left, maxHeight: menuPosition.maxHeight > 0 ? menuPosition.maxHeight : undefined }}
-              className={cn("fixed w-56 overflow-y-auto overscroll-contain bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 animate-in fade-in zoom-in-95 duration-150", Z_INDEX.menuPanel)}
+              className={cn("fixed w-56 overflow-y-auto overscroll-contain bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 py-2 animate-in fade-in zoom-in-95 duration-150", Z_INDEX.menuPanel)}
             >
               {/* User Info */}
               <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">

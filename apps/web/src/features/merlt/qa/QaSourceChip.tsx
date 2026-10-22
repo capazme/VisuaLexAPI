@@ -76,7 +76,7 @@ function SourceInfo({ source, cited }: { source: QaRetrievedSource; cited?: QaSo
             ref={refs.setFloating}
             style={floatingStyles}
             {...getFloatingProps()}
-            className="z-50 max-w-xs rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-xl dark:border-slate-700 dark:bg-slate-900"
+            className="z-50 max-w-xs rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-md dark:border-slate-700 dark:bg-slate-900"
           >
             <dl className="space-y-1.5">
               {cited?.expert && (

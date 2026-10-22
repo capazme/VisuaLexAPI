@@ -72,7 +72,7 @@ function NotFoundPage() {
       </p>
       <Link
         to="/"
-        className="mt-2 text-sm font-medium text-primary-600 dark:text-primary-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 rounded"
+        className="mt-2 inline-flex min-h-[44px] items-center rounded px-2 text-sm font-medium text-primary-600 dark:text-primary-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
       >
         Torna alla ricerca
       </Link>

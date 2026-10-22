@@ -26,7 +26,7 @@ const STATUS_LABEL: Record<MyContribJob['status'], string> = {
 
 const STATUS_TONE: Record<MyContribJob['status'], string> = {
   pending: 'text-slate-500',
-  running: 'text-blue-600 dark:text-blue-400',
+  running: 'text-primary-600 dark:text-primary-400',
   completed: 'text-emerald-600 dark:text-emerald-400',
   failed: 'text-red-600 dark:text-red-400',
   timeout: 'text-amber-600 dark:text-amber-400',

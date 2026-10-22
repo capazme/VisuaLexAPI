@@ -77,6 +77,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         className={cn(
           'inline-flex items-center justify-center gap-2 rounded-md py-1.5 text-center font-medium',
           TRANSITION,
+          // The press answers in 120 ms (Y1) on `--ease-out`, and with it the button's colours (`TRANSITION`'s 150
+          // elsewhere): one duration for every property it lists.
+          'duration-[120ms]',
           FOCUS_RING,
           DISABLED,
           ACTIVE,
