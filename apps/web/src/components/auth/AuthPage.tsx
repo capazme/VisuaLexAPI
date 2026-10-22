@@ -15,15 +15,14 @@
  * box with `scrollbar-gutter: stable`, so a window too low for it does not shift sideways when a bar
  * appears. The motion, once per change of tab: the mark under the tabs slides (`transform`, 200 ms),
  * the form leaving fades (120 ms) while the one coming in fades from 8 px on the side of its tab
- * (180 ms). Under reduced motion the change is immediate.
+ * (180 ms). Under reduced motion the change is immediate. Once, as the page opens, the colophon is written in
+ * ink (A3): the book traces itself, the wordmark comes out from under the pen's soft edge, the line rises under it.
  */
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { BookOpen } from 'lucide-react';
-import { motion } from 'framer-motion';
-import { SegmentWordmark } from './SegmentWordmark';
 import { BookMark } from '../ui/BookMark';
 import { FOCUS_RING } from '../../constants/interactions';
+import { cn } from '../../lib/utils';
 import { useAuth } from '../../hooks/useAuth';
 import { authPageTab, isLoginPage } from '../../utils/returnTo';
 import { canTransitionPage, startPageTransition } from '../../lib/pageTransition';
@@ -37,6 +36,11 @@ const TABS: { id: AuthTab; label: string; path: string }[] = [
   { id: 'login', label: 'Accedi', path: '/login' },
   { id: 'register', label: 'Registrati', path: '/register' },
 ];
+
+// The wordmark's letters (A3): each settles as the pen's tip reaches it, the mask crossing the word from 250 to
+// 1050 ms at an even pace and a letter taking 300 ms, so the last ends with the mask.
+const WORDMARK = [...'VisuaLex'];
+const inkDelay = (index: number) => Math.round(250 + (index * 500) / (WORDMARK.length - 1));
 
 // Entering the app (spec §6.3.1): once per session the book traces itself, then the app comes in.
 const ENTRY_MS = 720;
@@ -68,8 +72,14 @@ export function AuthPage() {
   // the form starts again empty (it stays mounted, so a new key mounts it afresh).
   const [signedUp, setSignedUp] = useState(false);
   const [registerKey, setRegisterKey] = useState(0);
-  // The wordmark has melted out of its seven-segment display (A2): the open book comes.
-  const [markSettled, setMarkSettled] = useState(false);
+  // The wordmark written in ink (A3, `index.css`): its mask goes once the pen has crossed it, so nothing stays on
+  // the finished page; under reduced motion the colophon only fades in, `inkShown` turning its opacity on.
+  const [inked, setInked] = useState(false);
+  const [inkShown, setInkShown] = useState(false);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setInkShown(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
   // And «Torna ad Accedi» finds a fresh sign-in form: a new key empties it, and the failure the page's
   // `useAuth` still holds (until the next sign-in) is not shown on it. A new failure is the form's own
   // message, so hiding the same words again loses nothing.
@@ -167,22 +177,33 @@ export function AuthPage() {
           <div className="mx-auto grid w-full max-w-4xl gap-8 md:grid-cols-[minmax(0,1fr)_420px] md:items-center md:gap-16">
             {/* The title grows only from `lg`: between 768 and 1023 px the column beside the card is about
                 200-430 px, and «VisuaLex» at 68 px is 272 px wide. */}
-            <header className="flex flex-col items-center gap-4 text-center md:items-start md:gap-5 md:text-left">
-              {/* The open book comes once the wordmark has melted out of its display (A2); its place is kept meanwhile. */}
-              <motion.span
-                aria-hidden="true"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: markSettled ? 1 : 0 }}
-                transition={{ duration: 0.3 }}
+            <header
+              className={cn(
+                'flex flex-col items-center gap-4 text-center md:items-start md:gap-5 md:text-left',
+                // Under reduced motion the global rule turns this into a 150 ms fade, the whole of the motion.
+                !inkShown && 'motion-reduce:opacity-0',
+              )}
+            >
+              <BookMark size={44} className="vlx-ink-book text-primary-600 dark:text-primary-400" />
+              {/* The name stays whole for a reader; the letters drawn are its picture, each settling as the pen
+                  passes. The padding, taken back by the margins, gives the mask room for the glyphs' edges. */}
+              <h1
+                className={cn(
+                  '-mx-[0.05em] -my-[0.1em] px-[0.05em] py-[0.1em] font-serif text-5xl font-medium leading-none tracking-tight text-slate-900 dark:text-slate-50 lg:text-[4.25rem]',
+                  !inked && 'vlx-ink-word',
+                )}
+                onAnimationEnd={(event) => {
+                  if (event.target === event.currentTarget && event.animationName === 'vlx-ink-write') setInked(true);
+                }}
               >
-                <BookOpen size={44} strokeWidth={1.5} className="text-primary-600 dark:text-primary-400" />
-              </motion.span>
-              <SegmentWordmark
-                className="font-serif text-5xl leading-none tracking-tight text-slate-900 dark:text-slate-50 lg:text-[4.25rem]"
-                weightClass="font-medium"
-                onSettled={() => setMarkSettled(true)}
-              />
-              <p className="max-w-[34ch] font-serif text-xl leading-relaxed text-slate-600 dark:text-slate-300">
+                <span className="sr-only">VisuaLex</span>
+                {WORDMARK.map((letter, index) => (
+                  <span key={index} aria-hidden="true" data-ink-letter style={{ animationDelay: `${inkDelay(index)}ms` }}>
+                    {letter}
+                  </span>
+                ))}
+              </h1>
+              <p className="vlx-ink-line max-w-[34ch] font-serif text-xl leading-relaxed text-slate-600 dark:text-slate-300">
                 Le norme italiane ed europee, le sentenze che le leggono, e il tuo lavoro sopra: note, evidenziazioni, dossier.
               </p>
             </header>

@@ -302,3 +302,52 @@ describe('AuthPage: two tabs on one page', () => {
     await waitFor(() => expect(screen.getByTestId('landed')).toHaveTextContent('/dossier?dossier=7'), { timeout: 2000 });
   });
 });
+
+// The wordmark written in ink (A3): one face, one ink; the name whole for a reader, nothing left on the finished page.
+describe('AuthPage: the wordmark written in ink', () => {
+  it('names the page «VisuaLex» for a reader, its drawn letters and the book hidden from them', () => {
+    renderAuth('/login');
+    const title = screen.getByRole('heading', { level: 1, name: 'VisuaLex' });
+    const letters = title.querySelectorAll('[data-ink-letter]');
+    expect([...letters].map((letter) => letter.textContent).join('')).toBe('VisuaLex');
+    for (const letter of letters) expect(letter).toHaveAttribute('aria-hidden', 'true');
+    expect(document.querySelector('svg.vlx-ink-book')).toHaveAttribute('aria-hidden', 'true');
+    // No trace of A2's display.
+    expect(title.querySelector('svg')).toBeNull();
+  });
+
+  it('lets each letter settle as the pen reaches it, the last as the mask ends (250 to 1050 ms)', () => {
+    renderAuth('/login');
+    const delays = [...screen.getByRole('heading', { level: 1 }).querySelectorAll<HTMLElement>('[data-ink-letter]')].map(
+      (letter) => parseInt(letter.style.animationDelay, 10),
+    );
+    expect(delays[0]).toBe(250);
+    expect(delays.at(-1)).toBe(750);
+    expect(delays).toEqual([...delays].sort((a, b) => a - b));
+  });
+
+  it('drops the mask once the pen has crossed the word, and only then', () => {
+    renderAuth('/login');
+    const title = screen.getByRole('heading', { level: 1 });
+    expect(title).toHaveClass('vlx-ink-word');
+    // jsdom's events carry no `animationName`: it is written on them as a browser would.
+    const end = (target: Element, animationName: string) => {
+      const event = new Event('animationend', { bubbles: true });
+      Object.defineProperty(event, 'animationName', { value: animationName });
+      act(() => {
+        target.dispatchEvent(event);
+      });
+    };
+    // A letter's own end bubbles up: it is not the mask's.
+    end(title.querySelector('[data-ink-letter]')!, 'vlx-ink-settle');
+    expect(title).toHaveClass('vlx-ink-word');
+    end(title, 'vlx-ink-write');
+    expect(title).not.toHaveClass('vlx-ink-word');
+  });
+
+  it('fades the colophon in under reduced motion, from the first frame after it is drawn', async () => {
+    renderAuth('/login');
+    const header = screen.getByRole('heading', { level: 1 }).closest('header')!;
+    await waitFor(() => expect(header).not.toHaveClass('motion-reduce:opacity-0'));
+  });
+});
