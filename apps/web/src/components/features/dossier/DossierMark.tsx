@@ -1,7 +1,7 @@
 import { cn } from '../../../lib/utils';
 
 /**
- * The empty dossier list's drawing (S7c), as the empty Community's (S7a): line art in the manner of the section
+ * The empty dossier list's drawing (S7c): line art in the manner of the section
  * switcher's mark — a rounded tile, round strokes of one weight — in the section's hue, a folder with two lines of
  * entries. Decorative: the words beside it say what to do.
  */

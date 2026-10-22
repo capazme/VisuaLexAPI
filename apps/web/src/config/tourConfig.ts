@@ -178,7 +178,7 @@ export const DOSSIER_STEPS: DriveStep[] = [
         element: '#tour-dossier-card',
         popover: {
             title: 'Card Dossier',
-            description: 'Ogni card mostra titolo, tag, quante norme e note contiene e l\'ultimo aggiornamento. Clicca per aprire.',
+            description: 'Ogni card mostra titolo, tag, quante norme, note e sentenze contiene e quando l\'hai creato. Clicca per aprire.',
             side: 'right',
             align: 'center',
         }

@@ -146,8 +146,9 @@ export function DossierArticleRow({
           className={cn(
             ROW_ICON,
             isImportant
-              ? 'text-amber-500'
-              : 'text-slate-400 hover:bg-amber-50 hover:text-amber-600 dark:text-slate-500 dark:hover:bg-amber-900/20',
+              ? 'text-amber-600 dark:text-amber-400'
+              // The unmarked star at 3:1 on the paper, as a control's edge must be (WCAG 1.4.11).
+              : 'text-slate-500 hover:bg-amber-50 hover:text-amber-600 dark:text-slate-400 dark:hover:bg-amber-900/20',
           )}
         >
           <Star size={16} className={cn(isImportant && 'fill-amber-400')} />
@@ -162,7 +163,7 @@ export function DossierArticleRow({
           {(notes.length > 0 || onAddNote) && (
             <div className="mb-2 mt-1 space-y-1.5">
               {notes.map((note) => (
-                <div key={note.id} className="group/note flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 dark:border-amber-900/50 dark:bg-amber-950/20">
+                <div key={note.id} className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 dark:border-amber-900/50 dark:bg-amber-950/20">
                   <StickyNote size={14} aria-hidden className="mt-0.5 flex-shrink-0 text-amber-600" />
                   <div className="min-w-0 flex-1">
                     <p className="whitespace-pre-wrap text-sm text-slate-800 dark:text-slate-200">{note.data}</p>

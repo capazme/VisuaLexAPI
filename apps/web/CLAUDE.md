@@ -2107,8 +2107,9 @@ re-applying a saturated background behind the text.
 **Mobile-first** — interactive controls keep a 44px touch target on mobile.
 `TOUCH_TARGET_RESPONSIVE` in `constants/interactions.ts` covers the height only
 (`min-h-[44px] md:min-h-0`); icon-only buttons need the width too, so they carry
-`min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0` explicitly — as the dossier
-row's star and remove buttons do. A text field or a select is at least 16 px below
+`min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0` explicitly. The pages in the
+planner's shape keep 44 px at every width instead: the planner, and the dossier's
+page since S7c (`dossierStyles.ts`: `ROW_ICON` for a row's star and removal). A text field or a select is at least 16 px below
 `md` (`FIELD_TEXT`, `text-[length:max(1rem,16px)] md:text-sm`, in `constants/interactions.ts`):
 Safari on an iPhone zooms the page into a field under 16 px as it takes the focus, and
 `text-base` is not enough — the text size «piccolo» makes 1 rem 14 px. `ui/Input` and

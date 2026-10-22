@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { Fragment, useState, useMemo, useEffect, useRef } from 'react';
 import {
   FolderPlus,
   Search,
@@ -27,7 +27,7 @@ import { OpenOnDashboardPicker } from './OpenOnDashboardPicker';
 import { searchesIntoOnePractice } from './openInPractice';
 import type { Dossier, DossierKind } from '../../../types';
 import { AttributionChip } from '../bulletin/AttributionChip';
-import { useDossierKind } from '../../../features/sections/useSection';
+import { sectionOfDossierKind, useDossierKind } from '../../../features/sections/useSection';
 import { kindLabel } from './dossierKinds';
 import { actsSummary, countsParts, layoutDossier } from './dossierLayout';
 import { ICON_BUTTON } from '../planner/plannerStyles';
@@ -254,9 +254,9 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
       // The page's name (L-37), its section's phrase over it: the kind listed is the section's, Gymnasium's study
       // dossiers, Opus's work ones (every dossier with Gymnasium off).
       title={DOSSIER_PAGE}
-      kicker={sectionKind === 'studio' ? 'gymnasium' : 'opus'}
+      kicker={sectionOfDossierKind(sectionKind)}
       // The same element from one kind to the other: the switcher's focus lands on it for Opus and for Gymnasium.
-      section={sectionKind === 'studio' ? 'gymnasium' : 'opus'}
+      section={sectionOfDossierKind(sectionKind)}
       className="animate-in fade-in duration-200"
       // On a phone the title keeps its row with «⋯» (Importa, Cestino) and «+» beside it (M1); from md the three buttons.
       actionBeside={!isDesktop}
@@ -375,10 +375,10 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
               <EmptyState variant="dossier" title="Nessun risultato" description="Prova a modificare i filtri di ricerca." />
             </div>
           ) : (
-            // No dossier yet: an empty state composed for the page (S7c), as the empty Community's — line art in the
+            // No dossier yet: an empty state composed for the page (S7c) — line art in the
             // section's hue, what a dossier is for, and the two ways to begin.
             <section aria-labelledby="dossier-list-empty" className="col-span-full mx-auto flex w-full max-w-lg flex-col items-center px-2 py-10 text-center md:py-16">
-              <DossierMark hue={sectionKind === 'studio' ? 'var(--vlx-section-gymnasium)' : 'var(--vlx-section-opus)'} />
+              <DossierMark hue={`var(--vlx-section-${sectionOfDossierKind(sectionKind)})`} />
               <h2 id="dossier-list-empty" className="mt-6 font-serif text-2xl font-medium tracking-tight text-slate-900 dark:text-slate-50">
                 {sectionKind ? `Nessun ${kindLabel(sectionKind).toLowerCase()}` : 'Nessun dossier creato'}
               </h2>
@@ -423,7 +423,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                   }
                 }}
                 className={cn(
-                  'dossier-card group relative flex cursor-pointer flex-col rounded-xl border border-slate-200 bg-white p-4 transition-[border-color,scale] hover:border-slate-400 active:scale-[0.98] md:p-5 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-500',
+                  'dossier-card group relative flex cursor-pointer flex-col rounded-xl border border-slate-200 bg-white p-4 transition-[border-color,scale] hover:border-slate-400 active:scale-[0.98] motion-reduce:active:scale-100 md:p-5 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-500',
                   FOCUS_RING,
                 )}
               >
@@ -496,14 +496,15 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                 <div className="mt-auto pt-3">
                   <p className="flex flex-wrap items-center gap-x-1.5 text-sm text-slate-600 dark:text-slate-400">
                     {countsParts(dossier.items).map((part, index) => (
-                      <span key={part} className="whitespace-nowrap">
-                        {index > 0 && <span aria-hidden>· </span>}
-                        {part}
-                      </span>
+                      // «·» and its spaces are in the text, for a screen reader and a copy; the line's gap draws them.
+                      <Fragment key={part}>
+                        {index > 0 && ' · '}
+                        <span className="whitespace-nowrap">{part}</span>
+                      </Fragment>
                     ))}
                     {counts.important > 0 && (
                       <span className="inline-flex items-center gap-1 whitespace-nowrap text-amber-800 dark:text-amber-300">
-                        <span aria-hidden>·</span>
+                        {' · '}
                         <Star size={12} aria-hidden className="fill-current" />
                         {counts.important}
                         <span className="sr-only">{counts.important === 1 ? ' importante' : ' importanti'}</span>

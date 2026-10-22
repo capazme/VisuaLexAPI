@@ -373,7 +373,8 @@ describe('DossierListView — cards and the empty list (S7c)', () => {
     const card = screen.getByRole('button', { name: 'Apri dossier Pratica Rossi' });
     expect(within(card).getByRole('heading', { level: 2, name: 'Pratica Rossi' })).toHaveClass('font-serif');
     const line = within(card).getByText('1 nota').closest('p')!;
-    expect(line).toHaveTextContent('1 atto· 1 articolo· 1 nota');
+    // Said as it is seen: the spaces round «·» are in the text.
+    expect(line).toHaveTextContent(/^1 atto · 1 articolo · 1 nota$/);
     expect(within(card).getByText('Creato il 1 agosto 2026')).toBeInTheDocument();
     for (const name of ['Apri Pratica Rossi su Dashboard', 'Azioni su Pratica Rossi']) {
       const control = within(card).getByRole('button', { name });

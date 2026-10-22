@@ -50,7 +50,7 @@ import { removeItemsWithUndo } from './removeItemsWithUndo';
 import { DossierActBlock } from './DossierActBlock';
 import { DossierNotesSection } from './DossierNotesSection';
 import { DossierDecisionsSection } from './DossierDecisionsSection';
-import { buildPdfBlocks, countMarksUnavailable, countUnavailable, loadDossierDecisions, loadDossierTexts, writeDossierPdf } from './dossierPdf';
+import { buildPdfBlocks, countMarksUnavailable, countUnavailable, loadDossierDecisions, loadDossierTexts, pdfCountsLine, writeDossierPdf } from './dossierPdf';
 import { loadPdfMarks } from './dossierPdfMarks';
 import { DossierPdfDialog, type DossierPdfOptions } from './DossierPdfDialog';
 import { lastActTitle, resolveBlockUrn } from './useActDetails';
@@ -72,6 +72,7 @@ import { dossierService, type DossierSnapshotApi } from '../../../services/dossi
 import { tagLabel } from '../../../utils/tagLabel';
 import { cn } from '../../../lib/utils';
 import { PageFrame } from '../../layout/PageFrame';
+import { sectionOfDossierKind } from '../../../features/sections/useSection';
 import { FOCUS_RING } from '../studia/progress/tokens';
 import { HEADER_BUTTON, HEADER_ICON_BUTTON, HEADER_PRIMARY } from './dossierStyles';
 import { FIELD, ICON_BUTTON } from '../planner/plannerStyles';
@@ -415,7 +416,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
       const blocks = buildPdfBlocks(dossier.items, texts, titles, { excerpts, marks, decisions });
 
       const doc = writeDossierPdf(
-        { title: dossier.title, description: dossier.description, tags: dossier.tags, countsLine: dossierCounts, exportedOn: new Date().toLocaleDateString('it-IT') },
+        { title: dossier.title, description: dossier.description, tags: dossier.tags, countsLine: pdfCountsLine(dossier.items, chosen), exportedOn: new Date().toLocaleDateString('it-IT') },
         blocks,
       );
       doc.save(`${dossier.title.replace(/[^a-z0-9]/gi, '_')}.pdf`);
@@ -531,8 +532,9 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
           line of the facts and the actions in one row, under the title at every width — beside it, a long name was
           squeezed into a narrow column (seen at 1366 px). */}
       <PageFrame
-        title={dossier.title}
-        kicker={dossier.kind === 'studio' ? 'gymnasium' : 'opus'}
+        // A name of one long word (a file's, an address) wraps too, as a task's title does: never a page wider than a phone.
+        title={<span className="[overflow-wrap:anywhere]">{dossier.title}</span>}
+        kicker={sectionOfDossierKind(dossier.kind)}
         line={dossier.description || undefined}
       >
         <div>
@@ -548,7 +550,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
           )}
           <p className="flex flex-wrap items-center gap-x-1.5 text-sm text-slate-600 dark:text-slate-400">
             {dossier.isPinned && (
-              <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-300">
+              <span className="inline-flex items-center gap-1 text-amber-800 dark:text-amber-300">
                 <Star size={14} aria-hidden className="fill-current" /> Tra i preferiti
                 <span aria-hidden className="text-slate-400">·</span>
               </span>
