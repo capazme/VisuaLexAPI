@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ isAdmin: false, canUseDevMode: false, devMode: false, setDevMode: vi.fn() }) }));
@@ -28,6 +28,27 @@ describe('SettingsModal — the groups (Y1)', () => {
       expect(heading).not.toHaveClass('uppercase');
     }
     expect(screen.getByRole('button', { name: /Ricomincia il tour guidato/ })).toBeInTheDocument();
+  });
+});
+
+describe('SettingsModal — «Carattere dell’interfaccia»', () => {
+  it('names the typeface control for what it sets, the interface\'s, not the law\'s (Bill and Luca)', () => {
+    render(view(true));
+    expect(screen.getByText('Carattere dell’interfaccia')).toBeInTheDocument();
+    const group = screen.getByRole('group', { name: 'Carattere dell’interfaccia' });
+    expect(group).toBeInTheDocument();
+    expect(screen.queryByText('Font')).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Famiglia font' })).toBeNull();
+  });
+
+  it('on a phone puts the label over its buttons, three 44 px thirds of the row; beside them from sm', () => {
+    render(view(true));
+    const group = screen.getByRole('group', { name: 'Carattere dell’interfaccia' });
+    expect(group).toHaveClass('grid', 'grid-cols-3', 'sm:flex');
+    expect(group.parentElement).toHaveClass('flex-col', 'sm:flex-row', 'sm:justify-between');
+    for (const name of ['Sans', 'Serif', 'Mono']) {
+      expect(within(group).getByRole('button', { name })).toHaveClass('min-h-[44px]', 'sm:min-h-0');
+    }
   });
 });
 
