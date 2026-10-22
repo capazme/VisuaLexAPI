@@ -52,8 +52,10 @@ function FilterSelect<T extends string>({ label, all, value, options, disabled, 
 }
 
 /**
- * The sticky filter row of «Le mie schede»: search, subject, state, kind, act, «Scritte da
- * Claude, da rileggere» and «Da ripassare oggi». On a phone the selects fold behind «Filtri», so the row does not take the screen.
+ * The sticky filter row of «Le mie schede»: search, subject, state, kind, act, «Scritte da Claude» (to read again) and
+ * «Da ripassare oggi». On a computer one row (G8): the search a third of it, then the selects and the two switches,
+ * wrapping only where the window is too narrow for them; under 1024 px the selects fold behind «Filtri», so the row
+ * does not take the screen.
  */
 export function CardFilters({ value, onChange, search, onSearchChange, acts }: CardFiltersProps) {
   const [open, setOpen] = useState(false);
@@ -65,9 +67,13 @@ export function CardFilters({ value, onChange, search, onSearchChange, acts }: C
       aria-label="Filtri"
       // Opaque, bled over the layout's page padding (p-4 md:p-8) so cards scrolling under it do not show. On a phone it pins
       // under the bar at the top (`--phone-bar-offset`, set by `Layout`), and moves up with it when the bar slides away.
-      className={cn('sticky top-[var(--phone-bar-offset,0px)] transition-[top] duration-200 ease-out motion-reduce:transition-none -mx-4 space-y-2 border-b border-current/10 bg-slate-50 px-4 pb-2 pt-2 md:-mx-2 md:px-2 dark:bg-slate-950', Z_INDEX.sticky)}
+      className={cn(
+        'sticky top-[var(--phone-bar-offset,0px)] transition-[top] duration-200 ease-out motion-reduce:transition-none -mx-4 space-y-2 border-b border-current/10 bg-slate-50 px-4 pb-2 pt-2 md:-mx-2 md:px-2 dark:bg-slate-950',
+        'lg:flex lg:items-start lg:gap-2 lg:space-y-0',
+        Z_INDEX.sticky,
+      )}
     >
-      <div className="flex gap-2">
+      <div className="flex gap-2 lg:w-1/3 lg:shrink-0">
         <div className="relative min-w-0 flex-1">
           <Search size={16} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
           <input
@@ -84,13 +90,13 @@ export function CardFilters({ value, onChange, search, onSearchChange, acts }: C
           type="button"
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
-          className={cn(CONTROL, 'inline-flex shrink-0 items-center gap-2 md:hidden')}
+          className={cn(CONTROL, 'inline-flex shrink-0 items-center gap-2 lg:hidden')}
         >
           <SlidersHorizontal size={16} aria-hidden />
           {active > 0 ? `Filtri (${active})` : 'Filtri'}
         </button>
       </div>
-      <div className={cn('grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center', open ? 'grid' : 'hidden md:flex')}>
+      <div className={cn('grid-cols-2 gap-2 lg:flex lg:min-w-0 lg:flex-1 lg:flex-wrap lg:items-center', open ? 'grid' : 'hidden lg:flex')}>
         <FilterSelect
           label="Materia"
           all="Tutte le materie"
@@ -125,14 +131,16 @@ export function CardFilters({ value, onChange, search, onSearchChange, acts }: C
         <button
           type="button"
           aria-pressed={value.daRileggere}
+          // The visible words start the name (label in name); the rest says what the switch keeps.
+          aria-label="Scritte da Claude, da rileggere"
           onClick={() => onChange({ ...value, daRileggere: !value.daRileggere })}
           className={cn(
             CONTROL,
-            'col-span-2 text-left md:col-span-1 md:text-center',
+            'col-span-2 text-left lg:col-span-1 lg:whitespace-nowrap lg:text-center',
             value.daRileggere && PRESSED,
           )}
         >
-          Scritte da Claude, da rileggere
+          Scritte da Claude
         </button>
         <button
           type="button"
@@ -140,7 +148,7 @@ export function CardFilters({ value, onChange, search, onSearchChange, acts }: C
           onClick={() => onChange({ ...value, dovuteOggi: !value.dovuteOggi })}
           className={cn(
             CONTROL,
-            'col-span-2 text-left md:col-span-1 md:text-center',
+            'col-span-2 text-left lg:col-span-1 lg:whitespace-nowrap lg:text-center',
             value.dovuteOggi && PRESSED,
           )}
         >

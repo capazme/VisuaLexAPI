@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { MemoryRouter, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 
 vi.mock('../../../services/studiaService', () => ({
   studiaService: { list: vi.fn(), get: vi.fn(), trash: vi.fn(), create: vi.fn(), update: vi.fn(), propose: vi.fn(), withdraw: vi.fn() },
@@ -143,9 +143,51 @@ describe('«Le mie schede», the list', () => {
   it('offers no «+ Nuova scheda» while the sources have not answered yet', async () => {
     sources.mockReturnValue(new Promise(() => {}));
     renderView();
-    await screen.findAllByRole('link');
-    expect(screen.getByRole('heading', { level: 2, name: 'Le mie schede' })).toBeInTheDocument();
+    // The cards are listed all the same; the page's title is the frame's (`StudiaPage`, L-37).
+    expect(await screen.findAllByRole('link')).toHaveLength(5);
+    expect(screen.queryByRole('heading', { level: 2, name: 'Le mie schede' })).toBeNull();
     expect(screen.queryByRole('button', { name: '+ Nuova scheda' })).toBeNull();
+  });
+
+  it('lays the cards out as tiles across the page with no card open, each with its front, subject, state and next review (G8)', async () => {
+    list.mockResolvedValue(page([card('r1', { prossimoRipasso: '2099-03-04' }), card('r2')]));
+    renderView();
+    const tile = await screen.findByRole('link', { name: /Domanda r1\?/ });
+    expect(tile.closest('ul')).toHaveClass('lg:grid-cols-2', '2xl:grid-cols-3');
+    expect(within(tile).getByText('Domanda r1?')).toHaveClass('font-serif');
+    expect(tile).toHaveTextContent('Diritto civile');
+    expect(tile).toHaveTextContent('Bozza');
+    expect(tile).toHaveTextContent('Prossimo ripasso: 4 marzo 2099');
+    // No column held empty for a card not chosen.
+    expect(screen.queryByText(/Scegli una scheda/)).toBeNull();
+  });
+
+  it('puts the list in one column beside the card once one is open (G8)', async () => {
+    renderView('/studia/schede/r1');
+    await screen.findByRole('article', { name: 'Scheda' });
+    expect(screen.getByRole('link', { name: /Domanda r1\?/ }).closest('ul')).not.toHaveClass('lg:grid-cols-2');
+  });
+
+  it('draws «+ Nuova scheda» beside the page\'s title, in the place the frame gives it', async () => {
+    const slot = document.createElement('div');
+    document.body.append(slot);
+    try {
+      render(
+        <MemoryRouter initialEntries={['/studia/schede']}>
+          <Routes>
+            <Route element={<Outlet context={{ validator: false, actionSlot: slot }} />}>
+              <Route path="/studia/schede" element={<MyCardsView />} />
+            </Route>
+          </Routes>
+        </MemoryRouter>,
+      );
+      await screen.findAllByRole('link');
+      const button = await screen.findByRole('button', { name: '+ Nuova scheda' });
+      expect(slot).toContainElement(button);
+      expect(screen.getAllByRole('button', { name: '+ Nuova scheda' })).toHaveLength(1);
+    } finally {
+      slot.remove();
+    }
   });
 
   it('says so, and offers to clear the filters, when they leave nothing', async () => {
