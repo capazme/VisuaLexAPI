@@ -130,7 +130,8 @@ export function DayBlock({ day, dayFailed, action, actionFailed, stops, onRetry,
           <p className={LARGE}>Non hai ancora schede da ripassare.</p>
           <p className="max-w-prose text-sm text-slate-700 dark:text-slate-200">
             Per cominciare, apri un articolo dalla{' '}
-            <Link to="/" className={cn('font-medium underline', FOCUS_RING)}>
+            {/* 44 px to a finger by its padding, taken back by its margins so no line moves (G8b). */}
+            <Link to="/" className={cn('-my-3 inline-block py-3 font-medium underline', FOCUS_RING)}>
               Ricerca
             </Link>{' '}
             e scegli «+ Nuova scheda» sotto il testo, oppure accendi le schede della comunità: le missioni partono dalla prima scheda.
