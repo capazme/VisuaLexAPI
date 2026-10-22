@@ -420,6 +420,14 @@ describe('extractCitations — an abbreviation is not the head of a longer one',
     expect(read('art. 5 c. p. p.')).toEqual([['art. 5 c. p. p.', 'codice di procedura penale', '5']]);
   });
 
+  it('the fully spaced «c. p. a.» is the codice del processo amministrativo, never «c. p.»', () => {
+    expect(read('art. 29 c. p. a.')).toEqual([['art. 29 c. p. a.', 'codice del processo amministrativo', '29']]);
+    expect(read('artt. 1 e 2 c. p. a.')[0]).toEqual(['artt. 1 e 2 c. p. a.', 'codice del processo amministrativo', '1']);
+    expect(extractCitations('art. 29 c. p. a.').map((c) => c.parsed.act_type)).toEqual(['codice del processo amministrativo']);
+    // …while «c. p.» before a word that starts with «a» is still the codice penale
+    expect(read('art. 29 c. p. altrimenti')[0]).toEqual(['art. 29 c. p.', 'codice penale', '29']);
+  });
+
   it('a final "c.p." before the next sentence still links', () => {
     expect(read('previsto dall\'art. 110 c.p. Il ricorso è infondato')).toEqual([["dall'art. 110 c.p.", 'codice penale', '110']]);
   });
@@ -519,6 +527,9 @@ describe('extractCitations — c.p.a., cod. nav., cod. post., c.g.c.', () => {
     expect(read("l'art. 5, comma 2, costituisce", civile)).toEqual([['art. 5, comma 2', 'codice civile', '5']]);
     // …while the code's own words still are
     expect(read("l'art. 5 costituzionale", civile)).toEqual([]);
+    expect(read('art. 5 Costit.', civile)).toEqual([]);
+    expect(read('art. 5 costit', civile)).toEqual([]);
+    expect(read('artt. 5 e 6 Costit.', civile)).toEqual([]);
     expect(read('artt. 5 e 6 codice della crisi', civile)).toEqual([]);
     expect(read('artt. 5 e 6 cod xyz', civile)).toEqual([]);
   });

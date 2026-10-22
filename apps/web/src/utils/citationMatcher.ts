@@ -121,7 +121,7 @@ const SUFFIX_TO_ACT_TYPE: Record<string, string> = {
 // `_ACT_ABBREV_PATTERN` in citation_linker.py (che non ammette spazi interni).
 const ACT_SUFFIX_PATTERN =
   '(' +
-  '(?:c\\.?p\\.?c|c\\.\\s+p\\.\\s+c(?=\\.)|c\\.?p\\.?p|c\\.\\s+p\\.\\s+p(?=\\.)|c\\.?p\\.?a|' +
+  '(?:c\\.?p\\.?c|c\\.\\s+p\\.\\s+c(?=\\.)|c\\.?p\\.?p|c\\.\\s+p\\.\\s+p(?=\\.)|c\\.?p\\.?a|c\\.\\s+p\\.\\s+a(?=\\.)|' +
   'c\\.?g\\.?c|c\\.\\s+g\\.\\s+c(?=\\.)|' +
   'c\\.?\\s*c|c\\.?\\s*p|' +
   'cost|c\\.?\\s*d\\.?\\s*s|(?:cod\\.?|c\\.)\\s*nav|c\\.?\\s*n|prel|cod\\.?\\s*civ|cod\\.?\\s*pen|cod\\.?\\s*post)' +
@@ -161,10 +161,11 @@ const NATIONAL_ACT_SOURCE =
 // Ciò che, dopo un articolo senza atto, fa pensare a un codice ("c.c.", "c.g.c.", "cod. …",
 // anche uno che nessun pattern sa leggere): i PATTERN 4 e 5 non danno quell'articolo alla
 // norma in lettura. "cost" e "cod" valgono da soli, col punto o come "costituzion…" e
-// "codic…": "gli artt. 5 e 6 costituiscono" e "codificano" sono parole, e l'elenco resta un link.
+// "codic…" ("Costit." compreso): "gli artt. 5 e 6 costituiscono" e "codificano" sono parole, e
+// l'elenco resta un link.
 const CODE_AFTER_SOURCE =
   '\\s*(?:,\\s*)?(?:c\\.?\\s*c|c\\.?\\s*p|c\\.?\\s*g\\.?\\s*c|' +
-  'cost(?:ituzion|\\.|(?![a-zà-ÿ]))|prel|cod(?:ic|\\.|(?![a-zà-ÿ])))';
+  'cost(?:ituzion|it(?:\\.|(?![a-zà-ÿ]))|\\.|(?![a-zà-ÿ]))|prel|cod(?:ic|\\.|(?![a-zà-ÿ])))';
 
 /**
  * Normalizza il tipo atto
