@@ -303,52 +303,60 @@ describe('AuthPage: two tabs on one page', () => {
   });
 });
 
-// The wordmark written in ink (A3): one face, one ink; the name whole for a reader, nothing left on the finished page.
+// The wordmark written in ink (A3): one face, one ink; the word one text throughout, nothing left on the finished page.
 describe('AuthPage: the wordmark written in ink', () => {
-  it('names the page «VisuaLex» for a reader, its drawn letters and the book hidden from them', () => {
+  // jsdom's events carry no `animationName`: it is written on them as a browser would.
+  const animation = (target: Element, type: 'animationend' | 'animationcancel', animationName: string) => {
+    const event = new Event(type, { bubbles: true });
+    Object.defineProperty(event, 'animationName', { value: animationName });
+    act(() => {
+      target.dispatchEvent(event);
+    });
+  };
+  const copy = () => document.querySelector('.vlx-ink-bleed');
+
+  it('names the page «VisuaLex» with one text, its blurred copy and the book hidden from a reader', () => {
     renderAuth('/login');
     const title = screen.getByRole('heading', { level: 1, name: 'VisuaLex' });
-    const letters = title.querySelectorAll('[data-ink-letter]');
-    expect([...letters].map((letter) => letter.textContent).join('')).toBe('VisuaLex');
-    for (const letter of letters) expect(letter).toHaveAttribute('aria-hidden', 'true');
+    // The word itself is never split into letters (WebKit kerns no pair across two elements).
+    const ink = title.querySelector('.vlx-ink-word')!;
+    expect(ink.childNodes).toHaveLength(1);
+    expect(ink.textContent).toBe('VisuaLex');
+    expect(copy()).toHaveAttribute('aria-hidden', 'true');
+    expect(copy()).toHaveClass('select-none');
     expect(document.querySelector('svg.vlx-ink-book')).toHaveAttribute('aria-hidden', 'true');
-    // No trace of A2's display.
     expect(title.querySelector('svg')).toBeNull();
   });
 
-  it('lets each letter settle as the pen reaches it, the last ending with the mask (250 to 1050 ms)', () => {
-    renderAuth('/login');
-    const delays = [...screen.getByRole('heading', { level: 1 }).querySelectorAll<HTMLElement>('[data-ink-letter]')].map(
-      (letter) => parseInt(letter.style.animationDelay, 10),
-    );
-    expect(delays[0]).toBe(250);
-    // The last letter's left side is 7/8 of the word: the edge, crossing 112 % in 800 ms, reaches it at 875 ms, and
-    // its 175 ms of settling end at 1050.
-    expect(delays.at(-1)).toBe(875);
-    expect(delays).toEqual([...delays].sort((a, b) => a - b));
-  });
-
-  it('makes the word one text again once the pen has crossed it, and only then', () => {
+  it('drops the copy and the mask once the ink is written, and only then', () => {
     renderAuth('/login');
     const title = screen.getByRole('heading', { level: 1 });
-    expect(title).toHaveClass('vlx-ink-word');
-    // jsdom's events carry no `animationName`: it is written on them as a browser would.
-    const end = (target: Element, animationName: string) => {
-      const event = new Event('animationend', { bubbles: true });
-      Object.defineProperty(event, 'animationName', { value: animationName });
-      act(() => {
-        target.dispatchEvent(event);
-      });
-    };
-    // A letter's own end bubbles up: it is not the mask's.
-    end(title.querySelector('[data-ink-letter]')!, 'vlx-ink-settle');
-    expect(title).toHaveClass('vlx-ink-word');
-    end(title, 'vlx-ink-write');
-    expect(title).not.toHaveClass('vlx-ink-word');
-    // No letters apart on the finished page (WebKit kerns no pair across two elements), no second copy.
-    expect(title.querySelector('[data-ink-letter]')).toBeNull();
-    expect(title.textContent).toBe('VisuaLex');
+    // The copy's own end bubbles up: it is not the ink's.
+    animation(copy()!, 'animationend', 'vlx-ink-bleed');
+    expect(copy()).not.toBeNull();
+    animation(title.querySelector('.vlx-ink-word')!, 'animationend', 'vlx-ink-write');
+    expect(copy()).toBeNull();
+    expect(title.querySelector('.vlx-ink-word')).toBeNull();
+    expect(title).toHaveTextContent(/^VisuaLex$/);
     expect(screen.getByRole('heading', { level: 1, name: 'VisuaLex' })).toBe(title);
+  });
+
+  it('ends the writing when it is cancelled, reduced motion turned on halfway', () => {
+    renderAuth('/login');
+    animation(document.querySelector('.vlx-ink-word')!, 'animationcancel', 'vlx-ink-write');
+    expect(copy()).toBeNull();
+    expect(document.querySelector('.vlx-ink-word')).toBeNull();
+  });
+
+  it('only fades the word in from the left on WebKit for iOS: no mask, no blurred copy', () => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15');
+    renderAuth('/login');
+    const title = screen.getByRole('heading', { level: 1, name: 'VisuaLex' });
+    expect(title.querySelector('.vlx-ink-plain')).toHaveTextContent('VisuaLex');
+    expect(title.querySelector('.vlx-ink-word')).toBeNull();
+    expect(copy()).toBeNull();
+    animation(title.querySelector('.vlx-ink-plain')!, 'animationend', 'vlx-ink-plain');
+    expect(title.querySelector('.vlx-ink-plain')).toBeNull();
   });
 
   it('turns the colophon\'s opacity on after its first frames, the fade reduced motion sees', async () => {
@@ -358,11 +366,11 @@ describe('AuthPage: the wordmark written in ink', () => {
     await waitFor(() => expect(header).not.toHaveClass('motion-reduce:opacity-0'));
   });
 
-  it('never takes the word apart under reduced motion', () => {
+  it('never writes the word under reduced motion', () => {
     reduceMotion(true);
     renderAuth('/login');
     const title = screen.getByRole('heading', { level: 1, name: 'VisuaLex' });
-    expect(title).not.toHaveClass('vlx-ink-word');
-    expect(title.querySelector('[data-ink-letter]')).toBeNull();
+    expect(title.querySelector('.vlx-ink-word, .vlx-ink-plain')).toBeNull();
+    expect(copy()).toBeNull();
   });
 });

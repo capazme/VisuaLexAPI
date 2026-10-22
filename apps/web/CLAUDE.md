@@ -96,18 +96,21 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (between 768 and 1023 px the column beside the card is about 200 px).
   **The wordmark** (A3, replacing A2's seven-segment display; inspired by a signature written with a pen, written
   from scratch in CSS, `index.css`'s `vlx-ink-*`): one face, one ink, once per opening, about 1.3 s. The book traces
-  itself (`BookMark` with `vlx-ink-book`, 450 ms), «VisuaLex» comes out from under a mask whose soft edge (12 %) is
-  the pen's tip — `--vlx-ink-edge`, an `@property` percentage, crosses the word from 250 to 1050 ms, its wait inside
-  the keyframes, not a delay — while each letter settles from `opacity 0.4` and a 1.5 px blur (175 ms, from the moment
-  the edge reaches its left side), and the line under it rises 4 px into view (200 ms). Everything fills backwards;
-  on the mask's `animationend` its class goes and the word is one text again (the letters apart lose their kerning
-  on WebKit), so the finished page is the page without the animation. While it plays the `h1` is named by an
-  `sr-only` copy and the letters are `aria-hidden`; nothing moves the layout or the focus. The animations sit inside
-  `prefers-reduced-motion: no-preference` (as `vlx-book-draw` does): the global reduced-motion rule cuts durations,
-  not delays, and a delayed `backwards` would have hidden the line for a second; under reduced motion the word is
-  never taken apart and the colophon fades in through that rule's 150 ms opacity transition. Measured in Chromium
-  only (headless, at 1920 and 390): not on Safari, where the brief's fallback for a stuttering mask is not written,
-  nor on a phone. The register form fits a window 768 px high
+  itself (`BookMark` with `vlx-ink-book`, 450 ms); a faint, blurred copy of «VisuaLex» comes out from under a mask whose
+  soft edge (12 %) is the pen's tip — `--vlx-ink-edge`, an `@property` percentage, 250–950 ms — and the word itself
+  follows it 100 ms behind under its own (350–1050 ms), so each letter is faint and soft before it is sharp; the copy
+  fades as the ink ends, and the line under it rises 4 px into view (200 ms). The waits are inside the keyframes, not
+  delays. The word is one text throughout, the copy stacked on it in one grid cell (`aria-hidden`, not selectable):
+  never split into letters, which lose their kerning on WebKit and settled 1–3 px when joined again. On the ink's
+  `animationend`, or its `animationcancel` (listened to on the element, React has none: reduced motion turned on
+  halfway), the copy and the mask go, so the finished page is the page without the animation (the text's box
+  measured identical at every moment). On WebKit for iOS (`inkMark.ts`, `isIOSWebKit`: an iPhone, an iPod, an iPad,
+  an iPad with a Mac's user agent and touch points) the word only fades in from the left, no mask, no blur — the
+  brief's fallback for a mask that stutters. The animations sit inside `prefers-reduced-motion: no-preference` (as
+  `vlx-book-draw` does): the global reduced-motion rule cuts durations, not delays, and a delayed `backwards` would
+  have hidden the line for a second; under reduced motion nothing is written and the colophon fades in through that
+  rule's 150 ms opacity transition. Measured in Chromium only (headless, at 1920 and 390, the iOS path by its user
+  agent): not on Safari nor on a phone. The register form fits a window 768 px high
   inside (1366×768, 1470×753 measured as viewports; a 768 px screen with a browser's bars scrolls a little) by
   its spacing (`space-y-4` between fields, `space-y-1.5` inside one), the sign-in form spaced the same. While a sign-in or a
   sign-up is on its way the tabs hold still (`aria-disabled`): its answer would land on the hidden form. A

@@ -18,7 +18,7 @@
  * (180 ms). Under reduced motion the change is immediate. Once, as the page opens, the colophon is written in
  * ink (A3): the book traces itself, the wordmark comes out from under the pen's soft edge, the line rises under it.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type AnimationEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { BookMark } from '../ui/BookMark';
 import { FOCUS_RING } from '../../constants/interactions';
@@ -27,6 +27,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { authPageTab, isLoginPage } from '../../utils/returnTo';
 import { canTransitionPage, startPageTransition } from '../../lib/pageTransition';
 import { focusField } from './authForm';
+import { INK_ENDS, isIOSWebKit } from './inkMark';
 import { LoginForm } from './LoginForm';
 import { RegisterForm } from './RegisterForm';
 
@@ -37,11 +38,8 @@ const TABS: { id: AuthTab; label: string; path: string }[] = [
   { id: 'register', label: 'Registrati', path: '/register' },
 ];
 
-// The wordmark's letters (A3): each settles from the moment the pen's soft edge reaches its left side — the edge
-// crossing 112 % of the word from 250 to 1050 ms at an even pace, a letter taken as an eighth of it — over 175 ms,
-// so the last ends with the mask.
-const WORDMARK = [...'VisuaLex'];
-const inkDelay = (index: number) => Math.round(250 + (800 * (index / WORDMARK.length)) / 1.12);
+// The wordmark's two copies (A3) stack in one cell of a grid, each with room for the mask past the glyphs' edges.
+const INK_CELL = 'col-start-1 row-start-1 px-[0.05em] py-[0.1em]';
 
 // Entering the app (spec §6.3.1): once per session the book traces itself, then the app comes in.
 const ENTRY_MS = 720;
@@ -73,10 +71,27 @@ export function AuthPage() {
   // the form starts again empty (it stays mounted, so a new key mounts it afresh).
   const [signedUp, setSignedUp] = useState(false);
   const [registerKey, setRegisterKey] = useState(0);
-  // The wordmark written in ink (A3, `index.css`): once the pen has crossed it the word is one text again, no mask
-  // and no letters apart (WebKit kerns no pair across two elements); under reduced motion it never comes apart, and
-  // the colophon only fades in, `inkShown` turning its opacity on after a frame drawn at 0.
+  // The wordmark written in ink (A3, `index.css`): the word is one text throughout, its kerning kept; while the pen
+  // writes it a faint blurred copy runs ahead of its mask. Once written — or when the writing is cancelled, reduced
+  // motion turned on halfway — the copy and the mask go. Under reduced motion nothing is written, and the colophon
+  // only fades in, `inkShown` turning its opacity on after a frame drawn at 0.
   const [inked, setInked] = useState(prefersReducedMotion);
+  const [plainInk] = useState(isIOSWebKit);
+  const endInk = (event: Pick<AnimationEvent, 'animationName'>) => {
+    if (INK_ENDS.includes(event.animationName)) setInked(true);
+  };
+  // React has no `animationcancel`: listened to on the element, so reduced motion turned on halfway (the rules go,
+  // the animation is cancelled, no `animationend` comes) still ends the writing.
+  const inkRef = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const element = inkRef.current;
+    if (!element || inked) return undefined;
+    const cancel = (event: globalThis.AnimationEvent) => {
+      if (INK_ENDS.includes(event.animationName)) setInked(true);
+    };
+    element.addEventListener('animationcancel', cancel);
+    return () => element.removeEventListener('animationcancel', cancel);
+  }, [inked]);
   const [inkShown, setInkShown] = useState(false);
   useEffect(() => {
     let frame = requestAnimationFrame(() => {
@@ -189,29 +204,19 @@ export function AuthPage() {
               )}
             >
               <BookMark size={44} className="vlx-ink-book text-primary-600 dark:text-primary-400" />
-              {/* The name stays whole for a reader; the letters drawn are its picture, each settling as the pen
-                  passes. The padding, taken back by the margins, gives the mask room for the glyphs' edges. */}
-              <h1
-                className={cn(
-                  '-mx-[0.05em] -my-[0.1em] px-[0.05em] py-[0.1em] font-serif text-5xl font-medium leading-none tracking-tight text-slate-900 dark:text-slate-50 lg:text-[4.25rem]',
-                  !inked && 'vlx-ink-word',
-                )}
-                onAnimationEnd={(event) => {
-                  if (event.target === event.currentTarget && event.animationName === 'vlx-ink-write') setInked(true);
-                }}
-              >
-                {inked ? (
-                  'VisuaLex'
-                ) : (
-                  <>
-                    <span className="sr-only select-none">VisuaLex</span>
-                    {WORDMARK.map((letter, index) => (
-                      <span key={index} aria-hidden="true" data-ink-letter style={{ animationDelay: `${inkDelay(index)}ms` }}>
-                        {letter}
-                      </span>
-                    ))}
-                  </>
-                )}
+              {/* One text, «VisuaLex», for the eye and for a reader; while the pen writes, a faint blurred copy of it,
+                  hidden from a reader, runs ahead of the ink's mask (WebKit kerns no pair across two elements, so the
+                  word is never split into letters). The cells' padding, taken back by the grid's margins, gives the
+                  masks room for the glyphs' edges. */}
+              <h1 className="font-serif text-5xl font-medium leading-none tracking-tight text-slate-900 dark:text-slate-50 lg:text-[4.25rem]">
+                <span ref={inkRef} className="-mx-[0.05em] -my-[0.1em] inline-grid" onAnimationEnd={endInk}>
+                  <span className={cn(INK_CELL, !inked && (plainInk ? 'vlx-ink-plain' : 'vlx-ink-word'))}>VisuaLex</span>
+                  {!inked && !plainInk && (
+                    <span aria-hidden="true" className={cn(INK_CELL, 'vlx-ink-bleed select-none')}>
+                      VisuaLex
+                    </span>
+                  )}
+                </span>
               </h1>
               <p className="vlx-ink-line max-w-[34ch] font-serif text-xl leading-relaxed text-slate-600 dark:text-slate-300">
                 Le norme italiane ed europee, le sentenze che le leggono, e il tuo lavoro sopra: note, evidenziazioni, dossier.
