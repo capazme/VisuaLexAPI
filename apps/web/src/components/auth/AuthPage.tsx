@@ -20,6 +20,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { BookOpen } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { SegmentWordmark } from './SegmentWordmark';
 import { BookMark } from '../ui/BookMark';
 import { FOCUS_RING } from '../../constants/interactions';
 import { useAuth } from '../../hooks/useAuth';
@@ -66,6 +68,8 @@ export function AuthPage() {
   // the form starts again empty (it stays mounted, so a new key mounts it afresh).
   const [signedUp, setSignedUp] = useState(false);
   const [registerKey, setRegisterKey] = useState(0);
+  // The wordmark has melted out of its seven-segment display (A2): the open book comes.
+  const [markSettled, setMarkSettled] = useState(false);
   // And «Torna ad Accedi» finds a fresh sign-in form: a new key empties it, and the failure the page's
   // `useAuth` still holds (until the next sign-in) is not shown on it. A new failure is the form's own
   // message, so hiding the same words again loses nothing.
@@ -164,10 +168,19 @@ export function AuthPage() {
             {/* The title grows only from `lg`: between 768 and 1023 px the column beside the card is about
                 200-430 px, and «VisuaLex» at 68 px is 272 px wide. */}
             <header className="flex flex-col items-center gap-4 text-center md:items-start md:gap-5 md:text-left">
-              <BookOpen aria-hidden="true" size={44} strokeWidth={1.5} className="text-primary-600 dark:text-primary-400" />
-              <h1 className="font-serif text-5xl font-medium leading-none tracking-tight text-slate-900 dark:text-slate-50 lg:text-[4.25rem]">
-                VisuaLex
-              </h1>
+              {/* The open book comes once the wordmark has melted out of its display (A2); its place is kept meanwhile. */}
+              <motion.span
+                aria-hidden="true"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: markSettled ? 1 : 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <BookOpen size={44} strokeWidth={1.5} className="text-primary-600 dark:text-primary-400" />
+              </motion.span>
+              <SegmentWordmark
+                className="font-serif text-5xl font-medium leading-none tracking-tight text-slate-900 dark:text-slate-50 lg:text-[4.25rem]"
+                onSettled={() => setMarkSettled(true)}
+              />
               <p className="max-w-[34ch] font-serif text-xl leading-relaxed text-slate-600 dark:text-slate-300">
                 Le norme italiane ed europee, le sentenze che le leggono, e il tuo lavoro sopra: note, evidenziazioni, dossier.
               </p>
