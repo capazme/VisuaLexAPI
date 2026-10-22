@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { WireConfirm } from '../WireConfirm';
@@ -219,5 +219,20 @@ describe('WireConfirm — a confirmation drawn from its button (K1b)', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Annulla' })).toHaveFocus());
     await user.keyboard('{Escape}');
     expect(closeSettings).not.toHaveBeenCalled();
+  });
+
+  it('makes the cancel the evident button when going back is wanted most (U1c), the focus still on it', async () => {
+    render(
+      <WireConfirm open emphasis="cancel" title="Interrompere?" message="…" confirmLabel="Interrompi" cancelLabel="Continua" onConfirm={vi.fn()} onCancel={vi.fn()} />,
+    );
+    const dialog = screen.getByRole('alertdialog');
+    const [first, second] = within(dialog).getAllByRole('button');
+    // The outlined confirmation first, the filled cancel on the right.
+    expect(first).toHaveAccessibleName('Interrompi');
+    expect(second).toHaveAccessibleName('Continua');
+    expect(second).toHaveClass('bg-toga-600');
+    expect(first).not.toHaveClass('bg-toga-600');
+    expect(first).not.toHaveClass('bg-red-600');
+    await waitFor(() => expect(second).toHaveFocus());
   });
 });

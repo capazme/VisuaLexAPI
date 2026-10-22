@@ -225,10 +225,12 @@ describe('the review session', () => {
       await screen.findByText('Domanda a?');
       fireEvent.keyDown(document.body, { key: 'Escape' });
       const dialog = await screen.findByRole('alertdialog', { name: 'Interrompere il ripasso?' });
-      expect(within(dialog).getByText('Le schede già valutate restano registrate.')).toBeInTheDocument();
+      // What happens, with the session's count (U1c).
+      expect(within(dialog).getByText('Non hai ancora valutato schede in questo ripasso. Le schede ti aspettano in «Oggi».')).toBeInTheDocument();
       // The dialog has the keyboard: space behind it shows nothing.
       fireEvent.keyDown(document.body, { key: ' ' });
       expect(screen.queryByText('Risposta a.')).not.toBeInTheDocument();
+      await waitFor(() => expect(dialog).toHaveAttribute('data-ready'));
       await userEvent.setup().click(within(dialog).getByRole('button', { name: 'Interrompi' }));
       expect(await screen.findByText('Landing')).toBeInTheDocument();
     });
@@ -237,7 +239,25 @@ describe('the review session', () => {
       renderSession([card('a')]);
       await screen.findByText('Domanda a?');
       await userEvent.setup().click(screen.getByRole('button', { name: 'Interrompi' }));
-      await userEvent.setup().click(await screen.findByRole('button', { name: 'Continua' }));
+      const dialog = await screen.findByRole('alertdialog', { name: 'Interrompere il ripasso?' });
+      await waitFor(() => expect(dialog).toHaveAttribute('data-ready'));
+      await userEvent.setup().click(within(dialog).getByRole('button', { name: 'Continua il ripasso' }));
+      await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+      expect(screen.getByText('Domanda a?')).toBeInTheDocument();
+    });
+
+    it('makes going on the evident action: filled, on the right, the focus on it, Esc going on (U1c)', async () => {
+      renderSession([card('a')]);
+      await screen.findByText('Domanda a?');
+      await userEvent.setup().click(screen.getByRole('button', { name: 'Interrompi' }));
+      const dialog = await screen.findByRole('alertdialog', { name: 'Interrompere il ripasso?' });
+      const [first, second] = within(dialog).getAllByRole('button');
+      expect(first).toHaveAccessibleName('Interrompi');
+      expect(second).toHaveAccessibleName('Continua il ripasso');
+      // No red: stopping destroys nothing.
+      expect(first.className).not.toMatch(/\bbg-red-/);
+      await waitFor(() => expect(second).toHaveFocus());
+      await userEvent.setup().keyboard('{Escape}');
       await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
       expect(screen.getByText('Domanda a?')).toBeInTheDocument();
     });

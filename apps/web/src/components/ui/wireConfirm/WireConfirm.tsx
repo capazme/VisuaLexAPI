@@ -36,6 +36,12 @@ export interface WireConfirmProps {
   onConfirm: () => void | Promise<string | null | void>;
   onCancel: () => void;
   /**
+   * Which button is the evident one: the confirmation (the default), or the cancel when going back is what one wants
+   * most — «Continua il ripasso» over «Interrompi» (U1c): then the cancel is filled and on the right, the confirmation
+   * outlined. The focus opens on the cancel and Esc is the cancel either way.
+   */
+  emphasis?: 'confirm' | 'cancel';
+  /**
    * The button the wire starts from and the focus goes back to. Pass it (`event.currentTarget`): Safari and a tap do not
    * focus a button they press. Absent, the element focused as it opens — right for a menu's entry, whose menu gives
    * the focus back to its trigger by code before the entry runs.
@@ -80,6 +86,7 @@ export function WireConfirm({
   onCancel,
   origin,
   onOutcomeDone,
+  emphasis = 'confirm',
 }: WireConfirmProps) {
   const still = Boolean(useReducedMotion());
   const id = useId();
@@ -242,6 +249,7 @@ export function WireConfirm({
             cancelLabel={cancelLabel}
             confirmLabel={confirmLabel}
             variant={variant}
+            emphasis={emphasis}
             still={still}
             paths={paths}
             ready={ready}
@@ -268,6 +276,7 @@ interface WireLayerProps {
   cancelLabel: string;
   confirmLabel: string;
   variant: 'default' | 'danger';
+  emphasis: 'confirm' | 'cancel';
   still: boolean;
   paths: WirePaths | null;
   ready: boolean;
@@ -279,7 +288,7 @@ interface WireLayerProps {
 }
 
 /** The backdrop, the wire and the card: one presence, so the wire winds back while the card goes. */
-function WireLayer({ id, title, message, cancelLabel, confirmLabel, variant, still, paths, ready, cardRef, cancelRef, confirmRef, onCancel, onConfirm }: WireLayerProps) {
+function WireLayer({ id, title, message, cancelLabel, confirmLabel, variant, emphasis, still, paths, ready, cardRef, cancelRef, confirmRef, onCancel, onConfirm }: WireLayerProps) {
   // Leaving, it takes no key and no click: an Enter during the rewind must not confirm.
   const present = useIsPresent();
   const ink = variant === 'danger' ? 'text-red-600 dark:text-red-400' : 'text-primary-600 dark:text-primary-400';
@@ -312,6 +321,18 @@ function WireLayer({ id, title, message, cancelLabel, confirmLabel, variant, sti
         ? { scaleY: 0.02, opacity: 0, transition: { duration: BACK_OUTLINE_S, ease: ease.inOut } }
         : { opacity: 0, transition: { duration: still ? 0.12 : BACK_CARD_S } },
   };
+
+  const confirmButton = (
+    <Button
+      ref={confirmRef}
+      variant={emphasis === 'cancel' ? 'secondary' : variant === 'danger' ? 'danger' : 'primary'}
+      size="sm"
+      className="min-h-[44px] md:min-h-9"
+      onClick={onConfirm}
+    >
+      {confirmLabel}
+    </Button>
+  );
 
   return (
     // Leaving, the layer still takes the clicks (they do not fall to the page under the rewind); the card takes none.
@@ -356,13 +377,13 @@ function WireLayer({ id, title, message, cancelLabel, confirmLabel, variant, sti
           <motion.p id={`${id}-message`} variants={row(1)} className="mt-2 text-sm leading-relaxed text-ink-600 dark:text-ink-300">
             {message}
           </motion.p>
-          <motion.div variants={row(2)} className="mt-5 flex justify-end gap-2">
-            <Button ref={cancelRef} variant="quiet" size="sm" className="min-h-[44px] md:min-h-9" onClick={onCancel}>
+          <motion.div variants={row(2)} className="mt-5 flex flex-wrap justify-end gap-2">
+            {/* The evident button on the right: the confirmation, or the cancel when it is the one wanted most. */}
+            {emphasis === 'cancel' && confirmButton}
+            <Button ref={cancelRef} variant={emphasis === 'cancel' ? 'primary' : 'quiet'} size="sm" className="min-h-[44px] md:min-h-9" onClick={onCancel}>
               {cancelLabel}
             </Button>
-            <Button ref={confirmRef} variant={variant === 'danger' ? 'danger' : 'primary'} size="sm" className="min-h-[44px] md:min-h-9" onClick={onConfirm}>
-              {confirmLabel}
-            </Button>
+            {emphasis === 'confirm' && confirmButton}
           </motion.div>
         </motion.div>
       </div>

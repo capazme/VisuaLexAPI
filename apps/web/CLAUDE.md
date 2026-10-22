@@ -984,7 +984,11 @@ card: a second key pressed between a post resolving and the re-render must not d
 Keys: space reveals (ignored on a focused button or link, in a field, under an `aria-modal` dialog or a
 `data-find-overlay` layer), 1–4 grade after the reveal, Esc closes the article first, then asks
 «Interrompere il ripasso?» while a card is on screen (with no card — the end, a failed read, the read on its way — it
-goes back to Oggi, as the header's button does); listed in the «?» dialog's «Ripasso» group.
+goes back to Oggi, as the header's button does); listed in the «?» dialog's «Ripasso» group. The question is K1b's
+`WireConfirm` drawn from the header's «Interrompi», for the button and for Esc alike (U1c), no icon, its words the
+session's count (`reviewStop.ts`: «Hai ripassato 4 schede: restano registrate. Le altre ti aspettano in «Oggi».»);
+going on is the evident action (`emphasis="cancel"`: «Continua il ripasso» filled and on the right, the focus on it,
+Esc), «Interrompi» outlined — nothing is destroyed, so no red.
 **The lesson** (Gymnasium spec `docs/superpowers/specs/2026-10-19-gymnasium-restyle-design.md` §5.4; the Studia screens
 spec §6 as rewritten for G2): the session is a screen of its own. `StudiaPage` draws it, with no heading of the area,
 in `LessonFrame`: portalled to the body in the `lesson` band (`z-[70]`, over the sidebar, the floating buttons, the
@@ -2062,7 +2066,8 @@ absent, the element focused as it opens, right for a menu's entry — `MenuButto
 by code before an entry runs, the Forum's card does the same by hand). A button its action disabled (busy) gets the
 focus back once enabled again. A wire leaves the button, meets the card on the edge
 that faces it (`wirePath.ts`, pure) and draws its outline both ways; where the ends meet the card appears, its rows
-rising one after the other (about 500 ms; the lead fades once it is there). «Annulla», Esc or a click outside wind it
+rising one after the other (about 500 ms; the lead fades once it is there). `emphasis="cancel"` makes the cancel the
+filled button, on the right, where going back is what one wants most (the lesson's «Interrompere il ripasso?»). «Annulla», Esc or a click outside wind it
 back into the button (about 300 ms) and give it the focus; leaving, the card is `inert`, so an Enter during the rewind
 confirms nothing, and the layer still takes the clicks, which do not fall to the page. Its buttons answer only once
 they have risen into sight (`READY_MS`, about 500 ms; `data-ready` on the card): a double tap on a button the card then

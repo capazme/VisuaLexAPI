@@ -6,7 +6,8 @@ import { Z_INDEX } from '../../../constants/zIndex';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { useAppStore } from '../../../store/useAppStore';
 import type { AncoraScheda, Materia, Progressi } from '../../../types/studia';
-import { ConfirmDialog } from '../../ui/ConfirmDialog';
+import { WireConfirm } from '../../ui/wireConfirm/WireConfirm';
+import { stopMessage } from './reviewStop';
 import { Toast } from '../../ui/Toast';
 import { DossierItemReader } from '../dossier/DossierItemReader';
 import { formatInterval } from './formatInterval';
@@ -235,6 +236,9 @@ export function ReviewSession() {
   const istituto = (materia && params.get('istituto')) || undefined;
 
   const [confirmStop, setConfirmStop] = useState(false);
+  // «Interrompi» in the header: the confirmation is drawn from it, whether it was pressed or Esc asked (U1c). Kept in
+  // state (a callback ref), as the confirmation reads it while rendering.
+  const [stopButton, setStopButton] = useState<HTMLButtonElement | null>(null);
   const [panel, setPanel] = useState<{ step: number; anchor: AncoraScheda } | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
 
@@ -375,6 +379,7 @@ export function ReviewSession() {
       <header className="relative shrink-0 px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
         <div className={cn(COLUMN, 'relative flex items-center gap-3')}>
           <button
+            ref={setStopButton}
             type="button"
             onClick={leave}
             aria-label={showCard ? 'Interrompi' : 'Chiudi'}
@@ -408,12 +413,16 @@ export function ReviewSession() {
         )}
       </header>
       {middle}
-      <ConfirmDialog
+      {/* K1b's confirmation, drawn from «Interrompi» (U1c): what happens, said with the session's count; going on is
+          the evident action (filled, the focus on it, Esc), stopping the outlined one; nothing destructive, no red. */}
+      <WireConfirm
         open={confirmStop}
         title="Interrompere il ripasso?"
-        message="Le schede già valutate restano registrate."
+        message={stopMessage(total - remaining)}
         confirmLabel="Interrompi"
-        cancelLabel="Continua"
+        cancelLabel="Continua il ripasso"
+        emphasis="cancel"
+        origin={stopButton}
         onConfirm={() => navigate(HOME_PATH)}
         onCancel={() => setConfirmStop(false)}
       />
