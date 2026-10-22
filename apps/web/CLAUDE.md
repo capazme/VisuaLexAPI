@@ -18,7 +18,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   columns from `lg`, three from `2xl`; `CardGroups`' `grid`), each with its front in Newsreader, its subject's dot,
   its state and its next review, and with one open the list is a column beside it; the filters (`CardFilters`) are one
   row from `lg` (the search a third, the selects, «Scritte da Claude» and «Da ripassare oggi»), behind «Filtri» under
-  1024 px; the act filter offers the acts of the cards listed,
+  1024 px; the search box's hint is «Cerca per istituto o domanda» from `sm`, «Cerca nelle schede» below (it was cut, Q1),
+  its name «Cerca nelle schede» and «Per istituto o domanda» its description at every width; the act filter offers the acts of the cards listed,
   keeping what a narrowed list hid until a deletion starts it over; each card shows the next review,
   `nextReviewLabel`, and «Da ripassare oggi» filters with `dovuteOggi`; «+ Nuova scheda», beside the page's
   title (portalled into `StudiaPage`'s `actionSlot`, from the outlet's context) and as the empty list's action, opens `CardFormDialog` with `{ kind: 'create' }` and no article (no
@@ -28,7 +29,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   to the top once the dialog's first focus lands, which had left «Materia» scrolled out; a 502/503/504 says the
   service is not available at the moment, only a call with no answer asks to check the connection), and is drawn only while
   Normattiva answers (`useCardSources` over `cardSourcesAnswer`, the cached `/health/detailed`, read once per
-  mount; until it answers the empty list says only «Non hai ancora schede.», with the sources down it points to an
+  mount; the empty list says «Non hai ancora schede.» and what a card is (Q1), then, once the sources answer, the solid
+  «Scrivi la prima scheda» (the same form); until they answer it says no way to begin, with the sources down it points to an
   article and promises nothing; after the first card is saved the title's button takes the focus); the detail proposes a draft
   («Proponi alla comunità» asks for the notice through `AcceptTextDialog`, the one place a text to
   accept is drawn — every word from the server's version, the body as `TextParagraphs` plain text) and
@@ -563,7 +565,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `secondary` (paper with an ink-200 hairline), `quiet` (text only) and `danger` (red-600) — `ghost` and
   `outline` are the earlier names of `quiet` and `secondary` —, no gradient, glow or hover lift, a minimum
   height of 36 px on a desktop and 44 px on a phone; `loading` keeps the label and puts a spinner in the
-  icon's place (`aria-busy`), `status="error" | "success"` shows the outcome of the last press. `Modal`
+  icon's place (`aria-busy`), `status="error" | "success"` shows the outcome of the last press. Its look is
+  `ui/buttonStyles.ts`'s `buttonClassName(variant, size)`, for a link that must look like one (the 404's «Torna alla
+  ricerca», `primary` `lg`: 44 px at every width). `Modal`
   enters in `dur.panel` on `ease.drawer`, growing from 0.97, and `Sheet` rises from its edge on the same
   timing (its «Chiudi» in ink-500, dark ink-400: over 3:1, since it is often the one way out); both only fade under reduced motion (`useReducedMotion`).
   `Sheet` gives the focus back to what had it as it opened, taken while it is first drawn: a field inside with
