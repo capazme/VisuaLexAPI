@@ -53,12 +53,34 @@ describe('ConnectedAppsSection', () => {
     fireEvent.click(await screen.findByRole('button', { name: /revoca claude code/i }));
     expect(revoke).not.toHaveBeenCalled();
     const dialog = await screen.findByRole('alertdialog');
+    // Its buttons answer once they have risen into sight (K1b).
+    await waitFor(() => expect(dialog).toHaveAttribute('data-ready'));
     fireEvent.click(within(dialog).getByRole('button', { name: /^revoca$/i }));
     await waitFor(() => expect(revoke).toHaveBeenCalledWith('grant-1'));
     // The row waits for «Revocata ✓» over its button (K1b), and cannot be revoked twice meanwhile.
     expect(screen.getByText('Claude Code')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /revoca claude code/i })).toBeDisabled();
     await waitFor(() => expect(screen.queryByText('Claude Code')).toBeNull(), { timeout: 3000 });
+  });
+
+  it('two apps revoked in a row both go, each once its tick has been said, and the confirmation keeps its words while it leaves', async () => {
+    const OTHER = { ...APP, id: 'grant-2', clientName: 'LibreLex' };
+    listConnectedApps.mockResolvedValue([APP, OTHER]);
+    revoke.mockResolvedValue(undefined);
+    render(<ConnectedAppsSection />);
+    for (const [name, app] of [[/revoca claude code/i, 'Claude Code'], [/revoca librelex/i, 'LibreLex']] as const) {
+      fireEvent.click(await screen.findByRole('button', { name }));
+      const dialog = await screen.findByRole('alertdialog');
+      await waitFor(() => expect(dialog).toHaveAttribute('data-ready'));
+      fireEvent.click(within(dialog).getByRole('button', { name: /^revoca$/i }));
+      // Leaving, it still names the app it revoked.
+      expect(dialog).toHaveTextContent(`${app} non potrà più accedere`);
+      await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull(), { timeout: 2000 });
+    }
+    await waitFor(() => {
+      expect(screen.queryByText('Claude Code')).toBeNull();
+      expect(screen.queryByText('LibreLex')).toBeNull();
+    }, { timeout: 5000 });
   });
 
   it('switches the permission to delete for one connection', async () => {

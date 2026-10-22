@@ -64,7 +64,9 @@ export function BulletinBoardPage() {
   const [editingEnv, setEditingEnv] = useState<SharedEnvironment | null>(null);
   const [deletingEnv, setDeletingEnv] = useState<SharedEnvironment | null>(null);
   // The deleted copy whose card waits for «Eliminata ✓» to go (K1b).
-  const deletedEnvId = useRef<string | null>(null);
+  const deletedEnvIds = useRef<string[]>([]);
+  // The copy the confirmation names, kept while it leaves (its title does not empty under the rewind).
+  const [shownEnv, setShownEnv] = useState<SharedEnvironment | null>(null);
   const [reviewingSuggestion, setReviewingSuggestion] = useState<EnvironmentSuggestion | null>(null);
   const [editingSuggestion, setEditingSuggestion] = useState<EnvironmentSuggestion | null>(null);
   const [aliasConflict, setAliasConflict] = useState<{ itemId: string; suggestedTrigger: string; existingAliasId?: string } | null>(null);
@@ -220,6 +222,7 @@ export function BulletinBoardPage() {
   // Delete handler
   const handleDeleteClick = (env: SharedEnvironment) => {
     setDeletingEnv(env);
+    setShownEnv(env);
   };
 
   /** The deletion; the card's menu button says «Eliminata» with its tick, and the card goes once it has said it. */
@@ -229,7 +232,7 @@ export function BulletinBoardPage() {
     setDeletingEnv(null);
     try {
       await sharedEnvironmentService.delete(env.id);
-      deletedEnvId.current = env.id;
+      deletedEnvIds.current.push(env.id);
       showToast('Copia pubblicata eliminata', 'success');
       return 'Eliminata';
     } catch (error: unknown) {
@@ -241,9 +244,9 @@ export function BulletinBoardPage() {
 
   // The deleted copy's card goes once its tick has said it; the focus it held goes to the next card's menu button.
   const dropDeletedEnv = () => {
-    const id = deletedEnvId.current;
+    // Oldest first: two deleted in a row each go when theirs has been said.
+    const id = deletedEnvIds.current.shift();
     if (!id) return;
-    deletedEnvId.current = null;
     const lost = document.activeElement === document.body || document.activeElement === null
       || document.activeElement?.closest('[data-shared-env]')?.getAttribute('data-shared-env') === id;
     const triggers = [...document.querySelectorAll<HTMLElement>('[data-shared-env] [aria-label^="Azioni su"]')];
@@ -649,7 +652,7 @@ export function BulletinBoardPage() {
       <WireConfirm
         open={deletingEnv !== null}
         variant="danger"
-        title={deletingEnv ? `Eliminare «${deletingEnv.title}» dai dossier pubblici?` : 'Eliminare dai dossier pubblici?'}
+        title={shownEnv ? `Eliminare «${shownEnv.title}» dai dossier pubblici?` : 'Eliminare dai dossier pubblici?'}
         message="La copia pubblicata, le sue versioni, i «Mi piace» e le segnalazioni vengono eliminati. Il tuo dossier resta com'è; chi l'ha già aggiunto ai suoi dossier ne conserva la copia."
         confirmLabel="Elimina definitivamente"
         onConfirm={handleDeleteConfirm}

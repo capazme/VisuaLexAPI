@@ -25,8 +25,12 @@ export function ConnectedAppsSection() {
   const [message, setMessage] = useState<string | null>(null);
   // The connection whose permission is being changed: its switch waits, so what it shows is what the server holds.
   const [switching, setSwitching] = useState<string | null>(null);
-  // The app revoked whose row waits for «Revocata ✓» to go, and the «Revoca» its confirmation was drawn from (K1b).
-  const [revoked, setRevoked] = useState<string | null>(null);
+  // The apps revoked whose rows wait for their «Revocata ✓» to go, oldest first (two revoked in a row each go when
+  // theirs has been said), and the «Revoca» a confirmation was drawn from (K1b).
+  const revokedQueue = useRef<string[]>([]);
+  const [revoked, setRevoked] = useState<string[]>([]);
+  // The app the confirmation names, kept while it leaves (its words do not empty under the rewind).
+  const [shownApp, setShownApp] = useState<ConnectedApp | null>(null);
   const [revokeFrom, setRevokeFrom] = useState<HTMLElement | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -77,7 +81,8 @@ export function ConnectedAppsSection() {
     try {
       await connectionsService.revoke(app.id);
       setMessage(`Collegamento con ${appName(app)} revocato.`);
-      setRevoked(app.id);
+      revokedQueue.current.push(app.id);
+      setRevoked([...revokedQueue.current]);
       return 'Revocata';
     } catch (error: unknown) {
       setMessage(getErrorMessage(error) ?? 'Impossibile revocare il collegamento.');
@@ -87,9 +92,9 @@ export function ConnectedAppsSection() {
 
   // The revoked app's row goes; the focus it held goes to the next app's «Revoca», else to the list's box.
   const dropRevoked = () => {
-    const id = revoked;
+    const id = revokedQueue.current.shift();
     if (!id) return;
-    setRevoked(null);
+    setRevoked([...revokedQueue.current]);
     const holder = listRef.current;
     const buttons = [...(holder?.querySelectorAll<HTMLButtonElement>('[data-revoke]') ?? [])];
     const at = buttons.findIndex((b) => b.dataset.revoke === id);
@@ -136,10 +141,11 @@ export function ConnectedAppsSection() {
                   type="button"
                   data-revoke={app.id}
                   // Revoked, it waits for its tick to go: no second revocation meanwhile.
-                  disabled={revoked === app.id}
+                  disabled={revoked.includes(app.id)}
                   onClick={(event) => {
                     setRevokeFrom(event.currentTarget);
                     setPending(app);
+                    setShownApp(app);
                   }}
                   aria-label={`Revoca ${appName(app)}`}
                   className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-300"
@@ -158,8 +164,8 @@ export function ConnectedAppsSection() {
         variant="danger"
         title="Revocare il collegamento?"
         message={
-          pending
-            ? `${appName(pending)} non potrà più accedere al tuo account. Per usarla di nuovo dovrai autorizzarla un’altra volta.`
+          shownApp
+            ? `${appName(shownApp)} non potrà più accedere al tuo account. Per usarla di nuovo dovrai autorizzarla un’altra volta.`
             : ''
         }
         confirmLabel="Revoca"

@@ -63,6 +63,9 @@ const BACK_OUTLINE_S = 0.18;
 const BACK_LEAD_S = 0.12;
 /** The lead fading once the card is open. */
 const LEAD_FADE_S = 0.2;
+/** When the buttons have risen into sight, in milliseconds (the third row's end); a fade under reduced motion. */
+const READY_MS = Math.round((CARD_AT + 2 * ROW_GAP + ROW_S) * 1000);
+const READY_STILL_MS = 120;
 
 const boxOf = (rect: DOMRect): Box => ({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });
 
@@ -88,6 +91,10 @@ export function WireConfirm({
   const [confirmed, setConfirmed] = useState(false);
   const [paths, setPaths] = useState<WirePaths | null>(null);
   const [outcome, setOutcome] = useState<{ label: string; box: Box } | null>(null);
+  const outcomeRef = useRef<{ label: string; box: Box } | null>(null);
+  // The buttons have risen into sight: before, a confirmation would run unseen (a double tap on a button the card
+  // then covers, on a phone).
+  const [ready, setReady] = useState(false);
   // The outcome waits for the card to be gone, so the two never overlap.
   const pendingOutcome = useRef<{ label: string; box: Box } | null>(null);
   const exited = useRef(true);
@@ -101,8 +108,8 @@ export function WireConfirm({
       setFrom(origin ?? (document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null));
       setConfirmed(false);
       setPaths(null);
-      // Opened again before the last one was gone: its outcome is not this one's.
-      setOutcome(null);
+      // Its buttons answer only once they are seen (`READY_MS`).
+      setReady(false);
     }
   }
   const outcomeDone = useRef(onOutcomeDone);
@@ -127,10 +134,16 @@ export function WireConfirm({
 
   useEffect(() => {
     if (!open) return;
-    pendingOutcome.current = null;
+    // An outcome still waiting for the last card to go (opened again before it went) is over: its caller is told.
+    if (pendingOutcome.current) {
+      pendingOutcome.current = null;
+      outcomeDone.current?.();
+    }
     exited.current = false;
+    const timer = window.setTimeout(() => setReady(true), still ? READY_STILL_MS : READY_MS);
     cancelRef.current?.focus({ preventScroll: true });
-  }, [open]);
+    return () => window.clearTimeout(timer);
+  }, [open, still]);
 
   // Closed: the focus goes back to the button at once, not after the rewind. A button its action disabled (busy) takes
   // it once enabled again, if nothing else took it meanwhile.
@@ -187,11 +200,23 @@ export function WireConfirm({
       outcomeDone.current?.();
       return;
     }
-    if (exited.current) setOutcome({ label, box });
-    else pendingOutcome.current = { label, box };
+    if (exited.current) show({ label, box });
+    else {
+      // One outcome waits at a time: one already waiting is over, and its caller told.
+      if (pendingOutcome.current) outcomeDone.current?.();
+      pendingOutcome.current = { label, box };
+    }
+  };
+
+  /** The tick over the button; one already there gives way, and its caller is told it is over. */
+  const show = (next: { label: string; box: Box }) => {
+    if (outcomeRef.current) outcomeDone.current?.();
+    outcomeRef.current = next;
+    setOutcome(next);
   };
 
   const endOutcome = useCallback(() => {
+    outcomeRef.current = null;
     setOutcome(null);
     outcomeDone.current?.();
   }, []);
@@ -199,7 +224,7 @@ export function WireConfirm({
   const onExitComplete = () => {
     exited.current = true;
     if (pendingOutcome.current) {
-      setOutcome(pendingOutcome.current);
+      show(pendingOutcome.current);
       pendingOutcome.current = null;
     }
   };
@@ -219,11 +244,14 @@ export function WireConfirm({
             variant={variant}
             still={still}
             paths={paths}
+            ready={ready}
             cardRef={cardRef}
             cancelRef={cancelRef}
             confirmRef={confirmRef}
             onCancel={onCancel}
-            onConfirm={() => void confirm()}
+            onConfirm={() => {
+              if (ready) void confirm();
+            }}
           />
         )}
       </AnimatePresence>
@@ -242,6 +270,7 @@ interface WireLayerProps {
   variant: 'default' | 'danger';
   still: boolean;
   paths: WirePaths | null;
+  ready: boolean;
   cardRef: RefObject<HTMLDivElement | null>;
   cancelRef: RefObject<HTMLButtonElement | null>;
   confirmRef: RefObject<HTMLButtonElement | null>;
@@ -250,7 +279,7 @@ interface WireLayerProps {
 }
 
 /** The backdrop, the wire and the card: one presence, so the wire winds back while the card goes. */
-function WireLayer({ id, title, message, cancelLabel, confirmLabel, variant, still, paths, cardRef, cancelRef, confirmRef, onCancel, onConfirm }: WireLayerProps) {
+function WireLayer({ id, title, message, cancelLabel, confirmLabel, variant, still, paths, ready, cardRef, cancelRef, confirmRef, onCancel, onConfirm }: WireLayerProps) {
   // Leaving, it takes no key and no click: an Enter during the rewind must not confirm.
   const present = useIsPresent();
   const ink = variant === 'danger' ? 'text-red-600 dark:text-red-400' : 'text-primary-600 dark:text-primary-400';
@@ -285,7 +314,8 @@ function WireLayer({ id, title, message, cancelLabel, confirmLabel, variant, sti
   };
 
   return (
-    <div className={cn('fixed inset-0', Z_INDEX.modal)} inert={!present || undefined}>
+    // Leaving, the layer still takes the clicks (they do not fall to the page under the rewind); the card takes none.
+    <div className={cn('fixed inset-0', Z_INDEX.modal)}>
       <motion.div
         aria-hidden
         className="absolute inset-0 bg-ink-950/30"
@@ -310,6 +340,10 @@ function WireLayer({ id, title, message, cancelLabel, confirmLabel, variant, sti
           aria-describedby={`${id}-message`}
           // A click on its text keeps the focus in it (the document's Tab trap brings it to the buttons).
           tabIndex={-1}
+          // Leaving, it takes no key and no click: an Enter during the rewind must not confirm.
+          inert={!present || undefined}
+          // Its buttons answer (they have risen into sight).
+          data-ready={ready || undefined}
           className="pointer-events-auto w-full max-w-sm rounded-2xl border border-ink-200 bg-white p-5 shadow-xl dark:border-ink-700 dark:bg-ink-900"
           variants={card}
           initial="hidden"

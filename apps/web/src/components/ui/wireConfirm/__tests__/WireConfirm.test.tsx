@@ -98,6 +98,7 @@ describe('WireConfirm — a confirmation drawn from its button (K1b)', () => {
     const user = userEvent.setup();
     render(<Busy />);
     await user.click(screen.getByRole('button', { name: 'Elimina' }));
+    await waitFor(() => expect(screen.getByRole('alertdialog')).toHaveAttribute('data-ready'));
     fireEvent.click(screen.getByRole('button', { name: 'Conferma' }));
     expect(screen.getByRole('button', { name: 'Elimina' })).toBeDisabled();
     act(() => (document.activeElement as HTMLElement | null)?.blur());
@@ -128,10 +129,47 @@ describe('WireConfirm — a confirmation drawn from its button (K1b)', () => {
     }
     render(<Removed />);
     await user.click(screen.getByRole('button', { name: 'Revoca' }));
+    await waitFor(() => expect(screen.getByRole('alertdialog')).toHaveAttribute('data-ready'));
     await user.click(screen.getByRole('button', { name: 'Conferma' }));
     expect(await screen.findByText('Revocata', {}, { timeout: 2000 })).toBeInTheDocument();
     expect(done).not.toHaveBeenCalled();
     await waitFor(() => expect(done).toHaveBeenCalledTimes(1), { timeout: 3000 });
+  });
+
+  it('takes no confirmation before its buttons have risen into sight: a double tap under it runs nothing unseen', async () => {
+    const onConfirm = vi.fn();
+    render(<Host onConfirm={onConfirm} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Elimina i miei dati' }));
+    // The second tap of a double tap, on the button now under it.
+    fireEvent.click(screen.getByRole('button', { name: 'Elimina i dati' }));
+    expect(onConfirm).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByRole('alertdialog')).toHaveAttribute('data-ready'));
+    fireEvent.click(screen.getByRole('button', { name: 'Elimina i dati' }));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it('a second outcome while the first one\'s tick shows: the first is over, its caller told, then the second', async () => {
+    const done = vi.fn();
+    function Twice() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>Revoca</button>
+          <WireConfirm open={open} title="Revocare?" message="…" onConfirm={async () => { setOpen(false); return 'Revocata'; }} onCancel={() => setOpen(false)} onOutcomeDone={done} />
+        </>
+      );
+    }
+    const user = userEvent.setup();
+    render(<Twice />);
+    for (let i = 0; i < 2; i += 1) {
+      await user.click(screen.getByRole('button', { name: 'Revoca' }));
+      await waitFor(() => expect(screen.getByRole('alertdialog')).toHaveAttribute('data-ready'));
+      await user.click(screen.getByRole('button', { name: 'Conferma' }));
+      if (i === 0) await screen.findByText('Revocata', {}, { timeout: 2000 });
+    }
+    // The first gave way to the second (the first tick still showing): its caller told then, not lost.
+    await waitFor(() => expect(done).toHaveBeenCalledTimes(1), { timeout: 1000 });
+    await waitFor(() => expect(done).toHaveBeenCalledTimes(2), { timeout: 3000 });
   });
 
   it('a click outside cancels', async () => {
@@ -148,6 +186,7 @@ describe('WireConfirm — a confirmation drawn from its button (K1b)', () => {
     const onConfirm = vi.fn(async () => 'Eliminati');
     render(<Host onConfirm={onConfirm} />);
     await user.click(screen.getByRole('button', { name: 'Elimina i miei dati' }));
+    await waitFor(() => expect(screen.getByRole('alertdialog')).toHaveAttribute('data-ready'));
     await user.click(screen.getByRole('button', { name: 'Elimina i dati' }));
     expect(onConfirm).toHaveBeenCalledTimes(1);
     // Seen over the button (the caller says it in words where a screen reader hears it).
@@ -159,6 +198,7 @@ describe('WireConfirm — a confirmation drawn from its button (K1b)', () => {
     const onConfirm = vi.fn(async () => { throw new Error('no'); });
     render(<Host onConfirm={onConfirm} />);
     await user.click(screen.getByRole('button', { name: 'Elimina i miei dati' }));
+    await waitFor(() => expect(screen.getByRole('alertdialog')).toHaveAttribute('data-ready'));
     await user.click(screen.getByRole('button', { name: 'Elimina i dati' }));
     await act(async () => { await new Promise((r) => setTimeout(r, 600)); });
     expect(screen.queryByText('Eliminati')).toBeNull();
