@@ -21,3 +21,12 @@ URLs (the `/eli/` URLs answer 202 to non-browsers). Three markups live here:
 Trimming: `str()` of the elements with the listed ids, assembled inside
 `<html><body>`. The capture and trim commands are in
 `docs/superpowers/plans/2026-09-19-archivio-visualex-extensions.md`, Task 1.
+
+Added 2026-10-22:
+
+- `eprivacy_eli_legacy_trimmed.html` — the `/eli/dir/2002/58/oj/ita` page as the scraper's
+  browser receives it: a legacy act with no `DC.description`, no `oj-doc-ti`, no
+  `title-doc-last`, only the ELI metadata naming the act in 23 languages
+  (`<meta property="eli:title" lang="…">`). Trimmed to `<title>`, those metas and `#TexteOnly`.
+- `synthetic_oj_article_15_bis.html` — **synthetic**, written for the test: an OJ-style act
+  whose only article 15 is «Articolo 15 bis». No real page with that shape is known.
