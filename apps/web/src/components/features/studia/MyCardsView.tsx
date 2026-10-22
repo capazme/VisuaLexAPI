@@ -325,7 +325,7 @@ export function MyCardsView() {
       <div className={cn(beside && 'grid grid-cols-[minmax(0,5fr)_minmax(0,7fr)] items-start gap-6')}>
         {showList && (
           <div className="min-w-0">
-            <CardFilters value={filterState} onChange={setFilterState} search={search} onSearchChange={setSearch} acts={actOptions} />
+            <CardFilters value={filterState} onChange={setFilterState} search={search} onSearchChange={setSearch} acts={actOptions} row={!beside} />
             <div className="pt-4">
               {error && (
                 <div role="alert" className="mb-3 flex flex-wrap items-center gap-x-3 text-sm text-red-700 dark:text-red-400">

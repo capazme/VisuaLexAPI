@@ -101,9 +101,10 @@ afterEach(() => {
 describe('«Le mie schede», the list', () => {
   it('groups the cards by subject and institute, in the order the server gives', async () => {
     renderView();
-    await screen.findByRole('heading', { level: 3, name: /Diritto civile/ });
-    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Diritto civile3 schede', 'Diritto penale2 schede']);
-    expect(screen.getAllByRole('heading', { level: 4 }).map((h) => h.textContent)).toEqual([
+    // Under the page's title (the frame's h1): the subjects h2, their institutes h3.
+    await screen.findByRole('heading', { level: 2, name: /Diritto civile/ });
+    expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Diritto civile3 schede', 'Diritto penale2 schede']);
+    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
       'Contratto1 scheda', 'Risoluzione per inadempimento2 schede', 'Reato2 schede',
     ]);
     expect(screen.getAllByRole('link')).toHaveLength(5);
@@ -166,6 +167,10 @@ describe('«Le mie schede», the list', () => {
     renderView('/studia/schede/r1');
     await screen.findByRole('article', { name: 'Scheda' });
     expect(screen.getByRole('link', { name: /Domanda r1\?/ }).closest('ul')).not.toHaveClass('lg:grid-cols-2');
+    // The filters keep the narrow column's layout: the search across it, not a third of a row.
+    const filters = screen.getByRole('group', { name: 'Filtri' });
+    expect(filters.className).not.toMatch(/\blg:flex\b/);
+    expect(screen.getByRole('searchbox', { name: 'Cerca nelle schede' }).closest('div.flex')?.className).not.toMatch(/lg:w-1\/3/);
   });
 
   it('draws «+ Nuova scheda» beside the page\'s title, in the place the frame gives it', async () => {

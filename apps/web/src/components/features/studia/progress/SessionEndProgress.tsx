@@ -1,6 +1,6 @@
 import type { Progressi } from '../../../../types/studia';
 import { GoalRing } from './GoalRing';
-import { WeekRow } from './StatsBand';
+import { WeekRow } from './WeekRow';
 import { StreakBadge } from './StreakBadge';
 
 /**

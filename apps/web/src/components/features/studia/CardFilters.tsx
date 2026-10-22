@@ -16,6 +16,11 @@ export interface CardFiltersProps {
   onSearchChange: (text: string) => void;
   /** The acts the user's cards rest on, labelled by the source convention. */
   acts: ActOption[];
+  /**
+   * One row from `lg` (G8): the list has the page's width. Beside an open card the list is a narrow column, where the
+   * row would squeeze the search: there the search keeps the column's width and the rest wraps under it from `md`.
+   */
+  row?: boolean;
 }
 
 // 44 px at every width (Gymnasium spec §3): the row is short enough to afford it on a computer too.
@@ -58,7 +63,7 @@ function FilterSelect<T extends string>({ label, all, value, options, disabled, 
  * wrapping only where the window is too narrow for them; under 1024 px the selects fold behind «Filtri», so the row
  * does not take the screen.
  */
-export function CardFilters({ value, onChange, search, onSearchChange, acts }: CardFiltersProps) {
+export function CardFilters({ value, onChange, search, onSearchChange, acts, row = true }: CardFiltersProps) {
   const [open, setOpen] = useState(false);
   const active = [value.materia, value.stato, value.tipo, value.normaKey].filter(Boolean).length + (value.daRileggere ? 1 : 0) + (value.dovuteOggi ? 1 : 0);
 
@@ -70,11 +75,11 @@ export function CardFilters({ value, onChange, search, onSearchChange, acts }: C
       // under the bar at the top (`--phone-bar-offset`, set by `Layout`), and moves up with it when the bar slides away.
       className={cn(
         'sticky top-[var(--phone-bar-offset,0px)] transition-[top] duration-200 ease-out motion-reduce:transition-none -mx-4 space-y-2 border-b border-current/10 bg-slate-50 px-4 pb-2 pt-2 md:-mx-2 md:px-2 dark:bg-slate-950',
-        'lg:flex lg:items-start lg:gap-2 lg:space-y-0',
+        row && 'lg:flex lg:items-start lg:gap-2 lg:space-y-0',
         Z_INDEX.sticky,
       )}
     >
-      <div className="flex gap-2 lg:w-1/3 lg:shrink-0">
+      <div className={cn('flex gap-2', row && 'lg:w-1/3 lg:shrink-0')}>
         <div className="relative min-w-0 flex-1">
           <Search size={16} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
           <input
@@ -91,13 +96,19 @@ export function CardFilters({ value, onChange, search, onSearchChange, acts }: C
           type="button"
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
-          className={cn(CONTROL, 'inline-flex shrink-0 items-center gap-2 lg:hidden')}
+          className={cn(CONTROL, 'inline-flex shrink-0 items-center gap-2', row ? 'lg:hidden' : 'md:hidden')}
         >
           <SlidersHorizontal size={16} aria-hidden />
           {active > 0 ? `Filtri (${active})` : 'Filtri'}
         </button>
       </div>
-      <div className={cn('grid-cols-2 gap-2 lg:flex lg:min-w-0 lg:flex-1 lg:flex-wrap lg:items-center', open ? 'grid' : 'hidden lg:flex')}>
+      <div
+        className={cn(
+          'grid-cols-2 gap-2',
+          row ? 'lg:flex lg:min-w-0 lg:flex-1 lg:flex-wrap lg:items-center' : 'md:flex md:flex-wrap md:items-center',
+          open ? 'grid' : cn('hidden', row ? 'lg:flex' : 'md:flex'),
+        )}
+      >
         <FilterSelect
           label="Materia"
           all="Tutte le materie"
@@ -137,7 +148,8 @@ export function CardFilters({ value, onChange, search, onSearchChange, acts }: C
           onClick={() => onChange({ ...value, daRileggere: !value.daRileggere })}
           className={cn(
             CONTROL,
-            'col-span-2 text-left lg:col-span-1 lg:whitespace-nowrap lg:text-center',
+            'col-span-2 text-left',
+            row ? 'lg:col-span-1 lg:whitespace-nowrap lg:text-center' : 'md:col-span-1 md:text-center',
             value.daRileggere && PRESSED,
           )}
         >
@@ -149,7 +161,8 @@ export function CardFilters({ value, onChange, search, onSearchChange, acts }: C
           onClick={() => onChange({ ...value, dovuteOggi: !value.dovuteOggi })}
           className={cn(
             CONTROL,
-            'col-span-2 text-left lg:col-span-1 lg:whitespace-nowrap lg:text-center',
+            'col-span-2 text-left',
+            row ? 'lg:col-span-1 lg:whitespace-nowrap lg:text-center' : 'md:col-span-1 md:text-center',
             value.dovuteOggi && PRESSED,
           )}
         >

@@ -204,7 +204,7 @@ function EndScreen({ summary, day, more, onHome, onContinue }: EndScreenProps) {
               {more ? 'Continua' : 'Torna a Oggi'}
             </button>
             {more && (
-              <button type="button" onClick={onHome} className={QUIET_BUTTON}>
+              <button type="button" onClick={onHome} className={cn(QUIET_BUTTON, 'mx-0 justify-self-center text-center')}>
                 Torna a Oggi
               </button>
             )}

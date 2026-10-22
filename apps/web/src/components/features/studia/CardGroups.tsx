@@ -74,11 +74,11 @@ export function CardGroups({ groups, selectedId, folded, onToggleFold, grid = fa
         const total = group.istituti.reduce((sum, institute) => sum + institute.cards.length, 0);
         return (
           <section key={group.materia} aria-label={MATERIA_LABEL[group.materia]} className="min-w-0">
-            <h3 className="flex flex-wrap items-baseline gap-x-2 pb-1 font-serif text-lg font-medium tracking-tight text-slate-900 dark:text-slate-50">
+            <h2 className="flex flex-wrap items-baseline gap-x-2 pb-1 font-serif text-lg font-medium tracking-tight text-slate-900 dark:text-slate-50">
               <span aria-hidden className="h-2.5 w-2.5 shrink-0 self-center rounded-full" style={{ backgroundColor: subjectHue(group.materia) }} />
               {MATERIA_LABEL[group.materia]}
               <span className={cn('font-sans text-xs font-normal', MUTED_TEXT)}>{count(total)}</span>
-            </h3>
+            </h2>
             {/* On the page's paper, not in a tile: the cards are the tiles. */}
             <div className="border-b border-slate-200 dark:border-slate-800">
               {group.istituti.map((institute) => {
@@ -86,7 +86,7 @@ export function CardGroups({ groups, selectedId, folded, onToggleFold, grid = fa
                 const isFolded = folded.has(key);
                 return (
                   <div key={key} className="border-t border-slate-200 dark:border-slate-800">
-                    <h4>
+                    <h3>
                       <button
                         type="button"
                         aria-expanded={!isFolded}
@@ -101,7 +101,7 @@ export function CardGroups({ groups, selectedId, folded, onToggleFold, grid = fa
                         <span className="min-w-0 flex-1 break-words">{institute.istituto}</span>
                         <span className={cn('shrink-0 text-xs font-normal', MUTED_TEXT)}>{count(institute.cards.length)}</span>
                       </button>
-                    </h4>
+                    </h3>
                     {!isFolded && (
                       <ul className={cn('grid gap-2 pb-4 pt-1', grid && 'lg:grid-cols-2 2xl:grid-cols-3')}>
                         {institute.cards.map((card) => (

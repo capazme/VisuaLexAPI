@@ -5,7 +5,7 @@ import { cn } from '../../../../lib/utils';
 import type { Progressi } from '../../../../types/studia';
 import { GoalStamp } from '../progress/Celebration';
 import { todayState } from '../progress/today';
-import { BLOCK_HEADING, MUTED_TEXT, QUIET_BUTTON, TILE } from '../progress/tokens';
+import { BLOCK_HEADING, QUIET_BUTTON, TILE } from '../progress/tokens';
 import { MISSION_INK_MS, MissionRow } from './MissionMark';
 import { missionOrder, missionSummary, todayMissions, type Mission } from './missions';
 import { useFreshMissions } from '../progress/seenProgress';
@@ -71,16 +71,15 @@ function MissionsOfToday({ day, missions, children }: { day: Progressi; missions
  * rows — the mark, the title, «4 di 16», the points and a bar of 4 px — and the summary «2 di 3». The action is the day
  * block's, above; the goal's row takes the stamp once met. The targets are settings, not missions: one line under the
  * rows opens them («Obiettivo e nuove al giorno: nelle impostazioni»). While the first read travels the card holds its
- * size; a failed read, or no card at all, is the day block's to say.
+ * size; a failed read, or no card at all, is the day block's to say (no card is drawn then).
  */
 export function TodayMissions({ day, dayFailed, onOpenSettings, settingsPanel, celebrate, stampRef }: TodayMissionsProps) {
   const state = todayState(day, dayFailed, false);
   const missions = day && (state === 'todo' || state === 'done') ? todayMissions(day) : null;
-  // A server without the points (#253) sends no missions: no card at all, rather than «0 di 0» over nothing.
-  if (state === 'unread' || missions?.length === 0) return null;
-  // A server without the points (#253) sends no missions: the day's action stands alone, with no «0 di 0».
-  const bare = missions !== null && missions.length === 0;
-  const summary = missions && !bare ? missionSummary(missions) : null;
+  // A failed read and no card at all are the day block's to say; a server without the points (#253) sends no
+  // missions: no card at all, rather than «0 di 0» over nothing.
+  if (state === 'unread' || state === 'empty' || missions?.length === 0) return null;
+  const summary = missions ? missionSummary(missions) : null;
   const met = day?.oggi.raggiunto ?? false;
   // No new card to be had: the settings open on the community's subjects, where more can come from.
   const noNewCards = missions?.some((mission) => mission.id === 'nuove' && mission.status === 'vuota') ?? false;
@@ -88,9 +87,9 @@ export function TodayMissions({ day, dayFailed, onOpenSettings, settingsPanel, c
   return (
     <section aria-labelledby="studia-missioni" aria-busy={state === 'loading'} className={cn(TILE, 'px-4 pb-1 pt-4 md:px-6 md:pt-5')}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h3 id="studia-missioni" className={BLOCK_HEADING}>
+        <h2 id="studia-missioni" className={BLOCK_HEADING}>
           Le missioni di oggi
-        </h3>
+        </h2>
         {summary && (
           <p className="text-sm font-medium tabular-nums text-slate-700 dark:text-slate-200">
             {`${summary.done} di ${summary.of}`}
@@ -111,8 +110,6 @@ export function TodayMissions({ day, dayFailed, onOpenSettings, settingsPanel, c
           ))}
         </div>
       )}
-
-      {state === 'empty' && <p className={cn('max-w-prose pb-3 pt-2 text-sm', MUTED_TEXT)}>Le missioni partono dalla prima scheda.</p>}
 
       {missions && day && (
         <>

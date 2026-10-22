@@ -36,7 +36,7 @@ function pageName(pathname: string): string {
 /** The review session is the lesson, a screen of its own (Gymnasium spec §5.4). */
 const isLesson = (pathname: string) => /^\/studia\/ripasso\/sessione(\/|$)/.test(pathname);
 
-/** The streak and the goal over «Le mie schede» and «Da validare» (Gymnasium spec §5.1): the reward stays in sight. */
+/** The streak and the goal over «Da validare» (Gymnasium spec §5.1): the reward stays in sight. */
 function AreaStrip() {
   const progress = useProgress(undefined);
   return <StudyStrip dense data={progress.data} loading={progress.status === 'loading' && progress.data === null} onSettingsChanged={progress.reload} />;

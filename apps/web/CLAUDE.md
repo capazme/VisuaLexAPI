@@ -1136,7 +1136,7 @@ level, never as «+XP» in the lesson (spec §5.3).
 (L-37; «I tuoi progressi» stays the section's heading for a screen reader only), then: **the summary** (`StreakBadge compact` and `GoalRing compact`, always the whole
 day's, as the server's streak and goal are; the reviews of 30 days are the trend's total only — G7, Bill: the sum of
 `materie[].ripassi30`, the review log joined to the cards, and the calendar's daily counters are two counts of one
-thing, which part when cards are deleted for good, and read as two answers); **the subject chips** (`SubjectChips`, 44 px at every width — Oggi's too —, the subject «Oggi» remembers, and a line saying
+thing, which part when cards are deleted for good, and read as two answers); **the subject chips** (`SubjectChips`, 44 px at every width, the subject «Oggi» remembers — «Oggi» chooses it in «Le tue materie» since G8 —, and a line saying
 what it narrows); **«Il tuo andamento»** (`ReviewTrend`, G7, which replaced the calendar: see below); then, side by side
 from `lg`, **«Le schede per stato»** (`CardStatesBar`: the bar's segments are buttons as before, each a 44 px box at every width with its colour
 drawn 28 px tall inside on a computer, and under it the

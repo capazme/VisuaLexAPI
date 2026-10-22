@@ -114,7 +114,7 @@ from a gear in the header of **Oggi** — since G1b, in its statistics band (§5
 tuoi progressi», under its heading: the card grows downward (about 200 ms; at once under reduced motion), no window
 and no veil; the gear again or Esc closes them and the focus goes back to the gear. The two numbers save when their
 field is left (or on Enter) with a discreet «Salvato», no «Salva» each; the community's subjects sit one level down,
-closed, «Schede della comunità · N di 5». The missions' «Cambia…» buttons open the same panel and take the focus there
+closed, «Schede della comunità · N di 5». The missions' «Cambia…» buttons (since G8, the one line under the missions) open the same panel and take the focus there
 («Accendi le schede della comunità» with the subjects open). The strip over «Le mie schede» and «Da validare» keeps
 the sheet.
 

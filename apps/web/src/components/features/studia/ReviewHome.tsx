@@ -38,7 +38,10 @@ const ASIDE = 'xl:col-start-2 xl:row-span-full xl:self-start';
  * window and the settings are closed: taller, its foot must scroll into reach.
  */
 const STICK = 'xl:sticky xl:top-8';
-/** The confetti fall over the day, the missions and the band: rows 1–3 in one column, rows 1–2 across both from `xl`. */
+/**
+ * The confetti fall over the day, the missions and the right column's box (the band and the subjects): rows 1–3 in one
+ * column, rows 1–2 across both from `xl`.
+ */
 const BURST = 'xl:col-span-full xl:row-end-3';
 /** `STICK`'s top, and as much again under the column. */
 const STICK_GAP = 32;
@@ -143,7 +146,7 @@ export function ReviewHome() {
           settingsPanel={STUDY_SETTINGS_PANEL}
         />
       </div>
-      <div className={cn('min-w-0', split && LEFT)}>
+      <div className={cn('min-w-0 empty:hidden', split && LEFT)}>
         <TodayMissions
           day={data}
           dayFailed={day.status === 'error'}

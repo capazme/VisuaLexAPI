@@ -273,7 +273,8 @@ describe('ReviewHome', () => {
     expect(screen.getByText(/apri un articolo dalla/)).toHaveTextContent('«+ Nuova scheda» sotto il testo');
     expect(screen.getByRole('link', { name: 'Ricerca' })).toHaveAttribute('href', '/');
     expect(screen.queryByRole('button', { name: START })).toBeNull();
-    expect(screen.getByText('Le missioni partono dalla prima scheda.')).toBeInTheDocument();
+    // Said once, in the day block: no missions card under it.
+    expect(screen.queryByRole('region', { name: 'Le missioni di oggi' })).toBeNull();
     // A button, not a link (G8): it opens the settings at the community's subjects.
     const day = screen.getByRole('region', { name: 'Il ripasso di oggi' });
     await userEvent.setup().click(within(day).getByRole('button', { name: 'Accendi le schede della comunità' }));
@@ -556,6 +557,25 @@ describe('ReviewHome', () => {
       expect(gear).toHaveFocus();
     });
 
+    it('lets the right column scroll with the page when it is taller than the window (G8)', async () => {
+      const Observer = globalThis.ResizeObserver;
+      const height = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight');
+      globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} } as unknown as typeof ResizeObserver;
+      Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, get: () => window.innerHeight });
+      try {
+        progress.mockResolvedValue(answer(1, 1));
+        renderHome();
+        const stats = await screen.findByRole('region', { name: 'I tuoi progressi' });
+        // As tall as the window: with 32 px above and below it does not fit, so it is not sticky.
+        await waitFor(() => expect(stats.parentElement).not.toHaveClass('xl:sticky'));
+        expect(stats.parentElement).toHaveClass('xl:col-start-2');
+      } finally {
+        globalThis.ResizeObserver = Observer;
+        if (height) Object.defineProperty(HTMLElement.prototype, 'offsetHeight', height);
+        else delete (HTMLElement.prototype as { offsetHeight?: number }).offsetHeight;
+      }
+    });
+
     it('lets the right column scroll with the page while the settings are open (G6)', async () => {
       progress.mockResolvedValue(answer(1, 1));
       renderHome();
@@ -644,7 +664,8 @@ describe('ReviewHome', () => {
       renderHome();
       const civile = await subjectRow('Diritto civile');
       expect(await within(civile).findByText('7 oggi')).toBeInTheDocument();
-      expect(civile).toHaveTextContent('7 oggi da ripassare');
+      // Said «7 da ripassare oggi» to a screen reader; «7 oggi» to the eye.
+    expect(within(civile).getByText(', 7 da ripassare oggi')).toHaveClass('sr-only');
       expect(await subjectRow('Diritto penale')).toHaveTextContent('0 oggi');
       expect(percorso).toHaveBeenCalledTimes(1);
       expect(percorso).toHaveBeenCalledWith();

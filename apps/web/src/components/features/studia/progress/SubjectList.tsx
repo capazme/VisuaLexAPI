@@ -4,7 +4,7 @@ import { cn } from '../../../../lib/utils';
 import type { Materia, Progressi } from '../../../../types/studia';
 import { MATERIA_LABEL } from '../studiaLabels';
 import { InstituteStops } from './InstituteStops';
-import { totalCards } from './layout';
+import { formatCount, totalCards } from './layout';
 import { dueBySubject, orderStops, stopStates } from './today';
 import { BLOCK_HEADING, FOCUS_RING, INK_BORDER, INK_TEXT, MUTED_TEXT, SECONDARY_BUTTON, TILE, subjectHue } from './tokens';
 import type { PercorsoState } from './usePercorso';
@@ -38,7 +38,8 @@ const IDLE = 'border-slate-200 text-slate-800 hover:bg-slate-50 dark:border-slat
  * One scrolling row of cards on a phone (G8: not three lines of chips), its bar not drawn; from `md` a list, one row a
  * subject.
  */
-const LIST = cn('-mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-1 md:mx-0 md:grid md:gap-1.5 md:overflow-visible md:px-0 md:pb-0', HIDDEN_SCROLLBAR);
+// Padded by the focus ring's 4 px all round, and the same taken back by the margins, so the scroller never cuts it.
+const LIST = cn('-m-1 flex snap-x gap-2 overflow-x-auto p-1 md:m-0 md:grid md:gap-1.5 md:overflow-visible md:p-0', HIDDEN_SCROLLBAR);
 const ITEM = 'w-60 shrink-0 snap-start md:w-auto';
 
 /**
@@ -58,9 +59,9 @@ export function SubjectList({ materie, loading, reloading, selected, onSelect, p
   if (!materie) {
     return (
       <section aria-labelledby="studia-materie" aria-busy={loading} className="space-y-3">
-        <h3 id="studia-materie" className={BLOCK_HEADING}>
+        <h2 id="studia-materie" className={BLOCK_HEADING}>
           Le tue materie
-        </h3>
+        </h2>
         {loading ? (
           <div aria-hidden className={LIST}>
             {Array.from({ length: 6 }, (_, index) => (
@@ -79,9 +80,9 @@ export function SubjectList({ materie, loading, reloading, selected, onSelect, p
   const chosen = selected ? stops.find((stop) => stop.materia === selected) : undefined;
   return (
     <section aria-labelledby="studia-materie" className={cn('space-y-3 transition-opacity', reloading && 'opacity-60')} aria-busy={reloading}>
-      <h3 id="studia-materie" className={BLOCK_HEADING}>
+      <h2 id="studia-materie" className={BLOCK_HEADING}>
         Le tue materie
-      </h3>
+      </h2>
       <div role="group" aria-label="Materia">
         <ul className={LIST}>
           <li className={cn(ITEM, 'w-auto')}>
@@ -111,8 +112,8 @@ export function SubjectList({ materie, loading, reloading, selected, onSelect, p
                     <span className="flex shrink-0 items-center gap-2.5">
                       {due ? (
                         <span className={cn('text-sm tabular-nums', dovute > 0 ? cn('font-semibold', INK_TEXT) : cn('font-normal', MUTED_TEXT))}>
-                          {`${dovute} oggi`}
-                          <span className="sr-only"> da ripassare</span>
+                          <span aria-hidden>{`${formatCount(dovute)} oggi`}</span>
+                          <span className="sr-only">{`, ${formatCount(dovute)} da ripassare oggi`}</span>
                         </span>
                       ) : (
                         percorso.status === 'loading' && <span aria-hidden className="h-4 w-12 rounded bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800/60" />
@@ -142,9 +143,9 @@ export function SubjectList({ materie, loading, reloading, selected, onSelect, p
       </div>
       {chosen && totalCards(chosen) > 0 && (
         <section aria-labelledby="studia-istituti" className={cn(TILE, 'space-y-2 p-3')}>
-          <h4 id="studia-istituti" className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+          <h3 id="studia-istituti" className="text-sm font-semibold text-slate-700 dark:text-slate-200">
             {`Gli istituti di ${MATERIA_LABEL[chosen.materia]}`}
-          </h4>
+          </h3>
           <InstituteStops materia={chosen.materia} percorso={percorso} onRetry={onRetryPercorso} />
         </section>
       )}

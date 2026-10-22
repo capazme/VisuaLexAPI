@@ -14,7 +14,7 @@ import { VoteBar } from './VoteBar';
 import { recordXpSeen } from './progress/seenProgress';
 import { gainOf, gainWords } from './progress/xpGains';
 import type { StudiaOutletContext } from './StudiaPage';
-import { BLOCK_HEADING, FOCUS_RING, INK_TEXT, MUTED_TEXT, TILE } from './progress/tokens';
+import { FOCUS_RING, INK_TEXT, MUTED_TEXT, TILE } from './progress/tokens';
 
 const STORAGE_KEY = 'visualex.studia.valida.materia';
 const MEASURE = 'max-w-[60ch]';
@@ -160,8 +160,9 @@ export function ValidationQueueView() {
 
   return (
     <section className="flex min-h-0 flex-col gap-4">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className={BLOCK_HEADING}>Da validare</h2>
+      <header className="flex flex-wrap items-center justify-end gap-3">
+        {/* The page's title says «Da validare» (L-37): this names the view for a screen reader only. */}
+        <h2 className="sr-only">Da validare</h2>
         <div className="w-full md:w-64">
           <FormSelect aria-label="Materia" value={materia ?? ''} onChange={(e) => chooseMateria(e.target.value)} className="min-h-[44px] rounded-xl">
             <option value="">Tutte le materie</option>

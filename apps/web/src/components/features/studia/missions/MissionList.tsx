@@ -66,18 +66,18 @@ export function MissionList({ data, loading }: MissionListProps) {
   return (
     <section aria-labelledby="studia-tutte" className="space-y-3">
       <div className="space-y-1">
-        <h3 id="studia-tutte" className={BLOCK_HEADING}>
+        <h2 id="studia-tutte" className={BLOCK_HEADING}>
           Tutte le missioni
-        </h3>
+        </h2>
         <p className={cn('max-w-prose text-sm', MUTED_TEXT)}>Le tre di oggi sono qui sopra.</p>
       </div>
       {groups.length > 0 && (
         <div className={cn(TILE, 'divide-y divide-slate-100 px-4 dark:divide-slate-800 md:px-6')}>
           {groups.map(({ group, label }) => (
             <section key={group} aria-labelledby={`studia-missioni-${group}`} className="py-4">
-              <h4 id={`studia-missioni-${group}`} className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+              <h3 id={`studia-missioni-${group}`} className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                 {label}
-              </h4>
+              </h3>
               <ul aria-labelledby={`studia-missioni-${group}`}>
                 {active
                   .filter((mission) => mission.group === group)
