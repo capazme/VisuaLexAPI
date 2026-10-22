@@ -174,7 +174,7 @@ export function ArticleGraphSideRail({
       )}
       <aside
         className={cn(
-          'fixed z-40 flex flex-col border-slate-200 bg-white shadow-xl transition-transform duration-200 dark:border-slate-700 dark:bg-slate-900',
+          'fixed z-40 flex flex-col border-slate-200 bg-white shadow-lg transition-transform duration-200 dark:border-slate-700 dark:bg-slate-900',
           mode === 'bottom-sheet'
             ? 'inset-x-0 bottom-0 h-[55vh] rounded-t-2xl border-t'
             : 'right-0 top-0 h-full w-[340px] max-w-[90vw] border-l',

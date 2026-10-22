@@ -155,7 +155,7 @@ export function StudyModeToolsPanel({
           style={{ touchAction: 'pan-y' }}
           className={cn(
             // Base styles
-            "absolute z-10 flex flex-col shadow-xl",
+            "absolute z-10 flex flex-col shadow-md",
             // Mobile: bottom sheet style. `overscroll-contain` stops the
             // content scroll from bubbling up to the article body (rubber
             // banding past the top of the notes list was pulling the
@@ -252,7 +252,7 @@ export function StudyModeToolsPanel({
                       <p className={cn("text-sm whitespace-pre-wrap pr-6 leading-relaxed", styles.text)}>
                         {note.text}
                       </p>
-                      <p className={cn("text-[10px] mt-2 font-medium opacity-60", styles.muted)}>
+                      <p className={cn("text-[11px] mt-2 font-medium opacity-60", styles.muted)}>
                         {new Date(note.createdAt).toLocaleString()}
                       </p>
                       <button
@@ -352,7 +352,7 @@ export function StudyModeToolsPanel({
                   <Send size={16} />
                 </button>
               </div>
-              <p className={cn("text-[10px] mt-1.5 text-right opacity-70", styles.muted)}>
+              <p className={cn("text-[11px] mt-1.5 text-right opacity-70", styles.muted)}>
                 Premi ⌘+Enter per salvare
               </p>
             </div>

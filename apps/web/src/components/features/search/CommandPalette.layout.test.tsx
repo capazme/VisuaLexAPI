@@ -179,7 +179,7 @@ describe('CommandPalette — growing out of the field (R2)', () => {
     const computed = window.getComputedStyle.bind(window);
     vi.spyOn(window, 'getComputedStyle').mockImplementation((el: Element, pseudo?: string | null) => {
       const style = computed(el, pseudo);
-      if (!(el instanceof HTMLElement) || !el.classList.contains('shadow-xl')) return style;
+      if (!(el instanceof HTMLElement) || !el.classList.contains('shadow-lg')) return style;
       return new Proxy(style, {
         get: (target, key) => {
           if (key === 'clipPath') return caught;
@@ -238,7 +238,7 @@ describe('CommandPalette — growing out of the field (R2)', () => {
     const computed = window.getComputedStyle.bind(window);
     vi.spyOn(window, 'getComputedStyle').mockImplementation((el: Element, pseudo?: string | null) => {
       const style = computed(el, pseudo);
-      if (!(el instanceof HTMLElement) || !el.classList.contains('shadow-xl')) return style;
+      if (!(el instanceof HTMLElement) || !el.classList.contains('shadow-lg')) return style;
       return new Proxy(style, {
         get: (target, key) => {
           if (key === 'opacity') return '0.4';

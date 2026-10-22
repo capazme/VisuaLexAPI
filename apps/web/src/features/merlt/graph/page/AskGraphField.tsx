@@ -76,7 +76,7 @@ export function AskGraphField({
     <div className="rounded-lg border border-slate-200 bg-white shadow-sm focus-within:ring-2 focus-within:ring-primary-500 dark:border-slate-700 dark:bg-slate-900">
       {hasContext && (
         <div className="flex flex-wrap items-center gap-1 border-b border-slate-100 px-2 py-1.5 dark:border-slate-800">
-          <span className="mr-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+          <span className="mr-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">
             Contesto
           </span>
           {contextItems.map((item) => (

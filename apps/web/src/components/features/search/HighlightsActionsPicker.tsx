@@ -82,7 +82,7 @@ export function HighlightsActionsPicker({
                     <div
                         style={{ transformOrigin: getTransformOrigin(placement) }}
                         className={cn(
-                            'flex items-center rounded-lg shadow-2xl overflow-hidden',
+                            'flex items-center rounded-lg shadow-md overflow-hidden',
                             'bg-slate-900 dark:bg-slate-800 border border-slate-700/60',
                             'animate-in fade-in zoom-in-95 duration-150',
                         )}
@@ -132,11 +132,11 @@ function IconAction({ icon, title, pressed, disabled, onClick }: IconActionProps
             aria-pressed={pressed}
             className={cn(
                 'inline-flex items-center justify-center w-9 h-9 transition-colors',
-                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-purple-300/60',
+                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-primary-300/60',
                 disabled
                     ? 'text-slate-600 cursor-not-allowed'
                     : pressed
-                        ? 'bg-purple-500/20 text-purple-300'
+                        ? 'bg-primary-500/20 text-primary-300'
                         : 'text-slate-300 hover:bg-slate-700 hover:text-white',
             )}
         >

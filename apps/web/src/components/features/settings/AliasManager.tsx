@@ -197,10 +197,10 @@ export function AliasManager() {
         >
             <div className="space-y-6">
                 {/* Info Banner */}
-                <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-xl p-4">
-                    <p className="text-sm text-indigo-700 dark:text-indigo-300">
+                <div className="bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-xl p-4">
+                    <p className="text-sm text-primary-700 dark:text-primary-300">
                         Crea abbreviazioni per norme frequenti. Dopo aver creato un alias potrai cercare digitando{' '}
-                        <code className="bg-indigo-100 dark:bg-indigo-800 px-1.5 py-0.5 rounded text-xs font-mono">
+                        <code className="bg-primary-100 dark:bg-primary-800 px-1.5 py-0.5 rounded text-xs font-mono">
                             art X [trigger]
                         </code>
                         {' '}nella Command Palette (⌘K).
@@ -329,7 +329,7 @@ export function AliasManager() {
                                 "w-full py-2.5 px-4 rounded-lg text-sm font-medium transition-colors",
                                 "flex items-center justify-center gap-2",
                                 canSubmit
-                                    ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                                    ? "bg-primary-600 text-white hover:bg-primary-700"
                                     : "bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed"
                             )}
                         >
@@ -408,7 +408,7 @@ export function AliasManager() {
                                     {preset.date ? `/${preset.date}` : ''}
                                 </span>
                                 {overriddenPresets.has(trigger) && (
-                                    <span className="shrink-0 px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[10px] font-bold uppercase">
+                                    <span className="shrink-0 px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[11px] font-bold uppercase">
                                         sovrascritto
                                     </span>
                                 )}
@@ -474,7 +474,7 @@ function AliasItem({
 }: AliasItemProps) {
     if (isEditing) {
         return (
-            <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-xl p-3 border border-indigo-200 dark:border-indigo-800">
+            <div className="bg-primary-50 dark:bg-primary-900/20 rounded-xl p-3 border border-primary-200 dark:border-primary-800">
                 <div className="flex gap-2 mb-2">
                     <input
                         type="text"
@@ -500,7 +500,7 @@ function AliasItem({
                     </button>
                     <button
                         onClick={onSaveEdit}
-                        className="px-3 py-1 text-xs rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
+                        className="px-3 py-1 text-xs rounded-lg bg-primary-600 text-white hover:bg-primary-700"
                     >
                         Salva
                     </button>
@@ -510,13 +510,13 @@ function AliasItem({
     }
 
     return (
-        <div className="group flex items-center gap-3 p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors">
-            <div className="w-10 h-10 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-mono text-sm font-bold">
+        <div className="group flex items-center gap-3 p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-primary-300 dark:hover:border-primary-700 transition-colors">
+            <div className="w-10 h-10 rounded-lg bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 flex items-center justify-center font-mono text-sm font-bold">
                 {alias.trigger.slice(0, 2).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                    <span className="font-mono font-bold text-primary-600 dark:text-primary-400">
                         {alias.trigger}
                     </span>
                     <ArrowRight size={12} className="text-slate-400" />

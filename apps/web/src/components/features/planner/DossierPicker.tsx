@@ -107,7 +107,7 @@ export function DossierPicker({ value, onChange, labelId }: Props) {
         <ChevronDown size={15} aria-hidden className="shrink-0 text-slate-500" />
       </button>
       {open && (
-        <div className={cn('absolute left-0 right-0 mt-1 rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl dark:border-slate-700 dark:bg-slate-800', Z_INDEX.dropdown)}>
+        <div className={cn('absolute left-0 right-0 mt-1 rounded-lg border border-slate-200 bg-white p-1.5 shadow-md dark:border-slate-700 dark:bg-slate-800', Z_INDEX.dropdown)}>
           <input
             autoFocus
             role="combobox"

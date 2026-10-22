@@ -19,7 +19,7 @@ export function AliasConflictDialog({ suggestedTrigger, onChoose, onClose }: Ali
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-md p-5">
+      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-lg w-full max-w-md p-5">
         <div className="flex items-start gap-3 mb-4">
           <AlertTriangle className="text-amber-500 shrink-0" size={20} />
           <div>
