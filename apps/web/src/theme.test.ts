@@ -549,7 +549,16 @@ describe('the section change (T1)', () => {
 
   it('gives a menu or a popover a hairline and a drop in the dark, as the floating surfaces (Y1)', async () => {
     const css = await compile(['shadow-md', 'shadow-lg']);
-    expect(css).toMatch(/\.dark \.shadow-md\s*\{\s*box-shadow:\s*0 0 0 1px var\(--color-ink-700\)/);
+    expect(css).toMatch(/\.dark \.shadow-md\s*\{\s*--tw-shadow:\s*0 0 0 1px var\(--color-ink-700\)/);
+    expect(css).toMatch(/\.dark :is\(\.shadow-lg, \.shadow-xl, \.shadow-2xl\)\s*\{\s*--tw-shadow:/);
+  }, 30000);
+
+  it('keeps a focus ring over a shadow in the dark: the dark rules set `--tw-shadow`, never `box-shadow` (Y1)', async () => {
+    const css = await compile(['shadow-md', 'shadow-lg', 'focus-visible:ring-2']);
+    // Outside the layers a `box-shadow` on `.dark .shadow-*` replaced the ring of `focus-visible:ring-2` (WCAG 2.4.7).
+    expect(css).not.toMatch(/\.dark[^{}]*\.shadow-[^{}]*\{[^}]*box-shadow:/);
+    // The utility composes the rings before the shadow, so the dark `--tw-shadow` keeps the ring.
+    expect(css).toMatch(/\.shadow-md\s*\{[^}]*box-shadow:[^;]*var\(--tw-ring-shadow\)[^;]*var\(--tw-shadow\)/);
   }, 30000);
 
   it('draws no ring on a title focused after a choice made with a pointer, over the utilities\' ring', async () => {

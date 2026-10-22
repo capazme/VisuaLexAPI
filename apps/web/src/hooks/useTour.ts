@@ -76,7 +76,8 @@ let held = false;
  */
 const layoutBand = (width: number) => (width < 768 ? 0 : width < 1024 ? 1 : 2);
 
-/** The last input was a key (a tour opened by the keyboard shows its focus ring; one opened by itself or a click not). */
+/** A key was pressed since the tour started, or since the last pointer press: its focus then shows the ring. A tour's
+ *  start forgets it (`startTour`), so the first focus driver.js gives shows none, whatever opened the tour. */
 let keyboardLast = false;
 let watchingInput = false;
 function watchInput(): void {

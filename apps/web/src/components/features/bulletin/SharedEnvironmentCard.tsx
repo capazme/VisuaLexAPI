@@ -32,7 +32,8 @@ const CATEGORY_TEXT: Record<EnvironmentCategory, string> = {
   civil: 'text-primary-700 dark:text-primary-300',
   penal: 'text-red-700 dark:text-red-300',
   administrative: 'text-amber-700 dark:text-amber-300',
-  eu: 'text-primary-700 dark:text-primary-300',
+  // The Union's own hue, apart from the civil's toga: a key tells one category from another.
+  eu: 'text-sky-700 dark:text-sky-300',
   other: 'text-slate-600 dark:text-slate-300',
 };
 
@@ -42,11 +43,11 @@ const CATEGORY_TEXT: Record<EnvironmentCategory, string> = {
 // because EnvironmentCategory doesn't carry a CSS variable.
 const CATEGORY_STRIPE: Record<EnvironmentCategory, string> = {
   compliance: '#a855f7',
-  // Their labels are toga (`primary-*`, Y1): the stripes the same ink.
+  // Civil law in toga, as its label (`primary-*`, Y1); the Union in sky, as its own.
   civil: 'var(--color-toga-500)',
   penal: '#ef4444',
   administrative: '#f59e0b',
-  eu: 'var(--color-toga-500)',
+  eu: '#0ea5e9',
   other: '#64748b',
 };
 

@@ -123,15 +123,17 @@ export function GoalStamp({ giorno, serie, press, compact = false, className }: 
       animate={{ scale: 1, opacity: 1, rotate: -8 }}
       transition={{ type: 'spring', stiffness: 520, damping: 24, delay: 0.25 }}
       className={cn(
-        'pointer-events-none w-max rounded border-[3px] border-double text-center font-serif uppercase leading-tight tracking-[0.12em] mix-blend-multiply dark:mix-blend-normal',
-        compact ? 'px-1.5 py-0.5' : 'px-2.5 py-1',
+        'pointer-events-none w-max rounded border-[3px] border-double text-center font-serif uppercase leading-tight mix-blend-multiply dark:mix-blend-normal',
+        // Compact (the lesson's notice), its letters closer: at 11 px the stamp's spacing left the words beside it a
+        // column four lines tall at 320 px (Y1).
+        compact ? 'px-1.5 py-0.5 tracking-[0.04em]' : 'px-2.5 py-1 tracking-[0.12em]',
         STAMP,
         className,
       )}
     >
       <span className={cn('block font-bold', compact ? 'text-[11px]' : 'text-xs md:text-sm')}>Obiettivo raggiunto</span>
       {/* No text under 11 px, the compact stamp included (Y1). */}
-      <span className={cn('block tracking-wide', compact ? 'text-[11px]' : 'text-xs')}>
+      <span className={cn('block', compact ? 'text-[11px] tracking-normal' : 'text-xs tracking-wide')}>
         {formatDate(giorno)} · giorno {serie}
       </span>
     </motion.div>
@@ -169,10 +171,12 @@ export function SessionCelebration({ giorno, serie, onStart, onDone }: SessionCe
 
   return (
     <div data-testid="session-celebration" className={cn('pointer-events-none absolute inset-x-0 top-0 flex justify-center', Z_INDEX.dropdown)}>
-      <div className={cn(TILE, 'relative flex w-full max-w-md items-center justify-between gap-3 overflow-hidden px-3 py-1.5 shadow-lg')}>
+      <div className={cn(TILE, 'relative flex w-full max-w-md items-center justify-center gap-3 overflow-hidden px-3 py-1.5 shadow-lg min-[400px]:justify-between')}>
         {/* The confetti first, so the words and the stamp are drawn over them. */}
         <ConfettiBurst />
-        <p className={cn('relative font-serif text-sm font-semibold leading-tight', INK_TEXT)} aria-hidden>
+        {/* Under 400 px the stamp says it alone (its date and «giorno N»): the words beside it, at the stamp's 11 px
+            width, made a column four lines tall (Y1). */}
+        <p className={cn('relative hidden font-serif text-sm font-semibold leading-tight min-[400px]:block', INK_TEXT)} aria-hidden>
           {/* On a phone the stamp says it: one line keeps the notice clear of the card. */}
           <span className="hidden sm:block">Obiettivo di oggi raggiunto</span>
           <span className="block sm:font-normal">
