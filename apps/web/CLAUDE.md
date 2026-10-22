@@ -2111,7 +2111,9 @@ meant to stay split; add new features as new files, not inside the shells:
   (`ForumCommunityPage`, `/forum/community`, a placeholder: an empty state composed for the page, S7a — centred in the
   column, `CommunityMark`, line art in the manner of the section's mark in the Forum's hue, «Le discussioni arrivano
   presto», two lines on what it will be, and «Esplora i dossier pubblici», a link drawn as the one button). `BulletinBoardPage.tsx` is a shell over three dumb views, the tabs «Esplora · I miei pubblicati ·
-  Suggerimenti» (`ForumExploreView`, `ForumMyEnvironmentsView`, `ForumSuggestionsView`); Explore's filters are one row
+  Suggerimenti» (`ForumTabs`: `aria-pressed`, short labels «Esplora · Miei · Suggeriti» sharing the row in equal parts
+  below `sm`, whole from it — at 320 px the last was cut, S7a; `ForumExploreView`, `ForumMyEnvironmentsView`,
+  `ForumSuggestionsView`); the titles of «Dossier pubblici» and «Community» come from `features/sections/pageNames.ts`; Explore's filters are one row
   from `sm` and, on a phone, the search across with the category («Tutte»), the order and the 44 px refresh under it, M1. «Pubblica un dossier»
   is `PublishDossierPicker` (the user's dossiers not yet in the Forum, then the dossier's own
   `PublishDossierDialog`; the Forum never publishes a workspace); «Modifica» on a published dossier

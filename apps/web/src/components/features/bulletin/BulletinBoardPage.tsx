@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Upload, Package, Lightbulb } from 'lucide-react';
+import { Upload } from 'lucide-react';
 import { AddToMyDossiersDialog } from './AddToMyDossiersDialog';
 import { PublishDossierPicker } from './PublishDossierPicker';
 import { ReportModal } from './ReportModal';
@@ -12,6 +12,7 @@ import { AliasConflictDialog } from './AliasConflictDialog';
 import { ForumExploreView, type SortOption } from './ForumExploreView';
 import { ForumMyEnvironmentsView } from './ForumMyEnvironmentsView';
 import { ForumSuggestionsView } from './ForumSuggestionsView';
+import { ForumTabs, type ForumTab } from './ForumTabs';
 import { ArchivedEnvironmentsSection } from './ArchivedEnvironmentsSection';
 import { SharedLinkImport } from './SharedLinkImport';
 import { Toast } from '../../ui/Toast';
@@ -27,7 +28,7 @@ import type { SharedEnvironment, EnvironmentCategory, SharedEnvironmentListRespo
 import { PUBLIC_DOSSIERS_PAGE } from '../../../features/sections/pageNames';
 import { PageFrame } from '../../layout/PageFrame';
 
-type TabType = 'explore' | 'my' | 'suggestions';
+type TabType = ForumTab;
 
 export function BulletinBoardPage() {
   // Tab state
@@ -416,47 +417,8 @@ export function BulletinBoardPage() {
       }
     >
 
-      {/* Tab Navigation */}
-      <div id="tour-forum-tabs" className="flex max-w-full gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg w-fit">
-        <button
-          onClick={() => setActiveTab('explore')}
-          className={`flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:px-4 md:min-h-0 ${
-            activeTab === 'explore'
-              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <Search size={16} className="hidden sm:block" aria-hidden />
-          Esplora
-        </button>
-        <button
-          onClick={() => setActiveTab('my')}
-          className={`flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:px-4 md:min-h-0 ${
-            activeTab === 'my'
-              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <Package size={16} className="hidden sm:block" aria-hidden />
-          I miei pubblicati
-        </button>
-        <button
-          onClick={() => setActiveTab('suggestions')}
-          className={`flex min-h-[44px] items-center gap-2 whitespace-nowrap rounded-md px-2.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:px-4 md:min-h-0 relative ${
-            activeTab === 'suggestions'
-              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <Lightbulb size={16} className="hidden sm:block" aria-hidden />
-          Suggerimenti
-          {pendingCount > 0 && (
-            <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary-600 text-white text-xs rounded-full flex items-center justify-center">
-              {pendingCount}
-            </span>
-          )}
-        </button>
-      </div>
+      {/* The tabs: short labels on a phone, whole from `sm` (S7a). */}
+      <ForumTabs active={activeTab} onChange={setActiveTab} pendingCount={pendingCount} />
 
       {/* Tab views */}
       {activeTab === 'explore' && (
