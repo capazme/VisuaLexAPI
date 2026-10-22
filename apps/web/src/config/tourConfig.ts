@@ -88,7 +88,7 @@ export const SEARCH_STEPS: DriveStep[] = [
         element: '#tour-search-field',
         popover: {
             title: 'Cerca una Norma',
-            description: 'Scrivi qui una citazione naturale, come "art. 2043 cc" o "Cass. civ. 10787/2024", e premi Invio: non serve compilare dei campi. Il campo resta sempre in cima alla pagina, e ogni risultato finisce sul tavolo di una pratica.',
+            description: 'Scrivi qui una citazione naturale, come "art. 2043 cc" o "Cass. civ. 10787/2024": il campo si apre nel menu di ricerca, e Invio cerca. Non serve compilare dei campi. Il campo resta sempre in cima alla pagina, e ogni risultato finisce sul tavolo di una pratica.',
             side: 'bottom',
             align: 'center',
         }
@@ -266,7 +266,7 @@ export const FORUM_STEPS: DriveStep[] = [
     {
         popover: {
             title: 'Dossier pubblici',
-            description: 'I dossier di studio pubblicati dalla comunità: aggiungili ai tuoi dossier, pubblica i tuoi e suggerisci contenuti agli altri. In cima trovi i dossier di studio pronti di VisuaLex.',
+            description: 'I dossier di studio pubblicati dalla comunità: aggiungili ai tuoi dossier, pubblica i tuoi e suggerisci contenuti agli altri. Dopo i dossier della comunità trovi quelli pronti di VisuaLex.',
             side: 'over',
             align: 'center',
         }

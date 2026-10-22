@@ -391,10 +391,11 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                   <FolderPlus size={18} aria-hidden />
                   Crea il tuo primo dossier
                 </button>
-                {/* The ready-made study dossiers sit in the Forum (spec 2026-10-13-environments-into-forum, D12). */}
-                <button type="button" onClick={() => navigate('/forum')} className={cn(HEADER_BUTTON, 'justify-center sm:whitespace-nowrap')}>
+                {/* The ready-made study dossiers sit in the Forum (spec 2026-10-13-environments-into-forum, D12), after the
+                    community's dossiers since S7a: the address takes the reader to their strip. */}
+                <button type="button" onClick={() => navigate('/forum#pronti')} className={cn(HEADER_BUTTON, 'justify-center sm:whitespace-nowrap')}>
                   <BookOpen size={18} aria-hidden />
-                  Dossier di studio pronti
+                  Pronti da VisuaLex
                 </button>
               </div>
             </section>

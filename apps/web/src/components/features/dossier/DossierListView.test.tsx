@@ -395,6 +395,6 @@ describe('DossierListView — cards and the empty list (S7c)', () => {
     expect(drawing).toHaveAttribute('aria-hidden', 'true');
     expect(drawing.innerHTML).toContain('var(--vlx-section-opus)');
     expect(within(empty).getByRole('button', { name: 'Crea il tuo primo dossier' })).toHaveClass('min-h-[44px]', 'bg-primary-600');
-    expect(within(empty).getByRole('button', { name: 'Dossier di studio pronti' })).toHaveClass('min-h-[44px]');
+    expect(within(empty).getByRole('button', { name: 'Pronti da VisuaLex' })).toHaveClass('min-h-[44px]');
   });
 });
