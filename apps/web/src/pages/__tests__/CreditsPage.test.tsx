@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import userEvent from '@testing-library/user-event';
 import { CreditEntry, CreditsPage } from '../CreditsPage';
 import { CREDITS, CREDIT_GROUPS, type Credit } from '../../data/credits';
 
@@ -102,5 +103,43 @@ describe('CreditEntry — the worst case', () => {
       expect(el.className).toContain('[overflow-wrap:anywhere]');
       expect(el.className).not.toMatch(/truncate|line-clamp|whitespace-nowrap/);
     }
+  });
+});
+
+// A page to consult (U1d): the frame's whole width, an index of the groups, the sources as cards.
+describe('CreditsPage — laid out for consulting', () => {
+  it('lists the groups in an index, in order, the first marked as the place being read', () => {
+    renderAt('/crediti');
+    const index = screen.getByRole('navigation', { name: 'In questa pagina' });
+    const links = within(index).getAllByRole('link');
+    expect(links.map((link) => link.textContent)).toEqual(CREDIT_GROUPS.map((group) => group.title));
+    expect(links.map((link) => link.getAttribute('href'))).toEqual(CREDIT_GROUPS.map((group) => `/crediti#${group.id}`));
+    expect(links[0]).toHaveAttribute('aria-current', 'location');
+    for (const link of links) expect(link).toHaveClass('min-h-[44px]');
+    // A row of its own on a phone, scrolling inside its band; a column beside the sources from 1024 px.
+    expect(within(index).getByRole('list')).toHaveClass('overflow-x-auto', 'lg:flex-col');
+  });
+
+  it('brings a group from the index to its section, and focuses it', async () => {
+    renderAt('/crediti');
+    await userEvent.click(screen.getByRole('link', { name: 'Giurisprudenza' }));
+    const section = document.getElementById('giurisprudenza')!;
+    expect(scrolled).toContain(section);
+    expect(section).toHaveFocus();
+    expect(section).toHaveAccessibleName('Giurisprudenza');
+  });
+
+  it('draws each source as a card, two a row from 1280 px, its links at its foot', () => {
+    renderAt('/crediti');
+    for (const group of CREDIT_GROUPS) {
+      const section = screen.getByRole('region', { name: group.title });
+      const grid = section.querySelector('article')!.parentElement!;
+      expect(grid).toHaveClass('grid', 'xl:grid-cols-2');
+    }
+    const article = document.getElementById('normattiva')!;
+    expect(article).toHaveClass('flex', 'h-full', 'flex-col');
+    expect(article.querySelector('a')!.parentElement).toHaveClass('mt-auto');
+    // No narrow column any more: the frame's whole width.
+    expect(document.querySelector('.max-w-2xl')).toBeNull();
   });
 });

@@ -2,13 +2,15 @@
  * «Crediti» (`/crediti`): the public sources VisuaLex reads and the typefaces it ships, with what we use of
  * each, the conditions, the line of attribution and the links. Public — reached without signing in, from the
  * login's foot and the user menu — and drawn from `data/credits.ts` alone. Every entry is an anchor
- * (`/crediti#corte-costituzionale`), so a short line elsewhere can point at its own entry.
+ * (`/crediti#corte-costituzionale`), so a short line elsewhere can point at its own entry. A page to consult, not to
+ * read through (U1d): in the frame's whole width, an index «In questa pagina» beside the sources from 1024 px (in a row
+ * of its own on a phone), the sources as cards, two a row from 1280 px. Only the layout changed: the lines are C1's.
  */
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { BookOpen, ExternalLink } from 'lucide-react';
 import { CREDITS, CREDIT_GROUPS, type Credit } from '../data/credits';
-import { FOCUS_RING } from '../constants/interactions';
+import { FOCUS_RING, HIDDEN_SCROLLBAR } from '../constants/interactions';
 import { cn } from '../lib/utils';
 import { PageFrame } from '../components/layout/PageFrame';
 
@@ -35,7 +37,8 @@ export function CreditEntry({ credit }: { credit: Credit }) {
       id={credit.id}
       aria-labelledby={titleId}
       tabIndex={-1}
-      className="scroll-mt-6 border-t border-slate-200 py-6 outline-none first:border-t-0 first:pt-2 dark:border-slate-800"
+      // A card, as tall as its row's other one; its links at its foot.
+      className="flex h-full scroll-mt-6 flex-col rounded-xl border border-slate-200 bg-white p-5 outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:p-6 dark:border-slate-800 dark:bg-slate-900"
     >
       <h3 id={titleId} className="font-serif text-xl font-medium text-slate-900 [overflow-wrap:anywhere] dark:text-slate-50">
         {credit.name}
@@ -60,7 +63,7 @@ export function CreditEntry({ credit }: { credit: Credit }) {
           </dd>
         </div>
       </dl>
-      <p className="mt-3 flex flex-wrap gap-x-5">
+      <p className="mt-auto flex flex-wrap gap-x-5 pt-3">
         <ExternalAnchor href={credit.sourceUrl} label="Sito della fonte" name={credit.name} />
         {credit.licenceUrl && <ExternalAnchor href={credit.licenceUrl} label="Testo della licenza" name={credit.name} />}
       </p>
@@ -68,8 +71,78 @@ export function CreditEntry({ credit }: { credit: Credit }) {
   );
 }
 
+/** The index's places: the groups, each a section of the page with its anchor (`/crediti#giurisprudenza`). */
+const GROUPS = CREDIT_GROUPS.filter((group) => CREDITS.some((credit) => credit.group === group.id));
+
+/**
+ * The group in view, for the index's mark: the last section whose top has passed the upper third of the window. No
+ * observer in a test or an old browser: the first group stays marked.
+ */
+function useGroupInView(): string {
+  const [current, setCurrent] = useState<string>(GROUPS[0]?.id ?? '');
+  useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') return undefined;
+    const seen = new Map<string, boolean>();
+    const observer = new IntersectionObserver(
+      (records) => {
+        for (const record of records) seen.set(record.target.id, record.isIntersecting);
+        const inView = GROUPS.find((group) => seen.get(group.id));
+        if (inView) setCurrent(inView.id);
+      },
+      // A band across the upper part of the window: the section crossing it is the one being read.
+      { rootMargin: '-20% 0px -60% 0px' },
+    );
+    for (const group of GROUPS) {
+      const section = document.getElementById(group.id);
+      if (section) observer.observe(section);
+    }
+    return () => observer.disconnect();
+  }, []);
+  return current;
+}
+
+const INDEX_LINK = cn(
+  'flex min-h-[44px] shrink-0 items-center whitespace-nowrap rounded-md px-3 text-sm font-medium transition-colors lg:whitespace-normal',
+  FOCUS_RING,
+);
+
+/** «In questa pagina»: beside the sources from 1024 px, staying in view; a row of its own that scrolls on a phone. */
+function PageIndex({ current }: { current: string }) {
+  return (
+    // `min-w-0`: a grid item, it would otherwise grow to its row of links and widen a phone's page.
+    <nav aria-label="In questa pagina" className="min-w-0 lg:sticky lg:top-6 lg:self-start">
+      <p aria-hidden className="mb-2 hidden px-3 text-sm font-medium text-slate-600 lg:block dark:text-slate-400">
+        In questa pagina
+      </p>
+      {/* On a phone the row scrolls inside its band: the page never scrolls sideways. */}
+      <ul className={cn('-mx-1 flex gap-1 overflow-x-auto px-1 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0', HIDDEN_SCROLLBAR)}>
+        {GROUPS.map((group) => {
+          const here = group.id === current;
+          return (
+            <li key={group.id}>
+              <Link
+                to={{ hash: group.id }}
+                aria-current={here ? 'location' : undefined}
+                className={cn(
+                  INDEX_LINK,
+                  here
+                    ? 'bg-primary-50 text-primary-800 dark:bg-primary-950/50 dark:text-primary-200'
+                    : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
+                )}
+              >
+                {group.title}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
+
 export function CreditsPage() {
   const { hash } = useLocation();
+  const current = useGroupInView();
 
   // The router renders after the browser has looked for the fragment, so the entry is reached here; focus
   // follows, for a screen reader, without a second scroll. No smooth scroll: nothing moves under reduced
@@ -90,7 +163,7 @@ export function CreditsPage() {
 
   return (
     // The sections' frame (W2), outside the layout: its column (`max-w-7xl`, the layout's padding), the title at its left
-    // edge in `PageFrame`'s size; the text keeps its reading column.
+    // edge in `PageFrame`'s size, the whole width used (U1d).
     <div className="min-h-dvh bg-slate-50 dark:bg-slate-950">
       <div className="mx-auto w-full max-w-7xl p-4 pb-16 md:p-8 md:pb-16">
         <header>
@@ -102,32 +175,40 @@ export function CreditsPage() {
 
         <main className="mt-8">
           <PageFrame title="Crediti">
-            <div className="max-w-2xl">
-              <div className="border-b border-slate-200 pb-6 dark:border-slate-800">
-                <p className="max-w-prose font-serif text-lg leading-relaxed text-slate-700 dark:text-slate-300">
-                  VisuaLex usa i dati pubblici delle fonti elencate qui sotto e in questa pagina ne indica la provenienza:
-                  per ciascuna, cosa usiamo, a quali condizioni e come la citiamo. In fondo, i caratteri tipografici
-                  dell’interfaccia.
-                </p>
-              </div>
+            {/* The opening across the frame; the long paragraph at a reading measure. */}
+            <p className="max-w-[70ch] font-serif text-lg leading-relaxed text-slate-700 dark:text-slate-300">
+              VisuaLex usa i dati pubblici delle fonti elencate qui sotto e in questa pagina ne indica la provenienza:
+              per ciascuna, cosa usiamo, a quali condizioni e come la citiamo. In fondo, i caratteri tipografici
+              dell’interfaccia.
+            </p>
 
-              {CREDIT_GROUPS.map((group) => {
-                const entries = CREDITS.filter((credit) => credit.group === group.id);
-                if (entries.length === 0) return null;
-                const headingId = `crediti-${group.id}`;
-                return (
-                  <section key={group.id} aria-labelledby={headingId} className="mt-10">
-                    <h2 id={headingId} className="font-serif text-2xl font-medium text-slate-900 dark:text-slate-50">
-                      {group.title}
-                    </h2>
-                    <div className="mt-2">
-                      {entries.map((credit) => (
-                        <CreditEntry key={credit.id} credit={credit} />
-                      ))}
-                    </div>
-                  </section>
-                );
-              })}
+            <div className="grid gap-8 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-10">
+              <PageIndex current={current} />
+              <div className="min-w-0">
+                {GROUPS.map((group, index) => {
+                  const entries = CREDITS.filter((credit) => credit.group === group.id);
+                  const headingId = `crediti-${group.id}`;
+                  return (
+                    <section
+                      key={group.id}
+                      id={group.id}
+                      aria-labelledby={headingId}
+                      tabIndex={-1}
+                      className={cn('scroll-mt-6 outline-none', index > 0 && 'mt-12')}
+                    >
+                      <h2 id={headingId} className="font-serif text-2xl font-medium text-slate-900 dark:text-slate-50">
+                        {group.title}
+                      </h2>
+                      {/* Two a row from 1280 px, as tall as each other; one below. */}
+                      <div className="mt-4 grid gap-4 xl:grid-cols-2">
+                        {entries.map((credit) => (
+                          <CreditEntry key={credit.id} credit={credit} />
+                        ))}
+                      </div>
+                    </section>
+                  );
+                })}
+              </div>
             </div>
           </PageFrame>
         </main>
