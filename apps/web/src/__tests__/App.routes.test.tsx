@@ -104,10 +104,11 @@ describe('App routing', () => {
     expect(window.location.pathname).toBe('/forum');
   });
 
-  it('opens the Community placeholder at /forum/community, with the Forum\'s title and a way to the public dossiers', async () => {
+  it('opens the Community placeholder at /forum/community, titled by its name under the Forum\'s phrase, and a way to the public dossiers', async () => {
     renderAt('/forum/community');
-    expect(await screen.findByRole('heading', { level: 1, name: 'Forum: il luogo del dibattito giuridico' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: 'Community' })).toBeInTheDocument();
+    // The page's name as its title, the Forum's phrase small over it (L-37).
+    expect(await screen.findByRole('heading', { level: 1, name: 'Community' })).toBeInTheDocument();
+    expect(screen.getByText('Forum · il luogo del dibattito giuridico')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Apri i dossier pubblici' })).toHaveAttribute('href', '/forum');
     expect(screen.queryByText('Pagina non trovata')).toBeNull();
     expect(screen.getByTestId('layout')).toBeInTheDocument();
@@ -178,13 +179,14 @@ describe('App routing — Studia', () => {
     const session = await screen.findByRole('heading', { name: 'Sessione di ripasso' });
     expect(screen.getByTestId('lesson-frame')).toContainElement(session);
     // The lesson is a screen of its own: the area's heading is not drawn over it.
-    expect(screen.queryByRole('heading', { level: 1, name: 'Gymnasium: la tua palestra giuridica' })).toBeNull();
+    expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
   });
 
   it('opens «Progressi» at /studia/progressi, inside the area, under its heading (Gymnasium spec §5.3)', async () => {
     renderAt('/studia/progressi');
     expect(await screen.findByRole('heading', { level: 2, name: 'I tuoi progressi' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 1, name: 'Gymnasium: la tua palestra giuridica' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Progressi' })).toBeInTheDocument();
+    expect(screen.getByText('Gymnasium · la tua palestra giuridica')).toBeInTheDocument();
     // The read is mocked to fail here: the page says so.
     expect(await screen.findByText('Non riesco a leggere i tuoi progressi.')).toBeInTheDocument();
   });

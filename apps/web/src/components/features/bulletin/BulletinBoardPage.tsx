@@ -421,6 +421,7 @@ export function BulletinBoardPage() {
   return (
     <PageFrame
       title="Dossier pubblici"
+      kicker="forum"
       line="I dossier di studio pubblicati dalla comunità"
       section="forum"
       action={

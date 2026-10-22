@@ -707,7 +707,7 @@ export function SearchPanel() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
-            className={cn('fixed bottom-24 right-4 w-full max-w-md px-4', Z_INDEX.toast)}
+            className={cn('fixed bottom-24 right-4 w-full max-w-md px-4 md:bottom-40', Z_INDEX.toast)}
             role="alert"
             aria-live="polite"
           >
@@ -733,7 +733,7 @@ export function SearchPanel() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
-            className={cn('fixed bottom-24 right-4 w-full max-w-md px-4', Z_INDEX.toast)}
+            className={cn('fixed bottom-24 right-4 w-full max-w-md px-4 md:bottom-40', Z_INDEX.toast)}
             role="alert"
             aria-live="assertive"
             aria-atomic="true"

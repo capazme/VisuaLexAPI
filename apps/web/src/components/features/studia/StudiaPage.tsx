@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
+import { pageName } from '../../../features/sections/pageNames';
 import { PageFrame } from '../../layout/PageFrame';
 import { LessonFrame } from './LessonFrame';
 import { StudyStrip } from './progress/StudyStrip';
@@ -11,23 +13,31 @@ import { useProgress } from './progress/useProgress';
  */
 export interface StudiaOutletContext {
   validator: boolean | null | undefined;
+  /** Where a view puts the page's action, beside the title (`PageFrame`'s `action`): «+ Nuova scheda» on «Le mie schede». */
+  actionSlot?: HTMLElement | null;
 }
 
-/** The views that show the smaller strip over them: «Oggi» and «Progressi» draw their own, the session is a lesson of its own. */
-const underStrip = (pathname: string) => /^\/studia\/(schede|valida)(\/|$)/.test(pathname);
+/**
+ * The view that shows the smaller strip over it: «Da validare». «Oggi» and «Progressi» draw their own, «Le mie schede»
+ * none (G8: the streak and the goal were said there a third time), the session is a lesson of its own.
+ */
+const underStrip = (pathname: string) => /^\/studia\/valida(\/|$)/.test(pathname);
+
+/** The views with an action beside the title, which they draw into the frame's slot. */
+const withAction = (pathname: string) => /^\/studia\/schede(\/|$)/.test(pathname);
 
 /** The review session is the lesson, a screen of its own (Gymnasium spec §5.4). */
 const isLesson = (pathname: string) => /^\/studia\/ripasso\/sessione(\/|$)/.test(pathname);
 
-/** The streak and the goal over «Le mie schede» and «Da validare» (Gymnasium spec §5.1): the reward stays in sight. */
+/** The streak and the goal over «Da validare» (Gymnasium spec §5.1): the reward stays in sight. */
 function AreaStrip() {
   const progress = useProgress(undefined);
   return <StudyStrip dense data={progress.data} loading={progress.status === 'loading' && progress.data === null} onSettingsChanged={progress.reload} />;
 }
 
 /**
- * Gymnasium (the code keeps the name `studia`): the area's heading — «Gymnasium: la tua palestra giuridica»; the
- * section switcher keeps the short name — and the view. Its views —
+ * Gymnasium (the code keeps the name `studia`): the view's name as the page's title, «Gymnasium · la tua palestra
+ * giuridica» small over it (L-37), and the view. Its views —
  * Oggi, Progressi, Le mie schede, Da validare for validators — are the sidebar's entries in this section
  * (sections spec S6, Gymnasium spec §4). Every view is in the sections' frame (`PageFrame`, G6 and W2): the layout's
  * full width, the heading at its left edge; the layout pads the page and, below `lg`, starts it under the phone's
@@ -36,7 +46,8 @@ function AreaStrip() {
 export function StudiaPage() {
   const { isValidator, loading, user } = useAuth();
   const { pathname } = useLocation();
-  const context = { validator: loading ? undefined : user ? isValidator : null } satisfies StudiaOutletContext;
+  const [actionSlot, setActionSlot] = useState<HTMLElement | null>(null);
+  const context = { validator: loading ? undefined : user ? isValidator : null, actionSlot } satisfies StudiaOutletContext;
   if (isLesson(pathname)) {
     return (
       <LessonFrame>
@@ -45,7 +56,14 @@ export function StudiaPage() {
     );
   }
   return (
-    <PageFrame title="Gymnasium: la tua palestra giuridica" section="gymnasium" className="h-full">
+    <PageFrame
+      // The view's name, from the one list of the pages' names (L-37); the section's phrase goes over it.
+      title={pageName(pathname) ?? 'Oggi'}
+      kicker="gymnasium"
+      section="gymnasium"
+      className="h-full"
+      action={withAction(pathname) ? <div ref={setActionSlot} className="contents" /> : undefined}
+    >
       {underStrip(pathname) && <AreaStrip />}
       <Outlet context={context} />
     </PageFrame>
