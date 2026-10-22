@@ -226,7 +226,7 @@ describe('the review session', () => {
       fireEvent.keyDown(document.body, { key: 'Escape' });
       const dialog = await screen.findByRole('alertdialog', { name: 'Interrompere il ripasso?' });
       // What happens, with the session's count (U1c).
-      expect(within(dialog).getByText('Non hai ancora valutato nessuna scheda. Ti aspettano in «Oggi».')).toBeInTheDocument();
+      expect(within(dialog).getByText('Non hai ancora valutato nessuna scheda. Ti aspetta in «Oggi».')).toBeInTheDocument();
       // The dialog has the keyboard: space behind it shows nothing.
       fireEvent.keyDown(document.body, { key: ' ' });
       expect(screen.queryByText('Risposta a.')).not.toBeInTheDocument();

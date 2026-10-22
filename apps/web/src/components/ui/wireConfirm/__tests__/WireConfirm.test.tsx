@@ -235,4 +235,16 @@ describe('WireConfirm — a confirmation drawn from its button (K1b)', () => {
     expect(first).not.toHaveClass('bg-red-600');
     await waitFor(() => expect(second).toHaveFocus());
   });
+
+  it('moves no focus as it mounts closed, even with a place to go back to', () => {
+    const focusBack = vi.fn(() => document.body);
+    render(
+      <>
+        <input aria-label="Campo" autoFocus />
+        <WireConfirm open={false} title="Interrompere?" message="…" focusBack={focusBack} onConfirm={vi.fn()} onCancel={vi.fn()} />
+      </>,
+    );
+    expect(focusBack).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Campo')).toHaveFocus();
+  });
 });

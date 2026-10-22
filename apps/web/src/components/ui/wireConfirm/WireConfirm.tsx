@@ -161,9 +161,16 @@ export function WireConfirm({
   }, [open, still]);
 
   // Closed: the focus goes back to the button at once, not after the rewind. A button its action disabled (busy) takes
-  // it once enabled again, if nothing else took it meanwhile.
+  // it once enabled again, if nothing else took it meanwhile. Only after a real closing — mounted closed, nothing moves
+  // the focus (with `focusBack`, the lesson's card would take it as the page opens) — and once per closing.
+  const closing = useRef(false);
   useEffect(() => {
-    if (open) return;
+    if (open) {
+      closing.current = true;
+      return;
+    }
+    if (!closing.current) return;
+    closing.current = false;
     // Cancelled, with a place of its own to go back to.
     const back = confirmed ? null : focusBackRef.current?.();
     if (back?.isConnected) {
