@@ -35,6 +35,20 @@ export function reviewScope(userId: string, materieComunita: LingoMateria[], mat
   return { AND: [scope, { materia }, ...(istituto === undefined ? [] : [{ istituto }])] };
 }
 
+/**
+ * The cards in `scope` the user has a review state for, each with that state. The cards first and their states
+ * second, the order Prisma reads a relation in: a card gone between the two statements (the account's deletion,
+ * its author's trash) takes its states with it and counts nothing. The other way round, the states first and
+ * their card as a relation, the second statement found no card and the read was a 500
+ * (tests/lingoCardGoneMidRead.test.ts).
+ */
+export function reviewedCardsQuery<S extends Prisma.LingoCardSelect>(userId: string, scope: Prisma.LingoCardWhereInput, card: S) {
+  return {
+    where: { AND: [scope, { statiRipasso: { some: { utenteId: userId } } }] },
+    select: { ...card, statiRipasso: { where: { utenteId: userId }, select: { dueAt: true, lastReviewAt: true } } },
+  } satisfies Prisma.LingoCardFindManyArgs;
+}
+
 /** The days to the next review that each grade would give: what the four buttons show. `state` is null for a new card. */
 export function previewIntervals(state: SrsState | null, elapsedDays: number): Record<Rating, number> {
   const days = {} as Record<Rating, number>;
