@@ -178,7 +178,7 @@ export const DOSSIER_STEPS: DriveStep[] = [
         element: '#tour-dossier-card',
         popover: {
             title: 'Card Dossier',
-            description: 'Ogni card mostra titolo, tag, quante norme e note contiene e l\'ultimo aggiornamento. Clicca per aprire.',
+            description: 'Ogni card mostra titolo, tag, quante norme, note e sentenze contiene e quando l\'hai creato. Clicca per aprire.',
             side: 'right',
             align: 'center',
         }
@@ -266,7 +266,7 @@ export const FORUM_STEPS: DriveStep[] = [
     {
         popover: {
             title: 'Dossier pubblici',
-            description: 'I dossier di studio pubblicati dalla comunità: aggiungili ai tuoi dossier, pubblica i tuoi e suggerisci contenuti agli altri. In cima trovi i dossier di studio pronti di VisuaLex.',
+            description: 'I dossier di studio pubblicati dalla comunità: aggiungili ai tuoi dossier, pubblica i tuoi e suggerisci contenuti agli altri. Dopo i dossier della comunità trovi quelli pronti di VisuaLex.',
             side: 'over',
             align: 'center',
         }

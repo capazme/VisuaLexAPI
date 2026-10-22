@@ -106,10 +106,11 @@ describe('App routing', () => {
 
   it('opens the Community placeholder at /forum/community, titled by its name under the Forum\'s phrase, and a way to the public dossiers', async () => {
     renderAt('/forum/community');
-    // The page's name as its title, the Forum's phrase small over it (L-37).
+    // The page's name as its title, the Forum's phrase small over it (L-37), and the S7a empty state.
     expect(await screen.findByRole('heading', { level: 1, name: 'Community' })).toBeInTheDocument();
     expect(screen.getByText('Forum · il luogo del dibattito giuridico')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Apri i dossier pubblici' })).toHaveAttribute('href', '/forum');
+    expect(screen.getByRole('heading', { level: 2, name: 'Le discussioni arrivano presto' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Esplora i dossier pubblici' })).toHaveAttribute('href', '/forum');
     expect(screen.queryByText('Pagina non trovata')).toBeNull();
     expect(screen.getByTestId('layout')).toBeInTheDocument();
   });
