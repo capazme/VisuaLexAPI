@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { matchRubrichePart, rubricheFor } from './actRubriche';
+import { normalizeArticleId } from './treeUtils';
 import type { ActRubricheResponse, RubrichePart } from './actStructureCache';
 
 // The shape measured on 4 Oct 2026 for d.lgs. 196/2003: the top-level map is an annex's.
@@ -15,6 +16,13 @@ describe('rubricheFor', () => {
   it('uses the top-level map for an act with no parts', () => {
     expect(rubricheFor({ rubriche: { '1': 'Definizione', '2 bis': 'Ambito' }, parts: [] }, null))
       .toEqual({ '1': 'Definizione', '2-bis': 'Ambito' });
+  });
+  it('finds the title of an ordinal the tree writes in two words, whatever spelling the dossier asks with', () => {
+    // `/fetch_rubriche` keys the codice del consumo's art. 135-sexdecies as the tree writes it, «135 sex decies».
+    const titles = rubricheFor({ rubriche: { '135-sex-decies': 'Ambito di applicazione' }, parts: [] }, null);
+    for (const asked of ['135-sexdecies', '135 sexdecies', '135sexdecies', '135 sex decies']) {
+      expect(titles[normalizeArticleId(asked)], asked).toBe('Ambito di applicazione');
+    }
   });
   it('matches the body of an act in parts by its article numbers', () => {
     expect(rubricheFor(DLGS_196, ['1', '2', '2-bis', '2-ter', '3', '4'])['1']).toBe('Oggetto');

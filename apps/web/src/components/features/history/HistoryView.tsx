@@ -16,6 +16,7 @@ import { labelFromParams } from '../../../utils/sources';
 import { DecisionHistoryRow } from './DecisionHistoryRow';
 import { PageFrame } from '../../layout/PageFrame';
 import { decisionHistoryLabel, identityFromKey } from '../../../utils/decisionLinks';
+import { FIELD_TEXT } from '../../../constants/interactions';
 
 // Stripe color per act_type — keyed on lowercased exact match. Codes get
 // distinct colors so the user can scan the timeline visually; everything
@@ -360,7 +361,7 @@ export function HistoryView() {
                             onChange={(e) => setSearchTerm(e.target.value)}
                             aria-keyshortcuts="/"
                             title="Cerca (premi /)"
-                            className="w-full pl-9 pr-4 py-2 text-sm rounded-lg bg-slate-100 dark:bg-slate-700 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-slate-900 transition-colors min-h-[44px] md:min-h-0 md:py-1.5 md:rounded-full"
+                            className={`w-full pl-9 pr-4 py-2 ${FIELD_TEXT} rounded-lg bg-slate-100 dark:bg-slate-700 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-slate-900 transition-colors min-h-[44px] md:min-h-0 md:py-1.5 md:rounded-full`}
                         />
                         <Search size={16} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     </div>
