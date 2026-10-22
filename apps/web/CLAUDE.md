@@ -428,7 +428,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   about 280 ms on `ease.out` (no bounce; a curve, not a spring); the clip is set before the first paint, so the panel
   never flashes open, and the growth starts once the first frame is drawn (mounting the rows is a long frame, which an
   animation started before it would spend unseen); Web Animations with no fill, so once grown nothing holds the clip and
-  the card's `shadow-xl` shows. The content fades in as it grows; the first four groups come 30 ms apart, rising 4 px.
+  the card's `shadow-lg` shows. The content fades in as it grows; the first four groups come 30 ms apart, rising 4 px.
   Closing (Esc, a click outside, a choice), the same way back in about 200 ms from wherever it is (a growth cut short
   included), the panel taking no pointer meanwhile; opened again before it went, it grows back from there. Without Web
   Animations the panel is drawn at once. While the box filters, a row filtered out fades and pops out of its list
