@@ -7,9 +7,15 @@ import { FORUM_CATEGORIES } from '../../../utils/forumCategories';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
 import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import { cn } from '../../../lib/utils';
+import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import type { SharedEnvironment, EnvironmentCategory, StudyImportReport } from '../../../types';
 
 export type SortOption = 'newest' | 'popular' | 'mostDownloaded';
+
+/** The community's dossiers (S7a): one column on a phone, two from `md`, three from `xl`; a row's cards one height. */
+const GRID = 'grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-3';
+/** On a phone VisuaLex's packs come after this many of the community's dossiers. */
+const PHONE_CARDS_BEFORE_PACKS = 2;
 
 const SORT_OPTIONS: { value: SortOption; label: string; icon: React.ReactNode }[] = [
   { value: 'newest', label: 'Più recenti', icon: <Clock size={14} /> },
@@ -83,6 +89,27 @@ export function ForumExploreView({
   const selectedSort = SORT_OPTIONS.find(o => o.value === sort)!;
   const selectedCategory = CATEGORY_OPTIONS.find(o => o.value === category)!;
   const hasFilter = Boolean(searchQuery) || category !== 'all';
+  // The community's dossiers first, the Forum's reason (S7a); VisuaLex's packs after them — on a computer after the
+  // grid, on a phone after its first two cards, so the first screen shows what the community published.
+  const desktop = useIsDesktop();
+  const packs = <StudyPacksBand category={category} onAdded={onPacksAdded} onError={onPacksError} />;
+  const cards = (list: SharedEnvironment[], offset = 0) => (
+    <div className={GRID}>
+      {list.map((env, idx) => (
+        <SharedEnvironmentCard
+          key={env.id}
+          environment={env}
+          onLike={onLike}
+          onImport={onImport}
+          onReport={onReport}
+          onSuggest={onSuggest}
+          isLiking={likingIds.has(env.id)}
+          isFirst={offset + idx === 0}
+        />
+      ))}
+    </div>
+  );
+  const packsInGrid = !desktop && environments.length > PHONE_CARDS_BEFORE_PACKS;
 
   return (
     <>
@@ -205,10 +232,6 @@ export function ForumExploreView({
         />
       )}
 
-      {/* Ready-made study dossiers, then the community's most added */}
-      <StudyPacksBand category={category} onAdded={onPacksAdded} onError={onPacksError} />
-      <TopEnvironmentsWidget onImport={onImport} />
-
       {/* Results count */}
       {!loading && (
         <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -218,7 +241,7 @@ export function ForumExploreView({
 
       {/* Grid */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+        <div className={GRID}>
           {[...Array(6)].map((_, i) => (
             <div
               key={i}
@@ -275,21 +298,14 @@ export function ForumExploreView({
             }
           />
         )
+      ) : packsInGrid ? (
+        <>
+          {cards(environments.slice(0, PHONE_CARDS_BEFORE_PACKS))}
+          {packs}
+          {cards(environments.slice(PHONE_CARDS_BEFORE_PACKS), PHONE_CARDS_BEFORE_PACKS)}
+        </>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-          {environments.map((env, idx) => (
-            <SharedEnvironmentCard
-              key={env.id}
-              environment={env}
-              onLike={onLike}
-              onImport={onImport}
-              onReport={onReport}
-              onSuggest={onSuggest}
-              isLiking={likingIds.has(env.id)}
-              isFirst={idx === 0}
-            />
-          ))}
-        </div>
+        cards(environments)
       )}
 
       {/* Pagination */}
@@ -314,6 +330,10 @@ export function ForumExploreView({
           </button>
         </div>
       )}
+
+      {/* VisuaLex's packs after the community's dossiers (unless placed among them on a phone), then the most added. */}
+      {!packsInGrid && packs}
+      <TopEnvironmentsWidget onImport={onImport} />
     </>
   );
 }

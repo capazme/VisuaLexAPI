@@ -1,4 +1,4 @@
-import { Heart, Download, Eye, MoreHorizontal, Flag, User, Edit, EyeOff, History, Lightbulb, MessageSquare, Trash2, FolderPlus } from 'lucide-react';
+import { Heart, Eye, MoreHorizontal, Flag, Edit, EyeOff, History, Lightbulb, MessageSquare, Trash2, FolderPlus } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import type { SharedEnvironment, EnvironmentCategory } from '../../../types';
 import { formatDistanceToNow } from 'date-fns';
@@ -6,6 +6,7 @@ import { it } from 'date-fns/locale';
 import { FORUM_CATEGORIES } from '../../../utils/forumCategories';
 import { tagLabel } from '../../../utils/tagLabel';
 import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
+import { cn } from '../../../lib/utils';
 
 interface SharedEnvironmentCardProps {
   environment: SharedEnvironment;
@@ -26,28 +27,11 @@ interface SharedEnvironmentCardProps {
   isFirst?: boolean;
 }
 
-// Category text color (used for the micro-header label).
-const CATEGORY_TEXT: Record<EnvironmentCategory, string> = {
-  compliance: 'text-purple-700 dark:text-purple-300',
-  civil: 'text-blue-700 dark:text-blue-300',
-  penal: 'text-red-700 dark:text-red-300',
-  administrative: 'text-amber-700 dark:text-amber-300',
-  eu: 'text-indigo-700 dark:text-indigo-300',
-  other: 'text-slate-600 dark:text-slate-300',
-};
+/** A category's hue, from the category palette's tokens (light and dark): the card's leading stripe and the meta line's dot. */
+const categoryHue = (c: EnvironmentCategory) => `hsl(var(--category-${c}))`;
 
-// Tailwind-500 hex per category — drives the 4px leading-edge stripe via
-// inline style. Mirrors the environments polish pattern (56e3205) where
-// the stripe color came from an HSL CSS variable; here we map directly
-// because EnvironmentCategory doesn't carry a CSS variable.
-const CATEGORY_STRIPE: Record<EnvironmentCategory, string> = {
-  compliance: '#a855f7',
-  civil: '#3b82f6',
-  penal: '#ef4444',
-  administrative: '#f59e0b',
-  eu: '#6366f1',
-  other: '#64748b',
-};
+/** The tags shown on a card (S7a): two, then «+N». */
+const TAGS_SHOWN = 2;
 
 const categoryLabel = (c: EnvironmentCategory) => FORUM_CATEGORIES.find((o) => o.value === c)?.label ?? 'Altro';
 
@@ -69,8 +53,8 @@ export function SharedEnvironmentCard({
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const categoryTextClass = CATEGORY_TEXT[environment.category];
-  const stripeColor = CATEGORY_STRIPE[environment.category];
+  const hue = categoryHue(environment.category);
+  const titleId = `forum-card-${environment.id}`;
   const isWithdrawn = !environment.isActive;
   const hasPendingSuggestions = (environment.pendingSuggestionsCount ?? 0) > 0;
 
@@ -99,62 +83,46 @@ export function SharedEnvironmentCard({
   const timeAgoRelative = !Number.isNaN(timeSourceMs)
     ? formatDistanceToNow(new Date(timeSourceMs), { addSuffix: true, locale: it })
     : null;
-  const timeAgo = timeAgoRelative
-    ? wasEdited
-      ? `Aggiornato ${timeAgoRelative}`
-      : `Creato ${timeAgoRelative}`
-    : null;
   const timeAbsolute = !Number.isNaN(timeSourceMs)
-    ? new Date(timeSourceIso).toLocaleString('it-IT', { dateStyle: 'medium', timeStyle: 'short' })
+    ? `${wasEdited ? 'Aggiornato' : 'Creato'} il ${new Date(timeSourceIso).toLocaleString('it-IT', { dateStyle: 'medium', timeStyle: 'short' })}`
     : undefined;
 
   return (
-    <div
+    // One card a dossier (S7a): as tall as its row in the grid, its one action at its foot.
+    <article
       id={isFirst ? 'tour-forum-card' : undefined}
-      className={`group relative bg-white dark:bg-slate-800 rounded-xl border shadow-sm hover:shadow-md transition-[color,background-color,border-color,box-shadow,opacity] duration-200 overflow-hidden ${
-      isWithdrawn
-        ? 'border-slate-300 dark:border-slate-600 opacity-75'
-        : 'border-slate-200 dark:border-slate-700'
-    }`}>
-      {/* Category Stripe (4px leading edge) — same pattern as EnvironmentCard
-          and DossierArticleRow. Replaces the former horizontal category
-          banner that duplicated bg/border colour signals. */}
-      <span
-        aria-hidden="true"
-        className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl"
-        style={{ backgroundColor: stripeColor }}
-      />
+      aria-labelledby={titleId}
+      className={cn(
+        'group relative flex h-full flex-col rounded-xl border bg-white transition-colors dark:bg-slate-900',
+        isWithdrawn ? 'border-slate-300 opacity-75 dark:border-slate-600' : 'border-slate-200 dark:border-slate-700',
+      )}
+    >
+      {/* The category's hue down the leading edge, from its token; no clipping on the card, so the «⋯» menu can hang out. */}
+      <span aria-hidden="true" className="absolute -bottom-px -left-px -top-px w-1 rounded-l-xl" style={{ backgroundColor: hue }} />
 
-      {/* Content */}
-      <div className="p-4 pl-5">
-        {/* Micro-header: category label + version + status badges + 3-dot menu */}
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <span className={`text-xs font-semibold uppercase tracking-wide ${categoryTextClass}`}>
-              {categoryLabel(environment.category)}
-            </span>
-            <span className="text-xs text-slate-500 dark:text-slate-400 flex-shrink-0">
-              v{environment.currentVersion}
-            </span>
-          </div>
-          <div className="flex items-center gap-1 flex-shrink-0">
-            {/* Withdrawn badge */}
+      <div className="flex flex-1 flex-col p-4 pl-5">
+        {/* The title, the badges of the state, the «⋯» menu. */}
+        <div className="flex items-start gap-2">
+          <h3 id={titleId} className="min-w-0 flex-1 break-words font-serif text-lg font-medium leading-snug text-slate-900 line-clamp-2 dark:text-slate-50">
+            {environment.title}
+          </h3>
+          <div className="flex shrink-0 items-center gap-1">
             {isWithdrawn && (
-              <span className="px-2 py-0.5 text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-full flex items-center gap-1">
-                <EyeOff size={10} />
+              <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                <EyeOff size={12} aria-hidden />
                 Ritirato
               </span>
             )}
-            {/* Pending suggestions badge */}
             {hasPendingSuggestions && environment.isOwner && (
-              <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full flex items-center gap-1">
-                <MessageSquare size={10} />
+              <span className="flex items-center gap-1 rounded-full bg-primary-50 px-2 py-0.5 text-xs font-medium text-primary-800 dark:bg-primary-900/30 dark:text-primary-200">
+                <MessageSquare size={12} aria-hidden />
                 {environment.pendingSuggestionsCount}
+                <span className="sr-only"> suggerimenti in attesa</span>
               </span>
             )}
-            {/* Owner badge (only when the card is in the Explore grid — the My tab hides it since the whole column is already "your" environments) */}
+            {/* The user's own, in Explore (the «I miei pubblicati» tab is all theirs). */}
             {environment.isOwner && !showOwnerActions && (
-              <span className="px-2 py-0.5 text-xs font-medium bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-full">
+              <span className="rounded-full bg-primary-50 px-2 py-0.5 text-xs font-medium text-primary-800 dark:bg-primary-900/30 dark:text-primary-200">
                 Tuo
               </span>
             )}
@@ -268,91 +236,83 @@ export function SharedEnvironmentCard({
           </div>
         </div>
 
-        {/* Title & Description */}
-        <h3 className="font-semibold text-slate-900 dark:text-white mb-1 line-clamp-1">
-          {environment.title}
-        </h3>
-        {environment.description && (
-          <p className="text-sm text-slate-600 dark:text-slate-400 mb-3 line-clamp-2">
-            {environment.description}
-          </p>
-        )}
-
-        {/* Tags */}
-        {environment.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-3">
-            {environment.tags.slice(0, 3).map((tag, idx) => (
-              <span
-                key={idx}
-                className="px-2 py-0.5 text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 rounded-full"
-              >
-                {tagLabel(tag)}
-              </span>
-            ))}
-            {environment.tags.length > 3 && (
-              <span className="px-2 py-0.5 text-xs text-slate-500 dark:text-slate-500">
-                +{environment.tags.length - 3}
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Stats */}
-        <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400 mb-3">
-          <span className="flex items-center gap-1">
-            <Heart size={12} className={environment.userLiked ? 'fill-red-500 text-red-500' : ''} />
-            {environment.likeCount}
-          </span>
-          <span className="flex items-center gap-1">
-            <Download size={12} />
-            {environment.downloadCount}
-          </span>
-          <span className="flex items-center gap-1">
-            <Eye size={12} />
-            {environment.viewCount}
-          </span>
-        </div>
-
-        {/* Author & Time */}
-        <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-4">
-          <span className="flex items-center gap-1">
-            <User size={12} />
-            {environment.user.username}
-          </span>
-          {timeAgo && (
-            <span title={timeAbsolute} className="truncate max-w-[60%] text-right">
-              {timeAgo}
-            </span>
+        {/* The category, the version, the author and how long ago, in one line of plain text. */}
+        <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-sm text-slate-600 dark:text-slate-400">
+          <span aria-hidden className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: hue }} />
+          <span>{categoryLabel(environment.category)}</span>
+          <span aria-hidden>·</span>
+          <span>v{environment.currentVersion}</span>
+          <span aria-hidden>·</span>
+          <span className="min-w-0 break-all">{environment.user.username}</span>
+          {timeAgoRelative && (
+            <>
+              <span aria-hidden>·</span>
+              <span title={timeAbsolute}>{timeAgoRelative}</span>
+            </>
           )}
-        </div>
+        </p>
+        {environment.description && (
+          <p className="mt-2 line-clamp-2 text-sm text-slate-700 dark:text-slate-300">{environment.description}</p>
+        )}
 
-        {/* Actions */}
-        <div className="flex gap-2">
+        {environment.tags.length > 0 && (
+          <ul aria-label="Etichette" className="mt-3 flex flex-wrap gap-1">
+            {environment.tags.slice(0, TAGS_SHOWN).map((tag, idx) => (
+              <li key={idx} className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                {tagLabel(tag)}
+              </li>
+            ))}
+            {environment.tags.length > TAGS_SHOWN && (
+              <li className="px-1 py-0.5 text-xs text-slate-600 dark:text-slate-400">
+                <span aria-hidden>+{environment.tags.length - TAGS_SHOWN}</span>
+                <span className="sr-only">{`e altre ${environment.tags.length - TAGS_SHOWN}`}</span>
+              </li>
+            )}
+          </ul>
+        )}
+
+        {/* At the foot: «Mi piace» as its heart and count, then the card's one action, outlined. */}
+        <div className="mt-auto flex items-center gap-2 pt-4">
           <button
+            type="button"
             onClick={() => onLike(environment.id)}
             disabled={isLiking}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-medium transition-[color,background-color,border-color,opacity] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${TOUCH_TARGET_RESPONSIVE} ${
+            aria-pressed={environment.userLiked}
+            aria-label={`Mi piace: ${environment.likeCount}`}
+            className={cn(
+              'inline-flex min-w-[44px] shrink-0 items-center justify-center gap-1.5 rounded-lg px-2 text-sm tabular-nums transition-colors disabled:opacity-50 md:min-w-0',
+              TOUCH_TARGET_RESPONSIVE,
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900',
               environment.userLiked
-                ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800'
-                : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
-            } disabled:opacity-50`}
+                ? 'text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20'
+                : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800',
+            )}
           >
-            <Heart size={16} className={environment.userLiked ? 'fill-current' : ''} />
-            {environment.userLiked ? 'Piaciuto' : 'Mi piace'}
+            <Heart size={18} aria-hidden className={environment.userLiked ? 'fill-current' : ''} />
+            <span aria-hidden>{environment.likeCount}</span>
           </button>
+          {environment.downloadCount > 0 && (
+            <span className="text-sm text-slate-600 dark:text-slate-400">
+              {environment.downloadCount === 1 ? 'Aggiunto 1 volta' : `Aggiunto ${environment.downloadCount} volte`}
+            </span>
+          )}
           {!environment.isOwner && (
             <button
+              type="button"
               onClick={() => onImport(environment)}
               aria-label={`Aggiungi «${environment.title}» ai miei dossier`}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${TOUCH_TARGET_RESPONSIVE}`}
+              className={cn(
+                'ml-auto inline-flex items-center justify-center gap-1.5 rounded-lg border border-primary-600 px-3 py-2 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-50 dark:border-primary-400 dark:text-primary-300 dark:hover:bg-primary-900/30',
+                TOUCH_TARGET_RESPONSIVE,
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900',
+              )}
             >
               <FolderPlus size={16} aria-hidden />
-              Ai miei dossier
+              Aggiungi ai miei dossier
             </button>
           )}
         </div>
       </div>
-
-    </div>
+    </article>
   );
 }

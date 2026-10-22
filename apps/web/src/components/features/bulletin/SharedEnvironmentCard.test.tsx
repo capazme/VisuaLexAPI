@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SharedEnvironmentCard } from './SharedEnvironmentCard';
 import type { SharedEnvironment } from '../../../types';
@@ -55,9 +55,9 @@ describe('SharedEnvironmentCard «Ai miei dossier»', () => {
     expect(menu).toHaveClass('min-h-[44px]', 'min-w-[44px]', 'md:min-h-0', 'md:min-w-0');
   });
 
-  it('gives «Mi piace» and «Ai miei dossier» a 44 px touch target on a phone', () => {
+  it('gives «Mi piace» and «Aggiungi ai miei dossier» a 44 px touch target on a phone', () => {
     renderCard(base);
-    expect(screen.getByRole('button', { name: /Mi piace/ })).toHaveClass('min-h-[44px]', 'md:min-h-0');
+    expect(screen.getByRole('button', { name: /Mi piace/ })).toHaveClass('min-h-[44px]', 'min-w-[44px]', 'md:min-h-0');
     expect(screen.getByRole('button', { name: /Aggiungi «Ricorso Rossi» ai miei dossier/ })).toHaveClass('min-h-[44px]', 'md:min-h-0');
   });
 });
@@ -67,5 +67,52 @@ describe('SharedEnvironmentCard — its tags', () => {
     renderCard({ ...base, tags: ['appello', 'GDPR'] });
     expect(screen.getByText('Appello')).toBeInTheDocument();
     expect(screen.getByText('GDPR')).toBeInTheDocument();
+  });
+});
+
+// The card as S7a draws it: the title in Newsreader, one plain line of who and when, two tags at most, «Mi piace» an
+// icon with its number, one action, outlined.
+describe('SharedEnvironmentCard — its shape (S7a)', () => {
+  it('titles it in Newsreader 18 px and says the category, the version, the author and when in one plain line', () => {
+    renderCard({ ...base, createdAt: new Date(Date.now() - 2 * 86400000).toISOString(), updatedAt: new Date(Date.now() - 2 * 86400000).toISOString() });
+    const card = screen.getByRole('article', { name: 'Ricorso Rossi' });
+    expect(screen.getByRole('heading', { name: 'Ricorso Rossi' })).toHaveClass('font-serif', 'text-lg');
+    const line = within(card).getByText('Civile').parentElement!;
+    expect(line).toHaveClass('text-sm');
+    expect(line.className).not.toMatch(/uppercase/);
+    expect(line).toHaveTextContent('Civile·v1·autore·2 giorni fa');
+  });
+
+  it('shows two tags at most, then «+N»', () => {
+    renderCard({ ...base, tags: ['appello', 'gdpr', 'locazione', 'mora'] });
+    const tags = within(screen.getByRole('list', { name: 'Etichette' })).getAllByRole('listitem');
+    expect(tags.map((tag) => tag.textContent)).toEqual(['Appello', 'Gdpr', '+2e altre 2']);
+  });
+
+  it('draws «Mi piace» as a heart with its number, pressed when liked, and passes the card on', async () => {
+    const onLike = vi.fn();
+    render(<SharedEnvironmentCard environment={{ ...base, likeCount: 7, userLiked: true }} onLike={onLike} onImport={vi.fn()} onReport={vi.fn()} />);
+    const like = screen.getByRole('button', { name: 'Mi piace: 7' });
+    expect(like).toHaveAttribute('aria-pressed', 'true');
+    expect(like).toHaveTextContent(/^7$/);
+    await userEvent.click(like);
+    expect(onLike).toHaveBeenCalledWith('env-1');
+  });
+
+  it('has one action, outlined, not filled', () => {
+    renderCard(base);
+    const add = screen.getByRole('button', { name: /Aggiungi «Ricorso Rossi» ai miei dossier/ });
+    expect(add).toHaveTextContent('Aggiungi ai miei dossier');
+    expect(add).toHaveClass('border', 'border-primary-600');
+    expect(add.className).not.toMatch(/bg-primary-600/);
+    // Only the like, the action and the «⋯» menu: no counter of views or downloads drawn as bare numbers.
+    expect(screen.getAllByRole('button')).toHaveLength(3);
+  });
+
+  it('takes the category\'s hue from its token, not a hand-written colour', () => {
+    const { container } = renderCard({ ...base, category: 'penal' });
+    const hued = [...container.querySelectorAll<HTMLElement>('[style]')].map((el) => el.style.backgroundColor);
+    expect(hued.length).toBeGreaterThan(0);
+    for (const colour of hued) expect(colour).toBe('hsl(var(--category-penal))');
   });
 });
