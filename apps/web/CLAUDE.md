@@ -85,8 +85,10 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   once, in the page, and `LoginForm` takes it as a prop. The card takes the height of the form shown (A1c,
   Luca, 22 Oct 2026; it replaced A1b's card as tall as the taller form, which left «Accedi» a box of empty space):
   both forms stay mounted, the one not shown out of the flow (`absolute` from the box's top), `invisible` and
-  `inert`, and the box that holds them takes the shown one's height, measured (`ResizeObserver`), in 220 ms from a
-  change of tab on (at once under reduced motion; clipping only while it moves); each form keeps what was typed in
+  `inert`, and the box that holds them is as tall as the shown one (`height: auto`, always clipped by `overflow: clip`,
+  which makes no scroller); only across a change of tab is its height written, from where the box is to the new
+  form's, read after the commit (a fresh «Registrati» after a sign-up), in 220 ms, let go at `transitionend` (at once
+  under reduced motion); each form keeps what was typed in
   it, and its error (after a
   sign-up, the confirmation stays until the tab changes, and back on «Registrati» a new key mounts the form
   empty; «Torna ad Accedi» finds a fresh sign-in form too, a new key, with the failure the page's `useAuth`

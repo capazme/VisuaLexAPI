@@ -126,12 +126,13 @@ export function AuthPage() {
   // change of tab is its height written, from the form leaving's to the form coming in's, and let go when the
   // transition ends (or, should none come, a little after it).
   const [boxHeight, setBoxHeight] = useState<number | null>(null);
-  const boxTarget = useRef<number | null>(null);
+  // A change of tab on its way: the height of the form coming in is read once it is committed (see below).
+  const boxChanging = useRef(false);
   const boxTimer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(boxTimer.current), []);
   const letBoxGo = () => {
     window.clearTimeout(boxTimer.current);
-    boxTarget.current = null;
+    boxChanging.current = false;
     setBoxHeight(null);
   };
   // The page centres the card by its height on «Accedi» (`--login-card-h`): measured as it opens, when the window's
@@ -162,11 +163,14 @@ export function AuthPage() {
     };
   }, []);
   // The second half of a change of tab: once the box holds the old height (the render of the change), the new one,
-  // which the transition then runs to.
+  // which the transition then runs to. Read here, after the commit, not as the tab is chosen: «Registrati» after a
+  // sign-up is mounted afresh by then (a new key), its empty form, not the confirmation it showed. The read also makes
+  // the browser apply the old height first, so the change moves from the keyboard too (the arrows, Home, End).
   useEffect(() => {
-    if (boxTarget.current === null) return undefined;
+    if (!boxChanging.current) return undefined;
+    const target = heightOf(panelOf(tab));
     const frame = requestAnimationFrame(() => {
-      if (boxTarget.current !== null) setBoxHeight(boxTarget.current);
+      if (boxChanging.current) setBoxHeight(target);
     });
     return () => cancelAnimationFrame(frame);
   }, [tab]);
@@ -195,7 +199,7 @@ export function AuthPage() {
     if (moves) {
       // From where the box is (halfway through another change, its height on the way) to the form coming in.
       setBoxHeight(heightOf(frameRef.current));
-      boxTarget.current = heightOf(panelOf(next));
+      boxChanging.current = true;
       window.clearTimeout(boxTimer.current);
       boxTimer.current = window.setTimeout(letBoxGo, 400);
     }
@@ -334,7 +338,8 @@ export function AuthPage() {
                   the first paint, none under reduced motion). The form hidden leaves the flow, from the box's top:
                   it keeps what was typed in it, fades out (its `visibility` follows at the end of the fade) and is
                   out of reach meanwhile (`inert`). The panels' 8 px padding keeps the fields' focus rings, and the 8
-                  px a form comes in from, inside the card; the box clips only while its height moves. */}
+                  px a form comes in from, inside the card. At rest its height is the shown form's own (`auto`); only
+                  across a change of tab is it written, and it always clips. */}
               <div
                 ref={frameRef}
                 // Always clipped, and by `clip`, which makes no scroller: the form out of the flow, taller, would

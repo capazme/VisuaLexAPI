@@ -337,6 +337,48 @@ describe('AuthPage: two tabs on one page', () => {
     expect(document.getElementById('auth-panel-register')).toHaveAttribute('inert');
   });
 
+  /** The forms' heights as a browser would give them: «Registrati» showing its confirmation is short. */
+  const layOut = () => {
+    const shown = () => document.querySelector('[role="tabpanel"]:not([aria-hidden])')!;
+    const heightOfPanel = (el: Element) => (el.id === 'auth-panel-login' ? 300 : el.querySelector('h2')?.textContent === 'Registrazione completata' ? 300 : 560);
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      let height = 0;
+      if (this.id === 'auth-panel-login' || this.id === 'auth-panel-register') height = heightOfPanel(this);
+      else if (this.tagName === 'MAIN') height = 120 + heightOfPanel(shown());
+      else if (this.querySelector(':scope > #auth-panel-login')) height = this.style.height ? parseFloat(this.style.height) : heightOfPanel(shown());
+      return { height, width: 0, top: 0, left: 0, right: 0, bottom: height, x: 0, y: 0, toJSON: () => ({}) } as DOMRect;
+    });
+  };
+
+  it('after a sign-up, back on «Registrati» the box runs to the empty form\'s height, not the confirmation\'s', async () => {
+    layOut();
+    renderAuth('/register');
+    const p = within(panel());
+    fireEvent.change(p.getByLabelText('Email'), { target: { value: 'avv@studio.it' } });
+    fireEvent.change(p.getByLabelText('Username'), { target: { value: 'avv_rossi' } });
+    fireEvent.change(p.getByLabelText('Password'), { target: { value: 'Segreta123' } });
+    fireEvent.change(p.getByLabelText('Conferma password'), { target: { value: 'Segreta123' } });
+    fireEvent.click(p.getByRole('button', { name: 'Crea account' }));
+    await screen.findByRole('heading', { name: 'Registrazione completata' });
+    const frame = document.getElementById('auth-panel-login')!.parentElement!;
+    fireEvent.click(within(panel()).getByRole('button', { name: 'Torna ad Accedi' }));
+    heightEnds(frame);
+    fireEvent.click(tab('Registrati'));
+    // Read once the fresh form is mounted: its 560 px, not the 300 of the confirmation it replaced.
+    await waitFor(() => expect(frame.style.height).toBe('560px'));
+    expect(within(panel()).getByLabelText('Email')).toHaveValue('');
+  });
+
+  it('moves the height from the keyboard too: the arrows go from the old height to the new', async () => {
+    layOut();
+    renderAuth('/login');
+    const frame = document.getElementById('auth-panel-login')!.parentElement!;
+    fireEvent.keyDown(tab('Accedi'), { key: 'ArrowRight' });
+    expect(frame.style.height).toBe('300px');
+    expect(frame).toHaveClass('transition-[height]');
+    await waitFor(() => expect(frame.style.height).toBe('560px'));
+  });
+
   it('under reduced motion the change is immediate: no form fading out, none sliding in', () => {
     reduceMotion(true);
     renderAuth('/login');
