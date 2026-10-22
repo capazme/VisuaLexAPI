@@ -8,17 +8,19 @@ vi.unmock('./useTour');
 type DriverOptions = {
   onDestroyStarted?: () => void;
   onDestroyed?: () => void;
-  onPopoverRender?: (popover: { closeButton: HTMLButtonElement }) => void;
+  onPopoverRender?: (popover: { closeButton: HTMLButtonElement; wrapper: HTMLElement }) => void;
   steps: unknown[];
 };
-const made: Array<{ active: boolean; destroy: () => void; options: DriverOptions }> = [];
+const made: Array<{ active: boolean; destroy: () => void; options: DriverOptions; element: Element | null }> = [];
 vi.mock('driver.js', () => ({
   driver: (options: DriverOptions) => {
     const d = {
       active: false,
       options,
+      element: null as Element | null,
       drive() { d.active = true; },
       isActive: () => d.active,
+      getActiveElement: () => d.element ?? undefined,
       destroy() { d.active = false; options.onDestroyed?.(); },
     };
     made.push(d);
@@ -82,7 +84,90 @@ describe('useTour — the popover speaks Italian', () => {
     act(() => { result.current.startTour('welcome'); });
     const closeButton = document.createElement('button');
     closeButton.setAttribute('aria-label', 'Close');
-    made[0].options.onPopoverRender?.({ closeButton });
+    made[0].options.onPopoverRender?.({ closeButton, wrapper: document.createElement('div') });
     expect(closeButton).toHaveAttribute('aria-label', 'Chiudi');
+  });
+});
+
+describe('useTour — the focus it gives (Y1)', () => {
+  const popover = () => {
+    const wrapper = document.createElement('div');
+    const closeButton = document.createElement('button');
+    wrapper.append(closeButton);
+    document.body.append(wrapper);
+    return { wrapper, closeButton };
+  };
+
+  it('a focus given to its ✕ after a click shows no ring until it leaves', () => {
+    const { result } = renderHook(() => useTour());
+    act(() => { result.current.startTour('welcome'); });
+    window.dispatchEvent(new Event('pointerdown'));
+    const p = popover();
+    made[0].options.onPopoverRender?.(p);
+    p.closeButton.focus();
+    expect(p.closeButton).toHaveAttribute('data-pointer-focus');
+    p.closeButton.blur();
+    expect(p.closeButton).not.toHaveAttribute('data-pointer-focus');
+  });
+
+  it('a tour that starts after some typing still gives its first focus no ring', () => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    const { result } = renderHook(() => useTour());
+    act(() => { result.current.startTour('welcome'); });
+    const p = popover();
+    made[0].options.onPopoverRender?.(p);
+    p.closeButton.focus();
+    expect(p.closeButton).toHaveAttribute('data-pointer-focus');
+  });
+
+  it('after a key pressed in the tour, the focus keeps its ring', () => {
+    const { result } = renderHook(() => useTour());
+    act(() => { result.current.startTour('welcome'); });
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab' }));
+    const p = popover();
+    made[0].options.onPopoverRender?.(p);
+    p.closeButton.focus();
+    expect(p.closeButton).not.toHaveAttribute('data-pointer-focus');
+  });
+});
+
+describe('useTour — a window that changes its layout (Y1)', () => {
+  const resizeTo = (width: number) => {
+    Object.defineProperty(window, 'innerWidth', { value: width, configurable: true });
+    act(() => {
+      window.dispatchEvent(new Event('resize'));
+      vi.advanceTimersByTime(20);
+    });
+  };
+
+  it('closes the tour when the window passes to another layout, and leaves it unseen', () => {
+    const { result } = renderHook(() => useTour());
+    act(() => { result.current.startTour('welcome'); });
+    resizeTo(1100);
+    expect(made[0].active).toBe(true);
+    resizeTo(390);
+    expect(made[0].active).toBe(false);
+    expect(seen('welcome')).toBe(false);
+  });
+
+  it('closes it when the element it points at is no longer drawn', () => {
+    const { result } = renderHook(() => useTour());
+    act(() => { result.current.startTour('welcome'); });
+    const element = document.getElementById('tour-sidebar')!;
+    made[0].element = element;
+    element.getClientRects = () => [{}] as unknown as DOMRectList;
+    resizeTo(1300);
+    expect(made[0].active).toBe(true);
+    element.getClientRects = () => [] as unknown as DOMRectList;
+    resizeTo(1310);
+    expect(made[0].active).toBe(false);
+  });
+
+  it('stops listening once the tour is gone', () => {
+    const remove = vi.spyOn(window, 'removeEventListener');
+    const { result } = renderHook(() => useTour());
+    act(() => { result.current.startTour('welcome'); });
+    act(() => { made[0].destroy(); });
+    expect(remove).toHaveBeenCalledWith('resize', expect.any(Function));
   });
 });

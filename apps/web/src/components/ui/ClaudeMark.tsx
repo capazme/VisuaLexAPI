@@ -21,7 +21,7 @@ export function ClaudeMark({ createdBy, compact = false }: Props) {
     // Never wider than its row: an application's name can be long, and a mark that would not shrink pushed a phone's
     // page sideways in «Le mie schede» (G8b); its words wrap instead.
     <span
-      className="inline-flex max-w-full items-center gap-1 rounded bg-violet-50 px-1.5 py-0.5 text-[11px] font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-300"
+      className="inline-flex max-w-full items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300"
       title={sentence}
     >
       <Sparkles size={11} aria-hidden className="shrink-0" />

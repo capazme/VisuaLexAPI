@@ -311,8 +311,13 @@ describe('PracticeActBlock: the structure window and the arrows (§6.4)', () => 
   it('on a desktop Struttura owns the window', async () => {
     const { practiceId, actId } = setUp(L24_URN, [article(L24, '5')]);
     render(<Block practiceId={practiceId} actId={actId} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Struttura della norma' }));
+    const structure = screen.getByRole('button', { name: 'Struttura della norma' });
+    // It opens a window: expanded, not pressed (R3b).
+    expect(structure).toHaveAttribute('aria-expanded', 'false');
+    expect(structure).not.toHaveAttribute('aria-pressed');
+    fireEvent.click(structure);
     expect(s().structureWindow.blockId).toBe(actId);
+    expect(screen.getByRole('button', { name: 'Struttura della norma' })).toHaveAttribute('aria-expanded', 'true');
     await waitFor(() => expect(lastTree()).toEqual(expect.objectContaining({ variant: 'window', isOpen: true })));
     expect(h.trees.every((t) => t.variant === 'window')).toBe(true);
   });

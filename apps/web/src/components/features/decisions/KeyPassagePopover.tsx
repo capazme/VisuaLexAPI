@@ -69,7 +69,7 @@ export function KeyPassagePopover({ kind, anchorEl, onMakeOwn, onHideAll, onClos
           <div
             style={{ transformOrigin: getTransformOrigin(placement) }}
             className={cn(
-              'w-64 rounded-lg border border-teal-200 bg-white p-1.5 shadow-xl dark:border-teal-900/60 dark:bg-slate-900',
+              'w-64 rounded-lg border border-teal-200 bg-white p-1.5 shadow-md dark:border-teal-900/60 dark:bg-slate-900',
               'animate-in fade-in zoom-in-95 duration-150',
             )}
           >

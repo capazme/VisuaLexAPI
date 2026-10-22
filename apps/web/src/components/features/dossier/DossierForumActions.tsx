@@ -105,7 +105,7 @@ export function DossierForumActions({ dossier, showToast, buttonClassName }: Pro
           aria-label={blocked ? 'Ritirato dai dossier pubblici' : 'Pubblica nel Forum'}
           // The look `MenuButton` gives the header's other triggers.
           className={cn(
-            'inline-flex items-center gap-2 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
+            'inline-flex items-center gap-2 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
             buttonClassName,
             'disabled:cursor-not-allowed disabled:opacity-40',
           )}

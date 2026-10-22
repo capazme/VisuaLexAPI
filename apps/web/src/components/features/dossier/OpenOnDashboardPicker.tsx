@@ -21,13 +21,13 @@ export function OpenOnDashboardPicker({ groups, onPick, onPickAll, onClose }: Pr
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-md border border-slate-200 dark:border-slate-800">
+      <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-lg w-full max-w-md border border-slate-200 dark:border-slate-800">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
           <h3 className="font-semibold text-lg text-slate-900 dark:text-white">Quale norma aprire?</h3>
           <button
             onClick={onClose}
             aria-label="Chiudi"
-            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
           >
             <X size={18} />
           </button>
@@ -41,9 +41,9 @@ export function OpenOnDashboardPicker({ groups, onPick, onPickAll, onClose }: Pr
           <button
             type="button"
             onClick={onPickAll}
-            className="w-full text-left px-4 py-3 rounded-lg border border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 flex items-start gap-3"
+            className="w-full text-left px-4 py-3 rounded-lg border border-primary-300 dark:border-primary-700 bg-primary-50 dark:bg-primary-900/20 hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 flex items-start gap-3"
           >
-            <Layers size={18} className="text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+            <Layers size={18} className="text-primary-600 dark:text-primary-400 flex-shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
               <div className="font-medium text-sm text-slate-900 dark:text-white">
                 Apri tutto
@@ -65,9 +65,9 @@ export function OpenOnDashboardPicker({ groups, onPick, onPickAll, onClose }: Pr
               key={g.key}
               type="button"
               onClick={() => onPick(g)}
-              className="w-full text-left px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 flex items-start gap-3"
+              className="w-full text-left px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-primary-300 dark:hover:border-primary-700 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 flex items-start gap-3"
             >
-              <BookOpen size={18} className="text-blue-500 flex-shrink-0 mt-0.5" />
+              <BookOpen size={18} className="text-primary-500 flex-shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
                 <div className="font-medium text-sm text-slate-900 dark:text-white truncate">
                   {actHeading(g)}
@@ -89,7 +89,7 @@ export function OpenOnDashboardPicker({ groups, onPick, onPickAll, onClose }: Pr
         <div className="flex justify-end px-6 py-3 border-t border-slate-200 dark:border-slate-800">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
           >
             Annulla
           </button>

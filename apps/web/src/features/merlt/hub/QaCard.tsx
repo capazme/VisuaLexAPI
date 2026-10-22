@@ -70,7 +70,7 @@ export function QaCard({ qaAskable, lastQa }: QaCardProps) {
             {lastQa.data.query}
           </p>
           {confidenceLabel(lastQa.data.confidence) && (
-            <span className="mt-2 inline-flex w-fit items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+            <span className="mt-2 inline-flex w-fit items-center rounded-full bg-primary-50 px-2 py-0.5 text-[11px] font-medium text-primary-700 dark:bg-primary-950/40 dark:text-primary-300">
               {confidenceLabel(lastQa.data.confidence)}
             </span>
           )}

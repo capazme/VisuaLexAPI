@@ -31,7 +31,7 @@ export function VersionStatusChip({ chip, onClick }: VersionStatusChipProps) {
             title={chip.title}
             aria-haspopup="dialog"
             className={cn(
-                'inline-flex min-h-[44px] items-center gap-1.5 rounded-md text-left text-sm transition-colors md:min-h-0',
+                'inline-flex min-h-[44px] items-center gap-1 rounded-md text-left text-sm transition-colors md:min-h-0 md:gap-1.5',
                 'underline-offset-4 hover:underline',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
                 TONE[chip.tone],
