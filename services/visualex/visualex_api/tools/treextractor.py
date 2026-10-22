@@ -780,7 +780,8 @@ def _extract_eurlex_rubriche(soup):
 
 
 # "del 27 aprile 2016", "dell'8 giugno 2000": the line between an act's name and its subject.
-_EURLEX_DATE_LINE = re.compile(r"^dell?['’\s]", re.IGNORECASE)
+# A digit after it: «DEL PARLAMENTO EUROPEO…», an act's name split over two lines, is no date.
+_EURLEX_DATE_LINE = re.compile(r"^dell?['’\s]\s*\d", re.IGNORECASE)
 # The legacy page's description: "Direttiva 2002/58/CE del Parlamento europeo e del Consiglio, del 12 luglio 2002, relativa al …".
 _EURLEX_DESCRIPTION_SUBJECT = re.compile(
     r",\s*dell?['’\s]\s*\d{1,2}[°º]?\s+\S+\s+\d{4}\s*,\s*(.+)$", re.IGNORECASE | re.DOTALL)

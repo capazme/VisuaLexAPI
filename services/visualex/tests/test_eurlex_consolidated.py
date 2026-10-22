@@ -764,3 +764,11 @@ class TestConsolidatedTitleFromTheFirstRun:
             "nonché alla libera circolazione di tali dati e che abroga la direttiva 95/46/CE "
             "(regolamento generale sulla protezione dei dati)"
         )
+
+    def test_a_name_split_over_two_lines_is_no_date_line(self):
+        # «DEL PARLAMENTO EUROPEO…» opens with «del» but holds no date: the subject follows the date.
+        page = ('<div class="eli-main-title"><p class="oj-doc-ti">REGOLAMENTO (UE) 2016/679</p>'
+                '<p class="oj-doc-ti">DEL PARLAMENTO EUROPEO E DEL CONSIGLIO</p>'
+                '<p class="oj-doc-ti">del 27 aprile 2016</p>'
+                '<p class="oj-doc-ti">relativo alla protezione delle persone fisiche</p></div>')
+        assert _extract_eurlex_title(BeautifulSoup(page, "html.parser")) == "relativo alla protezione delle persone fisiche"
