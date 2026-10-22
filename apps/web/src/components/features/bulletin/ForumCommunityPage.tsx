@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { FolderOpen } from 'lucide-react';
-import { SECTION_TITLES } from '../../../features/sections/sections';
+import { COMMUNITY_PAGE } from '../../../features/sections/pageNames';
 import { PageFrame } from '../../layout/PageFrame';
 import { CommunityMark } from './CommunityMark';
 
@@ -13,7 +13,8 @@ import { CommunityMark } from './CommunityMark';
  */
 export function ForumCommunityPage() {
   return (
-    <PageFrame title={SECTION_TITLES.forum}>
+    // The page's name, from the one list of the pages' names, the Forum's phrase over it (L-37).
+    <PageFrame title={COMMUNITY_PAGE} kicker="forum">
       <section aria-labelledby="forum-community-heading" className="mx-auto flex w-full max-w-md flex-col items-center px-2 py-10 text-center md:py-16">
         <CommunityMark />
         <h2 id="forum-community-heading" className="mt-6 font-serif text-2xl font-medium tracking-tight text-slate-900 dark:text-slate-50">

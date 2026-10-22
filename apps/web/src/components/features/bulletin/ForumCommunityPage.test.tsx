@@ -8,7 +8,7 @@ vi.mock('../../../services/notificationService', () => ({ notificationService: {
 vi.mock('../../../hooks/useTour', () => ({ useTour: () => ({ tryStartTour: forum.tryStartTour }) }));
 
 import { ForumCommunityPage } from './ForumCommunityPage';
-import { SECTION_TITLES } from '../../../features/sections/sections';
+import { SECTION_PHRASES, sectionKicker } from '../../../features/sections/sections';
 
 function renderPage() {
   return render(
@@ -20,12 +20,13 @@ function renderPage() {
 
 // An honest placeholder (F1): it says what is coming and shows nothing that is not there.
 describe('ForumCommunityPage', () => {
-  it('carries the Forum\'s title with its phrase, from the one constant', () => {
+  it('is titled by its name, the Forum\'s phrase small over it, from the one constant (L-37)', () => {
     renderPage();
-    expect(SECTION_TITLES.forum).toBe('Forum: il luogo del dibattito giuridico');
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(SECTION_TITLES.forum);
+    expect(SECTION_PHRASES.forum).toBe('il luogo del dibattito giuridico');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/^Community$/);
+    expect(screen.getByText(sectionKicker('forum'))).toHaveTextContent('Forum · il luogo del dibattito giuridico');
     // Opus's phrase waits for its page.
-    expect(screen.queryByText(SECTION_TITLES.opus)).toBeNull();
+    expect(screen.queryByText(sectionKicker('opus'))).toBeNull();
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
   });
 

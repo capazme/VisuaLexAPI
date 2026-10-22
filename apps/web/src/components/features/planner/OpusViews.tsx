@@ -6,7 +6,7 @@ import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
 import { addDaysToIsoDate, todayInRome } from '../../../utils/dateUtils';
 import type { Task, TaskView } from '../../../types/tasks';
-import { BLOCK_HEADING, QUIET_BUTTON, SECONDARY_BUTTON } from '../studia/progress/tokens';
+import { QUIET_BUTTON, SECONDARY_BUTTON } from '../studia/progress/tokens';
 import { QuickAddField } from './QuickAddField';
 import { restoreTask } from './taskActions';
 import { blockHeading, dayHeading, groupUpcoming, longDay, splitToday, UPCOMING_DAYS, weekStart } from './taskDates';
@@ -60,9 +60,10 @@ function ViewFrame({ view, heading, line, defaults, options, before, children, e
     <section aria-labelledby={`opus-${view}`} className="min-w-0 space-y-5 pb-8">
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">
-          {/* Where the focus goes when the last row leaves (`focusAwayFrom`). */}
-          <h2 id={`opus-${view}`} tabIndex={-1} data-focus-fallback className={cn(BLOCK_HEADING, 'focus-visible:outline-none')}>{heading}</h2>
-          <p className="mt-0.5 text-sm text-slate-600 dark:text-slate-400">{typeof line === 'function' ? line(today) : line}</p>
+          {/* Where the focus goes when the last row leaves (`focusAwayFrom`). Said to a screen reader only: the page's
+              title above already names the view (`OpusPage`, L-37). */}
+          <h2 id={`opus-${view}`} tabIndex={-1} data-focus-fallback className="sr-only">{heading}</h2>
+          <p className="text-sm text-slate-600 dark:text-slate-400">{typeof line === 'function' ? line(today) : line}</p>
         </div>
         {options}
       </div>

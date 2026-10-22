@@ -24,6 +24,7 @@ import { customAliasService } from '../../../services/customAliasService';
 import { notificationService } from '../../../services/notificationService';
 import { publishMerltEvent, MERLT_EVENT_TYPES } from '../../../features/merlt/merltEventBus';
 import type { SharedEnvironment, EnvironmentCategory, SharedEnvironmentListResponse, EnvironmentSuggestion, StudyImportReport } from '../../../types';
+import { PUBLIC_DOSSIERS_PAGE } from '../../../features/sections/pageNames';
 import { PageFrame } from '../../layout/PageFrame';
 
 type TabType = 'explore' | 'my' | 'suggestions';
@@ -399,7 +400,8 @@ export function BulletinBoardPage() {
 
   return (
     <PageFrame
-      title="Dossier pubblici"
+      title={PUBLIC_DOSSIERS_PAGE}
+      kicker="forum"
       line="I dossier di studio pubblicati dalla comunità"
       section="forum"
       action={
