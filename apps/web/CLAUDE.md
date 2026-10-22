@@ -371,10 +371,11 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   is always on screen, and sets `--search-bar-height` on `<main>`, which `h-app-row` subtracts and the bar takes as its
   height. It is the door to the search menu (R2, brief of 21 Oct 2026: one field, no «Opzioni»): a button
   (`#tour-search-field`, `aria-haspopup="dialog"`) that shows the words and opens the palette with them
-  (`openCommandPaletteWith`, or `openCommandPalette` when empty) on a click, on the focus Tab brings (a Tab pressed
-  within 400 ms, outside the open palette, taken once: the focus the palette gives back as it closes opens nothing), on
-  a character typed on it (AltGr's too; the character goes on after its words), on the arrows, and on ⌘K
-  (`openSearchMenu`, `Layout`; nothing while the palette is open). Esc on it empties its words. On a phone the sheet does
+  (`openCommandPaletteWith`, or `openCommandPalette` when empty) on a click, Enter or Space, the arrows, a character
+  typed on it (AltGr's too; the character goes on after its words), words pasted on it (`onPaste`, after its words),
+  and ⌘K (`openSearchMenu`, `Layout`; nothing while the palette is open). Tab only brings the focus (a focus changes no
+  context, WCAG 3.2.1: Bill's choice). It stands for a field (`data-text-field`): «?», ⌘Z and the page's other
+  shortcuts leave it alone (`isEditableTarget`, `Layout`'s `isTyping`). Esc on it empties its words. On a phone the sheet does
   not give the focus back, so the palette gives it to what opened it as it closes; the field focuses itself on a click
   (Safari and a tap do not focus a button). The palette's own tour starts only on an empty opening: opened with words,
   it would take the letters that follow.
@@ -383,11 +384,12 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (`returnWordsToSearchField`); a choice empties it. No practice is closed.
   **The palette's look** (`CommandPalette`, the search menu's brief O1, 20 Oct 2026): on a computer a panel that
   drops from the field's form (`SEARCH_FIELD_FORM_ID` in `utils/searchFieldControl.ts`; floating-ui puts its top on
-  the field's, as wide as the field, so it covers it, one height of at most 640 px while the box filters, so it does
-  not jump at every letter), hung at the top, centred, where no field is on screen (another page, Focus mode); on a
+  the field's, as wide as the field, so it covers it, as tall as what it holds up to 640 px — Bill: one row is not a
+  640 px panel —, the lists scrolling inside it past that: a flex column all the way down to the columns, since a
+  percentage height finds nothing definite in a panel sized by its content), hung at the top, centred, where no field is on screen (another page, Focus mode); on a
   phone `ui/Sheet` («Menu di ricerca», its own «Chiudi»). From the top: the box, the one strong thing, with the help
-  line (12 px) or what the box was read as, which is the field's old preview line: «Sentenza → …», «tramite alias →
-  …», «Invio cerca» / «Invio completa», «Cerco l’atto…» while the server names it, a topic's line. Enter in the box
+  line (12 px), or «Cerco l’atto…» while the server names it: a decision, a norm or a topic read in the box is its
+  row, the chosen one, with «↵», never a second line saying the same (Bill). Enter in the box
   follows the field's order: a decision, then a wait while the server is still naming the act (the line says «la
   ricerca parte appena lo trovo», and the search runs once it answers, never after a close; any change of the words
   drops the wait, so a new Enter is needed), then a norm (a ready one searched, another taken to its next step; an alias counted once,
@@ -395,7 +397,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   Opened again within the 200 ms of the reset after a close, it starts at its first step all the same. The steps after the act («Dettagli», «Articolo») are subpages: the act chosen is a crumb
   in the field (`Torna indietro: <what it shows>`, the act, and its number and year on the article's step; 44 px on a
   phone) that goes back a step, and so does Backspace in an empty field (not a held one; on an empty date it goes to
-  the number first); there is no trail of steps under the box. Then two columns on a computer and one on a phone, in this
+  the number first); the article's field opens empty, its placeholder saying what it takes, so Backspace there goes
+  back at once (a «1» standing in it took the first press, Bill); there is no trail of steps under the box. Then two columns on a computer and one on a phone, in this
   order: «Scegli l'atto» (`paletteActs.ts`: every act of `ACT_TYPES` named in full with the source convention's
   abbreviation, «Codice civile · c.c.», in 44 px rows under group headings in Geist 12 px) and «A portata di mano»
   (Preferiti, I tuoi alias with the presets' line, «In dotazione» while typing; six of each at rest, then «Tutti i

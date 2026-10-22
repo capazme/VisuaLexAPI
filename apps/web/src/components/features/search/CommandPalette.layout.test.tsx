@@ -80,6 +80,17 @@ describe('CommandPalette — where it opens', () => {
     opener.remove();
   });
 
+  it('is as tall as what it holds, up to its maximum: no fixed height (Bill)', () => {
+    asDesktop(true);
+    const form = document.createElement('form');
+    form.id = SEARCH_FIELD_FORM_ID;
+    document.body.append(form);
+    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    const box = screen.getByRole('dialog', { name: 'Menu di ricerca' });
+    expect(box.style.height).toBe('');
+    expect(box.querySelector(':scope > div')).toHaveClass('max-h-[var(--palette-max-h,40rem)]');
+  });
+
   it('on a computer with no field on screen, hangs at the top, centred', () => {
     asDesktop(true);
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
@@ -127,15 +138,14 @@ describe('CommandPalette — the field and the steps', () => {
     expect(screen.getByPlaceholderText(/art 2043 cc/i)).toBeInTheDocument();
   });
 
-  it('goes back a step with Backspace on an empty field (R2)', async () => {
+  it('goes back a step with Backspace on the empty field it opens with, from the keyboard alone (R2, Bill)', async () => {
     asDesktop(true);
     const user = userEvent.setup();
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
-    await user.click(screen.getByRole('option', { name: 'Codice civile · c.c.' }));
-    const box = screen.getByRole('textbox', { name: "Numero dell'articolo" });
-    // «1» by default: the first Backspace empties it, the second goes back.
-    await user.click(box);
-    await user.keyboard('{End}{Backspace}');
+    // «Codice penale», Enter: the article's field, empty, has the focus.
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'codice penale{Enter}');
+    const box = await screen.findByRole('textbox', { name: "Numero dell'articolo" });
+    await waitFor(() => expect(box).toHaveFocus());
     expect(box).toHaveValue('');
     await user.keyboard('{Backspace}');
     expect(screen.getByPlaceholderText(/art 2043 cc/i)).toBeInTheDocument();
@@ -272,6 +282,7 @@ describe('CommandPalette — «Filtri avanzati»', () => {
     expect(toggle).toHaveTextContent('2 filtri attivi');
 
     await user.click(screen.getByRole('option', { name: 'Codice civile · c.c.' }));
+    await user.type(screen.getByRole('textbox', { name: "Numero dell'articolo" }), '1');
     await user.click(screen.getByRole('button', { name: "Apri l'articolo" }));
     expect(onSearch).toHaveBeenCalledWith(expect.objectContaining({ filters: expect.objectContaining({ source: 'eurlex', yearFrom: 1990 }) }));
   });

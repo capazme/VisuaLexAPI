@@ -155,7 +155,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   });
   const [step, setStep] = useState<PaletteStep>('select_act');
   const [selectedAct, setSelectedAct] = useState('');
-  const [article, setArticle] = useState('1');
+  // Empty, its placeholder saying what it takes: a «1» standing there took Backspace's first press (Bill).
+  const [article, setArticle] = useState('');
   const [actNumber, setActNumber] = useState('');
   const [actDate, setActDate] = useState('');
   const [inputValue, setInputValue] = useState('');
@@ -270,7 +271,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
       const timer = setTimeout(() => {
         setStep('select_act');
         setSelectedAct('');
-        setArticle('1');
+        setArticle('');
         setActNumber('');
         setActDate('');
         setInputValue('');
@@ -499,15 +500,13 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     middleware: [
       // Its top on the field's: the panel's own box takes the field's place.
       offset(({ rects }) => -rects.reference.height),
-      // As wide as the field; one height while the box filters the lists, so the panel
-      // does not jump under the hand at every letter.
+      // As wide as the field; as tall as what it holds, up to the height it always had (Bill: one row is not a
+      // 640 px panel), the window allowing.
       size({
         padding: 16,
         apply({ rects, availableHeight, elements }) {
-          Object.assign(elements.floating.style, {
-            width: `${rects.reference.width}px`,
-            height: `${Math.min(PANEL_MAX_HEIGHT, Math.max(320, availableHeight))}px`,
-          });
+          elements.floating.style.width = `${rects.reference.width}px`;
+          elements.floating.style.setProperty('--palette-max-h', `${Math.min(PANEL_MAX_HEIGHT, Math.max(320, availableHeight))}px`);
         },
       }),
     ],
@@ -527,7 +526,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
       // words but those handed over.
       setStep('select_act');
       setSelectedAct('');
-      setArticle('1');
+      setArticle('');
       setActNumber('');
       setActDate('');
       setWaitingFor(null);
@@ -631,7 +630,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                 // The field's order (R2): a decision, then the server still naming the act (the search runs when it
                 // answers), then a norm — unless the arrows chose another row, which Enter then picks.
                 if (['ArrowDown', 'ArrowUp', 'Home', 'End', 'PageDown', 'PageUp'].includes(e.key)) setMoved(true);
-                if (e.key !== 'Enter' || moved) return;
+                // An Enter that ends an IME composition chooses the composed word, it searches nothing.
+                if (e.key !== 'Enter' || moved || e.nativeEvent.isComposing) return;
                 if (decisionRef) {
                   e.preventDefault();
                   handleOpenDecision();
@@ -724,18 +724,21 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   // The help line, or what the box was read as, 10 px under the field and on the line of its text: the
   // field's edge (12 px of row, 1 of border, 12 of padding), then on the first step the icon's 20 px and
   // the gap's 12. The visible line is aria-hidden: the status region says it.
+  // The line under the box says what no row says: the wait for the server. A decision, a norm or a topic read in the
+  // box is its row, the chosen one, with «↵» — a second line saying the same was one too many (Bill).
+  const lineSays = step === 'select_act' && preview && (waiting || resolvingRemotely) ? preview : null;
   const fieldLine = (
     <div aria-hidden className="flex min-h-5 items-center gap-3 pb-3 pl-[25px] pr-4 pt-2.5 text-xs">
       {step === 'select_act' && (
         <span className="flex w-5 shrink-0 justify-center">
-          {preview && <preview.icon size={14} className={preview.tone} />}
+          {lineSays && <lineSays.icon size={14} className={lineSays.tone} />}
         </span>
       )}
-      {step === 'select_act' && preview ? (
+      {lineSays ? (
         <>
           <span id="command-palette-help" className="sr-only">{helpLine}</span>
-          <span className={cn('min-w-0 flex-1 truncate font-medium', preview.tone)}>{preview.text}</span>
-          <span className={cn('shrink-0', SUBTLE)}>{preview.action}</span>
+          <span className={cn('min-w-0 flex-1 truncate font-medium', lineSays.tone)}>{lineSays.text}</span>
+          <span className={cn('shrink-0', SUBTLE)}>{lineSays.action}</span>
         </>
       ) : (
         <span id="command-palette-help" className={SUBTLE}>{helpLine}</span>
@@ -902,7 +905,9 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     : quickNorms.length > 0 || hasAliases;
   const selectBody = (
     <Command.List
-      className={cn('px-2', isDesktop && 'h-full [&>[cmdk-list-sizer]]:flex [&>[cmdk-list-sizer]]:h-full [&>[cmdk-list-sizer]]:flex-col')}
+      // `min-h-0`: in a panel as tall as its content, up to its maximum, the list may shrink below its rows — the
+      // columns then scroll — instead of holding the panel at its full length. A flex column all the way down (a percentage height finds nothing definite in a panel sized by its content).
+      className={cn('px-2', isDesktop && 'flex min-h-0 flex-1 flex-col [&>[cmdk-list-sizer]]:flex [&>[cmdk-list-sizer]]:min-h-0 [&>[cmdk-list-sizer]]:flex-1 [&>[cmdk-list-sizer]]:flex-col')}
     >
       {/* A topic, not a decision or a norm: its own line, over the two columns */}
       {topic && (
@@ -1128,7 +1133,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
               // The box holds the panel's height; only the panel takes the pointer (a shorter step
               // leaves the rest of the box to the backdrop's click).
               'pointer-events-none flex flex-col',
-              anchor ? 'fixed' : 'fixed inset-x-4 top-16 mx-auto h-[min(40rem,calc(100dvh-6rem))] max-w-3xl',
+              anchor ? 'fixed' : 'fixed inset-x-4 top-16 mx-auto max-w-3xl [--palette-max-h:min(40rem,calc(100dvh-6rem))]',
               Z_INDEX.commandPalette,
             )}
           >
@@ -1140,8 +1145,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
               exit={still ? { opacity: 0, transition: { duration: dur.press } } : { opacity: 0, y: -4, transition: { duration: dur.press, ease: ease.out } }}
               transition={{ duration: dur.pop, ease: ease.out }}
               className={cn(
-                'pointer-events-auto flex min-h-0 max-h-full flex-col overflow-hidden rounded-xl border border-ink-200 bg-white shadow-xl dark:border-ink-700 dark:bg-ink-900',
-                step === 'select_act' && 'flex-1',
+                // As tall as its content, up to `--palette-max-h`: the lists scroll inside it past that.
+                'pointer-events-auto flex min-h-0 max-h-[var(--palette-max-h,40rem)] flex-col overflow-hidden rounded-xl border border-ink-200 bg-white shadow-xl dark:border-ink-700 dark:bg-ink-900',
               )}
             >
               {content}

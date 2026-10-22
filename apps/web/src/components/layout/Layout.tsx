@@ -177,7 +177,9 @@ export function Layout() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       // Don't trigger shortcuts when typing in inputs
-      const isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement).tagName);
+      // An element that stands for a field (the search page's field, `data-text-field`) is typed on too: «?» there is a letter.
+      const target = e.target as HTMLElement;
+      const isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || Boolean(target.closest?.('[data-text-field]'));
 
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
