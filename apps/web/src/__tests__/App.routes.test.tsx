@@ -55,8 +55,10 @@ vi.mock('../services/studiaService', () => ({
     get: vi.fn().mockRejectedValue({ status: 404 }),
     queue: vi.fn().mockResolvedValue({ cards: [] }),
     vote: vi.fn().mockRejectedValue({ status: 404 }),
-    // The strip over Le mie schede and Da validare reads the progress (Gymnasium spec §5.1).
+    // The strip over Da validare reads the progress (Gymnasium spec §5.1), and its settings, mounted closed, the
+    // study preferences (U1b).
     progress: vi.fn().mockRejectedValue({ status: 404 }),
+    preferences: vi.fn().mockRejectedValue({ status: 404 }),
   },
 }));
 vi.mock('../components/features/studia/ReviewHome', () => ({ ReviewHome: () => <h2>Ripasso di oggi</h2> }));
