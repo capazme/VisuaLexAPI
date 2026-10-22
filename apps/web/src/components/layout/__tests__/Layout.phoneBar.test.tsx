@@ -191,6 +191,7 @@ describe('Layout — the phone bar\'s name, as iOS\'s large titles (G8)', () => 
           <Route element={<Layout />}>
             <Route path="/forum" element={<h1>Dossier pubblici</h1>} />
             <Route path="/history" element={<h1>Cronologia</h1>} />
+            <Route path="/documents" element={<p>Nessun titolo</p>} />
           </Route>
         </Routes>
       </MemoryRouter>,
@@ -199,28 +200,37 @@ describe('Layout — the phone bar\'s name, as iOS\'s large titles (G8)', () => 
   }
   const name = (bar: HTMLElement) => bar.querySelector('p')!;
 
-  it('names the section while the page\'s title is in sight, and the page once it has scrolled out, fading it in', () => {
+  it('shows no name while the page\'s title is in sight, and the page\'s once it has scrolled out, fading it in', () => {
     const bar = at('/forum');
     const observer = FakeIntersectionObserver.last!;
     // The page's own title, watched in the content scroller, under the bar.
     expect(observer.target).toHaveTextContent('Dossier pubblici');
     expect(observer.target?.tagName).toBe('H1');
-    expect(name(bar)).toHaveTextContent(/^Forum$/);
+    // Only the menu and the magnifier: no «Forum» over «Forum · il luogo…», no name under the large title.
+    expect(name(bar)).toHaveTextContent(/^$/);
+    expect(name(bar)).toHaveAttribute('aria-hidden', 'true');
+    expect(within(bar).getAllByRole('button')).toHaveLength(2);
 
     observer.say(false);
     expect(name(bar)).toHaveTextContent(/^Dossier pubblici$/);
+    expect(name(bar)).not.toHaveAttribute('aria-hidden');
     // A fade of 150 ms, only where motion is welcome: at once under reduced motion.
     expect(name(bar)).toHaveClass('motion-safe:animate-in', 'motion-safe:fade-in', 'motion-safe:duration-150');
     expect(name(bar).className).not.toMatch(/(^|\s)(animate-in|fade-in)(\s|$)/);
 
     observer.say(true);
-    expect(name(bar)).toHaveTextContent(/^Forum$/);
+    expect(name(bar)).toHaveTextContent(/^$/);
   });
 
-  it('names a Corpus page, which belongs to no section, by its own name, title in sight or not', () => {
+  it('does the same on a Corpus page: the name comes with the scroll', () => {
     const bar = at('/history');
-    expect(name(bar)).toHaveTextContent(/^Cronologia$/);
+    expect(name(bar)).toHaveTextContent(/^$/);
     FakeIntersectionObserver.last!.say(false);
     expect(name(bar)).toHaveTextContent(/^Cronologia$/);
+  });
+
+  it('names at once a page with no title of its own', () => {
+    const bar = at('/documents');
+    expect(name(bar)).toHaveTextContent(/^Analizza documento$/);
   });
 });

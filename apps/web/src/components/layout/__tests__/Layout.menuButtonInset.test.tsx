@@ -42,13 +42,13 @@ describe('Layout — the phone\'s bar below lg (M1)', () => {
     },
   );
 
-  // At the top of a section's page, its title in sight, the bar names the section; the page's name comes once the title
-  // has scrolled out (G8, `Layout.phoneBar.test.tsx`). A Corpus page has its own name, always.
+  // jsdom has no IntersectionObserver, where the bar names the page at once; with one, the name waits for the page's
+  // title to scroll out (G8, `Layout.phoneBar.test.tsx`).
   it.each([
-    ['/studia/ripasso', 'Gymnasium'],
-    ['/forum/community', 'Forum'],
+    ['/studia/ripasso', 'Oggi'],
+    ['/forum/community', 'Community'],
     ['/collega-app', 'Collega un’app AI'],
-  ])('names the section, or a Corpus page, in the middle on %s', (path, title) => {
+  ])('names the page in the middle on %s', (path, title) => {
     at(path);
     expect(within(screen.getByTestId('phone-top-bar')).getByText(title)).toBeInTheDocument();
   });

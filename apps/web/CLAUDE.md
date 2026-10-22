@@ -323,11 +323,11 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   backdrop closes; entries are 44 px high on a phone. **The phone's bar** (M1, 21 Oct 2026): below `lg` every page
   has one bar at the top. On the search page it is the field's bar (56 px below `lg`, 72 from it), with `MenuToggle`
   beside the field; on every other page `PhoneTopBar` (`layout/PhoneTopBar.tsx`): `MenuToggle` at the left (44 px, the
-  services' dot), a name in Newsreader in the middle — as iOS's large titles (G8): on a section's page (and the dossiers)
-  the section's name while the page's `h1` is in sight under the bar, the page's name once it has scrolled out, faded in
-  over 150 ms (`motion-safe:` only); on a Corpus page its own name, always (`usePageTitleInView`: an `IntersectionObserver`
-  on the first `h1` of the content scroller, the bar's height off its top, a `MutationObserver` finding a title drawn
-  later; no `h1`, the page's name; `phoneBarTitle.ts` over `features/sections/pageNames.ts`, the one list of the pages'
+  services' dot), in the middle — as iOS's large titles (G8) — nothing while the page's `h1` is in sight under the bar
+  (it says the name already: no «Gymnasium» over «Gymnasium · la tua palestra giuridica»), the page's name in Newsreader
+  once it has scrolled out, faded in over 150 ms (`motion-safe:` only), on every page (`usePageTitleInView`: an
+  `IntersectionObserver` on the first `h1` of the content scroller, the bar's height off its top, a `MutationObserver`
+  finding a title drawn later; a page with no `h1`, or a browser with no observer, has the name at once; `phoneBarTitle.ts` over `features/sections/pageNames.ts`, the one list of the pages'
   names, which the titles read too, else the section's name) —, the magnifier on the right, which opens the search menu (the palette) and takes the focus on a
   click (Safari's does not give it), so the menu gives it back as it closes; on the page's paper with a
   hairline, absolutely placed over the content area (`Z_INDEX.floating`), which starts under it (`pt-[calc(4.5rem+env(safe-area-inset-top))]`,
