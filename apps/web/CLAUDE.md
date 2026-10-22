@@ -1935,11 +1935,15 @@ by code before an entry runs, the Forum's card does the same by hand). A button 
 focus back once enabled again. A wire leaves the button, meets the card on the edge
 that faces it (`wirePath.ts`, pure) and draws its outline both ways; where the ends meet the card appears, its rows
 rising one after the other (about 500 ms; the lead fades once it is there). «Annulla», Esc or a click outside wind it
-back into the button (about 300 ms) and give it the focus; leaving, it is `inert`, so an Enter during the rewind
-confirms nothing. Confirming folds the card into a line, and `onConfirm` may resolve to the outcome the button then
+back into the button (about 300 ms) and give it the focus; leaving, the card is `inert`, so an Enter during the rewind
+confirms nothing, and the layer still takes the clicks, which do not fall to the page. Its buttons answer only once
+they have risen into sight (`READY_MS`, about 500 ms; `data-ready` on the card): a double tap on a button the card then
+covers runs nothing unseen. Confirming folds the card into a line, and `onConfirm` may resolve to the outcome the button then
 says, a tick drawing itself over it (`OutcomeTick`, «Eliminata ✓», 1.6 s, seen only: each caller says the outcome in
 words where a screen reader hears it); a caller that removes the button (a row, a card) does it in `onOutcomeDone`,
-once the tick is gone, and hands the focus to a neighbour. The outline is drawn again when the window changes. The focus opens on «Annulla» and Tab goes between the two buttons. Under reduced
+once the tick is gone, and hands the focus to a neighbour; an outcome that gives way to a newer one (two revocations in
+a row) is told over at once, so the callers keep a queue of ids, oldest first, and the words a confirmation names until
+it is gone. The outline is drawn again when the window changes. The focus opens on «Annulla» and Tab goes between the two buttons. Under reduced
 motion the card fades in already drawn, and the outcome comes once it is gone. On a phone the card is the page's
 width less 16 px each side.
 
