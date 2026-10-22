@@ -128,7 +128,7 @@ export function MenuButton({ label, items, children, triggerClassName, align = '
         onClick={() => (open ? close(false) : setOpenAt('first'))}
         onKeyDown={onTriggerKey}
         className={cn(
-          'inline-flex items-center gap-2 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
+          'inline-flex items-center gap-2 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
           triggerClassName,
         )}
       >
@@ -143,7 +143,7 @@ export function MenuButton({ label, items, children, triggerClassName, align = '
           onKeyDown={onMenuKey}
           className={cn(
             Z_INDEX.dropdown,
-            'absolute w-56 rounded-lg border border-slate-200 bg-white py-1 shadow-xl dark:border-slate-700 dark:bg-slate-800',
+            'absolute w-56 rounded-lg border border-slate-200 bg-white py-1 shadow-md dark:border-slate-700 dark:bg-slate-800',
             placement === 'above' ? 'bottom-full mb-1' : 'mt-1',
             align === 'right' ? 'right-0' : 'left-0',
             menuClassName,

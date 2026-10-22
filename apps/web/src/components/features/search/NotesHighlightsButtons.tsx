@@ -114,17 +114,17 @@ export function NotesHighlightsButtons({
                 aria-label={highlightsName}
                 className={cn(size, "rounded-md transition-colors relative",
                     isHighlightsOpen
-                        ? "bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400"
+                        ? "bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400"
                         : highlightsCount > 0
-                            ? "text-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20"
-                            : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-purple-500"
+                            ? "text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
+                            : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-primary-600"
                 )}
                 title={tip(highlightsName, lockedReason)}
                 disabled={Boolean(lockedReason)}
             >
                 <Highlighter size={16} aria-hidden />
                 {highlightsCount > 0 && (
-                    <span aria-hidden className="absolute -top-1.5 -right-1.5 h-4 min-w-4 px-0.5 bg-purple-500 text-white text-[11px] leading-none rounded-full flex items-center justify-center font-bold">
+                    <span aria-hidden className="absolute -top-1.5 -right-1.5 h-4 min-w-4 px-0.5 bg-primary-600 text-white text-[11px] leading-none rounded-full flex items-center justify-center font-bold">
                         {highlightsCount}
                     </span>
                 )}

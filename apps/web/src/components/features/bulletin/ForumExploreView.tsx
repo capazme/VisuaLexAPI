@@ -18,10 +18,12 @@ const GRID = CARD_GRID;
 /** On a phone VisuaLex's packs come after this many of the community's dossiers. */
 const PHONE_CARDS_BEFORE_PACKS = 2;
 
-const SORT_OPTIONS: { value: SortOption; label: string; icon: React.ReactNode }[] = [
-  { value: 'newest', label: 'Più recenti', icon: <Clock size={14} /> },
-  { value: 'popular', label: 'Più popolari', icon: <TrendingUp size={14} /> },
-  { value: 'mostDownloaded', label: 'Più aggiunti', icon: <Users size={14} /> },
+/** `short`: the button's word under `sm`, where half a 320 px row cut the label («Più rece…»); the menu and the
+ *  button's name keep the label. */
+const SORT_OPTIONS: { value: SortOption; label: string; short: string; icon: React.ReactNode }[] = [
+  { value: 'newest', label: 'Più recenti', short: 'Recenti', icon: <Clock size={14} /> },
+  { value: 'popular', label: 'Più popolari', short: 'Popolari', icon: <TrendingUp size={14} /> },
+  { value: 'mostDownloaded', label: 'Più aggiunti', short: 'Aggiunti', icon: <Users size={14} /> },
 ];
 
 /** The category and order buttons: half the row each on a phone (44 px tall), their own width from `sm`. */
@@ -228,7 +230,7 @@ export function ForumExploreView({
             <ChevronDown size={16} aria-hidden className="shrink-0" />
           </button>
           {showCategoryDropdown && (
-            <div className="absolute top-full left-0 mt-1 w-max min-w-full bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 py-1 z-20">
+            <div className="absolute top-full left-0 mt-1 w-max min-w-full bg-white dark:bg-slate-800 rounded-lg shadow-md border border-slate-200 dark:border-slate-700 py-1 z-20">
               {CATEGORY_OPTIONS.map((option) => (
                 <button
                   key={option.value}
@@ -261,11 +263,14 @@ export function ForumExploreView({
             className={cn(FILTER_BUTTON, 'sm:min-w-[160px]')}
           >
             <span aria-hidden className="hidden shrink-0 sm:block">{selectedSort.icon}</span>
-            <span className="min-w-0 flex-1 truncate text-left">{selectedSort.label}</span>
+            <span className="min-w-0 flex-1 truncate text-left">
+              <span className="sm:hidden">{selectedSort.short}</span>
+              <span className="hidden sm:inline">{selectedSort.label}</span>
+            </span>
             <ChevronDown size={16} aria-hidden className="shrink-0" />
           </button>
           {showSortDropdown && (
-            <div className="absolute top-full right-0 mt-1 w-max min-w-full bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 py-1 z-20">
+            <div className="absolute top-full right-0 mt-1 w-max min-w-full bg-white dark:bg-slate-800 rounded-lg shadow-md border border-slate-200 dark:border-slate-700 py-1 z-20">
               {SORT_OPTIONS.map((option) => (
                 <button
                   key={option.value}

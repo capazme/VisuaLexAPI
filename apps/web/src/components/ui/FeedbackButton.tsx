@@ -23,7 +23,7 @@ export function FeedbackButton({ className, onOpen }: FeedbackButtonProps) {
             exit={{ opacity: 0, x: 10 }}
             className="absolute right-full mr-3 top-1/2 -translate-y-1/2 whitespace-nowrap"
           >
-            <div className="px-3 py-1.5 bg-slate-900 dark:bg-slate-700 text-white text-sm rounded-lg shadow-lg">
+            <div className="px-3 py-1.5 bg-slate-900 dark:bg-slate-700 text-white text-sm rounded-lg shadow-md">
               Invia feedback
             </div>
           </motion.div>

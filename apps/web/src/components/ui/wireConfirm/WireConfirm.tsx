@@ -388,7 +388,7 @@ function WireLayer({ id, title, message, cancelLabel, confirmLabel, variant, emp
           inert={!present || undefined}
           // Its buttons answer (they have risen into sight).
           data-ready={ready || undefined}
-          className="pointer-events-auto w-full max-w-sm rounded-2xl border border-ink-200 bg-white p-5 shadow-xl dark:border-ink-700 dark:bg-ink-900"
+          className="pointer-events-auto w-full max-w-sm rounded-2xl border border-ink-200 bg-white p-5 shadow-lg dark:border-ink-700 dark:bg-ink-900"
           variants={card}
           initial="hidden"
           animate="shown"

@@ -197,6 +197,13 @@ describe('ForumExploreView - the filters on a phone', () => {
     expect(within(category).getByText('Tutte le categorie')).toHaveClass('hidden', 'sm:inline');
     expect(screen.getByRole('button', { name: /^Ordine: / })).toHaveAttribute('aria-expanded', 'false');
   });
+
+  it('writes the order in one word on a phone, where half a 320 px row cut «Più rece…», its name in full', () => {
+    renderView();
+    const order = screen.getByRole('button', { name: 'Ordine: Più recenti' });
+    expect(within(order).getByText('Recenti')).toHaveClass('sm:hidden');
+    expect(within(order).getByText('Più recenti')).toHaveClass('hidden', 'sm:inline');
+  });
 });
 
 // The community's dossiers first, the Forum's reason; VisuaLex's packs after them (S7a).

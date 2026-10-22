@@ -182,7 +182,7 @@ export function Modal({
               className={cn(
                 'w-full pointer-events-auto',
                 'bg-white dark:bg-slate-900',
-                'rounded-2xl shadow-2xl',
+                'rounded-2xl shadow-lg',
                 'border border-slate-200 dark:border-slate-800',
                 'max-h-[90vh] flex flex-col',
                 sizeStyles[size],

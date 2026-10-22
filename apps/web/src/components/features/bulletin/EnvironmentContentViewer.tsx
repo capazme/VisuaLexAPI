@@ -156,10 +156,10 @@ export function EnvironmentContentViewer({
     return (
       <button
         onClick={(e) => { e.stopPropagation(); toggleSelection(type, id); }}
-        className="mr-2 flex-shrink-0 hover:text-indigo-600 dark:hover:text-indigo-400"
+        className="mr-2 flex-shrink-0 hover:text-primary-600 dark:hover:text-primary-400"
       >
         {checked ? (
-          <CheckSquare size={16} className="text-indigo-600 dark:text-indigo-400" />
+          <CheckSquare size={16} className="text-primary-600 dark:text-primary-400" />
         ) : (
           <Square size={16} className="text-slate-400" />
         )}
@@ -188,7 +188,7 @@ export function EnvironmentContentViewer({
                   <ChevronRight size={14} />
                 )}
               </button>
-              <FolderOpen size={14} className="mr-2 text-indigo-500" />
+              <FolderOpen size={14} className="mr-2 text-primary-500" />
               <span className="flex-1 text-sm text-slate-700 dark:text-slate-300 truncate">
                 {dossier.name}
               </span>
@@ -296,7 +296,7 @@ export function EnvironmentContentViewer({
               className="flex items-center py-1.5 px-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
             >
               {renderCheckbox('aliases', alias.id)}
-              <code className="text-xs font-mono bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 px-1.5 py-0.5 rounded mr-2">
+              <code className="text-xs font-mono bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300 px-1.5 py-0.5 rounded mr-2">
                 {alias.trigger}
               </code>
               <span className="text-slate-400 mx-1">&rarr;</span>
@@ -421,7 +421,7 @@ export function EnvironmentContentViewer({
                 flex items-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap
                 transition-colors border-b-2 -mb-px
                 ${isActive
-                  ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400 bg-white dark:bg-slate-900'
+                  ? 'border-primary-500 text-primary-600 dark:text-primary-400 bg-white dark:bg-slate-900'
                   : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                 }
                 ${count === 0 ? 'opacity-50' : ''}
@@ -433,9 +433,9 @@ export function EnvironmentContentViewer({
               </span>
               {count > 0 && (
                 <span className={`
-                  px-1.5 py-0.5 rounded-full text-[10px] font-bold
+                  px-1.5 py-0.5 rounded-full text-[11px] font-bold
                   ${isActive
-                    ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300'
+                    ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-300'
                     : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
                   }
                 `}>

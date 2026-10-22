@@ -116,7 +116,7 @@ function ProvisionalReviewCard({
           </p>
         )}
 
-        <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+        <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
           <Chip>usi: {item.usage_count ?? 0}</Chip>
           <Chip>feedback+: {item.positive_feedback_count ?? 0}</Chip>
           {item.has_confirmed_citation && <Chip>citato da confermati</Chip>}
