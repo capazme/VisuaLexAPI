@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { FOCUS_BUTTON_CLEARANCE, PAGE_TITLE, PageFrame } from './PageFrame';
+import { FOCUS_BUTTON_CLEARANCE, PAGE_KICKER, PAGE_TITLE, PageFrame } from './PageFrame';
+import { SECTION_PHRASES, sectionKicker } from '../../features/sections/sections';
 
 describe('PageFrame (W2)', () => {
   it('takes the layout\'s width, with nothing narrower, and heads it with the title, the sentence and the action', () => {
@@ -38,9 +39,41 @@ describe('PageFrame (W2)', () => {
     expect(screen.getByRole('banner')).not.toHaveClass(FOCUS_BUTTON_CLEARANCE);
   });
 
+  it('names the page in the title and its section, with the phrase, small over it (L-37)', () => {
+    const { unmount } = render(
+      <PageFrame title="Oggi" kicker="gymnasium" section="gymnasium">
+        <p>corpo</p>
+      </PageFrame>,
+    );
+    const title = screen.getByRole('heading', { level: 1 });
+    expect(title).toHaveTextContent(/^Oggi$/);
+    const kicker = screen.getByText('Gymnasium · la tua palestra giuridica');
+    expect(kicker).toHaveClass(...PAGE_KICKER.split(' '));
+    // Over the title, in the same header, and not a heading of its own.
+    expect(kicker.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(kicker.tagName).toBe('P');
+    unmount();
+    render(
+      <PageFrame title="Cronologia">
+        <p>corpo</p>
+      </PageFrame>,
+    );
+    expect(screen.queryByText(/ · /)).toBeNull();
+  });
+
+  it('keeps the sections\' phrases in one place, each after its section\'s name', () => {
+    expect(SECTION_PHRASES).toEqual({
+      gymnasium: 'la tua palestra giuridica',
+      opus: 'la tua officina giuridica',
+      forum: 'il luogo del dibattito giuridico',
+    });
+    expect(sectionKicker('opus')).toBe('Opus · la tua officina giuridica');
+    expect(sectionKicker('forum')).toBe('Forum · il luogo del dibattito giuridico');
+  });
+
   it('marks a section\'s home title for the section switcher\'s focus, and no other', () => {
     const { unmount } = render(
-      <PageFrame title="Gymnasium: la tua palestra giuridica" section="gymnasium">
+      <PageFrame title="Oggi" section="gymnasium">
         <p>corpo</p>
       </PageFrame>,
     );

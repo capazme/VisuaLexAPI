@@ -120,7 +120,8 @@ export function ProgressPage() {
 
   return (
     <section aria-labelledby="studia-progressi-pagina" className="space-y-6 pb-8">
-      <h2 id="studia-progressi-pagina" className="font-serif text-2xl font-medium tracking-tight text-slate-900 dark:text-slate-50">
+      {/* The page's title says «Progressi» (L-37): this names the section for a screen reader only. */}
+      <h2 id="studia-progressi-pagina" className="sr-only">
         I tuoi progressi
       </h2>
 
