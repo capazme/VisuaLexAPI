@@ -234,7 +234,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `section` marks a section's home for the switcher's focus (`data-section-title`, `tabIndex={-1}`, `FOCUS_RING`).
   It draws the dossier list, «Dossier pubblici», Community, Gymnasium (every view but the lesson, through
   `StudiaPage`), Opus's planner (`OpusPage`, its views the frame's width), «Analizza documento», «Collega un'app AI» (its body keeps a column of 768 px: it reads as text, the
-  title does not move), the Cronologia and the MERL-T hub; «Cestino» and the MERL-T pages under a way back
+  title does not move), the Cronologia, the MERL-T hub and, since S7b, the graph («Grafo», the window's height: its
+  canvas under the frame's header); «Cestino» and the MERL-T pages under a way back
   («Torna ai Dossier», «MERL-T») write their `h1` with `PAGE_TITLE`. A dossier's own page is in the frame since S7c
   (`DossierDetailView`: its name the title, under «Torna ai Dossier»; see «Dossier»). Impostazioni (a dialog, not a page), the Scrivania, the lesson, the reader and the practice, the
   login stay out; «Crediti», public and outside the layout, is in the frame since M1 (the column's width and padding, the
@@ -308,11 +309,12 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `end`, so it is not active under `/forum/community`) and «Community» — the section keeps its name and its areas are
   named apart, so «Forum» is never written twice. The section's line is «Dossier pubblici e community». The sections'
   phrases (the owner's, 19 Oct 2026: «la tua palestra giuridica», «la tua officina giuridica», «il luogo del dibattito
-  giuridico») live in `SECTION_PHRASES` (`sections.ts`) only, and since L-37 (22 Oct 2026) go over a page's title as
+  giuridico»; Academia's, «il laboratorio del diritto», 22 Oct 2026) live in `SECTION_PHRASES` (`sections.ts`) only, and since L-37 (22 Oct 2026) go over a page's title as
   `sectionKicker`'s «Opus · la tua officina giuridica», `PageFrame`'s `kicker`; the title is the page's name — Gymnasium's
   views («Oggi», «Progressi», «Le mie schede», «Da validare», `StudiaPage`), Opus's («Oggi», «Prossimi giorni», «Lista
   d'ingresso», «Cestino dei compiti», `OpusPage`; a view's own `h2` stays for screen readers and the focus's
-  fallback), the Forum's «Dossier pubblici» and «Community». The switcher's Opus entry carries the same count as «Oggi» (`MenuItem.badgeLabel` names
+  fallback), the Forum's «Dossier pubblici» and «Community». Academia's «Assistente» and «Grafo» too, under «Academia · il
+  laboratorio del diritto» (Bill and the owner, 22 Oct 2026); `kickerOf` draws no line for a section with no phrase. The switcher's Opus entry carries the same count as «Oggi» (`MenuItem.badgeLabel` names
   what a count counts; without it «N notifiche»), and no dot: it is a to-do, not news. A count is 11 px on red 600.
   **Words, not only icons** (`layout`, `sidebarWidth.ts`): from `xl` the desktop column is a 224 px bar with
   icon and word and the groups' headings (the section's name, or «Studia» and «Contribuisci»), the palette's
@@ -500,6 +502,27 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   the notice, «Scarica i miei dati», «Elimina i miei dati MERL-T», «Revoca il consenso». The
   welcome tour waits for the screen (`Layout`). The Forum's events carry the environment, never
   its author, and an annotation event never carries the note's words (the owner, 18 October 2026, «c»).
+- `features/merlt/hub/` and `pages/MerltHubPage.tsx` — Academia's «Assistente», consent first (S7b). With the
+  consent «Nessuno» the page opens on `ConsentFirst` («Attiva MERL-T»: what MERL-T does, «Che cosa raccoglie» at each
+  level — `levels.ts`'s summaries, rendered from it, never a shorter list —, «Scegli il consenso» → `ConsentDialog`),
+  only where a consent can be given: with no notice (a server answering 404 `merlt_disabled`, or none published) the
+  dialog would show nothing, so `ConsentUnavailable` says «MERL-T non è attivo su questo server»; a read that failed
+  says so, with «Riprova». The cards' gated actions follow the same `ConsentGate` (`hubStyles.ts`). Then four cards of equal height (`HubCard`: a serif
+  title, the text, one action at its foot): Q&A, «Valida proposte», «Grafo giuridico» (only with the graph's flag),
+  «I miei contributi». An action that needs more consent is `HubAction`'s `gated`, its words («Serve il consenso
+  base», «… completo», or «Non attivo su questo server», «Consenso non letto») on an `aria-disabled` button still in
+  the Tab order, never a badge, and none while the consent is being read; the level is named as `levels.ts` names it
+  («Nessuna raccolta»); a source the card cannot reach is said in its text; an
+  action is a `Link` or a `button`, never a button inside a link. The consent and the profile (`ConsentCard`,
+  `ProfileCard`, unchanged in what they do: change, revoke, the ladder, the vote's weight) open one at a time from a
+  row of links at the foot («Consenso e privacy · Base», «Il tuo profilo»). The ops cards stay for administrators.
+  Tokens in `hub/hubStyles.ts` (44 px, no text under 12 px). On `/grafo` (`GraphExplorerPage`) the deliberation
+  column is a rail while the graph is empty — no centre, no node or relation chosen, no question — opened by hand
+  from the rail or by whatever fills it, and open from then on (not stored: the stored preference is the user's
+  collapse); on a phone the «Dibattito» button sits over the home bar (`env(safe-area-inset-bottom)`), the truncation
+  chip over it, and the frame keeps the canvas tall — no line under the title, the slice's tools as icons beside it. `features/merlt/academiaTokens.test.ts`
+  reads every MERL-T file and fails on a `text-[Npx]` under 12 or a hand-written `blue-`, `indigo-`, `purple-` or
+  `violet-` (not the canvas's labels, `graphStyles.ts`'s `labelFontSize`, which scale with the graph's zoom).
 - `components/ui/` — shared primitives: `Button`, `IconButton`, `Input`, `Card`,
   `Modal`, `ConfirmDialog`, `WireConfirm` (below, «Destructive confirmations»), `Toast`, `EmptyState`, `Sheet` (a
   phone's bottom sheet), plus feature-flavoured modals.

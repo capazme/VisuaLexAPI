@@ -59,7 +59,7 @@ export function GraphTruncationChip({
   return (
     <div
       role="status"
-      className="absolute bottom-16 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 px-3 py-1 rounded-full border border-amber-200 bg-amber-50 text-xs font-medium text-amber-800 shadow-sm dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-300 md:bottom-3"
+      className="absolute bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 px-3 py-1 rounded-full border border-amber-200 bg-amber-50 text-xs font-medium text-amber-800 shadow-sm dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-300 md:bottom-3"
     >
       <Scissors size={12} aria-hidden="true" className="shrink-0" />
       <span>
@@ -71,7 +71,7 @@ export function GraphTruncationChip({
           onClick={() => onLoadMore(next)}
           disabled={loading}
           aria-label="Carica più relazioni"
-          className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-600 px-2 py-0.5 text-[11px] font-semibold text-white transition-colors hover:bg-amber-700 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:bg-amber-500 dark:hover:bg-amber-400 dark:text-amber-950"
+          className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-600 px-2 py-0.5 text-xs font-semibold text-white transition-colors hover:bg-amber-700 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:bg-amber-500 dark:hover:bg-amber-400 dark:text-amber-950"
         >
           {loading ? <Loader2 size={11} className="animate-spin" /> : null}
           Carica di più

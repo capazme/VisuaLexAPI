@@ -54,7 +54,7 @@ export function RassegnaPassage({ passo, besideId, backEntry }: { passo: Rassegn
               {passo.pronunce.map((p, i) => <DecisionChip key={`${p.key ?? p.label}-${i}`} pronuncia={p} besideId={besideId} backEntry={backEntry} />)}
             </div>
           )}
-          <p className="text-[11px] text-slate-400">
+          <p className="text-xs text-slate-600 dark:text-slate-400">
             Fonte: Ufficio del Massimario della Corte di cassazione ·{' '}
             <a href={passo.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600 dark:hover:text-slate-200">
               Apri sul portale del Massimario
