@@ -55,7 +55,10 @@ describe('ConnectedAppsSection', () => {
     const dialog = await screen.findByRole('alertdialog');
     fireEvent.click(within(dialog).getByRole('button', { name: /^revoca$/i }));
     await waitFor(() => expect(revoke).toHaveBeenCalledWith('grant-1'));
-    await waitFor(() => expect(screen.queryByText('Claude Code')).toBeNull());
+    // The row waits for «Revocata ✓» over its button (K1b), and cannot be revoked twice meanwhile.
+    expect(screen.getByText('Claude Code')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /revoca claude code/i })).toBeDisabled();
+    await waitFor(() => expect(screen.queryByText('Claude Code')).toBeNull(), { timeout: 3000 });
   });
 
   it('switches the permission to delete for one connection', async () => {

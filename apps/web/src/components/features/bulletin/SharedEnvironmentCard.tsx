@@ -111,6 +111,7 @@ export function SharedEnvironmentCard({
   return (
     <div
       id={isFirst ? 'tour-forum-card' : undefined}
+      data-shared-env={environment.id}
       className={`group relative bg-white dark:bg-slate-800 rounded-xl border shadow-sm hover:shadow-md transition-[color,background-color,border-color,box-shadow,opacity] duration-200 overflow-hidden ${
       isWithdrawn
         ? 'border-slate-300 dark:border-slate-600 opacity-75'

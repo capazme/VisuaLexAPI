@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useIsPresent, useReducedMotion } from 'framer-motion';
 import { Button } from '../Button';
@@ -35,8 +35,17 @@ export interface WireConfirmProps {
    */
   onConfirm: () => void | Promise<string | null | void>;
   onCancel: () => void;
-  /** The button the wire starts from and the focus goes back to; the element focused as it opens, by default. */
+  /**
+   * The button the wire starts from and the focus goes back to. Pass it (`event.currentTarget`): Safari and a tap do not
+   * focus a button they press. Absent, the element focused as it opens — right for a menu's entry, whose menu gives
+   * the focus back to its trigger by code before the entry runs.
+   */
   origin?: HTMLElement | null;
+  /**
+   * The outcome has been said (its tick gone), or there was none to draw: a caller that removes the button (a row, a
+   * card) does it now, not while the tick still sits over it.
+   */
+  onOutcomeDone?: () => void;
 }
 
 /** The card's corner radius (`rounded-2xl`): the outline the wire draws follows it. */
@@ -67,6 +76,7 @@ export function WireConfirm({
   onConfirm,
   onCancel,
   origin,
+  onOutcomeDone,
 }: WireConfirmProps) {
   const still = Boolean(useReducedMotion());
   const id = useId();
@@ -91,34 +101,70 @@ export function WireConfirm({
       setFrom(origin ?? (document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null));
       setConfirmed(false);
       setPaths(null);
+      // Opened again before the last one was gone: its outcome is not this one's.
+      setOutcome(null);
     }
   }
+  const outcomeDone = useRef(onOutcomeDone);
+  useEffect(() => {
+    outcomeDone.current = onOutcomeDone;
+  });
 
   useEffect(() => (open ? openDialog(token.current) : undefined), [open]);
 
-  // Measured once the card is laid out (it is drawn transparent first): the wire runs from the button to it.
+  // Measured once the card is laid out (it is drawn transparent first): the wire runs from the button to it; again
+  // when the window changes (a phone turned), or the outline would stay where the card was.
   useLayoutEffect(() => {
-    if (!open || still || !cardRef.current || !from?.isConnected) return;
-    // The geometry is read from the layout just committed.
-    setPaths(wirePaths(boxOf(from.getBoundingClientRect()), boxOf(cardRef.current.getBoundingClientRect()), RADIUS));
+    if (!open || still || !from?.isConnected) return;
+    const measure = () => {
+      if (!cardRef.current || !from.isConnected) return;
+      setPaths(wirePaths(boxOf(from.getBoundingClientRect()), boxOf(cardRef.current.getBoundingClientRect()), RADIUS));
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
   }, [open, still, from]);
 
   useEffect(() => {
     if (!open) return;
+    pendingOutcome.current = null;
     exited.current = false;
     cancelRef.current?.focus({ preventScroll: true });
   }, [open]);
 
-  // Closed: the focus goes back to the button at once, not after the rewind.
+  // Closed: the focus goes back to the button at once, not after the rewind. A button its action disabled (busy) takes
+  // it once enabled again, if nothing else took it meanwhile.
   useEffect(() => {
-    if (open || !from) return;
-    if (from.isConnected) from.focus({ preventScroll: true });
+    if (open || !from?.isConnected) return;
+    if (!(from as HTMLButtonElement).disabled) {
+      from.focus({ preventScroll: true });
+      return;
+    }
+    const observer = new MutationObserver(() => {
+      if ((from as HTMLButtonElement).disabled) return;
+      observer.disconnect();
+      if (from.isConnected && (document.activeElement === document.body || document.activeElement === null)) from.focus({ preventScroll: true });
+    });
+    observer.observe(from, { attributes: true, attributeFilter: ['disabled'] });
+    const timer = window.setTimeout(() => observer.disconnect(), 10000);
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(timer);
+    };
   }, [open, from]);
 
   useEffect(() => {
     if (!open) return;
     const onKey = (event: globalThis.KeyboardEvent) => {
-      if (event.key !== 'Escape' || event.defaultPrevented || !isTopmostDialog(token.current)) return;
+      if (event.defaultPrevented || !isTopmostDialog(token.current)) return;
+      if (event.key === 'Tab') {
+        // The two buttons, and nothing else: from the card's text or the page, Tab comes back to them.
+        event.preventDefault();
+        const next = document.activeElement === cancelRef.current ? confirmRef.current : cancelRef.current;
+        next?.focus();
+        return;
+      }
+      if (event.key !== 'Escape') return;
       event.preventDefault();
       onCancel();
     };
@@ -136,10 +182,19 @@ export function WireConfirm({
       // The caller says what went wrong; no tick.
       return;
     }
-    if (!label || !box) return;
+    if (!label) return;
+    if (!box) {
+      outcomeDone.current?.();
+      return;
+    }
     if (exited.current) setOutcome({ label, box });
     else pendingOutcome.current = { label, box };
   };
+
+  const endOutcome = useCallback(() => {
+    setOutcome(null);
+    outcomeDone.current?.();
+  }, []);
 
   const onExitComplete = () => {
     exited.current = true;
@@ -172,7 +227,7 @@ export function WireConfirm({
           />
         )}
       </AnimatePresence>
-      {outcome && <OutcomeTick label={outcome.label} box={outcome.box} still={still} onDone={() => setOutcome(null)} />}
+      {outcome && <OutcomeTick key={`${outcome.label}-${outcome.box.left}-${outcome.box.top}`} label={outcome.label} box={outcome.box} still={still} onDone={endOutcome} />}
     </>,
     document.body,
   );
@@ -204,12 +259,6 @@ function WireLayer({ id, title, message, cancelLabel, confirmLabel, variant, sti
     hidden: { opacity: 0, y: still ? 0 : 4 },
     shown: { opacity: 1, y: 0, transition: { duration: ROW_S, delay: still ? 0 : CARD_AT + i * ROW_GAP, ease: ease.out } },
   });
-  // Tab goes between the two buttons, and stays in the card.
-  const trapTab = (event: KeyboardEvent) => {
-    if (event.key !== 'Tab') return;
-    event.preventDefault();
-    (document.activeElement === cancelRef.current ? confirmRef.current : cancelRef.current)?.focus();
-  };
   // The lead fades once the card is there (a wire across the page would stay), and is back to wind into the button.
   const lead = {
     hidden: { pathLength: 0, opacity: 1 },
@@ -259,7 +308,8 @@ function WireLayer({ id, title, message, cancelLabel, confirmLabel, variant, sti
           aria-modal="true"
           aria-labelledby={`${id}-title`}
           aria-describedby={`${id}-message`}
-          onKeyDown={trapTab}
+          // A click on its text keeps the focus in it (the document's Tab trap brings it to the buttons).
+          tabIndex={-1}
           className="pointer-events-auto w-full max-w-sm rounded-2xl border border-ink-200 bg-white p-5 shadow-xl dark:border-ink-700 dark:bg-ink-900"
           variants={card}
           initial="hidden"

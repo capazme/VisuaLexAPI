@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { ease } from '../../../lib/motion';
@@ -18,17 +18,24 @@ interface OutcomeTickProps {
 
 /**
  * The outcome said on the button a confirmation was drawn from (K1b): over it, on the paper, a tick that draws itself
- * and the word («Eliminata ✓»), for 1.6 s, then it fades. Read once by a screen reader. Takes no pointer and no focus.
+ * and the word («Eliminata ✓»), for 1.6 s, then it fades. Takes no pointer and no focus.
  */
 export function OutcomeTick({ label, box, still, onDone }: OutcomeTickProps) {
+  // Once, from its mount: a re-render of the caller does not start it again.
+  const done = useRef(onDone);
   useEffect(() => {
-    const timer = window.setTimeout(onDone, OUTCOME_MS);
+    done.current = onDone;
+  });
+  useEffect(() => {
+    const timer = window.setTimeout(() => done.current(), OUTCOME_MS);
     return () => window.clearTimeout(timer);
-  }, [onDone]);
+  }, []);
 
   return (
+    // Seen, not read: each caller says the outcome in its own words where a screen reader hears it (a status line, a
+    // notification); a region inserted with its text is often not read anyway.
     <motion.div
-      role="status"
+      aria-hidden
       className={cn(
         'pointer-events-none fixed flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-emerald-200 bg-white px-2 text-sm font-medium text-emerald-800 shadow-sm',
         'dark:border-emerald-900/60 dark:bg-ink-900 dark:text-emerald-300',

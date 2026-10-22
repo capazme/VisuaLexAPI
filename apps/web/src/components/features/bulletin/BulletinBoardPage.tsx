@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Upload, Package, Lightbulb } from 'lucide-react';
 import { AddToMyDossiersDialog } from './AddToMyDossiersDialog';
@@ -16,7 +16,6 @@ import { ArchivedEnvironmentsSection } from './ArchivedEnvironmentsSection';
 import { SharedLinkImport } from './SharedLinkImport';
 import { Toast } from '../../ui/Toast';
 import { WireConfirm } from '../../ui/wireConfirm/WireConfirm';
-import { OUTCOME_MS } from '../../ui/wireConfirm/OutcomeTick';
 import { useTour } from '../../../hooks/useTour';
 import { useAppStore } from '../../../store/useAppStore';
 import { studyImportSentence } from '../../../utils/studyImportReport';
@@ -64,6 +63,8 @@ export function BulletinBoardPage() {
   const [suggestingTo, setSuggestingTo] = useState<SharedEnvironment | null>(null);
   const [editingEnv, setEditingEnv] = useState<SharedEnvironment | null>(null);
   const [deletingEnv, setDeletingEnv] = useState<SharedEnvironment | null>(null);
+  // The deleted copy whose card waits for «Eliminata ✓» to go (K1b).
+  const deletedEnvId = useRef<string | null>(null);
   const [reviewingSuggestion, setReviewingSuggestion] = useState<EnvironmentSuggestion | null>(null);
   const [editingSuggestion, setEditingSuggestion] = useState<EnvironmentSuggestion | null>(null);
   const [aliasConflict, setAliasConflict] = useState<{ itemId: string; suggestedTrigger: string; existingAliasId?: string } | null>(null);
@@ -228,7 +229,7 @@ export function BulletinBoardPage() {
     setDeletingEnv(null);
     try {
       await sharedEnvironmentService.delete(env.id);
-      window.setTimeout(() => setMyEnvironments(prev => prev.filter(e => e.id !== env.id)), OUTCOME_MS);
+      deletedEnvId.current = env.id;
       showToast('Copia pubblicata eliminata', 'success');
       return 'Eliminata';
     } catch (error: unknown) {
@@ -236,6 +237,19 @@ export function BulletinBoardPage() {
       showToast(message, 'error');
       return null;
     }
+  };
+
+  // The deleted copy's card goes once its tick has said it; the focus it held goes to the next card's menu button.
+  const dropDeletedEnv = () => {
+    const id = deletedEnvId.current;
+    if (!id) return;
+    deletedEnvId.current = null;
+    const lost = document.activeElement === document.body || document.activeElement === null
+      || document.activeElement?.closest('[data-shared-env]')?.getAttribute('data-shared-env') === id;
+    const triggers = [...document.querySelectorAll<HTMLElement>('[data-shared-env] [aria-label^="Azioni su"]')];
+    const at = triggers.findIndex((t) => t.closest('[data-shared-env]')?.getAttribute('data-shared-env') === id);
+    setMyEnvironments(prev => prev.filter(e => e.id !== id));
+    if (lost) (triggers[at + 1] ?? triggers[at - 1])?.focus({ preventScroll: true });
   };
 
   // Suggestion item handlers
@@ -640,6 +654,7 @@ export function BulletinBoardPage() {
         confirmLabel="Elimina definitivamente"
         onConfirm={handleDeleteConfirm}
         onCancel={() => setDeletingEnv(null)}
+        onOutcomeDone={dropDeletedEnv}
       />
 
       {/* Toast */}

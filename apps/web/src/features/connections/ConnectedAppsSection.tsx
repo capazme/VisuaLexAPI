@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link2, Unplug } from 'lucide-react';
 import { WireConfirm } from '../../components/ui/wireConfirm/WireConfirm';
-import { OUTCOME_MS } from '../../components/ui/wireConfirm/OutcomeTick';
 import { getErrorMessage } from '../../utils/errors';
 import { connectionsService, type ConnectedApp } from './connectionsService';
 
@@ -26,6 +25,10 @@ export function ConnectedAppsSection() {
   const [message, setMessage] = useState<string | null>(null);
   // The connection whose permission is being changed: its switch waits, so what it shows is what the server holds.
   const [switching, setSwitching] = useState<string | null>(null);
+  // The app revoked whose row waits for «Revocata ✓» to go, and the «Revoca» its confirmation was drawn from (K1b).
+  const [revoked, setRevoked] = useState<string | null>(null);
+  const [revokeFrom, setRevokeFrom] = useState<HTMLElement | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,7 +69,7 @@ export function ConnectedAppsSection() {
     }
   };
 
-  /** The revocation; «Revoca» says «Revocata» with its tick, and the row goes once it has said it. */
+  /** The revocation; «Revoca» says «Revocata» with its tick, and the row goes once it has said it (`dropRevoked`). */
   const confirmRevoke = async (): Promise<string | null> => {
     const app = pending;
     setPending(null);
@@ -74,11 +77,7 @@ export function ConnectedAppsSection() {
     try {
       await connectionsService.revoke(app.id);
       setMessage(`Collegamento con ${appName(app)} revocato.`);
-      window.setTimeout(() => {
-        setState((current) =>
-          current.status === 'ready' ? { status: 'ready', apps: current.apps.filter((a) => a.id !== app.id) } : current,
-        );
-      }, OUTCOME_MS);
+      setRevoked(app.id);
       return 'Revocata';
     } catch (error: unknown) {
       setMessage(getErrorMessage(error) ?? 'Impossibile revocare il collegamento.');
@@ -86,12 +85,27 @@ export function ConnectedAppsSection() {
     }
   };
 
+  // The revoked app's row goes; the focus it held goes to the next app's «Revoca», else to the list's box.
+  const dropRevoked = () => {
+    const id = revoked;
+    if (!id) return;
+    setRevoked(null);
+    const holder = listRef.current;
+    const buttons = [...(holder?.querySelectorAll<HTMLButtonElement>('[data-revoke]') ?? [])];
+    const at = buttons.findIndex((b) => b.dataset.revoke === id);
+    const lost = holder?.contains(document.activeElement) || document.activeElement === document.body;
+    setState((current) =>
+      current.status === 'ready' ? { status: 'ready', apps: current.apps.filter((a) => a.id !== id) } : current,
+    );
+    if (lost) (buttons[at + 1] ?? buttons[at - 1] ?? holder)?.focus({ preventScroll: true });
+  };
+
   return (
     <div>
       <label className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-1.5">
         <Link2 size={12} aria-hidden /> Applicazioni collegate
       </label>
-      <div className="space-y-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+      <div ref={listRef} tabIndex={-1} className="space-y-3 rounded-xl border border-slate-200 p-3 focus:outline-none dark:border-slate-700">
         {state.status === 'loading' && <p className="text-xs text-slate-500">Caricamento…</p>}
         {state.status === 'error' && <p className="text-xs text-red-600">{state.message}</p>}
         {state.status === 'ready' && state.apps.length === 0 && (
@@ -120,7 +134,13 @@ export function ConnectedAppsSection() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setPending(app)}
+                  data-revoke={app.id}
+                  // Revoked, it waits for its tick to go: no second revocation meanwhile.
+                  disabled={revoked === app.id}
+                  onClick={(event) => {
+                    setRevokeFrom(event.currentTarget);
+                    setPending(app);
+                  }}
                   aria-label={`Revoca ${appName(app)}`}
                   className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-300"
                 >
@@ -144,6 +164,8 @@ export function ConnectedAppsSection() {
         }
         confirmLabel="Revoca"
         onConfirm={confirmRevoke}
+        origin={revokeFrom}
+        onOutcomeDone={dropRevoked}
         onCancel={() => setPending(null)}
       />
     </div>

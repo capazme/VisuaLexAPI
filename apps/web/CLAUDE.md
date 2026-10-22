@@ -431,8 +431,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `Modal`, `ConfirmDialog`, `WireConfirm` (below, «Destructive confirmations»), `Toast`, `EmptyState`, `Sheet` (a
   phone's bottom sheet), plus feature-flavoured modals.
   `Modal` is portaled to `document.body`, so a dialog opened inside a reading window
-  (transformed, stacked) is not confined to it; each open `Modal` (and `WireConfirm`) is on a module-level
-  stack (`ui/dialogStack.ts`) and only the top-most handles Tab (the focus trap) and Esc, so a dialog opened
+  (transformed, stacked) is not confined to it; each open `Modal` and `WireConfirm` is on a module-level
+  stack (`ui/dialogStack.ts`) and only the top-most handles Tab (its focus trap, on `document`) and Esc, so a dialog opened
   from a dialog keeps the keyboard.
   `Button` has four variants (spec `2026-10-18-redesign-inchiostro` §5.1): `primary` (toga-600, white),
   `secondary` (paper with an ink-200 hairline), `quiet` (text only) and `danger` (red-600) — `ghost` and
@@ -1929,14 +1929,17 @@ the message so it names the scope *and* what is not touched ("Segnalibri e dossi
 saranno toccati"). Where the action **leaves you** or **cannot be undone** and comes rarely (K1b, L-35: erasing
 the MERL-T data, revoking a connected app, deleting a published copy from the dossier's «Forum» menu or from the
 Forum's card), the confirmation is drawn from its button: `components/ui/wireConfirm/WireConfirm` (the same props,
-plus `origin`, the button, by default the element focused as it opens — `MenuButton` gives it back to its trigger
-before an entry runs, the Forum's card does the same by hand). A wire leaves the button, meets the card on the edge
+plus `origin`, the button: pass it, `event.currentTarget`, since Safari and a tap do not focus a button they press;
+absent, the element focused as it opens, right for a menu's entry — `MenuButton` gives the focus back to its trigger
+by code before an entry runs, the Forum's card does the same by hand). A button its action disabled (busy) gets the
+focus back once enabled again. A wire leaves the button, meets the card on the edge
 that faces it (`wirePath.ts`, pure) and draws its outline both ways; where the ends meet the card appears, its rows
 rising one after the other (about 500 ms; the lead fades once it is there). «Annulla», Esc or a click outside wind it
 back into the button (about 300 ms) and give it the focus; leaving, it is `inert`, so an Enter during the rewind
 confirms nothing. Confirming folds the card into a line, and `onConfirm` may resolve to the outcome the button then
-says, a tick drawing itself over it (`OutcomeTick`, «Eliminata ✓», 1.6 s, `role="status"`); a caller that removes
-the button waits `OUTCOME_MS`. The focus opens on «Annulla» and Tab goes between the two buttons. Under reduced
+says, a tick drawing itself over it (`OutcomeTick`, «Eliminata ✓», 1.6 s, seen only: each caller says the outcome in
+words where a screen reader hears it); a caller that removes the button (a row, a card) does it in `onOutcomeDone`,
+once the tick is gone, and hands the focus to a neighbour. The outline is drawn again when the window changes. The focus opens on «Annulla» and Tab goes between the two buttons. Under reduced
 motion the card fades in already drawn, and the outcome comes once it is gone. On a phone the card is the page's
 width less 16 px each side.
 

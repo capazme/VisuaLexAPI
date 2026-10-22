@@ -80,9 +80,12 @@ export function wirePaths(button: Box, card: Box, radius: number): WirePaths {
   const centre: Point = [button.left + button.width / 2, button.top + button.height / 2];
   const { point: attach, edge } = attachPoint(card, centre, radius);
   // The lead leaves the button from its side that faces the card.
+  // A button above the card leaves from its bottom; one the card covers (its centre inside it) from its top, the side
+  // nearer the edge the wire meets.
+  const covered = centre[1] > card.top && centre[1] < card.top + card.height && centre[0] > card.left && centre[0] < card.left + card.width;
   const start: Point =
     edge === 'bottom' ? [centre[0], button.top]
-      : edge === 'top' ? [centre[0], button.top + button.height]
+      : edge === 'top' ? [centre[0], covered ? button.top : button.top + button.height]
         : edge === 'left' ? [button.left + button.width, centre[1]]
           : [button.left, centre[1]];
   const points = outlinePoints(card, radius);

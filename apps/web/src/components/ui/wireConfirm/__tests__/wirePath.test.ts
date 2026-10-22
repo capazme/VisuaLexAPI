@@ -31,8 +31,9 @@ describe('wirePath — the wire from the button to the card (K1b)', () => {
     expect(cw[0]).toEqual([300, 400]);
     expect(cw.at(-1)).toEqual([300, 400]);
     expect(ccw).toEqual([...cw].reverse());
-    // Clockwise from the bottom edge goes left first (y down).
+    // Clockwise from the bottom edge goes left first (y down), along that edge.
     expect(cw[1][0]).toBeLessThan(300);
+    expect(cw[1][1]).toBe(400);
   });
 
   it('works from every side', () => {
@@ -44,6 +45,10 @@ describe('wirePath — the wire from the button to the card (K1b)', () => {
       const { clockwise, counter, attach } = wirePaths(button, CARD, 16);
       expect(points(clockwise)[0]).toEqual(attach);
       expect(points(counter)[0]).toEqual(attach);
+      // The next point lies on the same edge as the attach point: the round starts along it, not across the card.
+      const [ax, ay] = attach;
+      const [nx, ny] = points(clockwise)[1];
+      expect(ax === nx || ay === ny).toBe(true);
     }
   });
 });

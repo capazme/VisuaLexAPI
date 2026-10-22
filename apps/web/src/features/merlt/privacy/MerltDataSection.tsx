@@ -27,6 +27,8 @@ export function MerltDataSection() {
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [revokeOpen, setRevokeOpen] = useState(false);
   const [eraseOpen, setEraseOpen] = useState(false);
+  // The button the erasure's confirmation is drawn from (K1b).
+  const [eraseFrom, setEraseFrom] = useState<HTMLElement | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -118,7 +120,7 @@ export function MerltDataSection() {
             </button>
             <button
               type="button"
-              onClick={() => { setMessage(null); setEraseOpen(true); }}
+              onClick={(event) => { setMessage(null); setEraseFrom(event.currentTarget); setEraseOpen(true); }}
               disabled={busy}
               className={cn(ROW, 'bg-red-50 text-red-700 hover:bg-red-100 sm:col-span-2 dark:bg-red-950/30 dark:text-red-300')}
             >
@@ -154,6 +156,7 @@ export function MerltDataSection() {
         confirmLabel="Elimina i dati"
         onConfirm={handleErase}
         onCancel={() => setEraseOpen(false)}
+        origin={eraseFrom}
       />
       {notice && (
         <Modal isOpen={noticeOpen} onClose={() => setNoticeOpen(false)} title={notice.titolo} size="lg">
