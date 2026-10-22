@@ -139,9 +139,11 @@ describe('VersionBanner — an article that will change (V1, G-355)', () => {
         expect(title('2027-03-11')).toBe("Dall'11 marzo 2027 questo articolo cambia.");
     });
 
-    it('marks the chip «Cambia dal …» in the same tone, and keeps today\'s window in its title', () => {
+    it('marks the chip with what the banner says, the day in full, in the same tone, today\'s window in its title', () => {
+        expect(show(TODAY, undated, later('amended')).chip).toMatchObject({ tone: 'upcoming', label: 'Cambia dal 1° gennaio 2027' });
+        expect(show(TODAY, undated, { change: 'amended', valid_from: '2027-08-08', version_number: null }).chip?.label).toBe("Cambia dall'8 agosto 2027");
         const chip = show(TODAY, undated, later('abrogated')).chip!;
-        expect(chip).toMatchObject({ tone: 'upcoming', label: 'Cambia dal 01-01-2027' });
+        expect(chip).toMatchObject({ tone: 'upcoming', label: 'Abrogato dal 1° gennaio 2027' });
         expect(chip.title).toContain('In vigore dal 01-07-1986');
         expect(chip.title).toContain('è abrogato');
     });
@@ -160,14 +162,14 @@ describe('VersionBanner — an article that will change (V1, G-355)', () => {
     it('past the day, in an article a practice kept, says it in the past tense and that the text was in force until the day before', () => {
         const display = show(TODAY, undated, later('abrogated'), '2027-01-15');
         expect(display.banner).toMatchObject({ title: 'Dal 1° gennaio 2027 questo articolo è abrogato.', body: 'Qui leggi il testo in vigore fino al 31 dicembre 2026: non è più il testo attuale.' });
-        expect(display.chip?.label).toBe('Abrogato dal 01-01-2027');
+        expect(display.chip?.label).toBe('Abrogato dal 1° gennaio 2027');
         expect(show(TODAY, undated, later('amended'), '2027-01-01').banner?.title).toBe('Dal 1° gennaio 2027 questo articolo è cambiato.');
     });
 
     it('says it even when the source\'s page of today could not be read: the server read the article at today', () => {
         const display = show(undefined, undated, later('amended'));
         expect(display.banner?.body).toBe('Qui leggi il testo in vigore oggi.');
-        expect(display.chip?.label).toBe('Cambia dal 01-01-2027');
+        expect(display.chip?.label).toBe('Cambia dal 1° gennaio 2027');
     });
 
     it('gives way to what the source says of a text repealed, not yet in force or outside the day asked', () => {
@@ -196,8 +198,8 @@ describe('VersionBanner — an article that will change (V1, G-355)', () => {
     });
 
     it('past the day, a repealed article\'s chip says «Abrogato dal …», an amended one «Cambiato dal …»; the citation reads the window', () => {
-        expect(show(TODAY, undated, later('abrogated'), '2027-02-01').chip?.label).toBe('Abrogato dal 01-01-2027');
-        expect(show(TODAY, undated, later('amended'), '2027-02-01').chip?.label).toBe('Cambiato dal 01-01-2027');
+        expect(show(TODAY, undated, later('abrogated'), '2027-02-01').chip?.label).toBe('Abrogato dal 1° gennaio 2027');
+        expect(show(TODAY, undated, later('amended'), '2027-02-01').chip?.label).toBe('Cambiato dal 1° gennaio 2027');
         expect(show(TODAY, undated, later('abrogated'), '2027-02-01').citeAs).toMatchObject({ state: 'historical', valid_from: '1986-07-01', valid_to: '2026-12-31' });
         expect(show(TODAY, undated, later('abrogated')).citeAs).toBeUndefined();
     });

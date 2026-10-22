@@ -1304,8 +1304,9 @@ already published (art. 3 d.P.R. 131/1986, read on 21 October 2026, repealed fro
 `describeVersion(validity, request, upcoming)` then gives the banner `upcoming` («Dal 1° gennaio 2027 questo articolo
 è abrogato.» / «… cambia.», «Qui leggi il testo in vigore oggi, dal …» with today's window when the source gave it;
 the date through `withPreposition` and
-`formatDateForCitation`, `CalendarClock`, the sky tone of `current_in_window`, `role="status"`) and the chip «Cambia
-dal 01-01-2027» in the same tone, today's window in its title — only on the text in force asked with no date, and
+`formatDateForCitation`, `CalendarClock`, the sky tone of `current_in_window`, `role="status"`) and the chip says what the
+banner says, the day in full as the banner writes it — «Abrogato dal 1° gennaio 2027», «Cambia dall'8 agosto 2027» —
+in the same tone, today's window in its title — only on the text in force asked with no date, and
 with nothing else switched off: today's text is cited, copied and annotated as before. `upcoming` without
 `validity` (today's page unread, the article read at today) still says it, its chip with no window in the title. A
 practice keeps its articles in the browser and never reads them again: past the day (`todayInRome`, the fourth

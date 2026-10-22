@@ -132,7 +132,7 @@ describe('ArticleTabContent — the text in force', () => {
     expect(banner).toHaveTextContent('Qui leggi il testo in vigore oggi, dal 28 dicembre 2025.');
     // Rule 23: the text root holds article_text alone.
     expect(document.querySelector('.vlx-b')!.parentElement!.contains(banner)).toBe(false);
-    expect(screen.getByRole('button', { name: 'Cambia dal 01-01-2027' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Abrogato dal 1° gennaio 2027' })).toBeInTheDocument();
     expect(screen.getAllByTitle('Apri note')[0]).toBeEnabled();
   });
 
@@ -386,7 +386,7 @@ describe('ArticleTabContent — copying a past text', () => {
     const KEPT: ArticleValidity = { ...CURRENT, valid_from: '2020-03-01', valid_to: '2025-12-31' };
     show(article(KEPT, { versione: 'vigente', data_versione: '' }, { upcoming: { change: 'abrogated', valid_from: '2026-01-01', version_number: 9 } }));
     expect(screen.getByText('Dal 1° gennaio 2026 questo articolo è abrogato.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Abrogato dal 01-01-2026' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Abrogato dal 1° gennaio 2026' })).toBeInTheDocument();
     fireEvent.click(copyButton());
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     const copied: string = writeText.mock.calls[0][0];

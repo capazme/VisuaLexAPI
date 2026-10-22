@@ -254,14 +254,18 @@ function upcomingBanner(upcoming: ArticleUpcoming, validity: ArticleValidity | u
 }
 
 function upcomingChip(upcoming: ArticleUpcoming, validity: ArticleValidity | undefined, today: VersionChip | null, passed: boolean): VersionChip {
-  const day = formatDateDashed(upcoming.valid_from);
+  // The day in full, as the banner writes it («dal 1° gennaio 2027», «dall'8 agosto 2027»): the chip names what the
+  // banner says, «Abrogato» for a repeal before and after the day, «Cambia» / «Cambiato» for an amendment.
+  const from = withPreposition('dal', formatDateForCitation(upcoming.valid_from));
   const repealed = upcoming.change === 'abrogated';
+  const word = repealed ? 'Abrogato' : passed ? 'Cambiato' : 'Cambia';
   const what = repealed ? 'è abrogato' : passed ? 'è cambiato' : 'cambia';
   const version = validity?.version_number ? ` Versione n. ${validity.version_number}.` : '';
+  const day = from.charAt(0).toUpperCase() + from.slice(1);
   return {
     tone: 'upcoming',
-    label: `${passed ? (repealed ? 'Abrogato' : 'Cambiato') : 'Cambia'} dal ${day}`,
-    title: `${today ? `${today.label}. ` : ''}Dal ${day} questo articolo ${what}.${version} ${SOURCE_NOTE}`,
+    label: `${word} ${from}`,
+    title: `${today ? `${today.label}. ` : ''}${day} questo articolo ${what}.${version} ${SOURCE_NOTE}`,
   };
 }
 
