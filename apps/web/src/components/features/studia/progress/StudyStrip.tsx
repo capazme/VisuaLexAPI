@@ -33,8 +33,9 @@ export function StudyStrip({ data, loading, onSettingsChanged, dense = false }: 
     gear.current?.focus();
   };
   return (
-    <div className={cn(TILE, 'px-3 md:px-4', dense ? 'py-1' : 'py-2')} aria-busy={loading}>
-      <div className="flex min-h-14 items-center gap-x-4 gap-y-2 md:gap-x-6">
+    // The strip's own height counts its padding, as before the panel: closed, the panel has none.
+    <div className={cn(TILE, 'flex min-h-14 flex-col justify-center px-3 md:px-4', dense ? 'py-1' : 'py-2')} aria-busy={loading}>
+      <div className="flex items-center gap-x-4 md:gap-x-6">
         {data ? (
           <>
             <StreakBadge compact dense={dense} attuale={data.serie.attuale} record={data.serie.record} ultimiGiorni={data.serie.ultimiGiorni} />

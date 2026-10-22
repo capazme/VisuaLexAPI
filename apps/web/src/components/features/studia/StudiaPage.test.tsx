@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useOutletContext } from 'react-router-dom';
 
@@ -11,6 +11,7 @@ vi.mock('../../../services/studiaService', () => ({
 
 import { Z_INDEX } from '../../../constants/zIndex';
 import { StudiaPage, type StudiaOutletContext } from './StudiaPage';
+import { studiaService } from '../../../services/studiaService';
 
 function Validator() {
   return <p data-testid="validator">{String(useOutletContext<StudiaOutletContext>().validator)}</p>;
@@ -123,6 +124,7 @@ describe('StudiaPage', () => {
   });
 
   it('opens the study settings in the strip, in place and never in a window, Esc giving the focus back to the gear (U1b)', async () => {
+    vi.mocked(studiaService.preferences).mockResolvedValue({ ripassiAlGiorno: 20, nuoveAlGiorno: 10, materieComunita: [] } as never);
     at('/studia/valida');
     const user = userEvent.setup();
     const gear = screen.getByRole('button', { name: 'Impostazioni dello studio' });
@@ -133,7 +135,20 @@ describe('StudiaPage', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
     const panel = screen.getByRole('region', { name: 'Impostazioni dello studio' });
     expect(gear).toHaveAttribute('aria-controls', panel.id);
-    act(() => panel.focus());
+    // In the strip, which grows downward with it.
+    expect(gear.closest('[aria-busy]')).toContainElement(panel);
+    // Esc in the community's subjects, one level down, closes only them, the focus back on their button.
+    const community = await within(panel).findByRole('button', { name: /^Schede della comunità · / });
+    await user.click(community);
+    expect(community).toHaveAttribute('aria-expanded', 'true');
+    await user.tab();
+    expect(within(panel).getAllByRole('switch')[0]).toHaveFocus();
+    await user.keyboard('{Escape}');
+    expect(community).toHaveAttribute('aria-expanded', 'false');
+    expect(community).toHaveFocus();
+    expect(screen.getByRole('region', { name: 'Impostazioni dello studio' })).toBe(panel);
+    // Esc from a field closes the settings, the focus back on the gear.
+    await user.click(within(panel).getByLabelText('Ripassi al giorno'));
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('region', { name: 'Impostazioni dello studio' })).toBeNull();
     expect(gear).toHaveFocus();

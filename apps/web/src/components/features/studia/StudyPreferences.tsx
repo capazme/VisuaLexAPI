@@ -9,7 +9,7 @@ import { MATERIA_LABEL } from './studiaLabels';
 export interface StudyPreferencesProps {
   /** Called after a change reached the server: the counts of the day may have moved. */
   onChanged: () => void;
-  /** Drawn open, with no disclosure of its own: the panel the gear opens in «Oggi»'s band, or the strip's sheet (Gymnasium spec §4). */
+  /** Drawn open, with no disclosure of its own: the panel the gear opens in «Oggi»'s band and in the strip (U1b). */
   open?: boolean;
   /** Each new value opens the community's subjects (a mission's «Accendi le schede della comunità» led here); 0 asks nothing. */
   communityRequest?: number;

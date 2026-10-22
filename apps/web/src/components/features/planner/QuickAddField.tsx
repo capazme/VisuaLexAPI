@@ -105,8 +105,8 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
         >
           <SlidersHorizontal size={16} aria-hidden />
           <span className="sr-only sm:not-sr-only sm:text-sm sm:font-medium">Dettagli</span>
-          {/* Turns as the panel opens, with its height. */}
-          <ChevronDown size={14} aria-hidden className={cn('hidden shrink-0 transition-transform duration-200 motion-reduce:transition-none sm:block', open && 'rotate-180')} />
+          {/* Turns as the panel opens, with its height: the button's state at every width. */}
+          <ChevronDown size={14} aria-hidden className={cn('shrink-0 transition-transform duration-200 motion-reduce:transition-none', open && 'rotate-180')} />
         </button>
         <button type="submit" disabled={busy || !draft.title.trim()} className={cn(INK_BUTTON, 'shrink-0 px-3 sm:px-4')}>
           {busy ? 'Aggiungo…' : <>Aggiungi<span className="sr-only"> il compito</span></>}

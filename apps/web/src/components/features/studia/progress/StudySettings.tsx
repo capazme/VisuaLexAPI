@@ -38,7 +38,7 @@ export function SettingsGear({ open, onClick, controls, ref }: SettingsGearProps
 export interface StudySettingsPanelProps {
   id: string;
   open: boolean;
-  /** Esc inside it: the band closes it and gives the focus back to the gear (`StatsBand`'s `close`). */
+  /** Esc inside it: the card or the strip closes it and gives the focus back to its gear. */
   onClose: () => void;
   onChanged: () => void;
   /** Each new value opens the community's subjects. */
@@ -63,8 +63,9 @@ export function StudySettingsPanel({ id, open, onClose, onChanged, communityRequ
       aria-label="Impostazioni dello studio"
       tabIndex={-1}
       className="focus:outline-none"
-      // The card's gap (20 px) above the line, as when the panel was a row of the card's grid.
-      contentClassName="mt-5 border-t border-slate-200 pb-1 pt-4 dark:border-slate-800"
+      // 20 px above the line, the card's gap when the panel was a row of its grid; room under the last control in the
+      // strip too, whose own padding is small.
+      contentClassName="mt-5 border-t border-slate-200 pb-2 pt-4 dark:border-slate-800"
     >
       <StudyPreferences open communityRequest={communityRequest} onChanged={onChanged} listClassName={cn('md:grid-cols-2', aside && 'xl:grid-cols-1')} />
     </Collapsible>
