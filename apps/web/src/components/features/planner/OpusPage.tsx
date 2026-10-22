@@ -1,16 +1,9 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { Trash2 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
+import { pageName } from '../../../features/sections/pageNames';
 import { PageFrame } from '../../layout/PageFrame';
 import { QUIET_BUTTON } from '../studia/progress/tokens';
-
-/** Each view's name, the page's title (L-37): «Opus · la tua officina giuridica» goes over it. */
-function pageName(pathname: string): string {
-  if (pathname.startsWith('/opus/prossimi')) return 'Prossimi giorni';
-  if (pathname.startsWith('/opus/ingresso')) return "Lista d'ingresso";
-  if (pathname.startsWith('/opus/cestino')) return 'Cestino dei compiti';
-  return 'Oggi';
-}
 
 /**
  * Opus's page (the planner, wave 1): the view's name as the title, the section's phrase over it (L-37), over its views —
@@ -25,7 +18,8 @@ export function OpusPage() {
   const inTrash = pathname.startsWith('/opus/cestino');
   return (
     <PageFrame
-      title={pageName(pathname)}
+      // The view's name, from the one list of the pages' names (L-37).
+      title={pageName(pathname) ?? 'Oggi'}
       kicker="opus"
       section="opus"
       className="h-full"

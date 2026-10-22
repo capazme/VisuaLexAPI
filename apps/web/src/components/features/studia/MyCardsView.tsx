@@ -359,6 +359,9 @@ export function MyCardsView() {
 
         {id && (
           <div className={cn('min-w-0 pt-2 md:pt-0', desktop && 'sticky top-[var(--phone-bar-offset,0px)] max-h-[calc(100dvh-var(--phone-bar-offset,0px))] overflow-y-auto pb-4')}>
+            {/* The outline under the page's title: the card's own headings (h3, h4) sit under this, on a phone with no list
+                beside it, on a computer beside the subjects' h2. */}
+            <h2 className="sr-only">La scheda scelta</h2>
             {selected ? (
               <DetailOf
                 // Its confirmations and pending request belong to this card: another one starts clean.

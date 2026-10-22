@@ -324,7 +324,7 @@ The session becomes a screen of its own:
   button and the feedback button on screen, and `Layout.tsx` is untouched.
 - **The end**: the sentence («Hai ripassato 23 schede, 4 da rifare. Le prossime: domani.»), the ring and
   the streak as now, and two buttons: «Torna a Oggi» and, if cards are left, «Continua». *Corrected on 22 October
-  (G8):* one card, centred, holds the sentence, the ring, the streak and the week, and one primary action — «Continua»
+  (G8):* one card, centred, holds the sentence, the ring and the streak — whose strip of the last seven days is the week, so no second row of it —, and one primary action — «Continua»
   when cards are left, else «Torna a Oggi» —, with «Torna a Oggi» a quiet link under «Continua»; no bar under it. The
   progress bar's ink takes the section's hue, not the ink's near-grey.
 - The celebration (progress spec §6.4) is kept as it is: once a day, 1.5 s, beside the card, never on top.

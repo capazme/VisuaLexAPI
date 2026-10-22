@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
+import { pageName } from '../../../features/sections/pageNames';
 import { PageFrame } from '../../layout/PageFrame';
 import { LessonFrame } from './LessonFrame';
 import { StudyStrip } from './progress/StudyStrip';
@@ -24,14 +25,6 @@ const underStrip = (pathname: string) => /^\/studia\/valida(\/|$)/.test(pathname
 
 /** The views with an action beside the title, which they draw into the frame's slot. */
 const withAction = (pathname: string) => /^\/studia\/schede(\/|$)/.test(pathname);
-
-/** Each view's name, the page's title (L-37): the section's phrase goes over it. */
-function pageName(pathname: string): string {
-  if (/^\/studia\/progressi(\/|$)/.test(pathname)) return 'Progressi';
-  if (/^\/studia\/schede(\/|$)/.test(pathname)) return 'Le mie schede';
-  if (/^\/studia\/valida(\/|$)/.test(pathname)) return 'Da validare';
-  return 'Oggi';
-}
 
 /** The review session is the lesson, a screen of its own (Gymnasium spec §5.4). */
 const isLesson = (pathname: string) => /^\/studia\/ripasso\/sessione(\/|$)/.test(pathname);
@@ -64,7 +57,8 @@ export function StudiaPage() {
   }
   return (
     <PageFrame
-      title={pageName(pathname)}
+      // The view's name, from the one list of the pages' names (L-37); the section's phrase goes over it.
+      title={pageName(pathname) ?? 'Oggi'}
       kicker="gymnasium"
       section="gymnasium"
       className="h-full"

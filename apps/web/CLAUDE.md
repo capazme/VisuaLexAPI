@@ -948,7 +948,7 @@ slate sans above, question and answer in the reader's serif at a 60ch measure, t
 is the card's own motion (a hairline, then the answer, `motion-safe:` only; the celebration never touches the card);
 the articles under the answer are 44 px buttons. Nothing else moves between a grade and the next card. The end (G8): one
 card, centred (`lesson-end`), with no bar under it — the sentence («Hai ripassato 23 schede, 4 da rifare. Le prossime:
-domani.», focused), the ring, the streak and the week (`SessionEndProgress`, from the day's read, `WeekRow` of the band),
+domani.», focused), the ring and the streak with its strip of the last seven days — the week, said once (`SessionEndProgress`, from the day's read) —,
 and one primary action: «Continua», which reads the same session again, when the read of the session's scope still
 counts cards for today (`cardsLeft`, `progress/today.ts`: due plus the new ones today allows; for a session narrowed to
 one institute, G5, `instituteCardsLeft` over the road's read, `usePercorso`: the institute's due cards and its new ones
@@ -1038,7 +1038,7 @@ places the right column; inside the tiles a sentence stops at `max-w-prose`. In 
    save travels, so a switch pressed right after a number is neither lost nor overwritten. The week (`layout.ts` `currentWeek`: Monday
    to Sunday from the server's today and `serie.ultimiGiorni`, seven boxes with «LMMGVSD», a day to come dotted, and the
    days before the first one the calendar holds `vuoto`, never missed; each state in words for a screen reader,
-   `DAY_STATE_LABEL`; `WeekRow`, which the lesson's end draws too), then the cards by state in one line (G8, `StatesLine`:
+   `DAY_STATE_LABEL`; `WeekRow`, its own file), then the cards by state in one line (G8, `StatesLine`:
    «3 nuove · 5 in apprendimento · 2 consolidate», each with its swatch, a list named «Le schede per stato») over the
    bar of the three colours. From `xl` the band is the top of the right column, about 400 to 490 px: `aside` adds the `xl:` classes that stack it as on a phone (the
    week at the column's width). «Tutti i progressi →», a text link (44 px, not a button across the column, G8), leads to `/studia/progressi`: the trend, the

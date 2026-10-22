@@ -877,11 +877,14 @@ describe('the lesson (Gymnasium spec §5.4)', () => {
       const sentence = await screen.findByText('Hai ripassato 1 scheda, nessuna da rifare. Le prossime: domani.');
       await screen.findByRole('img', { name: /Obiettivo di oggi/ });
       expect(screen.queryByRole('button', { name: 'Continua' })).not.toBeInTheDocument();
-      // One card, centred, holds the sentence, the ring, the streak, the week and the one action (G8).
+      // One card, centred, holds the sentence, the ring, the streak (with its strip of the last seven days, the week: no
+      // second row of it) and the one action (G8).
       const end = screen.getByTestId('lesson-end');
       expect(end).toContainElement(sentence);
       expect(end).toContainElement(screen.getByRole('img', { name: /Obiettivo di oggi/ }));
-      expect(within(end).getByRole('list', { name: 'Questa settimana' })).toBeInTheDocument();
+      expect(end).toContainElement(screen.getByRole('group', { name: /^Serie:/ }));
+      expect(within(end).getByRole('list', { name: 'Ultimi sette giorni' })).toBeInTheDocument();
+      expect(within(end).queryByRole('list', { name: 'Questa settimana' })).toBeNull();
       expect(within(end).getByRole('button', { name: 'Torna a Oggi' })).toHaveClass(...LESSON_PRIMARY.split(' '));
       expect(screen.getAllByRole('button', { name: 'Torna a Oggi' })).toHaveLength(1);
       expect(screen.queryByTestId('lesson-bar')).toBeNull();

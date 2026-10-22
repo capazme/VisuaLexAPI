@@ -19,7 +19,7 @@ function boxClass(day: WeekDay, today: boolean): string {
 
 /**
  * The current week, Monday to Sunday, each box with its letter; the states are also words, for a screen reader. The band's
- * (`aside`: at the right column's width from `xl`) and the lesson's end (G8).
+ * (`aside`: at the right column's width from `xl`).
  */
 export function WeekRow({ data, aside }: { data: Progressi; aside: boolean }) {
   // The calendar is sorted by day: its first row is the first day studied in the window, none for a newcomer.

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 import { FOCUS_RING } from '../../constants/interactions';
 import { sectionKicker, type PhrasedSection, type SectionId } from '../../features/sections/sections';
 import { cn } from '../../lib/utils';
@@ -46,6 +46,9 @@ export interface PageFrameProps {
  * Outside it: the Scrivania, the lesson, the reader and the practice, the login.
  */
 export function PageFrame({ title, kicker, line, action, actionBeside = false, section, titleId, className, children }: PageFrameProps) {
+  // The title says only the page's name («Oggi» in Opus and in Gymnasium): the line over it describes it, so the focus
+  // the section switcher puts on the title also says which section it is in.
+  const kickerId = useId();
   return (
     <div className={cn('flex w-full min-w-0 flex-col gap-6', className)}>
       <header className={cn(
@@ -54,8 +57,12 @@ export function PageFrame({ title, kicker, line, action, actionBeside = false, s
         action && FOCUS_BUTTON_CLEARANCE,
       )}>
         <div className="min-w-0">
-          {kicker && <p className={cn(PAGE_KICKER, 'mb-1')}>{sectionKicker(kicker)}</p>}
-          <h1 id={titleId} data-section-title={section} tabIndex={section ? -1 : undefined} className={cn(PAGE_TITLE, section && cn(FOCUS_RING, 'rounded-sm'))}>
+          {kicker && (
+            <p id={kickerId} className={cn(PAGE_KICKER, 'mb-1')}>
+              {sectionKicker(kicker)}
+            </p>
+          )}
+          <h1 id={titleId} aria-describedby={kicker ? kickerId : undefined} data-section-title={section} tabIndex={section ? -1 : undefined} className={cn(PAGE_TITLE, section && cn(FOCUS_RING, 'rounded-sm'))}>
             {title}
           </h1>
           {line && <p className="mt-1 max-w-prose text-slate-600 dark:text-slate-400">{line}</p>}
