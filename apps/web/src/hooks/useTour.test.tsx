@@ -110,7 +110,17 @@ describe('useTour — the focus it gives (Y1)', () => {
     expect(p.closeButton).not.toHaveAttribute('data-pointer-focus');
   });
 
-  it('after a key, the focus keeps its ring', () => {
+  it('a tour that starts after some typing still gives its first focus no ring', () => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    const { result } = renderHook(() => useTour());
+    act(() => { result.current.startTour('welcome'); });
+    const p = popover();
+    made[0].options.onPopoverRender?.(p);
+    p.closeButton.focus();
+    expect(p.closeButton).toHaveAttribute('data-pointer-focus');
+  });
+
+  it('after a key pressed in the tour, the focus keeps its ring', () => {
     const { result } = renderHook(() => useTour());
     act(() => { result.current.startTour('welcome'); });
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab' }));

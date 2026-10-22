@@ -57,8 +57,21 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
         setDeleteOpen(false);
         setDeletePassword('');
         setDeleteConfirmation('');
+        setAccountMessage(null);
         deleteOpener.current?.focus();
     };
+    // The dialog stays mounted (`Layout`): closed, it forgets a deletion begun and its password, during render (no
+    // effect), so it opens again with «Elimina l’account…» closed.
+    const [wasOpen, setWasOpen] = useState(isOpen);
+    if (wasOpen !== isOpen) {
+        setWasOpen(isOpen);
+        if (!isOpen) {
+            setDeleteOpen(false);
+            setDeletePassword('');
+            setDeleteConfirmation('');
+            setAccountMessage(null);
+        }
+    }
     const [devModeBusy, setDevModeBusy] = useState(false);
     const [devModeError, setDevModeError] = useState(false);
 
@@ -334,7 +347,7 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                     <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Dati e privacy</h3>
                     <div className="space-y-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
                         <p className="text-xs text-slate-500">Esporta una copia dei tuoi dati oppure elimina definitivamente l’account. Password e token non vengono inclusi nell’export.</p>
-                        <button type="button" onClick={() => void handleExportAccount()} disabled={accountBusy} className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-primary-50 px-3 py-2 text-sm font-medium text-primary-700 hover:bg-primary-100 disabled:opacity-50 dark:bg-primary-950/30 dark:text-primary-300"><Download size={16} /> Esporta i miei dati</button>
+                        <button type="button" onClick={() => void handleExportAccount()} disabled={accountBusy} className="w-full inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-primary-50 px-3 py-2 md:min-h-0 text-sm font-medium text-primary-700 hover:bg-primary-100 disabled:opacity-50 dark:bg-primary-950/30 dark:text-primary-300"><Download size={16} /> Esporta i miei dati</button>
                         <button
                             ref={deleteOpener}
                             type="button"
@@ -350,7 +363,7 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                                 <p className="text-xs text-slate-600 dark:text-slate-400">L’account e i suoi dati vengono eliminati per sempre. Per confermare, la password e la frase «ELIMINA ACCOUNT».</p>
                                 <input autoFocus type="password" value={deletePassword} onChange={event => setDeletePassword(event.target.value)} placeholder="Password corrente" aria-label="Password corrente per eliminare account" className={cn('w-full rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800', FIELD_TEXT)} />
                                 <input value={deleteConfirmation} onChange={event => setDeleteConfirmation(event.target.value)} placeholder="Scrivi ELIMINA ACCOUNT" aria-label="Conferma eliminazione account" className={cn('w-full rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800', FIELD_TEXT)} />
-                                <button type="button" onClick={() => void handleDeleteAccount()} disabled={accountBusy || !deletePassword || deleteConfirmation !== 'ELIMINA ACCOUNT'} className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:bg-red-950/30 dark:text-red-300"><Trash2 size={16} /> Elimina definitivamente l’account</button>
+                                <button type="button" onClick={() => void handleDeleteAccount()} disabled={accountBusy || !deletePassword || deleteConfirmation !== 'ELIMINA ACCOUNT'} className="min-h-[44px] md:min-h-0 w-full inline-flex items-center justify-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:bg-red-950/30 dark:text-red-300"><Trash2 size={16} /> Elimina definitivamente l’account</button>
                                 <button type="button" onClick={closeDelete} className="w-full inline-flex min-h-[44px] items-center justify-center rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 md:min-h-0 dark:text-slate-300 dark:hover:bg-slate-800">Annulla</button>
                             </div>
                         )}

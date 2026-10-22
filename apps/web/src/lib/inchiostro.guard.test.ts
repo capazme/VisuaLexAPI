@@ -46,8 +46,13 @@ function hits(pattern: RegExp, allowed: string[] = []): string[] {
 }
 
 describe('Inchiostro\'s sizes, elevation and paper', () => {
-  it('no text is written under 11 px', () => {
-    expect(hits(/\btext-\[(?:[0-9]|10)(?:\.\d+)?px\]/)).toEqual([]);
+  it('no text is written under 11 px (in px, as a length, or in rem under 0.6875)', () => {
+    expect(hits(/\btext-\[(?:length:)?(?:[0-9]|10)(?:\.\d+)?px\]/)).toEqual([]);
+    const smallRem = sources(src).map((file) => relative(src, file)).flatMap((file) =>
+      [...readFileSync(join(src, file), 'utf8').matchAll(/\btext-\[(?:length:)?(\d*\.?\d+)rem\]/g)]
+        .filter((m) => Number(m[1]) < 11 / 16)
+        .map((m) => `${file}: ${m[0]}`));
+    expect(smallRem).toEqual([]);
   });
 
   it('no shadow is `xl` or `2xl`', () => {
@@ -56,12 +61,20 @@ describe('Inchiostro\'s sizes, elevation and paper', () => {
 
   it('no gradient, but the loading skeleton\'s shimmer', () => {
     expect(hits(/\bbg-(?:gradient|linear|radial|conic)-/, [join('components', 'ui', 'Skeleton.tsx')])).toEqual([]);
+    // Nor as an arbitrary value, but the comparison's hatch where a side has no comma (a sign, not a shade).
+    expect(hits(/\bbg-\[[^\]]*gradient/, [join('components', 'features', 'compare', 'compareParts.tsx')])).toEqual([]);
   });
 });
 
 describe('Inchiostro\'s colours', () => {
   it('no file writes blue, indigo, purple or violet by hand, outside the colour keys', () => {
     expect(hits(HAND_COLOUR, Object.keys(KEYS))).toEqual([]);
+  });
+
+  it('the stylesheet\'s `@apply` writes none of them either', () => {
+    const css = readFileSync(join(src, 'index.css'), 'utf8').split('\n');
+    const applied = css.map((line, i) => (/@apply\b/.test(line) && HAND_COLOUR.test(line) ? `index.css:${i + 1}` : null)).filter(Boolean);
+    expect(applied).toEqual([]);
   });
 
   it('every colour key still uses its hue: a key that no longer needs it leaves the list', () => {

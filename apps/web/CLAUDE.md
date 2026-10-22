@@ -2138,8 +2138,10 @@ other route fails.
 `primary-*` (toga), everything else `slate-*` (ink), a section its hue (`--vlx-section-*`); no `blue-*`, `indigo-*`,
 `purple-*` or `violet-*` (the first two were aliases of toga, the others hues of no section) but in the colour keys the
 test lists with their reason (the courts' chips, the Forum's categories, the kinds of a suggestion's items); no text
-under 11 px; elevation by kind — cards `shadow-sm` or a border, menus and popovers `shadow-md`, windows and dialogs
-`shadow-lg`, never `xl` or `2xl` —; flat paper, no gradient but the skeleton's shimmer. `Button` presses to 0.97 in
+under 11 px (px, a length or rem); elevation by kind — cards `shadow-sm` or a border, menus and popovers `shadow-md`,
+windows and dialogs `shadow-lg`, never `xl` or `2xl`; in the dark `index.css` draws `shadow-md` and up as a hairline and a
+drop —; flat paper, no gradient but the skeleton's shimmer and the comparison's hatch (`GapCell`); `index.css`'s
+`@apply` is read too. `Button` presses to 0.97 in
 120 ms; a hover that moves or grows something sits under `[@media(hover:hover)_and_(pointer:fine)]` (`HOVER_LIFT`).
 
 **Colour markers** — for a list mirroring something already coloured in the

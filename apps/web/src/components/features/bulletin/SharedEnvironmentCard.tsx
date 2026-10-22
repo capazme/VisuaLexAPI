@@ -42,10 +42,11 @@ const CATEGORY_TEXT: Record<EnvironmentCategory, string> = {
 // because EnvironmentCategory doesn't carry a CSS variable.
 const CATEGORY_STRIPE: Record<EnvironmentCategory, string> = {
   compliance: '#a855f7',
-  civil: '#3b82f6',
+  // Their labels are toga (`primary-*`, Y1): the stripes the same ink.
+  civil: 'var(--color-toga-500)',
   penal: '#ef4444',
   administrative: '#f59e0b',
-  eu: '#6366f1',
+  eu: 'var(--color-toga-500)',
   other: '#64748b',
 };
 

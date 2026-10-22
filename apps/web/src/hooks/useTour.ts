@@ -178,6 +178,9 @@ export function useTour(options: UseTourOptions = {}) {
         }
 
         watchInput();
+        // A tour starts on its own (a surface mounted, a delay): the keys typed before it say nothing of how its first
+        // focus came; a key pressed in the tour shows the ring again.
+        keyboardLast = false;
         const band = layoutBand(window.innerWidth);
         // Cheap enough at every resize event (a width and one element's rectangles); driver.js redraws the rest itself.
         const onResize = () => {

@@ -1136,6 +1136,10 @@
 .dark :is(.shadow-lg, .shadow-xl, .shadow-2xl) {
   box-shadow: 0 0 0 1px var(--color-ink-700), 0 16px 40px -12px rgb(0 0 0 / 0.6);
 }
+/* A menu or a popover (`shadow-md`, Y1): the same hairline, a shorter drop. */
+.dark .shadow-md {
+  box-shadow: 0 0 0 1px var(--color-ink-700), 0 8px 24px -10px rgb(0 0 0 / 0.55);
+}
 
 /* The book mark (ui/BookMark, and the splash in index.html): the cover traces, then the spine; while
    something loads it breathes. Under reduced motion the global rule makes both instant. */
@@ -1257,8 +1261,9 @@
   color: var(--color-ink-500);
 }
 .dark .driver-popover.visualex-tour-popover .driver-popover-close-btn { color: var(--color-ink-400); }
-.driver-popover.visualex-tour-popover .driver-popover-footer button:focus-visible,
-.driver-popover.visualex-tour-popover .driver-popover-close-btn:focus-visible {
+/* Not a focus driver.js gave with no key pressed (`data-pointer-focus`, `useTour`): the ✕ drew its square after a click. */
+.driver-popover.visualex-tour-popover .driver-popover-footer button:focus-visible:not([data-pointer-focus]),
+.driver-popover.visualex-tour-popover .driver-popover-close-btn:focus-visible:not([data-pointer-focus]) {
   outline: 2px solid var(--color-toga-500);
   outline-offset: 2px;
 }

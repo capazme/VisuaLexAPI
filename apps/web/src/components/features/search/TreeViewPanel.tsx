@@ -580,7 +580,7 @@ export function TreeViewPanel({
                         <span className="relative block truncate max-w-[140px]">{annex.label}</span>
                         <span className={cn(
                           "relative text-[11px] block mt-0.5 font-medium",
-                          isActive ? "text-primary-100" : "text-slate-400 dark:text-slate-500"
+                          isActive ? "text-primary-100" : "text-slate-600 dark:text-slate-400"
                         )}>
                           {annex.article_count} articoli
                         </span>
