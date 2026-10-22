@@ -17,7 +17,6 @@ import { useNavigate } from 'react-router-dom';
 import { appStore, useAppStore } from '../../../store/useAppStore';
 import { cn } from '../../../lib/utils';
 import { DossierModal } from '../../ui/DossierModal';
-import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { EmptyState } from '../../ui/EmptyState';
 import { MenuButton } from '../../ui/MenuButton';
 import {
@@ -33,9 +32,10 @@ import { AttributionChip } from '../bulletin/AttributionChip';
 import { useDossierKind } from '../../../features/sections/useSection';
 import { kindLabel } from './dossierKinds';
 import { actsSummary, layoutDossier } from './dossierLayout';
-import { deleteDossierMessage, deleteDossierWithUndo } from './deleteDossierWithUndo';
+import { deleteDossierWithUndo } from './deleteDossierWithUndo';
 import { hasTagCategory, tagCategories, tagLabel } from '../../../utils/tagLabel';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
+import { DOSSIER_PAGE } from '../../../features/sections/pageNames';
 import { PageFrame } from '../../layout/PageFrame';
 
 type ToastType = 'success' | 'error' | 'info' | 'warning';
@@ -71,7 +71,6 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
   const [sortBy, setSortBy] = useState<SortBy>('date');
 
   const [editingDossier, setEditingDossier] = useState<Dossier | null>(null);
-  const [deletingDossier, setDeletingDossier] = useState<Dossier | null>(null);
   const [openPickerGroups, setOpenPickerGroups] = useState<{ dossier: Dossier; groups: NormaGroup[] } | null>(null);
   const [importing, setImporting] = useState<ImportCheck | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -174,12 +173,6 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
     }
   };
 
-  const handleConfirmDelete = () => {
-    if (deletingDossier) {
-      deleteDossierWithUndo(deletingDossier, onTrashChanged);
-      setDeletingDossier(null);
-    }
-  };
 
   // JSON file import: opens the same preview modal used by share-link imports.
   const triggerFileImport = () => fileInputRef.current?.click();
@@ -194,7 +187,6 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
     const hasOverlay =
       isModalOpen ||
       editingDossier !== null ||
-      deletingDossier !== null ||
       importing !== null ||
       openPickerGroups !== null;
 
@@ -221,7 +213,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [isModalOpen, editingDossier, deletingDossier, importing, openPickerGroups]);
+  }, [isModalOpen, editingDossier, importing, openPickerGroups]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -257,7 +249,10 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
 
   return (
     <PageFrame
-      title={sectionKind ? `I tuoi ${kindLabel(sectionKind).toLowerCase()}` : 'I tuoi Dossier'}
+      // The page's name (L-37), its section's phrase over it: the kind listed is the section's, Gymnasium's study
+      // dossiers, Opus's work ones (every dossier with Gymnasium off).
+      title={DOSSIER_PAGE}
+      kicker={sectionKind === 'studio' ? 'gymnasium' : 'opus'}
       // The same element from one kind to the other: the switcher's focus lands on it for Opus and for Gymnasium.
       section={sectionKind === 'studio' ? 'gymnasium' : 'opus'}
       className="animate-in fade-in duration-200"
@@ -467,7 +462,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                       items={[
                         { label: 'Apri su Dashboard', icon: ExternalLink, onSelect: () => handleQuickOpen(dossier), disabled: !hasNormaItems },
                         { label: 'Rinomina / Modifica', icon: Edit2, onSelect: () => setEditingDossier(dossier) },
-                        { label: 'Elimina', icon: Trash2, danger: true, separatorBefore: true, onSelect: () => setDeletingDossier(dossier) },
+                        { label: 'Elimina', icon: Trash2, danger: true, separatorBefore: true, onSelect: () => deleteDossierWithUndo(dossier, onTrashChanged) },
                       ]}
                     >
                       <MoreHorizontal size={18} />
@@ -550,18 +545,6 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
           dossier={editingDossier}
           onClose={() => setEditingDossier(null)}
           onSave={handleUpdateDossier}
-        />
-      )}
-
-      {deletingDossier && (
-        <ConfirmDialog
-          open
-          variant="danger"
-          title="Eliminare questo dossier?"
-          message={deleteDossierMessage(deletingDossier.title)}
-          confirmLabel="Elimina"
-          onConfirm={handleConfirmDelete}
-          onCancel={() => setDeletingDossier(null)}
         />
       )}
 

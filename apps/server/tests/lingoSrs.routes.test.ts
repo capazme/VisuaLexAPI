@@ -351,6 +351,12 @@ describe('the review routes', () => {
       expect(response.body).toEqual({
         registrata: true, prossimoRipasso: '2026-10-21', scheduledDays: 2,
         oggi: { giorno: '2026-10-19', ripassi: 1, obiettivo: 10, raggiunto: true, appenaRaggiunto: true, serie: 1 },
+        // Her one new card learned (fewer than five left) and the goal of a day with nothing left (Gymnasium XP spec §3.3).
+        xp: {
+          crediti: [{ missione: 'nuove', punti: 15 }, { missione: 'obiettivo', punti: 10 }],
+          livello: { livello: 1, totale: 25, nelLivello: 25, perIlProssimo: 100, oggi: 25 },
+          nuovoLivello: false,
+        },
       });
       const state = await prisma.lingoStatoRipasso.findUniqueOrThrow({ where: { utenteId_cardId: { utenteId: alice.id, cardId: c.id } } });
       expect(state).toMatchObject({ stability: 2.4, difficulty: 4.93, reps: 1, lapses: 0 });

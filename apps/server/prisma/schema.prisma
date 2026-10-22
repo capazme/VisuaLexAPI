@@ -76,6 +76,7 @@ model User {
   lingoRevisioni        LingoRevisioneSRS[]
   lingoPreferenzeStudio LingoPreferenzeStudio?
   lingoGiornateStudio   LingoGiornataStudio[]
+  lingoCreditiXp        LingoCreditoXp[]
 
   // LingoLex validation: set by an administrator; the votes this user cast (kept,
   // anonymous, when the account goes), the notice versions they wrote (same) and
@@ -99,6 +100,10 @@ model User {
 
   // What connected applications deleted for this user (MCP second round)
   trashEntries TrashEntry[]
+
+  // The planner's tasks (wave 1): the ones the user owns, and the ones assigned to them (empty until wave 4)
+  tasks         Task[] @relation("TaskOwner")
+  assignedTasks Task[] @relation("TaskAssignee")
 
   @@map("users")
 }
@@ -269,7 +274,7 @@ model MerltQaJob {
   // rather than age-since-submit. A heavy ReAct deliberation legitimately
   // runs up to ~11min; sweeping on createdAt alone would flip a live,
   // still-progressing query to `timeout` (see jobWatchdog.ts qaStaleAfterMs).
-  updatedAt    DateTime       @updatedAt @map("updated_at")
+  updatedAt    DateTime       @default(now()) @updatedAt @map("updated_at") // the migration gives it a default
   startedAt    DateTime?      @map("started_at")
   completedAt  DateTime?      @map("completed_at")
 
@@ -478,6 +483,8 @@ model Dossier {
   user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   items            DossierItem[]
   snapshots        DossierSnapshot[]
+  // The planner's tasks filed under this dossier (the dossier is the project, answer 1).
+  tasks            Task[]
   // Its copy in the Forum, if published: seen by its owner only, never in the public content.
   publishedCopy    SharedEnvironment?     @relation("SharedEnvironmentSourceDossier")
   sourceSuggestion EnvironmentSuggestion? @relation("SuggestionSourcedDossiers", fields: [sourceSuggestionId], references: [id], onDelete: SetNull)
@@ -538,6 +545,8 @@ model DossierItem {
 
   // Relationships
   dossier Dossier @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+  // Tasks hooked to this entry: they lose the hook (SET NULL) when the entry goes.
+  tasks   Task[]
 
   @@index([dossierId])
   @@map("dossier_items")
@@ -1260,16 +1269,61 @@ model LingoGiornataStudio {
   utenteId   String   @map("utente_id")
   giorno     DateTime @db.Date
   ripassi    Int      @default(0)
+  // Of `ripassi`, the grades of a card that was due by the end of that day (Gymnasium XP spec §3.1, G-334).
+  ripassiDovuti Int @default(0) @map("ripassi_dovuti")
   nuove      Int      @default(0)
   sbagliate  Int      @default(0)
   codaFinita Boolean  @default(false) @map("coda_finita")
   valido     Boolean  @default(false)
+  // Validation votes cast that day (Gymnasium XP spec §3.5), written only by the vote route; never decreased.
+  voti       Int      @default(0)
   updatedAt  DateTime @updatedAt @map("updated_at")
 
   utente User @relation(fields: [utenteId], references: [id], onDelete: Cascade)
 
   @@id([utenteId, giorno])
   @@map("lingo_giornate_studio")
+}
+
+// Gymnasium's experience points (spec 2026-10-20-gymnasium-xp-levels §5.2): one row per mission credited per
+// period, append-only (only an account deletion's cascade removes rows). `punti` is the value at the time.
+// The CHECKs on `punti`, on the shape of `periodo` and on the event's id are in the migration, not here.
+enum LingoMissione {
+  DOVUTE
+  NUOVE
+  OBIETTIVO
+  MATERIA_FERMA
+  SCRIVI
+  CONVALIDA
+  SETTIMANA
+  CONSOLIDA
+}
+
+enum LingoFonteXp {
+  REVISIONE
+  PROPOSTA
+  VOTO
+  LETTURA
+}
+
+model LingoCreditoXp {
+  id        String        @id @default(uuid())
+  utenteId  String        @map("utente_id")
+  missione  LingoMissione
+  periodo   String        // G:YYYY-MM-DD (a day), S:YYYY-MM-DD (the Monday of a week), U (once)
+  giorno    DateTime      @db.Date
+  punti     Int
+  fonte     LingoFonteXp
+  fonteId   String?       @map("fonte_id") // the review log row, the card, the vote; no foreign key
+  materia   LingoMateria?
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  utente User @relation(fields: [utenteId], references: [id], onDelete: Cascade)
+
+  @@unique([utenteId, missione, periodo])
+  @@unique([missione, fonteId])
+  @@index([utenteId, giorno])
+  @@map("lingo_crediti_xp")
 }
 
 // The thresholds of the community's validation (Studia, spec 2026-10-18). One row per key; the
@@ -1471,4 +1525,80 @@ model TrashEntry {
   @@index([userId, deletedAt])
   @@index([expiresAt])
   @@map("trash_entries")
+}
+
+// ============================================
+// PLANNER (Opus): personal tasks, wave 1
+// ============================================
+
+// Where a task comes from (answer 9): the lawyer's work, study, the Forum.
+enum TaskOrigin {
+  lavoro
+  studio
+  forum
+}
+
+// What a repeating task counts from: its planned date («ogni») or the day it was completed («ogni!»).
+enum TaskRecurrenceFrom {
+  pianificata
+  completamento
+}
+
+// A task of the planner (answers 2–4 and 7 on the task model). The owner's alone: `assigneeId`
+// stays null until sharing (wave 4). Dates are Europe/Rome civil days (DATE) with an optional
+// time (TIME); the planned date and the deadline are two different things, and the deadline never
+// moves or repeats. The ranges and pairings are CHECKs in the migration
+// `20261025100001_planner_tasks`, not in this model.
+model Task {
+  id            String  @id @default(uuid())
+  userId        String  @map("user_id")
+  // The dossier the task is filed under; none = the user's inbox. Goes to the trash with the dossier.
+  dossierId     String? @map("dossier_id")
+  // An entry of that dossier the task is about; null again when the entry goes.
+  dossierItemId String? @map("dossier_item_id")
+  // A subtask's parent: the schema takes any depth, the web shows one level. Same dossier as the parent.
+  parentId      String? @map("parent_id")
+  position      Int     @default(0)
+  title         String
+  description   String?
+  // 1 the most urgent, 4 the default.
+  priority      Int      @default(4)
+  labels        String[] @default([])
+
+  plannedDate DateTime? @map("planned_date") @db.Date
+  plannedTime DateTime? @map("planned_time") @db.Time(0)
+  dueDate     DateTime? @map("due_date") @db.Date
+  dueTime     DateTime? @map("due_time") @db.Time(0)
+
+  // An RRULE (RFC 5545) of the closed subset in `tasks/recurrence.ts`; the server computes the next date.
+  recurrence      String?
+  recurrenceFrom  TaskRecurrenceFrom @default(pianificata) @map("recurrence_from")
+  // The day of the month a monthly or yearly repetition keeps (the planned date's when the rule or
+  // the date was set), so a month without it shortens that occurrence only.
+  recurrenceDay   Int?               @map("recurrence_day") @db.SmallInt
+  durationMinutes Int?               @map("duration_minutes")
+  assigneeId      String?            @map("assignee_id")
+  origin          TaskOrigin         @default(lavoro)
+
+  completedAt DateTime? @map("completed_at")
+  // In the trash since then; swept after 30 days.
+  deletedAt   DateTime? @map("deleted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  user        User         @relation("TaskOwner", fields: [userId], references: [id], onDelete: Cascade)
+  dossier     Dossier?     @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+  dossierItem DossierItem? @relation(fields: [dossierItemId], references: [id], onDelete: SetNull)
+  parent      Task?        @relation("TaskSubtasks", fields: [parentId], references: [id], onDelete: Cascade)
+  subtasks    Task[]       @relation("TaskSubtasks")
+  assignee    User?        @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  @@index([userId, plannedDate])
+  @@index([userId, dueDate])
+  @@index([dossierId])
+  @@index([dossierItemId])
+  @@index([parentId])
+  @@index([assigneeId])
+  @@index([deletedAt])
+  @@map("tasks")
 }

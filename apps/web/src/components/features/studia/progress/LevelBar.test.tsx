@@ -1,0 +1,65 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import { LevelBar } from './LevelBar';
+
+const motion = vi.hoisted(() => ({ reduce: false }));
+vi.mock('framer-motion', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('framer-motion')>()),
+  useReducedMotion: () => motion.reduce,
+}));
+
+const SEEN = 'visualex.studia.visto';
+afterEach(() => {
+  localStorage.removeItem(SEEN);
+  motion.reduce = false;
+});
+
+describe('the level bar (Gymnasium XP spec §4, G1c)', () => {
+  it('says the level, what the next one still asks and today’s points, in words for a screen reader', () => {
+    render(<LevelBar livello={{ livello: 4, totale: 412, nelLivello: 37, perIlProssimo: 175, oggi: 45 }} />);
+    const bar = screen.getByTestId('level-bar');
+    expect(bar).toHaveTextContent('Livello 4');
+    expect(bar).toHaveTextContent('Ancora 138 XP per il livello 5');
+    expect(bar).toHaveTextContent('oggi +45 XP');
+    expect(screen.getByText('Ancora 138 punti per il livello 5. Oggi 45 punti.')).toHaveClass('sr-only');
+    // The bar is the text's picture: 37 of 175, named and valued as the lesson's bar is.
+    const progress = screen.getByRole('progressbar', { name: 'Livello 4' });
+    expect(progress).toHaveAttribute('aria-valuenow', '37');
+    expect(progress).toHaveAttribute('aria-valuemax', '175');
+    expect(progress).toHaveAttribute('aria-valuetext', '37 punti di 175 per il livello 5');
+    const fill = progress.firstElementChild as HTMLElement;
+    expect(fill.style.width).toBe(`${(37 / 175) * 100}%`);
+    // Nothing grew on a first visit.
+    expect(screen.queryByTestId('xp-gain')).toBeNull();
+  });
+
+  it('leaves today’s points out on a day with none', () => {
+    render(<LevelBar livello={{ livello: 1, totale: 0, nelLivello: 0, perIlProssimo: 100, oggi: 0 }} />);
+    expect(screen.getByTestId('level-bar')).not.toHaveTextContent('oggi');
+  });
+
+  it('shows what grew since this browser drew it, and announces a level not yet shown, once', async () => {
+    localStorage.setItem(SEEN, JSON.stringify({ xp: 90, livello: 1 }));
+    const { unmount } = render(<LevelBar livello={{ livello: 2, totale: 110, nelLivello: 10, perIlProssimo: 125, oggi: 20 }} />);
+    expect(screen.getByTestId('xp-gain')).toHaveTextContent('+20 XP');
+    await waitFor(() => expect(screen.getByText('Nuovo livello: sei al livello 2.')).toBeInTheDocument());
+    unmount();
+    render(<LevelBar livello={{ livello: 2, totale: 110, nelLivello: 10, perIlProssimo: 125, oggi: 20 }} />);
+    expect(screen.queryByTestId('xp-gain')).toBeNull();
+    expect(screen.queryByText(/Nuovo livello/)).toBeNull();
+  });
+
+  it('presses a new level in, and under reduced motion draws it at rest, still announced', async () => {
+    localStorage.setItem(SEEN, JSON.stringify({ xp: 90, livello: 1 }));
+    const { unmount } = render(<LevelBar livello={{ livello: 2, totale: 110, nelLivello: 10, perIlProssimo: 125, oggi: 20 }} />);
+    expect(screen.getByText('Livello 2').style.opacity).toBe('0');
+    unmount();
+    motion.reduce = true;
+    localStorage.setItem(SEEN, JSON.stringify({ xp: 90, livello: 1 }));
+    render(<LevelBar livello={{ livello: 2, totale: 110, nelLivello: 10, perIlProssimo: 125, oggi: 20 }} />);
+    const level = screen.getByText('Livello 2');
+    expect(level.style.opacity).not.toBe('0');
+    expect(level.style.transform).not.toMatch(/scale/);
+    await waitFor(() => expect(screen.getByText('Nuovo livello: sei al livello 2.')).toBeInTheDocument());
+  });
+});

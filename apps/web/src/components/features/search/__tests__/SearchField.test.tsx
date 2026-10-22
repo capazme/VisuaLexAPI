@@ -68,6 +68,12 @@ afterEach(() => {
 });
 
 describe('SearchField — the search page\'s field', () => {
+  it('is at least 16 px on a phone, so Safari on an iPhone does not zoom into it, with the text size «piccolo» too', () => {
+    renderField();
+    expect(field()).toHaveClass('text-[length:max(1rem,16px)]', 'md:text-sm');
+    expect(field()).not.toHaveClass('text-base');
+  });
+
   it('searches a complete norm in the practices with Enter, as a typed search, and empties itself', async () => {
     const user = userEvent.setup();
     renderField();

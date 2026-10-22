@@ -6,7 +6,9 @@ vi.mock('../Sidebar', () => ({ Sidebar: () => null }));
 vi.mock('../../ui/SettingsModal', () => ({ SettingsModal: () => null }));
 vi.mock('../../ui/FeedbackButton', () => ({ FeedbackButton: () => null }));
 vi.mock('../../ui/ChangelogNotification', () => ({ ChangelogNotification: () => null }));
-vi.mock('../../ui/Toast', () => ({ UndoToastContainer: () => null }));
+vi.mock('../../ui/Toast', () => ({ NotificationHost: () => null }));
+// The planner's host reads the tasks from the server: not under test here.
+vi.mock('../../features/planner/PlannerHost', () => ({ PlannerHost: () => null }));
 vi.mock('../../ui/SyncErrorToast', () => ({ SyncErrorToast: () => null }));
 vi.mock('../../ui/KeyboardShortcutsModal', () => ({ KeyboardShortcutsModal: () => null }));
 vi.mock('../../../hooks/useServiceHealth', () => ({ useServiceHealth: () => ({ snapshot: { overall: 'online', services: [], checkedAt: '' }, refresh: vi.fn() }) }));

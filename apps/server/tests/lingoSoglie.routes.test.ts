@@ -194,8 +194,8 @@ describe('saving the thresholds', () => {
     await salva(admin, { approvazioni: 3, errate: 1 });
     const card = await makeCard(autore.id, 'PROPOSTA_COMMUNITY', ['APPROVATA']);
     const [a, b] = [await makeValidator('soglia-val-a'), await makeValidator('soglia-val-b')];
-    expect((await vote(a, card.id, 'APPROVATA')).body).toEqual({ stato: 'PROPOSTA_COMMUNITY' });
-    expect((await vote(b, card.id, 'APPROVATA')).body).toEqual({ stato: 'VALIDATA' });
+    expect((await vote(a, card.id, 'APPROVATA')).body).toMatchObject({ stato: 'PROPOSTA_COMMUNITY' });
+    expect((await vote(b, card.id, 'APPROVATA')).body).toMatchObject({ stato: 'VALIDATA' });
     expect(await stato(card.id)).toBe('VALIDATA');
   });
 });

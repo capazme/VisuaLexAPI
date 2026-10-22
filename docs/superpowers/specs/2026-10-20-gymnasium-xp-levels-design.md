@@ -287,8 +287,9 @@ to finish, or the read waits for the deletion and finds no user.
 **The mission details** (the progress of each is what §5.3 returns):
 
 - `dovute` (review scope): `due` = cards due before tomorrow (`dueWhere`, the session's definition);
-  `fatte` = today's reviews less today's first reviews (the stored day's `ripassi − nuove`). Fulfilled when
-  `fatte ≥ 1` and `due = 0`. Progress `fatte` of `fatte + due`; `vuota` when both are 0.
+  `fatte` = today's grades of a card that was already due, by the same definition (the stored day's
+  `ripassi_dovuti`, §5.2; G-334): a card graded before its day or graded for the first time does not count,
+  so the mission cannot be earned without a due card. Fulfilled when `fatte ≥ 1` and `due = 0`. Progress `fatte` of `fatte + due`; `vuota` when both are 0.
 - `nuove` (review scope): `imparate` = today's first reviews (the stored day's `nuove`); `rimaste` = new
   cards in the review scope (`newCardsWhere`, ignoring the quota). Target `min(5, imparate + rimaste)`;
   `vuota` when it is 0; fulfilled when `imparate ≥ target`. `motivo: 'quota'` when the quota left today
@@ -354,6 +355,11 @@ narrowed by subject. The change also corrects two texts that would become false:
 `lingo/studyDays.ts` («nothing else writes these rows») and the progress spec's §5.1 list of who writes a
 row; and the export test's expected shape (`tests/accountData.test.ts`) gains `voti`.
 
+**And a second (G-334):** `lingo_giornate_studio.ripassi_dovuti`, integer, default 0: of the day's
+`ripassi`, the grades of a card whose state was due before tomorrow (`dueAt` before 00:00 Rome of the next
+day, as `dueWhere`). `recordGradeDay` adds it in the same update as `ripassi`, from the state the grade
+read before rewriting it; nothing else writes it. Only «dovute» reads it; the streak does not.
+
 ### 5.3 The reads and the answers
 
 **One shape for the level**, used everywhere:
@@ -384,7 +390,8 @@ row; and the export test's expected shape (`tests/accountData.test.ts`) gains `v
 - `stato`: `fatta` (credited for the period), `aperta`, `vuota` (nothing to do in this period) or
   `in-arrivo` (announced, not yet recorded) — G1b's `MissionStatus`.
 - `progresso: { fatte, di }` maps to the web's `progress: { done, of }`; absent for `scrivi`, `in-arrivo`
-  and a `vuota` with nothing to count.
+  and a `vuota` with nothing to count: «convalida» with no vote cast and nothing to vote on has none, with one vote
+  cast it stays `vuota` with «1 of 2».
 - `motivo` (only on `nuove`, when not `fatta`): `quota` (§5.1).
 - `materia` (only on `materia-ferma`): the subject the mission is about.
 - `missioni`, `livello` and `crediti` are never narrowed by `materia`, like `oggi.raggiunto` and `serie`.
@@ -460,10 +467,10 @@ decision 14 already foresees the RLCF weighted sum replacing the count), the exi
 ## 7. Migration
 
 One migration, written by hand and applied with `migrate deploy` (never `migrate dev`): the two enums,
-the table with its two unique keys, index and checks, and the column `lingo_giornate_studio.voti`
-(`INTEGER NOT NULL DEFAULT 0`). **No backfill:** the ledger records missions it saw; the past cannot say
+the table with its two unique keys, index and checks, and the columns `lingo_giornate_studio.voti` and
+`lingo_giornate_studio.ripassi_dovuti` (`INTEGER NOT NULL DEFAULT 0`). **No backfill:** the ledger records missions it saw; the past cannot say
 which missions were done on a given day (whether the due cards were all reviewed, for instance), so XP
-starts at zero for everyone on the day 1.10 ships (G-317), and `voti` starts at zero. Its name
+starts at zero for everyone on the day 1.10 ships (G-317), and both counters start at zero. Its name
 is reserved with the orchestrator before it is written (proposed: `<next free timestamp>_lingo_xp_ledger`);
 the drift check covers the model, and the checks are written in SQL as for the other Studia tables.
 
@@ -474,7 +481,7 @@ the drift check covers the model, and the checks are written in SQL as for the o
   read only the review, the proposals and the votes.
 - **Personal data, the user's alone.** Credits cascade with the account (`deleteUserAccount` needs no
   change: the cascade does it). `GET /auth/export` carries them as `data.lingoCreditiXp` (mission,
-  period, day, points, kind of event, subject), next to `lingoGiornate`, which gains `voti`. Nothing is
+  period, day, points, kind of event, subject), next to `lingoGiornate`, which gains `voti` and `ripassiDovuti`. Nothing is
   sent to MERL-T.
 - **Session only.** Every route that settles missions is outside the delegated table, so an exchanged
   token (Claude Code, LibreLex) can neither earn XP nor read it; `progressi` already answers 403 to it.
@@ -508,6 +515,7 @@ weights after a month of use.
 
 All the questions this spec raised were answered by the owners on 20 October 2026. G-314…G-318 were
 accepted by both owners as recommended; the five choices are the front-end owner's (L-27 follow-up).
+G-334 came up while building the server, where §3.1 («a due card») and §5.1 (`ripassi − nuove`) disagreed.
 
 | Code | Decision | Date |
 | --- | --- | --- |
@@ -521,6 +529,7 @@ accepted by both owners as recommended; the five choices are the front-end owner
 | L-27 (3) | No titles in 1.10 (§4) | 20 Oct 2026 |
 | L-27 (4) | The same missions for everyone in 1.10, personalised later (§3.1) | 20 Oct 2026 |
 | L-27 (5) | «Impara 5» and the daily goal do not go below 5 new cards and 10 reviews for XP; this changes G1b's web rule in 1.10 (§3.3) | 20 Oct 2026 |
+| G-334 | «Ripassa le schede dovute» counts only the grades of a card already due (`ripassi_dovuti`, in the same migration), so a card graded early cannot earn it (§5.1, §5.2) | 20 Oct 2026 |
 
 Validating earns XP whatever the verdict (§3.5); together with G-318 it is the principle the authority
 spec starts from.

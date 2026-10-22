@@ -15,6 +15,10 @@ import { Sidebar, SIDEBAR_SMALL_TEXT, SIDEBAR_TOGGLE_TEXT } from './Sidebar';
 import { appStore } from '../../store/useAppStore';
 import { subscribeSearchField } from '../../utils/searchFieldControl';
 import { sectionStore } from '../../features/sections/useSection';
+import { plannerStore } from '../features/planner/plannerStore';
+
+/** Opus's entries: the planner's three views, then the dossiers. */
+const OPUS_HREFS = ['/', '/documents', '/opus/oggi', '/opus/prossimi', '/opus/ingresso', '/dossier'];
 import type { ServiceHealthState } from '../../services/healthService';
 
 /** `Layout`'s one probe of the services, handed to the sidebar (S1). */
@@ -175,10 +179,25 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     }
   });
 
-  it('Opus: the dossiers', () => {
+  it("Opus: the planner's views, then the dossiers", () => {
     renderSidebar('/');
-    expect(hrefs()).toEqual(['/', '/documents', '/dossier']);
-    expect(screen.getByRole('group', { name: 'Opus' })).toContainElement(screen.getByRole('link', { name: 'Dossier' }));
+    expect(hrefs()).toEqual(OPUS_HREFS);
+    const opus = screen.getByRole('group', { name: 'Opus' });
+    expect(within(opus).getAllByRole('link').map((a) => a.getAttribute('aria-label'))).toEqual(['Oggi', 'Prossimi giorni', "Lista d'ingresso", 'Dossier']);
+  });
+
+  it('counts the overdue and today\'s tasks beside «Oggi», and says it in words (row 16)', () => {
+    plannerStore.setState({ todayCount: 3 });
+    try {
+      renderSidebar('/opus/oggi');
+      const today = screen.getByRole('link', { name: 'Oggi, 3 compiti per oggi o scaduti' });
+      expect(today).toHaveAttribute('aria-current', 'page');
+      expect(today).toHaveTextContent('3');
+      cleanupAndRender('/opus/oggi', () => plannerStore.setState({ todayCount: 0 }));
+      expect(screen.getByRole('link', { name: 'Oggi' })).not.toHaveTextContent(/\d/);
+    } finally {
+      plannerStore.setState({ todayCount: null });
+    }
   });
 
   it('Gymnasium: «Studia» holds Oggi, Progressi and the dossiers, «Contribuisci» Le mie schede and, for a validator only, «Da validare» (Gymnasium spec §4)', () => {
@@ -225,7 +244,7 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     expect(hrefs()).toEqual(['/', '/documents', '/merlt', '/grafo']);
     // Without the mode the section is not offered: a stored Academia falls back to Opus.
     cleanupAndRender('/', () => { account.devMode = false; sectionStore.setState({ section: 'academia' }); });
-    expect(hrefs()).toEqual(['/', '/documents', '/dossier']);
+    expect(hrefs()).toEqual(OPUS_HREFS);
     expect(screen.queryByRole('link', { name: /Grafo|Assistente/ })).toBeNull();
   });
 
@@ -242,12 +261,12 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     vi.stubEnv('VITE_FEATURE_STUDIA', 'false');
     sectionStore.setState({ section: 'gymnasium' });
     renderSidebar('/');
-    expect(hrefs()).toEqual(['/', '/documents', '/dossier']);
+    expect(hrefs()).toEqual(OPUS_HREFS);
   });
 
   it("is the same list in the phone's copy, closed off-canvas or open (spec D8)", () => {
     renderSidebar('/', { isOpen: false });
-    expect(hrefs()).toEqual(['/', '/documents', '/dossier']);
+    expect(hrefs()).toEqual(OPUS_HREFS);
     openUserMenu();
     expect(screen.getByRole('menuitem', { name: /Impostazioni/ })).toBeInTheDocument();
   });
@@ -270,7 +289,9 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
       expect(animate).not.toHaveBeenCalled();
       fireEvent.click(screen.getByRole('button', { name: /^Sezione:/ }));
       fireEvent.click(screen.getByRole('menuitemradio', { name: /Forum/ }));
-      const faded = animate.mock.contexts as HTMLElement[];
+      // The switcher's own menu moves too (S6); the navigation's entries are what this counts.
+      const nav = document.getElementById('tour-sidebar')!;
+      const faded = (animate.mock.contexts as HTMLElement[]).filter((el) => nav.contains(el));
       expect(faded.length).toBeGreaterThan(0);
       const forum = screen.getByRole('group', { name: 'Forum' });
       for (const entry of faded) expect(forum).toContainElement(entry);
@@ -730,8 +751,9 @@ describe('Sidebar — the words', () => {
     const forum = screen.getByRole('link', { name: 'Dossier pubblici, 3 notifiche' });
     expect(forum).toHaveTextContent(/^Dossier pubblici3$/);
     expect(screen.getByRole('link', { name: 'Community' })).toHaveTextContent(/^Community$/);
-    // The section is named beside its mark; the button keeps its name.
-    expect(screen.getByRole('button', { name: /^Sezione: Forum/ })).toHaveTextContent('Forum');
+    // The section is named beside its mark, on the split button's left part, which goes to its home (S6).
+    expect(screen.getByRole('button', { name: 'Vai a Forum: Dossier pubblici' })).toHaveTextContent('Forum');
+    expect(screen.getByRole('button', { name: 'Cambia sezione' })).toHaveAttribute('aria-haspopup', 'menu');
     // The username is shown, so the name carries it (label in name).
     expect(screen.getByRole('button', { name: 'Menu utente di tester' })).toHaveTextContent('tester');
   });

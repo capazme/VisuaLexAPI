@@ -36,6 +36,8 @@ export interface TrashListEntry {
   dossierId: string | null;
   label: string;
   itemCount: number;
+  /** A whole dossier's planner tasks, which went to the trash with it (absent when it had none). */
+  taskCount?: number;
   items?: { itemType: string; citation: string | null; actCitation: string | null }[];
   cards?: { istituto: string; domanda: string }[];
   clientName: string | null;
@@ -94,6 +96,20 @@ async function lockDossier(tx: Prisma.TransactionClient, userId: string, dossier
   return rows.length === 1;
 }
 
+/**
+ * A database error from a move to the trash or a restore, as it reaches the logs: its kind and code
+ * only. The rows travel through these queries (a dossier's name, its tasks' titles: a client's name,
+ * possibly), and Prisma's message can quote the arguments of the query it refused. The caller gets
+ * the usual 500; an `AppError` passes through untouched.
+ */
+function quietly(where: string, error: unknown): never {
+  if (error instanceof AppError) throw error;
+  const kind = error instanceof Error ? error.name : typeof error;
+  const code = error instanceof Prisma.PrismaClientKnownRequestError ? ` ${error.code}` : '';
+  console.error(`${where} failed: ${kind}${code}`);
+  throw new AppError(500, 'Internal server error');
+}
+
 let lastSweep = 0;
 
 /** Removes the entries past their 30 days; returns how many. */
@@ -115,35 +131,45 @@ async function maybeSweep(): Promise<void> {
 }
 
 /**
- * Moves a whole dossier, with its entries and snapshots, to the trash. A
- * connected application names the entries the user was shown when confirming
- * (`seenItemIds`): one added or removed meanwhile refuses the move (409). The
+ * Moves a whole dossier, with its entries, snapshots and planner tasks, to the trash. A
+ * connected application names what the user was shown when confirming (`seen`): the entries,
+ * and how many tasks go with them («e 3 compiti», never their titles; owner, 20 October 2026).
+ * An entry added or removed meanwhile, or another number of tasks, refuses the move (409). The
  * web app's own deletion passes null: whatever the dossier holds goes, and
  * comes back, together (owner, 13 October 2026, question 160).
  */
 export async function trashDossier(
   userId: string,
   dossierId: string,
-  seenItemIds: string[] | null,
+  seen: { itemIds: string[]; taskCount: number } | null,
   by: DeletedBy,
-): Promise<{ trashId: string; itemCount: number }> {
+): Promise<{ trashId: string; itemCount: number; taskCount: number }> {
   await maybeSweep();
   return prisma.$transaction(async (tx) => {
     if (!(await lockDossier(tx, userId, dossierId))) throw new AppError(404, 'Dossier not found');
+    // Its tasks are locked too, before they are read: a change in flight (an edit, a tick, a task
+    // moved to the trash) is committed first and lands in the payload, and one that comes after
+    // waits and then finds no task. Otherwise the payload would keep the task as it was.
+    await tx.$queryRaw`SELECT id FROM tasks WHERE dossier_id = ${dossierId} AND user_id = ${userId} ORDER BY id FOR UPDATE`;
     const dossier = await tx.dossier.findFirst({
       where: { id: dossierId, userId },
       include: {
         items: { orderBy: { position: 'asc' } },
         snapshots: { orderBy: { version: 'asc' } },
         publishedCopy: { select: { id: true } },
+        // Its tasks follow it, done and trashed ones too, and come back with it (answer 2 on the task model).
+        tasks: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
       },
     });
     if (!dossier) throw new AppError(404, 'Dossier not found');
-    const seen = seenItemIds && new Set(seenItemIds);
-    if (seen && (seen.size !== dossier.items.length || dossier.items.some((item) => !seen.has(item.id)))) {
-      throw new AppError(409, 'Il dossier è cambiato dopo la conferma: nulla è stato eliminato.');
+    if (seen) {
+      const seenIds = new Set(seen.itemIds);
+      const sameItems = seenIds.size === dossier.items.length && dossier.items.every((item) => seenIds.has(item.id));
+      if (!sameItems || seen.taskCount !== dossier.tasks.length) {
+        throw new AppError(409, 'Il dossier è cambiato dopo la conferma: nulla è stato eliminato.');
+      }
     }
-    const { items, snapshots, publishedCopy, ...row } = dossier;
+    const { items, snapshots, publishedCopy, tasks, ...row } = dossier;
     const now = new Date();
     const entry = await tx.trashEntry.create({
       data: {
@@ -151,9 +177,9 @@ export async function trashDossier(
         kind: 'DOSSIER',
         dossierId: dossier.id,
         label: dossier.name,
-        summary: { itemCount: items.length },
+        summary: tasks.length > 0 ? { itemCount: items.length, taskCount: tasks.length } : { itemCount: items.length },
         // Its copy in the Forum stays published; the link (cleared with the row) comes back on restore.
-        payload: asJson({ dossier: row, items, snapshots, publishedCopyId: publishedCopy?.id ?? null }),
+        payload: asJson({ dossier: row, items, snapshots, publishedCopyId: publishedCopy?.id ?? null, tasks }),
         clientId: by.clientId,
         clientName: by.clientName,
         grantId: by.grantId,
@@ -161,10 +187,10 @@ export async function trashDossier(
         expiresAt: expiry(now),
       },
     });
-    // Items and snapshots cascade with the dossier.
+    // Items, snapshots and tasks cascade with the dossier.
     await tx.dossier.delete({ where: { id: dossier.id } });
-    return { trashId: entry.id, itemCount: items.length };
-  });
+    return { trashId: entry.id, itemCount: items.length, taskCount: tasks.length };
+  }).catch((error: unknown) => quietly('Dossier trash', error));
 }
 
 /**
@@ -277,13 +303,14 @@ export async function listTrash(userId: string): Promise<TrashListEntry[]> {
     orderBy: { deletedAt: 'desc' },
   });
   return entries.map((entry) => {
-    const summary = entry.summary as { itemCount?: number; items?: ItemSummary[]; cards?: { istituto: string; domanda: string }[] };
+    const summary = entry.summary as { itemCount?: number; taskCount?: number; items?: ItemSummary[]; cards?: { istituto: string; domanda: string }[] };
     return {
       id: entry.id,
       kind: entry.kind,
       dossierId: entry.dossierId,
       label: entry.label,
       itemCount: summary.itemCount ?? 0,
+      ...(summary.taskCount ? { taskCount: summary.taskCount } : {}),
       ...(summary.items ? { items: summary.items } : {}),
       ...(summary.cards ? { cards: summary.cards } : {}),
       clientName: entry.clientName,
@@ -313,6 +340,34 @@ async function existingId(value: unknown, count: (id: string) => Promise<number>
   return (await count(value)) > 0 ? value : null;
 }
 
+/** A planner task as the payload keeps it (dates as ISO strings; DATE and TIME columns at their UTC instant). */
+type StoredTask = {
+  id: string;
+  dossierItemId: string | null;
+  parentId: string | null;
+  position: number;
+  title: string;
+  description: string | null;
+  priority: number;
+  labels: string[];
+  plannedDate: string | null;
+  plannedTime: string | null;
+  dueDate: string | null;
+  dueTime: string | null;
+  recurrence: string | null;
+  recurrenceFrom: Prisma.TaskCreateManyInput['recurrenceFrom'];
+  /** Absent in a payload stored before the column: the repetition then counts from the planned date's day. */
+  recurrenceDay?: number | null;
+  durationMinutes: number | null;
+  assigneeId: string | null;
+  origin: Prisma.TaskCreateManyInput['origin'];
+  completedAt: string | null;
+  deletedAt: string | null;
+  createdAt: string;
+};
+
+const dateOrNull = (value: string | null) => (value === null ? null : new Date(value));
+
 const jsonOrNull = (value: unknown) => (value === null || value === undefined ? Prisma.JsonNull : (value as Prisma.InputJsonValue));
 
 const itemRow = (item: StoredItem, dossierId: string, position: number, aboutItemId: string | null): Prisma.DossierItemCreateManyInput => ({
@@ -340,11 +395,26 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
     return await prisma.$transaction(async (tx) => {
       const entry = await tx.trashEntry.findFirst({ where: { id: trashId, userId, expiresAt: { gt: new Date() } } });
       if (!entry) throw new AppError(404, 'Elemento del cestino non trovato.');
+      // A dossier's published copy is locked before its entry, in the order the admin's withdraw and
+      // republish take them (the copy, then the entry they rewrite): the other way round, a restore and
+      // one of those would deadlock.
+      const copyId = entry.kind === 'DOSSIER' ? (entry.payload as { publishedCopyId?: unknown }).publishedCopyId : null;
+      if (typeof copyId === 'string' && copyId) await tx.$queryRaw`SELECT id FROM shared_environments WHERE id = ${copyId} FOR UPDATE`;
+      // The entry goes first, as the one claim on it: a purge, the sweep or another restore that took
+      // it meanwhile is waited for and then leaves nothing to delete, a 404; a refusal further on rolls
+      // the deletion back. Its payload is the one the deletion returns, read after any wait: an admin's
+      // withdrawal that wrote its block into the entry meanwhile comes back with the dossier.
+      const claimed = await tx.$queryRaw<{ payload: Prisma.JsonValue }[]>`
+        DELETE FROM trash_entries WHERE id = ${entry.id} AND user_id = ${userId} RETURNING payload`;
+      if (claimed.length === 0) throw new AppError(404, 'Elemento del cestino non trovato.');
+      const payload = claimed[0].payload;
 
       if (entry.kind === 'DOSSIER') {
-        const { dossier, items, snapshots, publishedCopyId } = entry.payload as unknown as {
+        // `tasks` is absent from an entry trashed before the planner.
+        const { dossier, items, snapshots, publishedCopyId, tasks = [] } = payload as unknown as {
           dossier: Record<string, unknown> & { id: string; createdAt: string; updatedAt: string };
           publishedCopyId?: string | null;
+          tasks?: StoredTask[];
           items: StoredItem[];
           snapshots: { id: string; dossierId: string; version: number; label: string | null; content: unknown; fingerprint: string | null; createdAt: string }[];
         };
@@ -385,6 +455,60 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
             })),
           });
         }
+        if (tasks.length > 0) {
+          // A task keeps its entry and its parent when they came back with it (they always do: both
+          // are of the same dossier), its assignee when that account still exists.
+          const itemIds = new Set(items.map((item) => item.id));
+          // A task that is live again elsewhere (it left the dossier in a race with the deletion) stays
+          // as it is: restoring the dossier must not fail on it.
+          const live = new Set(
+            (await tx.task.findMany({ where: { id: { in: tasks.map((task) => task.id) } }, select: { id: true } })).map((task) => task.id),
+          );
+          const restored = tasks.filter((task) => !live.has(task.id));
+          const taskIds = new Set(restored.map((task) => task.id));
+          const assignees = new Map<string, string | null>();
+          for (const task of tasks) {
+            if (taskIds.has(task.id) && task.assigneeId && !assignees.has(task.assigneeId)) {
+              assignees.set(task.assigneeId, await existingId(task.assigneeId, (id) => tx.user.count({ where: { id } })));
+            }
+          }
+          // Parents are set in a second step: a large payload is inserted in several statements, and a
+          // subtask may come before its parent.
+          await tx.task.createMany({
+            data: restored.map((task) => ({
+              id: task.id,
+              userId,
+              dossierId: dossier.id,
+              dossierItemId: task.dossierItemId && itemIds.has(task.dossierItemId) ? task.dossierItemId : null,
+              parentId: null,
+              position: task.position,
+              title: task.title,
+              description: task.description,
+              priority: task.priority,
+              labels: task.labels,
+              plannedDate: dateOrNull(task.plannedDate),
+              plannedTime: dateOrNull(task.plannedTime),
+              dueDate: dateOrNull(task.dueDate),
+              dueTime: dateOrNull(task.dueTime),
+              recurrence: task.recurrence,
+              recurrenceFrom: task.recurrenceFrom,
+              recurrenceDay: task.recurrenceDay ?? null,
+              durationMinutes: task.durationMinutes,
+              assigneeId: task.assigneeId ? (assignees.get(task.assigneeId) ?? null) : null,
+              origin: task.origin,
+              completedAt: dateOrNull(task.completedAt),
+              deletedAt: dateOrNull(task.deletedAt),
+              createdAt: new Date(task.createdAt),
+            })),
+          });
+          const byParent = new Map<string, string[]>();
+          for (const task of restored) {
+            if (task.parentId && taskIds.has(task.parentId)) byParent.set(task.parentId, [...(byParent.get(task.parentId) ?? []), task.id]);
+          }
+          for (const [parentId, children] of byParent) {
+            await tx.task.updateMany({ where: { id: { in: children } }, data: { parentId } });
+          }
+        }
         if (typeof publishedCopyId === 'string' && publishedCopyId) {
           // Relinked only when the copy is still the user's and linked to nothing else.
           await tx.sharedEnvironment.updateMany({
@@ -392,14 +516,14 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
             data: { sourceDossierId: dossier.id },
           });
         }
-        await tx.trashEntry.delete({ where: { id: entry.id } });
         return { dossierId: dossier.id };
       }
 
       if (entry.kind === 'DOSSIER_ITEMS') {
-        const { items } = entry.payload as unknown as { items: StoredItem[] };
+        const { items } = payload as unknown as { items: StoredItem[] };
         const targetId = targetDossierId ?? entry.dossierId;
-        const target = targetId ? await tx.dossier.findFirst({ where: { id: targetId, userId } }) : null;
+        // Locked, so a dossier going to the trash meanwhile is waited for and found gone, not half-written to.
+        const target = targetId && (await lockDossier(tx, userId, targetId)) ? await tx.dossier.findFirst({ where: { id: targetId, userId } }) : null;
         if (!target) {
           if (targetDossierId) throw new AppError(404, 'Dossier not found');
           throw new AppError(409, 'Il dossier non esiste più: scegli dove ripristinare.');
@@ -416,13 +540,12 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
           data: items.map((item, i) => itemRow(item, target.id, start + i, about(item))),
         });
         await tx.dossier.update({ where: { id: target.id }, data: { updatedAt: new Date() } });
-        await tx.trashEntry.delete({ where: { id: entry.id } });
         return { dossierId: target.id };
       }
 
       if (entry.kind === 'LINGO_CARDS') {
         // `states` and `reviews` are absent from an entry trashed before reviews were kept.
-        const { cards, states = [], reviews = [] } = entry.payload as unknown as {
+        const { cards, states = [], reviews = [] } = payload as unknown as {
           cards: (Record<string, unknown> & { id: string; createdAt: string; ancore: (Record<string, unknown> & { id: string; ultimaVerifica: string })[] })[];
           states?: StoredReviewState[];
           reviews?: StoredReview[];
@@ -468,7 +591,6 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
             durataMs: log.durataMs,
           })),
         });
-        await tx.trashEntry.delete({ where: { id: entry.id } });
         return { dossierId: null };
       }
 
@@ -479,7 +601,7 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       throw new AppError(409, 'Questi elementi sono già stati ripristinati.');
     }
-    throw error;
+    return quietly('Trash restore', error);
   }
 }
 

@@ -36,6 +36,8 @@ const shortcutGroups: ShortcutGroup[] = [
     shortcuts: [
       { keys: [modKey, 'Space'], description: 'Toggle Focus Mode' },
       { keys: ['Esc'], description: 'Chiudi modal/pannello' },
+      // The newest «Annulla» of the notifications (L-36); outside fields and editors, where it is the browser's undo.
+      { keys: [modKey, 'Z'], description: 'Annulla l’ultima azione con «Annulla» (fuori dai campi di testo)' },
     ],
   },
   {
@@ -49,6 +51,14 @@ const shortcutGroups: ShortcutGroup[] = [
     shortcuts: [
       { keys: ['←', '→'], description: 'Articolo precedente/successivo' },
       { keys: [modKey, 'C'], description: 'Copia articolo' },
+    ],
+  },
+  {
+    title: 'Compiti',
+    shortcuts: [
+      { keys: ['C'], description: 'Nuovo compito (nella pagina di un dossier, in quel dossier)' },
+      { keys: ['↑', '↓'], description: 'Compito precedente/successivo' },
+      { keys: ['Spazio'], description: 'Segna come fatto' },
     ],
   },
   {

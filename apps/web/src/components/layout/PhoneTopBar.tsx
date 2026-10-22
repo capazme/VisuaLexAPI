@@ -46,7 +46,7 @@ export function MenuToggle({ open, onToggle, notice, buttonRef }: MenuToggleProp
 
 export interface PhoneTopBarProps {
   menu: MenuToggleProps;
-  /** The page's name (`phoneBarTitle`), in the middle. */
+  /** The name in the middle: none while the page's title is in sight (empty), else the page's (`phoneBarTitle`). */
   title: string;
   /** Out of the way while the reader scrolls down (`useHideOnScroll`); only on a phone, below `md`. */
   hidden: boolean;
@@ -60,7 +60,8 @@ export interface PhoneTopBarProps {
 
 /**
  * The bar at the top of every page below `lg` but the search page, whose bar is the search field (M1): the menu at
- * the left, the page's name in the middle, the search on the right; the page's own title stays under it. It lies over
+ * the left, in the middle nothing while the page's title is in sight under it and the page's name once it has
+ * scrolled out (G8, as iOS's large titles), the search on the right. It lies over
  * the content area, which starts under it, on the page's paper with a hairline under it. On a phone it slides up out
  * of the way scrolling down and comes back scrolling up — at once under reduced motion; from `md` it stays, and its
  * right side leaves room for `Layout`'s Focus button.
@@ -82,8 +83,21 @@ export function PhoneTopBar({ menu, title, hidden, onReveal, onSearch, barRef }:
       {/* `px-1`: the menu's icon lines up with the page's 16 px margin. */}
       <div className="flex h-14 items-center gap-1 px-1 md:pr-[3.25rem]">
         <MenuToggle {...menu} />
-        <p className="min-w-0 flex-1 truncate text-center font-serif text-lg font-medium text-slate-900 dark:text-slate-50">{title}</p>
-        <button type="button" onClick={onSearch} aria-label="Apri il menu di ricerca" className={BAR_BUTTON}>
+        {/* Keyed by the name: the page's, once the title has scrolled out, fades in, 150 ms; at once under reduced motion
+            (G8; inspired by iOS's large titles, written from scratch). Empty, it keeps its place between the buttons. */}
+        <p key={title} aria-hidden={title ? undefined : true} className="min-w-0 flex-1 truncate text-center font-serif text-lg font-medium text-slate-900 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150 dark:text-slate-50">
+          {title}
+        </p>
+        <button
+          type="button"
+          // Safari does not focus a button it clicks: focused here, so the search menu gives the focus back to it.
+          onClick={(event) => {
+            event.currentTarget.focus({ preventScroll: true });
+            onSearch();
+          }}
+          aria-label="Apri il menu di ricerca"
+          className={BAR_BUTTON}
+        >
           <Search size={20} aria-hidden />
         </button>
       </div>

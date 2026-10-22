@@ -27,6 +27,15 @@ export const HOVER_LIFT = '[@media(hover:hover)_and_(pointer:fine)]:hover:-trans
  */
 export const HIDDEN_SCROLLBAR = '[scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
 
+/**
+ * A field's text: at least 16 px below md, 14 px from it. Safari on an iPhone zooms the page into a field whose text
+ * is under 16 px as it takes the focus, and the page stays zoomed. Not `text-base`: with the text size «piccolo»
+ * (`html[data-font-size="small"]`, 14 px) 1 rem is 14 px. `ui/Input` and `ui/FormSelect` carry it, and so do the
+ * searches of «Le mie schede» and of the Cronologia; a field written by hand takes it. A `text-*` class passed after
+ * it replaces it (`cn`), and the zoom comes back.
+ */
+export const FIELD_TEXT = 'text-[length:max(1rem,16px)] md:text-sm';
+
 /** Mobile touch target minimum size - use on interactive elements */
 export const TOUCH_TARGET = 'min-h-[44px] min-w-[44px]';
 

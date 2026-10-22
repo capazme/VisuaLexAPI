@@ -229,6 +229,9 @@
     --category-other: 220 9% 46%;
     /* Gymnasium's procedura penale (studia/progress/tokens.ts): the violet it always had */
     --category-penal-procedure: 270 60% 62%;
+    /* A subject's hue drawn as a line on the light card (G7, «Il tuo andamento»): a fifth darker, so every hue keeps
+       3:1 on white (amministrativo is 2.1:1 as it is); `theme.test.ts` checks it. */
+    --vlx-trend-shade: black 20%;
 
     /* Text highlight tokens — light theme */
     --hl-yellow-bg: 48 96% 89%;
@@ -287,6 +290,8 @@
     --category-eu: 158 64% 52%;
     --category-other: 218 11% 65%;
     --category-penal-procedure: 270 60% 70%;
+    /* On the dark card the hues already clear 3:1: no shade. */
+    --vlx-trend-shade: transparent 0%;
 
     /* Text highlight tokens — dark theme (inverted: dark saturated bg, light fg) */
     --hl-yellow-bg: 21 91% 30%;
@@ -1276,6 +1281,8 @@
   --vlx-section-forum: oklch(55% 0.08 190);
   /* The lesson bar's head runs ahead of the ink: the section's hue, lighter where the ink is dark. */
   --vlx-gymnasium-wash: oklch(64% 0.1 268);
+  /* The lesson bar's ink (G8): the section's hue at a step that reads as a colour, over 3:1 on its track. */
+  --vlx-gymnasium-bar: oklch(48% 0.14 268);
 }
 .dark {
   --vlx-section-opus: var(--color-toga-500);
@@ -1283,11 +1290,31 @@
   --vlx-section-academia: oklch(60% 0.09 70);
   --vlx-section-forum: oklch(58% 0.08 190);
   --vlx-gymnasium-wash: oklch(45% 0.11 268);
+  --vlx-gymnasium-bar: oklch(70% 0.12 268);
 }
 .vlx-section-mark { background: var(--vlx-section-opus); }
 .vlx-section-mark[data-section="gymnasium"] { background: var(--vlx-section-gymnasium); }
 .vlx-section-mark[data-section="academia"] { background: var(--vlx-section-academia); }
 .vlx-section-mark[data-section="forum"] { background: var(--vlx-section-forum); }
+
+/* «Analizza documento»'s box (D6): the frame's dashes stand still at rest — nothing moves for ever on an open page
+   (Bill) —, turn slowly under a mouse or with the keyboard's focus on the box, and run while a file is dragged over
+   the window, by their offset alone (two periods of «8 6»); a hidden tab stops them all. The row's bar, while a
+   document is read, is a segment that slides, never a share it does not know. Still under reduced motion. */
+@keyframes vlx-dash-turn { to { stroke-dashoffset: -28; } }
+.vlx-dash { animation: vlx-dash-turn 3.2s linear infinite; animation-play-state: paused; }
+.group:hover .vlx-dash, .group:focus-visible .vlx-dash { animation-play-state: running; }
+.vlx-dash-run { animation: vlx-dash-turn 0.8s linear infinite; }
+.group[data-tab-hidden] .vlx-dash, .group[data-tab-hidden] .vlx-dash-run { animation-play-state: paused; }
+@keyframes vlx-bar-slide { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
+.vlx-bar-slide { animation: vlx-bar-slide 1.1s var(--ease-in-out) infinite; }
+@keyframes vlx-shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-6px); } 40% { transform: translateX(5px); } 60% { transform: translateX(-3px); } 80% { transform: translateX(2px); } }
+.vlx-shake { animation: vlx-shake 300ms var(--ease-out) 1; }
+@media (prefers-reduced-motion: reduce) {
+  .vlx-dash, .vlx-dash-run, .vlx-bar-slide, .vlx-shake { animation: none; }
+  /* A still quarter would read as a share: the whole track, faint, says «at work» and no amount. */
+  .vlx-bar-slide { width: 100%; opacity: 0.45; }
+}
 
 /* Gymnasium's small motions (S2). Each plays once for what grew since this browser last drew it
    (`progress/seenProgress.ts`); under reduced motion none moves and the final state is drawn at once. */
@@ -1332,6 +1359,7 @@
   --ease-catch: linear(0, 0.054, 0.1792, 0.3334, 0.4894, 0.6308, 0.7498, 0.844, 0.9143, 0.9638, 0.9962, 1.0154, 1.0251, 1.0283, 1.0273, 1.0241, 1.0198, 1.0153, 1.0112, 1.0077, 1.0049, 1.0028, 1.0013, 1.0003, 0.9996, 1);
 }
 .vlx-lesson-head { background: var(--vlx-gymnasium-wash); }
+.vlx-lesson-ink { background: var(--vlx-gymnasium-bar); }
 
 @media (prefers-reduced-motion: reduce) {
   .vlx-mission-inking { animation: none; background-position: 0 0; text-decoration-color: var(--vlx-section-gymnasium); }

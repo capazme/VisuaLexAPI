@@ -238,7 +238,7 @@ describe('«Da validare», the keyboard and the vote bar', () => {
     approve.focus();
     await userEvent.click(approve);
     await screen.findByText('Domanda c2?');
-    const heading = screen.getByRole('heading', { level: 3 });
+    const heading = screen.getByRole('heading', { level: 2 });
     expect(heading).toHaveAttribute('tabindex', '-1');
     await waitFor(() => expect(heading).toHaveFocus());
   });
@@ -250,17 +250,17 @@ describe('«Da validare», the keyboard and the vote bar', () => {
     await userEvent.type(screen.getByRole('textbox', { name: 'Scrivi il motivo' }), 'No.');
     await userEvent.click(screen.getByRole('button', { name: 'Invia' }));
     await screen.findByText('Domanda c2?');
-    await waitFor(() => expect(screen.getByRole('heading', { level: 3 })).toHaveFocus());
+    await waitFor(() => expect(screen.getByRole('heading', { level: 2 })).toHaveFocus());
   });
 
   it('does not take the keyboard away when the card is not left (the vote failed) or on the first card', async () => {
     vote.mockRejectedValueOnce(rejection(500));
     render(<ValidationQueueView />);
     await screen.findByText('Domanda c1?');
-    expect(screen.getByRole('heading', { level: 3 })).not.toHaveFocus();
+    expect(screen.getByRole('heading', { level: 2 })).not.toHaveFocus();
     await userEvent.click(screen.getByRole('button', { name: 'Approvata' }));
     await screen.findByText('Non sono riuscito a registrare il voto. Riprova.');
-    expect(screen.getByRole('heading', { level: 3 })).not.toHaveFocus();
+    expect(screen.getByRole('heading', { level: 2 })).not.toHaveFocus();
   });
 });
 
@@ -406,6 +406,33 @@ describe('«Da validare», a subject change while a vote is on its way', () => {
     });
     return { promise, resolve, reject };
   };
+
+  it('says the points of the vote on its message, whatever the verdict (G1c)', async () => {
+    answerByMateria();
+    const livello = { livello: 1, totale: 20, nelLivello: 20, perIlProssimo: 100, oggi: 20 };
+    vote.mockResolvedValueOnce({ stato: 'PROPOSTA_COMMUNITY', xp: { crediti: [{ missione: 'convalida', punti: 20 }], livello, nuovoLivello: false } });
+    render(<ValidationQueueView />);
+    await screen.findByText('Domanda c1?');
+    await userEvent.click(screen.getByRole('button', { name: 'Approvata' }));
+    expect(await screen.findByText('Voto registrato · hai guadagnato 20 punti')).toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem('visualex.studia.visto')!)).toMatchObject({ xp: 20 });
+    localStorage.removeItem('visualex.studia.visto');
+  });
+
+  it('says no points for a vote that earned none, nor for a vote refused (409)', async () => {
+    answerByMateria();
+    const livello = { livello: 1, totale: 20, nelLivello: 20, perIlProssimo: 100, oggi: 20 };
+    vote.mockResolvedValueOnce({ stato: 'PROPOSTA_COMMUNITY', xp: { crediti: [], livello, nuovoLivello: false } });
+    vote.mockRejectedValueOnce({ status: 409 });
+    render(<ValidationQueueView />);
+    await screen.findByText('Domanda c1?');
+    await userEvent.click(screen.getByRole('button', { name: 'Approvata' }));
+    expect(await screen.findByText('Voto registrato')).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: 'Approvata' }));
+    expect(await screen.findByText('Hai già votato questa scheda: passo alla prossima.')).toBeInTheDocument();
+    expect(screen.queryByText(/punti/)).toBeNull();
+    localStorage.removeItem('visualex.studia.visto');
+  });
 
   it('keeps showing the new subject’s card, never stuck on «Carico le schede…», once the vote resolves', async () => {
     answerByMateria();

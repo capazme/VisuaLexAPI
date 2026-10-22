@@ -7,7 +7,7 @@ import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
 import type { ArticleData, Norma } from '../../../types';
 import { MenuButton } from '../../ui/MenuButton';
-import { ConfirmDialog } from '../../ui/ConfirmDialog';
+import { removePracticeActWithUndo } from './practiceUndo';
 import { Modal } from '../../ui/Modal';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { TreeViewPanel } from '../search/TreeViewPanel';
@@ -54,14 +54,13 @@ function chipLabel(article: ArticleData): string {
  */
 export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference }: PracticeActBlockProps) {
   const {
-    toggleActCollapse, revealPracticeArticle, revealPracticeRow, addArticlesToPractice, removePracticeAct,
+    toggleActCollapse, revealPracticeArticle, revealPracticeRow, addArticlesToPractice,
     moveActToPractice, openStructureWindow, closeStructureWindow,
   } = useAppStore(useShallow((s) => ({
     toggleActCollapse: s.toggleActCollapse,
     revealPracticeArticle: s.revealPracticeArticle,
     revealPracticeRow: s.revealPracticeRow,
     addArticlesToPractice: s.addArticlesToPractice,
-    removePracticeAct: s.removePracticeAct,
     moveActToPractice: s.moveActToPractice,
     openStructureWindow: s.openStructureWindow,
     closeStructureWindow: s.closeStructureWindow,
@@ -100,7 +99,6 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
   };
   // The row Study Mode shows while it is open; null, closed.
   const [studyKey, setStudyKey] = useState<string | null>(null);
-  const [confirmRemove, setConfirmRemove] = useState(false);
 
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
     useSortable({ id: act.id });
@@ -289,7 +287,7 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
             triggerClassName={MENU_TRIGGER}
             items={[
               { label: "Sposta in un'altra pratica", icon: FolderInput, onSelect: () => setMoveOpen(true) },
-              { label: "Rimuovi l'atto", icon: Trash2, danger: true, separatorBefore: true, onSelect: () => setConfirmRemove(true) },
+              { label: "Rimuovi l'atto", icon: Trash2, danger: true, separatorBefore: true, onSelect: () => removePracticeActWithUndo(practiceId, act.id) },
             ]}
           >
             <MoreHorizontal size={18} aria-hidden />
@@ -411,18 +409,6 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
         rubricheParts={rubricheParts}
       />
 
-      <ConfirmDialog
-        open={confirmRemove}
-        variant="danger"
-        title="Rimuovere l'atto?"
-        message="Tutti gli articoli dell'atto verranno tolti dalla pratica. Gli articoli salvati nei segnalibri e nei dossier, le note e le evidenziazioni non saranno toccati."
-        confirmLabel="Rimuovi"
-        onConfirm={() => {
-          setConfirmRemove(false);
-          removePracticeAct(practiceId, act.id);
-        }}
-        onCancel={() => setConfirmRemove(false)}
-      />
 
       <Modal
         isOpen={moveOpen}

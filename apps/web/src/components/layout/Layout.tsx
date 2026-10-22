@@ -10,7 +10,7 @@ import { SettingsModal } from '../ui/SettingsModal';
 import { FeedbackButton } from '../ui/FeedbackButton';
 import { FeedbackModal } from '../ui/FeedbackModal';
 import { ChangelogNotification } from '../ui/ChangelogNotification';
-import { UndoToastContainer } from '../ui/Toast';
+import { NotificationHost } from '../ui/Toast';
 import { SyncErrorToast } from '../ui/SyncErrorToast';
 import { KeyboardShortcutsModal } from '../ui/KeyboardShortcutsModal';
 import { cn } from '../../lib/utils';
@@ -32,6 +32,9 @@ import { sectionStore } from '../../features/sections/useSection';
 import { MenuToggle, PhoneTopBar } from './PhoneTopBar';
 import { phoneBarTitle } from './phoneBarTitle';
 import { useHideOnScroll } from './useHideOnScroll';
+import { usePageTitleInView } from './usePageTitleInView';
+import { PlannerHost } from '../features/planner/PlannerHost';
+import { useMediaQuery } from '../../hooks/useIsDesktop';
 
 export function Layout() {
   const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel, openCommandPalette } = useAppStore(useShallow(s => ({
@@ -70,6 +73,11 @@ export function Layout() {
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
   const [phoneBarElement, setPhoneBarElement] = useState<HTMLElement | null>(null);
   const phoneBar = useHideOnScroll(scroller, { enabled: showPhoneBar && !sidebarOpen, resetKey: pathname, bar: phoneBarElement });
+  // The bar's name (G8, as iOS's large titles): nothing in the middle while the page's own title is in sight under the
+  // bar — it says the name already —, the page's name once the title has scrolled out (`PhoneTopBar` fades it in). A
+  // page with no `h1` has its name at once.
+  const titleInView = usePageTitleInView(scroller, { enabled: showPhoneBar, resetKey: pathname, bar: phoneBarElement });
+  const barTitle = titleInView ? '' : phoneBarTitle(pathname, sectionName);
   // The services' probe, once for both copies of the sidebar and running with the menu closed (S1): its
   // status is the user menu's «Stato dei servizi», and a fault is a dot on the user button and, on a
   // phone, on the button that opens the drawer, whose names say it.
@@ -84,6 +92,22 @@ export function Layout() {
     const active = document.activeElement;
     if (!active || active === document.body || drawerRef.current?.contains(active)) menuToggleRef.current?.focus({ preventScroll: true });
   };
+  // Esc closes the drawer and gives the focus to the button that opened it, wherever the focus was (opening it from the
+  // bar leaves the focus on that button). An Esc a control inside took (the user menu, the section switcher) or an
+  // overlay over the drawer (a modal dialog, a sheet, the palette) is theirs. Only while the drawer is drawn: a window
+  // widened past `lg` with it open hides it by CSS and keeps the state, and its Esc belongs to the page (gotcha 26).
+  const drawerDrawn = !useMediaQuery('(min-width: 1024px)');
+  useEffect(() => {
+    if (!sidebarOpen || !drawerDrawn) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented || isWorkspaceCovered()) return;
+      e.preventDefault();
+      setSidebarOpen(false);
+      menuToggleRef.current?.focus({ preventScroll: true });
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [sidebarOpen, drawerDrawn]);
   const menuToggle = {
     buttonRef: menuToggleRef,
     open: sidebarOpen,
@@ -273,9 +297,10 @@ export function Layout() {
           onClick={() => updateSettings({ focusMode: !settings.focusMode })}
           id="tour-focus-toggle"
           className={cn(
-            'hidden md:block fixed top-4 right-4 z-50 p-2.5 rounded-xl transition-colors',
+            // 44 px, the touch target (it was 42: a 20 px icon in 10 px of padding and a 1 px border).
+            'hidden md:grid place-items-center h-11 w-11 fixed top-4 right-4 z-50 rounded-xl transition-colors',
             // Between md and lg it sits inside the bar's right end, centred on its 56 px.
-            !settings.focusMode && 'max-lg:right-1 max-lg:top-[calc(env(safe-area-inset-top)+0.4375rem)]',
+            !settings.focusMode && 'max-lg:right-1 max-lg:top-[calc(env(safe-area-inset-top)+0.375rem)]',
             'shadow-sm border',
             settings.focusMode
               ? 'bg-primary-600 text-white border-transparent hover:bg-primary-700'
@@ -289,7 +314,7 @@ export function Layout() {
         {showPhoneBar && (
           <PhoneTopBar
             menu={menuToggle}
-            title={phoneBarTitle(pathname, sectionName)}
+            title={barTitle}
             hidden={phoneBar.hidden}
             onReveal={phoneBar.reveal}
             barRef={setPhoneBarElement}
@@ -320,6 +345,10 @@ export function Layout() {
           ref={setScroller}
           className={cn(
             'vlx-page flex-1 overflow-y-auto w-full h-full',
+            // A page that grows past the window («Oggi», «Progressi», «Collega un'app AI», as it loads) drew its 8 px bar
+            // and moved the centred column 4 px to the left: the room is kept. Not on the search page, whose practice row
+            // is the scroller's height (`h-app-row`) and would only lose 8 px to an empty gutter.
+            !onSearchPage && '[scrollbar-gutter:stable]',
             // What the keyboard's focus or an anchor scrolls to stops under the phone's bar, not behind it (WCAG 2.4.11).
             showPhoneBar && 'max-lg:scroll-pt-[calc(3.5rem+env(safe-area-inset-top)+0.5rem)]',
           )}
@@ -350,7 +379,7 @@ export function Layout() {
       <ChangelogNotification />
 
       {/* Global Undo Toast Container */}
-      <UndoToastContainer />
+      <NotificationHost />
 
       {/* MERL-T global plugin slot — Layout-level side-effect mounts
           (forum-signal tracker, etc.). Renders null but keeps subscribers
@@ -362,6 +391,9 @@ export function Layout() {
 
       {/* The palette (⌘K) and the managers it opens, on every page */}
       <GlobalSearch />
+
+      {/* The planner's quick add («c»), its toast and the count beside «Oggi», on every page */}
+      <PlannerHost enabled={isAuthenticated} />
 
       {/* Find in the text (Cmd/Ctrl+F, the reading toolbars' magnifier) */}
       <FindWindow />

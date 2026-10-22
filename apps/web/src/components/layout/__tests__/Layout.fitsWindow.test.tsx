@@ -8,7 +8,9 @@ vi.mock('../../ui/FeedbackButton', () => ({
   FeedbackButton: ({ className }: { className?: string }) => <button type="button" data-testid="feedback" className={className}>Feedback</button>,
 }));
 vi.mock('../../ui/ChangelogNotification', () => ({ ChangelogNotification: () => null }));
-vi.mock('../../ui/Toast', () => ({ UndoToastContainer: () => null }));
+vi.mock('../../ui/Toast', () => ({ NotificationHost: () => null }));
+// The planner's host reads the tasks from the server: not under test here.
+vi.mock('../../features/planner/PlannerHost', () => ({ PlannerHost: () => null }));
 vi.mock('../../ui/SyncErrorToast', () => ({ SyncErrorToast: () => null }));
 vi.mock('../../ui/KeyboardShortcutsModal', () => ({ KeyboardShortcutsModal: () => null }));
 vi.mock('../../../hooks/useServiceHealth', () => ({ useServiceHealth: () => ({ snapshot: { overall: 'online', services: [], checkedAt: '' }, refresh: vi.fn() }) }));
@@ -40,5 +42,20 @@ describe('Layout — the document never scrolls', () => {
     // The content area pads 2 rem above and below it at `md`: the practice row's `h-app-row` (100dvh - 4rem)
     // is that, so the scroller's content is exactly its height with windows beside.
     expect(scroller.firstElementChild).toHaveClass('md:p-8');
+  });
+});
+
+// A page that grows past the window drew its bar and moved the centred column sideways by half of it.
+describe('Layout — the scrollbar moves nothing', () => {
+  it('keeps the bar\'s room on a page that scrolls', () => {
+    const { container } = at('/studia/progressi');
+    const scroller = container.querySelector('main .overflow-y-auto') as HTMLElement;
+    expect(scroller).toHaveClass('[scrollbar-gutter:stable]');
+  });
+
+  it('keeps none on the search page, whose practice row is the scroller\'s height', () => {
+    const { container } = at('/');
+    const scroller = container.querySelector('main .overflow-y-auto') as HTMLElement;
+    expect(scroller).not.toHaveClass('[scrollbar-gutter:stable]');
   });
 });

@@ -11,8 +11,10 @@ import { ArticleReadOnly } from './ArticleReadOnly';
 import { MATERIA_LABEL, anchorLabel, cardTitle, normaFromAnchor } from './studiaLabels';
 import { useValidationQueue, type VoteOutcome } from './useValidationQueue';
 import { VoteBar } from './VoteBar';
+import { recordXpSeen } from './progress/seenProgress';
+import { gainOf, gainWords } from './progress/xpGains';
 import type { StudiaOutletContext } from './StudiaPage';
-import { BLOCK_HEADING, FOCUS_RING, INK_TEXT, MUTED_TEXT, TILE } from './progress/tokens';
+import { FOCUS_RING, INK_TEXT, MUTED_TEXT, TILE } from './progress/tokens';
 
 const STORAGE_KEY = 'visualex.studia.valida.materia';
 const MEASURE = 'max-w-[60ch]';
@@ -61,20 +63,21 @@ function CardBody({ card, headingRef }: { card: Scheda; headingRef: RefObject<HT
     <article aria-label="Scheda da validare" className={cn(TILE, 'space-y-5 p-5 md:p-6')}>
       <div>
         {/* Focusable by script only: after a vote the keyboard lands here, on the card that comes next. */}
-        <h3 ref={headingRef} tabIndex={-1} className={cn('mb-2 break-words text-sm focus:outline-none', MUTED_TEXT)}>{cardTitle(card)}</h3>
+        {/* Under the page's title, «Da validare» (L-37): the card's heading is the next level. */}
+        <h2 ref={headingRef} tabIndex={-1} className={cn('mb-2 break-words text-sm focus:outline-none', MUTED_TEXT)}>{cardTitle(card)}</h2>
         <p className={cn(MEASURE, 'whitespace-pre-line break-words text-left font-serif text-xl leading-[1.7] text-slate-900 dark:text-slate-50')}>{card.domanda}</p>
         <hr className={cn(MEASURE, 'my-4 border-slate-200 dark:border-slate-700')} />
         <p className={cn(MEASURE, 'whitespace-pre-line break-words text-left font-serif text-lg leading-[1.7] text-slate-800 dark:text-slate-200')}>{card.risposta}</p>
       </div>
       {card.spiegazione && (
         <section>
-          <h4 className={PART_HEADING}>Spiegazione</h4>
+          <h3 className={PART_HEADING}>Spiegazione</h3>
           <p className={cn(MEASURE, 'whitespace-pre-line break-words text-left font-serif text-base leading-[1.7] text-slate-600 dark:text-slate-400')}>{card.spiegazione}</p>
         </section>
       )}
       {others.length > 0 && (
         <section>
-          <h4 className={PART_HEADING}>Altre ancore</h4>
+          <h3 className={PART_HEADING}>Altre ancore</h3>
           <ul className="space-y-1 break-words text-sm text-slate-700 dark:text-slate-200">
             {others.map((anchor) => (
               <li key={`${anchor.normaKey}|${anchor.articleId}`}>{anchorLabel(anchor) ?? anchor.urn}</li>
@@ -145,17 +148,20 @@ export function ValidationQueueView() {
 
   const cast: Parameters<typeof VoteBar>[0]['onVote'] = async (giudizio, motivazione) => {
     votedOn.current = card?.id ?? null;
-    const outcome = await vote(giudizio, motivazione);
+    const { outcome, xp } = await vote(giudizio, motivazione);
     // The card stays (the vote failed, or the user was stopped): the keyboard stays where it is.
     if (outcome === 'failed' || outcome === 'forbidden') votedOn.current = null;
     const message = OUTCOME_TOAST[outcome];
-    if (message) setToast(message);
+    // The points ride on the vote's message (G1c), saying who earns them: «Voto registrato · hai guadagnato 20 punti».
+    // Never a word that reads as what the vote weighs or gave the card (G-318).
+    const gain = gainOf(Date.now(), xp);
+    if (xp) recordXpSeen(xp);
+    if (message) setToast(gain ? { ...message, message: `${message.message} · ${gainWords(gain)}` } : message);
   };
 
   return (
     <section className="flex min-h-0 flex-col gap-4">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className={BLOCK_HEADING}>Da validare</h2>
+      <header className="flex flex-wrap items-center justify-end gap-3">
         <div className="w-full md:w-64">
           <FormSelect aria-label="Materia" value={materia ?? ''} onChange={(e) => chooseMateria(e.target.value)} className="min-h-[44px] rounded-xl">
             <option value="">Tutte le materie</option>
@@ -198,7 +204,7 @@ export function ValidationQueueView() {
               <CardBody card={card} headingRef={headingRef} />
               {!desktop && (
                 <section className="mt-5 border-t border-slate-200 pt-2 dark:border-slate-700">
-                  <h4>
+                  <h3>
                     <button
                       type="button"
                       aria-expanded={openFor === card.id}
@@ -208,7 +214,7 @@ export function ValidationQueueView() {
                       Testo dell’articolo
                       <ChevronDown size={16} aria-hidden className={cn('transition-transform motion-reduce:transition-none', openFor === card.id && 'rotate-180')} />
                     </button>
-                  </h4>
+                  </h3>
                   {openFor === card.id && <AnchoredArticle card={card} showToast={showToast} />}
                 </section>
               )}

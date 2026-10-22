@@ -1,7 +1,7 @@
 import { useEffect, useEffectEvent, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { Gavel, Search, SlidersHorizontal, Tag, Zap } from 'lucide-react';
 import { cn } from '../../../lib/utils';
-import { FOCUS_RING } from '../../../constants/interactions';
+import { FIELD_TEXT, FOCUS_RING } from '../../../constants/interactions';
 import { useAppStore } from '../../../store/useAppStore';
 import { citationSearchParams, useSearchQuery } from '../../../hooks/useSearchQuery';
 import { useSearchActions } from '../../../hooks/useSearchActions';
@@ -133,7 +133,8 @@ export function SearchField() {
             aria-describedby="search-field-status"
             placeholder={isDesktop ? 'Norma, sentenza o tema: art. 2043 c.c., Cass. civ. 10787/2024' : 'Norma, sentenza o tema'}
             className={cn(
-              'h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-base text-slate-900 shadow-sm placeholder:text-slate-400 md:text-sm',
+              'h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-slate-900 shadow-sm placeholder:text-slate-400',
+              FIELD_TEXT,
               'dark:border-slate-700 dark:bg-slate-900 dark:text-white',
               'focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30',
             )}
