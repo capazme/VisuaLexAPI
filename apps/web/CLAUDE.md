@@ -458,7 +458,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   the body as the sheet closed. The notifications (K1a,
   `components/ui/notifications/`): every `Toast` while `isVisible` and every `showUndoToast` is an entry of one
   store (`notifications.ts`), drawn by `NotificationHost` (mounted once in `Layout`, in the toast band): a stack at
-  the bottom (at the top for `position="top"`), three at most per edge — the newest first, a fourth closes the oldest
+  the bottom (at the top for `position="top"`; from `md` at the right, its foot over the feedback button, which it
+  covered), three at most per edge — the newest first, a fourth closes the oldest
   plain one first (an «Annulla» or a notification that stays until closed goes only when nothing else can; one pushed
   out stands), the others move with `spring.gentle`; a list named «Notifiche», read from a
   polite and an assertive live region that `notify` sets when one arrives (a closing one never makes an older one read
@@ -469,8 +470,11 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   of weight (Geist's axis); the clip is let go once open, so a focus ring is never cut. Each entry's time is a
   `countdown.ts`, held by a mouse over it, the focus in it, a finger on it and a hidden tab; «Annulla»'s 5 s is the
   line at the bottom drawing back between two ticks, which grow while it is held. Run out (or taken back), it closes
-  into the line, which draws back to the centre; ✕, Esc from inside it and a swipe to the side (a coarse pointer;
-  a short one springs back) fold it and slide it away. «Annulla» closes it at once — nothing in a closing
+  into the line, which draws back to the centre; ✕, Esc from inside it and a swipe to the side (a finger, or the
+  mouse dragging it from anywhere but a button, which it presses instead; a short one springs back, and a press that
+  moved it is no click — `swipeGuard.ts`: never a key's click (`detail` 0), and the flag goes once the release has
+  been seen, so a swipe let go outside eats nothing after it; no text is selected while it moves; started in `onPointerDown` with `dragListener` off, so the words stay selectable by a double
+  or triple click) fold it and slide it away. «Annulla» closes it at once — nothing in a closing
   notification takes a click (`inert`) — awaits the undo and draws «Ripristinato» in its place for 1.5 s (`undoneSlots`: the place is kept when the undo
   outlasts the exit); the focus of a notification closed from the keyboard (Esc, or a key's click, `detail` 0, or a
   `:focus-visible` button) goes to the next one still open — never after a mouse click or a swipe, where it would
@@ -479,8 +483,18 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   after saying so; a practice's or an act's with nothing left to put back says «Non ripristinabile: …»). At logout
   (`clearUserData`) every notification goes, `dropped`: an «Annulla» resolves as not standing and runs no undo, so an
   action held until the notification is gone (a large import) is not carried out. Plain toasts stay 3 s. Under reduced motion it fades, already open, and the time line still draws
-  back. Its «Annulla» and ✕ are 44 px at every width. `registerUndoToastListener` hands the newest «Annulla» on screen
-  to a test. `Tooltip` waits 500 ms under a pointer, opens at once and
+  back. Its «Annulla» and ✕ are 44 px at every width. **Ctrl+Z (⌘Z on a Mac)** runs the newest «Annulla» still on screen
+  (L-36; `undoShortcut.ts`, the host's `keydown` on `window`): never in a field, a list, an editor or anything
+  editable (`isEditableTarget`: there it is the browser's own undo), never with Shift (redo), never when something
+  took the key first, never under a dialog or an overlay (`isWorkspaceCovered`: an undo behind it would go unseen),
+  once for a held key (`repeat`), Z read by its place on a keyboard that writes no Latin letter; with no «Annulla» on
+  screen the key goes by. «Ripristinato» comes as after a click, and once the undo has run the live region says
+  «Ripristinato: <what was undone>» in its place (one message: two in a row on an atomic region, the first is lost);
+  the focus in the notification undone goes to the next one, as after Esc. That notification writes the key beside its «Annulla» («Annulla · Ctrl+Z»,
+  seen, not in the name; `aria-keyshortcuts`) where the pointer is not coarse and nothing covers the workspace
+  (`useWorkspaceCovered`, watched only while an «Annulla» is on screen: under a dialog the key does nothing); the
+  shortcuts' list has it.
+  `registerUndoToastListener` hands the newest «Annulla» on screen to a test. `Tooltip` waits 500 ms under a pointer, opens at once and
   without motion within 300 ms of another closing, and at once on keyboard focus.
   Interaction tokens live in `constants/interactions.ts`, stacking bands in
   `constants/zIndex.ts`. Compose these rather than hand-rolling Tailwind: `TRANSITION` names the
