@@ -136,11 +136,11 @@ describe.each([
     expect(screen.queryAllByTestId('reading-window')).toHaveLength(desktop ? 1 : 0);
     expect(screen.queryAllByTestId('reading-full-screen')).toHaveLength(desktop ? 0 : 1);
     if (desktop) {
-      expect(screen.getByText(/Giurisprudenza \(1\)/)).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Giurisprudenza (1)' })).toBeInTheDocument();
     } else {
-      expect(screen.queryByText(/Giurisprudenza \(1\)/)).toBeNull();
+      expect(screen.queryByRole('heading', { name: 'Giurisprudenza (1)' })).toBeNull();
       fireEvent.click(screen.getByRole('button', { name: 'Pratica' }));
-      expect(screen.getByText(/Giurisprudenza \(1\)/)).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Giurisprudenza (1)' })).toBeInTheDocument();
       expect(screen.queryByTestId('decision-reader')).toBeNull();
     }
   });

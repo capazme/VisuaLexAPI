@@ -112,7 +112,7 @@ export function InlineNotePopover({ note, anchorEl, onClose, onUpdate, onRemove 
                     <div
                         style={{ transformOrigin }}
                         className={cn(
-                            'relative w-[300px] rounded-lg shadow-xl border border-amber-200 dark:border-amber-900/40',
+                            'relative w-[300px] rounded-lg shadow-md border border-amber-200 dark:border-amber-900/40',
                             'bg-white dark:bg-slate-900 animate-in fade-in zoom-in-95 duration-150',
                         )}
                     >

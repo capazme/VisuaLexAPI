@@ -4,7 +4,7 @@ import { DecisionLink } from '../../../components/features/decisions/DecisionLin
 import type { ReadingBackEntry } from '../../../utils/readingBackStack';
 import type { RassegnaPronuncia } from './types';
 
-const CHIP = 'px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300';
+const CHIP = 'px-2 py-0.5 rounded text-xs font-medium bg-primary-100 text-primary-800 dark:bg-primary-900/50 dark:text-primary-300';
 
 /** A decision cited in a paragraph: a link to its address when the data name it well enough to make one
  *  (`linkableDecisionPath`: a known court, a number, a year), a plain label when they do not. The

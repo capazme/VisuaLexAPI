@@ -70,7 +70,7 @@ export function UpdateNotePopover({ noteId, paragraphs, anchorEl, onClose }: Upd
                     <div
                         style={{ transformOrigin }}
                         className={cn(
-                            'w-[min(24rem,calc(100vw-2rem))] max-h-[60vh] overflow-y-auto rounded-lg border shadow-xl',
+                            'w-[min(24rem,calc(100vw-2rem))] max-h-[60vh] overflow-y-auto rounded-lg border shadow-md',
                             'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900',
                             'animate-in fade-in zoom-in-95 duration-150',
                         )}

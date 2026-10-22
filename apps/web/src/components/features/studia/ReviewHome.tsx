@@ -129,7 +129,8 @@ export function ReviewHome() {
     // `xl` two (G6): the day, the missions and the list on the left, two thirds, and the statistics with the subjects on
     // the right, kept in sight under the heading while the page scrolls. The document's order is the reading order the
     // owner fixed — missions, statistics, list — on every width; the grid places the right column.
-    <section className={cn('relative grid gap-6 pb-8', split && SPLIT)}>
+    // One column of `minmax(0, 1fr)` below `xl` (two from it, `SPLIT`): an implicit track grows to its widest content.
+    <section className={cn('relative grid grid-cols-1 gap-6 pb-8', split && SPLIT)}>
       <div className={cn('min-w-0', split && LEFT)}>
         <DayBlock
           day={data}
@@ -157,7 +158,9 @@ export function ReviewHome() {
         />
       </div>
       {/* Under the missions on a phone; beside everything from `xl`, sticky while it fits. */}
-      <div ref={aside} className={cn('grid min-w-0 gap-6', split && ASIDE, split && !settingsOpen && fits && STICK)}>
+      {/* One column of `minmax(0, 1fr)`: an implicit track takes its width from its widest content, «Le tue materie»'s
+          strip of 240 px cards on a phone (G8b: 1370 px, the card out of the screen). */}
+      <div ref={aside} className={cn('grid min-w-0 grid-cols-1 gap-6', split && ASIDE, split && !settingsOpen && fits && STICK)}>
         <StatsBand
           aside={split}
           data={data}
