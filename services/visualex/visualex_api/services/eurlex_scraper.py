@@ -452,9 +452,15 @@ class EurlexScraper(BaseScraper):
 
         # Strategy 3: Look for any element whose text matches article pattern exactly. The modern
         # OJ page writes "Articolo\xa0N", which only this one reads; the number must end there,
-        # as in `_heads_article`, or art. 15 asked would be served "Articolo 15 bis".
+        # as in `_heads_article`, or art. 15 asked would be served "Articolo 15 bis". An article
+        # asked with its suffix («15 bis», «15-bis», «15bis») reads "Articolo\xa015\xa0bis" too.
         if not article_section:
-            article_regex = re.compile(rf'^Articolo\s+{re.escape(str(article))}\b', re.IGNORECASE)
+            asked = re.fullmatch(rf'(\d+)[\s\-]*({ARTICLE_SUFFIX_ALTERNATION})?', str(article).strip(), re.IGNORECASE)
+            if asked:
+                spelled = asked.group(1) + (rf'[\s\-]*{asked.group(2)}' if asked.group(2) else '')
+            else:
+                spelled = re.escape(str(article))
+            article_regex = re.compile(rf'^Articolo\s+{spelled}\b', re.IGNORECASE)
 
             def heads_by_regex(text):
                 match = article_regex.match(text)

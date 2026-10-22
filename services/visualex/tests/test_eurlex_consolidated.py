@@ -247,8 +247,10 @@ class TestConsolidatedArticleText:
             text14 = await scraper.extract_article_text(BeautifulSoup(html, "html.parser"), "14")
             assert text14.split("\n")[:3] == ["Articolo\xa014" if "nbsp" in markup else "Articolo 14",
                                                "Disposizioni generali", "Testo dell'articolo 14."]
-        asked = await scraper.extract_article_text(BeautifulSoup(html.replace("&nbsp;", " "), "html.parser"), "15 bis")
-        assert asked.startswith("Articolo 15 bis")
+        # The article that is there opens, asked in any spelling, non-breaking spaces included.
+        for spelling in ("15 bis", "15-bis", "15bis"):
+            asked = await scraper.extract_article_text(BeautifulSoup(html, "html.parser"), spelling)
+            assert asked.replace("\xa0", " ").split("\n")[:2] == ["Articolo 15 bis", "Articolo inserito"], spelling
 
     @pytest.mark.parametrize("heading,article,heads", [
         ("Articolo 15 bis", "15", False),
