@@ -2,7 +2,8 @@ import { cn } from '../../../../lib/utils';
 import type { Progressi } from '../../../../types/studia';
 import { BLOCK_HEADING, MUTED_TEXT, TILE } from '../progress/tokens';
 import { MissionRow } from './MissionMark';
-import { allMissions, soonLine, type MissionGroup } from './missions';
+import { todayState } from '../progress/today';
+import { allMissions, soonLine, todayMissions, type MissionGroup } from './missions';
 
 const GROUPS: { group: MissionGroup; label: string }[] = [
   { group: 'giornaliera', label: 'Giornaliere' },
@@ -63,13 +64,17 @@ export function MissionList({ data, loading }: MissionListProps) {
   const active = missions.filter((mission) => mission.status !== 'in-arrivo');
   const groups = GROUPS.filter(({ group }) => active.some((mission) => mission.group === group));
   const soon = soonLine(missions);
+  // «Le missioni di oggi» is drawn only with cards to work on (no card at all: the day block alone, G8): only then is
+  // there anything «qui sopra» to point to. The same rule as `TodayMissions`'.
+  const state = todayState(data, false, false);
+  const todayAbove = (state === 'todo' || state === 'done') && todayMissions(data).length > 0;
   return (
     <section aria-labelledby="studia-tutte" className="space-y-3">
       <div className="space-y-1">
         <h2 id="studia-tutte" className={BLOCK_HEADING}>
           Tutte le missioni
         </h2>
-        <p className={cn('max-w-prose text-sm', MUTED_TEXT)}>Le tre di oggi sono qui sopra.</p>
+        {todayAbove && <p className={cn('max-w-prose text-sm', MUTED_TEXT)}>Le tre di oggi sono qui sopra.</p>}
       </div>
       {groups.length > 0 && (
         <div className={cn(TILE, 'divide-y divide-slate-100 px-4 dark:divide-slate-800 md:px-6')}>

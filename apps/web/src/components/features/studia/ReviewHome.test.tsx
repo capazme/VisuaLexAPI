@@ -273,8 +273,10 @@ describe('ReviewHome', () => {
     expect(screen.getByText(/apri un articolo dalla/)).toHaveTextContent('«+ Nuova scheda» sotto il testo');
     expect(screen.getByRole('link', { name: 'Ricerca' })).toHaveAttribute('href', '/');
     expect(screen.queryByRole('button', { name: START })).toBeNull();
-    // Said once, in the day block: no missions card under it.
+    // Said once, in the day block: no missions card under it, and so nothing «qui sopra» for the full list to point to.
     expect(screen.queryByRole('region', { name: 'Le missioni di oggi' })).toBeNull();
+    expect(await screen.findByRole('region', { name: 'Tutte le missioni' })).toBeInTheDocument();
+    expect(screen.queryByText('Le tre di oggi sono qui sopra.')).toBeNull();
     // A button, not a link (G8): it opens the settings at the community's subjects.
     const day = screen.getByRole('region', { name: 'Il ripasso di oggi' });
     await userEvent.setup().click(within(day).getByRole('button', { name: 'Accendi le schede della comunità' }));
@@ -632,6 +634,13 @@ describe('ReviewHome', () => {
       // A subject with no card has nothing to start.
       expect(stops[3]).toHaveTextContent('Nessuna scheda');
       expect(within(stops[3]).queryByRole('button', { name: /^Ripassa/ })).toBeNull();
+      // Every row as wide as «Tutte le materie» (G8, Bill: 8 px short at 1920): a row from `md`, the choice taking what
+      // «Ripassa» leaves — all of it with no card —, never a grid whose empty column keeps its gap.
+      for (const stop of stops) {
+        expect(stop).toHaveClass('md:flex');
+        expect(stop.className).not.toMatch(/md:grid-cols/);
+        expect(within(stop).getAllByRole('button')[0]).toHaveClass('md:flex-1');
+      }
       await userEvent.setup().click(within(stops[0]).getByRole('button', { name: 'Ripassa Diritto penale' }));
       expect(screen.getByTestId('where')).toHaveTextContent('/studia/ripasso/sessione?materia=DIRITTO_PENALE');
     });
@@ -813,6 +822,13 @@ describe('ReviewHome', () => {
       expect(rows[2]).toHaveTextContent('10 punti guadagnati');
       expect(rows[2]).toHaveTextContent('compiuta');
       expect(within(card).getByText('1 di 3')).toBeInTheDocument();
+      // On a phone every row has one shape: the count and the points under the title, whatever its length; beside it
+      // from `md` (G8).
+      for (const row of rows) {
+        const head = row.querySelector('p')!.parentElement!;
+        expect(head).toHaveClass('flex-col', 'items-start', 'md:flex-row', 'md:justify-between');
+        expect(head.className).not.toMatch(/(^|\s)flex-wrap(\s|$)/);
+      }
       // The bar is 4 px (G8); the first row no longer carries the action.
       expect(rows[0].querySelector('.h-1')).not.toBeNull();
       expect(within(rows[0]).queryByRole('button')).toBeNull();

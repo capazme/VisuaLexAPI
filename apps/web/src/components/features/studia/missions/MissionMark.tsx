@@ -112,7 +112,9 @@ export function MissionRow({ mission, bar = false, quietNote = false, aside, chi
     >
       <MissionMark status={mission.status} drip={inked && ink === 'drip'} />
       <div className="grid min-w-0 gap-1.5">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        {/* On a phone the count and the points always go under the title, whatever its length, so every row has the
+            same shape (G8, Bill); from `md` they sit at the end of the title's line. */}
+        <div className="flex flex-col items-start gap-y-1 md:flex-row md:flex-wrap md:items-baseline md:justify-between md:gap-x-3">
           <p
             className={cn(
               'font-medium',

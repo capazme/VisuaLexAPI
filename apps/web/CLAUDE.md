@@ -993,7 +993,8 @@ places the right column; inside the tiles a sentence stops at `max-w-prose`. In 
    under reduced motion.
 2. **«Le missioni di oggi»** (`missions/TodayMissions`): the day's three missions as compact rows, one under the other,
    each with its mark (drawn, never pressed), «8 di 18», its points («20 XP», «+20 XP» in ink once earned, said as «vale 20 punti» /
-   «20 punti guadagnati») and a bar of 4 px, and the summary «2 di 3» over those with something to do today; no action
+   «20 punti guadagnati») — on a phone always under the title, whatever its length, so every row has one shape; at the
+   end of the title's line from `md` (`MissionRow`, both lists) — and a bar of 4 px, and the summary «2 di 3» over those with something to do today; no action
    of their own (the day block holds it). **The server
    decides them** (G1c, Gymnasium XP spec `docs/superpowers/specs/2026-10-20-gymnasium-xp-levels-design.md` §5.3): the
    progress read carries `missioni` (`MissioneServer`: state, `progresso`, `punti`, `principale`, `motivo`, `materia`), each
@@ -1048,9 +1049,10 @@ places the right column; inside the tiles a sentence stops at `max-w-prose`. In 
 4. **«Le tue materie»** (`progress/SubjectList`, G8), under the band in the same box: it took the place of «Cosa ripassi»
    (the chips) and «Il percorso» (the road), which said almost the same thing in two forms. A group «Materia»: on top
    «Tutte le materie», then one row a subject in the road's order (`orderStops`, new plus in learning first, then by
-   name — kept so when the institute read answers, which would otherwise move the rows under the reader's hand), each a
-   44 px `aria-pressed` choice — its hue's dot, its name, «3 oggi» (the cards due today, `dueBySubject` of the read by
-   institute; said «3 oggi da ripassare»), a small bar of its consolidated share and the three states in words for a
+   name — kept so when the institute read answers, which would otherwise move the rows under the reader's hand), each,
+   from `md`, a flex row as wide as «Tutte le materie» (a grid's empty column for a subject with no card kept its 8 px
+   gap), a 44 px `aria-pressed` choice that takes what «Ripassa» leaves — its hue's dot, its name, «3 oggi» (the cards due today, `dueBySubject` of the read by
+   institute; said «3 da ripassare oggi»), a small bar of its consolidated share and the three states in words for a
    screen reader (`stopStates`) — and «Ripassa» for a session narrowed to it (none, and «Nessuna scheda», for a subject
    with no card). The choice narrows the day block and the session it starts, kept in
    `localStorage` under `visualex.studia.ripasso.materia` by `progress/rememberedSubject.ts`, which «Progressi» shares:
@@ -1069,7 +1071,7 @@ places the right column; inside the tiles a sentence stops at `max-w-prose`. In 
    materia.» with «Riprova» (no alert; its name says which subject), the stops read before kept when a new read fails, a subject with none.
    A failed first progress read says «Non riesco a leggere le tue materie: …» under the heading (no second alert).
 5. **«Tutte le missioni»** (`missions/MissionList`): daily, weekly, long-term, without today's three, which item 2
-   shows above («Le tre di oggi sono qui sopra.», G6): every mission the server lists that is not `principale` and can be
+   shows above («Le tre di oggi sono qui sopra.», G6, said only when that card is drawn — not with no card at all): every mission the server lists that is not `principale` and can be
    done, with its state, count, line and points — «convalida» only when the server lists it (a validator's); a `vuota`
    keeps its count beside «Niente oggi» («1 di 2») —; the missions announced and not yet recorded (`in-arrivo`) have no
    row, ring or points: one line in slate 500 at the foot names them (`soonLine`: «In arrivo: caso breve, una settimana

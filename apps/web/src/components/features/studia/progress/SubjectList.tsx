@@ -100,10 +100,12 @@ export function SubjectList({ materie, loading, reloading, selected, onSelect, p
               <li
                 key={stop.materia}
                 // `backwards` fill (the utility's): each row waits unseen for its turn, then rests where it is.
-                className={cn(ITEM, 'grid gap-1.5 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-2')}
+                // From `md` a row: the choice takes what «Ripassa» leaves, all of it for a subject with no card, so every row
+                // ends where «Tutte le materie» does (a grid's empty column kept its 8 px gap).
+                className={cn(ITEM, 'grid gap-1.5 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 md:flex md:items-center md:gap-2')}
                 style={{ animationDelay: `${(index + 1) * STAGGER_MS}ms` }}
               >
-                <button type="button" aria-pressed={on} onClick={() => onSelect(stop.materia)} className={cn(CHOICE, on ? PRESSED : IDLE, 'flex-wrap md:flex-nowrap')}>
+                <button type="button" aria-pressed={on} onClick={() => onSelect(stop.materia)} className={cn(CHOICE, on ? PRESSED : IDLE, 'flex-wrap md:min-w-0 md:flex-1 md:flex-nowrap')}>
                   <span aria-hidden className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: subjectHue(stop.materia) }} />
                   <span className="min-w-0 flex-1 truncate">{label}</span>
                   {total === 0 ? (
@@ -131,7 +133,7 @@ export function SubjectList({ materie, loading, reloading, selected, onSelect, p
                     type="button"
                     aria-label={`Ripassa ${label}`}
                     onClick={() => navigate(`/studia/ripasso/sessione?materia=${stop.materia}`)}
-                    className={cn(SECONDARY_BUTTON, 'px-3')}
+                    className={cn(SECONDARY_BUTTON, 'shrink-0 px-3')}
                   >
                     Ripassa
                   </button>
