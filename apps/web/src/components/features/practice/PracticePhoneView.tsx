@@ -123,7 +123,8 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming }: Pr
               lists the practices, to switch or start one —, its count under it, «Salva come dossier» and «⋯». */}
           {practice && <PhonePracticeHead practice={practice} save={save} onList={() => setListing(true)} />}
           {practice && (
-            <div className="space-y-4 px-4 pb-4 pt-2">
+            // At the layout's 16 px from the edges (R3b): no step of its own.
+            <div className="space-y-4 pb-4 pt-2">
               <PracticeStreamingBar streaming={streaming} practiceId={practice.id} />
               {practice.acts.length === 0 && practice.decisions.length === 0 ? (
                 <PracticeEmpty />
@@ -147,7 +148,7 @@ function PhonePracticeHead({ practice, save, onList }: { practice: Practice; sav
   const countLine = practiceCountLine(practiceCounts(practice));
   return (
     // One row (R3: the text first): the name with «▾», the count after it, then the save and «⋯».
-    <div className="flex items-center gap-1 border-b border-slate-200 px-4 dark:border-slate-800">
+    <div className="flex items-center gap-1 border-b border-slate-200 dark:border-slate-800">
       <div className="flex min-w-0 flex-1 items-center gap-2">
         <h2 className={cn('min-w-0', countLine && 'max-w-[70%] shrink-0')}>
           <button
@@ -155,7 +156,9 @@ function PhonePracticeHead({ practice, save, onList }: { practice: Practice; sav
             onClick={onList}
             aria-haspopup="dialog"
             title="Elenco delle pratiche"
-            className="-ml-1 inline-flex min-h-[44px] max-w-full items-center gap-1 rounded-lg px-1 font-serif text-xl font-medium text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-white"
+            // `-ml-1` sets the name on the column's edge; the cap gives those 4 px back, or the heading, as wide as its content
+            // less the margin, cut «c.c.» to «c…» with room beside it (R3b).
+            className="-ml-1 inline-flex min-h-[44px] max-w-[calc(100%+0.25rem)] items-center gap-1 rounded-lg px-1 font-serif text-xl font-medium text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-white"
           >
             <span className="truncate">{practice.label}</span>
             <ChevronDown size={18} aria-hidden className="flex-shrink-0 text-slate-500" />

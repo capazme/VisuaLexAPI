@@ -1,4 +1,5 @@
 import { useMemo, type ReactNode } from 'react';
+import { Zap } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import type { ArticleData } from '../../../types';
 import { ArticleTabContent } from '../search/ArticleTabContent';
@@ -9,6 +10,7 @@ import { shortNorm } from '../../../utils/sources';
 import { PracticeRowShell, type RowBeside } from './PracticeRowShell';
 import { articleRowKey, articleWindowId, besideRefFor, practiceArticleKey } from '../../../utils/practice';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
+import { quickNormParamsOf } from '../../../utils/quickNormParams';
 
 export interface PracticeArticleRowProps {
   practiceId: string;
@@ -32,6 +34,9 @@ export function PracticeArticleRow({
   const articleKey = practiceArticleKey(article);
   const rowKey = articleRowKey(practiceId, actId, articleKey);
   const isOpen = useAppStore((s) => s.practiceRows[rowKey] === true);
+  // Among the quick norms (R3b): its toggle is an entry of the reader's «⋯», so the row says it, open or folded.
+  const quickParams = useMemo(() => quickNormParamsOf(article.norma_data), [article.norma_data]);
+  const isQuick = useAppStore((s) => s.quickNorms.length > 0 && s.isQuickNorm(quickParams));
   const setRowOpen = useAppStore((s) => s.setRowOpen);
   const removePracticeArticle = useAppStore((s) => s.removePracticeArticle);
   const openBeside = useAppStore((s) => s.openBeside);
@@ -90,6 +95,11 @@ export function PracticeArticleRow({
               </span>
             )}
           </span>
+          {isQuick && (
+            <span role="img" aria-label="Tra le norme rapide" title="Tra le norme rapide" className="flex-shrink-0 text-amber-600 dark:text-amber-400">
+              <Zap size={14} aria-hidden className="fill-current" />
+            </span>
+          )}
           {historicalLabel && (
             <span className="flex-shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
               {historicalLabel}

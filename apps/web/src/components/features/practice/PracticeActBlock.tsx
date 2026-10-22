@@ -276,8 +276,9 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
                   type="button"
                   onClick={toggleStructure}
                   aria-label="Struttura della norma"
-                  aria-pressed={isStructureWindowOpen}
-                  className={cn(TOOL_BUTTON, 'practice-act-structure aria-pressed:bg-slate-200/70 aria-pressed:text-slate-900 dark:aria-pressed:bg-slate-800 dark:aria-pressed:text-white')}
+                  // It opens a window (the index): expanded, not pressed (R3b).
+                  aria-expanded={isStructureWindowOpen}
+                  className={cn(TOOL_BUTTON, 'practice-act-structure aria-expanded:bg-slate-200/70 aria-expanded:text-slate-900 dark:aria-expanded:bg-slate-800 dark:aria-expanded:text-white')}
                 >
                   <GitBranch size={16} aria-hidden />
                   <span className="hidden lg:inline">{treeLoading ? 'Carico…' : 'Struttura'}</span>

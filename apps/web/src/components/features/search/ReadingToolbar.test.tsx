@@ -114,6 +114,9 @@ describe('ReadingToolbar — three tools in words, the rest behind «⋯» (R3)'
         const { container } = setup();
         const buttons = within(phoneRow(container)).getAllByRole('button');
         expect(buttons[0]).toHaveTextContent('');
+        // Close together, the last one's target reaching into the page's margin: the status keeps one line at 320 (R3b).
+        expect(phoneRow(container)).toHaveClass('-mr-3');
+        expect(phoneRow(container)).not.toHaveClass('gap-1');
         expect(buttons.map((b) => b.getAttribute('aria-label') ?? b.textContent)).toEqual(['Al dossier', 'Altre azioni sull’articolo']);
         buttons.forEach((b) => expect(b).toHaveClass('min-h-[44px]', 'min-w-[44px]'));
     });

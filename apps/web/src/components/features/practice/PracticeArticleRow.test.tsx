@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ArticleData } from '../../../types';
 
@@ -50,6 +50,24 @@ describe('PracticeArticleRow (spec §3.2)', () => {
     expect(screen.getByText('Risarcimento per fatto illecito')).toBeInTheDocument();
     // a code's annex is never shown
     expect(screen.queryByText(/All\./)).toBeNull();
+  });
+
+  it('says in its header that the article is among the quick norms, open or folded (R3b)', () => {
+    const { practiceId, actId } = setUp([CC_2043]);
+    appStore.setState({ quickNorms: [] });
+    const { rerender } = render(row(practiceId, actId, CC_2043));
+    expect(screen.queryByRole('img', { name: 'Tra le norme rapide' })).toBeNull();
+    act(() => {
+      appStore.setState({
+        quickNorms: [{
+          id: 'q1', label: 'art. 2043 c.c.', createdAt: '2026-10-01T00:00:00.000Z', usageCount: 0,
+          searchParams: { act_type: CC_2043.norma_data.tipo_atto, act_number: CC_2043.norma_data.numero_atto || '', date: CC_2043.norma_data.data || '', article: '2043', version: 'vigente' },
+        }],
+      });
+    });
+    rerender(row(practiceId, actId, CC_2043));
+    expect(screen.getByRole('img', { name: 'Tra le norme rapide' })).toBeInTheDocument();
+    appStore.setState({ quickNorms: [] });
   });
 
   it('closed, it mounts no reader; its header opens it, and only the header toggles', () => {
