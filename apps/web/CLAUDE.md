@@ -2131,11 +2131,12 @@ meant to stay split; add new features as new files, not inside the shells:
   `article` with its title in Newsreader 18 px, a plain line «● Civile · v1 · autore · 2 giorni fa» (the category's hue
   from its token `--category-*`, never a hand-written colour; one line where the card has room, wrapped between its parts
   on a narrow one, a long username cut, whole on hover), two tags then «+N», «Mi piace» a heart with its number
-  (`aria-pressed`, named «Mi piace: N»; on a computer 36 px tall) and one action, «Aggiungi ai miei dossier», outlined,
-  its words cut rather than pushed out on the narrowest card; a withdrawn card is a dashed edge on a quieter paper and
+  (`aria-pressed`, named «Mi piace: N»; on a computer 36 px tall) and one action, «Aggiungi ai miei dossier», outlined
+  («Aggiungi» below `sm`, as the packs' cards, its name whole); a withdrawn card is a dashed edge on a quieter paper and
   the badge, never an opacity (it would trap the «⋯» menu in a stacking context, gotcha 22, and fade the text under AA).
-  How many added a dossier is what «Più aggiunti» sorts by and «I più aggiunti» (an `h2`, last on the page) lists, not a
-  number on every card; the views are no longer shown. Then «Pronti da VisuaLex» (`StudyPacksBand`, over
+  Beside the like, small, «aggiunto da 12» (nothing at 0); the views are the author's alone, beside it in «I miei
+  pubblicati» (`showOwnerActions`), never on Explore; where a card is too narrow the action goes under them, whole. «I
+  più aggiunti» is an `h2`, last on the page. Then «Pronti da VisuaLex» (`StudyPacksBand`, over
   `utils/studyPacks.ts`: the 20 packs of `data/exampleEnvironments.ts`, each a pack's dossiers plus «‹pack›: articoli
   chiave»): one row of compact cards that scrolls sideways (`#pronti`, `tabIndex 0`, so the keyboard scrolls it past
   packs already added), every pack in it — on a computer after the grid and its pages; on a phone right after the
@@ -2143,7 +2144,9 @@ meant to stay split; add new features as new files, not inside the shells:
   never mounted again while a new read travels, the rest under a hidden `h2` «Altri dossier della comunità»
   (`useIsDesktop`, one place or the other); it follows Explore's category and adds a pack through `import-study`; the
   empty dossier list's «Pronti da VisuaLex» goes to `/forum#pronti`, where Explore, once read, scrolls the content
-  scroller alone to the strip under the phone's bar (`scroll-padding-top`, gotcha 34) and focuses it. One list of categories, `utils/forumCategories.ts`. `EnvironmentContentViewer` (the tree of a
+  scroller alone to the strip under the phone's bar (`scroll-padding-top`, gotcha 34) and focuses it, once: the fragment
+  then leaves the address (`history.replaceState`, the router's state kept), so another tab and back, or a reload, do not
+  jump again. One list of categories, `utils/forumCategories.ts`. `EnvironmentContentViewer` (the tree of a
   content's dossiers, quick norms, aliases, notes and highlights), `useLeftOutNotice` and `annotationLabels` serve
   the suggestions. The suggestion flow adds `SuggestionReviewDialog`, `EditSuggestionDialog`,
   `SuggestionItemCard` (all five itemTypes), `AliasConflictDialog`,

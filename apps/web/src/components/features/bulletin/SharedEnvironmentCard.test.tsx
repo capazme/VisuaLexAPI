@@ -110,12 +110,14 @@ describe('SharedEnvironmentCard — its shape (S7a)', () => {
   it('has one action, outlined, not filled', () => {
     renderCard(base);
     const add = screen.getByRole('button', { name: /Aggiungi «Ricorso Rossi» ai miei dossier/ });
-    expect(add).toHaveTextContent('Aggiungi ai miei dossier');
+    // «Aggiungi» on a phone, the whole words from sm; the name whole on every width.
+    expect(within(add).getByText('Aggiungi', { selector: 'span' })).toHaveClass('sm:hidden');
+    expect(within(add).getByText('Aggiungi ai miei dossier')).toHaveClass('hidden', 'sm:inline');
     expect(add).toHaveClass('border', 'border-primary-600');
     expect(add.className).not.toMatch(/bg-primary-600/);
-    // Only the like, the action and the «⋯» menu: no counter of views or downloads drawn as bare numbers.
+    // Only the like, the action and the «⋯» menu: no counters drawn as bare numbers.
     expect(screen.getAllByRole('button')).toHaveLength(3);
-    // On the narrowest card its words are cut rather than pushed out of it; the like is as tall as it on a computer.
+    // Its words are cut rather than pushed out of a narrow card; the like is as tall as it on a computer.
     expect(within(add).getByText('Aggiungi ai miei dossier')).toHaveClass('truncate');
     expect(add).toHaveClass('min-w-0');
     expect(screen.getByRole('button', { name: /Mi piace/ })).toHaveClass('md:min-h-9');
@@ -134,5 +136,34 @@ describe('SharedEnvironmentCard — its shape (S7a)', () => {
     const hued = [...container.querySelectorAll<HTMLElement>('[style]')].map((el) => el.style.backgroundColor);
     expect(hued.length).toBeGreaterThan(0);
     for (const colour of hued) expect(colour).toBe('hsl(var(--category-penal))');
+  });
+});
+
+// How many added a dossier stays on its card, small, beside the like; the views are its author's alone (Bill, S7a).
+describe('SharedEnvironmentCard — who added it, and the views', () => {
+  it('says «aggiunto da N» beside the like, and nothing at 0', () => {
+    const { unmount } = renderCard({ ...base, downloadCount: 12, viewCount: 340 });
+    const line = screen.getByText('aggiunto da 12');
+    expect(line.closest('div')).toContainElement(screen.getByRole('button', { name: /Mi piace/ }));
+    expect(line.parentElement).toHaveClass('text-xs');
+    // Not the views: they are the author's.
+    expect(screen.queryByText(/visualizzazion/)).toBeNull();
+    unmount();
+    renderCard({ ...base, downloadCount: 0, viewCount: 340 });
+    expect(screen.queryByText(/aggiunto da/)).toBeNull();
+  });
+
+  it('shows its author the views, in «I miei pubblicati»', () => {
+    render(
+      <SharedEnvironmentCard
+        environment={{ ...base, isOwner: true, downloadCount: 3, viewCount: 1 }}
+        onLike={vi.fn()}
+        onImport={vi.fn()}
+        onReport={vi.fn()}
+        showOwnerActions
+      />,
+    );
+    expect(screen.getByText('aggiunto da 3')).toBeInTheDocument();
+    expect(screen.getByText('1 visualizzazione')).toBeInTheDocument();
   });
 });

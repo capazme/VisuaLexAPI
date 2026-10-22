@@ -290,10 +290,10 @@ export function SharedEnvironmentCard({
           </ul>
         )}
 
-        {/* At the foot: «Mi piace» as its heart and count, then the card's one action, outlined. How many added a dossier
-            is what the order «Più aggiunti» sorts by and «I più aggiunti» lists, not a third number on every card. */}
+        {/* At the foot: «Mi piace» as its heart and count, how many added it, then the card's one action, outlined. */}
         {/* As tall as the action, on a card without one too (the user's own), so every foot lines up. */}
-        <div className="mt-auto flex min-h-[3.375rem] items-center gap-2 pt-4">
+        {/* Where the card is too narrow for all three, the action goes under them, whole, at the right. */}
+        <div className="mt-auto flex min-h-[3.375rem] flex-wrap items-center gap-x-2 gap-y-2 pt-4">
           <button
             type="button"
             onClick={() => onLike(environment.id)}
@@ -314,20 +314,35 @@ export function SharedEnvironmentCard({
             <Heart size={18} aria-hidden className={environment.userLiked ? 'fill-current' : ''} />
             <span aria-hidden>{environment.likeCount}</span>
           </button>
+          {/* Beside the like, small: how many added it (nothing at 0), and — to its author only, in «I miei
+              pubblicati» — how many viewed it. */}
+          {(environment.downloadCount > 0 || showOwnerActions) && (
+            <p className="min-w-0 text-xs text-slate-600 dark:text-slate-400">
+              {environment.downloadCount > 0 && <span className="whitespace-nowrap">aggiunto da {environment.downloadCount}</span>}
+              {environment.downloadCount > 0 && showOwnerActions && <span aria-hidden> · </span>}
+              {showOwnerActions && (
+                <span className="whitespace-nowrap">
+                  {environment.viewCount === 1 ? '1 visualizzazione' : `${environment.viewCount} visualizzazioni`}
+                </span>
+              )}
+            </p>
+          )}
           {!environment.isOwner && (
             <button
               type="button"
               onClick={() => onImport(environment)}
               aria-label={`Aggiungi «${environment.title}» ai miei dossier`}
               className={cn(
-                'ml-auto inline-flex min-w-0 items-center justify-center gap-1.5 rounded-lg border border-primary-600 px-3 py-2 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-50 dark:border-primary-400 dark:text-primary-300 dark:hover:bg-primary-900/30',
+                'ml-auto inline-flex min-w-0 max-w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-primary-600 px-3 py-2 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-50 dark:border-primary-400 dark:text-primary-300 dark:hover:bg-primary-900/30',
                 TOUCH_TARGET_RESPONSIVE,
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900',
               )}
             >
               <FolderPlus size={16} aria-hidden className="shrink-0" />
-              {/* One line: on the narrowest card (320 px) the words are cut rather than pushed out of it. */}
-              <span className="truncate">Aggiungi ai miei dossier</span>
+              {/* «Aggiungi» on a phone, as the packs' cards say it, the whole words from `sm` (at 320 px they were cut);
+                  the name, the button's label, is whole on every width. */}
+              <span className="truncate sm:hidden">Aggiungi</span>
+              <span className="hidden truncate sm:inline">Aggiungi ai miei dossier</span>
             </button>
           )}
         </div>

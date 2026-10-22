@@ -283,9 +283,18 @@ describe('ForumExploreView - the order of the page', () => {
     scroller.scrollTo = scrollTo as unknown as typeof scroller.scrollTo;
     document.body.append(scroller);
     try {
-      render(<ForumExploreViewIn into={scroller} />);
+      const { unmount } = render(<ForumExploreViewIn into={scroller} />);
       expect(scrollTo).toHaveBeenCalledTimes(1);
       expect(document.activeElement).toBe(document.getElementById('pronti'));
+      // The fragment leaves the address after the jump, the rest of it kept.
+      expect(window.location.hash).toBe('');
+      expect(window.location.pathname).toBe('/forum');
+      // Explore drawn again (another tab and back, a reload): no second jump, no focus taken.
+      unmount();
+      (document.activeElement as HTMLElement | null)?.blur();
+      render(<ForumExploreViewIn into={scroller} />);
+      expect(scrollTo).toHaveBeenCalledTimes(1);
+      expect(document.activeElement).not.toBe(document.getElementById('pronti'));
     } finally {
       scroller.remove();
       window.history.replaceState(null, '', '/');

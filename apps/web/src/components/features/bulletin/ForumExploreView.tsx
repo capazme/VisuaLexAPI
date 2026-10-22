@@ -166,6 +166,9 @@ export function ForumExploreView({
     const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     scroller.scrollTo({ top: Math.max(0, top), behavior: reduce ? 'auto' : 'smooth' });
     strip.focus({ preventScroll: true });
+    // Once: the fragment leaves the address (the router's state kept), so going back to Explore from another tab, or
+    // reloading, neither scrolls to the strip again nor takes the focus.
+    window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}`);
   }, [loading]);
   const skeleton = (count: number) => (
     <div aria-hidden className={GRID}>
