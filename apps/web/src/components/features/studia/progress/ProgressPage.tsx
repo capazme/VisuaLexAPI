@@ -60,7 +60,7 @@ function Summary({ data }: { data: Progressi }) {
           <GoalRing compact giorno={data.oggi.giorno} ripassi={data.oggi.ripassi} obiettivo={data.oggi.obiettivo} raggiunto={data.oggi.raggiunto} />
         </div>
       </div>
-      <LevelBar livello={data.livello} className="lg:max-w-md" />
+      {data.livello && <LevelBar livello={data.livello} className="lg:max-w-md" />}
     </div>
   );
 }

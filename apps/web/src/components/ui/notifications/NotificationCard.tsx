@@ -1,10 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
-import { motion, stagger, useAnimate, type AnimationPlaybackControls, type PanInfo } from 'framer-motion';
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { motion, stagger, useAnimate, useDragControls, type AnimationPlaybackControls, type PanInfo } from 'framer-motion';
 import { AlertCircle, CheckCircle2, Info, X, XCircle } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { ease } from '../../../lib/motion';
 import type { HoldReason } from './countdown';
 import type { NotificationEntry, NotificationType } from './notifications';
+import { createSwipeGuard } from './swipeGuard';
 
 /**
  * The notification drawn from a line (K1a), inspired by Animorio's «notifica dalla riga», written from scratch with
@@ -48,10 +49,7 @@ const ICON_INK: Record<NotificationType, string> = {
 /** The line is the app's ink, red for an error. */
 const LINE_INK = (type: NotificationType) => (type === 'error' ? 'bg-red-600 dark:bg-red-400' : 'bg-primary-600 dark:bg-primary-400');
 
-/** Whether a finger is the pointer: a swipe to the side closes the notification there. */
-const coarsePointer = () => typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
-
-/** How far, or how fast, a swipe has to go to close it; a shorter one goes back to its place. */
+/** How far, or how fast, a swipe (a finger, or the mouse dragging it) has to go to close it; a shorter one goes back. */
 const SWIPE_PX = 80;
 const SWIPE_SPEED = 500;
 
@@ -61,6 +59,8 @@ export interface NotificationCardProps {
   still: boolean;
   /** Alone, outside a stack (a `Toast` where no stack is mounted, as in a component's test): no swipe. */
   standalone?: boolean;
+  /** The newest «Annulla»: the key that runs it, written beside it («Annulla · Ctrl+Z») and declared to assistive tech. */
+  shortcut?: { label: string; keys: string };
   onUndo: () => void;
   onDismiss: () => void;
   onHold: (reason: HoldReason, on: boolean) => void;
@@ -68,9 +68,12 @@ export interface NotificationCardProps {
   onExited: () => void;
 }
 
-export function NotificationCard({ entry, still, standalone = false, onUndo, onDismiss, onHold, onExited }: NotificationCardProps) {
+export function NotificationCard({ entry, still, standalone = false, shortcut, onUndo, onDismiss, onHold, onExited }: NotificationCardProps) {
   const [scope, animate] = useAnimate<HTMLDivElement>();
   const swipedTo = useRef(1);
+  const dragControls = useDragControls();
+  // Whether a click is one: a press that moved the notification is not (`swipeGuard.ts`).
+  const [swipe] = useState(() => createSwipeGuard());
   const timeLine = useRef<AnimationPlaybackControls | null>(null);
   const entrance = useRef<AnimationPlaybackControls | null>(null);
   const exited = useRef(false);
@@ -193,6 +196,12 @@ export function NotificationCard({ entry, still, standalone = false, onUndo, onD
   };
 
   const onPointerDown = (event: ReactPointerEvent) => {
+    swipe.pressed();
+    // A swipe to the side, by a finger or the mouse: the mouse not from a button, which it would press instead. Started
+    // here (`dragListener` off), so framer-motion leaves the words selectable by a double or triple click.
+    if (!closing && !standalone && (event.pointerType !== 'mouse' || !(event.target as Element).closest('button, a'))) {
+      dragControls.start(event);
+    }
     if (event.pointerType !== 'touch') return;
     onHold('touch', true);
     const release = () => {
@@ -204,7 +213,28 @@ export function NotificationCard({ entry, still, standalone = false, onUndo, onD
     window.addEventListener('pointercancel', release);
   };
 
+  // A notification gone in the middle of a swipe gives the page its selection back.
+  useEffect(() => () => {
+    if (swipe.moving) document.body.style.userSelect = '';
+  }, [swipe]);
+
+  const onDragStart = () => {
+    swipe.started();
+    // A press on the words that turned into a swipe leaves no half selection behind, and makes none while it moves.
+    window.getSelection()?.removeAllRanges();
+    document.body.style.userSelect = 'none';
+  };
+  // A press that moved the notification is no click: let go over «Annulla» or ✕, a short swipe springs back and runs
+  // nothing. A key's click (`detail` 0: Enter, Space, a screen reader) is always one.
+  const onClickCapture = (event: ReactMouseEvent) => {
+    if (!swipe.eats(event.detail)) return;
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
   const onDragEnd = (_: unknown, info: PanInfo) => {
+    document.body.style.userSelect = '';
+    swipe.ended();
     if (Math.abs(info.offset.x) < SWIPE_PX && Math.abs(info.velocity.x) < SWIPE_SPEED) return;
     swipedTo.current = info.offset.x < 0 ? -1 : 1;
     handOff(onDismiss, false);
@@ -215,8 +245,13 @@ export function NotificationCard({ entry, still, standalone = false, onUndo, onD
     <motion.div
       ref={scope}
       data-card
-      drag={!closing && !standalone && coarsePointer() ? 'x' : false}
-      // Swiped away, it leaves from where the finger let it go.
+      // A finger or the mouse swipes it away; the drag starts in `onPointerDown`.
+      drag={!closing && !standalone ? 'x' : false}
+      dragListener={false}
+      dragControls={dragControls}
+      onDragStart={onDragStart}
+      onClickCapture={onClickCapture}
+      // Swiped away, it leaves from where the pointer let it go.
       dragSnapToOrigin={!closing}
       dragElastic={0.4}
       onDragEnd={onDragEnd}
@@ -229,6 +264,7 @@ export function NotificationCard({ entry, still, standalone = false, onUndo, onD
       }}
       onPointerDown={onPointerDown}
       onKeyDown={onKeyDown}
+      data-notification-id={entry.id}
       className={cn('relative w-full touch-pan-y', closing && 'pointer-events-none')}
     >
       {/* The line the notification is drawn from, with its two ticks; it sits on the slit's lower edge as it opens. The
@@ -261,6 +297,7 @@ export function NotificationCard({ entry, still, standalone = false, onUndo, onD
               data-word
               onClick={(event) => handOff(onUndo, byKeys(event))}
               disabled={closing}
+              aria-keyshortcuts={shortcut?.keys}
               className={cn(
                 'min-h-[44px] shrink-0 rounded-lg px-3 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/30',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
@@ -268,6 +305,8 @@ export function NotificationCard({ entry, still, standalone = false, onUndo, onD
               )}
             >
               Annulla
+              {/* Seen, not part of the name («Annulla»): `aria-keyshortcuts` says the key. */}
+              {shortcut && <span aria-hidden className="ml-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">· {shortcut.label}</span>}
             </button>
           )}
           {entry.action && (

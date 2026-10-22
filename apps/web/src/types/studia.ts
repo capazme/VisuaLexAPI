@@ -265,11 +265,14 @@ export interface Progressi {
   materie: (ConteggiStati & { materia: Materia; ripassi30: number })[];
   calendario: GiornoAttivita[];
   prossimi: { giorno: string; schede: number }[];
-  /** The level, the missions and the credits this read wrote: the whole day's, never narrowed by `materia`. */
-  livello: XpLivello;
+  /**
+   * The level, the missions and the credits this read wrote: the whole day's, never narrowed by `materia`. Absent
+   * from a server without the points (#253): the page draws no level bar and no mission, and the rest stays.
+   */
+  livello?: XpLivello;
   /** In catalogue order; «convalida» only for a validator. */
-  missioni: MissioneServer[];
-  crediti: XpCredito[];
+  missioni?: MissioneServer[];
+  crediti?: XpCredito[];
 }
 
 /**
