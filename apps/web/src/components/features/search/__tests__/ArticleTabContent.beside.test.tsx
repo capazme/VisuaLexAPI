@@ -101,22 +101,27 @@ afterEach(() => {
 
 /** The desktop row of the toolbar: the one with the notes button. */
 const desktopRow = (container: HTMLElement) => container.querySelector('div.hidden.md\\:flex') as HTMLElement;
-const labels = (row: HTMLElement) => [...row.querySelectorAll('button, a')].map((b) => b.getAttribute('aria-label') ?? b.getAttribute('title'));
+const labels = (row: HTMLElement) => [...row.querySelectorAll('button, a')].map((b) => b.getAttribute('aria-label') ?? b.textContent);
+/** Opens a row's «⋯» (R3) and returns its menu. */
+function openMore(row: HTMLElement) {
+  const trigger = within(row).getByRole('button', { name: 'Altre azioni sull’articolo' });
+  fireEvent.click(trigger);
+  return document.getElementById(trigger.getAttribute('aria-controls')!)!;
+}
+const entries = (menu: HTMLElement) => within(menu).getAllByRole('menuitem').map((item) => item.querySelector('span > span')?.textContent ?? item.textContent);
 
 describe('ArticleTabContent variant="beside" — the compact bar (T12)', () => {
-  it('shows exactly notes, highlights, discussions, the magnifier and copy, and no «⋯»', () => {
+  it('shows exactly notes and highlights in words, and behind «⋯» discussions, the find window and copy', () => {
     const { container } = show('beside');
-    expect(labels(desktopRow(container))).toEqual(['Apri note', 'Gestisci evidenziazioni', 'Glosse sull’articolo', 'Cerca nel testo', 'Copia']);
-    expect(screen.queryByTitle('Altre azioni')).not.toBeInTheDocument();
+    expect(labels(desktopRow(container))).toEqual(['Note', 'Evidenziazioni', 'Altre azioni sull’articolo']);
+    expect(entries(openMore(desktopRow(container)))).toEqual(['Glosse sull’articolo', 'Cerca nel testo', 'Copia']);
   });
 
-  it('the magnifier opens the find window on that text, scoped to the window\'s practice', async () => {
+  it('«Cerca nel testo» opens the find window on that text, scoped to the window\'s practice', async () => {
     const { container } = show('beside');
-    const magnifier = () => within(desktopRow(container)).getByRole('button', { name: 'Cerca nel testo' });
-    expect(magnifier()).toHaveAttribute('aria-pressed', 'false');
-    fireEvent.click(magnifier());
+    fireEvent.click(within(openMore(desktopRow(container))).getByRole('menuitem', { name: 'Cerca nel testo' }));
     expect(screen.getByRole('search')).toBeInTheDocument();
-    expect(magnifier()).toHaveAttribute('aria-pressed', 'true');
+    expect(entries(openMore(desktopRow(container)))).toContain('Chiudi la ricerca nel testo');
     expect(screen.getByRole('button', { name: 'Questa pratica' })).toHaveAttribute('aria-pressed', 'true');
     // Registered under the practice, not under the window's own id.
     expect(findRootsFor(PRACTICE)).toHaveLength(1);
@@ -125,8 +130,8 @@ describe('ArticleTabContent variant="beside" — the compact bar (T12)', () => {
 
   it('a past text keeps the rules of describeVersion: discussions off', () => {
     const past: ArticleValidity = { state: 'historical', valid_from: '2003-12-25', valid_to: '2007-12-29', version_number: 3, act_updated: null, request_in_window: true };
-    show('beside', article({ validity: past, norma_data: { ...NORMA, data_versione: '2005-06-01', versione: 'originale' } }));
-    for (const button of screen.getAllByTitle(/Glosse sull’articolo — /)) expect(button).toBeDisabled();
+    const { container } = show('beside', article({ validity: past, norma_data: { ...NORMA, data_versione: '2005-06-01', versione: 'originale' } }));
+    expect(within(openMore(desktopRow(container))).getByRole('menuitem', { name: /^Glosse sull’articolo/ })).toBeDisabled();
   });
 });
 
@@ -161,8 +166,11 @@ describe('ArticleTabContent variant="row" — everything as today', () => {
     devMode.mockReturnValue(true);
     const { container } = show('row', article(), vi.fn());
     const desktop = labels(desktopRow(container));
-    expect(desktop).toEqual(expect.arrayContaining(['Aggiungi a norme rapide', 'Apri note', 'Aggiungi a dossier', 'Altre azioni']));
-    expect(screen.getByTitle('Modalità studio')).toBeInTheDocument();
+    expect(desktop).toEqual(expect.arrayContaining(['Note', 'Al dossier', 'Altre azioni sull’articolo']));
+    expect(entries(openMore(desktopRow(container)))).toEqual(expect.arrayContaining(['Aggiungi alle norme rapide', 'Esporta…', 'Testo alla data…']));
+    // Study Mode: the act's «Studio» on a computer; the phone's «⋯» has it too.
+    const phone = container.querySelector('div.flex.md\\:hidden') as HTMLElement;
+    expect(entries(openMore(phone))).toContain('Modalità studio');
     await waitFor(() => expect(screen.getByText(/scheda su questo articolo/i)).toBeInTheDocument());
     expect(screen.getByText(/Chiedi su questo articolo/)).toBeInTheDocument();
     expect(screen.getByTestId('slot-article_sidebar')).toBeInTheDocument();
@@ -199,7 +207,7 @@ describe('ArticleTabContent variant="beside" — root rule 23, with the find win
     async (_id, raw) => {
       const plain = raw.replace(/\n/g, '');
       const { container, unmount } = show('beside', article({ article_text: raw }));
-      fireEvent.click(within(desktopRow(container)).getByRole('button', { name: 'Cerca nel testo' }));
+      fireEvent.click(within(openMore(desktopRow(container))).getByRole('menuitem', { name: 'Cerca nel testo' }));
       fireEvent.change(screen.getByRole('searchbox', { name: 'Cerca nel testo' }), { target: { value: wordOf(plain) } });
       await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/^1 di \d+$/));
       const [root] = findRootsFor(PRACTICE);

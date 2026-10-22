@@ -144,7 +144,7 @@ describe('VersionBanner — an article that will change (V1, G-355)', () => {
         expect(show(TODAY, undated, { change: 'amended', valid_from: '2027-08-08', version_number: null }).chip?.label).toBe("Cambia dall'8 agosto 2027");
         const chip = show(TODAY, undated, later('abrogated')).chip!;
         expect(chip).toMatchObject({ tone: 'upcoming', label: 'Abrogato dal 1° gennaio 2027' });
-        expect(chip.title).toContain('In vigore dal 01-07-1986');
+        expect(chip.title).toContain('In vigore dal 1° luglio 1986');
         expect(chip.title).toContain('è abrogato');
     });
 

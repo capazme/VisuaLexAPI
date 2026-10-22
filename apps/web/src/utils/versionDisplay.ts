@@ -1,5 +1,5 @@
 import type { ArticleData, ArticleUpcoming, ArticleValidity, NormaVisitata, SearchParams, ValidityState } from '../types';
-import { addDaysToIsoDate, formatDateDashed, formatDateForCitation, formatDateForDisplay, parseItalianDate, todayInRome, withPreposition } from './dateUtils';
+import { addDaysToIsoDate, formatDateForCitation, formatDateForDisplay, parseItalianDate, todayInRome, withPreposition } from './dateUtils';
 
 /**
  * What a reader is told about the version of the text on screen.
@@ -159,21 +159,22 @@ export interface VersionDisplay {
 }
 
 function chipFor(validity: ArticleValidity): VersionChip {
-  const from = validity.valid_from ? formatDateDashed(validity.valid_from) : '';
-  const to = validity.valid_to ? formatDateDashed(validity.valid_to) : '';
+  // The days in full, as a lawyer writes them (R3): «dal 1° gennaio 2005», «dall'8 agosto».
+  const from = validity.valid_from ? withPreposition('dal', formatDateForCitation(validity.valid_from)) : '';
+  const to = validity.valid_to ? withPreposition('al', formatDateForCitation(validity.valid_to)) : '';
   const version = validity.version_number ? ` Versione n. ${validity.version_number}.` : '';
   const title = `${SOURCE_NOTE}${version}`;
   switch (validity.state) {
     case 'current':
-      return { tone: 'current', label: from ? `In vigore dal ${from}` : 'In vigore', title };
+      return { tone: 'current', label: from ? `In vigore ${from}` : 'In vigore', title };
     case 'historical':
       return {
         tone: 'historical',
-        label: `Testo storico${from || to ? ' ·' : ''}${from ? ` dal ${from}` : ''}${to ? ` al ${to}` : ''}`,
+        label: `Testo storico${from || to ? ' ·' : ''}${from ? ` ${from}` : ''}${to ? ` ${to}` : ''}`,
         title,
       };
     case 'abrogated':
-      return { tone: 'abrogated', label: from ? `Abrogato dal ${from}` : 'Abrogato', title };
+      return { tone: 'abrogated', label: from ? `Abrogato ${from}` : 'Abrogato', title };
     case 'not_yet':
       return { tone: 'not_yet', label: 'Non ancora esistente', title };
   }

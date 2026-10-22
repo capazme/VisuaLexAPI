@@ -59,7 +59,7 @@ export function MerltHubPage() {
   return (
     <PageFrame
       title={ASSISTANT_PAGE}
-      // L-37: Academia's phrase is still to be chosen; the line comes with it (`SECTION_PHRASES`).
+      // L-37: «Academia · il laboratorio del diritto» over the page's name.
       kicker="academia"
       line="Il tuo centro per l’intelligenza giuridica MERL-T: fai domande, valida le proposte della community, esplora il grafo e contribuisci con i tuoi appunti."
       section="academia"

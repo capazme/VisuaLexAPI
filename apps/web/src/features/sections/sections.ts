@@ -32,6 +32,8 @@ export const SECTION_PHRASES = {
   gymnasium: 'la tua palestra giuridica',
   opus: 'la tua officina giuridica',
   forum: 'il luogo del dibattito giuridico',
+  // Bill and the owner's choice for S7b, 22 October 2026.
+  academia: 'il laboratorio del diritto',
 } as const satisfies Partial<Record<SectionId, string>>;
 
 /** A section with a phrase. */
@@ -44,8 +46,8 @@ export function sectionKicker(id: PhrasedSection): string {
 }
 
 /**
- * The line over a page of any section, or nothing for a section with no phrase yet (Academia): its pages already pass
- * their `kicker`, so the line appears as soon as its phrase is written above.
+ * The line over a page of any section, or nothing for a section with no phrase yet (a new one): its pages pass their
+ * `kicker` all the same, and the line appears as soon as its phrase is written above.
  */
 export function kickerOf(id: SectionId): string | null {
   return id in SECTION_PHRASES ? sectionKicker(id as PhrasedSection) : null;

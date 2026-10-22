@@ -69,20 +69,20 @@ describe('PageFrame (W2)', () => {
       gymnasium: 'la tua palestra giuridica',
       opus: 'la tua officina giuridica',
       forum: 'il luogo del dibattito giuridico',
+      academia: 'il laboratorio del diritto',
     });
     expect(sectionKicker('opus')).toBe('Opus · la tua officina giuridica');
     expect(sectionKicker('forum')).toBe('Forum · il luogo del dibattito giuridico');
   });
 
-  it('draws no line for a section with no phrase yet, so Academia\'s pages get theirs once it is written', () => {
+  it('draws Academia\'s line over «Assistente» and «Grafo», its phrase chosen (S7b)', () => {
     render(
       <PageFrame title="Assistente" kicker="academia">
         <p>corpo</p>
       </PageFrame>,
     );
-    expect(kickerOf('academia')).toBeNull();
-    expect(screen.queryByText(/Academia · /)).toBeNull();
-    expect(screen.getByRole('heading', { level: 1, name: 'Assistente' })).not.toHaveAttribute('aria-describedby');
+    expect(kickerOf('academia')).toBe('Academia · il laboratorio del diritto');
+    expect(screen.getByRole('heading', { level: 1, name: 'Assistente' })).toHaveAccessibleDescription('Academia · il laboratorio del diritto');
   });
 
   it('marks a section\'s home title for the section switcher\'s focus, and no other', () => {
@@ -112,6 +112,8 @@ describe('PageFrame (W2)', () => {
  */
 const SECTION_PAGES = [
   'components/features/dossier/DossierListView.tsx',
+  // A dossier's own page, in the frame since S7c: its name is the frame's title.
+  'components/features/dossier/DossierDetailView.tsx',
   'components/features/dossier/TrashPage.tsx',
   'components/features/bulletin/BulletinBoardPage.tsx',
   'components/features/bulletin/ForumCommunityPage.tsx',
@@ -143,13 +145,16 @@ describe('the section pages (W2)', () => {
 
 /**
  * The pages' names in one list (L-37): the phone's bar and the titles of Gymnasium's views, Opus's, the dossier list and
- * Academia's two pages read `features/sections/pageNames.ts`; none keeps a list of its own.
+ * the Forum's two pages and Academia's two read `features/sections/pageNames.ts`; none keeps a list of its own or writes
+ * its title by hand.
  */
 describe('the pages\' names (L-37)', () => {
   it.each([
     'components/features/studia/StudiaPage.tsx',
     'components/features/planner/OpusPage.tsx',
     'components/features/dossier/DossierListView.tsx',
+    'components/features/bulletin/BulletinBoardPage.tsx',
+    'components/features/bulletin/ForumCommunityPage.tsx',
     'components/layout/phoneBarTitle.ts',
     'pages/MerltHubPage.tsx',
     'features/merlt/graph/page/GraphExplorerPage.tsx',
@@ -157,5 +162,18 @@ describe('the pages\' names (L-37)', () => {
     const source = readFileSync(resolve(process.cwd(), 'src', file), 'utf8');
     expect(source).toMatch(/from '[./]+(features\/)?(sections\/)?pageNames'/);
     expect(source).not.toMatch(/function pageName\b|const PAGES\b/);
+    // A page that imports the list still takes its title from it, never a word written in its frame.
+    expect(source).not.toMatch(/<PageFrame[^>]*\btitle="/);
+  });
+
+  it.each([
+    ['components/features/bulletin/BulletinBoardPage.tsx', 'PUBLIC_DOSSIERS_PAGE'],
+    ['components/features/bulletin/ForumCommunityPage.tsx', 'COMMUNITY_PAGE'],
+    ['components/features/dossier/DossierListView.tsx', 'DOSSIER_PAGE'],
+    ['pages/MerltHubPage.tsx', 'ASSISTANT_PAGE'],
+    ['features/merlt/graph/page/GraphExplorerPage.tsx', 'GRAPH_PAGE'],
+  ])('%s is titled %s', (file, name) => {
+    const source = readFileSync(resolve(process.cwd(), 'src', file), 'utf8');
+    expect(source).toContain(`title={${name}}`);
   });
 });

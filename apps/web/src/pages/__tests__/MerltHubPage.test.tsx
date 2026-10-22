@@ -146,6 +146,11 @@ describe('MerltHubPage', () => {
     expect(screen.queryByTestId('hub-card-graph')).not.toBeInTheDocument();
   });
 
+  it('says Academia\'s line over its name (L-37)', () => {
+    renderHub();
+    expect(screen.getByRole('heading', { level: 1, name: 'Assistente' })).toHaveAccessibleDescription('Academia · il laboratorio del diritto');
+  });
+
   it('does not show the stale "(presto)" copy in the header', () => {
     renderHub();
     expect(screen.queryByText(/\(presto\)/)).not.toBeInTheDocument();

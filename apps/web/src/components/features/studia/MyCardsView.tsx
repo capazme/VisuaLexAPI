@@ -84,7 +84,9 @@ function useCardDetail(card: Scheda): { card: Scheda; failed: boolean; retry: ()
  */
 function NoCardsYet({ sources, onNew }: { sources: boolean | undefined; onNew: () => void }) {
   const search = (
-    <Link to="/" className={cn('font-medium underline underline-offset-2', FOCUS_RING)}>
+    // In a sentence: 44 px to a finger by its padding, taken back by its margins so no line moves (G8b), as the
+    // notes' link in a dossier.
+    <Link to="/" className={cn('-my-3 inline-block py-3 font-medium underline underline-offset-2', FOCUS_RING)}>
       Ricerca
     </Link>
   );

@@ -22,9 +22,13 @@ export function isUndoShortcut(event: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'm
   return mac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
 }
 
-/** Where the key undoes typing: a field, a list to choose from, an editor, anything editable. */
+/**
+ * Where the key undoes typing: a field, a list to choose from, an editor, anything editable — and an element that
+ * stands for a field (`data-text-field`: the search page's field, a button that opens the search menu with what is
+ * typed on it).
+ */
 export function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   if (target.isContentEditable) return true;
-  return target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [role="combobox"]') !== null;
+  return target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [role="combobox"], [data-text-field]') !== null;
 }

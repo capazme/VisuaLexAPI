@@ -83,7 +83,8 @@ export function PracticeBar({ onHeightChange }: { onHeightChange?: (height: numb
 
   return (
     <>
-      <div ref={setBarNode} id="tour-practice-bar" className={cn('fixed bottom-6 left-1/2 -translate-x-1/2', Z_INDEX.dock)}>
+      {/* At the bottom left of the column, beside the sidebar, not over the middle of the text (R3). */}
+      <div ref={setBarNode} id="tour-practice-bar" className={cn('fixed bottom-6 left-[calc(var(--sidebar-width,0px)+1.5rem)]', Z_INDEX.dock)}>
         {!isExpanded ? (
           <button
             type="button"
@@ -103,8 +104,8 @@ export function PracticeBar({ onHeightChange }: { onHeightChange?: (height: numb
             <div className="flex items-center justify-between gap-4 rounded-t-2xl border-b border-slate-200/60 bg-slate-50/50 px-4 py-2 dark:border-slate-800 dark:bg-slate-900/50">
               <div className="flex items-center gap-2">
                 <Layers size={14} aria-hidden className="text-primary-500" />
-                <span className="text-xs font-bold uppercase tracking-widest text-slate-600 dark:text-slate-400">Pratiche</span>
-                <span className="rounded-md bg-primary-100 px-1.5 py-0.5 text-xs font-bold text-primary-700 dark:bg-primary-900/50 dark:text-primary-300">
+                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Pratiche</span>
+                <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                   {ids.length}
                 </span>
               </div>
@@ -136,7 +137,7 @@ export function PracticeBar({ onHeightChange }: { onHeightChange?: (height: numb
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={ids} strategy={horizontalListSortingStrategy}>
                 {/* Wraps rather than scrolls: a scrolling row would clip the chips' menus. */}
-                <div className="flex max-w-[90vw] flex-wrap gap-2 p-3">
+                <div className="flex max-w-[calc(100vw-var(--sidebar-width,0px)-3rem)] flex-wrap gap-2 p-3">
                   {ids.map((id) => (
                     <PracticeChip
                       key={id}

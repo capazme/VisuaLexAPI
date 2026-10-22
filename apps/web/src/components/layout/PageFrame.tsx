@@ -49,7 +49,7 @@ export function PageFrame({ title, kicker, line, action, actionBeside = false, s
   // The title says only the page's name («Oggi» in Opus and in Gymnasium): the line over it describes it, so the focus
   // the section switcher puts on the title also says which section it is in.
   const kickerId = useId();
-  // A section with no phrase yet (Academia) draws no line, and the title describes nothing.
+  // A section with no phrase yet draws no line, and the title describes nothing.
   const kickerText = kicker ? kickerOf(kicker) : null;
   return (
     <div className={cn('flex w-full min-w-0 flex-col gap-6', className)}>

@@ -163,7 +163,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // actually mounts. Using ref.current in render triggers the
     // react-hooks/refs lint and can miss the post-mount update.
     const [notesButtonEl, setNotesButtonEl] = useState<HTMLButtonElement | null>(null);
-    const [showMoreMenu, setShowMoreMenu] = useState(false);
     const [showCopyModal, setShowCopyModal] = useState(false);
     const [showAdvancedExport, setShowAdvancedExport] = useState(false);
     const [showVersionInput, setShowVersionInput] = useState(false);
@@ -214,7 +213,9 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const findTargetKey = useMemo(() => `${itemKey}|${versionKey(norma_data)}`, [itemKey, norma_data]);
     const findHost = findHostId ?? originTabId ?? tabId;
     useRegisterFindRoot(findHost, findTargetKey, shortNorm(norma_data), textRootRef);
-    const isFindOpen = useFindWindowScopedTo(findHost, findTargetKey);
+    // Exact (R3): «Cerca nel testo» is a menu entry, and on a practice the window covers with no text pointed at it
+    // points the window here; only on this very text does it say «Chiudi».
+    const isFindOpen = useFindWindowScopedTo(findHost, findTargetKey, true);
     const isSavedArticle = useMemo(
         () => bookmarks.some(bookmark => bookmark.normaKey === itemKey),
         [bookmarks, itemKey],
@@ -799,11 +800,9 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 highlightsButtonRef={setHighlightsButtonEl}
                 highlightsCount={readOnly ? 0 : allPanelHighlights.length}
                 isDiscussionOpen={discussion.open}
-                showMoreMenu={showMoreMenu}
                 onToggleNotes={() => setIsPeekOpen(v => !v)}
                 onToggleHighlightsPeek={() => setIsHighlightsPeekOpen(v => !v)}
                 onToggleDiscussion={discussion.toggle}
-                onToggleMoreMenu={setShowMoreMenu}
                 isPinnedQuick={isPinnedQuick}
                 onToggleQuickNorm={handleToggleQuickNorm}
                 onMobileCopy={handleMobileCopy}

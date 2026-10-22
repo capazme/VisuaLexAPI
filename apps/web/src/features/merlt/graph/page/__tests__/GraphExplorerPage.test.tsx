@@ -1647,6 +1647,7 @@ describe('GraphExplorerPage', () => {
       const title = screen.getByRole('heading', { level: 1, name: 'Grafo' });
       expect(title).toHaveClass('font-serif');
       expect(title.querySelector('svg')).toBeNull();
+      expect(title).toHaveAccessibleDescription('Academia · il laboratorio del diritto');
       const search = screen.getByPlaceholderText(/cerca un articolo/i);
       expect(search).toHaveClass('min-h-[44px]');
       expect(search.closest('.max-w-md')).toBeNull();

@@ -47,9 +47,18 @@ export function useDossierKind(): DossierKind | null {
   return isStudiaEnabled() ? kind : null;
 }
 
+/**
+ * The section a kind of dossier lives in (S7): the study dossiers in Gymnasium, the work ones in Opus — and every one
+ * in Opus without Gymnasium (`VITE_FEATURE_STUDIA` off), which the user could not reach. The one place that decides
+ * it: the dossier pages' kicker and hue read it.
+ */
+export function sectionOfDossierKind(kind: DossierKind | null | undefined): 'opus' | 'gymnasium' {
+  return kind === 'studio' && isStudiaEnabled() ? 'gymnasium' : 'opus';
+}
+
 /** A dossier opened by its address takes the user to its kind's section (S7). */
 export function showSectionOfDossier(kind: DossierKind | undefined) {
-  if (isStudiaEnabled()) sectionStore.getState().setSection(kind === 'studio' ? 'gymnasium' : 'opus');
+  if (isStudiaEnabled()) sectionStore.getState().setSection(sectionOfDossierKind(kind));
 }
 
 /** The sections this user can enter: Academia with the development mode (S12), Gymnasium with its flag. */

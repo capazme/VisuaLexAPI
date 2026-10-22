@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { DossierItem, NormaVisitata } from '../../../types';
 import { actKeyOf, actsSummary, articleLabel, codeName, compareArticles, dossierItemOrder, foldedArticleList, layoutDossier } from './dossierLayout';
+import { countsLine, countsParts } from './dossierLayout';
 
 let n = 0;
 function art(data: Partial<NormaVisitata> & { numero_articolo: string }, actCitation?: string | null): DossierItem {
@@ -221,5 +222,17 @@ describe('every kind of item at once', () => {
     const order = dossierItemOrder(items, layout, [layout.acts[0].key]);
     expect(order).toHaveLength(items.length);
     expect(new Set(order)).toEqual(new Set(items.map((i) => i.id)));
+  });
+});
+
+// What a dossier holds, in one line (S7c): the list's card and the page say it alike.
+describe('countsLine', () => {
+  it('says the acts and their articles always, the notes and the decisions when there are some', () => {
+    const norm = (id: string, article: string) => ({ id, type: 'norma' as const, addedAt: '', data: { tipo_atto: 'legge', numero_atto: '241', data: '1990-08-07', numero_articolo: article } });
+    const note = (id: string) => ({ id, type: 'note' as const, addedAt: '', data: 'x' });
+    const decision: DossierItem = { id: 's', type: 'sentenza', addedAt: '', data: { corte: 'corte_costituzionale', numero: 1, anno: 2014, etichetta: 'x' } };
+    expect(countsLine([norm('a', '1'), norm('b', '2')])).toBe('1 atto · 2 articoli');
+    expect(countsParts([norm('a', '1'), note('n'), note('m'), decision])).toEqual(['1 atto', '1 articolo', '2 note', '1 sentenza']);
+    expect(countsLine([])).toBe('0 atti · 0 articoli');
   });
 });
