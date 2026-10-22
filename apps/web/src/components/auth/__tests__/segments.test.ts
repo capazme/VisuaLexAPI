@@ -2,16 +2,25 @@ import { describe, expect, it } from 'vitest';
 import { cellAt, cellLines, isWebKit, LETTERS, MELT_AT, DONE_AT, TIMING, TOTAL_MS, WORD, WRONG } from '../segments';
 
 describe('segments — «VISUALEX» on a seven-segment display (A2)', () => {
-  it('has a letter for every cell, and the hard ones as the brief says: V a U, X an H', () => {
+  it('has a letter for every cell, and the hard ones: X an H', () => {
     expect([...WORD].every((letter) => LETTERS[letter]?.length)).toBe(true);
-    expect(LETTERS.V).toEqual(LETTERS.U);
     expect([...LETTERS.X].sort()).toEqual(['b', 'c', 'e', 'f', 'g']);
   });
 
-  it('draws the V\'s cell narrower than the U\'s, so the two are told apart', () => {
-    // The cell's width, read on its bottom segment (which both letters light).
-    const width = (i: number) => cellLines(i).d.x2 - cellLines(i).d.x1;
-    expect(width(0)).toBeLessThan(width(3));
+  it('draws the V as a V, never «11»: its two lower strokes converge to the bottom\'s middle, with no bottom bar', () => {
+    expect([...LETTERS.V].sort()).toEqual(['b', 'c', 'e', 'f']);
+    const v = cellLines(0);
+    const middle = (v.a.x1 + v.a.x2) / 2;
+    // Each lower stroke leans in: from the cell's side at the middle height to near the middle at the bottom.
+    expect(v.e.x2).toBeGreaterThan(v.e.x1);
+    expect(v.c.x2).toBeLessThan(v.c.x1);
+    expect(Math.abs(v.e.x2 - middle)).toBeLessThan(1);
+    expect(Math.abs(v.c.x2 - middle)).toBeLessThan(1);
+    expect(v.e.y2).toBe(v.d.y1);
+    // The U beside it keeps its upright sides and its bottom bar: the two are told apart.
+    const u = cellLines(3);
+    expect(u.e.x2).toBe(u.e.x1);
+    expect(LETTERS.U).toContain('d');
   });
 
   it('passes each cell through one wrong drawing, never its own letter, then stops on its letter', () => {

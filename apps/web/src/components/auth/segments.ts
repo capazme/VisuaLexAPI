@@ -17,10 +17,11 @@ export const SEGMENTS: readonly Segment[] = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
 export const WORD = 'VISUALEX';
 
 /**
- * The letters, as a seven-segment display can write them. The hard ones: V as a narrow U (`narrow` below), X as an H.
+ * The letters, as a seven-segment display can write them. The hard ones: V with its two lower strokes converging to the
+ * bottom's middle (`cellLines`) and no bottom bar — a narrow U read «11» beside the I (Bill, 22 Oct 2026) —, X as an H.
  */
 export const LETTERS: Record<string, readonly Segment[]> = {
-  V: ['b', 'c', 'd', 'e', 'f'],
+  V: ['b', 'c', 'e', 'f'],
   I: ['b', 'c'],
   S: ['a', 'f', 'g', 'c', 'd'],
   U: ['b', 'c', 'd', 'e', 'f'],
@@ -30,8 +31,6 @@ export const LETTERS: Record<string, readonly Segment[]> = {
   X: ['b', 'c', 'e', 'f', 'g'],
 };
 
-/** The cells drawn narrower: the V, so it is not read as the U beside it. */
-export const NARROW = new Set([0]);
 
 /**
  * The one wrong drawing each cell passes through before its letter (a digit or another letter the display can
@@ -96,11 +95,13 @@ export const PAD = 3;
 export const VIEW_W = PAD * 2 + WORD.length * CELL_W + (WORD.length - 1) * GAP;
 export const VIEW_H = PAD * 2 + CELL_H;
 
-/** The seven segments of cell `index` as lines (their ends stopping short of the corners, as on a display). */
+/**
+ * The seven segments of cell `index` as lines (their ends stopping short of the corners, as on a display). In the V's
+ * cell the two lower strokes (`e`, `c`) lean in and almost meet at the bottom's middle: the V's point.
+ */
 export function cellLines(index: number): Record<Segment, SegmentLine> {
-  const inset = NARROW.has(index) ? 2.5 : 0;
-  const x0 = PAD + index * (CELL_W + GAP) + inset;
-  const w = CELL_W - inset * 2;
+  const x0 = PAD + index * (CELL_W + GAP);
+  const w = CELL_W;
   const y0 = PAD;
   const half = CELL_H / 2;
   const m = 1.6; // the gap at each joint
@@ -112,8 +113,17 @@ export function cellLines(index: number): Record<Segment, SegmentLine> {
     e: { x1: x0, y1: y0 + half + m, x2: x0, y2: y0 + CELL_H - m },
     f: { x1: x0, y1: y0 + m, x2: x0, y2: y0 + half - m },
     g: { x1: x0 + m, y1: y0 + half, x2: x0 + w - m, y2: y0 + half },
+    ...(WORD[index] === 'V'
+      ? {
+        e: { x1: x0, y1: y0 + half + m, x2: x0 + w / 2 - V_GAP, y2: y0 + CELL_H },
+        c: { x1: x0 + w, y1: y0 + half + m, x2: x0 + w / 2 + V_GAP, y2: y0 + CELL_H },
+      }
+      : {}),
   };
 }
+
+/** Half the gap left at the V's point, so the two strokes read as a display's segments, not one stroke. */
+const V_GAP = 0.8;
 
 /**
  * WebKit, where the fusion filter is redrawn on the CPU at every frame while its blur changes (A2's fallback: the melt

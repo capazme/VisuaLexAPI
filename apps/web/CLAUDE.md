@@ -92,7 +92,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (between 768 and 1023 px the column beside the card is about 200 px).
   **The wordmark** (A2, `SegmentWordmark` over the pure `segments.ts`; inspired by Animorio's «logo dai sette segmenti»,
   written from scratch with SVG, an SVG filter and Framer Motion): once per opening, «VISUALEX» on eight seven-segment
-  cells slanted by 7° (V a narrow U, X an H) lights up in steps, each cell through one wrong drawing to its letter
+  cells slanted by 7° (V with its two lower strokes converging to the bottom's middle and no bottom bar — a narrow U
+  read «11» beside the I —, X an H) lights up in steps, each cell through one wrong drawing to its letter
   (0.9 s), holds (0.4 s), and melts into the real wordmark — the segments round and join (`feGaussianBlur` cut by
   `feColorMatrix`, the blur back to 0 before the filter goes), the Newsreader copy takes its weight from 300, the slant
   goes back to nothing (0.8 s) —, then the open book fades in (2.1 s and the book's 0.3 s in all). The `h1` is
