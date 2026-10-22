@@ -1384,6 +1384,27 @@ asked for (`request_in_window` false) is shown with a warning and is not cited,
 copied, exported or saved (`copyBlockedReason` says why); the update notes of a
 past text are open by default and can be closed (the `updatesOpenByDefault` option
 of `useArticleTextInteractions`).
+**An article that will change says so** (V1, G-355): Normattiva, asked with no date, may answer with a later text
+already published (art. 3 d.P.R. 131/1986, read on 21 October 2026, repealed from 1 January 2027); the server serves today's text instead, its
+`valid_to` the day before, and adds `ArticleData.upcoming` (`change`: `abrogated` or `amended`, `valid_from`).
+`describeVersion(validity, request, upcoming)` then gives the banner `upcoming` («Dal 1° gennaio 2027 questo articolo
+è abrogato.» / «… cambia.», «Qui leggi il testo in vigore oggi, dal …» with today's window when the source gave it;
+the date through `withPreposition` and
+`formatDateForCitation`, `CalendarClock`, the sky tone of `current_in_window`, `role="status"`) and the chip says what the
+banner says, the day in full as the banner writes it — «Abrogato dal 1° gennaio 2027», «Cambia dall'8 agosto 2027» —
+in the same tone, today's window in its title — only on the text in force asked with no date, and
+with nothing else switched off: today's text is cited, copied and annotated as before. `upcoming` without
+`validity` (today's page unread, the article read at today) still says it, its chip with no window in the title. A
+practice keeps its articles in the browser and never reads them again: past the day (`todayInRome`, the fourth
+argument, which the tests give), the same answer says «… è abrogato.» / «… è cambiato.», «Qui leggi il testo in vigore
+fino al 31 dicembre 2026: non è più il testo attuale.», the chip «Abrogato dal …» / «Cambiato dal …», and a copy cites
+it with its window («nel testo in vigore dal … al 31 dicembre 2026», `VersionDisplay.citeAs`, which every caller of
+`formatNormCitation` reads first), never as the text in force. Only `abrogated` and `amended` are read, with an ISO
+day: any other `change` (G-357 adds more) or none says nothing, and neither does a text the source puts in force
+after today — it is never «in vigore oggi». Every surface that draws the
+banner passes `upcoming` (the reader, the dossier reader, Gymnasium's article, the comparison, where it stands above
+its column and the article is still compared). It only informs: «Vedi il testo dal …» waits for the server to serve
+the later text (G-357).
 
 **«Confronta articoli»** (`features/compare/CompareView`, spec `docs/superpowers/specs/2026-10-13-compare-articles-design.md`):
 a full-screen overlay (`data-find-overlay`) over two articles chosen from the practices, a search or the history. The
@@ -1824,7 +1845,7 @@ Duplicating any of these is a defect, not a shortcut.
   puts a spelled-out date after "il", "del", "dal", "al" or "nel"),
   `addDaysToIsoDate`, and `todayInRome` (the day the server compares a
   `version_date` with; the browser's own day can differ).
-- `utils/versionDisplay.ts` — `describeVersion(validity, request)` (chip, banner,
+- `utils/versionDisplay.ts` — `describeVersion(validity, request, upcoming?, today?)` (chip, banner,
   what is shown and what is off: `readOnly`, `textVisible`,
   `canCite`, `canCopyOrSave` with its reason `copyBlockedReason`,
   `updateNotesOpen`), `versionKey` (which text a request asks for, as one string),

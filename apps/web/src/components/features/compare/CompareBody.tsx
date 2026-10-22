@@ -79,8 +79,10 @@ export function CompareBody({ left, right, onRemove }: CompareBodyProps) {
     const display = describeVersion(article.validity, {
       versione: article.norma_data.versione,
       data_versione: article.norma_data.data_versione,
-    });
-    return !display.canCite && display.banner ? [{ side, banner: display.banner, hidden: !display.textVisible }] : [];
+    }, article.upcoming);
+    // An article that will change says so too (V1), above its column; it is still compared.
+    const says = !display.canCite || display.banner?.kind === 'upcoming';
+    return says && display.banner ? [{ side, banner: display.banner, hidden: !display.textVisible }] : [];
   });
   // An article that did not exist yet has no text to read (the reader hides it): nothing is compared.
   const nothingToCompare = warnings.some((w) => w.hidden);
