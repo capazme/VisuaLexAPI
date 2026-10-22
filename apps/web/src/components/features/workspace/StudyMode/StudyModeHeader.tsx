@@ -205,7 +205,7 @@ export function StudyModeHeader({
                   onClick={() => onThemeChange('dark')}
                   className={cn(
                     "p-1 rounded-md transition-[color,background-color,border-color,box-shadow]",
-                    theme === 'dark' ? 'bg-slate-700 shadow-sm text-blue-400' : 'text-slate-400 hover:text-slate-500'
+                    theme === 'dark' ? 'bg-slate-700 shadow-sm text-primary-400' : 'text-slate-400 hover:text-slate-500'
                   )}
                   title="Tema scuro (3)"
                 >

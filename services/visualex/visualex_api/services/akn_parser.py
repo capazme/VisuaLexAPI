@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 import structlog
 from lxml import etree
 
-from ..tools.article_suffixes import ARTICLE_SUFFIX_ALTERNATION
+from ..tools.article_suffixes import ARTICLE_ORDINAL_SUFFIXES, ARTICLE_SUFFIX_ALTERNATION
 
 log = structlog.get_logger()
 
@@ -51,10 +51,21 @@ _AGGIORNAMENTO_MARKER = "-----------"
 #                               parenthesised block of its own, right after the
 #                               repeated "Art. N." line.
 #
-# Measured over the committed fixtures: 3248/3249 for the codice civile,
-# 995/995 for the codice penale, 50/51 for L. 241/1990, 104/109 for
-# D.Lgs. 231/2001. The Costituzione yields 0, which is correct — its articles
-# have no rubriche.
+# A third shape, in component acts only: a rubrica an amendment rewrote has lost
+# its brackets ("Art. 45." / "Domicilio dei coniugi, del minore e
+# dell'interdetto." / body). Nothing in the markup tells it from the first line
+# of the body, so it is read only where the part writes its rubriche in brackets
+# (`_unbracketed_rubrica`, from `rubriche()`), never in an act whose rubriche are
+# headings or that has none (the Costituzione).
+#
+# Measured on the codice civile's export of 21 October 2026: 3039 of its 3249
+# articles (2840 in brackets, 199 without), 159 repealed, and 51 with no
+# rubrica: notices («ARTICOLO NON PIU' PREVISTO…», «… ha disposto …») and
+# articles whose text starts at once (artt. 147, 148, 155). The codice di
+# procedura civile's of the same day: 928 of 1056 (922 before), 101 repealed.
+# Over the committed fixtures: 995/995 for the codice penale, 50/51 for L.
+# 241/1990, 104/109 for D.Lgs. 231/2001; the Costituzione yields 0, which is
+# correct — its articles have no rubriche.
 
 # Everything after "Art." on the heading line. What of it belongs to the article
 # id and what is the rubrica cannot be decided by pattern: "Art. 2409 bis" is an
@@ -65,6 +76,24 @@ _RUBRICA_FROM_HEADING = re.compile(r"^#+\s*Art\.?\s*(.+)$")
 # "(Potere discrezionale del giudice nell'applicazione della pena: limiti) Nei
 # limiti stabiliti dalla legge…" (art. 132 c.p.).
 _RUBRICA_LEADING_PAREN = re.compile(r"^\((.{3,200}?)\)", re.S)
+
+# What the unbracketed shape is never: a notice in the rubrica's place («Il D.Lgs.
+# … ha disposto …», «ARTICOLO NON PIU' PREVISTO …», an abrogation), the article
+# number repeated in another spelling («Art. 2545-quinquiesdecies» under the key
+# 2545-quindecies), or a separator line. Note calls at its end («(321)(322)») are
+# not part of it, nor a bare one after its final period («Mutamento del rito. 178.»,
+# art. 473-bis c.p.c.), nor a closing bracket left from the bracketed form it had
+# («Compromesso).», art. 807 c.p.c.).
+_NOT_A_RUBRICA = re.compile(r"\bha disposto\b|abrogat|non pi[uù]'? previsto|^Art\.?\s*\d|^-{3,}", re.I)
+_TRAILING_NOTE_CALLS = re.compile(r"(?:\s*\(\d+\))+\s*\.?$|(?<=\.)\s+\d+\.?$")
+_UNBRACKETED_MAX = 160
+# The repeated "Art. N." line, written as the key would not read it: the other
+# spelling of the ordinal («Art. 2545-quinquiesdecies.» under 2545-quindecies), or
+# the number without its suffix («Art. 1159.» under 1159-bis).
+# One digit, then the rest in one possessive run: `\d+[\w./-]*\.?` let the digits and the
+# class (which holds digits and the dot) split a long number every way («Art. » + 20,000
+# digits + «!»: 7 s). Same strings matched.
+_REPEATED_NUMBER = re.compile(r"Art\.?\s*+\d[\w./-]*+", re.I)
 
 # An abrogated article carries no rubrica because it carries no content. Saying
 # so is more useful than leaving the row blank — the reader cannot otherwise
@@ -155,6 +184,48 @@ def presentable_title(raw: str | None) -> str:
     return _restore_accents(text)
 
 
+def _has_bracketed_rubrica(article_text: str) -> bool:
+    """Whether the article's rubrica is written in brackets after its number (the
+    component acts' form), as opposed to a heading."""
+    blocks = [b.strip() for b in article_text.strip().split("\n") if b.strip()]
+    return any(b.startswith("(") for b in blocks[1:6])
+
+
+def _unbracketed_rubrica(article_text: str | None, key: str) -> str | None:
+    """The rubrica of a component act's article when an amendment wrote it without
+    brackets: the first line after the repeated article number (and a part's title),
+    when a body follows it. Called only for a part that writes its rubriche in
+    brackets (`AknAct.rubriche`), and only for an article `extract_rubrica` found none
+    in: a short sentence of the body would read the same.
+    """
+    if not article_text:
+        return None
+    blocks = [b.strip() for b in article_text.strip().split("\n") if b.strip()]
+    rest = blocks[1:]
+    i = 0
+    while i < min(len(rest), 5):
+        block = rest[i]
+        number = re.sub(r"^Art\.?\s*", "", block).rstrip(".")
+        if _REPEATED_NUMBER.fullmatch(block) or normalize_article_key(number) == key \
+                or (block == block.upper() and len(block) < 90):
+            i += 1
+            continue
+        break
+    if i + 1 >= len(rest):
+        return None                    # no body after it: a notice, or a body alone
+    line, after = rest[i], rest[i + 1]
+    if (line.startswith("(") or len(line) > _UNBRACKETED_MAX or line[-1] in ",;:"
+            or line == line.upper() or _NOT_A_RUBRICA.search(line) or after.startswith("---")):
+        return None
+    line = _TRAILING_NOTE_CALLS.sub("", line)
+    if line.endswith("."):
+        line = line[:-1]
+    if line.endswith(")") and line.count(")") > line.count("("):
+        line = line[:-1]
+    line = " ".join(line.split())
+    return _restore_accents(line) if line else None
+
+
 def extract_rubrica(article_text: str | None, key: str | None = None) -> str | None:
     """The rubrica of a rendered article, or None when it has none.
 
@@ -203,8 +274,8 @@ def extract_rubrica(article_text: str | None, key: str | None = None) -> str | N
                 tail.append(block)
                 continue
             stripped = re.sub(r"^Art\.?\s*", "", block).rstrip(".")
-            if key and normalize_article_key(stripped) == key:
-                continue          # the repeated article number
+            if (key and normalize_article_key(stripped) == key) or _REPEATED_NUMBER.fullmatch(block):
+                continue          # the repeated article number, in whatever spelling
             if block == block.upper() and len(block) < 90:
                 continue          # the part title
             break                 # real body text: there is no rubrica here
@@ -268,6 +339,28 @@ def normalize_article_key(numero_articolo: str) -> str:
     key = re.sub(r"-{2,}", "-", key).strip("-")
     key = re.sub(r"(?<=[a-z])-(\d+)$", r".\1", key)
     return key
+
+
+def comparable_article_key(numero_articolo: str) -> str:
+    """`normalize_article_key`, with an ordinal split in two words joined when the
+    table holds it joined: for comparing two spellings of one article, never as a key
+    that is answered.
+
+    Normattiva writes "135 sex decies" in the tree (and in the AKN export of the
+    codice del consumo), "135sexdecies" in the URN, and a request may use either:
+    "135-sexdecies" was «non presente» against the tree. Both read "135-sexdecies"
+    here. `normalize_article_key` keeps them apart because its keys are what
+    /fetch_rubriche and the fingerprints answer. A pair the table does not hold
+    joined ("135 vicies semel") stays two words.
+    """
+    key = normalize_article_key(numero_articolo)
+    split = _SPLIT_ORDINAL.match(key)
+    if split and split.group(2) + split.group(3) in ARTICLE_ORDINAL_SUFFIXES:
+        return f"{split.group(1)}-{split.group(2)}{split.group(3)}{split.group(4)}"
+    return key
+
+
+_SPLIT_ORDINAL = re.compile(r"^(\d+)-([a-z]+)-([a-z]+)\b(.*)$")
 
 
 # ---------------------------------------------------------------------------
@@ -399,10 +492,21 @@ class ParsedAct:
         matched = self._resolve_part(part) if part else None
         articles = matched.articles if matched else self.articles
         out: dict[str, str] = {}
+        bracketed = 0
         for key, text in articles.items():
             rubrica = extract_rubrica(text, key)
             if rubrica:
                 out[key] = rubrica
+                bracketed += _has_bracketed_rubrica(text)
+        # A part that writes its rubriche in brackets also has some an amendment
+        # rewrote without them; an act that does not (headings, or none at all) never
+        # reads a body line as one.
+        if articles and bracketed * 2 > len(articles):
+            for key, text in articles.items():
+                if key not in out and not is_abrogato(text):
+                    rubrica = _unbracketed_rubrica(text, key)
+                    if rubrica:
+                        out[key] = rubrica
         return out
 
     def abrogati(self, part: str | None = None) -> list[str]:

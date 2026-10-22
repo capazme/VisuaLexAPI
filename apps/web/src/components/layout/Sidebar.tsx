@@ -10,7 +10,7 @@ import { SectionSwitcher } from '../../features/sections/SectionSwitcher';
 import { useSection } from '../../features/sections/useSection';
 import { useEntriesEntrance } from '../../features/sections/useEntriesEntrance';
 import { useAppStore } from '../../store/useAppStore';
-import { focusSearchField } from '../../utils/searchFieldControl';
+import { PALETTE_SHORTCUT, focusSearchField } from '../../utils/searchFieldControl';
 import { useAuth } from '../../hooks/useAuth';
 import { useIsDesktop } from '../../hooks/useIsDesktop';
 import { useForumNotifications } from '../../hooks/useForumNotifications';
@@ -71,9 +71,6 @@ export const SIDEBAR_SMALL_TEXT = 'text-slate-600 dark:text-slate-400';
  * word beside it, and read as faint in dark mode on the owner's pass.
  */
 export const SIDEBAR_TOGGLE_TEXT = 'text-slate-700 dark:text-slate-300';
-
-/** The palette's shortcut as this keyboard writes it. */
-const PALETTE_SHORTCUT = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform) ? '⌘K' : 'Ctrl K';
 
 const menuItemClass = "w-full flex items-center gap-3 px-4 py-2.5 min-h-[44px] md:min-h-0 text-sm focus-visible:outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer";
 
@@ -356,9 +353,10 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
   };
 
   // «Ricerca» is the search page with the cursor in its field, no window over it (the owner, 13 Oct
-  // 2026: «ok come raccomandi»); ⌘K is the palette. The link itself navigates.
+  // 2026: «ok come raccomandi»); the first key typed opens the search menu (R2), as ⌘K does. The link itself
+  // navigates.
   const handleSearchClick = () => {
-    focusSearchField({}, { wait: true });
+    focusSearchField({ focus: true }, { wait: true });
     closeMobile();
   };
 
@@ -587,7 +585,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
               aria-label="Menu utente"
               onKeyDown={onMenuKeyDown}
               style={{ bottom: menuPosition.bottom, left: menuPosition.left, maxHeight: menuPosition.maxHeight > 0 ? menuPosition.maxHeight : undefined }}
-              className={cn("fixed w-56 overflow-y-auto overscroll-contain bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 animate-in fade-in zoom-in-95 duration-150", Z_INDEX.menuPanel)}
+              className={cn("fixed w-56 overflow-y-auto overscroll-contain bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 py-2 animate-in fade-in zoom-in-95 duration-150", Z_INDEX.menuPanel)}
             >
               {/* User Info */}
               <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">

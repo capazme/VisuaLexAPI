@@ -51,7 +51,7 @@ export const WELCOME_STEPS: DriveStep[] = [
         element: '#tour-section-switcher',
         popover: {
             title: 'Le sezioni',
-            description: 'Da questa icona passi da una sezione all\'altra: Opus per il lavoro, Gymnasium per lo studio, il Forum per la comunità. La barra laterale cambia con la sezione.',
+            description: 'Da qui passi da una sezione all\'altra: Opus per il lavoro, Gymnasium per lo studio, il Forum per la comunità. Dove la barra scrive il nome della sezione, il nome riporta alla sua pagina principale e la freccia accanto apre le altre. La barra laterale cambia con la sezione.',
             side: 'right',
             align: 'start',
         }
@@ -88,7 +88,7 @@ export const SEARCH_STEPS: DriveStep[] = [
         element: '#tour-search-field',
         popover: {
             title: 'Cerca una Norma',
-            description: 'Scrivi qui una citazione naturale, come "art. 2043 cc" o "Cass. civ. 10787/2024", e premi Invio: non serve compilare dei campi. Il campo resta sempre in cima alla pagina, e ogni risultato finisce sul tavolo di una pratica.',
+            description: 'Scrivi qui una citazione naturale, come "art. 2043 cc" o "Cass. civ. 10787/2024": il campo si apre nel menu di ricerca, e Invio cerca. Non serve compilare dei campi. Il campo resta sempre in cima alla pagina, e ogni risultato finisce sul tavolo di una pratica.',
             side: 'bottom',
             align: 'center',
         }
@@ -178,7 +178,7 @@ export const DOSSIER_STEPS: DriveStep[] = [
         element: '#tour-dossier-card',
         popover: {
             title: 'Card Dossier',
-            description: 'Ogni card mostra titolo, tag, quante norme e note contiene e l\'ultimo aggiornamento. Clicca per aprire.',
+            description: 'Ogni card mostra titolo, tag, quante norme, note e sentenze contiene e quando l\'hai creato. Clicca per aprire.',
             side: 'right',
             align: 'center',
         }
@@ -266,7 +266,7 @@ export const FORUM_STEPS: DriveStep[] = [
     {
         popover: {
             title: 'Dossier pubblici',
-            description: 'I dossier di studio pubblicati dalla comunità: aggiungili ai tuoi dossier, pubblica i tuoi e suggerisci contenuti agli altri. In cima trovi i dossier di studio pronti di VisuaLex.',
+            description: 'I dossier di studio pubblicati dalla comunità: aggiungili ai tuoi dossier, pubblica i tuoi e suggerisci contenuti agli altri. Dopo i dossier della comunità trovi quelli pronti di VisuaLex.',
             side: 'over',
             align: 'center',
         }

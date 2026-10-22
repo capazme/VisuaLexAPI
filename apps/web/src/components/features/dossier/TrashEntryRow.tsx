@@ -68,7 +68,7 @@ export function TrashEntryRow({ entry, showSource, dossiers, onRestore, onPurge,
             onClick={() => void restore()}
             disabled={busy}
             aria-label={`Ripristina ${title}`}
-            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-slate-300 px-3 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 md:min-h-0 md:py-1.5 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-slate-300 px-3 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 md:min-h-0 md:py-1.5 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
           >
             <RotateCcw size={14} aria-hidden /> Ripristina
           </button>
@@ -100,7 +100,7 @@ export function TrashEntryRow({ entry, showSource, dossiers, onRestore, onPurge,
             type="button"
             onClick={() => void restore(target)}
             disabled={!target || busy}
-            className="min-h-[44px] rounded-lg bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 md:min-h-0 md:py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+            className="min-h-[44px] rounded-lg bg-primary-600 px-3 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50 md:min-h-0 md:py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
           >
             Ripristina qui
           </button>

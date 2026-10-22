@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
-import { Moon, Sun, HelpCircle, Shield, Info, GitBranch, GitCommit, Settings, Type, Palette, Download, Trash2, FlaskConical } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Moon, Sun, HelpCircle, Shield, Info, GitBranch, GitCommit, Settings, Download, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store/useAppStore';
 import { useAuth } from '../../hooks/useAuth';
 import { cn } from '../../lib/utils';
+import { FIELD_TEXT } from '../../constants/interactions';
 import { Modal } from './Modal';
 import { accountService } from '../../services/accountService';
 import { ConnectedAppsSection } from '../../features/connections';
@@ -49,6 +50,28 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
     const [accountMessage, setAccountMessage] = useState<string | null>(null);
     const [deletePassword, setDeletePassword] = useState('');
     const [deleteConfirmation, setDeleteConfirmation] = useState('');
+    // Erasing the account is behind its own button (Y1): the password and the confirmation only once it is asked for.
+    const [deleteOpen, setDeleteOpen] = useState(false);
+    const deleteOpener = useRef<HTMLButtonElement>(null);
+    const closeDelete = () => {
+        setDeleteOpen(false);
+        setDeletePassword('');
+        setDeleteConfirmation('');
+        setAccountMessage(null);
+        deleteOpener.current?.focus();
+    };
+    // The dialog stays mounted (`Layout`): closed, it forgets a deletion begun and its password, during render (no
+    // effect), so it opens again with «Elimina l’account…» closed.
+    const [wasOpen, setWasOpen] = useState(isOpen);
+    if (wasOpen !== isOpen) {
+        setWasOpen(isOpen);
+        if (!isOpen) {
+            setDeleteOpen(false);
+            setDeletePassword('');
+            setDeleteConfirmation('');
+            setAccountMessage(null);
+        }
+    }
     const [devModeBusy, setDevModeBusy] = useState(false);
     const [devModeError, setDevModeError] = useState(false);
 
@@ -141,7 +164,7 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
     };
 
     const FONT_SIZE_OPTIONS: Array<{ value: 'small' | 'medium' | 'large' | 'xlarge'; label: string; sizeClass: string }> = [
-        { value: 'small', label: 'Piccolo', sizeClass: 'text-[10px]' },
+        { value: 'small', label: 'Piccolo', sizeClass: 'text-[11px]' },
         { value: 'medium', label: 'Medio', sizeClass: 'text-xs' },
         { value: 'large', label: 'Grande', sizeClass: 'text-sm' },
         { value: 'xlarge', label: 'Molto grande', sizeClass: 'text-base' },
@@ -164,9 +187,7 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
             <div className="space-y-6">
                 {/* Theme - iOS-style Segmented Control */}
                 <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-1.5">
-                        <Palette size={12} aria-hidden /> Tema
-                    </label>
+                    <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Tema</h3>
                     <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-xl grid grid-cols-2 gap-1">
                         <button
                             onClick={() => updateSettings({ theme: 'light' })}
@@ -197,9 +218,7 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
 
                 {/* Typography */}
                 <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-1.5">
-                        <Type size={12} aria-hidden /> Tipografia
-                    </label>
+                    <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Tipografia</h3>
                     <div className="space-y-3">
                         <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800 p-2 rounded-lg">
                             <span className="text-sm text-slate-600 dark:text-slate-400 px-2">Dimensione</span>
@@ -214,7 +233,7 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                                             "w-8 h-8 flex items-center justify-center rounded font-bold transition-colors",
                                             sizeClass,
                                             settings.fontSize === value
-                                                ? "bg-blue-600 text-white"
+                                                ? "bg-primary-600 text-white"
                                                 : "hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
                                         )}
                                     >
@@ -224,19 +243,21 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                             </div>
                         </div>
 
-                        <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800 p-2 rounded-lg">
-                            <span className="text-sm text-slate-600 dark:text-slate-400 px-2">Font</span>
-                            <div className="flex gap-1" role="group" aria-label="Famiglia font">
+                        {/* Under `sm` the label over its buttons, which share the row in three 44 px thirds (Bill): beside
+                            them the longer label pushed the row past a 320 px window. */}
+                        <div className="flex flex-col gap-2 bg-slate-50 dark:bg-slate-800 p-2 rounded-lg sm:flex-row sm:items-center sm:justify-between">
+                            <span className="text-sm text-slate-600 dark:text-slate-400 px-2">Carattere dell’interfaccia</span>
+                            <div className="grid grid-cols-3 gap-1 sm:flex" role="group" aria-label="Carattere dell’interfaccia">
                                 {FONT_FAMILY_OPTIONS.map(({ value, label, fontClass }) => (
                                     <button
                                         key={value}
                                         onClick={() => updateSettings({ fontFamily: value })}
                                         aria-pressed={settings.fontFamily === value}
                                         className={cn(
-                                            "px-3 py-1.5 rounded text-xs border transition-colors",
+                                            "min-h-[44px] px-3 py-1.5 rounded text-xs border transition-colors sm:min-h-0",
                                             fontClass,
                                             settings.fontFamily === value
-                                                ? "border-blue-500 bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400"
+                                                ? "border-primary-500 bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400"
                                                 : "border-transparent hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
                                         )}
                                     >
@@ -251,19 +272,17 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                 {/* Restart Tour */}
                 {onRestartTour && (
                     <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-1.5">
-                            <HelpCircle size={12} aria-hidden /> Aiuto
-                        </label>
+                        <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Aiuto</h3>
                         <button
                             onClick={() => {
                                 onClose();
                                 // Small delay to let modal close animation complete
                                 setTimeout(() => onRestartTour(), 200);
                             }}
-                            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors text-sm font-medium"
+                            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors text-sm font-medium"
                         >
                             <HelpCircle size={16} />
-                            Ricomincia il Tour Guidato
+                            Ricomincia il tour guidato
                         </button>
                     </div>
                 )}
@@ -271,9 +290,7 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                 {/* Development mode - only for accounts the administrator enabled */}
                 {canUseDevMode && (
                     <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-1.5">
-                            <FlaskConical size={12} aria-hidden /> Sviluppo
-                        </label>
+                        <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Sviluppo</h3>
                         <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
                             <div className="min-w-0">
                                 <p id="dev-mode-label" className="text-sm font-medium text-slate-700 dark:text-slate-200">Modalità sviluppo</p>
@@ -293,7 +310,7 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                                     aria-hidden
                                     className={cn(
                                         "relative block h-6 w-11 rounded-full transition-colors group-focus-visible:ring-2 group-focus-visible:ring-primary-500 group-focus-visible:ring-offset-2",
-                                        devMode ? "bg-blue-600" : "bg-slate-300 dark:bg-slate-600"
+                                        devMode ? "bg-primary-600" : "bg-slate-300 dark:bg-slate-600"
                                     )}
                                 >
                                     <span
@@ -314,9 +331,7 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                 {/* Admin Panel - only for admins */}
                 {isAdmin && (
                     <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-1.5">
-                            <Shield size={12} aria-hidden /> Amministrazione
-                        </label>
+                        <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Amministrazione</h3>
                         <button
                             onClick={() => {
                                 onClose();
@@ -331,13 +346,29 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                 )}
 
                 <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-1.5"><Shield size={12} aria-hidden /> Dati e privacy</label>
+                    <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Dati e privacy</h3>
                     <div className="space-y-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
                         <p className="text-xs text-slate-500">Esporta una copia dei tuoi dati oppure elimina definitivamente l’account. Password e token non vengono inclusi nell’export.</p>
-                        <button type="button" onClick={() => void handleExportAccount()} disabled={accountBusy} className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50 dark:bg-blue-950/30 dark:text-blue-300"><Download size={16} /> Esporta i miei dati</button>
-                        <input type="password" value={deletePassword} onChange={event => setDeletePassword(event.target.value)} placeholder="Password corrente" aria-label="Password corrente per eliminare account" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800" />
-                        <input value={deleteConfirmation} onChange={event => setDeleteConfirmation(event.target.value)} placeholder="Scrivi ELIMINA ACCOUNT" aria-label="Conferma eliminazione account" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800" />
-                        <button type="button" onClick={() => void handleDeleteAccount()} disabled={accountBusy || !deletePassword || deleteConfirmation !== 'ELIMINA ACCOUNT'} className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:bg-red-950/30 dark:text-red-300"><Trash2 size={16} /> Elimina definitivamente l’account</button>
+                        <button type="button" onClick={() => void handleExportAccount()} disabled={accountBusy} className="w-full inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-primary-50 px-3 py-2 md:min-h-0 text-sm font-medium text-primary-700 hover:bg-primary-100 disabled:opacity-50 dark:bg-primary-950/30 dark:text-primary-300"><Download size={16} /> Esporta i miei dati</button>
+                        <button
+                            ref={deleteOpener}
+                            type="button"
+                            onClick={() => (deleteOpen ? closeDelete() : setDeleteOpen(true))}
+                            aria-expanded={deleteOpen}
+                            aria-controls="delete-account-form"
+                            className="w-full inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 md:min-h-0 dark:text-red-300 dark:hover:bg-red-950/30"
+                        >
+                            <Trash2 size={16} aria-hidden /> Elimina l’account…
+                        </button>
+                        {deleteOpen && (
+                            <div id="delete-account-form" className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-700">
+                                <p className="text-xs text-slate-600 dark:text-slate-400">L’account e i suoi dati vengono eliminati per sempre. Per confermare, la password e la frase «ELIMINA ACCOUNT».</p>
+                                <input autoFocus type="password" value={deletePassword} onChange={event => setDeletePassword(event.target.value)} placeholder="Password corrente" aria-label="Password corrente per eliminare account" className={cn('w-full rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800', FIELD_TEXT)} />
+                                <input value={deleteConfirmation} onChange={event => setDeleteConfirmation(event.target.value)} placeholder="Scrivi ELIMINA ACCOUNT" aria-label="Conferma eliminazione account" className={cn('w-full rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800', FIELD_TEXT)} />
+                                <button type="button" onClick={() => void handleDeleteAccount()} disabled={accountBusy || !deletePassword || deleteConfirmation !== 'ELIMINA ACCOUNT'} className="min-h-[44px] md:min-h-0 w-full inline-flex items-center justify-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 dark:bg-red-950/30 dark:text-red-300"><Trash2 size={16} /> Elimina definitivamente l’account</button>
+                                <button type="button" onClick={closeDelete} className="w-full inline-flex min-h-[44px] items-center justify-center rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 md:min-h-0 dark:text-slate-300 dark:hover:bg-slate-800">Annulla</button>
+                            </div>
+                        )}
                         {accountMessage && <p role="status" className="text-xs text-slate-500">{accountMessage}</p>}
                     </div>
                 </div>
@@ -348,9 +379,7 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
 
                 {/* Version Info */}
                 <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-1.5">
-                        <Info size={12} aria-hidden /> Informazioni
-                    </label>
+                    <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Informazioni</h3>
                     <button
                         onClick={() => setShowInfo(!showInfo)}
                         aria-expanded={showInfo}
@@ -373,7 +402,7 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                             <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl space-y-2 text-xs">
                                 <div className="flex items-center justify-between">
                                     <span className="text-slate-500">Versione</span>
-                                    <span className="font-mono font-medium text-blue-600 dark:text-blue-400">
+                                    <span className="font-mono font-medium text-primary-600 dark:text-primary-400">
                                         v{versionInfo.version}
                                     </span>
                                 </div>
@@ -411,12 +440,12 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                                                 )}
                                             >
                                                 <div className="flex items-start gap-2">
-                                                    <span className="font-mono text-blue-500 shrink-0">{commit.hash}</span>
+                                                    <span className="font-mono text-primary-500 shrink-0">{commit.hash}</span>
                                                     <p className="text-slate-700 dark:text-slate-300 line-clamp-2">
                                                         {commit.message}
                                                     </p>
                                                 </div>
-                                                <p className="text-slate-400 dark:text-slate-500 mt-0.5 text-[10px]">
+                                                <p className="text-slate-600 dark:text-slate-400 mt-0.5 text-[11px]">
                                                     {commit.author} · {formatDate(commit.date)}
                                                 </p>
                                             </div>
@@ -434,7 +463,7 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                                     <p className="text-red-500">Impossibile caricare le informazioni</p>
                                     <button
                                         onClick={() => setVersionError(false)}
-                                        className="text-blue-500 hover:underline"
+                                        className="text-primary-500 hover:underline"
                                     >
                                         Riprova
                                     </button>

@@ -100,7 +100,7 @@ export function QaProcessTrace({ answer }: { answer: QaAnswer }) {
         {trace || metrics ? (
           <details>
             <summary className="cursor-pointer text-slate-500">Trace grezzo (JSON)</summary>
-            <pre className="mt-1 max-h-80 overflow-auto rounded bg-slate-900 p-2 text-[11px] leading-relaxed text-slate-100">
+            <pre className="mt-1 max-h-80 overflow-auto rounded bg-slate-900 p-2 text-xs leading-relaxed text-slate-100">
               {JSON.stringify({ pipeline_trace: trace, pipeline_metrics: metrics }, null, 2)}
             </pre>
           </details>

@@ -3,7 +3,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { Check } from 'lucide-react';
 import { ease, spring } from '../../../../lib/motion';
 import { cn } from '../../../../lib/utils';
-import { INK_BG, INK_BORDER, MUTED_TEXT, ON_INK } from '../progress/tokens';
+import { INK_BG, INK_BORDER, INK_TEXT, MUTED_TEXT, ON_INK } from '../progress/tokens';
 import { STATUS_LABEL, type Mission, type MissionStatus } from './missions';
 
 /**
@@ -60,9 +60,22 @@ export function MissionMark({ status, drip = false }: { status: MissionStatus; d
   );
 }
 
+/**
+ * What a mission is worth (Gymnasium XP spec §9): «20 XP» beside its count, «+20 XP» in ink once earned. Said in words
+ * to a screen reader. Never on a mission still to come, which cannot be earned.
+ */
+function MissionPoints({ points, earned }: { points: number; earned: boolean }) {
+  return (
+    <p className={cn('shrink-0 text-xs font-medium tabular-nums', earned ? INK_TEXT : MUTED_TEXT)}>
+      <span aria-hidden>{`${earned ? '+' : ''}${points} XP`}</span>
+      <span className="sr-only">{earned ? `${points} punti guadagnati` : `vale ${points} punti`}</span>
+    </p>
+  );
+}
+
 export interface MissionRowProps {
   mission: Mission;
-  /** A thin bar of the share under the title (today's missions; the full list keeps to the words). */
+  /** A thin bar of the share under the title, 4 px (today's missions, G8; the full list keeps to the words). */
   bar?: boolean;
   /** The note is said to a screen reader only (the goal's line, when the stamp says it to the eye). */
   quietNote?: boolean;
@@ -79,7 +92,7 @@ export interface MissionRowProps {
   layout?: boolean;
 }
 
-/** One mission: its mark, its title and state, «8 di 18» (and the bar), its note, and its action. */
+/** One mission: its mark, its title and state, «8 di 18» and its points (and the bar), its note, and its action. */
 export function MissionRow({ mission, bar = false, quietNote = false, aside, children, ink, layout = false }: MissionRowProps) {
   const { progress } = mission;
   // A mission done is full, also the goal the server counted with the queue finished under it.
@@ -91,15 +104,17 @@ export function MissionRow({ mission, bar = false, quietNote = false, aside, chi
       transition={spring.snappy}
       data-missione={mission.id}
       className={cn(
-        'grid grid-cols-[24px_minmax(0,1fr)] gap-x-3 py-4 first:pt-3',
+        'grid grid-cols-[24px_minmax(0,1fr)] gap-x-3 py-3 first:pt-2.5',
         // A row that moves keeps its padding wherever it lands: the last one's is taken back by the list's margin
         // (`MissionsOfToday`). The first row and its missing rule never change: the due cards stay first.
         !layout && 'last:pb-0',
       )}
     >
       <MissionMark status={mission.status} drip={inked && ink === 'drip'} />
-      <div className="grid min-w-0 gap-2">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+      <div className="grid min-w-0 gap-1.5">
+        {/* On a phone the count and the points always go under the title, whatever its length, so every row has the
+            same shape (G8); from `md` they sit at the end of the title's line. */}
+        <div className="flex flex-col items-start gap-y-1 md:flex-row md:flex-wrap md:items-baseline md:justify-between md:gap-x-3">
           <p
             className={cn(
               'font-medium',
@@ -115,10 +130,13 @@ export function MissionRow({ mission, bar = false, quietNote = false, aside, chi
             {mission.title}
             <span className="sr-only">{`: ${STATUS_LABEL[mission.status]}`}</span>
           </p>
-          {aside ?? (progress && <p className="shrink-0 text-sm tabular-nums text-slate-600 dark:text-slate-300">{`${progress.done} di ${progress.of}`}</p>)}
+          <div className="flex shrink-0 items-baseline gap-x-3">
+            {aside ?? (progress && <p className="shrink-0 text-sm tabular-nums text-slate-600 dark:text-slate-300">{`${progress.done} di ${progress.of}`}</p>)}
+            {mission.status !== 'in-arrivo' && <MissionPoints points={mission.points} earned={mission.status === 'fatta'} />}
+          </div>
         </div>
         {bar && progress && (
-          <span aria-hidden className="block h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+          <span aria-hidden className="block h-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
             <span className={cn('block h-full rounded-full transition-[width] duration-500 ease-out motion-reduce:transition-none', INK_BG)} style={{ width: `${share * 100}%` }} />
           </span>
         )}

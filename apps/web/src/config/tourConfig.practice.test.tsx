@@ -46,7 +46,7 @@ beforeEach(() => {
     practices: [], activePracticeId: null, practiceRows: {}, pendingReveal: null,
     structureWindow: { blockId: null, position: { x: 0, y: 0 } },
   });
-  appStore.getState().addArticlesToPractice(null, CC_RD, [article(CC_RD, '2043', { allegato: '2' })]);
+  appStore.getState().addArticlesToPractice(null, CC_RD, [article(CC_RD, '2043', { allegato: '2' }), article(CC_RD, '2044', { allegato: '2' })]);
 });
 
 describe('the practice tours point at what the table draws', () => {

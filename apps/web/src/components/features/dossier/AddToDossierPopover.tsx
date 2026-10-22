@@ -97,7 +97,7 @@ function DesktopPopover({ anchorEl, onClose, norma, sentenza, onAdded, onDuplica
                     <div
                         style={{ transformOrigin: getTransformOrigin(placement) }}
                         className={cn(
-                            'w-72 flex flex-col rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700',
+                            'w-72 flex flex-col rounded-xl shadow-md border border-slate-200 dark:border-slate-700',
                             'bg-white dark:bg-slate-900 animate-in fade-in zoom-in-95 duration-150',
                         )}
                     >
@@ -130,7 +130,7 @@ function MobileSheet({ onClose, norma, sentenza, onAdded, onDuplicate }: BodyPro
                 role="dialog"
                 aria-modal="true"
                 className={cn(
-                    'fixed inset-x-4 bottom-4 flex flex-col rounded-2xl shadow-2xl',
+                    'fixed inset-x-4 bottom-4 flex flex-col rounded-2xl shadow-lg',
                     'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800',
                     'max-h-[70vh] animate-in slide-in-from-bottom duration-200',
                     Z_INDEX.citationPreview,

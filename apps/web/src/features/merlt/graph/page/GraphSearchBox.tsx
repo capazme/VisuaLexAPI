@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Search, Loader2 } from 'lucide-react';
+import { FIELD_TEXT } from '../../../../constants/interactions';
 import { searchGraph } from '../shared/graphApi';
 import type { GraphSearchItem } from '../shared/types';
 import { isOpenableResult } from './graphCenter';
@@ -122,7 +123,7 @@ export function GraphSearchBox({ onSelect, placeholder }: GraphSearchBoxProps): 
   const showDropdown = open && query.trim().length > 0;
 
   return (
-    <div ref={containerRef} className="relative w-full max-w-md">
+    <div ref={containerRef} className="relative w-full">
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
@@ -135,7 +136,8 @@ export function GraphSearchBox({ onSelect, placeholder }: GraphSearchBoxProps): 
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={onKeyDown}
           placeholder={placeholder ?? 'Cerca un articolo o un concetto…'}
-          className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-9 text-sm text-slate-800 placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+          aria-label="Cerca nel grafo"
+          className={`min-h-[44px] w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-9 ${FIELD_TEXT} text-slate-800 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100`}
         />
         {state.phase === 'searching' && (
           <span
@@ -152,7 +154,7 @@ export function GraphSearchBox({ onSelect, placeholder }: GraphSearchBoxProps): 
         <ul
           id="graph-search-listbox"
           role="listbox"
-          className="absolute z-40 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
+          className="absolute z-40 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-slate-200 bg-white py-1 shadow-md dark:border-slate-700 dark:bg-slate-800"
         >
           {results.map((item, i) => (
             <li
@@ -183,7 +185,7 @@ export function GraphSearchBox({ onSelect, placeholder }: GraphSearchBoxProps): 
       {showDropdown && state.phase === 'success' && results.length === 0 && (
         <div
           role="status"
-          className="absolute z-40 mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 shadow-lg dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"
+          className="absolute z-40 mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 shadow-md dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"
         >
           Nessun risultato per «{state.term}»
         </div>
@@ -192,7 +194,7 @@ export function GraphSearchBox({ onSelect, placeholder }: GraphSearchBoxProps): 
       {showDropdown && state.phase === 'error' && (
         <div
           role="alert"
-          className="absolute z-40 mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 shadow-lg dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"
+          className="absolute z-40 mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 shadow-md dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400"
         >
           Ricerca non disponibile — riprova.
         </div>

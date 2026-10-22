@@ -65,7 +65,7 @@ export function EdgeDetailsDrawer({
             Relazione
           </h2>
           <span
-            className="mt-1 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:text-slate-300"
+            className="mt-1 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-300"
             style={{ backgroundColor: `${typeColor}22` }}
           >
             <span className="h-2 w-2 rounded-full" style={{ backgroundColor: typeColor }} />
@@ -136,7 +136,7 @@ export function EdgeDetailsDrawer({
 function Field({ label, children }: { label: string; children: React.ReactNode }): React.ReactElement {
   return (
     <div>
-      <p className="mb-0.5 text-[10px] uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="mb-0.5 text-xs uppercase tracking-wide text-slate-600 dark:text-slate-400">{label}</p>
       {children}
     </div>
   );

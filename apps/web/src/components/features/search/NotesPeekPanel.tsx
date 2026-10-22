@@ -102,7 +102,7 @@ function DesktopPeek({ anchorEl, onClose, ...rest }: NotesPeekPanelProps) {
                     <div
                         style={{ transformOrigin: getTransformOrigin(placement) }}
                         className={cn(
-                            'w-[360px] flex flex-col rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700',
+                            'w-[360px] flex flex-col rounded-xl shadow-md border border-slate-200 dark:border-slate-700',
                             'bg-white dark:bg-slate-900 animate-in fade-in zoom-in-95 duration-150',
                         )}
                     >
@@ -135,7 +135,7 @@ function MobileSheet({ onClose, ...rest }: NotesPeekPanelProps) {
                 role="dialog"
                 aria-modal="true"
                 className={cn(
-                    'fixed inset-x-0 bottom-0 flex flex-col rounded-t-2xl shadow-2xl',
+                    'fixed inset-x-0 bottom-0 flex flex-col rounded-t-2xl shadow-lg',
                     'bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800',
                     'max-h-[70vh] animate-in slide-in-from-bottom duration-200',
                     Z_INDEX.citationPreview,
@@ -361,7 +361,7 @@ interface NoteGroupProps {
 function NoteGroup({ label, notes, editingId, editingText, onStartEdit, onChangeEdit, onCommitEdit, onCancelEdit, onRemove }: NoteGroupProps) {
     return (
         <div className="space-y-2">
-            <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
                 {label}
             </h4>
             {notes.map(note => (

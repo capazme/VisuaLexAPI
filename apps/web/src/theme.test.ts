@@ -104,6 +104,7 @@ describe('the practice row\'s columns', () => {
 
 describe('the Inchiostro palette', () => {
   it('aliases the Tailwind scales the app writes to ink and toga', async () => {
+    // The aliases stay in the theme (an old class still renders in toga); the guard test keeps them out of the sources.
     const css = await compile(['bg-ink-500', 'bg-toga-600', 'text-slate-500', 'bg-blue-600', 'ring-indigo-500', 'bg-primary-600']);
     expect(css).toContain('.bg-ink-500');
     expect(css).toContain('.bg-toga-600');
@@ -269,7 +270,7 @@ describe('the Inchiostro palette', () => {
     expect(ratio(linear('ink-400'), linear('ink-900'))).toBeGreaterThanOrEqual(4.5);
   });
 
-  it('keeps the marks and labels of Gymnasium\'s «Progressi» apart from what they sit on (ActivityCalendar, DueForecast)', () => {
+  it('keeps the marks and labels of Gymnasium\'s «Progressi» apart from what they sit on (ReviewTrend, DueForecast)', () => {
     const source = readFileSync(CSS_PATH, 'utf8') + readFileSync(resolve(process.cwd(), 'node_modules/tailwindcss/theme.css'), 'utf8');
     // `primary-*` and `slate-*` are aliases (`var(--color-toga-*)`, `var(--color-ink-*)`): followed to the value.
     const linear = (name: string): number[] => {
@@ -294,18 +295,57 @@ describe('the Inchiostro palette', () => {
       return (hi + 0.05) / (lo + 0.05);
     };
     const white = [1, 1, 1];
-    // A day's mark (the dot, the dash) is ink on the calendar's pale steps (HEAT_FILL 0–2) and the ground's colour on
-    // the deep ones (3–4): 3:1, a graphic that carries the day's state (WCAG 1.4.11).
-    for (const step of ['ink-100', 'primary-200', 'primary-400']) expect(ratio(linear('primary-900'), linear(step)), step).toBeGreaterThanOrEqual(3);
-    for (const step of ['primary-600', 'primary-900']) expect(ratio(white, linear(step)), step).toBeGreaterThanOrEqual(3);
-    for (const step of ['ink-800', 'primary-900', 'primary-700']) expect(ratio(linear('primary-300'), linear(step)), step).toBeGreaterThanOrEqual(3);
-    // On a subject's hue the ink mark sits on a rim of the tile's ground (white; dark: slate 900), whatever the hue.
-    expect(ratio(linear('primary-900'), white)).toBeGreaterThanOrEqual(3);
-    expect(ratio(linear('primary-300'), linear('ink-900'))).toBeGreaterThanOrEqual(3);
-    for (const step of ['primary-500', 'primary-300']) expect(ratio(linear('ink-900'), linear(step)), step).toBeGreaterThanOrEqual(3);
-    // The days to come and a day with nothing due, dotted on the tile (white; dark: slate 900).
+    // The trend's rise, words at 14 px (G7): AA, 4.5:1, on the tile in both themes.
+    expect(ratio(linear('green-700'), white)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(linear('green-400'), linear('ink-900'))).toBeGreaterThanOrEqual(4.5);
+    // The trend's line and its cursor's dot on the tile (white; dark: slate 900): 3:1, a graphic (WCAG 1.4.11) (G7).
+    expect(ratio(linear('primary-600'), white)).toBeGreaterThanOrEqual(3);
+    expect(ratio(linear('primary-400'), linear('ink-900'))).toBeGreaterThanOrEqual(3);
+    // The goal's dashed line, the ticks of the days not done, and a day with nothing due, on the tile.
     expect(ratio(linear('ink-500'), white)).toBeGreaterThanOrEqual(3);
     expect(ratio(linear('ink-400'), linear('ink-900'))).toBeGreaterThanOrEqual(3);
+    // The bars of the coming days, ink on the tile.
+    expect(ratio(linear('primary-900'), white)).toBeGreaterThanOrEqual(3);
+    expect(ratio(linear('primary-300'), linear('ink-900'))).toBeGreaterThanOrEqual(3);
+    // A subject's line (G7): its hue mixed in OKLab with `--vlx-trend-shade` (black 20% on the light card, none on the
+    // dark), 3:1 on the tile, for each of the subjects' hues.
+    const css = readFileSync(CSS_PATH, 'utf8');
+    const hsl = (h: number, s: number, l: number): number[] => {
+      const [S, L] = [s / 100, l / 100];
+      const k = (n: number) => (n + h / 30) % 12;
+      const a = S * Math.min(L, 1 - L);
+      return [0, 8, 4].map((n) => L - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1)));
+    };
+    const toLinear = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+    const oklab = (rgb: number[]) => {
+      const [r, g, b] = rgb.map(toLinear);
+      const [l, m, q] = [0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b, 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b, 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b].map(Math.cbrt);
+      return [0.2104542553 * l + 0.793617785 * m - 0.0040720468 * q, 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * q, 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * q];
+    };
+    const fromOklab = ([L, A, B]: number[]) => {
+      const [l, m, q] = [L + 0.3963377774 * A + 0.2158037573 * B, L - 0.1055613458 * A - 0.0638541728 * B, L - 0.0894841775 * A - 1.291485548 * B].map((v) => v ** 3);
+      return [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * q, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * q, -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * q].map((v) => Math.min(1, Math.max(0, v)));
+    };
+    const shade = (block: string) => {
+      const m = block.match(/--vlx-trend-shade:\s*(black|transparent)\s+(\d+)%/);
+      if (!m) throw new Error('--vlx-trend-shade not found');
+      return Number(m[2]) / 100;
+    };
+    // The light block and the dark one, each from its first subject's hue (kept in the block, so it is checked too).
+    const blocks = css.split(/(?=--category-compliance:)/).slice(1, 3);
+    const tiles = [white, linear('ink-900')];
+    let checked = 0;
+    blocks.forEach((block, mode) => {
+      const p = shade(block);
+      for (const m of block.matchAll(/--category-(compliance|civil|penal|administrative|eu|penal-procedure):\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%/g)) {
+        const lab = oklab(hsl(Number(m[2]), Number(m[3]), Number(m[4])));
+        // Black is (0, 0, 0) in OKLab: mixing in `p` of it scales the colour by 1 − p.
+        const mixed = fromOklab(lab.map((v) => v * (1 - p)));
+        checked += 1;
+        expect(ratio(mixed, tiles[mode]), `${mode ? 'dark' : 'light'} ${m[1]}`).toBeGreaterThanOrEqual(3);
+      }
+    });
+    expect(checked).toBe(12);
     // Today's bar on its tinted column (amber 50; dark: amber 400 at 10% over slate 900, far apart).
     expect(ratio(linear('amber-600'), linear('amber-50'))).toBeGreaterThanOrEqual(3);
     // «oggi» under the coming days, at 12 px: AA.
@@ -330,7 +370,7 @@ describe('the tours (driver.js)', () => {
     const close = rule('.driver-popover.visualex-tour-popover .driver-popover-close-btn');
     expect(close).toMatch(/width:\s*44px/);
     expect(close).toMatch(/height:\s*44px/);
-    expect(css).toMatch(/\.driver-popover-close-btn:focus-visible\s*\{\s*outline:\s*2px solid/);
+    expect(css).toMatch(/\.driver-popover-close-btn:focus-visible:not\(\[data-pointer-focus\]\)\s*\{\s*outline:\s*2px solid/);
   });
 });
 
@@ -497,6 +537,28 @@ describe('the section change (T1)', () => {
     expect(css).toMatch(/::view-transition-new\(vlx-page\):only-child\s*\{\s*animation-delay:\s*0ms/);
     const reduced = css.split('@media (prefers-reduced-motion: reduce)').slice(1).join(' ');
     expect(reduced).toMatch(/::view-transition-new\(\*\)\s*\{\s*animation:\s*none\s*!important/);
+  }, 30000);
+
+  it('draws the tour\'s focus ring only for a focus not given with no key pressed (Y1)', () => {
+    const css = readFileSync(CSS_PATH, 'utf8');
+    const rule = css.match(/([^{}]*)\{\s*outline:\s*2px solid var\(--color-toga-500\);\s*outline-offset:\s*2px;\s*\}/)![1];
+    for (const selector of rule.replace(/\/\*[\s\S]*?\*\//g, '').split(',').map((part) => part.trim())) {
+      expect(selector).toMatch(/:focus-visible:not\(\[data-pointer-focus\]\)$/);
+    }
+  });
+
+  it('gives a menu or a popover a hairline and a drop in the dark, as the floating surfaces (Y1)', async () => {
+    const css = await compile(['shadow-md', 'shadow-lg']);
+    expect(css).toMatch(/\.dark \.shadow-md\s*\{\s*--tw-shadow:\s*0 0 0 1px var\(--color-ink-700\)/);
+    expect(css).toMatch(/\.dark :is\(\.shadow-lg, \.shadow-xl, \.shadow-2xl\)\s*\{\s*--tw-shadow:/);
+  }, 30000);
+
+  it('keeps a focus ring over a shadow in the dark: the dark rules set `--tw-shadow`, never `box-shadow` (Y1)', async () => {
+    const css = await compile(['shadow-md', 'shadow-lg', 'focus-visible:ring-2']);
+    // Outside the layers a `box-shadow` on `.dark .shadow-*` replaced the ring of `focus-visible:ring-2` (WCAG 2.4.7).
+    expect(css).not.toMatch(/\.dark[^{}]*\.shadow-[^{}]*\{[^}]*box-shadow:/);
+    // The utility composes the rings before the shadow, so the dark `--tw-shadow` keeps the ring.
+    expect(css).toMatch(/\.shadow-md\s*\{[^}]*box-shadow:[^;]*var\(--tw-ring-shadow\)[^;]*var\(--tw-shadow\)/);
   }, 30000);
 
   it('draws no ring on a title focused after a choice made with a pointer, over the utilities\' ring', async () => {

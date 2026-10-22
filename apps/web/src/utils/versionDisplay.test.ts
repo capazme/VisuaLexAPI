@@ -89,11 +89,17 @@ describe('describeVersion — the text in force', () => {
     const shown = describeVersion(validity(), { versione: 'vigente' });
     expect(shown.chip).toEqual({
       tone: 'current',
-      label: 'In vigore dal 28-12-2025',
+      label: 'In vigore dal 28 dicembre 2025',
       title: 'Testo consolidato di Normattiva, a fini informativi: fa fede la Gazzetta Ufficiale. Versione n. 8.',
     });
     expect(shown.banner).toBeNull();
     expect(shown).toMatchObject({ textVisible: true, readOnly: false, canCite: true, canCopyOrSave: true });
+  });
+
+  it('writes the day in full, as a lawyer does, eliding before 8 and 11 (R3)', () => {
+    expect(describeVersion(validity({ valid_from: '2005-01-01' }), {}).chip?.label).toBe('In vigore dal 1° gennaio 2005');
+    expect(describeVersion(validity({ valid_from: '2014-08-08' }), {}).chip?.label).toBe("In vigore dall'8 agosto 2014");
+    expect(describeVersion(validity({ valid_from: null }), {}).chip?.label).toBe('In vigore');
   });
 
   it('says nothing about the version when the page names none', () => {
@@ -112,7 +118,7 @@ describe('describeVersion — a past text', () => {
   const shown = describeVersion(MIDDLE, { versione: 'vigente', data_versione: '2005-06-01' });
 
   it('shows the window the source stated, not the date that was typed', () => {
-    expect(shown.chip).toMatchObject({ tone: 'historical', label: 'Testo storico · dal 25-12-2003 al 29-12-2007' });
+    expect(shown.chip).toMatchObject({ tone: 'historical', label: 'Testo storico · dal 25 dicembre 2003 al 29 dicembre 2007' });
     expect(shown.chip?.title).toContain('Versione n. 7.');
   });
 
@@ -204,7 +210,7 @@ describe('describeVersion — banners elide before the 8th and the 11th', () => 
 describe('describeVersion — a repealed article', () => {
   it('says since when, and shows the notice as the text', () => {
     const shown = describeVersion(ABROGATED, { versione: 'vigente' });
-    expect(shown.chip).toMatchObject({ tone: 'abrogated', label: 'Abrogato dal 06-02-2016' });
+    expect(shown.chip).toMatchObject({ tone: 'abrogated', label: 'Abrogato dal 6 febbraio 2016' });
     expect(shown.banner).toBeNull();
     expect(shown).toMatchObject({ textVisible: true, readOnly: false });
   });

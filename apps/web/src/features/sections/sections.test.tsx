@@ -7,7 +7,7 @@ const account = vi.hoisted(() => ({ devMode: false }));
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ devMode: account.devMode }) }));
 
 import { sectionForPath } from './sections';
-import { sectionStore, useSection } from './useSection';
+import { sectionOfDossierKind, sectionStore, useSection } from './useSection';
 
 function render(path: string) {
   const wrapper = ({ children }: { children: ReactNode }) => <MemoryRouter initialEntries={[path]}>{children}</MemoryRouter>;
@@ -68,6 +68,12 @@ describe('useSection', () => {
     const { result } = render('/');
     expect(result.current.sections.map((s) => s.id)).toEqual(['opus', 'forum']);
     expect(result.current.section).toBe('opus');
+  });
+
+  it('puts a dossier in its kind\'s section, and every one in Opus with Gymnasium off', () => {
+    expect([sectionOfDossierKind('studio'), sectionOfDossierKind('lavoro'), sectionOfDossierKind(null)]).toEqual(['gymnasium', 'opus', 'opus']);
+    vi.stubEnv('VITE_FEATURE_STUDIA', 'false');
+    expect(sectionOfDossierKind('studio')).toBe('opus');
   });
 
   it('switches section when the browser refuses to save it (full or blocked storage)', () => {

@@ -7,7 +7,7 @@ vi.mock('../Sidebar', () => ({ Sidebar: () => null }));
 vi.mock('../../ui/SettingsModal', () => ({ SettingsModal: () => null }));
 vi.mock('../../ui/FeedbackButton', () => ({ FeedbackButton: () => null }));
 vi.mock('../../ui/ChangelogNotification', () => ({ ChangelogNotification: () => null }));
-vi.mock('../../ui/Toast', () => ({ UndoToastContainer: () => null }));
+vi.mock('../../ui/Toast', () => ({ NotificationHost: () => null }));
 // The planner's host reads the tasks from the server: not under test here.
 vi.mock('../../features/planner/PlannerHost', () => ({ PlannerHost: () => null }));
 vi.mock('../../ui/SyncErrorToast', () => ({ SyncErrorToast: () => null }));
@@ -42,6 +42,8 @@ describe('Layout — the phone\'s bar below lg (M1)', () => {
     },
   );
 
+  // jsdom has no IntersectionObserver, where the bar names the page at once; with one, the name waits for the page's
+  // title to scroll out (G8, `Layout.phoneBar.test.tsx`).
   it.each([
     ['/studia/ripasso', 'Oggi'],
     ['/forum/community', 'Community'],

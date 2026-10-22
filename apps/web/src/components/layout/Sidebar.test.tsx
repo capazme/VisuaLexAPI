@@ -109,7 +109,7 @@ describe('Sidebar — accessible names', () => {
     renderSidebar('/dossier');
     fireEvent.click(screen.getByRole('link', { name: 'Ricerca' }));
     expect(screen.getByTestId('where')).toHaveTextContent(/^\/$/);
-    expect(field).toHaveBeenCalledWith({});
+    expect(field).toHaveBeenCalledWith({ focus: true });
     expect(appStore.getState().commandPaletteOpen).toBe(false);
     unsubscribe();
   });
@@ -289,7 +289,9 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
       expect(animate).not.toHaveBeenCalled();
       fireEvent.click(screen.getByRole('button', { name: /^Sezione:/ }));
       fireEvent.click(screen.getByRole('menuitemradio', { name: /Forum/ }));
-      const faded = animate.mock.contexts as HTMLElement[];
+      // The switcher's own menu moves too (S6); the navigation's entries are what this counts.
+      const nav = document.getElementById('tour-sidebar')!;
+      const faded = (animate.mock.contexts as HTMLElement[]).filter((el) => nav.contains(el));
       expect(faded.length).toBeGreaterThan(0);
       const forum = screen.getByRole('group', { name: 'Forum' });
       for (const entry of faded) expect(forum).toContainElement(entry);
@@ -749,8 +751,9 @@ describe('Sidebar — the words', () => {
     const forum = screen.getByRole('link', { name: 'Dossier pubblici, 3 notifiche' });
     expect(forum).toHaveTextContent(/^Dossier pubblici3$/);
     expect(screen.getByRole('link', { name: 'Community' })).toHaveTextContent(/^Community$/);
-    // The section is named beside its mark; the button keeps its name.
-    expect(screen.getByRole('button', { name: /^Sezione: Forum/ })).toHaveTextContent('Forum');
+    // The section is named beside its mark, on the split button's left part, which goes to its home (S6).
+    expect(screen.getByRole('button', { name: 'Vai a Forum: Dossier pubblici' })).toHaveTextContent('Forum');
+    expect(screen.getByRole('button', { name: 'Cambia sezione' })).toHaveAttribute('aria-haspopup', 'menu');
     // The username is shown, so the name carries it (label in name).
     expect(screen.getByRole('button', { name: 'Menu utente di tester' })).toHaveTextContent('tester');
   });
