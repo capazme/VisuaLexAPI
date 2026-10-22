@@ -120,7 +120,7 @@ describe('CommandPalette — where it opens', () => {
 });
 
 describe('CommandPalette — growing out of the field (R2)', () => {
-  it('starts as tall as the search page\'s field, at its corners, and grows into the panel', () => {
+  it('starts as tall as the search page\'s field, at its corners, and grows into the panel', async () => {
     asDesktop(true);
     // jsdom has no Web Animations: one that records what it was asked.
     const asked: Keyframe[][] = [];
@@ -129,20 +129,23 @@ describe('CommandPalette — growing out of the field (R2)', () => {
       return { cancel: vi.fn(), onfinish: null, playState: 'running' } as unknown as Animation;
     });
     Object.defineProperty(HTMLElement.prototype, 'animate', { value: animateSpy, configurable: true, writable: true });
-    const form = document.createElement('form');
-    form.id = SEARCH_FIELD_FORM_ID;
-    Object.defineProperty(form, 'offsetHeight', { value: 44 });
-    document.body.append(form);
-    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
-    const panel = screen.getByRole('dialog', { name: 'Menu di ricerca' }).querySelector<HTMLElement>('.rounded-2xl')!;
-    // Set before the first paint, so it never flashes open: the field's height and corners.
-    expect(panel.style.clipPath).toBe('inset(0px 0px calc(100% - 44px) 0px round 12px)');
-    // And grown to the panel's, at a card's corners.
-    expect(asked).toContainEqual([
-      { clipPath: 'inset(0px 0px calc(100% - 44px) 0px round 12px)' },
-      { clipPath: 'inset(0px 0px calc(0% - 0px) 0px round 16px)' },
-    ]);
-    Reflect.deleteProperty(HTMLElement.prototype, 'animate');
+    try {
+      const form = document.createElement('form');
+      form.id = SEARCH_FIELD_FORM_ID;
+      Object.defineProperty(form, 'offsetHeight', { value: 44 });
+      document.body.append(form);
+      render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+      const panel = screen.getByRole('dialog', { name: 'Menu di ricerca' }).querySelector<HTMLElement>('.rounded-2xl')!;
+      // Set before the first paint, so it never flashes open: the field's height and corners.
+      expect(panel.style.clipPath).toBe('inset(0px 0px calc(100% - 44px) 0px round 12px)');
+      // Grown to the panel's, at a card's corners — once the first frame is drawn.
+      await waitFor(() => expect(asked).toContainEqual([
+        { clipPath: 'inset(0px 0px calc(100% - 44px) 0px round 12px)' },
+        { clipPath: 'inset(0px 0px calc(0% - 0px) 0px round 16px)' },
+      ]));
+    } finally {
+      Reflect.deleteProperty(HTMLElement.prototype, 'animate');
+    }
   });
 
   it('without Web Animations draws the panel at once, never left clipped to the field', () => {
