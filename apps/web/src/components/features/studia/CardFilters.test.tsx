@@ -27,16 +27,31 @@ describe('CardFilters — the search box', () => {
     expect(screen.getByRole('searchbox')).toHaveAttribute('placeholder', 'Cerca nelle schede');
   });
 
+  it('says only «Cerca» below 360 px, where beside «Filtri» nothing longer fits, its name whole', () => {
+    windowOf(320);
+    renderFilters();
+    const box = screen.getByRole('searchbox', { name: 'Cerca nelle schede' });
+    expect(box).toHaveAttribute('placeholder', 'Cerca');
+    expect(box).toHaveAccessibleDescription('Per istituto o domanda');
+  });
+
   it('says what it searches in the box from 640 px', () => {
     windowOf(1366);
     renderFilters();
     expect(screen.getByRole('searchbox')).toHaveAttribute('placeholder', 'Cerca per istituto o domanda');
   });
 
-  it.each([390, 1366])('keeps its whole name and what it searches for a screen reader at %i px', (width) => {
-    windowOf(width);
+  it('keeps its whole name, and tells a screen reader what it searches, below 640 px', () => {
+    windowOf(390);
     renderFilters();
     const box = screen.getByRole('searchbox', { name: 'Cerca nelle schede' });
     expect(box).toHaveAccessibleDescription('Per istituto o domanda');
+  });
+
+  it('keeps its whole name from 640 px, the hint saying what it searches (not said twice)', () => {
+    windowOf(1366);
+    renderFilters();
+    const box = screen.getByRole('searchbox', { name: 'Cerca nelle schede' });
+    expect(box).not.toHaveAttribute('aria-describedby');
   });
 });

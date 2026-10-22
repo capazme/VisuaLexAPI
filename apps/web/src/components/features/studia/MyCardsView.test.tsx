@@ -116,14 +116,15 @@ describe('«Le mie schede», the list', () => {
     renderView();
     expect(await screen.findByText('Non hai ancora schede.')).toBeInTheDocument();
     // What a card is (Q1).
-    expect(screen.getByText(/Una scheda è una domanda e la sua risposta su un articolo, ad esempio «art\. 1455 c\.c\.»/)).toBeInTheDocument();
+    expect(screen.getByText(/Una scheda è una domanda e la sua risposta, fondate su un articolo, ad esempio «art\. 1455 c\.c\.»/)).toBeInTheDocument();
     // On one line: the citation's spaces are non-breaking (the matcher's normalizer reads them as spaces).
     expect(screen.getByText(/Una scheda è/).textContent).toContain('«art.\u00a01455\u00a0c.c.»');
     // The heading's «+ Nuova scheda», and the empty list's solid «Scrivi la prima scheda», the same form.
     expect(screen.getAllByRole('button', { name: '+ Nuova scheda' })).toHaveLength(1);
     const first = await screen.findByRole('button', { name: 'Scrivi la prima scheda' });
     expect(first).toHaveClass('min-h-[44px]', 'font-semibold');
-    expect(first.className).toMatch(/\bbg-/);
+    // Solid ink: the block's one action (`INK_BUTTON`).
+    expect(first).toHaveClass('bg-primary-900', 'dark:bg-primary-300');
     expect(screen.getByRole('link', { name: 'Ricerca' })).toHaveAttribute('href', '/');
     await userEvent.setup().click(first);
     expect(await screen.findByRole('dialog', { name: 'Nuova scheda' })).toBeInTheDocument();

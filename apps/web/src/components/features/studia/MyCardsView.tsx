@@ -96,8 +96,8 @@ function NoCardsYet({ sources, onNew }: { sources: boolean | undefined; onNew: (
       <p className={cn('font-serif text-xl leading-snug md:text-2xl', INK_TEXT)}>Non hai ancora schede.</p>
       <p className="max-w-prose text-sm text-slate-700 dark:text-slate-200">
         {/* The citation on one line: non-breaking spaces. */}
-        Una scheda è una domanda e la sua risposta su un articolo, ad esempio {'«art.\u00a01455\u00a0c.c.»'}: il ripasso di
-        «Oggi» te la ripropone quando stai per dimenticarla.
+        Una scheda è una domanda e la sua risposta, fondate su un articolo, ad esempio {'«art.\u00a01455\u00a0c.c.»'}: il
+        ripasso in «Oggi» te la ripropone quando stai per dimenticarla.
       </p>
       {sources === undefined ? null : sources ? (
         <>

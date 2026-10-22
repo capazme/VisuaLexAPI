@@ -18,11 +18,11 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   columns from `lg`, three from `2xl`; `CardGroups`' `grid`), each with its front in Newsreader, its subject's dot,
   its state and its next review, and with one open the list is a column beside it; the filters (`CardFilters`) are one
   row from `lg` (the search a third, the selects, «Scritte da Claude» and «Da ripassare oggi»), behind «Filtri» under
-  1024 px; the search box's hint is «Cerca per istituto o domanda» from `sm`, «Cerca nelle schede» below (it was cut, Q1),
-  its name «Cerca nelle schede» and «Per istituto o domanda» its description at every width; the act filter offers the acts of the cards listed,
+  1024 px; the search box's hint is «Cerca per istituto o domanda» from `sm`, «Cerca nelle schede» below, «Cerca» under 360 px (it was cut, Q1),
+  its name «Cerca nelle schede» at every width, and below `sm` «Per istituto o domanda» its description; the act filter offers the acts of the cards listed,
   keeping what a narrowed list hid until a deletion starts it over; each card shows the next review,
   `nextReviewLabel`, and «Da ripassare oggi» filters with `dovuteOggi`; «+ Nuova scheda», beside the page's
-  title (portalled into `StudiaPage`'s `actionSlot`, from the outlet's context) and as the empty list's action, opens `CardFormDialog` with `{ kind: 'create' }` and no article (no
+  title (portalled into `StudiaPage`'s `actionSlot`, from the outlet's context), and the empty list's «Scrivi la prima scheda» (Q1), open `CardFormDialog` with `{ kind: 'create' }` and no article (no
   fixed anchor, the reference field open, the anchors typed as «art. 1455 c.c.», which `POST /lingo/cards`
   resolves; saved with no anchor, the reference field stays open and takes the focus; the field has «Aggiungi»
   only — Esc or an empty «Aggiungi» closes it — so the dialog's «Annulla» is the one; the form's body goes back

@@ -17,11 +17,11 @@ import { isStudiaEnabled } from './features/studia/featureFlag';
 import { DevRoute } from './features/devMode/DevRoute';
 import { OpusPage } from './components/features/planner/OpusPage';
 import { InboxView, TaskTrashView, TodayView, UpcomingView } from './components/features/planner/OpusViews';
+import { buttonClassName } from './components/ui/buttonStyles';
+import { cn } from './lib/utils';
 
 // Lazy load admin page + MERL-T surfaces (route-level code splitting)
 import { lazy, Suspense } from 'react';
-import { buttonClassName } from './components/ui/buttonStyles';
-import { cn } from './lib/utils';
 const AdminPage = lazy(() => import('./pages/AdminPage').then(m => ({ default: m.AdminPage })));
 const MerltHubPage = lazy(() =>
   import('./pages/MerltHubPage').then(m => ({ default: m.MerltHubPage })),
