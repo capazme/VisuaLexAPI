@@ -50,8 +50,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   403, and when `/auth/me` failed (`validator` null, never taken for «not a validator») it reads and the server decides),
   `/history`, `/forum` («Dossier pubblici»; `/environments`, the page «Ambienti» was, redirects there keeping an old
   share link's `?import=`), `/forum/community` («Community», `ForumCommunityPage`: an honest placeholder — titled
-  «Community» under the Forum's phrase (L-37), «Domande e discussioni tra colleghi, in arrivo», a link to `/forum`; no sample posts, no counts, no
-  server route), `/documents`, `/collega-app` («Collega un'app AI»,
+  «Community» under the Forum's phrase (L-37), an empty state composed for the page, «Le discussioni arrivano presto»
+  with «Esplora i dossier pubblici», see `features/bulletin/` below; no sample posts, no counts, no server route), `/documents`, `/collega-app` («Collega un'app AI»,
   `features/connections/ConnectAiAppPage`: the MCP address from `GET /api/oauth/connection` with
   «Copia», one card per client that connects today — `aiClients.ts`, the survey of 13 Oct 2026, with
   the clients our server refuses listed apart and why —, the personal-data notice (what a connected app reads: dossier
@@ -497,6 +497,17 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
 - `components/ui/` — shared primitives: `Button`, `IconButton`, `Input`, `Card`,
   `Modal`, `ConfirmDialog`, `WireConfirm` (below, «Destructive confirmations»), `Toast`, `EmptyState`, `Sheet` (a
   phone's bottom sheet), plus feature-flavoured modals.
+  `SegmentedTabs` and `SegmentedTabPanel` («linguette che scorrono», U1; first on the Forum's three tabs and its
+  suggestions' «Ricevuti · Inviati», S7a) are a
+  `tablist` over one `tabpanel`: the chosen tab's mark slides on `spring.snappy` (a `layoutId` in the row's own
+  `LayoutGroup`, still on the first drawing), the content comes in over 160 ms with a 12 px shift the way the mark
+  moved (to a tab further right, the content moves right too: U1's words), in CSS (`animate-in`, fill backwards —
+  Framer's fade ended by writing the opacity, one frame at 0 and, under reduced motion, a second fade from the global
+  150 ms opacity transition of `index.css`), the panel clipping the shift 8 px out at the sides; under reduced motion
+  the mark is drawn in place and the content changes at once (that sheet makes every animation instant); the arrows,
+  Home and End move the choice and the focus (not with Alt, Cmd or Ctrl). The older
+  `SegmentedControl` (a choice in a form: the card's kind, a relation's end) slides a pill too, without the keyboard,
+  reduced motion or a row's own `LayoutGroup`: U1 folds it in.
   `Modal` is portaled to `document.body`, so a dialog opened inside a reading window
   (transformed, stacked) is not confined to it; each open `Modal` and `WireConfirm` is on a module-level
   stack (`ui/dialogStack.ts`) and only the top-most handles Tab (its focus trap, on `document`) and Esc, so a dialog opened
@@ -2182,8 +2193,12 @@ meant to stay split; add new features as new files, not inside the shells:
   component names stay `bulletin` and `SharedEnvironment*` because they match the backend model; the route is
   `/forum`, the page's `h1` «Dossier pubblici», and what leaves it says so («Ritira dai dossier pubblici», toast
   «Dossier ritirato»; in the dossier's header «Copia pubblicata ritirata»), never «dal Forum»: the Forum is the section, which also holds «Community»
-  (`ForumCommunityPage`, `/forum/community`, a placeholder). `BulletinBoardPage.tsx` is a shell over three dumb views, the tabs «Esplora · I miei pubblicati ·
-  Suggerimenti» (`ForumExploreView`, `ForumMyEnvironmentsView`, `ForumSuggestionsView`); Explore's filters are one row
+  (`ForumCommunityPage`, `/forum/community`, a placeholder: an empty state composed for the page, S7a — centred in the
+  column, `CommunityMark`, line art in the manner of the section's mark in the Forum's hue, «Le discussioni arrivano
+  presto», two lines on what it will be, and «Esplora i dossier pubblici», a link drawn as the one button). `BulletinBoardPage.tsx` is a shell over three dumb views, the tabs «Esplora · I miei pubblicati ·
+  Suggerimenti» (`ForumTabs`, drawn by `ui/SegmentedTabs`: short labels «Esplora · Miei · Suggeriti» sharing the row in
+  equal parts below `sm`, whole from it — at 320 px the last was cut, S7a; the views, `ForumExploreView`,
+  `ForumMyEnvironmentsView`, `ForumSuggestionsView`, in its `SegmentedTabPanel`, their order in `forumSections.ts`); the titles of «Dossier pubblici» and «Community» come from `features/sections/pageNames.ts`; Explore's filters are one row
   from `sm` and, on a phone, the search across with the category («Tutte»), the order and the 44 px refresh under it, M1. «Pubblica un dossier»
   is `PublishDossierPicker` (the user's dossiers not yet in the Forum, then the dossier's own
   `PublishDossierDialog`; the Forum never publishes a workspace); «Modifica» on a published dossier
@@ -2195,10 +2210,28 @@ meant to stay split; add new features as new files, not inside the shells:
   of the archive (`ArchivedEnvironmentsSection` under «I miei pubblicati»: «Ambienti salvati (archivio)», «Recupera
   i dossier» through `POST /environments/:id/recover`, «Esporta JSON», «Elimina»; absent for a user with none; no
   environment is created any more) and an old share link (`SharedLinkImport`, reading `?import=`, through `POST
-  /dossiers/import-study`, quick norms and aliases left out). «Dossier di studio pronti» (`StudyPacksBand`, over
-  `utils/studyPacks.ts`: the 20 packs of `data/exampleEnvironments.ts`, each a pack's dossiers plus «‹pack›:
-  articoli chiave») follows Explore's category and adds a pack through `import-study`; the empty dossier list
-  points to it. One list of categories, `utils/forumCategories.ts`. `EnvironmentContentViewer` (the tree of a
+  /dossiers/import-study`, quick norms and aliases left out). Explore shows **the community's dossiers first** (S7a,
+  the Forum's reason), under a visually hidden `h2` «Dalla comunità»: a grid of `SharedEnvironmentCard`s (`CARD_GRID`,
+  «I miei pubblicati»' too: one column, two from `md`, three from `xl`, a row's cards one height, `h-full`), each an
+  `article` with its title in Newsreader 18 px, a plain line «● Civile · v1 · autore · 2 giorni fa» (the category's hue
+  from its token `--category-*`, never a hand-written colour; one line where the card has room, wrapped between its parts
+  on a narrow one, a long username cut, whole on hover), two tags then «+N», «Mi piace» a heart with its number
+  (`aria-pressed`, named «Mi piace: N»; on a computer 36 px tall) and one action, «Aggiungi ai miei dossier», outlined
+  («Aggiungi» below `sm`, as the packs' cards, its name whole); a withdrawn card is a dashed edge on a quieter paper and
+  the badge, never an opacity (it would trap the «⋯» menu in a stacking context, gotcha 22, and fade the text under AA).
+  Beside the like, small, «aggiunto da 12» (nothing at 0); the views are the author's alone, beside it in «I miei
+  pubblicati» (`showOwnerActions`), never on Explore; where a card is too narrow the action goes under them, whole. «I
+  più aggiunti» is an `h2`, last on the page. Then «Pronti da VisuaLex» (`StudyPacksBand`, over
+  `utils/studyPacks.ts`: the 20 packs of `data/exampleEnvironments.ts`, each a pack's dossiers plus «‹pack›: articoli
+  chiave»): one row of compact cards that scrolls sideways (`#pronti`, `tabIndex 0`, so the keyboard scrolls it past
+  packs already added), every pack in it — on a computer after the grid and its pages; on a phone right after the
+  community's first two dossiers (or their places while a read travels, or the empty state), in a fixed place so it is
+  never mounted again while a new read travels, the rest under a hidden `h2` «Altri dossier della comunità»
+  (`useIsDesktop`, one place or the other); it follows Explore's category and adds a pack through `import-study`; the
+  empty dossier list's «Pronti da VisuaLex» goes to `/forum#pronti`, where Explore, once read, scrolls the content
+  scroller alone to the strip under the phone's bar (`scroll-padding-top`, gotcha 34) and focuses it, once: the fragment
+  then leaves the address (`history.replaceState`, the router's state kept), so another tab and back, or a reload, do not
+  jump again. One list of categories, `utils/forumCategories.ts`. `EnvironmentContentViewer` (the tree of a
   content's dossiers, quick norms, aliases, notes and highlights), `useLeftOutNotice` and `annotationLabels` serve
   the suggestions. The suggestion flow adds `SuggestionReviewDialog`, `EditSuggestionDialog`,
   `SuggestionItemCard` (all five itemTypes), `AliasConflictDialog`,

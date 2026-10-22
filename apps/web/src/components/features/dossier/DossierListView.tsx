@@ -387,13 +387,14 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                       <FolderPlus size={18} />
                       Crea il tuo primo dossier
                     </button>
-                    {/* The ready-made study dossiers sit in the Forum (spec 2026-10-13-environments-into-forum, D12). */}
+                    {/* The ready-made study dossiers sit in the Forum (spec 2026-10-13-environments-into-forum, D12), after the
+                        community's dossiers since S7a: the address takes the reader to their strip. */}
                     <button
-                      onClick={() => navigate('/forum')}
+                      onClick={() => navigate('/forum#pronti')}
                       className="px-5 py-2.5 rounded-lg inline-flex items-center gap-2 text-blue-700 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-slate-800 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                     >
                       <BookOpen size={18} aria-hidden />
-                      Dossier di studio pronti
+                      Pronti da VisuaLex
                     </button>
                   </div>
                 )

@@ -13,18 +13,25 @@ beforeEach(() => {
 });
 
 describe('StudyPacksBand', () => {
-  it('shows six packs, then all of them on request', () => {
+  it('lays every pack out in one row of cards that scrolls sideways, under «Pronti da VisuaLex» (S7a)', () => {
     render(<StudyPacksBand category="all" onAdded={vi.fn()} onError={vi.fn()} />);
-    const list = () => within(screen.getByRole('region', { name: 'Dossier di studio pronti' })).getAllByRole('listitem');
-    expect(list()).toHaveLength(6);
-    fireEvent.click(screen.getByRole('button', { name: `Mostra tutti (${STUDY_PACKS.length})` }));
-    expect(list()).toHaveLength(STUDY_PACKS.length);
+    const region = screen.getByRole('region', { name: 'Pronti da VisuaLex' });
+    const items = within(region).getAllByRole('listitem');
+    expect(items).toHaveLength(STUDY_PACKS.length);
+    expect(items[0].parentElement).toHaveClass('flex', 'overflow-x-auto', 'snap-x');
+    expect(items[0]).toHaveClass('w-56', 'shrink-0', 'snap-start');
+    // The row takes the focus itself, so the keyboard scrolls it past packs that hold no button.
+    const row = screen.getByRole('list', { name: 'Pronti da VisuaLex' });
+    expect(row).toHaveAttribute('tabindex', '0');
+    expect(row).toHaveAttribute('id', 'pronti');
+    // No «Mostra tutti»: the row holds them all.
+    expect(screen.queryByRole('button', { name: /^Mostra tutti/ })).toBeNull();
   });
 
   it('follows the category filter', () => {
     render(<StudyPacksBand category="penal" onAdded={vi.fn()} onError={vi.fn()} />);
     const shown = within(screen.getByRole('region')).getAllByRole('listitem').length;
-    expect(shown).toBe(Math.min(6, STUDY_PACKS.filter((p) => p.category === 'penal').length));
+    expect(shown).toBe(STUDY_PACKS.filter((p) => p.category === 'penal').length);
   });
 
   it('adds a pack as dossiers di studio, without notes or highlights', async () => {
