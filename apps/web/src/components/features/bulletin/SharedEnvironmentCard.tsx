@@ -111,6 +111,7 @@ export function SharedEnvironmentCard({
   return (
     <div
       id={isFirst ? 'tour-forum-card' : undefined}
+      data-shared-env={environment.id}
       className={`group relative bg-white dark:bg-slate-800 rounded-xl border shadow-sm hover:shadow-md transition-[color,background-color,border-color,box-shadow,opacity] duration-200 overflow-hidden ${
       isWithdrawn
         ? 'border-slate-300 dark:border-slate-600 opacity-75'
@@ -223,6 +224,9 @@ export function SharedEnvironmentCard({
                       {onDelete && (
                         <button
                           onClick={() => {
+                            // The focus goes back to the menu's button, as `MenuButton` does: the confirmation is drawn
+                            // from it and returns the focus there (K1b).
+                            menuRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
                             onDelete(environment);
                             setShowMenu(false);
                           }}
