@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BrainCircuit, Download, FileText, SlidersHorizontal, Trash2, UserX } from 'lucide-react';
+import { Download, FileText, SlidersHorizontal, Trash2, UserX } from 'lucide-react';
 import { WireConfirm } from '../../../components/ui/wireConfirm/WireConfirm';
 import { Modal } from '../../../components/ui/Modal';
 import { TextParagraphs } from '../../../components/features/studia/TextParagraphs';
@@ -83,9 +83,7 @@ export function MerltDataSection() {
 
   return (
     <div>
-      <label className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-1.5">
-        <BrainCircuit size={12} aria-hidden /> Dati MERL-T
-      </label>
+      <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Dati MERL-T</h3>
       <div className="space-y-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
         <p className="text-xs text-slate-500">
           MERL-T impara da come usi VisuaLex solo se acconsenti. Qui puoi cambiare scelta, leggere l’informativa,

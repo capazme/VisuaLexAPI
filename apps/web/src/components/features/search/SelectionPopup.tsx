@@ -280,7 +280,7 @@ export function SelectionPopup({
               <button
                 key={color}
                 onClick={() => handleHighlightColor(color)}
-                className="w-7 h-7 rounded-full border-2 border-white/40 transition-transform hover:scale-110 hover:ring-2 hover:ring-white/60"
+                className="w-7 h-7 rounded-full border-2 border-white/40 transition-transform [(hover:hover)_and_(pointer:fine)]:hover:scale-110 hover:ring-2 hover:ring-white/60"
                 style={{ backgroundColor: getHighlightSwatch(color) }}
                 title={`Evidenzia in ${color}`}
               />

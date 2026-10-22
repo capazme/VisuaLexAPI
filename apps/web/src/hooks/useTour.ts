@@ -69,6 +69,31 @@ let onScreen: Driver | null = null;
 // meanwhile is not started (it is asked again the next time its surface mounts, unseen).
 let held = false;
 
+/**
+ * The layout a width draws (the phone's, the rail's, the sidebar's): a tour started in one is closed when the window
+ * passes to another (Y1: from 1920 to 390 the veil stayed at its old size, over a page laid out anew). Closed, not
+ * done: it is asked again the next time its surface mounts.
+ */
+const layoutBand = (width: number) => (width < 768 ? 0 : width < 1024 ? 1 : 2);
+
+/** The last input was a key (a tour opened by the keyboard shows its focus ring; one opened by itself or a click not). */
+let keyboardLast = false;
+let watchingInput = false;
+function watchInput(): void {
+    if (watchingInput || typeof window === 'undefined') return;
+    watchingInput = true;
+    window.addEventListener('keydown', () => { keyboardLast = true; }, true);
+    window.addEventListener('pointerdown', () => { keyboardLast = false; }, true);
+}
+
+/** A focus driver.js gives its popover's button with no key pressed shows no ring (`data-pointer-focus`, `index.css`)
+ *  until it leaves: the ✕ drew the focus square after a click (Y1). */
+function quietFocus(target: EventTarget | null): void {
+    if (keyboardLast || !(target instanceof HTMLElement)) return;
+    target.setAttribute('data-pointer-focus', '');
+    target.addEventListener('blur', () => target.removeAttribute('data-pointer-focus'), { once: true });
+}
+
 export function holdTours(hold: boolean): void {
     held = hold;
 }
@@ -152,6 +177,20 @@ export function useTour(options: UseTourOptions = {}) {
             driverRef.current.destroy();
         }
 
+        watchInput();
+        const band = layoutBand(window.innerWidth);
+        // Cheap enough at every resize event (a width and one element's rectangles); driver.js redraws the rest itself.
+        const onResize = () => {
+            const tour = driverRef.current;
+            if (!tour?.isActive()) return;
+            const element = tour.getActiveElement();
+            const gone = element && element.id !== 'driver-dummy-element' && (!element.isConnected || element.getClientRects().length === 0);
+            // `destroy` closes it without `onDestroyStarted`: not marked as seen.
+            if (layoutBand(window.innerWidth) !== band || gone) tour.destroy();
+        };
+        window.addEventListener('resize', onResize);
+        const stopWatchingLayout = () => window.removeEventListener('resize', onResize);
+
         driverRef.current = driver({
             animate: true,
             showProgress: true,
@@ -167,6 +206,8 @@ export function useTour(options: UseTourOptions = {}) {
             popoverClass: 'visualex-tour-popover',
             onPopoverRender: (popover) => {
                 popover.closeButton.setAttribute('aria-label', TOUR_UI.closeBtnLabel);
+                popover.wrapper.addEventListener('focusin', (event) => quietFocus(event.target));
+                if (popover.wrapper.contains(document.activeElement)) quietFocus(document.activeElement);
             },
             onDestroyStarted: () => {
                 markTourComplete(tourType);
@@ -174,6 +215,7 @@ export function useTour(options: UseTourOptions = {}) {
                 driverRef.current?.destroy();
             },
             onDestroyed: () => {
+                stopWatchingLayout();
                 if (onScreen === driverRef.current) onScreen = null;
                 driverRef.current = null;
             }
