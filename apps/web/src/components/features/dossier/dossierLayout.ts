@@ -85,7 +85,8 @@ const ORDINALS: Record<string, number> = {
 
 // "2043" → [2043, 0, ''], "2-bis" → [2, 2, ''], "270-bis.1" → [270, 2, '.1'].
 // "2bis", as a history entry stores what was typed, reads as "2-bis" (the
-// server's own normalisation); a split ordinal ("135-sex-decies") ranks last.
+// server's own normalisation); a split ordinal the table holds joined
+// ("135-sex-decies") reads as it ("135-sexdecies", 16), another ranks last.
 function articleRank(numero: string): [number, number, string] {
   const id = normalizeArticleId(numero || '').replace(/^(\d+)([a-z])/, '$1-$2');
   const match = /^(\d+)(?:-([a-z]+))?(.*)$/.exec(id);

@@ -83,7 +83,16 @@ export function PhoneTopBar({ menu, title, hidden, onReveal, onSearch, barRef }:
       <div className="flex h-14 items-center gap-1 px-1 md:pr-[3.25rem]">
         <MenuToggle {...menu} />
         <p className="min-w-0 flex-1 truncate text-center font-serif text-lg font-medium text-slate-900 dark:text-slate-50">{title}</p>
-        <button type="button" onClick={onSearch} aria-label="Apri il menu di ricerca" className={BAR_BUTTON}>
+        <button
+          type="button"
+          // Safari does not focus a button it clicks: focused here, so the search menu gives the focus back to it.
+          onClick={(event) => {
+            event.currentTarget.focus({ preventScroll: true });
+            onSearch();
+          }}
+          aria-label="Apri il menu di ricerca"
+          className={BAR_BUTTON}
+        >
           <Search size={20} aria-hidden />
         </button>
       </div>

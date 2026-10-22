@@ -1,18 +1,27 @@
-import { ARTICLE_SUFFIX_ALTERNATION } from './articleSuffixes';
+import { ARTICLE_ORDINAL_SUFFIXES, ARTICLE_SUFFIX_ALTERNATION } from './articleSuffixes';
+
+const ORDINALS: ReadonlySet<string> = new Set(ARTICLE_ORDINAL_SUFFIXES);
+// An ordinal split in two words: "135-sex-decies".
+const SPLIT_ORDINAL = /^(\d+)-([a-z]+)-([a-z]+)\b(.*)$/;
+// An ordinal written against its number: "2bis", the URN's "135sexdecies".
+const ATTACHED_ORDINAL = new RegExp(`^(\\d+)(${ARTICLE_SUFFIX_ALTERNATION})\\b`);
 
 /**
- * Extracts article IDs from a tree structure.
- * Handles various tree node formats from the API:
- * - Flat array of strings: ["TITOLO...", "1", "2", "3", ...]
- * - Nested objects with properties: { numero, label, title, children, ... }
- */
-/**
- * Normalizes article ID format for consistent comparison.
- * Converts "3 bis" -> "3-bis", trims whitespace.
+ * Normalizes article ID format for consistent comparison — never a key that is
+ * stored or sent. Converts "3 bis" and "3bis" -> "3-bis", trims whitespace.
+ * An ordinal split in two words is joined when the table holds it joined, as the
+ * API's `comparable_article_key` does: Normattiva writes "135 sex decies" in the
+ * tree (and `/fetch_rubriche` keys it "135-sex-decies") and "135sexdecies" in the
+ * URN, and all of them are "135-sexdecies" here — the dossier's row of art.
+ * 135-sexdecies cod. consumo had no title. A pair the table does not hold joined
+ * ("135 vicies semel") stays two words.
  */
 export function normalizeArticleId(id: string): string {
   if (!id) return id;
-  return id.trim().toLowerCase().replace(/\s+/g, '-').replace(/\.$/, '');
+  const key = id.trim().toLowerCase().replace(/\s+/g, '-').replace(/\.$/, '');
+  const split = SPLIT_ORDINAL.exec(key);
+  if (split && ORDINALS.has(split[2] + split[3])) return `${split[1]}-${split[2]}${split[3]}${split[4]}`;
+  return key.replace(ATTACHED_ORDINAL, '$1-$2');
 }
 
 // Tree nodes come from several API shapes; a node is either a plain string or a
@@ -32,6 +41,12 @@ interface TreeNodeObject {
 export type TreeNode = string | TreeNodeObject;
 type TreeNodes = TreeNode[] | Record<string, TreeNode> | null | undefined;
 
+/**
+ * Extracts article IDs from a tree structure.
+ * Handles various tree node formats from the API:
+ * - Flat array of strings: ["TITOLO...", "1", "2", "3", ...]
+ * - Nested objects with properties: { numero, label, title, children, ... }
+ */
 export function extractArticleIdsFromTree(treeData: TreeNode[]): string[] {
   const articleIds: string[] = [];
   const seen = new Set<string>(); // Track normalized IDs to avoid duplicates
