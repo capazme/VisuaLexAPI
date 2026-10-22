@@ -312,7 +312,7 @@ function PanelGrowth({ still, fromHeight, className, children }: { still: boolea
   }, [isPresent, still]);
 
   return (
-    <div ref={ref} className={cn('rounded-2xl shadow-xl', className)}>
+    <div ref={ref} className={cn('rounded-2xl shadow-lg', className)}>
       <motion.div
         className="flex min-h-0 flex-1 flex-col"
         initial={{ opacity: 0 }}

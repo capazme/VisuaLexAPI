@@ -99,7 +99,7 @@ export function PracticeBar({ onHeightChange }: { onHeightChange?: (height: numb
         ) : (
           <nav
             aria-label="Pratiche"
-            className="rounded-2xl border border-slate-200/60 bg-white/95 shadow-2xl ring-1 ring-black/5 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/95"
+            className="rounded-2xl border border-slate-200/60 bg-white/95 shadow-md ring-1 ring-black/5 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/95"
           >
             <div className="flex items-center justify-between gap-4 rounded-t-2xl border-b border-slate-200/60 bg-slate-50/50 px-4 py-2 dark:border-slate-800 dark:bg-slate-900/50">
               <div className="flex items-center gap-2">

@@ -30,6 +30,7 @@ import { InlineNoteComposer } from './InlineNoteComposer';
 import { ArticleBody } from './ArticleBody';
 import { closeFindWindow, openFindWindow } from '../../../utils/findWindowControl';
 import { useFindWindowScopedTo } from '../../../hooks/useFindWindowScopedTo';
+import { quickNormParamsOf } from '../../../utils/quickNormParams';
 import { ArticleDiscussionPanel } from './ArticleDiscussionPanel';
 import { UpdateNotePopover } from './UpdateNotePopover';
 import { BlockAnnotationsPopover } from './BlockAnnotationsPopover';
@@ -400,14 +401,11 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         container.classList.toggle('highlights-hidden', highlightsHidden);
     }, [highlightsHidden]);
 
-    const quickNormParams = useMemo(() => ({
-        act_type: norma_data.tipo_atto,
-        act_number: norma_data.numero_atto || '',
-        date: norma_data.data || '',
-        article: norma_data.numero_articolo,
-        annex: norma_data.allegato,
-        version: 'vigente' as const,
-    }), [norma_data.tipo_atto, norma_data.numero_atto, norma_data.data, norma_data.numero_articolo, norma_data.allegato]);
+    const quickNormParams = useMemo(
+        () => quickNormParamsOf(norma_data),
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- the fields it reads, not the object
+        [norma_data.tipo_atto, norma_data.numero_atto, norma_data.data, norma_data.numero_articolo, norma_data.allegato],
+    );
 
     const isPinnedQuick = isQuickNorm(quickNormParams);
 

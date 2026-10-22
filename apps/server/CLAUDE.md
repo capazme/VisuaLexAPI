@@ -507,6 +507,12 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `lapses`) and a log row appended. `GET`/`PUT /preferenze`: the daily goal of new cards
   (1–200, default 20), the review goal `ripassiAlGiorno` (1–200, default 10) and the
   community subjects; `GET` never creates the row.
+- **Today's counts, read only** — `GET /api/lingo/srs/conteggi` (G-356; session only, no parameters: any is a 400)
+  answers `{ giorno, dovute, nuove }`: the Rome day, the cards due by its end and the new cards it still allows
+  (the daily goal less the cards introduced today, at most those available), over the whole `reviewScope`, the
+  same counts `/sessione` answers in `conteggi`. For a page that only shows them (Opus's «Oggi»): unlike
+  `/sessione` and `/progressi` it never marks the day's queue finished, settles a mission or credits points, and
+  writes no row (not even the preferences). `tests/lingoConteggi.routes.test.ts` checks that nothing is written.
 - **The streak and the progress dashboard** (spec
   `docs/superpowers/specs/2026-10-13-studia-progress-design.md`; session only, like the rest
   of `/api/lingo/srs`). `LingoGiornataStudio` (`lingo_giornate_studio`) holds one row per user

@@ -52,6 +52,15 @@ describe('Button', () => {
     }
   });
 
+  it('presses to 0.97 in 120 ms on `--ease-out` (Y1)', () => {
+    render(<Button>Premi</Button>);
+    const { className } = screen.getByRole('button', { name: 'Premi' });
+    expect(className).toContain('active:scale-[0.97]');
+    expect(className).toContain('duration-[120ms]');
+    expect(className).not.toContain('duration-150');
+    expect(className).toContain('ease-out');
+  });
+
   it('keeps a 20 px line at every size', () => {
     render(
       <>

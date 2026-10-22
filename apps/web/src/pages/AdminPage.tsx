@@ -304,13 +304,13 @@ export function AdminPage() {
     switch (type) {
       case 'bug': return <Bug size={16} className="text-red-500" />;
       case 'suggestion': return <Lightbulb size={16} className="text-amber-500" />;
-      default: return <HelpCircle size={16} className="text-blue-500" />;
+      default: return <HelpCircle size={16} className="text-primary-500" />;
     }
   };
 
   const getFeedbackStatusBadge = (status: FeedbackStatus) => {
     const styles = {
-      new: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+      new: 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400',
       read: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
       resolved: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
       dismissed: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
@@ -585,7 +585,7 @@ export function AdminPage() {
                 </button>
                 <button
                   onClick={() => setShowCreateModal(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors"
                 >
                   <UserPlus size={18} />
                   Nuovo Utente
@@ -714,7 +714,7 @@ export function AdminPage() {
                             <div className="flex items-center justify-end gap-1">
                               <button
                                 onClick={() => setShowResetPasswordModal(u.id)}
-                                className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                                className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg transition-colors"
                                 title="Reimposta password"
                               >
                                 <Key size={16} />
@@ -774,7 +774,7 @@ export function AdminPage() {
                 <select
                   value={feedbackFilter.status || ''}
                   onChange={(e) => setFeedbackFilter({ ...feedbackFilter, status: e.target.value as FeedbackStatus || undefined })}
-                  className="px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
                 >
                   <option value="">Tutti gli stati</option>
                   <option value="new">Nuovo</option>
@@ -785,7 +785,7 @@ export function AdminPage() {
                 <select
                   value={feedbackFilter.type || ''}
                   onChange={(e) => setFeedbackFilter({ ...feedbackFilter, type: e.target.value as FeedbackType || undefined })}
-                  className="px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
                 >
                   <option value="">Tutti i tipi</option>
                   <option value="bug">Bug</option>
@@ -822,7 +822,7 @@ export function AdminPage() {
                     className={cn(
                       'bg-white dark:bg-gray-800 rounded-xl border p-4 transition-colors',
                       f.status === 'new'
-                        ? 'border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/10'
+                        ? 'border-primary-200 dark:border-primary-800 bg-primary-50/50 dark:bg-primary-900/10'
                         : 'border-gray-200 dark:border-gray-700'
                     )}
                   >
@@ -850,7 +850,7 @@ export function AdminPage() {
                           <button
                             onClick={() => handleUpdateFeedbackStatus(f.id, 'read')}
                             disabled={actionLoading}
-                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                            className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg transition-colors"
                             title="Segna come letto"
                           >
                             <Eye size={16} />
@@ -915,7 +915,7 @@ export function AdminPage() {
                       value={envSearch}
                       onChange={(e) => setEnvSearch(e.target.value)}
                       placeholder="Cerca un dossier pubblicato…"
-                      className="pl-9 pr-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none w-64"
+                      className="pl-9 pr-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none w-64"
                     />
                   </div>
                   <button
@@ -929,7 +929,7 @@ export function AdminPage() {
                 <select
                   value={envStatusFilter}
                   onChange={(e) => setEnvStatusFilter(e.target.value as 'active' | 'withdrawn' | 'all')}
-                  className="px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
                 >
                   <option value="all">Tutti</option>
                   <option value="active">Attivi</option>
@@ -1122,7 +1122,7 @@ export function AdminPage() {
                 <select
                   value={reportStatusFilter}
                   onChange={(e) => setReportStatusFilter(e.target.value as ReportStatus | 'all')}
-                  className="px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none"
                 >
                   <option value="pending">In attesa</option>
                   <option value="reviewed">Esaminate</option>
@@ -1242,7 +1242,7 @@ export function AdminPage() {
       {/* Create User Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg w-full max-w-md mx-4 p-6">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               Crea Nuovo Utente
             </h3>
@@ -1260,7 +1260,7 @@ export function AdminPage() {
                   type="email"
                   value={newUser.email}
                   onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                   required
                 />
               </div>
@@ -1272,7 +1272,7 @@ export function AdminPage() {
                   type="text"
                   value={newUser.username}
                   onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                   required
                   minLength={3}
                 />
@@ -1285,7 +1285,7 @@ export function AdminPage() {
                   type="password"
                   value={newUser.password}
                   onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                   required
                   minLength={3}
                 />
@@ -1296,7 +1296,7 @@ export function AdminPage() {
                   id="isAdmin"
                   checked={newUser.isAdmin}
                   onChange={(e) => setNewUser({ ...newUser, isAdmin: e.target.checked })}
-                  className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                  className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
                 />
                 <label htmlFor="isAdmin" className="text-sm text-gray-700 dark:text-gray-300">
                   Amministratore
@@ -1317,7 +1317,7 @@ export function AdminPage() {
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                  className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
                 >
                   {actionLoading ? 'Creazione...' : 'Crea Utente'}
                 </button>
@@ -1330,7 +1330,7 @@ export function AdminPage() {
       {/* Reset Password Modal */}
       {showResetPasswordModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg w-full max-w-md mx-4 p-6">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               Reset Password
             </h3>
@@ -1348,7 +1348,7 @@ export function AdminPage() {
                   type="password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                   minLength={3}
                 />
               </div>
@@ -1367,7 +1367,7 @@ export function AdminPage() {
                 <button
                   onClick={handleResetPassword}
                   disabled={actionLoading || !newPassword}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                  className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
                 >
                   {actionLoading ? 'Reset...' : 'Reset Password'}
                 </button>
@@ -1380,7 +1380,7 @@ export function AdminPage() {
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg w-full max-w-md mx-4 p-6">
             <div className="text-center">
               <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Trash2 size={24} />
@@ -1414,7 +1414,7 @@ export function AdminPage() {
       {/* Delete Feedback Confirmation Modal */}
       {showDeleteFeedbackConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg w-full max-w-md mx-4 p-6">
             <div className="text-center">
               <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Trash2 size={24} />
@@ -1448,7 +1448,7 @@ export function AdminPage() {
       {/* Delete Environment Confirmation Modal */}
       {showDeleteEnvConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg w-full max-w-md mx-4 p-6">
             <div className="text-center">
               <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Trash2 size={24} />

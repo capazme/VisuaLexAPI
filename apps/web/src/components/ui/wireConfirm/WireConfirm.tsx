@@ -36,6 +36,17 @@ export interface WireConfirmProps {
   onConfirm: () => void | Promise<string | null | void>;
   onCancel: () => void;
   /**
+   * Which button is the evident one: the confirmation (the default), or the cancel when going back is what one wants
+   * most — «Continua il ripasso» over «Interrompi» (U1c): then the cancel is filled and on the right, the confirmation
+   * outlined. The focus opens on the cancel and Esc is the cancel either way.
+   */
+  emphasis?: 'confirm' | 'cancel';
+  /**
+   * Where the focus goes after a cancel, when not back to `origin` (read as it closes): the lesson's card after
+   * «Continua il ripasso», where Space shows the answer — on «Interrompi» it would press it again.
+   */
+  focusBack?: () => HTMLElement | null | undefined;
+  /**
    * The button the wire starts from and the focus goes back to. Pass it (`event.currentTarget`): Safari and a tap do not
    * focus a button they press. Absent, the element focused as it opens — right for a menu's entry, whose menu gives
    * the focus back to its trigger by code before the entry runs.
@@ -80,6 +91,8 @@ export function WireConfirm({
   onCancel,
   origin,
   onOutcomeDone,
+  emphasis = 'confirm',
+  focusBack,
 }: WireConfirmProps) {
   const still = Boolean(useReducedMotion());
   const id = useId();
@@ -113,8 +126,10 @@ export function WireConfirm({
     }
   }
   const outcomeDone = useRef(onOutcomeDone);
+  const focusBackRef = useRef(focusBack);
   useEffect(() => {
     outcomeDone.current = onOutcomeDone;
+    focusBackRef.current = focusBack;
   });
 
   useEffect(() => (open ? openDialog(token.current) : undefined), [open]);
@@ -146,9 +161,23 @@ export function WireConfirm({
   }, [open, still]);
 
   // Closed: the focus goes back to the button at once, not after the rewind. A button its action disabled (busy) takes
-  // it once enabled again, if nothing else took it meanwhile.
+  // it once enabled again, if nothing else took it meanwhile. Only after a real closing — mounted closed, nothing moves
+  // the focus (with `focusBack`, the lesson's card would take it as the page opens) — and once per closing.
+  const closing = useRef(false);
   useEffect(() => {
-    if (open || !from?.isConnected) return;
+    if (open) {
+      closing.current = true;
+      return;
+    }
+    if (!closing.current) return;
+    closing.current = false;
+    // Cancelled, with a place of its own to go back to.
+    const back = confirmed ? null : focusBackRef.current?.();
+    if (back?.isConnected) {
+      back.focus({ preventScroll: true });
+      return;
+    }
+    if (!from?.isConnected) return;
     if (!(from as HTMLButtonElement).disabled) {
       from.focus({ preventScroll: true });
       return;
@@ -164,7 +193,7 @@ export function WireConfirm({
       observer.disconnect();
       window.clearTimeout(timer);
     };
-  }, [open, from]);
+  }, [open, from, confirmed]);
 
   useEffect(() => {
     if (!open) return;
@@ -242,6 +271,7 @@ export function WireConfirm({
             cancelLabel={cancelLabel}
             confirmLabel={confirmLabel}
             variant={variant}
+            emphasis={emphasis}
             still={still}
             paths={paths}
             ready={ready}
@@ -268,6 +298,7 @@ interface WireLayerProps {
   cancelLabel: string;
   confirmLabel: string;
   variant: 'default' | 'danger';
+  emphasis: 'confirm' | 'cancel';
   still: boolean;
   paths: WirePaths | null;
   ready: boolean;
@@ -279,7 +310,7 @@ interface WireLayerProps {
 }
 
 /** The backdrop, the wire and the card: one presence, so the wire winds back while the card goes. */
-function WireLayer({ id, title, message, cancelLabel, confirmLabel, variant, still, paths, ready, cardRef, cancelRef, confirmRef, onCancel, onConfirm }: WireLayerProps) {
+function WireLayer({ id, title, message, cancelLabel, confirmLabel, variant, emphasis, still, paths, ready, cardRef, cancelRef, confirmRef, onCancel, onConfirm }: WireLayerProps) {
   // Leaving, it takes no key and no click: an Enter during the rewind must not confirm.
   const present = useIsPresent();
   const ink = variant === 'danger' ? 'text-red-600 dark:text-red-400' : 'text-primary-600 dark:text-primary-400';
@@ -313,6 +344,19 @@ function WireLayer({ id, title, message, cancelLabel, confirmLabel, variant, sti
         : { opacity: 0, transition: { duration: still ? 0.12 : BACK_CARD_S } },
   };
 
+  const confirmButton = (
+    <Button
+      ref={confirmRef}
+      variant={emphasis === 'cancel' ? 'secondary' : variant === 'danger' ? 'danger' : 'primary'}
+      size="sm"
+      // Outlined, a dangerous confirmation keeps its red in its words, as the wire does.
+      className={cn('min-h-[44px] md:min-h-9', emphasis === 'cancel' && variant === 'danger' && 'text-red-700 dark:text-red-300')}
+      onClick={onConfirm}
+    >
+      {confirmLabel}
+    </Button>
+  );
+
   return (
     // Leaving, the layer still takes the clicks (they do not fall to the page under the rewind); the card takes none.
     <div className={cn('fixed inset-0', Z_INDEX.modal)}>
@@ -344,7 +388,7 @@ function WireLayer({ id, title, message, cancelLabel, confirmLabel, variant, sti
           inert={!present || undefined}
           // Its buttons answer (they have risen into sight).
           data-ready={ready || undefined}
-          className="pointer-events-auto w-full max-w-sm rounded-2xl border border-ink-200 bg-white p-5 shadow-xl dark:border-ink-700 dark:bg-ink-900"
+          className="pointer-events-auto w-full max-w-sm rounded-2xl border border-ink-200 bg-white p-5 shadow-lg dark:border-ink-700 dark:bg-ink-900"
           variants={card}
           initial="hidden"
           animate="shown"
@@ -356,13 +400,13 @@ function WireLayer({ id, title, message, cancelLabel, confirmLabel, variant, sti
           <motion.p id={`${id}-message`} variants={row(1)} className="mt-2 text-sm leading-relaxed text-ink-600 dark:text-ink-300">
             {message}
           </motion.p>
-          <motion.div variants={row(2)} className="mt-5 flex justify-end gap-2">
-            <Button ref={cancelRef} variant="quiet" size="sm" className="min-h-[44px] md:min-h-9" onClick={onCancel}>
+          <motion.div variants={row(2)} className="mt-5 flex flex-wrap justify-end gap-2">
+            {/* The evident button on the right: the confirmation, or the cancel when it is the one wanted most. */}
+            {emphasis === 'cancel' && confirmButton}
+            <Button ref={cancelRef} variant={emphasis === 'cancel' ? 'primary' : 'quiet'} size="sm" className="min-h-[44px] md:min-h-9" onClick={onCancel}>
               {cancelLabel}
             </Button>
-            <Button ref={confirmRef} variant={variant === 'danger' ? 'danger' : 'primary'} size="sm" className="min-h-[44px] md:min-h-9" onClick={onConfirm}>
-              {confirmLabel}
-            </Button>
+            {emphasis === 'confirm' && confirmButton}
           </motion.div>
         </motion.div>
       </div>

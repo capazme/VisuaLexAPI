@@ -19,9 +19,9 @@ export function DossierKindChoice({ value, onChange, disabled }: Props) {
             key={kind}
             className={cn(
               'flex min-h-[44px] cursor-pointer items-start gap-2 rounded-lg border p-3 text-sm transition-colors',
-              'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue-500',
+              'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary-500',
               value === kind
-                ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/30'
+                ? 'border-primary-500 bg-primary-50 dark:border-primary-400 dark:bg-primary-900/30'
                 : 'border-slate-300 hover:border-slate-400 dark:border-slate-600 dark:hover:border-slate-500',
             )}
           >
