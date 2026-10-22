@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { createPortal } from 'react-dom';
+import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
@@ -15,7 +16,8 @@ import { CardFilters } from './CardFilters';
 import { CardGroups } from './CardGroups';
 import type { CardFormMode } from './CardForm';
 import { CardFormDialog } from './CardFormDialog';
-import { BLOCK_HEADING, FOCUS_RING, INK_BUTTON, INK_TEXT, MUTED_TEXT, QUIET_BUTTON, SECONDARY_BUTTON, TILE } from './progress/tokens';
+import { FOCUS_RING, INK_BUTTON, INK_TEXT, MUTED_TEXT, QUIET_BUTTON, SECONDARY_BUTTON, TILE } from './progress/tokens';
+import type { StudiaOutletContext } from './StudiaPage';
 import { anchorActLabel, searchParamsFromAnchor } from './studiaLabels';
 import { useCardSources } from './useCardSources';
 import { NO_FILTERS, useMyCards, type ActOption, type CardQuery, type FilterState } from './useMyCards';
@@ -143,14 +145,16 @@ function withActsOf(
 }
 
 /**
- * «Le mie schede»: the user's cards by subject and institute, behind a sticky filter row, with
- * the selected card beside the list (a phone shows one or the other). The selection is the route:
- * `/studia/schede/:id`. «+ Nuova scheda», in the heading and in the empty list, opens the form with no
- * article — only while the sources answer (`useCardSources`).
+ * «Le mie schede»: the user's cards by subject and institute, behind a sticky filter row, across the page's width as a
+ * grid of tiles (G8); with a card selected, the list in one column and the card beside it (a phone shows one or the
+ * other). The selection is the route: `/studia/schede/:id`. «+ Nuova scheda», beside the page's title (`StudiaPage`'s
+ * slot) and in the empty list, opens the form with no article — only while the sources answer (`useCardSources`).
  */
 export function MyCardsView() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  // Beside the page's title; drawn in the view's own row where no frame gives a place (the view alone).
+  const actionSlot = useOutletContext<StudiaOutletContext | undefined>()?.actionSlot;
   const desktop = useIsDesktop();
   const triggerSearch = useAppStore((s) => s.triggerSearch);
   const sources = useCardSources();
@@ -306,22 +310,22 @@ export function MyCardsView() {
     settleSearch('');
   };
   const showList = desktop || !id;
+  // With a card open on a computer the list is a column beside it; without one the cards take the page's width.
+  const beside = desktop && Boolean(id);
+  const newCard = canWrite && (
+    <button ref={newCardButton} type="button" aria-haspopup="dialog" onClick={openNew} className={SECONDARY_BUTTON}>
+      + Nuova scheda
+    </button>
+  );
 
   return (
     <section className="space-y-4 pb-8">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className={BLOCK_HEADING}>Le mie schede</h2>
-        {canWrite && (
-          <button ref={newCardButton} type="button" aria-haspopup="dialog" onClick={openNew} className={SECONDARY_BUTTON}>
-            + Nuova scheda
-          </button>
-        )}
-      </header>
+      {newCard && (actionSlot ? createPortal(newCard, actionSlot) : <div className="flex justify-end">{newCard}</div>)}
 
-      <div className="md:grid md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] md:items-start md:gap-6">
+      <div className={cn(beside && 'grid grid-cols-[minmax(0,5fr)_minmax(0,7fr)] items-start gap-6')}>
         {showList && (
           <div className="min-w-0">
-            <CardFilters value={filterState} onChange={setFilterState} search={search} onSearchChange={setSearch} acts={actOptions} />
+            <CardFilters value={filterState} onChange={setFilterState} search={search} onSearchChange={setSearch} acts={actOptions} row={!beside} />
             <div className="pt-4">
               {error && (
                 <div role="alert" className="mb-3 flex flex-wrap items-center gap-x-3 text-sm text-red-700 dark:text-red-400">
@@ -343,7 +347,7 @@ export function MyCardsView() {
                 ) : (
                   <NoCardsYet sources={sources} onNew={openNew} />
                 ))}
-              <CardGroups groups={groups} selectedId={id} folded={folded} onToggleFold={toggleFold} />
+              <CardGroups groups={groups} selectedId={id} folded={folded} onToggleFold={toggleFold} grid={!beside} />
               {hasMore && (
                 <button type="button" onClick={loadMore} disabled={loading} className={cn(SECONDARY_BUTTON, 'mt-4 w-full disabled:opacity-60')}>
                   Mostra altre schede
@@ -353,8 +357,11 @@ export function MyCardsView() {
           </div>
         )}
 
-        {id ? (
+        {id && (
           <div className={cn('min-w-0 pt-2 md:pt-0', desktop && 'sticky top-[var(--phone-bar-offset,0px)] max-h-[calc(100dvh-var(--phone-bar-offset,0px))] overflow-y-auto pb-4')}>
+            {/* The outline under the page's title: the card's own headings (h3, h4) sit under this, on a phone with no list
+                beside it, on a computer beside the subjects' h2. */}
+            <h2 className="sr-only">La scheda scelta</h2>
             {selected ? (
               <DetailOf
                 // Its confirmations and pending request belong to this card: another one starts clean.
@@ -377,13 +384,6 @@ export function MyCardsView() {
               </div>
             )}
           </div>
-        ) : (
-          desktop &&
-          cards.length > 0 && (
-            <p className={cn('rounded-2xl border border-dashed border-slate-300 px-6 py-10 text-center text-sm dark:border-slate-700', MUTED_TEXT)}>
-              Scegli una scheda dall’elenco per leggerla.
-            </p>
-          )
         )}
       </div>
 

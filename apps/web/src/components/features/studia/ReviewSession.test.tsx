@@ -23,6 +23,7 @@ import { Z_INDEX } from '../../../constants/zIndex';
 import type { Progressi, SchedaDiRipasso } from '../../../types/studia';
 import { SESSION_NOTICE_MS } from './progress/Celebration';
 import { GRADE_NOTE_MS } from './useGradeNote';
+import { LESSON_PRIMARY } from './lessonStyles';
 import { ReviewSession } from './ReviewSession';
 import { xpFields } from './__fixtures__/xp';
 
@@ -623,6 +624,8 @@ describe('the lesson (Gymnasium spec §5.4)', () => {
       expect(bar()).toHaveAttribute('aria-valuenow', '0');
       expect(bar()).toHaveAttribute('aria-valuemax', '4');
       expect(screen.getByTestId('lesson-progress-fill')).toHaveStyle({ width: '0%' });
+      // The section's hue, not the ink's near-grey (G8).
+      expect(screen.getByTestId('lesson-progress-fill')).toHaveClass('vlx-lesson-ink');
 
       await show();
       await user.click(screen.getByRole('button', { name: /Bene/ }));
@@ -874,7 +877,17 @@ describe('the lesson (Gymnasium spec §5.4)', () => {
       const sentence = await screen.findByText('Hai ripassato 1 scheda, nessuna da rifare. Le prossime: domani.');
       await screen.findByRole('img', { name: /Obiettivo di oggi/ });
       expect(screen.queryByRole('button', { name: 'Continua' })).not.toBeInTheDocument();
-      expect(screen.getByTestId('lesson-bar')).toContainElement(screen.getByRole('button', { name: 'Torna a Oggi' }));
+      // One card, centred, holds the sentence, the ring, the streak (with its strip of the last seven days, the week: no
+      // second row of it) and the one action (G8).
+      const end = screen.getByTestId('lesson-end');
+      expect(end).toContainElement(sentence);
+      expect(end).toContainElement(screen.getByRole('img', { name: /Obiettivo di oggi/ }));
+      expect(end).toContainElement(screen.getByRole('group', { name: /^Serie:/ }));
+      expect(within(end).getByRole('list', { name: 'Ultimi sette giorni' })).toBeInTheDocument();
+      expect(within(end).queryByRole('list', { name: 'Questa settimana' })).toBeNull();
+      expect(within(end).getByRole('button', { name: 'Torna a Oggi' })).toHaveClass(...LESSON_PRIMARY.split(' '));
+      expect(screen.getAllByRole('button', { name: 'Torna a Oggi' })).toHaveLength(1);
+      expect(screen.queryByTestId('lesson-bar')).toBeNull();
       // Focus goes to how it went.
       expect(document.activeElement).toBe(sentence);
     });
@@ -885,6 +898,9 @@ describe('the lesson (Gymnasium spec §5.4)', () => {
       await show();
       await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
       const more = await screen.findByRole('button', { name: 'Continua' });
+      // One primary action: «Torna a Oggi» a quiet link under it, not a second button alike (G8).
+      expect(more).toHaveClass(...LESSON_PRIMARY.split(' '));
+      expect(screen.getByRole('button', { name: 'Torna a Oggi' })).not.toHaveClass(...LESSON_PRIMARY.split(' '));
       session.mockResolvedValue({ conteggi: { dovute: 1, nuove: 0 }, cards: [card('e')] });
       await userEvent.setup().click(more);
       expect(await screen.findByText('Domanda e?')).toBeInTheDocument();
