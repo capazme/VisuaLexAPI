@@ -15,19 +15,19 @@
  * box with `scrollbar-gutter: stable`, so a window too low for it does not shift sideways when a bar
  * appears. The motion, once per change of tab: the mark under the tabs slides (`transform`, 200 ms),
  * the form leaving fades (120 ms) while the one coming in fades from 8 px on the side of its tab
- * (180 ms). Under reduced motion the change is immediate.
+ * (180 ms). Under reduced motion the change is immediate. Once, as the page opens, the colophon is written in
+ * ink (A3): the book traces itself, the wordmark comes out from under the pen's soft edge, the line rises under it.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type AnimationEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { BookOpen } from 'lucide-react';
-import { motion } from 'framer-motion';
-import { SegmentWordmark } from './SegmentWordmark';
 import { BookMark } from '../ui/BookMark';
 import { FOCUS_RING } from '../../constants/interactions';
+import { cn } from '../../lib/utils';
 import { useAuth } from '../../hooks/useAuth';
 import { authPageTab, isLoginPage } from '../../utils/returnTo';
 import { canTransitionPage, startPageTransition } from '../../lib/pageTransition';
 import { focusField } from './authForm';
+import { INK_ENDS, isIOSWebKit } from './inkMark';
 import { LoginForm } from './LoginForm';
 import { RegisterForm } from './RegisterForm';
 
@@ -37,6 +37,9 @@ const TABS: { id: AuthTab; label: string; path: string }[] = [
   { id: 'login', label: 'Accedi', path: '/login' },
   { id: 'register', label: 'Registrati', path: '/register' },
 ];
+
+// The wordmark's two copies (A3) stack in one cell of a grid, each with room for the mask past the glyphs' edges.
+const INK_CELL = 'col-start-1 row-start-1 px-[0.05em] py-[0.1em]';
 
 // Entering the app (spec §6.3.1): once per session the book traces itself, then the app comes in.
 const ENTRY_MS = 720;
@@ -68,8 +71,34 @@ export function AuthPage() {
   // the form starts again empty (it stays mounted, so a new key mounts it afresh).
   const [signedUp, setSignedUp] = useState(false);
   const [registerKey, setRegisterKey] = useState(0);
-  // The wordmark has melted out of its seven-segment display (A2): the open book comes.
-  const [markSettled, setMarkSettled] = useState(false);
+  // The wordmark written in ink (A3, `index.css`): the word is one text throughout, its kerning kept; while the pen
+  // writes it a faint blurred copy runs ahead of its mask. Once written — or when the writing is cancelled, reduced
+  // motion turned on halfway — the copy and the mask go. Under reduced motion nothing is written, and the colophon
+  // only fades in, `inkShown` turning its opacity on after a frame drawn at 0.
+  const [inked, setInked] = useState(prefersReducedMotion);
+  const [plainInk] = useState(isIOSWebKit);
+  const endInk = (event: Pick<AnimationEvent, 'animationName'>) => {
+    if (INK_ENDS.includes(event.animationName)) setInked(true);
+  };
+  // React has no `animationcancel`: listened to on the element, so reduced motion turned on halfway (the rules go,
+  // the animation is cancelled, no `animationend` comes) still ends the writing.
+  const inkRef = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const element = inkRef.current;
+    if (!element || inked) return undefined;
+    const cancel = (event: globalThis.AnimationEvent) => {
+      if (INK_ENDS.includes(event.animationName)) setInked(true);
+    };
+    element.addEventListener('animationcancel', cancel);
+    return () => element.removeEventListener('animationcancel', cancel);
+  }, [inked]);
+  const [inkShown, setInkShown] = useState(false);
+  useEffect(() => {
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => setInkShown(true));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
   // And «Torna ad Accedi» finds a fresh sign-in form: a new key empties it, and the failure the page's
   // `useAuth` still holds (until the next sign-in) is not shown on it. A new failure is the form's own
   // message, so hiding the same words again loses nothing.
@@ -167,22 +196,29 @@ export function AuthPage() {
           <div className="mx-auto grid w-full max-w-4xl gap-8 md:grid-cols-[minmax(0,1fr)_420px] md:items-center md:gap-16">
             {/* The title grows only from `lg`: between 768 and 1023 px the column beside the card is about
                 200-430 px, and «VisuaLex» at 68 px is 272 px wide. */}
-            <header className="flex flex-col items-center gap-4 text-center md:items-start md:gap-5 md:text-left">
-              {/* The open book comes once the wordmark has melted out of its display (A2); its place is kept meanwhile. */}
-              <motion.span
-                aria-hidden="true"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: markSettled ? 1 : 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                <BookOpen size={44} strokeWidth={1.5} className="text-primary-600 dark:text-primary-400" />
-              </motion.span>
-              <SegmentWordmark
-                className="font-serif text-5xl leading-none tracking-tight text-slate-900 dark:text-slate-50 lg:text-[4.25rem]"
-                weightClass="font-medium"
-                onSettled={() => setMarkSettled(true)}
-              />
-              <p className="max-w-[34ch] font-serif text-xl leading-relaxed text-slate-600 dark:text-slate-300">
+            <header
+              className={cn(
+                'flex flex-col items-center gap-4 text-center md:items-start md:gap-5 md:text-left',
+                // Under reduced motion the global rule turns this into a 150 ms fade, the whole of the motion.
+                !inkShown && 'motion-reduce:opacity-0',
+              )}
+            >
+              <BookMark size={44} className="vlx-ink-book text-primary-600 dark:text-primary-400" />
+              {/* One text, «VisuaLex», for the eye and for a reader; while the pen writes, a faint blurred copy of it,
+                  hidden from a reader, runs ahead of the ink's mask (WebKit kerns no pair across two elements, so the
+                  word is never split into letters). The cells' padding, taken back by the grid's margins, gives the
+                  masks room for the glyphs' edges. */}
+              <h1 className="font-serif text-5xl font-medium leading-none tracking-tight text-slate-900 dark:text-slate-50 lg:text-[4.25rem]">
+                <span ref={inkRef} className="-mx-[0.05em] -my-[0.1em] inline-grid" onAnimationEnd={endInk}>
+                  <span className={cn(INK_CELL, !inked && (plainInk ? 'vlx-ink-plain' : 'vlx-ink-word'))}>VisuaLex</span>
+                  {!inked && !plainInk && (
+                    <span aria-hidden="true" className={cn(INK_CELL, 'vlx-ink-bleed select-none')}>
+                      VisuaLex
+                    </span>
+                  )}
+                </span>
+              </h1>
+              <p className="vlx-ink-line max-w-[34ch] font-serif text-xl leading-relaxed text-slate-600 dark:text-slate-300">
                 Le norme italiane ed europee, le sentenze che le leggono, e il tuo lavoro sopra: note, evidenziazioni, dossier.
               </p>
             </header>

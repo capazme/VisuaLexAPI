@@ -27,8 +27,6 @@ const HAND_COLOUR = /\b(?:bg|text|border(?:-[trblxyse])?|ring(?:-offset)?|outlin
 const KEYS: Record<string, string> = {
   [join('components', 'features', 'search', 'caseLaw', 'authorityColor.ts')]:
     'the courts: one colour per authority on every row of case law (the Corte costituzionale is violet)',
-  [join('components', 'features', 'bulletin', 'SharedEnvironmentCard.tsx')]:
-    'the Forum\'s categories: one colour per category, the card\'s stripe and its label',
   [join('components', 'features', 'bulletin', 'SuggestionItemCard.tsx')]:
     'the kinds of a suggestion\'s items: notes, highlights, dossiers, quick norms, aliases (purple)',
   [join('components', 'features', 'bulletin', 'SuggestContentModal.tsx')]:

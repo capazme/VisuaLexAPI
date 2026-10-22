@@ -9,6 +9,8 @@ import { shownAnnex } from './dossierLayout';
 import { ClaudeMark } from '../../ui/ClaudeMark';
 import { claudeMarkSentence } from '../../ui/claudeMarkSentence';
 import { formatTimestampLong } from './dossierUtils';
+import { FOCUS_RING } from '../studia/progress/tokens';
+import { ROW, ROW_ICON, ROW_LINE, ROW_REMOVE, ROW_TITLE } from './dossierStyles';
 
 type NormaItem = Extract<DossierItem, { type: 'norma' }>;
 type NoteItem = Extract<DossierItem, { type: 'note' }>;
@@ -33,8 +35,9 @@ export interface DossierArticleRowProps {
 }
 
 /**
- * One article inside its act's block: "art. 3 — rubrica", the star, the text read
- * in place (spec §5). The act is named once by the block, so the row never repeats it.
+ * One article inside its act's block, a row of two levels as the planner's tasks (S7c): «art. 3» over a grey line, its
+ * rubric (else when it was added), the signs at the right, then the star and the removal, 44 px at every width; the
+ * text read in place (spec §5). The act is named once by the block, so the row never repeats it.
  */
 export function DossierArticleRow({
   item, rubrica, isSelected, showCheckbox, onToggleSelect, isExpanded, onToggleExpand,
@@ -48,6 +51,9 @@ export function DossierArticleRow({
   }, []);
 
   const shownRubrica = rubrica ?? textRubrica;
+  // The grey line: the rubric, else when it was added; nothing when neither is known.
+  const added = formatTimestampLong(item.addedAt);
+  const greyLine = shownRubrica ?? (added ? `Aggiunto il ${added}` : null);
   const annex = shownAnnex(item.data);
   const isImportant = item.status === 'important';
   // "Testo al 29/12/2007": a row that holds a past text says so.
@@ -68,27 +74,23 @@ export function DossierArticleRow({
     + (byApp ? `, ${notes.length === 1 ? '' : 'una '}${claudeMarkSentence(byApp)}` : '');
 
   return (
-    <div
-      className={cn(
-        'group relative rounded-lg py-1 pl-3 pr-1 transition-colors',
-        isSelected ? 'bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800/60',
-      )}
-    >
-      {isImportant && <span aria-hidden className="absolute bottom-1 left-0 top-1 w-1 rounded bg-amber-400" />}
-      <div className="flex items-center gap-1 md:gap-2">
+    <div className={cn(ROW, 'pl-3 transition-colors', isSelected ? 'bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800/40')}>
+      {isImportant && <span aria-hidden className="absolute bottom-2 left-0 top-2 w-1 rounded bg-amber-400" />}
+      <div className="flex items-start gap-1">
         {showCheckbox && (
           <button
             type="button"
             onClick={onToggleSelect}
             aria-label={isSelected ? 'Deseleziona elemento' : 'Seleziona elemento'}
             aria-pressed={isSelected}
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded text-slate-400 hover:text-primary-500 md:min-h-0 md:min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            className={cn(ROW_ICON, 'text-slate-500 hover:text-primary-700 dark:text-slate-400 dark:hover:text-primary-300')}
           >
-            {isSelected ? <CheckSquare size={18} className="text-primary-500" /> : <Square size={18} />}
+            {isSelected ? <CheckSquare size={18} className="text-primary-600 dark:text-primary-400" /> : <Square size={18} />}
           </button>
         )}
         {/* The expand toggle wraps only text: the star and the remove button stay
-            outside it, since ARIA makes a role="button"'s descendants presentational. */}
+            outside it, since ARIA makes a role="button"'s descendants presentational. Two levels, as the planner's
+            tasks (S7c): the article, then a grey line — its rubric, else when it was added —, the signs at the right. */}
         <div
           role="button"
           tabIndex={0}
@@ -103,40 +105,37 @@ export function DossierArticleRow({
               onToggleExpand();
             }
           }}
-          className="flex min-h-[44px] min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md py-1 md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+          className={cn('flex min-h-[44px] min-w-0 flex-1 cursor-pointer items-start gap-2 rounded-md py-2.5', FOCUS_RING)}
         >
           <ChevronDown
             size={16}
             aria-hidden
-            className={cn('flex-shrink-0 text-slate-400 transition-transform', !isExpanded && '-rotate-90')}
+            className={cn('mt-0.5 flex-shrink-0 text-slate-500 transition-transform motion-reduce:transition-none dark:text-slate-400', !isExpanded && '-rotate-90')}
           />
-          <span className="min-w-0 flex-1 truncate text-sm md:text-[15px]">
-            <span className="font-medium text-slate-900 dark:text-white">art. {item.data.numero_articolo}</span>
-            {shownRubrica && (
-              <span className="text-slate-500 dark:text-slate-400">
-                {' — '}
-                <span>{shownRubrica}</span>
+          <span className="min-w-0 flex-1">
+            <span className={cn(ROW_TITLE, 'block font-medium')}>art. {item.data.numero_articolo}</span>
+            {greyLine && <span className={cn(ROW_LINE, 'mt-0.5 line-clamp-2 block')}>{greyLine}</span>}
+          </span>
+          <span className="flex flex-shrink-0 flex-wrap items-center justify-end gap-1.5 pt-0.5">
+            {annex && (
+              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                All. {annex}
               </span>
             )}
+            {historicalLabel && (
+              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                {historicalLabel}
+              </span>
+            )}
+            {notes.length > 0 && !isExpanded && (
+              <span className="inline-flex items-center gap-1 text-xs text-amber-800 dark:text-amber-300" title={notes.length === 1 ? '1 nota' : `${notes.length} note`}>
+                <StickyNote size={13} aria-hidden />
+                {notes.length}
+                <span className="sr-only">{notes.length === 1 ? 'nota' : 'note'}</span>
+              </span>
+            )}
+            {notes.length > 0 && !isExpanded && byApp && <ClaudeMark createdBy={byApp} compact />}
           </span>
-          {annex && (
-            <span className="flex-shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300">
-              All. {annex}
-            </span>
-          )}
-          {historicalLabel && (
-            <span className="flex-shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-              {historicalLabel}
-            </span>
-          )}
-          {notes.length > 0 && !isExpanded && (
-            <span className="inline-flex flex-shrink-0 items-center gap-1 text-xs text-amber-700 dark:text-amber-300" title={notes.length === 1 ? '1 nota' : `${notes.length} note`}>
-              <StickyNote size={13} aria-hidden />
-              {notes.length}
-              <span className="sr-only">{notes.length === 1 ? 'nota' : 'note'}</span>
-            </span>
-          )}
-          {notes.length > 0 && !isExpanded && byApp && <ClaudeMark createdBy={byApp} compact />}
         </div>
         <button
           type="button"
@@ -145,30 +144,26 @@ export function DossierArticleRow({
           aria-label={isImportant ? 'Rimuovi da importanti' : 'Segna come importante'}
           title={isImportant ? 'Importante' : 'Segna come importante'}
           className={cn(
-            'flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md p-1.5 transition-colors md:min-h-0 md:min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500',
+            ROW_ICON,
             isImportant
-              ? 'text-amber-500'
-              : 'text-slate-300 hover:bg-amber-50 hover:text-amber-500 dark:text-slate-600 dark:hover:bg-amber-900/20',
+              ? 'text-amber-600 dark:text-amber-400'
+              // The unmarked star at 3:1 on the paper, as a control's edge must be (WCAG 1.4.11).
+              : 'text-slate-500 hover:bg-amber-50 hover:text-amber-600 dark:text-slate-400 dark:hover:bg-amber-900/20',
           )}
         >
           <Star size={16} className={cn(isImportant && 'fill-amber-400')} />
         </button>
-        <button
-          type="button"
-          onClick={onRemove}
-          aria-label="Rimuovi articolo dal dossier"
-          className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md p-1.5 text-slate-400 transition-[color,background-color,border-color,opacity] hover:bg-red-50 hover:text-red-500 md:min-h-0 md:min-w-0 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 dark:hover:bg-red-900/20"
-        >
-          <Trash2 size={16} />
+        <button type="button" onClick={onRemove} aria-label="Rimuovi articolo dal dossier" className={ROW_REMOVE}>
+          <Trash2 size={16} aria-hidden />
         </button>
       </div>
       {isExpanded && (
-        <div id={regionId} className="pb-2 pl-6 pr-2">
+        <div id={regionId} className="pb-3 pl-6 pr-2">
           {/* The article's notes first, then its text (spec §6). */}
           {(notes.length > 0 || onAddNote) && (
             <div className="mb-2 mt-1 space-y-1.5">
               {notes.map((note) => (
-                <div key={note.id} className="group/note flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 dark:border-amber-900/50 dark:bg-amber-950/20">
+                <div key={note.id} className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 dark:border-amber-900/50 dark:bg-amber-950/20">
                   <StickyNote size={14} aria-hidden className="mt-0.5 flex-shrink-0 text-amber-600" />
                   <div className="min-w-0 flex-1">
                     <p className="whitespace-pre-wrap text-sm text-slate-800 dark:text-slate-200">{note.data}</p>
@@ -182,9 +177,9 @@ export function DossierArticleRow({
                       type="button"
                       onClick={() => onRemoveNote(note)}
                       aria-label="Rimuovi nota"
-                      className="flex min-h-[44px] min-w-[44px] flex-shrink-0 items-center justify-center rounded-md text-slate-400 hover:text-red-500 md:min-h-0 md:min-w-0 md:opacity-0 md:group-hover/note:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                      className={ROW_REMOVE}
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={14} aria-hidden />
                     </button>
                   )}
                 </div>
@@ -193,7 +188,7 @@ export function DossierArticleRow({
                 <button
                   type="button"
                   onClick={onAddNote}
-                  className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md px-2 text-xs font-medium text-amber-700 hover:bg-amber-50 md:min-h-0 md:py-1 dark:text-amber-300 dark:hover:bg-amber-950/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                  className={cn('-ml-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-md px-2 text-sm font-medium text-amber-800 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-950/30', FOCUS_RING)}
                 >
                   <Plus size={13} aria-hidden /> Aggiungi una nota all'articolo
                 </button>

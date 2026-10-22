@@ -9,7 +9,7 @@ import { fetchDecisionCached } from '../../../utils/decisionFetchCache';
 import { identityOf } from '../../../utils/decisionLinks';
 import { isAnchoredNote } from '../../../utils/decisionRender';
 import { describeVersion, historicalItemLabel } from '../../../utils/versionDisplay';
-import { articleLabel, layoutDossier } from './dossierLayout';
+import { articleLabel, countsLine, layoutDossier } from './dossierLayout';
 import { decisionCitationOf } from './dossierUtils';
 import {
   BODY as DECISION_BODY, LEADING as DECISION_LEADING,
@@ -122,6 +122,11 @@ export async function loadDossierTexts(
     }
   }));
   return texts;
+}
+
+/** The PDF's line of counts: the page's, with only the decisions chosen for it — the others are not printed. */
+export function pdfCountsLine(items: DossierItem[], decisionIds: ReadonlySet<string>): string {
+  return countsLine(items.filter((item) => item.type !== 'sentenza' || decisionIds.has(item.id)));
 }
 
 const DECISION_FETCHES_AT_ONCE = 3;
