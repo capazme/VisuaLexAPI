@@ -13,6 +13,7 @@ import { CREDITS, CREDIT_GROUPS, type Credit } from '../data/credits';
 import { FOCUS_RING, HIDDEN_SCROLLBAR } from '../constants/interactions';
 import { cn } from '../lib/utils';
 import { PageFrame } from '../components/layout/PageFrame';
+import { groupAt } from './creditsIndex';
 
 const LINK = cn(
   'inline-flex min-h-[44px] items-center gap-1.5 rounded-md font-medium text-primary-700 underline-offset-4 hover:underline dark:text-primary-300',
@@ -38,7 +39,7 @@ export function CreditEntry({ credit }: { credit: Credit }) {
       aria-labelledby={titleId}
       tabIndex={-1}
       // A card, as tall as its row's other one; its links at its foot.
-      className="flex h-full scroll-mt-6 flex-col rounded-xl border border-slate-200 bg-white p-5 outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:p-6 dark:border-slate-800 dark:bg-slate-900"
+      className={cn('flex h-full scroll-mt-6 flex-col rounded-xl border border-slate-200 bg-white p-5 md:p-6 dark:border-slate-800 dark:bg-slate-900', FOCUS_RING)}
     >
       <h3 id={titleId} className="font-serif text-xl font-medium text-slate-900 [overflow-wrap:anywhere] dark:text-slate-50">
         {credit.name}
@@ -74,35 +75,37 @@ export function CreditEntry({ credit }: { credit: Credit }) {
 /** The index's places: the groups, each a section of the page with its anchor (`/crediti#giurisprudenza`). */
 const GROUPS = CREDIT_GROUPS.filter((group) => CREDITS.some((credit) => credit.group === group.id));
 
-/**
- * The group in view, for the index's mark: the last section whose top has passed the upper third of the window. No
- * observer in a test or an old browser: the first group stays marked.
- */
 function useGroupInView(): string {
   const [current, setCurrent] = useState<string>(GROUPS[0]?.id ?? '');
   useEffect(() => {
-    if (typeof IntersectionObserver === 'undefined') return undefined;
-    const seen = new Map<string, boolean>();
-    const observer = new IntersectionObserver(
-      (records) => {
-        for (const record of records) seen.set(record.target.id, record.isIntersecting);
-        const inView = GROUPS.find((group) => seen.get(group.id));
-        if (inView) setCurrent(inView.id);
-      },
-      // A band across the upper part of the window: the section crossing it is the one being read.
-      { rootMargin: '-20% 0px -60% 0px' },
-    );
-    for (const group of GROUPS) {
-      const section = document.getElementById(group.id);
-      if (section) observer.observe(section);
-    }
-    return () => observer.disconnect();
+    let frame = 0;
+    const read = () => {
+      frame = 0;
+      const tops = GROUPS.flatMap((group) => {
+        const section = document.getElementById(group.id);
+        return section ? [{ id: group.id, top: section.getBoundingClientRect().top }] : [];
+      });
+      const page = document.scrollingElement ?? document.documentElement;
+      const atEnd = page.scrollHeight > window.innerHeight && window.scrollY + window.innerHeight >= page.scrollHeight - 2;
+      setCurrent(groupAt(tops, window.innerHeight, atEnd));
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(read);
+    };
+    read();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
   }, []);
   return current;
 }
 
 const INDEX_LINK = cn(
-  'flex min-h-[44px] shrink-0 items-center whitespace-nowrap rounded-md px-3 text-sm font-medium transition-colors lg:whitespace-normal',
+  'flex min-h-[44px] shrink-0 items-center whitespace-nowrap rounded-md border-transparent px-3 text-sm transition-colors lg:whitespace-normal lg:border-l-2',
   FOCUS_RING,
 );
 
@@ -115,7 +118,8 @@ function PageIndex({ current }: { current: string }) {
         In questa pagina
       </p>
       {/* On a phone the row scrolls inside its band: the page never scrolls sideways. */}
-      <ul className={cn('-mx-1 flex gap-1 overflow-x-auto px-1 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0', HIDDEN_SCROLLBAR)}>
+      {/* `relative`, as every strip that scrolls (`apps/web/CLAUDE.md`); room for the focus ring on every side. */}
+      <ul className={cn('relative -mx-1 -my-1 flex gap-1 overflow-x-auto px-1 py-1 lg:mx-0 lg:my-0 lg:flex-col lg:overflow-visible lg:px-0 lg:py-0', HIDDEN_SCROLLBAR)}>
         {GROUPS.map((group) => {
           const here = group.id === current;
           return (
@@ -125,9 +129,10 @@ function PageIndex({ current }: { current: string }) {
                 aria-current={here ? 'location' : undefined}
                 className={cn(
                   INDEX_LINK,
+                  // Marked by more than a tint: the weight, and from 1024 px the bar down its edge (the attribution's).
                   here
-                    ? 'bg-primary-50 text-primary-800 dark:bg-primary-950/50 dark:text-primary-200'
-                    : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
+                    ? 'bg-primary-50 font-semibold text-primary-800 lg:border-primary-600 dark:bg-primary-950/50 dark:text-primary-200 dark:lg:border-primary-400'
+                    : 'font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
                 )}
               >
                 {group.title}
@@ -141,7 +146,7 @@ function PageIndex({ current }: { current: string }) {
 }
 
 export function CreditsPage() {
-  const { hash } = useLocation();
+  const { hash, key } = useLocation();
   const current = useGroupInView();
 
   // The router renders after the browser has looked for the fragment, so the entry is reached here; focus
@@ -159,7 +164,8 @@ export function CreditsPage() {
     if (!target) return;
     target.scrollIntoView({ block: 'start' });
     target.focus({ preventScroll: true });
-  }, [hash]);
+  // The key too: the index's same item pressed again is a new navigation to the same fragment, and goes there again.
+  }, [hash, key]);
 
   return (
     // The sections' frame (W2), outside the layout: its column (`max-w-7xl`, the layout's padding), the title at its left
@@ -182,7 +188,7 @@ export function CreditsPage() {
               dell’interfaccia.
             </p>
 
-            <div className="grid gap-8 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-10">
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-10">
               <PageIndex current={current} />
               <div className="min-w-0">
                 {GROUPS.map((group, index) => {
@@ -194,13 +200,14 @@ export function CreditsPage() {
                       id={group.id}
                       aria-labelledby={headingId}
                       tabIndex={-1}
-                      className={cn('scroll-mt-6 outline-none', index > 0 && 'mt-12')}
+                      // Reached from the index, it takes the focus: its ring says where the keyboard is.
+                      className={cn('scroll-mt-6 rounded-xl', FOCUS_RING, index > 0 && 'mt-12')}
                     >
                       <h2 id={headingId} className="font-serif text-2xl font-medium text-slate-900 dark:text-slate-50">
                         {group.title}
                       </h2>
                       {/* Two a row from 1280 px, as tall as each other; one below. */}
-                      <div className="mt-4 grid gap-4 xl:grid-cols-2">
+                      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
                         {entries.map((credit) => (
                           <CreditEntry key={credit.id} credit={credit} />
                         ))}

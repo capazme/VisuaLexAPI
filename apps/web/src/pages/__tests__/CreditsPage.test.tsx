@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import { CreditEntry, CreditsPage } from '../CreditsPage';
+import { groupAt } from '../creditsIndex';
 import { CREDITS, CREDIT_GROUPS, type Credit } from '../../data/credits';
 
 const scrolled: Element[] = [];
@@ -108,25 +109,41 @@ describe('CreditEntry — the worst case', () => {
 
 // A page to consult (U1d): the frame's whole width, an index of the groups, the sources as cards.
 describe('CreditsPage — laid out for consulting', () => {
-  it('lists the groups in an index, in order, the first marked as the place being read', () => {
+  it('lists the groups in an index, in order, one marked as the place being read', () => {
     renderAt('/crediti');
     const index = screen.getByRole('navigation', { name: 'In questa pagina' });
     const links = within(index).getAllByRole('link');
     expect(links.map((link) => link.textContent)).toEqual(CREDIT_GROUPS.map((group) => group.title));
     expect(links.map((link) => link.getAttribute('href'))).toEqual(CREDIT_GROUPS.map((group) => `/crediti#${group.id}`));
-    expect(links[0]).toHaveAttribute('aria-current', 'location');
+    // One place marked at a time (jsdom lays nothing out: which one is `groupAt`'s, tested below).
+    expect(links.filter((link) => link.getAttribute('aria-current') === 'location')).toHaveLength(1);
     for (const link of links) expect(link).toHaveClass('min-h-[44px]');
     // A row of its own on a phone, scrolling inside its band; a column beside the sources from 1024 px.
     expect(within(index).getByRole('list')).toHaveClass('overflow-x-auto', 'lg:flex-col');
   });
 
-  it('brings a group from the index to its section, and focuses it', async () => {
+  it('brings a group from the index to its section, and focuses it, again when its item is pressed again', async () => {
     renderAt('/crediti');
-    await userEvent.click(screen.getByRole('link', { name: 'Giurisprudenza' }));
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('link', { name: 'Giurisprudenza' }));
     const section = document.getElementById('giurisprudenza')!;
-    expect(scrolled).toContain(section);
+    expect(scrolled).toEqual([section]);
     expect(section).toHaveFocus();
     expect(section).toHaveAccessibleName('Giurisprudenza');
+    // Scrolled away, the same item brings it back.
+    act(() => section.blur());
+    await user.click(screen.getByRole('link', { name: 'Giurisprudenza' }));
+    expect(scrolled).toEqual([section, section]);
+    expect(section).toHaveFocus();
+  });
+
+  it('draws each source\'s words exactly as credits.ts holds them', () => {
+    renderAt('/crediti');
+    for (const credit of CREDITS) {
+      const article = document.getElementById(credit.id)!;
+      const values = [...article.querySelectorAll('dd')].map((dd) => dd.textContent);
+      expect(values).toEqual([credit.uses, credit.terms, credit.attribution]);
+    }
   });
 
   it('draws each source as a card, two a row from 1280 px, its links at its foot', () => {
@@ -141,5 +158,21 @@ describe('CreditsPage — laid out for consulting', () => {
     expect(article.querySelector('a')!.parentElement).toHaveClass('mt-auto');
     // No narrow column any more: the frame's whole width.
     expect(document.querySelector('.max-w-2xl')).toBeNull();
+  });
+});
+
+// The index's mark follows the page's scroll (U1d).
+describe('groupAt', () => {
+  const tops = (...values: number[]) => values.map((top, i) => ({ id: ['norme', 'giurisprudenza', 'autorita', 'software'][i], top }));
+
+  it('marks the last section whose top has passed the reading line', () => {
+    expect(groupAt(tops(-900, -100, 350, 900), 1000, false)).toBe('giurisprudenza');
+    expect(groupAt(tops(-900, -500, 290, 900), 1000, false)).toBe('autorita');
+  });
+
+  it('marks the first above the first section, and the last at the page\'s end', () => {
+    expect(groupAt(tops(500, 1200, 1900, 2600), 1000, false)).toBe('norme');
+    // A short last section never reaches the line on a tall window: the end marks it.
+    expect(groupAt(tops(-2000, -1200, 100, 600), 1000, true)).toBe('software');
   });
 });

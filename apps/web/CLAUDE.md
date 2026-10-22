@@ -144,7 +144,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   conditions, never the open data's CC BY 4.0; the Corte costituzionale «CC BY-SA 3.0» with no version.
   `/crediti` is `pages/CreditsPage`: public (outside `ProtectedRoute`), a page to consult in the frame's whole width
   (U1d): the opening at a reading measure, then from 1024 px an index «In questa pagina» (`nav`, 220 px, sticky,
-  `aria-current="location"` on the group being read, by an `IntersectionObserver`) beside the sources, on a phone a
+  `aria-current="location"` on the group being read, from the scroll — `creditsIndex.ts`'s `groupAt`: the last section
+  past 30 % of the window, the last at the page's end; marked by weight and a bar, not a tint alone; the same item
+  pressed again goes there again) beside the sources, on a phone a
   row of its own that scrolls inside its band (`min-w-0`, or the grid item widens the page); a section per group
   (`CREDIT_GROUPS`, its `id` the group's, `/crediti#giurisprudenza`), the entries as cards of equal height, two a row
   from 1280 px; an `article` per entry whose `id` is the anchor — the page scrolls to the address's
@@ -235,8 +237,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   title does not move), the Cronologia and the MERL-T hub; «Cestino» and the MERL-T pages under a way back
   («Torna ai Dossier», «MERL-T») write their `h1` with `PAGE_TITLE`. A dossier's own page (its name, its star and
   its actions), Impostazioni (a dialog, not a page), the Scrivania, the lesson, the reader and the practice, the
-  login stay out; «Crediti», public and outside the layout, is in the frame since M1 (the column's width and padding, the
-  text in its 672 px column). On a phone `actionBeside` keeps icon-only actions on the title's row (the dossier list's
+  login stay out; «Crediti», public and outside the layout, is in the frame since M1 (the column's width and padding;
+  since U1d its whole width, an index beside the sources). On a phone `actionBeside` keeps icon-only actions on the title's row (the dossier list's
   «⋯» and «+»). `PageFrame.test.tsx` reads the section pages' files
   and fails on a title of their own, an icon in an `h1` or a root narrowed with `mx-auto max-w-…`. `Layout`'s content
   area keeps the scrollbar's room (`scrollbar-gutter: stable`) on every page but the search page: a page that grew past
