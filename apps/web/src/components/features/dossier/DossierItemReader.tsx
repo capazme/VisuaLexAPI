@@ -108,14 +108,14 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
   useEffect(() => {
     if (article) onArticle?.(article);
   }, [article, onArticle]);
-  const display = article ? describeVersion(article.validity, norma) : null;
+  const display = article ? describeVersion(article.validity, norma, article.upcoming) : null;
   const readOnly = display?.readOnly ?? false;
   const historical = requestIsHistorical(norma);
   const citeLocked = historical && !display?.canCite;
   const citationNow = () => (display?.canCite
     ? formatNormCitation({
       norma,
-      validity: article?.validity,
+      validity: display?.citeAs ?? article?.validity,
       requestedDate: norma.data_versione?.trim() || undefined,
       original: !norma.data_versione?.trim() && requestIsHistorical(norma),
       consultedAt: todayInRome(),
