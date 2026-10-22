@@ -1,6 +1,7 @@
 /**
  * What stopping keeps, with the session's count (U1c): the cards graded — each counted once, a «Di nuovo» too, its grade
- * saved — stay; the ones left wait in «Oggi».
+ * saved — stay; the ones left wait in «Oggi». The session asks only once a card is graded; the sentence for none stays
+ * for any other caller.
  */
 export function stopMessage(graded: number, remaining: number): string {
   const rest = remaining === 1 ? 'L’altra ti aspetta in «Oggi».' : 'Le altre ti aspettano in «Oggi».';

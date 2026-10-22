@@ -250,12 +250,12 @@ export function ReviewSession() {
   const [toast, setToast] = useState<ToastState>(null);
 
   // Esc closes the article beside the card first (on a phone the sheet closes itself); a second one asks to stop,
-  // or leaves when there is no card to interrupt.
+  // or leaves when there is nothing to interrupt: no card, or none graded yet (U1c: stopping then loses nothing).
   const panelOpen = useRef(false);
-  const cardOnScreen = useRef(false);
+  const askToStop = useRef(false);
   const handleEscape = useCallback(() => {
     if (panelOpen.current) setPanel(null);
-    else if (cardOnScreen.current) setConfirmStop(true);
+    else if (askToStop.current) setConfirmStop(true);
     else navigate(HOME_PATH);
   }, [navigate]);
 
@@ -275,14 +275,17 @@ export function ReviewSession() {
   else if (!loading && remaining > total) setTotal(remaining);
 
   const showCard = !loadError && !loading && !done && current !== null;
+  // The confirmation only once a card is graded (U1c, Bill's choice): with none, «Interrompi» leaves at once. A grade
+  // still on its way is not waited for: its post goes on after the session has gone.
+  const asksToStop = showCard && summary.reviewed > 0;
   // An article belongs to the step it was opened at: a card that comes back is a new step.
   const openAnchor = panel && current && panel.step === step ? panel.anchor : null;
   // In the commit, not after it: an Esc pressed as soon as a card is drawn must already find it there, or it would
   // leave without asking.
   useLayoutEffect(() => {
     panelOpen.current = openAnchor !== null && desktop;
-    cardOnScreen.current = showCard;
-  }, [openAnchor, desktop, showCard]);
+    askToStop.current = asksToStop;
+  }, [openAnchor, desktop, asksToStop]);
 
   const openInReader = (anchor: AncoraScheda) => {
     const searchParams = searchParamsFromAnchor(anchor);
@@ -291,7 +294,7 @@ export function ReviewSession() {
     triggerSearch(searchParams);
   };
 
-  const leave = () => (showCard ? setConfirmStop(true) : navigate(HOME_PATH));
+  const leave = () => (asksToStop ? setConfirmStop(true) : navigate(HOME_PATH));
 
   const skippedLine = skipped && (
     <p role="status" className="mb-4 text-sm text-slate-600 dark:text-slate-300">

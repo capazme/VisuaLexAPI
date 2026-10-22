@@ -1006,8 +1006,9 @@ Its key handler reads the queue from refs and every queue update checks the head
 card: a second key pressed between a post resolving and the re-render must not drop the next card.
 Keys: space reveals (ignored on a focused button or link, in a field, under an `aria-modal` dialog or a
 `data-find-overlay` layer), 1–4 grade after the reveal, Esc closes the article first, then asks
-«Interrompere il ripasso?» while a card is on screen (with no card — the end, a failed read, the read on its way — it
-goes back to Oggi, as the header's button does); listed in the «?» dialog's «Ripasso» group. The question is K1b's
+«Interrompere il ripasso?» while a card is on screen and at least one is graded (with none graded it leaves at once,
+since stopping loses nothing — U1c, Bill's choice; with no card — the end, a failed read, the read on its way — it goes
+back to Oggi too, as the header's button does); listed in the «?» dialog's «Ripasso» group. The question is K1b's
 `WireConfirm` drawn from the header's «Interrompi», for the button and for Esc alike (U1c), no icon, its words the
 session's count of cards graded (`summary.reviewed`, a «Di nuovo» counted; `reviewStop.ts`: «Hai ripassato 4 schede:
 restano registrate. Le altre ti aspettano in “Oggi”.»); going on is the evident action (`emphasis="cancel"`:
