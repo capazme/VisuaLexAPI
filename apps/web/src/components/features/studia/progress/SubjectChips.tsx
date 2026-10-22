@@ -27,7 +27,7 @@ export function SubjectChips({ selected, onSelect }: SubjectChipsProps) {
     );
   return (
     // One scrolling row on a phone, where six chips would take four lines, its bar not drawn; wrapped from `md`.
-    <div role="group" aria-label="Materia" className={cn('-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 md:mx-0 md:flex-wrap md:overflow-visible md:px-0 md:pb-0', HIDDEN_SCROLLBAR)}>
+    <div role="group" aria-label="Materia" className={cn('relative -mx-1 flex gap-2 overflow-x-auto px-1 pb-1 md:mx-0 md:flex-wrap md:overflow-visible md:px-0 md:pb-0', HIDDEN_SCROLLBAR)}>
       <button type="button" aria-pressed={selected === undefined} onClick={() => onSelect(undefined)} className={chip(selected === undefined)}>
         Tutte le materie
       </button>

@@ -88,7 +88,7 @@ const subjectChoice = (label: string) => within(subjects()).getByRole('button', 
 /** A subject's row in «Le tue materie», by its name. */
 const subjectRow = async (label: string) => {
   const group = await screen.findByRole('group', { name: 'Materia' });
-  return within(group).getAllByRole('listitem').find((li) => li.querySelector('.truncate')?.textContent === label)!;
+  return within(group).getAllByRole('listitem').find((li) => li.querySelector('[data-subject-name]')?.textContent === label)!;
 };
 const START = /^(Inizia|Continua) il ripasso$/;
 
@@ -626,7 +626,7 @@ describe('ReviewHome', () => {
       // «Tutte le materie» on top, the active choice.
       expect(within(rows[0]).getByRole('button', { name: 'Tutte le materie' })).toHaveAttribute('aria-pressed', 'true');
       const stops = rows.slice(1);
-      expect(stops.map((li) => li.querySelector('.truncate')?.textContent)).toEqual([
+      expect(stops.map((li) => li.querySelector('[data-subject-name]')?.textContent)).toEqual([
         'Diritto penale', 'Diritto civile', 'Diritto processuale civile', 'Diritto amministrativo', 'Diritto processuale penale',
       ]);
       // The states said in words to a screen reader; the reviews of 30 days are «Progressi»' alone (G8).
