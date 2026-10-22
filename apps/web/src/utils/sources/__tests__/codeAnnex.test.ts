@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { citeNorm, namedAnnex, shortNorm } from '../normLabels';
+import { actHeading, actSubtitle, citeNorm, namedAnnex, shortNorm } from '../normLabels';
 
 // A code's annex is the code itself (the c.c. is Allegato 2 of r.d. 262/1942): never named,
 // also for a code cited by its decree (G-350, G-351).
@@ -10,14 +10,31 @@ describe('a code’s default annex is never named', () => {
     expect(shortNorm(norm)).toBe('art. 5 d.lgs. 79/2011');
   });
 
-  it('the c.p.a.', () => {
+  // Four codes cited by their sigla, like the c.c. (G-360, G-366): no annex is ever named.
+  it('the c.p.a., the cod. nav., the cod. post. and the c.g.c.', () => {
     expect(citeNorm({ tipo_atto: 'codice del processo amministrativo', allegato: '2', numero_articolo: '29' }))
-      .toBe('art. 29, d.lgs. 2 luglio 2010, n. 104');
+      .toBe('art. 29 c.p.a.');
+    expect(shortNorm({ tipo_atto: 'codice della navigazione', allegato: '1', numero_articolo: '69' })).toBe('art. 69 cod. nav.');
+    expect(citeNorm({ tipo_atto: 'codice postale e delle telecomunicazioni', allegato: '1', numero_articolo: '20' }))
+      .toBe('art. 20 cod. post.');
+    expect(citeNorm({ tipo_atto: 'codice di giustizia contabile', allegato: '1', numero_articolo: '52' })).toBe('art. 52 c.g.c.');
   });
 
   it('an annex other than the default, or of an act that is not a code, is named', () => {
-    expect(citeNorm({ tipo_atto: 'codice del processo amministrativo', allegato: '1', numero_articolo: '29' }))
-      .toBe('art. 29, d.lgs. 2 luglio 2010, n. 104 (Allegato 1)');
+    expect(citeNorm({ tipo_atto: 'codice del turismo', allegato: '2', numero_articolo: '5' }))
+      .toBe('art. 5, d.lgs. 23 maggio 2011, n. 79 (Allegato 2)');
+    // Another annex of a code's decree is not the code (the c.p.a.'s annex 3): the decree and its annex.
+    const other = { tipo_atto: 'codice del processo amministrativo', allegato: '3', numero_articolo: '1' };
+    expect(citeNorm(other)).toBe('art. 1, d.lgs. 2 luglio 2010, n. 104 (Allegato 3)');
+    expect(shortNorm(other)).toBe('art. 1 d.lgs. 104/2010 (All. 3)');
+    expect(actHeading(other)).toBe('d.lgs. 2 luglio 2010, n. 104');
+    expect(namedAnnex(other)).toBe('3');
+    const stored = { ...other, tipo_atto_reale: 'decreto legislativo', numero_atto: '104', data: '2010-07-02' };
+    expect(actHeading(stored)).toBe('d.lgs. 2 luglio 2010, n. 104');
+    expect(actSubtitle(stored)).toBe('');
+    expect(actSubtitle({ ...stored, allegato: '2' })).toBe('d.lgs. 2 luglio 2010, n. 104');
+    expect(citeNorm({ tipo_atto: 'codice civile', allegato: '1', numero_articolo: '12' }))
+      .toBe('art. 12, r.d. 16 marzo 1942, n. 262 (Allegato 1)');
     expect(citeNorm({ tipo_atto: 'decreto legislativo', numero_atto: '81', data: '2008-04-09', allegato: 'A', numero_articolo: '1' }))
       .toBe('art. 1, d.lgs. 9 aprile 2008, n. 81 (Allegato A)');
   });
@@ -39,7 +56,7 @@ describe('an act whose text is its annex', () => {
 describe('namedAnnex', () => {
   it('names an annex the labels name', () => {
     expect(namedAnnex({ tipo_atto: 'decreto legislativo', numero_atto: '81', data: '2008-04-09', allegato: 'A' })).toBe('A');
-    expect(namedAnnex({ tipo_atto: 'codice del processo amministrativo', allegato: '1' })).toBe('1');
+    expect(namedAnnex({ tipo_atto: 'codice del turismo', allegato: '2' })).toBe('2');
   });
 
   it('names none for a code\'s own annex, by name or by decree, nor for the TULPS', () => {

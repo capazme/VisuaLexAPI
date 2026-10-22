@@ -123,6 +123,9 @@ const ABBREVIATION_MAP: Record<string, string> = {
   'cce': 'codice delle comunicazioni elettroniche',
   'cod. com. elet.': 'codice delle comunicazioni elettroniche',
   'codice delle comunicazioni elettroniche': 'codice delle comunicazioni elettroniche',
+  // «c.p.a.» was missing, and «c.p.» read the head of it: «art. 29 c.p.a.» was the codice penale.
+  'c.p.a.': 'codice del processo amministrativo',
+  'c.p.a': 'codice del processo amministrativo',
   'cpa': 'codice del processo amministrativo',
   'cod. proc. amm.': 'codice del processo amministrativo',
   'codice del processo amministrativo': 'codice del processo amministrativo',
@@ -145,6 +148,8 @@ const ABBREVIATION_MAP: Record<string, string> = {
   'ctu': 'codice del turismo',
   'cod. turismo': 'codice del turismo',
   'codice del turismo': 'codice del turismo',
+  'c.g.c.': 'codice di giustizia contabile',
+  'c.g.c': 'codice di giustizia contabile',
   'cgco': 'codice di giustizia contabile',
   'cod. giust. cont.': 'codice di giustizia contabile',
   'codice di giustizia contabile': 'codice di giustizia contabile',
@@ -161,6 +166,7 @@ const ABBREVIATION_MAP: Record<string, string> = {
   'cod. naut. diport.': 'codice della nautica da diporto',
   'codice della nautica da diporto': 'codice della nautica da diporto',
   'cpet': 'codice postale e delle telecomunicazioni',
+  'cod. post.': 'codice postale e delle telecomunicazioni',
   'cod. post. telecom.': 'codice postale e delle telecomunicazioni',
   'codice postale e delle telecomunicazioni': 'codice postale e delle telecomunicazioni',
 

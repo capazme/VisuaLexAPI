@@ -19,6 +19,11 @@ export const NAMED_ACTS: Readonly<Record<string, string>> = {
   preleggi: 'preleggi',
   "disposizioni per l'attuazione del codice civile e disposizioni transitorie": 'disp. att. c.c.',
   "disposizioni per l'attuazione del codice di procedura civile e disposizioni transitorie": 'disp. att. c.p.c.',
+  // By their sigla, like the c.c. and the c.p.c. (owner, G-360 and G-366, 22 October 2026).
+  'codice del processo amministrativo': 'c.p.a.',
+  'codice della navigazione': 'cod. nav.',
+  'codice postale e delle telecomunicazioni': 'cod. post.',
+  'codice di giustizia contabile': 'c.g.c.',
   tue: 'TUE',
   tfue: 'TFUE',
   cdfue: 'CDFUE',

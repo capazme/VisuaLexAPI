@@ -114,6 +114,13 @@ _NAMED = {
     "preleggi": "preleggi",
     "disposizioni per l'attuazione del codice civile e disposizioni transitorie": "disp. att. c.c.",
     "disposizioni per l'attuazione del codice di procedura civile e disposizioni transitorie": "disp. att. c.p.c.",
+    # Four more codes by their sigla, like the c.c. and the c.p.c. (owner, G-360 and G-366,
+    # 22 October 2026): once their default annex is not named (G-359), «art. 1, d.lgs. 104/2010»
+    # would read as the decree's own art. 1.
+    "codice del processo amministrativo": "c.p.a.",
+    "codice della navigazione": "cod. nav.",
+    "codice postale e delle telecomunicazioni": "cod. post.",
+    "codice di giustizia contabile": "c.g.c.",
     "tue": "TUE",
     "tfue": "TFUE",
     "cdfue": "CDFUE",
@@ -158,11 +165,25 @@ def _day(iso: str) -> Optional[str]:
     return f"{'1°' if day == 1 else day} {_MONTHS[int(match.group(2)) - 1]} {match.group(1)}"
 
 
+def _named(norm: Mapping[str, Any]) -> Optional[str]:
+    """The act's own name («c.c.», «c.p.a.»), unless the norm sits in another annex of the
+    code's decree than the code's: the norme di attuazione of the c.p.a. (annex 3 of d.lgs.
+    104/2010) are not the c.p.a., and are cited by the decree with their annex."""
+    kind = _key(_text(norm, "tipo_atto"))
+    name = _NAMED.get(kind)
+    annex = _text(norm, "allegato")
+    row = codice_urn(kind) or ""
+    if name and annex and re.search(r";\d+:\w+$", row) and not row.endswith(f":{annex}"):
+        return None
+    return name
+
+
 def _act(norm: Mapping[str, Any]) -> tuple[str, str]:
     """The act as cited, and how an article joins it (a space for the named acts, else a comma)."""
     kind = _key(_text(norm, "tipo_atto"))
-    if kind in _NAMED:
-        return _NAMED[kind], " "
+    name = _named(norm)
+    if name:
+        return name, " "
     number, date, real = _text(norm, "numero_atto"), _text(norm, "data"), _text(norm, "tipo_atto_reale")
     if kind in _EU:
         year = date[:4]
@@ -170,7 +191,7 @@ def _act(norm: Mapping[str, Any]) -> tuple[str, str]:
     if not real:
         # An act the codes table names (an aliased code, the regulation of the c.p.i.): cited by
         # its decree, with the table's date and number where the norm carries none.
-        details = extract_codice_details(_text(norm, "tipo_atto"))
+        details = extract_codice_details(kind)
         if details:
             real, date, number = details["tipo_atto_reale"], date or details["data"], number or details["numero_atto"]
     real_key = _key(real) or kind

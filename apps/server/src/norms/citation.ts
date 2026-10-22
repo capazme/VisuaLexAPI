@@ -70,11 +70,22 @@ function isAnnexedActText(norm: CitableAct, annex: string): boolean {
   return ANNEXED_ACTS[`${type.replace(/ /g, '.')}:${date};${number}`] === annex;
 }
 
+// The act's own name («c.c.», «c.p.a.»), unless the norm sits in another annex of the code's
+// decree than the code's: the norme di attuazione of the c.p.a. (annex 3 of d.lgs. 104/2010) are
+// not the c.p.a., and are cited by the decree with their annex. The API's `sources._named`.
+function namedAct(norm: CitableAct): string | undefined {
+  const named = NAMED_ACTS[key(norm.tipo_atto)];
+  const value = text(norm.allegato);
+  const row = CODES_BY_NAME.get(key(norm.tipo_atto)) ?? '';
+  if (named && value && /;\d+:\w+$/.test(row) && !row.endsWith(`:${value}`)) return undefined;
+  return named;
+}
+
 // The act, and how an article joins it: a code, the Constitution and a treaty follow the
 // article with a space ("art. 1284 c.c."), every other act with a comma (short: a space).
 function actOf(norm: CitableAct, short: boolean): { act: string; joiner: string } {
   const kind = key(norm.tipo_atto);
-  const named = NAMED_ACTS[kind];
+  const named = namedAct(norm);
   if (named) return { act: named, joiner: ' ' };
   const joiner = short ? ' ' : ', ';
   const eu = EU_ACTS[kind];
@@ -103,7 +114,7 @@ function annexOf(norm: CitableAct, short: boolean): string {
   const kind = key(norm.tipo_atto);
   // A code's annex is the code itself (c.c. is Allegato 2 of r.d. 262/1942): never named,
   // also for a code cited by its decree (the codice del turismo is «d.lgs. 23 maggio 2011, n. 79»).
-  if (!value || NAMED_ACTS[kind] || EU_ACTS[kind]) return '';
+  if (!value || namedAct(norm) || EU_ACTS[kind]) return '';
   if ((CODES_BY_NAME.get(kind) ?? '').endsWith(`:${value}`)) return '';
   if (isAnnexedActText(norm, value)) return '';
   return short ? ` (All. ${value})` : ` (Allegato ${value})`;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { citeAct, citeArticle, citeStoredAct, citeStoredNorm } from '../../src/norms/citation';
+import { citeAct, citeArticle, citeStoredAct, citeStoredNorm, shortNorm } from '../../src/norms/citation';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
@@ -125,13 +125,26 @@ describe('a code’s default annex', () => {
   it('is never named', () => {
     expect(citeArticle({ tipo_atto: 'codice del turismo', allegato: '1', numero_articolo: '5' }))
       .toBe('art. 5, d.lgs. 23 maggio 2011, n. 79');
-    expect(citeArticle({ tipo_atto: 'codice del processo amministrativo', allegato: '2', numero_articolo: '29' }))
-      .toBe('art. 29, d.lgs. 2 luglio 2010, n. 104');
+  });
+
+  it('nor for the four codes cited by their sigla (G-360, G-366)', () => {
+    expect(citeArticle({ tipo_atto: 'codice del processo amministrativo', allegato: '2', numero_articolo: '29' })).toBe('art. 29 c.p.a.');
+    expect(citeArticle({ tipo_atto: 'codice della navigazione', allegato: '1', numero_articolo: '69' })).toBe('art. 69 cod. nav.');
+    expect(citeArticle({ tipo_atto: 'codice postale e delle telecomunicazioni', allegato: '1', numero_articolo: '20' }))
+      .toBe('art. 20 cod. post.');
+    expect(citeArticle({ tipo_atto: 'codice di giustizia contabile', allegato: '1', numero_articolo: '52' })).toBe('art. 52 c.g.c.');
   });
 
   it('another annex, or an act that is not a code, is named', () => {
-    expect(citeArticle({ tipo_atto: 'codice del processo amministrativo', allegato: '1', numero_articolo: '29' }))
-      .toBe('art. 29, d.lgs. 2 luglio 2010, n. 104 (Allegato 1)');
+    expect(citeArticle({ tipo_atto: 'codice del turismo', allegato: '2', numero_articolo: '5' }))
+      .toBe('art. 5, d.lgs. 23 maggio 2011, n. 79 (Allegato 2)');
+    // Another annex of a code's decree is not the code (the c.p.a.'s annex 3): the decree and its annex.
+    expect(citeArticle({ tipo_atto: 'codice del processo amministrativo', allegato: '3', numero_articolo: '1' }))
+      .toBe('art. 1, d.lgs. 2 luglio 2010, n. 104 (Allegato 3)');
+    expect(shortNorm({ tipo_atto: 'codice del processo amministrativo', allegato: '3', numero_articolo: '1' }))
+      .toBe('art. 1 d.lgs. 104/2010 (All. 3)');
+    expect(citeArticle({ tipo_atto: 'codice civile', allegato: '1', numero_articolo: '12' }))
+      .toBe('art. 12, r.d. 16 marzo 1942, n. 262 (Allegato 1)');
     expect(citeArticle({ tipo_atto: 'decreto legislativo', numero_atto: '81', data: '2008-04-09', allegato: 'A', numero_articolo: '1' }))
       .toBe('art. 1, d.lgs. 9 aprile 2008, n. 81 (Allegato A)');
   });

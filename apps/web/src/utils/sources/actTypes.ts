@@ -18,6 +18,11 @@ export const NAMED_ACTS: Readonly<Record<string, string>> = {
   preleggi: 'preleggi',
   "disposizioni per l'attuazione del codice civile e disposizioni transitorie": 'disp. att. c.c.',
   "disposizioni per l'attuazione del codice di procedura civile e disposizioni transitorie": 'disp. att. c.p.c.',
+  // By their sigla, like the c.c. and the c.p.c. (owner, G-360 and G-366, 22 October 2026).
+  'codice del processo amministrativo': 'c.p.a.',
+  'codice della navigazione': 'cod. nav.',
+  'codice postale e delle telecomunicazioni': 'cod. post.',
+  'codice di giustizia contabile': 'c.g.c.',
   tue: 'TUE',
   tfue: 'TFUE',
   cdfue: 'CDFUE',
@@ -40,6 +45,10 @@ export const NAMED_HEADINGS: Readonly<Record<string, string>> = {
   "disposizioni per l'attuazione del codice civile e disposizioni transitorie": 'Disposizioni di attuazione del codice civile',
   "disposizioni per l'attuazione del codice di procedura civile e disposizioni transitorie":
     'Disposizioni di attuazione del codice di procedura civile',
+  'codice del processo amministrativo': 'Codice del processo amministrativo',
+  'codice della navigazione': 'Codice della navigazione',
+  'codice postale e delle telecomunicazioni': 'Codice postale e delle telecomunicazioni',
+  'codice di giustizia contabile': 'Codice di giustizia contabile',
   tue: "Trattato sull'Unione europea",
   tfue: "Trattato sul funzionamento dell'Unione europea",
   cdfue: "Carta dei diritti fondamentali dell'Unione europea",

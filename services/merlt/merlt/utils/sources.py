@@ -127,6 +127,11 @@ _NAMED = {
     "preleggi": "preleggi",
     "disposizioni per l'attuazione del codice civile e disposizioni transitorie": "disp. att. c.c.",
     "disposizioni per l'attuazione del codice di procedura civile e disposizioni transitorie": "disp. att. c.p.c.",
+    # By their sigla, like the c.c. and the c.p.c. (owner, G-360 and G-366, 22 October 2026).
+    "codice del processo amministrativo": "c.p.a.",
+    "codice della navigazione": "cod. nav.",
+    "codice postale e delle telecomunicazioni": "cod. post.",
+    "codice di giustizia contabile": "c.g.c.",
     "tue": "TUE",
     "tfue": "TFUE",
     "cdfue": "CDFUE",
@@ -146,6 +151,10 @@ _HEADINGS = {
         "Disposizioni di attuazione del codice civile",
     "disposizioni per l'attuazione del codice di procedura civile e disposizioni transitorie":
         "Disposizioni di attuazione del codice di procedura civile",
+    "codice del processo amministrativo": "Codice del processo amministrativo",
+    "codice della navigazione": "Codice della navigazione",
+    "codice postale e delle telecomunicazioni": "Codice postale e delle telecomunicazioni",
+    "codice di giustizia contabile": "Codice di giustizia contabile",
     "tue": "Trattato sull'Unione europea",
     "tfue": "Trattato sul funzionamento dell'Unione europea",
     "cdfue": "Carta dei diritti fondamentali dell'Unione europea",
@@ -212,10 +221,24 @@ def _real_type(norm: Mapping[str, Any]) -> tuple[str, str, str]:
     return real or _key(_text(norm, "tipo_atto")), date, number
 
 
+def _named(norm: Mapping[str, Any]) -> Optional[str]:
+    """The act's own name («c.c.», «c.p.a.»), unless the norm sits in another annex of the
+    code's decree than the code's (the norme di attuazione of the c.p.a., annex 3): those are
+    cited by the decree with their annex. The API's `sources._named`."""
+    kind = _key(_text(norm, "tipo_atto"))
+    name = _NAMED.get(kind)
+    annex = _text(norm, "allegato")
+    row = _CODES_BY_NAME.get(kind) or ""
+    if name and annex and re.search(r";\d+:\w+$", row) and not row.endswith(f":{annex}"):
+        return None
+    return name
+
+
 def _act(norm: Mapping[str, Any], short: bool) -> tuple[str, str]:
     kind = _key(_text(norm, "tipo_atto"))
-    if kind in _NAMED:
-        return _NAMED[kind], " "
+    name = _named(norm)
+    if name:
+        return name, " "
     if kind in _EU:
         number, year = _text(norm, "numero_atto"), _text(norm, "data")[:4]
         return (f"{_EU[kind]} {year}/{number}" if number and year.isdigit() else _EU[kind]), (" " if short else ", ")
@@ -239,7 +262,7 @@ def _act(norm: Mapping[str, Any], short: bool) -> tuple[str, str]:
 
 def _annex(norm: Mapping[str, Any], joined: str, short: bool) -> str:
     annex = _text(norm, "allegato")
-    if not annex or _key(_text(norm, "tipo_atto")) in _NAMED or _key(_text(norm, "tipo_atto")) in _EU:
+    if not annex or _named(norm) or _key(_text(norm, "tipo_atto")) in _EU:
         return ""
     # A code's annex is the code itself, also for a code cited by its decree (the codice
     # del turismo is «d.lgs. 23 maggio 2011, n. 79», never «… (Allegato 1)»).
@@ -275,7 +298,7 @@ def short_norm(norm: Mapping[str, Any]) -> str:
 
 def act_heading(norm: Mapping[str, Any]) -> str:
     """"Codice civile", "l. 7 agosto 1990, n. 241": an act node's ``titolo``."""
-    return _HEADINGS.get(_key(_text(norm, "tipo_atto"))) or cite_act(norm)
+    return (_HEADINGS.get(_key(_text(norm, "tipo_atto"))) if _named(norm) else None) or cite_act(norm)
 
 
 def authority(norm: Mapping[str, Any]) -> Optional[str]:
