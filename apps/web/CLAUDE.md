@@ -145,9 +145,11 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `/crediti` is `pages/CreditsPage`: public (outside `ProtectedRoute`), a page to consult in the frame's whole width
   (U1d): the opening at a reading measure, then from 1024 px an index «In questa pagina» (`nav`, 220 px, sticky,
   `aria-current="location"` on the group being read, from the scroll — `creditsIndex.ts`'s `groupAt`: the last section
-  past 30 % of the window, the last at the page's end; marked by weight and a bar, not a tint alone; the same item
-  pressed again goes there again) beside the sources, on a phone a
-  row of its own that scrolls inside its band (`min-w-0`, or the grid item widens the page); a section per group
+  past 30 % of the window, the last at the page's end; a group an address or the index reached stays marked while the
+  page stays there (`groupOf`: `/crediti#cerdef` marks «Autorità e registri», not the last group the page's end would);
+  marked by weight and a bar, not a tint alone; the same item pressed again goes there again) beside the sources, on a
+  phone rows that wrap, every group in sight, the bar under the place being read (`min-w-0`, or the grid item widens
+  the page); a section per group
   (`CREDIT_GROUPS`, its `id` the group's, `/crediti#giurisprudenza`), the entries as cards of equal height, two a row
   from 1280 px; an `article` per entry whose `id` is the anchor — the page scrolls to the address's
   fragment and focuses the entry, since the router renders after the browser looked for it —, external

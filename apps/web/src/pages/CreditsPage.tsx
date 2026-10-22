@@ -6,14 +6,14 @@
  * read through (U1d): in the frame's whole width, an index «In questa pagina» beside the sources from 1024 px (in a row
  * of its own on a phone), the sources as cards, two a row from 1280 px. Only the layout changed: the lines are C1's.
  */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { BookOpen, ExternalLink } from 'lucide-react';
 import { CREDITS, CREDIT_GROUPS, type Credit } from '../data/credits';
-import { FOCUS_RING, HIDDEN_SCROLLBAR } from '../constants/interactions';
+import { FOCUS_RING } from '../constants/interactions';
 import { cn } from '../lib/utils';
 import { PageFrame } from '../components/layout/PageFrame';
-import { groupAt } from './creditsIndex';
+import { groupAt, groupOf } from './creditsIndex';
 
 const LINK = cn(
   'inline-flex min-h-[44px] items-center gap-1.5 rounded-md font-medium text-primary-700 underline-offset-4 hover:underline dark:text-primary-300',
@@ -75,12 +75,25 @@ export function CreditEntry({ credit }: { credit: Credit }) {
 /** The index's places: the groups, each a section of the page with its anchor (`/crediti#giurisprudenza`). */
 const GROUPS = CREDIT_GROUPS.filter((group) => CREDITS.some((credit) => credit.group === group.id));
 
-function useGroupInView(): string {
+/**
+ * The group being read, and `hold`: a group an address or the index took the page to stays marked while the page
+ * stays where that left it, so an entry near the page's end marks its own group, not the last one. Scrolled away, the
+ * scroll decides again.
+ */
+function useGroupInView(): [string, (id: string) => void] {
   const [current, setCurrent] = useState<string>(GROUPS[0]?.id ?? '');
+  const held = useRef<{ id: string; y: number } | null>(null);
   useEffect(() => {
     let frame = 0;
     const read = () => {
       frame = 0;
+      if (held.current) {
+        if (Math.abs(window.scrollY - held.current.y) < 2) {
+          setCurrent(held.current.id);
+          return;
+        }
+        held.current = null;
+      }
       const tops = GROUPS.flatMap((group) => {
         const section = document.getElementById(group.id);
         return section ? [{ id: group.id, top: section.getBoundingClientRect().top }] : [];
@@ -101,15 +114,20 @@ function useGroupInView(): string {
       if (frame) cancelAnimationFrame(frame);
     };
   }, []);
-  return current;
+  const hold = useCallback((id: string) => {
+    held.current = { id, y: window.scrollY };
+    setCurrent(id);
+  }, []);
+  return [current, hold];
 }
 
+// The bar the place being read gets: under it on a phone, down its edge from 1024 px.
 const INDEX_LINK = cn(
-  'flex min-h-[44px] shrink-0 items-center whitespace-nowrap rounded-md border-transparent px-3 text-sm transition-colors lg:whitespace-normal lg:border-l-2',
+  'flex min-h-[44px] items-center whitespace-nowrap rounded-md border-transparent px-3 text-sm transition-colors max-lg:rounded-b-none max-lg:border-b-2 lg:whitespace-normal lg:border-l-2',
   FOCUS_RING,
 );
 
-/** «In questa pagina»: beside the sources from 1024 px, staying in view; a row of its own that scrolls on a phone. */
+/** «In questa pagina»: beside the sources from 1024 px, staying in view; on a phone rows of their own, every group seen. */
 function PageIndex({ current }: { current: string }) {
   return (
     // `min-w-0`: a grid item, it would otherwise grow to its row of links and widen a phone's page.
@@ -117,9 +135,9 @@ function PageIndex({ current }: { current: string }) {
       <p aria-hidden className="mb-2 hidden px-3 text-sm font-medium text-slate-600 lg:block dark:text-slate-400">
         In questa pagina
       </p>
-      {/* On a phone the row scrolls inside its band: the page never scrolls sideways. */}
-      {/* `relative`, as every strip that scrolls (`apps/web/CLAUDE.md`); room for the focus ring on every side. */}
-      <ul className={cn('relative -mx-1 -my-1 flex gap-1 overflow-x-auto px-1 py-1 lg:mx-0 lg:my-0 lg:flex-col lg:overflow-visible lg:px-0 lg:py-0', HIDDEN_SCROLLBAR)}>
+      {/* On a phone the groups wrap rather than scroll: a row that scrolled ended at «Autorità e registri» at 390 px,
+          with nothing to say «Software e caratteri» was there. */}
+      <ul className="flex flex-wrap gap-1 lg:flex-col">
         {GROUPS.map((group) => {
           const here = group.id === current;
           return (
@@ -129,9 +147,10 @@ function PageIndex({ current }: { current: string }) {
                 aria-current={here ? 'location' : undefined}
                 className={cn(
                   INDEX_LINK,
-                  // Marked by more than a tint: the weight, and from 1024 px the bar down its edge (the attribution's).
+                  // Marked by more than a tint: the weight and the bar (the attribution's), under it on a phone, down its edge
+                  // from 1024 px.
                   here
-                    ? 'bg-primary-50 font-semibold text-primary-800 lg:border-primary-600 dark:bg-primary-950/50 dark:text-primary-200 dark:lg:border-primary-400'
+                    ? 'border-primary-600 bg-primary-50 font-semibold text-primary-800 dark:border-primary-400 dark:bg-primary-950/50 dark:text-primary-200'
                     : 'font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
                 )}
               >
@@ -147,7 +166,7 @@ function PageIndex({ current }: { current: string }) {
 
 export function CreditsPage() {
   const { hash, key } = useLocation();
-  const current = useGroupInView();
+  const [current, hold] = useGroupInView();
 
   // The router renders after the browser has looked for the fragment, so the entry is reached here; focus
   // follows, for a screen reader, without a second scroll. No smooth scroll: nothing moves under reduced
@@ -164,8 +183,11 @@ export function CreditsPage() {
     if (!target) return;
     target.scrollIntoView({ block: 'start' });
     target.focus({ preventScroll: true });
+    // The index marks the group reached: an entry of the last rows of the group before the last ends the page.
+    const group = groupOf(id, CREDITS, GROUPS);
+    if (group) hold(group);
   // The key too: the index's same item pressed again is a new navigation to the same fragment, and goes there again.
-  }, [hash, key]);
+  }, [hash, key, hold]);
 
   return (
     // The sections' frame (W2), outside the layout: its column (`max-w-7xl`, the layout's padding), the title at its left

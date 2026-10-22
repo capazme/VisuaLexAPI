@@ -12,3 +12,16 @@ export function groupAt(tops: ReadonlyArray<{ id: string; top: number }>, viewpo
   const passed = tops.filter((section) => section.top <= viewport * READING_LINE);
   return (passed[passed.length - 1] ?? tops[0]).id;
 }
+
+/**
+ * The group an address's fragment names: a group's own id, or the group of the entry it names (`/crediti#cerdef`
+ * marks «Autorità e registri», not the last group the page's end would). Undefined for any other fragment.
+ */
+export function groupOf(
+  id: string,
+  entries: ReadonlyArray<{ id: string; group: string }>,
+  groups: ReadonlyArray<{ id: string }>,
+): string | undefined {
+  if (groups.some((group) => group.id === id)) return id;
+  return entries.find((entry) => entry.id === id)?.group;
+}
