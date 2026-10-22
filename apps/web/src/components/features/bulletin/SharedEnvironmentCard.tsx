@@ -243,7 +243,10 @@ export function SharedEnvironmentCard({
           <span aria-hidden>·</span>
           <span>v{environment.currentVersion}</span>
           <span aria-hidden>·</span>
-          <span className="min-w-0 break-all">{environment.user.username}</span>
+          {/* A long username is cut, whole on hover: the line stays one line where it can. */}
+          <span className="inline-block max-w-[11rem] truncate align-bottom" title={environment.user.username}>
+            {environment.user.username}
+          </span>
           {timeAgoRelative && (
             <>
               <span aria-hidden>·</span>
@@ -271,7 +274,8 @@ export function SharedEnvironmentCard({
           </ul>
         )}
 
-        {/* At the foot: «Mi piace» as its heart and count, then the card's one action, outlined. */}
+        {/* At the foot: «Mi piace» as its heart and count, then the card's one action, outlined. How many added it is
+            the order «Più aggiunti»' and «I più aggiunti»', not a third number on every card. */}
         <div className="mt-auto flex items-center gap-2 pt-4">
           <button
             type="button"
@@ -291,18 +295,13 @@ export function SharedEnvironmentCard({
             <Heart size={18} aria-hidden className={environment.userLiked ? 'fill-current' : ''} />
             <span aria-hidden>{environment.likeCount}</span>
           </button>
-          {environment.downloadCount > 0 && (
-            <span className="text-sm text-slate-600 dark:text-slate-400">
-              {environment.downloadCount === 1 ? 'Aggiunto 1 volta' : `Aggiunto ${environment.downloadCount} volte`}
-            </span>
-          )}
           {!environment.isOwner && (
             <button
               type="button"
               onClick={() => onImport(environment)}
               aria-label={`Aggiungi «${environment.title}» ai miei dossier`}
               className={cn(
-                'ml-auto inline-flex items-center justify-center gap-1.5 rounded-lg border border-primary-600 px-3 py-2 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-50 dark:border-primary-400 dark:text-primary-300 dark:hover:bg-primary-900/30',
+                'ml-auto inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-primary-600 px-3 py-2 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-50 dark:border-primary-400 dark:text-primary-300 dark:hover:bg-primary-900/30',
                 TOUCH_TARGET_RESPONSIVE,
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900',
               )}
