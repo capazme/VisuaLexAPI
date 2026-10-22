@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { countdown, dayHeading, daysBetween, groupUpcoming, shortDay, splitToday, todayCountLabel } from './taskDates';
+import { blockHeading, countdown, dayHeading, daysBetween, dayTone, groupUpcoming, monthLabel, rowDay, shortDay, splitToday, stripDay, todayCountLabel, weekStart } from './taskDates';
 import { nestTasks } from './taskTree';
 import type { Task } from '../../../types/tasks';
 
@@ -50,6 +50,28 @@ describe('days in words', () => {
     expect(dayHeading(TODAY, TODAY)).toBe('Oggi · martedì 20 ottobre');
     expect(dayHeading('2026-10-21', TODAY)).toBe('Domani · mercoledì 21 ottobre');
     expect(dayHeading('2026-10-22', TODAY)).toBe('Giovedì 22 ottobre');
+  });
+
+  it("writes a row's planned day, a late one with how late in words", () => {
+    expect(rowDay('2026-10-18', TODAY)).toBe('dom 18 ott · in ritardo di 2 giorni');
+    expect(rowDay('2026-10-19', TODAY)).toBe('Ieri · in ritardo di 1 giorno');
+    expect(rowDay(TODAY, TODAY)).toBe('Oggi');
+    expect(rowDay('2026-10-21', TODAY)).toBe('Domani');
+    expect(rowDay('2026-10-23', TODAY)).toBe('venerdì');
+    expect(rowDay('2026-10-27', TODAY)).toBe('mar 27 ott');
+    expect(['2026-10-19', TODAY, '2026-10-21', '2026-10-26', '2026-10-27'].map((day) => dayTone(day, TODAY))).toEqual(['late', 'today', 'tomorrow', 'week', 'later']);
+  });
+
+  it("heads a day's block and walks the week from Monday", () => {
+    expect(blockHeading(TODAY, TODAY)).toBe('20 ott · Oggi · martedì');
+    expect(blockHeading('2026-10-21', TODAY)).toBe('21 ott · Domani · mercoledì');
+    expect(blockHeading('2026-10-23', TODAY)).toBe('23 ott · venerdì');
+    expect(weekStart(TODAY)).toBe('2026-10-19');
+    expect(weekStart('2026-10-19')).toBe('2026-10-19');
+    expect(weekStart('2026-10-25')).toBe('2026-10-19');
+    expect(weekStart('2026-11-01')).toBe('2026-10-26');
+    expect(stripDay('2026-10-19')).toEqual({ weekday: 'lun', date: 19 });
+    expect(monthLabel('2026-10-19')).toBe('ottobre 2026');
   });
 
   it('counts the bar in words', () => {

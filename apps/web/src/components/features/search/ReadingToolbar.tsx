@@ -1,13 +1,14 @@
 import { useRef, type Ref } from 'react';
 import type { ArticleData } from '../../../types';
-import { ExternalLink, Zap, FolderPlus, Copy, MessageCircle, Share2, Download, MoreHorizontal, Clock, BookOpen, GitCompare } from 'lucide-react';
+import { ExternalLink, Zap, FolderPlus, Copy, MessageCircle, Share2, Download, MoreHorizontal, Clock, BookOpen, GitCompare, Search } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
+import { FOCUS_RING } from '../../../constants/interactions';
 import type { VersionChip } from '../../../utils/versionDisplay';
+import { MenuButton, type MenuItem } from '../../ui/MenuButton';
 import { VersionStatusChip } from './VersionStatusChip';
 import { NotesHighlightsButtons } from './NotesHighlightsButtons';
-import { DiscussionButton } from './DiscussionButton';
-import { FindInTextButton } from './FindInTextButton';
+import { namedAnnex } from '../../../utils/sources';
 
 export interface ReadingToolbarProps {
     normaData: ArticleData['norma_data'];
@@ -34,12 +35,10 @@ export interface ReadingToolbarProps {
     highlightsButtonRef?: Ref<HTMLButtonElement | null>;
     highlightsCount: number;
     isDiscussionOpen: boolean;
-    showMoreMenu: boolean;
     isPinnedQuick: boolean;
     onToggleNotes: () => void;
     onToggleHighlightsPeek: () => void;
     onToggleDiscussion: () => void;
-    onToggleMoreMenu: (next: boolean) => void;
     onToggleQuickNorm: () => void;
     onMobileCopy: () => Promise<void> | void;
     onOpenStudyMode?: () => void;
@@ -50,11 +49,11 @@ export interface ReadingToolbarProps {
     onOpenVersionInput: () => void;
     onCompare: () => void;
     /**
-     * The compact form of a light window beside a practice's table (spec §4.1, T12): notes,
-     * highlights, discussions, copy and the magnifier, nothing else (the phone row has no notes or
-     * highlights buttons to begin with). The version chip and the annex badge stay: they say which
-     * text this is. The tools the table's row keeps (quick norm, dossier, Study Mode, the source
-     * link, «⋯») are the row's.
+     * The compact form of a light window beside a practice's table (spec §4.1, T12): notes and
+     * highlights in words, and behind «⋯» the discussions, the magnifier and copy, nothing else (the
+     * phone row has no notes or highlights buttons to begin with). The status and the annex stay:
+     * they say which text this is. The tools the table's row keeps (quick norm, dossier, Study Mode,
+     * the source link, sharing, export, a date, a comparison) are the row's.
      */
     compact?: boolean;
     /**
@@ -68,6 +67,15 @@ export interface ReadingToolbarProps {
         onToggle: (button: HTMLElement | null, wasPressed: boolean) => void;
     };
 }
+
+/** The article's visible actions (R3): quiet, neutral, the word with the icon; 36 px on a computer, 44 on a phone. */
+const ACTION = cn(
+    'inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-slate-600 transition-colors',
+    'hover:bg-slate-100 hover:text-slate-900 aria-expanded:bg-slate-200/70 aria-expanded:text-slate-900 md:h-9 md:min-h-0 md:min-w-0',
+    'dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white dark:aria-expanded:bg-slate-800 dark:aria-expanded:text-white',
+    'disabled:cursor-not-allowed disabled:opacity-40',
+    FOCUS_RING,
+);
 
 export function ReadingToolbar({
     normaData,
@@ -83,12 +91,10 @@ export function ReadingToolbar({
     highlightsButtonRef,
     highlightsCount,
     isDiscussionOpen,
-    showMoreMenu,
     isPinnedQuick,
     onToggleNotes,
     onToggleHighlightsPeek,
     onToggleDiscussion,
-    onToggleMoreMenu,
     onToggleQuickNorm,
     onMobileCopy,
     onOpenStudyMode,
@@ -101,120 +107,119 @@ export function ReadingToolbar({
     compact = false,
     find,
 }: ReadingToolbarProps) {
-    // Both rows are mounted and one is hidden by CSS: the window returns focus to the one on screen.
-    const desktopFindRef = useRef<HTMLButtonElement>(null);
-    const phoneFindRef = useRef<HTMLButtonElement>(null);
-    const toggleFind = (wasPressed: boolean) => {
+    // Both rows are mounted and one is hidden by CSS: the find window returns the focus to the «⋯» on screen.
+    const desktopMoreRef = useRef<HTMLDivElement>(null);
+    const phoneMoreRef = useRef<HTMLDivElement>(null);
+    const toggleFind = () => {
         if (!find) return;
-        const desktop = desktopFindRef.current;
-        find.onToggle(desktop && desktop.getClientRects().length > 0 ? desktop : phoneFindRef.current, wasPressed);
+        const desktop = desktopMoreRef.current?.querySelector('button') ?? null;
+        const shown = desktop && desktop.getClientRects().length > 0 ? desktop : phoneMoreRef.current?.querySelector('button') ?? null;
+        find.onToggle(shown, find.isOpen);
     };
-    // A switched-off tool keeps its name and gains the reason in its tooltip.
+    // A switched-off tool keeps its name and gains the reason in its tooltip (a menu's entry, under its name).
     const tip = (name: string, reason?: string) => (reason ? `${name} — ${reason}` : name);
     const lock = (reason?: string) => (reason ? { disabled: true } : {});
     // Exporting writes the article out like a copy does, and the export header
     // carries no version: anything that may not be copied, or is a reading, stays in.
     const exportLockedReason = copyLockedReason ?? lockedReason;
+
+    /** The tools behind «⋯» (R3: three in words, the rest here), the phone's adding what its row does not show. */
+    const moreItems = (phone: boolean): MenuItem[] => [
+        ...(compact ? [] : [{
+            label: isPinnedQuick ? 'Togli dalle norme rapide' : 'Aggiungi alle norme rapide',
+            icon: Zap,
+            onSelect: onToggleQuickNorm,
+            disabled: Boolean(lockedReason),
+            description: lockedReason,
+        }]),
+        {
+            label: isDiscussionOpen ? 'Chiudi le glosse' : 'Glosse sull’articolo',
+            icon: MessageCircle,
+            onSelect: onToggleDiscussion,
+            disabled: Boolean(lockedReason),
+            description: lockedReason,
+        },
+        ...(find ? [{ label: find.isOpen ? 'Chiudi la ricerca nel testo' : 'Cerca nel testo', icon: Search, onSelect: toggleFind }] : []),
+        {
+            label: 'Copia',
+            icon: Copy,
+            onSelect: () => (phone ? void onMobileCopy() : onOpenCopyModal()),
+            disabled: Boolean(copyLockedReason),
+            description: copyLockedReason,
+        },
+        ...(compact ? [] : [
+            ...(phone ? [
+                { label: 'Modalità studio', icon: BookOpen, onSelect: () => onOpenStudyMode?.(), disabled: Boolean(lockedReason) || !onOpenStudyMode, description: lockedReason },
+                ...(url ? [{ label: 'Apri la fonte', icon: ExternalLink, onSelect: () => { window.open(url, '_blank', 'noopener,noreferrer'); } }] : []),
+            ] : []),
+            { label: 'Condividi link', icon: Share2, onSelect: onShareLink, separatorBefore: true },
+            { label: 'Esporta…', icon: Download, onSelect: onOpenAdvancedExport, disabled: Boolean(exportLockedReason), description: exportLockedReason },
+            { label: 'Testo alla data…', icon: Clock, onSelect: onOpenVersionInput },
+            { label: 'Confronta con…', icon: GitCompare, onSelect: onCompare },
+        ]),
+    ];
+
+    // The annex as the source convention names it: never a code's own (the codice civile is Allegato 2 of its decree).
+    const annex = namedAnnex(normaData);
+    /** «Al dossier»: its word on a computer; on a phone the icon, so the status and the tools keep one row. */
+    const dossierButton = (ref?: Ref<HTMLButtonElement | null>, phone = false) => (
+        <button
+            ref={ref}
+            type="button"
+            onClick={onOpenDossier}
+            className={ACTION}
+            aria-label={phone ? 'Al dossier' : undefined}
+            title={tip('Aggiungi l’articolo a un dossier', copyLockedReason)}
+            {...lock(copyLockedReason)}
+        >
+            <FolderPlus size={phone ? 18 : 16} aria-hidden />
+            {!phone && 'Al dossier'}
+        </button>
+    );
+
     return (
-        <div data-pinned-head className={cn('glass-toolbar sticky top-[var(--reading-toolbar-top,0px)] flex flex-wrap gap-x-1 gap-y-1 items-center justify-between p-2 rounded-t-xl mb-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-b-2 border-slate-200/50 dark:border-slate-800/50', Z_INDEX.sticky)}>
-            {/* Version Info & Annex Source Badge */}
-            <div className="contents md:flex md:items-center md:gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+        // One line beside the text (R3: no box of its own), opaque while it is pinned over the text it heads, on the
+        // ground it stands on: the page's paper in a practice's row, the window's (and the phone's reader's) when compact.
+        <div
+            data-pinned-head
+            className={cn(
+                'glass-toolbar sticky top-[var(--reading-toolbar-top,0px)] mb-3 flex items-center justify-between gap-x-1 gap-y-1 border-b py-1 backdrop-blur-md md:flex-wrap md:gap-x-2',
+                compact
+                    ? 'border-slate-100 bg-white/95 dark:border-slate-700 dark:bg-slate-800/95'
+                    : 'border-slate-200 bg-slate-50/95 dark:border-slate-800 dark:bg-slate-950/95',
+                Z_INDEX.sticky,
+            )}
+        >
+            {/* Which text this is, in words: the status, then the annex. */}
+            {/* On a phone it takes what the tools leave (and wraps inside); from `md` its own width, so the tools wrap. */}
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 text-sm text-slate-600 md:flex-initial dark:text-slate-400">
                 {versionChip && <VersionStatusChip chip={versionChip} onClick={onOpenVersionInput} />}
-                {/* Annex Source Badge */}
-                {normaData.allegato && (
-                    <>
-                        {versionChip && <span className="hidden md:inline text-slate-300 dark:text-slate-700">|</span>}
-                        <span className="px-2 py-1 rounded-md bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
-                            Allegato {normaData.allegato}
-                        </span>
-                    </>
+                {annex && (
+                    // On a phone the annex has its own line under the status, so no dot ever leads a line or goes missing.
+                    <span className="basis-full md:basis-auto">
+                        {versionChip && <span aria-hidden className="mr-2 hidden text-slate-400 md:inline dark:text-slate-600">·</span>}
+                        Allegato {annex}
+                    </span>
                 )}
             </div>
 
-            {/* Mobile: Quick Actions + Study Mode toggle */}
-            <div className="flex md:hidden ml-auto flex-wrap justify-end items-center gap-1 [&_button:disabled]:opacity-40 [&_button:disabled]:cursor-not-allowed">
-                {!compact && <button
-                    onClick={onToggleQuickNorm}
-                    aria-pressed={isPinnedQuick}
-                    className={cn(
-                        "inline-flex min-h-[44px] min-w-[44px] items-center justify-center p-2 lg:p-2.5 rounded-lg transition-colors",
-                        isPinnedQuick
-                            ? "bg-amber-50 text-amber-500 dark:bg-amber-900/20 dark:text-amber-400"
-                            : "text-slate-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:text-amber-500"
-                    )}
-                    title={tip(isPinnedQuick ? "Rimuovi dalle norme rapide" : "Aggiungi a norme rapide", lockedReason)}
-                    {...lock(lockedReason)}
-                >
-                    <Zap size={20} className={cn(isPinnedQuick && "fill-amber-500")} />
-                </button>}
-                <button
-                    onClick={onToggleDiscussion}
-                    aria-expanded={isDiscussionOpen}
-                    aria-haspopup="dialog"
-                    className={cn("inline-flex min-h-[44px] min-w-[44px] items-center justify-center p-2 lg:p-2.5 rounded-lg transition-colors relative", isDiscussionOpen ? "bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400" : "text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-primary-500")}
-                    title={tip("Glosse sull’articolo", lockedReason)}
-                    {...lock(lockedReason)}
-                >
-                    <MessageCircle size={20} />
-                </button>
-                {find && <FindInTextButton ref={phoneFindRef} isOpen={find.isOpen} onToggle={toggleFind} size={20} />}
-                <button
-                    onClick={() => { void onMobileCopy(); }}
-                    className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center p-2 lg:p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-emerald-500 transition-colors"
-                    title={tip("Copia testo", copyLockedReason)}
-                    {...lock(copyLockedReason)}
-                >
-                    <Copy size={20} />
-                </button>
-                {!compact && <button
-                    onClick={onOpenDossier}
-                    className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center p-2 lg:p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-blue-500 transition-colors"
-                    title={tip("Aggiungi a dossier", copyLockedReason)}
-                    aria-label="Aggiungi a dossier"
-                    {...lock(copyLockedReason)}
-                >
-                    <FolderPlus size={20} />
-                </button>}
-                {/* Study Mode button - sempre visibile */}
-                {!compact && <button
-                    onClick={onOpenStudyMode}
-                    className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center p-2 lg:p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-purple-500 transition-colors"
-                    title={tip("Modalità studio", lockedReason)}
-                    {...lock(lockedReason)}
-                >
-                    <BookOpen size={20} />
-                </button>}
-                {url && !compact && (
-                    <a
-                        href={url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center p-2 lg:p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-primary-500 transition-colors"
-                        title="Apri fonte"
-                    >
-                        <ExternalLink size={20} />
-                    </a>
-                )}
+            {/* A phone: the dossier and «⋯», 44 px each. */}
+            {/* Close together, the last one's 44 px reaching into the page's right margin (`-mr-3`): the status keeps one line
+                at 320 px («In vigore dal 1° gennaio 2005», R3b). Not in the compact bar (the phone's full-screen reader, a
+                window): there the card's padding is the edge, and its overflow would cut the focus ring. */}
+            <div className={cn('ml-auto flex flex-shrink-0 items-center md:hidden', !compact && '-mr-3')}>
+                {!compact && dossierButton(undefined, true)}
+                <div ref={phoneMoreRef} className="contents">
+                    <MenuButton label="Altre azioni sull’articolo" triggerClassName={ACTION} items={moreItems(true)}>
+                        <MoreHorizontal size={18} aria-hidden />
+                    </MenuButton>
+                </div>
             </div>
 
-            {/* Desktop: Full Quick Actions */}
-            <div className="hidden md:flex items-center gap-1 [&_button:disabled]:opacity-40 [&_button:disabled]:cursor-not-allowed">
-                {/* Primary buttons */}
-                {!compact && <button
-                    onClick={onToggleQuickNorm}
-                    aria-pressed={isPinnedQuick}
-                    className={cn(
-                        "p-1.5 rounded-md transition-colors",
-                        isPinnedQuick
-                            ? "bg-amber-50 text-amber-500 dark:bg-amber-900/20 dark:text-amber-400"
-                            : "text-slate-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:text-amber-500"
-                    )}
-                    title={tip(isPinnedQuick ? "Rimuovi dalle norme rapide" : "Aggiungi a norme rapide", lockedReason)}
-                    {...lock(lockedReason)}
-                >
-                    <Zap size={16} className={cn(isPinnedQuick && "fill-amber-500")} />
-                </button>}
+            {/* A computer: three tools in words, then «⋯». */}
+            <div className="hidden flex-shrink-0 items-center gap-1 md:flex">
                 <NotesHighlightsButtons
+                    labelled
                     notesCount={notesCount}
                     highlightsCount={highlightsCount}
                     isNotesOpen={isNotesPeekOpen}
@@ -225,101 +230,12 @@ export function ReadingToolbar({
                     onToggleHighlights={onToggleHighlightsPeek}
                     lockedReason={lockedReason}
                 />
-                <DiscussionButton
-                    isOpen={isDiscussionOpen}
-                    onToggle={onToggleDiscussion}
-                    name="Glosse sull’articolo"
-                    lockedReason={lockedReason}
-                />
-                {find && <FindInTextButton ref={desktopFindRef} isOpen={find.isOpen} onToggle={toggleFind} />}
-                <button
-                    onClick={onOpenCopyModal}
-                    className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-emerald-500 transition-colors"
-                    title={tip("Copia", copyLockedReason)}
-                    {...lock(copyLockedReason)}
-                >
-                    <Copy size={16} />
-                </button>
-                {!compact && <button
-                    ref={dossierButtonRef}
-                    onClick={onOpenDossier}
-                    className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-blue-500 transition-colors"
-                    title={tip("Aggiungi a dossier", copyLockedReason)}
-                    aria-label="Aggiungi a dossier"
-                    {...lock(copyLockedReason)}
-                >
-                    <FolderPlus size={16} />
-                </button>}
-
-                {!compact && <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-1" />}
-
-                {/* More menu */}
-                {!compact && <div className="relative">
-                    <button
-                        onClick={() => onToggleMoreMenu(!showMoreMenu)}
-                        className={cn(
-                            "p-1.5 rounded-md transition-colors",
-                            showMoreMenu
-                                ? "bg-slate-100 dark:bg-slate-800 text-primary-500"
-                                : "text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                        )}
-                        title="Altre azioni"
-                    >
-                        <MoreHorizontal size={16} />
-                    </button>
-                    {showMoreMenu && (
-                        <>
-                            <div className={cn('fixed inset-0', Z_INDEX.dropdown)} onClick={() => onToggleMoreMenu(false)} />
-                            <div className={cn('absolute right-0 mt-2 w-48 bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in-95 duration-200 py-1', Z_INDEX.dropdown)}>
-                                <button
-                                    onClick={() => {
-                                        onShareLink();
-                                        onToggleMoreMenu(false);
-                                    }}
-                                    className="w-full px-3 py-2 text-sm text-left flex items-center gap-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                                >
-                                    <Share2 size={14} className="text-slate-400" />
-                                    Condividi link
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        onOpenAdvancedExport();
-                                        onToggleMoreMenu(false);
-                                    }}
-                                    title={tip("Esporta...", exportLockedReason)}
-                                    {...lock(exportLockedReason)}
-                                    className="w-full px-3 py-2 text-sm text-left flex items-center gap-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                                >
-                                    <Download size={14} className="text-slate-400" />
-                                    Esporta...
-                                </button>
-
-                                <div className="border-t border-slate-200 dark:border-slate-700 my-1" />
-
-                                <button
-                                    onClick={() => {
-                                        onOpenVersionInput();
-                                        onToggleMoreMenu(false);
-                                    }}
-                                    className="w-full px-3 py-2 text-sm text-left flex items-center gap-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                                >
-                                    <Clock size={14} className="text-slate-400" />
-                                    Testo alla data...
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        onCompare();
-                                        onToggleMoreMenu(false);
-                                    }}
-                                    className="w-full px-3 py-2 text-sm text-left flex items-center gap-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                                >
-                                    <GitCompare size={14} className="text-slate-400" />
-                                    Confronta con...
-                                </button>
-                            </div>
-                        </>
-                    )}
-                </div>}
+                {!compact && dossierButton(dossierButtonRef)}
+                <div ref={desktopMoreRef} className="contents">
+                    <MenuButton label="Altre azioni sull’articolo" triggerClassName={ACTION} items={moreItems(false)}>
+                        <MoreHorizontal size={18} aria-hidden />
+                    </MenuButton>
+                </div>
             </div>
         </div>
     );

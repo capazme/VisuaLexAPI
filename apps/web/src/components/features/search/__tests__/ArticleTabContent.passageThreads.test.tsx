@@ -123,7 +123,9 @@ describe('ArticleTabContent passage discussions', () => {
     expect(screen.queryByText(/Nessuna glossa ancora\./)).not.toBeInTheDocument();
     expect(container.querySelector('.vlx-sign[data-threads="1"]')).toBeNull();
 
-    fireEvent.click(screen.getAllByTitle('Glosse sull’articolo')[0]);
+    // The glosse are an entry of the article's «⋯» (R3).
+    fireEvent.click(screen.getAllByRole('button', { name: 'Altre azioni sull’articolo' })[0]);
+    fireEvent.click(screen.getAllByRole('menuitem', { name: 'Glosse sull’articolo' })[0]);
     const panel = await screen.findByRole('dialog', { name: 'Glosse sull’articolo' });
     const panelError = await within(panel).findByRole('alert');
     expect(screen.getAllByRole('alert')).toHaveLength(1);

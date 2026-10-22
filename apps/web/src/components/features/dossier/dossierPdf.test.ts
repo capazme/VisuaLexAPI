@@ -7,7 +7,7 @@ const fetchDecisionCached = vi.fn();
 vi.mock('../../../utils/decisionFetchCache', () => ({ fetchDecisionCached: (...a: unknown[]) => fetchDecisionCached(...a) }));
 
 import { countMarksUnavailable,
-  buildPdfBlocks, countUnavailable, loadDossierDecisions, loadDossierTexts, PDF_NO_MARKS, PDF_TEXT_UNAVAILABLE,
+  buildPdfBlocks, countUnavailable, loadDossierDecisions, loadDossierTexts, PDF_NO_MARKS, PDF_TEXT_UNAVAILABLE, pdfCountsLine,
   type LoadedDecision, type PdfBlock, type PdfMarks,
 } from './dossierPdf';
 import type { DossierItem, NormaVisitata } from '../../../types';
@@ -82,6 +82,14 @@ describe('decisions in the PDF', () => {
     const texts = await loadDossierTexts([decision, a1], () => {});
     expect(fetchArticleForNorma).toHaveBeenCalledTimes(1);
     expect(texts.has('s')).toBe(false);
+  });
+});
+
+describe('pdfCountsLine', () => {
+  it('counts only the decisions chosen for the PDF, as the PDF prints only those', () => {
+    const second: DossierItem = { ...decision, id: 's2' };
+    expect(pdfCountsLine([a1, note, decision, second], new Set())).toBe('1 atto · 1 articolo · 1 nota');
+    expect(pdfCountsLine([a1, note, decision, second], new Set(['s2']))).toBe('1 atto · 1 articolo · 1 nota · 1 sentenza');
   });
 });
 

@@ -95,8 +95,8 @@ export function QaSynthesisWithCitations({ text, enabled, onSubmit }: QaSynthesi
       aria-expanded={activeIdx === i}
       onClick={() => setActiveIdx((prev) => (prev === i ? null : i))}
       className={cn(
-        'rounded-sm border-b border-dotted border-blue-400 text-blue-700 transition-colors hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-blue-300 dark:hover:bg-blue-950/40',
-        activeIdx === i && 'bg-blue-100 dark:bg-blue-900/50',
+        'rounded-sm border-b border-dotted border-primary-400 text-primary-700 transition-colors hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-300 dark:hover:bg-primary-950/40',
+        activeIdx === i && 'bg-primary-100 dark:bg-primary-900/50',
       )}
     >
       {parsed.plainText.slice(m.startIndex, m.endIndex)}

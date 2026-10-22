@@ -1,4 +1,4 @@
-import { AlertTriangle, Info } from 'lucide-react';
+import { AlertTriangle, CalendarClock, Info } from 'lucide-react';
 import { Button } from '../../ui/Button';
 import { cn } from '../../../lib/utils';
 import { formatDateForCitation, withPreposition } from '../../../utils/dateUtils';
@@ -9,6 +9,8 @@ const TONE: Record<BannerData['kind'], string> = {
     unreliable: 'border-red-200 bg-red-50 text-red-900 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-200',
     not_yet: 'border-slate-200 bg-slate-50 text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200',
     current_in_window: 'border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-900/40 dark:bg-sky-950/20 dark:text-sky-200',
+    // Informing, not an error: the tone of `current_in_window`.
+    upcoming: 'border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-900/40 dark:bg-sky-950/20 dark:text-sky-200',
 };
 
 function labelOf(action: BannerAction, banner: BannerData): string {
@@ -35,7 +37,7 @@ interface VersionBannerProps {
  * but `article_text` (root CLAUDE.md, rule 23).
  */
 export function VersionBanner({ banner, onAction, variant = 'banner' }: VersionBannerProps) {
-    const Icon = banner.kind === 'unreliable' ? AlertTriangle : Info;
+    const Icon = banner.kind === 'unreliable' ? AlertTriangle : banner.kind === 'upcoming' ? CalendarClock : Info;
     return (
         <div
             role={banner.kind === 'unreliable' ? 'alert' : 'status'}

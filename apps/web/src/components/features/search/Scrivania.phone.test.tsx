@@ -32,9 +32,11 @@ describe('the Scrivania on a phone', () => {
   it('keeps the page\'s 16 px margin and centres the block in the window under the search bar', () => {
     const { container } = renderPage();
     expect(container.firstElementChild).toHaveClass(
-      'max-md:-mx-4', 'max-md:w-auto', 'max-md:px-0', 'max-md:flex', 'max-md:flex-col', 'max-md:justify-center',
+      'max-md:w-auto', 'max-md:px-0', 'max-md:flex', 'max-md:flex-col', 'max-md:justify-center',
       'max-md:min-h-[calc(100dvh-var(--search-bar-height,0px)-2rem)]',
     );
+    // The reader's column has no padding below md since R3b: taking 16 px back would put the page on the screen's edges.
+    expect(container.firstElementChild).not.toHaveClass('max-md:-mx-4');
   });
 
   it('takes Focus mode\'s padding off instead, where no search bar is drawn', () => {

@@ -626,7 +626,11 @@ _EURLEX_ARTICLE_NUM = re.compile(r"^(?:Articolo|Article)\s+([\w.-]+)", re.IGNORE
 # "►M2 … ◄" (amending act), "►C2 … ◄" (corrigendum), "►B" (base act), and
 # "▼M2" / "▼B" at the head of a replaced block. The glyphs are never part of
 # the legal text.
-_AMENDMENT_MARK = re.compile(r"\s*[►◄▼](?:[A-Z]\d*)?\s*")
+# A marker with the whitespace on both sides. The leading run is matched only from its first
+# character (`(?<!\s)`), or a search restarted at every blank of a long run and scanned the
+# rest of it each time: 0.85 s on 20,000 blanks. A marker right after an earlier match, whose
+# trailing run took the blanks, is the second branch. Same matches as `\s*[►◄▼]…\s*`.
+_AMENDMENT_MARK = re.compile(r"(?:(?<!\s)\s++)?[►◄▼](?:[A-Z]\d*)?\s*")
 
 
 def strip_amendment_markers(text: str) -> str:
@@ -765,7 +769,9 @@ def _extract_eurlex_title(soup):
     the same class, so only the first consecutive run counts, and only when it holds the date); the
     consolidated page in `title-doc-first` and
     `title-doc-last` (printed twice, the first copy is enough); the legacy page in its
-    `DC.description` meta only.
+    `DC.description` meta, which the `/eli/` address of a legacy act does not carry (dir.
+    2002/58): there the ELI metadata names the act in every language, and the Italian
+    `eli:title` is read the same way. Never a title from another language.
     """
     container = soup.find(class_="eli-main-title")
     first = (container or soup).find("p", class_="oj-doc-ti")
@@ -784,9 +790,12 @@ def _extract_eurlex_title(soup):
     last = soup.find("p", class_="title-doc-last")
     if last is not None:
         return _eurlex_subject([last.get_text(" ", strip=True)])
-    meta = soup.find("meta", attrs={"name": "DC.description"})
-    match = _EURLEX_DESCRIPTION_SUBJECT.search((meta.get("content") or "") if meta else "")
-    return " ".join(match.group(1).split()) if match else ""
+    for meta in (soup.find("meta", attrs={"name": "DC.description"}),
+                 soup.find("meta", attrs={"property": "eli:title", "lang": "it"})):
+        match = _EURLEX_DESCRIPTION_SUBJECT.search((meta.get("content") or "") if meta else "")
+        if match:
+            return " ".join(match.group(1).split())
+    return ""
 
 
 def _extract_eli_info(normurn):

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 // ---- mocks (hoisted) ----
@@ -53,6 +53,11 @@ function renderHub() {
   );
 }
 
+/** The consent and the profile open from the row at the page's foot (S7b). */
+function openFoot(name: RegExp) {
+  fireEvent.click(screen.getByRole('button', { name }));
+}
+
 const baseFeatures = {
   merltEnabled: true,
   graphEnabled: true,
@@ -66,9 +71,12 @@ const baseFeatures = {
   opsVisible: false,
 };
 
+const NOTICE = { id: 'n1', versione: 1, titolo: 'Informativa MERL-T', corpo: 'Il testo.', conferma: 'Ho letto', azione: 'Leggi' };
+
 const baseConsent = {
   level: 'basic' as const,
   status: 'ready' as const,
+  notice: NOTICE,
   canTrack: true,
   error: null,
   consent: { level: 'basic', lastAuditAt: null },
@@ -102,6 +110,7 @@ describe('MerltHubPage', () => {
 
   it('renders the consent card with the current level and ladder', () => {
     renderHub();
+    openFoot(/Consenso e privacy/);
     const card = screen.getByTestId('hub-card-consent');
     expect(card).toBeInTheDocument();
     expect(card).toHaveTextContent(/base/i);
@@ -135,6 +144,11 @@ describe('MerltHubPage', () => {
     useMerltFeaturesMock.mockReturnValue({ ...baseFeatures, graphEnabled: false, graphReadable: false });
     renderHub();
     expect(screen.queryByTestId('hub-card-graph')).not.toBeInTheDocument();
+  });
+
+  it('says Academia\'s line over its name (L-37)', () => {
+    renderHub();
+    expect(screen.getByRole('heading', { level: 1, name: 'Assistente' })).toHaveAccessibleDescription('Academia · il laboratorio del diritto');
   });
 
   it('does not show the stale "(presto)" copy in the header', () => {
@@ -210,7 +224,7 @@ describe('MerltHubPage', () => {
     });
   });
 
-  it('shows a fail-soft pill when the validation count endpoint errors', async () => {
+  it('says a validation count it cannot read in the card\'s text', async () => {
     useMerltFeaturesMock.mockReturnValue({ ...baseFeatures, canValidate: true });
     fetchPendingMock.mockRejectedValue(new Error('merlt_unavailable'));
     renderHub();
@@ -239,6 +253,7 @@ describe('MerltHubPage', () => {
 
   it('loads and humanizes the authority profile (stars; raw number on hover only)', async () => {
     renderHub();
+    openFoot(/Il tuo profilo/);
     await waitFor(() => {
       const card = screen.getByTestId('hub-card-profile');
       expect(card).toHaveTextContent(/Il peso del tuo voto/i);
@@ -254,12 +269,13 @@ describe('MerltHubPage', () => {
   it('shows a degraded profile state when the profile fetch fails', async () => {
     fetchProfile.mockRejectedValue(new Error('merlt_unavailable'));
     renderHub();
+    openFoot(/Il tuo profilo/);
     await waitFor(() =>
       expect(screen.getByTestId('hub-card-profile')).toHaveTextContent(/non disponibile|non disponibili/i),
     );
   });
 
-  it('renders a "non raggiungibile" pill on the graph card when MERL-T is unreachable', async () => {
+  it('says on the graph card that MERL-T is unreachable, in its text', async () => {
     getHealth.mockResolvedValue({ bff: 'ok', merlt: 'unreachable', error: 'down' });
     renderHub();
     await waitFor(() =>
@@ -271,11 +287,110 @@ describe('MerltHubPage', () => {
     const revokeConsent = vi.fn().mockResolvedValue({ erasureCompleted: false });
     useConsentMock.mockReturnValue({ ...baseConsent, revokeConsent });
     renderHub();
+    openFoot(/Consenso e privacy/);
     // click "Revoca" in the consent card
     fireEvent.click(screen.getByRole('button', { name: /^Revoca$/ }));
     // the dialog names both ways out
     expect(await screen.findByRole('button', { name: /Revoca ed elimina i dati raccolti/i })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Revoca soltanto/i }));
     await waitFor(() => expect(revokeConsent).toHaveBeenCalledWith({ reason: expect.any(String), deleteData: false }));
+  });
+});
+
+// Consent first (S7b): with no consent the page opens on what MERL-T does and collects, four cards follow with one
+// action each, and the consent and the profile go down to a row of links.
+describe('MerltHubPage — consent first (S7b)', () => {
+  const none = () => {
+    useMerltFeaturesMock.mockReturnValue({ ...baseFeatures, consentLevel: 'none' as const, qaAskable: false, canTrack: false });
+    useConsentMock.mockReturnValue({ ...baseConsent, level: 'none', consent: null });
+  };
+
+  it('opens on «Attiva MERL-T» with no consent, whose button opens the consent dialog', () => {
+    none();
+    renderHub();
+    const block = screen.getByTestId('hub-consent-first');
+    expect(block).toHaveTextContent('Attiva MERL-T');
+    // What it collects, in the levels' words: never the notes' text.
+    // What it collects, said as such, in the levels' words.
+    expect(block).toHaveTextContent('Che cosa raccoglie. Con il consenso base: le tue letture');
+    expect(block).toHaveTextContent('note (mai il loro testo)');
+    expect(block).toHaveTextContent('le citazioni con il testo intorno');
+    expect(screen.queryByTestId('dialog')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Scegli il consenso' }));
+    expect(screen.getByTestId('dialog')).toBeInTheDocument();
+  });
+
+  it('leaves the block out once a consent is given, and while the consent is being read', () => {
+    renderHub();
+    expect(screen.queryByTestId('hub-consent-first')).toBeNull();
+    none();
+    useConsentMock.mockReturnValue({ ...baseConsent, level: 'none', consent: null, status: 'loading' });
+    renderHub();
+    expect(screen.queryByTestId('hub-consent-first')).toBeNull();
+  });
+
+  it('shows four cards, the actions that need more consent saying so and disabled, no badge', () => {
+    none();
+    renderHub();
+    const cards = ['hub-card-qa', 'hub-card-validate', 'hub-card-graph', 'hub-card-contrib'].map((id) => screen.getByTestId(id));
+    expect(screen.queryByTestId('hub-card-consent')).toBeNull();
+    expect(screen.queryByTestId('hub-card-profile')).toBeNull();
+    // Said, and reachable: `aria-disabled`, in the Tab order.
+    for (const [card, name] of [[cards[0], 'Serve il consenso base'], [cards[1], 'Serve il consenso completo'], [cards[3], 'Serve il consenso completo']] as const) {
+      const action = within(card).getByRole('button', { name });
+      expect(action).toHaveAttribute('aria-disabled', 'true');
+      expect(action).not.toBeDisabled();
+    }
+    // Reading the graph is free: its action is a link, and no card nests a button in a link.
+    expect(within(cards[2]).getByRole('link', { name: 'Esplora il grafo' })).toHaveAttribute('href', '/grafo');
+    for (const card of cards) expect(card.querySelector('a button, button a')).toBeNull();
+  });
+
+  it('says MERL-T is not active on a server without it (no notice), with no button that does nothing', () => {
+    none();
+    useConsentMock.mockReturnValue({ ...baseConsent, level: 'none', consent: null, notice: null });
+    renderHub();
+    expect(screen.queryByTestId('hub-consent-first')).toBeNull();
+    expect(screen.getByTestId('hub-consent-unavailable')).toHaveTextContent('MERL-T non è attivo su questo server');
+    expect(screen.queryByRole('button', { name: 'Scegli il consenso' })).toBeNull();
+    expect(within(screen.getByTestId('hub-card-qa')).getByRole('button', { name: 'Non attivo su questo server' })).toHaveAttribute('aria-disabled', 'true');
+    // Nor a «Gestisci» in the consent's panel.
+    fireEvent.click(screen.getByRole('button', { name: /Consenso e privacy/ }));
+    expect(within(screen.getByTestId('hub-card-consent')).queryByRole('button', { name: 'Gestisci' })).toBeNull();
+  });
+
+  it('says the consent could not be read when the read fails, and reads it again on «Riprova»', () => {
+    const refresh = vi.fn().mockResolvedValue(undefined);
+    none();
+    useConsentMock.mockReturnValue({ ...baseConsent, level: 'none', consent: null, notice: null, status: 'error', error: 'boom', refresh });
+    renderHub();
+    expect(screen.getByTestId('hub-consent-unavailable')).toHaveTextContent('Non è stato possibile leggere il tuo consenso a MERL-T.');
+    expect(within(screen.getByTestId('hub-card-validate')).getByRole('button', { name: 'Consenso non letto' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Serve il consenso/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Riprova' }));
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it('offers no action that needs consent while the consent is being read', () => {
+    none();
+    useConsentMock.mockReturnValue({ ...baseConsent, level: 'none', consent: null, status: 'loading' });
+    renderHub();
+    expect(screen.queryByRole('button', { name: /Serve il consenso/ })).toBeNull();
+  });
+
+  it('opens the consent and the profile from the row at the foot, one at a time', () => {
+    renderHub();
+    const consent = screen.getByRole('button', { name: /Consenso e privacy/ });
+    const profile = screen.getByRole('button', { name: /Il tuo profilo/ });
+    // The level as the consent screen names it (`levels.ts`).
+    expect(consent).toHaveTextContent('· Base');
+    expect(consent).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(consent);
+    expect(consent).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('hub-card-consent')).toBeInTheDocument();
+    fireEvent.click(profile);
+    expect(screen.queryByTestId('hub-card-consent')).toBeNull();
+    expect(screen.getByTestId('hub-card-profile')).toBeInTheDocument();
+    for (const button of [consent, profile]) expect(button).toHaveClass('min-h-[44px]');
   });
 });

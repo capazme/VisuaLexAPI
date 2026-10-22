@@ -96,7 +96,7 @@ export function NodeDetailsDrawer({
           </h2>
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             <span
-              className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:text-slate-300"
+              className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-300"
               style={{ backgroundColor: `${typeColor}22` }}
             >
               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: typeColor }} />
@@ -104,7 +104,7 @@ export function NodeDetailsDrawer({
             </span>
             {provMeta && (
               <span
-                className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:text-slate-300"
+                className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-300"
                 style={{ backgroundColor: `${provMeta.color}22` }}
               >
                 <span className="h-2 w-2 rounded-full" style={{ backgroundColor: provMeta.color }} />
@@ -113,7 +113,7 @@ export function NodeDetailsDrawer({
             )}
             {degree !== undefined && (
               <span
-                className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300"
                 title="Numero totale di relazioni di questo nodo nell'intero grafo"
               >
                 <Share2 size={10} aria-hidden="true" />
@@ -223,7 +223,7 @@ export function NodeDetailsDrawer({
 function Field({ label, children }: { label: string; children: React.ReactNode }): React.ReactElement {
   return (
     <div>
-      <p className="mb-0.5 text-[10px] uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="mb-0.5 text-xs uppercase tracking-wide text-slate-600 dark:text-slate-400">{label}</p>
       {children}
     </div>
   );
@@ -245,7 +245,7 @@ function RelationGroup({
   if (edges.length === 0) return null;
   return (
     <div>
-      <p className="mb-1 text-[10px] uppercase tracking-wide text-slate-400">{title}</p>
+      <p className="mb-1 text-xs uppercase tracking-wide text-slate-600 dark:text-slate-400">{title}</p>
       <ul className="space-y-0.5">
         {edges.map((e) => {
           const otherId = dir === 'out' ? e.target : e.source;
@@ -259,7 +259,7 @@ function RelationGroup({
                 className="flex w-full items-center justify-between gap-2 rounded px-1.5 py-1 text-left hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:cursor-default disabled:opacity-50 disabled:text-slate-400 disabled:hover:bg-transparent dark:hover:bg-slate-800"
               >
                 <span className="truncate text-slate-700 dark:text-slate-200">{other?.label ?? otherId}</span>
-                <span className="shrink-0 text-[10px] text-slate-400">{e.type}</span>
+                <span className="shrink-0 text-xs text-slate-600 dark:text-slate-400">{e.type}</span>
               </button>
             </li>
           );

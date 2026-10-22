@@ -26,7 +26,7 @@ vi.mock('../../../hooks/useServiceHealth', async () => {
 vi.mock('../../ui/SettingsModal', () => ({ SettingsModal: () => null }));
 vi.mock('../../ui/FeedbackButton', () => ({ FeedbackButton: () => null }));
 vi.mock('../../ui/ChangelogNotification', () => ({ ChangelogNotification: () => null }));
-vi.mock('../../ui/Toast', () => ({ UndoToastContainer: () => null }));
+vi.mock('../../ui/Toast', () => ({ NotificationHost: () => null }));
 // The planner's host reads the tasks from the server: not under test here.
 vi.mock('../../features/planner/PlannerHost', () => ({ PlannerHost: () => null }));
 vi.mock('../../ui/SyncErrorToast', () => ({ SyncErrorToast: () => null }));
@@ -97,5 +97,15 @@ describe('Layout — the ? key', () => {
     expect(screen.queryByText('Scorciatoie da Tastiera')).toBeNull();
     fireEvent.keyDown(window, { key: '?' });
     expect(screen.getByText('Scorciatoie da Tastiera')).toBeInTheDocument();
+  });
+
+  it('is a letter on an element that stands for a field (the search page\'s field, R2)', () => {
+    at();
+    const field = document.createElement('button');
+    field.setAttribute('data-text-field', '');
+    document.body.append(field);
+    fireEvent.keyDown(field, { key: '?' });
+    expect(screen.queryByText('Scorciatoie da Tastiera')).toBeNull();
+    field.remove();
   });
 });

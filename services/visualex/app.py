@@ -26,7 +26,8 @@ from visualex_api.tools.norma import Norma, NormaVisitata
 from visualex_api.services.normattiva_scraper import NormattivaScraper
 from visualex_api.services.eurlex_scraper import EurlexScraper
 from visualex_api.services.pdfextractor import extract_pdf, cleanup_browser_pool, is_allowed_pdf_urn
-from visualex_api.services.akn_parser import normalize_article_key
+from visualex_api.services.akn_parser import comparable_article_key
+from visualex_api.tools.article_suffixes import other_ordinal_spelling
 from visualex_api.services import act_dates, massimario_portal
 from visualex_api.services.normattiva_validity import (
     read_upcoming_request,
@@ -55,7 +56,7 @@ from visualex_api.tools.urngenerator import complete_request_date, pdf_cache_pat
 from visualex_api.tools.cache_manager import prune_normattiva_cache
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import article_input_error, parse_article_input, normalize_act_type
-from visualex_api.tools.map import codice_urn, extract_codice_details
+from visualex_api.tools.map import CODE_ROWS_OF_SEVERAL_CODES, act_default_annex, codice_urn, extract_codice_details
 from visualex_api.tools.nl_parser import parse_nl_query
 from visualex_api.tools.sources import cite_act, cite_article
 from visualex_api.tools.alias_resolver import resolve_alias
@@ -538,6 +539,16 @@ class NormaController:
                 if annex_match:
                     annex_value = annex_match.group(1)
                     log.info("Using default annex from codice URN", codice=normalized_type, default_annex=annex_value)
+                    if normalized_type.lower() in CODE_ROWS_OF_SEVERAL_CODES:
+                        # The row names two codes: the war code's article is not
+                        # «non presente» in the codici penali militari, it is in annex 2.
+                        asked_annex = annex_value
+            else:
+                # An act cited by type, date and number whose text is its annex (the TULPS,
+                # annex 1 of r.d. 773/1931): keyed like a code, by the annex.
+                annex_value = act_default_annex(norma.url)
+                if annex_value:
+                    log.info("Using the annex that is the act's text", act=norma.url, default_annex=annex_value)
 
         log.info("Final annex value before smart lookup", annex=annex_value, explicit_dispositivo=explicit_dispositivo)
 
@@ -555,25 +566,33 @@ class NormaController:
                     if tree_metadata and 'annexes' in tree_metadata and tree_count > 0:
                         annexes = tree_metadata['annexes']
                         log.info("Smart lookup: found annexes", annex_count=len(annexes))
+                        # Each part's numbers as canonical keys, once: normalising them for
+                        # every requested article cost ~0.6 s of blocking CPU on a range of
+                        # 100 articles of a code.
+                        part_keys = [
+                            {comparable_article_key(art) for art in annex_info.get('article_numbers', [])}
+                            for annex_info in annexes
+                        ]
 
                         # For each requested article, check where it exists
                         for article in articles:
-                            article_normalized = article.strip().lower()
+                            # Canonical keys on both sides, either spelling of the ordinal: the
+                            # tree writes "21 nonies" and the request "21-nonies", and a raw
+                            # comparison never found a suffixed article in its annex, so the
+                            # request went to the dispositivo and Normattiva answered its art. 1.
+                            wanted = comparable_article_key(article.strip())
+                            wanted_keys = {wanted, other_ordinal_spelling(wanted)} - {None}
                             found_in_dispositivo = False
                             found_in_annex = None
                             best_annex = None
                             best_annex_count = 0
 
-                            for annex_info in annexes:
+                            for annex_info, keys in zip(annexes, part_keys):
                                 annex_num = annex_info.get('number')  # None for dispositivo
-                                article_numbers = annex_info.get('article_numbers', [])
                                 article_count = annex_info.get('article_count', 0)
 
                                 # Check if article exists in this section
-                                article_exists = any(
-                                    art.strip().lower() == article_normalized
-                                    for art in article_numbers
-                                )
+                                article_exists = not keys.isdisjoint(wanted_keys)
 
                                 if article_exists:
                                     if annex_num is None:
@@ -612,7 +631,7 @@ class NormaController:
             cleaned_article = article.strip().replace(' ', '-') if ' ' in article.strip() else article.strip()
             log.info("Processing article", article=cleaned_article)
 
-            exists = await self._article_exists_in_tree(norma, cleaned_article, scope)
+            cleaned_article, exists = await self._source_spelling(norma, cleaned_article, scope)
             if exists is False:
                 log.info("Requested article is not in the act",
                          article=cleaned_article, norma=str(norma))
@@ -648,6 +667,31 @@ class NormaController:
         log.info("Created NormaVisitata instances", norma_visitata_list=[nv.to_dict() for nv in norma_visitata_list])
         return norma_visitata_list
 
+    async def _source_spelling(self, norma, article, annex):
+        """`article` as the act spells its ordinal, and whether the act holds it.
+
+        Returns `(article, exists)`, `exists` as `_article_exists_in_tree` answers it.
+
+        Two spellings circulate for 9, 15, 16, 18, 19 and 20 («novies» / «nonies», …) and
+        Normattiva uses one per act: «391 novies» in the c.p.p., «21 nonies» in l.
+        241/1990. Asked with the other one, the article was «non presente» (and its URN,
+        `~art391nonies`, is not the act's). Only an article whose ordinal has another
+        spelling is looked up, in the tree the existence check reads anyway; when the act
+        holds the other spelling and not the one asked, the act's is used, so the URN and
+        the stored norm are the act's. Anything else, the tree unreadable included, keeps
+        what was asked. One existence check for any other article, at most two for one
+        whose ordinal has two spellings (a tree that failed is not cached).
+        """
+        exists = await self._article_exists_in_tree(norma, article, annex)
+        if exists is not False:
+            return article, exists
+        other = other_ordinal_spelling(comparable_article_key(article))
+        if other is not None and await self._article_exists_in_tree(norma, other, annex):
+            log.info("Article asked with the other spelling of its ordinal",
+                     asked=article, act_spelling=other)
+            return other, True
+        return article, exists
+
     async def _article_exists_in_tree(self, norma, article, annex):
         """Whether `article` is in the act's article tree.
 
@@ -659,7 +703,9 @@ class NormaController:
         a bare act URL is also accepted, for the tree-only path.
 
         Article numbers are canonicalised on both sides with the AKN parser's
-        `normalize_article_key`: the tree API and the scraper disagree on the
+        `comparable_article_key` (`normalize_article_key`, with an ordinal split in
+        two words joined: the tree's "135 sex decies" is the request's
+        "135-sexdecies"): the tree API and the scraper disagree on the
         separator ("1-bis" vs "1 bis"). That normaliser reads the ordinal from
         the shared table in `tools/article_suffixes.py` and falls back to "any
         alphabetic tail" for anything the table does not list, which is
@@ -694,19 +740,19 @@ class NormaController:
             index = await fetch_act_index(norma)
             if index is not None:
                 log.info("Tree unusable, answered from the AKN index", **log_ctx)
-                wanted = normalize_article_key(article)
-                return any(normalize_article_key(k) == wanted for k in index.keys)
+                wanted = comparable_article_key(article)
+                return any(comparable_article_key(k) == wanted for k in index.keys)
             log.warning("Tree unusable and no AKN index, skipping existence check",
                         **log_ctx)
             return None
 
-        wanted = normalize_article_key(article)
+        wanted = comparable_article_key(article)
         for entry in articles:
             if not isinstance(entry, dict):
                 continue  # section/annex labels are bare strings
             if annex is not None and str(entry.get('allegato') or '') != str(annex):
                 continue
-            if normalize_article_key(entry.get('numero', '')) == wanted:
+            if comparable_article_key(entry.get('numero', '')) == wanted:
                 return True
         return False
 
@@ -728,10 +774,10 @@ class NormaController:
         articles = tree_result[0] if isinstance(tree_result, (tuple, list)) and len(tree_result) == 3 else tree_result
         if isinstance(articles, str) or not articles:
             return ''
-        wanted = normalize_article_key(article)
+        wanted = comparable_article_key(article)
         parts = []
         for entry in articles:
-            if not isinstance(entry, dict) or normalize_article_key(entry.get('numero', '')) != wanted:
+            if not isinstance(entry, dict) or comparable_article_key(entry.get('numero', '')) != wanted:
                 continue
             part = str(entry.get('allegato') or '')
             if part != str(annex) and part not in parts:

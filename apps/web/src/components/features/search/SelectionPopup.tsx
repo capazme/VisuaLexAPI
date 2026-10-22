@@ -265,7 +265,7 @@ export function SelectionPopup({
       onMouseDown={(e) => e.stopPropagation()}
     >
       {/* Main popup */}
-      <div className="bg-slate-900 dark:bg-slate-800 text-white rounded-lg shadow-2xl border border-slate-700 overflow-hidden">
+      <div className="bg-slate-900 dark:bg-slate-800 text-white rounded-lg shadow-md border border-slate-700 overflow-hidden">
         {showColorPicker ? (
           /* Color picker view */
           <div className="p-2 flex items-center gap-1">
@@ -280,7 +280,7 @@ export function SelectionPopup({
               <button
                 key={color}
                 onClick={() => handleHighlightColor(color)}
-                className="w-7 h-7 rounded-full border-2 border-white/40 transition-transform hover:scale-110 hover:ring-2 hover:ring-white/60"
+                className="w-7 h-7 rounded-full border-2 border-white/40 transition-transform [@media(hover:hover)_and_(pointer:fine)]:hover:scale-110 hover:ring-2 hover:ring-white/60"
                 style={{ backgroundColor: getHighlightSwatch(color) }}
                 title={`Evidenzia in ${color}`}
               />
@@ -304,7 +304,7 @@ export function SelectionPopup({
                   className="p-2.5 hover:bg-slate-700 transition-colors flex items-center gap-1.5 text-sm"
                   title="Aggiungi nota (N)"
                 >
-                  <StickyNote size={16} className="text-blue-400" />
+                  <StickyNote size={16} className="text-primary-400" />
                 </button>
                 {onDiscuss && (
                   <>
@@ -350,7 +350,7 @@ export function SelectionPopup({
                   className="p-2.5 hover:bg-slate-700 transition-colors flex items-center gap-1.5 text-sm"
                   title="Cerca"
                 >
-                  <Search size={16} className="text-purple-400" />
+                  <Search size={16} className="text-primary-300" aria-hidden />
                 </button>
               </>
             )}

@@ -30,7 +30,7 @@ from bs4 import BeautifulSoup, Tag
 from ..tools.article_suffixes import ARTICLE_SUFFIX_ALTERNATION
 from ..tools.exceptions import ValidationError
 from ..tools.text_op import parse_date
-from .akn_parser import normalize_article_key
+from .akn_parser import comparable_article_key
 
 log = structlog.get_logger()
 
@@ -262,7 +262,7 @@ def extract_validity(
     text = body.get_text(" ", strip=True)
     if article:
         label = _LABEL.search(text[:400])
-        if label is None or normalize_article_key(label.group(1)) != normalize_article_key(article):
+        if label is None or comparable_article_key(label.group(1)) != comparable_article_key(article):
             log.info("Validity not read: the page is not the article asked for",
                      asked=article, found=label.group(1) if label else None)
             return None
