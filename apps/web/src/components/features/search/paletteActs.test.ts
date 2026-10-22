@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ACT_TYPES } from '../../../constants/actTypes';
-import { filterPaletteActs, paletteActGroups, paletteActName, queryMatches } from './paletteActs';
+import { filterPaletteActs, paletteActGroups, paletteActName, queryMatches, matchRanges } from './paletteActs';
 
 const names = (query: string) => filterPaletteActs(query).flatMap((g) => g.acts.map((a) => a.name));
 
@@ -66,5 +66,23 @@ describe('queryMatches', () => {
     expect(queryMatches('2043 cc', 'Art. 2043 c.c.')).toBe(true);
     expect(queryMatches('2043 c.c.', 'Art. 2043 cc')).toBe(true);
     expect(queryMatches('', 'anything')).toBe(true);
+  });
+});
+
+describe('matchRanges — the letters a typed word matches (R2)', () => {
+  it('marks the start of each word a typed word begins, case and accents folded', () => {
+    expect(matchRanges('Codice di procedura civile', 'proc civ')).toEqual([[10, 14], [20, 23]]);
+    expect(matchRanges('Proprietà', 'proprieta')).toEqual([[0, 9]]);
+  });
+
+  it('steps over an abbreviation\'s dots, and marks nothing for an empty query or no match', () => {
+    expect(matchRanges('c.c.', 'cc')).toEqual([[0, 3]]);
+    expect(matchRanges('Codice civile', '')).toEqual([]);
+    expect(matchRanges('Codice civile', 'penale')).toEqual([]);
+  });
+
+  it('never marks inside a word, only from its start', () => {
+    expect(matchRanges('Decreto-legge', 'legge')).toEqual([[8, 13]]);
+    expect(matchRanges('Collegato', 'legge')).toEqual([]);
   });
 });

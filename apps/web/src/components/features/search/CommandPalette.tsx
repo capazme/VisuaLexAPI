@@ -1,7 +1,7 @@
-import { createContext, useContext, useEffect, useEffectEvent, useState, useCallback, useMemo, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useEffectEvent, useLayoutEffect, useState, useCallback, useMemo, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref } from 'react';
 import { Command, useCommandState } from 'cmdk';
 import { autoUpdate, FloatingFocusManager, FloatingPortal, offset, size, useFloating, useInteractions, useRole } from '@floating-ui/react';
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { animate, motion, AnimatePresence, useIsPresent, usePresence, useReducedMotion } from 'framer-motion';
 import { ChevronDown, ChevronRight, Gavel, List, Search, Settings2, SlidersHorizontal, Sparkles, Tag, X, Zap } from 'lucide-react';
 import type { SearchParams, CustomAlias, SearchFilters } from '../../../types';
 import { cn } from '../../../lib/utils';
@@ -19,9 +19,8 @@ import { activeFiltersLabel, countActiveFilters, defaultSearchFilters } from '..
 import { SEARCH_FIELD_FORM_ID, returnWordsToSearchField } from '../../../utils/searchFieldControl';
 import { citationSearchParams, useSearchQuery } from '../../../hooks/useSearchQuery';
 import { formatDecisionShort } from '../../../utils/decisionLinks';
-import { Sheet } from '../../ui/Sheet';
 import { Button } from '../../ui/Button';
-import { filterPaletteActs, paletteActName, queryMatches } from './paletteActs';
+import { filterPaletteActs, paletteActName, queryMatches, matchRanges } from './paletteActs';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -110,18 +109,140 @@ function RowHighlight({ value, still }: { value: string; still: boolean }) {
     : <motion.span aria-hidden layoutId={`command-palette-chosen-row:${scope}`} transition={spring.snappy} className={tint} />;
 }
 
-function PaletteRow({ value, onSelect, still, className, children }: {
+/**
+ * A row of the menu (R2): while the box filters, the rows left slide to their places (`layout`) and those filtered out
+ * fade away, popped out of the list (`AnimatePresence mode="popLayout"` around a list's rows) — and a row leaving is
+ * `disabled` for cmdk, so Enter never picks a row no longer there. Under reduced motion nothing moves.
+ */
+function PaletteRow({ ref, value, onSelect, still, entering = false, className, children }: {
+  ref?: Ref<HTMLDivElement>;
   value: string;
   onSelect: () => void;
   still: boolean;
+  /** In a list that filters: it fades in when a letter brings it back. */
+  entering?: boolean;
   className?: string;
   children: ReactNode;
 }) {
+  const present = useIsPresent();
   return (
-    <Command.Item value={value} onSelect={onSelect} className={cn(ROW, className)}>
-      <RowHighlight value={value} still={still} />
-      {children}
+    // Leaving, it is not an option any more: not for Enter (`disabled`), not for a screen reader (`aria-hidden`).
+    <Command.Item asChild value={value} onSelect={onSelect} disabled={!present} aria-hidden={!present || undefined}>
+      <motion.div
+        ref={ref}
+        layout={still ? false : 'position'}
+        initial={entering && !still ? { opacity: 0 } : false}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0, transition: { duration: dur.press } }}
+        transition={{ layout: spring.snappy, opacity: { duration: dur.press } }}
+        className={cn(ROW, className)}
+      >
+        <RowHighlight value={value} still={still} />
+        {children}
+      </motion.div>
     </Command.Item>
+  );
+}
+
+/** A row's words with the letters the box matched drawn in the app's ink (R2). */
+function Matched({ text, query }: { text: string; query: string }) {
+  const ranges = matchRanges(text, query);
+  if (ranges.length === 0) return <>{text}</>;
+  const parts: ReactNode[] = [];
+  let at = 0;
+  ranges.forEach(([start, end]) => {
+    if (start > at) parts.push(text.slice(at, start));
+    parts.push(<span key={start} className="font-semibold text-toga-700 dark:text-toga-300">{text.slice(start, end)}</span>);
+    at = end;
+  });
+  if (at < text.length) parts.push(text.slice(at));
+  return <>{parts}</>;
+}
+
+/** The search field's corner radius (`rounded-xl`) and the panel's (`rounded-2xl`): the growth goes from one to the other. */
+const FIELD_RADIUS = 12;
+const PANEL_RADIUS = 16;
+/** The growth: about 280 ms opening, 200 ms closing (the brief's), on the app's curves; no bounce. */
+const GROW_S = 0.28;
+const SHRINK_S = 0.2;
+/** The groups entering: the first four, 30 ms apart, from when the panel is half grown. */
+const GROUPS_ENTERING = 4;
+const GROUP_STAGGER_MS = 30;
+const GROUPS_AT_MS = 140;
+const PANEL_SHADOW = '0 20px 25px -5px rgb(0 0 0 / 0.12), 0 8px 10px -6px rgb(0 0 0 / 0.1)';
+
+/**
+ * The panel growing out of the search page's field (R2), inspired by Animorio's «menu dei comandi», written from
+ * scratch with Framer Motion: the same place and width, the height uncovered from the field's down to the panel's
+ * (`clip-path`, the corners from the field's to a card's), then the shadow deepens; the content fades in as it
+ * grows. Closing, the same way back (`usePresence`). Under reduced motion it only fades.
+ */
+function PanelGrowth({ still, fromHeight, className, children }: { still: boolean; fromHeight: number; className: string; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [isPresent, safeToRemove] = usePresence();
+  // The part hidden at the bottom, as a share of the panel and a length: the panel's own height is set by floating-ui
+  // after it mounts, so it is never measured here. One template, so the two ends interpolate.
+  const clipFor = (share: number, px: number, radius: number) => `inset(0px 0px calc(${share}% - ${px}px) 0px round ${radius}px)`;
+  const asField = clipFor(100, fromHeight, FIELD_RADIUS);
+  const asPanel = clipFor(0, 0, PANEL_RADIUS);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (still) {
+      const fade = animate(el, { opacity: [0, 1] }, { duration: dur.pop, ease: ease.out });
+      return () => fade.stop();
+    }
+    el.style.boxShadow = 'none';
+    // Set before the first paint: the animation starts a frame later, and the panel would flash open meanwhile.
+    el.style.clipPath = asField;
+    // The groups come one after the other as it grows: the first four, 30 ms apart, rising 4 px.
+    // (A DOM without Web Animations, a test's, skips it.)
+    const groups = [...el.querySelectorAll<HTMLElement>('[cmdk-group]')].slice(0, GROUPS_ENTERING).filter((group) => typeof group.animate === 'function').map((group, i) =>
+      group.animate(
+        [{ opacity: 0, transform: 'translateY(4px)' }, { opacity: 1, transform: 'none' }],
+        { duration: dur.pop * 1000, delay: GROUPS_AT_MS + i * GROUP_STAGGER_MS, easing: `cubic-bezier(${ease.out.join(', ')})`, fill: 'backwards' },
+      ));
+    const grow = animate(el, { clipPath: [asField, asPanel] }, { duration: GROW_S, ease: ease.out });
+    let shadow: { stop: () => void } | null = null;
+    void grow.then(() => {
+      // The clip would cut the shadow: gone once grown, and the shadow deepens.
+      el.style.clipPath = 'none';
+      shadow = animate(el, { boxShadow: ['0 1px 2px rgb(0 0 0 / 0.05)', PANEL_SHADOW] }, { duration: dur.press, ease: ease.out });
+    });
+    return () => {
+      grow.stop();
+      shadow?.stop();
+      groups.forEach((animation) => animation.cancel());
+    };
+    // Once per opening: the panel's own re-renders do not grow it again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the field's height is read as it opens
+  }, [still]);
+
+  useEffect(() => {
+    if (isPresent) return;
+    const el = ref.current;
+    if (!el) {
+      safeToRemove?.();
+      return;
+    }
+    const run = still
+      ? animate(el, { opacity: 0 }, { duration: dur.press })
+      : animate(el, { clipPath: [asPanel, asField], boxShadow: 'none' }, { duration: SHRINK_S, ease: ease.inOut });
+    void run.then(() => safeToRemove?.());
+    return () => run.stop();
+  }, [isPresent, still, asField, asPanel, safeToRemove]);
+
+  return (
+    <div ref={ref} className={cn('rounded-2xl', className)} style={still ? { opacity: 0 } : undefined}>
+      <motion.div
+        className="flex min-h-0 flex-1 flex-col"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1, transition: { duration: dur.press, delay: still ? 0 : 0.04, ease: ease.out } }}
+      >
+        {children}
+      </motion.div>
+    </div>
   );
 }
 
@@ -489,6 +610,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   // is followed, and passed at render time (gotcha 13).
   const field = isOpen && isDesktop ? document.getElementById(SEARCH_FIELD_FORM_ID) : null;
   const anchor = field?.isConnected ? field : null;
+  // The height the panel grows from: the field's, where it grows out of it; a field's height elsewhere (a phone's bar).
+  const growFrom = anchor?.offsetHeight || 44;
   // A dialog on a computer too: the focus stays inside while it is open and goes back where it was
   // (the field) when it closes. Placed only when the field is there.
   const { refs, floatingStyles, context } = useFloating({
@@ -542,12 +665,10 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   const wordsNow = useRef('');
   const stepNow = useRef<PaletteStep>(step);
   const choseNow = useRef(chose);
-  const phoneOpenerNow = useRef<HTMLElement | null>(null);
   useEffect(() => {
     wordsNow.current = inputValue;
     stepNow.current = step;
     choseNow.current = chose;
-    phoneOpenerNow.current = isDesktop ? null : opener;
   });
   const closedOnce = useRef(isOpen);
   useEffect(() => {
@@ -558,8 +679,6 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     if (!closedOnce.current) return;
     closedOnce.current = false;
     returnWordsToSearchField(!choseNow.current && stepNow.current === 'select_act' ? wordsNow.current.trim() : '');
-    // On a phone the sheet does not give the focus back: the field (or what opened it) takes it, as on a computer.
-    if (phoneOpenerNow.current?.isConnected) phoneOpenerNow.current.focus({ preventScroll: true });
   }, [isOpen]);
 
   // The step's content slides in from the side it moved to; the first step of an opening does not move.
@@ -707,8 +826,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
         )}
       </motion.div>
 
-      {/* On a phone the sheet's own «Chiudi» closes it. */}
-      {isDesktop && (
+      {/* «Chiudi», on a phone too: the panel has no other (R2). */}
+      {(
         <button
           type="button"
           onClick={onClose}
@@ -786,14 +905,16 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
           heading={group.heading}
           className={GROUP_WITH_HEADING}
         >
-          {group.acts.map((act) => (
-            <PaletteRow key={act.value} value={`atto ${act.value}`} onSelect={() => handleSelectAct(act.value)} still={still}>
-              <span className="min-w-0 flex-1 line-clamp-2">
-                <span className="text-ink-900 dark:text-ink-50">{act.name}</span>
-                {act.abbreviation && <span className={SUBTLE}> · {act.abbreviation}</span>}
-              </span>
-            </PaletteRow>
-          ))}
+          <AnimatePresence initial={false} mode="popLayout">
+            {group.acts.map((act) => (
+              <PaletteRow key={act.value} value={`atto ${act.value}`} onSelect={() => handleSelectAct(act.value)} still={still} entering>
+                <span className="min-w-0 flex-1 line-clamp-2">
+                  <span className="text-ink-900 dark:text-ink-50"><Matched text={act.name} query={inputValue} /></span>
+                  {act.abbreviation && <span className={SUBTLE}> · <Matched text={act.abbreviation} query={inputValue} /></span>}
+                </span>
+              </PaletteRow>
+            ))}
+          </AnimatePresence>
         </Command.Group>
       ))}
     </div>
@@ -824,15 +945,17 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
           {quickNorms.length === 0 ? (
             <p className={QUIET_LINE}>Nessun preferito: il fulmine su un articolo lo aggiunge qui</p>
           ) : (
-            visibleQuickNorms.map((qn) => (
-              <PaletteRow key={qn.id} value={`preferito ${qn.id}`} onSelect={() => handleSelectQuickNorm(qn.id)} still={still}>
-                <Zap size={14} aria-hidden className="shrink-0 fill-amber-500 text-amber-600 dark:text-amber-400" />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-ink-900 dark:text-ink-50">{qn.label}</span>
-                  <span className={cn('block truncate text-xs', SUBTLE)}>{paletteActName(qn.searchParams.act_type)}</span>
-                </span>
-              </PaletteRow>
-            ))
+            <AnimatePresence initial={false} mode="popLayout">
+              {visibleQuickNorms.map((qn) => (
+                <PaletteRow key={qn.id} value={`preferito ${qn.id}`} onSelect={() => handleSelectQuickNorm(qn.id)} still={still} entering>
+                  <Zap size={14} aria-hidden className="shrink-0 fill-amber-500 text-amber-600 dark:text-amber-400" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-ink-900 dark:text-ink-50"><Matched text={qn.label} query={inputValue} /></span>
+                    <span className={cn('block truncate text-xs', SUBTLE)}>{paletteActName(qn.searchParams.act_type)}</span>
+                  </span>
+                </PaletteRow>
+              ))}
+            </AnimatePresence>
           )}
           {hiddenQuickNorms > 0 && (
             <PaletteRow value="preferiti tutti" onSelect={handleOpenQuickNormsManager} still={still} className="text-toga-700 dark:text-toga-300">
@@ -850,15 +973,17 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
               +{presetEntries.length} già pronti{presetHint && `: ${presetHint}…`}
             </p>
           )}
+          <AnimatePresence initial={false} mode="popLayout">
           {visibleAliases.map((alias) => (
-            <PaletteRow key={alias.id} value={`alias ${alias.id}`} onSelect={() => handleSelectAlias(alias)} still={still}>
+            <PaletteRow key={alias.id} value={`alias ${alias.id}`} onSelect={() => handleSelectAlias(alias)} still={still} entering>
               <Tag size={14} aria-hidden className={ROW_ICON} />
               <span className="min-w-0 flex-1">
-                <span className="block truncate font-medium text-ink-900 dark:text-ink-50">{alias.trigger}</span>
+                <span className="block truncate font-medium text-ink-900 dark:text-ink-50"><Matched text={alias.trigger} query={inputValue} /></span>
                 <span className={cn('block truncate text-xs', SUBTLE)}>→ {alias.expandTo}</span>
               </span>
             </PaletteRow>
           ))}
+          </AnimatePresence>
           {/* The door to the manager. Rendered whatever the user owns, on purpose: gated on owning an
               alias, it hid the only way to make the first one. A row of the list, so typing «alias»
               finds it. */}
@@ -876,11 +1001,12 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
       {/* Presets — only while the user is typing, under their own heading. */}
       {visiblePresets.length > 0 && (
         <Command.Group heading="In dotazione · non devi crearli" className={GROUP_WITH_HEADING}>
+          <AnimatePresence initial={false} mode="popLayout">
           {visiblePresets.map(([trigger, preset]) => (
-            <PaletteRow key={trigger} value={`preset ${trigger}`} onSelect={() => handleSelectPreset(trigger)} still={still}>
+            <PaletteRow key={trigger} value={`preset ${trigger}`} onSelect={() => handleSelectPreset(trigger)} still={still} entering>
               <Sparkles size={14} aria-hidden className={ROW_ICON} />
               <span className="min-w-0 flex-1">
-                <span className="block truncate font-medium text-ink-900 dark:text-ink-50">{trigger}</span>
+                <span className="block truncate font-medium text-ink-900 dark:text-ink-50"><Matched text={trigger} query={inputValue} /></span>
                 <span className={cn('block truncate text-xs', SUBTLE)}>
                   → {[paletteActName(preset.act_type), preset.act_number && `n. ${preset.act_number}`, preset.date]
                     .filter(Boolean)
@@ -889,6 +1015,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
               </span>
             </PaletteRow>
           ))}
+          </AnimatePresence>
         </Command.Group>
       )}
     </div>
@@ -1077,22 +1204,6 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     </ChosenRowScope.Provider>
   );
 
-  // A phone: a sheet from the bottom, the whole width (`ui/Sheet`, its own «Chiudi»).
-  if (!isDesktop) {
-    if (!isOpen) return null;
-    return (
-      <Sheet
-        title="Menu di ricerca"
-        onClose={onClose}
-        initialFocusRef={step === 'select_act' ? boxRef : undefined}
-        closeOnBackdrop
-        className={Z_INDEX.commandPalette}
-      >
-        {content}
-      </Sheet>
-    );
-  }
-
   return (
     <FloatingPortal>
       {/* Covers the workspace: Cmd/Ctrl+F is left to the browser (`isWorkspaceCovered`). Drawn only while
@@ -1128,24 +1239,22 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
               // The box holds the panel's height; only the panel takes the pointer (a shorter step
               // leaves the rest of the box to the backdrop's click).
               'pointer-events-none flex flex-col',
-              anchor ? 'fixed' : 'fixed inset-x-4 top-16 mx-auto h-[min(40rem,calc(100dvh-6rem))] max-w-3xl',
+              anchor
+                ? 'fixed'
+                : isDesktop
+                  ? 'fixed inset-x-4 top-16 mx-auto h-[min(40rem,calc(100dvh-6rem))] max-w-3xl'
+                  // A phone: the page's width less 16 px each side, dropping from the bar at the top (R2).
+                  : 'fixed inset-x-4 top-[calc(env(safe-area-inset-top)+0.5rem)] h-[min(40rem,calc(100dvh-1rem-env(safe-area-inset-top)))]',
               Z_INDEX.commandPalette,
             )}
           >
-            {/* It drops a few pixels from the field and fades in (about 160 ms), and leaves faster;
-                under reduced motion it only fades. */}
-            <motion.div
-              initial={still ? { opacity: 0 } : { opacity: 0, y: -6 }}
-              animate={still ? { opacity: 1 } : { opacity: 1, y: 0 }}
-              exit={still ? { opacity: 0, transition: { duration: dur.press } } : { opacity: 0, y: -4, transition: { duration: dur.press, ease: ease.out } }}
-              transition={{ duration: dur.pop, ease: ease.out }}
-              className={cn(
-                'pointer-events-auto flex min-h-0 max-h-full flex-col overflow-hidden rounded-xl border border-ink-200 bg-white shadow-xl dark:border-ink-700 dark:bg-ink-900',
-                step === 'select_act' && 'flex-1',
-              )}
-            >
+            {/* The field grows into the panel (R2): `PanelGrowth`. */}
+            <PanelGrowth still={still} fromHeight={growFrom} className={cn(
+              'pointer-events-auto flex min-h-0 max-h-full flex-col overflow-hidden border border-ink-200 bg-white dark:border-ink-700 dark:bg-ink-900',
+              step === 'select_act' && 'flex-1',
+            )}>
               {content}
-            </motion.div>
+            </PanelGrowth>
           </div>
         )}
       </AnimatePresence>

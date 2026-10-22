@@ -132,3 +132,42 @@ export function paletteActName(value: string): string {
   }
   return value;
 }
+
+/**
+ * Where the words typed match `text`, for drawing those letters apart (R2): for each typed word, the first word of
+ * the text it begins, case and accents folded one character for one, an abbreviation's dots stepped over («cc» in
+ * «c.c.»). Ranges `[start, end)` over `text`, ordered and joined where they touch. Nothing for an empty query.
+ */
+export function matchRanges(text: string, query: string): [number, number][] {
+  const wanted = foldAlias(query).split(/[^a-z0-9]+/).filter(Boolean);
+  if (wanted.length === 0) return [];
+  const folded = [...text].map((c) => foldAlias(c).charAt(0) || c.toLowerCase());
+  const isWord = (c: string | undefined) => c !== undefined && /[a-z0-9]/.test(c);
+  const starts = folded.flatMap((c, i) => (isWord(c) && !isWord(folded[i - 1]) ? [i] : []));
+  const ranges: [number, number][] = [];
+  for (const word of wanted) {
+    for (const start of starts) {
+      let at = start;
+      let ok = true;
+      for (const ch of word) {
+        while (folded[at] === '.') at += 1;
+        if (folded[at] !== ch) {
+          ok = false;
+          break;
+        }
+        at += 1;
+      }
+      if (ok) {
+        ranges.push([start, at]);
+        break;
+      }
+    }
+  }
+  ranges.sort((a, b) => a[0] - b[0]);
+  return ranges.reduce<[number, number][]>((joined, range) => {
+    const last = joined.at(-1);
+    if (last && range[0] <= last[1]) last[1] = Math.max(last[1], range[1]);
+    else joined.push([...range]);
+    return joined;
+  }, []);
+}

@@ -5,6 +5,12 @@ import userEvent from '@testing-library/user-event';
 vi.mock('../../../hooks/useTour', () => ({
   useTour: () => ({ tryStartTour: vi.fn(), startTour: vi.fn(), hasSeenTour: () => true }),
 }));
+// framer-motion reads the reduced-motion preference once for the run: the hook is what the palette asks.
+const motionPref = vi.hoisted(() => ({ reduced: false }));
+vi.mock('framer-motion', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('framer-motion')>()),
+  useReducedMotion: () => motionPref.reduced,
+}));
 
 import { CommandPalette } from './CommandPalette';
 import { appStore } from '../../../store/useAppStore';
@@ -101,12 +107,37 @@ describe('CommandPalette — where it opens', () => {
     opener.remove();
   });
 
-  it('on a phone, is a sheet with its «Chiudi», and shows no keys', () => {
+  it('on a phone, drops from the bar at the top across the page less 16 px each side, with its «Chiudi», and shows no keys (R2)', () => {
     asDesktop(false);
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
-    const sheet = screen.getByRole('dialog', { name: 'Menu di ricerca' });
-    expect(within(sheet).getByRole('button', { name: 'Chiudi' })).toBeInTheDocument();
+    const panel = screen.getByRole('dialog', { name: 'Menu di ricerca' });
+    expect(panel).toHaveClass('inset-x-4');
+    expect(panel.className).toMatch(/top-\[calc\(env\(safe-area-inset-top\)/);
+    expect(within(panel).getByRole('button', { name: 'Chiudi' })).toBeInTheDocument();
     expect(screen.queryByText('Naviga')).toBeNull();
+  });
+});
+
+describe('CommandPalette — growing out of the field (R2)', () => {
+  it('starts as tall as the search page\'s field, at its corners, and grows into the panel', () => {
+    asDesktop(true);
+    const form = document.createElement('form');
+    form.id = SEARCH_FIELD_FORM_ID;
+    Object.defineProperty(form, 'offsetHeight', { value: 44 });
+    document.body.append(form);
+    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    const panel = screen.getByRole('dialog', { name: 'Menu di ricerca' }).querySelector<HTMLElement>('.rounded-2xl')!;
+    // Set before the first paint, so it never flashes open: the field's height and corners.
+    expect(panel.style.clipPath).toBe('inset(0px 0px calc(100% - 44px) 0px round 12px)');
+  });
+
+  it('under reduced motion grows nothing: no clip, it fades', () => {
+    asDesktop(true);
+    motionPref.reduced = true;
+    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    const panel = screen.getByRole('dialog', { name: 'Menu di ricerca' }).querySelector<HTMLElement>('.rounded-2xl')!;
+    expect(panel.style.clipPath).toBe('');
+    motionPref.reduced = false;
   });
 });
 
@@ -186,6 +217,21 @@ describe('CommandPalette — «Scegli l\'atto»', () => {
     expect(screen.getByText('Codici fondamentali')).toBeInTheDocument();
     expect(screen.getByText('Unione europea')).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Codice di procedura civile · c.p.c.' })).toBeInTheDocument();
+  });
+
+  it('draws the letters the box matched in the app\'s ink, and a row leaving is no option any more (R2)', async () => {
+    asDesktop(true);
+    const user = userEvent.setup();
+    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    await user.type(screen.getByRole('combobox'), 'proc');
+    const row = screen.getAllByRole('option').find((o) => o.textContent === 'Codice di procedura civile · c.p.c.')!;
+    expect(row.querySelector('.text-toga-700')).toHaveTextContent(/^proc$/);
+    // A row filtered away, while it fades: hidden, and never Enter's.
+    const leaving = screen.queryAllByRole('option', { hidden: true }).find((o) => o.textContent === 'Codice civile · c.c.');
+    if (leaving) {
+      expect(leaving).toHaveAttribute('aria-hidden', 'true');
+      expect(leaving).toHaveAttribute('aria-disabled', 'true');
+    }
   });
 
   it('is narrowed by the field while it is typed', async () => {
@@ -385,7 +431,7 @@ describe('CommandPalette — on a phone, the order', () => {
 });
 
 describe('CommandPalette — on a phone, the focus back (R2)', () => {
-  it('gives the focus back to what opened it as it closes: the sheet does not', () => {
+  it('gives the focus back to what opened it as it closes, on a phone too (R2: the same panel)', async () => {
     asDesktop(false);
     const opener = document.createElement('button');
     document.body.append(opener);
@@ -394,7 +440,7 @@ describe('CommandPalette — on a phone, the focus back (R2)', () => {
     rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
     expect(opener).not.toHaveFocus();
     rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
-    expect(opener).toHaveFocus();
+    await waitFor(() => expect(opener).toHaveFocus());
     opener.remove();
   });
 });
