@@ -205,8 +205,9 @@ export function ReadingToolbar({
 
             {/* A phone: the dossier and «⋯», 44 px each. */}
             {/* Close together, the last one's 44 px reaching into the page's right margin (`-mr-3`): the status keeps one line
-                at 320 px («In vigore dal 1° gennaio 2005», R3b). */}
-            <div className="-mr-3 ml-auto flex flex-shrink-0 items-center md:hidden">
+                at 320 px («In vigore dal 1° gennaio 2005», R3b). Not in the compact bar (the phone's full-screen reader, a
+                window): there the card's padding is the edge, and its overflow would cut the focus ring. */}
+            <div className={cn('ml-auto flex flex-shrink-0 items-center md:hidden', !compact && '-mr-3')}>
                 {!compact && dossierButton(undefined, true)}
                 <div ref={phoneMoreRef} className="contents">
                     <MenuButton label="Altre azioni sull’articolo" triggerClassName={ACTION} items={moreItems(true)}>

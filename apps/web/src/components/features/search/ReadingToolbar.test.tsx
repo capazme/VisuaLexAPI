@@ -334,6 +334,8 @@ describe('ReadingToolbar — the compact form of a light window (spec §4.1)', (
     it('the phone\'s row holds «⋯» alone: no quick norm, dossier, Study Mode or source link', () => {
         const { container } = setup({ compact: true, find, url: 'https://example.org/x' });
         const row = phoneRow(container);
+        // The card's padding is its edge (the full-screen reader): no reach into it, which cut the focus ring (R3b).
+        expect(row).not.toHaveClass('-mr-3');
         expect(within(row).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['Altre azioni sull’articolo']);
         expect(entryNames(openMore(row))).toEqual(['Glosse sull’articolo', 'Cerca nel testo', 'Copia']);
     });
