@@ -2113,10 +2113,11 @@ page since S7c (`dossierStyles.ts`: `ROW_ICON` for a row's star and removal). A 
 `md` (`FIELD_TEXT`, `text-[length:max(1rem,16px)] md:text-sm`, in `constants/interactions.ts`):
 Safari on an iPhone zooms the page into a field under 16 px as it takes the focus, and
 `text-base` is not enough — the text size «piccolo» makes 1 rem 14 px. `ui/Input` and
-`ui/FormSelect` carry it, and so do the searches of «Le mie schede» and of the Cronologia
+`ui/FormSelect` carry it, and so do the searches of «Le mie schede» and of the Cronologia, the
+planner's `FIELD` (its tasks' fields, the dossier's search since S7c)
 (`ui/__tests__/fieldText.test.tsx`), the search page's field and the palette's fields (its box
 is `max(1.125rem,16px)`); about sixty fields written by hand do not yet (the find
-window, the dossier's search, the index filter, the case-law filters, the dossier pickers,
+window, the index filter, the case-law filters, the dossier pickers,
 the notes): a field written by hand takes it, and a `text-*` class after it in `cn` undoes it.
 
 ## Common Patterns

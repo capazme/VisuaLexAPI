@@ -565,4 +565,11 @@ describe('DossierDetailView — in the frame, in the planner\'s shape (S7c)', ()
     expect(words.parentElement).toContainElement(date);
     expect(within(notes).getByRole('button', { name: 'Rimuovi nota' })).toHaveClass('h-11', 'w-11');
   });
+
+  it('writes the search at 16 px at least on a phone, whatever the text size (Safari zooms under it)', () => {
+    renderView(dossier);
+    const search = screen.getByRole('textbox', { name: 'Cerca negli elementi del dossier' });
+    expect(search).toHaveClass('text-[length:max(1rem,16px)]', 'md:text-sm');
+    expect(search).not.toHaveClass('text-base');
+  });
 });
