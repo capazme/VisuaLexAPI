@@ -202,3 +202,13 @@ export function resetNotifications() {
   // Told last, the list already empty: what they held ends (an «Annulla» resolves as not standing, its undo not run).
   told.forEach((h) => h.onClose?.('dropped'));
 }
+
+/** The newest «Annulla» still answering (not leaving): what Ctrl+Z (⌘Z) runs. */
+export function latestUndoable(entries = notificationStore.getState().entries): NotificationEntry | undefined {
+  return [...entries].reverse().find((e) => e.undoable && !e.closing);
+}
+
+/** Says `message` in the live region, as a notification arriving would (the shortcut's «Annullato: …»). */
+export function announce(message: string, politeness: 'polite' | 'assertive' = 'polite') {
+  notificationStore.setState((s) => ({ announced: { ...s.announced, [politeness]: { id: nextId++, message } } }));
+}
