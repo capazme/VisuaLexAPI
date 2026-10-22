@@ -1,8 +1,7 @@
-import { useState, type KeyboardEvent, type Ref } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+import type { Ref } from 'react';
 import { Settings2 } from 'lucide-react';
+import { Collapsible } from '../../../ui/Collapsible';
 import { Sheet } from '../../../ui/Sheet';
-import { dur, ease } from '../../../../lib/motion';
 import { cn } from '../../../../lib/utils';
 import { StudyPreferences } from '../StudyPreferences';
 import { FOCUS_RING } from './tokens';
@@ -56,7 +55,7 @@ export function StudySettingsSheet({ onClose, onChanged }: { onClose: () => void
 export interface StudySettingsPanelProps {
   id: string;
   open: boolean;
-  /** Esc inside it: the band closes it and gives the focus back to the gear. */
+  /** Esc inside it: the band closes it and gives the focus back to the gear (`StatsBand`'s `close`). */
   onClose: () => void;
   onChanged: () => void;
   /** Each new value opens the community's subjects. */
@@ -67,39 +66,23 @@ export interface StudySettingsPanelProps {
 
 /**
  * The study settings in place, inside «I tuoi progressi» under its heading (the owner, 21 October 2026: «si estende il
- * tab»): no window and no veil; the card grows downward, its height in `dur.pop` on `ease.out`, at once under reduced
- * motion. Esc inside it closes it. Mounted closed with the band, so the settings are read before the gear is pressed and
- * the height grows once, to its full size (read on opening, they arrived halfway and the card jumped); closed it is
- * `hidden` and `inert`, once its height has gone.
+ * tab»): `ui/Collapsible`, the app's one way to open a panel in place (U1a) — no window and no veil, the card grows
+ * downward, Esc inside closes it. Mounted closed with the band, so the settings are read before the gear is pressed
+ * and the height grows once, to its full size (read on opening, they arrived halfway and the card jumped).
  */
 export function StudySettingsPanel({ id, open, onClose, onChanged, communityRequest = 0, aside = false }: StudySettingsPanelProps) {
-  const reduce = useReducedMotion() ?? false;
-  // Still drawn while it closes; `hidden` once the height has reached 0.
-  const [shown, setShown] = useState(open);
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== 'Escape') return;
-    event.stopPropagation();
-    onClose();
-  };
   return (
-    <motion.div
+    <Collapsible
       id={id}
+      open={open}
+      onClose={onClose}
       role="region"
       aria-label="Impostazioni dello studio"
       tabIndex={-1}
-      hidden={!open && !shown}
-      inert={!open}
-      onKeyDown={onKeyDown}
-      initial={false}
-      animate={open ? { height: 'auto', opacity: 1 } : { height: 0, opacity: 0 }}
-      transition={{ duration: reduce ? 0 : dur.pop, ease: ease.out }}
-      onAnimationComplete={() => setShown(open)}
-      // The height moves only while it opens or closes; the controls' rings stay inside its edge.
-      className="-mx-1 overflow-hidden px-1 focus:outline-none"
+      className="focus:outline-none"
+      contentClassName="border-t border-slate-200 pb-1 pt-4 dark:border-slate-800"
     >
-      <div className="border-t border-slate-200 pb-1 pt-4 dark:border-slate-800">
-        <StudyPreferences open communityRequest={communityRequest} onChanged={onChanged} listClassName={cn('md:grid-cols-2', aside && 'xl:grid-cols-1')} />
-      </div>
-    </motion.div>
+      <StudyPreferences open communityRequest={communityRequest} onChanged={onChanged} listClassName={cn('md:grid-cols-2', aside && 'xl:grid-cols-1')} />
+    </Collapsible>
   );
 }

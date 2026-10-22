@@ -494,6 +494,13 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
 - `components/ui/` — shared primitives: `Button`, `IconButton`, `Input`, `Card`,
   `Modal`, `ConfirmDialog`, `WireConfirm` (below, «Destructive confirmations»), `Toast`, `EmptyState`, `Sheet` (a
   phone's bottom sheet), plus feature-flavoured modals.
+  `Collapsible` («la tendina», U1a) is the one way to open a panel in place, pushing what follows down — no window, no
+  veil: `grid-template-rows` from `0fr` to `1fr` (no height in script), 200 ms on `--ease-out` to open and 150 ms to
+  close, its content fading in 150 ms just after; closed it is `inert`, `aria-hidden` and, once its height has gone,
+  `visibility: hidden`; open and still its content may overflow (a menu, a ring), clipped only while the height moves;
+  Esc inside closes it and gives the focus back to `triggerRef`. Under reduced motion it opens and closes at once —
+  the content is kept at full opacity, or the global rule's 150 ms (after the delay) would fade it in late. The
+  trigger is the caller's (`aria-expanded`, `aria-controls`). «Oggi»'s study settings (`StudySettingsPanel`) use it.
   `Modal` is portaled to `document.body`, so a dialog opened inside a reading window
   (transformed, stacked) is not confined to it; each open `Modal` and `WireConfirm` is on a module-level
   stack (`ui/dialogStack.ts`) and only the top-most handles Tab (its focus trap, on `document`) and Esc, so a dialog opened
@@ -1097,8 +1104,8 @@ places the right column; inside the tiles a sentence stops at `max-w-prose`. In 
    compact`) so the goal is still said, and the day block and the rest of «Oggi» and «Progressi» stay as before);
    the gear «Impostazioni dello
    studio» (`progress/StudySettings`: `SettingsGear` with `aria-controls`, and `StudySettingsPanel` — G6, the owner's
-   «si estende il tab»: `StudyPreferences open` inside the card under its heading, no window and no veil, its height
-   in `dur.pop` on `ease.out` through Framer Motion, at once under reduced motion; the gear again or Esc inside closes it
+   «si estende il tab»: `StudyPreferences open` inside the card under its heading, no window and no veil, in a
+   `ui/Collapsible` since U1a; the gear again or Esc inside closes it
    and the focus goes back to the gear; while it is open the right column is not sticky, so its foot can be scrolled to; the
    missions' settings line and the day block's buttons open it and focus it, «Accendi le schede della comunità» with the subjects open; the
    strip over «Da validare» keeps `StudySettingsSheet`, a `ui/Sheet` capped at `max-w-lg` from
