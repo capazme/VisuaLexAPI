@@ -377,7 +377,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
           ) : (
             // No dossier yet: an empty state composed for the page (S7c), as the empty Community's — line art in the
             // section's hue, what a dossier is for, and the two ways to begin.
-            <section aria-labelledby="dossier-list-empty" className="col-span-full mx-auto flex w-full max-w-md flex-col items-center px-2 py-10 text-center md:py-16">
+            <section aria-labelledby="dossier-list-empty" className="col-span-full mx-auto flex w-full max-w-lg flex-col items-center px-2 py-10 text-center md:py-16">
               <DossierMark hue={sectionKind === 'studio' ? 'var(--vlx-section-gymnasium)' : 'var(--vlx-section-opus)'} />
               <h2 id="dossier-list-empty" className="mt-6 font-serif text-2xl font-medium tracking-tight text-slate-900 dark:text-slate-50">
                 {sectionKind ? `Nessun ${kindLabel(sectionKind).toLowerCase()}` : 'Nessun dossier creato'}
@@ -387,12 +387,12 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
               </p>
               <p className="mt-2 text-slate-600 dark:text-slate-400">Crea il primo, o parti da un dossier di studio pronto.</p>
               <div className="mt-8 flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center">
-                <button type="button" onClick={() => setIsModalOpen(true)} className={cn(HEADER_PRIMARY, 'justify-center')}>
+                <button type="button" onClick={() => setIsModalOpen(true)} className={cn(HEADER_PRIMARY, 'justify-center sm:whitespace-nowrap')}>
                   <FolderPlus size={18} aria-hidden />
                   Crea il tuo primo dossier
                 </button>
                 {/* The ready-made study dossiers sit in the Forum (spec 2026-10-13-environments-into-forum, D12). */}
-                <button type="button" onClick={() => navigate('/forum')} className={cn(HEADER_BUTTON, 'justify-center')}>
+                <button type="button" onClick={() => navigate('/forum')} className={cn(HEADER_BUTTON, 'justify-center sm:whitespace-nowrap')}>
                   <BookOpen size={18} aria-hidden />
                   Dossier di studio pronti
                 </button>
