@@ -255,6 +255,12 @@ def test_the_annexed_acts_table_is_the_apis():
     assert ANNEXED_ACTS == _api_literal("map.py", "ANNEXED_ACTS")
 
 
+def test_the_annex_sigle_and_headings_are_the_apis():
+    from merlt.utils.map import ANNEX_HEADINGS, ANNEX_SIGLE
+    assert ANNEX_SIGLE == _api_literal("map.py", "ANNEX_SIGLE")
+    assert ANNEX_HEADINGS == _api_literal("map.py", "ANNEX_HEADINGS")
+
+
 def test_the_tulps_names_no_annex():
     from merlt.utils.sources import cite_article
     norm = {"tipo_atto": "regio decreto", "numero_atto": "773", "data": "1931-06-18", "allegato": "1",

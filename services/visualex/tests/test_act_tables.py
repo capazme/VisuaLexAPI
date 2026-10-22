@@ -29,7 +29,8 @@ class TestNothingWasLost:
     def test_the_dotted_urn_table_is_untouched(self):
         # text_op.normalize_act_type(search=False) reads this one; the source
         # repo has no counterpart, so a wholesale replacement would ImportError.
-        assert len(NORMATTIVA) == 111
+        # 111, plus «c.g.c», «c.g.c.» and «cod. post.», the sigle the convention writes (G-366).
+        assert len(NORMATTIVA) == 114
 
     @pytest.mark.parametrize("key", [
         "codice del Terzo settore",
