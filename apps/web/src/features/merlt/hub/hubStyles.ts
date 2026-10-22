@@ -29,3 +29,17 @@ export const HUB_QUIET_BUTTON = `w-full min-h-[44px] rounded-lg border border-sl
 
 /** A link of the row at the page's foot («Consenso e privacy», «Il tuo profilo»): words, 44 px tall. */
 export const HUB_LINK = `inline-flex min-h-[44px] items-center gap-1.5 rounded-md text-sm font-medium text-primary-700 underline-offset-4 hover:underline dark:text-primary-300 ${FOCUS_RING}`;
+
+/**
+ * Where the consent stands for the cards' actions: read (`known`), being read, not readable (`unread`: the read
+ * failed), or not to be given here (`off`: a server without MERL-T or without its notice).
+ */
+export type ConsentGate = 'known' | 'loading' | 'unread' | 'off';
+
+/** What a card's action says when it needs more consent than the user gave; nothing while the consent is read. */
+export function gateLabel(gate: ConsentGate, needed: 'base' | 'completo'): string | null {
+  if (gate === 'loading') return null;
+  if (gate === 'unread') return 'Consenso non letto';
+  if (gate === 'off') return 'Non attivo su questo server';
+  return `Serve il consenso ${needed}`;
+}

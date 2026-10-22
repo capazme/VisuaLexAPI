@@ -1,6 +1,7 @@
 import { ScrollText } from 'lucide-react';
 import { HubAction, HubCard } from './HubCard';
-import { HUB_NOTE, HUB_TEXT } from './hubStyles';
+import { gatedAction } from './gatedAction';
+import { HUB_NOTE, HUB_TEXT, type ConsentGate } from './hubStyles';
 import type { AsyncSlice } from './useHubData';
 
 /**
@@ -13,14 +14,14 @@ import type { AsyncSlice } from './useHubData';
 export interface ValidateCardProps {
   canValidate: boolean;
   pendingCount: AsyncSlice<number>;
-  /** The consent is still being read: no action yet, rather than one that says consent is missing. */
-  consentLoading?: boolean;
+  /** Where the consent stands: being read, no action yet; unread or not to be given here, said so. */
+  consentGate?: ConsentGate;
 }
 
-export function ValidateCard({ canValidate, consentLoading = false, pendingCount }: ValidateCardProps) {
+export function ValidateCard({ canValidate, consentGate = 'known', pendingCount }: ValidateCardProps) {
   const waiting = pendingCount.status === 'success' && pendingCount.data > 0;
   const action = !canValidate ? (
-    consentLoading ? undefined : <HubAction gated="Serve il consenso completo" />
+    gatedAction(consentGate, 'completo')
   ) : (
     <HubAction to="/merlt/valida">{waiting ? 'Vota ora' : 'Apri la coda'}</HubAction>
   );

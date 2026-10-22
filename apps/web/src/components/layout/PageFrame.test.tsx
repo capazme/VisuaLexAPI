@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { FOCUS_BUTTON_CLEARANCE, PAGE_KICKER, PAGE_TITLE, PageFrame } from './PageFrame';
-import { SECTION_PHRASES, sectionKicker } from '../../features/sections/sections';
+import { SECTION_PHRASES, kickerOf, sectionKicker } from '../../features/sections/sections';
 
 describe('PageFrame (W2)', () => {
   it('takes the layout\'s width, with nothing narrower, and heads it with the title, the sentence and the action', () => {
@@ -72,6 +72,17 @@ describe('PageFrame (W2)', () => {
     });
     expect(sectionKicker('opus')).toBe('Opus · la tua officina giuridica');
     expect(sectionKicker('forum')).toBe('Forum · il luogo del dibattito giuridico');
+  });
+
+  it('draws no line for a section with no phrase yet, so Academia\'s pages get theirs once it is written', () => {
+    render(
+      <PageFrame title="Assistente" kicker="academia">
+        <p>corpo</p>
+      </PageFrame>,
+    );
+    expect(kickerOf('academia')).toBeNull();
+    expect(screen.queryByText(/Academia · /)).toBeNull();
+    expect(screen.getByRole('heading', { level: 1, name: 'Assistente' })).not.toHaveAttribute('aria-describedby');
   });
 
   it('marks a section\'s home title for the section switcher\'s focus, and no other', () => {

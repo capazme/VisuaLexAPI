@@ -1,6 +1,7 @@
 import { UploadCloud } from 'lucide-react';
 import { HubAction, HubCard } from './HubCard';
-import { HUB_NOTE, HUB_TEXT } from './hubStyles';
+import { gatedAction } from './gatedAction';
+import { HUB_NOTE, HUB_TEXT, type ConsentGate } from './hubStyles';
 import type { AsyncSlice } from './useHubData';
 import type { MyContribJob } from '../contrib/contribApi';
 
@@ -13,8 +14,8 @@ import type { MyContribJob } from '../contrib/contribApi';
 export interface ContribCardProps {
   canContribute: boolean;
   lastContrib: AsyncSlice<MyContribJob | null>;
-  /** The consent is still being read: no action yet, rather than one that says consent is missing. */
-  consentLoading?: boolean;
+  /** Where the consent stands: being read, no action yet; unread or not to be given here, said so. */
+  consentGate?: ConsentGate;
 }
 
 const STATUS_LABEL: Record<MyContribJob['status'], string> = {
@@ -33,9 +34,9 @@ const STATUS_TONE: Record<MyContribJob['status'], string> = {
   timeout: 'text-amber-800 dark:text-amber-400',
 };
 
-export function ContribCard({ canContribute, consentLoading = false, lastContrib }: ContribCardProps) {
+export function ContribCard({ canContribute, consentGate = 'known', lastContrib }: ContribCardProps) {
   const action = !canContribute ? (
-    consentLoading ? undefined : <HubAction gated="Serve il consenso completo" />
+    gatedAction(consentGate, 'completo')
   ) : (
     <HubAction to="/merlt/contribuisci">Carica appunti</HubAction>
   );

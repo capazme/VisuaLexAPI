@@ -6,6 +6,7 @@ import { HubCard } from './HubCard';
 import { HUB_TEXT } from './hubStyles';
 import { useConsent } from '../consent/useConsent';
 import { RevokeConsentDialog } from '../consent/RevokeConsentDialog';
+import { LEVEL_LABEL } from '../consent/levels';
 import type { MerltConsentLevel } from '../merltConsent';
 
 /**
@@ -22,11 +23,6 @@ export interface ConsentCardProps {
   onManage: () => void;
 }
 
-const LEVEL_LABEL: Record<MerltConsentLevel, string> = {
-  none: 'Nessuno',
-  basic: 'Base',
-  full: 'Completo',
-};
 
 /** The three ladder rungs, in order; `min` is the level that unlocks each. */
 const LADDER: { min: MerltConsentLevel; icon: typeof BookOpen; label: string; desc: string }[] = [
@@ -38,7 +34,7 @@ const LADDER: { min: MerltConsentLevel; icon: typeof BookOpen; label: string; de
 const LEVEL_RANK: Record<MerltConsentLevel, number> = { none: 0, basic: 1, full: 2 };
 
 export function ConsentCard({ onManage }: ConsentCardProps) {
-  const { level, consent } = useConsent();
+  const { level, consent, notice } = useConsent();
   const [revokeOpen, setRevokeOpen] = useState(false);
 
   return (
@@ -48,9 +44,12 @@ export function ConsentCard({ onManage }: ConsentCardProps) {
       title="Consenso e privacy"
       action={
         <>
-          <button type="button" onClick={onManage} className={PANEL_BUTTON}>
-            Gestisci
-          </button>
+          {/* Without a notice (no MERL-T on the server) there is nothing to choose: no «Gestisci» doing nothing. */}
+          {notice && (
+            <button type="button" onClick={onManage} className={PANEL_BUTTON}>
+              Gestisci
+            </button>
+          )}
           {level !== 'none' && (
             <button type="button" onClick={() => setRevokeOpen(true)} className={PANEL_BUTTON}>
               Revoca

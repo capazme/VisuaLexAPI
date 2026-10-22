@@ -1,6 +1,6 @@
 import { useId, type ReactNode } from 'react';
 import { FOCUS_RING } from '../../constants/interactions';
-import { sectionKicker, type PhrasedSection, type SectionId } from '../../features/sections/sections';
+import { kickerOf, type SectionId } from '../../features/sections/sections';
 import { cn } from '../../lib/utils';
 
 /** A page's title: Newsreader, 28 px on a phone and 30 px from `md`, the same on every section page. */
@@ -22,7 +22,7 @@ export interface PageFrameProps {
   /** The page's name («Oggi», «Le mie schede»): since L-37 the section's phrase is the `kicker` over it, not the title. */
   title: ReactNode;
   /** The section the page belongs to: its name and phrase over the title, small («Gymnasium · la tua palestra giuridica»). */
-  kicker?: PhrasedSection;
+  kicker?: SectionId;
   /** The sentence under the title. */
   line?: ReactNode;
   /** The page's main action, beside the title from `md`, under it on a phone. */
@@ -49,6 +49,8 @@ export function PageFrame({ title, kicker, line, action, actionBeside = false, s
   // The title says only the page's name («Oggi» in Opus and in Gymnasium): the line over it describes it, so the focus
   // the section switcher puts on the title also says which section it is in.
   const kickerId = useId();
+  // A section with no phrase yet (Academia) draws no line, and the title describes nothing.
+  const kickerText = kicker ? kickerOf(kicker) : null;
   return (
     <div className={cn('flex w-full min-w-0 flex-col gap-6', className)}>
       <header className={cn(
@@ -57,12 +59,12 @@ export function PageFrame({ title, kicker, line, action, actionBeside = false, s
         action && FOCUS_BUTTON_CLEARANCE,
       )}>
         <div className="min-w-0">
-          {kicker && (
+          {kickerText && (
             <p id={kickerId} className={cn(PAGE_KICKER, 'mb-1')}>
-              {sectionKicker(kicker)}
+              {kickerText}
             </p>
           )}
-          <h1 id={titleId} aria-describedby={kicker ? kickerId : undefined} data-section-title={section} tabIndex={section ? -1 : undefined} className={cn(PAGE_TITLE, section && cn(FOCUS_RING, 'rounded-sm'))}>
+          <h1 id={titleId} aria-describedby={kickerText ? kickerId : undefined} data-section-title={section} tabIndex={section ? -1 : undefined} className={cn(PAGE_TITLE, section && cn(FOCUS_RING, 'rounded-sm'))}>
             {title}
           </h1>
           {line && <p className="mt-1 max-w-prose text-slate-600 dark:text-slate-400">{line}</p>}

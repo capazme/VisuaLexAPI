@@ -1,7 +1,8 @@
 import { useNavigate } from 'react-router-dom';
 import { MessageSquare } from 'lucide-react';
 import { HubAction, HubCard } from './HubCard';
-import { HUB_NOTE, HUB_QUIET_BUTTON, HUB_TEXT } from './hubStyles';
+import { gatedAction } from './gatedAction';
+import { HUB_NOTE, HUB_QUIET_BUTTON, HUB_TEXT, type ConsentGate } from './hubStyles';
 import type { AsyncSlice } from './useHubData';
 import type { QaHistoryItem } from '../qa/types';
 
@@ -20,8 +21,8 @@ const EXAMPLE_QUESTION = 'Cosa distingue il dolo dalla colpa nella responsabilit
 export interface QaCardProps {
   qaAskable: boolean;
   lastQa: AsyncSlice<QaHistoryItem | null>;
-  /** The consent is still being read: no action yet, rather than one that says consent is missing. */
-  consentLoading?: boolean;
+  /** Where the consent stands: being read, no action yet; unread or not to be given here, said so. */
+  consentGate?: ConsentGate;
 }
 
 function confidenceLabel(confidence: number | null | undefined): string | null {
@@ -30,7 +31,7 @@ function confidenceLabel(confidence: number | null | undefined): string | null {
   return `${pct}% affidabilità`;
 }
 
-export function QaCard({ qaAskable, consentLoading = false, lastQa }: QaCardProps) {
+export function QaCard({ qaAskable, consentGate = 'known', lastQa }: QaCardProps) {
   const navigate = useNavigate();
 
   // Slice 4 absorb (Decision A): the graph is the sole Q&A surface. The prefill
@@ -42,7 +43,7 @@ export function QaCard({ qaAskable, consentLoading = false, lastQa }: QaCardProp
 
   const asked = lastQa.status === 'success' && lastQa.data;
   const action = !qaAskable ? (
-    consentLoading ? undefined : <HubAction gated="Serve il consenso base" />
+    gatedAction(consentGate, 'base')
   ) : (
     <HubAction onClick={() => goAsk()}>{asked ? 'Nuova domanda' : 'Fai una domanda'}</HubAction>
   );

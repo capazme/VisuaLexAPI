@@ -14,6 +14,7 @@ import {
   useHubData,
   HubCard,
   ConsentFirst,
+  ConsentUnavailable,
   QaCard,
   ValidateCard,
   GraphCard,
@@ -21,21 +22,19 @@ import {
   ConsentCard,
   ProfileCard,
 } from '../features/merlt/hub';
-import { HUB_LINK } from '../features/merlt/hub/hubStyles';
-import type { MerltConsentLevel } from '../features/merlt/merltConsent';
-
-const LEVEL_LABEL: Record<MerltConsentLevel, string> = {
-  none: 'Nessuno',
-  basic: 'Base',
-  full: 'Completo',
-};
+import { HUB_LINK, type ConsentGate } from '../features/merlt/hub/hubStyles';
+import { LEVEL_LABEL } from '../features/merlt/consent/levels';
 
 /** The panels the row at the page's foot opens, one at a time. */
 type FootPanel = 'consent' | 'profile';
 
 export function MerltHubPage() {
   const features = useMerltFeatures();
-  const { level, status: consentStatus } = useConsent();
+  const { level, status: consentStatus, notice, refresh } = useConsent();
+  // Where the consent stands for the cards: being read, unreadable, not to be given here (no MERL-T on the server, or
+  // no notice: `ConsentDialog` has nothing to show then), or read.
+  const consentGate: ConsentGate =
+    consentStatus === 'loading' ? 'loading' : consentStatus === 'error' ? 'unread' : notice ? 'known' : 'off';
   const [dialogOpen, setDialogOpen] = useState(false);
   const [footPanel, setFootPanel] = useState<FootPanel | null>(null);
 
@@ -60,23 +59,28 @@ export function MerltHubPage() {
   return (
     <PageFrame
       title={ASSISTANT_PAGE}
+      // L-37: Academia's phrase is still to be chosen; the line comes with it (`SECTION_PHRASES`).
+      kicker="academia"
       line="Il tuo centro per l’intelligenza giuridica MERL-T: fai domande, valida le proposte della community, esplora il grafo e contribuisci con i tuoi appunti."
       section="academia"
     >
       {/* Consent first (S7b): with none, what MERL-T does and collects comes before what it cannot do yet — once the
-          server has said so: while it reads, the level is «none» for everyone. */}
-      {level === 'none' && consentStatus === 'ready' && <ConsentFirst onChoose={() => setDialogOpen(true)} />}
+          server has said so (while it reads, the level is «none» for everyone), and only where a consent can be given. */}
+      {consentGate === 'known' && level === 'none' && <ConsentFirst onChoose={() => setDialogOpen(true)} />}
+      {(consentGate === 'off' || consentGate === 'unread') && (
+        <ConsentUnavailable reason={consentGate} onRetry={() => void refresh()} />
+      )}
 
       {/* Four cards of equal height, one action each; an action that needs more consent says so. */}
       <div className="grid gap-5 md:grid-cols-2">
-        <QaCard qaAskable={features.qaAskable} lastQa={hub.lastQa} consentLoading={consentStatus === 'loading'} />
+        <QaCard qaAskable={features.qaAskable} lastQa={hub.lastQa} consentGate={consentGate} />
 
-        <ValidateCard canValidate={features.canValidate} pendingCount={hub.pendingCount} consentLoading={consentStatus === 'loading'} />
+        <ValidateCard canValidate={features.canValidate} pendingCount={hub.pendingCount} consentGate={consentGate} />
 
         {/* Reading the graph is free (D2): visibility follows the feature flag. */}
         {features.graphEnabled && <GraphCard health={hub.health} />}
 
-        <ContribCard canContribute={features.canContribute} lastContrib={hub.lastContrib} consentLoading={consentStatus === 'loading'} />
+        <ContribCard canContribute={features.canContribute} lastContrib={hub.lastContrib} consentGate={consentGate} />
 
         {features.opsVisible && (
           <HubCard testId="hub-card-ops" icon={Settings} title="Ops (admin)">

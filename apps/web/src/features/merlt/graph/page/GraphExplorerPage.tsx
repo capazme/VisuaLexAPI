@@ -1084,6 +1084,8 @@ export function GraphExplorerPage(): React.ReactElement {
     // 2rem each side.
     <PageFrame
       title={GRAPH_PAGE}
+      // L-37: Academia's phrase is still to be chosen; the line comes with it (`SECTION_PHRASES`).
+      kicker="academia"
       // On a phone the canvas needs the height: no line there, and the slice's tools beside the title as icons.
       line={<span className="hidden md:inline">Le relazioni tra norme, principi e concetti.</span>}
       actionBeside

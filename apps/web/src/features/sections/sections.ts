@@ -44,6 +44,14 @@ export function sectionKicker(id: PhrasedSection): string {
 }
 
 /**
+ * The line over a page of any section, or nothing for a section with no phrase yet (Academia): its pages already pass
+ * their `kicker`, so the line appears as soon as its phrase is written above.
+ */
+export function kickerOf(id: SectionId): string | null {
+  return id in SECTION_PHRASES ? sectionKicker(id as PhrasedSection) : null;
+}
+
+/**
  * The code of a section's home where it is loaded on demand (`App.tsx`'s `lazy` routes): fetched when the switcher
  * opens, so the change (T1) finds the page there instead of fading into «Caricamento…». The same modules as the
  * routes', so the same files.

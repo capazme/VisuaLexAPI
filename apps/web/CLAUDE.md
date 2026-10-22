@@ -303,7 +303,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `sectionKicker`'s «Opus · la tua officina giuridica», `PageFrame`'s `kicker`; the title is the page's name — Gymnasium's
   views («Oggi», «Progressi», «Le mie schede», «Da validare», `StudiaPage`), Opus's («Oggi», «Prossimi giorni», «Lista
   d'ingresso», «Cestino dei compiti», `OpusPage`; a view's own `h2` stays for screen readers and the focus's
-  fallback), the Forum's «Dossier pubblici» and «Community». The switcher's Opus entry carries the same count as «Oggi» (`MenuItem.badgeLabel` names
+  fallback), the Forum's «Dossier pubblici» and «Community». Academia has no phrase yet: its «Assistente» and «Grafo» pass
+  `kicker="academia"` and `kickerOf` draws no line until `SECTION_PHRASES` has one. The switcher's Opus entry carries the same count as «Oggi» (`MenuItem.badgeLabel` names
   what a count counts; without it «N notifiche»), and no dot: it is a to-do, not news. A count is 11 px on red 600.
   **Words, not only icons** (`layout`, `sidebarWidth.ts`): from `xl` the desktop column is a 224 px bar with
   icon and word and the groups' headings (the section's name, or «Studia» and «Contribuisci»), the palette's
@@ -456,12 +457,16 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   welcome tour waits for the screen (`Layout`). The Forum's events carry the environment, never
   its author, and an annotation event never carries the note's words (the owner, 18 October 2026, «c»).
 - `features/merlt/hub/` and `pages/MerltHubPage.tsx` — Academia's «Assistente», consent first (S7b). With the
-  consent «Nessuno» the page opens on `ConsentFirst` («Attiva MERL-T»: what MERL-T does, what each level collects —
-  `levels.ts`'s summaries, rendered from it, never a shorter list —, «Scegli il consenso» → `ConsentDialog`). Then four cards of equal height (`HubCard`: a serif
+  consent «Nessuno» the page opens on `ConsentFirst` («Attiva MERL-T»: what MERL-T does, «Che cosa raccoglie» at each
+  level — `levels.ts`'s summaries, rendered from it, never a shorter list —, «Scegli il consenso» → `ConsentDialog`),
+  only where a consent can be given: with no notice (a server answering 404 `merlt_disabled`, or none published) the
+  dialog would show nothing, so `ConsentUnavailable` says «MERL-T non è attivo su questo server»; a read that failed
+  says so, with «Riprova». The cards' gated actions follow the same `ConsentGate` (`hubStyles.ts`). Then four cards of equal height (`HubCard`: a serif
   title, the text, one action at its foot): Q&A, «Valida proposte», «Grafo giuridico» (only with the graph's flag),
   «I miei contributi». An action that needs more consent is `HubAction`'s `gated`, its words («Serve il consenso
-  base», «… completo») on an `aria-disabled` button still in the Tab order, never a badge, and none while the consent
-  is being read; a source the card cannot reach is said in its text; an
+  base», «… completo», or «Non attivo su questo server», «Consenso non letto») on an `aria-disabled` button still in
+  the Tab order, never a badge, and none while the consent is being read; the level is named as `levels.ts` names it
+  («Nessuna raccolta»); a source the card cannot reach is said in its text; an
   action is a `Link` or a `button`, never a button inside a link. The consent and the profile (`ConsentCard`,
   `ProfileCard`, unchanged in what they do: change, revoke, the ladder, the vote's weight) open one at a time from a
   row of links at the foot («Consenso e privacy · Base», «Il tuo profilo»). The ops cards stay for administrators.
