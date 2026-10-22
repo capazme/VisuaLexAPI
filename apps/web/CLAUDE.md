@@ -287,8 +287,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   Transitions the page changes at once, and only the mark and the sidebar's entries move. Choosing the section one is
   in goes to its home
   with no change shown. The sidebar: the Corpus entries for everyone — «Ricerca»
-  (a link to `/` that puts the cursor in the search page's field, `focusSearchField`, with no window over it —
-  the owner, 13 Oct 2026; its hover label carries ⌘K, the palette; the quick norms' dot sits under it;
+  (a link to `/` that puts the cursor on the search page's field, `focusSearchField({ focus: true })`, with no
+  window over it — the owner, 13 Oct 2026; the first key typed opens the search menu with it; its hover label
+  carries ⌘K, the palette; the quick norms' dot sits under it;
   `#tour-nav-search` is what the welcome and search tours point at) and «Analizza documento» —, then the active
   section's, in a group named after it: Opus, «Oggi» (the home, `/opus/oggi`, with the count of overdue and today's
   tasks, named in words: «Oggi, 3 compiti per oggi o scaduti»), «Prossimi giorni», «Lista d'ingresso» and Dossier;
@@ -368,19 +369,37 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `docs/superpowers/specs/2026-10-13-fixed-search-design.md`): `Layout` draws it on `/` (not in Focus mode) in a
   bar above the content scroller (56 px and the iPhone's top edge below `lg`, 72 from it; the phone's bar there), so it
   is always on screen, and sets `--search-bar-height` on `<main>`, which `h-app-row` subtracts and the bar takes as its
-  height. It reads what is typed with the palette's own
-  reading, `hooks/useSearchQuery` (a decision, a norm with the server's resolver as fallback, a topic): Enter opens
-  the decision, searches a ready norm (`citationSearchParams`), searches the topic, or hands a norm that still
-  lacks its number, date or article to the palette with the words (`openCommandPaletteWith`); Enter pressed while
-  the server is still naming the act waits for its answer. «Opzioni» (⌘K) opens the palette. No practice is
-  closed.
+  height. It is the door to the search menu (R2, brief of 21 Oct 2026: one field, no «Opzioni»): a button
+  (`#tour-search-field`, `aria-haspopup="dialog"`) that shows the words and opens the palette with them
+  (`openCommandPaletteWith`, or `openCommandPalette` when empty) on a click, Enter or Space, the arrows, a character
+  typed on it (AltGr's too; the character goes on after its words), words pasted on it (`onPaste`, after its words),
+  and ⌘K (`openSearchMenu`, `Layout`; nothing while the palette is open). Tab only brings the focus (a focus changes no
+  context, WCAG 3.2.1: Bill's choice). It stands for a field (`data-text-field`): «?», ⌘Z and the page's other
+  shortcuts leave it alone (`isEditableTarget`, `Layout`'s `isTyping`). Esc on it empties its words. The focus goes back to what opened
+  the palette as it closes, on a phone too; the field focuses itself on a click (Safari and a tap do not focus a
+  button). The palette's own tour starts only on an empty opening: opened with words,
+  it would take the letters that follow.
+  Everything else is the palette's: what the box reads, the first row, Enter, the steps. The palette closing with no
+  choice (Esc, a click outside, ✕) at its first step gives its words back to the field
+  (`returnWordsToSearchField`); a choice empties it. No practice is closed.
   **The palette's look** (`CommandPalette`, the search menu's brief O1, 20 Oct 2026): on a computer a panel that
   drops from the field's form (`SEARCH_FIELD_FORM_ID` in `utils/searchFieldControl.ts`; floating-ui puts its top on
-  the field's, as wide as the field and «Opzioni», one height of at most 640 px while the box filters, so it does
-  not jump at every letter), hung at the top, centred, where no field is on screen (another page, Focus mode); on a
-  phone `ui/Sheet` («Menu di ricerca», its own «Chiudi»). From the top: the box, the one strong thing, with the help
-  line (12 px) or what the box was read as; the steps «Atto › Dettagli › Articolo» as a thin trail, the one in use in
-  ink (`aria-current="step"`), each 44 px on a phone; then two columns on a computer and one on a phone, in this
+  the field's, as wide as the field, so it covers it, as tall as what it holds up to 640 px — Bill: one row is not a
+  640 px panel —, the lists scrolling inside it past that: a flex column all the way down to the columns, since a
+  percentage height finds nothing definite in a panel sized by its content), hung at the top, centred, where no field is on screen (another page, Focus mode); on a
+  phone the same panel, the page's width less 16 px each side, dropping from the bar at the top (R2: no bottom sheet
+  any more; its «Chiudi» is the field row's ✕, drawn at every width). From the top: the box, the one strong thing, with the help
+  line (12 px), or «Cerco l’atto…» while the server names it: a decision, a norm or a topic read in the box is its
+  row, the chosen one, with «↵», never a second line saying the same (Bill). Enter in the box
+  follows the field's order: a decision, then a wait while the server is still naming the act (the line says «la
+  ricerca parte appena lo trovo», and the search runs once it answers, never after a close; any change of the words
+  drops the wait, so a new Enter is needed), then a norm (a ready one searched, another taken to its next step; an alias counted once,
+  there), then a topic — unless the arrows chose another row since the words changed: Enter is then that row's.
+  Opened again within the 200 ms of the reset after a close, it starts at its first step all the same. The steps after the act («Dettagli», «Articolo») are subpages: the act chosen is a crumb
+  in the field (`Torna indietro: <what it shows>`, the act, and its number and year on the article's step; 44 px on a
+  phone) that goes back a step, and so does Backspace in an empty field (not a held one; on an empty date it goes to
+  the number first); the article's field opens empty, its placeholder saying what it takes, so Backspace there goes
+  back at once (a «1» standing in it took the first press, Bill); there is no trail of steps under the box. Then two columns on a computer and one on a phone, in this
   order: «Scegli l'atto» (`paletteActs.ts`: every act of `ACT_TYPES` named in full with the source convention's
   abbreviation, «Codice civile · c.c.», in 44 px rows under group headings in Geist 12 px) and «A portata di mano»
   (Preferiti, I tuoi alias with the presets' line, «In dotazione» while typing; six of each at rest, then «Tutti i
@@ -399,14 +418,32 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   arrows, Home and End anywhere inside it (Enter picks the chosen row): every control that is not the box keeps
   them (`keepKeys`), or Enter on «Filtri avanzati» would open the first act.
   On a computer the panel is a dialog («Menu di ricerca», `useRole` and `FloatingFocusManager`, modal): the focus
-  stays inside, and goes back to what had it as the palette opened («Opzioni», the field), as it closes rather than
+  stays inside, and goes back to what had it as the palette opened (the field), as it closes rather than
   once the fade is over (the manager sits outside the `AnimatePresence`); nothing had it, the field. cmdk replaces an
   id given to `Command.List` with its own, so the tour's `#command-palette-results` is on the acts' column;
-  `tourConfig.commandPalette.test.tsx` checks the palette's tour against the palette drawn, on both breakpoints. Motion: the panel fades in dropping 6 px (`dur.pop`) and leaves in `dur.press`; a new step slides in
-  from the side it moved to; the chosen row's tint is one element carried from row to row (`layoutId`); under
-  reduced motion everything only fades. This reverses spec `2026-10-18-redesign-inchiostro` §6.1 («no open or close
+  `tourConfig.commandPalette.test.tsx` checks the palette's tour against the palette drawn, on both breakpoints. Motion (R2, the second pull request; inspired by Animorio's «menu dei comandi», written from scratch with
+  Framer Motion and Web Animations): the field grows into the panel (`PanelGrowth`): the same place and width, the panel
+  uncovered from the field's height down to its own (`clip-path`, `calc(100% - <the field's height>)` to
+  `calc(0% - 0px)`, one template so the two ends interpolate; the corners from the field's 12 px to a card's 16), in
+  about 280 ms on `ease.out` (no bounce; a curve, not a spring); the clip is set before the first paint, so the panel
+  never flashes open, and the growth starts once the first frame is drawn (mounting the rows is a long frame, which an
+  animation started before it would spend unseen); Web Animations with no fill, so once grown nothing holds the clip and
+  the card's `shadow-xl` shows. The content fades in as it grows; the first four groups come 30 ms apart, rising 4 px.
+  Closing (Esc, a click outside, a choice), the same way back in about 200 ms from wherever it is (a growth cut short
+  included), the panel taking no pointer meanwhile; opened again before it went, it grows back from there. Without Web
+  Animations the panel is drawn at once. While the box filters, a row filtered out fades and pops out of its list
+  (`AnimatePresence mode="popLayout"`, against its own scrolling column, which is `relative`) and the rows left slide to
+  their places (`layout`, `spring.snappy`); a row leaving is `disabled` for cmdk and `aria-hidden` (Enter never picks a
+  row no longer there); the letters the box matched are drawn in toga, semibold (`Matched`, over `matchRanges` in
+  `paletteActs.ts`, one entry per UTF-16 unit; an abbreviation typed with its dots is one word). A new step slides in
+  from the side it moved to; the chosen row's tint is one element carried from row to row (`layoutId`). On a phone the
+  page under the panel holds still (the body's overflow, a backdrop that takes no touch scroll) and the panel is as tall
+  as the visual viewport leaves (the keyboard; `100dvh` does not shrink on iOS), watched only while the menu is open on a phone. Under reduced motion everything only
+  fades and nothing moves. This reverses spec `2026-10-18-redesign-inchiostro` §6.1 («no open or close
   animation») for the palette, as the brief asked. There is no «ultimi atti aperti»: the web keeps no list of the
-  acts opened (the search history is the server's, read by its page alone). `utils/searchFieldControl.ts` reaches it: `focusSearchField({ text? }, { wait? })` says whether the field took
+  acts opened (the search history is the server's, read by its page alone). `utils/searchFieldControl.ts` reaches it: `focusSearchField({ text?, open?, focus? }, { wait? })` opens the
+  menu from the field (with `focus`, only puts the cursor on it; with `open: false`, only sets its words, as
+  `returnWordsToSearchField` does) and says whether the field took
   the request, and the sidebar's «Ricerca», which navigates first, asks it to wait (2 s) for the field to mount;
   the empty page's button and examples and the empty practice use `focusSearchFieldOrPalette`, which opens the
   palette with the same words when no field is on screen (Focus mode).
@@ -455,10 +492,11 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   welcome tour waits for the screen (`Layout`). The Forum's events carry the environment, never
   its author, and an annotation event never carries the note's words (the owner, 18 October 2026, «c»).
 - `components/ui/` — shared primitives: `Button`, `IconButton`, `Input`, `Card`,
-  `Modal`, `ConfirmDialog`, `Toast`, `EmptyState`, `Sheet` (a phone's bottom sheet), plus feature-flavoured modals.
+  `Modal`, `ConfirmDialog`, `WireConfirm` (below, «Destructive confirmations»), `Toast`, `EmptyState`, `Sheet` (a
+  phone's bottom sheet), plus feature-flavoured modals.
   `Modal` is portaled to `document.body`, so a dialog opened inside a reading window
-  (transformed, stacked) is not confined to it; each open `Modal` is on a module-level
-  stack and only the top-most handles Tab (the focus trap) and Esc, so a dialog opened
+  (transformed, stacked) is not confined to it; each open `Modal` and `WireConfirm` is on a module-level
+  stack (`ui/dialogStack.ts`) and only the top-most handles Tab (its focus trap, on `document`) and Esc, so a dialog opened
   from a dialog keeps the keyboard.
   `Button` has four variants (spec `2026-10-18-redesign-inchiostro` §5.1): `primary` (toga-600, white),
   `secondary` (paper with an ink-200 hairline), `quiet` (text only) and `danger` (red-600) — `ghost` and
@@ -2025,7 +2063,26 @@ its target is still there (the import does not write into a dossier deleted mean
 browser asks before the page is left (`beforeunload`). Otherwise never
 `window.confirm`: use `components/ui/ConfirmDialog` with `variant="danger"`, and word
 the message so it names the scope *and* what is not touched ("Segnalibri e dossier non
-saranno toccati").
+saranno toccati"). Where the action **leaves you** or **cannot be undone** and comes rarely (K1b, L-35: erasing
+the MERL-T data, revoking a connected app, deleting a published copy from the dossier's «Forum» menu or from the
+Forum's card), the confirmation is drawn from its button: `components/ui/wireConfirm/WireConfirm` (the same props,
+plus `origin`, the button: pass it, `event.currentTarget`, since Safari and a tap do not focus a button they press;
+absent, the element focused as it opens, right for a menu's entry — `MenuButton` gives the focus back to its trigger
+by code before an entry runs, the Forum's card does the same by hand). A button its action disabled (busy) gets the
+focus back once enabled again. A wire leaves the button, meets the card on the edge
+that faces it (`wirePath.ts`, pure) and draws its outline both ways; where the ends meet the card appears, its rows
+rising one after the other (about 500 ms; the lead fades once it is there). «Annulla», Esc or a click outside wind it
+back into the button (about 300 ms) and give it the focus; leaving, the card is `inert`, so an Enter during the rewind
+confirms nothing, and the layer still takes the clicks, which do not fall to the page. Its buttons answer only once
+they have risen into sight (`READY_MS`, about 500 ms; `data-ready` on the card): a double tap on a button the card then
+covers runs nothing unseen. Confirming folds the card into a line, and `onConfirm` may resolve to the outcome the button then
+says, a tick drawing itself over it (`OutcomeTick`, «Eliminata ✓», 1.6 s, seen only: each caller says the outcome in
+words where a screen reader hears it); a caller that removes the button (a row, a card) does it in `onOutcomeDone`,
+once the tick is gone, and hands the focus to a neighbour; an outcome that gives way to a newer one (two revocations in
+a row) is told over at once, so the callers keep a queue of ids, oldest first, and the words a confirmation names until
+it is gone. The outline is drawn again when the window changes. The focus opens on «Annulla» and Tab goes between the two buttons. Under reduced
+motion the card fades in already drawn, and the outcome comes once it is gone. On a phone the card is the page's
+width less 16 px each side.
 
 **Keyboard-accessible collapsibles** — a `div` that toggles on click needs
 `role="button"`, `tabIndex={0}`, `aria-expanded`, a dynamic `aria-label`

@@ -32,6 +32,7 @@ import { sectionStore } from '../../features/sections/useSection';
 import { MenuToggle, PhoneTopBar } from './PhoneTopBar';
 import { phoneBarTitle } from './phoneBarTitle';
 import { useHideOnScroll } from './useHideOnScroll';
+import { openSearchMenu } from '../../utils/searchFieldControl';
 import { usePageTitleInView } from './usePageTitleInView';
 import { PlannerHost } from '../features/planner/PlannerHost';
 import { useMediaQuery } from '../../hooks/useIsDesktop';
@@ -176,11 +177,14 @@ export function Layout() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       // Don't trigger shortcuts when typing in inputs
-      const isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement).tagName);
+      // An element that stands for a field (the search page's field, `data-text-field`) is typed on too: «?» there is a letter.
+      const target = e.target as HTMLElement;
+      const isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || Boolean(target.closest?.('[data-text-field]'));
 
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        openCommandPalette();
+        // The search page's field grows into the menu with its words; elsewhere the menu opens empty (R2).
+        openSearchMenu();
       }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'b') {
         e.preventDefault();
