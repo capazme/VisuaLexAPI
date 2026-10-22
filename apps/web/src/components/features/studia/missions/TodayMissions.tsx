@@ -75,9 +75,12 @@ function MissionsOfToday({ day, missions, children }: { day: Progressi; missions
  */
 export function TodayMissions({ day, dayFailed, onOpenSettings, settingsPanel, celebrate, stampRef }: TodayMissionsProps) {
   const state = todayState(day, dayFailed, false);
-  if (state === 'unread') return null;
   const missions = day && (state === 'todo' || state === 'done') ? todayMissions(day) : null;
-  const summary = missions ? missionSummary(missions) : null;
+  // A server without the points (#253) sends no missions: no card at all, rather than «0 di 0» over nothing.
+  if (state === 'unread' || missions?.length === 0) return null;
+  // A server without the points (#253) sends no missions: the day's action stands alone, with no «0 di 0».
+  const bare = missions !== null && missions.length === 0;
+  const summary = missions && !bare ? missionSummary(missions) : null;
   const met = day?.oggi.raggiunto ?? false;
   // No new card to be had: the settings open on the community's subjects, where more can come from.
   const noNewCards = missions?.some((mission) => mission.id === 'nuove' && mission.status === 'vuota') ?? false;

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Search, SlidersHorizontal } from 'lucide-react';
 import { cn } from '../../../lib/utils';
+import { FIELD_TEXT } from '../../../constants/interactions';
 import { Z_INDEX } from '../../../constants/zIndex';
 import type { Materia, StatoScheda, TipoScheda } from '../../../types/studia';
 import type { ActOption, FilterState } from './useMyCards';
@@ -41,7 +42,7 @@ function FilterSelect<T extends string>({ label, all, value, options, disabled, 
       value={value ?? ''}
       disabled={disabled}
       onChange={(e) => onChange((e.target.value || undefined) as T | undefined)}
-      className={cn(CONTROL, 'min-w-0 disabled:opacity-60')}
+      className={cn(CONTROL, FIELD_TEXT, 'min-w-0 disabled:opacity-60')}
     >
       <option value="">{all}</option>
       {options.map(([optionValue, text]) => (
@@ -83,7 +84,7 @@ export function CardFilters({ value, onChange, search, onSearchChange, acts }: C
             aria-label="Cerca nelle schede"
             placeholder="Cerca per istituto o domanda"
             maxLength={100}
-            className={cn(CONTROL, 'w-full pl-9')}
+            className={cn(CONTROL, FIELD_TEXT, 'w-full pl-9')}
           />
         </div>
         <button

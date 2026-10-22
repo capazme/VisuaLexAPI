@@ -1,5 +1,6 @@
 import { forwardRef, useId, useState, type InputHTMLAttributes, type ReactNode } from 'react';
 import { cn } from '../../lib/utils';
+import { FIELD_TEXT } from '../../constants/interactions';
 
 export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> {
   label?: string;
@@ -82,7 +83,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               'transition-colors duration-150 ease-out outline-none',
               'text-slate-900 dark:text-slate-100',
               'placeholder:text-slate-400 dark:placeholder:text-slate-500',
-              'text-sm font-medium',
+              FIELD_TEXT,
+              'font-medium',
               // Disabled state
               'disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100 dark:disabled:bg-slate-800',
               // Focus states - using focus-visible for better keyboard accessibility

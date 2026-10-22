@@ -1297,6 +1297,25 @@
 .vlx-section-mark[data-section="academia"] { background: var(--vlx-section-academia); }
 .vlx-section-mark[data-section="forum"] { background: var(--vlx-section-forum); }
 
+/* «Analizza documento»'s box (D6): the frame's dashes stand still at rest — nothing moves for ever on an open page
+   (Bill) —, turn slowly under a mouse or with the keyboard's focus on the box, and run while a file is dragged over
+   the window, by their offset alone (two periods of «8 6»); a hidden tab stops them all. The row's bar, while a
+   document is read, is a segment that slides, never a share it does not know. Still under reduced motion. */
+@keyframes vlx-dash-turn { to { stroke-dashoffset: -28; } }
+.vlx-dash { animation: vlx-dash-turn 3.2s linear infinite; animation-play-state: paused; }
+.group:hover .vlx-dash, .group:focus-visible .vlx-dash { animation-play-state: running; }
+.vlx-dash-run { animation: vlx-dash-turn 0.8s linear infinite; }
+.group[data-tab-hidden] .vlx-dash, .group[data-tab-hidden] .vlx-dash-run { animation-play-state: paused; }
+@keyframes vlx-bar-slide { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
+.vlx-bar-slide { animation: vlx-bar-slide 1.1s var(--ease-in-out) infinite; }
+@keyframes vlx-shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-6px); } 40% { transform: translateX(5px); } 60% { transform: translateX(-3px); } 80% { transform: translateX(2px); } }
+.vlx-shake { animation: vlx-shake 300ms var(--ease-out) 1; }
+@media (prefers-reduced-motion: reduce) {
+  .vlx-dash, .vlx-dash-run, .vlx-bar-slide, .vlx-shake { animation: none; }
+  /* A still quarter would read as a share: the whole track, faint, says «at work» and no amount. */
+  .vlx-bar-slide { width: 100%; opacity: 0.45; }
+}
+
 /* Gymnasium's small motions (S2). Each plays once for what grew since this browser last drew it
    (`progress/seenProgress.ts`); under reduced motion none moves and the final state is drawn at once. */
 

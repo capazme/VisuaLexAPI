@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Check } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import type { ConteggiStati, Progressi } from '../../../../types/studia';
+import { GoalRing } from './GoalRing';
 import { LevelBar } from './LevelBar';
 import { currentWeek, formatDayLong, totalCards, type WeekDay } from './layout';
 import { stopStates } from './today';
@@ -137,7 +138,10 @@ export function StatsBand({ data, loading, settingsOpen, onToggleSettings, onClo
               <WeekRow data={data} aside={aside} />
             </div>
           </div>
-          <LevelBar livello={data.livello} />
+          {/* A server without the points (#253) sends no level and no missions: no bar, and the goal's ring in the
+              missions' stead, so the goal is still said. */}
+          {data.livello && <LevelBar livello={data.livello} />}
+          {!data.missioni?.length && <GoalRing compact giorno={data.oggi.giorno} ripassi={data.oggi.ripassi} obiettivo={data.oggi.obiettivo} raggiunto={data.oggi.raggiunto} />}
           <StatesLine stati={data.stati} />
           <Link
             to="/studia/progressi"

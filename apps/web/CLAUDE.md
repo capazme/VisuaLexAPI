@@ -166,8 +166,27 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   (the column; on a phone, where the columns are stacked, the page as well when the column is not wholly
   in sight) and pulses it once (`--doc-pulse`, the theme's toga step); the box closes upwards, then the
   result comes (`AnimatePresence mode="wait"`: both at once flashed a scrollbar), and the first 8 rows
-  enter 40 ms apart, none of it under reduced motion. While `/documents` is open it refuses a file
-  dropped **anywhere in the window** but on its box (`dragover`/`drop` listeners on `window`, so the
+  enter 40 ms apart, none of it under reduced motion. **The box** (`DropZone`, D6, a native `<button>`: the click,
+  Enter and Space open the picker) follows a file from `dragover` alone — `dragenter`/`dragleave` fire between
+  children —, on `window`: `idle`, `page` (a file over the window), `over` (over the box, which leans the sheets
+  towards the pointer), back to `idle` 400 ms after the last event (the HTML standard lets a still pointer send a
+  `dragover` only every 350 ± 200 ms; the brief's 200 could rest the box under a file still held). Its frame is an SVG measured on the box: dashes
+  that stand still at rest and turn slowly under a mouse or the keyboard's focus (`vlx-dash`, `stroke-dashoffset`,
+  paused by default; Bill: nothing moves for ever on an open page), in ink and faster over the window, one line over
+  the box, all stopped in a hidden tab (`data-tab-hidden`) —
+  three strokes shown by their opacity, as the tinted ground: only transforms, opacity and the dash offset move;
+  three sheets in a pile fan out, then open wide (Framer Motion, `spring.gentle`); let go, they settle and a wave
+  runs in from the frame, and the ink sheet flies to the document's row (`SheetFlight`, in a portal, taking the
+  kind's colour by a veil's opacity). The row (`DocumentRow`, `documentJob.ts`): the kind's mark (DOCX ink, HTML
+  amber, Markdown and TXT slate), the name cut with an ellipsis, the size, «Leggo il documento…» then «Cerco le
+  citazioni…» (the search after a frame, so the words are on screen) over a bar that slides — no percentage it
+  does not know —, the check for 450 ms, then the text; a refusal turns it red, shakes it once (`vlx-shake`, 300 ms)
+  with its reason, and ✕ slides it away. «Il file resta nel tuo browser» is in the box in every state; a phone
+  says «Tocca per scegliere un documento». A polite live region says «Documento in lettura» (the search for citations is too short
+  to say), «Pronto», the refusal, then the count. Several files let go at once: the first is read, and its row says
+  «Letto il primo dei N file: uno alla volta». Under reduced motion the dashes stand, the sheets change place without
+  moving, and nothing is thrown, bounced or shaken. While `/documents` is open it refuses a file
+  dropped **anywhere in the window** but on its box (the same `dragover`/`drop` listeners on `window`, so the
   browser does not open the file in place of the app): a drop zone added elsewhere on the page, or in
   the shell, is neutralised there until those listeners let it through) and `decisions`
   (`DecisionView`, the body of a decision wherever it is drawn; `DecisionEntryView`, a practice's
@@ -198,7 +217,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   login stay out; «Crediti», public and outside the layout, is in the frame since M1 (the column's width and padding, the
   text in its 672 px column). On a phone `actionBeside` keeps icon-only actions on the title's row (the dossier list's
   «⋯» and «+»). `PageFrame.test.tsx` reads the section pages' files
-  and fails on a title of their own, an icon in an `h1` or a root narrowed with `mx-auto max-w-…`. **The sections** (D-076, spec
+  and fails on a title of their own, an icon in an `h1` or a root narrowed with `mx-auto max-w-…`. `Layout`'s content
+  area keeps the scrollbar's room (`scrollbar-gutter: stable`) on every page but the search page: a page that grew past
+  the window as it loaded drew its 8 px bar and moved the centred column 4 px sideways. **The sections** (D-076, spec
   `docs/superpowers/specs/2026-10-18-sections-switcher-design.md`): Corpus is the common core and no section;
   over it Opus, Gymnasium (the code's `studia`), Academia (development mode only) and Forum, in
   `features/sections/` (`sections.ts`: names, lines, icons, home addresses, `sectionForPath`; `useSection`: the
@@ -303,7 +324,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   has one bar at the top. On the search page it is the field's bar (56 px below `lg`, 72 from it), with `MenuToggle`
   beside the field; on every other page `PhoneTopBar` (`layout/PhoneTopBar.tsx`): `MenuToggle` at the left (44 px, the
   services' dot), the page's name in Newsreader in the middle (`phoneBarTitle.ts`: the menu's word for the page, else
-  the section's name), the magnifier on the right, which opens the search menu (the palette); on the page's paper with a
+  the section's name), the magnifier on the right, which opens the search menu (the palette) and takes the focus on a
+  click (Safari's does not give it), so the menu gives it back as it closes; on the page's paper with a
   hairline, absolutely placed over the content area (`Z_INDEX.floating`), which starts under it (`pt-[calc(4.5rem+env(safe-area-inset-top))]`,
   repeated at `md`), and whose `scroll-padding-top` stops what the focus or an anchor scrolls to under it (WCAG 2.4.11).
   Below `md` it slides away scrolling down and comes back scrolling up or near the top (`useHideOnScroll`, which listens
@@ -315,7 +337,10 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   does the same, or it slides under the bar). Focus mode and Gymnasium's lesson draw no bar. During a section change
   the bar is named (`vlx-phone-bar`, `index.css`), so the page's picture passes under it. The drawer's section switcher
   sits where the bar is; the closed drawer is `inert`, and whatever closes it from inside (an entry, a link, the
-  backdrop) gives the focus to the bar's menu button, where a dialog an entry opens gives it back. That button is
+  backdrop) gives the focus to the bar's menu button, where a dialog an entry opens gives it back; Esc closes it
+  wherever the focus is (opening it leaves the focus on the button) and gives the focus to that button, unless a control
+  inside took the key (the user menu, the section switcher) or an overlay is over it (`aria-modal`, `data-find-overlay`:
+  a sheet, the palette); only below `lg`, so a window widened with the drawer open leaves Esc to the page. That button is
   `data-focus-parked`: a section chosen in the drawer still focuses its new title (`sectionTransition.ts` does not
   take the parked focus for a move by the user).
   There is no «Ricerca Veloce», no
@@ -423,7 +448,10 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   height of 36 px on a desktop and 44 px on a phone; `loading` keeps the label and puts a spinner in the
   icon's place (`aria-busy`), `status="error" | "success"` shows the outcome of the last press. `Modal`
   enters in `dur.panel` on `ease.drawer`, growing from 0.97, and `Sheet` rises from its edge on the same
-  timing (its «Chiudi» in ink-500, dark ink-400: over 3:1, since it is often the one way out); both only fade under reduced motion (`useReducedMotion`). The notifications (K1a,
+  timing (its «Chiudi» in ink-500, dark ink-400: over 3:1, since it is often the one way out); both only fade under reduced motion (`useReducedMotion`).
+  `Sheet` gives the focus back to what had it as it opened, taken while it is first drawn: a field inside with
+  `autoFocus` (the palette's box) takes the focus before the focus manager records what had it, and the focus went to
+  the body as the sheet closed. The notifications (K1a,
   `components/ui/notifications/`): every `Toast` while `isVisible` and every `showUndoToast` is an entry of one
   store (`notifications.ts`), drawn by `NotificationHost` (mounted once in `Layout`, in the toast band): a stack at
   the bottom (at the top for `position="top"`), three at most per edge — the newest first, a fourth closes the oldest
@@ -993,7 +1021,10 @@ places the right column; inside the tiles a sentence stops at `max-w-prose`. In 
    goal (G8: the goal's mission says it, and «Progressi» draws it); under them **the level** (`progress/LevelBar`, G1c: «Livello 4», «oggi +45 XP», a quiet bar of `nelLivello` of `perIlProssimo` and
    «Ancora 138 XP per il livello 5», all from the read's `livello`, which the server computes; the user's alone, G-316 — never
    in the Forum, a public dossier or anything another user sees —, no title, L-27 choice 3, and never a weight of a vote,
-   G-318); the gear «Impostazioni dello
+   G-318; a read with no `livello`, `missioni` or `crediti` — a server without the points, #253 — draws no level bar and no
+   missions: no «Le missioni di oggi» and no «Tutte le missioni», the band takes the goal's ring back (`GoalRing
+   compact`) so the goal is still said, and the day block and the rest of «Oggi» and «Progressi» stay as before);
+   the gear «Impostazioni dello
    studio» (`progress/StudySettings`: `SettingsGear` with `aria-controls`, and `StudySettingsPanel` — G6, the owner's
    «si estende il tab»: `StudyPreferences open` inside the card under its heading, no window and no veil, its height
    in `dur.pop` on `ease.out` through Framer Motion, at once under reduced motion; the gear again or Esc inside closes it
@@ -1990,7 +2021,15 @@ re-applying a saturated background behind the text.
 `TOUCH_TARGET_RESPONSIVE` in `constants/interactions.ts` covers the height only
 (`min-h-[44px] md:min-h-0`); icon-only buttons need the width too, so they carry
 `min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0` explicitly — as the dossier
-row's star and remove buttons do.
+row's star and remove buttons do. A text field or a select is at least 16 px below
+`md` (`FIELD_TEXT`, `text-[length:max(1rem,16px)] md:text-sm`, in `constants/interactions.ts`):
+Safari on an iPhone zooms the page into a field under 16 px as it takes the focus, and
+`text-base` is not enough — the text size «piccolo» makes 1 rem 14 px. `ui/Input` and
+`ui/FormSelect` carry it, and so do the searches of «Le mie schede» and of the Cronologia
+(`ui/__tests__/fieldText.test.tsx`), the search page's field and the palette's fields (its box
+is `max(1.125rem,16px)`); about sixty fields written by hand do not yet (the find
+window, the dossier's search, the index filter, the case-law filters, the dossier pickers,
+the notes): a field written by hand takes it, and a `text-*` class after it in `cn` undoes it.
 
 ## Common Patterns
 
@@ -2156,7 +2195,8 @@ meant to stay split; add new features as new files, not inside the shells:
   on a phone; the saved norms that changed come under the title, then the card. On `/dossier` the `h1` is the visible
   title of the list, of the open dossier and of «Cestino», and what sits under it is `h2` (a dossier's card; an open
   dossier's notes, acts, «Giurisprudenza» and «Rimossi di recente»).
-- `features/documents/` — `DocumentReviewPage.tsx` (the page), `DocumentText.tsx`, `CitationList.tsx`,
+- `features/documents/` — `DocumentReviewPage.tsx` (the page), `DropZone.tsx` (the box), `DocumentRow.tsx`
+  (the document's row and `SheetFlight`), `documentJob.ts`, `DocumentText.tsx`, `CitationList.tsx`,
   `citationGroups.ts`, `documentFile.ts`; invented sample files for the tests in `__tests__/fixtures.ts`.
 
 ## Gotchas
@@ -2173,6 +2213,12 @@ meant to stay split; add new features as new files, not inside the shells:
    include the dotted sub-number (`270-bis.1`, `171-octies.1`), the slash
    (`314/2`) and multi-token ordinals (`135-sex-decies`), on both the server
    normaliser and the archive (`tools/archivio-normativo/archivio_normativo/hierarchy.py`).
+   The web's comparisons go through `normalizeArticleId` (`utils/treeUtils.ts`, never a
+   key that is stored or sent), which joins a two-word ordinal the table holds joined, as
+   the API's `comparable_article_key` does («135 sex decies», «135sexdecies» and
+   «135-sexdecies» are one: the dossier's row of that article had no title, since
+   `/fetch_rubriche` keys it `135-sex-decies`), and puts the dash in a suffix written
+   against its number («2bis»). `TreeViewPanel`'s private copy is gone: do not make another.
 10. **Popover positioning vs entry animation** — floating-ui positions with an
     inline `transform`; an `animate-in zoom-in-95` on the *same* element
     overwrites it and the popover flies from (0,0). Split across two elements.

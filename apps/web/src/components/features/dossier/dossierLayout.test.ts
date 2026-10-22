@@ -94,6 +94,10 @@ describe('compareArticles', () => {
       .sort(compareArticles).map((x) => x.numero_articolo);
     expect(sorted).toEqual(['2', '2bis', '2-bis.2', '2-bis.10', '2ter', '270-bis.1']);
   });
+  it('ranks an ordinal split in two words as the joined one', () => {
+    const sorted = [nv('135-septiesdecies'), nv('135 sex decies'), nv('135-quinquiesdecies')].sort(compareArticles).map((x) => x.numero_articolo);
+    expect(sorted).toEqual(['135-quinquiesdecies', '135 sex decies', '135-septiesdecies']);
+  });
   it('puts an article that is not a number after the numbered ones', () => {
     expect([nv('unico'), nv('5')].sort(compareArticles).map((x) => x.numero_articolo)).toEqual(['5', 'unico']);
   });

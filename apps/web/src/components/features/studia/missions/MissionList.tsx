@@ -57,6 +57,8 @@ export function MissionList({ data, loading }: MissionListProps) {
       </div>
     ) : null;
   }
+  // A server without the points (#253) sends no missions: no list, rather than three empty groups.
+  if (!data.missioni?.length) return null;
   const missions = allMissions(data).filter((mission) => !mission.main);
   const active = missions.filter((mission) => mission.status !== 'in-arrivo');
   const groups = GROUPS.filter(({ group }) => active.some((mission) => mission.group === group));

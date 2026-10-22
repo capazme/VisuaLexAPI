@@ -158,7 +158,7 @@ export function missionFrom(mission: MissioneServer, data: Progressi): Mission {
 
 /** Every mission of the read, in the server's order: the day's, the week's and the long run's («convalida» a validator's only). */
 export function allMissions(data: Progressi): Mission[] {
-  return data.missioni.map((mission) => missionFrom(mission, data));
+  return (data.missioni ?? []).map((mission) => missionFrom(mission, data));
 }
 
 /** «Le missioni di oggi»: the three the server marks `principale`, in its order. */
