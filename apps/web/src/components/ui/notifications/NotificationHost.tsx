@@ -4,6 +4,7 @@ import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { spring } from '../../../lib/motion';
 import { isWorkspaceCovered } from '../../../utils/findWindowControl';
+import { useWorkspaceCovered } from '../../../hooks/useWorkspaceCovered';
 import { NotificationCard } from './NotificationCard';
 import { isEditableTarget, isUndoShortcut, undoShortcutKeys, undoShortcutLabel } from './undoShortcut';
 import {
@@ -59,7 +60,10 @@ export function NotificationHost() {
   }, []);
   // The notification the shortcut would undo writes it beside its «Annulla», where a keyboard is likely.
   const keyboard = typeof window.matchMedia !== 'function' || !window.matchMedia('(pointer: coarse)').matches;
-  const shortcutFor = keyboard ? latestUndoable(entries)?.id : undefined;
+  const newest = keyboard ? latestUndoable(entries)?.id : undefined;
+  // Under a dialog or an overlay the key does nothing: the notification does not promise it.
+  const covered = useWorkspaceCovered(newest !== undefined);
+  const shortcutFor = covered ? undefined : newest;
 
   return (
     <div className={cn('pointer-events-none fixed inset-0', Z_INDEX.toast)}>

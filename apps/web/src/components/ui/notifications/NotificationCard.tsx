@@ -1,10 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { motion, stagger, useAnimate, useDragControls, type AnimationPlaybackControls, type PanInfo } from 'framer-motion';
 import { AlertCircle, CheckCircle2, Info, X, XCircle } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { ease } from '../../../lib/motion';
 import type { HoldReason } from './countdown';
 import type { NotificationEntry, NotificationType } from './notifications';
+import { createSwipeGuard } from './swipeGuard';
 
 /**
  * The notification drawn from a line (K1a), inspired by Animorio's «notifica dalla riga», written from scratch with
@@ -71,8 +72,8 @@ export function NotificationCard({ entry, still, standalone = false, shortcut, o
   const [scope, animate] = useAnimate<HTMLDivElement>();
   const swipedTo = useRef(1);
   const dragControls = useDragControls();
-  // The pointer moved the notification since it was pressed.
-  const dragged = useRef(false);
+  // Whether a click is one: a press that moved the notification is not (`swipeGuard.ts`).
+  const [swipe] = useState(() => createSwipeGuard());
   const timeLine = useRef<AnimationPlaybackControls | null>(null);
   const entrance = useRef<AnimationPlaybackControls | null>(null);
   const exited = useRef(false);
@@ -195,7 +196,7 @@ export function NotificationCard({ entry, still, standalone = false, shortcut, o
   };
 
   const onPointerDown = (event: ReactPointerEvent) => {
-    dragged.current = false;
+    swipe.pressed();
     // A swipe to the side, by a finger or the mouse: the mouse not from a button, which it would press instead. Started
     // here (`dragListener` off), so framer-motion leaves the words selectable by a double or triple click.
     if (!closing && !standalone && (event.pointerType !== 'mouse' || !(event.target as Element).closest('button, a'))) {
@@ -212,21 +213,28 @@ export function NotificationCard({ entry, still, standalone = false, shortcut, o
     window.addEventListener('pointercancel', release);
   };
 
+  // A notification gone in the middle of a swipe gives the page its selection back.
+  useEffect(() => () => {
+    if (swipe.moving) document.body.style.userSelect = '';
+  }, [swipe]);
+
   const onDragStart = () => {
-    dragged.current = true;
-    // A press on the words that turned into a swipe leaves no half selection behind.
+    swipe.started();
+    // A press on the words that turned into a swipe leaves no half selection behind, and makes none while it moves.
     window.getSelection()?.removeAllRanges();
+    document.body.style.userSelect = 'none';
   };
   // A press that moved the notification is no click: let go over «Annulla» or ✕, a short swipe springs back and runs
-  // nothing.
+  // nothing. A key's click (`detail` 0: Enter, Space, a screen reader) is always one.
   const onClickCapture = (event: ReactMouseEvent) => {
-    if (!dragged.current) return;
-    dragged.current = false;
+    if (!swipe.eats(event.detail)) return;
     event.preventDefault();
     event.stopPropagation();
   };
 
   const onDragEnd = (_: unknown, info: PanInfo) => {
+    document.body.style.userSelect = '';
+    swipe.ended();
     if (Math.abs(info.offset.x) < SWIPE_PX && Math.abs(info.velocity.x) < SWIPE_SPEED) return;
     swipedTo.current = info.offset.x < 0 ? -1 : 1;
     handOff(onDismiss, false);

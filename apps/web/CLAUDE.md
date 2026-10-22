@@ -431,7 +431,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   line at the bottom drawing back between two ticks, which grow while it is held. Run out (or taken back), it closes
   into the line, which draws back to the centre; ✕, Esc from inside it and a swipe to the side (a finger, or the
   mouse dragging it from anywhere but a button, which it presses instead; a short one springs back, and a press that
-  moved it is no click; started in `onPointerDown` with `dragListener` off, so the words stay selectable by a double
+  moved it is no click — `swipeGuard.ts`: never a key's click (`detail` 0), and the flag goes once the release has
+  been seen, so a swipe let go outside eats nothing after it; no text is selected while it moves; started in `onPointerDown` with `dragListener` off, so the words stay selectable by a double
   or triple click) fold it and slide it away. «Annulla» closes it at once — nothing in a closing
   notification takes a click (`inert`) — awaits the undo and draws «Ripristinato» in its place for 1.5 s (`undoneSlots`: the place is kept when the undo
   outlasts the exit); the focus of a notification closed from the keyboard (Esc, or a key's click, `detail` 0, or a
@@ -449,7 +450,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   screen the key goes by. «Ripristinato» comes as after a click, and once the undo has run the live region says
   «Ripristinato: <what was undone>» in its place (one message: two in a row on an atomic region, the first is lost);
   the focus in the notification undone goes to the next one, as after Esc. That notification writes the key beside its «Annulla» («Annulla · Ctrl+Z»,
-  seen, not in the name; `aria-keyshortcuts`) where the pointer is not coarse; the shortcuts' list has it.
+  seen, not in the name; `aria-keyshortcuts`) where the pointer is not coarse and nothing covers the workspace
+  (`useWorkspaceCovered`, watched only while an «Annulla» is on screen: under a dialog the key does nothing); the
+  shortcuts' list has it.
   `registerUndoToastListener` hands the newest «Annulla» on screen to a test. `Tooltip` waits 500 ms under a pointer, opens at once and
   without motion within 300 ms of another closing, and at once on keyboard focus.
   Interaction tokens live in `constants/interactions.ts`, stacking bands in

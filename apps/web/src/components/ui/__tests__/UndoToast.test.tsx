@@ -314,6 +314,23 @@ describe('NotificationHost (K1a)', () => {
       expect(within(card('Primo rimosso')).getByRole('button', { name: 'Annulla' })).not.toHaveTextContent('Ctrl+Z');
     });
 
+    it('does not write «· Ctrl+Z» under a dialog, where the key does nothing, and writes it again once it goes', async () => {
+      platform('Win32');
+      await two();
+      const newest = () => within(cards()[0]).getByRole('button', { name: 'Annulla' });
+      expect(newest()).toHaveTextContent('Ctrl+Z');
+      const dialog = document.createElement('div');
+      dialog.setAttribute('aria-modal', 'true');
+      try {
+        await act(async () => { document.body.append(dialog); await new Promise((r) => setTimeout(r, 20)); });
+        expect(newest()).not.toHaveTextContent('Ctrl+Z');
+        expect(newest()).not.toHaveAttribute('aria-keyshortcuts');
+      } finally {
+        await act(async () => { dialog.remove(); await new Promise((r) => setTimeout(r, 20)); });
+      }
+      expect(newest()).toHaveTextContent('Ctrl+Z');
+    });
+
     it('is ⌘Z on a Mac', async () => {
       platform('MacIntel');
       const { undoNew } = await two();
