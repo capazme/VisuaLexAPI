@@ -243,16 +243,18 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                             </div>
                         </div>
 
-                        <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800 p-2 rounded-lg">
+                        {/* Under `sm` the label over its buttons, which share the row in three 44 px thirds (Bill): beside
+                            them the longer label pushed the row past a 320 px window. */}
+                        <div className="flex flex-col gap-2 bg-slate-50 dark:bg-slate-800 p-2 rounded-lg sm:flex-row sm:items-center sm:justify-between">
                             <span className="text-sm text-slate-600 dark:text-slate-400 px-2">Carattere dell’interfaccia</span>
-                            <div className="flex gap-1" role="group" aria-label="Carattere dell’interfaccia">
+                            <div className="grid grid-cols-3 gap-1 sm:flex" role="group" aria-label="Carattere dell’interfaccia">
                                 {FONT_FAMILY_OPTIONS.map(({ value, label, fontClass }) => (
                                     <button
                                         key={value}
                                         onClick={() => updateSettings({ fontFamily: value })}
                                         aria-pressed={settings.fontFamily === value}
                                         className={cn(
-                                            "px-3 py-1.5 rounded text-xs border transition-colors",
+                                            "min-h-[44px] px-3 py-1.5 rounded text-xs border transition-colors sm:min-h-0",
                                             fontClass,
                                             settings.fontFamily === value
                                                 ? "border-primary-500 bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400"
