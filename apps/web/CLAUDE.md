@@ -632,7 +632,8 @@ checks the files; «termine calcolato» comes with wave 2 and its warning), and 
   (`PlannerHost`, at the top: the undo toast holds the bottom). Every write bumps `plannerStore.version` and every view
   mounted reads again; nothing holds tasks between reads. No toast, log or error carries a task's title (it may name a
   client): `useTaskView` and the count log a status only.
-- **Adding**: `QuickAddField` at the top of each view (a title and Enter; «Dettagli» for dates, priority and dossier;
+- **Adding**: `QuickAddField` at the top of each view (a title and Enter, at 16 px on a phone; «Dettagli» opens dates,
+  priority and dossier in a `ui/Collapsible` under the row, the box growing, its arrow turning, Esc closing it — U1b;
   a line says where the task goes; a task that will not show in the view is announced); «c» (as in «compito») from anywhere opens
   `TaskDialog` (`PlannerHost`, mounted by `Layout`; not in a field, with a modifier, or under a dialog,
   a menu or a `data-find-overlay`), with the dossier chosen on `/dossier?dossier=` and today's date on «Oggi» and
@@ -1111,10 +1112,10 @@ places the right column; inside the tiles a sentence stops at `max-w-prose`. In 
    `ui/Collapsible` since U1a; the gear again or Esc inside closes it
    and the focus goes back to the gear; while it is open the right column is not sticky, so its foot can be scrolled to; the
    missions' settings line and the day block's buttons open it and focus it, «Accendi le schede della comunità» with the subjects open; the
-   strip over «Da validare» keeps `StudySettingsSheet`, a `ui/Sheet` capped at `max-w-lg` from
-   `md`, not closed by Esc or the backdrop). `StudyPreferences` saves a number when its field is left or on Enter (an
+   strip over «Da validare» (`StudyStrip`) opens the same panel in place since U1b, the strip growing downward — no
+   window any more: `StudySettingsSheet` is gone). `StudyPreferences` saves a number when its field is left or on Enter (an
    unchanged one is not sent; «Salvato» beside it, no «Salva»), keeps the community's subjects one level down, closed
-   («Schede della comunità · N di 5»), and sends its saves one after the other, a switch held only while its own
+   («Schede della comunità · N di 5», a `ui/Collapsible` of its own since U1b), and sends its saves one after the other, a switch held only while its own
    save travels, so a switch pressed right after a number is neither lost nor overwritten. The week (`layout.ts` `currentWeek`: Monday
    to Sunday from the server's today and `serie.ultimiGiorni`, seven boxes with «LMMGVSD», a day to come dotted, and the
    days before the first one the calendar holds `vuoto`, never missed; each state in words for a screen reader,

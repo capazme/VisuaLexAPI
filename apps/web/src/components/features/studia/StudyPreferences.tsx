@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '../../../lib/utils';
+import { Collapsible } from '../../ui/Collapsible';
 import { studiaService } from '../../../services/studiaService';
 import type { Materia, PreferenzeStudio } from '../../../types/studia';
 import { MATERIA_LABEL } from './studiaLabels';
@@ -122,6 +123,7 @@ export function StudyPreferences({ onChanged, open: alwaysOpen = false, communit
   const [disclosed, setOpen] = useState(false);
   const open = alwaysOpen || disclosed;
   const [community, setCommunity] = useState(communityRequest > 0);
+  const communityButton = useRef<HTMLButtonElement>(null);
   // A new request opens the subjects, whatever the reader left them as (state adjusted while rendering, not in an effect).
   const [answered, setAnswered] = useState(communityRequest);
   if (communityRequest !== answered) {
@@ -213,6 +215,7 @@ export function StudyPreferences({ onChanged, open: alwaysOpen = false, communit
             {/* One level down, closed at first (G6): the first level stays short, the card no longer runs past the missions. */}
             <div>
               <button
+                ref={communityButton}
                 type="button"
                 aria-expanded={community}
                 aria-controls={communityId}
@@ -222,35 +225,38 @@ export function StudyPreferences({ onChanged, open: alwaysOpen = false, communit
                 <ChevronDown size={16} aria-hidden className={cn('shrink-0 text-slate-400 transition-transform motion-reduce:transition-none', !community && '-rotate-90')} />
                 {`Schede della comunità · ${preferences.materieComunita.length} di ${subjects.length}`}
               </button>
-              <fieldset id={communityId} hidden={!community} className="pt-1">
-                <legend className="sr-only">Schede della comunità</legend>
-                <p className="mb-1 text-sm text-slate-500 dark:text-slate-400">Schede validate dalla comunità, per materia</p>
-                <ul className={cn('grid gap-x-6', listClassName)}>
-                  {subjects.map(([materia, label]) => {
-                    const on = preferences.materieComunita.includes(materia);
-                    return (
-                      <li key={materia}>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={on}
-                          disabled={switching}
-                          onClick={() => toggle(materia)}
-                          className="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-md px-1 text-left text-sm text-slate-800 md:min-h-0 md:py-1.5 disabled:opacity-60 dark:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                        >
-                          {label}
-                          <span
-                            aria-hidden
-                            className={cn('relative inline-block h-5 w-9 shrink-0 rounded-full transition-colors motion-reduce:transition-none', on ? 'bg-primary-600' : 'bg-slate-300 dark:bg-slate-600')}
+              {/* A panel in place too (U1b), one level down. */}
+              <Collapsible id={communityId} open={community} onClose={() => setCommunity(false)} triggerRef={communityButton}>
+                <fieldset className="pt-1">
+                  <legend className="sr-only">Schede della comunità</legend>
+                  <p className="mb-1 text-sm text-slate-500 dark:text-slate-400">Schede validate dalla comunità, per materia</p>
+                  <ul className={cn('grid gap-x-6', listClassName)}>
+                    {subjects.map(([materia, label]) => {
+                      const on = preferences.materieComunita.includes(materia);
+                      return (
+                        <li key={materia}>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={on}
+                            disabled={switching}
+                            onClick={() => toggle(materia)}
+                            className="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-md px-1 text-left text-sm text-slate-800 md:min-h-0 md:py-1.5 disabled:opacity-60 dark:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                           >
-                            <span className={cn('absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform motion-reduce:transition-none', on && 'translate-x-4')} />
-                          </span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </fieldset>
+                            {label}
+                            <span
+                              aria-hidden
+                              className={cn('relative inline-block h-5 w-9 shrink-0 rounded-full transition-colors motion-reduce:transition-none', on ? 'bg-primary-600' : 'bg-slate-300 dark:bg-slate-600')}
+                            >
+                              <span className={cn('absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform motion-reduce:transition-none', on && 'translate-x-4')} />
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </fieldset>
+              </Collapsible>
             </div>
           </>
         )}

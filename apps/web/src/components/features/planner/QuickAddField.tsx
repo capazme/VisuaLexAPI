@@ -1,5 +1,7 @@
-import { useId, useState, type FormEvent } from 'react';
-import { Plus, SlidersHorizontal } from 'lucide-react';
+import { useId, useRef, useState, type FormEvent } from 'react';
+import { ChevronDown, Plus, SlidersHorizontal } from 'lucide-react';
+import { FIELD_TEXT } from '../../../constants/interactions';
+import { Collapsible } from '../../ui/Collapsible';
 import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
 import { taskService } from '../../../services/taskService';
@@ -32,13 +34,15 @@ function summary(draft: TaskDraft, today: string, dossierTitle: string | undefin
 }
 
 /**
- * The field at the top of each view: a title and Enter. «Dettagli» opens the dates, the priority and the dossier;
- * the full set (labels, repetition, description) is the task's dialog. No date is read from the words (wave 2).
+ * The field at the top of each view: a title and Enter. «Dettagli» opens the dates, the priority and the dossier in a
+ * `ui/Collapsible` under the row (U1b: the box grows, never a jump); the full set (labels, repetition, description) is
+ * the task's dialog. No date is read from the words (wave 2).
  */
 export function QuickAddField({ view, today, defaults, dossierLocked = false }: Props) {
   const id = useId();
   const [draft, setDraft] = useState<TaskDraft>(() => emptyDraft(defaults));
   const [open, setOpen] = useState(false);
+  const detailsButton = useRef<HTMLButtonElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dossierTitle = useAppStore((s) => (draft.dossierId ? s.dossiers.find((d) => d.id === draft.dossierId)?.title : undefined));
@@ -89,9 +93,10 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
           placeholder="Aggiungi un compito"
           aria-describedby={`${id}-summary`}
           autoComplete="off"
-          className="min-h-[44px] min-w-0 flex-1 rounded-lg bg-transparent px-2 text-base text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 md:text-sm dark:text-slate-100 dark:placeholder:text-slate-400"
+          className={cn('min-h-[44px] min-w-0 flex-1 rounded-lg bg-transparent px-2 text-slate-900 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:text-slate-100 dark:placeholder:text-slate-400', FIELD_TEXT)}
         />
         <button
+          ref={detailsButton}
           type="button"
           aria-expanded={open}
           aria-controls={`${id}-details`}
@@ -100,17 +105,23 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
         >
           <SlidersHorizontal size={16} aria-hidden />
           <span className="sr-only sm:not-sr-only sm:text-sm sm:font-medium">Dettagli</span>
+          {/* Turns as the panel opens, with its height. */}
+          <ChevronDown size={14} aria-hidden className={cn('hidden shrink-0 transition-transform duration-200 motion-reduce:transition-none sm:block', open && 'rotate-180')} />
         </button>
         <button type="submit" disabled={busy || !draft.title.trim()} className={cn(INK_BUTTON, 'shrink-0 px-3 sm:px-4')}>
           {busy ? 'Aggiungo…' : <>Aggiungi<span className="sr-only"> il compito</span></>}
         </button>
       </div>
       <p id={`${id}-summary`} className={cn(FIELD_HINT, 'px-4 pb-2')}>{summary(draft, today, dossierTitle)}</p>
-      {open && (
-        <div id={`${id}-details`} className="border-t border-slate-200 p-3 dark:border-slate-800">
-          <TaskFields draft={draft} onChange={setDraft} dossierLocked={dossierLocked} />
-        </div>
-      )}
+      <Collapsible
+        id={`${id}-details`}
+        open={open}
+        onClose={() => setOpen(false)}
+        triggerRef={detailsButton}
+        contentClassName="border-t border-slate-200 p-3 dark:border-slate-800"
+      >
+        <TaskFields draft={draft} onChange={setDraft} dossierLocked={dossierLocked} />
+      </Collapsible>
       {error && (
         <p role="alert" className="border-t border-slate-200 px-4 py-2 text-sm text-red-800 dark:border-slate-800 dark:text-red-200">
           {error}

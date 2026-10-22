@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useOutletContext } from 'react-router-dom';
 
 const auth = vi.hoisted(() => ({ value: { isValidator: false, loading: false, user: { id: 'u1' } as { id: string } | null } }));
@@ -119,6 +120,27 @@ describe('StudiaPage', () => {
   it('shows the strip, with its gear, over «Da validare» (Gymnasium spec §5.1)', () => {
     at('/studia/valida');
     expect(screen.getByRole('button', { name: 'Impostazioni dello studio' })).toBeInTheDocument();
+  });
+
+  it('opens the study settings in the strip, in place and never in a window, Esc giving the focus back to the gear (U1b)', async () => {
+    at('/studia/valida');
+    const user = userEvent.setup();
+    const gear = screen.getByRole('button', { name: 'Impostazioni dello studio' });
+    expect(gear).not.toHaveAttribute('aria-haspopup');
+    expect(screen.queryByRole('region', { name: 'Impostazioni dello studio' })).toBeNull();
+    await user.click(gear);
+    expect(gear).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    const panel = screen.getByRole('region', { name: 'Impostazioni dello studio' });
+    expect(gear).toHaveAttribute('aria-controls', panel.id);
+    act(() => panel.focus());
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('region', { name: 'Impostazioni dello studio' })).toBeNull();
+    expect(gear).toHaveFocus();
+    // The gear again opens and closes them.
+    await user.click(gear);
+    await user.click(gear);
+    expect(gear).toHaveAttribute('aria-expanded', 'false');
   });
 
   it.each(['/studia/ripasso', '/studia/progressi', '/studia/schede', '/studia/valida'])('draws %s in the sections\' frame, the layout\'s full width with nothing narrower (G6, W2)', (path) => {
