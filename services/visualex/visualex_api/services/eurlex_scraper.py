@@ -9,7 +9,7 @@ from ..tools.sys_op import BaseScraper
 from ..tools.exceptions import DocumentNotFoundError, NetworkError, ValidationError
 from ..tools.cache_manager import get_cache_manager
 from ..tools.selectors import EURLexSelectors
-from ..tools.treextractor import is_quoted_heading, strip_amendment_markers
+from ..tools.treextractor import HEADING_ORDINAL, is_quoted_heading, strip_amendment_markers
 from .akn_parser import normalize_article_key
 from ..tools.article_suffixes import ARTICLE_SUFFIX_ALTERNATION
 
@@ -220,10 +220,10 @@ def _cons_lines(element) -> list[str]:
     return lines
 
 
-# An ordinal right after a heading's number ("Articolo 15 bis", "Articolo 15bis"), a whole
-# word: "Articolo 1 Terzi" is art. 1 with its rubrica run on, not an ordinal.
-_ORDINAL_AFTER_NUMBER = re.compile(
-    rf"[\s\-]*+(?:{ARTICLE_SUFFIX_ALTERNATION})(?![^\W\d_])", re.IGNORECASE)
+# An ordinal right after a heading's number ("Articolo 15 bis", "Articolo 15bis", and glued to the
+# text after it, "Articolo 15 bisTesto"), never the head of a word: "Articolo 1 Terzi" is art. 1
+# with its rubrica run on (`HEADING_ORDINAL`).
+_ORDINAL_AFTER_NUMBER = re.compile(rf"[\s\-]*+{HEADING_ORDINAL}", re.IGNORECASE)
 
 
 def _number_ends_here(rest) -> bool:

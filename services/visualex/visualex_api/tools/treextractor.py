@@ -518,9 +518,16 @@ def is_quoted_heading(element) -> bool:
             or element.find_parent("td") is not None)
 
 
+# An ordinal after a heading's number: a whole word («15 bis», «15 BIS», «15-bis»), or a lower-case
+# ordinal glued to the capital that opens the text after it, as a class-less page whose heading and
+# text share an element reads «Articolo 15 bisTesto». A capital after a lower-case ordinal never
+# starts a word of it; «Articolo 1 Bisogna» and «Articolo 1Terzi» stay art. 1.
+HEADING_ORDINAL = (rf"(?:(?:{ARTICLE_SUFFIX_ALTERNATION})(?![^\W\d_])"
+                   rf"|(?-i:(?:{ARTICLE_SUFFIX_ALTERNATION})(?=[A-ZÀ-Ý])))")
+
 # An OJ heading's number with its ordinal, read as one article: «Articolo 15 bis» is «15-bis».
 _EURLEX_HEADING_NUMBER = re.compile(
-    rf"^(?:Articolo|Article)\s+(\d+)(?:[\s\-]*+({ARTICLE_SUFFIX_ALTERNATION})(?![^\W\d_]))?", re.IGNORECASE)
+    rf"^(?:Articolo|Article)\s+(\d+)(?:[\s\-]*+({HEADING_ORDINAL}))?", re.IGNORECASE)
 
 
 def eurlex_heading_number(text):
@@ -798,7 +805,8 @@ def _extract_eurlex_title(soup):
     The OJ page names the act in `oj-doc-ti` lines inside `eli-main-title` (an annex's heading uses
     the same class, so only the first consecutive run counts, and only when it holds the date); the
     consolidated page in `title-doc-first` and
-    `title-doc-last` (printed twice, the first copy is enough); the legacy page in its
+    `title-doc-last` (printed twice, the first copy is enough; the subject in `title-doc-first`
+    when `title-doc-last` holds only the EEA note); the legacy page in its
     `DC.description` meta, which the `/eli/` address of a legacy act does not carry (dir.
     2002/58): there the ELI metadata names the act in every language, and the Italian
     `eli:title` is read the same way. Never a title from another language.
@@ -819,7 +827,19 @@ def _extract_eurlex_title(soup):
         return _eurlex_subject(lines)
     last = soup.find("p", class_="title-doc-last")
     if last is not None:
-        return _eurlex_subject([last.get_text(" ", strip=True)])
+        subject = _eurlex_subject([last.get_text(" ", strip=True)])
+        if subject:
+            return subject
+        # The consolidated GDPR (02016R0679-20160504) has only the EEA note there: its subject is
+        # in the `title-doc-first` run, after the date line, as on the OJ page.
+        first = soup.find("p", class_="title-doc-first")
+        run = [first] if first is not None else []
+        for sibling in first.find_next_siblings() if first is not None else []:
+            if sibling.name != "p" or "title-doc-first" not in (sibling.get("class") or []):
+                break
+            run.append(sibling)
+        lines = [p.get_text(" ", strip=True) for p in run]
+        return _eurlex_subject(lines) if any(_EURLEX_DATE_LINE.match(line) for line in lines) else ""
     # The Italian expression of the act: `about` names it (…/oj/ita), the language tag alone
     # could also sit on another resource's meta.
     eli_title = soup.find("meta", attrs={"property": "eli:title", "lang": "it",

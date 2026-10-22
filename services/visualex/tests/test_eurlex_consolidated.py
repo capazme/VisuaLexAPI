@@ -723,3 +723,44 @@ class TestEliTitleOfTheItalianExpression:
         soup = soup_of("eprivacy_eli_legacy_trimmed.html")
         soup.find("meta", attrs={"property": "eli:title", "lang": "it"})["about"] = "http://data.europa.eu/eli/dir/2002/58/oj"
         assert _extract_eurlex_title(soup) == ""
+
+
+class TestGluedHeading:
+    """A class-less page whose heading and text share an element reads «Articolo 15 bisTesto…»:
+    the ordinal glued to the text was not taken for one, and art. 15 asked was served art. 15 bis
+    (found by the mcp-legal-it review). Synthetic page (fixtures/eurlex/README.md)."""
+
+    async def test_art_15_is_not_found(self):
+        with pytest.raises(DocumentNotFoundError):
+            await EurlexScraper().extract_article_text(soup_of("synthetic_classless_glued_15_bis.html"), "15")
+
+    @pytest.mark.parametrize("article", ["15 bis", "15-bis", "15bis"])
+    async def test_art_15_bis_is_served_from_its_heading(self, article):
+        text = await EurlexScraper().extract_article_text(soup_of("synthetic_classless_glued_15_bis.html"), article)
+        assert text == "Articolo 15 bis\nTesto dell'articolo 15 bis."
+
+    async def test_the_index_lists_15_bis_once(self):
+        result, _, _ = await _parse_eurlex_tree(soup_of("synthetic_classless_glued_15_bis.html"),
+                                                "https://eur-lex.europa.eu/eli/reg/2000/1/oj/ita")
+        assert [item["numero"] for item in result] == ["14", "15-bis", "16"]
+
+    @pytest.mark.parametrize("heading,article,heads", [
+        ("Articolo 15 bisTesto", "15", False),
+        ("Articolo 15terDisposizioni", "15", False),
+        ("Articolo 1 Bisogna", "1", True),
+        ("Articolo 1Terzi", "1", True),
+        ("Articolo 1Testo", "1", True),
+    ])
+    def test_a_glued_ordinal_is_an_ordinal(self, heading, article, heads):
+        from visualex_api.services.eurlex_scraper import _heads_article
+        assert _heads_article(heading, f"Articolo {article}") is heads
+
+
+class TestConsolidatedTitleFromTheFirstRun:
+    def test_the_gdpr_consolidated_has_its_subject_in_title_doc_first(self):
+        # CELEX 02016R0679-20160504: `title-doc-last` holds only «(Testo rilevante ai fini del SEE)».
+        assert _extract_eurlex_title(soup_of("gdpr_consolidated_20160504_title_trimmed.html")) == (
+            "relativo alla protezione delle persone fisiche con riguardo al trattamento dei dati personali, "
+            "nonché alla libera circolazione di tali dati e che abroga la direttiva 95/46/CE "
+            "(regolamento generale sulla protezione dei dati)"
+        )
