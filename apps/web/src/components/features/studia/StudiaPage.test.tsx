@@ -1,12 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useOutletContext } from 'react-router-dom';
 
 const auth = vi.hoisted(() => ({ value: { isValidator: false, loading: false, user: { id: 'u1' } as { id: string } | null } }));
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => auth.value }));
 vi.mock('../../../services/studiaService', () => ({
-  studiaService: { progress: vi.fn(() => new Promise(() => {})), preferences: vi.fn(() => new Promise(() => {})) },
+  studiaService: {
+    progress: vi.fn(() => new Promise(() => {})),
+    preferences: vi.fn(() => new Promise(() => {})),
+    savePreferences: vi.fn(),
+  },
 }));
 
 import { Z_INDEX } from '../../../constants/zIndex';
@@ -124,14 +128,17 @@ describe('StudiaPage', () => {
   });
 
   it('opens the study settings in the strip, in place and never in a window, Esc giving the focus back to the gear (U1b)', async () => {
-    vi.mocked(studiaService.preferences).mockResolvedValue({ ripassiAlGiorno: 20, nuoveAlGiorno: 10, materieComunita: [] } as never);
+    vi.mocked(studiaService.preferences).mockClear().mockResolvedValue({ ripassiAlGiorno: 20, nuoveAlGiorno: 10, materieComunita: [] } as never);
     at('/studia/valida');
     const user = userEvent.setup();
     const gear = screen.getByRole('button', { name: 'Impostazioni dello studio' });
     expect(gear).not.toHaveAttribute('aria-haspopup');
     expect(screen.queryByRole('region', { name: 'Impostazioni dello studio' })).toBeNull();
+    // Nothing read before the gear is pressed: the panel is mounted at its first opening.
+    expect(studiaService.preferences).not.toHaveBeenCalled();
     await user.click(gear);
-    expect(gear).toHaveAttribute('aria-expanded', 'true');
+    expect(studiaService.preferences).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(gear).toHaveAttribute('aria-expanded', 'true'));
     expect(screen.queryByRole('dialog')).toBeNull();
     const panel = screen.getByRole('region', { name: 'Impostazioni dello studio' });
     expect(gear).toHaveAttribute('aria-controls', panel.id);
@@ -152,10 +159,26 @@ describe('StudiaPage', () => {
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('region', { name: 'Impostazioni dello studio' })).toBeNull();
     expect(gear).toHaveFocus();
-    // The gear again opens and closes them.
+    // The gear again opens and closes them, the settings read once.
     await user.click(gear);
     await user.click(gear);
     expect(gear).toHaveAttribute('aria-expanded', 'false');
+    expect(studiaService.preferences).toHaveBeenCalledTimes(1);
+  });
+
+  it('saves a number typed in the strip\'s settings when Esc closes them: the field is left (U1b)', async () => {
+    vi.mocked(studiaService.preferences).mockResolvedValue({ ripassiAlGiorno: 20, nuoveAlGiorno: 10, materieComunita: [] } as never);
+    vi.mocked(studiaService.savePreferences).mockClear().mockResolvedValue({ ripassiAlGiorno: 30, nuoveAlGiorno: 10, materieComunita: [] } as never);
+    at('/studia/valida');
+    const user = userEvent.setup();
+    const gear = screen.getByRole('button', { name: 'Impostazioni dello studio' });
+    await user.click(gear);
+    const field = await screen.findByLabelText('Ripassi al giorno');
+    await user.clear(field);
+    await user.type(field, '30');
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(studiaService.savePreferences).toHaveBeenCalledWith({ ripassiAlGiorno: 30 }));
+    expect(gear).toHaveFocus();
   });
 
   it.each(['/studia/ripasso', '/studia/progressi', '/studia/schede', '/studia/valida'])('draws %s in the sections\' frame, the layout\'s full width with nothing narrower (G6, W2)', (path) => {

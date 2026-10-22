@@ -1127,7 +1127,8 @@ places the right column; inside the tiles a sentence stops at `max-w-prose`. In 
    and the focus goes back to the gear; while it is open the right column is not sticky, so its foot can be scrolled to; the
    missions' settings line and the day block's buttons open it and focus it, «Accendi le schede della comunità» with the subjects open; the
    strip over «Da validare» (`StudyStrip`) opens the same panel in place since U1b, the strip growing downward — no
-   window any more: `StudySettingsSheet` is gone). `StudyPreferences` saves a number when its field is left or on Enter (an
+   window any more: `StudySettingsSheet` is gone; mounted at the first opening and kept, so the settings are read only
+   once the gear is pressed). `StudyPreferences` saves a number when its field is left or on Enter (an
    unchanged one is not sent; «Salvato» beside it, no «Salva»), keeps the community's subjects one level down, closed
    («Schede della comunità · N di 5», a `ui/Collapsible` of its own since U1b), and sends its saves one after the other, a switch held only while its own
    save travels, so a switch pressed right after a number is neither lost nor overwritten. The week (`layout.ts` `currentWeek`: Monday

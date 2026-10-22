@@ -52,6 +52,9 @@ describe('QuickAddField — «Dettagli»', () => {
   it('shows its state by its arrow at every width', async () => {
     render(<QuickAddField view="today" today="2026-10-22" defaults={{}} />);
     const details = screen.getByRole('button', { name: 'Dettagli' });
+    // Icon and arrow in a row at every width, never stacked (the planner's icon button is a grid).
+    expect(details).toHaveClass('inline-flex');
+    expect(details).not.toHaveClass('inline-grid');
     const arrow = details.querySelectorAll('svg')[1];
     expect(arrow.getAttribute('class')).not.toMatch(/\bhidden\b/);
     await userEvent.click(details);

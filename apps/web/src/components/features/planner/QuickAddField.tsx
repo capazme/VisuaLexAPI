@@ -101,7 +101,8 @@ export function QuickAddField({ view, today, defaults, dossierLocked = false }: 
           aria-expanded={open}
           aria-controls={`${id}-details`}
           onClick={() => setOpen((v) => !v)}
-          className={cn(ICON_BUTTON, 'gap-1.5 px-2 sm:inline-flex sm:px-3', open && 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-50')}
+          // In a row at every width: the planner's icon button is a grid, which stacked the icon over the arrow.
+          className={cn(ICON_BUTTON, 'inline-flex gap-1.5 px-2 sm:px-3', open && 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-50')}
         >
           <SlidersHorizontal size={16} aria-hidden />
           <span className="sr-only sm:not-sr-only sm:text-sm sm:font-medium">Dettagli</span>

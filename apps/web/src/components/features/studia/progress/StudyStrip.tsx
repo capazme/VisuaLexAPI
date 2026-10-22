@@ -25,6 +25,17 @@ export interface StudyStripProps {
  */
 export function StudyStrip({ data, loading, onSettingsChanged, dense = false }: StudyStripProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Mounted at the first opening, then kept: «Da validare» reads the study settings only once the gear is pressed
+  // (before, the window read them as it opened). Mounted closed, it opens in the next frame, so its height grows.
+  const [panelMounted, setPanelMounted] = useState(false);
+  const toggleSettings = () => {
+    if (panelMounted) {
+      setSettingsOpen((v) => !v);
+      return;
+    }
+    setPanelMounted(true);
+    requestAnimationFrame(() => setSettingsOpen(true));
+  };
   const panelId = useId();
   const gear = useRef<HTMLButtonElement>(null);
   // Esc inside the settings: closed, and the focus back on the gear.
@@ -52,9 +63,9 @@ export function StudyStrip({ data, loading, onSettingsChanged, dense = false }: 
             </>
           )
         )}
-        <SettingsGear ref={gear} open={settingsOpen} onClick={() => setSettingsOpen((v) => !v)} controls={panelId} />
+        <SettingsGear ref={gear} open={settingsOpen} onClick={toggleSettings} controls={panelId} />
       </div>
-      <StudySettingsPanel id={panelId} open={settingsOpen} onClose={close} onChanged={onSettingsChanged} />
+      {panelMounted && <StudySettingsPanel id={panelId} open={settingsOpen} onClose={close} onChanged={onSettingsChanged} />}
     </div>
   );
 }
