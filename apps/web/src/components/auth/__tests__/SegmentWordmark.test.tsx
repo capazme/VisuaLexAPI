@@ -19,7 +19,7 @@ afterEach(() => {
 describe('SegmentWordmark — the sign-in page\'s wordmark (A2)', () => {
   it('is the heading «VisuaLex» throughout; the display and the melting copy are hidden from a screen reader', () => {
     vi.useFakeTimers();
-    render(<SegmentWordmark className="text-5xl" />);
+    render(<SegmentWordmark className="text-5xl" weightClass="font-medium" />);
     expect(screen.getByRole('heading', { level: 1, name: 'VisuaLex' })).toBeInTheDocument();
     const svg = document.querySelector('h1 svg');
     expect(svg).toHaveAttribute('aria-hidden');
@@ -29,7 +29,7 @@ describe('SegmentWordmark — the sign-in page\'s wordmark (A2)', () => {
   it('plays once: the display goes when the melt ends, and the page is told the wordmark is there', () => {
     vi.useFakeTimers();
     const onSettled = vi.fn();
-    render(<SegmentWordmark className="text-5xl" onSettled={onSettled} />);
+    render(<SegmentWordmark className="text-5xl" weightClass="font-medium" onSettled={onSettled} />);
     expect(onSettled).not.toHaveBeenCalled();
     act(() => { vi.advanceTimersByTime(DONE_AT + 10); });
     expect(onSettled).toHaveBeenCalledTimes(1);
@@ -38,11 +38,26 @@ describe('SegmentWordmark — the sign-in page\'s wordmark (A2)', () => {
     expect(onSettled).toHaveBeenCalledTimes(1);
   });
 
-  it('a click on it plays it again, once it has ended', () => {
+  it('holds the real wordmark\'s box from the first frame, and hides the melting copies from a screen reader', () => {
     vi.useFakeTimers();
-    render(<SegmentWordmark className="text-5xl" />);
+    render(<SegmentWordmark className="text-5xl" weightClass="font-medium" />);
+    const h1 = screen.getByRole('heading', { level: 1 });
+    const spans = [...h1.querySelectorAll(':scope > span')];
+    // The real one, in the flow, and the two copies laid over it.
+    expect(spans[0]).toHaveTextContent('VisuaLex');
+    expect(spans[0]).not.toHaveAttribute('aria-hidden');
+    expect(spans.slice(1).every((span) => span.getAttribute('aria-hidden') === 'true')).toBe(true);
+    expect(spans[2]).toHaveClass('font-medium');
+  });
+
+  it('a click on it plays it again, once it has ended, never while it runs', () => {
+    vi.useFakeTimers();
+    const onSettled = vi.fn();
+    render(<SegmentWordmark className="text-5xl" weightClass="font-medium" onSettled={onSettled} />);
     fireEvent.click(screen.getByRole('heading', { level: 1 }));
     act(() => { vi.advanceTimersByTime(DONE_AT + 10); });
+    // The click during the run restarted nothing: it ended on time, once.
+    expect(onSettled).toHaveBeenCalledTimes(1);
     expect(document.querySelector('h1 svg')).toBeNull();
     fireEvent.click(screen.getByRole('heading', { level: 1 }));
     expect(document.querySelector('h1 svg')).not.toBeNull();
@@ -51,7 +66,7 @@ describe('SegmentWordmark — the sign-in page\'s wordmark (A2)', () => {
   it('under reduced motion draws no display: the wordmark only fades in', () => {
     motionPref.reduced = true;
     const onSettled = vi.fn();
-    render(<SegmentWordmark className="text-5xl" onSettled={onSettled} />);
+    render(<SegmentWordmark className="text-5xl" weightClass="font-medium" onSettled={onSettled} />);
     expect(document.querySelector('h1 svg')).toBeNull();
     expect(screen.getByRole('heading', { level: 1, name: 'VisuaLex' })).toBeInTheDocument();
     expect(onSettled).toHaveBeenCalled();

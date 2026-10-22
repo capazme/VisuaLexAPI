@@ -8,8 +8,9 @@ describe('segments — «VISUALEX» on a seven-segment display (A2)', () => {
     expect([...LETTERS.X].sort()).toEqual(['b', 'c', 'e', 'f', 'g']);
   });
 
-  it('draws the V narrower than the U, so the two are told apart', () => {
-    const width = (i: number) => cellLines(i).a.x2 - cellLines(i).a.x1;
+  it('draws the V\'s cell narrower than the U\'s, so the two are told apart', () => {
+    // The cell's width, read on its bottom segment (which both letters light).
+    const width = (i: number) => cellLines(i).d.x2 - cellLines(i).d.x1;
     expect(width(0)).toBeLessThan(width(3));
   });
 

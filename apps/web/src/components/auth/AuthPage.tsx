@@ -178,7 +178,8 @@ export function AuthPage() {
                 <BookOpen size={44} strokeWidth={1.5} className="text-primary-600 dark:text-primary-400" />
               </motion.span>
               <SegmentWordmark
-                className="font-serif text-5xl font-medium leading-none tracking-tight text-slate-900 dark:text-slate-50 lg:text-[4.25rem]"
+                className="font-serif text-5xl leading-none tracking-tight text-slate-900 dark:text-slate-50 lg:text-[4.25rem]"
+                weightClass="font-medium"
                 onSettled={() => setMarkSettled(true)}
               />
               <p className="max-w-[34ch] font-serif text-xl leading-relaxed text-slate-600 dark:text-slate-300">
