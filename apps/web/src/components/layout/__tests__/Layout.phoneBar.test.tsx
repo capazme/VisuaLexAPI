@@ -1,7 +1,7 @@
 // The phone's bar with the drawer and the keyboard (M1): it comes back when the focus lands in it and never hides with
 // the focus inside, and closing the drawer gives the focus to its menu button.
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../Sidebar', () => ({
@@ -150,5 +150,77 @@ describe('Layout — the phone\'s bar and the keyboard', () => {
   it('parks the focus on a button a section\'s new title may still take', () => {
     const { bar } = page();
     expect(within(bar).getByRole('button', { name: 'Apri il menu' })).toHaveAttribute('data-focus-parked');
+  });
+});
+
+/** A fake IntersectionObserver: the test says when the title is in sight. */
+class FakeIntersectionObserver {
+  static last: FakeIntersectionObserver | null = null;
+  target: Element | null = null;
+  private readonly callback: IntersectionObserverCallback;
+  constructor(callback: IntersectionObserverCallback) {
+    this.callback = callback;
+    FakeIntersectionObserver.last = this;
+  }
+  observe(target: Element) {
+    this.target = target;
+  }
+  unobserve() {}
+  disconnect() {}
+  takeRecords() {
+    return [];
+  }
+  say(isIntersecting: boolean) {
+    act(() => this.callback([{ isIntersecting, target: this.target } as IntersectionObserverEntry], this as unknown as IntersectionObserver));
+  }
+}
+
+describe('Layout — the phone bar\'s name, as iOS\'s large titles (G8)', () => {
+  beforeEach(() => {
+    FakeIntersectionObserver.last = null;
+    vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function at(path: string) {
+    render(
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/forum" element={<h1>Dossier pubblici</h1>} />
+            <Route path="/history" element={<h1>Cronologia</h1>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    return screen.getByTestId('phone-top-bar');
+  }
+  const name = (bar: HTMLElement) => bar.querySelector('p')!;
+
+  it('names the section while the page\'s title is in sight, and the page once it has scrolled out, fading it in', () => {
+    const bar = at('/forum');
+    const observer = FakeIntersectionObserver.last!;
+    // The page's own title, watched in the content scroller, under the bar.
+    expect(observer.target).toHaveTextContent('Dossier pubblici');
+    expect(observer.target?.tagName).toBe('H1');
+    expect(name(bar)).toHaveTextContent(/^Forum$/);
+
+    observer.say(false);
+    expect(name(bar)).toHaveTextContent(/^Dossier pubblici$/);
+    // A fade of 150 ms, only where motion is welcome: at once under reduced motion.
+    expect(name(bar)).toHaveClass('motion-safe:animate-in', 'motion-safe:fade-in', 'motion-safe:duration-150');
+    expect(name(bar).className).not.toMatch(/(^|\s)(animate-in|fade-in)(\s|$)/);
+
+    observer.say(true);
+    expect(name(bar)).toHaveTextContent(/^Forum$/);
+  });
+
+  it('names a Corpus page, which belongs to no section, by its own name, title in sight or not', () => {
+    const bar = at('/history');
+    expect(name(bar)).toHaveTextContent(/^Cronologia$/);
+    FakeIntersectionObserver.last!.say(false);
+    expect(name(bar)).toHaveTextContent(/^Cronologia$/);
   });
 });

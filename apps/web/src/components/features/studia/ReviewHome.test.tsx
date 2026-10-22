@@ -97,7 +97,7 @@ describe('ReviewHome', () => {
     progress.mockResolvedValue(answer(18, 20));
     renderHome();
     expect(await screen.findByText('18 da ripassare, 20 nuove')).toBeInTheDocument();
-    expect(screen.getByText('Oggi · lunedì 19 ottobre')).toBeInTheDocument();
+    expect(screen.getByText('lunedì 19 ottobre')).toBeInTheDocument();
     expect(progress).toHaveBeenCalledWith(undefined);
     expect(screen.getByRole('img', { name: 'Serie: 4 giorni di fila, record 9' })).toBeInTheDocument();
     // The goal is the mission's to say (G8): no ring of it on «Oggi».
@@ -167,7 +167,7 @@ describe('ReviewHome', () => {
     progress.mockResolvedValue(answer(2, 5));
     await userEvent.setup().click(subjectChoice('Diritto penale'));
     expect(await screen.findByText('2 da ripassare, 5 nuove')).toBeInTheDocument();
-    expect(screen.getByText('Oggi in Diritto penale · lunedì 19 ottobre')).toBeInTheDocument();
+    expect(screen.getByText('lunedì 19 ottobre · Diritto penale')).toBeInTheDocument();
     expect(subjectChoice('Diritto penale')).toHaveAttribute('aria-pressed', 'true');
     expect(progress).toHaveBeenLastCalledWith('DIRITTO_PENALE');
     expect(localStorage.getItem(STORAGE_KEY)).toBe('DIRITTO_PENALE');
@@ -177,7 +177,7 @@ describe('ReviewHome', () => {
     unmount();
 
     renderHome();
-    await screen.findByText('Oggi in Diritto penale · lunedì 19 ottobre');
+    await screen.findByText('lunedì 19 ottobre · Diritto penale');
     expect(await screen.findByText('2 da ripassare, 5 nuove')).toBeInTheDocument();
     expect(progress).toHaveBeenLastCalledWith('DIRITTO_PENALE');
   });
@@ -324,7 +324,7 @@ describe('ReviewHome', () => {
     // The newer request answers first, the older one after.
     pending[1](answer(7, 7));
     expect(await screen.findByText('7 da ripassare, 7 nuove')).toBeInTheDocument();
-    expect(screen.getByText('Oggi in Diritto civile · lunedì 19 ottobre')).toBeInTheDocument();
+    expect(screen.getByText('lunedì 19 ottobre · Diritto civile')).toBeInTheDocument();
     pending[0](answer(9, 9));
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(screen.getByText('7 da ripassare, 7 nuove')).toBeInTheDocument();
@@ -588,12 +588,13 @@ describe('ReviewHome', () => {
       expect(stats.parentElement).not.toHaveClass('xl:sticky');
     });
 
-    it('says «Oggi» once, with the day, over the large line: no «Oggi:» before the counts (G8)', async () => {
+    it('says the day alone over the large line — the title says «Oggi» —, and no «Oggi:» before the counts (G8)', async () => {
       progress.mockResolvedValue(answer(12, 8));
       renderHome();
       const day = await screen.findByRole('region', { name: 'Il ripasso di oggi' });
       expect(within(day).getByText('12 da ripassare, 8 nuove')).toHaveClass('font-serif', 'md:text-4xl');
-      expect(within(day).getByText('Oggi · lunedì 19 ottobre')).toBeInTheDocument();
+      expect(within(day).getByText('lunedì 19 ottobre')).toBeInTheDocument();
+      expect(within(day).queryByText(/^Oggi/)).toBeNull();
       expect(screen.queryByText(/^Oggi:/)).toBeNull();
       // The missions under it carry no action of their own.
       const missions = screen.getByRole('region', { name: 'Le missioni di oggi' });
@@ -906,7 +907,7 @@ describe('ReviewHome', () => {
       progress.mockImplementation(() => new Promise((resolve) => { answerCivile = resolve; }));
       await user.click(subjectChoice('Diritto civile'));
       // Penale's answer is not drawn under Civile's name: the block waits, «Inizia il ripasso» with it.
-      expect(screen.getByText('Oggi in Diritto civile · lunedì 19 ottobre')).toBeInTheDocument();
+      expect(screen.getByText('lunedì 19 ottobre · Diritto civile')).toBeInTheDocument();
       expect(screen.queryByText('2 da ripassare, 3 nuove')).toBeNull();
       expect(screen.queryByRole('button', { name: 'Inizia il ripasso' })).toBeNull();
       answerCivile(answer(7, 1));

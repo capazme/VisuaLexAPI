@@ -49,10 +49,14 @@ const LARGE = cn('max-w-prose font-serif text-3xl font-medium leading-tight trac
 
 const RETRY = cn('min-h-[44px] rounded px-1 font-sans text-base font-medium underline', FOCUS_RING);
 
-/** The small line on top: «Oggi · mercoledì 22 ottobre», the server's day; «Oggi in Diritto penale · …» narrowed. */
+/**
+ * The small line on top: the server's day, «giovedì 22 ottobre» — the page's title says «Oggi» already (G8) —; narrowed
+ * to a subject, «giovedì 22 ottobre · Diritto penale». Nothing before the first read.
+ */
 function DayLine({ day, subject }: { day: Progressi | null; subject?: string }) {
-  const scope = subject ? `Oggi in ${subject}` : 'Oggi';
-  return <p className={cn('text-sm font-medium', MUTED_TEXT)}>{day ? `${scope} · ${formatDayLong(day.oggi.giorno)}` : scope}</p>;
+  if (!day) return null;
+  const date = formatDayLong(day.oggi.giorno);
+  return <p className={cn('text-sm font-medium', MUTED_TEXT)}>{subject ? `${date} · ${subject}` : date}</p>;
 }
 
 /**

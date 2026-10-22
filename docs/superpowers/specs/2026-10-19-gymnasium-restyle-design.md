@@ -131,9 +131,11 @@ off. The order of L-24 stays — the day's missions, then the numbers, then the 
 
 - **The title** (L-37) is the page's name, «Oggi» (and «Progressi», «Le mie schede», «Da validare»), with
   «Gymnasium · la tua palestra giuridica» small over it; Opus and the Forum the same. One place in the code (the
-  sections' phrases and `PageFrame`'s line over the title).
+  sections' phrases and `PageFrame`'s line over the title). On a phone the bar at the top does as iOS's large titles:
+  the section's name while the page's title is in sight, the page's name, faded in over 150 ms, once it has scrolled
+  out (at once under reduced motion), so the name is not written twice one under the other.
 - **The day block**, first in the left column (on a phone the first thing, «Inizia il ripasso» within the first 400 px
-  under the bar): a tile with the section's hue down its left edge; «Oggi · mercoledì 22 ottobre» small; «12 da
+  under the bar): a tile with the section's hue down its left edge; the day small, «mercoledì 22 ottobre» (the title says «Oggi»); «12 da
   ripassare, 8 nuove» in Newsreader, 36 px; «circa 7 minuti · Diritto civile, Diritto penale e altre 2» (the subjects
   with cards due, from the read by institute, then those with new cards while today allows some); and «Inizia il
   ripasso», the page's one primary button, wide. Done: «Hai finito per oggi.» and «Domani: 9 da ripassare.», with a

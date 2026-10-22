@@ -32,6 +32,7 @@ import { sectionStore } from '../../features/sections/useSection';
 import { MenuToggle, PhoneTopBar } from './PhoneTopBar';
 import { phoneBarTitle } from './phoneBarTitle';
 import { useHideOnScroll } from './useHideOnScroll';
+import { usePageTitleInView } from './usePageTitleInView';
 import { PlannerHost } from '../features/planner/PlannerHost';
 import { useMediaQuery } from '../../hooks/useIsDesktop';
 
@@ -72,6 +73,12 @@ export function Layout() {
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
   const [phoneBarElement, setPhoneBarElement] = useState<HTMLElement | null>(null);
   const phoneBar = useHideOnScroll(scroller, { enabled: showPhoneBar && !sidebarOpen, resetKey: pathname, bar: phoneBarElement });
+  // The bar's name (G8, as iOS's large titles): a section's page shows the section while its own title is in sight
+  // under the bar, the page's name once the title has scrolled out (`PhoneTopBar` fades it in). A Corpus page (the
+  // Cronologia, «Analizza documento»…) belongs to no section: its name, always. The dossiers are their section's.
+  const titleInView = usePageTitleInView(scroller, { enabled: showPhoneBar, resetKey: pathname, bar: phoneBarElement });
+  const sectionPage = sectionForPath(pathname) !== null || /^\/dossier(\/|$)/.test(pathname);
+  const barTitle = titleInView && sectionPage ? sectionName : phoneBarTitle(pathname, sectionName);
   // The services' probe, once for both copies of the sidebar and running with the menu closed (S1): its
   // status is the user menu's «Stato dei servizi», and a fault is a dot on the user button and, on a
   // phone, on the button that opens the drawer, whose names say it.
@@ -308,7 +315,7 @@ export function Layout() {
         {showPhoneBar && (
           <PhoneTopBar
             menu={menuToggle}
-            title={phoneBarTitle(pathname, sectionName)}
+            title={barTitle}
             hidden={phoneBar.hidden}
             onReveal={phoneBar.reveal}
             barRef={setPhoneBarElement}

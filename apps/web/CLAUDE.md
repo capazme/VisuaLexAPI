@@ -323,8 +323,12 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   backdrop closes; entries are 44 px high on a phone. **The phone's bar** (M1, 21 Oct 2026): below `lg` every page
   has one bar at the top. On the search page it is the field's bar (56 px below `lg`, 72 from it), with `MenuToggle`
   beside the field; on every other page `PhoneTopBar` (`layout/PhoneTopBar.tsx`): `MenuToggle` at the left (44 px, the
-  services' dot), the page's name in Newsreader in the middle (`phoneBarTitle.ts`: the menu's word for the page, else
-  the section's name), the magnifier on the right, which opens the search menu (the palette) and takes the focus on a
+  services' dot), a name in Newsreader in the middle — as iOS's large titles (G8): on a section's page (and the dossiers)
+  the section's name while the page's `h1` is in sight under the bar, the page's name once it has scrolled out, faded in
+  over 150 ms (`motion-safe:` only); on a Corpus page its own name, always (`usePageTitleInView`: an `IntersectionObserver`
+  on the first `h1` of the content scroller, the bar's height off its top, a `MutationObserver` finding a title drawn
+  later; no `h1`, the page's name; `phoneBarTitle.ts` over `features/sections/pageNames.ts`, the one list of the pages'
+  names, which the titles read too, else the section's name) —, the magnifier on the right, which opens the search menu (the palette) and takes the focus on a
   click (Safari's does not give it), so the menu gives it back as it closes; on the page's paper with a
   hairline, absolutely placed over the content area (`Z_INDEX.floating`), which starts under it (`pt-[calc(4.5rem+env(safe-area-inset-top))]`,
   repeated at `md`), and whose `scroll-padding-top` stops what the focus or an anchor scrolls to under it (WCAG 2.4.11).
@@ -972,8 +976,8 @@ document keeps the order the owner fixed (L-24) — missions, statistics, list �
 places the right column; inside the tiles a sentence stops at `max-w-prose`. In that order:
 1. **The day block** (`missions/DayBlock`, G8, the page's entry; on a phone «Inizia il ripasso» within the first 400 px
    under the bar): a tile with the section's hue as a 4 px rule down its left edge (`--vlx-section-gymnasium`), a
-   visually hidden `h2` «Il ripasso di oggi»; «Oggi · lunedì 19 ottobre» small («Oggi in Diritto penale · …» narrowed to
-   a subject); in Newsreader, 30 px on a phone and 36 from `md`, what is on today, «12 da ripassare, 8 nuove»
+   visually hidden `h2` «Il ripasso di oggi»; the day small, «lunedì 19 ottobre» (the title says «Oggi»; «lunedì 19
+   ottobre · Diritto penale» narrowed to a subject); in Newsreader, 30 px on a phone and 36 from `md`, what is on today, «12 da ripassare, 8 nuove»
    (`todaySentence`, a part that is zero left out); under it «circa 7 minuti · Diritto civile, Diritto penale e altre 2»
    (`estimateLabel` in `studiaLabels.ts`, `ceil(cards × SECONDS_PER_CARD / 60)`, 20 s a card, an estimate; the subjects
    from `todaySubjects` — those with cards due in the road's read by institute, the most first, then while today allows
