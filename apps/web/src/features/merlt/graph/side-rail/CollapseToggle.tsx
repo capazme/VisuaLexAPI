@@ -30,7 +30,7 @@ export function CollapseToggle({ isOpen, onToggle }: CollapseToggleProps): React
       ) : (
         <>
           <Network className="h-4 w-4" />
-          <span className="text-[11px] [writing-mode:vertical-rl]">Grafo</span>
+          <span className="text-xs [writing-mode:vertical-rl]">Grafo</span>
         </>
       )}
     </button>

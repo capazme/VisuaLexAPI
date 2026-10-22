@@ -83,35 +83,36 @@ export function MobileDeliberationSheet({
           role="dialog"
           aria-modal="true"
           aria-label="Dibattito sul grafo"
-          className="fixed inset-x-0 bottom-0 z-50 flex h-[55vh] flex-col rounded-t-2xl border-t border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900"
+          className="fixed inset-x-0 bottom-0 z-50 flex h-[55vh] flex-col rounded-t-2xl border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] shadow-lg dark:border-slate-700 dark:bg-slate-900"
         >
-          <div className="relative flex shrink-0 items-center justify-center px-3 pt-2 pb-1">
+          <div className="relative flex min-h-11 shrink-0 items-center justify-center px-3">
             <span className="h-1 w-10 rounded-full bg-slate-300 dark:bg-slate-600" aria-hidden="true" />
             <button
               ref={closeButtonRef}
               type="button"
               aria-label="Chiudi"
               onClick={() => setOpen(false)}
-              className="absolute right-2 top-1.5 rounded p-1 text-slate-400 transition-colors hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:text-slate-200"
+              className="absolute right-1 top-0 inline-grid h-11 w-11 place-items-center rounded-lg text-slate-500 transition-colors hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:text-slate-200"
             >
-              <X size={16} />
+              <X size={16} aria-hidden />
             </button>
           </div>
           <div className="flex min-h-0 flex-1 flex-col">{children}</div>
         </div>
       </>
     ) : (
+      // At the window's foot, over the iPhone's home bar (S7b): never at mid-screen.
       <button
         type="button"
         onClick={handleOpen}
-        className="fixed bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full bg-primary-600 px-4 py-2.5 text-sm font-medium text-white shadow-lg transition-colors hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+        className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-1/2 z-40 flex min-h-[44px] -translate-x-1/2 items-center gap-2 rounded-full bg-primary-600 px-5 text-sm font-medium text-white shadow-lg transition-colors hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
       >
         <MessageSquare size={16} aria-hidden="true" />
         Dibattito
         {(badge || pillBadge) && (
           <span className="relative flex h-2 w-2">
             <span
-              className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/80"
+              className="absolute inline-flex h-full w-full animate-ping rounded-full motion-reduce:animate-none bg-white/80"
               aria-hidden="true"
             />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-white" aria-hidden="true" />

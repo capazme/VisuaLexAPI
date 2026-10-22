@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Loader2, Lock, MessageSquare, Send, X } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
+import { FIELD_TEXT } from '../../../../constants/interactions';
 import type { QaMode } from '../../qa/types';
 
 /**
@@ -65,8 +66,8 @@ export function AskGraphField({
 
   if (disabled) {
     return (
-      <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400">
-        <Lock size={14} className="shrink-0" />
+      <div className="flex min-h-[44px] items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400">
+        <Lock size={14} aria-hidden className="shrink-0" />
         <span>Per chiedere al grafo serve il consenso base.</span>
       </div>
     );
@@ -76,13 +77,13 @@ export function AskGraphField({
     <div className="rounded-lg border border-slate-200 bg-white shadow-sm focus-within:ring-2 focus-within:ring-primary-500 dark:border-slate-700 dark:bg-slate-900">
       {hasContext && (
         <div className="flex flex-wrap items-center gap-1 border-b border-slate-100 px-2 py-1.5 dark:border-slate-800">
-          <span className="mr-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">
+          <span className="mr-0.5 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">
             Contesto
           </span>
           {contextItems.map((item) => (
             <span
               key={item.id}
-              className="inline-flex max-w-[10rem] items-center gap-1 rounded-full bg-primary-50 px-2 py-0.5 text-[11px] font-medium text-primary-700 dark:bg-primary-950/40 dark:text-primary-300"
+              className="inline-flex max-w-[10rem] items-center gap-1 rounded-full bg-primary-50 px-2 py-0.5 text-xs font-medium text-primary-700 dark:bg-primary-950/40 dark:text-primary-300"
             >
               <span className="truncate" title={item.label}>
                 {item.label}
@@ -102,8 +103,9 @@ export function AskGraphField({
           ))}
         </div>
       )}
-      <div className="flex items-center gap-2 px-2 py-1.5">
-        <MessageSquare size={16} className="shrink-0 text-primary-500" aria-hidden="true" />
+      {/* One row 44 px tall, its controls as tall as it (S7b): the field, the mode, the button. */}
+      <div className="flex min-h-[44px] items-stretch gap-2 pl-2">
+        <MessageSquare size={16} className="shrink-0 self-center text-primary-500" aria-hidden="true" />
         <input
           type="text"
           value={value}
@@ -116,12 +118,12 @@ export function AskGraphField({
           }}
           placeholder={placeholder}
           aria-label="Chiedi al grafo"
-          className="min-w-0 flex-1 bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none dark:text-white"
+          className={cn('min-h-[44px] min-w-0 flex-1 bg-transparent text-slate-900 placeholder:text-slate-500 focus:outline-none dark:text-white dark:placeholder:text-slate-400', FIELD_TEXT)}
         />
         <div
           role="radiogroup"
           aria-label="Modalità di risposta"
-          className="hidden shrink-0 rounded-md border border-slate-200 p-0.5 text-[11px] dark:border-slate-700 sm:inline-flex"
+          className="hidden shrink-0 border-x border-slate-200 text-xs dark:border-slate-700 sm:inline-flex"
         >
           {(['convergent', 'divergent'] as const).map((m) => (
             <button
@@ -131,10 +133,10 @@ export function AskGraphField({
               aria-checked={mode === m}
               onClick={() => setMode(m)}
               className={cn(
-                'rounded px-2 py-0.5 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+                'min-h-[44px] min-w-[44px] px-2.5 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500',
                 mode === m
                   ? 'bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300'
-                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300',
+                  : 'text-slate-600 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200',
               )}
             >
               {m === 'convergent' ? 'Sintesi' : 'Tesi'}
@@ -147,7 +149,7 @@ export function AskGraphField({
           disabled={!value.trim() || busy}
           aria-label="Chiedi al grafo"
           title={busy ? 'Attendi la deliberazione in corso…' : undefined}
-          className="inline-flex shrink-0 items-center gap-1 rounded-md bg-primary-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-primary-700 disabled:bg-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:disabled:bg-slate-700 dark:focus-visible:ring-offset-slate-900"
+          className="inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-r-[7px] bg-primary-600 px-3 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:bg-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:disabled:bg-slate-700 dark:focus-visible:ring-offset-slate-900"
         >
           {busy ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} Chiedi
         </button>

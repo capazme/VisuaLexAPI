@@ -58,7 +58,7 @@ export function RelationEndpointPicker({
           <span className="min-w-0">
             <span className="block truncate">{value.label}</span>
             {value.label !== value.id && (
-              <span className="block truncate font-mono text-[11px] opacity-80">{value.id}</span>
+              <span className="block truncate font-mono text-xs opacity-80">{value.id}</span>
             )}
           </span>
         </span>

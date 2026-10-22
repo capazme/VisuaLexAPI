@@ -255,8 +255,9 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
             {formatNormaMeta(act.norma, act.articles.length)}
           </p>
         </div>
-        {/* `mt-1` on a phone: «⋯» level with the title's 44 px line, not with the column's top. */}
-        <div className="ml-auto mt-1 flex flex-shrink-0 items-center gap-1 md:mt-0">
+        {/* `mt-1` on a phone: «⋯» level with the title's 44 px line, not with the column's top; `-mr-3`: its 44 px reach
+            into the page's margin, as every icon on the column's right edge (R3b). */}
+        <div className="-mr-3 ml-auto mt-1 flex flex-shrink-0 items-center gap-1 md:mr-0 md:mt-0">
           {/* The tools on a computer; on a phone they are entries of «⋯» (below), not drawn at all. */}
           {isDesktop && <div className="flex items-center gap-1">
             <button
@@ -276,8 +277,9 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
                   type="button"
                   onClick={toggleStructure}
                   aria-label="Struttura della norma"
-                  aria-pressed={isStructureWindowOpen}
-                  className={cn(TOOL_BUTTON, 'practice-act-structure aria-pressed:bg-slate-200/70 aria-pressed:text-slate-900 dark:aria-pressed:bg-slate-800 dark:aria-pressed:text-white')}
+                  // It opens a window (the index): expanded, not pressed (R3b).
+                  aria-expanded={isStructureWindowOpen}
+                  className={cn(TOOL_BUTTON, 'practice-act-structure aria-expanded:bg-slate-200/70 aria-expanded:text-slate-900 dark:aria-expanded:bg-slate-800 dark:aria-expanded:text-white')}
                 >
                   <GitBranch size={16} aria-hidden />
                   <span className="hidden lg:inline">{treeLoading ? 'Carico…' : 'Struttura'}</span>

@@ -100,6 +100,16 @@ describe('PracticePhoneView (spec §8, P3)', () => {
     expect(s().practiceNotice).toBe(notice);
   });
 
+  it('sits at the layout\'s edge, no step of its own, and writes a short name whole (R3b)', () => {
+    s().createPractice('c.c.');
+    const { container } = render(view());
+    // The column and the head add no side padding: the text starts 16 px from the screen's edges.
+    expect(container.querySelector('.space-y-4')!.className).not.toMatch(/\bpx-/);
+    expect(screen.getByRole('heading', { level: 2 }).parentElement!.parentElement!.className).not.toMatch(/\bpx-/);
+    // `-ml-1` and a cap of 100 % cut «c.c.» to «c…» beside free room: the cap gives the margin back.
+    expect(screen.getByTitle('Elenco delle pratiche')).toHaveClass('-ml-1', 'max-w-[calc(100%+0.25rem)]');
+  });
+
   it('the header\'s controls are 44 px targets: the name, «Salva come dossier» and «⋯»', () => {
     s().createPractice('Prima');
     render(view());
