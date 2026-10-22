@@ -50,8 +50,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   403, and when `/auth/me` failed (`validator` null, never taken for «not a validator») it reads and the server decides),
   `/history`, `/forum` («Dossier pubblici»; `/environments`, the page «Ambienti» was, redirects there keeping an old
   share link's `?import=`), `/forum/community` («Community», `ForumCommunityPage`: an honest placeholder — titled
-  «Community» under the Forum's phrase (L-37), «Domande e discussioni tra colleghi, in arrivo», a link to `/forum`; no sample posts, no counts, no
-  server route), `/documents`, `/collega-app` («Collega un'app AI»,
+  «Community» under the Forum's phrase (L-37), an empty state composed for the page, «Le discussioni arrivano presto»
+  with «Esplora i dossier pubblici», see `features/bulletin/` below; no sample posts, no counts, no server route), `/documents`, `/collega-app` («Collega un'app AI»,
   `features/connections/ConnectAiAppPage`: the MCP address from `GET /api/oauth/connection` with
   «Copia», one card per client that connects today — `aiClients.ts`, the survey of 13 Oct 2026, with
   the clients our server refuses listed apart and why —, the personal-data notice (what a connected app reads: dossier
@@ -94,20 +94,23 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   downwards and the tabs never move, and the colophon is centred against the card (text left-aligned; on a
   phone centred above it), so it follows half of such a growth; its title is 48 px up to `lg` and 68 px from it
   (between 768 and 1023 px the column beside the card is about 200 px).
-  **The wordmark** (A2, `SegmentWordmark` over the pure `segments.ts`; inspired by Animorio's «logo dai sette segmenti»,
-  written from scratch with SVG, an SVG filter and Framer Motion): once per opening, «VISUALEX» on eight seven-segment
-  cells slanted by 7° (V with its two lower strokes converging to the bottom's middle and no bottom bar — a narrow U
-  read «11» beside the I —, X an H) lights up in steps, each cell through one wrong drawing to its letter
-  (0.9 s), holds (0.4 s), and melts into the real wordmark — the segments round and join (`feGaussianBlur` cut by
-  `feColorMatrix`, the blur back to 0 before the filter goes), the Newsreader copy takes its weight from 300, the slant
-  goes back to nothing (0.8 s) —, then the open book fades in (2.1 s and the book's 0.3 s in all). The `h1` is
-  «VisuaLex» throughout (the display and the melting copy `aria-hidden`), its box is the real wordmark's from the first
-  frame, nothing takes the focus; a click on it plays it again once it has ended; under reduced motion it only fades
-  in. Measured at 60 fps in Chromium at every width (not
-  on a phone). The weight comes by two copies cross-faded (300, then the wordmark's own, `weightClass`), never a weight
-  animated; on WebKit (`isWebKit` in `segments.ts`: Safari on a Mac, every browser on an iPhone or an iPad — Chrome,
-  Firefox and Edge there are WebKit too —, an iPad with a Mac's user agent and touch points) the filter is left out and
-  the melt is the cross-fade alone, the brief's fallback. The register form fits a window 768 px high
+  **The wordmark** (A3, replacing A2's seven-segment display; inspired by a signature written with a pen, written
+  from scratch in CSS, `index.css`'s `vlx-ink-*`): one face, one ink, once per opening, about 1.3 s. The book traces
+  itself (`BookMark` with `vlx-ink-book`, 450 ms); a faint, blurred copy of «VisuaLex» comes out from under a mask whose
+  soft edge (12 %) is the pen's tip — `--vlx-ink-edge`, an `@property` percentage, 250–950 ms — and the word itself
+  follows it 100 ms behind under its own (350–1050 ms), so each letter is faint and soft before it is sharp; the copy
+  fades as the ink ends, and the line under it rises 4 px into view (200 ms). The waits are inside the keyframes, not
+  delays. The word is one text throughout, the copy stacked on it in one grid cell (`aria-hidden`, not selectable):
+  never split into letters, which lose their kerning on WebKit and settled 1–3 px when joined again. On the ink's
+  `animationend`, or its `animationcancel` (listened to on the element, React has none: reduced motion turned on
+  halfway), the copy and the mask go, so the finished page is the page without the animation (the text's box
+  measured identical at every moment). On WebKit for iOS (`inkMark.ts`, `isIOSWebKit`: an iPhone, an iPod, an iPad,
+  an iPad with a Mac's user agent and touch points) the word only fades in from the left, no mask, no blur — the
+  brief's fallback for a mask that stutters. The animations sit inside `prefers-reduced-motion: no-preference` (as
+  `vlx-book-draw` does): the global reduced-motion rule cuts durations, not delays, and a delayed `backwards` would
+  have hidden the line for a second; under reduced motion nothing is written and the colophon fades in through that
+  rule's 150 ms opacity transition. Measured in Chromium only (headless, at 1920 and 390, the iOS path by its user
+  agent): not on Safari nor on a phone. The register form fits a window 768 px high
   inside (1366×768, 1470×753 measured as viewports; a 768 px screen with a browser's bars scrolls a little) by
   its spacing (`space-y-4` between fields, `space-y-1.5` inside one), the sign-in form spaced the same. While a sign-in or a
   sign-up is on its way the tabs hold still (`aria-disabled`): its answer would land on the hidden form. A
@@ -226,8 +229,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   It draws the dossier list, «Dossier pubblici», Community, Gymnasium (every view but the lesson, through
   `StudiaPage`), Opus's planner (`OpusPage`, its views the frame's width), «Analizza documento», «Collega un'app AI» (its body keeps a column of 768 px: it reads as text, the
   title does not move), the Cronologia and the MERL-T hub; «Cestino» and the MERL-T pages under a way back
-  («Torna ai Dossier», «MERL-T») write their `h1` with `PAGE_TITLE`. A dossier's own page (its name, its star and
-  its actions), Impostazioni (a dialog, not a page), the Scrivania, the lesson, the reader and the practice, the
+  («Torna ai Dossier», «MERL-T») write their `h1` with `PAGE_TITLE`. A dossier's own page is in the frame since S7c
+  (`DossierDetailView`: its name the title, under «Torna ai Dossier»; see «Dossier»). Impostazioni (a dialog, not a page), the Scrivania, the lesson, the reader and the practice, the
   login stay out; «Crediti», public and outside the layout, is in the frame since M1 (the column's width and padding, the
   text in its 672 px column). On a phone `actionBeside` keeps icon-only actions on the title's row (the dossier list's
   «⋯» and «+»). `PageFrame.test.tsx` reads the section pages' files
@@ -504,6 +507,17 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   box of no height and keeps its parent's `gap`: it goes in a plain wrapper with what it opens under. Under reduced motion it opens and closes at once —
   the content is kept at full opacity, or the global rule's 150 ms (after the delay) would fade it in late. The
   trigger is the caller's (`aria-expanded`, `aria-controls`). «Oggi»'s study settings (`StudySettingsPanel`) use it.
+  `SegmentedTabs` and `SegmentedTabPanel` («linguette che scorrono», U1; first on the Forum's three tabs and its
+  suggestions' «Ricevuti · Inviati», S7a) are a
+  `tablist` over one `tabpanel`: the chosen tab's mark slides on `spring.snappy` (a `layoutId` in the row's own
+  `LayoutGroup`, still on the first drawing), the content comes in over 160 ms with a 12 px shift the way the mark
+  moved (to a tab further right, the content moves right too: U1's words), in CSS (`animate-in`, fill backwards —
+  Framer's fade ended by writing the opacity, one frame at 0 and, under reduced motion, a second fade from the global
+  150 ms opacity transition of `index.css`), the panel clipping the shift 8 px out at the sides; under reduced motion
+  the mark is drawn in place and the content changes at once (that sheet makes every animation instant); the arrows,
+  Home and End move the choice and the focus (not with Alt, Cmd or Ctrl). The older
+  `SegmentedControl` (a choice in a form: the card's kind, a relation's end) slides a pill too, without the keyboard,
+  reduced motion or a row's own `LayoutGroup`: U1 folds it in.
   `Modal` is portaled to `document.body`, so a dialog opened inside a reading window
   (transformed, stacked) is not confined to it; each open `Modal` and `WireConfirm` is on a module-level
   stack (`ui/dialogStack.ts`) and only the top-most handles Tab (its focus trap, on `document`) and Esc, so a dialog opened
@@ -1628,8 +1642,20 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   and each new annex or search blanked it while it was read. Acts reorder by drag:
   `setDossierItemOrder` saves the whole order and waits, never sending a
   temporary id, while an added item is pending
-  (`pendingDossierOrders`). Articles do not drag. The header has three actions
-  and a «⋯» (`ui/MenuButton`); «Seleziona elementi» lives there.
+  (`pendingDossierOrders`). Articles do not drag. **The page is in the planner's shape** (S7c, `dossierStyles.ts`):
+  in the sections' frame (`PageFrame`, under one 44 px «Torna ai Dossier»), the dossier's name the `h1` in the reader's
+  serif with no icon, wrapping at the column's width, its section's phrase over it (`kicker`: Gymnasium for a dossier
+  di studio, else Opus), the description under it; then the tags, one line of the facts («Tra i preferiti · Dossier di
+  lavoro · creato il … · 2 atti · 6 articoli · 3 note · 2 sentenze», `countsLine`/`countsParts` in `dossierLayout.ts`,
+  which the list's card says alike) and the header's actions in one row (D3) under the title at every width — beside it,
+  a long name was squeezed into a narrow column, and before S7c pushed the actions off the page at 1366 px: «Apri
+  tutto su Dashboard», «Aggiungi», «Esporta», the Forum's and «⋯» (`ui/MenuButton`; «Seleziona elementi» lives
+  there). Every control is 44 px at every width, as the planner's (the search is the planner's `FIELD`); the act
+  blocks, the free notes and «Giurisprudenza» are tiles (`SECTION_TILE`, no shadow) headed in the reader's serif, no
+  small capitals, and their entries rows of two levels, as the planner's tasks (`ROW`, a rule under each): a title
+  (15 px), a grey line (13 px: an article's rubric, else «Aggiunto il …», nothing when neither is known; a note's date
+  and who wrote it, under its words; a decision's «Aggiunta il …»), the signs, then the star and the removal (44 px,
+  always there) at the right; no hand-written blue.
 - **Notes**: every note a dossier gets from the web takes the notes route
   (`addNoteToDossier` → `POST /dossiers/:id/notes`), the one Claude's notes take
   through MCP. A note about an article (`aboutItemId`) sits with it: a count on
@@ -1773,7 +1799,7 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   `DossierModal` is create-only.
 - **Rows** (`DossierArticleRow`): the expand toggle lives on a header-scoped
   sub-div, never wrapping the reader or the action buttons (see gotcha 22); the
-  star keeps a 44px touch target. The accessible name carries the server's
+  star and the removal are 44 px at every width (S7c). The accessible name carries the server's
   `citation`, so two laws' art. 3 never read alike.
 - **Versions**: an item keeps the version it was added with (`versione`,
   `data_versione`), whichever button added it (`normaForDossier` for the window
@@ -2143,15 +2169,17 @@ re-applying a saturated background behind the text.
 **Mobile-first** — interactive controls keep a 44px touch target on mobile.
 `TOUCH_TARGET_RESPONSIVE` in `constants/interactions.ts` covers the height only
 (`min-h-[44px] md:min-h-0`); icon-only buttons need the width too, so they carry
-`min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0` explicitly — as the dossier
-row's star and remove buttons do. A text field or a select is at least 16 px below
+`min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0` explicitly. The pages in the
+planner's shape keep 44 px at every width instead: the planner, and the dossier's
+page since S7c (`dossierStyles.ts`: `ROW_ICON` for a row's star and removal). A text field or a select is at least 16 px below
 `md` (`FIELD_TEXT`, `text-[length:max(1rem,16px)] md:text-sm`, in `constants/interactions.ts`):
 Safari on an iPhone zooms the page into a field under 16 px as it takes the focus, and
 `text-base` is not enough — the text size «piccolo» makes 1 rem 14 px. `ui/Input` and
-`ui/FormSelect` carry it, and so do the searches of «Le mie schede» and of the Cronologia
+`ui/FormSelect` carry it, and so do the searches of «Le mie schede» and of the Cronologia, the
+planner's `FIELD` (its tasks' fields, the dossier's search since S7c)
 (`ui/__tests__/fieldText.test.tsx`), the search page's field and the palette's fields (its box
 is `max(1.125rem,16px)`); about sixty fields written by hand do not yet (the find
-window, the dossier's search, the index filter, the case-law filters, the dossier pickers,
+window, the index filter, the case-law filters, the dossier pickers,
 the notes): a field written by hand takes it, and a `text-*` class after it in `cn` undoes it.
 
 ## Common Patterns
@@ -2180,9 +2208,13 @@ meant to stay split; add new features as new files, not inside the shells:
   `i`; the search, then two menus — the order and «Filtra per categoria», one
   category at a time, «Tutte le categorie» first («Tutte» on a phone, by `useIsDesktop`), the categories of the section's dossiers, absent when
   there are none — on one row on a computer, half and half under the search on
-  a phone; on a phone the title keeps its row with «⋯» — «Importa da file JSON», «Cestino (n)» — and «+», M1), `DossierDetailView.tsx` (sections and header), `DossierActBlock.tsx`
+  a phone; on a phone the title keeps its row with «⋯» — «Importa da file JSON», «Cestino (n)» — and «+», M1; the cards since S7c: a Newsreader title, the
+  counts in one line from `countsParts`, «Creato il …», the quick open and «⋯»
+  always there at 44 px; with no dossier, a composed empty state with
+  `DossierMark.tsx`), `DossierDetailView.tsx` (sections and header), `DossierActBlock.tsx`
   (an act and its rows), `DossierArticleRow.tsx` (row + star + expand),
-  `DossierNotesSection.tsx`, `DossierItemReader.tsx` (in-place article),
+  `DossierNotesSection.tsx`, `DossierDecisionsSection.tsx`, `dossierStyles.ts`
+  (the page's tokens, in the planner's measures), `DossierItemReader.tsx` (in-place article),
   `AddToDossierPopover.tsx`, one file per modal, shared helpers in
   `dossierUtils.ts`, `dossierLayout.ts`, `dossierPdf.ts`, `pdfExcerpts.ts`, `dossierPdfMarks.ts`, `DossierPdfDialog.tsx`, `useActDetails.ts`.
 - `features/bulletin/` — the Forum. Its area «Dossier pubblici»: «I dossier di studio pubblicati dalla comunità» (spec
@@ -2190,8 +2222,12 @@ meant to stay split; add new features as new files, not inside the shells:
   component names stay `bulletin` and `SharedEnvironment*` because they match the backend model; the route is
   `/forum`, the page's `h1` «Dossier pubblici», and what leaves it says so («Ritira dai dossier pubblici», toast
   «Dossier ritirato»; in the dossier's header «Copia pubblicata ritirata»), never «dal Forum»: the Forum is the section, which also holds «Community»
-  (`ForumCommunityPage`, `/forum/community`, a placeholder). `BulletinBoardPage.tsx` is a shell over three dumb views, the tabs «Esplora · I miei pubblicati ·
-  Suggerimenti» (`ForumExploreView`, `ForumMyEnvironmentsView`, `ForumSuggestionsView`); Explore's filters are one row
+  (`ForumCommunityPage`, `/forum/community`, a placeholder: an empty state composed for the page, S7a — centred in the
+  column, `CommunityMark`, line art in the manner of the section's mark in the Forum's hue, «Le discussioni arrivano
+  presto», two lines on what it will be, and «Esplora i dossier pubblici», a link drawn as the one button). `BulletinBoardPage.tsx` is a shell over three dumb views, the tabs «Esplora · I miei pubblicati ·
+  Suggerimenti» (`ForumTabs`, drawn by `ui/SegmentedTabs`: short labels «Esplora · Miei · Suggeriti» sharing the row in
+  equal parts below `sm`, whole from it — at 320 px the last was cut, S7a; the views, `ForumExploreView`,
+  `ForumMyEnvironmentsView`, `ForumSuggestionsView`, in its `SegmentedTabPanel`, their order in `forumSections.ts`); the titles of «Dossier pubblici» and «Community» come from `features/sections/pageNames.ts`; Explore's filters are one row
   from `sm` and, on a phone, the search across with the category («Tutte»), the order and the 44 px refresh under it, M1. «Pubblica un dossier»
   is `PublishDossierPicker` (the user's dossiers not yet in the Forum, then the dossier's own
   `PublishDossierDialog`; the Forum never publishes a workspace); «Modifica» on a published dossier
@@ -2203,10 +2239,28 @@ meant to stay split; add new features as new files, not inside the shells:
   of the archive (`ArchivedEnvironmentsSection` under «I miei pubblicati»: «Ambienti salvati (archivio)», «Recupera
   i dossier» through `POST /environments/:id/recover`, «Esporta JSON», «Elimina»; absent for a user with none; no
   environment is created any more) and an old share link (`SharedLinkImport`, reading `?import=`, through `POST
-  /dossiers/import-study`, quick norms and aliases left out). «Dossier di studio pronti» (`StudyPacksBand`, over
-  `utils/studyPacks.ts`: the 20 packs of `data/exampleEnvironments.ts`, each a pack's dossiers plus «‹pack›:
-  articoli chiave») follows Explore's category and adds a pack through `import-study`; the empty dossier list
-  points to it. One list of categories, `utils/forumCategories.ts`. `EnvironmentContentViewer` (the tree of a
+  /dossiers/import-study`, quick norms and aliases left out). Explore shows **the community's dossiers first** (S7a,
+  the Forum's reason), under a visually hidden `h2` «Dalla comunità»: a grid of `SharedEnvironmentCard`s (`CARD_GRID`,
+  «I miei pubblicati»' too: one column, two from `md`, three from `xl`, a row's cards one height, `h-full`), each an
+  `article` with its title in Newsreader 18 px, a plain line «● Civile · v1 · autore · 2 giorni fa» (the category's hue
+  from its token `--category-*`, never a hand-written colour; one line where the card has room, wrapped between its parts
+  on a narrow one, a long username cut, whole on hover), two tags then «+N», «Mi piace» a heart with its number
+  (`aria-pressed`, named «Mi piace: N»; on a computer 36 px tall) and one action, «Aggiungi ai miei dossier», outlined
+  («Aggiungi» below `sm`, as the packs' cards, its name whole); a withdrawn card is a dashed edge on a quieter paper and
+  the badge, never an opacity (it would trap the «⋯» menu in a stacking context, gotcha 22, and fade the text under AA).
+  Beside the like, small, «aggiunto da 12» (nothing at 0); the views are the author's alone, beside it in «I miei
+  pubblicati» (`showOwnerActions`), never on Explore; where a card is too narrow the action goes under them, whole. «I
+  più aggiunti» is an `h2`, last on the page. Then «Pronti da VisuaLex» (`StudyPacksBand`, over
+  `utils/studyPacks.ts`: the 20 packs of `data/exampleEnvironments.ts`, each a pack's dossiers plus «‹pack›: articoli
+  chiave»): one row of compact cards that scrolls sideways (`#pronti`, `tabIndex 0`, so the keyboard scrolls it past
+  packs already added), every pack in it — on a computer after the grid and its pages; on a phone right after the
+  community's first two dossiers (or their places while a read travels, or the empty state), in a fixed place so it is
+  never mounted again while a new read travels, the rest under a hidden `h2` «Altri dossier della comunità»
+  (`useIsDesktop`, one place or the other); it follows Explore's category and adds a pack through `import-study`; the
+  empty dossier list's «Pronti da VisuaLex» goes to `/forum#pronti`, where Explore, once read, scrolls the content
+  scroller alone to the strip under the phone's bar (`scroll-padding-top`, gotcha 34) and focuses it, once: the fragment
+  then leaves the address (`history.replaceState`, the router's state kept), so another tab and back, or a reload, do not
+  jump again. One list of categories, `utils/forumCategories.ts`. `EnvironmentContentViewer` (the tree of a
   content's dossiers, quick norms, aliases, notes and highlights), `useLeftOutNotice` and `annotationLabels` serve
   the suggestions. The suggestion flow adds `SuggestionReviewDialog`, `EditSuggestionDialog`,
   `SuggestionItemCard` (all five itemTypes), `AliasConflictDialog`,

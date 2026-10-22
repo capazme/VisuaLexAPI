@@ -1,3 +1,4 @@
+import { FIELD_TEXT } from '../../../constants/interactions';
 import { FOCUS_RING } from '../studia/progress/tokens';
 import type { CountdownTone, DayTone } from './taskDates';
 import type { TaskPriority } from '../../../types/tasks';
@@ -7,9 +8,13 @@ import type { TaskPriority } from '../../../types/tasks';
  * every width, no text under 11 px (`plannerStyle.test.ts` reads the files), light and dark.
  */
 
-/** A field; in the dark theme the browser's own parts (a date's calendar, a time's clock, a list) are drawn dark. */
+/**
+ * A field; in the dark theme the browser's own parts (a date's calendar, a time's clock, a list) are drawn dark. Its
+ * text is `FIELD_TEXT`, 16 px at least below `md` whatever the text size: `text-base` is 14 px with «piccolo», and
+ * Safari on an iPhone zooms into it.
+ */
 export const FIELD =
-  `min-h-[44px] w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-900 placeholder:text-slate-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 md:text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400 dark:disabled:bg-slate-800 dark:[color-scheme:dark] ${FOCUS_RING}`;
+  `min-h-[44px] w-full rounded-lg border border-slate-300 bg-white px-3 ${FIELD_TEXT} text-slate-900 placeholder:text-slate-500 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400 dark:disabled:bg-slate-800 dark:[color-scheme:dark] ${FOCUS_RING}`;
 
 export const FIELD_LABEL = 'text-sm font-medium text-slate-800 dark:text-slate-200';
 
