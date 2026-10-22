@@ -110,7 +110,8 @@ export function PracticeRowShell({
           onClick={onRemove}
           aria-label={`Togli dal tavolo ${removeName}`}
           title="Togli dal tavolo"
-          className={cn(ICON_BUTTON, 'md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100')}
+          // On a phone its 44 px reach into the page's margin, as every icon on the column's right edge (R3b).
+          className={cn(ICON_BUTTON, '-mr-3 md:mr-0 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100')}
         >
           <X size={16} aria-hidden />
         </button>

@@ -34,9 +34,10 @@ export function PracticeArticleRow({
   const articleKey = practiceArticleKey(article);
   const rowKey = articleRowKey(practiceId, actId, articleKey);
   const isOpen = useAppStore((s) => s.practiceRows[rowKey] === true);
-  // Among the quick norms (R3b): its toggle is an entry of the reader's «⋯», so the row says it, open or folded.
+  // Among the quick norms (R3b): its toggle is an entry of the reader's «⋯», so the row says it, open or folded, by the
+  // reader's own rule (`isQuickNorm`, so the two never disagree) — for the text in force only: a quick norm opens that one.
   const quickParams = useMemo(() => quickNormParamsOf(article.norma_data), [article.norma_data]);
-  const isQuick = useAppStore((s) => s.quickNorms.length > 0 && s.isQuickNorm(quickParams));
+  const isQuick = useAppStore((s) => s.quickNorms.length > 0 && !historicalItemLabel(article.norma_data) && s.isQuickNorm(quickParams));
   const setRowOpen = useAppStore((s) => s.setRowOpen);
   const removePracticeArticle = useAppStore((s) => s.removePracticeArticle);
   const openBeside = useAppStore((s) => s.openBeside);
@@ -80,7 +81,8 @@ export function PracticeArticleRow({
       rowKey={rowKey}
       isOpen={isOpen}
       onToggle={() => setRowOpen(rowKey, !isOpen)}
-      name={named}
+      // The toggle's name replaces the header's content (a button's children are not read): it carries the sign's words.
+      name={isQuick ? `${named}, tra le norme rapide` : named}
       removeName={named}
       onRemove={() => removePracticeArticle(practiceId, actId, articleKey)}
       beside={beside}
@@ -96,7 +98,7 @@ export function PracticeArticleRow({
             )}
           </span>
           {isQuick && (
-            <span role="img" aria-label="Tra le norme rapide" title="Tra le norme rapide" className="flex-shrink-0 text-amber-600 dark:text-amber-400">
+            <span aria-hidden title="Tra le norme rapide" className="flex-shrink-0 text-amber-600 dark:text-amber-400">
               <Zap size={14} aria-hidden className="fill-current" />
             </span>
           )}

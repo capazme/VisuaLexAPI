@@ -40,6 +40,7 @@ function row(practiceId: string, actId: string, data: ArticleData, extra: Partia
 
 beforeEach(() => {
   readers.length = 0;
+  appStore.setState({ quickNorms: [] });
 });
 
 describe('PracticeArticleRow (spec §3.2)', () => {
@@ -56,7 +57,7 @@ describe('PracticeArticleRow (spec §3.2)', () => {
     const { practiceId, actId } = setUp([CC_2043]);
     appStore.setState({ quickNorms: [] });
     const { rerender } = render(row(practiceId, actId, CC_2043));
-    expect(screen.queryByRole('img', { name: 'Tra le norme rapide' })).toBeNull();
+    expect(screen.queryByTitle('Tra le norme rapide')).toBeNull();
     act(() => {
       appStore.setState({
         quickNorms: [{
@@ -66,8 +67,24 @@ describe('PracticeArticleRow (spec §3.2)', () => {
       });
     });
     rerender(row(practiceId, actId, CC_2043));
-    expect(screen.getByRole('img', { name: 'Tra le norme rapide' })).toBeInTheDocument();
-    appStore.setState({ quickNorms: [] });
+    // Said in the toggle's name (its children are not read), seen as a bolt; the remove button's name unchanged.
+    expect(screen.getByRole('button', { name: /^Espandi art\. 2043 c\.c\., tra le norme rapide$/ })).toBeInTheDocument();
+    expect(screen.getByTitle('Tra le norme rapide')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Togli dal tavolo art\. 2043 c\.c\.$/ })).toBeInTheDocument();
+  });
+
+  it('says nothing of a quick norm on a past text: the quick norm opens the text in force', () => {
+    const { practiceId, actId } = setUp([PAST_5], L24);
+    act(() => {
+      appStore.setState({
+        quickNorms: [{
+          id: 'q2', label: 'art. 5', createdAt: '2026-10-01T00:00:00.000Z', usageCount: 0,
+          searchParams: { act_type: PAST_5.norma_data.tipo_atto, act_number: PAST_5.norma_data.numero_atto || '', date: PAST_5.norma_data.data || '', article: '5', version: 'vigente' },
+        }],
+      });
+    });
+    render(row(practiceId, actId, PAST_5));
+    expect(screen.queryByTitle('Tra le norme rapide')).toBeNull();
   });
 
   it('closed, it mounts no reader; its header opens it, and only the header toggles', () => {

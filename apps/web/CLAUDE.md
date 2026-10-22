@@ -2132,7 +2132,8 @@ not a ref object, and pass it at render time (gotcha 13).
 **Toggle buttons** — drive the visual from an `isPressed` selector, not a fixed
 colour: idle `text-slate-400` + hover accent, active `bg-{accent}-50
 text-{accent}` (plus `fill-` when the icon has a body). Toast wording must match
-the action actually taken. Always set `aria-pressed`.
+the action actually taken. Always set `aria-pressed` — except on a button that opens a window or a panel, which says
+`aria-expanded` instead (the act's «Struttura della norma», R3b).
 
 **Two flavours of pop-up** — *Peek* (header, scrollable body, composer; ~360px,
 page-themed) when the surface lists or edits content; *action bar* (thin dark
@@ -2303,7 +2304,11 @@ meant to stay split; add new features as new files, not inside the shells:
   tap lists the practices with «Nuova pratica»; R3 took the carousel's chevrons and dots away —, the count after it,
   which gives way first, «Salva come dossier» as a 44 px icon and its «⋯» (`usePracticeSaveActions`); with all of R3
   the text of «art. 1453 c.c.», one article of an act whose title takes one line, starts 251 px under the bar at the
-  top at 390 and 360 px (each more line of title or meta, about 25 px more),
+  top at 390 and 360 px (each more line of title or meta, about 25 px more); R3b: below `md` neither `ReaderLayout`, the
+  column, a row nor the text root steps in — the layout's 16 px are the edge, the text runs from 16 to 16 —, the icons
+  on the column's right edge reach 12 px into that margin (`-mr-3`: the row's ✕, the act's and the head's «⋯», the
+  reading bar's tools, so the status keeps one line at 320 px), and a row shows a bolt when its article is among the
+  quick norms, said in its toggle's name,
   over the same column; while `phoneReader` is set it draws `ReadingFullScreen` in the column's place
   — the column is not kept mounted under it, gotcha 26 — and gives the column back at the scroll
   position of the page's content scroller it left, asked for again while the remounted column grows

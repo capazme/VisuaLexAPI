@@ -178,6 +178,8 @@ function PhonePracticeHead({ practice, save, onList }: { practice: Practice; sav
         <FolderPlus size={18} aria-hidden />
       </button>
       <MenuButton
+        // Its 44 px reach into the page's margin, as every icon on the column's right edge (R3b).
+        className="-mr-3"
         label={`Altre azioni per la pratica ${practice.label}`}
         triggerClassName="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
         items={save.items}

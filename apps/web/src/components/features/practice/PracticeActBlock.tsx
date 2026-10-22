@@ -255,8 +255,9 @@ export function PracticeActBlock({ practiceId, act, onViewPdf, onCrossReference 
             {formatNormaMeta(act.norma, act.articles.length)}
           </p>
         </div>
-        {/* `mt-1` on a phone: «⋯» level with the title's 44 px line, not with the column's top. */}
-        <div className="ml-auto mt-1 flex flex-shrink-0 items-center gap-1 md:mt-0">
+        {/* `mt-1` on a phone: «⋯» level with the title's 44 px line, not with the column's top; `-mr-3`: its 44 px reach
+            into the page's margin, as every icon on the column's right edge (R3b). */}
+        <div className="-mr-3 ml-auto mt-1 flex flex-shrink-0 items-center gap-1 md:mr-0 md:mt-0">
           {/* The tools on a computer; on a phone they are entries of «⋯» (below), not drawn at all. */}
           {isDesktop && <div className="flex items-center gap-1">
             <button
