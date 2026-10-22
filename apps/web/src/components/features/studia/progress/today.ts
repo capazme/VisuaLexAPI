@@ -2,7 +2,7 @@ import type { ConteggiStati, Materia, Progressi, TappaIstituto } from '../../../
 import { MATERIA_LABEL } from '../studiaLabels';
 import { addDays, formatCount, formatDayLong } from './layout';
 
-/** «Oggi»'s pure decisions (Gymnasium spec §5.1, §5.2): what the action card says, and the road's order; and what the lesson's end offers (§5.4). */
+/** «Oggi»'s pure decisions (Gymnasium spec §5.1, §5.2): what the day block says, and the subjects' order; and what the lesson's end offers (§5.4). */
 
 type Stop = Progressi['materie'][number];
 
@@ -53,19 +53,6 @@ export function instituteSessionPath(materia: Materia, istituto: string): string
 }
 
 /**
- * The next day with cards, from the coming days the server sent (today first): «domani», «martedì 21
- * ottobre», or null when none is due in the fortnight. `prossimi` counts the cards already studied: new
- * cards still waiting (today's quota of them used up) come tomorrow. The web formats the server's days,
- * never computes one.
- */
-export function nextDueDay(data: Progressi): string | null {
-  if (data.stati.nuove > 0) return 'domani';
-  const next = data.prossimi.find((day) => day.giorno > data.oggi.giorno && day.schede > 0);
-  if (!next) return null;
-  return next.giorno === addDays(data.oggi.giorno, 1) ? 'domani' : formatDayLong(next.giorno);
-}
-
-/**
  * What the card shows: the first read travelling or failed, no card at all yet, done for today, or cards
  * to review. Narrowed to a subject, no card is «done» in that subject, never «no card at all».
  */
@@ -95,4 +82,51 @@ export function cardsLeft(data: Progressi): number {
 export function instituteCardsLeft(stops: readonly TappaIstituto[], materia: Materia, istituto: string, subject: Progressi): number {
   const stop = stops.find((s) => s.materia === materia && s.istituto === istituto);
   return stop ? stop.dovute + Math.min(stop.nuove, subject.oggi.nuove) : 0;
+}
+
+/** «12 da ripassare, 8 nuove», the day block's large line (G8); a part that is zero is left out. */
+export function todaySentence(data: Progressi): string {
+  return [
+    data.oggi.dovute > 0 ? `${formatCount(data.oggi.dovute)} da ripassare` : null,
+    data.oggi.nuove > 0 ? count(data.oggi.nuove, 'nuova', 'nuove') : null,
+  ]
+    .filter(Boolean)
+    .join(', ');
+}
+
+/**
+ * The subjects today's cards come from (G8, the line under the day block's sentence): those with cards due, the most
+ * first, from the road's read by institute; then, when today still allows new cards, those that hold some. Null while
+ * the road's read has not answered: the line waits for it rather than name a part. Never a guess at which new card
+ * the server will pick: a subject with new cards is one they may come from.
+ */
+export function todaySubjects(materie: Progressi['materie'], stops: readonly TappaIstituto[] | null, newToday: number): Materia[] | null {
+  if (stops === null) return null;
+  const due = dueBySubject(stops);
+  const byDue = [...due].filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1] || MATERIA_LABEL[a[0]].localeCompare(MATERIA_LABEL[b[0]], 'it')).map(([materia]) => materia);
+  const withNew = newToday > 0 ? orderStops(materie).filter((stop) => stop.nuove > 0 && !byDue.includes(stop.materia)).map((stop) => stop.materia) : [];
+  return [...byDue, ...withNew];
+}
+
+/** «Diritto civile», «Diritto civile e Diritto penale», «Diritto civile, Diritto penale e altre 2»: two names at most. */
+export function subjectsPhrase(subjects: readonly Materia[]): string | null {
+  const names = subjects.map((materia) => MATERIA_LABEL[materia]);
+  if (names.length === 0) return null;
+  if (names.length <= 2) return names.join(' e ');
+  const rest = names.length - 2;
+  return `${names[0]}, ${names[1]} e ${rest === 1 ? 'un’altra' : `altre ${rest}`}`;
+}
+
+/**
+ * What the day block says under «Hai finito per oggi.» (G8): «Domani: 9 da ripassare», the next day with cards by name
+ * further on, «domani» with no count while new cards wait (`prossimi` counts only cards already studied), or none in
+ * the fortnight. The server's days, formatted; never one computed here.
+ */
+export function nextDayLine(data: Progressi): string {
+  const tomorrow = addDays(data.oggi.giorno, 1);
+  const next = data.prossimi.find((day) => day.giorno > data.oggi.giorno && day.schede > 0);
+  if (next && next.giorno === tomorrow) return `Domani: ${formatCount(next.schede)} da ripassare.`;
+  if (data.stati.nuove > 0) return 'Domani: altre schede nuove da imparare.';
+  if (next) return `Le prossime: ${formatDayLong(next.giorno)}, ${formatCount(next.schede)} da ripassare.`;
+  return 'Nessuna scheda in programma nei prossimi 14 giorni.';
 }

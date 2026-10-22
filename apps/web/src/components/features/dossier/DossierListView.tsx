@@ -35,6 +35,7 @@ import { actsSummary, layoutDossier } from './dossierLayout';
 import { deleteDossierWithUndo } from './deleteDossierWithUndo';
 import { hasTagCategory, tagCategories, tagLabel } from '../../../utils/tagLabel';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
+import { DOSSIER_PAGE } from '../../../features/sections/pageNames';
 import { PageFrame } from '../../layout/PageFrame';
 
 type ToastType = 'success' | 'error' | 'info' | 'warning';
@@ -248,7 +249,10 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
 
   return (
     <PageFrame
-      title={sectionKind ? `I tuoi ${kindLabel(sectionKind).toLowerCase()}` : 'I tuoi Dossier'}
+      // The page's name (L-37), its section's phrase over it: the kind listed is the section's, Gymnasium's study
+      // dossiers, Opus's work ones (every dossier with Gymnasium off).
+      title={DOSSIER_PAGE}
+      kicker={sectionKind === 'studio' ? 'gymnasium' : 'opus'}
       // The same element from one kind to the other: the switcher's focus lands on it for Opus and for Gymnasium.
       section={sectionKind === 'studio' ? 'gymnasium' : 'opus'}
       className="animate-in fade-in duration-200"

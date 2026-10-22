@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom';
-import { FolderOpen, MessagesSquare } from 'lucide-react';
-import { SECTION_TITLES } from '../../../features/sections/sections';
+import { FolderOpen } from 'lucide-react';
 import { PageFrame } from '../../layout/PageFrame';
 
 /**
@@ -11,13 +10,10 @@ import { PageFrame } from '../../layout/PageFrame';
  */
 export function ForumCommunityPage() {
   return (
-    <PageFrame title={SECTION_TITLES.forum}>
-      <section aria-labelledby="forum-community-heading" className="max-w-prose">
-        <h2 id="forum-community-heading" className="flex items-center gap-2 text-xl font-semibold text-slate-900 dark:text-slate-50">
-          <MessagesSquare size={22} aria-hidden className="shrink-0 text-primary-600 dark:text-primary-400" />
-          Community
-        </h2>
-        <p className="mt-2 text-slate-700 dark:text-slate-300">Domande e discussioni tra colleghi, in arrivo.</p>
+    <PageFrame title="Community" kicker="forum">
+      {/* The title names the page (L-37): no second «Community» under it. */}
+      <section className="max-w-prose">
+        <p className="text-slate-700 dark:text-slate-300">Domande e discussioni tra colleghi, in arrivo.</p>
         <p className="mt-1 text-slate-600 dark:text-slate-400">Per ora il Forum raccoglie i dossier pubblicati dalla comunità.</p>
         <Link
           to="/forum"

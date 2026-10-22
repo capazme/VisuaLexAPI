@@ -7,6 +7,8 @@ const TONE: Record<VersionChip['tone'], string> = {
     historical: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
     abrogated: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',
     not_yet: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200',
+    // The text in force today, which a later text will change: informing, as the banner beside the text.
+    upcoming: 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200',
 };
 
 interface VersionStatusChipProps {
