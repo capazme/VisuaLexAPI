@@ -45,7 +45,7 @@ export function ConsentCard({ onManage }: ConsentCardProps) {
     <HubCard
       testId="hub-card-consent"
       icon={ShieldCheck}
-      title="Consenso & Privacy"
+      title="Consenso e privacy"
       action={
         <>
           <button type="button" onClick={onManage} className={PANEL_BUTTON}>

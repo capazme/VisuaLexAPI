@@ -303,7 +303,8 @@ describe('MerltHubPage — consent first (S7b)', () => {
     const block = screen.getByTestId('hub-consent-first');
     expect(block).toHaveTextContent('Attiva MERL-T');
     // What it collects, in the levels' words: never the notes' text.
-    expect(block).toHaveTextContent(/mai il testo delle tue note/);
+    expect(block).toHaveTextContent('note (mai il loro testo)');
+    expect(block).toHaveTextContent('le citazioni con il testo intorno');
     expect(screen.queryByTestId('dialog')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Scegli il consenso' }));
     expect(screen.getByTestId('dialog')).toBeInTheDocument();
@@ -324,13 +325,22 @@ describe('MerltHubPage — consent first (S7b)', () => {
     const cards = ['hub-card-qa', 'hub-card-validate', 'hub-card-graph', 'hub-card-contrib'].map((id) => screen.getByTestId(id));
     expect(screen.queryByTestId('hub-card-consent')).toBeNull();
     expect(screen.queryByTestId('hub-card-profile')).toBeNull();
-    expect(screen.queryByTestId('hub-pill')).toBeNull();
-    expect(within(cards[0]).getByRole('button', { name: 'Serve il consenso base' })).toBeDisabled();
-    expect(within(cards[1]).getByRole('button', { name: 'Serve il consenso completo' })).toBeDisabled();
-    expect(within(cards[3]).getByRole('button', { name: 'Serve il consenso completo' })).toBeDisabled();
+    // Said, and reachable: `aria-disabled`, in the Tab order.
+    for (const [card, name] of [[cards[0], 'Serve il consenso base'], [cards[1], 'Serve il consenso completo'], [cards[3], 'Serve il consenso completo']] as const) {
+      const action = within(card).getByRole('button', { name });
+      expect(action).toHaveAttribute('aria-disabled', 'true');
+      expect(action).not.toBeDisabled();
+    }
     // Reading the graph is free: its action is a link, and no card nests a button in a link.
     expect(within(cards[2]).getByRole('link', { name: 'Esplora il grafo' })).toHaveAttribute('href', '/grafo');
     for (const card of cards) expect(card.querySelector('a button, button a')).toBeNull();
+  });
+
+  it('offers no action that needs consent while the consent is being read', () => {
+    none();
+    useConsentMock.mockReturnValue({ ...baseConsent, level: 'none', consent: null, status: 'loading' });
+    renderHub();
+    expect(screen.queryByRole('button', { name: /Serve il consenso/ })).toBeNull();
   });
 
   it('opens the consent and the profile from the row at the foot, one at a time', () => {

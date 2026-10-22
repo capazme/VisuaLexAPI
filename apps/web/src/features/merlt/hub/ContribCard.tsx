@@ -13,6 +13,8 @@ import type { MyContribJob } from '../contrib/contribApi';
 export interface ContribCardProps {
   canContribute: boolean;
   lastContrib: AsyncSlice<MyContribJob | null>;
+  /** The consent is still being read: no action yet, rather than one that says consent is missing. */
+  consentLoading?: boolean;
 }
 
 const STATUS_LABEL: Record<MyContribJob['status'], string> = {
@@ -31,9 +33,9 @@ const STATUS_TONE: Record<MyContribJob['status'], string> = {
   timeout: 'text-amber-800 dark:text-amber-400',
 };
 
-export function ContribCard({ canContribute, lastContrib }: ContribCardProps) {
+export function ContribCard({ canContribute, consentLoading = false, lastContrib }: ContribCardProps) {
   const action = !canContribute ? (
-    <HubAction gated="Serve il consenso completo" />
+    consentLoading ? undefined : <HubAction gated="Serve il consenso completo" />
   ) : (
     <HubAction to="/merlt/contribuisci">Carica appunti</HubAction>
   );

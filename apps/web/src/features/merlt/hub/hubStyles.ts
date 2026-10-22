@@ -22,7 +22,7 @@ export const HUB_NOTE = 'text-[13px] text-slate-600 dark:text-slate-400';
 export const HUB_PRIMARY = `inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-medium text-white transition-colors hover:bg-primary-700 ${FOCUS_RING}`;
 
 /** An action that needs more consent than the user gave: said in its words, disabled, no badge. */
-export const HUB_GATED = 'inline-flex min-h-[44px] cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 px-4 text-sm font-medium text-slate-600 dark:border-slate-600 dark:text-slate-400';
+export const HUB_GATED = `inline-flex min-h-[44px] cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 px-4 text-sm font-medium text-slate-600 dark:border-slate-600 dark:text-slate-400 ${FOCUS_RING}`;
 
 /** A plain action with words beside a card's text: the example question, the last one to take up. */
 export const HUB_QUIET_BUTTON = `w-full min-h-[44px] rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm text-slate-800 transition-colors hover:border-primary-300 hover:bg-primary-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 ${FOCUS_RING}`;

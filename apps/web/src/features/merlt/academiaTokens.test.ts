@@ -5,7 +5,9 @@ import { describe, expect, it } from 'vitest';
 /**
  * Academia's type and colours (S7b): no text under 12 px, and the colours from the «Inchiostro» tokens — `primary-*`,
  * never a hand-written `blue-`, `indigo-`, `purple-` or `violet-` (Y1). Every MERL-T file the section draws: the hub,
- * the graph, the validation and contribution pages, and the pieces the reader borrows from them.
+ * the graph, the validation and contribution pages, and the pieces the reader borrows from them. Not the canvas's
+ * labels (`graph/shared/graphStyles.ts`'s `labelFontSize`): drawn in the graph's own units, they grow and shrink with
+ * its zoom.
  */
 // The suite runs from `apps/web`, as `theme.test.ts` assumes.
 const ROOT = resolve(process.cwd(), 'src');

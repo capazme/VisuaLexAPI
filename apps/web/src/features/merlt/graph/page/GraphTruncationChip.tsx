@@ -59,7 +59,7 @@ export function GraphTruncationChip({
   return (
     <div
       role="status"
-      className="absolute bottom-16 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 px-3 py-1 rounded-full border border-amber-200 bg-amber-50 text-xs font-medium text-amber-800 shadow-sm dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-300 md:bottom-3"
+      className="absolute bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 px-3 py-1 rounded-full border border-amber-200 bg-amber-50 text-xs font-medium text-amber-800 shadow-sm dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-300 md:bottom-3"
     >
       <Scissors size={12} aria-hidden="true" className="shrink-0" />
       <span>

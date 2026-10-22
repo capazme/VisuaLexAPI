@@ -69,14 +69,14 @@ export function MerltHubPage() {
 
       {/* Four cards of equal height, one action each; an action that needs more consent says so. */}
       <div className="grid gap-5 md:grid-cols-2">
-        <QaCard qaAskable={features.qaAskable} lastQa={hub.lastQa} />
+        <QaCard qaAskable={features.qaAskable} lastQa={hub.lastQa} consentLoading={consentStatus === 'loading'} />
 
-        <ValidateCard canValidate={features.canValidate} pendingCount={hub.pendingCount} />
+        <ValidateCard canValidate={features.canValidate} pendingCount={hub.pendingCount} consentLoading={consentStatus === 'loading'} />
 
         {/* Reading the graph is free (D2): visibility follows the feature flag. */}
         {features.graphEnabled && <GraphCard health={hub.health} />}
 
-        <ContribCard canContribute={features.canContribute} lastContrib={hub.lastContrib} />
+        <ContribCard canContribute={features.canContribute} lastContrib={hub.lastContrib} consentLoading={consentStatus === 'loading'} />
 
         {features.opsVisible && (
           <HubCard testId="hub-card-ops" icon={Settings} title="Ops (admin)">

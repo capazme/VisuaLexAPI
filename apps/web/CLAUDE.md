@@ -456,20 +456,22 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   welcome tour waits for the screen (`Layout`). The Forum's events carry the environment, never
   its author, and an annotation event never carries the note's words (the owner, 18 October 2026, «c»).
 - `features/merlt/hub/` and `pages/MerltHubPage.tsx` — Academia's «Assistente», consent first (S7b). With the
-  consent «Nessuno» the page opens on `ConsentFirst` («Attiva MERL-T»: what MERL-T does, what each level collects in
-  `levels.ts`'s words, «Scegli il consenso» → `ConsentDialog`). Then four cards of equal height (`HubCard`: a serif
+  consent «Nessuno» the page opens on `ConsentFirst` («Attiva MERL-T»: what MERL-T does, what each level collects —
+  `levels.ts`'s summaries, rendered from it, never a shorter list —, «Scegli il consenso» → `ConsentDialog`). Then four cards of equal height (`HubCard`: a serif
   title, the text, one action at its foot): Q&A, «Valida proposte», «Grafo giuridico» (only with the graph's flag),
   «I miei contributi». An action that needs more consent is `HubAction`'s `gated`, its words («Serve il consenso
-  base», «… completo») on a disabled button, never a badge; a source the card cannot reach is said in its text; an
+  base», «… completo») on an `aria-disabled` button still in the Tab order, never a badge, and none while the consent
+  is being read; a source the card cannot reach is said in its text; an
   action is a `Link` or a `button`, never a button inside a link. The consent and the profile (`ConsentCard`,
   `ProfileCard`, unchanged in what they do: change, revoke, the ladder, the vote's weight) open one at a time from a
   row of links at the foot («Consenso e privacy · Base», «Il tuo profilo»). The ops cards stay for administrators.
   Tokens in `hub/hubStyles.ts` (44 px, no text under 12 px). On `/grafo` (`GraphExplorerPage`) the deliberation
   column is a rail while the graph is empty — no centre, no node or relation chosen, no question — opened by hand
-  from the rail or by whatever fills it (not stored: the stored preference is the user's collapse); on a phone the
-  «Dibattito» button sits over the home bar (`env(safe-area-inset-bottom)`). `features/merlt/academiaTokens.test.ts`
+  from the rail or by whatever fills it, and open from then on (not stored: the stored preference is the user's
+  collapse); on a phone the «Dibattito» button sits over the home bar (`env(safe-area-inset-bottom)`), the truncation
+  chip over it, and the frame keeps the canvas tall — no line under the title, the slice's tools as icons beside it. `features/merlt/academiaTokens.test.ts`
   reads every MERL-T file and fails on a `text-[Npx]` under 12 or a hand-written `blue-`, `indigo-`, `purple-` or
-  `violet-`.
+  `violet-` (not the canvas's labels, `graphStyles.ts`'s `labelFontSize`, which scale with the graph's zoom).
 - `components/ui/` — shared primitives: `Button`, `IconButton`, `Input`, `Card`,
   `Modal`, `ConfirmDialog`, `WireConfirm` (below, «Destructive confirmations»), `Toast`, `EmptyState`, `Sheet` (a
   phone's bottom sheet), plus feature-flavoured modals.

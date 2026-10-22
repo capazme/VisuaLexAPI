@@ -42,8 +42,9 @@ export type HubActionProps =
 /** A card's one action: a link, a button, or what is missing to use it. Never a button inside a link. */
 export function HubAction(props: HubActionProps) {
   if ('gated' in props) {
+    // `aria-disabled`, not `disabled`: still in the Tab order, so a keyboard and a reader hear what is missing.
     return (
-      <button type="button" disabled className={HUB_GATED}>
+      <button type="button" aria-disabled="true" className={HUB_GATED}>
         <Lock size={16} aria-hidden />
         {props.gated}
       </button>

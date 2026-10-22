@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Search, Loader2 } from 'lucide-react';
+import { FIELD_TEXT } from '../../../../constants/interactions';
 import { searchGraph } from '../shared/graphApi';
 import type { GraphSearchItem } from '../shared/types';
 import { isOpenableResult } from './graphCenter';
@@ -135,7 +136,8 @@ export function GraphSearchBox({ onSelect, placeholder }: GraphSearchBoxProps): 
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={onKeyDown}
           placeholder={placeholder ?? 'Cerca un articolo o un concetto…'}
-          className="min-h-[44px] w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-9 text-sm text-slate-800 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+          aria-label="Cerca nel grafo"
+          className={`min-h-[44px] w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-9 ${FIELD_TEXT} text-slate-800 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100`}
         />
         {state.phase === 'searching' && (
           <span

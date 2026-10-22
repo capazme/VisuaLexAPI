@@ -13,12 +13,14 @@ import type { AsyncSlice } from './useHubData';
 export interface ValidateCardProps {
   canValidate: boolean;
   pendingCount: AsyncSlice<number>;
+  /** The consent is still being read: no action yet, rather than one that says consent is missing. */
+  consentLoading?: boolean;
 }
 
-export function ValidateCard({ canValidate, pendingCount }: ValidateCardProps) {
+export function ValidateCard({ canValidate, consentLoading = false, pendingCount }: ValidateCardProps) {
   const waiting = pendingCount.status === 'success' && pendingCount.data > 0;
   const action = !canValidate ? (
-    <HubAction gated="Serve il consenso completo" />
+    consentLoading ? undefined : <HubAction gated="Serve il consenso completo" />
   ) : (
     <HubAction to="/merlt/valida">{waiting ? 'Vota ora' : 'Apri la coda'}</HubAction>
   );

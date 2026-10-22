@@ -314,6 +314,9 @@ export function GraphExplorerPage(): React.ReactElement {
   // persisted: the stored preference is the user's own collapse.
   const [openedByHand, setOpenedByHand] = useState(false);
   const hasGraphFocus = Boolean(urn) || selectedNodeId !== null || selectedEdge !== null || qa.turns.length > 0;
+  // Once something filled it, the column stays open when the graph empties again (a centre cleared): only the user's
+  // own collapse closes it then. Derived during render (react-hooks/set-state-in-effect).
+  if (hasGraphFocus && !openedByHand) setOpenedByHand(true);
   const columnClosed = columnCollapsed || (!hasGraphFocus && !openedByHand);
   const toggleColumn = useCallback((): void => {
     if (columnClosed) {
@@ -1081,7 +1084,9 @@ export function GraphExplorerPage(): React.ReactElement {
     // 2rem each side.
     <PageFrame
       title={GRAPH_PAGE}
-      line="Le relazioni tra norme, principi e concetti."
+      // On a phone the canvas needs the height: no line there, and the slice's tools beside the title as icons.
+      line={<span className="hidden md:inline">Le relazioni tra norme, principi e concetti.</span>}
+      actionBeside
       className="h-[calc(100dvh-5.5rem-env(safe-area-inset-top))] gap-4 md:h-[calc(100dvh-6.5rem-env(safe-area-inset-top))] lg:h-[calc(100dvh-4rem)]"
       action={
         <>
@@ -1090,17 +1095,19 @@ export function GraphExplorerPage(): React.ReactElement {
             onClick={handleExportSlice}
             disabled={graph.status !== 'success' || nodes.length === 0}
             title="Esporta lo slice corrente come file locale"
+            aria-label="Esporta slice"
             className={SLICE_BUTTON}
           >
-            <Download size={16} aria-hidden /> Esporta slice
+            <Download size={16} aria-hidden /> <span className="hidden md:inline">Esporta slice</span>
           </button>
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
             title="Carica e visualizza uno slice salvato localmente"
+            aria-label="Carica slice"
             className={SLICE_BUTTON}
           >
-            <Upload size={16} aria-hidden /> Carica slice
+            <Upload size={16} aria-hidden /> <span className="hidden md:inline">Carica slice</span>
           </button>
           <input
             ref={fileInputRef}
@@ -1435,7 +1442,7 @@ export function GraphExplorerPage(): React.ReactElement {
 }
 
 /** The page's tools beside its title (S7b): 44 px, their words with their icon. */
-const SLICE_BUTTON = `inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-40 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 ${FOCUS_RING}`;
+const SLICE_BUTTON = `inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-40 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 ${FOCUS_RING}`;
 
 /** Best-known label for a breadcrumb urn (falls back to the urn itself). */
 function labelFor(urn: string, entries: ReturnType<typeof useBreadcrumbHistory>['entries']): string {

@@ -2374,7 +2374,7 @@ function ContrastConflictView({
 
         {/* Intensity of the contrast (drives the arc thickness on canvas). */}
         <div>
-          <p className="mb-0.5 text-xs uppercase tracking-wide text-slate-400">Intensità del contrasto</p>
+          <p className="mb-0.5 text-xs uppercase tracking-wide text-slate-600 dark:text-slate-400">Intensità del contrasto</p>
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <span className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
               <span className="block h-full rounded-full bg-red-400" style={{ width: `${Math.round(score * 100)}%` }} />
@@ -2385,14 +2385,14 @@ function ContrastConflictView({
 
         {conflict.contention_point && (
           <div>
-            <p className="mb-0.5 text-xs uppercase tracking-wide text-slate-400">Punto di divergenza</p>
+            <p className="mb-0.5 text-xs uppercase tracking-wide text-slate-600 dark:text-slate-400">Punto di divergenza</p>
             <p className="whitespace-pre-wrap text-slate-700 dark:text-slate-200">{conflict.contention_point}</p>
           </div>
         )}
 
         {conflict.excerpt_a && (
           <div>
-            <p className="mb-0.5 flex items-center gap-1.5 text-xs uppercase tracking-wide text-slate-400">
+            <p className="mb-0.5 flex items-center gap-1.5 text-xs uppercase tracking-wide text-slate-600 dark:text-slate-400">
               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: colorA }} aria-hidden="true" />
               {expertALabel}
             </p>
@@ -2402,7 +2402,7 @@ function ContrastConflictView({
 
         {conflict.excerpt_b && (
           <div>
-            <p className="mb-0.5 flex items-center gap-1.5 text-xs uppercase tracking-wide text-slate-400">
+            <p className="mb-0.5 flex items-center gap-1.5 text-xs uppercase tracking-wide text-slate-600 dark:text-slate-400">
               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: colorB }} aria-hidden="true" />
               {expertBLabel}
             </p>

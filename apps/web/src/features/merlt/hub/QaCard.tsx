@@ -20,6 +20,8 @@ const EXAMPLE_QUESTION = 'Cosa distingue il dolo dalla colpa nella responsabilit
 export interface QaCardProps {
   qaAskable: boolean;
   lastQa: AsyncSlice<QaHistoryItem | null>;
+  /** The consent is still being read: no action yet, rather than one that says consent is missing. */
+  consentLoading?: boolean;
 }
 
 function confidenceLabel(confidence: number | null | undefined): string | null {
@@ -28,7 +30,7 @@ function confidenceLabel(confidence: number | null | undefined): string | null {
   return `${pct}% affidabilità`;
 }
 
-export function QaCard({ qaAskable, lastQa }: QaCardProps) {
+export function QaCard({ qaAskable, consentLoading = false, lastQa }: QaCardProps) {
   const navigate = useNavigate();
 
   // Slice 4 absorb (Decision A): the graph is the sole Q&A surface. The prefill
@@ -40,7 +42,7 @@ export function QaCard({ qaAskable, lastQa }: QaCardProps) {
 
   const asked = lastQa.status === 'success' && lastQa.data;
   const action = !qaAskable ? (
-    <HubAction gated="Serve il consenso base" />
+    consentLoading ? undefined : <HubAction gated="Serve il consenso base" />
   ) : (
     <HubAction onClick={() => goAsk()}>{asked ? 'Nuova domanda' : 'Fai una domanda'}</HubAction>
   );

@@ -136,7 +136,7 @@ export function EdgeDetailsDrawer({
 function Field({ label, children }: { label: string; children: React.ReactNode }): React.ReactElement {
   return (
     <div>
-      <p className="mb-0.5 text-xs uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="mb-0.5 text-xs uppercase tracking-wide text-slate-600 dark:text-slate-400">{label}</p>
       {children}
     </div>
   );
