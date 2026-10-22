@@ -97,7 +97,7 @@ export function MissedCitationReporter({ anchorRect, selectedText, onSubmit, onC
           >
             <div className="flex items-start gap-2 px-3 pb-1 pt-2.5">
               <Flag size={14} className="mt-0.5 shrink-0 text-primary-500" aria-hidden="true" />
-              <p className="line-clamp-2 min-w-0 flex-1 text-[11px] italic text-slate-600 dark:text-slate-300">
+              <p className="line-clamp-2 min-w-0 flex-1 text-xs italic text-slate-600 dark:text-slate-300">
                 Citazione non riconosciuta: &ldquo;{selectedText}&rdquo;
               </p>
               <button

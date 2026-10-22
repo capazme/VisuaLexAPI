@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { FOCUS_BUTTON_CLEARANCE, PAGE_KICKER, PAGE_TITLE, PageFrame } from './PageFrame';
-import { SECTION_PHRASES, sectionKicker } from '../../features/sections/sections';
+import { SECTION_PHRASES, kickerOf, sectionKicker } from '../../features/sections/sections';
 
 describe('PageFrame (W2)', () => {
   it('takes the layout\'s width, with nothing narrower, and heads it with the title, the sentence and the action', () => {
@@ -69,9 +69,20 @@ describe('PageFrame (W2)', () => {
       gymnasium: 'la tua palestra giuridica',
       opus: 'la tua officina giuridica',
       forum: 'il luogo del dibattito giuridico',
+      academia: 'il laboratorio del diritto',
     });
     expect(sectionKicker('opus')).toBe('Opus · la tua officina giuridica');
     expect(sectionKicker('forum')).toBe('Forum · il luogo del dibattito giuridico');
+  });
+
+  it('draws Academia\'s line over «Assistente» and «Grafo», its phrase chosen (S7b)', () => {
+    render(
+      <PageFrame title="Assistente" kicker="academia">
+        <p>corpo</p>
+      </PageFrame>,
+    );
+    expect(kickerOf('academia')).toBe('Academia · il laboratorio del diritto');
+    expect(screen.getByRole('heading', { level: 1, name: 'Assistente' })).toHaveAccessibleDescription('Academia · il laboratorio del diritto');
   });
 
   it('marks a section\'s home title for the section switcher\'s focus, and no other', () => {
@@ -114,6 +125,8 @@ const SECTION_PAGES = [
   'pages/MerltHubPage.tsx',
   'features/merlt/contrib/ContribPage.tsx',
   'features/merlt/validate/ValidationPage.tsx',
+  // Full height, its canvas under the frame's header (S7b).
+  'features/merlt/graph/page/GraphExplorerPage.tsx',
   // Public, outside the layout, in the same frame since M1: the title at the column's edge, the text narrow.
   'pages/CreditsPage.tsx',
 ];
@@ -132,7 +145,8 @@ describe('the section pages (W2)', () => {
 
 /**
  * The pages' names in one list (L-37): the phone's bar and the titles of Gymnasium's views, Opus's, the dossier list and
- * the Forum's two pages read `features/sections/pageNames.ts`; none keeps a list of its own or writes its title by hand.
+ * the Forum's two pages and Academia's two read `features/sections/pageNames.ts`; none keeps a list of its own or writes
+ * its title by hand.
  */
 describe('the pages\' names (L-37)', () => {
   it.each([
@@ -142,9 +156,11 @@ describe('the pages\' names (L-37)', () => {
     'components/features/bulletin/BulletinBoardPage.tsx',
     'components/features/bulletin/ForumCommunityPage.tsx',
     'components/layout/phoneBarTitle.ts',
+    'pages/MerltHubPage.tsx',
+    'features/merlt/graph/page/GraphExplorerPage.tsx',
   ])('%s reads them from the one list', (file) => {
     const source = readFileSync(resolve(process.cwd(), 'src', file), 'utf8');
-    expect(source).toMatch(/from '[./]+(features\/sections\/)?pageNames'|from '\.\.\/\.\.\/features\/sections\/pageNames'/);
+    expect(source).toMatch(/from '[./]+(features\/)?(sections\/)?pageNames'/);
     expect(source).not.toMatch(/function pageName\b|const PAGES\b/);
     // A page that imports the list still takes its title from it, never a word written in its frame.
     expect(source).not.toMatch(/<PageFrame[^>]*\btitle="/);
@@ -154,6 +170,8 @@ describe('the pages\' names (L-37)', () => {
     ['components/features/bulletin/BulletinBoardPage.tsx', 'PUBLIC_DOSSIERS_PAGE'],
     ['components/features/bulletin/ForumCommunityPage.tsx', 'COMMUNITY_PAGE'],
     ['components/features/dossier/DossierListView.tsx', 'DOSSIER_PAGE'],
+    ['pages/MerltHubPage.tsx', 'ASSISTANT_PAGE'],
+    ['features/merlt/graph/page/GraphExplorerPage.tsx', 'GRAPH_PAGE'],
   ])('%s is titled %s', (file, name) => {
     const source = readFileSync(resolve(process.cwd(), 'src', file), 'utf8');
     expect(source).toContain(`title={${name}}`);
