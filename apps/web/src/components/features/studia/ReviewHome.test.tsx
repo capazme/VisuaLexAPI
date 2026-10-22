@@ -634,7 +634,7 @@ describe('ReviewHome', () => {
       // A subject with no card has nothing to start.
       expect(stops[3]).toHaveTextContent('Nessuna scheda');
       expect(within(stops[3]).queryByRole('button', { name: /^Ripassa/ })).toBeNull();
-      // Every row as wide as «Tutte le materie» (G8, Bill: 8 px short at 1920): a row from `md`, the choice taking what
+      // Every row as wide as «Tutte le materie» (G8: they were 8 px short at 1920): a row from `md`, the choice taking what
       // «Ripassa» leaves — all of it with no card —, never a grid whose empty column keeps its gap.
       for (const stop of stops) {
         expect(stop).toHaveClass('md:flex');
