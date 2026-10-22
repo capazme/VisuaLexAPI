@@ -4,6 +4,8 @@ import { appStore, useAppStore } from '../../../store/useAppStore';
 import { useTour } from '../../../hooks/useTour';
 import type { ArticleData } from '../../../types';
 import { MenuButton } from '../../ui/MenuButton';
+import { PAGE_TITLE } from '../../layout/PageFrame';
+import { cn } from '../../../lib/utils';
 import { practiceCountLine, practiceCounts, type Practice } from '../../../utils/practice';
 import { isEmptyPractice } from './practiceView';
 import { closePracticeWithUndo } from './practiceUndo';
@@ -60,27 +62,28 @@ function PracticeHeader({ practice }: { practice: Practice }) {
   const save = usePracticeSaveActions(practice.id);
 
   return (
-    <header id="tour-practice-header" data-pinned-head className="flex items-start gap-2 px-1">
+    <header id="tour-practice-header" data-pinned-head className="flex items-start gap-2 px-1 pb-2">
       <div className="min-w-0 flex-1">
         {editing ? (
           <PracticeNameInput
             initial={practice.label}
-            className="w-full text-xl font-bold"
+            className={cn('w-full', PAGE_TITLE)}
             onDone={(name) => {
               setEditing(false);
               if (name !== null) renamePractice(practice.id, name);
             }}
           />
         ) : (
+          // The page's title, as every section page writes it (`PageFrame`'s `PAGE_TITLE`, R3).
           <h2
             onDoubleClick={() => setEditing(true)}
             title="Doppio clic per rinominare"
-            className="truncate text-xl font-bold text-slate-900 dark:text-white"
+            className={cn('truncate', PAGE_TITLE)}
           >
             {practice.label}
           </h2>
         )}
-        {countLine && <p className="text-sm text-slate-500 dark:text-slate-400">{countLine}</p>}
+        {countLine && <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{countLine}</p>}
       </div>
       <button
         type="button"

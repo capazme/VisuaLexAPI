@@ -53,7 +53,7 @@ describe('PracticeTable (spec §3.1)', () => {
     expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('l. 24/2017');
     expect(screen.getByText('1 atto · 2 articoli · 1 sentenza')).toBeInTheDocument();
     expect(screen.getByTestId('practice-column')).toBeInTheDocument();
-    expect(screen.getByText(/Giurisprudenza \(1\)/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Giurisprudenza (1)' })).toBeInTheDocument();
   });
 
   it('switching the active practice switches the table', () => {

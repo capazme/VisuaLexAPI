@@ -39,7 +39,10 @@ const IDLE = 'border-slate-200 text-slate-800 hover:bg-slate-50 dark:border-slat
  * subject.
  */
 // Padded by the focus ring's 4 px all round, and the same taken back by the margins, so the scroller never cuts it.
-const LIST = cn('-m-1 flex snap-x gap-2 overflow-x-auto p-1 md:m-0 md:grid md:gap-1.5 md:overflow-visible md:p-0', HIDDEN_SCROLLBAR);
+// `relative`: the strip scrolls on a phone, and an absolute piece inside it (each card's `sr-only` words) takes the
+// nearest positioned box as its own; without it, «Oggi»'s section, so the strip clipped none of them and the page
+// scrolled sideways to the last one, 1316 px at 390 (G8b).
+const LIST = cn('relative -m-1 flex snap-x gap-2 overflow-x-auto p-1 md:m-0 md:grid md:gap-1.5 md:overflow-visible md:p-0', HIDDEN_SCROLLBAR);
 const ITEM = 'w-60 shrink-0 snap-start md:w-auto';
 
 /**
@@ -102,16 +105,19 @@ export function SubjectList({ materie, loading, reloading, selected, onSelect, p
                 // `backwards` fill (the utility's): each row waits unseen for its turn, then rests where it is.
                 // From `md` a row: the choice takes what «Ripassa» leaves, all of it for a subject with no card, so every row
                 // ends where «Tutte le materie» does (a grid's empty column kept its 8 px gap).
-                className={cn(ITEM, 'grid gap-1.5 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 md:flex md:items-center md:gap-2')}
+                // On a phone the strip makes every card as tall as the tallest: its rows keep their own height (`content-start`).
+                className={cn(ITEM, 'grid gap-1.5 max-md:content-start motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 md:flex md:items-center md:gap-2')}
                 style={{ animationDelay: `${(index + 1) * STAGGER_MS}ms` }}
               >
                 <button type="button" aria-pressed={on} onClick={() => onSelect(stop.materia)} className={cn(CHOICE, on ? PRESSED : IDLE, 'flex-wrap md:min-w-0 md:flex-1 md:flex-nowrap')}>
                   <span aria-hidden className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: subjectHue(stop.materia) }} />
-                  <span className="min-w-0 flex-1 truncate">{label}</span>
+                  {/* Never cut (G8b): on a phone the name has the card's width — the counts go to a line of their own —
+                      and wraps between words, hyphenated in Italian if a word is too long. */}
+                  <span data-subject-name className="min-w-0 flex-1 break-words hyphens-auto">{label}</span>
                   {total === 0 ? (
-                    <span className={cn('shrink-0 text-xs font-normal', MUTED_TEXT)}>Nessuna scheda</span>
+                    <span className={cn('shrink-0 text-xs font-normal max-md:basis-full max-md:pl-[18px]', MUTED_TEXT)}>Nessuna scheda</span>
                   ) : (
-                    <span className="flex shrink-0 items-center gap-2.5">
+                    <span className="flex shrink-0 items-center gap-2.5 max-md:basis-full max-md:pl-[18px]">
                       {due ? (
                         <span className={cn('text-sm tabular-nums', dovute > 0 ? cn('font-semibold', INK_TEXT) : cn('font-normal', MUTED_TEXT))}>
                           <span aria-hidden>{`${formatCount(dovute)} oggi`}</span>

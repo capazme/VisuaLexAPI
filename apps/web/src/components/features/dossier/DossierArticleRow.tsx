@@ -116,7 +116,8 @@ export function DossierArticleRow({
             <span className={cn(ROW_TITLE, 'block font-medium')}>art. {item.data.numero_articolo}</span>
             {greyLine && <span className={cn(ROW_LINE, 'mt-0.5 line-clamp-2 block')}>{greyLine}</span>}
           </span>
-          <span className="flex flex-shrink-0 flex-wrap items-center justify-end gap-1.5 pt-0.5">
+          {/* The signs may shrink, up to half the row: a long application's name wraps instead of squeezing the title. */}
+          <span className="flex min-w-0 max-w-[50%] flex-wrap items-center justify-end gap-1.5 pt-0.5">
             {annex && (
               <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                 All. {annex}

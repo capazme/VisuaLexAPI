@@ -797,7 +797,15 @@ never repeated, nothing persisted.
 The dashboard article view (`ArticleTabContent`) composes: `ArticleBody` (renders
 sanitised HTML + hosts `SelectionPopup`), `useArticleMarkers` (turns raw text into
 HTML with highlight `<mark>`s and wavy note anchors), and the toolbar
-(`ReadingToolbar`). Keys are `buildItemKey(norma)` and
+(`ReadingToolbar`; R3, «prima il testo»: one line over the text with a hairline, no box — the status in words,
+`VersionStatusChip`, «In vigore dal 1° gennaio 2005» with the date in full, and «Allegato N» (`shownAnnex`: never a
+code's own); on a computer «Note» and
+«Evidenziazioni» with their counts (`NotesHighlightsButtons labelled`), «Al dossier», then «⋯» («Altre azioni
+sull’articolo»: the quick norm, the glosse, «Cerca nel testo», «Copia», «Condividi link», «Esporta…», «Testo alla
+data…», «Confronta con…»); on a phone «Al dossier» (its icon) and «⋯» on the status's row, «⋯» adding Study Mode and the source (the compact bar of a window and of the phone's
+reader: «Note», «Evidenziazioni» and «⋯» with the glosse, «Cerca nel testo» and «Copia»; on a phone «⋯» alone); quiet
+neutral buttons, 36 px on a computer and 44 on a phone; «Cerca nel testo» says «Chiudi la ricerca nel testo» only while
+the window is pointed at this very text (`useFindWindowScopedTo(…, exact)`), else it points the window here. Nothing of it is inside the text root, root rule 23). Keys are `buildItemKey(norma)` and
 `uniqueArticleIdFromNorma(norma)` from `utils/normaKeys.ts` — the dossier reader
 uses the same two functions, and they must stay byte-identical or annotations
 made on one surface stop appearing on the other.
@@ -926,8 +934,9 @@ the article's words) and highlights whose text changed — without it they could
 
 **Find in the text** («Cerca nel testo», spec §13): one floating `FindWindow` (`features/search/`,
 mounted once in `Layout`, portalled, z-index `findWindow`) opened by Cmd/Ctrl+F (`Layout.tsx`: opens,
-or focuses and selects the query when already open) and by the magnifier (`FindInTextButton`) of
-`ReadingToolbar` (desktop and phone rows) and `DecisionReadingToolbar`. Cmd/Ctrl+F is intercepted on `/`
+or focuses and selects the query when already open), by «Cerca nel testo» in the «⋯» of `ReadingToolbar`
+(desktop and phone rows; R3: the window gives the focus back to that «⋯») and by the magnifier
+(`FindInTextButton`) of `DecisionReadingToolbar`. Cmd/Ctrl+F is intercepted on `/`
 only, where the workspace is drawn; on every other route it is the browser's, and leaving `/` closes the
 window. It is also the browser's while an overlay covers the workspace (`isWorkspaceCovered`): an element
 with `aria-modal="true"`, or one marked `data-find-overlay` — Study Mode, `CommandPalette`, `CompareView`,
@@ -2285,20 +2294,28 @@ meant to stay split; add new features as new files, not inside the shells:
   (round 6 of the norm-tab redesign).
 - `features/practice/` — the practice, the norm-tab's replacement (spec
   `2026-10-08-norm-tab-container-design.md`): `PracticeTable` (the active practice on the desktop:
-  header with name, count line, a «Salva come dossier» button and «⋯», the streaming bar, then
+  header in the page frame's type — the name in `PAGE_TITLE`, the count line under it, «Salva come dossier» and «⋯» on
+  its right —, the streaming bar, then
   `PracticeColumn`; the topic searches are windows beside it on the desktop and the full-screen reader's
   subject on a phone); `PracticeColumn` (the acts, dragged
-  into order, then «Giurisprudenza»; it takes the reveal once) of `PracticeActBlock` (an act: its sticky
-  heading with Studio, Struttura, PDF and «⋯», the index line of its rows, the rows; the structure
-  window on the desktop, the drawer on a phone), `PracticeArticleRow` (an article, its reader mounted
+  into order, then «Giurisprudenza»; it takes the reveal once) of `PracticeActBlock` (an act, R3: a section
+  with no card around it — its sticky heading, the act's name in Newsreader 22 px over a hairline, with Studio,
+  Struttura, PDF and «⋯» as neutral quiet buttons — on a phone one row, the title and «⋯», which holds Studio,
+  Struttura and PDF, and the meta line only when it says more than the count —; the index line of its rows, drawn only
+  for an act of more than one article, its chips in slate, on a phone one row that scrolls sideways beside the arrows;
+  the rows; the structure window on the desktop, the drawer on a phone), `PracticeArticleRow` (an article, its reader mounted
   only while open) and `PracticeDecisionsSection` (the decisions, newest first, read in place through
-  `DecisionEntryView`), both rows on `PracticeRowShell` (the header-scoped toggle, «Togli dal tavolo»,
+  `DecisionEntryView`, under «Giurisprudenza (n)» in the act's type, no card), both rows on `PracticeRowShell` (the header-scoped toggle, «Togli dal tavolo»,
   «Apri accanto» (on the desktop a row whose subject a window shows folds and says «Aperto accanto ·
   Chiudi la finestra», so one subject has one mounted reading surface, T5; on a phone it opens the
   full-screen reader, icon-only so the row's name keeps its width, and no row ever folds));
-  `PracticeBar` + `PracticeChip` (the bar of practices, `fixed bottom-6`, `Z_INDEX.dock`, `#tour-practice-bar`; a «⋯» per chip);
-  `PracticePhoneView` (the phone's table: chevrons, the name — a tap lists the practices with «Nuova
-  pratica» — and dots, the count line with «Salva come dossier» and its «⋯» (`usePracticeSaveActions`),
+  `PracticeBar` + `PracticeChip` (the bar of practices, `fixed bottom-6` at the column's left, beside the sidebar
+  (`--sidebar-width`), not over the middle of the text, R3; `Z_INDEX.dock`, `#tour-practice-bar`; a «⋯» per chip);
+  `PracticePhoneView` (the phone's table: its head, `PhonePracticeHead`, one row, is the practice's name with «▾» — a
+  tap lists the practices with «Nuova pratica»; R3 took the carousel's chevrons and dots away —, the count after it,
+  which gives way first, «Salva come dossier» as a 44 px icon and its «⋯» (`usePracticeSaveActions`); with all of R3
+  the text of «art. 1453 c.c.», one article of an act whose title takes one line, starts 251 px under the bar at the
+  top at 390 and 360 px (each more line of title or meta, about 25 px more),
   over the same column; while `phoneReader` is set it draws `ReadingFullScreen` in the column's place
   — the column is not kept mounted under it, gotcha 26 — and gives the column back at the scroll
   position of the page's content scroller it left, asked for again while the remounted column grows
@@ -2325,7 +2342,7 @@ meant to stay split; add new features as new files, not inside the shells:
   width, measured, for that row only) and `ReadingWindow` (the light window: title, «Chiudi», a scrolling body with
   the column's bottom padding, the body by kind; it reads under its own id and passes its practice as
   `findHostId`, and an article as `ArticleTabContent variant="beside"`: the compact `ReadingToolbar`
-  (notes, highlights, discussions, the magnifier and copy), and no Studio,
+  (notes and highlights in words, and behind «⋯» discussions, the find window and copy), and no Studio,
   Studia row, MERL-T entry or graph rail; the `row` variant is the table's). «Salva come dossier» and «Aggiungi a un dossier…» (spec §7): `practiceDossierItems`
   (pure: the items in table order, each article from its own `norma_data`, a code's search and index
   copies one item; `dossierHoldsArticle`), `useSavePracticeAsDossier` (create first, add, order once,
@@ -2529,7 +2546,12 @@ meant to stay split; add new features as new files, not inside the shells:
     `:where(.dark, .dark *)::…`, as `index.css` does; `theme.test.ts` checks it.
     A short sideways row of controls on a phone draws no bar at all (`HIDDEN_SCROLLBAR` in
     `constants/interactions.ts`, both engines; a swipe, the trackpad and focus still scroll it): the
-    subject chips' row still showed a light one in dark mode on the owner's pass, 19 October 2026.
+    subject chips' row still showed a light one in dark mode on the owner's pass, 19 October 2026. Such a row is
+  `relative`: an absolute piece inside it (a card's `sr-only` words) takes the nearest positioned box as its own, and
+  beyond the row the row clips nothing — «Oggi»'s strip of subjects made the whole page scroll sideways to its last
+  card's `sr-only` (1316 px at 390, G8b); and a grid that holds one declares its column (`grid-cols-1`, a
+  `minmax(0,1fr)`), or its implicit track grows to the row's full width. `studia/phoneWidth.test.ts` reads Gymnasium
+  for both.
 
 30. **A bare `fetch` to a scraping route works in development and answers 401 in
     production.** Vite proxies those routes to the Python API with no login; the ingress
