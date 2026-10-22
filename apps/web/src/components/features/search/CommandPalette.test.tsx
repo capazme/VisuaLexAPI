@@ -69,7 +69,7 @@ describe('CommandPalette — act names the client does not carry', () => {
     expect(fetch).toHaveBeenCalledWith('/parse_query', expect.objectContaining({ method: 'POST' }));
 
     // Resolved: the hint flips from "completa" to "ricerca".
-    await waitFor(() => expect(screen.getByText(/Invio cerca/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Apri l'articolo/)).toBeInTheDocument());
   });
 
   it('does not ask the server for a query the client already resolved', async () => {
@@ -83,7 +83,7 @@ describe('CommandPalette — act names the client does not carry', () => {
     // could have fired, and a slow typist (a loaded machine) could fire it on a half-typed query.
     await settle();
 
-    await waitFor(() => expect(screen.getByText(/Invio cerca/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Apri l'articolo/)).toBeInTheDocument());
     // Scoped to /parse_query on purpose: the palette also fetches the alias
     // catalog on open, and that call is unrelated to citation resolution.
     expect(fetch).not.toHaveBeenCalledWith('/parse_query', expect.anything());
@@ -101,7 +101,7 @@ describe('CommandPalette — act names the client does not carry', () => {
 
     // A backend that stopped answering must not be silent (CLAUDE.md gotcha 18).
     await waitFor(() => expect(errors.length).toBeGreaterThan(0));
-    expect(screen.queryByText(/Invio cerca/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Apri l'articolo/)).not.toBeInTheDocument();
   });
 });
 
@@ -126,7 +126,7 @@ describe('CommandPalette — the annex a citation names', () => {
 
     await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 1 tusl (All. A)');
     await settle();
-    await waitFor(() => expect(screen.getByText(/Invio cerca/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Apri l'articolo/)).toBeInTheDocument());
     await user.keyboard('{Enter}');
 
     expect(onSearch).toHaveBeenCalledWith(expect.objectContaining({ act_number: '81', annex: 'A' }));
@@ -316,8 +316,9 @@ describe('CommandPalette — a decision named in the box', () => {
     await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'Cass. civ. 99999/2024');
 
     // the visible line, and the one live region (mounted from the start) that announces it
-    expect(await screen.findByText('Sentenza → Cass. civ., n. 99999/2024')).toBeInTheDocument();
-    expect(screen.getByText('Invio apre')).toBeInTheDocument();
+    // One row says it, the chosen one (Bill: no second line saying the same).
+    expect(await screen.findByText(/Apri la sentenza/)).toBeInTheDocument();
+    expect(screen.queryByText(/Sentenza →|Invio apre/)).toBeNull();
     expect(screen.getByRole('status')).toHaveTextContent('Sentenza: Cass. civ., n. 99999/2024. Invio per aprire.');
 
     await user.keyboard('{Enter}');
@@ -337,7 +338,7 @@ describe('CommandPalette — a decision named in the box', () => {
     // a norm query is answered by the server first, then the box turns into a decision
     await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 18 statuto dei lavoratori');
     await settle();
-    await waitFor(() => expect(screen.getByText(/Invio cerca/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Apri l'articolo/)).toBeInTheDocument());
     await user.clear(screen.getByPlaceholderText(/art 2043 cc/i));
     await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'Cass. civ. 99999/2024');
     await user.keyboard('{Enter}');
@@ -364,8 +365,8 @@ describe('CommandPalette — a decision named in the box', () => {
     const user = userEvent.setup();
     renderPalette();
     await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 2043 cc');
-    await waitFor(() => expect(screen.getByText(/Invio cerca/i)).toBeInTheDocument());
-    expect(screen.queryByText(/Sentenza →/)).toBeNull();
+    await waitFor(() => expect(screen.getByText(/Apri l'articolo/)).toBeInTheDocument());
+    expect(screen.queryByText(/Apri la sentenza/)).toBeNull();
   });
 
   it('does not read a decision when the first word is a custom alias trigger', async () => {
@@ -381,7 +382,7 @@ describe('CommandPalette — a decision named in the box', () => {
 
     await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'cass 99999/2024');
 
-    expect(screen.queryByText(/Sentenza →/)).toBeNull();
+    expect(screen.queryByText(/Apri la sentenza/)).toBeNull();
     await user.keyboard('{Enter}');
     expect(openDecision).not.toHaveBeenCalled();
   });
@@ -421,7 +422,7 @@ describe('CommandPalette — a citation handed over as it opens', () => {
     appStore.setState({ commandPaletteQuery: 'Cass. civ., n. 99999/2024' });
     renderPalette();
     expect(screen.getByPlaceholderText(/art 2043 cc/i)).toHaveValue('Cass. civ., n. 99999/2024');
-    expect(await screen.findByText('Sentenza → Cass. civ., n. 99999/2024')).toBeInTheDocument();
+    expect(await screen.findByText(/Apri la sentenza/)).toBeInTheDocument();
     expect(appStore.getState().commandPaletteQuery).toBeNull();
   });
 });
@@ -566,7 +567,7 @@ describe('CommandPalette — the search page\'s field\'s rules, now its own (R2)
     await user.type(box, 'art 18 statuto dei lavoratori{Enter}');
     await user.type(box, 'x{Backspace}');
     await settle();
-    await waitFor(() => expect(screen.getByText(/Invio cerca/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Apri l'articolo/)).toBeInTheDocument());
     expect(onSearch).not.toHaveBeenCalled();
   });
 
@@ -589,6 +590,27 @@ describe('CommandPalette — the search page\'s field\'s rules, now its own (R2)
     expect(onSearch).toHaveBeenCalledTimes(1);
     expect(trackAliasUsage).toHaveBeenCalledTimes(1);
     appStore.setState({ trackAliasUsage: original.trackAliasUsage, customAliases: original.customAliases } as never);
+  });
+
+  it('says a ready citation once, in its row with «↵», not again in a line under the box (Bill)', async () => {
+    const user = userEvent.setup();
+    renderPalette();
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 2043 cc');
+    expect(screen.getByText(/Apri l'articolo/)).toBeInTheDocument();
+    expect(screen.queryByText(/Invio cerca/)).toBeNull();
+    // The line under the box keeps its help, seen: no preview of the citation in its place.
+    const help = document.getElementById('command-palette-help')!;
+    expect(help).not.toHaveClass('sr-only');
+    expect(help).toHaveTextContent(/^Scrivi una citazione/);
+  });
+
+  it('an Enter that ends an IME composition searches nothing', async () => {
+    const user = userEvent.setup();
+    const onSearch = renderPalette();
+    const box = screen.getByPlaceholderText(/art 2043 cc/i);
+    await user.type(box, 'art 2043 cc');
+    fireEvent.keyDown(box, { key: 'Enter', isComposing: true });
+    expect(onSearch).not.toHaveBeenCalled();
   });
 
   it('does not search once closed: Esc during the wait drops it', async () => {

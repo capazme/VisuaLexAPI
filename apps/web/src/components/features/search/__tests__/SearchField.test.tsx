@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { appStore } from '../../../../store/useAppStore';
+import { isEditableTarget } from '../../../ui/notifications/undoShortcut';
 import { SearchField } from '../SearchField';
 import { PALETTE_SHORTCUT, focusSearchField, openSearchMenu, resetSearchFieldControl, returnWordsToSearchField } from '../../../../utils/searchFieldControl';
 
@@ -58,18 +59,17 @@ describe('SearchField — the door to the search menu (R2)', () => {
     expect(openCommandPaletteWith).toHaveBeenCalledWith('art 2043 cc');
   });
 
-  it('grows into the menu when Tab brings the focus, not when the menu gives it back', async () => {
+  it('takes only the focus from Tab, opening nothing (WCAG 3.2.1); Enter and ArrowDown then open the menu', async () => {
     const user = userEvent.setup();
     renderField();
     await user.tab();
     expect(field()).toHaveFocus();
+    expect(openCommandPalette).not.toHaveBeenCalled();
+    await user.keyboard('{Enter}');
     expect(openCommandPalette).toHaveBeenCalledTimes(1);
-    field().blur();
-    // The menu closing gives the focus back by script: no new opening.
-    act(() => field().focus());
-    expect(openCommandPalette).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(field(), { key: 'ArrowDown' });
+    expect(openCommandPalette).toHaveBeenCalledTimes(2);
   });
-
   it('a letter typed on it goes on in the menu, after its words', () => {
     renderField();
     act(() => returnWordsToSearchField('art 2043'));
@@ -98,17 +98,6 @@ describe('SearchField — the door to the search menu (R2)', () => {
     expect(openCommandPaletteWith).toHaveBeenCalledWith('a');
   });
 
-  it('the cursor put by «Ricerca» right after a Tab still opens no menu', async () => {
-    const user = userEvent.setup();
-    renderField();
-    await user.keyboard('{Tab}');
-    vi.clearAllMocks();
-    field().blur();
-    act(() => { focusSearchField({ focus: true }); });
-    expect(field()).toHaveFocus();
-    expect(openCommandPalette).not.toHaveBeenCalled();
-  });
-
   it('says it took a request, and a request that did not wait is not kept', () => {
     expect(focusSearchField({ text: 'gdpr' })).toBe(false);
     renderField();
@@ -123,6 +112,21 @@ describe('SearchField — the door to the search menu (R2)', () => {
     expect(openCommandPaletteWith).not.toHaveBeenCalled();
     act(() => returnWordsToSearchField(''));
     expect(field()).not.toHaveTextContent('legge 241');
+  });
+
+  it('words pasted on it go on in the menu, after its own (Ctrl/⌘+V)', () => {
+    renderField();
+    fireEvent.paste(field(), { clipboardData: { getData: () => 'art. 2043 c.c.' } });
+    expect(openCommandPaletteWith).toHaveBeenLastCalledWith('art. 2043 c.c.');
+    act(() => returnWordsToSearchField('legge'));
+    fireEvent.paste(field(), { clipboardData: { getData: () => '  241/1990\n' } });
+    expect(openCommandPaletteWith).toHaveBeenLastCalledWith('legge 241/1990');
+  });
+
+  it('stands for a field: the page\'s shortcuts and ⌘Z leave it alone', () => {
+    renderField();
+    expect(field()).toHaveAttribute('data-text-field');
+    expect(isEditableTarget(field())).toBe(true);
   });
 
   it('Escape empties its words', () => {
@@ -150,15 +154,6 @@ describe('SearchField — what the review found (R2)', () => {
     appStore.setState({ commandPaletteOpen: true });
     act(() => openSearchMenu());
     expect(openCommandPaletteWith).not.toHaveBeenCalled();
-    expect(openCommandPalette).not.toHaveBeenCalled();
-  });
-
-  it('a Tab pressed inside the open menu does not count: the focus given back right after opens nothing', () => {
-    renderField();
-    appStore.setState({ commandPaletteOpen: true });
-    fireEvent.keyDown(window, { key: 'Tab' });
-    appStore.setState({ commandPaletteOpen: false });
-    act(() => field().focus());
     expect(openCommandPalette).not.toHaveBeenCalled();
   });
 

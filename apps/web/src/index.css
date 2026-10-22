@@ -1281,6 +1281,8 @@
   --vlx-section-forum: oklch(55% 0.08 190);
   /* The lesson bar's head runs ahead of the ink: the section's hue, lighter where the ink is dark. */
   --vlx-gymnasium-wash: oklch(64% 0.1 268);
+  /* The lesson bar's ink (G8): the section's hue at a step that reads as a colour, over 3:1 on its track. */
+  --vlx-gymnasium-bar: oklch(48% 0.14 268);
 }
 .dark {
   --vlx-section-opus: var(--color-toga-500);
@@ -1288,6 +1290,7 @@
   --vlx-section-academia: oklch(60% 0.09 70);
   --vlx-section-forum: oklch(58% 0.08 190);
   --vlx-gymnasium-wash: oklch(45% 0.11 268);
+  --vlx-gymnasium-bar: oklch(70% 0.12 268);
 }
 .vlx-section-mark { background: var(--vlx-section-opus); }
 .vlx-section-mark[data-section="gymnasium"] { background: var(--vlx-section-gymnasium); }
@@ -1356,6 +1359,7 @@
   --ease-catch: linear(0, 0.054, 0.1792, 0.3334, 0.4894, 0.6308, 0.7498, 0.844, 0.9143, 0.9638, 0.9962, 1.0154, 1.0251, 1.0283, 1.0273, 1.0241, 1.0198, 1.0153, 1.0112, 1.0077, 1.0049, 1.0028, 1.0013, 1.0003, 0.9996, 1);
 }
 .vlx-lesson-head { background: var(--vlx-gymnasium-wash); }
+.vlx-lesson-ink { background: var(--vlx-gymnasium-bar); }
 
 @media (prefers-reduced-motion: reduce) {
   .vlx-mission-inking { animation: none; background-position: 0 0; text-decoration-color: var(--vlx-section-gymnasium); }

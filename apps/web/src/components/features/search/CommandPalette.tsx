@@ -170,22 +170,34 @@ const GROUPS_ENTERING = 4;
 const GROUP_STAGGER_MS = 30;
 const GROUPS_AT_MS = 140;
 
-/**
- * The panel growing out of the search page's field (R2), inspired by Animorio's «menu dei comandi», written from
- * scratch with Framer Motion: the same place and width, the height uncovered from the field's down to the panel's
- * (`clip-path`, the corners from the field's to a card's), then the shadow deepens; the content fades in as it
- * grows. Closing, the same way back (`usePresence`). Under reduced motion it only fades.
- */
 /** The visual viewport's height (a phone's keyboard shortens it, `100dvh` does not on iOS); null where it is unknown. */
 const subscribeViewport = (change: () => void) => {
   window.visualViewport?.addEventListener('resize', change);
   return () => window.visualViewport?.removeEventListener('resize', change);
 };
 const viewportHeight = () => window.visualViewport?.height ?? null;
+/** Closed, or on a computer: nothing watched. */
+const subscribeNothing = () => () => {};
+const noHeight = () => null;
 
+/**
+ * The panel growing out of the search page's field (R2), inspired by Animorio's «menu dei comandi», written from
+ * scratch with Web Animations and Framer Motion: the same place and width, the height uncovered from the field's down
+ * to the panel's (`clip-path`, the corners from the field's to a card's), then the clip goes and the card's shadow
+ * shows; the content fades in as it grows. Closing, the same way back (`usePresence`); opened again meanwhile, it grows
+ * back from where the closing was. Under reduced motion it only fades.
+ */
 function PanelGrowth({ still, fromHeight, className, children }: { still: boolean; fromHeight: number; className: string; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const [isPresent, safeToRemove] = usePresence();
+  // `safeToRemove` is a new function at every render: kept here, it does not start the closing again (one closing,
+  // one animation).
+  const remove = useRef(safeToRemove);
+  useEffect(() => {
+    remove.current = safeToRemove;
+  });
+  // The closing on its way, for a new opening to take over from where it is.
+  const closing = useRef<Animation | null>(null);
   // The part hidden at the bottom, as a share of the panel and a length: the panel's own height is set by floating-ui
   // after it mounts, so it is never measured here. One template, so the two ends interpolate.
   const clipFor = (share: number, px: number, radius: number) => `inset(0px 0px calc(${share}% - ${px}px) 0px round ${radius}px)`;
@@ -205,8 +217,15 @@ function PanelGrowth({ still, fromHeight, className, children }: { still: boolea
       const fade = canAnimate(el) ? el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: dur.pop * 1000, easing: curve }) : null;
       return () => fade?.cancel();
     }
+    // Coming back before it went (the layout effects run before the closing's cleanup): from where the closing is.
+    if (closing.current) {
+      el.style.clipPath = getComputedStyle(el).clipPath;
+      closing.current.onfinish = null;
+      closing.current.cancel();
+      closing.current = null;
+    }
     // An opening (nothing left by a closing): set before the first paint, or the panel would flash open meanwhile.
-    const from = el.style.clipPath || asField;
+    const from = el.style.clipPath && el.style.clipPath !== 'none' ? el.style.clipPath : asField;
     if (!canAnimate(el)) {
       el.style.clipPath = '';
       return;
@@ -252,7 +271,7 @@ function PanelGrowth({ still, fromHeight, className, children }: { still: boolea
     if (isPresent) return;
     const el = ref.current;
     if (!el || !canAnimate(el)) {
-      safeToRemove?.();
+      remove.current?.();
       return;
     }
     el.style.pointerEvents = 'none';
@@ -260,14 +279,21 @@ function PanelGrowth({ still, fromHeight, className, children }: { still: boolea
     const run = still
       ? el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: dur.press * 1000, fill: 'forwards' })
       : el.animate([{ clipPath: now && now !== 'none' ? now : asPanel }, { clipPath: asField }], { duration: SHRINK_S * 1000, easing: `cubic-bezier(${ease.inOut.join(', ')})`, fill: 'forwards' });
-    run.onfinish = () => safeToRemove?.();
+    run.onfinish = () => {
+      closing.current = null;
+      remove.current?.();
+    };
+    closing.current = run;
     return () => {
-      // Coming back before it went: the growth starts from here.
-      el.style.clipPath = still ? '' : getComputedStyle(el).clipPath;
+      // Taken over by a new opening already (see the growth), or gone with the panel.
+      if (closing.current !== run) return;
       run.onfinish = null;
       run.cancel();
+      closing.current = null;
     };
-  }, [isPresent, still, asField, asPanel, safeToRemove]);
+    // Once per closing: the field's height and the curves are read as it starts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `asField`/`asPanel` are strings rebuilt each render
+  }, [isPresent, still]);
 
   return (
     <div ref={ref} className={cn('rounded-2xl shadow-xl', className)}>
@@ -312,7 +338,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   });
   const [step, setStep] = useState<PaletteStep>('select_act');
   const [selectedAct, setSelectedAct] = useState('');
-  const [article, setArticle] = useState('1');
+  // Empty, its placeholder saying what it takes: a «1» standing there took Backspace's first press (Bill).
+  const [article, setArticle] = useState('');
   const [actNumber, setActNumber] = useState('');
   const [actDate, setActDate] = useState('');
   const [inputValue, setInputValue] = useState('');
@@ -427,7 +454,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
       const timer = setTimeout(() => {
         setStep('select_act');
         setSelectedAct('');
-        setArticle('1');
+        setArticle('');
         setActNumber('');
         setActDate('');
         setInputValue('');
@@ -650,7 +677,12 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   const growFrom = anchor?.offsetHeight || 44;
   // A phone: the panel as tall as what the keyboard leaves, and the page under it holds still (the sheet it replaced
   // did both).
-  const shownHeight = useSyncExternalStore(subscribeViewport, viewportHeight, () => null);
+  const watchViewport = isOpen && !isDesktop;
+  const shownHeight = useSyncExternalStore(
+    watchViewport ? subscribeViewport : subscribeNothing,
+    watchViewport ? viewportHeight : noHeight,
+    noHeight,
+  );
   useEffect(() => {
     if (!isOpen || isDesktop) return;
     const before = document.body.style.overflow;
@@ -669,15 +701,13 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     middleware: [
       // Its top on the field's: the panel's own box takes the field's place.
       offset(({ rects }) => -rects.reference.height),
-      // As wide as the field; one height while the box filters the lists, so the panel
-      // does not jump under the hand at every letter.
+      // As wide as the field; as tall as what it holds, up to the height it always had (Bill: one row is not a
+      // 640 px panel), the window allowing.
       size({
         padding: 16,
         apply({ rects, availableHeight, elements }) {
-          Object.assign(elements.floating.style, {
-            width: `${rects.reference.width}px`,
-            height: `${Math.min(PANEL_MAX_HEIGHT, Math.max(320, availableHeight))}px`,
-          });
+          elements.floating.style.width = `${rects.reference.width}px`;
+          elements.floating.style.setProperty('--palette-max-h', `${Math.min(PANEL_MAX_HEIGHT, Math.max(320, availableHeight))}px`);
         },
       }),
     ],
@@ -697,7 +727,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
       // words but those handed over.
       setStep('select_act');
       setSelectedAct('');
-      setArticle('1');
+      setArticle('');
       setActNumber('');
       setActDate('');
       setWaitingFor(null);
@@ -797,7 +827,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
                 // The field's order (R2): a decision, then the server still naming the act (the search runs when it
                 // answers), then a norm — unless the arrows chose another row, which Enter then picks.
                 if (['ArrowDown', 'ArrowUp', 'Home', 'End', 'PageDown', 'PageUp'].includes(e.key)) setMoved(true);
-                if (e.key !== 'Enter' || moved) return;
+                // An Enter that ends an IME composition chooses the composed word, it searches nothing.
+                if (e.key !== 'Enter' || moved || e.nativeEvent.isComposing) return;
                 if (decisionRef) {
                   e.preventDefault();
                   handleOpenDecision();
@@ -888,18 +919,21 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   // The help line, or what the box was read as, 10 px under the field and on the line of its text: the
   // field's edge (12 px of row, 1 of border, 12 of padding), then on the first step the icon's 20 px and
   // the gap's 12. The visible line is aria-hidden: the status region says it.
+  // The line under the box says what no row says: the wait for the server. A decision, a norm or a topic read in the
+  // box is its row, the chosen one, with «↵» — a second line saying the same was one too many (Bill).
+  const lineSays = step === 'select_act' && preview && (waiting || resolvingRemotely) ? preview : null;
   const fieldLine = (
     <div aria-hidden className="flex min-h-5 items-center gap-3 pb-3 pl-[25px] pr-4 pt-2.5 text-xs">
       {step === 'select_act' && (
         <span className="flex w-5 shrink-0 justify-center">
-          {preview && <preview.icon size={14} className={preview.tone} />}
+          {lineSays && <lineSays.icon size={14} className={lineSays.tone} />}
         </span>
       )}
-      {step === 'select_act' && preview ? (
+      {lineSays ? (
         <>
           <span id="command-palette-help" className="sr-only">{helpLine}</span>
-          <span className={cn('min-w-0 flex-1 truncate font-medium', preview.tone)}>{preview.text}</span>
-          <span className={cn('shrink-0', SUBTLE)}>{preview.action}</span>
+          <span className={cn('min-w-0 flex-1 truncate font-medium', lineSays.tone)}>{lineSays.text}</span>
+          <span className={cn('shrink-0', SUBTLE)}>{lineSays.action}</span>
         </>
       ) : (
         <span id="command-palette-help" className={SUBTLE}>{helpLine}</span>
@@ -1075,7 +1109,9 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     : quickNorms.length > 0 || hasAliases;
   const selectBody = (
     <Command.List
-      className={cn('px-2', isDesktop && 'h-full [&>[cmdk-list-sizer]]:flex [&>[cmdk-list-sizer]]:h-full [&>[cmdk-list-sizer]]:flex-col')}
+      // `min-h-0`: in a panel as tall as its content, up to its maximum, the list may shrink below its rows — the
+      // columns then scroll — instead of holding the panel at its full length. A flex column all the way down (a percentage height finds nothing definite in a panel sized by its content).
+      className={cn('px-2', isDesktop && 'flex min-h-0 flex-1 flex-col [&>[cmdk-list-sizer]]:flex [&>[cmdk-list-sizer]]:min-h-0 [&>[cmdk-list-sizer]]:flex-1 [&>[cmdk-list-sizer]]:flex-col')}
     >
       {/* A topic, not a decision or a norm: its own line, over the two columns */}
       {topic && (
@@ -1284,7 +1320,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
             style={anchor
               ? floatingStyles
               : !isDesktop && shownHeight
-                ? { height: `min(40rem, calc(${shownHeight}px - 1rem - env(safe-area-inset-top)))` }
+                ? { ['--palette-max-h' as string]: `min(40rem, calc(${shownHeight}px - 1rem - env(safe-area-inset-top)))` }
                 : undefined}
             className={cn(
               // The box holds the panel's height; only the panel takes the pointer (a shorter step
@@ -1293,17 +1329,15 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
               anchor
                 ? 'fixed'
                 : isDesktop
-                  ? 'fixed inset-x-4 top-16 mx-auto h-[min(40rem,calc(100dvh-6rem))] max-w-3xl'
+                  ? 'fixed inset-x-4 top-16 mx-auto max-w-3xl [--palette-max-h:min(40rem,calc(100dvh-6rem))]'
                   // A phone: the page's width less 16 px each side, dropping from the bar at the top (R2).
-                  : 'fixed inset-x-4 top-[calc(env(safe-area-inset-top)+0.5rem)] h-[min(40rem,calc(100dvh-1rem-env(safe-area-inset-top)))]',
+                  : 'fixed inset-x-4 top-[calc(env(safe-area-inset-top)+0.5rem)] [--palette-max-h:min(40rem,calc(100dvh-1rem-env(safe-area-inset-top)))]',
               Z_INDEX.commandPalette,
             )}
           >
-            {/* The field grows into the panel (R2): `PanelGrowth`. */}
-            <PanelGrowth still={still} fromHeight={growFrom} className={cn(
-              'pointer-events-auto flex min-h-0 max-h-full flex-col overflow-hidden border border-ink-200 bg-white dark:border-ink-700 dark:bg-ink-900',
-              step === 'select_act' && 'flex-1',
-            )}>
+            {/* The field grows into the panel (R2): `PanelGrowth`. As tall as its content, up to `--palette-max-h`: the
+                lists scroll inside it past that. */}
+            <PanelGrowth still={still} fromHeight={growFrom} className="pointer-events-auto flex min-h-0 max-h-[var(--palette-max-h,40rem)] flex-col overflow-hidden border border-ink-200 bg-white dark:border-ink-700 dark:bg-ink-900">
               {content}
             </PanelGrowth>
           </div>

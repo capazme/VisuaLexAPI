@@ -1,14 +1,16 @@
 import { useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Check } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import type { ConteggiStati, Progressi } from '../../../../types/studia';
 import { GoalRing } from './GoalRing';
 import { LevelBar } from './LevelBar';
-import { currentWeek, formatDayLong, totalCards, type WeekDay } from './layout';
+import { totalCards } from './layout';
+import { stopStates } from './today';
 import { StreakBadge } from './StreakBadge';
 import { SettingsGear, StudySettingsPanel } from './StudySettings';
-import { BLOCK_HEADING, CARD_STATES, DAY_STATE_LABEL, INK_BG, INK_BORDER, INK_TEXT, MUTED_TEXT, ON_INK, SECONDARY_BUTTON, TILE } from './tokens';
+import { BLOCK_HEADING, CARD_STATES, FOCUS_RING, INK_TEXT, MUTED_TEXT, TILE } from './tokens';
+import { WeekRow } from './WeekRow';
 
 export interface StatsBandProps {
   /** The whole day's answer; null before the first one, or when it could not be read. */
@@ -28,75 +30,27 @@ export interface StatsBandProps {
   aside?: boolean;
 }
 
+/** In the right column from `xl`: the week at the column's width. */
+const ASIDE_WEEK = 'xl:ml-0 xl:w-full';
+
 /**
- * In the right column from `xl`: the week and the link at the column's width, the numbers a step smaller, and the three
- * states in columns as wide as their words, spread across, so «In apprendimento» stays on one line under its number.
+ * The cards by state in one line (G8): each count with its swatch and its name, «3 nuove · 5 in apprendimento · 2
+ * consolidate», and the bar of the three colours under it. The words say it; the bar is their picture.
  */
-const ASIDE = {
-  week: 'xl:ml-0 xl:w-full',
-  row: 'xl:w-full xl:gap-1.5',
-  numbers: 'xl:grid-cols-[repeat(3,auto)] xl:justify-between',
-  label: 'xl:whitespace-nowrap',
-  number: 'xl:text-3xl',
-  link: 'xl:w-full',
-} as const;
-
-/** A box of the week: ticked for a day that counted, dashed for a rest, empty for a missed one, outlined for today. */
-function boxClass(day: WeekDay, today: boolean): string {
-  return cn(
-    'grid h-8 w-8 place-content-center rounded-md border-[1.5px]',
-    day.stato === 'fatto' && cn(INK_BG, INK_BORDER, ON_INK),
-    day.stato === 'riposo' && cn('border-dashed', INK_BORDER),
-    day.stato === 'saltato' && 'border-slate-300 dark:border-slate-600',
-    day.stato === 'oggi' && INK_BORDER,
-    (day.stato === 'futuro' || day.stato === 'vuoto') && 'border-dotted border-slate-300 dark:border-slate-700',
-    today && 'ring-2 ring-primary-900/40 ring-offset-2 ring-offset-white dark:ring-primary-300/40 dark:ring-offset-slate-900',
-  );
-}
-
-/** The current week, Monday to Sunday, each box with its letter; the states are also words, for a screen reader. */
-function WeekRow({ data, aside }: { data: Progressi; aside: boolean }) {
-  // The calendar is sorted by day: its first row is the first day studied in the window, none for a newcomer.
-  const week = currentWeek(data.oggi.giorno, data.serie.ultimiGiorni, data.calendario[0]?.giorno);
-  return (
-    <ol aria-label="Questa settimana" className={cn('grid w-full grid-cols-7 gap-1.5 md:w-auto md:gap-2', aside && ASIDE.row)}>
-      {week.map((day) => {
-        const today = day.giorno === data.oggi.giorno;
-        return (
-          <li key={day.giorno} data-stato={day.stato} className="grid justify-items-center gap-1">
-            <span aria-hidden className={cn('text-xs font-medium', today ? INK_TEXT : MUTED_TEXT)}>
-              {day.lettera}
-            </span>
-            <span aria-hidden className={boxClass(day, today)}>
-              {day.stato === 'fatto' && <Check size={15} strokeWidth={3} />}
-            </span>
-            <span className="sr-only">{`${formatDayLong(day.giorno)}: ${DAY_STATE_LABEL[day.stato]}`}</span>
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
-
-/** The cards by state: three large numbers in the reader's serif, their names in the interface's sans, the bar under. */
-function StateNumbers({ stati, aside }: { stati: ConteggiStati; aside: boolean }) {
+function StatesLine({ stati }: { stati: ConteggiStati }) {
   const total = totalCards(stati);
+  // «3 nuove», «5 in apprendimento», «1 consolidata»: in `CARD_STATES`' order, with their plurals.
+  const words = stopStates(stati).split(' · ');
   return (
-    <div className="grid gap-3">
-      <dl className={cn('grid grid-cols-3 gap-3', aside && ASIDE.numbers)}>
-        {CARD_STATES.map((state) => (
-          // The number above its name: `dt` first in the document, drawn second; packed to the top, so the three
-          // numbers stay on one line when a name takes two.
-          <div key={state.key} className="flex flex-col-reverse justify-end gap-1">
-            <dt className={cn('flex items-center gap-1.5 text-sm leading-tight', aside && ASIDE.label, MUTED_TEXT)}>
-              <span aria-hidden className={cn('inline-block h-2.5 w-2.5 shrink-0 rounded-sm', state.swatch)} />
-              {state.label}
-            </dt>
-            <dd className={cn('font-serif text-3xl font-medium leading-none tabular-nums md:text-4xl', aside && ASIDE.number, INK_TEXT)}>{stati[state.key]}</dd>
-          </div>
+    <div className="grid gap-2">
+      <ul aria-label="Le schede per stato" className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm tabular-nums text-slate-700 dark:text-slate-200">
+        {CARD_STATES.map((state, index) => (
+          <li key={state.key} className="inline-flex items-center gap-1.5 whitespace-nowrap">
+            <span aria-hidden className={cn('inline-block h-2.5 w-2.5 shrink-0 rounded-sm', state.swatch)} />
+            {words[index]}
+          </li>
         ))}
-      </dl>
-      {/* The numbers say it: the bar is their picture. */}
+      </ul>
       <span aria-hidden className="flex h-2 gap-0.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
         {total > 0 &&
           CARD_STATES.filter((state) => stati[state.key] > 0).map((state) => (
@@ -107,17 +61,18 @@ function StateNumbers({ stati, aside }: { stati: ConteggiStati; aside: boolean }
   );
 }
 
+/** The panel's id: the gear, the missions' settings line and the day block's settings buttons control it. */
+export const STUDY_SETTINGS_PANEL = 'studia-impostazioni';
+
 /**
  * «I tuoi progressi», one band (Gymnasium spec §5.1). Up to `xl` it spans the page and lays its pieces out in a row from
- * `md`; as «Oggi»'s right column from `xl` (`aside`, G6), about 300 to 400 px, it stacks them as on a phone (the week
- * and «Tutti i progressi» at the column's width): the streak, today's goal and the gear; the current week as
- * seven boxes; the level (`LevelBar`, G1c: the user's alone); the cards by state as three numbers with their bar; «Tutti i progressi», a link to `/studia/progressi`,
- * where the long calendar, the coming days and the subjects live (G3: the data in one place). The gear opens the study
- * settings in the card, under the heading (G6). While the first read travels it holds its final size; a failed read leaves the
- * heading and the gear (the missions say it failed, with «Riprova»).
+ * `md`; as «Oggi»'s right column from `xl` (`aside`, G6) it stacks them as on a phone (the week at the column's width):
+ * the streak and the gear; the current week as seven boxes; the level (`LevelBar`, G1c: the user's alone); the cards by
+ * state in one line with their bar; «Tutti i progressi →», a text link to `/studia/progressi`, where the trend, the
+ * coming days and the subjects live (G3: the data in one place). No ring of the goal (G8): the goal's mission says it.
+ * The gear opens the study settings in the card, under the heading (G6). While the first read travels it holds its
+ * final size; a failed read leaves the heading and the gear (the day block says it failed, with «Riprova»).
  */
-/** The panel's id: the gear and the missions' «Cambia…» buttons control it. */
-export const STUDY_SETTINGS_PANEL = 'studia-impostazioni';
 
 export function StatsBand({ data, loading, settingsOpen, onToggleSettings, onCloseSettings, onSettingsChanged, communityRequest = 0, celebrate = false, aside = false }: StatsBandProps) {
   const gear = useRef<HTMLButtonElement>(null);
@@ -129,9 +84,9 @@ export function StatsBand({ data, loading, settingsOpen, onToggleSettings, onClo
   return (
     <section aria-labelledby="studia-progressi" aria-busy={loading} className={cn(TILE, 'grid gap-5 p-4 md:p-6')}>
       <div className="flex items-center gap-3">
-        <h3 id="studia-progressi" className={BLOCK_HEADING}>
+        <h2 id="studia-progressi" className={BLOCK_HEADING}>
           I tuoi progressi
-        </h3>
+        </h2>
         <SettingsGear ref={gear} open={settingsOpen} onClick={onToggleSettings} controls={STUDY_SETTINGS_PANEL} />
       </div>
       {/* Under the heading, inside the card, which grows downward; never a window over the page. */}
@@ -141,17 +96,21 @@ export function StatsBand({ data, loading, settingsOpen, onToggleSettings, onClo
         <>
           <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
             <StreakBadge compact attuale={data.serie.attuale} record={data.serie.record} ultimiGiorni={data.serie.ultimiGiorni} pop={celebrate} />
-            <div className="shrink-0">
-              <GoalRing compact giorno={data.oggi.giorno} ripassi={data.oggi.ripassi} obiettivo={data.oggi.obiettivo} raggiunto={data.oggi.raggiunto} />
-            </div>
-            <div className={cn('w-full md:ml-auto md:w-auto', aside && ASIDE.week)}>
+            <div className={cn('w-full md:ml-auto md:w-auto', aside && ASIDE_WEEK)}>
               <WeekRow data={data} aside={aside} />
             </div>
           </div>
+          {/* A server without the points (#253) sends no level and no missions: no bar, and the goal's ring in the
+              missions' stead, so the goal is still said. */}
           {data.livello && <LevelBar livello={data.livello} />}
-          <StateNumbers stati={data.stati} aside={aside} />
-          <Link to="/studia/progressi" className={cn(SECONDARY_BUTTON, 'inline-flex w-full items-center justify-center md:w-auto md:justify-self-start', aside && ASIDE.link)}>
+          {!data.missioni?.length && <GoalRing compact giorno={data.oggi.giorno} ripassi={data.oggi.ripassi} obiettivo={data.oggi.obiettivo} raggiunto={data.oggi.raggiunto} />}
+          <StatesLine stati={data.stati} />
+          <Link
+            to="/studia/progressi"
+            className={cn('-mx-1 inline-flex min-h-[44px] items-center gap-1.5 justify-self-start rounded-lg px-1 text-sm font-semibold underline-offset-4 hover:underline', INK_TEXT, FOCUS_RING)}
+          >
             Tutti i progressi
+            <ArrowRight size={15} aria-hidden />
           </Link>
         </>
       ) : loading ? (
@@ -159,12 +118,11 @@ export function StatsBand({ data, loading, settingsOpen, onToggleSettings, onClo
         <div aria-hidden className="grid gap-5">
           <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
             <div className="h-10 w-40 rounded-lg bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
-            <div className="h-10 w-24 rounded-lg bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
-            <div className={cn('h-14 w-full rounded-lg bg-slate-100 motion-safe:animate-pulse md:ml-auto md:w-72 dark:bg-slate-800', aside && ASIDE.week)} />
+            <div className={cn('h-14 w-full rounded-lg bg-slate-100 motion-safe:animate-pulse md:ml-auto md:w-72 dark:bg-slate-800', aside && ASIDE_WEEK)} />
           </div>
           <div className="h-[4.5rem] rounded-lg bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
-          <div className="h-[4.5rem] rounded-lg bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
-          <div className={cn('h-11 w-full rounded-xl bg-slate-100 motion-safe:animate-pulse md:w-36 dark:bg-slate-800', aside && ASIDE.link)} />
+          <div className="h-10 rounded-lg bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
+          <div className="h-11 w-36 rounded-lg bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
         </div>
       ) : (
         <p className={cn('text-sm', MUTED_TEXT)}>I numeri tornano appena riesco a leggerli.</p>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Progressi, TappaIstituto } from '../../../../types/studia';
-import { cardsLeft, dueBySubject, dueLabel, instituteCardsLeft, instituteSessionPath, nextDueDay, orderInstitutes, orderStops, stopStates, todayState } from './today';
+import { cardsLeft, dueBySubject, dueLabel, instituteCardsLeft, instituteSessionPath, nextDayLine, orderInstitutes, orderStops, stopStates, subjectsPhrase, todaySentence, todayState, todaySubjects } from './today';
 import { xpFields } from '../__fixtures__/xp';
 
 type Stop = Progressi['materie'][number];
@@ -106,15 +106,42 @@ describe('the action card\'s state', () => {
   });
 });
 
-describe('the next day with cards', () => {
-  it('is tomorrow, a later day by name, or none in the fortnight', () => {
-    expect(nextDueDay(answer({}, [0, 4, 1]))).toBe('domani');
-    expect(nextDueDay(answer({}, [3, 0, 0, 2]))).toBe('giovedì 22 ottobre');
-    expect(nextDueDay(answer({}, [5, 0, 0]))).toBeNull();
+describe('the next day with cards, under «Hai finito per oggi.» (G8)', () => {
+  it('counts tomorrow\'s cards, names a later day with its count, or says none is coming in the fortnight', () => {
+    expect(nextDayLine(answer({}, [0, 4, 1]))).toBe('Domani: 4 da ripassare.');
+    expect(nextDayLine(answer({}, [3, 0, 0, 2]))).toBe('Le prossime: giovedì 22 ottobre, 2 da ripassare.');
+    expect(nextDayLine(answer({}, [5, 0, 0]))).toBe('Nessuna scheda in programma nei prossimi 14 giorni.');
   });
 
   it('is tomorrow while new cards wait, which `prossimi` does not count (today\'s quota of them used up)', () => {
-    expect(nextDueDay(answer({}, [0, 0, 0, 2], { nuove: 30, apprendimento: 0, consolidate: 0 }))).toBe('domani');
+    expect(nextDayLine(answer({}, [0, 0, 0, 2], { nuove: 30, apprendimento: 0, consolidate: 0 }))).toBe('Domani: altre schede nuove da imparare.');
+    expect(nextDayLine(answer({}, [0, 9], { nuove: 30, apprendimento: 0, consolidate: 0 }))).toBe('Domani: 9 da ripassare.');
+  });
+});
+
+describe('the day block\'s lines (G8)', () => {
+  it('says what is on today, a part that is zero left out', () => {
+    expect(todaySentence(answer({ dovute: 12, nuove: 8 }))).toBe('12 da ripassare, 8 nuove');
+    expect(todaySentence(answer({ dovute: 0, nuove: 1 }))).toBe('1 nuova');
+    expect(todaySentence(answer({ dovute: 12345, nuove: 0 }))).toBe('12.345 da ripassare');
+  });
+
+  it('names the subjects the cards due come from, the most first, then those with new cards while today allows some', () => {
+    const materie = [stop('DIRITTO_CIVILE', 0, 3), stop('DIRITTO_PENALE', 4, 0), stop('DIRITTO_AMMINISTRATIVO', 2, 0), stop('DIRITTO_PROCESSUALE_CIVILE', 0, 0)];
+    const stops = [tappa('DIRITTO_CIVILE', 'Mora', 2), tappa('DIRITTO_CIVILE', 'Risoluzione', 1), tappa('DIRITTO_PROCESSUALE_PENALE', 'Misure', 5), tappa('DIRITTO_PENALE', 'Dolo', 0)];
+    expect(todaySubjects(materie, stops, 3)).toEqual(['DIRITTO_PROCESSUALE_PENALE', 'DIRITTO_CIVILE', 'DIRITTO_PENALE', 'DIRITTO_AMMINISTRATIVO']);
+    // No new card today: only the cards due say where the session goes.
+    expect(todaySubjects(materie, stops, 0)).toEqual(['DIRITTO_PROCESSUALE_PENALE', 'DIRITTO_CIVILE']);
+    // The road's read has not answered: the line waits rather than name a part.
+    expect(todaySubjects(materie, null, 3)).toBeNull();
+  });
+
+  it('writes two names at most, then how many more', () => {
+    expect(subjectsPhrase([])).toBeNull();
+    expect(subjectsPhrase(['DIRITTO_CIVILE'])).toBe('Diritto civile');
+    expect(subjectsPhrase(['DIRITTO_CIVILE', 'DIRITTO_PENALE'])).toBe('Diritto civile e Diritto penale');
+    expect(subjectsPhrase(['DIRITTO_CIVILE', 'DIRITTO_PENALE', 'DIRITTO_AMMINISTRATIVO'])).toBe('Diritto civile, Diritto penale e un’altra');
+    expect(subjectsPhrase(['DIRITTO_CIVILE', 'DIRITTO_PENALE', 'DIRITTO_AMMINISTRATIVO', 'DIRITTO_PROCESSUALE_CIVILE'])).toBe('Diritto civile, Diritto penale e altre 2');
   });
 });
 

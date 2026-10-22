@@ -75,7 +75,7 @@ function MissionPoints({ points, earned }: { points: number; earned: boolean }) 
 
 export interface MissionRowProps {
   mission: Mission;
-  /** A thin bar of the share under the title (today's missions; the full list keeps to the words). */
+  /** A thin bar of the share under the title, 4 px (today's missions, G8; the full list keeps to the words). */
   bar?: boolean;
   /** The note is said to a screen reader only (the goal's line, when the stamp says it to the eye). */
   quietNote?: boolean;
@@ -104,15 +104,17 @@ export function MissionRow({ mission, bar = false, quietNote = false, aside, chi
       transition={spring.snappy}
       data-missione={mission.id}
       className={cn(
-        'grid grid-cols-[24px_minmax(0,1fr)] gap-x-3 py-4 first:pt-3',
+        'grid grid-cols-[24px_minmax(0,1fr)] gap-x-3 py-3 first:pt-2.5',
         // A row that moves keeps its padding wherever it lands: the last one's is taken back by the list's margin
         // (`MissionsOfToday`). The first row and its missing rule never change: the due cards stay first.
         !layout && 'last:pb-0',
       )}
     >
       <MissionMark status={mission.status} drip={inked && ink === 'drip'} />
-      <div className="grid min-w-0 gap-2">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+      <div className="grid min-w-0 gap-1.5">
+        {/* On a phone the count and the points always go under the title, whatever its length, so every row has the
+            same shape (G8); from `md` they sit at the end of the title's line. */}
+        <div className="flex flex-col items-start gap-y-1 md:flex-row md:flex-wrap md:items-baseline md:justify-between md:gap-x-3">
           <p
             className={cn(
               'font-medium',
@@ -134,7 +136,7 @@ export function MissionRow({ mission, bar = false, quietNote = false, aside, chi
           </div>
         </div>
         {bar && progress && (
-          <span aria-hidden className="block h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+          <span aria-hidden className="block h-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
             <span className={cn('block h-full rounded-full transition-[width] duration-500 ease-out motion-reduce:transition-none', INK_BG)} style={{ width: `${share * 100}%` }} />
           </span>
         )}

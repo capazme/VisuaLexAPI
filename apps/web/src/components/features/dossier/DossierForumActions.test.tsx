@@ -57,6 +57,8 @@ describe('DossierForumActions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Forum: Nel Forum · v3' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Elimina dai dossier pubblici' }));
     expect(service.delete).not.toHaveBeenCalled();
+    // Its buttons answer once they have risen into sight (K1b).
+    await waitFor(() => expect(screen.getByRole('alertdialog')).toHaveAttribute('data-ready'));
     fireEvent.click(screen.getByRole('button', { name: 'Elimina dai dossier pubblici' }));
     await waitFor(() => expect(service.delete).toHaveBeenCalledWith('e1'));
   });

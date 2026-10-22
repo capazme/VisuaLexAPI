@@ -1,25 +1,22 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type ClipboardEvent } from 'react';
 import { Search } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { FIELD_TEXT } from '../../../constants/interactions';
-import { appStore, useAppStore } from '../../../store/useAppStore';
+import { useAppStore } from '../../../store/useAppStore';
 import { PALETTE_SHORTCUT, SEARCH_FIELD_FORM_ID, subscribeSearchField } from '../../../utils/searchFieldControl';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 
-/** A focus that comes this soon after Tab was given by Tab: the field opens. One given back by the menu does not. */
-const TAB_FOCUS_MS = 400;
-
 /**
  * The search page's field, always on screen above the practices (spec `2026-10-13-fixed-search-design.md`), and the
- * door to the search menu (R2): a click, the focus brought by Tab, a key typed on it or ⌘K grow it into the menu, in
- * the same place, with its words — one field: what the menu reads, its first row, Enter, the acts, favourites, aliases,
+ * door to the search menu (R2): a click, Enter, the arrows, a key typed on it (which goes on in the menu's box) or ⌘K
+ * grow it into the menu, in the same place, with its words; Tab only brings the focus (a focus changes no context,
+ * WCAG 3.2.1 — Bill's choice) — one field: what the menu reads, its first row, Enter, the acts, favourites, aliases,
  * filters and the steps are all the menu's (`CommandPalette`). The menu closing without a choice gives its words back
- * here; a choice empties it. The focus the menu gives back does not open it again.
+ * here; a choice empties it.
  */
 export function SearchField() {
   const [value, setValue] = useState('');
   const valueRef = useRef(value);
-  const tabAt = useRef(0);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const isOpen = useAppStore((s) => s.commandPaletteOpen);
   const openCommandPaletteWith = useAppStore((s) => s.openCommandPaletteWith);
@@ -46,21 +43,18 @@ export function SearchField() {
   useEffect(() => subscribeSearchField(({ text, open: grow = true, focus }) => {
     if (text !== undefined) setValue(text);
     if (focus) {
-      // A focus given by script, never a Tab's: it must not open the menu.
-      tabAt.current = 0;
       buttonRef.current?.focus();
     } else if (grow) openRef.current(text ?? valueRef.current);
   }), []);
 
-  // Which key brought the focus: Tab opens the menu, the menu's giving the focus back does not.
-  useEffect(() => {
-    const onKey = (event: globalThis.KeyboardEvent) => {
-      // Not a Tab inside the open menu: Esc right after it gives the focus back here, which must open nothing.
-      if (event.key === 'Tab' && !appStore.getState().commandPaletteOpen) tabAt.current = Date.now();
-    };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, []);
+  // Pasted on it, the words go on in the menu, after its own (a button takes no paste of its own: Ctrl/⌘+V reaches it as
+  // a key with a modifier, which `onKeyDown` leaves alone).
+  const onPaste = (event: ClipboardEvent<HTMLButtonElement>) => {
+    const pasted = event.clipboardData.getData('text').replace(/\s+/g, ' ').trim();
+    if (!pasted) return;
+    event.preventDefault();
+    open(valueRef.current ? `${valueRef.current} ${pasted}` : pasted);
+  };
 
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     // A letter typed on the field goes on in the menu, after its words; Enter, Space and the arrows open it.
@@ -70,6 +64,7 @@ export function SearchField() {
       event.preventDefault();
       open(valueRef.current + event.key);
     } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      // (Enter and Space press the button: its click opens it.)
       event.preventDefault();
       open();
     } else if (event.key === 'Escape' && valueRef.current) {
@@ -95,13 +90,10 @@ export function SearchField() {
             event.currentTarget.focus();
             open();
           }}
-          onFocus={() => {
-            // One Tab opens it once: the focus the menu gives back right after is not a Tab's.
-            const byTab = Date.now() - tabAt.current < TAB_FOCUS_MS;
-            tabAt.current = 0;
-            if (byTab) open();
-          }}
           onKeyDown={onKeyDown}
+          onPaste={onPaste}
+          // It stands for a field: «?», ⌘Z and the other shortcuts of a page leave it alone.
+          data-text-field=""
           className={cn(
             // The field's type size (`FIELD_TEXT`, 16 px at least on a phone, «piccolo» included), as the box it opens.
             'relative flex h-11 w-full min-w-0 items-center rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-left shadow-sm',
