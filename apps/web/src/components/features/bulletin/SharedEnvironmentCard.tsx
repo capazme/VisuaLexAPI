@@ -237,14 +237,14 @@ export function SharedEnvironmentCard({
         </div>
 
         {/* The category, the version, the author and how long ago, in one line of plain text. */}
-        <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-sm text-slate-600 dark:text-slate-400">
+        {/* One line, never wrapped: only the username gives way, cut, whole on hover. */}
+        <p className="mt-1 flex min-w-0 items-center gap-x-1.5 whitespace-nowrap text-sm text-slate-600 dark:text-slate-400">
           <span aria-hidden className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: hue }} />
           <span>{categoryLabel(environment.category)}</span>
           <span aria-hidden>·</span>
           <span>v{environment.currentVersion}</span>
           <span aria-hidden>·</span>
-          {/* A long username is cut, whole on hover: the line stays one line where it can. */}
-          <span className="inline-block max-w-[11rem] truncate align-bottom" title={environment.user.username}>
+          <span className="min-w-0 truncate" title={environment.user.username}>
             {environment.user.username}
           </span>
           {timeAgoRelative && (
@@ -276,7 +276,8 @@ export function SharedEnvironmentCard({
 
         {/* At the foot: «Mi piace» as its heart and count, then the card's one action, outlined. How many added it is
             the order «Più aggiunti»' and «I più aggiunti»', not a third number on every card. */}
-        <div className="mt-auto flex items-center gap-2 pt-4">
+        {/* As tall as the action, on a card without one too (the user's own), so every foot lines up. */}
+        <div className="mt-auto flex min-h-[3.375rem] items-center gap-2 pt-4">
           <button
             type="button"
             onClick={() => onLike(environment.id)}

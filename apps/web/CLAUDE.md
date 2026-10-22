@@ -2066,7 +2066,9 @@ meant to stay split; add new features as new files, not inside the shells:
   component names stay `bulletin` and `SharedEnvironment*` because they match the backend model; the route is
   `/forum`, the page's `h1` «Dossier pubblici», and what leaves it says so («Ritira dai dossier pubblici», toast
   «Dossier ritirato»; in the dossier's header «Copia pubblicata ritirata»), never «dal Forum»: the Forum is the section, which also holds «Community»
-  (`ForumCommunityPage`, `/forum/community`, a placeholder). `BulletinBoardPage.tsx` is a shell over three dumb views, the tabs «Esplora · I miei pubblicati ·
+  (`ForumCommunityPage`, `/forum/community`, a placeholder: an empty state composed for the page, S7a — centred in the
+  column, `CommunityMark`, line art in the manner of the section's mark in the Forum's hue, «Le discussioni arrivano
+  presto», two lines on what it will be, and «Esplora i dossier pubblici», a link drawn as the one button). `BulletinBoardPage.tsx` is a shell over three dumb views, the tabs «Esplora · I miei pubblicati ·
   Suggerimenti» (`ForumExploreView`, `ForumMyEnvironmentsView`, `ForumSuggestionsView`); Explore's filters are one row
   from `sm` and, on a phone, the search across with the category («Tutte»), the order and the 44 px refresh under it, M1. «Pubblica un dossier»
   is `PublishDossierPicker` (the user's dossiers not yet in the Forum, then the dossier's own
@@ -2083,7 +2085,7 @@ meant to stay split; add new features as new files, not inside the shells:
   the Forum's reason): a grid of `SharedEnvironmentCard`s, one column, two from `md`, three from `xl`, a row's cards one
   height (`h-full`), each an `article` with its title in Newsreader 18 px, one plain line «● Civile · v1 · autore · 2
   giorni fa» (the category's hue from its token `--category-*`, never a hand-written colour; a long username cut, whole
-  on hover), two tags then «+N», «Mi piace» a heart with its number (`aria-pressed`, named «Mi piace: N») and one action,
+  on hover, the line never wrapped), two tags then «+N», «Mi piace» a heart with its number (`aria-pressed`, named «Mi piace: N») and one action,
   «Aggiungi ai miei dossier», outlined; the count of additions is the order «Più aggiunti»' and «I più aggiunti»' (the
   widget, last on the page), not a number on every card. Then «Pronti da VisuaLex» (`StudyPacksBand`, over
   `utils/studyPacks.ts`: the 20 packs of `data/exampleEnvironments.ts`, each a pack's dossiers plus «‹pack›: articoli
