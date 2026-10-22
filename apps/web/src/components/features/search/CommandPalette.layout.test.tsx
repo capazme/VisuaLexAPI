@@ -48,6 +48,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  motionPref.reduced = false;
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
   document.getElementById(SEARCH_FIELD_FORM_ID)?.remove();
@@ -121,6 +122,13 @@ describe('CommandPalette — where it opens', () => {
 describe('CommandPalette — growing out of the field (R2)', () => {
   it('starts as tall as the search page\'s field, at its corners, and grows into the panel', () => {
     asDesktop(true);
+    // jsdom has no Web Animations: one that records what it was asked.
+    const asked: Keyframe[][] = [];
+    const animateSpy = vi.fn(function (this: HTMLElement, keyframes: Keyframe[]) {
+      asked.push(keyframes);
+      return { cancel: vi.fn(), onfinish: null, playState: 'running' } as unknown as Animation;
+    });
+    Object.defineProperty(HTMLElement.prototype, 'animate', { value: animateSpy, configurable: true, writable: true });
     const form = document.createElement('form');
     form.id = SEARCH_FIELD_FORM_ID;
     Object.defineProperty(form, 'offsetHeight', { value: 44 });
@@ -129,6 +137,19 @@ describe('CommandPalette — growing out of the field (R2)', () => {
     const panel = screen.getByRole('dialog', { name: 'Menu di ricerca' }).querySelector<HTMLElement>('.rounded-2xl')!;
     // Set before the first paint, so it never flashes open: the field's height and corners.
     expect(panel.style.clipPath).toBe('inset(0px 0px calc(100% - 44px) 0px round 12px)');
+    // And grown to the panel's, at a card's corners.
+    expect(asked).toContainEqual([
+      { clipPath: 'inset(0px 0px calc(100% - 44px) 0px round 12px)' },
+      { clipPath: 'inset(0px 0px calc(0% - 0px) 0px round 16px)' },
+    ]);
+    Reflect.deleteProperty(HTMLElement.prototype, 'animate');
+  });
+
+  it('without Web Animations draws the panel at once, never left clipped to the field', () => {
+    asDesktop(true);
+    render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    const panel = screen.getByRole('dialog', { name: 'Menu di ricerca' }).querySelector<HTMLElement>('.rounded-2xl')!;
+    expect(panel.style.clipPath).toBe('');
   });
 
   it('under reduced motion grows nothing: no clip, it fades', () => {
@@ -137,7 +158,6 @@ describe('CommandPalette — growing out of the field (R2)', () => {
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
     const panel = screen.getByRole('dialog', { name: 'Menu di ricerca' }).querySelector<HTMLElement>('.rounded-2xl')!;
     expect(panel.style.clipPath).toBe('');
-    motionPref.reduced = false;
   });
 });
 
@@ -219,19 +239,19 @@ describe('CommandPalette — «Scegli l\'atto»', () => {
     expect(screen.getByRole('option', { name: 'Codice di procedura civile · c.p.c.' })).toBeInTheDocument();
   });
 
-  it('draws the letters the box matched in the app\'s ink, and a row leaving is no option any more (R2)', async () => {
+  it('draws the letters the box matched in the app\'s ink, and a row leaving is no option any more (R2)', () => {
     asDesktop(true);
-    const user = userEvent.setup();
     render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
-    await user.type(screen.getByRole('combobox'), 'proc');
+    // One change, then a look in the same tick: the rows filtered away are still fading.
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'proc' } });
     const row = screen.getAllByRole('option').find((o) => o.textContent === 'Codice di procedura civile · c.p.c.')!;
     expect(row.querySelector('.text-toga-700')).toHaveTextContent(/^proc$/);
     // A row filtered away, while it fades: hidden, and never Enter's.
-    const leaving = screen.queryAllByRole('option', { hidden: true }).find((o) => o.textContent === 'Codice civile · c.c.');
-    if (leaving) {
-      expect(leaving).toHaveAttribute('aria-hidden', 'true');
-      expect(leaving).toHaveAttribute('aria-disabled', 'true');
-    }
+    const leaving = screen.getAllByRole('option', { hidden: true }).find((o) => o.textContent === 'Codice civile · c.c.');
+    expect(leaving).toBeDefined();
+    expect(leaving).toHaveAttribute('aria-hidden', 'true');
+    expect(leaving).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).not.toContain('Codice civile · c.c.');
   });
 
   it('is narrowed by the field while it is typed', async () => {

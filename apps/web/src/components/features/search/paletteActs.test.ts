@@ -77,6 +77,12 @@ describe('matchRanges — the letters a typed word matches (R2)', () => {
 
   it('steps over an abbreviation\'s dots, and marks nothing for an empty query or no match', () => {
     expect(matchRanges('c.c.', 'cc')).toEqual([[0, 3]]);
+    // Typed with its dots, an abbreviation is one word: the whole «c.c.», not its first «c» twice.
+    expect(matchRanges('Codice civile · c.c.', 'c.c.')).toEqual([[16, 19]]);
+    // After an emoji (two UTF-16 units) the letters marked are still the right ones.
+    const label = '⚡ Art. 2043 c.c.';
+    const [[start, end]] = matchRanges(label, '2043');
+    expect(label.slice(start, end)).toBe('2043');
     expect(matchRanges('Codice civile', '')).toEqual([]);
     expect(matchRanges('Codice civile', 'penale')).toEqual([]);
   });

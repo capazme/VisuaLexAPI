@@ -392,17 +392,24 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   once the fade is over (the manager sits outside the `AnimatePresence`); nothing had it, the field. cmdk replaces an
   id given to `Command.List` with its own, so the tour's `#command-palette-results` is on the acts' column;
   `tourConfig.commandPalette.test.tsx` checks the palette's tour against the palette drawn, on both breakpoints. Motion (R2, the second pull request; inspired by Animorio's «menu dei comandi», written from scratch with
-  Framer Motion): the field grows into the panel (`PanelGrowth`): the same place and width, the panel uncovered from the
-  field's height down to its own (`clip-path`, `calc(100% - <the field's height>)` to `calc(0% - 0px)`, one template so
-  the two ends interpolate, set before the first paint so it never flashes open; the corners from the field's 12 px to a
-  card's 16), in about 280 ms on `ease.out`, then the clip goes and the shadow deepens; the content fades in as it
-  grows; the first four groups come 30 ms apart, rising 4 px (Web Animations); closing (Esc, a click outside, a
-  choice), the same way back in about 200 ms. While the box filters, a row filtered out fades and pops out of its list
-  (`AnimatePresence mode="popLayout"`) and the rows left slide to their places (`layout`, `spring.snappy`); a row
-  leaving is `disabled` for cmdk and `aria-hidden` (Enter never picks a row no longer there); the letters the box
-  matched are drawn in toga, semibold (`Matched`, over `matchRanges` in `paletteActs.ts`). A new step slides in from
-  the side it moved to; the chosen row's tint is one element carried from row to row (`layoutId`). Under reduced motion
-  everything only fades and nothing moves. This reverses spec `2026-10-18-redesign-inchiostro` §6.1 («no open or close
+  Framer Motion and Web Animations): the field grows into the panel (`PanelGrowth`): the same place and width, the panel
+  uncovered from the field's height down to its own (`clip-path`, `calc(100% - <the field's height>)` to
+  `calc(0% - 0px)`, one template so the two ends interpolate; the corners from the field's 12 px to a card's 16), in
+  about 280 ms on `ease.out` (no bounce; a curve, not a spring); the clip is set before the first paint, so the panel
+  never flashes open, and the growth starts once the first frame is drawn (mounting the rows is a long frame, which an
+  animation started before it would spend unseen); Web Animations with no fill, so once grown nothing holds the clip and
+  the card's `shadow-xl` shows. The content fades in as it grows; the first four groups come 30 ms apart, rising 4 px.
+  Closing (Esc, a click outside, a choice), the same way back in about 200 ms from wherever it is (a growth cut short
+  included), the panel taking no pointer meanwhile; opened again before it went, it grows back from there. Without Web
+  Animations the panel is drawn at once. While the box filters, a row filtered out fades and pops out of its list
+  (`AnimatePresence mode="popLayout"`, against its own scrolling column, which is `relative`) and the rows left slide to
+  their places (`layout`, `spring.snappy`); a row leaving is `disabled` for cmdk and `aria-hidden` (Enter never picks a
+  row no longer there); the letters the box matched are drawn in toga, semibold (`Matched`, over `matchRanges` in
+  `paletteActs.ts`, one entry per UTF-16 unit; an abbreviation typed with its dots is one word). A new step slides in
+  from the side it moved to; the chosen row's tint is one element carried from row to row (`layoutId`). On a phone the
+  page under the panel holds still (the body's overflow, a backdrop that takes no touch scroll) and the panel is as tall
+  as the visual viewport leaves (the keyboard; `100dvh` does not shrink on iOS). Under reduced motion everything only
+  fades and nothing moves. This reverses spec `2026-10-18-redesign-inchiostro` §6.1 («no open or close
   animation») for the palette, as the brief asked. There is no «ultimi atti aperti»: the web keeps no list of the
   acts opened (the search history is the server's, read by its page alone). `utils/searchFieldControl.ts` reaches it: `focusSearchField({ text?, open?, focus? }, { wait? })` opens the
   menu from the field (with `focus`, only puts the cursor on it; with `open: false`, only sets its words, as

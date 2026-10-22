@@ -1,7 +1,7 @@
-import { createContext, useContext, useEffect, useEffectEvent, useLayoutEffect, useState, useCallback, useMemo, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref } from 'react';
+import { createContext, useContext, useEffect, useEffectEvent, useLayoutEffect, useState, useSyncExternalStore, useCallback, useMemo, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref } from 'react';
 import { Command, useCommandState } from 'cmdk';
 import { autoUpdate, FloatingFocusManager, FloatingPortal, offset, size, useFloating, useInteractions, useRole } from '@floating-ui/react';
-import { animate, motion, AnimatePresence, useIsPresent, usePresence, useReducedMotion } from 'framer-motion';
+import { motion, AnimatePresence, useIsPresent, usePresence, useReducedMotion } from 'framer-motion';
 import { ChevronDown, ChevronRight, Gavel, List, Search, Settings2, SlidersHorizontal, Sparkles, Tag, X, Zap } from 'lucide-react';
 import type { SearchParams, CustomAlias, SearchFilters } from '../../../types';
 import { cn } from '../../../lib/utils';
@@ -169,7 +169,6 @@ const SHRINK_S = 0.2;
 const GROUPS_ENTERING = 4;
 const GROUP_STAGGER_MS = 30;
 const GROUPS_AT_MS = 140;
-const PANEL_SHADOW = '0 20px 25px -5px rgb(0 0 0 / 0.12), 0 8px 10px -6px rgb(0 0 0 / 0.1)';
 
 /**
  * The panel growing out of the search page's field (R2), inspired by Animorio's «menu dei comandi», written from
@@ -177,6 +176,13 @@ const PANEL_SHADOW = '0 20px 25px -5px rgb(0 0 0 / 0.12), 0 8px 10px -6px rgb(0 
  * (`clip-path`, the corners from the field's to a card's), then the shadow deepens; the content fades in as it
  * grows. Closing, the same way back (`usePresence`). Under reduced motion it only fades.
  */
+/** The visual viewport's height (a phone's keyboard shortens it, `100dvh` does not on iOS); null where it is unknown. */
+const subscribeViewport = (change: () => void) => {
+  window.visualViewport?.addEventListener('resize', change);
+  return () => window.visualViewport?.removeEventListener('resize', change);
+};
+const viewportHeight = () => window.visualViewport?.height ?? null;
+
 function PanelGrowth({ still, fromHeight, className, children }: { still: boolean; fromHeight: number; className: string; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const [isPresent, safeToRemove] = usePresence();
@@ -185,56 +191,86 @@ function PanelGrowth({ still, fromHeight, className, children }: { still: boolea
   const clipFor = (share: number, px: number, radius: number) => `inset(0px 0px calc(${share}% - ${px}px) 0px round ${radius}px)`;
   const asField = clipFor(100, fromHeight, FIELD_RADIUS);
   const asPanel = clipFor(0, 0, PANEL_RADIUS);
+  const curve = `cubic-bezier(${ease.out.join(', ')})`;
+  // Web Animations with no fill: once over, nothing holds the clip (the shadow outside it shows), and a closing
+  // interrupted by a new opening starts from where it was. (A DOM without them, a test's, draws the panel at once.)
+  const canAnimate = (el: HTMLElement) => typeof el.animate === 'function';
 
+  // Growing: from the field on an opening; from where a closing was, when the panel comes back before it went.
   useLayoutEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!el || !isPresent) return;
+    el.style.pointerEvents = '';
     if (still) {
-      const fade = animate(el, { opacity: [0, 1] }, { duration: dur.pop, ease: ease.out });
-      return () => fade.stop();
+      const fade = canAnimate(el) ? el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: dur.pop * 1000, easing: curve }) : null;
+      return () => fade?.cancel();
     }
-    el.style.boxShadow = 'none';
-    // Set before the first paint: the animation starts a frame later, and the panel would flash open meanwhile.
-    el.style.clipPath = asField;
-    // The groups come one after the other as it grows: the first four, 30 ms apart, rising 4 px.
-    // (A DOM without Web Animations, a test's, skips it.)
-    const groups = [...el.querySelectorAll<HTMLElement>('[cmdk-group]')].slice(0, GROUPS_ENTERING).filter((group) => typeof group.animate === 'function').map((group, i) =>
-      group.animate(
-        [{ opacity: 0, transform: 'translateY(4px)' }, { opacity: 1, transform: 'none' }],
-        { duration: dur.pop * 1000, delay: GROUPS_AT_MS + i * GROUP_STAGGER_MS, easing: `cubic-bezier(${ease.out.join(', ')})`, fill: 'backwards' },
-      ));
-    const grow = animate(el, { clipPath: [asField, asPanel] }, { duration: GROW_S, ease: ease.out });
-    let shadow: { stop: () => void } | null = null;
-    void grow.then(() => {
-      // The clip would cut the shadow: gone once grown, and the shadow deepens.
-      el.style.clipPath = 'none';
-      shadow = animate(el, { boxShadow: ['0 1px 2px rgb(0 0 0 / 0.05)', PANEL_SHADOW] }, { duration: dur.press, ease: ease.out });
+    // An opening (nothing left by a closing): set before the first paint, or the panel would flash open meanwhile.
+    const from = el.style.clipPath || asField;
+    if (!canAnimate(el)) {
+      el.style.clipPath = '';
+      return;
+    }
+    el.style.clipPath = from;
+    // Started once the first frame is drawn: mounting the menu's rows is a long frame, and an animation started before
+    // it would run its time out unseen, the panel appearing whole.
+    let grow: Animation | null = null;
+    let groups: Animation[] = [];
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        // The groups come one after the other as it grows: the first four, 30 ms apart, rising 4 px — on an opening only.
+        groups = from === asField
+          ? [...el.querySelectorAll<HTMLElement>('[cmdk-group]')].slice(0, GROUPS_ENTERING).map((group, i) =>
+            group.animate(
+              [{ opacity: 0, transform: 'translateY(4px)' }, { opacity: 1, transform: 'none' }],
+              { duration: dur.pop * 1000, delay: GROUPS_AT_MS + i * GROUP_STAGGER_MS, easing: curve, fill: 'backwards' },
+            ))
+          : [];
+        grow = el.animate([{ clipPath: from }, { clipPath: asPanel }], { duration: GROW_S * 1000, easing: curve });
+        // Grown, the clip goes: the card's own shadow shows.
+        grow.onfinish = () => {
+          el.style.clipPath = '';
+        };
+      });
     });
     return () => {
-      grow.stop();
-      shadow?.stop();
+      cancelAnimationFrame(frame);
+      // Cut short (a closing, mid-growth): the closing starts from here, not from the field or the full panel.
+      if (grow?.playState === 'running') el.style.clipPath = getComputedStyle(el).clipPath;
+      if (grow) {
+        grow.onfinish = null;
+        grow.cancel();
+      }
       groups.forEach((animation) => animation.cancel());
     };
-    // Once per opening: the panel's own re-renders do not grow it again.
+    // Once per opening (or coming back): the panel's own re-renders do not grow it again.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the field's height is read as it opens
-  }, [still]);
+  }, [still, isPresent]);
 
+  // Closing: the same way back, from where it is (a growth cut short included); it takes no pointer meanwhile.
   useEffect(() => {
     if (isPresent) return;
     const el = ref.current;
-    if (!el) {
+    if (!el || !canAnimate(el)) {
       safeToRemove?.();
       return;
     }
+    el.style.pointerEvents = 'none';
+    const now = getComputedStyle(el).clipPath;
     const run = still
-      ? animate(el, { opacity: 0 }, { duration: dur.press })
-      : animate(el, { clipPath: [asPanel, asField], boxShadow: 'none' }, { duration: SHRINK_S, ease: ease.inOut });
-    void run.then(() => safeToRemove?.());
-    return () => run.stop();
+      ? el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: dur.press * 1000, fill: 'forwards' })
+      : el.animate([{ clipPath: now && now !== 'none' ? now : asPanel }, { clipPath: asField }], { duration: SHRINK_S * 1000, easing: `cubic-bezier(${ease.inOut.join(', ')})`, fill: 'forwards' });
+    run.onfinish = () => safeToRemove?.();
+    return () => {
+      // Coming back before it went: the growth starts from here.
+      el.style.clipPath = still ? '' : getComputedStyle(el).clipPath;
+      run.onfinish = null;
+      run.cancel();
+    };
   }, [isPresent, still, asField, asPanel, safeToRemove]);
 
   return (
-    <div ref={ref} className={cn('rounded-2xl', className)} style={still ? { opacity: 0 } : undefined}>
+    <div ref={ref} className={cn('rounded-2xl shadow-xl', className)}>
       <motion.div
         className="flex min-h-0 flex-1 flex-col"
         initial={{ opacity: 0 }}
@@ -612,6 +648,17 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   const anchor = field?.isConnected ? field : null;
   // The height the panel grows from: the field's, where it grows out of it; a field's height elsewhere (a phone's bar).
   const growFrom = anchor?.offsetHeight || 44;
+  // A phone: the panel as tall as what the keyboard leaves, and the page under it holds still (the sheet it replaced
+  // did both).
+  const shownHeight = useSyncExternalStore(subscribeViewport, viewportHeight, () => null);
+  useEffect(() => {
+    if (!isOpen || isDesktop) return;
+    const before = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = before;
+    };
+  }, [isOpen, isDesktop]);
   // A dialog on a computer too: the focus stays inside while it is open and goes back where it was
   // (the field) when it closes. Placed only when the field is there.
   const { refs, floatingStyles, context } = useFloating({
@@ -827,16 +874,14 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
       </motion.div>
 
       {/* «Chiudi», on a phone too: the panel has no other (R2). */}
-      {(
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Chiudi"
-          className={cn('inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-800 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-ink-100', FOCUS_RING)}
-        >
-          <X size={18} aria-hidden />
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Chiudi"
+        className={cn('inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-800 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-ink-100', FOCUS_RING)}
+      >
+        <X size={18} aria-hidden />
+      </button>
     </div>
   );
 
@@ -1022,7 +1067,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   );
 
   // ── The body of each step ───────────────────────────────────────────────────────────────────────
-  const scrollColumn = isDesktop ? 'min-h-0 overflow-y-auto overscroll-contain custom-scrollbar pb-2' : 'pb-2';
+  // `relative`: a row filtered out pops out of the list (`popLayout`, absolute) against its own column, which clips it.
+  const scrollColumn = isDesktop ? 'relative min-h-0 overflow-y-auto overscroll-contain custom-scrollbar pb-2' : 'relative pb-2';
   // «A portata di mano» has rows: something saved at rest, or a match while typing.
   const atHandHasRows = typed
     ? visibleQuickNorms.length > 0 || visibleAliases.length > 0 || showAliasDoor || visiblePresets.length > 0
@@ -1195,7 +1241,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
         </>
       ) : (
         // On a phone the field stays at the top and the rest scrolls under it.
-        <motion.div layoutScroll className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <motion.div layoutScroll className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {body}
           {filtersBlock}
         </motion.div>
@@ -1212,7 +1258,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
         <div
           data-find-overlay=""
           aria-hidden
-          className={cn('fixed inset-0 bg-ink-950/20 dark:bg-ink-950/50', Z_INDEX.commandPalette)}
+          // `touch-none`: a drag on it does not scroll the page under it (iOS).
+          className={cn('fixed inset-0 touch-none bg-ink-950/20 dark:bg-ink-950/50', Z_INDEX.commandPalette)}
           onClick={onClose}
         />
       )}
@@ -1234,7 +1281,11 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
             ref={refs.setFloating}
             {...getFloatingProps()}
             aria-label="Menu di ricerca"
-            style={anchor ? floatingStyles : undefined}
+            style={anchor
+              ? floatingStyles
+              : !isDesktop && shownHeight
+                ? { height: `min(40rem, calc(${shownHeight}px - 1rem - env(safe-area-inset-top)))` }
+                : undefined}
             className={cn(
               // The box holds the panel's height; only the panel takes the pointer (a shorter step
               // leaves the rest of the box to the backdrop's click).

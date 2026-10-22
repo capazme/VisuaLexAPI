@@ -139,9 +139,11 @@ export function paletteActName(value: string): string {
  * «c.c.»). Ranges `[start, end)` over `text`, ordered and joined where they touch. Nothing for an empty query.
  */
 export function matchRanges(text: string, query: string): [number, number][] {
-  const wanted = foldAlias(query).split(/[^a-z0-9]+/).filter(Boolean);
+  // An abbreviation typed with its dots is one word: «c.c.» as «cc».
+  const wanted = foldAlias(query).replace(/\./g, '').split(/[^a-z0-9]+/).filter(Boolean);
   if (wanted.length === 0) return [];
-  const folded = [...text].map((c) => foldAlias(c).charAt(0) || c.toLowerCase());
+  // One entry per UTF-16 unit, as `slice` counts (an emoji is two, left as they are).
+  const folded = text.split('').map((c) => foldAlias(c).charAt(0) || c.toLowerCase());
   const isWord = (c: string | undefined) => c !== undefined && /[a-z0-9]/.test(c);
   const starts = folded.flatMap((c, i) => (isWord(c) && !isWord(folded[i - 1]) ? [i] : []));
   const ranges: [number, number][] = [];
