@@ -381,6 +381,19 @@ describe('ArticleTabContent — copying a past text', () => {
     expect(copied).not.toContain('Tratto da');
   });
 
+  it('past the day of an announced repeal, cites the text it is with its window, never as the text in force (V1)', async () => {
+    // A practice kept the answer of before the day: the change came on 1 January 2026, today is later.
+    const KEPT: ArticleValidity = { ...CURRENT, valid_from: '2020-03-01', valid_to: '2025-12-31' };
+    show(article(KEPT, { versione: 'vigente', data_versione: '' }, { upcoming: { change: 'abrogated', valid_from: '2026-01-01', version_number: 9 } }));
+    expect(screen.getByText('Dal 1° gennaio 2026 questo articolo è abrogato.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Abrogato dal 01-01-2026' })).toBeInTheDocument();
+    fireEvent.click(copyButton());
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    const copied: string = writeText.mock.calls[0][0];
+    expect(copied).toMatch(/^art\. 1284 c\.c\., nel testo in vigore dal 1° marzo 2020 al 31 dicembre 2025 \(Normattiva, testo consolidato, consultato /);
+    expect(copied).not.toContain('testo vigente');
+  });
+
   it('starts the text in force with its citation too (D8)', async () => {
     show(article(CURRENT, { versione: 'vigente', data_versione: '' }));
     fireEvent.click(copyButton());

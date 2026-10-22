@@ -242,7 +242,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const citationNow = () => (display.canCite
         ? formatNormCitation({
             norma: norma_data,
-            validity: data.validity,
+            validity: display.citeAs ?? data.validity,
             requestedDate,
             original: !requestedDate && requestIsHistorical(norma_data),
             consultedAt: todayInRome(),

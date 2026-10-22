@@ -52,9 +52,12 @@ export interface ArticleData {
 
 export type ValidityState = 'current' | 'historical' | 'not_yet' | 'abrogated';
 
-/** What a later text does to the article, and from which day (ISO): the server's `upcoming` (G-355). */
+/**
+ * What a later text does to the article, and from which day (ISO): the server's `upcoming` (G-355). The web reads
+ * `abrogated` and `amended`; any other value (G-357 adds more) or none says nothing.
+ */
 export interface ArticleUpcoming {
-    change: 'abrogated' | 'amended';
+    change: string | null;
     valid_from: string;
     version_number: number | null;
 }

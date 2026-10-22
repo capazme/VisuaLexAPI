@@ -24,6 +24,9 @@ export const READ_ONLY_REASON = 'Non disponibile su un testo storico';
 export const NOT_YET_REASON = 'Non disponibile: l’articolo non esisteva a quella data';
 export const UNRELIABLE_REASON = 'Non disponibile: la versione restituita non comprende la data richiesta';
 
+/** An ISO day, as the server writes `upcoming.valid_from`. */
+const ISO_DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 const SOURCE_NOTE = 'Testo consolidato di Normattiva, a fini informativi: fa fede la Gazzetta Ufficiale.';
 
 function textOf(value: unknown): string | undefined {
@@ -131,6 +134,11 @@ export interface VersionDisplay {
   /** Whether a "nel testo in vigore al …" citation may be made. */
   canCite: boolean;
   /**
+   * The window a citation reads, when it is not the source's `validity`: past the day of an announced change (V1),
+   * today's text is a past one, cited «nel testo in vigore dal … al …», never as the text in force.
+   */
+  citeAs?: ArticleValidity;
+  /**
    * Whether the text may be copied, exported or added to a dossier. Not an
    * article that did not exist yet (the served text is a notice), and not a
    * version that does not contain the requested day: with no citation to lead
@@ -227,6 +235,7 @@ function upcomingBanner(upcoming: ArticleUpcoming, validity: ArticleValidity | u
   const day = from.charAt(0).toUpperCase() + from.slice(1);
   const repealed = upcoming.change === 'abrogated';
   if (passed) {
+    // A practice keeps its articles: past the day, today's text is a past one.
     const lastDay = addDaysToIsoDate(upcoming.valid_from, -1);
     return {
       kind: 'upcoming',
@@ -246,11 +255,12 @@ function upcomingBanner(upcoming: ArticleUpcoming, validity: ArticleValidity | u
 
 function upcomingChip(upcoming: ArticleUpcoming, validity: ArticleValidity | undefined, today: VersionChip | null, passed: boolean): VersionChip {
   const day = formatDateDashed(upcoming.valid_from);
-  const what = upcoming.change === 'abrogated' ? 'è abrogato' : passed ? 'è cambiato' : 'cambia';
+  const repealed = upcoming.change === 'abrogated';
+  const what = repealed ? 'è abrogato' : passed ? 'è cambiato' : 'cambia';
   const version = validity?.version_number ? ` Versione n. ${validity.version_number}.` : '';
   return {
     tone: 'upcoming',
-    label: `${passed ? 'Cambiato' : 'Cambia'} dal ${day}`,
+    label: `${passed ? (repealed ? 'Abrogato' : 'Cambiato') : 'Cambia'} dal ${day}`,
     title: `${today ? `${today.label}. ` : ''}Dal ${day} questo articolo ${what}.${version} ${SOURCE_NOTE}`,
   };
 }
@@ -293,12 +303,29 @@ export function describeVersion(
 
   const chip = validity ? chipFor(validity) : null;
   const banner = validity ? bannerFor(validity, requestedDay, canCite) : null;
-  // A later text announced only beside today's: a text asked for by date or as the original says nothing of it.
-  const willChange = Boolean(upcoming?.valid_from) && !asked && !banner && validity?.state !== 'abrogated' && validity?.state !== 'not_yet';
+  // A later text announced only beside today's: a text asked for by date or as the original says nothing of it; a
+  // change the web does not know (G-357 adds more), or none, says nothing; a text the source puts in force after today
+  // is not «in vigore oggi».
+  const willChange = (upcoming?.change === 'abrogated' || upcoming?.change === 'amended')
+    && ISO_DAY_RE.test(upcoming.valid_from ?? '')
+    && !asked && !banner
+    && validity?.state !== 'abrogated' && validity?.state !== 'not_yet'
+    && !(validity?.valid_from && validity.valid_from > today);
 
   const passed = willChange && upcoming!.valid_from <= today;
+  const citeAs: ArticleValidity | undefined = passed
+    ? {
+      state: 'historical',
+      valid_from: validity?.valid_from ?? null,
+      valid_to: addDaysToIsoDate(upcoming!.valid_from, -1),
+      version_number: validity?.version_number ?? null,
+      act_updated: validity?.act_updated ?? null,
+      request_in_window: null,
+    }
+    : undefined;
 
   return {
+    ...(citeAs ? { citeAs } : {}),
     chip: willChange ? upcomingChip(upcoming!, validity, chip, passed) : chip,
     banner: willChange ? upcomingBanner(upcoming!, validity, passed) : banner,
     textVisible: !notYet,

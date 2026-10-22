@@ -160,7 +160,7 @@ describe('VersionBanner — an article that will change (V1, G-355)', () => {
     it('past the day, in an article a practice kept, says it in the past tense and that the text was in force until the day before', () => {
         const display = show(TODAY, undated, later('abrogated'), '2027-01-15');
         expect(display.banner).toMatchObject({ title: 'Dal 1° gennaio 2027 questo articolo è abrogato.', body: 'Qui leggi il testo in vigore fino al 31 dicembre 2026: non è più il testo attuale.' });
-        expect(display.chip?.label).toBe('Cambiato dal 01-01-2027');
+        expect(display.chip?.label).toBe('Abrogato dal 01-01-2027');
         expect(show(TODAY, undated, later('amended'), '2027-01-01').banner?.title).toBe('Dal 1° gennaio 2027 questo articolo è cambiato.');
     });
 
@@ -174,6 +174,32 @@ describe('VersionBanner — an article that will change (V1, G-355)', () => {
         expect(show({ ...TODAY, state: 'abrogated' }, undated, later('amended')).banner).toBeNull();
         expect(show({ ...TODAY, state: 'not_yet', valid_from: null }, undated, later('amended')).banner?.kind).toBe('not_yet');
         expect(show({ ...TODAY, request_in_window: false }, undated, later('amended')).banner?.kind).toBe('unreliable');
+    });
+
+    it('says nothing of a change it does not know, or of none (G-357\'s «inserted», a null)', () => {
+        for (const change of ['inserted', null, 'repealed', '']) {
+            const display = show(TODAY, undated, { change, valid_from: '2027-01-01', version_number: 2 });
+            expect(display.banner).toBeNull();
+            expect(display.chip?.tone).toBe('current');
+        }
+    });
+
+    it('says nothing without a day it can read', () => {
+        for (const valid_from of ['', '1° gennaio 2027', '2027-1-1', undefined as unknown as string]) {
+            expect(show(TODAY, undated, { change: 'abrogated', valid_from, version_number: 2 }).banner).toBeNull();
+        }
+    });
+
+    it('never says «in vigore oggi» of a text the source puts in force after today', () => {
+        const later2 = { ...TODAY, valid_from: '2027-01-01', valid_to: null };
+        expect(show(later2, undated, later('amended')).banner).toBeNull();
+    });
+
+    it('past the day, a repealed article\'s chip says «Abrogato dal …», an amended one «Cambiato dal …»; the citation reads the window', () => {
+        expect(show(TODAY, undated, later('abrogated'), '2027-02-01').chip?.label).toBe('Abrogato dal 01-01-2027');
+        expect(show(TODAY, undated, later('amended'), '2027-02-01').chip?.label).toBe('Cambiato dal 01-01-2027');
+        expect(show(TODAY, undated, later('abrogated'), '2027-02-01').citeAs).toMatchObject({ state: 'historical', valid_from: '1986-07-01', valid_to: '2026-12-31' });
+        expect(show(TODAY, undated, later('abrogated')).citeAs).toBeUndefined();
     });
 
     it('changes nothing else: today\'s text can be annotated, cited and copied', () => {

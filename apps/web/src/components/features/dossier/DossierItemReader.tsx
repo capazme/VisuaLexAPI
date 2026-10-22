@@ -115,7 +115,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
   const citationNow = () => (display?.canCite
     ? formatNormCitation({
       norma,
-      validity: article?.validity,
+      validity: display?.citeAs ?? article?.validity,
       requestedDate: norma.data_versione?.trim() || undefined,
       original: !norma.data_versione?.trim() && requestIsHistorical(norma),
       consultedAt: todayInRome(),

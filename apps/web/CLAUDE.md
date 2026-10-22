@@ -1310,7 +1310,11 @@ with nothing else switched off: today's text is cited, copied and annotated as b
 `validity` (today's page unread, the article read at today) still says it, its chip with no window in the title. A
 practice keeps its articles in the browser and never reads them again: past the day (`todayInRome`, the fourth
 argument, which the tests give), the same answer says «… è abrogato.» / «… è cambiato.», «Qui leggi il testo in vigore
-fino al 31 dicembre 2026: non è più il testo attuale.», and the chip «Cambiato dal …». Every surface that draws the
+fino al 31 dicembre 2026: non è più il testo attuale.», the chip «Abrogato dal …» / «Cambiato dal …», and a copy cites
+it with its window («nel testo in vigore dal … al 31 dicembre 2026», `VersionDisplay.citeAs`, which every caller of
+`formatNormCitation` reads first), never as the text in force. Only `abrogated` and `amended` are read, with an ISO
+day: any other `change` (G-357 adds more) or none says nothing, and neither does a text the source puts in force
+after today — it is never «in vigore oggi». Every surface that draws the
 banner passes `upcoming` (the reader, the dossier reader, Gymnasium's article, the comparison, where it stands above
 its column and the article is still compared). It only informs: «Vedi il testo dal …» waits for the server to serve
 the later text (G-357).

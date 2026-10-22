@@ -67,7 +67,7 @@ export function ArticleReadOnly({ norma, showToast }: ArticleReadOnlyProps) {
       return;
     }
     const citation = display?.canCite
-      ? formatNormCitation({ norma, validity: article?.validity, requestedDate: undefined, original: false, consultedAt: todayInRome() })
+      ? formatNormCitation({ norma, validity: display?.citeAs ?? article?.validity, requestedDate: undefined, original: false, consultedAt: todayInRome() })
       : null;
     try {
       await navigator.clipboard.writeText(withCitation(text, citation, unversionedCitation(norma, todayInRome())));
