@@ -1358,7 +1358,8 @@ export function GraphExplorerPage(): React.ReactElement {
             className={cn(
               'hidden shrink-0 overflow-hidden md:block',
               !isResizingColumn && 'transition-[width] duration-200',
-              columnClosed && 'w-11',
+              // 48 px: the rail's button keeps 44 inside its border.
+              columnClosed && 'w-12',
             )}
             style={columnClosed ? undefined : { width: columnWidth }}
           >
