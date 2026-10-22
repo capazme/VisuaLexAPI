@@ -82,17 +82,23 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   router state that carries the return after the login travels with it — and keeps the page mounted. The tab
   is the page's own state, read from the address when it opens: React Router 7 applies a navigation in a
   transition, so a tab read from the address would lag one render behind the click. `useAuth` runs
-  once, in the page, and `LoginForm` takes it as a prop. The page holds still across a change of tab (A1b):
-  both forms stay mounted in one cell of a grid, the one not shown `invisible` and `inert`, so the card is as
-  tall as the taller form whichever is open and each form keeps what was typed in it, and its error (after a
+  once, in the page, and `LoginForm` takes it as a prop. The card takes the height of the form shown (A1c,
+  Luca, 22 Oct 2026; it replaced A1b's card as tall as the taller form, which left «Accedi» a box of empty space):
+  both forms stay mounted, the one not shown out of the flow (`absolute` from the box's top), `invisible` and
+  `inert`, and the box that holds them is as tall as the shown one (`height: auto`, always clipped by `overflow: clip`,
+  which makes no scroller); only across a change of tab is its height written, from where the box is to the new
+  form's, read after the commit (a fresh «Registrati» after a sign-up), in 220 ms, let go at `transitionend` (at once
+  under reduced motion); each form keeps what was typed in
+  it, and its error (after a
   sign-up, the confirmation stays until the tab changes, and back on «Registrati» a new key mounts the form
   empty; «Torna ad Accedi» finds a fresh sign-in form too, a new key, with the failure the page's `useAuth`
   still holds not shown); «Crediti»
   is the last row of a grid as tall as the window; the page is its own scroller (`h-app`) with
   `scrollbar-gutter: stable`, so a low window does not shift sideways when a bar appears; on a computer the
-  card's top sits where the card would be centred above the foot, so a form that grows (an error) grows
-  downwards and the tabs never move, and the colophon is centred against the card (text left-aligned; on a
-  phone centred above it), so it follows half of such a growth; its title is 48 px up to `lg` and 68 px from it
+  card's top sits where the card on «Accedi» is centred above the foot (`--login-card-h`, its measured height), so
+  «Registrati», or a form that grows (an error), grows downwards, the tabs never move and the page scrolls when the
+  window is too low, and the colophon is centred against the card on «Accedi» (as tall as it, `md:min-h`; text
+  left-aligned; on a phone centred above it) and holds still; its title is 48 px up to `lg` and 68 px from it
   (between 768 and 1023 px the column beside the card is about 200 px).
   **The wordmark** (A3, replacing A2's seven-segment display; inspired by a signature written with a pen, written
   from scratch in CSS, `index.css`'s `vlx-ink-*`): one face, one ink, once per opening, about 1.3 s. The book traces
@@ -520,6 +526,16 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
 - `components/ui/` — shared primitives: `Button`, `IconButton`, `Input`, `Card`,
   `Modal`, `ConfirmDialog`, `WireConfirm` (below, «Destructive confirmations»), `Toast`, `EmptyState`, `Sheet` (a
   phone's bottom sheet), plus feature-flavoured modals.
+  `Collapsible` («la tendina», U1a) is the way to open a panel in place, pushing what follows down — no window, no
+  veil (two older panels still grow their height through Framer, `DocumentReviewPage` and `EnvironmentContentViewer`:
+  to move to it): `grid-template-rows` from `0fr` to `1fr` (no height in script), 200 ms on `--ease-out` to open and 150 ms to
+  close, its content fading in 150 ms just after; closed it is `inert`, `aria-hidden` and, once its height has gone,
+  `visibility: hidden` (visible at once as it opens, so a focus given in the next frame lands); open and still its
+  content may overflow (a menu, a ring), clipped only while the height moves; Esc inside closes it and gives the focus
+  back to `triggerRef` — not an Esc from a dialog portaled from inside it, which is the dialog's. Closed it is still a
+  box of no height and keeps its parent's `gap`: it goes in a plain wrapper with what it opens under. Under reduced motion it opens and closes at once —
+  the content is kept at full opacity, or the global rule's 150 ms (after the delay) would fade it in late. The
+  trigger is the caller's (`aria-expanded`, `aria-controls`). «Oggi»'s study settings (`StudySettingsPanel`) use it.
   `SegmentedTabs` and `SegmentedTabPanel` («linguette che scorrono», U1; first on the Forum's three tabs and its
   suggestions' «Ricevuti · Inviati», S7a) are a
   `tablist` over one `tabpanel`: the chosen tab's mark slides on `spring.snappy` (a `layoutId` in the row's own
@@ -659,7 +675,8 @@ checks the files; «termine calcolato» comes with wave 2 and its warning), and 
   (`PlannerHost`, at the top: the undo toast holds the bottom). Every write bumps `plannerStore.version` and every view
   mounted reads again; nothing holds tasks between reads. No toast, log or error carries a task's title (it may name a
   client): `useTaskView` and the count log a status only.
-- **Adding**: `QuickAddField` at the top of each view (a title and Enter; «Dettagli» for dates, priority and dossier;
+- **Adding**: `QuickAddField` at the top of each view (a title and Enter, at 16 px on a phone; «Dettagli» opens dates,
+  priority and dossier in a `ui/Collapsible` under the row, the box growing, its arrow turning, Esc closing it — U1b;
   a line says where the task goes; a task that will not show in the view is announced); «c» (as in «compito») from anywhere opens
   `TaskDialog` (`PlannerHost`, mounted by `Layout`; not in a field, with a modifier, or under a dialog,
   a menu or a `data-find-overlay`), with the dossier chosen on `/dossier?dossier=` and today's date on «Oggi» and
@@ -1143,14 +1160,15 @@ places the right column; inside the tiles a sentence stops at `max-w-prose`. In 
    compact`) so the goal is still said, and the day block and the rest of «Oggi» and «Progressi» stay as before);
    the gear «Impostazioni dello
    studio» (`progress/StudySettings`: `SettingsGear` with `aria-controls`, and `StudySettingsPanel` — G6, the owner's
-   «si estende il tab»: `StudyPreferences open` inside the card under its heading, no window and no veil, its height
-   in `dur.pop` on `ease.out` through Framer Motion, at once under reduced motion; the gear again or Esc inside closes it
+   «si estende il tab»: `StudyPreferences open` inside the card under its heading, no window and no veil, in a
+   `ui/Collapsible` since U1a; the gear again or Esc inside closes it
    and the focus goes back to the gear; while it is open the right column is not sticky, so its foot can be scrolled to; the
    missions' settings line and the day block's buttons open it and focus it, «Accendi le schede della comunità» with the subjects open; the
-   strip over «Da validare» keeps `StudySettingsSheet`, a `ui/Sheet` capped at `max-w-lg` from
-   `md`, not closed by Esc or the backdrop). `StudyPreferences` saves a number when its field is left or on Enter (an
+   strip over «Da validare» (`StudyStrip`) opens the same panel in place since U1b, the strip growing downward — no
+   window any more: `StudySettingsSheet` is gone; mounted at the first opening and kept, so the settings are read only
+   once the gear is pressed). `StudyPreferences` saves a number when its field is left or on Enter (an
    unchanged one is not sent; «Salvato» beside it, no «Salva»), keeps the community's subjects one level down, closed
-   («Schede della comunità · N di 5»), and sends its saves one after the other, a switch held only while its own
+   («Schede della comunità · N di 5», a `ui/Collapsible` of its own since U1b), and sends its saves one after the other, a switch held only while its own
    save travels, so a switch pressed right after a number is neither lost nor overwritten. The week (`layout.ts` `currentWeek`: Monday
    to Sunday from the server's today and `serie.ultimiGiorni`, seven boxes with «LMMGVSD», a day to come dotted, and the
    days before the first one the calendar holds `vuoto`, never missed; each state in words for a screen reader,
@@ -2155,7 +2173,8 @@ not a ref object, and pass it at render time (gotcha 13).
 **Toggle buttons** — drive the visual from an `isPressed` selector, not a fixed
 colour: idle `text-slate-400` + hover accent, active `bg-{accent}-50
 text-{accent}` (plus `fill-` when the icon has a body). Toast wording must match
-the action actually taken. Always set `aria-pressed`.
+the action actually taken. Always set `aria-pressed` — except on a button that opens a window or a panel, which says
+`aria-expanded` instead (the act's «Struttura della norma», R3b).
 
 **Two flavours of pop-up** — *Peek* (header, scrollable body, composer; ~360px,
 page-themed) when the surface lists or edits content; *action bar* (thin dark
@@ -2336,7 +2355,11 @@ meant to stay split; add new features as new files, not inside the shells:
   tap lists the practices with «Nuova pratica»; R3 took the carousel's chevrons and dots away —, the count after it,
   which gives way first, «Salva come dossier» as a 44 px icon and its «⋯» (`usePracticeSaveActions`); with all of R3
   the text of «art. 1453 c.c.», one article of an act whose title takes one line, starts 251 px under the bar at the
-  top at 390 and 360 px (each more line of title or meta, about 25 px more),
+  top at 390 and 360 px (each more line of title or meta, about 25 px more); R3b: below `md` neither `ReaderLayout`, the
+  column, a row nor the text root steps in — the layout's 16 px are the edge, the text runs from 16 to 16 —, the icons
+  on the column's right edge reach 12 px into that margin (`-mr-3`: the row's ✕, the act's and the head's «⋯», the
+  reading bar's tools, so the status keeps one line at 320 px), and a row shows a bolt when its article is among the
+  quick norms, said in its toggle's name,
   over the same column; while `phoneReader` is set it draws `ReadingFullScreen` in the column's place
   — the column is not kept mounted under it, gotcha 26 — and gives the column back at the scroll
   position of the page's content scroller it left, asked for again while the remounted column grows
