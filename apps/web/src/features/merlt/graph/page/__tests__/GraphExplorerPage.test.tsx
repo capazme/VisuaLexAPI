@@ -1586,15 +1586,16 @@ describe('GraphExplorerPage', () => {
     });
   });
 
+  // On a graph with a centre: on an empty one the column is a rail (S7b).
   describe('audit item 4 — draggable splitter between canvas and column', () => {
     it('renders the splitter at the default width', () => {
-      renderAt('/grafo');
+      renderAt('/grafo?urn=urn%3Atest');
       const separator = screen.getByRole('separator', { name: /ridimensiona il pannello del dibattito/i });
       expect(separator).toHaveAttribute('aria-valuenow', '400');
     });
 
     it('dragging the splitter left widens the column and persists the width', () => {
-      renderAt('/grafo');
+      renderAt('/grafo?urn=urn%3Atest');
       const separator = screen.getByRole('separator', { name: /ridimensiona il pannello del dibattito/i });
       const columnWrapper = separator.nextElementSibling as HTMLElement;
       expect(columnWrapper.style.width).toBe('400px');
@@ -1608,7 +1609,7 @@ describe('GraphExplorerPage', () => {
     });
 
     it('clamps the drag to COLUMN_WIDTH_MAX', () => {
-      renderAt('/grafo');
+      renderAt('/grafo?urn=urn%3Atest');
       const separator = screen.getByRole('separator', { name: /ridimensiona il pannello del dibattito/i });
       const columnWrapper = separator.nextElementSibling as HTMLElement;
 
@@ -1620,7 +1621,7 @@ describe('GraphExplorerPage', () => {
     });
 
     it('ArrowLeft/ArrowRight on the focused splitter resize by a fixed step', () => {
-      renderAt('/grafo');
+      renderAt('/grafo?urn=urn%3Atest');
       const separator = screen.getByRole('separator', { name: /ridimensiona il pannello del dibattito/i });
       const columnWrapper = separator.nextElementSibling as HTMLElement;
 
@@ -1633,9 +1634,42 @@ describe('GraphExplorerPage', () => {
     });
 
     it('hides the splitter when the column is collapsed', () => {
-      renderAt('/grafo');
+      renderAt('/grafo?urn=urn%3Atest');
       fireEvent.click(screen.getByRole('button', { name: /comprimi il pannello/i }));
       expect(screen.queryByRole('separator', { name: /ridimensiona il pannello del dibattito/i })).not.toBeInTheDocument();
+    });
+  });
+
+  // In the sections' frame, the search wide under the title, the column closed on an empty graph (S7b).
+  describe('S7b — the frame and the column on an empty graph', () => {
+    it('titles the page «Grafo» in the frame, with no icon, and puts the search wide under it', () => {
+      renderAt('/grafo');
+      const title = screen.getByRole('heading', { level: 1, name: 'Grafo' });
+      expect(title).toHaveClass('font-serif');
+      expect(title.querySelector('svg')).toBeNull();
+      expect(title).toHaveAccessibleDescription('Academia · il laboratorio del diritto');
+      const search = screen.getByPlaceholderText(/cerca un articolo/i);
+      expect(search).toHaveClass('min-h-[44px]');
+      expect(search.closest('.max-w-md')).toBeNull();
+      for (const name of [/esporta slice/i, /^carica slice$/i]) {
+        expect(screen.getByRole('button', { name })).toHaveClass('min-h-[44px]');
+      }
+    });
+
+    it('keeps the column a rail on an empty graph, with the ask field in the header, and opens it by hand', () => {
+      renderAt('/grafo');
+      expect(screen.queryByRole('separator', { name: /ridimensiona il pannello del dibattito/i })).toBeNull();
+      expect(screen.queryByRole('tab', { name: /dibattito/i })).toBeNull();
+      // The one composer is the header's while the column is closed.
+      expect(screen.getAllByRole('textbox', { name: 'Chiedi al grafo' })).toHaveLength(1);
+      fireEvent.click(screen.getByRole('button', { name: /espandi il pannello del dibattito/i }));
+      expect(screen.getByRole('separator', { name: /ridimensiona il pannello del dibattito/i })).toBeInTheDocument();
+    });
+
+    it('opens the column once the graph has a centre', () => {
+      renderAt('/grafo?urn=urn%3Atest');
+      expect(screen.getByRole('separator', { name: /ridimensiona il pannello del dibattito/i })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /espandi il pannello del dibattito/i })).toBeNull();
     });
   });
 });

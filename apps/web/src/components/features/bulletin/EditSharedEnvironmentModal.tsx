@@ -20,7 +20,7 @@ const TITLE_MAX = 100;
 const DESCRIPTION_MAX = 500;
 const TAGS_MAX = 10;
 const TAG_MAX = 30;
-const INPUT = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500';
+const INPUT = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
 
 function flag(text: string): string | null {
   const kinds = [...new Set(findPersonalData(text).map((s) => PERSONAL_DATA_LABELS[s.kind]))];

@@ -109,7 +109,7 @@ export function DecisionPreviewDialog({ preview, anchorRef, onOpen, openLabel }:
       ref={openRef}
       type="button"
       onClick={handleOpen}
-      className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors duration-150 hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 md:min-h-0"
+      className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors duration-150 hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 md:min-h-0"
     >
       <ExternalLink size={14} aria-hidden />
       {openLabel}

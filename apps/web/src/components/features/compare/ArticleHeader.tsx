@@ -20,7 +20,7 @@ export function ArticleHeader({ article, side, onRemove, className }: ArticleHea
         <div className={cn(
           'w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0',
           side === 'left'
-            ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+            ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
             : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400',
         )}>
           {articleNumber}

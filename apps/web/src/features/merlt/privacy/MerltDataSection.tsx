@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BrainCircuit, Download, FileText, SlidersHorizontal, Trash2, UserX } from 'lucide-react';
+import { Download, FileText, SlidersHorizontal, Trash2, UserX } from 'lucide-react';
 import { WireConfirm } from '../../../components/ui/wireConfirm/WireConfirm';
 import { Modal } from '../../../components/ui/Modal';
 import { TextParagraphs } from '../../../components/features/studia/TextParagraphs';
@@ -83,9 +83,7 @@ export function MerltDataSection() {
 
   return (
     <div>
-      <label className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-1.5">
-        <BrainCircuit size={12} aria-hidden /> Dati MERL-T
-      </label>
+      <h3 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Dati MERL-T</h3>
       <div className="space-y-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
         <p className="text-xs text-slate-500">
           MERL-T impara da come usi VisuaLex solo se acconsenti. Qui puoi cambiare scelta, leggere l’informativa,
@@ -114,7 +112,7 @@ export function MerltDataSection() {
               type="button"
               onClick={() => void handleExport()}
               disabled={busy}
-              className={cn(ROW, 'bg-blue-50 text-blue-700 hover:bg-blue-100 sm:col-span-2 dark:bg-blue-950/30 dark:text-blue-300')}
+              className={cn(ROW, 'bg-primary-50 text-primary-700 hover:bg-primary-100 sm:col-span-2 dark:bg-primary-950/30 dark:text-primary-300')}
             >
               <Download size={16} aria-hidden /> Scarica i miei dati
             </button>

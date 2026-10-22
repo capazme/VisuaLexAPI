@@ -1131,10 +1131,16 @@
   background: linear-gradient(135deg, transparent 50%, hsl(215 16% 47% / 0.4) 50%);
 }
 
-/* A floating surface in the dark is a lighter plane with a hairline, never a glow. Unlayered, so it
-   wins over the shadow-* utilities. */
+/* A floating surface in the dark is a lighter plane with a hairline, never a glow; a menu or a popover
+   (`shadow-md`, Y1) the same hairline with a shorter drop. Only `--tw-shadow` is set: the utility's own
+   `box-shadow` composes it after the rings, so a focus ring (`focus-visible:ring-*`) still shows over it
+   — a `box-shadow` written here, outside the layers, replaced the ring (WCAG 2.4.7). Unlayered, so it
+   wins over the utilities' `--tw-shadow`. */
 .dark :is(.shadow-lg, .shadow-xl, .shadow-2xl) {
-  box-shadow: 0 0 0 1px var(--color-ink-700), 0 16px 40px -12px rgb(0 0 0 / 0.6);
+  --tw-shadow: 0 0 0 1px var(--color-ink-700), 0 16px 40px -12px rgb(0 0 0 / 0.6);
+}
+.dark .shadow-md {
+  --tw-shadow: 0 0 0 1px var(--color-ink-700), 0 8px 24px -10px rgb(0 0 0 / 0.55);
 }
 
 /* The book mark (ui/BookMark, and the splash in index.html): the cover traces, then the spine; while
@@ -1296,8 +1302,9 @@
   color: var(--color-ink-500);
 }
 .dark .driver-popover.visualex-tour-popover .driver-popover-close-btn { color: var(--color-ink-400); }
-.driver-popover.visualex-tour-popover .driver-popover-footer button:focus-visible,
-.driver-popover.visualex-tour-popover .driver-popover-close-btn:focus-visible {
+/* Not a focus driver.js gave with no key pressed (`data-pointer-focus`, `useTour`): the ✕ drew its square after a click. */
+.driver-popover.visualex-tour-popover .driver-popover-footer button:focus-visible:not([data-pointer-focus]),
+.driver-popover.visualex-tour-popover .driver-popover-close-btn:focus-visible:not([data-pointer-focus]) {
   outline: 2px solid var(--color-toga-500);
   outline-offset: 2px;
 }

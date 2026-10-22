@@ -46,10 +46,11 @@ export function Scrivania() {
       id="tour-main-content"
       className={cn(
         'w-full min-h-full bg-slate-50 px-6 pb-24 pt-14 dark:bg-slate-950 md:pt-20',
-        // On a phone (M1): the page's 16 px margin (the layout's; the reader's column's 16 taken back, and none of its own), and the
+        // On a phone (M1): the page's 16 px margin (the layout's: the reader's column has none of its own below md since R3b, and
+        // the Scrivania none either), and the
         // block centred in the window under the search bar when it is shorter than it (the layout's padding taken off:
         // 1rem above and below, 3rem in Focus mode, which draws no search bar).
-        'max-md:-mx-4 max-md:w-auto max-md:flex max-md:flex-col max-md:justify-center max-md:px-0 max-md:py-8',
+        'max-md:w-auto max-md:flex max-md:flex-col max-md:justify-center max-md:px-0 max-md:py-8',
         focusMode ? 'max-md:min-h-[calc(100dvh-6rem)]' : 'max-md:min-h-[calc(100dvh-var(--search-bar-height,0px)-2rem)]',
       )}
     >

@@ -17,7 +17,8 @@ const maxWidthClasses = {
 export function ReaderLayout({ children, className, maxWidth = 'normal' }: ReaderLayoutProps) {
   return (
     <div className={cn(
-      'w-full mx-auto px-4 sm:px-6 lg:px-8',
+      // No padding of its own below `md` (R3b): the layout's 16 px are the reader's edge on a phone.
+      'w-full mx-auto md:px-6 lg:px-8',
       maxWidthClasses[maxWidth],
       className
     )}>
