@@ -53,7 +53,7 @@ interface Props {
 type SortBy = 'date' | 'name' | 'items';
 
 // The list's two menus (order, category): one look, 44 px on a phone, where they share a row half and half.
-const LIST_MENU = 'flex-1 min-w-0 px-3 md:px-4 py-3 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500';
+const LIST_MENU = 'flex-1 min-w-0 px-3 md:px-4 py-3 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
 
 export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTrash, onTrashChanged }: Props) {
   const { dossiers, updateDossier, triggerSearch, triggerMultiSearch, importDossier } = useAppStore();
@@ -264,14 +264,14 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
             <button
               type="button"
               onClick={onOpenTrash}
-              className="flex-1 md:flex-none bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 px-4 py-3 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              className="flex-1 md:flex-none bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 px-4 py-3 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
             >
               <Trash2 size={18} aria-hidden /> Cestino ({trashCount})
             </button>
           )}
           <button
             onClick={triggerFileImport}
-            className="flex-1 md:flex-none bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 px-4 py-3 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="flex-1 md:flex-none bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 px-4 py-3 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
             title="Importa da file JSON (i)"
             aria-label="Importa dossier da file JSON"
             aria-keyshortcuts="i"
@@ -281,7 +281,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
           <button
             id="tour-dossier-create"
             onClick={() => setIsModalOpen(true)}
-            className="flex-1 md:flex-none dossier-create-button bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+            className="flex-1 md:flex-none dossier-create-button bg-primary-600 hover:bg-primary-700 text-white px-4 py-3 md:py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
             title="Nuovo Dossier (n)"
             aria-keyshortcuts="n"
           >
@@ -304,7 +304,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
             id="tour-dossier-create"
             onClick={() => setIsModalOpen(true)}
             aria-label="Nuovo dossier"
-            className="dossier-create-button inline-flex h-11 w-11 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+            className="dossier-create-button inline-flex h-11 w-11 items-center justify-center rounded-lg bg-primary-600 text-white shadow-sm transition-colors hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
           >
             <Plus size={22} aria-hidden />
           </button>
@@ -334,7 +334,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
             placeholder="Cerca nei dossier…"
             aria-label="Cerca nei dossier"
             aria-keyshortcuts="/"
-            className="w-full pl-10 pr-4 py-3 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="w-full pl-10 pr-4 py-3 md:py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
           />
         </div>
         <div className="flex gap-3 md:gap-4">
@@ -382,7 +382,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                   <div className="flex flex-col items-center gap-2 sm:flex-row">
                     <button
                       onClick={() => setIsModalOpen(true)}
-                      className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg inline-flex items-center gap-2 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                      className="px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg inline-flex items-center gap-2 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
                     >
                       <FolderPlus size={18} />
                       Crea il tuo primo dossier
@@ -390,7 +390,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                     {/* The ready-made study dossiers sit in the Forum (spec 2026-10-13-environments-into-forum, D12). */}
                     <button
                       onClick={() => navigate('/forum')}
-                      className="px-5 py-2.5 rounded-lg inline-flex items-center gap-2 text-blue-700 hover:bg-blue-50 dark:text-blue-300 dark:hover:bg-slate-800 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                      className="px-5 py-2.5 rounded-lg inline-flex items-center gap-2 text-primary-700 hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-slate-800 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
                     >
                       <BookOpen size={18} aria-hidden />
                       Dossier di studio pronti
@@ -421,11 +421,11 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                     onSelect(dossier.id);
                   }
                 }}
-                className="dossier-card bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 md:p-5 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-[color,background-color,border-color,box-shadow,scale] cursor-pointer group relative active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+                className="dossier-card bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 md:p-5 hover:shadow-md hover:border-primary-300 dark:hover:border-primary-700 transition-[color,background-color,border-color,box-shadow,scale] cursor-pointer group relative active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
               >
                 <div className="flex justify-between items-start mb-3 md:mb-4 gap-2">
                   <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <Folder className="text-blue-500" size={28} />
+                    <Folder className="text-primary-500" size={28} />
                     {dossier.isPinned && (
                       <Star size={14} className="text-yellow-500 fill-yellow-500" aria-label="Preferito" />
                     )}
@@ -444,7 +444,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                       title={hasNormaItems ? 'Apri su Dashboard' : 'Nessun articolo da aprire'}
                       aria-label={`Apri ${dossier.title} su Dashboard`}
                       className={cn(
-                        'p-1.5 rounded text-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500',
+                        'p-1.5 rounded text-primary-500 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
                         'disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent',
                         // Desktop: hover/focus-within reveal, mobile: always visible.
                         'md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 max-md:opacity-100',
@@ -485,7 +485,9 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                       </span>
                     )}
                     {dossier.published?.isActive && (
-                      <span className="inline-flex items-center gap-1 rounded bg-violet-50 px-1.5 py-0.5 text-xs font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                      <span className="inline-flex items-center gap-1.5 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                        {/* The Forum's hue, as its section's mark: the one touch of colour (Y1). */}
+                        <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[var(--vlx-section-forum)]" />
                         Pubblicato nel Forum
                       </span>
                     )}
@@ -500,7 +502,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                 {dossier.tags && dossier.tags.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-2 md:mt-3">
                     {dossier.tags.slice(0, 3).map((tag) => (
-                      <span key={tag} className="text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded truncate max-w-[100px]">
+                      <span key={tag} className="text-xs bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 px-2 py-0.5 rounded truncate max-w-[100px]">
                         {tagLabel(tag)}
                       </span>
                     ))}
@@ -530,7 +532,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                 </p>
                 <div className="mt-3 md:mt-4 pt-3 md:pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center">
                   <span className="text-xs text-slate-400">{formatTimestampLong(dossier.createdAt)}</span>
-                  <ChevronRight size={18} className="text-slate-400 group-hover:text-blue-500 transition-colors flex-shrink-0" />
+                  <ChevronRight size={18} className="text-slate-400 group-hover:text-primary-500 transition-colors flex-shrink-0" />
                 </div>
               </div>
             );

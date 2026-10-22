@@ -90,7 +90,7 @@ export function CitationPreviewPopup({
             disabled={isLoading}
             className={cn(
               "w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
-              "bg-blue-600 hover:bg-blue-700 text-white",
+              "bg-primary-600 hover:bg-primary-700 text-white",
               "disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed",
               "dark:disabled:bg-slate-700 dark:disabled:text-slate-500"
             )}

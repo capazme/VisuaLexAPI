@@ -51,7 +51,7 @@ export function PDFViewer({ isOpen, onClose, pdfUrl, isLoading }: PDFViewerProps
         <div className="flex-1 relative bg-slate-950/50 flex items-center justify-center">
           {isLoading ? (
             <div className="text-center text-white">
-              <Loader2 size={40} className="animate-spin mx-auto mb-4 text-blue-500" />
+              <Loader2 size={40} className="animate-spin mx-auto mb-4 text-primary-500" />
               <p className="text-slate-400">Generazione PDF in corso...</p>
             </div>
           ) : pdfUrl ? (

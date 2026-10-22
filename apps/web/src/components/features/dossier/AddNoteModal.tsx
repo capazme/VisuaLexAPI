@@ -73,7 +73,7 @@ export function AddNoteModal({ onClose, onSave, heading = 'Aggiungi una nota al 
             type="button"
             onClick={onClose}
             aria-label="Chiudi"
-            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
           >
             <X size={20} />
           </button>
@@ -89,7 +89,7 @@ export function AddNoteModal({ onClose, onSave, heading = 'Aggiungi una nota al 
             onKeyDown={handleKeyDown}
             rows={6}
             placeholder="Scrivi un appunto, una riflessione o un promemoria da allegare al dossier…"
-            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 resize-y min-h-32 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 resize-y min-h-32 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
           />
           <div className="flex justify-between text-xs text-slate-400">
             <span>⌘/Ctrl + Invio per salvare</span>
@@ -103,7 +103,7 @@ export function AddNoteModal({ onClose, onSave, heading = 'Aggiungi una nota al 
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
           >
             Annulla
           </button>

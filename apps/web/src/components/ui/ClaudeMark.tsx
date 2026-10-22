@@ -19,7 +19,7 @@ export function ClaudeMark({ createdBy, compact = false }: Props) {
   const sentence = claudeMarkSentence(createdBy);
   return (
     <span
-      className="inline-flex flex-shrink-0 items-center gap-1 rounded bg-violet-50 px-1.5 py-0.5 text-[11px] font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-300"
+      className="inline-flex flex-shrink-0 items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300"
       title={sentence}
     >
       <Sparkles size={11} aria-hidden />

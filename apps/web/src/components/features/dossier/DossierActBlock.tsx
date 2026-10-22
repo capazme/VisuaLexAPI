@@ -39,7 +39,7 @@ export interface DossierActBlockProps {
 }
 
 const ACTION_BUTTON =
-  'flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-lg px-2 text-sm text-slate-600 transition-colors hover:bg-slate-100 md:min-h-0 md:min-w-0 md:py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-slate-300 dark:hover:bg-slate-700';
+  'flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-lg px-2 text-sm text-slate-600 transition-colors hover:bg-slate-100 md:min-h-0 md:min-w-0 md:py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-300 dark:hover:bg-slate-700';
 
 /** One act, named once, with its articles beneath it (spec §4). */
 export function DossierActBlock(props: DossierActBlockProps) {
@@ -63,7 +63,7 @@ export function DossierActBlock(props: DossierActBlockProps) {
             {...attributes}
             {...listeners}
             aria-label={`Sposta ${block.heading}`}
-            className="mt-1.5 hidden cursor-grab rounded text-slate-300 hover:text-slate-500 md:block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-slate-600"
+            className="mt-1.5 hidden cursor-grab rounded text-slate-300 hover:text-slate-500 md:block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-600"
           >
             <GripVertical size={18} />
           </button>
@@ -86,7 +86,7 @@ export function DossierActBlock(props: DossierActBlockProps) {
               }}
               className={cn(
                 'flex min-h-[44px] min-w-0 cursor-pointer items-center gap-2 rounded-md text-base font-semibold md:min-h-0',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
                 block.headingIsFallback ? 'text-slate-500 dark:text-slate-400' : 'text-slate-900 dark:text-white',
               )}
             >

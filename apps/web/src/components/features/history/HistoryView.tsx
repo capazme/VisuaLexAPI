@@ -361,7 +361,7 @@ export function HistoryView() {
                             onChange={(e) => setSearchTerm(e.target.value)}
                             aria-keyshortcuts="/"
                             title="Cerca (premi /)"
-                            className={`w-full pl-9 pr-4 py-2 ${FIELD_TEXT} rounded-lg bg-slate-100 dark:bg-slate-700 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-slate-900 transition-colors min-h-[44px] md:min-h-0 md:py-1.5 md:rounded-full`}
+                            className={`w-full pl-9 pr-4 py-2 ${FIELD_TEXT} rounded-lg bg-slate-100 dark:bg-slate-700 border-transparent focus:border-primary-500 focus:bg-white dark:focus:bg-slate-900 transition-colors min-h-[44px] md:min-h-0 md:py-1.5 md:rounded-full`}
                         />
                         <Search size={16} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     </div>
@@ -387,7 +387,7 @@ export function HistoryView() {
                 <div className="p-3 md:p-6">
                     {loading ? (
                         <div className="p-8 text-center">
-                            <Loader2 className="animate-spin mx-auto text-blue-500" size={24} />
+                            <Loader2 className="animate-spin mx-auto text-primary-500" size={24} />
                         </div>
                     ) : filteredHistory.length === 0 && history.length > 0 ? (
                         <EmptyState
@@ -411,7 +411,7 @@ export function HistoryView() {
                             action={
                                 <button
                                     onClick={() => navigate('/')}
-                                    className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg inline-flex items-center gap-2 transition-colors min-h-[44px]"
+                                    className="px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg inline-flex items-center gap-2 transition-colors min-h-[44px]"
                                 >
                                     <Search size={18} />
                                     Inizia una ricerca
@@ -425,20 +425,20 @@ export function HistoryView() {
                                     {/* Date label with timeline line */}
                                     {/* Mobile: smaller, simpler date label */}
                                     <div className="md:hidden flex items-center gap-2 mb-3 sticky top-[var(--phone-bar-offset,0px)] transition-[top] duration-200 ease-out motion-reduce:transition-none bg-white dark:bg-slate-800 py-1 z-10">
-                                        <div className="flex items-center gap-1.5 bg-blue-50 dark:bg-blue-900/30 px-2.5 py-1 rounded-full">
-                                            <Calendar size={12} className="text-blue-600 dark:text-blue-400" />
-                                            <span className="text-xs font-bold text-blue-600 dark:text-blue-400">{label}</span>
+                                        <div className="flex items-center gap-1.5 bg-primary-50 dark:bg-primary-900/30 px-2.5 py-1 rounded-full">
+                                            <Calendar size={12} className="text-primary-600 dark:text-primary-400" />
+                                            <span className="text-xs font-bold text-primary-600 dark:text-primary-400">{label}</span>
                                         </div>
-                                        <div className="flex-1 h-px bg-gradient-to-r from-blue-200 dark:from-blue-800 to-transparent" />
+                                        <div className="flex-1 h-px bg-gradient-to-r from-primary-200 dark:from-primary-800 to-transparent" />
                                     </div>
 
                                     {/* Desktop: full date label */}
                                     <div className="hidden md:flex items-center gap-3 mb-4 sticky top-[var(--phone-bar-offset,0px)] transition-[top] duration-200 ease-out motion-reduce:transition-none bg-white dark:bg-slate-800 py-2 z-10">
-                                        <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-full">
-                                            <Calendar size={14} className="text-blue-600 dark:text-blue-400" />
-                                            <span className="text-sm font-bold text-blue-600 dark:text-blue-400">{label}</span>
+                                        <div className="flex items-center gap-2 bg-primary-50 dark:bg-primary-900/30 px-3 py-1.5 rounded-full">
+                                            <Calendar size={14} className="text-primary-600 dark:text-primary-400" />
+                                            <span className="text-sm font-bold text-primary-600 dark:text-primary-400">{label}</span>
                                         </div>
-                                        <div className="flex-1 h-px bg-gradient-to-r from-blue-200 dark:from-blue-800 to-transparent" />
+                                        <div className="flex-1 h-px bg-gradient-to-r from-primary-200 dark:from-primary-800 to-transparent" />
                                     </div>
 
                                     {/* Timeline items */}
@@ -454,7 +454,7 @@ export function HistoryView() {
                                                     className={cn(
                                                         "relative bg-white dark:bg-slate-800 p-3 pl-4 rounded-lg border transition-[color,background-color,border-color,scale] cursor-pointer min-h-[44px]",
                                                         "border-slate-200 dark:border-slate-700",
-                                                        "active:scale-[0.98] active:border-blue-400"
+                                                        "active:scale-[0.98] active:border-primary-400"
                                                     )}
                                                 >
                                                     {/* Act-type stripe — see desktop card for rationale */}
@@ -466,7 +466,7 @@ export function HistoryView() {
                                                     <div className="flex items-start justify-between gap-2">
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center gap-1.5 mb-1">
-                                                                <span className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded text-xs font-bold">
+                                                                <span className="bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 px-2 py-0.5 rounded text-xs font-bold">
                                                                     Art. {item.article}
                                                                 </span>
                                                                 {item.act_number && (
@@ -487,7 +487,7 @@ export function HistoryView() {
                                                                 </p>
                                                             )}
                                                         </div>
-                                                        <ArrowRight size={18} className="text-blue-500 flex-shrink-0 mt-1" />
+                                                        <ArrowRight size={18} className="text-primary-500 flex-shrink-0 mt-1" />
                                                     </div>
                                                 </div>
                                             </div>
@@ -495,14 +495,14 @@ export function HistoryView() {
                                     </div>
 
                                     {/* Desktop: full timeline with dots */}
-                                    <div className="hidden md:block space-y-3 pl-6 border-l-2 border-blue-100 dark:border-blue-900 relative">
+                                    <div className="hidden md:block space-y-3 pl-6 border-l-2 border-primary-100 dark:border-primary-900 relative">
                                         {items.map((item, idx) => item.decision_key ? (
                                             <DecisionHistoryRow key={item.id} item={item} variant="desktop" onDelete={handleDeleteItem}
                                                 id={idx === 0 ? 'tour-history-item' : undefined} />
                                         ) : (
                                             <div key={idx} id={idx === 0 ? 'tour-history-item' : undefined} className="relative group">
                                                 {/* Timeline dot */}
-                                                <div className="absolute -left-[27px] top-3 w-3 h-3 bg-blue-500 rounded-full ring-4 ring-white dark:ring-slate-800" />
+                                                <div className="absolute -left-[27px] top-3 w-3 h-3 bg-primary-500 rounded-full ring-4 ring-white dark:ring-slate-800" />
 
                                                 {/* Item card */}
                                                 <div
@@ -510,7 +510,7 @@ export function HistoryView() {
                                                     className={cn(
                                                         "relative bg-white dark:bg-slate-800 p-4 pl-5 rounded-xl border-2 transition-[color,background-color,border-color,box-shadow] cursor-pointer",
                                                         "border-slate-200 dark:border-slate-700",
-                                                        "hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md"
+                                                        "hover:border-primary-300 dark:hover:border-primary-700 hover:shadow-md"
                                                     )}
                                                 >
                                                     {/* Act-type stripe — rounded-l-xl matches card corner so it doesn't
@@ -524,7 +524,7 @@ export function HistoryView() {
                                                     <div className="flex justify-between items-start gap-4">
                                                         <div className="flex-1">
                                                             <div className="flex items-baseline gap-2 mb-2">
-                                                                <p className="font-bold text-blue-600 dark:text-blue-400 text-lg capitalize">
+                                                                <p className="font-bold text-primary-600 dark:text-primary-400 text-lg capitalize">
                                                                     {item.act_type}
                                                                 </p>
                                                                 {item.act_number && (
@@ -534,7 +534,7 @@ export function HistoryView() {
                                                                 )}
                                                             </div>
                                                             <div className="flex flex-wrap gap-2 text-sm text-slate-500 items-center">
-                                                                <span className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-lg text-xs font-medium">
+                                                                <span className="bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 px-2 py-1 rounded-lg text-xs font-medium">
                                                                     Art. {item.article}
                                                                 </span>
                                                                 {item.date && (
@@ -606,7 +606,7 @@ export function HistoryView() {
                                                                                 className="w-full px-3 py-2 text-left text-sm flex items-center justify-between hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                                                                             >
                                                                                 <span className="flex items-center gap-2">
-                                                                                    <FolderPlus size={16} className="text-blue-500" />
+                                                                                    <FolderPlus size={16} className="text-primary-500" />
                                                                                     <span>Aggiungi a dossier</span>
                                                                                 </span>
                                                                                 <ArrowRight size={14} className="text-slate-400" />
@@ -631,7 +631,7 @@ export function HistoryView() {
                                                                                     <div className="border-t border-slate-200 dark:border-slate-700 mt-1 pt-1">
                                                                                         <button
                                                                                             onClick={(e) => handleCreateDossierAndAdd(e, item)}
-                                                                                            className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                                                                                            className="w-full px-3 py-2 text-left text-sm flex items-center gap-2 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
                                                                                         >
                                                                                             <Plus size={14} />
                                                                                             <span>Nuovo dossier...</span>
@@ -660,7 +660,7 @@ export function HistoryView() {
                                                                 )}
                                                             </div>
 
-                                                            <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-blue-500 pointer-events-none">
+                                                            <div className="p-2 bg-primary-50 dark:bg-primary-900/20 rounded-lg text-primary-500 pointer-events-none">
                                                                 <ArrowRight size={18} />
                                                             </div>
                                                         </div>

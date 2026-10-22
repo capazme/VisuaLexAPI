@@ -128,12 +128,12 @@ export function StudyModeSettings({
                     className={cn(
                       "flex-1 flex flex-col items-center gap-2 p-3 rounded-lg border transition-[color,background-color,border-color,box-shadow]",
                       theme === 'dark'
-                        ? 'border-blue-500 bg-slate-800 shadow-sm'
+                        ? 'border-primary-500 bg-slate-800 shadow-sm'
                         : cn('border-transparent', styles.button)
                     )}
                   >
-                    <Moon size={20} className={theme === 'dark' ? 'text-blue-400' : styles.muted} />
-                    <span className={cn("text-xs font-medium", theme === 'dark' ? 'text-blue-200' : styles.muted)}>Scuro</span>
+                    <Moon size={20} className={theme === 'dark' ? 'text-primary-400' : styles.muted} />
+                    <span className={cn("text-xs font-medium", theme === 'dark' ? 'text-primary-200' : styles.muted)}>Scuro</span>
                   </button>
                 </div>
               </div>

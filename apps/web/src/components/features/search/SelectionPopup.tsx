@@ -304,7 +304,7 @@ export function SelectionPopup({
                   className="p-2.5 hover:bg-slate-700 transition-colors flex items-center gap-1.5 text-sm"
                   title="Aggiungi nota (N)"
                 >
-                  <StickyNote size={16} className="text-blue-400" />
+                  <StickyNote size={16} className="text-primary-400" />
                 </button>
                 {onDiscuss && (
                   <>
@@ -350,7 +350,7 @@ export function SelectionPopup({
                   className="p-2.5 hover:bg-slate-700 transition-colors flex items-center gap-1.5 text-sm"
                   title="Cerca"
                 >
-                  <Search size={16} className="text-purple-400" />
+                  <Search size={16} className="text-primary-300" aria-hidden />
                 </button>
               </>
             )}

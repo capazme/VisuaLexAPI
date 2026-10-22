@@ -71,7 +71,7 @@ export function DossierArticleRow({
     <div
       className={cn(
         'group relative rounded-lg py-1 pl-3 pr-1 transition-colors',
-        isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800/60',
+        isSelected ? 'bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800/60',
       )}
     >
       {isImportant && <span aria-hidden className="absolute bottom-1 left-0 top-1 w-1 rounded bg-amber-400" />}
@@ -82,9 +82,9 @@ export function DossierArticleRow({
             onClick={onToggleSelect}
             aria-label={isSelected ? 'Deseleziona elemento' : 'Seleziona elemento'}
             aria-pressed={isSelected}
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded text-slate-400 hover:text-blue-500 md:min-h-0 md:min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded text-slate-400 hover:text-primary-500 md:min-h-0 md:min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
           >
-            {isSelected ? <CheckSquare size={18} className="text-blue-500" /> : <Square size={18} />}
+            {isSelected ? <CheckSquare size={18} className="text-primary-500" /> : <Square size={18} />}
           </button>
         )}
         {/* The expand toggle wraps only text: the star and the remove button stay
@@ -103,7 +103,7 @@ export function DossierArticleRow({
               onToggleExpand();
             }
           }}
-          className="flex min-h-[44px] min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md py-1 md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          className="flex min-h-[44px] min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md py-1 md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
         >
           <ChevronDown
             size={16}

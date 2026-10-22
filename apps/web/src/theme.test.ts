@@ -104,7 +104,7 @@ describe('the practice row\'s columns', () => {
 
 describe('the Inchiostro palette', () => {
   it('aliases the Tailwind scales the app writes to ink and toga', async () => {
-    const css = await compile(['bg-ink-500', 'bg-toga-600', 'text-slate-500', 'bg-blue-600', 'ring-indigo-500', 'bg-primary-600']);
+    const css = await compile(['bg-ink-500', 'bg-toga-600', 'text-slate-500', 'bg-primary-600', 'ring-primary-500', 'bg-primary-600']);
     expect(css).toContain('.bg-ink-500');
     expect(css).toContain('.bg-toga-600');
     expect(css).toMatch(/--color-slate-500:\s*var\(--color-ink-500\)/);

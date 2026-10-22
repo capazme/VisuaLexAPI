@@ -29,10 +29,10 @@ interface SharedEnvironmentCardProps {
 // Category text color (used for the micro-header label).
 const CATEGORY_TEXT: Record<EnvironmentCategory, string> = {
   compliance: 'text-purple-700 dark:text-purple-300',
-  civil: 'text-blue-700 dark:text-blue-300',
+  civil: 'text-primary-700 dark:text-primary-300',
   penal: 'text-red-700 dark:text-red-300',
   administrative: 'text-amber-700 dark:text-amber-300',
-  eu: 'text-indigo-700 dark:text-indigo-300',
+  eu: 'text-primary-700 dark:text-primary-300',
   other: 'text-slate-600 dark:text-slate-300',
 };
 
@@ -148,7 +148,7 @@ export function SharedEnvironmentCard({
             )}
             {/* Pending suggestions badge */}
             {hasPendingSuggestions && environment.isOwner && (
-              <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full flex items-center gap-1">
+              <span className="px-2 py-0.5 text-xs font-medium bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-full flex items-center gap-1">
                 <MessageSquare size={10} />
                 {environment.pendingSuggestionsCount}
               </span>

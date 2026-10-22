@@ -360,7 +360,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
                   className={cn(
                     "flex-1 px-3 py-2 text-xs font-bold rounded-lg transition-[color,background-color,border-color,box-shadow] flex items-center justify-center gap-1",
                     version === 'data'
-                      ? "bg-blue-500 text-white shadow-sm"
+                      ? "bg-primary-500 text-white shadow-sm"
                       : "bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600"
                   )}
                 >
@@ -372,13 +372,13 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
               {/* Date input when "data" is selected */}
               {version === 'data' && (
                 <div className="flex items-center gap-2 animate-in slide-in-from-top-2 duration-200">
-                  <Calendar size={14} className="text-blue-500 shrink-0" />
+                  <Calendar size={14} className="text-primary-500 shrink-0" />
                   <input
                     type="text"
                     value={versionDate}
                     onChange={(e) => setVersionDate(e.target.value)}
                     placeholder="es. 01/01/2020 o 2020"
-                    className="flex-1 px-3 py-2 text-sm border border-blue-200 dark:border-blue-800 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className="flex-1 px-3 py-2 text-sm border border-primary-200 dark:border-primary-800 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                   />
                 </div>
               )}

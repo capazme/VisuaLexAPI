@@ -132,11 +132,11 @@ function IconAction({ icon, title, pressed, disabled, onClick }: IconActionProps
             aria-pressed={pressed}
             className={cn(
                 'inline-flex items-center justify-center w-9 h-9 transition-colors',
-                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-purple-300/60',
+                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-primary-300/60',
                 disabled
                     ? 'text-slate-600 cursor-not-allowed'
                     : pressed
-                        ? 'bg-purple-500/20 text-purple-300'
+                        ? 'bg-primary-500/20 text-primary-300'
                         : 'text-slate-300 hover:bg-slate-700 hover:text-white',
             )}
         >

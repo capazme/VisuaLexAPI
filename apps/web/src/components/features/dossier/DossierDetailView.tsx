@@ -468,13 +468,13 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     <div className="animate-in slide-in-from-right-10 duration-200">
       <button
         onClick={onBack}
-        className="md:hidden mb-4 flex items-center gap-2 px-4 py-3 text-base font-medium text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+        className="md:hidden mb-4 flex items-center gap-2 px-4 py-3 text-base font-medium text-slate-700 dark:text-slate-300 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
       >
         <ArrowLeft size={20} /> Torna ai Dossier
       </button>
       <button
         onClick={onBack}
-        className="hidden md:flex mb-4 items-center gap-2 text-sm text-slate-500 hover:text-blue-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
+        className="hidden md:flex mb-4 items-center gap-2 text-sm text-slate-500 hover:text-primary-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
       >
         <ArrowLeft size={16} /> Torna ai Dossier
       </button>
@@ -484,7 +484,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
           <div className="flex-1">
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2 md:gap-3">
-                <Folder className="text-blue-500" size={24} aria-hidden />
+                <Folder className="text-primary-500" size={24} aria-hidden />
                 <span className="truncate">{dossier.title}</span>
               </h1>
               {dossier.isPinned && (
@@ -500,7 +500,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
             {dossier.tags && dossier.tags.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-2">
                 {dossier.tags.map((tag) => (
-                  <span key={tag} className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full">
+                  <span key={tag} className="text-xs bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 px-2 py-1 rounded-full">
                     {tagLabel(tag)}
                   </span>
                 ))}
@@ -516,7 +516,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
               type="button"
               onClick={handleOpenAllOnDashboard}
               disabled={!hasNormaItems}
-              className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-blue-600 px-3 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-40 md:min-h-0 md:py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-primary-600 px-3 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-40 md:min-h-0 md:py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
             >
               <ExternalLink size={16} aria-hidden />
               <span>Apri tutto<span className="hidden sm:inline"> su Dashboard</span></span>
@@ -582,14 +582,14 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
               onChange={(e) => setItemSearchQuery(e.target.value)}
               placeholder="Cerca in questo dossier..."
               aria-label="Cerca negli elementi del dossier"
-              className="w-full pl-9 pr-9 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              className="w-full pl-9 pr-9 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
             />
             {itemSearchQuery && (
               <button
                 type="button"
                 onClick={() => setItemSearchQuery('')}
                 aria-label="Azzera ricerca"
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
               >
                 <X size={14} />
               </button>
@@ -598,7 +598,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
           <button
             type="button"
             onClick={toggleExpandAll}
-            className="inline-flex items-center justify-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-700 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="inline-flex items-center justify-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-primary-300 dark:hover:border-primary-700 transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
             aria-pressed={allExpanded}
           >
             {allExpanded ? <ChevronsDownUp size={14} /> : <ChevronsUpDown size={14} />}
@@ -610,20 +610,20 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
       {showBulkActions && dossier.items.length > 0 && (
         <div className="mb-4 flex flex-col md:flex-row items-stretch md:items-center gap-3 md:justify-between bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
           <div className="flex items-center gap-3 flex-wrap">
-            <button onClick={selectAllItems} className="text-sm text-blue-600 hover:underline min-h-[44px] md:min-h-0 px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded">
+            <button onClick={selectAllItems} className="text-sm text-primary-600 hover:underline min-h-[44px] md:min-h-0 px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded">
               Seleziona tutti
             </button>
             <span className="text-sm text-slate-500">{selectedItems.size} selezionati</span>
             <button
               onClick={() => { setShowBulkActions(false); clearSelection(); }}
-              className="text-sm text-slate-600 dark:text-slate-300 hover:underline min-h-[44px] md:min-h-0 px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
+              className="text-sm text-slate-600 dark:text-slate-300 hover:underline min-h-[44px] md:min-h-0 px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
             >
               Annulla selezione
             </button>
           </div>
           {selectedItems.size > 0 && (
             <div className="flex items-center gap-2">
-              <button onClick={() => setMoveToModalOpen(true)} className="flex-1 md:flex-none px-4 py-2 md:px-3 md:py-1.5 text-sm bg-blue-50 dark:bg-blue-900/30 text-blue-600 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/50 flex items-center justify-center gap-1 min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+              <button onClick={() => setMoveToModalOpen(true)} className="flex-1 md:flex-none px-4 py-2 md:px-3 md:py-1.5 text-sm bg-primary-50 dark:bg-primary-900/30 text-primary-600 rounded-md hover:bg-primary-100 dark:hover:bg-primary-900/50 flex items-center justify-center gap-1 min-h-[44px] md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
                 <FolderInput size={16} />
                 <span className="md:inline">Sposta</span>
               </button>
@@ -652,7 +652,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
               description="Aggiungi articoli dai risultati di ricerca o importa da una norma."
               action={
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <button onClick={() => navigate('/')} className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg inline-flex items-center justify-center gap-2 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2">
+                  <button onClick={() => navigate('/')} className="px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg inline-flex items-center justify-center gap-2 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2">
                     <Search size={18} />
                     Cerca articoli
                   </button>
@@ -674,7 +674,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
                 <button
                   type="button"
                   onClick={() => setItemSearchQuery('')}
-                  className="px-4 py-2.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg inline-flex items-center justify-center gap-2 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                  className="px-4 py-2.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg inline-flex items-center justify-center gap-2 transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
                 >
                   <X size={18} />
                   Azzera filtri

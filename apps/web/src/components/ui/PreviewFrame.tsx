@@ -63,9 +63,9 @@ export function PreviewFrame({ visible, position, title, badge, onClose, onMouse
         >
           <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-primary-50 to-primary-50 dark:from-primary-900/30 dark:to-primary-900/30 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2 min-w-0">
-                <span className="text-sm font-semibold text-blue-700 dark:text-blue-300 truncate">{title}</span>
+                <span className="text-sm font-semibold text-primary-700 dark:text-primary-300 truncate">{title}</span>
                 {badge}
               </div>
               <button
