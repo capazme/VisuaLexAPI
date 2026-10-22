@@ -106,3 +106,22 @@ export const CODES_TABLE: Readonly<Record<string, string>> = {
 export const ANNEXED_ACTS: Readonly<Record<string, string>> = {
   'regio.decreto:1931-06-18;773': '1',
 };
+
+/**
+ * An annex of a code's decree, or an act of the codes table, cited by a sigla of its own
+ * (owner, G-369), keyed by the annex's identity «<decree>:<annex>». Any other annex of a code's
+ * decree is cited by the decree with «(Allegato N)». A copy of the API's `ANNEX_SIGLE`
+ * (visualex_api/tools/map.py), pinned by the golden test.
+ */
+export const ANNEX_SIGLE: Readonly<Record<string, string>> = {
+  'regio.decreto:1942-03-16;262:1': 'preleggi',
+  'decreto.legislativo:2010-07-02;104:3': 'disp. att. c.p.a.',
+  'decreto.legislativo:2010-07-02;104:4': 'disp. trans. c.p.a.',
+  'decreto.legislativo:2010-07-02;104:5': 'disp. coord. c.p.a.',
+  'decreto.legislativo:2016-08-26;174:2': 'disp. att. c.g.c.',
+  'decreto.legislativo:2016-08-26;174:3': 'disp. trans. c.g.c.',
+  'regio.decreto:1941-02-20;303:1': 'c.p.m.p.',
+  'regio.decreto:1941-02-20;303:2': 'c.p.m.g.',
+  'decreto.legislativo:1989-07-28;271:1': 'disp. att. c.p.p.',
+  'decreto.del.presidente.della.repubblica:1952-02-15;328:1': 'reg. nav. mar.',
+};

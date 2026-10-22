@@ -59,6 +59,35 @@ ANNEXED_ACTS = {
     "regio.decreto:1931-06-18;773": "1",
 }
 
+# An annex of a code's decree, or an act of the codes table, cited by a sigla of its own and
+# headed by its long name (G-369). A copy of the API's ANNEX_SIGLE and ANNEX_HEADINGS
+# (visualex_api/tools/map.py), pinned by tests/unit/test_sources_golden.py.
+ANNEX_SIGLE = {
+    "regio.decreto:1942-03-16;262:1": "preleggi",
+    "decreto.legislativo:2010-07-02;104:3": "disp. att. c.p.a.",
+    "decreto.legislativo:2010-07-02;104:4": "disp. trans. c.p.a.",
+    "decreto.legislativo:2010-07-02;104:5": "disp. coord. c.p.a.",
+    "decreto.legislativo:2016-08-26;174:2": "disp. att. c.g.c.",
+    "decreto.legislativo:2016-08-26;174:3": "disp. trans. c.g.c.",
+    "regio.decreto:1941-02-20;303:1": "c.p.m.p.",
+    "regio.decreto:1941-02-20;303:2": "c.p.m.g.",
+    "decreto.legislativo:1989-07-28;271:1": "disp. att. c.p.p.",
+    "decreto.del.presidente.della.repubblica:1952-02-15;328:1": "reg. nav. mar.",
+}
+
+ANNEX_HEADINGS = {
+    "regio.decreto:1942-03-16;262:1": "Preleggi",
+    "decreto.legislativo:2010-07-02;104:3": "Norme di attuazione del codice del processo amministrativo",
+    "decreto.legislativo:2010-07-02;104:4": "Norme transitorie del codice del processo amministrativo",
+    "decreto.legislativo:2010-07-02;104:5": "Norme di coordinamento e abrogazioni del codice del processo amministrativo",
+    "decreto.legislativo:2016-08-26;174:2": "Norme di attuazione del codice di giustizia contabile",
+    "decreto.legislativo:2016-08-26;174:3": "Norme transitorie e abrogazioni del codice di giustizia contabile",
+    "regio.decreto:1941-02-20;303:1": "Codice penale militare di pace",
+    "regio.decreto:1941-02-20;303:2": "Codice penale militare di guerra",
+    "decreto.legislativo:1989-07-28;271:1": "Norme di attuazione del codice di procedura penale",
+    "decreto.del.presidente.della.repubblica:1952-02-15;328:1": "Regolamento per l'esecuzione del codice della navigazione (navigazione marittima)",
+}
+
 NORMATTIVA_URN_CODICI = {
     "costituzione": "costituzione",
     "codice penale": "regio.decreto:1930-10-19;1398:1",

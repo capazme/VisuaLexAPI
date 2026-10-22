@@ -209,3 +209,26 @@ class TestFirstOfTheMonth:
     def test_the_day_is_kept(self, label):
         parsed = parse_nl_query(label)
         assert (parsed.date, parsed.act_number) == ("1993-09-01", "385")
+
+
+class TestAnnexSigle:
+    """An annex's sigla (G-369) reads back as the code and its annex, however it is spaced or
+    dotted: «disp att cpa» is the c.p.a.'s implementing rules, never the c.p.a."""
+
+    @pytest.mark.parametrize("label,act_type,annex", [
+        ("art. 1 disp. att. c.p.a.", "codice del processo amministrativo", "3"),
+        ("art. 1 disp.att.c.p.a.", "codice del processo amministrativo", "3"),
+        ("art. 1 disp att cpa", "codice del processo amministrativo", "3"),
+        ("art. 2 disp. trans. c.g.c.", "codice di giustizia contabile", "3"),
+        ("art. 5 cpmg", "codici penali militari di pace e di guerra", "2"),
+        ("art. 1 reg nav mar", "approvazione del Regolamento per l'esecuzione del Codice della navigazione (Navigazione marittima)", "1"),
+    ])
+    def test_the_code_and_its_annex(self, label, act_type, annex):
+        params = parse_nl_query(label).to_api_params()
+        assert (params["act_type"], params.get("annex")) == (act_type, annex)
+
+    @pytest.mark.parametrize("label,act_type", [("art. 29 c.p.a.", "codice del processo amministrativo"),
+                                                ("art. 2 c.p.", "codice penale")])
+    def test_a_code_sigla_names_no_annex(self, label, act_type):
+        params = parse_nl_query(label).to_api_params()
+        assert params["act_type"] == act_type and "annex" not in params

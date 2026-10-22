@@ -12,7 +12,7 @@ from typing import Optional
 
 from .act_resolver import resolve_atto
 from .article_suffixes import ARTICLE_SUFFIX_ALTERNATION
-from .map import NORMATTIVA_SEARCH
+from .map import ANNEX_SIGLE, NORMATTIVA_SEARCH, code_row_of_annex
 
 # Italian month names → month number
 _MESI = {
@@ -231,9 +231,14 @@ def parse_nl_query(raw_input: str) -> Optional[ParsedQuery]:
         if year_date:
             result.date = year_date
 
-    # 5. Identify act type from remaining text
-    known = _identify_known_act(text)
-    if known:
+    # 5. Identify act type from remaining text: an annex's own sigla first («disp. att. c.p.a.»
+    #    is the c.p.a.'s decree at annex 3, never the «c.p.a.» inside it)
+    text, annex_code, sigla_annex = _extract_annex_sigla(text)
+    known = None if annex_code else _identify_known_act(text)
+    if annex_code:
+        result.act_type = annex_code
+        annex = annex or sigla_annex
+    elif known:
         result.act_type = known["tipo_atto"]
         if known.get("numero_atto") and not result.act_number:
             result.act_number = known["numero_atto"]
@@ -265,6 +270,29 @@ def _extract_annex(text: str) -> tuple[str, Optional[str]]:
         return text, None
     annex = annex if annex.isdigit() else annex.upper()
     return text[:m.start()] + " " + text[m.end():], annex
+
+
+# The sigla of an annex of a code's decree (G-369: «disp. att. c.p.a.», «c.p.m.g.»): the code and
+# the annex together, so the label reads back to the annex it was written from. Longest first;
+# each dot may be left out or followed by a space («disp att cpa» is not the c.p.a.), and the
+# sigla is never read inside a word.
+_ANNEX_SIGLA_PATTERNS = [
+    (re.compile(r"(?<![\w.])" + r"\.?\s*".join(re.escape(part.strip()) for part in sigla.rstrip(".").split("."))
+                + r"\.?(?![\w])"), identity)
+    for identity, sigla in sorted(ANNEX_SIGLE.items(), key=lambda item: -len(item[1]))
+    if "." in sigla
+]
+
+
+def _extract_annex_sigla(text: str) -> tuple[str, Optional[str], Optional[str]]:
+    """Take an annex's sigla out of the text: (remaining, code's name, annex), or the text alone."""
+    for pattern, identity in _ANNEX_SIGLA_PATTERNS:
+        match = pattern.search(text)
+        if match:
+            row = code_row_of_annex(identity)
+            if row:
+                return (text[:match.start()] + " " + text[match.end():]).strip(), row[0], row[1]
+    return text, None, None
 
 
 def _normalize(text: str) -> str:

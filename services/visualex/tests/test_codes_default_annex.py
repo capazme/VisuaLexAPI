@@ -111,14 +111,23 @@ async def test_another_code_keeps_its_plain_refusal():
     ({"tipo_atto": "codice postale e delle telecomunicazioni", "allegato": "1", "numero_articolo": "20"},
      "art. 20 cod. post."),
     ({"tipo_atto": "codice di giustizia contabile", "allegato": "1", "numero_articolo": "52"}, "art. 52 c.g.c."),
-    # another annex of a code's decree is not the code: cited by the decree, its annex named
+    # another annex of a code's decree is not the code: its own sigla (G-369) ...
     ({"tipo_atto": "codice del processo amministrativo", "allegato": "3", "numero_articolo": "1"},
-     "art. 1, d.lgs. 2 luglio 2010, n. 104 (Allegato 3)"),
-    ({"tipo_atto": "codice civile", "allegato": "1", "numero_articolo": "12"},
-     "art. 12, r.d. 16 marzo 1942, n. 262 (Allegato 1)"),
-    # the name as a stored norm may carry it, capitalised and with a double space
+     "art. 1 disp. att. c.p.a."),
+    ({"tipo_atto": "codice civile", "allegato": "1", "numero_articolo": "12"}, "art. 12 preleggi"),
+    ({"tipo_atto": "codici penali militari di pace e di guerra", "allegato": "2", "numero_articolo": "1"},
+     "art. 1 c.p.m.g."),
+    # ... the name as a stored norm may carry it, capitalised and with a double space ...
     ({"tipo_atto": "Codice  del processo amministrativo", "allegato": "3", "numero_articolo": "1"},
-     "art. 1, d.lgs. 2 luglio 2010, n. 104 (Allegato 3)"),
+     "art. 1 disp. att. c.p.a."),
+    # ... or a norm stored by its decree and annex: the same annex, the same label ...
+    ({"tipo_atto": "decreto legislativo", "numero_atto": "104", "data": "2010-07-02", "allegato": "3",
+      "numero_articolo": "1"}, "art. 1 disp. att. c.p.a."),
+    ({"tipo_atto": "decreto legislativo", "numero_atto": "104", "data": "2010-07-02", "allegato": "2",
+      "numero_articolo": "29"}, "art. 29 c.p.a."),
+    # ... and an annex without one is cited by the decree with its annex (the c.p.a.'s index)
+    ({"tipo_atto": "codice del processo amministrativo", "allegato": "1", "numero_articolo": "1"},
+     "art. 1, d.lgs. 2 luglio 2010, n. 104 (Allegato 1)"),
     # an annex other than the code's default is still named, for a code cited by its decree
     ({"tipo_atto": "codice del turismo", "allegato": "2", "numero_articolo": "5"},
      "art. 5, d.lgs. 23 maggio 2011, n. 79 (Allegato 2)"),

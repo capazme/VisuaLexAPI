@@ -12,7 +12,7 @@
 import type { NormaVisitata } from '../../types';
 import { formatDateForCitation, withPreposition } from '../dateUtils';
 import { isEuropeanAct } from '../versionDisplay';
-import { ACT_TYPES, ANNEXED_ACTS, CODES_TABLE, EU_ACTS, NAMED_ACTS, NAMED_HEADINGS } from './actTypes';
+import { ACT_TYPES, ANNEX_HEADINGS, ANNEX_SIGLE, ANNEXED_ACTS, CODES_TABLE, EU_ACTS, NAMED_ACTS, NAMED_HEADINGS } from './actTypes';
 
 /** The fields a label reads: a stored `norma_data`, or what a parser or a search gives. */
 export type LabelledNorm = Partial<Pick<NormaVisitata, 'tipo_atto' | 'tipo_atto_reale' | 'numero_atto' | 'data' | 'allegato' | 'numero_articolo'>>;
@@ -58,15 +58,44 @@ function isAnnexedActText(norm: LabelledNorm, annex: string): boolean {
   return ANNEXED_ACTS[`${type.replace(/ /g, '.')}:${date};${number}`] === annex;
 }
 
-// The act's own name («c.c.», «c.p.a.»), unless the norm sits in another annex of the code's
-// decree than the code's: the norme di attuazione of the c.p.a. (annex 3 of d.lgs. 104/2010) are
-// not the c.p.a., and are cited by the decree with their annex. The API's `sources._named`.
-function namedAct(norm: LabelledNorm): string | undefined {
-  const named = NAMED_ACTS[key(norm.tipo_atto)];
+// The sigla of an annex by its identity («<decree>:<annex>»): the codes NAMED_ACTS names, at the
+// annex the codes table keys them by, and ANNEX_SIGLE (G-369). The API's `sources._SIGLA_BY_ANNEX`.
+const ANNEXED_CODES: ReadonlyArray<readonly [string, string]> = Object.entries(CODES_TABLE)
+  .filter(([, urn]) => /;\d+:\w+$/.test(urn))
+  .map(([name, urn]) => [urn, key(name)] as const);
+const SIGLA_BY_ANNEX: Readonly<Record<string, string>> = {
+  ...Object.fromEntries(ANNEXED_CODES.filter(([, kind]) => NAMED_ACTS[kind]).map(([urn, kind]) => [urn, NAMED_ACTS[kind]])),
+  ...ANNEX_SIGLE,
+};
+
+const HEADING_BY_ANNEX: Readonly<Record<string, string>> = {
+  ...Object.fromEntries(ANNEXED_CODES.filter(([, kind]) => NAMED_HEADINGS[kind]).map(([urn, kind]) => [urn, NAMED_HEADINGS[kind]])),
+  ...ANNEX_HEADINGS,
+};
+
+// «<decree>:<annex>» of the annex the norm sits in: a code's (its stored annex, or the one the codes
+// table keys it by), or an act's cited by type, date and number with an annex.
+function annexIdentity(norm: LabelledNorm): string | null {
   const value = text(norm.allegato);
   const row = CODES_BY_NAME.get(key(norm.tipo_atto)) ?? '';
-  if (named && value && /;\d+:\w+$/.test(row) && !row.endsWith(`:${value}`)) return undefined;
-  return named;
+  if (/;\d+:\w+$/.test(row)) {
+    const cut = row.lastIndexOf(':');
+    return `${row.slice(0, cut)}:${value || row.slice(cut + 1)}`;
+  }
+  const kind = key(norm.tipo_atto_reale || norm.tipo_atto).replace(/ /g, '.');
+  const date = text(norm.data);
+  const number = text(norm.numero_atto);
+  return value && /^\d{4}-\d{2}-\d{2}$/.test(date) && number ? `${kind}:${date};${number}:${value}` : null;
+}
+
+// The act's own name («c.c.», «c.p.a.», «disp. att. c.p.a.»): by the annex it sits in, so another
+// annex of a code's decree is not the code; else by its name, for an act the codes table keys by no
+// annex. Undefined for anything else, cited by the decree with its annex. The API's `sources._named`.
+function namedAct(norm: LabelledNorm): string | undefined {
+  const identity = annexIdentity(norm);
+  if (identity && SIGLA_BY_ANNEX[identity]) return SIGLA_BY_ANNEX[identity];
+  if (/;\d+:\w+$/.test(CODES_BY_NAME.get(key(norm.tipo_atto)) ?? '')) return undefined;
+  return NAMED_ACTS[key(norm.tipo_atto)];
 }
 
 function act(norm: LabelledNorm, short: boolean): { act: string; joiner: string } {
@@ -148,7 +177,14 @@ export function shortAct(norm: LabelledNorm): string {
 
 /** The act as a title: a code's name («Codice civile»), else its citation. */
 export function actHeading(norm: LabelledNorm): string {
-  return (namedAct(norm) ? NAMED_HEADINGS[key(norm.tipo_atto)] : undefined) ?? citeAct(norm);
+  return namedHeading(norm) ?? citeAct(norm);
+}
+
+// The long name of an act cited by its own name, by the same rule as `namedAct` («Codice civile»,
+// «Norme di attuazione del codice del processo amministrativo»).
+function namedHeading(norm: LabelledNorm): string | undefined {
+  if (!namedAct(norm)) return undefined;
+  return HEADING_BY_ANNEX[annexIdentity(norm) ?? ''] ?? NAMED_HEADINGS[key(norm.tipo_atto)];
 }
 
 /** An act named by its own name or listed in the codes table: its heading needs no estremi. */
@@ -165,11 +201,14 @@ export function isNamedAct(norm: LabelledNorm): boolean {
  */
 export function actSubtitle(norm: LabelledNorm): string {
   const kind = key(norm.tipo_atto);
-  if (NAMED_HEADINGS[kind]) {
-    // Another annex of the code's decree: the heading is already the decree, and the code is not its name.
-    if (!namedAct(norm)) return '';
-    return text(norm.tipo_atto_reale) && text(norm.data)
-      ? citeAct({ tipo_atto: norm.tipo_atto_reale, data: norm.data, numero_atto: norm.numero_atto })
+  if (NAMED_HEADINGS[kind] || namedHeading(norm)) {
+    // An annex without a name of its own: the heading is already the decree.
+    if (!namedHeading(norm)) return '';
+    // The decree it is: its real type, or the type a norm stored by its decree carries («d.lgs.
+    // 104/2010 (All. 2)» is headed «Codice del processo amministrativo»).
+    const decree = text(norm.tipo_atto_reale) || (ACT_TYPES[kind] ? text(norm.tipo_atto) : '');
+    return decree && text(norm.data)
+      ? citeAct({ tipo_atto: decree, data: norm.data, numero_atto: norm.numero_atto })
       : '';
   }
   if (CODES_BY_NAME.has(kind)) {

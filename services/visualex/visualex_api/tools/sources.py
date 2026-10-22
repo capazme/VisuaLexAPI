@@ -17,7 +17,7 @@ from __future__ import annotations
 import re
 from typing import Any, Mapping, Optional
 
-from .map import act_default_annex, codice_urn, extract_codice_details
+from .map import ANNEX_SIGLE, NORMATTIVA_URN_CODICI, act_default_annex, codice_urn, extract_codice_details
 
 NORMATTIVA_RESOLVER = "https://www.normattiva.it/uri-res/N2Ls?"
 
@@ -165,17 +165,43 @@ def _day(iso: str) -> Optional[str]:
     return f"{'1°' if day == 1 else day} {_MONTHS[int(match.group(2)) - 1]} {match.group(1)}"
 
 
-def _named(norm: Mapping[str, Any]) -> Optional[str]:
-    """The act's own name («c.c.», «c.p.a.»), unless the norm sits in another annex of the
-    code's decree than the code's: the norme di attuazione of the c.p.a. (annex 3 of d.lgs.
-    104/2010) are not the c.p.a., and are cited by the decree with their annex."""
-    kind = _key(_text(norm, "tipo_atto"))
-    name = _NAMED.get(kind)
+# The sigla of an annex by its identity («<decree>:<annex>»): the codes the table above names,
+# at the annex the codes table keys them by, and the annexes and acts of ANNEX_SIGLE (G-369).
+_SIGLA_BY_ANNEX = {
+    **{urn: _NAMED[_key(name)] for name, urn in NORMATTIVA_URN_CODICI.items()
+       if _key(name) in _NAMED and re.search(r";\d+:\w+$", urn)},
+    **ANNEX_SIGLE,
+}
+
+
+def _annex_identity(norm: Mapping[str, Any]) -> Optional[str]:
+    """«<decree>:<annex>» of the annex the norm sits in: a code's (its stored annex, or the one
+    the codes table keys it by), or an act's cited by type, date and number with an annex."""
     annex = _text(norm, "allegato")
-    row = codice_urn(kind) or ""
-    if name and annex and re.search(r";\d+:\w+$", row) and not row.endswith(f":{annex}"):
+    row = codice_urn(_key(_text(norm, "tipo_atto"))) or ""
+    if re.search(r";\d+:\w+$", row):
+        base, _, default = row.rpartition(":")
+        return f"{base}:{annex or default}"
+    kind = _key(_text(norm, "tipo_atto_reale") or _text(norm, "tipo_atto")).replace(" ", ".")
+    date, number = _text(norm, "data"), _text(norm, "numero_atto")
+    if annex and _ISO_DAY.fullmatch(date) and number:
+        return f"{kind}:{date};{number}:{annex}"
+    return None
+
+
+def _named(norm: Mapping[str, Any]) -> Optional[str]:
+    """The act's own name («c.c.», «c.p.a.», «disp. att. c.p.a.»): by the annex it sits in
+    (`_SIGLA_BY_ANNEX`), so another annex of a code's decree is not the code; else by the
+    act's name, for an act the codes table keys by no annex (the c.p.p., the Constitution).
+    None for anything else: the norme di attuazione of the c.p.a. without their own sigla
+    would be cited by the decree with their annex."""
+    identity = _annex_identity(norm)
+    if identity in _SIGLA_BY_ANNEX:
+        return _SIGLA_BY_ANNEX[identity]
+    row = codice_urn(_key(_text(norm, "tipo_atto"))) or ""
+    if re.search(r";\d+:\w+$", row):
         return None
-    return name
+    return _NAMED.get(_key(_text(norm, "tipo_atto")))
 
 
 def _act(norm: Mapping[str, Any]) -> tuple[str, str]:
