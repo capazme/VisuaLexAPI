@@ -1,4 +1,4 @@
-import { useState, type HTMLAttributes, type KeyboardEvent, type ReactNode, type RefObject, type TransitionEvent } from 'react';
+import { useEffect, useState, type HTMLAttributes, type KeyboardEvent, type ReactNode, type RefObject, type TransitionEvent } from 'react';
 import { useReducedMotion } from 'framer-motion';
 import { cn } from '../../lib/utils';
 
@@ -10,7 +10,9 @@ import { cn } from '../../lib/utils';
  * `visibility: hidden` once its height has gone; open and still, its content may overflow its edges (a menu, a focus
  * ring), clipped only while the height moves. Esc inside it closes it and gives the focus back to its trigger.
  *
- * The trigger is the caller's: a button with `aria-expanded={open}` and `aria-controls={id}`.
+ * The trigger is the caller's: a button with `aria-expanded={open}` and `aria-controls={id}`. Closed, it is still a
+ * box of no height: in a parent with `gap-*` or `space-y-*` it keeps its gap, so it goes in a plain wrapper with what
+ * it opens under.
  */
 export interface CollapsibleProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'id'> {
   id: string;
@@ -24,21 +26,32 @@ export interface CollapsibleProps extends Omit<HTMLAttributes<HTMLDivElement>, '
   children: ReactNode;
 }
 
-export function Collapsible({ id, open, onClose, triggerRef, className, contentClassName, children, onKeyDown, ...rest }: CollapsibleProps) {
+export function Collapsible({ id, open, onClose, triggerRef, className, contentClassName, children, onKeyDown, onTransitionEnd, ...rest }: CollapsibleProps) {
   const reduce = useReducedMotion() ?? false;
   // Whether the height has reached the state asked for, derived during render (react-hooks/set-state-in-effect).
   const [settled, setSettled] = useState({ open, done: true });
   if (settled.open !== open) setSettled({ open, done: false });
   const still = reduce || settled.done;
+  // Some changes end with no `transitionend` (an ancestor not displayed, a change undone within a frame): a little after
+  // the longest transition the height is taken as still all the same, or its content would stay clipped.
+  useEffect(() => {
+    if (settled.done) return undefined;
+    const timer = window.setTimeout(() => setSettled({ open, done: true }), 260);
+    return () => window.clearTimeout(timer);
+  }, [open, settled.done]);
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     onKeyDown?.(event);
     if (event.defaultPrevented || event.key !== 'Escape' || !onClose) return;
+    // A dialog portaled from inside it (a confirmation, a sheet) sends its Esc up the React tree: that Esc is the
+    // dialog's, never the panel's.
+    if (!event.currentTarget.contains(event.target as Node)) return;
     event.stopPropagation();
     onClose();
     triggerRef?.current?.focus();
   };
   const handleTransitionEnd = (event: TransitionEvent<HTMLDivElement>) => {
+    onTransitionEnd?.(event);
     if (event.target === event.currentTarget && event.propertyName === 'grid-template-rows') setSettled({ open, done: true });
   };
 
@@ -51,8 +64,10 @@ export function Collapsible({ id, open, onClose, triggerRef, className, contentC
       onKeyDown={handleKeyDown}
       onTransitionEnd={handleTransitionEnd}
       className={cn(
-        'grid transition-[grid-template-rows,visibility] [transition-timing-function:var(--ease-out)]',
-        open ? 'grid-rows-[1fr] duration-200' : 'invisible grid-rows-[0fr] duration-150',
+        // `visibility` moves only as it closes (hidden once the height has gone); opening, it is visible at once, so a
+        // focus given in the next frame lands.
+        'grid ease-out',
+        open ? 'grid-rows-[1fr] transition-[grid-template-rows] duration-200' : 'invisible grid-rows-[0fr] transition-[grid-template-rows,visibility] duration-150',
         className,
       )}
     >

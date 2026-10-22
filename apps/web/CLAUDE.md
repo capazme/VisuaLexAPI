@@ -494,11 +494,14 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
 - `components/ui/` — shared primitives: `Button`, `IconButton`, `Input`, `Card`,
   `Modal`, `ConfirmDialog`, `WireConfirm` (below, «Destructive confirmations»), `Toast`, `EmptyState`, `Sheet` (a
   phone's bottom sheet), plus feature-flavoured modals.
-  `Collapsible` («la tendina», U1a) is the one way to open a panel in place, pushing what follows down — no window, no
-  veil: `grid-template-rows` from `0fr` to `1fr` (no height in script), 200 ms on `--ease-out` to open and 150 ms to
+  `Collapsible` («la tendina», U1a) is the way to open a panel in place, pushing what follows down — no window, no
+  veil (two older panels still grow their height through Framer, `DocumentReviewPage` and `EnvironmentContentViewer`:
+  to move to it): `grid-template-rows` from `0fr` to `1fr` (no height in script), 200 ms on `--ease-out` to open and 150 ms to
   close, its content fading in 150 ms just after; closed it is `inert`, `aria-hidden` and, once its height has gone,
-  `visibility: hidden`; open and still its content may overflow (a menu, a ring), clipped only while the height moves;
-  Esc inside closes it and gives the focus back to `triggerRef`. Under reduced motion it opens and closes at once —
+  `visibility: hidden` (visible at once as it opens, so a focus given in the next frame lands); open and still its
+  content may overflow (a menu, a ring), clipped only while the height moves; Esc inside closes it and gives the focus
+  back to `triggerRef` — not an Esc from a dialog portaled from inside it, which is the dialog's. Closed it is still a
+  box of no height and keeps its parent's `gap`: it goes in a plain wrapper with what it opens under. Under reduced motion it opens and closes at once —
   the content is kept at full opacity, or the global rule's 150 ms (after the delay) would fade it in late. The
   trigger is the caller's (`aria-expanded`, `aria-controls`). «Oggi»'s study settings (`StudySettingsPanel`) use it.
   `Modal` is portaled to `document.body`, so a dialog opened inside a reading window

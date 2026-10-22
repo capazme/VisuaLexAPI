@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Collapsible } from '../Collapsible';
 
@@ -10,7 +11,7 @@ vi.mock('framer-motion', async (importOriginal) => ({
   useReducedMotion: () => motion.reduced,
 }));
 
-function Harness({ initiallyOpen = false }: { initiallyOpen?: boolean }) {
+function Harness({ initiallyOpen = false, inside }: { initiallyOpen?: boolean; inside?: ReactNode }) {
   const [open, setOpen] = useState(initiallyOpen);
   const trigger = useRef<HTMLButtonElement>(null);
   return (
@@ -23,6 +24,7 @@ function Harness({ initiallyOpen = false }: { initiallyOpen?: boolean }) {
           Scadenza
           <input />
         </label>
+        {inside}
       </Collapsible>
       <p>Sotto</p>
     </>
@@ -87,5 +89,59 @@ describe('Collapsible', () => {
     await userEvent.keyboard('{Escape}');
     expect(screen.queryByRole('region', { name: 'Dettagli del compito' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Dettagli' })).toHaveFocus();
+  });
+
+  it('takes no transitionend from inside it for its own', () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole('button', { name: 'Dettagli' }));
+    const end = new Event('transitionend', { bubbles: true });
+    Object.defineProperty(end, 'propertyName', { value: 'grid-template-rows' });
+    fireEvent(screen.getByLabelText('Scadenza'), end);
+    expect(panel().firstElementChild).toHaveClass('overflow-hidden');
+  });
+
+  it('opens again when reopened halfway through closing, visible at once', () => {
+    render(<Harness initiallyOpen />);
+    const trigger = screen.getByRole('button', { name: 'Dettagli' });
+    fireEvent.click(trigger);
+    expect(panel()).toHaveClass('invisible', 'transition-[grid-template-rows,visibility]');
+    fireEvent.click(trigger);
+    // Opening, visibility does not transition: a focus given in the next frame lands.
+    expect(panel()).toHaveClass('grid-rows-[1fr]', 'transition-[grid-template-rows]');
+    expect(panel()).not.toHaveClass('invisible');
+    expect(screen.getByRole('region', { name: 'Dettagli del compito' })).toBeInTheDocument();
+  });
+
+  it('leaves an Esc that something inside handled, and one from a dialog portaled from inside it', async () => {
+    function Dialog() {
+      return createPortal(
+        <div role="dialog" aria-label="Conferma">
+          <button type="button">Annulla</button>
+        </div>,
+        document.body,
+      );
+    }
+    render(<Harness initiallyOpen inside={<><input aria-label="Gestito" onKeyDown={(e) => e.key === 'Escape' && e.preventDefault()} /><Dialog /></>} />);
+    await userEvent.click(screen.getByLabelText('Gestito'));
+    await userEvent.keyboard('{Escape}');
+    expect(screen.getByRole('region', { name: 'Dettagli del compito' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Annulla' }));
+    await userEvent.keyboard('{Escape}');
+    expect(screen.getByRole('region', { name: 'Dettagli del compito' })).toBeInTheDocument();
+  });
+
+  it('frees its content after the longest transition even with no transitionend', async () => {
+    vi.useFakeTimers();
+    try {
+      render(<Harness />);
+      fireEvent.click(screen.getByRole('button', { name: 'Dettagli' }));
+      expect(panel().firstElementChild).toHaveClass('overflow-hidden');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(300);
+      });
+      expect(panel().firstElementChild).toHaveClass('overflow-visible');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

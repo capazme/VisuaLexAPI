@@ -80,7 +80,8 @@ export function StudySettingsPanel({ id, open, onClose, onChanged, communityRequ
       aria-label="Impostazioni dello studio"
       tabIndex={-1}
       className="focus:outline-none"
-      contentClassName="border-t border-slate-200 pb-1 pt-4 dark:border-slate-800"
+      // The card's gap (20 px) above the line, as when the panel was a row of the card's grid.
+      contentClassName="mt-5 border-t border-slate-200 pb-1 pt-4 dark:border-slate-800"
     >
       <StudyPreferences open communityRequest={communityRequest} onChanged={onChanged} listClassName={cn('md:grid-cols-2', aside && 'xl:grid-cols-1')} />
     </Collapsible>
