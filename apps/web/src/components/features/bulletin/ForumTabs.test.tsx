@@ -18,6 +18,8 @@ describe('ForumTabs', () => {
     render(<ForumTabs active="explore" onChange={vi.fn()} pendingCount={0} />);
     const row = document.getElementById('tour-forum-tabs')!;
     expect(row).toHaveClass('w-full', 'sm:w-fit');
+    // One named group of three pressed buttons (no tab panels to move between).
+    expect(screen.getByRole('group', { name: 'Sezioni del Forum' })).toBe(row);
     const tabs = within(row).getAllByRole('button');
     expect(tabs).toHaveLength(3);
     for (const tab of tabs) expect(tab).toHaveClass('flex-1', 'sm:flex-none', 'min-h-[44px]', 'whitespace-nowrap');

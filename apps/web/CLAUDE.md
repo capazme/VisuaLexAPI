@@ -50,8 +50,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   403, and when `/auth/me` failed (`validator` null, never taken for «not a validator») it reads and the server decides),
   `/history`, `/forum` («Dossier pubblici»; `/environments`, the page «Ambienti» was, redirects there keeping an old
   share link's `?import=`), `/forum/community` («Community», `ForumCommunityPage`: an honest placeholder — titled
-  «Community» under the Forum's phrase (L-37), «Domande e discussioni tra colleghi, in arrivo», a link to `/forum`; no sample posts, no counts, no
-  server route), `/documents`, `/collega-app` («Collega un'app AI»,
+  «Community» under the Forum's phrase (L-37), an empty state composed for the page, «Le discussioni arrivano presto»
+  with «Esplora i dossier pubblici», see `features/bulletin/` below; no sample posts, no counts, no server route), `/documents`, `/collega-app` («Collega un'app AI»,
   `features/connections/ConnectAiAppPage`: the MCP address from `GET /api/oauth/connection` with
   «Copia», one card per client that connects today — `aiClients.ts`, the survey of 13 Oct 2026, with
   the clients our server refuses listed apart and why —, the personal-data notice (what a connected app reads: dossier

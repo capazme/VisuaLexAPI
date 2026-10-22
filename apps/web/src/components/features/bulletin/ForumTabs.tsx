@@ -23,7 +23,13 @@ export interface ForumTabsProps {
 
 export function ForumTabs({ active, onChange, pendingCount }: ForumTabsProps) {
   return (
-    <div id="tour-forum-tabs" className="flex w-full gap-1 rounded-lg bg-slate-100 p-1 sm:w-fit sm:max-w-full dark:bg-slate-800">
+    // A group of pressed buttons, as the subject chips: one of three views, no tab panels to move between.
+    <div
+      id="tour-forum-tabs"
+      role="group"
+      aria-label="Sezioni del Forum"
+      className="flex w-full gap-1 rounded-lg bg-slate-100 p-1 sm:w-fit sm:max-w-full dark:bg-slate-800"
+    >
       {TABS.map(({ id, label, short, icon: Icon }) => (
         <button
           key={id}
@@ -38,11 +44,13 @@ export function ForumTabs({ active, onChange, pendingCount }: ForumTabsProps) {
           )}
         >
           <Icon size={16} className="hidden sm:block" aria-hidden />
-          {/* One of the two is drawn: the short label on a phone, the whole one from `sm`. */}
+          {/* One of the two is drawn: the short label on a phone, the whole one from `sm`. A browser leaves the one not
+              displayed out of the button's name, which is what the reader sees; jsdom, with no CSS, joins both. */}
           <span className="sm:hidden">{short}</span>
           <span className="hidden sm:inline">{label}</span>
           {id === 'suggestions' && pendingCount > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary-600 text-xs text-white">
+            // Off the word's end at 320 px, where «Suggeriti» nearly fills its third of the row.
+            <span className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary-600 text-xs text-white">
               {pendingCount}
               <span className="sr-only"> in attesa</span>
             </span>

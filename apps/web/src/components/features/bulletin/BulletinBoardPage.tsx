@@ -28,11 +28,10 @@ import type { SharedEnvironment, EnvironmentCategory, SharedEnvironmentListRespo
 import { PUBLIC_DOSSIERS_PAGE } from '../../../features/sections/pageNames';
 import { PageFrame } from '../../layout/PageFrame';
 
-type TabType = ForumTab;
 
 export function BulletinBoardPage() {
   // Tab state
-  const [activeTab, setActiveTab] = useState<TabType>('explore');
+  const [activeTab, setActiveTab] = useState<ForumTab>('explore');
 
   // State - Explore
   const [environments, setEnvironments] = useState<SharedEnvironment[]>([]);
