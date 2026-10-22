@@ -682,6 +682,25 @@ class TestQuotedArticles:
         text = await EurlexScraper().extract_article_text(soup_of("amending_dir_2009_136_trimmed.html"), article)
         assert text.split("\n")[:2] == [f"Articolo\xa0{article}", rubrica]
 
+    @pytest.mark.parametrize("markup", ["oj-ti-art", "class-less", "eli-subdivision"])
+    async def test_a_quoted_heading_before_the_acts_own_article_of_that_number(self, markup):
+        # Synthetic: art. 1 quotes, in a table cell and with no «, an «Articolo 3» of another
+        # act; the act's own art. 3 comes after it and is the one served and listed.
+        quoted = ('<table><tr><td><p class="oj-ti-art">Articolo 3</p>'
+                  '<p class="oj-normal">Testo citato di un altro atto.</p></td></tr></table>')
+        html = ('<html><body><p class="oj-ti-art">Articolo 1</p><p class="oj-normal">Modifiche.</p>' + quoted +
+                '<p class="oj-ti-art">Articolo 3</p><p class="oj-normal">Testo proprio dell\'articolo 3.</p></body></html>')
+        if markup == "class-less":
+            html = re.sub(r' class="[^"]*"', "", html)
+        elif markup == "eli-subdivision":
+            html = (re.sub(r' class="[^"]*"', "", html)
+                    .replace("<body>", '<body><div class="eli-subdivision">')
+                    .replace("<p>Articolo 3</p><p>Testo proprio", '</div><div class="eli-subdivision"><p>Articolo 3</p><p>Testo proprio'))
+        text = await EurlexScraper().extract_article_text(BeautifulSoup(html, "html.parser"), "3")
+        assert text.split("\n")[:2] == ["Articolo 3", "Testo proprio dell'articolo 3."]
+        result, _, _ = await _parse_eurlex_tree(BeautifulSoup(html, "html.parser"), self.URL)
+        assert [item["numero"] for item in result] == ["1", "3"]
+
     async def test_a_page_without_tables_keeps_every_article(self):
         # The legacy ELI page of dir. 2002/58: class-less paragraphs, no table cells, no «.
         result, count, _ = await _parse_eurlex_tree(soup_of("eprivacy_eli_legacy_trimmed.html"),

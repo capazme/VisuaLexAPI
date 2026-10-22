@@ -477,8 +477,10 @@ class EurlexScraper(BaseScraper):
         if not article_section:
             subdivisions = soup.find_all('div', class_=lambda c: c and 'eli-subdivision' in c)
             for subdiv in subdivisions:
-                title_elem = subdiv.find(['p', 'span', 'div'], string=lambda s: s and any(_heads_article(s.strip(), p) for p in search_patterns))
-                if title_elem and not is_quoted_heading(title_elem):
+                title_elem = subdiv.find(lambda tag: tag.name in ('p', 'span', 'div') and tag.string
+                                         and any(_heads_article(tag.string.strip(), p) for p in search_patterns)
+                                         and not is_quoted_heading(tag))
+                if title_elem:
                     article_section = subdiv
                     log.debug("Found article in eli-subdivision")
                     break
