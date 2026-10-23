@@ -415,7 +415,6 @@ export function ReviewSession() {
         {/* Over the header's row, as on the old page: beside the card, never on it. */}
         {celebrating && (
           <SessionCelebration
-            giorno={goalMet.giorno}
             serie={goalMet.serie}
             onStart={() => markCelebrated(goalMet.giorno)}
             onDone={() => setNoticeDone(goalMet.giorno)}

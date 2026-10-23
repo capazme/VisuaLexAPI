@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/react';
 import { ReviewTrend } from './progress/ReviewTrend';
 import { DueForecast } from './progress/DueForecast';
-import { GoalStamp } from './progress/Celebration';
+import { GoalMark } from './progress/GoalMark';
 
 /**
  * «Oggi» has no text under 11 px and one type language (Gymnasium spec §5.1, G1b): every label is the interface's
@@ -44,8 +44,10 @@ describe('the type scale of «Oggi»', () => {
     for (const label of labels) expect(label.closest('.text-xs')).not.toBeNull();
   });
 
-  it('writes the stamp’s date at 12 px on «Oggi»', () => {
-    const { getByTestId } = render(<GoalStamp giorno="2026-10-19" serie={5} press={false} />);
-    expect(getByTestId('goal-stamp').innerHTML).not.toMatch(/text-\[(?:[0-9]|10)px\]/);
+  it('draws the goal\'s mark with no text in it: its date and day are the interface\'s words beside it (G9)', () => {
+    const { getByTestId } = render(<GoalMark size={112} label="Obiettivo raggiunto" />);
+    const mark = getByTestId('goal-mark');
+    expect(mark.querySelectorAll('text')).toHaveLength(0);
+    expect(mark.textContent).toBe('');
   });
 });

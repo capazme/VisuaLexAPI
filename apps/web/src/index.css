@@ -1163,6 +1163,18 @@
 @keyframes vlx-book-trace { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
 @keyframes vlx-book-breathe { to { opacity: 0.4; } }
 
+/* The goal's mark (G9, `GoalMark`): each stroke is an outline uncovered by a mask whose pen path is written — the ring,
+   then the tick, then the stroke under it, about a second in all, once. The pen paths carry `pathLength="1"`, so one
+   dash of 1 and a gap of 2 cover the whole path at an offset of 0 and none of it at 1. Only with motion allowed, and
+   filling backwards only: under reduced motion, and once written, the mark is whole and still. */
+.vlx-goal-mark-pen { stroke-dasharray: 1 2; }
+@media (prefers-reduced-motion: no-preference) {
+  .vlx-goal-mark-draw .vlx-goal-mark-pen { animation: vlx-goal-mark-write 560ms var(--ease-in-out) backwards; }
+  .vlx-goal-mark-draw mask:nth-of-type(2) .vlx-goal-mark-pen { animation-duration: 300ms; animation-delay: 520ms; }
+  .vlx-goal-mark-draw mask:nth-of-type(3) .vlx-goal-mark-pen { animation-duration: 220ms; animation-delay: 800ms; }
+}
+@keyframes vlx-goal-mark-write { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+
 /* The sign-in's wordmark written in ink (A3, `AuthPage`): one face, one ink, one gesture. The book traces itself
    (0–450 ms); a faint, blurred copy of «VisuaLex» comes out from under a mask whose soft edge is the pen's tip
    (250–950 ms), and the ink, the word itself, follows it 100 ms behind under its own (350–1050 ms), so each letter is
