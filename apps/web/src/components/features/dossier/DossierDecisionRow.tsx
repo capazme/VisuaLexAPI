@@ -1,0 +1,104 @@
+import { CheckSquare, ChevronDown, Square, Star, Trash2 } from 'lucide-react';
+import { cn } from '../../../lib/utils';
+import { identityOf } from '../../../utils/decisionLinks';
+import { DossierDecisionReader } from './DossierDecisionReader';
+import { decisionCitationOf, formatTimestampLong } from './dossierUtils';
+import type { SentenzaItem } from './dossierLayout';
+import { FOCUS_RING } from '../studia/progress/tokens';
+import { ROW, ROW_ICON, ROW_LINE, ROW_REMOVE, ROW_TITLE } from './dossierStyles';
+
+export interface DossierDecisionRowProps {
+  item: SentenzaItem;
+  isSelected: boolean;
+  showCheckbox: boolean;
+  onToggleSelect: () => void;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  onRemove: () => void;
+  onToggleImportant: () => void;
+}
+
+/**
+ * One decision of «Giurisprudenza», a row as an article's (D7a, `DossierArticleRow`): the checkbox while selecting, the
+ * toggle with its arrow, the citation over a grey line («Aggiunta il …»), then the star and the removal, 44 px at every
+ * width; the decision read in place (`DossierDecisionReader`), asked for only once the row is opened. The citation is
+ * recomputed from the stored identity, never the stored copy (source convention, Q9). No note count or application's
+ * mark: a note of the dossier is about an article only (the server refuses one about anything else).
+ */
+export function DossierDecisionRow({
+  item, isSelected, showCheckbox, onToggleSelect, isExpanded, onToggleExpand, onRemove, onToggleImportant,
+}: DossierDecisionRowProps) {
+  const citation = decisionCitationOf(item.data);
+  const added = formatTimestampLong(item.addedAt);
+  const isImportant = item.status === 'important';
+  const regionId = `dossier-item-content-${item.id}`;
+
+  return (
+    <div className={cn(ROW, 'pl-3 transition-colors', isSelected ? 'bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800/40')}>
+      {isImportant && <span aria-hidden className="absolute bottom-2 left-0 top-2 w-1 rounded bg-amber-400" />}
+      <div className="flex items-start gap-1">
+        {showCheckbox && (
+          <button
+            type="button"
+            onClick={onToggleSelect}
+            aria-label={isSelected ? 'Deseleziona elemento' : 'Seleziona elemento'}
+            aria-pressed={isSelected}
+            className={cn(ROW_ICON, 'text-slate-500 hover:text-primary-700 dark:text-slate-400 dark:hover:text-primary-300')}
+          >
+            {isSelected ? <CheckSquare size={18} className="text-primary-600 dark:text-primary-400" /> : <Square size={18} />}
+          </button>
+        )}
+        {/* As an article's: the toggle wraps only text, the star and the removal stay outside it. */}
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label={`${isExpanded ? 'Comprimi' : 'Espandi'} ${citation}`}
+          aria-expanded={isExpanded}
+          aria-controls={isExpanded ? regionId : undefined}
+          onClick={onToggleExpand}
+          onKeyDown={(e) => {
+            if (e.target !== e.currentTarget) return;
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onToggleExpand();
+            }
+          }}
+          className={cn('flex min-h-[44px] min-w-0 flex-1 cursor-pointer items-start gap-2 rounded-md py-2.5', FOCUS_RING)}
+        >
+          <ChevronDown
+            size={16}
+            aria-hidden
+            className={cn('mt-0.5 flex-shrink-0 text-slate-500 transition-transform motion-reduce:transition-none dark:text-slate-400', !isExpanded && '-rotate-90')}
+          />
+          <span className="min-w-0 flex-1">
+            <span className={cn(ROW_TITLE, 'block font-medium [overflow-wrap:anywhere]')}>{citation}</span>
+            {added && <span className={cn(ROW_LINE, 'mt-0.5 block')}>Aggiunta il {added}</span>}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={onToggleImportant}
+          aria-pressed={isImportant}
+          aria-label={isImportant ? 'Rimuovi da importanti' : 'Segna come importante'}
+          title={isImportant ? 'Importante' : 'Segna come importante'}
+          className={cn(
+            ROW_ICON,
+            isImportant
+              ? 'text-amber-600 dark:text-amber-400'
+              : 'text-slate-500 hover:bg-amber-50 hover:text-amber-600 dark:text-slate-400 dark:hover:bg-amber-900/20',
+          )}
+        >
+          <Star size={16} className={cn(isImportant && 'fill-amber-400')} />
+        </button>
+        <button type="button" onClick={onRemove} aria-label={`Rimuovi ${citation} dal dossier`} className={ROW_REMOVE}>
+          <Trash2 size={16} aria-hidden />
+        </button>
+      </div>
+      {isExpanded && (
+        <div id={regionId} className="pb-3 pl-6 pr-2">
+          <DossierDecisionReader identity={identityOf(item.data)} />
+        </div>
+      )}
+    </div>
+  );
+}

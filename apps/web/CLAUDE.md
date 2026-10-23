@@ -1467,7 +1467,8 @@ else its first lines (`previewLines`): the first lines of a Cassazione decision 
 **A decision in a list opens its preview** (spec `docs/superpowers/specs/2026-10-13-decision-preview-from-lists-design.md`):
 every list that names a decision our reader opens — «Giurisprudenza» under an article (`CaseLawRow`: the
 Cassazione, the Court of Justice's judgments; never an order or an opinion, which go to
-EUR-Lex), the Massimario's chips, a topic search's window, the Cronologia and a dossier's «Giurisprudenza» —
+EUR-Lex), the Massimario's chips, a topic search's window and the Cronologia (a dossier's «Giurisprudenza» reads its
+decisions in place since D7a) —
 opens the same body (`DecisionPreviewContent`, the hover popup's) at once on a click or Enter, through
 `useListDecisionPreview` (`useDecisionPreview().openPreview`, no delay; a second click on the estremi closes it)
 and `DecisionPreviewDialog`. On the desktop it is `PreviewFrame` as a non-modal `dialog` («Anteprima di …»)
@@ -1678,7 +1679,9 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
 - **The page by act**: `dossierLayout.ts` (pure) turns the items into sections —
   the notes first (`DossierNotesSection`), then one `DossierActBlock` per act in
   the order the acts entered the dossier, then «Giurisprudenza»
-  (`DossierDecisionsSection`, the decisions in stored order). An act's identity is a code's name
+  (`DossierDecisionsSection`, the decisions in stored order). With acts and decisions both (D7a) they are two
+  columns from `lg`, «Norme» | «Giurisprudenza» (`COLUMN_HEADING`, a rule between them, each column in its own
+  order), the norms first below `lg`; one kind alone takes the width, untitled as before. An act's identity is a code's name
   (the codice civile with or without its R.D. is one act) or `tipo_atto|numero_atto|data`;
   its heading is a code's name or the server's `act_citation`, never formatted
   here (a muted fallback until the server answers); its articles sort by annex,
@@ -1794,8 +1797,16 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
 - **Decisions** (`type: 'sentenza'`): the item stores the identity, the attributes the item
   schema accepts and a label, never the text. They are added from the decision's reading surface
   («Aggiungi al dossier», `AddToDossierPopover` with `sentenza`) and listed after the acts under
-  «Giurisprudenza» (`DossierDecisionsSection`: each citation is a `DecisionLink` — its preview's «Apri la sentenza» goes to the decision's address — and
-  each row can be removed). The stored `etichetta` is a copy (source convention, D9):
+  «Giurisprudenza» (`DossierDecisionsSection`, D7a: each decision a row as an article's, `DossierDecisionRow` — the
+  checkbox while selecting, the arrow, the citation over «Aggiunta il …», the star, the removal, 44 px — opened in
+  place by `DossierDecisionReader`: the decision's own reader, `useDecisionAnswer` and `DecisionView` with
+  `DecisionReadingSurface`, never another, so notes, highlights and key passages work as anywhere and the text is the
+  reader's, gotcha 23; asked for only once opened; a decision without its text opens too and `DecisionView` says how it
+  came; «Apri la sentenza», the address, among its actions. No tab holds it: `DecisionReadingToolbar` draws no «Cerca
+  nel testo» without `onToggleFind`, and a cited norm goes to the search page, `onNormOpened`. No note count or
+  application's mark: the server takes a note about an article only, `assertArticleOfDossier`). «Seleziona tutti» takes
+  the decisions with the articles; «Apri tutto su Dashboard» opens a dossier of decisions alone too, one practice holding
+  them; «Espandi tutto» opens the articles only, each decision being a request to its court's source. The stored `etichetta` is a copy (source convention, D9):
   `decisionCitationOf` recomputes the citation from the identity and the attributes, every write
   sends it (`itemContentFor`, `serverItemFor`), the server recomputes it again on every write
   (`withDecisionLabel`), and every screen shows the recomputed one, never the copy.

@@ -59,7 +59,8 @@ export function DossierActBlock(props: DossierActBlockProps) {
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.6 : 1 }}
       aria-label={block.heading}
-      className={SECTION_TILE}
+      // A container: in the dossier's left column (D7a) the actions keep their words only where the act is wide.
+      className={cn(SECTION_TILE, '@container')}
     >
       <header className="flex items-start gap-1 border-b border-slate-200 px-2 py-1 md:gap-2 md:px-3 dark:border-slate-800">
         {!dragDisabled && (
@@ -76,7 +77,9 @@ export function DossierActBlock(props: DossierActBlockProps) {
         <div className="min-w-0 flex-1 px-1 py-1">
           {/* The accordion pattern: the heading holds the toggle, so the act is a
               heading to a screen reader and its name is the act's own words. */}
-          <h2 className="flex min-w-0 flex-wrap items-center gap-x-2 md:flex-nowrap">
+          {/* On one line, the name cut, while the act is 672 px wide (from md in one column); narrower — a phone, the
+              left column of two (D7a) — it wraps: a cut act name says nothing. */}
+          <h2 className="flex min-w-0 flex-wrap items-center gap-x-2 @2xl:flex-nowrap">
             <div
               role="button"
               tabIndex={0}
@@ -101,15 +104,14 @@ export function DossierActBlock(props: DossierActBlockProps) {
                 aria-hidden
                 className={cn('flex-shrink-0 text-slate-500 transition-transform motion-reduce:transition-none dark:text-slate-400', isFolded && '-rotate-90')}
               />
-              {/* A cut act name says nothing: on a phone it wraps. */}
-              <span className="break-words md:truncate">{block.heading}</span>
+              <span className="break-words @2xl:truncate">{block.heading}</span>
             </div>
             <span className={cn('flex-shrink-0', SECTION_COUNT)}>
               {count === 1 ? '1 articolo' : `${count} articoli`}
             </span>
           </h2>
           {title && (
-            <p className={cn(ROW_LINE, 'ml-6 line-clamp-2 md:line-clamp-none md:truncate')} title={title}>{title}</p>
+            <p className={cn(ROW_LINE, 'ml-6 line-clamp-2 @2xl:line-clamp-none @2xl:truncate')} title={title}>{title}</p>
           )}
           {isFolded && (
             <p className={cn(ROW_LINE, 'mb-1 ml-6 truncate')}>{foldedArticleList(block)}</p>
@@ -124,7 +126,8 @@ export function DossierActBlock(props: DossierActBlockProps) {
             className={ACTION_BUTTON}
           >
             <ExternalLink size={15} aria-hidden />
-            <span className="hidden lg:inline">Apri tutto</span>
+            {/* From lg, and while the act is 672 px wide: in the left column of two its name takes the room. */}
+            <span className="hidden lg:@2xl:inline">Apri tutto</span>
           </button>
           <button
             type="button"
@@ -134,7 +137,7 @@ export function DossierActBlock(props: DossierActBlockProps) {
             className={ACTION_BUTTON}
           >
             <Plus size={15} aria-hidden />
-            <span className="hidden lg:inline">Articoli</span>
+            <span className="hidden lg:@2xl:inline">Articoli</span>
           </button>
           <MenuButton
             label={`Azioni su ${block.heading}`}

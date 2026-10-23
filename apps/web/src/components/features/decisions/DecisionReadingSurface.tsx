@@ -61,6 +61,11 @@ export interface DecisionReadingSurfaceProps {
    * §6.6). Only the find window's registration, pressed state and opener read it.
    */
   findHostId?: string;
+  /**
+   * A norm the text cites was sent to the search: a host off the search page (the dossier) goes there, where the search
+   * runs. Without it the search waits for the search page, as in the workspace, which is that page.
+   */
+  onNormOpened?: () => void;
 }
 
 /**
@@ -69,7 +74,7 @@ export interface DecisionReadingSurfaceProps {
  * it. Self-contained: it takes the decision as props and reaches only the store's search and
  * way-back actions, so any host can mount it.
  */
-export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, hostBlockId, findHostId }: DecisionReadingSurfaceProps) {
+export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, hostBlockId, findHostId, onNormOpened }: DecisionReadingSurfaceProps) {
   const {
     triggerSearch, pushReadingBack, annotations, highlights, removeAnnotation, updateAnnotation,
     removeHighlight, loadAnnotationsForArticle, loadHighlightsForArticle, showKeyPassages, updateSettings,
@@ -238,7 +243,8 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
       version: 'vigente',
       ...(hostTabId ? { besideId: hostTabId } : {}),
     });
-  }, [triggerSearch, hostTabId]);
+    onNormOpened?.();
+  }, [triggerSearch, hostTabId, onNormOpened]);
 
   const decisionLinks = useDecisionLinks({ besideId: hostTabId, origin });
   useCitationLinks(contentRef, { onOpen: openCitation, origin, showPreview, hidePreview, isHoveringPopupRef, decisions: decisionLinks.links });
@@ -293,7 +299,8 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
         isDiscussionOpen={discussion.open}
         onToggleDiscussion={discussion.toggle}
         isFindOpen={isFindOpen}
-        onToggleFind={(wasPressed) => (wasPressed ? closeFindWindow() : openFindWindow({ tabId: findHost, targetKey: key, returnFocus: findButtonRef.current }))}
+        // No host, no find window: nothing of this text is registered for it to search (the dossier).
+        onToggleFind={findHost ? (wasPressed) => (wasPressed ? closeFindWindow() : openFindWindow({ tabId: findHost, targetKey: key, returnFocus: findButtonRef.current })) : undefined}
         findButtonRef={findButtonRef}
         keyPassages={(
           <KeyPassagesMenu

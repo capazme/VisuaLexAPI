@@ -270,12 +270,51 @@ describe('DossierDetailView — decisions', () => {
   it('lists a decision under «Giurisprudenza», after the acts, never among the notes', () => {
     renderView(withDecision);
     const decisions = screen.getByRole('region', { name: 'Giurisprudenza (1)' });
-    expect(within(decisions).getByRole('link', { name: CITATION })).toHaveAttribute('href', '/sentenze/corte-costituzionale/1/2014');
+    // A row opened in place, as an article's (D7a), no more a link to a preview.
+    expect(within(decisions).getByRole('button', { name: `Espandi ${CITATION}` })).toHaveAttribute('aria-expanded', 'false');
     expect(within(screen.getByRole('region', { name: /Note \(1\)/ })).queryByText(CITATION)).toBeNull();
     const lastAct = screen.getByRole('region', { name: L49 });
     expect(lastAct.compareDocumentPosition(decisions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // Not a note: the header's count of decisions comes with the dossier-by-act round's PR 3.
     expect(screen.getByText(/2 atti · 3 articoli · 1 nota/)).toBeInTheDocument();
+  });
+
+  it('sets the acts and the decisions in two columns from lg, «Norme» | «Giurisprudenza», the norms first below it (D7a)', () => {
+    renderView(withDecision);
+    const norms = screen.getByRole('region', { name: 'Norme' });
+    const decisions = screen.getByRole('region', { name: 'Giurisprudenza (1)' });
+    expect(within(norms).getByRole('region', { name: L247 })).toBeInTheDocument();
+    expect(within(norms).getByRole('region', { name: L49 })).toBeInTheDocument();
+    expect(norms).not.toContainElement(decisions);
+    expect(norms.compareDocumentPosition(decisions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const grid = norms.parentElement!;
+    expect(grid).toHaveClass('grid', 'grid-cols-1', 'lg:grid-cols-2');
+    // The rule between the columns, from lg only.
+    expect(decisions.parentElement).toHaveClass('lg:border-l', 'lg:pl-5');
+    expect(grid).toContainElement(decisions);
+  });
+
+  it('keeps one column, with no «Norme» title, when the dossier holds no decision', () => {
+    renderView();
+    expect(screen.queryByRole('region', { name: 'Norme' })).toBeNull();
+    expect(screen.queryByRole('region', { name: /^Giurisprudenza/ })).toBeNull();
+    expect(screen.getByRole('region', { name: L247 })).toBeInTheDocument();
+  });
+
+  it('gives the decisions alone the whole width', () => {
+    renderView({ ...withDecision, items: withDecision.items.filter((i) => i.type === 'sentenza') });
+    const decisions = screen.getByRole('region', { name: 'Giurisprudenza (1)' });
+    expect(screen.queryByRole('region', { name: 'Norme' })).toBeNull();
+    expect(decisions.parentElement?.className ?? '').not.toMatch(/lg:border-l/);
+  });
+
+  it('selects the decisions with the articles, «Seleziona tutti» taking both', () => {
+    renderView(withDecision);
+    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Seleziona elementi' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Seleziona tutti' }));
+    expect(screen.getByText('4 selezionati')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Giurisprudenza (1)' })).getByRole('button', { name: 'Deseleziona elemento' })).toBeInTheDocument();
   });
 
   it('finds a decision by its citation', () => {
