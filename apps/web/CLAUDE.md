@@ -1270,10 +1270,12 @@ tick and a short stroke under it, each the outline of a broad-nib pen stroke gen
 under 48 px), upright, in the one ink (`INK_TEXT`), with no text inside. It shows only when the goal's mission is done
 (`goalMissionDone`): a day the streak counts with the mission empty (nothing due, nothing new) or open (a goal of the
 user's own under the mission's 10 reviews) says so in the mission's line, with no mark and no celebration. In the day
-block (`DayBlock`), on a phone first, 72 px with «23 ottobre 2026 · giorno 3» beside it; from `md` at the block's right,
-112 px over those words, the block's right side kept for it — never beside the large line. Written (`draw`) only by the
-celebration: a mask whose pen path is uncovered stroke by stroke (`.vlx-goal-mark-draw`, about 1 s, motion allowed only);
-a page read again draws it whole. Its name, «Obiettivo raggiunto» (`role="img"`); the date is the words beside it. The
+block (`DayBlock`, from the whole day's read, so a subject chosen neither hides nor redraws it), on a phone first, 72 px
+with «23 ottobre 2026 · giorno 3» beside it, never beside the large line; from `md` at the block's right, 96 px over
+those words, the block's right side kept for it. Written (`draw`) only by the celebration: a mask whose pen path is
+uncovered stroke by stroke (`.vlx-goal-mark-draw`, about 1 s, motion allowed only); on WebKit, which may not repaint a
+shape whose mask CSS animates (Safari, every browser on an iPhone or an iPad, `writesInMasks`), a short fade of the
+mark whole instead (`.vlx-goal-mark-fade`, A3's fallback). A page read again draws it whole. Its name, «Obiettivo raggiunto» (`role="img"`); the date is the words beside it. The
 session's notice has the same mark, small, beside its words at every width. The session's end screen adds the ring and the streak
 (`SessionEndProgress`, the same read).
 **The small motions** (S2): the tally's new mark (the count pops with it), today's count landing in the ring

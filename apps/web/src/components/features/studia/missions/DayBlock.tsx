@@ -80,8 +80,9 @@ export function DayBlock({
   const whole = todayState(day, dayFailed, false);
   const state = whole === 'empty' ? 'empty' : todayState(action, actionFailed || dayFailed, filtered);
   const met = day?.oggi.raggiunto ?? false;
-  // «Obiettivo raggiunto» only when the goal's mission is done (G9), whatever the streak counts.
-  const goal = day && (state === 'todo' || state === 'done') && goalMissionDone(day) ? day : null;
+  // «Obiettivo raggiunto» only when the goal's mission is done (G9), whatever the streak counts: the whole day's, so a
+  // subject chosen (its read travelling, or nothing left in it) neither hides nor redraws it.
+  const goal = day && (whole === 'todo' || whole === 'done') && goalMissionDone(day) ? day : null;
 
   // The cascade, once, when the block first draws what it says (not while its places are held).
   const block = useRef<HTMLElement>(null);
@@ -108,20 +109,21 @@ export function DayBlock({
       className={cn(
         TILE,
         'relative grid justify-items-stretch gap-3 border-l-4 border-l-[color:var(--vlx-section-gymnasium)] dark:border-l-[color:var(--vlx-section-gymnasium)] p-5 md:justify-items-start md:p-7',
-        goal && 'md:pr-48',
+        goal && 'md:pr-44',
       )}
     >
       <h2 id="studia-giorno" className="sr-only">
         Il ripasso di oggi
       </h2>
       {goal && (
-        // The goal's mark (G9): on a phone first, over the date's line, 72 px with its words beside it; from `md` at the
-        // block's right, 112 px over its words, in the room that side had empty. Never beside the large line.
+        // The goal's mark (G9): on a phone first, over the date's line, 72 px with its words beside it, never beside the
+        // large line; from `md` at the block's right, 96 px over its words, in the room that side had empty. As wide as
+        // its content on a phone, so the confetti start from it, not the card's middle.
         <div
           ref={goalRef}
-          className="flex items-center gap-3 md:absolute md:right-7 md:top-1/2 md:w-36 md:-translate-y-1/2 md:flex-col md:gap-2 md:text-center"
+          className="flex w-max max-w-full items-center gap-3 md:absolute md:right-7 md:top-1/2 md:w-36 md:-translate-y-1/2 md:flex-col md:gap-2 md:text-center"
         >
-          <GoalMark size={112} draw={drawGoal} label="Obiettivo raggiunto" className={cn('h-[72px] w-[72px] md:h-28 md:w-28', INK_TEXT)} />
+          <GoalMark size={96} draw={drawGoal} label="Obiettivo raggiunto" className={cn('h-[72px] w-[72px] md:h-24 md:w-24', INK_TEXT)} />
           {/* «23 ottobre 2026 · giorno 3» on one line beside it; from `md` the date over the day, under it. */}
           <p className={cn('text-sm font-medium tabular-nums', MUTED_TEXT)}>
             <span className="md:block">{formatDate(goal.oggi.giorno)}</span>

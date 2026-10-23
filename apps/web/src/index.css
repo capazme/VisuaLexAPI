@@ -1172,8 +1172,11 @@
   .vlx-goal-mark-draw .vlx-goal-mark-pen { animation: vlx-goal-mark-write 560ms var(--ease-in-out) backwards; }
   .vlx-goal-mark-draw mask:nth-of-type(2) .vlx-goal-mark-pen { animation-duration: 300ms; animation-delay: 520ms; }
   .vlx-goal-mark-draw mask:nth-of-type(3) .vlx-goal-mark-pen { animation-duration: 220ms; animation-delay: 800ms; }
+  /* WebKit (`writesInMasks`): the mark whole, coming in. */
+  .vlx-goal-mark-fade { animation: vlx-goal-mark-fade 400ms var(--ease-out) backwards; }
 }
 @keyframes vlx-goal-mark-write { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes vlx-goal-mark-fade { from { opacity: 0; } }
 
 /* The sign-in's wordmark written in ink (A3, `AuthPage`): one face, one ink, one gesture. The book traces itself
    (0–450 ms); a faint, blurred copy of «VisuaLex» comes out from under a mask whose soft edge is the pen's tip

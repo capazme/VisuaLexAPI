@@ -23,7 +23,7 @@ const SOURCES = [
 const sizes = (source: string) => [...source.matchAll(/text-\[(\d+(?:\.\d+)?)px\]/g)].map((m) => Number(m[1]));
 
 describe('the type scale of «Oggi»', () => {
-  it.each(SOURCES)('%s writes no text size under 11 px, the session’s compact stamp included (Y1)', (file) => {
+  it.each(SOURCES)('%s writes no text size under 11 px, the goal’s mark’s words included (Y1, G9)', (file) => {
     const source = readFileSync(join(DIR, file), 'utf8');
     expect(sizes(source).filter((px) => px < 11)).toEqual([]);
     expect(source).not.toMatch(/<text\b/);

@@ -1,5 +1,6 @@
 import { useId } from 'react';
 import { cn } from '../../../../lib/utils';
+import { writesInMasks } from './goalMarkMotion';
 
 // The goal's mark (G9): a ring, a tick and a short stroke under it, each the outline of a broad-nib pen stroke — its
 // width following the stroke's direction against the nib, thin where the pen lands and lifts — generated once and
@@ -52,7 +53,7 @@ export function GoalMark({ size, draw = false, label, className }: GoalMarkProps
       aria-label={label}
       aria-hidden={label ? undefined : true}
       data-testid="goal-mark"
-      className={cn('vlx-goal-mark shrink-0 fill-current', draw && 'vlx-goal-mark-draw', className)}
+      className={cn('vlx-goal-mark shrink-0 fill-current', draw && (writesInMasks() ? 'vlx-goal-mark-draw' : 'vlx-goal-mark-fade'), className)}
     >
       <defs>
         {PEN.map((stroke) => (

@@ -441,16 +441,18 @@ describe('ReviewHome', () => {
       expect(screen.queryByTestId('goal-mark')).not.toBeInTheDocument();
     });
 
-    // G9, the case on Luca's screen: day 3 of the streak, nothing due, nothing new. The server counts the day
-    // (`raggiunto`) and leaves the goal's mission empty: the page never says «Obiettivo raggiunto» for it.
+    // G9, the case on Luca's screen: day 3 of the streak, nothing due, nothing new. The server counts the day with the
+    // queue finished (`raggiunto`, 0 reviews) and leaves the goal's mission empty: the page never says «Obiettivo
+    // raggiunto» for it.
     it('says the day counts, with no mark, no burst and no «0 di 0», when the goal\'s mission is empty', async () => {
       progress.mockResolvedValue({
-        ...answer(0, 0, { ripassi: 4, raggiunto: true }, 3),
+        ...answer(0, 0, { ripassi: 0, raggiunto: true }, 3),
         missioni: serverMissions({ dovute: { stato: 'vuota' }, nuove: { stato: 'vuota' }, obiettivo: { stato: 'vuota', progresso: undefined } }),
       });
       const { container } = renderHome();
       const missions = await screen.findByRole('region', { name: 'Le missioni di oggi' });
-      expect(within(missions).getByText('Hai finito le schede del giorno: il giorno conta. Serie: 3 giorni.')).toBeVisible();
+      // Read and seen: the stamp no longer covers it, nor hides it from the eye.
+      expect(within(missions).getByText('Hai finito le schede del giorno: il giorno conta. Serie: 3 giorni.')).not.toHaveClass('sr-only');
       expect(within(missions).getByText('Oggi non c\'è nulla da ripassare')).toBeInTheDocument();
       expect(within(missions).queryByText(/0 di 0/)).toBeNull();
       expect(screen.queryByTestId('goal-mark')).toBeNull();
@@ -464,10 +466,23 @@ describe('ReviewHome', () => {
         ...answer(2, 0, { ripassi: 6, obiettivo: 5, raggiunto: true }, 3),
         missioni: serverMissions({ obiettivo: { stato: 'aperta', progresso: { fatte: 6, di: 10 } } }),
       });
-      renderHome();
+      const { container } = renderHome();
       const missions = await screen.findByRole('region', { name: 'Le missioni di oggi' });
-      expect(within(missions).getByText('Il giorno conta per la serie; per i punti della missione servono 10 ripassi.')).toBeVisible();
+      expect(within(missions).getByText('Il giorno conta per la serie; per i punti della missione servono 10 ripassi.')).not.toHaveClass('sr-only');
+      // No mark, no burst, nothing celebrated: the goal's mission is still open.
       expect(screen.queryByTestId('goal-mark')).toBeNull();
+      expect(screen.queryByText(/Obiettivo raggiunto/)).toBeNull();
+      expect(container.querySelector('canvas')).toBeNull();
+      expect(localStorage.getItem(CELEBRATED_KEY)).toBeNull();
+    });
+
+    it('keeps the mark while a subject\'s read travels, the day\'s goal being the whole day\'s', async () => {
+      localStorage.setItem(CELEBRATED_KEY, '2026-10-19');
+      localStorage.setItem(STORAGE_KEY, 'DIRITTO_PENALE');
+      progress.mockImplementation((materia?: string) => (materia ? new Promise(() => {}) : Promise.resolve(met())));
+      renderHome();
+      expect(await screen.findByTestId('goal-mark')).toBeInTheDocument();
+      expect(dayBlock()).toContainElement(screen.getByTestId('goal-mark'));
     });
   });
 

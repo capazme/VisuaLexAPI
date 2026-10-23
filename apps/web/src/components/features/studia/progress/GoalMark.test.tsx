@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { GoalMark } from './GoalMark';
+import { writesInMasks } from './goalMarkMotion';
 
 describe('GoalMark (G9)', () => {
   it('is named «Obiettivo raggiunto» when given a name, and is decoration otherwise', () => {
@@ -50,5 +51,33 @@ describe('GoalMark (G9)', () => {
     render(<><GoalMark size={112} /><GoalMark size={32} /></>);
     const ids = [...document.querySelectorAll('mask')].map((mask) => mask.id);
     expect(new Set(ids).size).toBe(6);
+  });
+
+  it('writes itself in masks except on WebKit (Safari, every iPhone and iPad browser), where it fades in whole', () => {
+    const ua = (userAgent: string, maxTouchPoints = 0) => ({ userAgent, maxTouchPoints });
+    const CHROME = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
+    const EDGE = `${CHROME} Edg/130.0.0.0`;
+    const FIREFOX = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0';
+    const SAFARI = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15';
+    const IPHONE_CHROME = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/130.0 Mobile/15E148 Safari/604.1';
+    expect([CHROME, EDGE, FIREFOX].map((agent) => writesInMasks(ua(agent)))).toEqual([true, true, true]);
+    expect(writesInMasks(ua(SAFARI))).toBe(false);
+    expect(writesInMasks(ua(IPHONE_CHROME))).toBe(false);
+    // An iPad asking for the desktop site: a Mac's agent, with touch points.
+    expect(writesInMasks(ua(SAFARI, 5))).toBe(false);
+  });
+
+  it('fades in whole where masks are not written (WebKit)', () => {
+    const agent = Object.getOwnPropertyDescriptor(Navigator.prototype, 'userAgent');
+    Object.defineProperty(navigator, 'userAgent', { configurable: true, get: () => 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' });
+    try {
+      render(<GoalMark size={112} draw />);
+      const mark = screen.getByTestId('goal-mark');
+      expect(mark).toHaveClass('vlx-goal-mark-fade');
+      expect(mark).not.toHaveClass('vlx-goal-mark-draw');
+    } finally {
+      delete (navigator as unknown as Record<string, unknown>).userAgent;
+      if (agent) Object.defineProperty(Navigator.prototype, 'userAgent', agent);
+    }
   });
 });

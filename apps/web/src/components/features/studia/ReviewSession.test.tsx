@@ -653,6 +653,9 @@ describe('the goal of the day in the session (Studia progress spec §6.4)', () =
     await show();
     await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
     const notice = await screen.findByTestId('session-celebration');
+    // The goal's mark, small, beside the words (G9): the red stamp is gone.
+    expect(within(notice).getByTestId('goal-mark')).toBeInTheDocument();
+    expect(within(notice).queryByTestId('goal-stamp')).toBeNull();
     expect(notice.className).toContain('absolute');
     expect(notice.className).not.toContain('fixed');
     expect(notice.className).toContain('pointer-events-none');
