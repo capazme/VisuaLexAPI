@@ -196,9 +196,13 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     if (next.has(key)) next.delete(key); else next.add(key);
     return next;
   });
-  const allExpanded = visibleArticleIds.length > 0 && visibleArticleIds.every(id => expandedIds.has(id));
   // "Espandi tutto" opens every block and every article, a decision open staying open (D7a: never all the decisions,
-  // each a request to its court's source); "Comprimi tutto" closes every row.
+  // each a request to its court's source); "Comprimi tutto" closes every row, the decisions too — the only thing it
+  // offers in a dossier of decisions alone, once one is open.
+  const visibleDecisionIds = layout.decisions.map((item) => item.id);
+  const allExpanded = visibleArticleIds.length > 0
+    ? visibleArticleIds.every((id) => expandedIds.has(id))
+    : visibleDecisionIds.some((id) => expandedIds.has(id));
   const toggleExpandAll = () => {
     if (allExpanded) {
       setExpandedIds(new Set());
@@ -237,7 +241,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
 
   // The articles and the decisions on screen: notes carry no checkbox, so selecting "all" must not take them.
   const selectAllItems = () => {
-    setSelectedItems(new Set([...visibleArticleIds, ...layout.decisions.map((item) => item.id)]));
+    setSelectedItems(new Set([...visibleArticleIds, ...visibleDecisionIds]));
   };
 
   const clearSelection = () => setSelectedItems(new Set());
@@ -664,8 +668,8 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
             <button
               type="button"
               onClick={toggleExpandAll}
-              // Nothing to open without an article on screen (decisions alone).
-              disabled={visibleArticleIds.length === 0}
+              // Decisions alone: nothing to open, only open ones to close.
+              disabled={visibleArticleIds.length === 0 && !allExpanded}
               className={cn(HEADER_BUTTON, 'justify-center whitespace-nowrap disabled:opacity-40')}
               aria-pressed={allExpanded}
             >
@@ -758,7 +762,8 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
                   elements either way, only their classes changing, so a search that leaves one kind remounts nothing
                   (an open article keeps its text). */}
               <div className={cn('flex flex-col gap-4', twoColumns && 'gap-6 lg:grid lg:grid-cols-2 lg:gap-0')}>
-                <section aria-labelledby={twoColumns ? 'dossier-norms-heading' : undefined} className={cn('min-w-0', twoColumns && 'lg:pr-5')}>
+                {/* Hidden, still mounted, while no act is on screen: no empty block and no gap over the decisions. */}
+                <section aria-labelledby={twoColumns ? 'dossier-norms-heading' : undefined} className={cn('min-w-0', twoColumns && 'lg:pr-5', layout.acts.length === 0 && 'hidden')}>
                   {twoColumns && <h2 id="dossier-norms-heading" className={COLUMN_HEADING}>Norme</h2>}
                   {actsList}
                 </section>

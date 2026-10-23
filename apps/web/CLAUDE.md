@@ -1806,11 +1806,17 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   `DecisionReadingSurface`, never another, so notes, highlights and key passages work as anywhere and the text is the
   reader's, gotcha 23; asked for only once opened; a decision without its text opens too and `DecisionView` says how it
   came; «Apri la sentenza», the address, over it whatever came back. No tab holds it: no «Cerca nel testo», and a cited
-  norm or decision takes the reader to the workspace, `onLeave` (see «The host props»). No note count or
-  application's mark: the server takes a note about an article only, `assertArticleOfDossier`). «Seleziona tutti» takes
+  norm or decision takes the reader to the workspace, `onLeave` (see «The host props»); its heading an h3 under
+  «Giurisprudenza», `DecisionView`'s `headingLevel`. The application that filed it is marked as an article's notes are,
+  `ClaudeMark` with `verb="aggiunta"` — «aggiunta da Claude Code», never «scritta» — from the item's own `createdBy`,
+  on the grey line rather than at the right (a long citation beside it was squeezed into a column on a phone).
+  No note count: the server takes a note about an article only, `assertArticleOfDossier`, and counting the notes and
+  highlights on each text would cost a read per decision.) «Seleziona tutti» takes
   the decisions with the articles; «Apri tutto su Dashboard», on the page and on the list's card, opens a dossier of
   decisions alone too, one practice holding them; «Espandi tutto» opens the articles only, each decision being a request
-  to its court's source, and leaves a decision open as it was (disabled with no article on screen). In two columns the
+  to its court's source, and leaves a decision open as it was; «Comprimi tutto» closes every row, the decisions too (in
+  a dossier of decisions alone it is all the button offers, once one is open). The block of acts is hidden, still
+  mounted, while no act is on screen. In two columns the
   acts' headings are h3 under «Norme» (`headingLevel`), and the page keeps the same elements whatever the search leaves,
   only their classes changing, so an open article is never remounted. The stored `etichetta` is a copy (source convention, D9):
   `decisionCitationOf` recomputes the citation from the identity and the attributes, every write

@@ -97,6 +97,8 @@ describe('DossierDecisionsSection (D7a)', () => {
     expect(screen.getByRole('button', { name: `Comprimi ${CASS}` })).toHaveAttribute('aria-expanded', 'true');
     const motivazione = await screen.findByRole('region', { name: 'Motivazione' });
     expect(motivazione.textContent).toContain('Il ricorrente lamenta la violazione');
+    // Its heading a level under «Giurisprudenza» (h2).
+    expect(screen.getByRole('heading', { level: 3, name: /^Corte di cassazione/ })).toBeInTheDocument();
     expect(fetchDecision).toHaveBeenCalledTimes(1);
     // The decision's own reading surface: its toolbar, without the find window it has no tab for.
     expect(screen.getByRole('button', { name: /Glosse sulla decisione/ })).toBeInTheDocument();
@@ -181,6 +183,15 @@ describe('DossierDecisionsSection (D7a)', () => {
     expect(screen.getByRole('button', { name: 'Rimuovi da importanti' })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(first);
     expect(onToggleImportant).toHaveBeenCalledWith(cass);
+  });
+
+  it('marks a decision Claude filed, as an article\'s notes are, and says it in the row\'s name', () => {
+    renderSection([{ ...cass, createdBy: { clientName: 'Claude Code (visualex)' } }, cost]);
+    const filed = screen.getByRole('button', { name: `Espandi ${CASS}, aggiunta da Claude Code (visualex) (applicazione collegata)` });
+    expect(within(filed).getByText('Claude Code (visualex)')).toBeInTheDocument();
+    expect(within(filed).getByText('aggiunta da Claude Code (visualex) (applicazione collegata)')).toHaveClass('sr-only');
+    // The user's own carries none.
+    expect(screen.getByRole('button', { name: `Espandi ${COST}` })).toBeInTheDocument();
   });
 
   it('removes a decision as the other rows do', () => {

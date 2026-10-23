@@ -339,9 +339,19 @@ describe('DossierDetailView — decisions', () => {
     expect(screen.getByRole('button', { name: `Espandi ${CITATION}` })).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('offers no «Espandi tutto» to a dossier of decisions alone, which would open nothing', () => {
+  it('in a dossier of decisions alone, opens nothing with «Espandi tutto» but closes an open decision with «Comprimi tutto»', () => {
     renderView({ ...withDecision, items: withDecision.items.filter((i) => i.type === 'sentenza') });
     expect(screen.getByRole('button', { name: 'Espandi tutto' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: `Espandi ${CITATION}` }));
+    fireEvent.click(screen.getByRole('button', { name: 'Comprimi tutto' }));
+    expect(screen.getByRole('button', { name: `Espandi ${CITATION}` })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('button', { name: 'Espandi tutto' })).toBeDisabled();
+  });
+
+  it('draws no empty block of acts over the decisions alone', () => {
+    renderView({ ...withDecision, items: withDecision.items.filter((i) => i.type === 'sentenza') });
+    const column = screen.getByRole('region', { name: 'Giurisprudenza (1)' }).parentElement!;
+    expect(column.previousElementSibling).toHaveClass('hidden');
   });
 
   it('finds a decision by its citation', () => {

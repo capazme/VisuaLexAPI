@@ -46,6 +46,7 @@ export function DossierDecisionReader({ identity }: Props) {
         onRetry={retry}
         onChooseCandidate={chooseCandidate}
         onOpenPalette={() => openPaletteWith(formatDecisionShort(current))}
+        headingLevel={3}
         textSlot={answer?.esito === 'trovata' ? (
           <DecisionReadingSurface identity={answer.identita} testo={answer.testo} attributi={answer.attributi} onLeave={toWorkspace} />
         ) : undefined}
