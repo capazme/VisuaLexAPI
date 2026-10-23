@@ -261,17 +261,30 @@ describe('ReviewHome', () => {
 
   // P1: on a phone the page moved when the read came (CLS 0.63): the places held were shorter than what took them.
   describe('the places held as tall as what takes them (P1)', () => {
-    it('holds the day\'s line, two lines of the large line and of the cost on a phone, and taller mission rows there', () => {
+    it('holds the day\'s line, the large line as a phone wraps it, the cost on two lines, and the mission rows as tall as theirs', () => {
       progress.mockReturnValue(new Promise(() => {}));
       renderHome();
       const day = screen.getByRole('region', { name: 'Il ripasso di oggi' });
       const held = [...day.querySelectorAll('[aria-hidden="true"]')].map((el) => el.className);
+      // One line for the date without a subject.
       expect(held[0]).toMatch(/\bh-5\b.*\bw-40\b/);
-      expect(held[1]).toMatch(/h-\[75px\].*md:h-11/);
+      expect(held[0]).not.toMatch(/max-md:h-10/);
+      // Two lines under 390 px, one from there and from `md`.
+      expect(held[1]).toMatch(/h-\[75px\].*min-\[390px\]:h-\[38px\].*md:h-11/);
       expect(held[2]).toMatch(/\bh-10\b.*md:h-5/);
       const rows = screen.getByRole('region', { name: 'Le missioni di oggi' }).querySelectorAll('.grid-cols-\\[24px_minmax\\(0\\,1fr\\)\\] > div:last-child');
-      expect(rows).toHaveLength(3);
-      for (const row of rows) expect(row).toHaveClass('h-16', 'md:h-9');
+      expect([...rows].map((row) => ['h-[58px]', 'h-[84px]'].find((c) => row.classList.contains(c)))).toEqual(['h-[58px]', 'h-[58px]', 'h-[84px]']);
+      for (const row of rows) expect(row).toHaveClass('md:h-9');
+    });
+
+    it('holds two lines for the date on a phone with a subject remembered, and keeps it held while that subject\'s read answers first', async () => {
+      localStorage.setItem(STORAGE_KEY, 'DIRITTO_PROCESSUALE_PENALE');
+      progress.mockImplementation((materia?: string) => (materia ? Promise.resolve(answer(4, 2)) : new Promise(() => {})));
+      renderHome();
+      // The subject's read has answered, the day's has not: the block draws the subject's day, the date's place held.
+      expect(await screen.findByText('4 da ripassare, 2 nuove')).toBeInTheDocument();
+      const day = screen.getByRole('region', { name: 'Il ripasso di oggi' });
+      expect(day.querySelector('.w-40')).toHaveClass('h-5', 'max-md:h-10');
     });
 
     it('draws the date once with a subject chosen: no place held for it under the day\'s line while the subject\'s read travels', async () => {
@@ -283,12 +296,13 @@ describe('ReviewHome', () => {
       expect(day.querySelector('.w-40')).toBeNull();
     });
 
-    it('keeps two lines for the large line and the cost on a phone while the subjects\' read travels', async () => {
+    it('keeps two lines for the cost on a phone while the subjects\' read travels, and leaves the large line its own height', async () => {
       percorso.mockReturnValue(new Promise(() => {}));
       progress.mockResolvedValue(answer(18, 20));
       renderHome();
       const large = await screen.findByText('18 da ripassare, 20 nuove');
-      expect(large).toHaveClass('max-md:min-h-[2lh]');
+      // No room kept once read: a short sentence leaves no empty line under it.
+      expect(large.className).not.toMatch(/min-h/);
       expect(screen.getByText(/^circa \d+ minuti/)).toHaveClass('max-md:min-h-10');
     });
 

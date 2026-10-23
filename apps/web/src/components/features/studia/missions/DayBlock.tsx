@@ -99,16 +99,17 @@ export function DayBlock({ day, dayFailed, action, actionFailed, stops, onRetry,
         Il ripasso di oggi
       </h2>
       <DayLine day={day} subject={subject} />
+      {/* The date's place while the day's read travels — also when a subject's read answers first: on a phone two lines
+          with a subject («mercoledì 21 ottobre · Diritto processuale penale»), one without (P1). */}
+      {!day && !dayFailed && <div aria-hidden className={cn('h-5 w-40 rounded bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800', subject && 'max-md:h-10')} />}
 
       {state === 'loading' && (
-        // The final size, so nothing jumps when the read answers (P1: on a phone the block grew 91 px, CLS 0.63): the
-        // date's line, which waits for the read too; the large line on two lines below `md`, as «23 da ripassare, 15
-        // nuove» wraps there; the cost and the subjects on two.
+        // The final size, so nothing jumps when the read answers (P1: on a phone the block grew 91 px, CLS 0.63): the large
+        // line on two lines under 390 px, where «23 da ripassare, 15 nuove» wraps, one from there; the cost and the
+        // subjects on two below `md`.
         <>
           <p className="sr-only">Carico i tuoi progressi…</p>
-          {/* Only before the day's read: with a subject chosen the block also waits for that subject's read, under the date. */}
-          {!day && <div aria-hidden className="h-5 w-40 rounded bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />}
-          <div aria-hidden className="h-[75px] w-3/4 rounded-md bg-slate-100 motion-safe:animate-pulse md:h-11 dark:bg-slate-800" />
+          <div aria-hidden className="h-[75px] w-3/4 rounded-md bg-slate-100 motion-safe:animate-pulse min-[390px]:h-[38px] md:h-11 dark:bg-slate-800" />
           <div aria-hidden className="h-10 w-56 max-w-full rounded bg-slate-100 motion-safe:animate-pulse md:h-5 dark:bg-slate-800" />
           <div aria-hidden className="mt-1 h-12 w-full rounded-xl bg-slate-100 motion-safe:animate-pulse md:w-64 dark:bg-slate-800" />
         </>
@@ -148,9 +149,7 @@ export function DayBlock({ day, dayFailed, action, actionFailed, stops, onRetry,
 
       {(state === 'todo' || state === 'done') && action && (
         <>
-          {/* «23 da ripassare, 15 nuove» wraps or not by a few pixels on a phone (one line at 412 px, two at 390): the
-              line keeps two there, as its place held while the read travelled, so nothing under it moves (P1). */}
-          <p className={cn(LARGE, state === 'todo' && 'max-md:min-h-[2lh]')} aria-live="polite">
+          <p className={LARGE} aria-live="polite">
             {state === 'todo' ? todaySentence(action) : filtered ? 'Niente da ripassare in questa materia, per oggi.' : 'Hai finito per oggi.'}
           </p>
           {/* While the subjects' read travels, on a phone the line keeps the two lines it takes once they come (P1). */}

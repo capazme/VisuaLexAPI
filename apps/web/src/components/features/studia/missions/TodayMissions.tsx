@@ -105,8 +105,9 @@ export function TodayMissions({ day, dayFailed, onOpenSettings, settingsPanel, c
           {[0, 1, 2].map((row) => (
             <div key={row} aria-hidden className="grid grid-cols-[24px_minmax(0,1fr)] gap-x-3 py-3">
               <div className="h-6 w-6 rounded-full bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
-              {/* A row's words, its count and its bar: one line from `md`, two on a phone (P1). */}
-              <div className="h-16 rounded-lg bg-slate-100 motion-safe:animate-pulse md:h-9 dark:bg-slate-800" />
+              {/* A row's words, its count and its bar as a phone draws them, 58 px, the goal's with its line 84 (P1); one
+                  line from `md`. */}
+              <div className={cn('rounded-lg bg-slate-100 motion-safe:animate-pulse md:h-9 dark:bg-slate-800', row === 2 ? 'h-[84px]' : 'h-[58px]')} />
             </div>
           ))}
         </div>

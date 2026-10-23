@@ -1131,12 +1131,15 @@ the points, #253, or a failed read) the left column held the day block alone whi
 «Le tue materie» leaves the box then for the left column, under the day block — from `xl` only, and before the
 statistics in the document, so the keyboard follows the eye; below `xl` nothing moves —; while the first read travels it
 stays in the box, and after a failed read it stays on the left while «Riprova» reads again. The places held while the
-reads travel are as tall as what takes them (P1, phone CLS 0.63 → 0): the day block's: the date's line (before the day's
-read only), the large line on two lines and the cost on two below `md` (the heights of a day with cards to review: a
-day done or a page with no card moves up when it comes, the place held being taller), and the large line and the cost
-keep two lines there once read (the sentence wraps or not by a few pixels; the cost waits for the subjects' read); the missions' rows 64 px below `md`; «Le tue
-materie»'s strip held inside a plain box, so React never keeps the strip, a scroller Chrome measured in its own
-coordinates, as the list's group. In that order:
+reads travel are as tall as what takes them (P1, phone CLS 0.63 → 0), and only while they travel — no room is kept once
+read: the date's line while the day's read travels, also when a subject's read answers first (two lines on a phone with
+a subject); the large line on two lines under 390 px, where «23 da ripassare, 15 nuove» wraps, one from there; the cost
+on two below `md`, and kept on two there while the subjects' read travels (it says the subjects once they come); the
+missions' rows 58, 58 and 84 px on a phone, as theirs (the goal's with its line); «Le tue materie»'s strip held inside a
+plain box, so React never keeps the strip, a scroller Chrome measured in its own coordinates, as the list's group. The
+heights are a day's with cards to review and missions: a day done or a subject chosen leaves a small shift (CLS ≤ 0.03);
+with no mission at all (a server without the points, no card yet) the missions' place goes when the read comes (0.15–0.22,
+from 0.48–0.57 before). In that order:
 1. **The day block** (`missions/DayBlock`, G8, the page's entry; on a phone «Inizia il ripasso» within the first 400 px
    under the bar): a tile with the section's hue as a 4 px rule down its left edge (`--vlx-section-gymnasium`), a
    visually hidden `h2` «Il ripasso di oggi»; the day small, «lunedì 19 ottobre» (the title says «Oggi»; «lunedì 19
