@@ -1449,7 +1449,7 @@ own data (decided by the owner, 8 Oct 2026).
 **Downloads** (`DecisionDownloads`, among `DecisionView`'s actions for a found decision):
 «Scarica PDF» is a PDF of ours (`decisionPdf.ts`: `decisionPdfModel` is pure,
 `writeDecisionPdf` draws it with jsPDF through `utils/pdfWriter.ts`, the page layout the
-dossier's PDF shares), optionally «Con le mie evidenziazioni e note» (placed by `resolveAnchors`
+dossier's PDF shares; the button waits with the `Button` spinner while jsPDF loads), optionally «Con le mie evidenziazioni e note» (placed by `resolveAnchors`
 over the same projection; free notes follow the text; anchors that no longer land are listed under
 «Non ritrovate nel testo attuale», switchable with the `includeUnmatched` option of
 `decisionPdfModel`); «PDF originale della Corte», for the Cassazione only, is the court's own file
@@ -1816,6 +1816,14 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   `parseSentenzaContent` (dossierUtils) mirrors `apps/server/src/schemas/decisionItem.ts`:
   change both together. Every switch over item types ends in `assertNever`, so a new type cannot
   fall silently into "note".
+- **jsPDF is loaded on the first export** (`utils/loadJsPdf.ts`, a dynamic `import()` kept for the next
+  export and retried after a failed load): with pako and fast-png it is ~120 KB compressed that every
+  page, sign-in included, would otherwise download. Its users — `writeDossierPdf`, `writeDecisionPdf`,
+  `AdvancedExportModal` — are async and name jsPDF with `import type` only; `loadJsPdf.guard.test.ts`
+  refuses a value import of it anywhere. A button that writes a PDF shows the wait (spinner, disabled,
+  `aria-busy`) with its own label, no new text; `pdfIdentity.test.tsx` holds the bytes of a dossier, a
+  decision and an article PDF (date and `Math.random` fixed), so a change in how jsPDF is reached cannot
+  change the file.
 - **The PDF** (`dossierPdf.ts`) is grouped the same way and prints each
   article's text as the reader shows it, fetched through `articleFetchCache` —
   never a stored `article_text`, which items added through MCP or «Importa da

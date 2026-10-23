@@ -34,9 +34,9 @@ const BLOCKS: PdfBlock[] = [
 ];
 
 describe('writeDossierPdf', () => {
-  it('draws the header, the sections and a footer per page, as the dossier\'s PDF always has', () => {
+  it('draws the header, the sections and a footer per page, as the dossier\'s PDF always has', async () => {
     calls.length = 0;
-    const doc = writeDossierPdf(
+    const doc = await writeDossierPdf(
       { title: 'Pratica Rossi', description: 'Responsabilità civile', tags: ['civile', 'danni'], countsLine: '2 norme', exportedOn: '5/10/2026' },
       BLOCKS,
     );

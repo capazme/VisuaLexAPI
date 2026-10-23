@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Download, Copy, Check, FileText, StickyNote, Highlighter, Scale, FileCode, FileType } from 'lucide-react';
-import { jsPDF } from 'jspdf';
+import type { jsPDF } from 'jspdf';
+import { loadJsPdf } from '../../utils/loadJsPdf';
 import { cn } from '../../lib/utils';
 import { Modal } from './Modal';
 import type { ArticleData } from '../../types';
@@ -48,6 +49,8 @@ export function AdvancedExportModal({
 
   const [exportFormat, setExportFormat] = useState<ExportFormat>('clipboard');
   const [copied, setCopied] = useState(false);
+  // The PDF waits for jsPDF the first time (P1): the button turns its icon into a spinner, its words as they are.
+  const [writingPdf, setWritingPdf] = useState(false);
 
   const toggleSection = (id: string) => {
     setSections(prev => prev.map(s => (s.id === id ? { ...s, enabled: !s.enabled } : s)));
@@ -199,9 +202,11 @@ export function AdvancedExportModal({
    * layout intentionally simple (serif body, bold H2s, plain bullet
    * lists) — the goal is a readable printable, not a typeset document.
    */
-  const buildPdf = (): jsPDF => {
+  const buildPdf = async (): Promise<jsPDF> => {
     const plainText = (txt: string) => txt.replace(/<[^>]*>/g, '').replace(/\n{3,}/g, '\n\n').trim();
-    const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait' });
+    // jsPDF is loaded here, on the export (P1).
+    const JsPdf = await loadJsPdf();
+    const doc = new JsPdf({ unit: 'pt', format: 'a4', orientation: 'portrait' });
     const margin = 48;
     const width = doc.internal.pageSize.getWidth();
     const height = doc.internal.pageSize.getHeight();
@@ -303,9 +308,14 @@ export function AdvancedExportModal({
       URL.revokeObjectURL(link.href);
       onClose();
     } else if (exportFormat === 'pdf') {
-      const doc = buildPdf();
-      doc.save(`VisuaLex_${norma_data.tipo_atto.replace(/\s+/g, '_')}_Art${norma_data.numero_articolo}.pdf`);
-      onClose();
+      setWritingPdf(true);
+      try {
+        const doc = await buildPdf();
+        doc.save(`VisuaLex_${norma_data.tipo_atto.replace(/\s+/g, '_')}_Art${norma_data.numero_articolo}.pdf`);
+        onClose();
+      } finally {
+        setWritingPdf(false);
+      }
     } else if (exportFormat === 'rtf') {
       const rtfContent = generateRtfContent();
       const blob = new Blob([rtfContent], { type: 'application/rtf' });
@@ -349,6 +359,8 @@ export function AdvancedExportModal({
           </button>
           <button
             onClick={handleExport}
+            disabled={writingPdf}
+            aria-busy={writingPdf || undefined}
             className={cn(
               'px-6 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background',
               copied
@@ -368,7 +380,11 @@ export function AdvancedExportModal({
               </>
             ) : (
               <>
-                <Download size={16} />
+                {writingPdf ? (
+                  <span className="size-4 rounded-full border-2 border-current border-t-transparent animate-spin" aria-hidden="true" />
+                ) : (
+                  <Download size={16} />
+                )}
                 Scarica {exportFormat.toUpperCase()}
               </>
             )}

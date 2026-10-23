@@ -42,21 +42,37 @@ beforeEach(() => {
 });
 
 describe('DecisionDownloads', () => {
-  it('«Scarica PDF» saves a file named by the model', () => {
+  it('«Scarica PDF» saves a file named by the model', async () => {
     render(<DecisionDownloads answer={FOUND} identity={FOUND.identita} />);
     fireEvent.click(screen.getByRole('button', { name: /Scarica PDF/ }));
-    expect(save).toHaveBeenCalledWith('Cass_civ_sez_III_n_99999_2024.pdf');
+    // jsPDF comes on the first download (P1): the save follows it.
+    await waitFor(() => expect(save).toHaveBeenCalledWith('Cass_civ_sez_III_n_99999_2024.pdf'));
   });
 
-  it('with the option, the decision\'s own highlights are in the PDF (and only those)', () => {
+  it('shows the wait for jsPDF in the button, its words as they are, and gives it back once saved (P1)', async () => {
+    render(<DecisionDownloads answer={FOUND} identity={FOUND.identita} />);
+    const button = screen.getByRole('button', { name: /Scarica PDF/ });
+    fireEvent.click(button);
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('aria-busy', 'true');
+    expect(button).toHaveTextContent('Scarica PDF');
+    await waitFor(() => expect(save).toHaveBeenCalled());
+    await waitFor(() => expect(button).toBeEnabled());
+    expect(button).not.toHaveAttribute('aria-busy');
+  });
+
+  it('with the option, the decision\'s own highlights are in the PDF (and only those)', async () => {
     const mine = { id: 'h1', normaKey: KEY, articleId: '', rangeSerialized: '', text: 'Secondo', color: 'yellow', startOffset: 16 } as Highlight;
     const other = { ...mine, id: 'h2', normaKey: 'cassazione:civile:1:2024' } as Highlight;
     appStore.setState({ highlights: [mine, other] });
     render(<DecisionDownloads answer={FOUND} identity={FOUND.identita} />);
     fireEvent.click(screen.getByRole('button', { name: /Scarica PDF/ }));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
     expect(rect).not.toHaveBeenCalled();
     fireEvent.click(screen.getByLabelText('Con le mie evidenziazioni e note'));
+    await waitFor(() => expect(screen.getByRole('button', { name: /Scarica PDF/ })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: /Scarica PDF/ }));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
     expect(rect).toHaveBeenCalledTimes(1);
   });
 

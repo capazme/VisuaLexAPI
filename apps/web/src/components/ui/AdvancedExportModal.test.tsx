@@ -96,12 +96,25 @@ describe('AdvancedExportModal — nothing of Brocardi (D-078)', () => {
     expect(content).not.toMatch(BROCARDI_WORDS);
   });
 
-  it('writes the PDF with the text and nothing of Brocardi', () => {
+  it('writes the PDF with the text and nothing of Brocardi', async () => {
     renderModal(legacyArticle);
     fireEvent.click(screen.getByRole('button', { name: 'PDF' }));
     fireEvent.click(screen.getByRole('button', { name: /Scarica PDF/ }));
-    expect(pdfLines).toContain('Qualunque fatto doloso o colposo.');
+    // jsPDF comes on the first export (P1): the lines follow it.
+    await waitFor(() => expect(pdfLines).toContain('Qualunque fatto doloso o colposo.'));
     expect(pdfLines.join('\n')).not.toMatch(BROCARDI_WORDS);
+  });
+
+  it('shows the wait for jsPDF in «Scarica PDF», its words as they are (P1)', async () => {
+    const onClose = vi.fn();
+    render(<AdvancedExportModal isOpen onClose={onClose} articleData={articleData} annotations={[]} highlights={[]} />);
+    fireEvent.click(screen.getByRole('button', { name: 'PDF' }));
+    const button = screen.getByRole('button', { name: /Scarica PDF/ });
+    fireEvent.click(button);
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('aria-busy', 'true');
+    expect(button).toHaveTextContent('Scarica PDF');
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 });
 

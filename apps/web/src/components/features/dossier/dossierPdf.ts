@@ -1,4 +1,5 @@
-import { jsPDF } from 'jspdf';
+import type { jsPDF } from 'jspdf';
+import { loadJsPdf } from '../../../utils/loadJsPdf';
 import type { Annotation, DossierItem, Highlight } from '../../../types';
 import type { FoundDecision } from '../../../types/decisions';
 import { resolveAnchors } from '../../../utils/articleAnnotations';
@@ -318,9 +319,10 @@ function drawPdfDecision(w: PdfWriter, decision: PdfDecision): void {
   drawDecisionTail(w, model);
 }
 
-/** Draws the dossier's PDF: the header, then the sections `buildPdfBlocks` made. */
-export function writeDossierPdf(header: DossierPdfHeader, blocks: PdfBlock[]): jsPDF {
-  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+/** Draws the dossier's PDF: the header, then the sections `buildPdfBlocks` made. jsPDF is loaded here, on the export (P1). */
+export async function writeDossierPdf(header: DossierPdfHeader, blocks: PdfBlock[]): Promise<jsPDF> {
+  const JsPdf = await loadJsPdf();
+  const doc = new JsPdf({ unit: 'pt', format: 'a4' });
   const w = createPdfWriter(doc, { footerLeft: `${header.title} · VisuaLex` });
   const { ensureSpace, write } = w;
 
