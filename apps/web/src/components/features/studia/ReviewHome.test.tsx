@@ -259,6 +259,47 @@ describe('ReviewHome', () => {
     expect(container.querySelector('[aria-busy="true"]')).toBeNull();
   });
 
+  // P1: on a phone the page moved when the read came (CLS 0.63): the places held were shorter than what took them.
+  describe('the places held as tall as what takes them (P1)', () => {
+    it('holds the day\'s line, two lines of the large line and of the cost on a phone, and taller mission rows there', () => {
+      progress.mockReturnValue(new Promise(() => {}));
+      renderHome();
+      const day = screen.getByRole('region', { name: 'Il ripasso di oggi' });
+      const held = [...day.querySelectorAll('[aria-hidden="true"]')].map((el) => el.className);
+      expect(held[0]).toMatch(/\bh-5\b.*\bw-40\b/);
+      expect(held[1]).toMatch(/h-\[4\.75rem\].*md:h-11/);
+      expect(held[2]).toMatch(/\bh-10\b.*md:h-5/);
+      const rows = screen.getByRole('region', { name: 'Le missioni di oggi' }).querySelectorAll('.grid-cols-\\[24px_minmax\\(0\\,1fr\\)\\] > div:last-child');
+      expect(rows).toHaveLength(3);
+      for (const row of rows) expect(row).toHaveClass('h-16', 'md:h-9');
+    });
+
+    it('keeps two lines for the large line and the cost on a phone while the subjects\' read travels', async () => {
+      percorso.mockReturnValue(new Promise(() => {}));
+      progress.mockResolvedValue(answer(18, 20));
+      renderHome();
+      const large = await screen.findByText('18 da ripassare, 20 nuove');
+      expect(large).toHaveClass('max-md:min-h-[2lh]');
+      expect(screen.getByText(/^circa \d+ minuti/)).toHaveClass('max-md:min-h-10');
+    });
+
+    it('lets the cost\'s line be its own height once the subjects have come', async () => {
+      progress.mockResolvedValue(answer(18, 20));
+      renderHome();
+      expect(await screen.findByText(/^circa \d+ minuti/)).not.toHaveClass('max-md:min-h-10');
+    });
+
+    it('wraps the subjects\' strip held in a plain box, so React never keeps the strip, a scroller, when they come', () => {
+      progress.mockReturnValue(new Promise(() => {}));
+      renderHome();
+      const mine = screen.getByRole('region', { name: 'Le tue materie' });
+      const box = mine.querySelector('h2 + div')!;
+      expect(box).toHaveAttribute('aria-hidden', 'true');
+      expect(box.className).toBe('');
+      expect(box.firstElementChild!.className).toMatch(/overflow-x-auto/);
+    });
+  });
+
   it('says what the subjects are missing when the progress cannot be read, and draws them once read again', async () => {
     progress.mockRejectedValueOnce(new Error('down'));
     renderHome();

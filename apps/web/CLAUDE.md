@@ -1130,7 +1130,12 @@ places the right column; inside the tiles a sentence stops at `max-w-prose`. Wit
 the points, #253, or a failed read) the left column held the day block alone while the right ran past the window (G8c):
 «Le tue materie» leaves the box then for the left column, under the day block — from `xl` only, and before the
 statistics in the document, so the keyboard follows the eye; below `xl` nothing moves —; while the first read travels it
-stays in the box, and after a failed read it stays on the left while «Riprova» reads again. In that order:
+stays in the box, and after a failed read it stays on the left while «Riprova» reads again. The places held while the
+reads travel are as tall as what takes them (P1, phone CLS 0.63 → 0): the day block's the date's line, the large line on
+two lines and the cost on two below `md`, and the large line and the cost keep two lines there once read (the sentence
+wraps or not by a few pixels; the cost waits for the subjects' read); the missions' rows 64 px below `md`; «Le tue
+materie»'s strip held inside a plain box, so React never keeps the strip, a scroller Chrome measured in its own
+coordinates, as the list's group. In that order:
 1. **The day block** (`missions/DayBlock`, G8, the page's entry; on a phone «Inizia il ripasso» within the first 400 px
    under the bar): a tile with the section's hue as a 4 px rule down its left edge (`--vlx-section-gymnasium`), a
    visually hidden `h2` «Il ripasso di oggi»; the day small, «lunedì 19 ottobre» (the title says «Oggi»; «lunedì 19
@@ -2308,7 +2313,9 @@ meant to stay split; add new features as new files, not inside the shells:
   Suggerimenti» (`ForumTabs`, drawn by `ui/SegmentedTabs`: short labels «Esplora · Miei · Suggeriti» sharing the row in
   equal parts below `sm`, whole from it — at 320 px the last was cut, S7a; the views, `ForumExploreView`,
   `ForumMyEnvironmentsView`, `ForumSuggestionsView`, in its `SegmentedTabPanel`, their order in `forumSections.ts`); the titles of «Dossier pubblici» and «Community» come from `features/sections/pageNames.ts`; Explore's filters are one row
-  from `sm` and, on a phone, the search across with the category («Tutte»), the order and the 44 px refresh under it, M1. «Pubblica un dossier»
+  from `sm` and, on a phone, the search across with the category («Tutte»), the order and the 44 px refresh under it, M1. While
+Explore's read travels the count's line is kept, empty, and the cards held are as tall as a card that came (P1, CLS 0.12
+on a phone and 0.04 at 1920 → 0). «Pubblica un dossier»
   is `PublishDossierPicker` (the user's dossiers not yet in the Forum, then the dossier's own
   `PublishDossierDialog`; the Forum never publishes a workspace); «Modifica» on a published dossier
   (`EditSharedEnvironmentModal`) edits its name, description, category and tags only — what it holds changes

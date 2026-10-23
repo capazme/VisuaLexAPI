@@ -101,11 +101,14 @@ export function DayBlock({ day, dayFailed, action, actionFailed, stops, onRetry,
       <DayLine day={day} subject={subject} />
 
       {state === 'loading' && (
-        // The final size, so nothing jumps when the read answers.
+        // The final size, so nothing jumps when the read answers (P1: on a phone the block grew 91 px, CLS 0.63): the
+        // date's line, which waits for the read too; the large line on two lines below `md`, as «23 da ripassare, 15
+        // nuove» wraps there; the cost and the subjects on two.
         <>
           <p className="sr-only">Carico i tuoi progressi…</p>
-          <div aria-hidden className="h-9 w-3/4 rounded-md bg-slate-100 motion-safe:animate-pulse md:h-11 dark:bg-slate-800" />
-          <div aria-hidden className="h-5 w-56 max-w-full rounded bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
+          <div aria-hidden className="h-5 w-40 rounded bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
+          <div aria-hidden className="h-[4.75rem] w-3/4 rounded-md bg-slate-100 motion-safe:animate-pulse md:h-11 dark:bg-slate-800" />
+          <div aria-hidden className="h-10 w-56 max-w-full rounded bg-slate-100 motion-safe:animate-pulse md:h-5 dark:bg-slate-800" />
           <div aria-hidden className="mt-1 h-12 w-full rounded-xl bg-slate-100 motion-safe:animate-pulse md:w-64 dark:bg-slate-800" />
         </>
       )}
@@ -144,10 +147,13 @@ export function DayBlock({ day, dayFailed, action, actionFailed, stops, onRetry,
 
       {(state === 'todo' || state === 'done') && action && (
         <>
-          <p className={LARGE} aria-live="polite">
+          {/* «23 da ripassare, 15 nuove» wraps or not by a few pixels on a phone (one line at 412 px, two at 390): the
+              line keeps two there, as its place held while the read travelled, so nothing under it moves (P1). */}
+          <p className={cn(LARGE, state === 'todo' && 'max-md:min-h-[2lh]')} aria-live="polite">
             {state === 'todo' ? todaySentence(action) : filtered ? 'Niente da ripassare in questa materia, per oggi.' : 'Hai finito per oggi.'}
           </p>
-          {state === 'todo' && detail && <p className={cn('max-w-prose text-sm', MUTED_TEXT)}>{detail}</p>}
+          {/* While the subjects' read travels, on a phone the line keeps the two lines it takes once they come (P1). */}
+          {state === 'todo' && detail && <p className={cn('max-w-prose text-sm', MUTED_TEXT, stops === null && !materia && 'max-md:min-h-10')}>{detail}</p>}
           {state === 'done' && !filtered && <p className={cn('max-w-prose text-base', MUTED_TEXT)}>{nextDayLine(action)}</p>}
 
           {/* A read after the first failed: what is on screen is the last answer. */}
