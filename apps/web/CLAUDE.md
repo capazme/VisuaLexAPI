@@ -43,8 +43,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   dell'articolo»); `VoteBar` sends Approvata at once and asks a reason for Migliorabile and Errata, and sits
   `sticky bottom-0` at every width (the keyboard moves to the next card's heading after a vote, back to the
   verdict after «Annulla»; below `md` no feedback button floats over it, nor over any page: there it is the user
-  menu's «Invia un commento», M1; from `md`, signed in, `Layout` ends every page but the search page 16 px over it,
-  `md:pb-[5.375rem]` on the content area, G8c); the subject is remembered in `localStorage`; a vote that outlives a subject
+  menu's «Invia un commento», M1; from `md` it floats at the bar's right end, which keeps 56 px clear for it,
+  `md:pr-14`, G8c); the subject is remembered in `localStorage`; a vote that outlives a subject
   change only marks its card handled, and a 403 stops the queue with «Non sei più tra i validatori»; the queue is
   read only once the outlet's `validator` is `true` — while the account loads it waits, for someone the account
   says is not a validator it shows «Questa sezione è riservata…» with no request, which the server would refuse with
@@ -252,7 +252,12 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   «⋯» and «+»). `PageFrame.test.tsx` reads the section pages' files
   and fails on a title of their own, an icon in an `h1` or a root narrowed with `mx-auto max-w-…`. `Layout`'s content
   area keeps the scrollbar's room (`scrollbar-gutter: stable`) on every page but the search page: a page that grew past
-  the window as it loaded drew its 8 px bar and moved the centred column 4 px sideways. **The sections** (D-076, spec
+  the window as it loaded drew its 8 px bar and moved the centred column 4 px sideways. From `md`, for someone signed in
+  and on every page but the search page, it ends 16 px over the floating feedback button (G8c: it covered the last row
+  on the right, «Ripassa» of the last subject on «Oggi»): `--page-foot` (5.375 rem: the button's 24 px off the edge,
+  its 46 px and the air) as the bottom padding, which a page sized to the window takes off its height
+  (`GraphExplorerPage`, `var(--page-foot,2rem)`); a bar pinned to the bottom keeps the button's room at its right end
+  («Da validare»'s votes). **The sections** (D-076, spec
   `docs/superpowers/specs/2026-10-18-sections-switcher-design.md`): Corpus is the common core and no section;
   over it Opus, Gymnasium (the code's `studia`), Academia (development mode only) and Forum, in
   `features/sections/` (`sections.ts`: names, lines, icons, home addresses, `sectionForPath`; `useSection`: the

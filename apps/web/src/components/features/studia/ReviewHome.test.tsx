@@ -79,6 +79,7 @@ beforeEach(() => {
 afterEach(() => {
   localStorage.removeItem(STORAGE_KEY);
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 /** The subject filter of «Le tue materie» (G8), which took the chips' place. */
@@ -91,6 +92,15 @@ const subjectRow = async (label: string) => {
   return within(group).getAllByRole('listitem').find((li) => li.querySelector('[data-subject-name]')?.textContent === label)!;
 };
 const START = /^(Inizia|Continua) il ripasso$/;
+const follows = (a: Element, b: Element) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
+/** A window `width` px wide, for `min-width` queries (jsdom matches none). */
+function windowOf(width: number) {
+  vi.stubGlobal('matchMedia', (query: string) => {
+    const min = Number(/min-width:\s*(\d+)px/.exec(query)?.[1] ?? Infinity);
+    return { matches: width >= min, media: query, addEventListener: () => {}, removeEventListener: () => {} };
+  });
+}
 
 describe('ReviewHome', () => {
   it('says what is on today, how far the goal is, and offers to start', async () => {
@@ -435,7 +445,6 @@ describe('ReviewHome', () => {
       const stats = screen.getByRole('region', { name: 'I tuoi progressi' });
       const list = screen.getByRole('region', { name: 'Tutte le missioni' });
       const mine = screen.getByRole('region', { name: 'Le tue materie' });
-      const follows = (a: Element, b: Element) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
       expect(follows(day, missions) && follows(missions, stats) && follows(stats, mine) && follows(mine, list)).toBe(true);
       // The grid places them; the document keeps the order on every width.
       expect(stats.parentElement).toHaveClass('xl:col-start-2', 'xl:row-span-full', 'xl:sticky', 'xl:self-start');
@@ -444,27 +453,52 @@ describe('ReviewHome', () => {
       expect(stats.parentElement?.parentElement?.className).toMatch(/xl:grid-cols-\[minmax\(0,7fr\)_minmax\(0,5fr\)\]/);
     });
 
-    it('sets «Le tue materie» under the day block from `xl` when there is no mission, the statistics alone on the right (G8c)', async () => {
+    it('sets «Le tue materie» under the day block from `xl` when there is no mission, first for the keyboard too, the statistics alone on the right (G8c)', async () => {
+      windowOf(1366);
       const bare: Progressi = { ...answer(18, 8) };
       delete bare.missioni;
       progress.mockResolvedValue(bare);
-      renderHome();
+      const { container } = renderHome();
       const day = await screen.findByRole('region', { name: 'Il ripasso di oggi' });
       const stats = screen.getByRole('region', { name: 'I tuoi progressi' });
       const mine = screen.getByRole('region', { name: 'Le tue materie' });
       expect(stats.parentElement).not.toContainElement(mine);
       expect(mine.parentElement).toHaveClass('xl:col-start-1');
       expect(stats.parentElement).toHaveClass('xl:col-start-2', 'xl:row-span-full');
-      // On a phone the order stays the day, the statistics, the subjects.
-      const follows = (a: Element, b: Element) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
-      expect(follows(day, stats) && follows(stats, mine)).toBe(true);
+      expect(follows(day, mine) && follows(mine, stats)).toBe(true);
+      // Two rows on the left: no empty third leaving its gaps under the subjects.
+      expect(container.querySelector('section')).toHaveClass('xl:grid-rows-[auto_auto_1fr]');
+    });
+
+    it('moves nothing below `xl`: one column, the day, the statistics, the subjects (G8c)', async () => {
+      windowOf(1024);
+      const bare: Progressi = { ...answer(18, 8) };
+      delete bare.missioni;
+      progress.mockResolvedValue(bare);
+      renderHome();
+      const stats = await screen.findByRole('region', { name: 'I tuoi progressi' });
+      expect(stats.parentElement).toContainElement(screen.getByRole('region', { name: 'Le tue materie' }));
     });
 
     it('keeps «Le tue materie» in the right column while the first read travels, as the list of missions is still to come (G8c)', async () => {
+      windowOf(1366);
       progress.mockReturnValue(new Promise(() => {}));
       renderHome();
       const stats = await screen.findByRole('region', { name: 'I tuoi progressi' });
       expect(stats.parentElement).toContainElement(screen.getByRole('region', { name: 'Le tue materie' }));
+    });
+
+    it('keeps «Le tue materie» on the left after a failed read while «Riprova» reads again (G8c)', async () => {
+      windowOf(1366);
+      progress.mockRejectedValueOnce(new Error('down'));
+      renderHome();
+      const alert = await screen.findByRole('alert');
+      const stats = screen.getByRole('region', { name: 'I tuoi progressi' });
+      await waitFor(() => expect(stats.parentElement).not.toContainElement(screen.getByRole('region', { name: 'Le tue materie' })));
+      progress.mockReturnValue(new Promise(() => {}));
+      await userEvent.setup().click(within(alert).getByRole('button', { name: 'Riprova' }));
+      expect(progress).toHaveBeenCalledTimes(2);
+      expect(screen.getByRole('region', { name: 'I tuoi progressi' }).parentElement).not.toContainElement(screen.getByRole('region', { name: 'Le tue materie' }));
     });
 
     it('says the subjects once, in one list: no chips and no road beside them (G8)', async () => {

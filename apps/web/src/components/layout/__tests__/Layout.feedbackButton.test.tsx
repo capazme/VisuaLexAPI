@@ -51,12 +51,13 @@ describe('Layout — the page\'s foot, clear of the feedback button (G8c)', () =
 
   // From md the button, 24 px off the edge and 46 px tall, covered the last row on the right («Ripassa» of the last
   // subject on «Oggi»): the page ends 16 px over it.
-  const CLEARANCE = 'md:pb-[5.375rem]';
+  const CLEARANCE = 'md:pb-[var(--page-foot)]';
+  const FOOT = 'md:[--page-foot:5.375rem]';
 
   it.each(['/studia/ripasso', '/studia/schede', '/dossier', '/forum', '/studia/progressi'])('ends the page over the button on %s', (path) => {
     at(path);
     expect(screen.getByTestId('feedback')).toBeInTheDocument();
-    expect(screen.getByTestId('layout-content')).toHaveClass(CLEARANCE);
+    expect(screen.getByTestId('layout-content')).toHaveClass(CLEARANCE, FOOT);
   });
 
   it('keeps it in Focus mode, where the button still floats', async () => {

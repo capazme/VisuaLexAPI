@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useMediaQuery } from '../../../hooks/useIsDesktop';
 import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
 import type { Materia } from '../../../types/studia';
@@ -28,10 +29,11 @@ import { useProgress } from './progress/useProgress';
  * From `xl` two columns (G6), seven twelfths and five: the grid, the left column's place, the right column's (the band
  * and the subjects, sticky over every row) and the confetti's box. Applied only out of Focus mode, which narrows the
  * frame to 896 px: there the band would be too narrow for the week. The left holds three rows (the day, the missions,
- * the list; with no mission, the day and the subjects, G8c); the fourth, `1fr`, takes what the right column has beyond
- * them.
+ * the list); the fourth, `1fr`, takes what the right column has beyond them. With no mission (G8c) the left holds two,
+ * the day and the subjects (`LONELY_ROWS`): a third, empty, would leave two gaps under them.
  */
 const SPLIT = 'xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] xl:grid-rows-[auto_auto_auto_1fr] xl:pb-0';
+const LONELY_ROWS = 'xl:grid-rows-[auto_auto_1fr]';
 const LEFT = 'xl:col-start-1';
 const ASIDE = 'xl:col-start-2 xl:row-span-full xl:self-start';
 /**
@@ -41,7 +43,7 @@ const ASIDE = 'xl:col-start-2 xl:row-span-full xl:self-start';
 const STICK = 'xl:sticky xl:top-8';
 /**
  * The confetti fall over the day, the missions and the right column's box (the band and the subjects): rows 1–3 in one
- * column, rows 1–2 across both from `xl`.
+ * column, rows 1–2 across both from `xl` (with no mission, the day and the subjects on the left).
  */
 const BURST = 'xl:col-span-full xl:row-end-3';
 /** `STICK`'s top, and as much again under the column. */
@@ -88,6 +90,11 @@ export function ReviewHome() {
   const action = materia ? narrowed : day;
   const data = day.data;
   const loading = day.status === 'loading';
+  // Whether the day's read has answered once, failed included: a «Riprova» after a failure must not move the subjects
+  // back to the right column while it travels (G8c).
+  const [answered, setAnswered] = useState(false);
+  if (!answered && !loading) setAnswered(true);
+  const wide = useMediaQuery('(min-width: 1280px)');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [communityRequest, setCommunityRequest] = useState(0);
   // The settings' line under the missions, and the day block's settings buttons, open the settings and take the
@@ -111,10 +118,11 @@ export function ReviewHome() {
   // not celebrated when the page opened (the session celebrates at the grade that closes it and marks the day the
   // same way). It follows the data on screen, not the read's status, so a new read halfway does not cut it short.
   const celebrate = data !== null && data.oggi.raggiunto && data.oggi.ripassi > 0 && !celebratedBefore(data.oggi.giorno) && burstDone !== data.oggi.giorno;
-  // No mission on the left, read or to come (a server without the points, #253, or a failed read): from `xl` the left
-  // column held the day block alone, the right one ran past the window (G8c). «Le tue materie» goes left then, under
-  // the day block; the statistics keep the right column.
-  const lonely = split && !(loading && data === null) && !data?.missioni?.length;
+  // No mission on the left once the day's read has answered (a server without the points, #253, or a failed read):
+  // from `xl` the left column held the day block alone, the right one ran past the window (G8c). «Le tue materie» goes
+  // left then, under the day block, and before the statistics in the document, so the keyboard follows the eye; the
+  // statistics keep the right column. Below `xl` nothing moves: one column, the order the owner fixed.
+  const lonely = split && wide && answered && !data?.missioni?.length;
   const aside = useRef<HTMLDivElement>(null);
   const fits = useFitsInScroller(aside, split && !settingsOpen);
 
@@ -147,7 +155,7 @@ export function ReviewHome() {
     // the right, kept in sight under the heading while the page scrolls. The document's order is the reading order the
     // owner fixed — missions, statistics, list — on every width; the grid places the right column.
     // One column of `minmax(0, 1fr)` below `xl` (two from it, `SPLIT`): an implicit track grows to its widest content.
-    <section className={cn('relative grid grid-cols-1 gap-6 pb-8', split && SPLIT)}>
+    <section className={cn('relative grid grid-cols-1 gap-6 pb-8', split && SPLIT, lonely && LONELY_ROWS)}>
       <div className={cn('min-w-0', split && LEFT)}>
         <DayBlock
           day={data}
@@ -174,6 +182,8 @@ export function ReviewHome() {
           stampRef={stampRef}
         />
       </div>
+      {/* With no mission, from `xl`: under the day block, the right column placed beside it by the grid. */}
+      {lonely && <div className={cn('min-w-0', LEFT)}>{subjectList}</div>}
       {/* Under the missions on a phone; beside everything from `xl`, sticky while it fits. */}
       {/* One column of `minmax(0, 1fr)`: an implicit track takes its width from its widest content, «Le tue materie»'s
           strip of 240 px cards on a phone (G8b: 1370 px, the card out of the screen). */}
@@ -191,10 +201,8 @@ export function ReviewHome() {
         />
         {!lonely && subjectList}
       </div>
-      {/* Without missions, under the day block from `xl`; after the statistics on a phone, as in the right column. */}
-      {lonely && <div className={cn('min-w-0', LEFT)}>{subjectList}</div>}
-      {/* The confetti start from the stamp, in the goal's row, and fall over the day, the missions and the statistics,
-          never further: an absolute box placed on their rows (the grid's area is its containing block), out of the
+      {/* The confetti start from the stamp, in the goal's row, and fall over the day, the missions and the statistics
+          (with no mission, the subjects under the day), never further: an absolute box placed on their rows (the grid's area is its containing block), out of the
           flow, so mounting it moves nothing. */}
       {celebrate && data && (
         <div aria-hidden className={cn('pointer-events-none absolute inset-0 col-start-1 row-start-1 row-end-4', split && BURST)}>
