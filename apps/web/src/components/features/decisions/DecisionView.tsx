@@ -106,7 +106,8 @@ function FoundView({ answer, onToast, actions, textSlot, noTextSlot, title = 'he
           the decision (`title`). Focusable by script, so an entry that takes over from one merged into it can put the
           reader's focus on the decision. */}
       <Title
-        tabIndex={-1}
+        // Only a heading is focused by script (`DecisionEntryView`); a line of details is not a stop.
+        tabIndex={title === 'line' ? undefined : -1}
         data-decision-heading
         className={cn(
           'rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',

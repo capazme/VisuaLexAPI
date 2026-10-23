@@ -686,8 +686,8 @@ checks the files; «termine calcolato» comes with wave 2 and its warning), and 
 - **Adding**: `QuickAddField` at the top of each view (a title and Enter, at 16 px on a phone; «Dettagli» opens dates,
   priority and dossier in a `ui/Collapsible` under the row, the box growing, its arrow turning, Esc closing it — U1b;
   a line says where the task goes; a task that will not show in the view is announced; the field keeps its hint whole,
-  11.5 rem, and on a row too narrow for it and its two buttons — a phone, the dossier's panel — the buttons go under it,
-  at the right); «c» (as in «compito») from anywhere opens
+  12 em of its own 16 px text whatever the text size, never wider than its line, the ＋ with it, and on a row too narrow
+  for it and its two buttons — a phone — the buttons go under it, at the right); «c» (as in «compito») from anywhere opens
   `TaskDialog` (`PlannerHost`, mounted by `Layout`; not in a field, with a modifier, or under a dialog,
   a menu or a `data-find-overlay`), with the dossier chosen on `/dossier?dossier=` and today's date on «Oggi» and
   «Prossimi giorni»; a task the page will not list is announced, as from the field; listed in the «?» dialog. No date
@@ -1821,7 +1821,7 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   a dossier of decisions alone it is all the button offers, once one is open). The block of acts is hidden, still
   mounted, while no act is on screen. In two columns the
   acts' headings are h3 under «Norme» (`headingLevel`); an act's header follows its own width (`@container`): narrower
-  than 672 px its name wraps, its count following the name's last words on their line (not on a line of its own), its
+  than 42 rem (672 px at the default text size) its name wraps, its count following the name's last words on their line (not on a line of its own), its
   actions keeping their icons only; and the page keeps the same elements whatever the search leaves,
   only their classes changing, so an open article is never remounted. The stored `etichetta` is a copy (source convention, D9):
   `decisionCitationOf` recomputes the citation from the identity and the attributes, every write

@@ -81,7 +81,7 @@ export function DossierActBlock(props: DossierActBlockProps) {
         <div className="min-w-0 flex-1 px-1 py-1">
           {/* The accordion pattern: the heading holds the toggle, so the act is a
               heading to a screen reader and its name is the act's own words. */}
-          {/* On one line, the name cut, while the act is 672 px wide; narrower — a phone, a tablet's narrow window, the
+          {/* On one line, the name cut, while the act is 42 rem wide (672 px at the default text size); narrower — a phone, a tablet's narrow window, the
               left column of two (D7a) — it wraps: a cut act name says nothing. Its count then follows the name's last
               words, on its line, not on a line of its own under a name of two (the left column at 1024 px). */}
           <Heading className="flex min-w-0 flex-wrap items-center gap-x-2 @2xl:flex-nowrap">
@@ -133,7 +133,7 @@ export function DossierActBlock(props: DossierActBlockProps) {
             className={ACTION_BUTTON}
           >
             <ExternalLink size={15} aria-hidden />
-            {/* From lg, and while the act is 672 px wide: in the left column of two its name takes the room. */}
+            {/* From lg, and while the act is 42 rem wide: in the left column of two its name takes the room. */}
             <span className="hidden lg:@2xl:inline">Apri tutto</span>
           </button>
           <button
