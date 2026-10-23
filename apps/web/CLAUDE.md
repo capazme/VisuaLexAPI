@@ -256,7 +256,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   and on every page but the search page, it ends 16 px over the floating feedback button (G8c: it covered the last row
   on the right, «Ripassa» of the last subject on «Oggi»): `--page-foot` (5.375 rem: the button's 24 px off the edge,
   its 46 px and the air) as the bottom padding, which a page sized to the window takes off its height
-  (`GraphExplorerPage`, `var(--page-foot,2rem)`); a bar pinned to the bottom keeps the button's room at its right end
+  (`GraphExplorerPage`, `DocumentReviewPage`'s columns: `var(--page-foot,2rem)`); a bar pinned to the bottom keeps the button's room at its right end
   («Da validare»'s votes). **The sections** (D-076, spec
   `docs/superpowers/specs/2026-10-18-sections-switcher-design.md`): Corpus is the common core and no section;
   over it Opus, Gymnasium (the code's `studia`), Academia (development mode only) and Forum, in
@@ -1124,8 +1124,9 @@ rows), `sticky` at `top-8` while it fits in the content scroller with 32 px abov
 document keeps the order the owner fixed (L-24) — missions, statistics, list — with the day first (G8), and the grid only
 places the right column; inside the tiles a sentence stops at `max-w-prose`. With no mission once read (a server without
 the points, #253, or a failed read) the left column held the day block alone while the right ran past the window (G8c):
-«Le tue materie» leaves the box then for the left column, under the day block — after the statistics in the document,
-so a phone's order does not change —; while the first read travels it stays in the box. In that order:
+«Le tue materie» leaves the box then for the left column, under the day block — from `xl` only, and before the
+statistics in the document, so the keyboard follows the eye; below `xl` nothing moves —; while the first read travels it
+stays in the box, and after a failed read it stays on the left while «Riprova» reads again. In that order:
 1. **The day block** (`missions/DayBlock`, G8, the page's entry; on a phone «Inizia il ripasso» within the first 400 px
    under the bar): a tile with the section's hue as a 4 px rule down its left edge (`--vlx-section-gymnasium`), a
    visually hidden `h2` «Il ripasso di oggi»; the day small, «lunedì 19 ottobre» (the title says «Oggi»; «lunedì 19

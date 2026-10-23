@@ -85,7 +85,9 @@ const PANEL = 'flex min-h-0 flex-col overflow-hidden rounded-[10px] border borde
 const PANEL_HEAD = 'flex min-h-11 shrink-0 items-center border-b border-slate-200 px-4 text-sm font-medium text-slate-700 dark:border-slate-800 dark:text-slate-300';
 // Contained on a computer only: on a phone the stacked panels hand a swipe on to the page at their ends.
 const PANEL_BODY = 'relative min-h-0 flex-1 overflow-y-auto lg:overscroll-contain';
-const COLUMN_HEIGHT = 'lg:h-[calc(100dvh-17rem)] lg:min-h-[24rem]';
+// The window less what stands above the columns (15rem) and the page's foot (`--page-foot`: 2rem, more under the
+// feedback button, G8c), so the page itself does not scroll beside the columns.
+const COLUMN_HEIGHT = 'lg:h-[calc(100dvh-15rem-var(--page-foot,2rem))] lg:min-h-[24rem]';
 
 export function DocumentReviewPage() {
   const triggerSearch = useAppStore(s => s.triggerSearch);
