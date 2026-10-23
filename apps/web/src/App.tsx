@@ -17,6 +17,8 @@ import { isStudiaEnabled } from './features/studia/featureFlag';
 import { DevRoute } from './features/devMode/DevRoute';
 import { OpusPage } from './components/features/planner/OpusPage';
 import { InboxView, TaskTrashView, TodayView, UpcomingView } from './components/features/planner/OpusViews';
+import { buttonClassName } from './components/ui/buttonStyles';
+import { cn } from './lib/utils';
 
 // Lazy load admin page + MERL-T surfaces (route-level code splitting)
 import { lazy, Suspense } from 'react';
@@ -70,10 +72,8 @@ function NotFoundPage() {
       <p className="text-sm text-slate-500 dark:text-slate-400">
         L'indirizzo che hai aperto non esiste o non è più disponibile.
       </p>
-      <Link
-        to="/"
-        className="mt-2 inline-flex min-h-[44px] items-center rounded px-2 text-sm font-medium text-primary-600 dark:text-primary-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
-      >
+      {/* The page's one way on, so a button's look and 44 px at every width (Q1); a link still, since it leads elsewhere. */}
+      <Link to="/" className={cn(buttonClassName('primary', 'lg'), 'mt-2')}>
         Torna alla ricerca
       </Link>
     </div>

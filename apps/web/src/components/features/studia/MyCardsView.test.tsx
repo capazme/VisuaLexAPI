@@ -115,10 +115,19 @@ describe('«Le mie schede», the list', () => {
     list.mockResolvedValue(page([]));
     renderView();
     expect(await screen.findByText('Non hai ancora schede.')).toBeInTheDocument();
-    expect(screen.getByText(/Scrivi la prima da qui: indica l’articolo su cui poggia, ad esempio «art\. 1455 c\.c\.»/)).toBeInTheDocument();
-    // The heading's and the empty list's.
-    expect(screen.getAllByRole('button', { name: '+ Nuova scheda' })).toHaveLength(2);
+    // What a card is (Q1).
+    expect(screen.getByText(/Una scheda è una domanda e la sua risposta, fondate su un articolo, ad esempio «art\. 1455 c\.c\.»/)).toBeInTheDocument();
+    // On one line: the citation's spaces are non-breaking (the matcher's normalizer reads them as spaces).
+    expect(screen.getByText(/Una scheda è/).textContent).toContain('«art.\u00a01455\u00a0c.c.»');
+    // The heading's «+ Nuova scheda», and the empty list's solid «Scrivi la prima scheda», the same form.
+    expect(screen.getAllByRole('button', { name: '+ Nuova scheda' })).toHaveLength(1);
+    const first = await screen.findByRole('button', { name: 'Scrivi la prima scheda' });
+    expect(first).toHaveClass('min-h-[44px]', 'font-semibold');
+    // Solid ink: the block's one action (`INK_BUTTON`).
+    expect(first).toHaveClass('bg-primary-900', 'dark:bg-primary-300');
     expect(screen.getByRole('link', { name: 'Ricerca' })).toHaveAttribute('href', '/');
+    await userEvent.setup().click(first);
+    expect(await screen.findByRole('dialog', { name: 'Nuova scheda' })).toBeInTheDocument();
   });
 
   it('points to an article, and promises no button, when the sources do not answer', async () => {
@@ -128,16 +137,18 @@ describe('«Le mie schede», the list', () => {
     expect(await screen.findByText(/Per cominciare, apri un articolo dalla/)).toBeInTheDocument();
     expect(screen.getByText(/e scegli «\+ Nuova scheda» sotto il testo, o chiedi a Claude di scriverne\./)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '+ Nuova scheda' })).toBeNull();
-    expect(screen.queryByText(/Scrivi la prima da qui/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Scrivi la prima scheda' })).toBeNull();
+    expect(screen.getByText(/Una scheda è una domanda e la sua risposta/)).toBeInTheDocument();
   });
 
-  it('says only that there is no card while the sources have not answered: the way to begin is not said twice', async () => {
+  it('says only what a card is while the sources have not answered: the way to begin is not said twice', async () => {
     sources.mockReturnValue(new Promise(() => {}));
     list.mockResolvedValue(page([]));
     renderView();
     expect(await screen.findByText('Non hai ancora schede.')).toBeInTheDocument();
+    expect(screen.getByText(/Una scheda è una domanda e la sua risposta/)).toBeInTheDocument();
     expect(screen.queryByText(/Per cominciare/)).toBeNull();
-    expect(screen.queryByText(/Scrivi la prima da qui/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Scrivi la prima scheda' })).toBeNull();
     expect(screen.queryByRole('button', { name: '+ Nuova scheda' })).toBeNull();
   });
 
@@ -615,7 +626,8 @@ describe('«Le mie schede», a new card', () => {
     list.mockResolvedValue(page([]));
     renderView();
     await screen.findByText('Non hai ancora schede.');
-    const [fromHeading, fromEmpty] = screen.getAllByRole('button', { name: '+ Nuova scheda' });
+    const fromHeading = screen.getByRole('button', { name: '+ Nuova scheda' });
+    const fromEmpty = await screen.findByRole('button', { name: 'Scrivi la prima scheda' });
     await user.click(fromEmpty);
     const dialog = await screen.findByRole('dialog', { name: 'Nuova scheda' });
     await user.selectOptions(within(dialog).getByLabelText('Materia'), 'DIRITTO_CIVILE');
