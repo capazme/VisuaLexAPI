@@ -9,7 +9,7 @@ interface FeedbackButtonProps {
   onOpen: () => void;
 }
 
-/** The floating button at the bottom right, from `md`. */
+/** The floating button at the bottom right, from `md`. `Layout` keeps the page's foot clear of it: change both together. */
 export function FeedbackButton({ className, onOpen }: FeedbackButtonProps) {
   const [showTooltip, setShowTooltip] = useState(false);
 

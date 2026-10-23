@@ -227,10 +227,11 @@ export function ValidationQueueView() {
               </div>
             )}
           </div>
-          {/* Pinned to the bottom of the screen at every width, so a long card or a tall article never pushes it out of reach. */}
+          {/* Pinned to the bottom of the screen at every width, so a long card or a tall article never pushes it out of reach.
+              From md the feedback button floats over its right end: 56 px kept for it, so «Errata» stays clear (G8c). */}
           <div
             className={cn(
-              'sticky bottom-0 -mx-4 border-t border-slate-200 bg-slate-50 px-4 py-3 md:-mx-2 md:px-2 dark:border-slate-800 dark:bg-slate-950',
+              'sticky bottom-0 -mx-4 border-t border-slate-200 bg-slate-50 px-4 py-3 md:-mx-2 md:pl-2 md:pr-14 dark:border-slate-800 dark:bg-slate-950',
               Z_INDEX.sticky,
             )}
           >
