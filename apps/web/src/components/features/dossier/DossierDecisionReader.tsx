@@ -46,7 +46,8 @@ export function DossierDecisionReader({ identity }: Props) {
         onRetry={retry}
         onChooseCandidate={chooseCandidate}
         onOpenPalette={() => openPaletteWith(formatDecisionShort(current))}
-        headingLevel={3}
+        // The row names the decision: its full heading as a line of details, not a second title (D7a).
+        title="line"
         textSlot={answer?.esito === 'trovata' ? (
           <DecisionReadingSurface identity={answer.identita} testo={answer.testo} attributi={answer.attributi} onLeave={toWorkspace} />
         ) : undefined}

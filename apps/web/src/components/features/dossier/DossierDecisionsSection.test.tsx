@@ -97,8 +97,11 @@ describe('DossierDecisionsSection (D7a)', () => {
     expect(screen.getByRole('button', { name: `Comprimi ${CASS}` })).toHaveAttribute('aria-expanded', 'true');
     const motivazione = await screen.findByRole('region', { name: 'Motivazione' });
     expect(motivazione.textContent).toContain('Il ricorrente lamenta la violazione');
-    // Its heading a level under «Giurisprudenza» (h2).
-    expect(screen.getByRole('heading', { level: 3, name: /^Corte di cassazione/ })).toBeInTheDocument();
+    // The row names it: inside, its full name is a quiet line of details, no second and heavier title.
+    const details = screen.getByText(/^Corte di cassazione · Sez\. VII penale · Sentenza n\. 99999\/2024/);
+    expect(details.tagName).toBe('P');
+    expect(details).toHaveClass('text-sm', 'text-slate-600');
+    expect(screen.queryByRole('heading', { name: /^Corte di cassazione/ })).toBeNull();
     expect(fetchDecision).toHaveBeenCalledTimes(1);
     // The decision's own reading surface: its toolbar, without the find window it has no tab for.
     expect(screen.getByRole('button', { name: /Glosse sulla decisione/ })).toBeInTheDocument();

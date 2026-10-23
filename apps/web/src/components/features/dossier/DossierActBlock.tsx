@@ -56,6 +56,7 @@ export function DossierActBlock(props: DossierActBlockProps) {
     useSortable({ id: block.key, disabled: dragDisabled });
   const count = block.articles.length;
   const Heading = props.headingLevel === 3 ? 'h3' : 'h2';
+  const countLabel = count === 1 ? '1 articolo' : `${count} articoli`;
 
   return (
     <section
@@ -81,7 +82,8 @@ export function DossierActBlock(props: DossierActBlockProps) {
           {/* The accordion pattern: the heading holds the toggle, so the act is a
               heading to a screen reader and its name is the act's own words. */}
           {/* On one line, the name cut, while the act is 672 px wide; narrower — a phone, a tablet's narrow window, the
-              left column of two (D7a) — it wraps: a cut act name says nothing. */}
+              left column of two (D7a) — it wraps: a cut act name says nothing. Its count then follows the name's last
+              words, on its line, not on a line of its own under a name of two (the left column at 1024 px). */}
           <Heading className="flex min-w-0 flex-wrap items-center gap-x-2 @2xl:flex-nowrap">
             <div
               role="button"
@@ -107,11 +109,13 @@ export function DossierActBlock(props: DossierActBlockProps) {
                 aria-hidden
                 className={cn('flex-shrink-0 text-slate-500 transition-transform motion-reduce:transition-none dark:text-slate-400', isFolded && '-rotate-90')}
               />
-              <span className="break-words @2xl:truncate">{block.heading}</span>
+              <span className="break-words @2xl:truncate">
+                {block.heading}
+                {/* Shown in the name's flow while narrow; the heading's own count, below, says it to a screen reader. */}
+                <span aria-hidden className={cn(SECTION_COUNT, 'ml-2 whitespace-nowrap @2xl:hidden')}>{countLabel}</span>
+              </span>
             </div>
-            <span className={cn('flex-shrink-0', SECTION_COUNT)}>
-              {count === 1 ? '1 articolo' : `${count} articoli`}
-            </span>
+            <span className={cn('flex-shrink-0 sr-only @2xl:not-sr-only', SECTION_COUNT)}>{countLabel}</span>
           </Heading>
           {title && (
             <p className={cn(ROW_LINE, 'ml-6 line-clamp-2 @2xl:line-clamp-none @2xl:truncate')} title={title}>{title}</p>
