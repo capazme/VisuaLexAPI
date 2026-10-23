@@ -12,6 +12,85 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.10.1] - 2026-10-23
+
+The afternoon's design across the app, a fix for Gymnasium on the phone that
+was in production, the readers' corrections and a security update. No
+migration.
+
+### Fixes in production
+
+- Gymnasium «Oggi» fits a phone again: one column of minmax(0, 1fr), strips that
+  scroll sideways hold their pieces, subject names wrap (G8b).
+- dompurify 3.4.17 for a critical advisory on the reader's sanitizer; vitest
+  4.1.12 and ip-address 10.7.4 (moderate) in the three projects.
+
+### Look and navigation
+
+- The search field opens into the command menu, in place, with its words; Tab
+  only brings the focus (R2).
+- The reader puts the text first: one status line and three actions, the rest
+  in «⋯»; on the phone the text reaches the page's edges (R3, R3b).
+- Inchiostro everywhere: tokens instead of hand-written colours, no text under
+  11 px, shadows and focus rings in dark mode (Y1).
+- The sign-in wordmark written in ink, the card as tall as the form shown (A3,
+  A1c); «Carattere dell'interfaccia» instead of «Font».
+- A shared panel that opens in place (U1a); a task's «Dettagli» and the study
+  settings open in place (U1b); «Interrompere il ripasso?» from its button, and
+  no question with no card rated (U1c); «Crediti» across the frame with an index
+  beside the sources (U1d).
+
+### Dossier, Forum, Academia
+
+- A dossier's page in the planner's shape (S7c).
+- The Forum shows the community's dossiers first, «Pronti da VisuaLex» in a strip
+  below, «Recenti» on a phone (S7a).
+- Academia starts from the consent: nothing collected before a clear yes (S7b).
+
+### Legal texts and server
+
+- An article inserted from a later day says so; the later text on request,
+  always marked not in force (G-357, G-358).
+- EUR-Lex: the article asked is never served as its bis; whitespace read in
+  linear time; the title of older ELI pages.
+- A read-only route for Gymnasium's counts of the day (G-356); Gymnasium's
+  reads no longer answer 500 when a card or an account goes mid-read.
+
+### Release notes
+
+**Un aspetto più curato**
+- All'accesso la scritta VisuaLex si disegna come inchiostro sulla carta, con lo stesso carattere del resto della pagina. Il riquadro di accesso è alto quanto il modulo che mostri.
+- Colori, misure e ombre sono gli stessi in tutte le pagine, e i testi più piccoli sono stati ingranditi.
+- In Impostazioni, «Font» si chiama ora «Carattere dell'interfaccia»: cambia il carattere dei menu e dei pulsanti; il testo di legge resta sempre nel suo.
+
+**La ricerca**
+- Il campo di ricerca si apre nel menu dei comandi, nello stesso punto e con le parole già scritte; con Tab il campo prende solo il fuoco.
+
+**Il lettore delle norme**
+- Il testo viene prima: sopra l'articolo c'è una sola riga con lo stato («In vigore dal 1° gennaio 2005») e tre azioni; il resto è in «⋯».
+- Sul telefono il testo usa tutta la larghezza dello schermo.
+
+**Dossier, Forum e Academia**
+- La pagina di un dossier ha la forma del planner: titolo, azioni in una riga, compiti e voci come righe.
+- «Dettagli» di un compito si apre sul posto, senza una finestra.
+- Nel Forum vedi prima i dossier della comunità; quelli pronti di VisuaLex sono in una striscia sotto. «Community» spiega cosa arriverà.
+- Academia comincia dal consenso: se non l'hai dato, un solo riquadro ti dice cosa fa MERL-T e cosa raccoglie.
+
+**Gymnasium**
+- Sul telefono la pagina «Oggi» sta di nuovo tutta nello schermo, con la settimana intera e i nomi delle materie leggibili.
+- Le impostazioni dello studio si aprono sul posto, sopra l'elenco.
+- Se interrompi un ripasso senza aver valutato nessuna scheda, esci subito; se ne hai valutata almeno una, ti chiediamo conferma.
+
+**Crediti**
+- La pagina dei crediti usa tutta la larghezza, con l'indice delle fonti accanto.
+
+**Testi di legge**
+- Un articolo che entra in vigore più avanti ora lo dice: vedi il testo di oggi e, a richiesta, quello che verrà, con la data da cui varrà.
+- Atti dell'Unione: se chiedi un articolo che non c'è, ora te lo diciamo invece di mostrarne un altro; le pagine lunghe si aprono più in fretta; tornano i titoli mancanti di alcune direttive meno recenti.
+
+**Sicurezza**
+- Aggiornata la libreria che pulisce i testi mostrati nella pagina.
+
 ## [1.10.0] - 2026-10-22
 
 Opus's planner, Gymnasium's points and levels, and a night of design across
