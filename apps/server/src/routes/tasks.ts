@@ -62,7 +62,7 @@ const day = z.string().refine(isDay, { message: 'Una data va scritta AAAA-MM-GG 
 const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'Un orario va scritto HH:MM.' });
 // The closed values answer without repeating what was sent.
 const closed = <T extends readonly [string, ...string[]]>(values: T, message: string) =>
-  z.enum(values as unknown as [T[number], ...T[number][]], { errorMap: () => ({ message }) });
+  z.enum(values as unknown as [T[number], ...T[number][]], { error: message });
 
 const fields = {
   title: z
@@ -84,8 +84,8 @@ const fields = {
   dueDate: day.nullable(),
   dueTime: time.nullable(),
   recurrence: closed(RECURRENCE_RULE_VALUES, 'Ripetizione non prevista.').nullable(),
-  recurrenceFrom: z.nativeEnum(TaskRecurrenceFrom, { errorMap: () => ({ message: 'Valore non previsto.' }) }),
-  origin: z.nativeEnum(TaskOrigin, { errorMap: () => ({ message: 'Origine non prevista.' }) }),
+  recurrenceFrom: z.nativeEnum(TaskRecurrenceFrom, { error: 'Valore non previsto.' }),
+  origin: z.nativeEnum(TaskOrigin, { error: 'Origine non prevista.' }),
 };
 
 const createSchema = z.object(fields).partial().required({ title: true }).strict();

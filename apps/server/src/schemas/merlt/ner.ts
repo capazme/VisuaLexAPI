@@ -26,7 +26,7 @@ export const nerFeedbackRequestSchema = z
     startOffset: z.number().int().min(0).optional(),
     endOffset: z.number().int().min(0).optional(),
     contextWindow: z.string().max(5000).optional(),
-    originalParsed: z.record(z.unknown()).optional(),
+    originalParsed: z.record(z.string(), z.unknown()).optional(),
     correctReference: nerCorrectReferenceSchema.optional(),
     confidenceBefore: z.number().min(0).max(1).optional(),
   })

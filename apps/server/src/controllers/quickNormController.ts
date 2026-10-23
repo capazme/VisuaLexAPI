@@ -9,7 +9,7 @@ const createQuickNormSchema = z.object({
   label: z.string().min(1).max(300),
   // SearchParams shape is owned by the frontend — we validate only the
   // keys that the server actually reads (none) and ship the blob as-is.
-  searchParams: z.any(),
+  searchParams: z.any().optional(),
   sourceUrl: z.string().optional().nullable(),
 });
 

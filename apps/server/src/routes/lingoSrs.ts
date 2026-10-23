@@ -40,7 +40,7 @@ const sessionSchema = z
   .object({
     materia: z.nativeEnum(LingoMateria).optional(),
     istituto: z
-      .string({ invalid_type_error: 'Istituto non valido.' })
+      .string({ error: (issue) => (issue.input === undefined ? undefined : 'Istituto non valido.') })
       .trim()
       .min(1, 'L’istituto non può essere vuoto.')
       .max(200, 'L’istituto è troppo lungo (al massimo 200 caratteri).')
@@ -238,7 +238,7 @@ router.get('/progressi', async (req, res) => {
 // Each stop: `nuove` never reviewed, `apprendimento` / `consolidate` reviewed with an interval under / at least
 // `CONSOLIDATED_DAYS`, `dovute` reviewed and due by the end of today in Rome (a subset of the last two).
 // Same scope as the session, `?materia=` optional. Definitions: `lingo/percorso.ts`.
-const percorsoSchema = z.object({ materia: z.nativeEnum(LingoMateria, { errorMap: () => ({ message: 'Materia non valida.' }) }).optional() });
+const percorsoSchema = z.object({ materia: z.nativeEnum(LingoMateria, { error: 'Materia non valida.' }).optional() });
 router.get('/percorso', async (req, res) => {
   const { materia } = percorsoSchema.parse(req.query);
   res.json(await readPercorso(req.user!.id, materia));

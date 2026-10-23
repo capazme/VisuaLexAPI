@@ -223,7 +223,7 @@ export const updateDossier = async (req: Request, res: Response) => {
 };
 
 const importStudySchema = z.object({
-  content: z.unknown(),
+  content: z.unknown().optional(),
   addNotes: z.boolean().default(true),
   addHighlights: z.boolean().default(true),
 });
