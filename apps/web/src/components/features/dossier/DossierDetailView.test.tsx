@@ -28,7 +28,7 @@ vi.mock('./dossierPdf', async (importOriginal) => {
     loadDossierTexts: pdf.loadDossierTexts,
     loadDossierDecisions: pdf.loadDossierDecisions,
     buildPdfBlocks: (...args: Parameters<typeof real.buildPdfBlocks>) => { pdf.built.push(args); return real.buildPdfBlocks(...args); },
-    writeDossierPdf: (...args: unknown[]) => { pdf.written.push(args); return { save: pdf.save }; },
+    writeDossierPdf: async (...args: unknown[]) => { pdf.written.push(args); return { save: pdf.save }; },
   };
 });
 vi.mock('./dossierPdfMarks', () => ({ loadPdfMarks: pdf.loadPdfMarks }));

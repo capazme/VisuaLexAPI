@@ -49,7 +49,7 @@ export function AdvancedExportModal({
 
   const [exportFormat, setExportFormat] = useState<ExportFormat>('clipboard');
   const [copied, setCopied] = useState(false);
-  // The PDF waits for jsPDF the first time (P1): the button turns its icon into a spinner, its words as they are.
+  // The PDF waits for jsPDF the first time: the button turns its icon into a spinner, its words as they are.
   const [writingPdf, setWritingPdf] = useState(false);
 
   const toggleSection = (id: string) => {
@@ -204,7 +204,7 @@ export function AdvancedExportModal({
    */
   const buildPdf = async (): Promise<jsPDF> => {
     const plainText = (txt: string) => txt.replace(/<[^>]*>/g, '').replace(/\n{3,}/g, '\n\n').trim();
-    // jsPDF is loaded here, on the export (P1).
+    // jsPDF is loaded here, on the export.
     const JsPdf = await loadJsPdf();
     const doc = new JsPdf({ unit: 'pt', format: 'a4', orientation: 'portrait' });
     const margin = 48;
@@ -313,6 +313,8 @@ export function AdvancedExportModal({
         const doc = await buildPdf();
         doc.save(`VisuaLex_${norma_data.tipo_atto.replace(/\s+/g, '_')}_Art${norma_data.numero_articolo}.pdf`);
         onClose();
+      } catch (err) {
+        console.error('PDF export failed:', err);
       } finally {
         setWritingPdf(false);
       }
@@ -343,7 +345,7 @@ export function AdvancedExportModal({
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={() => { if (!writingPdf) onClose(); }}
       size="lg"
       title="Esporta Articolo"
       description={shortNorm(norma_data)}
@@ -353,6 +355,7 @@ export function AdvancedExportModal({
         <>
           <button
             onClick={onClose}
+            disabled={writingPdf}
             className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
           >
             Annulla
@@ -400,6 +403,7 @@ export function AdvancedExportModal({
               <button
                 key={section.id}
                 onClick={() => toggleSection(section.id)}
+                disabled={writingPdf}
                 className={cn(
                   'flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-left',
                   section.enabled
@@ -432,6 +436,7 @@ export function AdvancedExportModal({
                   <button
                     key={section.id}
                     onClick={() => toggleSection(section.id)}
+                    disabled={writingPdf}
                     className={cn(
                       'flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-left',
                       section.enabled
@@ -455,6 +460,7 @@ export function AdvancedExportModal({
           <div className="flex gap-2">
             <button
               onClick={() => setExportFormat('clipboard')}
+              disabled={writingPdf}
               className={cn(
                 'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
                 exportFormat === 'clipboard'
@@ -467,6 +473,7 @@ export function AdvancedExportModal({
             </button>
             <button
               onClick={() => setExportFormat('markdown')}
+              disabled={writingPdf}
               className={cn(
                 'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
                 exportFormat === 'markdown'
@@ -479,6 +486,7 @@ export function AdvancedExportModal({
             </button>
             <button
               onClick={() => setExportFormat('pdf')}
+              disabled={writingPdf}
               className={cn(
                 'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
                 exportFormat === 'pdf'
@@ -491,6 +499,7 @@ export function AdvancedExportModal({
             </button>
             <button
               onClick={() => setExportFormat('rtf')}
+              disabled={writingPdf}
               className={cn(
                 'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
                 exportFormat === 'rtf'
@@ -503,6 +512,7 @@ export function AdvancedExportModal({
             </button>
             <button
               onClick={() => setExportFormat('txt')}
+              disabled={writingPdf}
               className={cn(
                 'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
                 exportFormat === 'txt'

@@ -19,6 +19,19 @@ vi.mock('jspdf', async (importOriginal) => {
   return { ...real, jsPDF: Spied };
 });
 
+// jsPDF that cannot be loaded (offline, or a chunk a deploy removed), when a test asks for it.
+const { failLoad } = vi.hoisted(() => ({ failLoad: { next: false } }));
+vi.mock('../../../../utils/loadJsPdf', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../../../../utils/loadJsPdf')>();
+  return {
+    loadJsPdf: () => {
+      if (!failLoad.next) return real.loadJsPdf();
+      failLoad.next = false;
+      return Promise.reject(new Error('offline'));
+    },
+  };
+});
+
 const fetchOriginalPdf = vi.fn();
 vi.mock('../../../../services/decisionPdfService', () => ({ fetchOriginalPdf: (...a: unknown[]) => fetchOriginalPdf(...a) }));
 
@@ -45,11 +58,11 @@ describe('DecisionDownloads', () => {
   it('«Scarica PDF» saves a file named by the model', async () => {
     render(<DecisionDownloads answer={FOUND} identity={FOUND.identita} />);
     fireEvent.click(screen.getByRole('button', { name: /Scarica PDF/ }));
-    // jsPDF comes on the first download (P1): the save follows it.
+    // jsPDF comes on the first download: the save follows it.
     await waitFor(() => expect(save).toHaveBeenCalledWith('Cass_civ_sez_III_n_99999_2024.pdf'));
   });
 
-  it('shows the wait for jsPDF in the button, its words as they are, and gives it back once saved (P1)', async () => {
+  it('shows the wait for jsPDF in the button, its words as they are, and gives it back once saved', async () => {
     render(<DecisionDownloads answer={FOUND} identity={FOUND.identita} />);
     const button = screen.getByRole('button', { name: /Scarica PDF/ });
     fireEvent.click(button);
@@ -59,6 +72,20 @@ describe('DecisionDownloads', () => {
     await waitFor(() => expect(save).toHaveBeenCalled());
     await waitFor(() => expect(button).toBeEnabled());
     expect(button).not.toHaveAttribute('aria-busy');
+  });
+
+  it('when jsPDF cannot be loaded, says so as for a failed download and lets the user try again', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    failLoad.next = true;
+    render(<DecisionDownloads answer={FOUND} identity={FOUND.identita} />);
+    const button = screen.getByRole('button', { name: /Scarica PDF/ });
+    fireEvent.click(button);
+    expect(await screen.findByText('Download non riuscito: riprova.')).toBeInTheDocument();
+    expect(button).toBeEnabled();
+    expect(save).not.toHaveBeenCalled();
+    fireEvent.click(button);
+    await waitFor(() => expect(save).toHaveBeenCalledWith('Cass_civ_sez_III_n_99999_2024.pdf'));
+    expect(screen.queryByText('Download non riuscito: riprova.')).not.toBeInTheDocument();
   });
 
   it('with the option, the decision\'s own highlights are in the PDF (and only those)', async () => {

@@ -29,7 +29,7 @@ export function DecisionDownloads({ answer, identity }: { answer: FoundDecision;
   const key = decisionKey(identity);
   const [withMarks, setWithMarks] = useState(false);
   const [busy, setBusy] = useState(false);
-  // Ours waits for jsPDF the first time (P1): the button says so with its spinner, its words as they are.
+  // Ours waits for jsPDF the first time: the button says so with its spinner, its words as they are.
   const [writing, setWriting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 

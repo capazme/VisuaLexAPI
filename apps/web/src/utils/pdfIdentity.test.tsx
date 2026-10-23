@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+// jsPDF writes the creation date in local time with its offset: the fingerprints are taken in UTC, on any machine.
+vi.hoisted(() => { process.env.TZ = 'UTC'; });
 // jsPDF puts its methods on each instance: the real class, its `save` recording the file instead of offering it.
 const { saved } = vi.hoisted(() => ({ saved: [] as ArrayBuffer[] }));
 vi.mock('jspdf', async (importOriginal) => {
@@ -23,7 +25,7 @@ import { writeDossierPdf, type PdfBlock } from '../components/features/dossier/d
 import { decisionPdfModel, writeDecisionPdf } from '../components/features/decisions/decisionPdf';
 
 /**
- * The PDFs, byte for byte (P1, jsPDF loaded only on an export): a dossier, a decision and an article («Esporta
+ * The PDFs, byte for byte (jsPDF loaded only on an export): a dossier, a decision and an article («Esporta
  * articolo») written at a fixed instant give the same file as before jsPDF left the first chunk. The fingerprints below were taken on `develop` 25946f23, with
  * jsPDF imported statically; a change in what is drawn changes them, and so must be a change made on purpose.
  */
@@ -89,7 +91,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('the PDFs, byte for byte (P1)', () => {
+describe('the PDFs, byte for byte', () => {
   it('writes the dossier\'s PDF as before', async () => {
     seeded();
     const doc = await writeDossierPdf(HEADER, BLOCKS);

@@ -20,6 +20,20 @@ vi.mock('jspdf', () => ({
   },
 }));
 
+// jsPDF's arrival, held by a test that wants to act while it waits; otherwise it comes at once.
+const { gate } = vi.hoisted(() => ({ gate: { held: null as null | { promise: Promise<void>; open: () => void; fail: () => void } } }));
+vi.mock('../../utils/loadJsPdf', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../../utils/loadJsPdf')>();
+  return { loadJsPdf: async () => { if (gate.held) await gate.held.promise; return real.loadJsPdf(); } };
+});
+function holdJsPdf() {
+  let open = () => {};
+  let fail = () => {};
+  const promise = new Promise<void>((resolve, reject) => { open = resolve; fail = () => reject(new Error('offline')); });
+  gate.held = { promise, open, fail };
+  return gate.held;
+}
+
 import { AdvancedExportModal } from './AdvancedExportModal';
 import type { ArticleData } from '../../types';
 
@@ -100,12 +114,12 @@ describe('AdvancedExportModal — nothing of Brocardi (D-078)', () => {
     renderModal(legacyArticle);
     fireEvent.click(screen.getByRole('button', { name: 'PDF' }));
     fireEvent.click(screen.getByRole('button', { name: /Scarica PDF/ }));
-    // jsPDF comes on the first export (P1): the lines follow it.
+    // jsPDF comes on the first export: the lines follow it.
     await waitFor(() => expect(pdfLines).toContain('Qualunque fatto doloso o colposo.'));
     expect(pdfLines.join('\n')).not.toMatch(BROCARDI_WORDS);
   });
 
-  it('shows the wait for jsPDF in «Scarica PDF», its words as they are (P1)', async () => {
+  it('shows the wait for jsPDF in «Scarica PDF», its words as they are', async () => {
     const onClose = vi.fn();
     render(<AdvancedExportModal isOpen onClose={onClose} articleData={articleData} annotations={[]} highlights={[]} />);
     fireEvent.click(screen.getByRole('button', { name: 'PDF' }));
@@ -115,6 +129,41 @@ describe('AdvancedExportModal — nothing of Brocardi (D-078)', () => {
     expect(button).toHaveAttribute('aria-busy', 'true');
     expect(button).toHaveTextContent('Scarica PDF');
     await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+
+  it('cannot be closed while the PDF waits for jsPDF, and closes once it is saved', async () => {
+    const held = holdJsPdf();
+    const onClose = vi.fn();
+    render(<AdvancedExportModal isOpen onClose={onClose} articleData={articleData} annotations={[]} highlights={[]} />);
+    fireEvent.click(screen.getByRole('button', { name: 'PDF' }));
+    fireEvent.click(screen.getByRole('button', { name: /Scarica PDF/ }));
+    expect(screen.getByRole('button', { name: 'Annulla' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Copia' })).toBeDisabled();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.click(screen.getByRole('button', { name: 'Annulla' }));
+    expect(onClose).not.toHaveBeenCalled();
+    held.open();
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(pdfLines).toContain('Qualunque fatto doloso o colposo.');
+    gate.held = null;
+  });
+
+  it('when jsPDF cannot be loaded, gives the buttons back and stays open', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const held = holdJsPdf();
+    const onClose = vi.fn();
+    render(<AdvancedExportModal isOpen onClose={onClose} articleData={articleData} annotations={[]} highlights={[]} />);
+    fireEvent.click(screen.getByRole('button', { name: 'PDF' }));
+    const button = screen.getByRole('button', { name: /Scarica PDF/ });
+    fireEvent.click(button);
+    held.fail();
+    await waitFor(() => expect(button).toBeEnabled());
+    expect(button).not.toHaveAttribute('aria-busy');
+    expect(screen.getByRole('button', { name: 'Annulla' })).toBeEnabled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalled();
+    gate.held = null;
+    error.mockRestore();
   });
 });
 

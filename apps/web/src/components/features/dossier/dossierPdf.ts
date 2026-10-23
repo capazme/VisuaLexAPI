@@ -319,7 +319,7 @@ function drawPdfDecision(w: PdfWriter, decision: PdfDecision): void {
   drawDecisionTail(w, model);
 }
 
-/** Draws the dossier's PDF: the header, then the sections `buildPdfBlocks` made. jsPDF is loaded here, on the export (P1). */
+/** Draws the dossier's PDF: the header, then the sections `buildPdfBlocks` made. jsPDF is loaded here, on the export. */
 export async function writeDossierPdf(header: DossierPdfHeader, blocks: PdfBlock[]): Promise<jsPDF> {
   const JsPdf = await loadJsPdf();
   const doc = new JsPdf({ unit: 'pt', format: 'a4' });

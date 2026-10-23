@@ -280,7 +280,7 @@ export function drawDecision(w: PdfWriter, model: DecisionPdfModel): void {
   drawDecisionTail(w, model);
 }
 
-/** The decision's own PDF. jsPDF is loaded here, on the download (P1). */
+/** The decision's own PDF. jsPDF is loaded here, on the download. */
 export async function writeDecisionPdf(model: DecisionPdfModel): Promise<jsPDF> {
   const JsPdf = await loadJsPdf();
   const doc = new JsPdf({ unit: 'pt', format: 'a4' });

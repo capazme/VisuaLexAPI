@@ -1817,13 +1817,17 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   change both together. Every switch over item types ends in `assertNever`, so a new type cannot
   fall silently into "note".
 - **jsPDF is loaded on the first export** (`utils/loadJsPdf.ts`, a dynamic `import()` kept for the next
-  export and retried after a failed load): with pako and fast-png it is ~120 KB compressed that every
-  page, sign-in included, would otherwise download. Its users — `writeDossierPdf`, `writeDecisionPdf`,
+  export and retried after a failed load — a chunk a deploy removed keeps failing until the page is
+  reloaded, as a lazy route does): with pako and fast-png it is ~120 KB compressed that every page,
+  sign-in included, would otherwise download. Its users — `writeDossierPdf`, `writeDecisionPdf`,
   `AdvancedExportModal` — are async and name jsPDF with `import type` only; `loadJsPdf.guard.test.ts`
-  refuses a value import of it anywhere. A button that writes a PDF shows the wait (spinner, disabled,
-  `aria-busy`) with its own label, no new text; `pdfIdentity.test.tsx` holds the bytes of a dossier, a
-  decision and an article PDF (date and `Math.random` fixed), so a change in how jsPDF is reached cannot
-  change the file.
+  refuses, in any source file, a value import or re-export of it or of what it brings. A button that
+  writes a PDF shows the wait (spinner, disabled, `aria-busy`) with its own label, no new text; a load
+  that fails says what a failed write already said («Download non riuscito: riprova.», the dossier's
+  toast; the article's export only logs, as before). «Esporta articolo» cannot be closed or changed
+  while its PDF waits, as `DossierPdfDialog`. `pdfIdentity.test.tsx` holds the bytes of a dossier, a
+  decision and an article PDF (date, time zone and `Math.random` fixed), so a change in how jsPDF is
+  reached cannot change the file.
 - **The PDF** (`dossierPdf.ts`) is grouped the same way and prints each
   article's text as the reader shows it, fetched through `articleFetchCache` —
   never a stored `article_text`, which items added through MCP or «Importa da
