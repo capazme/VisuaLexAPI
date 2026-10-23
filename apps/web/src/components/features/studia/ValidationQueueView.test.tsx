@@ -231,6 +231,12 @@ describe('«Da validare», the keyboard and the vote bar', () => {
     }
   });
 
+  it('keeps the feedback button\'s room at the bar\'s right end from md, so «Errata» is not under it (G8c)', async () => {
+    render(<ValidationQueueView />);
+    await screen.findByText('Domanda c1?');
+    expect(screen.getByRole('group', { name: 'Il tuo giudizio' }).parentElement).toHaveClass('md:pr-14');
+  });
+
   it('moves the keyboard to the next card’s heading after a vote', async () => {
     render(<ValidationQueueView />);
     await screen.findByText('Domanda c1?');

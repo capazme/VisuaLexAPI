@@ -362,7 +362,12 @@ export function Layout() {
             // Under the phone's bar, 56 px and the iPhone's top edge, with the page's 16 px of air (md: again, or
             // md:p-8 wins).
             showPhoneBar && 'pt-[calc(4.5rem+env(safe-area-inset-top))] md:pt-[calc(4.5rem+env(safe-area-inset-top))] lg:pt-8',
-            settings.focusMode && 'max-w-4xl py-12'
+            settings.focusMode && 'max-w-4xl py-12',
+            // The feedback button floats over the page's foot from md, signed in: 24 px off the edge and 46 px tall, and
+            // 16 px of air over it, so the last row («Ripassa» of the last subject) scrolls clear of it (G8c). In
+            // `--page-foot`, which a page sized to the window takes off its height (the graph's). Not on the search page,
+            // whose practice row is the window less `p-8` (`h-app-row`).
+            isAuthenticated && !onSearchPage && 'md:[--page-foot:5.375rem] md:pb-[var(--page-foot)]',
           )}>
             <Outlet />
           </div>

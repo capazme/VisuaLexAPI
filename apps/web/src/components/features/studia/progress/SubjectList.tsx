@@ -46,9 +46,10 @@ const LIST = cn('relative -m-1 flex snap-x gap-2 overflow-x-auto p-1 md:m-0 md:g
 const ITEM = 'w-60 shrink-0 snap-start md:w-auto';
 
 /**
- * «Le tue materie» (G8), in «Oggi»'s right column under the statistics, in the place of «Cosa ripassi» (the chips) and
- * «Il percorso» (the road), which said almost the same thing twice: the subject filter and the road in one list. On top
- * «Tutte le materie», then one row a subject in the road's order (`orderStops`) — its hue's dot, its name, «3 oggi»
+ * «Le tue materie» (G8), in «Oggi»'s right column under the statistics (under the day block when there is no mission,
+ * G8c), in the place of «Cosa ripassi» (the chips) and «Il percorso» (the road), which said almost the same thing
+ * twice: the subject filter and the road in one list.
+ * On top «Tutte le materie», then one row a subject in the road's order (`orderStops`) — its hue's dot, its name, «3 oggi»
  * (the cards due today, from the read by institute), a small bar of its consolidated share, and «Ripassa», a session
  * narrowed to it. A row pressed narrows the day block and its session, as the chips did, remembered for the area; the
  * chosen subject's institutes follow the list (`InstituteStops`, G5), each a session narrowed to it. The cards due

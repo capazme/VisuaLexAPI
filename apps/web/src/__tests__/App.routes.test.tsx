@@ -124,6 +124,9 @@ describe('App routing', () => {
     expect(screen.getByTestId('layout')).toBeInTheDocument();
     const backLink = screen.getByRole('link', { name: 'Torna alla ricerca' });
     expect(backLink).toHaveAttribute('href', '/');
+    // A button's look, 44 px at every width (Q1): `Button`'s primary, large.
+    expect(backLink).toHaveClass('min-h-11', 'bg-toga-600', 'rounded-md');
+    expect(backLink.className).not.toMatch(/md:min-h-(8|9)\b/);
   });
 
   it('lazy-loads the MERL-T hub at /merlt', async () => {

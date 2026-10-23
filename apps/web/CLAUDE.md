@@ -18,17 +18,19 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   columns from `lg`, three from `2xl`; `CardGroups`' `grid`), each with its front in Newsreader, its subject's dot,
   its state and its next review, and with one open the list is a column beside it; the filters (`CardFilters`) are one
   row from `lg` (the search a third, the selects, «Scritte da Claude» and «Da ripassare oggi»), behind «Filtri» under
-  1024 px; the act filter offers the acts of the cards listed,
+  1024 px; the search box's hint is «Cerca per istituto o domanda» from `sm`, «Cerca nelle schede» below, «Cerca» under 360 px (it was cut, Q1),
+  its name «Cerca nelle schede» at every width, and below `sm` «Per istituto o domanda» its description; the act filter offers the acts of the cards listed,
   keeping what a narrowed list hid until a deletion starts it over; each card shows the next review,
   `nextReviewLabel`, and «Da ripassare oggi» filters with `dovuteOggi`; «+ Nuova scheda», beside the page's
-  title (portalled into `StudiaPage`'s `actionSlot`, from the outlet's context) and as the empty list's action, opens `CardFormDialog` with `{ kind: 'create' }` and no article (no
+  title (portalled into `StudiaPage`'s `actionSlot`, from the outlet's context), and the empty list's «Scrivi la prima scheda» (Q1), open `CardFormDialog` with `{ kind: 'create' }` and no article (no
   fixed anchor, the reference field open, the anchors typed as «art. 1455 c.c.», which `POST /lingo/cards`
   resolves; saved with no anchor, the reference field stays open and takes the focus; the field has «Aggiungi»
   only — Esc or an empty «Aggiungi» closes it — so the dialog's «Annulla» is the one; the form's body goes back
   to the top once the dialog's first focus lands, which had left «Materia» scrolled out; a 502/503/504 says the
   service is not available at the moment, only a call with no answer asks to check the connection), and is drawn only while
   Normattiva answers (`useCardSources` over `cardSourcesAnswer`, the cached `/health/detailed`, read once per
-  mount; until it answers the empty list says only «Non hai ancora schede.», with the sources down it points to an
+  mount; the empty list says «Non hai ancora schede.» and what a card is (Q1), then, once the sources answer, the solid
+  «Scrivi la prima scheda» (the same form); until they answer it says no way to begin, with the sources down it points to an
   article and promises nothing; after the first card is saved the title's button takes the focus); the detail proposes a draft
   («Proponi alla comunità» asks for the notice through `AcceptTextDialog`, the one place a text to
   accept is drawn — every word from the server's version, the body as `TextParagraphs` plain text) and
@@ -43,7 +45,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   dell'articolo»); `VoteBar` sends Approvata at once and asks a reason for Migliorabile and Errata, and sits
   `sticky bottom-0` at every width (the keyboard moves to the next card's heading after a vote, back to the
   verdict after «Annulla»; below `md` no feedback button floats over it, nor over any page: there it is the user
-  menu's «Invia un commento», M1); the subject is remembered in `localStorage`; a vote that outlives a subject
+  menu's «Invia un commento», M1; from `md` it floats at the bar's right end, which keeps 56 px clear for it,
+  `md:pr-14`, G8c); the subject is remembered in `localStorage`; a vote that outlives a subject
   change only marks its card handled, and a 403 stops the queue with «Non sei più tra i validatori»; the queue is
   read only once the outlet's `validator` is `true` — while the account loads it waits, for someone the account
   says is not a validator it shows «Questa sezione è riservata…» with no request, which the server would refuse with
@@ -251,7 +254,12 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   «⋯» and «+»). `PageFrame.test.tsx` reads the section pages' files
   and fails on a title of their own, an icon in an `h1` or a root narrowed with `mx-auto max-w-…`. `Layout`'s content
   area keeps the scrollbar's room (`scrollbar-gutter: stable`) on every page but the search page: a page that grew past
-  the window as it loaded drew its 8 px bar and moved the centred column 4 px sideways. **The sections** (D-076, spec
+  the window as it loaded drew its 8 px bar and moved the centred column 4 px sideways. From `md`, for someone signed in
+  and on every page but the search page, it ends 16 px over the floating feedback button (G8c: it covered the last row
+  on the right, «Ripassa» of the last subject on «Oggi»): `--page-foot` (5.375 rem: the button's 24 px off the edge,
+  its 46 px and the air) as the bottom padding, which a page sized to the window takes off its height
+  (`GraphExplorerPage`, `DocumentReviewPage`'s columns: `var(--page-foot,2rem)`); a bar pinned to the bottom keeps the button's room at its right end
+  («Da validare»'s votes). **The sections** (D-076, spec
   `docs/superpowers/specs/2026-10-18-sections-switcher-design.md`): Corpus is the common core and no section;
   over it Opus, Gymnasium (the code's `studia`), Academia (development mode only) and Forum, in
   `features/sections/` (`sections.ts`: names, lines, icons, home addresses, `sectionForPath`; `useSection`: the
@@ -563,7 +571,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `secondary` (paper with an ink-200 hairline), `quiet` (text only) and `danger` (red-600) — `ghost` and
   `outline` are the earlier names of `quiet` and `secondary` —, no gradient, glow or hover lift, a minimum
   height of 36 px on a desktop and 44 px on a phone; `loading` keeps the label and puts a spinner in the
-  icon's place (`aria-busy`), `status="error" | "success"` shows the outcome of the last press. `Modal`
+  icon's place (`aria-busy`), `status="error" | "success"` shows the outcome of the last press. Its look is
+  `ui/buttonStyles.ts`'s `buttonClassName(variant, size)`, for a link that must look like one (the 404's «Torna alla
+  ricerca», `primary` `lg`: 44 px at every width). `Modal`
   enters in `dur.panel` on `ease.drawer`, growing from 0.97, and `Sheet` rises from its edge on the same
   timing (its «Chiudi» in ink-500, dark ink-400: over 3:1, since it is often the one way out); both only fade under reduced motion (`useReducedMotion`).
   `Sheet` gives the focus back to what had it as it opened, taken while it is first drawn: a field inside with
@@ -1116,7 +1126,11 @@ and the full list, on the right the statistics and «Le tue materie» in one box
 rows), `sticky` at `top-8` while it fits in the content scroller with 32 px above and below (`useFitsInScroller`, a
 `ResizeObserver` on the box and the scroller; taller, its foot must scroll into reach) and the settings are closed. The
 document keeps the order the owner fixed (L-24) — missions, statistics, list — with the day first (G8), and the grid only
-places the right column; inside the tiles a sentence stops at `max-w-prose`. In that order:
+places the right column; inside the tiles a sentence stops at `max-w-prose`. With no mission once read (a server without
+the points, #253, or a failed read) the left column held the day block alone while the right ran past the window (G8c):
+«Le tue materie» leaves the box then for the left column, under the day block — from `xl` only, and before the
+statistics in the document, so the keyboard follows the eye; below `xl` nothing moves —; while the first read travels it
+stays in the box, and after a failed read it stays on the left while «Riprova» reads again. In that order:
 1. **The day block** (`missions/DayBlock`, G8, the page's entry; on a phone «Inizia il ripasso» within the first 400 px
    under the bar): a tile with the section's hue as a 4 px rule down its left edge (`--vlx-section-gymnasium`), a
    visually hidden `h2` «Il ripasso di oggi»; the day small, «lunedì 19 ottobre» (the title says «Oggi»; «lunedì 19
