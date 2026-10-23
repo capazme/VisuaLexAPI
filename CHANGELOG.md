@@ -53,6 +53,9 @@ migration.
   always marked not in force (G-357, G-358).
 - EUR-Lex: the article asked is never served as its bis; whitespace read in
   linear time; the title of older ELI pages.
+- The PDF export gives today's text for an undated request, under the act's full
+  name; the shared PDF cache can no longer be filled under another act's name, and
+  exported PDFs are swept after two days (G-361).
 - A read-only route for Gymnasium's counts of the day (G-356); Gymnasium's
   reads no longer answer 500 when a card or an account goes mid-read.
 
@@ -87,6 +90,7 @@ migration.
 **Testi di legge**
 - Un articolo che entra in vigore più avanti ora lo dice: vedi il testo di oggi e, a richiesta, quello che verrà, con la data da cui varrà.
 - Atti dell'Unione: se chiedi un articolo che non c'è, ora te lo diciamo invece di mostrarne un altro; le pagine lunghe si aprono più in fretta; tornano i titoli mancanti di alcune direttive meno recenti.
+- L'esportazione in PDF dà sempre il testo in vigore oggi, con il nome completo dell'atto.
 
 **Sicurezza**
 - Aggiornata la libreria che pulisce i testi mostrati nella pagina.
