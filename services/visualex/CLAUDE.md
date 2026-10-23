@@ -5,7 +5,11 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
 ### Python API (`services/visualex`)
 
 - **`app.py`** (this folder): main server, UI + API. **`services/visualex/visualex_api/app.py`**:
-  alternative server with `/api/*` prefix and Swagger.
+  alternative server with `/api/*` prefix and Swagger. It is not deployed (`asgi.py` serves
+  the root app) and it does **not** apply the in-force rules: no `validity`, no
+  `reject_future_version_date`, an undated request served as Normattiva answers it (G-355,
+  G-357, G-358 are the root app's). Never deploy it as it is; its `/api/export_pdf` follows
+  the root app's. Retiring or porting it goes with the move to the mcp-legal-it shell.
 - **`services/`** — `normattiva_scraper.py`, `eurlex_scraper.py`,
   `brocardi_scraper.py` (switched off, below), `pdfextractor.py` (Playwright pool),
   `http_client.py` (the shared throttled aiohttp client — TLS verification on;
@@ -340,7 +344,13 @@ POST unless noted, JSON bodies.
   «T-612/17», «Corte giust., causa 26/62»: a case before 1989 only after the court's name): the case's letter names the court, whatever name precedes it.
   No request leaves. Anything else is a 400 `richiesta_non_valida`. Design:
   docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md §2.1
-- `/export_pdf` — PDF via Playwright (rejects non-Normattiva URNs — SSRF guard)
+- `/export_pdf` — PDF via Playwright (rejects non-Normattiva URNs — SSRF guard). An
+  undated URN is exported as the text in force today, `!vig=<today>` in Europe/Rome
+  (`export_url`, G-355); a dated one or `@originale` as asked. The file is cached in
+  `download/` under the act's type, date, number, annex and version (`urn_to_filename`;
+  until 21 October 2026 the number and the year alone, so acts and versions shared a file),
+  and the PDFs there older than two days are deleted on the six-hour sweep
+  (`sweep_exported_pdfs`, top-level `.pdf` files only)
 - `GET /history` — server-side search history
 - `GET /health/detailed` — probes Normattiva and EUR-Lex **for
   real**, on the shared client and circuit breakers. One result is cached
@@ -640,8 +650,15 @@ Breaking one of these breaks the product. Read before editing.
     become a directory part of the cached PDF's path, read from and copied to.
     `urn_to_filename` now returns a bare file name (`[A-Za-z0-9._-]`, never hidden), and
     `pdf_cache_path(urn, directory)` is the only way a cache path is built: a file
-    directly inside `download/`. Any new path derived from a request goes through the
-    same kind of gate; `tests/test_pdf_cache_path.py` lists the attempts.
+    directly inside `download/`. The name is read from the query of a `/uri-res/N2Ls`
+    address alone (`_exported_urn`; any other path, a path parameter or a fragment is a 400):
+    the browser reads the path too and resolves its `..`, so a name read from anywhere in
+    the address let one act be cached, for everyone, under another's name. The query is
+    read whole against a strict grammar (`_EXPORTABLE_URN`: one URN, one version marker)
+    and the browser opens the address rebuilt from it (`export_url`). Each export
+    downloads to a name of its own (`export-<uuid>.pdf`) and is moved to the cache name, so
+    two exports at once never take each other's file. Any new path derived from a request
+    goes through the same kind of gate; `tests/test_pdf_cache_path.py` lists the attempts.
 
 31. **The window a page states is the only statement of which version came back.**
     `NormaVisitata.data_versione` is the date the caller *sent*, echoed (a request for the
