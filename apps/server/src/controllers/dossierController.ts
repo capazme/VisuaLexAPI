@@ -321,7 +321,8 @@ const noteSchema = z
       .string()
       .trim()
       .min(1)
-      .max(MAX_NOTE_LENGTH)
+      // In UTF-16 units, as the Forum's and the proposals' checks count a note (`.max` counts code points in zod 4).
+      .refine((text) => text.length <= MAX_NOTE_LENGTH, `Too big: expected string to have <=${MAX_NOTE_LENGTH} characters`)
       .refine((text) => !CONTROL.test(text), 'Caratteri di controllo non ammessi.'),
     // Not `.uuid()`: any id that is not a norm of this dossier gets the same answer below.
     aboutItemId: z.string().min(1).max(64).optional(),
