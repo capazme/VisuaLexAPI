@@ -43,7 +43,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   dell'articolo»); `VoteBar` sends Approvata at once and asks a reason for Migliorabile and Errata, and sits
   `sticky bottom-0` at every width (the keyboard moves to the next card's heading after a vote, back to the
   verdict after «Annulla»; below `md` no feedback button floats over it, nor over any page: there it is the user
-  menu's «Invia un commento», M1); the subject is remembered in `localStorage`; a vote that outlives a subject
+  menu's «Invia un commento», M1; from `md`, signed in, `Layout` ends every page but the search page 16 px over it,
+  `md:pb-[5.375rem]` on the content area, G8c); the subject is remembered in `localStorage`; a vote that outlives a subject
   change only marks its card handled, and a 403 stops the queue with «Non sei più tra i validatori»; the queue is
   read only once the outlet's `validator` is `true` — while the account loads it waits, for someone the account
   says is not a validator it shows «Questa sezione è riservata…» with no request, which the server would refuse with
@@ -1116,7 +1117,10 @@ and the full list, on the right the statistics and «Le tue materie» in one box
 rows), `sticky` at `top-8` while it fits in the content scroller with 32 px above and below (`useFitsInScroller`, a
 `ResizeObserver` on the box and the scroller; taller, its foot must scroll into reach) and the settings are closed. The
 document keeps the order the owner fixed (L-24) — missions, statistics, list — with the day first (G8), and the grid only
-places the right column; inside the tiles a sentence stops at `max-w-prose`. In that order:
+places the right column; inside the tiles a sentence stops at `max-w-prose`. With no mission once read (a server without
+the points, #253, or a failed read) the left column held the day block alone while the right ran past the window (G8c):
+«Le tue materie» leaves the box then for the left column, under the day block — after the statistics in the document,
+so a phone's order does not change —; while the first read travels it stays in the box. In that order:
 1. **The day block** (`missions/DayBlock`, G8, the page's entry; on a phone «Inizia il ripasso» within the first 400 px
    under the bar): a tile with the section's hue as a 4 px rule down its left edge (`--vlx-section-gymnasium`), a
    visually hidden `h2` «Il ripasso di oggi»; the day small, «lunedì 19 ottobre» (the title says «Oggi»; «lunedì 19

@@ -28,7 +28,8 @@ import { useProgress } from './progress/useProgress';
  * From `xl` two columns (G6), seven twelfths and five: the grid, the left column's place, the right column's (the band
  * and the subjects, sticky over every row) and the confetti's box. Applied only out of Focus mode, which narrows the
  * frame to 896 px: there the band would be too narrow for the week. The left holds three rows (the day, the missions,
- * the list); the fourth, `1fr`, takes what the right column has beyond them.
+ * the list; with no mission, the day and the subjects, G8c); the fourth, `1fr`, takes what the right column has beyond
+ * them.
  */
 const SPLIT = 'xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] xl:grid-rows-[auto_auto_auto_1fr] xl:pb-0';
 const LEFT = 'xl:col-start-1';
@@ -86,6 +87,7 @@ export function ReviewHome() {
   const percorso = usePercorso();
   const action = materia ? narrowed : day;
   const data = day.data;
+  const loading = day.status === 'loading';
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [communityRequest, setCommunityRequest] = useState(0);
   // The settings' line under the missions, and the day block's settings buttons, open the settings and take the
@@ -109,6 +111,10 @@ export function ReviewHome() {
   // not celebrated when the page opened (the session celebrates at the grade that closes it and marks the day the
   // same way). It follows the data on screen, not the read's status, so a new read halfway does not cut it short.
   const celebrate = data !== null && data.oggi.raggiunto && data.oggi.ripassi > 0 && !celebratedBefore(data.oggi.giorno) && burstDone !== data.oggi.giorno;
+  // No mission on the left, read or to come (a server without the points, #253, or a failed read): from `xl` the left
+  // column held the day block alone, the right one ran past the window (G8c). «Le tue materie» goes left then, under
+  // the day block; the statistics keep the right column.
+  const lonely = split && !(loading && data === null) && !data?.missioni?.length;
   const aside = useRef<HTMLDivElement>(null);
   const fits = useFitsInScroller(aside, split && !settingsOpen);
 
@@ -122,7 +128,18 @@ export function ReviewHome() {
     percorso.reload();
   };
   const start = () => navigate(materia ? `/studia/ripasso/sessione?materia=${materia}` : '/studia/ripasso/sessione');
-  const loading = day.status === 'loading';
+
+  const subjectList = (
+    <SubjectList
+      materie={data?.materie ?? null}
+      loading={loading && data === null}
+      reloading={loading && data !== null}
+      selected={materia}
+      onSelect={choose}
+      percorso={percorso}
+      onRetryPercorso={percorso.reload}
+    />
+  );
 
   return (
     // One column on a phone and a tablet — the day, the missions, the statistics, the subjects, the full list —; from
@@ -172,16 +189,10 @@ export function ReviewHome() {
           communityRequest={communityRequest}
           celebrate={celebrate}
         />
-        <SubjectList
-          materie={data?.materie ?? null}
-          loading={loading && data === null}
-          reloading={loading && data !== null}
-          selected={materia}
-          onSelect={choose}
-          percorso={percorso}
-          onRetryPercorso={percorso.reload}
-        />
+        {!lonely && subjectList}
       </div>
+      {/* Without missions, under the day block from `xl`; after the statistics on a phone, as in the right column. */}
+      {lonely && <div className={cn('min-w-0', LEFT)}>{subjectList}</div>}
       {/* The confetti start from the stamp, in the goal's row, and fall over the day, the missions and the statistics,
           never further: an absolute box placed on their rows (the grid's area is its containing block), out of the
           flow, so mounting it moves nothing. */}
