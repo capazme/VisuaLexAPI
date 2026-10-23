@@ -112,4 +112,9 @@ describe('credits.ts', () => {
     expect(getCredit('corte-costituzionale').name).toBe('Corte costituzionale');
     expect(creditHref('corte-costituzionale')).toBe('/crediti#corte-costituzionale');
   });
+
+  it('gives no entry the id of a group: both are anchors of one page (U1d)', () => {
+    const groups = new Set(CREDIT_GROUPS.map((group) => group.id as string));
+    expect(CREDITS.map((credit) => credit.id).filter((id) => groups.has(id))).toEqual([]);
+  });
 });

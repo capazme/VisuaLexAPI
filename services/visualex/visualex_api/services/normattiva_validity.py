@@ -332,10 +332,11 @@ def is_historical_request(version: Any, version_date: Any) -> bool:
 
 
 class Upcoming(TypedDict):
-    """The wire shape: `upcoming` next to `validity` when the text served is today's
-    and the source has already published a later one (G-355)."""
+    """The wire shape: `upcoming` next to `validity` when the source has published a text
+    not in force yet: next to today's text (G-355), next to an article inserted from a
+    later day (G-358), or describing the later text asked for explicitly (G-357)."""
 
-    change: str                      # "abrogated" or "amended"
+    change: Optional[str]            # "abrogated", "amended", "inserted"; None when it cannot be told
     valid_from: str                  # ISO day the later text comes into force
     version_number: Optional[int]
 
@@ -354,10 +355,12 @@ def starts_after_today(validity: Optional[Validity], today: Optional[date] = Non
     return valid_from > (today or _today_in_rome()).isoformat()
 
 
-def upcoming_change(validity: Validity) -> Upcoming:
-    """What a later text does to the article: repeal it, or change it."""
+def upcoming_change(validity: Validity, inserted: bool = False) -> Upcoming:
+    """What a later text does to the article: insert it (nothing is in force today),
+    repeal it, or change it."""
+    change = "inserted" if inserted else "abrogated" if validity.get("state") == "abrogated" else "amended"
     return {
-        "change": "abrogated" if validity.get("state") == "abrogated" else "amended",
+        "change": change,
         "valid_from": validity["valid_from"],
         "version_number": validity.get("version_number"),
     }
@@ -375,6 +378,23 @@ def _today_in_rome() -> date:
         # A slim image can lack the tz database. Use the latest offset Rome ever
         # has, so a valid date is never refused (one a couple of hours early may pass).
         return datetime.now(timezone(timedelta(hours=2))).date()
+
+
+def read_upcoming_request(version: Any, version_date: Any, today: Optional[date] = None) -> Optional[str]:
+    """For a request that asks explicitly for the text not in force yet (`upcoming: true`,
+    G-357): the day it names (ISO), or None when it names none. Refused (400) with
+    «originale», and with a day that cannot be read or is not after today: the text in
+    force on a day up to today is an ordinary dated request."""
+    if isinstance(version, str) and version.strip().lower() == "originale":
+        raise ValidationError("upcoming non si combina con la versione originale")
+    if not (isinstance(version_date, str) and version_date.strip()):
+        return None
+    day = _iso_day(version_date)
+    if day is None:
+        raise ValidationError(f"version_date non valida: {version_date.strip()[:40]}")
+    if date.fromisoformat(day) <= (today or _today_in_rome()):
+        raise ValidationError("con upcoming la data dev'essere successiva a oggi, o assente")
+    return day
 
 
 def reject_future_version_date(version_date: Any, today: Optional[date] = None) -> None:

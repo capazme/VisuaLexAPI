@@ -148,8 +148,16 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   entry —, OFL-1.1 as their `@fontsource-variable` packages say: the test reads the packages, and fails
   when `main.tsx` loads a typeface no entry covers). Normattiva carries the site's
   conditions, never the open data's CC BY 4.0; the Corte costituzionale «CC BY-SA 3.0» with no version.
-  `/crediti` is `pages/CreditsPage`: public (outside `ProtectedRoute`), one column, a section per group
-  (`CREDIT_GROUPS`), an `article` per entry whose `id` is the anchor — the page scrolls to the address's
+  `/crediti` is `pages/CreditsPage`: public (outside `ProtectedRoute`), a page to consult in the frame's whole width
+  (U1d): the opening at a reading measure, then from 1024 px an index «In questa pagina» (`nav`, 220 px, sticky,
+  `aria-current="location"` on the group being read, from the scroll — `creditsIndex.ts`'s `groupAt`: the last section
+  past 30 % of the window, the last at the page's end; a group an address or the index reached stays marked while the
+  page stays there (`groupOf`: `/crediti#cerdef` marks «Autorità e registri», not the last group the page's end would);
+  marked by weight and a bar, not a tint alone; the same item pressed again goes there again) beside the sources, on a
+  phone rows that wrap, every group in sight, the bar under the place being read (`min-w-0`, or the grid item widens
+  the page); a section per group
+  (`CREDIT_GROUPS`, its `id` the group's, `/crediti#giurisprudenza`), the entries as cards of equal height, two a row
+  from 1280 px; an `article` per entry whose `id` is the anchor — the page scrolls to the address's
   fragment and focuses the entry, since the router renders after the browser looked for it —, external
   links in a new tab with `rel="noopener noreferrer"`, every text breaking anywhere rather than widen a
   phone's page. Reached from the login's foot and the user menu's «Crediti».
@@ -238,8 +246,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   canvas under the frame's header); «Cestino» and the MERL-T pages under a way back
   («Torna ai Dossier», «MERL-T») write their `h1` with `PAGE_TITLE`. A dossier's own page is in the frame since S7c
   (`DossierDetailView`: its name the title, under «Torna ai Dossier»; see «Dossier»). Impostazioni (a dialog, not a page), the Scrivania, the lesson, the reader and the practice, the
-  login stay out; «Crediti», public and outside the layout, is in the frame since M1 (the column's width and padding, the
-  text in its 672 px column). On a phone `actionBeside` keeps icon-only actions on the title's row (the dossier list's
+  login stay out; «Crediti», public and outside the layout, is in the frame since M1 (the column's width and padding;
+  since U1d its whole width, an index beside the sources). On a phone `actionBeside` keeps icon-only actions on the title's row (the dossier list's
   «⋯» and «+»). `PageFrame.test.tsx` reads the section pages' files
   and fails on a title of their own, an icon in an `h1` or a root narrowed with `mx-auto max-w-…`. `Layout`'s content
   area keeps the scrollbar's room (`scrollbar-gutter: stable`) on every page but the search page: a page that grew past
@@ -1046,8 +1054,14 @@ Its key handler reads the queue from refs and every queue update checks the head
 card: a second key pressed between a post resolving and the re-render must not drop the next card.
 Keys: space reveals (ignored on a focused button or link, in a field, under an `aria-modal` dialog or a
 `data-find-overlay` layer), 1–4 grade after the reveal, Esc closes the article first, then asks
-«Interrompere il ripasso?» while a card is on screen (with no card — the end, a failed read, the read on its way — it
-goes back to Oggi, as the header's button does); listed in the «?» dialog's «Ripasso» group.
+«Interrompere il ripasso?» while a card is on screen and at least one is graded (with none graded it leaves at once,
+since stopping loses nothing — U1c, Bill's choice; with no card — the end, a failed read, the read on its way — it goes
+back to Oggi too, as the header's button does); listed in the «?» dialog's «Ripasso» group. The question is K1b's
+`WireConfirm` drawn from the header's «Interrompi», for the button and for Esc alike (U1c), no icon, its words the
+session's count of cards graded (`summary.reviewed`, a «Di nuovo» counted; `reviewStop.ts`: «Hai ripassato 4 schede:
+restano registrate. Le altre ti aspettano in “Oggi”.»); going on is the evident action (`emphasis="cancel"`:
+«Continua il ripasso» filled and on the right, the focus on it, Esc), «Interrompi» outlined — nothing is destroyed,
+so no red — and going on gives the focus back to the card (`focusBack`), where Space shows the answer.
 **The lesson** (Gymnasium spec `docs/superpowers/specs/2026-10-19-gymnasium-restyle-design.md` §5.4; the Studia screens
 spec §6 as rewritten for G2): the session is a screen of its own. `StudiaPage` draws it, with no heading of the area,
 in `LessonFrame`: portalled to the body in the `lesson` band (`z-[70]`, over the sidebar, the floating buttons, the
@@ -2138,7 +2152,9 @@ absent, the element focused as it opens, right for a menu's entry — `MenuButto
 by code before an entry runs, the Forum's card does the same by hand). A button its action disabled (busy) gets the
 focus back once enabled again. A wire leaves the button, meets the card on the edge
 that faces it (`wirePath.ts`, pure) and draws its outline both ways; where the ends meet the card appears, its rows
-rising one after the other (about 500 ms; the lead fades once it is there). «Annulla», Esc or a click outside wind it
+rising one after the other (about 500 ms; the lead fades once it is there). `emphasis="cancel"` makes the cancel the
+filled button, on the right, where going back is what one wants most (the lesson's «Interrompere il ripasso?», which
+leaves you and comes often); `focusBack` sends the focus elsewhere than the button after a cancel. «Annulla», Esc or a click outside wind it
 back into the button (about 300 ms) and give it the focus; leaving, the card is `inert`, so an Enter during the rewind
 confirms nothing, and the layer still takes the clicks, which do not fall to the page. Its buttons answer only once
 they have risen into sight (`READY_MS`, about 500 ms; `data-ready` on the card): a double tap on a button the card then
