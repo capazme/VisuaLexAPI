@@ -267,11 +267,20 @@ describe('ReviewHome', () => {
       const day = screen.getByRole('region', { name: 'Il ripasso di oggi' });
       const held = [...day.querySelectorAll('[aria-hidden="true"]')].map((el) => el.className);
       expect(held[0]).toMatch(/\bh-5\b.*\bw-40\b/);
-      expect(held[1]).toMatch(/h-\[4\.75rem\].*md:h-11/);
+      expect(held[1]).toMatch(/h-\[75px\].*md:h-11/);
       expect(held[2]).toMatch(/\bh-10\b.*md:h-5/);
       const rows = screen.getByRole('region', { name: 'Le missioni di oggi' }).querySelectorAll('.grid-cols-\\[24px_minmax\\(0\\,1fr\\)\\] > div:last-child');
       expect(rows).toHaveLength(3);
       for (const row of rows) expect(row).toHaveClass('h-16', 'md:h-9');
+    });
+
+    it('draws the date once with a subject chosen: no place held for it under the day\'s line while the subject\'s read travels', async () => {
+      localStorage.setItem(STORAGE_KEY, 'DIRITTO_PENALE');
+      progress.mockImplementation((materia?: string) => (materia ? new Promise(() => {}) : Promise.resolve(answer(18, 20))));
+      renderHome();
+      const day = await screen.findByRole('region', { name: 'Il ripasso di oggi' });
+      expect(await within(day).findByText(/^lunedì 19 ottobre/)).toBeInTheDocument();
+      expect(day.querySelector('.w-40')).toBeNull();
     });
 
     it('keeps two lines for the large line and the cost on a phone while the subjects\' read travels', async () => {

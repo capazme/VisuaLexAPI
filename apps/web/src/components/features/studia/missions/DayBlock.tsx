@@ -106,8 +106,9 @@ export function DayBlock({ day, dayFailed, action, actionFailed, stops, onRetry,
         // nuove» wraps there; the cost and the subjects on two.
         <>
           <p className="sr-only">Carico i tuoi progressi…</p>
-          <div aria-hidden className="h-5 w-40 rounded bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
-          <div aria-hidden className="h-[4.75rem] w-3/4 rounded-md bg-slate-100 motion-safe:animate-pulse md:h-11 dark:bg-slate-800" />
+          {/* Only before the day's read: with a subject chosen the block also waits for that subject's read, under the date. */}
+          {!day && <div aria-hidden className="h-5 w-40 rounded bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />}
+          <div aria-hidden className="h-[75px] w-3/4 rounded-md bg-slate-100 motion-safe:animate-pulse md:h-11 dark:bg-slate-800" />
           <div aria-hidden className="h-10 w-56 max-w-full rounded bg-slate-100 motion-safe:animate-pulse md:h-5 dark:bg-slate-800" />
           <div aria-hidden className="mt-1 h-12 w-full rounded-xl bg-slate-100 motion-safe:animate-pulse md:w-64 dark:bg-slate-800" />
         </>
