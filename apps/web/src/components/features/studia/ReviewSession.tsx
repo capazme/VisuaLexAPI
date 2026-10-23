@@ -416,7 +416,12 @@ export function ReviewSession() {
         {celebrating && (
           <SessionCelebration
             serie={goalMet.serie}
-            onStart={() => markCelebrated(goalMet.giorno)}
+            mark={goalMet.missione}
+            // The day is celebrated for this browser only with the mark: otherwise «Oggi» writes it, the first time, once
+            // the mission is done (G9).
+            onStart={() => {
+              if (goalMet.missione) markCelebrated(goalMet.giorno);
+            }}
             onDone={() => setNoticeDone(goalMet.giorno)}
           />
         )}

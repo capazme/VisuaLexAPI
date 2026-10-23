@@ -612,7 +612,12 @@ describe('the points of a grade in the session (G1c)', () => {
 });
 
 describe('the goal of the day in the session (Studia progress spec §6.4)', () => {
-  const closing = { registrata: true, prossimoRipasso: '2026-10-21', scheduledDays: 2, oggi: { giorno: '2026-10-19', ripassi: 10, obiettivo: 10, raggiunto: true, appenaRaggiunto: true, serie: 3 } };
+  // The grade that closes a goal of 10 also does its mission: the credit comes in the same answer.
+  const closing = {
+    registrata: true, prossimoRipasso: '2026-10-21', scheduledDays: 2,
+    oggi: { giorno: '2026-10-19', ripassi: 10, obiettivo: 10, raggiunto: true, appenaRaggiunto: true, serie: 3 },
+    xp: { crediti: [{ missione: 'obiettivo' as const, punti: 10 }], livello: { livello: 2, totale: 130, nelLivello: 30, perIlProssimo: 125, oggi: 10 }, nuovoLivello: false },
+  };
   const open = { registrata: true, prossimoRipasso: '2026-10-21', scheduledDays: 2, oggi: { giorno: '2026-10-19', ripassi: 9, obiettivo: 10, raggiunto: false, appenaRaggiunto: false, serie: 2 } };
 
   it('celebrates on the grade that closes the goal, remembers the day at once, says it to a screen reader, and is gone in 1.5 s', async () => {
@@ -630,6 +635,34 @@ describe('the goal of the day in the session (Studia progress spec §6.4)', () =
     expect(screen.getByText('Obiettivo di oggi raggiunto · serie di 3 giorni')).toBeInTheDocument();
     expect(SESSION_NOTICE_MS).toBeLessThanOrEqual(1500);
     await waitFor(() => expect(screen.queryByText('Serie di 3 giorni')).not.toBeInTheDocument(), { timeout: SESSION_NOTICE_MS + 1000 });
+  });
+
+  it('draws the goal\'s mark beside the words when the grade also does the goal\'s mission (G9)', async () => {
+    review.mockResolvedValueOnce(closing);
+    renderSession([card('a'), card('b')]);
+    await show();
+    await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
+    const notice = await screen.findByTestId('session-celebration');
+    expect(within(notice).getByTestId('goal-mark')).toBeInTheDocument();
+    expect(localStorage.getItem(CELEBRATED_KEY)).toBe('2026-10-19');
+  });
+
+  it('says a goal of one\'s own under the mission\'s 10 reviews in words alone, and leaves «Oggi» to celebrate the mission (G9)', async () => {
+    // A goal of 5 met at the 5th review: the day counts, the mission (10 reviews) is still open, no credit for it.
+    const ownGoal = {
+      registrata: true, prossimoRipasso: '2026-10-21', scheduledDays: 2,
+      oggi: { giorno: '2026-10-19', ripassi: 5, obiettivo: 5, raggiunto: true, appenaRaggiunto: true, serie: 3 },
+      xp: { crediti: [], livello: { livello: 2, totale: 120, nelLivello: 20, perIlProssimo: 125, oggi: 0 }, nuovoLivello: false },
+    };
+    review.mockResolvedValueOnce(ownGoal);
+    renderSession([card('a'), card('b')]);
+    await show();
+    await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
+    const notice = await screen.findByTestId('session-celebration');
+    expect(within(notice).getByText('Serie di 3 giorni')).toBeInTheDocument();
+    expect(within(notice).queryByTestId('goal-mark')).toBeNull();
+    // Not celebrated for this browser: «Oggi» writes the mark, the first time, once the mission is done.
+    expect(localStorage.getItem(CELEBRATED_KEY)).toBeNull();
   });
 
   it('leaves the keys to the review while it plays: space reveals, a number grades', async () => {

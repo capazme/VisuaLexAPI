@@ -379,12 +379,45 @@ describe('ReviewHome', () => {
       expect(container.querySelector('canvas')).toBeNull();
     });
 
+    // As the server sends it: the queue finished with no review counts the day, and leaves the goal's mission empty.
     it('does not celebrate a day that counted with nothing reviewed', async () => {
-      progress.mockResolvedValue(met({ ripassi: 0, raggiunto: true }));
+      progress.mockResolvedValue({
+        ...answer(0, 0, { ripassi: 0, raggiunto: true }, 5),
+        missioni: serverMissions({ obiettivo: { stato: 'vuota', progresso: undefined } }),
+      });
       const { container } = renderHome();
-      expect(await screen.findByTestId('goal-mark')).toBeInTheDocument();
+      await screen.findByRole('region', { name: 'Le missioni di oggi' });
+      expect(screen.queryByTestId('goal-mark')).toBeNull();
       expect(container.querySelector('canvas')).toBeNull();
       expect(localStorage.getItem(CELEBRATED_KEY)).toBeNull();
+    });
+
+    // The credit stays the whole day: 10 reviews of a goal of 10, the mission done, the goal then raised to 15.
+    it('draws no mark and celebrates nothing when the goal was raised past a mission already done', async () => {
+      progress.mockResolvedValue({
+        ...answer(8, 0, { ripassi: 10, obiettivo: 15, raggiunto: false }, 5),
+        missioni: serverMissions({ obiettivo: { stato: 'fatta', progresso: { fatte: 10, di: 10 } } }),
+      });
+      const { container } = renderHome();
+      await screen.findByRole('region', { name: 'Le missioni di oggi' });
+      expect(screen.queryByTestId('goal-mark')).toBeNull();
+      expect(screen.queryByText(/Obiettivo raggiunto/)).toBeNull();
+      expect(screen.getByText('Ancora 5 ripassi per tenere viva la serie.')).toBeInTheDocument();
+      expect(container.querySelector('canvas')).toBeNull();
+      expect(localStorage.getItem(CELEBRATED_KEY)).toBeNull();
+    });
+
+    it('writes the mark once: when the burst is over the writing goes, and a new read does not bring it back', async () => {
+      vi.mocked(HTMLCanvasElement.prototype.getContext).mockReturnValue(fakeContext());
+      progress.mockResolvedValue(met());
+      const { container } = renderHome();
+      expect(await screen.findByTestId('goal-mark')).toHaveClass('vlx-goal-mark-draw');
+      await waitFor(() => expect(container.querySelector('canvas')).toBeNull(), { timeout: 3000 });
+      expect(screen.getByTestId('goal-mark')).not.toHaveClass('vlx-goal-mark-draw');
+      // A new read (a subject chosen): the mark stays whole.
+      await userEvent.setup().click(subjectChoice('Diritto penale'));
+      await waitFor(() => expect(progress).toHaveBeenCalledWith('DIRITTO_PENALE'));
+      expect(screen.getByTestId('goal-mark')).not.toHaveClass('vlx-goal-mark-draw');
     });
 
     it('marks the day as the burst begins, so leaving halfway does not replay it', async () => {

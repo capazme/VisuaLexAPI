@@ -1267,16 +1267,21 @@ line says it to a screen reader). The confetti step by elapsed time (`confetti.t
 `stepsAt`), so they last 1.5 s on any screen. Under reduced motion nothing moves: no canvas, the end state only.
 **The goal's mark** (`progress/GoalMark`, G9; inspired by a sheet of hand-drawn ticks, written from scratch): a ring, a
 tick and a short stroke under it, each the outline of a broad-nib pen stroke generated once and kept as paths (heavier
-under 48 px), upright, in the one ink (`INK_TEXT`), with no text inside. It shows only when the goal's mission is done
-(`goalMissionDone`): a day the streak counts with the mission empty (nothing due, nothing new) or open (a goal of the
-user's own under the mission's 10 reviews) says so in the mission's line, with no mark and no celebration. In the day
+under 48 px), upright, in the one ink (`INK_TEXT`), with no text inside. It shows only when the goal is met and its
+mission done (`goalMissionDone`: `oggi.raggiunto` and the mission `fatta`): a day the streak counts with the mission
+empty (nothing due, nothing new) or open (a goal of the user's own under the mission's 10 reviews), or a mission done
+under a goal raised since (its credit stays the whole day), says so in the mission's line, with no mark and no
+celebration. In the day
 block (`DayBlock`, from the whole day's read, so a subject chosen neither hides nor redraws it), on a phone first, 72 px
 with «23 ottobre 2026 · giorno 3» beside it, never beside the large line; from `md` at the block's right, 96 px over
 those words, the block's right side kept for it. Written (`draw`) only by the celebration: a mask whose pen path is
-uncovered stroke by stroke (`.vlx-goal-mark-draw`, about 1 s, motion allowed only); on WebKit, which may not repaint a
+uncovered stroke by stroke (`.vlx-goal-mark-draw`, about 1 s, motion allowed only; each pen runs 3 units past its
+stroke's ends, so its butt ends never shave the thin tips at rest); on WebKit, which may not repaint a
 shape whose mask CSS animates (Safari, every browser on an iPhone or an iPad, `writesInMasks`), a short fade of the
 mark whole instead (`.vlx-goal-mark-fade`, A3's fallback). A page read again draws it whole. Its name, «Obiettivo raggiunto» (`role="img"`); the date is the words beside it. The
-session's notice has the same mark, small, beside its words at every width. The session's end screen adds the ring and the streak
+session's notice has the same mark, small, beside its words at every width, on the same rule: only when the grade that
+makes the day count also does the goal's mission (its credit in the answer, `GoalMet.missione`); otherwise the words
+alone, and the day is not marked celebrated, so «Oggi» writes the mark the first time, once the mission is done. The session's end screen adds the ring and the streak
 (`SessionEndProgress`, the same read).
 **The small motions** (S2): the tally's new mark (the count pops with it), today's count landing in the ring
 (`GoalRing`'s `vlx-digit-land`: the new digit falls into place and takes on its weight, 360 ms, over its own place held

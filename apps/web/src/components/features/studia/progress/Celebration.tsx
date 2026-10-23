@@ -103,6 +103,8 @@ export function ConfettiBurst({ originRef, onStart, onDone }: ConfettiBurstProps
 
 export interface SessionCelebrationProps {
   serie: number;
+  /** The goal's mission done by this grade: the mark beside the words (G9); otherwise the words alone. */
+  mark: boolean;
   /** Called as the notice appears: the day is marked celebrated at once (decision 10). */
   onStart: () => void;
   /** Called when the notice has been on screen for `SESSION_NOTICE_MS`. */
@@ -114,9 +116,10 @@ export interface SessionCelebrationProps {
  * close button and the progress bar, Gymnasium spec §5.4), never over the card or the grades, with the goal's mark and
  * the confetti inside it. It is placed in that row, not fixed over the screen; it takes no focus and no pointer
  * (the button under it stays usable), so the keys keep working. Gone in 1.5 s (decision 6). The mark is «Oggi»'s, small,
- * written beside the words (G9: it took the place of the red stamp); under reduced motion the same notice, still.
+ * written beside the words (G9: it took the place of the red stamp), and on the same rule: only with the goal's mission
+ * done by this grade (`mark`), the words alone otherwise; under reduced motion the same notice, still.
  */
-export function SessionCelebration({ serie, onStart, onDone }: SessionCelebrationProps) {
+export function SessionCelebration({ serie, mark, onStart, onDone }: SessionCelebrationProps) {
   const start = useRef(onStart);
   const done = useRef(onDone);
   useEffect(() => {
@@ -134,7 +137,7 @@ export function SessionCelebration({ serie, onStart, onDone }: SessionCelebratio
       <div className={cn(TILE, 'relative flex w-full max-w-md items-center justify-center gap-3 overflow-hidden px-3 py-1.5 shadow-lg')}>
         {/* The confetti first, so the mark and the words are drawn over them. */}
         <ConfettiBurst />
-        <GoalMark size={32} draw className={cn('relative', INK_TEXT)} />
+        {mark && <GoalMark size={32} draw className={cn('relative', INK_TEXT)} />}
         {/* Its words beside it at every width now that the mark is small (the stamp left them no room under 400 px). */}
         <p className={cn('relative font-serif text-sm font-semibold leading-tight', INK_TEXT)} aria-hidden>
           {/* On a phone the streak alone: one line keeps the notice clear of the card. */}
