@@ -78,9 +78,10 @@ function useCardDetail(card: Scheda): { card: Scheda; failed: boolean; retry: ()
 }
 
 /**
- * The list with no card yet: how to begin. From here with «+ Nuova scheda» when the sources answer (the
- * form checks every anchor against them); from an article, or through Claude, in any case. While the
- * sources have not answered, only the first line: the way to begin is not said twice in two ways.
+ * The list with no card yet: what a card is, and how to begin. From here with «Scrivi la prima scheda» (Q1: the block's
+ * one solid action, the form «+ Nuova scheda» opens) when the sources answer (the form checks every anchor against
+ * them); from an article, or through Claude, in any case. While the sources have not answered, no way to begin yet:
+ * it is not said twice in two ways.
  */
 function NoCardsYet({ sources, onNew }: { sources: boolean | undefined; onNew: () => void }) {
   const search = (
@@ -93,13 +94,15 @@ function NoCardsYet({ sources, onNew }: { sources: boolean | undefined; onNew: (
   return (
     <div className={cn(TILE, 'grid justify-items-stretch gap-3 p-4 md:justify-items-start md:p-6')}>
       <p className={cn('font-serif text-xl leading-snug md:text-2xl', INK_TEXT)}>Non hai ancora schede.</p>
+      <p className="max-w-prose text-sm text-slate-700 dark:text-slate-200">
+        {/* The citation on one line: non-breaking spaces. */}
+        Una scheda è una domanda e la sua risposta, fondate su un articolo, ad esempio {'«art.\u00a01455\u00a0c.c.»'}: il
+        ripasso in «Oggi» te la ripropone quando stai per dimenticarla.
+      </p>
       {sources === undefined ? null : sources ? (
         <>
-          <p className="max-w-prose text-sm text-slate-700 dark:text-slate-200">
-            Scrivi la prima da qui: indica l’articolo su cui poggia, ad esempio «art. 1455 c.c.», poi la domanda e la risposta.
-          </p>
           <button type="button" aria-haspopup="dialog" onClick={onNew} className={cn(INK_BUTTON, 'w-full px-6 md:w-auto')}>
-            + Nuova scheda
+            Scrivi la prima scheda
           </button>
           <p className="max-w-prose text-sm text-slate-700 dark:text-slate-200">
             Puoi anche aprire un articolo dalla {search} e scegliere «+ Nuova scheda» sotto il testo, o chiedere a Claude di scriverne.

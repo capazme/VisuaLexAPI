@@ -1080,8 +1080,8 @@ export function GraphExplorerPage(): React.ReactElement {
   return (
     // In the sections' frame (W2, S7b): the page's name as the title, in the reader's serif and with no icon, its tools
     // beside it, then the search wide under it. The window less the layout's padding: below lg it starts the page under
-    // the phone's bar (4.5rem and the iPhone's top edge on top, then 1rem, or 2rem from md, at the bottom); from lg,
-    // 2rem each side.
+    // the phone's bar (4.5rem and the iPhone's top edge on top, then 1rem at the bottom, or from md the page's foot,
+    // `--page-foot`: 2rem, more under the feedback button); from lg, 2rem on top and the foot at the bottom.
     <PageFrame
       title={GRAPH_PAGE}
       // L-37: «Academia · il laboratorio del diritto» over the page's name.
@@ -1089,7 +1089,7 @@ export function GraphExplorerPage(): React.ReactElement {
       // On a phone the canvas needs the height: no line there, and the slice's tools beside the title as icons.
       line={<span className="hidden md:inline">Le relazioni tra norme, principi e concetti.</span>}
       actionBeside
-      className="h-[calc(100dvh-5.5rem-env(safe-area-inset-top))] gap-4 md:h-[calc(100dvh-6.5rem-env(safe-area-inset-top))] lg:h-[calc(100dvh-4rem)]"
+      className="h-[calc(100dvh-5.5rem-env(safe-area-inset-top))] gap-4 md:h-[calc(100dvh-4.5rem-var(--page-foot,2rem)-env(safe-area-inset-top))] lg:h-[calc(100dvh-2rem-var(--page-foot,2rem))]"
       action={
         <>
           <button

@@ -426,6 +426,14 @@ describe('DocumentReviewPage — the worst cases', () => {
     expect(textBody().className).toMatch(/\[overflow-wrap:anywhere\]/);
   });
 
+  it('sizes both columns to the window less the page\'s foot, which grows under the feedback button (G8c)', async () => {
+    const { container } = render(<DocumentReviewPage />);
+    await choose(container, PARERE);
+    const text = screen.getByRole('region', { name: 'Testo del documento' });
+    const list = screen.getByRole('complementary', { name: 'Citazioni' });
+    for (const column of [text, list]) expect(column).toHaveClass('lg:h-[calc(100dvh-15rem-var(--page-foot,2rem))]');
+  });
+
   it('wraps a very long file name instead of widening the page, and keeps it whole for the pointer', async () => {
     const name = `${'parere-pro-veritate-sul-recesso-dal-contratto-di-fornitura-'.repeat(6)}definitivo.txt`;
     const { container } = render(<DocumentReviewPage />);

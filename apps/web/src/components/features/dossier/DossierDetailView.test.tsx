@@ -610,6 +610,28 @@ describe('DossierDetailView — in the frame, in the planner\'s shape (S7c)', ()
     for (const button of within(row).getAllByRole('button')) expect(button.className).not.toMatch(/md:min-h-0/);
   });
 
+  it('keeps a long title clear of the actions: they come after the description and the facts, each label on one line (D3b)', () => {
+    const title = 'Ransomware EVST – pagamento del riscatto e fondi pubblici, profili di responsabilità';
+    renderView({ ...dossier, title, description: 'Richiesta di riscatto ricevuta il 3 ottobre' });
+    const heading = screen.getByRole('heading', { level: 1, name: title });
+    const open = screen.getByRole('button', { name: 'Apri tutto su Dashboard' });
+    const row = open.parentElement!;
+    // Nothing beside the title: the header holds only the section's phrase, the title and the description.
+    expect(heading.closest('header')!.querySelector('button')).toBeNull();
+    // After the line of the facts.
+    expect(screen.getByText(/creato il/).compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The row wraps as a row when the window is narrow, never a label inside its button.
+    expect(row).toHaveClass('flex-wrap');
+    const buttons = ['Apri tutto su Dashboard', 'Aggiungi', 'Esporta', 'Pubblica nel Forum'].map((name) => screen.getByRole('button', { name }));
+    for (const button of buttons) expect(button).toHaveClass('whitespace-nowrap');
+    expect(row.lastElementChild).toContainElement(screen.getByRole('button', { name: 'Altre azioni' }));
+  });
+
+  it('keeps the Forum\'s label on one line once the dossier is published (D3b)', () => {
+    renderView({ ...dossier, published: { sharedEnvironmentId: 'e1', version: 3, isActive: true, updatedAt: '' } });
+    expect(screen.getByRole('button', { name: 'Forum: Nel Forum · v3' })).toHaveClass('whitespace-nowrap', 'min-h-[44px]');
+  });
+
   it('draws an article as a row of two levels — the article, a grey line, the signs — with 44 px controls', () => {
     renderView({
       ...dossier,
