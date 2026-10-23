@@ -93,6 +93,12 @@ const SUFFIX_TO_ACT_TYPE: Record<string, string> = {
   'cds': 'codice della strada',
   'c.n.': 'codice della navigazione',
   'cn': 'codice della navigazione',
+  'cod. nav.': 'codice della navigazione',
+  'c. nav.': 'codice della navigazione',
+  'cod. post.': 'codice postale e delle telecomunicazioni',
+  'c.g.c.': 'codice di giustizia contabile',
+  'c.g.c': 'codice di giustizia contabile',
+  'cgc': 'codice di giustizia contabile',
   'prel.': 'preleggi',
   'disp. att.': 'disposizioni attuative',
   'tue': 'TUE',
@@ -106,18 +112,19 @@ const SUFFIX_TO_ACT_TYPE: Record<string, string> = {
 // il codice penale), e il lookahead `(?!\.?[a-zà-ÿ'’])` impedisce a un'abbreviazione
 // di essere letta dentro una più lunga o dentro una parola: "c.p.a." non è
 // "c.p.", "c.c.i." non è "c.c.", "costituzionale" non è "cost", "c.p. c'è" non
-// è "c.p.c". Un apostrofo blocca solo se segue una lettera: «art. 2043 c.c.’» (virgolette
-// che si chiudono) resta un link. Un punto finale seguito da spazio resta valido ("art. 110 c.p.
-// Il ricorso"). Le forme di tre lettere si scrivono attaccate ("c.p.c.", "cpc")
+// è "c.p.c", "cod. navig." non è "cod. nav.". Un apostrofo blocca solo se segue una
+// lettera: «art. 2043 c.c.’» (virgolette che si chiudono) resta un link. Un punto finale seguito da spazio resta valido ("art. 110 c.p.
+// Il ricorso"). Le forme di tre lettere si scrivono attaccate ("c.p.c.", "cpc", "c.g.c.")
 // o del tutto spaziate con tutti i punti ("c. p. c."): una lettera dopo uno
 // spazio senza la sua serie di punti è la parola seguente ("c.p. c) la frode",
 // "c.p. p."), mai parte dell'abbreviazione. Stesso lookahead di
 // `_ACT_ABBREV_PATTERN` in citation_linker.py (che non ammette spazi interni).
 const ACT_SUFFIX_PATTERN =
   '(' +
-  '(?:c\\.?p\\.?c|c\\.\\s+p\\.\\s+c(?=\\.)|c\\.?p\\.?p|c\\.\\s+p\\.\\s+p(?=\\.)|c\\.?p\\.?a|' +
+  '(?:c\\.?p\\.?c|c\\.\\s+p\\.\\s+c(?=\\.)|c\\.?p\\.?p|c\\.\\s+p\\.\\s+p(?=\\.)|c\\.?p\\.?a|c\\.\\s+p\\.\\s+a(?=\\.)|' +
+  'c\\.?g\\.?c|c\\.\\s+g\\.\\s+c(?=\\.)|' +
   'c\\.?\\s*c|c\\.?\\s*p|' +
-  'cost|c\\.?\\s*d\\.?\\s*s|c\\.?\\s*n|prel|cod\\.?\\s*civ|cod\\.?\\s*pen)' +
+  'cost|c\\.?\\s*d\\.?\\s*s|(?:cod\\.?|c\\.)\\s*nav|c\\.?\\s*n|prel|cod\\.?\\s*civ|cod\\.?\\s*pen|cod\\.?\\s*post)' +
   "(?!\\.?[a-zà-ÿ])(?!\\.?['’][a-zà-ÿ])\\.?)";
 
 // Suffissi articolo (bis, ter, ... terdecies, sexiesdecies): la tabella sta in
@@ -151,6 +158,15 @@ const NATIONAL_ACT_SOURCE =
   'd\\.?\\s*p\\.?\\s*r\\.?|dpr|' +
   'regio\\s+decreto|r\\.?\\s*d\\.?|rd';
 
+// Ciò che, dopo un articolo senza atto, fa pensare a un codice ("c.c.", "c.g.c.", "cod. …",
+// anche uno che nessun pattern sa leggere): i PATTERN 4 e 5 non danno quell'articolo alla
+// norma in lettura. "cost" e "cod" valgono da soli, col punto o come "costituzion…" e
+// "codic…" ("Costit." compreso): "gli artt. 5 e 6 costituiscono" e "codificano" sono parole, e
+// l'elenco resta un link.
+const CODE_AFTER_SOURCE =
+  '\\s*(?:,\\s*)?(?:c\\.?\\s*c|c\\.?\\s*p|c\\.?\\s*g\\.?\\s*c|' +
+  'cost(?:ituzion|it(?:\\.|(?![a-zà-ÿ]))|\\.|(?![a-zà-ÿ]))|prel|cod(?:ic|\\.|(?![a-zà-ÿ])))';
+
 /**
  * Normalizza il tipo atto
  */
@@ -165,15 +181,17 @@ function normalizeActType(input: string): string {
     return SUFFIX_TO_ACT_TYPE[normalized];
   }
 
-  // Poi cerca match parziale per abbreviazioni con punti
-  const withoutSpaces = normalized.replace(/\s/g, '');
+  // Poi senza spazi e senza punti: "cod nav", "cod.nav" e "c. g. c." sono le forme
+  // della tabella. Nessuna forma, così ridotta, è quella di un altro atto.
+  const bare = (form: string) => form.replace(/[\s.]/g, '');
+  const bareInput = bare(normalized);
   for (const [abbr, actType] of Object.entries(ABBREVIATION_TO_ACT_TYPE)) {
-    if (abbr.replace(/\s/g, '') === withoutSpaces) {
+    if (bare(abbr) === bareInput) {
       return actType;
     }
   }
   for (const [suffix, actType] of Object.entries(SUFFIX_TO_ACT_TYPE)) {
-    if (suffix.replace(/\s/g, '') === withoutSpaces) {
+    if (bare(suffix) === bareInput) {
       return actType;
     }
   }
@@ -490,12 +508,12 @@ export function extractCitations(text: string, defaultNorma?: NormaContext): Cit
   if (defaultNorma?.tipo_atto) {
     const multiArticleNoSuffixRegex = new RegExp(
       `(${PREPOSITION_PATTERN}(?:artt?\\.?|articol[oi])\\s+)` +  // Gruppo 1: prefisso
-      // Cattura tutto il gruppo di numeri: "8 e 9" o "1, 2 e 3"
-      '(\\d+' + ARTICLE_SUFFIX_PATTERN + '(?:\\s*[,e]\\s*\\d+' + ARTICLE_SUFFIX_PATTERN + ')+)' +  // Gruppo 2: numeri
-      // Negative lookahead per non matchare se c'è un suffisso tipo atto dopo
-      '(?!\\s*(?:,\\s*)?(?:c\\.?\\s*c|c\\.?\\s*p|cost|prel|cod))',
+      // Cattura tutto il gruppo di numeri: "8 e 9" o "1, 2 e 3", per intero (come nel
+      // PATTERN 5: "artt. 8 e 19 cod. xyz" non diventa "8 e 1")
+      '(?=(\\d+' + ARTICLE_SUFFIX_PATTERN + '(?:\\s*[,e]\\s*\\d+' + ARTICLE_SUFFIX_PATTERN + ')+))\\2',  // Gruppo 2: numeri
       'gi'
     );
+    const codeAfter = new RegExp(`^${CODE_AFTER_SOURCE}`, 'i');
 
     while ((match = multiArticleNoSuffixRegex.exec(cleanText)) !== null) {
       const fullMatchStart = match.index;
@@ -503,7 +521,8 @@ export function extractCitations(text: string, defaultNorma?: NormaContext): Cit
 
       // Verifica che l'intero range non sia già usato
       if (isOverlapping(fullMatchStart, fullMatchEnd)) continue;
-      if (namesAnotherAct(cleanText.slice(fullMatchEnd, fullMatchEnd + 120))) {
+      const tail = cleanText.slice(fullMatchEnd, fullMatchEnd + 120);
+      if (codeAfter.test(tail) || namesAnotherAct(tail)) {
         // Rinunciato: l'intervallo va marcato, o il PATTERN 5 riprende il
         // primo articolo dell'elenco e lo dà alla norma in lettura.
         markUsed(fullMatchStart, fullMatchEnd);
@@ -550,11 +569,16 @@ export function extractCitations(text: string, defaultNorma?: NormaContext): Cit
   if (defaultNorma?.tipo_atto) {
     const simpleArticleRegex = new RegExp(
       `${ARTICLE_WORD_PATTERN}\\s+` +
-      '(\\d+' + ARTICLE_SUFFIX_PATTERN + ')' +
-      // Ignora comma/lettera opzionali (ma non catturare suffisso tipo atto)
-      '(?:\\s*(?:,\\s*)?(?:comma|co\\.|lett\\.?)\\s*[\\d\\w]+)*' +
+      // Il numero e il suffisso sono presi per intero (un lookahead e il suo riferimento
+      // fanno un gruppo atomico): davanti a un atto che il lookahead qui sotto esclude,
+      // "art. 69 cod. nav." tornava indietro di una cifra, e "art. 6" finiva sulla norma
+      // in lettura; "art. 5-bis" lasciava il suffisso e diventava "art. 5".
+      '(?=(\\d+' + ARTICLE_SUFFIX_PATTERN + '))\\1' +
+      // Ignora comma/lettera opzionali (ma non catturare suffisso tipo atto), anche
+      // queste per intero: "art. 69, comma 2, cod. xyz" non torna a "art. 69"
+      '(?=((?:\\s*(?:,\\s*)?(?:comma|co\\.|lett\\.?)\\s*[\\d\\w]+)*))\\2' +
       // Negative lookahead per non matchare se c'è un suffisso tipo atto dopo
-      '(?!\\s*(?:,\\s*)?(?:c\\.?\\s*c|c\\.?\\s*p|cost|prel|cod))',
+      `(?!${CODE_AFTER_SOURCE})`,
       'gi'
     );
 
