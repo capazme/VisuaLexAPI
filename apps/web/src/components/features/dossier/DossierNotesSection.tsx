@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { Trash2 } from 'lucide-react';
+import { StickyNote, Trash2 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import type { DossierItem } from '../../../types';
 import { formatTimestampLong } from './dossierUtils';
 import { ClaudeMark } from '../../ui/ClaudeMark';
+import { FOCUS_RING } from '../studia/progress/tokens';
+import { ROW, ROW_LINE, ROW_REMOVE, ROW_TITLE, SECTION_COUNT, SECTION_HEADING, SECTION_TILE } from './dossierStyles';
 
 type NoteItem = Extract<DossierItem, { type: 'note' }>;
 
@@ -20,50 +22,48 @@ function NoteRow({ note, onRemove }: { note: NoteItem; onRemove: () => void }) {
   const [open, setOpen] = useState(false);
   const long = isLong(note.data);
   return (
-    <li className="group flex items-start gap-2">
-      <div className="min-w-0 flex-1">
-        <p className={cn('whitespace-pre-wrap text-sm text-slate-800 dark:text-slate-200', long && !open && 'line-clamp-3')}>
+    <li className={cn(ROW, 'flex items-start gap-1 pl-1')}>
+      <div className="min-w-0 flex-1 py-2.5">
+        <p className={cn(ROW_TITLE, 'whitespace-pre-wrap [overflow-wrap:anywhere]', long && !open && 'line-clamp-3')}>
           {note.data}
         </p>
-        {long && (
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            aria-expanded={open}
-            className="mt-0.5 min-h-[44px] rounded text-xs font-medium text-amber-800 hover:underline md:min-h-0 dark:text-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
-          >
-            {open ? 'Mostra meno' : 'Mostra tutto'}
-          </button>
-        )}
+        {/* The grey line: when, and who wrote it when an application did; under the words, never beside them, so a
+            phone's narrow row keeps the note's width. */}
+        <p className={cn(ROW_LINE, 'mt-1 flex flex-wrap items-center gap-x-2 gap-y-1')}>
+          <span>{formatTimestampLong(note.addedAt)}</span>
+          <ClaudeMark createdBy={note.createdBy ?? null} />
+          {long && (
+            <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              aria-expanded={open}
+              className={cn('-my-3 min-h-[44px] rounded px-1 font-medium text-amber-800 hover:underline dark:text-amber-300', FOCUS_RING)}
+            >
+              {open ? 'Mostra meno' : 'Mostra tutto'}
+            </button>
+          )}
+        </p>
       </div>
-      <span className="flex flex-shrink-0 flex-col items-end gap-1 pt-0.5 text-xs text-slate-500 dark:text-slate-400">
-        {formatTimestampLong(note.addedAt)}
-        <ClaudeMark createdBy={note.createdBy ?? null} />
-      </span>
-      <button
-        type="button"
-        onClick={onRemove}
-        aria-label="Rimuovi nota"
-        className="flex min-h-[44px] min-w-[44px] flex-shrink-0 items-center justify-center rounded-md text-slate-400 hover:text-red-500 md:min-h-0 md:min-w-0 md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
-      >
-        <Trash2 size={15} />
+      <button type="button" onClick={onRemove} aria-label="Rimuovi nota" className={ROW_REMOVE}>
+        <Trash2 size={15} aria-hidden />
       </button>
     </li>
   );
 }
 
-/** The dossier's free notes, above the acts (spec §6). */
+/**
+ * The dossier's free notes, above the acts (spec §6), as the planner's rows (S7c): the words, a grey line under them,
+ * the removal at the right, 44 px; in a tile like the acts', its heading in the reader's serif with the note's colour.
+ */
 export function DossierNotesSection({ notes, onRemove }: Props) {
   if (notes.length === 0) return null;
   return (
-    <section
-      aria-labelledby="dossier-notes-heading"
-      className="rounded-xl border border-amber-200 bg-amber-50/60 p-3 md:p-4 dark:border-amber-900/50 dark:bg-amber-950/20"
-    >
-      <h2 id="dossier-notes-heading" className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">
-        Note ({notes.length})
+    <section aria-labelledby="dossier-notes-heading" className={cn(SECTION_TILE, 'px-3 pb-1 pt-3 md:px-4')}>
+      <h2 id="dossier-notes-heading" className={cn(SECTION_HEADING, 'flex items-center gap-2')}>
+        <StickyNote size={16} aria-hidden className="text-amber-600 dark:text-amber-400" />
+        Note <span className={SECTION_COUNT}>({notes.length})</span>
       </h2>
-      <ul className="space-y-2">
+      <ul className="mt-1">
         {notes.map((note) => (
           <NoteRow key={note.id} note={note} onRemove={() => onRemove(note)} />
         ))}

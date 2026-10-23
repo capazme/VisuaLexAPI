@@ -19,7 +19,7 @@ import re
 import logging
 from typing import Optional
 
-from .map import NORMATTIVA_URN_CODICI, EURLEX
+from .map import ANNEXED_ACTS, NORMATTIVA_URN_CODICI, EURLEX
 from .text_op import normalize_act_type, parse_date
 
 log = logging.getLogger(__name__)
@@ -112,6 +112,10 @@ def generate_urn(
 
         urn = f"{normalized_act_type_urn}:{formatted_date};{act_number}"
         log.info(f"Generated base URN: {urn}")
+        if annex is None:
+            # An act whose text is its annex (the TULPS, annex 1 of r.d. 773/1931) is keyed
+            # by that annex, as a code is by its default one.
+            annex = ANNEXED_ACTS.get(urn)
 
     # Add annex if specified
     if annex:

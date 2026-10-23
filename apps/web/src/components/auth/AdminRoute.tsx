@@ -57,7 +57,7 @@ export function AdminRoute({ children }: AdminRouteProps) {
           </p>
           <a
             href="/"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-medium transition-colors"
           >
             Torna alla Home
           </a>

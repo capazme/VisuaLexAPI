@@ -49,7 +49,14 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     the fingerprints a codice's in-memory index is a few hundred KB.
     `AKN_ENABLED=false` disables the whole path and is read at call time.
     `normalize_article_key` in `akn_parser.py` is the pure canonicaliser for
-    article numbers and needs no network.
+    article numbers and needs no network; `comparable_article_key` is the same with an
+    ordinal split in two words joined («135 sex decies», as the tree and the codice del
+    consumo's export write it, is «135-sexdecies»), for comparing two spellings only —
+    the keys `/fetch_rubriche` and the fingerprints answer keep the split. A component
+    act's rubrica is read in brackets, or, in a part that writes them in brackets,
+    without them when an amendment rewrote it so (`_unbracketed_rubrica`; the codice
+    civile: 2840 of 3249 before, 3039 since 21 October 2026, the rest repealed, notices, or
+    articles with no rubrica).
   - `normattiva_validity.py` — what a Normattiva article page says about its own
     validity: the window ("Testo in vigore dal … al …"), the version number, the
     act's last update, and a state (`current`, `historical`, `not_yet`,
@@ -113,7 +120,12 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     `citation_linker`, `alias_resolver` and `services/akn_parser`; mirrored by
     `apps/web/src/utils/articleSuffixes.ts`. Nine private copies each stopped at
     `decies`, so "art. 25-terdecies" resolved to art. 25-ter — an article that
-    exists, which is why nothing looked broken
+    exists, which is why nothing looked broken. `ORDINAL_SPELLINGS` pairs the two
+    spellings of 9, 15, 16, 18, 19 and 20 (`other_ordinal_spelling`): Normattiva uses one
+    per act («391 novies» c.p.p., «21 nonies» l. 241/1990), so `create_norma_visitata_from_data`
+    takes the act's spelling when the other one was asked (`_source_spelling`) and the URN
+    is the act's; `normalize_article_key` keeps the spelling it is given, since its keys
+    are what `/fetch_rubriche` and the fingerprints answer
   - `sys_op.py` — `PlaywrightManager` singleton (browser pooling), reached through
     `get_playwright_manager()`
   - `config.py` — rate limiting, cache size, Redis (`REDIS_ENABLED`, `REDIS_URL`)
@@ -122,7 +134,13 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     from the reviewable `_ATTI_DENOMINATI_SPEC` rows) and `codice_urn(name)`,
     the **case-insensitive** lookup into `NORMATTIVA_URN_CODICI` — six keys
     carry capitals ("codice del Terzo settore"), so a bare `in` test missed
-    them and those codici lost their default annex
+    them and those codici lost their default annex. `ANNEXED_ACTS` (with
+    `act_default_annex`) does the same for an act cited by type, date and number whose text
+    is its annex: the TULPS is annex 1 of r.d. 773/1931 (G-351), so «r.d. 773/1931, art. 86»
+    is stored and keyed with `allegato: "1"` and its URN is `…;773:1~art86`. A code's
+    default annex and such an act's annex are never named in a citation (`sources.py`, and
+    the server's, the web's and MERL-T's copies); the TS mirrors and MERL-T's copy of
+    `ANNEXED_ACTS` are pinned to this one by their tests
   - `map.py` also holds `BROCARDI_CODICI` (label → page, one row per source at
     brocardi.it/fonti.html) and `find_brocardi_url(tipo, numero, data)`, which
     `brocardi_scraper.do_know` asks — unused since Brocardi was switched off (D-078). The lookup is **by identity**: every label
@@ -613,7 +631,16 @@ Breaking one of these breaks the product. Read before editing.
     article, the refusal names the annex it looked in and adds where the article is
     («Articolo 29 non presente nell'allegato 1 di …: su Normattiva l'art. 29 si trova
     nell'allegato 2»), from the tree just read (`_where_else_in_tree`). Never for a
-    code's default annex: another annex of a code is another code. A request that asks
+    code's default annex: another annex of a code is another code. Every code in
+    `NORMATTIVA_URN_CODICI` whose URN ends in `:N` is bound to that annex (the c.c. and
+    the c.p.a. at 2, the c.p., the c.p.c., the cod. nav. and the others at 1; since
+    G-350 also the codice del turismo, the disp. att. c.p.p., the reg. navigazione and
+    the codici penali militari), so an article missing there is «non presente» in the
+    code, with no hint: the preleggi are annex 1 of the c.c.'s decree, their own row.
+    The one exception is a row of the table that names more than one code (`CODE_ROWS_OF_SEVERAL_CODES` in
+    `map.py`, read by `create_norma_visitata_from_data`): its other annex is the other
+    code of the same row (the war code is annex 2 of r.d. 303/1941), so the refusal
+    names the default annex and says where the article is. A request that asks
     for the dispositivo explicitly (`annex: ""`) is checked against the dispositivo alone,
     and its refusal reads «non presente nel testo di …» with the same hint: before, an
     article found only in an annex passed and came back as the act's art. 1.

@@ -116,14 +116,15 @@ export function CaseLawSection({ norma, topic, articleUrn, tabId, backEntry, isH
 
   return (
     <div className="mt-8 border-t border-slate-200 pt-4 dark:border-slate-800">
-      <h3 className="text-xs font-bold uppercase text-slate-600 dark:text-slate-300">
+      {/* A section's label, as the rest of the app writes it (R3): plain, `text-sm font-semibold`. */}
+      <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
         <button
           type="button"
           aria-expanded={open}
           aria-controls={panelId}
           onClick={toggle}
           className={cn(
-            'flex w-full items-center justify-between gap-3 text-left uppercase focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+            'flex w-full items-center justify-between gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
             TOUCH_TARGET_RESPONSIVE,
           )}
         >

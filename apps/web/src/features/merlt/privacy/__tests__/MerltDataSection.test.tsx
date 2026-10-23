@@ -114,6 +114,8 @@ describe('Impostazioni › Dati MERL-T', () => {
     render(<MerltDataSection />);
     fireEvent.click(screen.getByRole('button', { name: 'Elimina i miei dati MERL-T' }));
     expect(deleteMerltData).not.toHaveBeenCalled();
+    // Its buttons answer once they have risen into sight (K1b).
+    await waitFor(async () => expect(await screen.findByRole('alertdialog')).toHaveAttribute('data-ready'));
     await act(async () => { fireEvent.click(await screen.findByRole('button', { name: 'Elimina i dati' })); });
     await waitFor(() => expect(deleteMerltData).toHaveBeenCalledTimes(1));
     expect(screen.getByRole('status')).toHaveTextContent('si completa da sola');

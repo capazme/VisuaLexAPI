@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/react';
-import { ActivityCalendar } from './progress/ActivityCalendar';
+import { ReviewTrend } from './progress/ReviewTrend';
 import { DueForecast } from './progress/DueForecast';
 import { GoalStamp } from './progress/Celebration';
 
@@ -23,25 +23,24 @@ const SOURCES = [
 const sizes = (source: string) => [...source.matchAll(/text-\[(\d+(?:\.\d+)?)px\]/g)].map((m) => Number(m[1]));
 
 describe('the type scale of «Oggi»', () => {
-  it.each(SOURCES)('%s writes no text size under 11 px, but for the session’s compact stamp', (file) => {
-    let source = readFileSync(join(DIR, file), 'utf8');
-    // The compact stamp is the session's notice (G2), not drawn on «Oggi».
-    if (file.endsWith('Celebration.tsx')) source = source.replace(/compact \? 'text-\[\d+px\]'/g, '');
+  it.each(SOURCES)('%s writes no text size under 11 px, the session’s compact stamp included (Y1)', (file) => {
+    const source = readFileSync(join(DIR, file), 'utf8');
     expect(sizes(source).filter((px) => px < 11)).toEqual([]);
     expect(source).not.toMatch(/<text\b/);
   });
 
-  it('draws the calendar and the coming days with their labels as the interface’s text', () => {
+  it('draws the trend and the coming days with their labels as the interface’s text', () => {
     const days = Array.from({ length: 14 }, (_, i) => ({ giorno: `2026-10-${String(19 + i).padStart(2, '0')}`, schede: i }));
     const { container } = render(
       <>
-        <ActivityCalendar calendario={[]} today="2026-10-19" weeks={12} />
+        <ReviewTrend calendario={[]} today="2026-10-19" obiettivo={10} period="30g" onPeriod={() => {}} intro={false} />
         <DueForecast prossimi={days} />
       </>,
     );
     expect(container.querySelectorAll('svg text')).toHaveLength(0);
-    const labels = [...container.querySelectorAll('span.absolute')];
-    expect(labels.map((l) => l.textContent)).toEqual(expect.arrayContaining(['L', 'M', 'V', 'D', 'oggi']));
+    // The labels laid over the drawings (the periods' pill is a span with no words).
+    const labels = [...container.querySelectorAll('span.absolute')].filter((l) => l.textContent);
+    expect(labels.map((l) => l.textContent)).toEqual(expect.arrayContaining(['obiettivo', '0', '15', 'oggi']));
     for (const label of labels) expect(label.closest('.text-xs')).not.toBeNull();
   });
 

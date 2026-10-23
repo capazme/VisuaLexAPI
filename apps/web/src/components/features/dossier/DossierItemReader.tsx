@@ -108,14 +108,14 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
   useEffect(() => {
     if (article) onArticle?.(article);
   }, [article, onArticle]);
-  const display = article ? describeVersion(article.validity, norma) : null;
+  const display = article ? describeVersion(article.validity, norma, article.upcoming) : null;
   const readOnly = display?.readOnly ?? false;
   const historical = requestIsHistorical(norma);
   const citeLocked = historical && !display?.canCite;
   const citationNow = () => (display?.canCite
     ? formatNormCitation({
       norma,
-      validity: article?.validity,
+      validity: display?.citeAs ?? article?.validity,
       requestedDate: norma.data_versione?.trim() || undefined,
       original: !norma.data_versione?.trim() && requestIsHistorical(norma),
       consultedAt: todayInRome(),
@@ -336,7 +336,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
         <button
           type="button"
           onClick={onOpenOnDashboard}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 px-2 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 px-2 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
         >
           <ExternalLink size={13} /> Apri su Dashboard
         </button>

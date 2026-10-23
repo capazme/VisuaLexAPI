@@ -62,7 +62,7 @@ export function ArticleBody({
             {/* A size container: with room beside the 68ch column, each
                 block's annotation sign moves to the right margin (index.css). */}
             <div className="vlx-frame">
-                <div ref={textRef} className={cn(className, 'px-2 sm:px-4', updatesOpen && 'vlx-updates-open')} id={`article-content-${itemKey}`}>
+                <div ref={textRef} className={cn(className, 'md:px-4', updatesOpen && 'vlx-updates-open')} id={`article-content-${itemKey}`}>
                     {processedContent && <SafeHTML html={processedContent} />}
                 </div>
                 {/* Outside the text root: the placeholder is not text of the article, so a search never finds it. */}

@@ -1,14 +1,12 @@
-import { useState } from 'react';
 import { GripVertical, MoreHorizontal, Pencil, X } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { cn } from '../../../lib/utils';
 import { useAppStore } from '../../../store/useAppStore';
 import { MenuButton } from '../../ui/MenuButton';
-import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { practiceCountLine, practiceCounts } from '../../../utils/practice';
 import { PracticeNameInput } from './PracticeParts';
-import { CLOSE_PRACTICE_MESSAGE } from './practiceView';
+import { closePracticeWithUndo } from './practiceUndo';
 import { usePracticeSaveActions } from './usePracticeSaveActions';
 
 export interface PracticeChipProps {
@@ -28,8 +26,6 @@ export function PracticeChip({ practiceId, isActive, editing, onEditingChange }:
   const practice = useAppStore((s) => s.practices.find((p) => p.id === practiceId));
   const setActivePractice = useAppStore((s) => s.setActivePractice);
   const renamePractice = useAppStore((s) => s.renamePractice);
-  const closePractice = useAppStore((s) => s.closePractice);
-  const [confirmClose, setConfirmClose] = useState(false);
   const save = usePracticeSaveActions(practiceId);
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: practiceId });
 
@@ -84,7 +80,7 @@ export function PracticeChip({ practiceId, isActive, editing, onEditingChange }:
           )}>
             {practice.label}
           </span>
-          <span className="block truncate text-[10px] font-medium text-slate-500 dark:text-slate-400">{countLine}</span>
+          <span className="block truncate text-[11px] font-medium text-slate-600 dark:text-slate-400">{countLine}</span>
         </button>
       )}
       <MenuButton
@@ -94,24 +90,12 @@ export function PracticeChip({ practiceId, isActive, editing, onEditingChange }:
         items={[
           { label: 'Rinomina', icon: Pencil, onSelect: () => onEditingChange(true) },
           ...save.items,
-          { label: 'Chiudi la pratica', icon: X, danger: true, separatorBefore: true, onSelect: () => setConfirmClose(true) },
+          { label: 'Chiudi la pratica', icon: X, danger: true, separatorBefore: true, onSelect: () => closePracticeWithUndo(practiceId) },
         ]}
       >
         <MoreHorizontal size={14} aria-hidden />
       </MenuButton>
       {save.overlay}
-      <ConfirmDialog
-        open={confirmClose}
-        variant="danger"
-        title={`Chiudere la pratica «${practice.label}»?`}
-        message={CLOSE_PRACTICE_MESSAGE}
-        confirmLabel="Chiudi la pratica"
-        onConfirm={() => {
-          setConfirmClose(false);
-          closePractice(practiceId);
-        }}
-        onCancel={() => setConfirmClose(false)}
-      />
     </div>
   );
 }

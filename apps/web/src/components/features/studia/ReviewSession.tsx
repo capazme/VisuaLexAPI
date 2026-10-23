@@ -6,20 +6,22 @@ import { Z_INDEX } from '../../../constants/zIndex';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { useAppStore } from '../../../store/useAppStore';
 import type { AncoraScheda, Materia, Progressi } from '../../../types/studia';
-import { ConfirmDialog } from '../../ui/ConfirmDialog';
+import { WireConfirm } from '../../ui/wireConfirm/WireConfirm';
+import { stopMessage } from './reviewStop';
 import { Toast } from '../../ui/Toast';
 import { DossierItemReader } from '../dossier/DossierItemReader';
 import { formatInterval } from './formatInterval';
 import { GradeBar, LessonBar } from './GradeBar';
-import { LESSON_PRIMARY, LESSON_SECONDARY } from './lessonStyles';
+import { LESSON_PRIMARY } from './lessonStyles';
 import { ReviewCard } from './ReviewCard';
 import { Sheet } from '../../ui/Sheet';
 import { MATERIA_LABEL, anchorLabel, normaFromAnchor, searchParamsFromAnchor } from './studiaLabels';
 import { SessionCelebration } from './progress/Celebration';
+import { XpGain } from './progress/XpGain';
 import { SessionEndProgress } from './progress/SessionEndProgress';
 import { cardsLeft, instituteCardsLeft } from './progress/today';
 import { usePercorso } from './progress/usePercorso';
-import { FOCUS_RING, INK_BG } from './progress/tokens';
+import { FOCUS_RING, QUIET_BUTTON, TILE } from './progress/tokens';
 import { useCelebratedToday } from './progress/useCelebratedToday';
 import { useProgress } from './progress/useProgress';
 import { useGradeNote } from './useGradeNote';
@@ -77,8 +79,8 @@ function LessonProgress({ done, total }: { done: number; total: number }) {
       <div
         data-testid="lesson-progress-fill"
         className={cn(
-          'absolute inset-y-0 left-0 rounded-full motion-safe:transition-[width] motion-safe:delay-[70ms] motion-safe:duration-300 motion-safe:ease-(--ease-catch)',
-          INK_BG,
+          // The section's hue, not the ink's near-grey (G8): `vlx-lesson-ink` in `index.css`.
+          'vlx-lesson-ink absolute inset-y-0 left-0 rounded-full motion-safe:transition-[width] motion-safe:delay-[70ms] motion-safe:duration-300 motion-safe:ease-(--ease-catch)',
         )}
         style={width}
       />
@@ -188,29 +190,29 @@ function EndScreen({ summary, day, more, onHome, onContinue }: EndScreenProps) {
     sentence.current?.focus({ preventScroll: true });
   }, []);
 
+  // One card, centred, with one primary action (G8): «Continua» while the scope still has cards today, else «Torna a
+  // Oggi»; with «Continua», «Torna a Oggi» is a quiet link under it, never a second button alike.
   return (
-    <>
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className={cn(COLUMN, 'grid gap-6 px-4 py-8 md:py-14')}>
+    <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className={cn(COLUMN, 'grid px-4 py-8 md:py-14')}>
+        <section data-testid="lesson-end" aria-label="Fine del ripasso" className={cn(TILE, 'mx-auto grid w-full max-w-xl justify-items-center gap-6 p-6 text-center md:p-8')}>
           <p ref={sentence} tabIndex={-1} className="max-w-[60ch] font-serif text-2xl leading-snug text-slate-900 focus:outline-none md:text-3xl dark:text-slate-50">
             {endSentence(summary)}
           </p>
           <SessionEndProgress data={day} />
-        </div>
-      </div>
-      <LessonBar>
-        <div className="flex flex-col gap-2 md:flex-row">
-          <button type="button" onClick={onHome} className={more ? LESSON_SECONDARY : LESSON_PRIMARY}>
-            Torna a Oggi
-          </button>
-          {more && (
-            <button type="button" onClick={onContinue} className={LESSON_PRIMARY}>
-              Continua
+          <div className="grid w-full justify-items-center gap-1 md:w-auto">
+            <button type="button" onClick={more ? onContinue : onHome} className={cn(LESSON_PRIMARY, 'md:min-w-64')}>
+              {more ? 'Continua' : 'Torna a Oggi'}
             </button>
-          )}
-        </div>
-      </LessonBar>
-    </>
+            {more && (
+              <button type="button" onClick={onHome} className={cn(QUIET_BUTTON, 'mx-0 justify-self-center text-center')}>
+                Torna a Oggi
+              </button>
+            )}
+          </div>
+        </section>
+      </div>
+    </div>
   );
 }
 
@@ -234,20 +236,30 @@ export function ReviewSession() {
   const istituto = (materia && params.get('istituto')) || undefined;
 
   const [confirmStop, setConfirmStop] = useState(false);
+  // «Interrompi» in the header: the confirmation is drawn from it, whether it was pressed or Esc asked (U1c). Kept in
+  // state (a callback ref), as the confirmation reads it while rendering.
+  const [stopButton, setStopButton] = useState<HTMLButtonElement | null>(null);
+  // Going on, the focus goes back to the card (its answer once shown, else its question): on «Interrompi», Space
+  // — the answer's key, which the session leaves to a focused button — would press it again.
+  const cardColumn = useRef<HTMLDivElement>(null);
+  const backToCard = () => {
+    const places = cardColumn.current?.querySelectorAll<HTMLElement>('[tabindex="-1"]');
+    return places && places.length > 0 ? places[places.length - 1] : null;
+  };
   const [panel, setPanel] = useState<{ step: number; anchor: AncoraScheda } | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
 
   // Esc closes the article beside the card first (on a phone the sheet closes itself); a second one asks to stop,
-  // or leaves when there is no card to interrupt.
+  // or leaves when there is nothing to interrupt: no card, or none graded yet (U1c: stopping then loses nothing).
   const panelOpen = useRef(false);
-  const cardOnScreen = useRef(false);
+  const askToStop = useRef(false);
   const handleEscape = useCallback(() => {
     if (panelOpen.current) setPanel(null);
-    else if (cardOnScreen.current) setConfirmStop(true);
+    else if (askToStop.current) setConfirmStop(true);
     else navigate(HOME_PATH);
   }, [navigate]);
 
-  const { current, revealed, reveal, grade, remaining, done, summary, practice, step, loading, loadError, saveError, skipped, saving, reload, goalMet } =
+  const { current, revealed, reveal, grade, remaining, done, summary, practice, step, loading, loadError, saveError, skipped, saving, reload, goalMet, xpGain } =
     useReviewSession(materia, { istituto, paused: confirmStop, onEscape: handleEscape });
   const { note, noteKey, recordGrade } = useGradeNote({ step, current, revealed, practice, saving, skipped, paused: confirmStop });
   // The grade that made the day count plays the celebration, once a day for this browser (spec decision 10).
@@ -263,14 +275,17 @@ export function ReviewSession() {
   else if (!loading && remaining > total) setTotal(remaining);
 
   const showCard = !loadError && !loading && !done && current !== null;
+  // The confirmation only once a card is graded (U1c, Bill's choice): with none, «Interrompi» leaves at once. A grade
+  // still on its way is not waited for: its post goes on after the session has gone.
+  const asksToStop = showCard && summary.reviewed > 0;
   // An article belongs to the step it was opened at: a card that comes back is a new step.
   const openAnchor = panel && current && panel.step === step ? panel.anchor : null;
   // In the commit, not after it: an Esc pressed as soon as a card is drawn must already find it there, or it would
   // leave without asking.
   useLayoutEffect(() => {
     panelOpen.current = openAnchor !== null && desktop;
-    cardOnScreen.current = showCard;
-  }, [openAnchor, desktop, showCard]);
+    askToStop.current = asksToStop;
+  }, [openAnchor, desktop, asksToStop]);
 
   const openInReader = (anchor: AncoraScheda) => {
     const searchParams = searchParamsFromAnchor(anchor);
@@ -279,7 +294,7 @@ export function ReviewSession() {
     triggerSearch(searchParams);
   };
 
-  const leave = () => (showCard ? setConfirmStop(true) : navigate(HOME_PATH));
+  const leave = () => (asksToStop ? setConfirmStop(true) : navigate(HOME_PATH));
 
   const skippedLine = skipped && (
     <p role="status" className="mb-4 text-sm text-slate-600 dark:text-slate-300">
@@ -332,7 +347,7 @@ export function ReviewSession() {
         <div className="flex min-h-0 flex-1">
           {/* Keyed by step, so each card starts at the top of its own scroll, however far the last answer was read. */}
           <div key={step} className="min-w-0 flex-1 overflow-y-auto">
-            <div className={cn(COLUMN, 'px-4 pb-8 pt-2 md:pt-8')}>
+            <div ref={cardColumn} className={cn(COLUMN, 'px-4 pb-8 pt-2 md:pt-8')}>
               {skippedLine}
               <ReviewCard card={current} revealed={revealed} focusKey={step} onOpenAnchor={(anchor) => setPanel({ step, anchor })} />
             </div>
@@ -372,8 +387,9 @@ export function ReviewSession() {
         {goalMet ? `Obiettivo di oggi raggiunto · serie di ${goalMet.serie} ${goalMet.serie === 1 ? 'giorno' : 'giorni'}` : ''}
       </p>
       <header className="relative shrink-0 px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
-        <div className={cn(COLUMN, 'flex items-center gap-3')}>
+        <div className={cn(COLUMN, 'relative flex items-center gap-3')}>
           <button
+            ref={setStopButton}
             type="button"
             onClick={leave}
             aria-label={showCard ? 'Interrompi' : 'Chiudi'}
@@ -389,6 +405,12 @@ export function ReviewSession() {
           </button>
           <LessonProgress done={total - remaining} total={total} />
           {showCard && <p className="sr-only">{remaining === 1 ? 'Resta 1' : `Restano ${remaining}`}</p>}
+          {/* «+20 XP» sits over the bar's end, inside the header's row and out of the flow: the bar never shrinks for it,
+              it never reaches the card, and the card never waits. While the goal's notice covers the row it waits, and
+              comes once the notice has gone (a gain already shown is never shown again). */}
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center">
+            <XpGain gain={celebrating ? null : xpGain} />
+          </div>
         </div>
         {/* Over the header's row, as on the old page: beside the card, never on it. */}
         {celebrating && (
@@ -401,12 +423,17 @@ export function ReviewSession() {
         )}
       </header>
       {middle}
-      <ConfirmDialog
+      {/* K1b's confirmation, drawn from «Interrompi» (U1c): what happens, said with the session's count; going on is
+          the evident action (filled, the focus on it, Esc), stopping the outlined one; nothing destructive, no red. */}
+      <WireConfirm
         open={confirmStop}
         title="Interrompere il ripasso?"
-        message="Le schede già valutate restano registrate."
+        message={stopMessage(summary.reviewed, remaining)}
         confirmLabel="Interrompi"
-        cancelLabel="Continua"
+        cancelLabel="Continua il ripasso"
+        emphasis="cancel"
+        origin={stopButton}
+        focusBack={backToCard}
         onConfirm={() => navigate(HOME_PATH)}
         onCancel={() => setConfirmStop(false)}
       />

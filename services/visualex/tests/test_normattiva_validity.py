@@ -752,3 +752,11 @@ class TestHostilePages:
         assert found is not None
         assert found["state"] == "current"
         assert found["valid_from"] == "2003-12-25"
+
+
+@pytest.mark.parametrize("asked", ["135-sex-decies", "135 sex decies", "135-sexdecies"])
+def test_an_ordinal_split_in_two_words_is_the_same_article(asked):
+    # The tree writes «135 sex decies» (codice del consumo), the page «Art. 135-sexdecies»:
+    # with the split request the window was dropped as «not the article asked for».
+    v = extract_validity(synthetic(dal="1-2-2003", label="Art. 135-sexdecies"), article=asked)
+    assert v is not None and v["valid_from"] == "2003-02-01"

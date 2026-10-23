@@ -12,6 +12,89 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-10-22
+
+Opus's planner, Gymnasium's points and levels, and a night of design across
+the app; the readers keep codes in their annexes and say when an article will
+change. Two migrations, both additive: the `tasks` table, and the points ledger
+with one column of `lingo_giornate_studio` (default 0).
+
+### Opus
+
+- A planner for the day's work: «Oggi», «Prossimi giorni» with the week, the
+  inbox for what has no date yet; a task opens in a sheet (dossier, planned
+  date, deadline, priority, labels, repetition) and saves as it changes;
+  overdue deadlines and late tasks first; a dossier shows its tasks.
+
+### Gymnasium
+
+- Points and levels: each mission done is worth points, the level and what is
+  left to the next one in «I tuoi progressi», the points earned shown during
+  the lesson; the server keeps the ledger and the missions.
+- «Oggi» starts with the day: what is due, one button to begin, three compact
+  missions, the subjects in one place.
+- «Progressi»: a line chart of the reviews over 7 days, 30 days or six months,
+  with the goal, instead of the calendar.
+- The pages stand when a server sends no level or missions.
+
+### Look and navigation
+
+- The section switcher is a split button: the name to the section's main
+  page, the arrow to the list.
+- Notifications drawn from a line, with the time left to undo; deleting a
+  dossier or closing a practice asks nothing and offers «Annulla»; Ctrl+Z (⌘Z)
+  runs the newest «Annulla» outside text fields.
+- The confirmations that remain, for what cannot be undone, open from their
+  button with the focus on «Annulla».
+- Every page's title is the page's name, the section's phrase above it; on the
+  phone the bar shows the name once the title scrolls away.
+- Analizza documento: the drop zone reacts to a file dragged over it; the file
+  stays in the browser.
+- The sign-in page draws the wordmark on a seven-segment display.
+- Small fixes: Esc closes the phone's drawer, the focus goes back to the
+  magnifier, no sideways shift when a page grows past the window, fields of
+  16 px on the phone.
+
+### Legal texts
+
+- A date is the text in force on that day; an undated request is today's text,
+  and an article that will change says so beside the text («Dal 1° gennaio
+  2027 questo articolo è abrogato»).
+- Four codes published as a decree's annex, and the TULPS, are keyed by the
+  annex like the c.c. and the c.p.: their articles are the code's, labels
+  unchanged.
+- EUR-Lex: a missing article is no longer replaced by another one; the readers
+  find ordinals in one word or two («135 sex decies» and «135-sexdecies»),
+  rubriche without brackets, and read article numbers in linear time.
+- mcp-legal-it 2.17.1.
+
+### Release notes
+
+**Opus: il tuo planner**
+- In Opus c'è un planner per il lavoro di ogni giorno: «Oggi», «Prossimi giorni» con la settimana, la «Lista d'ingresso» per quello che non ha ancora una data.
+- Un compito si apre in una scheda con dossier, data pianificata, termine finale, priorità, etichette e ripetizione; ogni modifica si salva da sola.
+- I termini scaduti e i compiti in ritardo stanno in cima, con i giorni che mancano o che sono passati.
+- Un compito può appartenere a un dossier, e il dossier mostra i suoi compiti.
+
+**Gymnasium: punti e livelli**
+- Ogni missione compiuta vale dei punti; i punti fanno salire di livello. Il livello e quanto manca al prossimo sono in «I tuoi progressi».
+- Durante la lezione vedi i punti guadagnati, senza che interrompano il ripasso.
+- In «Progressi» il calendario lascia il posto a un grafico dei ripassi: 7 giorni, 30 giorni o 6 mesi, con la linea dell'obiettivo.
+- La pagina «Oggi» comincia con quello che c'è da fare oggi e un solo pulsante per iniziare.
+
+**Più ordine nell'interfaccia**
+- Il selettore delle sezioni ha due parti: il nome porta alla pagina principale della sezione, la freccia apre l'elenco.
+- Le notifiche nascono da una riga e mostrano il tempo per annullare; si fermano quando ci passi sopra. Eliminare un dossier o chiudere una pratica non chiede più conferma: c'è «Annulla».
+- Ctrl+Z (⌘Z sul Mac) annulla l'ultima azione finché la notifica è a schermo.
+- In «Analizza documento» la zona per il file reagisce quando ci trascini sopra un documento; il file resta nel tuo browser, come sempre.
+- Il titolo di ogni pagina dice dove sei («Oggi», «Progressi», «Le mie schede»), con il nome della sezione sopra.
+
+**Testi di legge più precisi**
+- Per un articolo che cambierà (per esempio abrogato dal 1° gennaio 2027) vedi il testo in vigore oggi. Accanto al testo un avviso dice da quando cambia.
+- Alcuni codici e testi unici pubblicati come allegato a un decreto (per esempio il codice del turismo e il TULPS) mostrano ora gli articoli del codice, non quelli del decreto.
+- Gli articoli di EUR-Lex che non si trovano non vengono più sostituiti da un altro articolo.
+- Gli articoli con suffisso in una parola sola (per esempio «391-novies») si cercano anche nella grafia dell'atto.
+
 ## [1.9.2] - 2026-10-21
 
 The look of VisuaLex, on the computer and on the phone; faster reading of the
