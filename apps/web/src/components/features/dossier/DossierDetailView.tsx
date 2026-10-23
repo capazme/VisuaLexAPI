@@ -197,13 +197,14 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     return next;
   });
   const allExpanded = visibleArticleIds.length > 0 && visibleArticleIds.every(id => expandedIds.has(id));
-  // "Espandi tutto" opens every block and every article; "Comprimi tutto" closes the articles only.
+  // "Espandi tutto" opens every block and every article, a decision open staying open (D7a: never all the decisions,
+  // each a request to its court's source); "Comprimi tutto" closes every row.
   const toggleExpandAll = () => {
     if (allExpanded) {
       setExpandedIds(new Set());
     } else {
       setFoldedActs(new Set());
-      setExpandedIds(new Set(visibleArticleIds));
+      setExpandedIds((prev) => new Set([...prev, ...visibleArticleIds]));
     }
   };
 
@@ -463,6 +464,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   };
 
   const hasNormaItems = dossier.items.some((i) => i.type === 'norma');
+  const twoColumns = layout.acts.length > 0 && layout.decisions.length > 0;
 
   // The acts, in the order dragged; the decisions, in stored order (D7a: each column its own).
   const actsList = (
@@ -481,6 +483,8 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
             <DossierActBlock
               key={block.key}
               block={block}
+              // Under «Norme» when the decisions stand beside the acts.
+              headingLevel={twoColumns ? 3 : 2}
               act={fullBlocks.get(block.key) ?? block}
               dragDisabled={hasFilter}
               isFolded={foldedActs.has(block.key)}
@@ -660,7 +664,9 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
             <button
               type="button"
               onClick={toggleExpandAll}
-              className={cn(HEADER_BUTTON, 'justify-center whitespace-nowrap')}
+              // Nothing to open without an article on screen (decisions alone).
+              disabled={visibleArticleIds.length === 0}
+              className={cn(HEADER_BUTTON, 'justify-center whitespace-nowrap disabled:opacity-40')}
               aria-pressed={allExpanded}
             >
               {allExpanded ? <ChevronsDownUp size={14} /> : <ChevronsUpDown size={14} />}
@@ -748,21 +754,16 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
             <>
               <DossierNotesSection notes={layout.notes} onRemove={handleRemoveSingle} />
               {/* Acts and decisions both (D7a): two columns from lg, «Norme» | «Giurisprudenza», a rule between them;
-                  below lg the norms, then the decisions. One kind alone takes the width, as before. */}
-              {layout.acts.length > 0 && layout.decisions.length > 0 ? (
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-0">
-                  <section aria-labelledby="dossier-norms-heading" className="min-w-0 lg:pr-5">
-                    <h2 id="dossier-norms-heading" className={COLUMN_HEADING}>Norme</h2>
-                    {actsList}
-                  </section>
-                  <div className="min-w-0 border-slate-200 lg:border-l lg:pl-5 dark:border-slate-800">{decisionsList}</div>
-                </div>
-              ) : (
-                <>
+                  below lg the norms, then the decisions. One kind alone takes the width, untitled as before. The same
+                  elements either way, only their classes changing, so a search that leaves one kind remounts nothing
+                  (an open article keeps its text). */}
+              <div className={cn('flex flex-col gap-4', twoColumns && 'gap-6 lg:grid lg:grid-cols-2 lg:gap-0')}>
+                <section aria-labelledby={twoColumns ? 'dossier-norms-heading' : undefined} className={cn('min-w-0', twoColumns && 'lg:pr-5')}>
+                  {twoColumns && <h2 id="dossier-norms-heading" className={COLUMN_HEADING}>Norme</h2>}
                   {actsList}
-                  {decisionsList}
-                </>
-              )}
+                </section>
+                <div className={cn('min-w-0 empty:hidden', twoColumns && 'border-slate-200 lg:border-l lg:pl-5 dark:border-slate-800')}>{decisionsList}</div>
+              </div>
             </>
           )}
         </div>

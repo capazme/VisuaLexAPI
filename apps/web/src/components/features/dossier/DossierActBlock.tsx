@@ -38,6 +38,8 @@ export interface DossierActBlockProps {
   attachedNotes?: Map<string, Extract<DossierItem, { type: 'note' }>[]>;
   onAddNote?: (item: DossierItem) => void;
   onRemoveNote?: (note: DossierItem) => void;
+  /** 3 under the page's «Norme» (D7a, the decisions beside the acts), else 2. */
+  headingLevel?: 2 | 3;
 }
 
 /** An act's action: 44 px at every width, as the planner's controls (S7c). */
@@ -53,6 +55,7 @@ export function DossierActBlock(props: DossierActBlockProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: block.key, disabled: dragDisabled });
   const count = block.articles.length;
+  const Heading = props.headingLevel === 3 ? 'h3' : 'h2';
 
   return (
     <section
@@ -77,9 +80,9 @@ export function DossierActBlock(props: DossierActBlockProps) {
         <div className="min-w-0 flex-1 px-1 py-1">
           {/* The accordion pattern: the heading holds the toggle, so the act is a
               heading to a screen reader and its name is the act's own words. */}
-          {/* On one line, the name cut, while the act is 672 px wide (from md in one column); narrower — a phone, the
+          {/* On one line, the name cut, while the act is 672 px wide; narrower — a phone, a tablet's narrow window, the
               left column of two (D7a) — it wraps: a cut act name says nothing. */}
-          <h2 className="flex min-w-0 flex-wrap items-center gap-x-2 @2xl:flex-nowrap">
+          <Heading className="flex min-w-0 flex-wrap items-center gap-x-2 @2xl:flex-nowrap">
             <div
               role="button"
               tabIndex={0}
@@ -109,7 +112,7 @@ export function DossierActBlock(props: DossierActBlockProps) {
             <span className={cn('flex-shrink-0', SECTION_COUNT)}>
               {count === 1 ? '1 articolo' : `${count} articoli`}
             </span>
-          </h2>
+          </Heading>
           {title && (
             <p className={cn(ROW_LINE, 'ml-6 line-clamp-2 @2xl:line-clamp-none @2xl:truncate')} title={title}>{title}</p>
           )}

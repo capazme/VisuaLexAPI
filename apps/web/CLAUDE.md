@@ -1661,7 +1661,10 @@ instead), and the find window, the way back and the index reach the row or the w
 `hostTabId` and `CaseLawSection`'s `tabId` name the host a surface reads in: a practice (its row) or one of its windows
 (or the phone's reader), never a tab. They give the find window the id it registers the text root under (`findHostId` overrides
 it with the window's practice), the way-back entry its `tabId`, and the links they render their `besideId`. A surface with no
-host (a preview such as the palette's result card) registers and records nothing.
+host (a preview such as the palette's result card, a decision read in the dossier) registers and records nothing, and a
+decision's draws no «Cerca nel testo» (`DecisionReadingToolbar` without `onToggleFind`): the find window would have
+nothing of it to search. Off the search page (the dossier) its `onLeave` takes the reader to the workspace when a norm or
+a decision the text cites is sent there.
 
 ### Dossier
 
@@ -1802,11 +1805,14 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   place by `DossierDecisionReader`: the decision's own reader, `useDecisionAnswer` and `DecisionView` with
   `DecisionReadingSurface`, never another, so notes, highlights and key passages work as anywhere and the text is the
   reader's, gotcha 23; asked for only once opened; a decision without its text opens too and `DecisionView` says how it
-  came; «Apri la sentenza», the address, among its actions. No tab holds it: `DecisionReadingToolbar` draws no «Cerca
-  nel testo» without `onToggleFind`, and a cited norm goes to the search page, `onNormOpened`. No note count or
+  came; «Apri la sentenza», the address, over it whatever came back. No tab holds it: no «Cerca nel testo», and a cited
+  norm or decision takes the reader to the workspace, `onLeave` (see «The host props»). No note count or
   application's mark: the server takes a note about an article only, `assertArticleOfDossier`). «Seleziona tutti» takes
-  the decisions with the articles; «Apri tutto su Dashboard» opens a dossier of decisions alone too, one practice holding
-  them; «Espandi tutto» opens the articles only, each decision being a request to its court's source. The stored `etichetta` is a copy (source convention, D9):
+  the decisions with the articles; «Apri tutto su Dashboard», on the page and on the list's card, opens a dossier of
+  decisions alone too, one practice holding them; «Espandi tutto» opens the articles only, each decision being a request
+  to its court's source, and leaves a decision open as it was (disabled with no article on screen). In two columns the
+  acts' headings are h3 under «Norme» (`headingLevel`), and the page keeps the same elements whatever the search leaves,
+  only their classes changing, so an open article is never remounted. The stored `etichetta` is a copy (source convention, D9):
   `decisionCitationOf` recomputes the citation from the identity and the attributes, every write
   sends it (`itemContentFor`, `serverItemFor`), the server recomputes it again on every write
   (`withDecisionLabel`), and every screen shows the recomputed one, never the copy.

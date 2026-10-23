@@ -62,10 +62,11 @@ export interface DecisionReadingSurfaceProps {
    */
   findHostId?: string;
   /**
-   * A norm the text cites was sent to the search: a host off the search page (the dossier) goes there, where the search
-   * runs. Without it the search waits for the search page, as in the workspace, which is that page.
+   * A norm or a decision the text cites was sent to the workspace (a search, a decision's window): a host off the
+   * search page (the dossier) goes there, where it is drawn. Without it nothing moves, as in the workspace, which is
+   * that page.
    */
-  onNormOpened?: () => void;
+  onLeave?: () => void;
 }
 
 /**
@@ -74,7 +75,7 @@ export interface DecisionReadingSurfaceProps {
  * it. Self-contained: it takes the decision as props and reaches only the store's search and
  * way-back actions, so any host can mount it.
  */
-export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, hostBlockId, findHostId, onNormOpened }: DecisionReadingSurfaceProps) {
+export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, hostBlockId, findHostId, onLeave }: DecisionReadingSurfaceProps) {
   const {
     triggerSearch, pushReadingBack, annotations, highlights, removeAnnotation, updateAnnotation,
     removeHighlight, loadAnnotationsForArticle, loadHighlightsForArticle, showKeyPassages, updateSettings,
@@ -243,10 +244,10 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
       version: 'vigente',
       ...(hostTabId ? { besideId: hostTabId } : {}),
     });
-    onNormOpened?.();
-  }, [triggerSearch, hostTabId, onNormOpened]);
+    onLeave?.();
+  }, [triggerSearch, hostTabId, onLeave]);
 
-  const decisionLinks = useDecisionLinks({ besideId: hostTabId, origin });
+  const decisionLinks = useDecisionLinks({ besideId: hostTabId, origin, onOpened: onLeave });
   useCitationLinks(contentRef, { onOpen: openCitation, origin, showPreview, hidePreview, isHoveringPopupRef, decisions: decisionLinks.links });
 
   const showToast = (message: string, type: ToastProps['type']) => setToast({ message, type });

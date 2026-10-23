@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { CheckSquare, ChevronDown, Square, Star, Trash2 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { identityOf } from '../../../utils/decisionLinks';
@@ -32,6 +33,8 @@ export function DossierDecisionRow({
   const added = formatTimestampLong(item.addedAt);
   const isImportant = item.status === 'important';
   const regionId = `dossier-item-content-${item.id}`;
+  // One object while the item stays: the reader asks the source again for a new reference, and the page redraws often.
+  const identity = useMemo(() => identityOf(item.data), [item.data]);
 
   return (
     <div className={cn(ROW, 'pl-3 transition-colors', isSelected ? 'bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800/40')}>
@@ -96,7 +99,7 @@ export function DossierDecisionRow({
       </div>
       {isExpanded && (
         <div id={regionId} className="pb-3 pl-6 pr-2">
-          <DossierDecisionReader identity={identityOf(item.data)} />
+          <DossierDecisionReader identity={identity} />
         </div>
       )}
     </div>

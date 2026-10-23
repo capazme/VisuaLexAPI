@@ -34,6 +34,8 @@ vi.mock('./dossierPdf', async (importOriginal) => {
 vi.mock('./dossierPdfMarks', () => ({ loadPdfMarks: pdf.loadPdfMarks }));
 vi.mock('../../../utils/actStructureCache', () => ({ fetchActRubriche: async () => ({ title: 'Titolo' }) }));
 vi.mock('./DossierItemReader', () => ({ DossierItemReader: () => null }));
+// A decision's reader asks its court: what is tested here is the page (its own tests: `DossierDecisionsSection.test.tsx`).
+vi.mock('./DossierDecisionReader', () => ({ DossierDecisionReader: () => null }));
 // The act's index, reduced to what it hands over: this many articles of a law.
 const tree = vi.hoisted(() => ({ count: 0 }));
 vi.mock('./TreeNavigatorModal', () => ({
@@ -288,7 +290,9 @@ describe('DossierDetailView — decisions', () => {
     expect(norms).not.toContainElement(decisions);
     expect(norms.compareDocumentPosition(decisions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const grid = norms.parentElement!;
-    expect(grid).toHaveClass('grid', 'grid-cols-1', 'lg:grid-cols-2');
+    expect(grid).toHaveClass('flex', 'flex-col', 'lg:grid', 'lg:grid-cols-2');
+    // The acts under «Norme», a level down.
+    expect(within(norms).getByRole('heading', { level: 3, name: `${L247} 2 articoli` })).toBeInTheDocument();
     // The rule between the columns, from lg only.
     expect(decisions.parentElement).toHaveClass('lg:border-l', 'lg:pl-5');
     expect(grid).toContainElement(decisions);
@@ -315,6 +319,29 @@ describe('DossierDetailView — decisions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Seleziona tutti' }));
     expect(screen.getByText('4 selezionati')).toBeInTheDocument();
     expect(within(screen.getByRole('region', { name: 'Giurisprudenza (1)' })).getByRole('button', { name: 'Deseleziona elemento' })).toBeInTheDocument();
+  });
+
+  it('keeps the acts mounted while a search leaves one kind on screen', () => {
+    renderView(withDecision);
+    const act247 = screen.getByRole('region', { name: L247 });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Cerca negli elementi del dossier' }), { target: { value: '247' } });
+    expect(screen.queryByRole('region', { name: /^Giurisprudenza/ })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Norme' })).toBeNull();
+    expect(screen.getByRole('region', { name: L247 })).toBe(act247);
+  });
+
+  it('«Espandi tutto» opens the articles and leaves an open decision open', () => {
+    renderView(withDecision);
+    fireEvent.click(screen.getByRole('button', { name: `Espandi ${CITATION}` }));
+    fireEvent.click(screen.getByRole('button', { name: 'Espandi tutto' }));
+    expect(screen.getByRole('button', { name: `Comprimi ${CITATION}` })).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Comprimi tutto' }));
+    expect(screen.getByRole('button', { name: `Espandi ${CITATION}` })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('offers no «Espandi tutto» to a dossier of decisions alone, which would open nothing', () => {
+    renderView({ ...withDecision, items: withDecision.items.filter((i) => i.type === 'sentenza') });
+    expect(screen.getByRole('button', { name: 'Espandi tutto' })).toBeDisabled();
   });
 
   it('finds a decision by its citation', () => {

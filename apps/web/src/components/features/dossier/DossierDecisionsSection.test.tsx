@@ -132,6 +132,47 @@ describe('DossierDecisionsSection (D7a)', () => {
     expect(appStore.getState().searchTrigger).toEqual(expect.objectContaining({ article: '1218' }));
   });
 
+  it('sends a decision the text cites to the workspace, where its window is drawn', async () => {
+    fetchDecision.mockResolvedValue(found({ motivazione: 'Così Corte cost. n. 71/2020, sul punto.' }));
+    appStore.setState({ practices: [], activePracticeId: null });
+    renderSection([cass]);
+    fireEvent.click(screen.getByRole('button', { name: `Espandi ${CASS}` }));
+    await screen.findByRole('region', { name: 'Motivazione' });
+    const cited = await waitFor(() => {
+      const link = document.querySelector<HTMLElement>('.decision-cite');
+      expect(link).not.toBeNull();
+      return link!;
+    });
+    fireEvent.click(cited);
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent(/^\/$/));
+    expect(appStore.getState().practices.flatMap((p) => p.decisions.map((d) => d.reference.numero))).toContain(71);
+  });
+
+  it('keeps «Apri la sentenza» when the decision was not found', async () => {
+    fetchDecision.mockResolvedValue({ esito: 'non_trovata', motivo: 'inesistente' });
+    renderSection([cass]);
+    fireEvent.click(screen.getByRole('button', { name: `Espandi ${CASS}` }));
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Apri la sentenza' })).toHaveAttribute('href', '/sentenze/cassazione-penale/99999/2024');
+  });
+
+  it('asks the source once for an open decision, however often the page redraws', async () => {
+    fetchDecision.mockResolvedValue({ esito: 'fonte_non_raggiungibile', fonte: 'cassazione' });
+    const { rerender } = renderSection([cass]);
+    fireEvent.click(screen.getByRole('button', { name: `Espandi ${CASS}` }));
+    await screen.findByRole('alert');
+    for (let i = 0; i < 3; i += 1) {
+      rerender(
+        <MemoryRouter initialEntries={['/dossier']}>
+          <Where />
+          <Routes><Route path="*" element={<Section decisions={[{ ...cass }]} />} /></Routes>
+        </MemoryRouter>,
+      );
+    }
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 10)); });
+    expect(fetchDecision).toHaveBeenCalledTimes(1);
+  });
+
   it('stars a decision as an article, and says it is starred', () => {
     const onToggleImportant = vi.fn();
     renderSection([cass, cost], { onToggleImportant });
