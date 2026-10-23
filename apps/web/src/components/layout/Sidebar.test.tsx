@@ -109,7 +109,7 @@ describe('Sidebar — accessible names', () => {
     renderSidebar('/dossier');
     fireEvent.click(screen.getByRole('link', { name: 'Ricerca' }));
     expect(screen.getByTestId('where')).toHaveTextContent(/^\/$/);
-    expect(field).toHaveBeenCalledWith({});
+    expect(field).toHaveBeenCalledWith({ focus: true });
     expect(appStore.getState().commandPaletteOpen).toBe(false);
     unsubscribe();
   });

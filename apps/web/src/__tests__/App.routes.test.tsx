@@ -55,8 +55,10 @@ vi.mock('../services/studiaService', () => ({
     get: vi.fn().mockRejectedValue({ status: 404 }),
     queue: vi.fn().mockResolvedValue({ cards: [] }),
     vote: vi.fn().mockRejectedValue({ status: 404 }),
-    // The strip over Le mie schede and Da validare reads the progress (Gymnasium spec §5.1).
+    // The strip over Da validare reads the progress (Gymnasium spec §5.1), and its settings, mounted closed, the
+    // study preferences (U1b).
     progress: vi.fn().mockRejectedValue({ status: 404 }),
+    preferences: vi.fn().mockRejectedValue({ status: 404 }),
   },
 }));
 vi.mock('../components/features/studia/ReviewHome', () => ({ ReviewHome: () => <h2>Ripasso di oggi</h2> }));
@@ -106,10 +108,11 @@ describe('App routing', () => {
 
   it('opens the Community placeholder at /forum/community, titled by its name under the Forum\'s phrase, and a way to the public dossiers', async () => {
     renderAt('/forum/community');
-    // The page's name as its title, the Forum's phrase small over it (L-37).
+    // The page's name as its title, the Forum's phrase small over it (L-37), and the S7a empty state.
     expect(await screen.findByRole('heading', { level: 1, name: 'Community' })).toBeInTheDocument();
     expect(screen.getByText('Forum · il luogo del dibattito giuridico')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Apri i dossier pubblici' })).toHaveAttribute('href', '/forum');
+    expect(screen.getByRole('heading', { level: 2, name: 'Le discussioni arrivano presto' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Esplora i dossier pubblici' })).toHaveAttribute('href', '/forum');
     expect(screen.queryByText('Pagina non trovata')).toBeNull();
     expect(screen.getByTestId('layout')).toBeInTheDocument();
   });

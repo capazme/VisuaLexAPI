@@ -1131,14 +1131,22 @@
   background: linear-gradient(135deg, transparent 50%, hsl(215 16% 47% / 0.4) 50%);
 }
 
-/* A floating surface in the dark is a lighter plane with a hairline, never a glow. Unlayered, so it
-   wins over the shadow-* utilities. */
+/* A floating surface in the dark is a lighter plane with a hairline, never a glow; a menu or a popover
+   (`shadow-md`, Y1) the same hairline with a shorter drop. Only `--tw-shadow` is set: the utility's own
+   `box-shadow` composes it after the rings, so a focus ring (`focus-visible:ring-*`) still shows over it
+   — a `box-shadow` written here, outside the layers, replaced the ring (WCAG 2.4.7). Unlayered, so it
+   wins over the utilities' `--tw-shadow`. */
 .dark :is(.shadow-lg, .shadow-xl, .shadow-2xl) {
-  box-shadow: 0 0 0 1px var(--color-ink-700), 0 16px 40px -12px rgb(0 0 0 / 0.6);
+  --tw-shadow: 0 0 0 1px var(--color-ink-700), 0 16px 40px -12px rgb(0 0 0 / 0.6);
+}
+.dark .shadow-md {
+  --tw-shadow: 0 0 0 1px var(--color-ink-700), 0 8px 24px -10px rgb(0 0 0 / 0.55);
 }
 
 /* The book mark (ui/BookMark, and the splash in index.html): the cover traces, then the spine; while
-   something loads it breathes. Under reduced motion the global rule makes both instant. */
+   something loads it breathes. The trace only with motion allowed: the global reduced-motion rule cuts durations, not
+   delays, and the spine's 420 ms of delay with a `both` fill kept it hidden that long; under reduced motion the
+   book is drawn at once. */
 .vlx-book path {
   fill: none;
   stroke: currentColor;
@@ -1147,11 +1155,48 @@
   stroke-linejoin: round;
   stroke-dasharray: 100;
 }
-.vlx-book-draw path { animation: vlx-book-trace 600ms var(--ease-in-out) both; }
-.vlx-book-draw path:last-child { animation-duration: 260ms; animation-delay: 420ms; }
+@media (prefers-reduced-motion: no-preference) {
+  .vlx-book-draw path { animation: vlx-book-trace 600ms var(--ease-in-out) both; }
+  .vlx-book-draw path:last-child { animation-duration: 260ms; animation-delay: 420ms; }
+}
 .vlx-book-breathe { animation: vlx-book-breathe 1.4s ease-in-out 700ms infinite alternate; }
 @keyframes vlx-book-trace { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
 @keyframes vlx-book-breathe { to { opacity: 0.4; } }
+
+/* The sign-in's wordmark written in ink (A3, `AuthPage`): one face, one ink, one gesture. The book traces itself
+   (0–450 ms); a faint, blurred copy of «VisuaLex» comes out from under a mask whose soft edge is the pen's tip
+   (250–950 ms), and the ink, the word itself, follows it 100 ms behind under its own (350–1050 ms), so each letter is
+   faint and soft before it is sharp; the copy fades as the ink ends, then the line under it rises 4 px into view
+   (1050–1250 ms). The word is one text throughout. Everything fills backwards only, and `AuthPage` drops the copy
+   and the mask at the end: no mask, no filter is left. On WebKit for iOS (`inkMark.ts`) the word only fades in from
+   the left, no mask, no blur. Only with motion allowed — the global rule cuts the durations, not the delays, and a
+   delayed `backwards` would hide the line for a second; under reduced motion the page fades in through that rule's
+   150 ms opacity transition. Without `@property` (Safari before 16.4) an edge cannot be interpolated: the word
+   shows whole halfway through, never hidden for good. */
+@property --vlx-ink-edge { syntax: '<percentage>'; inherits: false; initial-value: 112%; }
+@media (prefers-reduced-motion: no-preference) {
+  .vlx-ink-book path { animation: vlx-book-trace 450ms var(--ease-out) backwards; }
+  .vlx-ink-book path:last-child { animation-duration: 200ms; animation-delay: 250ms; }
+  .vlx-ink-word, .vlx-ink-bleed {
+    mask-image: linear-gradient(to right, #000 calc(var(--vlx-ink-edge) - 12%), transparent var(--vlx-ink-edge));
+  }
+  /* The waits inside the keyframes, not delays: a registered property in a delay's backwards fill read its initial
+     value (the word whole) once the timeline was set by hand. */
+  .vlx-ink-word { animation: vlx-ink-write 1050ms linear backwards; }
+  .vlx-ink-bleed { animation: vlx-ink-bleed 1050ms linear backwards; }
+  .vlx-ink-plain { animation: vlx-ink-plain 800ms var(--ease-out) 250ms backwards; }
+  .vlx-ink-line { animation: vlx-ink-rise 200ms var(--ease-out) 1050ms backwards; }
+}
+/* The copy is never seen outside its writing, whatever the motion setting becomes. */
+.vlx-ink-bleed { opacity: 0; filter: blur(1.5px); pointer-events: none; }
+@keyframes vlx-ink-write { 0%, 33.33% { --vlx-ink-edge: 0%; } to { --vlx-ink-edge: 112%; } }
+@keyframes vlx-ink-bleed {
+  0%, 23.81% { --vlx-ink-edge: 0%; opacity: 0.4; }
+  90.48% { --vlx-ink-edge: 112%; opacity: 0.4; }
+  to { --vlx-ink-edge: 112%; opacity: 0; }
+}
+@keyframes vlx-ink-plain { from { opacity: 0; translate: -6px 0; } }
+@keyframes vlx-ink-rise { from { opacity: 0; translate: 0 4px; } }
 
 /* ═══════════════════════════════════════════════════════════
    ENTRANCES — animate-in, fade-in, zoom-in-N, slide-in-from-*
@@ -1257,8 +1302,9 @@
   color: var(--color-ink-500);
 }
 .dark .driver-popover.visualex-tour-popover .driver-popover-close-btn { color: var(--color-ink-400); }
-.driver-popover.visualex-tour-popover .driver-popover-footer button:focus-visible,
-.driver-popover.visualex-tour-popover .driver-popover-close-btn:focus-visible {
+/* Not a focus driver.js gave with no key pressed (`data-pointer-focus`, `useTour`): the ✕ drew its square after a click. */
+.driver-popover.visualex-tour-popover .driver-popover-footer button:focus-visible:not([data-pointer-focus]),
+.driver-popover.visualex-tour-popover .driver-popover-close-btn:focus-visible:not([data-pointer-focus]) {
   outline: 2px solid var(--color-toga-500);
   outline-offset: 2px;
 }

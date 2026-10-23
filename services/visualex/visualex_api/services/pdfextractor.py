@@ -1,5 +1,7 @@
 import os
 import asyncio
+import time
+import uuid
 import structlog
 from contextlib import asynccontextmanager
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page, Download
@@ -200,9 +202,10 @@ class PDFExtractor:
             download: Download = await download_info.value
             log.info("Download started, saving file...")
 
-            # Save the download to our directory
-            pdf_filename = download.suggested_filename or f"document_{urn.split('/')[-1]}.pdf"
-            pdf_file_path = os.path.join(download_dir, pdf_filename)
+            # Save the download under a name of its own: two exports at once used to share
+            # the name Normattiva suggests, and one could take the other's file. The caller
+            # moves it to its cache name.
+            pdf_file_path = os.path.join(download_dir, f"export-{uuid.uuid4().hex}.pdf")
 
             # Save with progress logging
             await download.save_as(pdf_file_path)
@@ -240,6 +243,33 @@ async def extract_pdf(urn: str, timeout: int = 60000, use_pool: bool = True) -> 
 
 
 # Cleanup function to close browser pool on shutdown
+# How long an exported PDF stays in download/. An undated export is read at today's date
+# (G-355), so its name changes every day and a copy older than that is never served again.
+EXPORTED_PDF_MAX_AGE = 2 * 24 * 3600
+
+
+def sweep_exported_pdfs(directory: str, max_age: float = EXPORTED_PDF_MAX_AGE,
+                        now: Optional[float] = None) -> int:
+    """Deletes the PDFs written to `directory` more than `max_age` seconds ago; returns how
+    many. Only regular `.pdf` files directly inside it: the page caches in its
+    subfolders are not touched. A file that cannot be removed is left for the next sweep."""
+    cutoff = (time.time() if now is None else now) - max_age
+    removed = 0
+    try:
+        entries = list(os.scandir(directory))
+    except FileNotFoundError:
+        return 0
+    for entry in entries:
+        try:
+            if (entry.name.endswith(".pdf") and entry.is_file(follow_symlinks=False)
+                    and entry.stat(follow_symlinks=False).st_mtime < cutoff):
+                os.remove(entry.path)
+                removed += 1
+        except OSError as exc:
+            log.warning("Exported PDF could not be removed", file=entry.name, error=str(exc))
+    return removed
+
+
 async def cleanup_browser_pool():
     """Close the browser pool. Call this on application shutdown."""
     if BrowserPool._instance:

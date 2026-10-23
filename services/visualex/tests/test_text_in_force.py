@@ -131,6 +131,17 @@ class TestAfterARestart:
         assert result["upcoming"]["change"] == "abrogated"
 
     @pytest.mark.parametrize("endpoint", ARTICLE_ENDPOINTS)
+    async def test_an_expired_page_of_today_is_read_again_and_states_its_window(self, controller, brocardi, endpoint):
+        scraper = scraper_serving()
+        scraper.cache = StoringCache({BASE: LATER})   # today's page expired
+        scraper.request_document = AsyncMock(return_value=TODAY_PAGE)
+        [result] = await ask(controller, endpoint, requested(), scraper=scraper)
+        scraper.request_document.assert_awaited_once_with(f"{BASE}!vig=2026-10-21", source="normattiva")
+        assert result["article_text"].startswith("Art. 3\nContratti verbali")
+        assert result["validity"]["valid_to"] == "2026-12-31"
+        assert result["upcoming"]["change"] == "abrogated"
+
+    @pytest.mark.parametrize("endpoint", ARTICLE_ENDPOINTS)
     async def test_a_page_that_is_there_but_unreadable_costs_no_request(self, controller, brocardi, endpoint):
         scraper = scraper_serving()
         scraper.cache = StoringCache({BASE: "<html>no window</html>"})
@@ -151,7 +162,10 @@ class TestAfterARestart:
 
 class TestNothingInForceToday:
     @pytest.mark.parametrize("endpoint", ARTICLE_ENDPOINTS)
-    async def test_an_article_inserted_from_a_later_day_stands_as_it_was(self, controller, brocardi, endpoint):
+    async def test_an_article_inserted_from_a_later_day_is_marked_inserted(self, controller, brocardi, endpoint):
+        """Nothing is in force today: the later text is the only one, served as before
+        but marked not in force, with «inserted» and its day (G-358). The norm keeps the
+        request's identity: that text is the one that will come into force."""
         from tests.validity_pages import synthetic
 
         not_yet = synthetic(al="31-12-2026", label="Art. 3",
@@ -161,4 +175,117 @@ class TestNothingInForceToday:
         [result] = await ask(controller, endpoint, requested(), scraper=scraper)
         assert result["url"] == BASE
         assert result["validity"]["valid_from"] == "2027-01-01"
-        assert "upcoming" not in result
+        assert result["upcoming"] == {"change": "inserted", "valid_from": "2027-01-01", "version_number": 2}
+        assert result["not_in_force"] is True
+        assert result["norma_data"]["data_versione"] is None
+
+
+class TestTheLaterTextAskedFor:
+    """G-357: the later text, on explicit request, always marked not in force and dated to
+    the day it comes into force, so the web reads it as a text at a day (read only)."""
+
+    @pytest.mark.parametrize("endpoint", ARTICLE_ENDPOINTS)
+    @pytest.mark.parametrize("day", [None, "2027-01-01", "2027-06-30"])
+    async def test_it_is_served_marked(self, controller, brocardi, endpoint, day):
+        body = {"upcoming": True, **({"version_date": day} if day else {})}
+        [result] = await ask(controller, endpoint, requested(), scraper=scraper_serving(), body=body)
+        assert result["article_text"].startswith("Art. 3\n((ARTICOLO ABROGATO")
+        assert result["url"] == BASE
+        assert result["not_in_force"] is True
+        assert result["upcoming"] == {"change": "abrogated", "valid_from": "2027-01-01", "version_number": 2}
+        assert result["norma_data"]["versione"] == "vigente"
+        assert result["norma_data"]["data_versione"] == "2027-01-01"
+        assert result["validity"]["valid_from"] == "2027-01-01"
+        assert result["validity"]["request_in_window"] is True
+
+    @pytest.mark.parametrize("endpoint", ARTICLE_ENDPOINTS)
+    async def test_an_article_with_no_later_text_says_so(self, controller, brocardi, endpoint):
+        scraper = scraper_serving()
+        scraper.cache = FakeCache({BASE: TODAY_PAGE})
+        [result] = await ask(controller, endpoint, requested(), scraper=scraper, body={"upcoming": True})
+        assert "Nessuna versione non ancora in vigore" in result["error"]
+        assert "article_text" not in result
+
+    @pytest.mark.parametrize("endpoint", ARTICLE_ENDPOINTS)
+    async def test_a_day_before_the_later_text_says_when_it_starts(self, controller, brocardi, endpoint):
+        [result] = await ask(controller, endpoint, requested(), scraper=scraper_serving(),
+                             body={"upcoming": True, "version_date": "2026-12-01"})
+        assert "entra in vigore il 2027-01-01" in result["error"]
+
+
+class TestTheRequestGuard:
+    @pytest.mark.parametrize("version,day,ok", [
+        (None, None, True), ("vigente", "2027-01-01", True),
+        ("originale", None, False), (None, "2026-10-21", False), (None, "2020-01-01", False),
+        (None, "ieri", False),
+    ])
+    def test_upcoming_with_what(self, version, day, ok):
+        from visualex_api.services.normattiva_validity import read_upcoming_request
+        from visualex_api.tools.exceptions import ValidationError
+        if ok:
+            read_upcoming_request(version, day, today=TODAY)
+        else:
+            with pytest.raises(ValidationError):
+                read_upcoming_request(version, day, today=TODAY)
+
+    async def test_a_bare_future_date_is_still_refused(self, controller):
+        response = await controller.app.test_client().post(
+            "/fetch_article_text", json={"act_type": "legge", "article": "3", "version_date": "2027-01-01"})
+        assert response.status_code == 400
+
+
+class TestTheRequestIsBuiltUndated:
+    """`upcoming: true` reads the undated page whatever day it names: the norm handed to
+    the handlers carries no date, or every explicit request would answer «none»."""
+
+    async def test_a_later_day_is_accepted_and_not_kept_on_the_norm(self):
+        from app import NormaController
+
+        ctrl = NormaController.__new__(NormaController)
+        tree = ([{"numero": "3", "allegato": None}], 1, {})
+        with patch("app.get_tree", new=AsyncMock(return_value=tree)):
+            [nv] = await ctrl.create_norma_visitata_from_data({
+                "act_type": "decreto del presidente della repubblica", "date": "1986-04-26",
+                "act_number": "131", "article": "3", "upcoming": True, "version_date": "2027-06-30"})
+        assert nv.data_versione is None
+
+    @pytest.mark.parametrize("body", [
+        {"upcoming": True, "version": "originale"},
+        {"upcoming": True, "version_date": "2026-10-21"},
+    ])
+    async def test_what_cannot_go_with_it_is_a_400(self, controller, body):
+        response = await controller.app.test_client().post(
+            "/fetch_article_text", json={"act_type": "legge", "article": "3", **body})
+        assert response.status_code == 400
+
+
+class TestTheLaterTextOfAnInsertedArticle:
+    @pytest.mark.parametrize("endpoint", ARTICLE_ENDPOINTS)
+    async def test_it_is_inserted(self, controller, brocardi, endpoint):
+        from tests.validity_pages import synthetic
+
+        not_yet = synthetic(al="31-12-2026", label="Art. 3",
+                            content="<span>ARTICOLO NON ANCORA ESISTENTE O VIGENTE</span>")
+        scraper = scraper_serving()
+        scraper.cache = FakeCache({BASE: LATER, f"{BASE}!vig=2026-10-21": not_yet})
+        [result] = await ask(controller, endpoint, requested(), scraper=scraper, body={"upcoming": True})
+        assert result["upcoming"]["change"] == "inserted"
+        assert result["not_in_force"] is True
+
+    @pytest.mark.parametrize("endpoint", ARTICLE_ENDPOINTS)
+    async def test_today_unreadable_leaves_the_change_unknown(self, controller, brocardi, endpoint):
+        from tests.validity_pages import synthetic
+
+        amended = synthetic(dal="1-1-2027", label="Art. 3", content="<span>Testo modificato.</span>", version=2)
+        scraper = scraper_serving(today_fails=True)
+        scraper.cache = FakeCache({BASE: amended})
+        [result] = await ask(controller, endpoint, requested(), scraper=scraper, body={"upcoming": True})
+        assert result["upcoming"]["change"] is None
+        assert result["not_in_force"] is True
+
+    @pytest.mark.parametrize("endpoint", ARTICLE_ENDPOINTS)
+    async def test_an_unreadable_page_claims_nothing(self, controller, brocardi, endpoint):
+        scraper = scraper_serving()
+        scraper.cache = FakeCache({BASE: "<html>no window</html>"})
+        [result] = await ask(controller, endpoint, requested(), scraper=scraper, body={"upcoming": True})
+        assert "Non riesco a leggere la vigenza" in result["error"]

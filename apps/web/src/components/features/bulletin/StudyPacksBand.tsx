@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { BookOpen, Check, FolderPlus } from 'lucide-react';
+import { Check, FolderPlus } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { dossierService } from '../../../services/dossierService';
 import { getErrorMessage } from '../../../utils/errors';
 import { STUDY_PACKS, packAlreadyAdded, packContent, type StudyPack } from '../../../utils/studyPacks';
-import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
+import { cn } from '../../../lib/utils';
 import type { EnvironmentCategory, StudyImportReport } from '../../../types';
 
 interface Props {
@@ -14,22 +14,22 @@ interface Props {
   onError: (message: string) => void;
 }
 
-const SHOWN_AT_FIRST = 6;
+/** The pack's 44 px controls (S7a): on every width, the strip being a row of small cards. */
+const ACTION = 'inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-2 text-sm font-medium';
 
 /**
- * «Dossier di studio pronti» (spec 2026-10-13-environments-into-forum, D12): the packs VisuaLex ships, each added as
- * dossiers di studio with one request (`POST /dossiers/import-study`). A pack whose dossiers the user already holds
- * says so instead.
+ * «Pronti da VisuaLex» (spec 2026-10-13-environments-into-forum, D12; S7a): the packs VisuaLex ships, as one row of
+ * compact cards that scrolls sideways, after the community's dossiers — they are the Forum's reason, the packs a help.
+ * Each is added as dossiers di studio with one request (`POST /dossiers/import-study`); a pack whose dossiers the user
+ * already holds says so instead. Every pack is in the row: a swipe, the trackpad or Tab reach them.
  */
 export function StudyPacksBand({ category, onAdded, onError }: Props) {
   const dossiers = useAppStore((s) => s.dossiers);
   const [adding, setAdding] = useState<string | null>(null);
   // Added in this visit: marked at once, before the dossier list is read again, so a second tap makes no second copy.
   const [addedNow, setAddedNow] = useState<ReadonlySet<string>>(new Set());
-  const [showAll, setShowAll] = useState(false);
   const packs = STUDY_PACKS.filter((p) => category === 'all' || p.category === category);
   if (packs.length === 0) return null;
-  const shown = showAll ? packs : packs.slice(0, SHOWN_AT_FIRST);
 
   const add = async (pack: StudyPack) => {
     setAdding(pack.key);
@@ -45,24 +45,40 @@ export function StudyPacksBand({ category, onAdded, onError }: Props) {
   };
 
   return (
-    <section aria-labelledby="study-packs" className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
-      <div className="mb-3 flex items-baseline gap-2">
-        <BookOpen size={16} className="self-center text-emerald-600" aria-hidden />
-        <h2 id="study-packs" className="text-sm font-semibold text-slate-800 dark:text-slate-200">Dossier di studio pronti</h2>
-        <span className="text-xs text-slate-500 dark:text-slate-400">di VisuaLex</span>
+    <section aria-labelledby="study-packs" className="min-w-0 space-y-3">
+      <div className="flex flex-wrap items-baseline gap-x-2">
+        <h2 id="study-packs" className="font-serif text-xl font-medium tracking-tight text-slate-900 dark:text-slate-50">
+          Pronti da VisuaLex
+        </h2>
+        <span className="text-sm text-slate-600 dark:text-slate-400">dossier di studio da aggiungere ai tuoi</span>
       </div>
-      <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {shown.map((pack) => {
+      {/* One row that scrolls sideways, each card snapping to the start; the cards keep one width and one height. It takes
+          the focus itself, so the arrows scroll it even past the packs already added, which hold no button. */}
+      <ul
+        id="pronti"
+        tabIndex={0}
+        aria-labelledby="study-packs"
+        className="-mx-1 flex snap-x gap-3 overflow-x-auto rounded-xl px-1 pb-3 pt-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+      >
+        {packs.map((pack) => {
           const added = addedNow.has(pack.key) || packAlreadyAdded(pack, dossiers);
           return (
-            <li key={pack.key} className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 p-2 dark:border-slate-700">
+            <li
+              key={pack.key}
+              className="flex w-56 shrink-0 snap-start flex-col justify-between gap-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
+            >
               <span className="min-w-0">
-                <span className="block truncate text-sm font-medium text-slate-900 dark:text-white" title={pack.description}>{pack.name}</span>
-                <span className="block text-xs text-slate-500 dark:text-slate-400">{pack.dossiers.length} dossier</span>
+                <span className="line-clamp-2 break-words font-serif text-base font-medium leading-snug text-slate-900 dark:text-slate-50" title={pack.description}>
+                  {pack.name}
+                </span>
+                <span className="mt-0.5 flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-400">
+                  <span aria-hidden className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: `hsl(var(--category-${pack.category}))` }} />
+                  {pack.dossiers.length} dossier
+                </span>
               </span>
               {added ? (
-                <span className="inline-flex shrink-0 items-center gap-1 text-xs text-emerald-700 dark:text-emerald-300">
-                  <Check size={14} aria-hidden /> Già tra i tuoi dossier
+                <span className={cn(ACTION, 'px-0 text-emerald-700 dark:text-emerald-300')}>
+                  <Check size={16} aria-hidden /> Già tra i tuoi dossier
                 </span>
               ) : (
                 <button
@@ -70,25 +86,19 @@ export function StudyPacksBand({ category, onAdded, onError }: Props) {
                   onClick={() => void add(pack)}
                   disabled={adding !== null}
                   aria-label={`Aggiungi «${pack.name}» ai miei dossier`}
-                  className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-2 text-xs font-medium text-primary-700 hover:bg-primary-50 disabled:opacity-50 dark:text-primary-300 dark:hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${TOUCH_TARGET_RESPONSIVE}`}
+                  className={cn(
+                    ACTION,
+                    '-mx-2 self-start text-primary-700 hover:bg-primary-50 disabled:opacity-50 dark:text-primary-300 dark:hover:bg-primary-900/30',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+                  )}
                 >
-                  <FolderPlus size={14} aria-hidden /> {adding === pack.key ? 'Aggiungo…' : 'Aggiungi'}
+                  <FolderPlus size={16} aria-hidden /> {adding === pack.key ? 'Aggiungo…' : 'Aggiungi'}
                 </button>
               )}
             </li>
           );
         })}
       </ul>
-      {packs.length > SHOWN_AT_FIRST && (
-        <button
-          type="button"
-          onClick={() => setShowAll((v) => !v)}
-          aria-expanded={showAll}
-          className={`mt-2 rounded px-2 text-sm font-medium text-primary-600 hover:underline dark:text-primary-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${TOUCH_TARGET_RESPONSIVE}`}
-        >
-          {showAll ? 'Mostra meno' : `Mostra tutti (${packs.length})`}
-        </button>
-      )}
     </section>
   );
 }

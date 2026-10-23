@@ -30,6 +30,7 @@ import { InlineNoteComposer } from './InlineNoteComposer';
 import { ArticleBody } from './ArticleBody';
 import { closeFindWindow, openFindWindow } from '../../../utils/findWindowControl';
 import { useFindWindowScopedTo } from '../../../hooks/useFindWindowScopedTo';
+import { quickNormParamsOf } from '../../../utils/quickNormParams';
 import { ArticleDiscussionPanel } from './ArticleDiscussionPanel';
 import { UpdateNotePopover } from './UpdateNotePopover';
 import { BlockAnnotationsPopover } from './BlockAnnotationsPopover';
@@ -163,7 +164,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // actually mounts. Using ref.current in render triggers the
     // react-hooks/refs lint and can miss the post-mount update.
     const [notesButtonEl, setNotesButtonEl] = useState<HTMLButtonElement | null>(null);
-    const [showMoreMenu, setShowMoreMenu] = useState(false);
     const [showCopyModal, setShowCopyModal] = useState(false);
     const [showAdvancedExport, setShowAdvancedExport] = useState(false);
     const [showVersionInput, setShowVersionInput] = useState(false);
@@ -214,7 +214,9 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const findTargetKey = useMemo(() => `${itemKey}|${versionKey(norma_data)}`, [itemKey, norma_data]);
     const findHost = findHostId ?? originTabId ?? tabId;
     useRegisterFindRoot(findHost, findTargetKey, shortNorm(norma_data), textRootRef);
-    const isFindOpen = useFindWindowScopedTo(findHost, findTargetKey);
+    // Exact (R3): «Cerca nel testo» is a menu entry, and on a practice the window covers with no text pointed at it
+    // points the window here; only on this very text does it say «Chiudi».
+    const isFindOpen = useFindWindowScopedTo(findHost, findTargetKey, true);
     const isSavedArticle = useMemo(
         () => bookmarks.some(bookmark => bookmark.normaKey === itemKey),
         [bookmarks, itemKey],
@@ -399,14 +401,11 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         container.classList.toggle('highlights-hidden', highlightsHidden);
     }, [highlightsHidden]);
 
-    const quickNormParams = useMemo(() => ({
-        act_type: norma_data.tipo_atto,
-        act_number: norma_data.numero_atto || '',
-        date: norma_data.data || '',
-        article: norma_data.numero_articolo,
-        annex: norma_data.allegato,
-        version: 'vigente' as const,
-    }), [norma_data.tipo_atto, norma_data.numero_atto, norma_data.data, norma_data.numero_articolo, norma_data.allegato]);
+    const quickNormParams = useMemo(
+        () => quickNormParamsOf(norma_data),
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- the fields it reads, not the object
+        [norma_data.tipo_atto, norma_data.numero_atto, norma_data.data, norma_data.numero_articolo, norma_data.allegato],
+    );
 
     const isPinnedQuick = isQuickNorm(quickNormParams);
 
@@ -799,11 +798,9 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 highlightsButtonRef={setHighlightsButtonEl}
                 highlightsCount={readOnly ? 0 : allPanelHighlights.length}
                 isDiscussionOpen={discussion.open}
-                showMoreMenu={showMoreMenu}
                 onToggleNotes={() => setIsPeekOpen(v => !v)}
                 onToggleHighlightsPeek={() => setIsHighlightsPeekOpen(v => !v)}
                 onToggleDiscussion={discussion.toggle}
-                onToggleMoreMenu={setShowMoreMenu}
                 isPinnedQuick={isPinnedQuick}
                 onToggleQuickNorm={handleToggleQuickNorm}
                 onMobileCopy={handleMobileCopy}

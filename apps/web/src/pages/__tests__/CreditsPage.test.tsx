@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import userEvent from '@testing-library/user-event';
 import { CreditEntry, CreditsPage } from '../CreditsPage';
+import { groupAt, groupOf } from '../creditsIndex';
 import { CREDITS, CREDIT_GROUPS, type Credit } from '../../data/credits';
 
 const scrolled: Element[] = [];
@@ -102,5 +104,123 @@ describe('CreditEntry — the worst case', () => {
       expect(el.className).toContain('[overflow-wrap:anywhere]');
       expect(el.className).not.toMatch(/truncate|line-clamp|whitespace-nowrap/);
     }
+  });
+});
+
+// A page to consult (U1d): the frame's whole width, an index of the groups, the sources as cards.
+describe('CreditsPage — laid out for consulting', () => {
+  it('lists the groups in an index, in order, one marked as the place being read', () => {
+    renderAt('/crediti');
+    const index = screen.getByRole('navigation', { name: 'In questa pagina' });
+    const links = within(index).getAllByRole('link');
+    expect(links.map((link) => link.textContent)).toEqual(CREDIT_GROUPS.map((group) => group.title));
+    expect(links.map((link) => link.getAttribute('href'))).toEqual(CREDIT_GROUPS.map((group) => `/crediti#${group.id}`));
+    // One place marked at a time (jsdom lays nothing out: which one is `groupAt`'s, tested below).
+    expect(links.filter((link) => link.getAttribute('aria-current') === 'location')).toHaveLength(1);
+    for (const link of links) expect(link).toHaveClass('min-h-[44px]');
+    // On a phone the groups wrap, every one in sight (a scrolling row hid «Software e caratteri» at 390 px); a column
+    // beside the sources from 1024 px.
+    const list = within(index).getByRole('list');
+    expect(list).toHaveClass('flex-wrap', 'lg:flex-col');
+    expect(list.className).not.toMatch(/overflow-x-auto/);
+  });
+
+  it('marks the place being read by a bar on a phone too, not by a tint alone', () => {
+    renderAt('/crediti#norme');
+    const index = screen.getByRole('navigation', { name: 'In questa pagina' });
+    const here = within(index).getByRole('link', { name: 'Norme' });
+    expect(here).toHaveAttribute('aria-current', 'location');
+    // The bar under it below 1024 px, down its edge from there, in ink on every link; only the place's is coloured.
+    expect(here).toHaveClass('max-lg:border-b-2', 'lg:border-l-2', 'border-primary-600', 'font-semibold');
+    const other = within(index).getByRole('link', { name: 'Giurisprudenza' });
+    expect(other).toHaveClass('border-transparent');
+    expect(other).not.toHaveClass('border-primary-600');
+  });
+
+  it('marks the group of the entry an address opens, until the page is scrolled away', async () => {
+    // «cerdef» is among the last rows of the group before the last: on a tall window the page's end reaches it.
+    renderAt('/crediti#cerdef');
+    const index = screen.getByRole('navigation', { name: 'In questa pagina' });
+    const marked = () => within(index).getAllByRole('link').filter((link) => link.getAttribute('aria-current') === 'location').map((link) => link.textContent);
+    expect(marked()).toEqual(['Autorità e registri']);
+    // A scroll that leaves the page where the address took it changes nothing.
+    act(() => {
+      window.dispatchEvent(new Event('scroll'));
+    });
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    expect(marked()).toEqual(['Autorità e registri']);
+    // Scrolled away, the scroll decides again (jsdom lays nothing out: every section's top is 0, so the last).
+    Object.defineProperty(window, 'scrollY', { value: 600, configurable: true });
+    try {
+      act(() => {
+        window.dispatchEvent(new Event('scroll'));
+      });
+      await waitFor(() => expect(marked()).toEqual(['Software e caratteri']));
+    } finally {
+      Object.defineProperty(window, 'scrollY', { value: 0, configurable: true });
+    }
+  });
+
+  it('brings a group from the index to its section, and focuses it, again when its item is pressed again', async () => {
+    renderAt('/crediti');
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('link', { name: 'Giurisprudenza' }));
+    const section = document.getElementById('giurisprudenza')!;
+    expect(scrolled).toEqual([section]);
+    expect(section).toHaveFocus();
+    expect(section).toHaveAccessibleName('Giurisprudenza');
+    // Scrolled away, the same item brings it back.
+    act(() => section.blur());
+    await user.click(screen.getByRole('link', { name: 'Giurisprudenza' }));
+    expect(scrolled).toEqual([section, section]);
+    expect(section).toHaveFocus();
+  });
+
+  it('draws each source\'s words exactly as credits.ts holds them', () => {
+    renderAt('/crediti');
+    for (const credit of CREDITS) {
+      const article = document.getElementById(credit.id)!;
+      const values = [...article.querySelectorAll('dd')].map((dd) => dd.textContent);
+      expect(values).toEqual([credit.uses, credit.terms, credit.attribution]);
+    }
+  });
+
+  it('draws each source as a card, two a row from 1280 px, its links at its foot', () => {
+    renderAt('/crediti');
+    for (const group of CREDIT_GROUPS) {
+      const section = screen.getByRole('region', { name: group.title });
+      const grid = section.querySelector('article')!.parentElement!;
+      expect(grid).toHaveClass('grid', 'xl:grid-cols-2');
+    }
+    const article = document.getElementById('normattiva')!;
+    expect(article).toHaveClass('flex', 'h-full', 'flex-col');
+    expect(article.querySelector('a')!.parentElement).toHaveClass('mt-auto');
+    // No narrow column any more: the frame's whole width.
+    expect(document.querySelector('.max-w-2xl')).toBeNull();
+  });
+});
+
+// The index's mark follows the page's scroll (U1d).
+describe('groupAt', () => {
+  const tops = (...values: number[]) => values.map((top, i) => ({ id: ['norme', 'giurisprudenza', 'autorita', 'software'][i], top }));
+
+  it('marks the last section whose top has passed the reading line', () => {
+    expect(groupAt(tops(-900, -100, 350, 900), 1000, false)).toBe('giurisprudenza');
+    expect(groupAt(tops(-900, -500, 290, 900), 1000, false)).toBe('autorita');
+  });
+
+  it('marks the first above the first section, and the last at the page\'s end', () => {
+    expect(groupAt(tops(500, 1200, 1900, 2600), 1000, false)).toBe('norme');
+    // A short last section never reaches the line on a tall window: the end marks it.
+    expect(groupAt(tops(-2000, -1200, 100, 600), 1000, true)).toBe('software');
+  });
+});
+
+describe('groupOf', () => {
+  it('names the group of a group\'s fragment or of an entry\'s, and none for another', () => {
+    expect(groupOf('giurisprudenza', CREDITS, CREDIT_GROUPS)).toBe('giurisprudenza');
+    expect(groupOf('cerdef', CREDITS, CREDIT_GROUPS)).toBe('autorita');
+    expect(groupOf('geist', CREDITS, CREDIT_GROUPS)).toBe('software');
+    expect(groupOf('gazzetta-ufficiale', CREDITS, CREDIT_GROUPS)).toBeUndefined();
   });
 });

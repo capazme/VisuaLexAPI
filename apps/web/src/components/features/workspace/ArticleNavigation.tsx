@@ -143,10 +143,11 @@ export function ArticleNavigation({
   return (
     <div className={cn("flex items-center gap-1", className)}>
       <button
+        type="button"
         onClick={handlePrev}
         disabled={isFirst || isLoading}
         className={cn(
-          "p-1 rounded-md transition-colors relative",
+          "relative flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md transition-colors md:min-h-0 md:min-w-0 md:p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500",
           isFirst || isLoading
             ? "text-slate-300 dark:text-slate-600 cursor-not-allowed"
             : prevWillLoad
@@ -154,11 +155,12 @@ export function ArticleNavigation({
               : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-300"
         )}
         title={isPrevLoading ? 'Caricamento...' : prevWillLoad ? `Carica Art. ${prevId}` : "Articolo precedente"}
+        aria-label={isPrevLoading ? 'Caricamento...' : prevWillLoad ? `Carica Art. ${prevId}` : "Articolo precedente"}
       >
         {isPrevLoading ? (
           <Loader2 size={16} className="animate-spin text-primary-500" />
         ) : (
-          <ChevronLeft size={16} />
+          <ChevronLeft size={16} aria-hidden />
         )}
         {prevWillLoad && !isPrevLoading && (
           <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-primary-500 rounded-full" />
@@ -194,10 +196,11 @@ export function ArticleNavigation({
       )}
 
       <button
+        type="button"
         onClick={handleNext}
         disabled={isLast || isLoading}
         className={cn(
-          "p-1 rounded-md transition-colors relative",
+          "relative flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md transition-colors md:min-h-0 md:min-w-0 md:p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500",
           isLast || isLoading
             ? "text-slate-300 dark:text-slate-600 cursor-not-allowed"
             : nextWillLoad
@@ -205,11 +208,12 @@ export function ArticleNavigation({
               : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-300"
         )}
         title={isNextLoading ? 'Caricamento...' : nextWillLoad ? `Carica Art. ${nextId}` : "Articolo successivo"}
+        aria-label={isNextLoading ? 'Caricamento...' : nextWillLoad ? `Carica Art. ${nextId}` : "Articolo successivo"}
       >
         {isNextLoading ? (
           <Loader2 size={16} className="animate-spin text-primary-500" />
         ) : (
-          <ChevronRight size={16} />
+          <ChevronRight size={16} aria-hidden />
         )}
         {nextWillLoad && !isNextLoading && (
           <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-primary-500 rounded-full" />

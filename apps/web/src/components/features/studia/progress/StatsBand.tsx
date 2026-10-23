@@ -83,14 +83,18 @@ export function StatsBand({ data, loading, settingsOpen, onToggleSettings, onClo
   };
   return (
     <section aria-labelledby="studia-progressi" aria-busy={loading} className={cn(TILE, 'grid gap-5 p-4 md:p-6')}>
-      <div className="flex items-center gap-3">
-        <h2 id="studia-progressi" className={BLOCK_HEADING}>
-          I tuoi progressi
-        </h2>
-        <SettingsGear ref={gear} open={settingsOpen} onClick={onToggleSettings} controls={STUDY_SETTINGS_PANEL} />
+      {/* The heading and the settings under it in one plain box: closed, the panel is a row of no height, which the
+          card's gap would otherwise space out. */}
+      <div>
+        <div className="flex items-center gap-3">
+          <h2 id="studia-progressi" className={BLOCK_HEADING}>
+            I tuoi progressi
+          </h2>
+          <SettingsGear ref={gear} open={settingsOpen} onClick={onToggleSettings} controls={STUDY_SETTINGS_PANEL} />
+        </div>
+        {/* Under the heading, inside the card, which grows downward; never a window over the page. */}
+        <StudySettingsPanel id={STUDY_SETTINGS_PANEL} open={settingsOpen} onClose={close} onChanged={onSettingsChanged} communityRequest={communityRequest} aside={aside} />
       </div>
-      {/* Under the heading, inside the card, which grows downward; never a window over the page. */}
-      <StudySettingsPanel id={STUDY_SETTINGS_PANEL} open={settingsOpen} onClose={close} onChanged={onSettingsChanged} communityRequest={communityRequest} aside={aside} />
 
       {data ? (
         <>

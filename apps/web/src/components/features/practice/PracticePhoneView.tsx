@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight, FolderPlus, Layers, MoreHorizontal, Pencil, Plus, X } from 'lucide-react';
+import { ChevronDown, FolderPlus, Layers, MoreHorizontal, Pencil, Plus, X } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { appStore, useAppStore } from '../../../store/useAppStore';
 import type { ArticleData } from '../../../types';
@@ -27,17 +27,11 @@ const SETTLE_MS = 3000;
 /** What a user's own scroll starts with: it ends the asking. */
 const USER_SCROLL = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const;
 
-// 44 px touch targets (apps/web/CLAUDE.md, «Mobile-first»).
-const CHEVRON =
-  'flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl shadow-sm transition-[color,background-color,border-color,scale] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
-const CHEVRON_ON =
-  'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700';
-const CHEVRON_OFF = 'bg-slate-50 text-slate-300 dark:bg-slate-900 dark:text-slate-700';
 
 /**
- * The phone's table (spec §8): a header that switches practices — the chevrons, the name (a tap on it
- * lists the practices, with «+ Nuova pratica»), one dot per practice — over the active practice's
- * «Salva come dossier» and its column, rows opening in place. «Apri accanto», a decision opened from a
+ * The phone's table (spec §8, R3): one line that names the practice — a tap on the name lists the practices, to
+ * switch or add one (the chevrons and dots went: the text comes first) — with «Salva come dossier» and «⋯», over the
+ * active practice's column, rows opening in place. «Apri accanto», a decision opened from a
  * link and a topic search read in the full-screen reader instead (`phoneReader`, T19), which takes
  * the column's place — the column is not kept mounted under it (gotcha 26) — and gives it back at the
  * scroll position it left. The practice on screen is the active one, so the store's routing, the way
@@ -48,7 +42,6 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming }: Pr
   const practices = useAppStore(useShallow((s) => s.practices.map(practicePair)));
   const activePracticeId = useAppStore((s) => s.activePracticeId);
   const practice = useAppStore((s) => s.practices.find((p) => p.id === s.activePracticeId));
-  const setActivePractice = useAppStore((s) => s.setActivePractice);
   // The reader is drawn for the practice on screen only: one whose practice is not the active one is stale.
   const readerOpen = useAppStore((s) => s.phoneReader !== null && s.phoneReader.practiceId === s.activePracticeId &&
     s.practices.some((p) => p.id === s.phoneReader?.practiceId));
@@ -58,11 +51,6 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming }: Pr
   const save = usePracticeSaveActions(practice?.id ?? '');
 
   const list = practices.map(fromPracticePair);
-  const index = list.findIndex((p) => p.id === activePracticeId);
-  const go = (to: number) => {
-    const target = list[to];
-    if (target) setActivePractice(target.id);
-  };
 
   // The column's scroll position (the page's content scroller) is kept, with its practice, while the
   // column is drawn and given back when the reader closes on the same practice — unless a row is
@@ -131,67 +119,12 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming }: Pr
     <>
       {readerOpen ? <ReadingFullScreen onCrossReference={onCrossReference} /> : (
         <div ref={rootRef} data-testid="practice-phone-view" className="flex w-full flex-col bg-slate-50 dark:bg-slate-950">
-          {/* Under the search page's field, the phone's bar with the menu button beside it: no inset. */}
-          <div className="flex-shrink-0 border-b border-slate-200 bg-white/80 px-4 py-2 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/80">
-            <div className="flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => go(index - 1)}
-                disabled={index <= 0}
-                aria-label="Pratica precedente"
-                className={cn(CHEVRON, index <= 0 ? CHEVRON_OFF : CHEVRON_ON)}
-              >
-                <ChevronLeft size={20} aria-hidden />
-              </button>
-              <div className="min-w-0 flex-1 px-4 text-center">
-                <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                  <button
-                    type="button"
-                    onClick={() => setListing(true)}
-                    aria-haspopup="dialog"
-                    title="Elenco delle pratiche"
-                    className="inline-flex min-h-[44px] max-w-full items-center justify-center gap-1 rounded-lg px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                  >
-                    <span className="truncate">{practice?.label ?? ''}</span>
-                    <ChevronDown size={16} aria-hidden className="flex-shrink-0 text-slate-400" />
-                  </button>
-                </h2>
-                {/* Each dot is a 44 px button around a small visual dot; many practices wrap. */}
-                <div className="flex flex-wrap justify-center">
-                  {list.map((p, i) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => go(i)}
-                      aria-label={`Pratica ${i + 1}: ${p.label}`}
-                      aria-current={i === index ? 'true' : undefined}
-                      className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                    >
-                      <span
-                        aria-hidden
-                        className={cn(
-                          'block h-1.5 rounded-full transition-[width,background-color] duration-300',
-                          i === index ? 'w-6 bg-primary-500' : 'w-1.5 bg-slate-300 dark:bg-slate-700',
-                        )}
-                      />
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => go(index + 1)}
-                disabled={index < 0 || index >= list.length - 1}
-                aria-label="Pratica successiva"
-                className={cn(CHEVRON, index < 0 || index >= list.length - 1 ? CHEVRON_OFF : CHEVRON_ON)}
-              >
-                <ChevronRight size={20} aria-hidden />
-              </button>
-            </div>
-          </div>
+          {/* One line under the search page's field (R3: the text first): the practice's name as a drop-down — a tap
+              lists the practices, to switch or start one —, its count under it, «Salva come dossier» and «⋯». */}
+          {practice && <PhonePracticeHead practice={practice} save={save} onList={() => setListing(true)} />}
           {practice && (
-            <div className="space-y-4 p-4">
-              <PhonePracticeActions practice={practice} save={save} />
+            // At the layout's 16 px from the edges (R3b): no step of its own.
+            <div className="space-y-4 pb-4 pt-2">
               <PracticeStreamingBar streaming={streaming} practiceId={practice.id} />
               {practice.acts.length === 0 && practice.decisions.length === 0 ? (
                 <PracticeEmpty />
@@ -208,32 +141,51 @@ export function PracticePhoneView({ onViewPdf, onCrossReference, streaming }: Pr
   );
 }
 
-/** The count line, «Salva come dossier» and its «⋯» (spec §7, carry-over 15): the desktop header's
- *  save actions, on a phone. The toast is portalled to the document in the toast band. */
-function PhonePracticeActions({ practice, save }: { practice: Practice; save: PracticeSaveActions }) {
+/** The phone's head of the practice (R3), one row: its name as a drop-down over the list of practices, the count after it,
+ *  «Salva come dossier» (the icon, its name read) and its «⋯» (spec §7, carry-over 15). The toast is portalled to the
+ *  document in the toast band. */
+function PhonePracticeHead({ practice, save, onList }: { practice: Practice; save: PracticeSaveActions; onList: () => void }) {
   const countLine = practiceCountLine(practiceCounts(practice));
   return (
-    <div className="space-y-2">
-      {/* The count has its own line: it is never cut by the buttons. */}
-      {countLine && <p className="text-sm text-slate-500 dark:text-slate-400">{countLine}</p>}
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={save.saveAsNew}
-          disabled={save.busy}
-          className="inline-flex min-h-[44px] min-w-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-        >
-          <FolderPlus size={16} aria-hidden className="shrink-0" />
-          Salva come dossier
-        </button>
-        <MenuButton
-          label={`Altre azioni per la pratica ${practice.label}`}
-          triggerClassName="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-          items={save.items}
-        >
-          <MoreHorizontal size={18} aria-hidden />
-        </MenuButton>
+    // One row (R3: the text first): the name with «▾», the count after it, then the save and «⋯».
+    <div className="flex items-center gap-1 border-b border-slate-200 dark:border-slate-800">
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <h2 className={cn('min-w-0', countLine && 'max-w-[70%] shrink-0')}>
+          <button
+            type="button"
+            onClick={onList}
+            aria-haspopup="dialog"
+            title="Elenco delle pratiche"
+            // `-ml-1` sets the name on the column's edge; the cap gives those 4 px back, or the heading, as wide as its content
+            // less the margin, cut «c.c.» to «c…» with room beside it (R3b).
+            className="-ml-1 inline-flex min-h-[44px] max-w-[calc(100%+0.25rem)] items-center gap-1 rounded-lg px-1 font-serif text-xl font-medium text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-white"
+          >
+            <span className="truncate">{practice.label}</span>
+            <ChevronDown size={18} aria-hidden className="flex-shrink-0 text-slate-500" />
+          </button>
+        </h2>
+        {/* It gives way before the name does (the list of practices counts each one in full). */}
+        {countLine && <p title={countLine} className="min-w-0 truncate text-xs text-slate-600 dark:text-slate-400">{countLine}</p>}
       </div>
+      <button
+        type="button"
+        onClick={save.saveAsNew}
+        disabled={save.busy}
+        aria-label="Salva come dossier"
+        title="Salva come dossier"
+        className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-300 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+      >
+        <FolderPlus size={18} aria-hidden />
+      </button>
+      <MenuButton
+        // Its 44 px reach into the page's margin, as every icon on the column's right edge (R3b).
+        className="-mr-3"
+        label={`Altre azioni per la pratica ${practice.label}`}
+        triggerClassName="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+        items={save.items}
+      >
+        <MoreHorizontal size={18} aria-hidden />
+      </MenuButton>
     </div>
   );
 }

@@ -166,7 +166,7 @@ export function BlockAnnotationsPopover({
                     <div
                         style={{ transformOrigin: getTransformOrigin(placement) }}
                         className={cn(
-                            'flex max-h-[60vh] w-[min(22.5rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border shadow-2xl',
+                            'flex max-h-[60vh] w-[min(22.5rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-xl border shadow-md',
                             'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900',
                             'animate-in fade-in zoom-in-95 duration-150',
                         )}
@@ -187,7 +187,7 @@ export function BlockAnnotationsPopover({
                         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
                             {group.notes.length > 0 && (
                                 <section className="space-y-2">
-                                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Note</h4>
+                                    <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Note</h4>
                                     {group.notes.map((note) => (
                                         <NoteCard
                                             key={note.id}
@@ -206,7 +206,7 @@ export function BlockAnnotationsPopover({
                             )}
                             {group.highlights.length > 0 && (
                                 <section className="space-y-2">
-                                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Evidenziazioni</h4>
+                                    <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Evidenziazioni</h4>
                                     {group.highlights.map((highlight) => (
                                         <HighlightCard
                                             key={highlight.id}
@@ -219,7 +219,7 @@ export function BlockAnnotationsPopover({
                             )}
                             {group.threads.length > 0 && (
                                 <section className="space-y-2">
-                                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Glosse</h4>
+                                    <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Glosse</h4>
                                     {group.threads.map((thread) => (
                                         <ThreadCard
                                             key={thread.id}

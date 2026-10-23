@@ -1,7 +1,7 @@
-import { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useEffectEvent, useLayoutEffect, useState, useSyncExternalStore, useCallback, useMemo, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref } from 'react';
 import { Command, useCommandState } from 'cmdk';
 import { autoUpdate, FloatingFocusManager, FloatingPortal, offset, size, useFloating, useInteractions, useRole } from '@floating-ui/react';
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { motion, AnimatePresence, useIsPresent, usePresence, useReducedMotion } from 'framer-motion';
 import { ChevronDown, ChevronRight, Gavel, List, Search, Settings2, SlidersHorizontal, Sparkles, Tag, X, Zap } from 'lucide-react';
 import type { SearchParams, CustomAlias, SearchFilters } from '../../../types';
 import { cn } from '../../../lib/utils';
@@ -16,12 +16,11 @@ import { useAliasCatalog, foldAlias } from '../../../hooks/useAliasCatalog';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { FIELD_TEXT, FOCUS_RING, TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import { activeFiltersLabel, countActiveFilters, defaultSearchFilters } from '../../../utils/searchFilters';
-import { SEARCH_FIELD_FORM_ID } from '../../../utils/searchFieldControl';
+import { SEARCH_FIELD_FORM_ID, returnWordsToSearchField } from '../../../utils/searchFieldControl';
 import { citationSearchParams, useSearchQuery } from '../../../hooks/useSearchQuery';
 import { formatDecisionShort } from '../../../utils/decisionLinks';
-import { Sheet } from '../../ui/Sheet';
 import { Button } from '../../ui/Button';
-import { filterPaletteActs, paletteActName, queryMatches } from './paletteActs';
+import { filterPaletteActs, paletteActName, queryMatches, matchRanges } from './paletteActs';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -110,18 +109,218 @@ function RowHighlight({ value, still }: { value: string; still: boolean }) {
     : <motion.span aria-hidden layoutId={`command-palette-chosen-row:${scope}`} transition={spring.snappy} className={tint} />;
 }
 
-function PaletteRow({ value, onSelect, still, className, children }: {
+/**
+ * A row of the menu (R2): while the box filters, the rows left slide to their places (`layout`) and those filtered out
+ * fade away, popped out of the list (`AnimatePresence mode="popLayout"` around a list's rows) — and a row leaving is
+ * `disabled` for cmdk, so Enter never picks a row no longer there. Under reduced motion nothing moves.
+ */
+function PaletteRow({ ref, value, onSelect, still, entering = false, className, children }: {
+  ref?: Ref<HTMLDivElement>;
   value: string;
   onSelect: () => void;
   still: boolean;
+  /** In a list that filters: it fades in when a letter brings it back. */
+  entering?: boolean;
   className?: string;
   children: ReactNode;
 }) {
+  const present = useIsPresent();
   return (
-    <Command.Item value={value} onSelect={onSelect} className={cn(ROW, className)}>
-      <RowHighlight value={value} still={still} />
-      {children}
+    // Leaving, it is not an option any more: not for Enter (`disabled`), not for a screen reader (`aria-hidden`).
+    <Command.Item asChild value={value} onSelect={onSelect} disabled={!present} aria-hidden={!present || undefined}>
+      <motion.div
+        ref={ref}
+        layout={still ? false : 'position'}
+        initial={entering && !still ? { opacity: 0 } : false}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0, transition: { duration: dur.press } }}
+        transition={{ layout: spring.snappy, opacity: { duration: dur.press } }}
+        className={cn(ROW, className)}
+      >
+        <RowHighlight value={value} still={still} />
+        {children}
+      </motion.div>
     </Command.Item>
+  );
+}
+
+/** A row's words with the letters the box matched drawn in the app's ink (R2). */
+function Matched({ text, query }: { text: string; query: string }) {
+  const ranges = matchRanges(text, query);
+  if (ranges.length === 0) return <>{text}</>;
+  const parts: ReactNode[] = [];
+  let at = 0;
+  ranges.forEach(([start, end]) => {
+    if (start > at) parts.push(text.slice(at, start));
+    parts.push(<span key={start} className="font-semibold text-toga-700 dark:text-toga-300">{text.slice(start, end)}</span>);
+    at = end;
+  });
+  if (at < text.length) parts.push(text.slice(at));
+  return <>{parts}</>;
+}
+
+/** The search field's corner radius (`rounded-xl`) and the panel's (`rounded-2xl`): the growth goes from one to the other. */
+const FIELD_RADIUS = 12;
+const PANEL_RADIUS = 16;
+/** The growth: about 280 ms opening, 200 ms closing (the brief's), on the app's curves; no bounce. */
+const GROW_S = 0.28;
+const SHRINK_S = 0.2;
+/** The groups entering: the first four, 30 ms apart, from when the panel is half grown. */
+const GROUPS_ENTERING = 4;
+const GROUP_STAGGER_MS = 30;
+const GROUPS_AT_MS = 140;
+
+/** The visual viewport's height (a phone's keyboard shortens it, `100dvh` does not on iOS); null where it is unknown. */
+const subscribeViewport = (change: () => void) => {
+  window.visualViewport?.addEventListener('resize', change);
+  return () => window.visualViewport?.removeEventListener('resize', change);
+};
+const viewportHeight = () => window.visualViewport?.height ?? null;
+/** Closed, or on a computer: nothing watched. */
+const subscribeNothing = () => () => {};
+const noHeight = () => null;
+
+/**
+ * The panel growing out of the search page's field (R2), inspired by Animorio's «menu dei comandi», written from
+ * scratch with Web Animations and Framer Motion: the same place and width, the height uncovered from the field's down
+ * to the panel's (`clip-path`, the corners from the field's to a card's), then the clip goes and the card's shadow
+ * shows; the content fades in as it grows. Closing, the same way back (`usePresence`); opened again meanwhile, it grows
+ * back from where the closing was. Under reduced motion it only fades.
+ */
+function PanelGrowth({ still, fromHeight, className, children }: { still: boolean; fromHeight: number; className: string; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [isPresent, safeToRemove] = usePresence();
+  // `safeToRemove` is a new function at every render: kept here, it does not start the closing again (one closing,
+  // one animation).
+  const remove = useRef(safeToRemove);
+  useEffect(() => {
+    remove.current = safeToRemove;
+  });
+  // The closing on its way (or just finished, its end held), for a new opening to take over from where it is.
+  const closing = useRef<Animation | null>(null);
+  // An opening whose growth has not started yet (a close or StrictMode's second run before its first frames): when
+  // the panel comes back it is still an opening, with its groups' entrance, though a clip is already set.
+  const opening = useRef(false);
+  // The part hidden at the bottom, as a share of the panel and a length: the panel's own height is set by floating-ui
+  // after it mounts, so it is never measured here. One template, so the two ends interpolate.
+  const clipFor = (share: number, px: number, radius: number) => `inset(0px 0px calc(${share}% - ${px}px) 0px round ${radius}px)`;
+  const asField = clipFor(100, fromHeight, FIELD_RADIUS);
+  const asPanel = clipFor(0, 0, PANEL_RADIUS);
+  const curve = `cubic-bezier(${ease.out.join(', ')})`;
+  // Web Animations with no fill: once over, nothing holds the clip (the shadow outside it shows), and a closing
+  // interrupted by a new opening starts from where it was. (A DOM without them, a test's, draws the panel at once.)
+  const canAnimate = (el: HTMLElement) => typeof el.animate === 'function';
+
+  // Growing: from the field on an opening; from where a closing was, when the panel comes back before it went.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || !isPresent) return;
+    el.style.pointerEvents = '';
+    // Coming back before it went (the layout effects run before the closing's cleanup), or before its removal once
+    // it ended: from where the closing is.
+    let left: { clipPath: string; opacity: string } | null = null;
+    if (closing.current) {
+      const now = getComputedStyle(el);
+      left = { clipPath: now.clipPath, opacity: now.opacity };
+      closing.current.onfinish = null;
+      closing.current.cancel();
+      closing.current = null;
+    }
+    if (still) {
+      el.style.clipPath = '';
+      opening.current = false;
+      const fade = canAnimate(el)
+        ? el.animate([{ opacity: left ? Number(left.opacity) : 0 }, { opacity: 1 }], { duration: dur.pop * 1000, easing: curve })
+        : null;
+      return () => fade?.cancel();
+    }
+    if (left && left.clipPath && left.clipPath !== 'none') el.style.clipPath = left.clipPath;
+    // An opening (nothing left by a closing or a growth cut short): set before the first paint, or the panel would
+    // flash open meanwhile.
+    const held = el.style.clipPath && el.style.clipPath !== 'none' ? el.style.clipPath : '';
+    const isOpening = opening.current || !held;
+    const from = held || asField;
+    if (!canAnimate(el)) {
+      el.style.clipPath = '';
+      return;
+    }
+    el.style.clipPath = from;
+    opening.current = isOpening;
+    // Started once the first frame is drawn: mounting the menu's rows is a long frame, and an animation started before
+    // it would run its time out unseen, the panel appearing whole — and so is the render that brings it back during a
+    // closing: started there, it was nine tenths over by the first frame drawn.
+    let grow: Animation | null = null;
+    let groups: Animation[] = [];
+    const start = () => {
+      // The groups come one after the other as it grows: the first four, 30 ms apart, rising 4 px — on an opening only.
+      opening.current = false;
+      groups = isOpening
+        ? [...el.querySelectorAll<HTMLElement>('[cmdk-group]')].slice(0, GROUPS_ENTERING).map((group, i) =>
+          group.animate(
+            [{ opacity: 0, transform: 'translateY(4px)' }, { opacity: 1, transform: 'none' }],
+            { duration: dur.pop * 1000, delay: GROUPS_AT_MS + i * GROUP_STAGGER_MS, easing: curve, fill: 'backwards' },
+          ))
+        : [];
+      grow = el.animate([{ clipPath: from }, { clipPath: asPanel }], { duration: GROW_S * 1000, easing: curve });
+      // Grown, the clip goes: the card's own shadow shows.
+      grow.onfinish = () => {
+        el.style.clipPath = '';
+      };
+    };
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(start);
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      // Cut short (a closing, mid-growth): the closing starts from here, not from the field or the full panel.
+      if (grow?.playState === 'running') el.style.clipPath = getComputedStyle(el).clipPath;
+      if (grow) {
+        grow.onfinish = null;
+        grow.cancel();
+      }
+      groups.forEach((animation) => animation.cancel());
+    };
+    // Once per opening (or coming back): the panel's own re-renders do not grow it again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the field's height is read as it opens
+  }, [still, isPresent]);
+
+  // Closing: the same way back, from where it is (a growth cut short included); it takes no pointer meanwhile.
+  useEffect(() => {
+    if (isPresent) return;
+    const el = ref.current;
+    if (!el || !canAnimate(el)) {
+      remove.current?.();
+      return;
+    }
+    el.style.pointerEvents = 'none';
+    const now = getComputedStyle(el).clipPath;
+    const run = still
+      ? el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: dur.press * 1000, fill: 'forwards' })
+      : el.animate([{ clipPath: now && now !== 'none' ? now : asPanel }, { clipPath: asField }], { duration: SHRINK_S * 1000, easing: `cubic-bezier(${ease.inOut.join(', ')})`, fill: 'forwards' });
+    // Its end is held (`forwards`) until the panel goes: kept in the ref, so a panel brought back before its removal
+    // drops it (a finished closing left on it would clip the panel to the field once the new growth is over).
+    run.onfinish = () => remove.current?.();
+    closing.current = run;
+    return () => {
+      // Taken over by a new opening already (see the growth: a second cancel does nothing), or gone with the panel.
+      run.onfinish = null;
+      run.cancel();
+      if (closing.current === run) closing.current = null;
+    };
+    // Once per closing: the field's height and the curves are read as it starts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `asField`/`asPanel` are strings rebuilt each render
+  }, [isPresent, still]);
+
+  return (
+    <div ref={ref} className={cn('rounded-2xl shadow-lg', className)}>
+      <motion.div
+        className="flex min-h-0 flex-1 flex-col"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1, transition: { duration: dur.press, delay: still ? 0 : 0.04, ease: ease.out } }}
+      >
+        {children}
+      </motion.div>
+    </div>
   );
 }
 
@@ -146,6 +345,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   // can take that focus, so when the tour ends the box gets it back. Only if the box is still there:
   // the ref is empty once the palette has closed or moved on to another step.
   const boxRef = useRef<HTMLInputElement>(null);
+  const numberRef = useRef<HTMLInputElement>(null);
   const { tryStartTour } = useTour({
     theme: settings.theme as 'light' | 'dark',
     onComplete: (tour) => {
@@ -154,11 +354,19 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   });
   const [step, setStep] = useState<PaletteStep>('select_act');
   const [selectedAct, setSelectedAct] = useState('');
-  const [article, setArticle] = useState('1');
+  // Empty, its placeholder saying what it takes: a «1» standing there took Backspace's first press (Bill).
+  const [article, setArticle] = useState('');
   const [actNumber, setActNumber] = useState('');
   const [actDate, setActDate] = useState('');
   const [inputValue, setInputValue] = useState('');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  // Enter pressed while the server was still naming the act: the words it was pressed on (the field's rule, R2).
+  const [waitingFor, setWaitingFor] = useState<string | null>(null);
+  // The arrows moved the chosen row since the words last changed: Enter is then cmdk's, for the row chosen.
+  const [moved, setMoved] = useState(false);
+  // A choice made in this opening: closed after it, the search page's field is emptied; closed without one (Esc, a
+  // click outside, ✕), the words go back to it — one field (R2).
+  const [chose, setChose] = useState(false);
   const [filters, setFilters] = useState<SearchFilters>(defaultSearchFilters);
   const isDesktop = useIsDesktop();
   const still = Boolean(useReducedMotion());
@@ -188,12 +396,14 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     if (isOpen && commandPaletteQuery !== null) takeCommandPaletteQuery();
   }, [isOpen, commandPaletteQuery, takeCommandPaletteQuery]);
 
-  // Trigger Command Palette tour on first open
+  // The palette's tour on its first opening — an empty one: opened with words or a key typed on the search page's
+  // field (R2), the tour would take the focus and the letters that follow.
+  const startTourIfEmpty = useEffectEvent(() => {
+    if (!inputValue.trim()) tryStartTour('commandPalette');
+  });
   useEffect(() => {
-    if (isOpen) {
-      tryStartTour('commandPalette');
-    }
-  }, [isOpen, tryStartTour]);
+    if (isOpen) startTourIfEmpty();
+  }, [isOpen]);
 
   // Sorted custom aliases for display (by usage, then alphabetically)
   const sortedAliases = useMemo(() => {
@@ -260,10 +470,11 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
       const timer = setTimeout(() => {
         setStep('select_act');
         setSelectedAct('');
-        setArticle('1');
+        setArticle('');
         setActNumber('');
         setActDate('');
         setInputValue('');
+        setWaitingFor(null);
       }, 200);
       return () => clearTimeout(timer);
     }
@@ -284,6 +495,12 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     return () => document.removeEventListener('keydown', down);
   }, [isOpen, onClose]);
 
+  /** A choice made: the menu closes and the field is left empty. */
+  const done = useCallback(() => {
+    setChose(true);
+    onClose();
+  }, [onClose]);
+
   const handleSelectAct = useCallback((actValue: string) => {
     setSelectedAct(actValue);
     setInputValue('');
@@ -299,20 +516,20 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     const qn = selectQuickNorm(id);
     if (qn) {
       onSearch(qn.searchParams);
-      onClose();
+      done();
     }
-  }, [selectQuickNorm, onSearch, onClose]);
+  }, [selectQuickNorm, onSearch, done]);
 
   const handleOpenQuickNormsManager = useCallback(() => {
-    onClose();
+    done();
     // Small delay to let the palette close before opening manager
     setTimeout(() => openQuickNormsManager(), 100);
-  }, [onClose, openQuickNormsManager]);
+  }, [done, openQuickNormsManager]);
 
   const handleOpenAliasManager = useCallback(() => {
-    onClose();
+    done();
     setTimeout(() => openAliasManager(), 100);
-  }, [onClose, openAliasManager]);
+  }, [done, openAliasManager]);
 
   const handleSelectAlias = useCallback((alias: CustomAlias) => {
     trackAliasUsage(alias.id);
@@ -328,9 +545,9 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
         version_date: '',
         filters,
       });
-      onClose();
+      done();
     }
-  }, [trackAliasUsage, onSearch, onClose, filters]);
+  }, [trackAliasUsage, onSearch, done, filters]);
 
   const handleSelectPreset = useCallback((trigger: string) => {
     const preset = catalog.presets[trigger];
@@ -352,16 +569,16 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   const handleSearchTopic = useCallback(() => {
     if (!topic) return;
     openTopicSearch({ tema: topic }, `Tema: ${topic}`);
-    onClose();
+    done();
     onShowSearch?.();
-  }, [topic, openTopicSearch, onClose, onShowSearch]);
+  }, [topic, openTopicSearch, done, onShowSearch]);
 
   const handleOpenDecision = useCallback(() => {
     if (!decisionRef) return;
     openDecision(decisionRef, { fromLink: true });
-    onClose();
+    done();
     onShowSearch?.();
-  }, [decisionRef, openDecision, onClose, onShowSearch]);
+  }, [decisionRef, openDecision, done, onShowSearch]);
 
   const handleCitationSearch = useCallback(() => {
     if (!parsedCitation) return;
@@ -373,7 +590,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
 
     if (citationReady) {
       onSearch(citationSearchParams(parsedCitation, { filters }));
-      onClose();
+      done();
     } else if (parsedCitation.act_type) {
       setSelectedAct(parsedCitation.act_type);
       if (parsedCitation.article) setArticle(parsedCitation.article);
@@ -391,7 +608,34 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
         setStep('input_article');
       }
     }
-  }, [parsedCitation, citationReady, onSearch, onClose, filters, trackAliasUsage]);
+  }, [parsedCitation, citationReady, onSearch, done, filters, trackAliasUsage]);
+
+  // The answer Enter was waiting for has come: run it, once.
+  const runWhenAnswered = useEffectEvent(() => {
+    setWaitingFor(null);
+    if (decisionRef) handleOpenDecision();
+    else if (parsedCitation) handleCitationSearch();
+    else if (topic) handleSearchTopic();
+  });
+  useEffect(() => {
+    // Not once closed: Esc during the wait drops it (the reset clears it 200 ms later).
+    if (isOpen && waitingFor !== null && waitingFor === inputValue && !resolvingRemotely) runWhenAnswered();
+  }, [isOpen, waitingFor, inputValue, resolvingRemotely]);
+  const waiting = waitingFor !== null && waitingFor === inputValue;
+
+  /** One step back: the article to the details (when the act has them) or to the act, the details to the act. */
+  const stepBack = useCallback(() => {
+    if (step === 'input_article' && requiresDetails(selectedAct)) setStep('input_details');
+    else if (step !== 'select_act') setStep('select_act');
+  }, [step, selectedAct]);
+  /** Backspace on an empty field goes back a step, as in the field's crumb (R2). */
+  const backOnEmpty = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    // A held key does not run through the steps: it empties the field and stops there.
+    if (event.key === 'Backspace' && event.currentTarget.value === '' && !event.repeat) {
+      event.preventDefault();
+      stepBack();
+    }
+  };
 
   const handleSubmitArticle = useCallback(() => {
     if (!selectedAct || !article) return;
@@ -405,8 +649,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
       version_date: '',
       filters,
     });
-    onClose();
-  }, [selectedAct, article, actNumber, actDate, onSearch, onClose, filters]);
+    done();
+  }, [selectedAct, article, actNumber, actDate, onSearch, done, filters]);
 
   const handleSubmitDetails = useCallback(() => {
     if (!selectedAct || !actNumber || !actDate) return;
@@ -431,20 +675,40 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
       filters,
     });
 
-    onClose();
-  }, [selectedAct, actNumber, actDate, filters, onBrowseStructure, onClose]);
+    done();
+  }, [selectedAct, actNumber, actDate, filters, onBrowseStructure, done]);
 
   /** The act as a lawyer names it (`paletteActName`: case-insensitive, the raw value when unknown). */
   const selectedActLabel = useMemo(() => paletteActName(selectedAct), [selectedAct]);
+  /** The crumb in the field, and its name: the act, with its number and year on the article's step. */
+  const crumbText = `${selectedActLabel}${step === 'input_article' && actNumber ? ` ${actNumber}${actDate ? `/${actDate.slice(-4)}` : ''}` : ''}`;
 
-  // On a computer the palette drops from the search page's field, as wide as the field and «Opzioni»;
+  // On a computer the palette drops from the search page's field, as wide as the field, over it;
   // where no field is on screen (another page, Focus mode) it hangs at the top, centred. The form is
   // looked up at every render while open, so a field that mounts later (the address /sentenze) or goes
   // is followed, and passed at render time (gotcha 13).
   const field = isOpen && isDesktop ? document.getElementById(SEARCH_FIELD_FORM_ID) : null;
   const anchor = field?.isConnected ? field : null;
+  // The height the panel grows from: the field's, where it grows out of it; a field's height elsewhere (a phone's bar).
+  const growFrom = anchor?.offsetHeight || 44;
+  // A phone: the panel as tall as what the keyboard leaves, and the page under it holds still (the sheet it replaced
+  // did both).
+  const watchViewport = isOpen && !isDesktop;
+  const shownHeight = useSyncExternalStore(
+    watchViewport ? subscribeViewport : subscribeNothing,
+    watchViewport ? viewportHeight : noHeight,
+    noHeight,
+  );
+  useEffect(() => {
+    if (!isOpen || isDesktop) return;
+    const before = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = before;
+    };
+  }, [isOpen, isDesktop]);
   // A dialog on a computer too: the focus stays inside while it is open and goes back where it was
-  // («Opzioni», the field) when it closes. Placed only when the field is there.
+  // (the field) when it closes. Placed only when the field is there.
   const { refs, floatingStyles, context } = useFloating({
     open: isOpen,
     elements: { reference: anchor },
@@ -453,30 +717,70 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     middleware: [
       // Its top on the field's: the panel's own box takes the field's place.
       offset(({ rects }) => -rects.reference.height),
-      // As wide as the field and «Opzioni»; one height while the box filters the lists, so the panel
-      // does not jump under the hand at every letter.
+      // As wide as the field; as tall as what it holds, up to the height it always had (Bill: one row is not a
+      // 640 px panel), the window allowing.
       size({
         padding: 16,
         apply({ rects, availableHeight, elements }) {
-          Object.assign(elements.floating.style, {
-            width: `${rects.reference.width}px`,
-            height: `${Math.min(PANEL_MAX_HEIGHT, Math.max(320, availableHeight))}px`,
-          });
+          elements.floating.style.width = `${rects.reference.width}px`;
+          elements.floating.style.setProperty('--palette-max-h', `${Math.min(PANEL_MAX_HEIGHT, Math.max(320, availableHeight))}px`);
         },
       }),
     ],
     whileElementsMounted: autoUpdate,
   });
+  // The field gone while the menu is open (another page, Focus mode): what `size` wrote on the box goes with it, or
+  // the panel hung at the top would keep the field's width and height.
+  useLayoutEffect(() => {
+    if (anchor || !isDesktop) return;
+    const box = refs.floating.current;
+    box?.style.removeProperty('width');
+    box?.style.removeProperty('--palette-max-h');
+  }, [anchor, isDesktop, refs]);
   const role = useRole(context, { role: 'dialog' });
-  // What had the focus as the palette opened («Opzioni», the field, a button elsewhere): it gets it back.
+  // What had the focus as the palette opened (the field, a button elsewhere): it gets it back.
   // Taken during render as the palette opens (own state, no effect), before the box takes the focus.
   const [wasOpen, setWasOpen] = useState(false);
   const [opener, setOpener] = useState<HTMLElement | null>(null);
   if (isOpen !== wasOpen) {
     setWasOpen(isOpen);
-    if (isOpen) setOpener(document.activeElement instanceof HTMLElement ? document.activeElement : null);
+    if (isOpen) {
+      setOpener(document.activeElement instanceof HTMLElement ? document.activeElement : null);
+      setChose(false);
+      // Opened again before the reset after a close (200 ms): it starts at its first step all the same, with no
+      // words but those handed over.
+      setStep('select_act');
+      setSelectedAct('');
+      setArticle('');
+      setActNumber('');
+      setActDate('');
+      setWaitingFor(null);
+      setMoved(false);
+      if (commandPaletteQuery === null) setInputValue('');
+    }
   }
   const { getFloatingProps } = useInteractions([role]);
+
+  // Closed: its words go back to the search page's field when no choice was made (R2: one field), the field is
+  // emptied after a choice. Only on a closing, not on the first draw.
+  const wordsNow = useRef('');
+  const stepNow = useRef<PaletteStep>(step);
+  const choseNow = useRef(chose);
+  useEffect(() => {
+    wordsNow.current = inputValue;
+    stepNow.current = step;
+    choseNow.current = chose;
+  });
+  const closedOnce = useRef(isOpen);
+  useEffect(() => {
+    if (isOpen) {
+      closedOnce.current = true;
+      return;
+    }
+    if (!closedOnce.current) return;
+    closedOnce.current = false;
+    returnWordsToSearchField(!choseNow.current && stepNow.current === 'select_act' ? wordsNow.current.trim() : '');
+  }, [isOpen]);
 
   // The step's content slides in from the side it moved to; the first step of an opening does not move.
   const stepMotion = direction === 0
@@ -490,8 +794,10 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   const activeFilters = countActiveFilters(filters);
 
   // ── The field: the one strong thing of the panel ────────────────────────────────────────────────
+  const waitingLine = { icon: Search, tone: 'animate-pulse text-ink-500 dark:text-ink-400', text: 'Cerco l’atto… la ricerca parte appena lo trovo', action: '' };
   const preview = decisionRef
     ? { icon: Gavel, tone: 'text-emerald-700 dark:text-emerald-400', text: `Sentenza → ${formatDecisionShort(decisionRef)}`, action: 'Invio apre' }
+    : waiting ? waitingLine
     : parsedCitation && citationPreview
       ? {
           icon: parsedCitation.fromAlias ? Tag : Zap,
@@ -499,9 +805,13 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
             ? 'text-toga-700 dark:text-toga-300'
             : citationReady ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400',
           text: `${parsedCitation.fromAlias ? 'tramite alias → ' : ''}${citationPreview}`,
-          action: citationReady ? 'Invio ricerca' : 'Invio completa',
+          action: citationReady ? 'Invio cerca' : 'Invio completa',
         }
-      : null;
+      : resolvingRemotely
+        ? { ...waitingLine, text: 'Cerco l’atto…' }
+        : topic
+          ? { icon: Gavel, tone: 'text-emerald-700 dark:text-emerald-400', text: `Cerca «${topic}» nelle sentenze della Cassazione`, action: 'Invio cerca' }
+          : null;
 
   const helpLine = step === 'select_act'
     ? 'Scrivi una citazione: art. 2043 c.c., l. 241/1990, Cass. civ. 10787/2024'
@@ -525,17 +835,31 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
               ref={boxRef}
               autoFocus
               value={inputValue}
-              onValueChange={setInputValue}
+              onValueChange={(value) => {
+                // A change of the words drops a wait: a new Enter is needed, even back on the same words.
+                setWaitingFor(null);
+                setMoved(false);
+                setInputValue(value);
+              }}
+              enterKeyHint="search"
               aria-describedby="command-palette-help"
               placeholder="Atto o citazione, es. art 2043 cc"
               // 18 px, and never under 16 px: with the text size «piccolo» `text-lg` was 15.75 px, and Safari on an
               // iPhone zooms into a field under 16 px (`FIELD_TEXT`).
               className="h-full w-full min-w-0 bg-transparent text-[length:max(1.125rem,16px)] font-medium text-ink-900 outline-none placeholder:font-normal placeholder:text-ink-500 focus-visible:ring-0 focus-visible:ring-offset-0 dark:text-ink-50 dark:placeholder:text-ink-400"
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && decisionRef) {
+                // The field's order (R2): a decision, then the server still naming the act (the search runs when it
+                // answers), then a norm — unless the arrows chose another row, which Enter then picks.
+                if (['ArrowDown', 'ArrowUp', 'Home', 'End', 'PageDown', 'PageUp'].includes(e.key)) setMoved(true);
+                // An Enter that ends an IME composition chooses the composed word, it searches nothing.
+                if (e.key !== 'Enter' || moved || e.nativeEvent.isComposing) return;
+                if (decisionRef) {
                   e.preventDefault();
                   handleOpenDecision();
-                } else if (e.key === 'Enter' && parsedCitation) {
+                } else if (resolvingRemotely) {
+                  e.preventDefault();
+                  setWaitingFor(inputValue);
+                } else if (parsedCitation) {
                   e.preventDefault();
                   handleCitationSearch();
                 }
@@ -544,17 +868,30 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
           </div>
         )}
 
+        {step !== 'select_act' && (
+          // The crumb in the field (R2): the act chosen, which takes you back a step; Backspace on an empty field too.
+          <button
+            type="button"
+            onClick={stepBack}
+            aria-label={`Torna indietro: ${crumbText}`}
+            className={cn('inline-flex min-h-[44px] max-w-[45%] shrink-0 items-center gap-1 rounded-md bg-ink-100 px-2 text-sm font-medium text-ink-800 hover:bg-ink-200 md:min-h-9 dark:bg-ink-800 dark:text-ink-100 dark:hover:bg-ink-700', FOCUS_RING)}
+          >
+            <span className="truncate">{crumbText}</span>
+            <ChevronRight size={14} aria-hidden className="shrink-0" />
+          </button>
+        )}
         {step === 'input_details' && (
           <div className="flex min-w-0 flex-1 gap-2 py-1">
             <input
               type="text"
+              ref={numberRef}
               aria-label="Numero dell'atto"
               placeholder="Numero, es. 241"
               value={actNumber}
               onChange={(e) => setActNumber(e.target.value)}
               className={cn(FIELD_INPUT, 'flex-[1.5]')}
               autoFocus
-              onKeyDown={(e) => e.key === 'Enter' && handleSubmitDetails()}
+              onKeyDown={(e) => (e.key === 'Enter' ? handleSubmitDetails() : backOnEmpty(e))}
             />
             <input
               type="text"
@@ -563,7 +900,14 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
               onChange={(e) => setActDate(e.target.value)}
               placeholder="Anno o data"
               className={cn(FIELD_INPUT, 'flex-1')}
-              onKeyDown={(e) => e.key === 'Enter' && handleSubmitDetails()}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSubmitDetails();
+                // Backspace on an empty date goes back to the number first, while it holds one.
+                else if (e.key === 'Backspace' && e.currentTarget.value === '' && actNumber && !e.repeat) {
+                  e.preventDefault();
+                  numberRef.current?.focus();
+                } else backOnEmpty(e);
+              }}
             />
           </div>
         )}
@@ -578,82 +922,47 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
               onChange={(e) => setArticle(e.target.value)}
               className={FIELD_INPUT}
               autoFocus
-              onKeyDown={(e) => e.key === 'Enter' && handleSubmitArticle()}
+              onKeyDown={(e) => (e.key === 'Enter' ? handleSubmitArticle() : backOnEmpty(e))}
             />
           </div>
         )}
       </motion.div>
 
-      {/* On a phone the sheet's own «Chiudi» closes it. */}
-      {isDesktop && (
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Chiudi"
-          className={cn('inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-800 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-ink-100', FOCUS_RING)}
-        >
-          <X size={18} aria-hidden />
-        </button>
-      )}
+      {/* «Chiudi», on a phone too: the panel has no other (R2). */}
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Chiudi"
+        className={cn('inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-800 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-ink-100', FOCUS_RING)}
+      >
+        <X size={18} aria-hidden />
+      </button>
     </div>
   );
 
   // The help line, or what the box was read as, 10 px under the field and on the line of its text: the
   // field's edge (12 px of row, 1 of border, 12 of padding), then on the first step the icon's 20 px and
   // the gap's 12. The visible line is aria-hidden: the status region says it.
+  // The line under the box says what no row says: the wait for the server. A decision, a norm or a topic read in the
+  // box is its row, the chosen one, with «↵» — a second line saying the same was one too many (Bill).
+  const lineSays = step === 'select_act' && preview && (waiting || resolvingRemotely) ? preview : null;
   const fieldLine = (
     <div aria-hidden className="flex min-h-5 items-center gap-3 pb-3 pl-[25px] pr-4 pt-2.5 text-xs">
       {step === 'select_act' && (
         <span className="flex w-5 shrink-0 justify-center">
-          {preview && <preview.icon size={14} className={preview.tone} />}
+          {lineSays && <lineSays.icon size={14} className={lineSays.tone} />}
         </span>
       )}
-      {step === 'select_act' && preview ? (
+      {lineSays ? (
         <>
           <span id="command-palette-help" className="sr-only">{helpLine}</span>
-          <span className={cn('min-w-0 flex-1 truncate font-medium', preview.tone)}>{preview.text}</span>
-          <span className={cn('shrink-0', SUBTLE)}>{preview.action}</span>
+          <span className={cn('min-w-0 flex-1 truncate font-medium', lineSays.tone)}>{lineSays.text}</span>
+          <span className={cn('shrink-0', SUBTLE)}>{lineSays.action}</span>
         </>
       ) : (
         <span id="command-palette-help" className={SUBTLE}>{helpLine}</span>
       )}
     </div>
-  );
-
-  // The steps, a thin trail with the one in use in ink.
-  const stepClass = (current: boolean) => cn(
-    'inline-flex min-w-[44px] items-center justify-center rounded px-1 md:min-w-0 md:py-0.5',
-    TOUCH_TARGET_RESPONSIVE,
-    current ? 'font-medium text-ink-900 dark:text-ink-50' : SUBTLE,
-  );
-  const steps = (
-    <nav aria-label="Passi della ricerca" onKeyDown={keepKeys} className="flex items-center gap-1 border-t border-ink-100 px-3 text-xs dark:border-ink-800">
-      <button
-        type="button"
-        onClick={() => setStep('select_act')}
-        aria-current={step === 'select_act' ? 'step' : undefined}
-        className={cn(stepClass(step === 'select_act'), 'cursor-pointer hover:text-ink-900 dark:hover:text-ink-50', FOCUS_RING)}
-      >
-        Atto
-      </button>
-      {requiresDetails(selectedAct) && (
-        <>
-          <ChevronRight size={12} aria-hidden className="text-ink-400 dark:text-ink-500" />
-          <button
-            type="button"
-            onClick={() => selectedAct && setStep('input_details')}
-            aria-current={step === 'input_details' ? 'step' : undefined}
-            className={cn(stepClass(step === 'input_details'), 'cursor-pointer hover:text-ink-900 dark:hover:text-ink-50', FOCUS_RING)}
-          >
-            Dettagli
-          </button>
-        </>
-      )}
-      <ChevronRight size={12} aria-hidden className="text-ink-400 dark:text-ink-500" />
-      <span aria-current={step === 'input_article' ? 'step' : undefined} className={stepClass(step === 'input_article')}>
-        <span>Articolo</span>
-      </span>
-    </nav>
   );
 
   // ── What the box was read as: one strong row, the chosen one, in place of two columns with nothing
@@ -699,14 +1008,16 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
           heading={group.heading}
           className={GROUP_WITH_HEADING}
         >
-          {group.acts.map((act) => (
-            <PaletteRow key={act.value} value={`atto ${act.value}`} onSelect={() => handleSelectAct(act.value)} still={still}>
-              <span className="min-w-0 flex-1 line-clamp-2">
-                <span className="text-ink-900 dark:text-ink-50">{act.name}</span>
-                {act.abbreviation && <span className={SUBTLE}> · {act.abbreviation}</span>}
-              </span>
-            </PaletteRow>
-          ))}
+          <AnimatePresence initial={false} mode="popLayout">
+            {group.acts.map((act) => (
+              <PaletteRow key={act.value} value={`atto ${act.value}`} onSelect={() => handleSelectAct(act.value)} still={still} entering>
+                <span className="min-w-0 flex-1 line-clamp-2">
+                  <span className="text-ink-900 dark:text-ink-50"><Matched text={act.name} query={inputValue} /></span>
+                  {act.abbreviation && <span className={SUBTLE}> · <Matched text={act.abbreviation} query={inputValue} /></span>}
+                </span>
+              </PaletteRow>
+            ))}
+          </AnimatePresence>
         </Command.Group>
       ))}
     </div>
@@ -737,15 +1048,17 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
           {quickNorms.length === 0 ? (
             <p className={QUIET_LINE}>Nessun preferito: il fulmine su un articolo lo aggiunge qui</p>
           ) : (
-            visibleQuickNorms.map((qn) => (
-              <PaletteRow key={qn.id} value={`preferito ${qn.id}`} onSelect={() => handleSelectQuickNorm(qn.id)} still={still}>
-                <Zap size={14} aria-hidden className="shrink-0 fill-amber-500 text-amber-600 dark:text-amber-400" />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-ink-900 dark:text-ink-50">{qn.label}</span>
-                  <span className={cn('block truncate text-xs', SUBTLE)}>{paletteActName(qn.searchParams.act_type)}</span>
-                </span>
-              </PaletteRow>
-            ))
+            <AnimatePresence initial={false} mode="popLayout">
+              {visibleQuickNorms.map((qn) => (
+                <PaletteRow key={qn.id} value={`preferito ${qn.id}`} onSelect={() => handleSelectQuickNorm(qn.id)} still={still} entering>
+                  <Zap size={14} aria-hidden className="shrink-0 fill-amber-500 text-amber-600 dark:text-amber-400" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-ink-900 dark:text-ink-50"><Matched text={qn.label} query={inputValue} /></span>
+                    <span className={cn('block truncate text-xs', SUBTLE)}>{paletteActName(qn.searchParams.act_type)}</span>
+                  </span>
+                </PaletteRow>
+              ))}
+            </AnimatePresence>
           )}
           {hiddenQuickNorms > 0 && (
             <PaletteRow value="preferiti tutti" onSelect={handleOpenQuickNormsManager} still={still} className="text-toga-700 dark:text-toga-300">
@@ -763,15 +1076,17 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
               +{presetEntries.length} già pronti{presetHint && `: ${presetHint}…`}
             </p>
           )}
+          <AnimatePresence initial={false} mode="popLayout">
           {visibleAliases.map((alias) => (
-            <PaletteRow key={alias.id} value={`alias ${alias.id}`} onSelect={() => handleSelectAlias(alias)} still={still}>
+            <PaletteRow key={alias.id} value={`alias ${alias.id}`} onSelect={() => handleSelectAlias(alias)} still={still} entering>
               <Tag size={14} aria-hidden className={ROW_ICON} />
               <span className="min-w-0 flex-1">
-                <span className="block truncate font-medium text-ink-900 dark:text-ink-50">{alias.trigger}</span>
+                <span className="block truncate font-medium text-ink-900 dark:text-ink-50"><Matched text={alias.trigger} query={inputValue} /></span>
                 <span className={cn('block truncate text-xs', SUBTLE)}>→ {alias.expandTo}</span>
               </span>
             </PaletteRow>
           ))}
+          </AnimatePresence>
           {/* The door to the manager. Rendered whatever the user owns, on purpose: gated on owning an
               alias, it hid the only way to make the first one. A row of the list, so typing «alias»
               finds it. */}
@@ -789,11 +1104,12 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
       {/* Presets — only while the user is typing, under their own heading. */}
       {visiblePresets.length > 0 && (
         <Command.Group heading="In dotazione · non devi crearli" className={GROUP_WITH_HEADING}>
+          <AnimatePresence initial={false} mode="popLayout">
           {visiblePresets.map(([trigger, preset]) => (
-            <PaletteRow key={trigger} value={`preset ${trigger}`} onSelect={() => handleSelectPreset(trigger)} still={still}>
+            <PaletteRow key={trigger} value={`preset ${trigger}`} onSelect={() => handleSelectPreset(trigger)} still={still} entering>
               <Sparkles size={14} aria-hidden className={ROW_ICON} />
               <span className="min-w-0 flex-1">
-                <span className="block truncate font-medium text-ink-900 dark:text-ink-50">{trigger}</span>
+                <span className="block truncate font-medium text-ink-900 dark:text-ink-50"><Matched text={trigger} query={inputValue} /></span>
                 <span className={cn('block truncate text-xs', SUBTLE)}>
                   → {[paletteActName(preset.act_type), preset.act_number && `n. ${preset.act_number}`, preset.date]
                     .filter(Boolean)
@@ -802,20 +1118,24 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
               </span>
             </PaletteRow>
           ))}
+          </AnimatePresence>
         </Command.Group>
       )}
     </div>
   );
 
   // ── The body of each step ───────────────────────────────────────────────────────────────────────
-  const scrollColumn = isDesktop ? 'min-h-0 overflow-y-auto overscroll-contain custom-scrollbar pb-2' : 'pb-2';
+  // `relative`: a row filtered out pops out of the list (`popLayout`, absolute) against its own column, which clips it.
+  const scrollColumn = isDesktop ? 'relative min-h-0 overflow-y-auto overscroll-contain custom-scrollbar pb-2' : 'relative pb-2';
   // «A portata di mano» has rows: something saved at rest, or a match while typing.
   const atHandHasRows = typed
     ? visibleQuickNorms.length > 0 || visibleAliases.length > 0 || showAliasDoor || visiblePresets.length > 0
     : quickNorms.length > 0 || hasAliases;
   const selectBody = (
     <Command.List
-      className={cn('px-2', isDesktop && 'h-full [&>[cmdk-list-sizer]]:flex [&>[cmdk-list-sizer]]:h-full [&>[cmdk-list-sizer]]:flex-col')}
+      // `min-h-0`: in a panel as tall as its content, up to its maximum, the list may shrink below its rows — the
+      // columns then scroll — instead of holding the panel at its full length. A flex column all the way down (a percentage height finds nothing definite in a panel sized by its content).
+      className={cn('px-2', isDesktop && 'flex min-h-0 flex-1 flex-col [&>[cmdk-list-sizer]]:flex [&>[cmdk-list-sizer]]:min-h-0 [&>[cmdk-list-sizer]]:flex-1 [&>[cmdk-list-sizer]]:flex-col')}
     >
       {/* A topic, not a decision or a norm: its own line, over the two columns */}
       {topic && (
@@ -963,12 +1283,15 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
         <p role="status" className="sr-only">
           {decisionRef
             ? `Sentenza: ${formatDecisionShort(decisionRef)}. Invio per aprire.`
-            : preview ? `${preview.text}${preview.text.endsWith('.') ? '' : '.'} ${citationReady ? 'Premi Invio per cercare.' : 'Premi Invio per completare.'}`
-              : topic ? `Cerca "${topic}" nelle sentenze della Cassazione.` : ''}
+            : waiting ? 'Cerco l’atto… la ricerca parte appena lo trovo.'
+            : parsedCitation && citationPreview
+              ? `${preview!.text}${preview!.text.endsWith('.') ? '' : '.'} ${citationReady ? 'Premi Invio per cercare.' : 'Premi Invio per completare.'}`
+              : resolvingRemotely
+                ? 'Cerco l’atto…'
+                : topic ? `Cerca "${topic}" nelle sentenze della Cassazione.` : ''}
         </p>
         {fieldRow}
         {fieldLine}
-        {steps}
       </div>
       {isDesktop ? (
         <>
@@ -978,7 +1301,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
         </>
       ) : (
         // On a phone the field stays at the top and the rest scrolls under it.
-        <motion.div layoutScroll className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <motion.div layoutScroll className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {body}
           {filtersBlock}
         </motion.div>
@@ -986,22 +1309,6 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     </Command>
     </ChosenRowScope.Provider>
   );
-
-  // A phone: a sheet from the bottom, the whole width (`ui/Sheet`, its own «Chiudi»).
-  if (!isDesktop) {
-    if (!isOpen) return null;
-    return (
-      <Sheet
-        title="Menu di ricerca"
-        onClose={onClose}
-        initialFocusRef={step === 'select_act' ? boxRef : undefined}
-        closeOnBackdrop
-        className={Z_INDEX.commandPalette}
-      >
-        {content}
-      </Sheet>
-    );
-  }
 
   return (
     <FloatingPortal>
@@ -1011,7 +1318,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
         <div
           data-find-overlay=""
           aria-hidden
-          className={cn('fixed inset-0 bg-ink-950/20 dark:bg-ink-950/50', Z_INDEX.commandPalette)}
+          // `touch-none`: a drag on it does not scroll the page under it (iOS).
+          className={cn('fixed inset-0 touch-none bg-ink-950/20 dark:bg-ink-950/50', Z_INDEX.commandPalette)}
           onClick={onClose}
         />
       )}
@@ -1033,29 +1341,29 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
             ref={refs.setFloating}
             {...getFloatingProps()}
             aria-label="Menu di ricerca"
-            style={anchor ? floatingStyles : undefined}
+            style={anchor
+              ? floatingStyles
+              : !isDesktop && shownHeight
+                ? { ['--palette-max-h' as string]: `min(40rem, calc(${shownHeight}px - 1rem - env(safe-area-inset-top)))` }
+                : undefined}
             className={cn(
               // The box holds the panel's height; only the panel takes the pointer (a shorter step
               // leaves the rest of the box to the backdrop's click).
               'pointer-events-none flex flex-col',
-              anchor ? 'fixed' : 'fixed inset-x-4 top-16 mx-auto h-[min(40rem,calc(100dvh-6rem))] max-w-3xl',
+              anchor
+                ? 'fixed'
+                : isDesktop
+                  ? 'fixed inset-x-4 top-16 mx-auto max-w-3xl [--palette-max-h:min(40rem,calc(100dvh-6rem))]'
+                  // A phone: the page's width less 16 px each side, dropping from the bar at the top (R2).
+                  : 'fixed inset-x-4 top-[calc(env(safe-area-inset-top)+0.5rem)] [--palette-max-h:min(40rem,calc(100dvh-1rem-env(safe-area-inset-top)))]',
               Z_INDEX.commandPalette,
             )}
           >
-            {/* It drops a few pixels from the field and fades in (about 160 ms), and leaves faster;
-                under reduced motion it only fades. */}
-            <motion.div
-              initial={still ? { opacity: 0 } : { opacity: 0, y: -6 }}
-              animate={still ? { opacity: 1 } : { opacity: 1, y: 0 }}
-              exit={still ? { opacity: 0, transition: { duration: dur.press } } : { opacity: 0, y: -4, transition: { duration: dur.press, ease: ease.out } }}
-              transition={{ duration: dur.pop, ease: ease.out }}
-              className={cn(
-                'pointer-events-auto flex min-h-0 max-h-full flex-col overflow-hidden rounded-xl border border-ink-200 bg-white shadow-xl dark:border-ink-700 dark:bg-ink-900',
-                step === 'select_act' && 'flex-1',
-              )}
-            >
+            {/* The field grows into the panel (R2): `PanelGrowth`. As tall as its content, up to `--palette-max-h`: the
+                lists scroll inside it past that. */}
+            <PanelGrowth still={still} fromHeight={growFrom} className="pointer-events-auto flex min-h-0 max-h-[var(--palette-max-h,40rem)] flex-col overflow-hidden border border-ink-200 bg-white dark:border-ink-700 dark:bg-ink-900">
               {content}
-            </motion.div>
+            </PanelGrowth>
           </div>
         )}
       </AnimatePresence>

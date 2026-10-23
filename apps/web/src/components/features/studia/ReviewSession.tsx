@@ -6,7 +6,8 @@ import { Z_INDEX } from '../../../constants/zIndex';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { useAppStore } from '../../../store/useAppStore';
 import type { AncoraScheda, Materia, Progressi } from '../../../types/studia';
-import { ConfirmDialog } from '../../ui/ConfirmDialog';
+import { WireConfirm } from '../../ui/wireConfirm/WireConfirm';
+import { stopMessage } from './reviewStop';
 import { Toast } from '../../ui/Toast';
 import { DossierItemReader } from '../dossier/DossierItemReader';
 import { formatInterval } from './formatInterval';
@@ -235,16 +236,26 @@ export function ReviewSession() {
   const istituto = (materia && params.get('istituto')) || undefined;
 
   const [confirmStop, setConfirmStop] = useState(false);
+  // «Interrompi» in the header: the confirmation is drawn from it, whether it was pressed or Esc asked (U1c). Kept in
+  // state (a callback ref), as the confirmation reads it while rendering.
+  const [stopButton, setStopButton] = useState<HTMLButtonElement | null>(null);
+  // Going on, the focus goes back to the card (its answer once shown, else its question): on «Interrompi», Space
+  // — the answer's key, which the session leaves to a focused button — would press it again.
+  const cardColumn = useRef<HTMLDivElement>(null);
+  const backToCard = () => {
+    const places = cardColumn.current?.querySelectorAll<HTMLElement>('[tabindex="-1"]');
+    return places && places.length > 0 ? places[places.length - 1] : null;
+  };
   const [panel, setPanel] = useState<{ step: number; anchor: AncoraScheda } | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
 
   // Esc closes the article beside the card first (on a phone the sheet closes itself); a second one asks to stop,
-  // or leaves when there is no card to interrupt.
+  // or leaves when there is nothing to interrupt: no card, or none graded yet (U1c: stopping then loses nothing).
   const panelOpen = useRef(false);
-  const cardOnScreen = useRef(false);
+  const askToStop = useRef(false);
   const handleEscape = useCallback(() => {
     if (panelOpen.current) setPanel(null);
-    else if (cardOnScreen.current) setConfirmStop(true);
+    else if (askToStop.current) setConfirmStop(true);
     else navigate(HOME_PATH);
   }, [navigate]);
 
@@ -264,14 +275,17 @@ export function ReviewSession() {
   else if (!loading && remaining > total) setTotal(remaining);
 
   const showCard = !loadError && !loading && !done && current !== null;
+  // The confirmation only once a card is graded (U1c, Bill's choice): with none, «Interrompi» leaves at once. A grade
+  // still on its way is not waited for: its post goes on after the session has gone.
+  const asksToStop = showCard && summary.reviewed > 0;
   // An article belongs to the step it was opened at: a card that comes back is a new step.
   const openAnchor = panel && current && panel.step === step ? panel.anchor : null;
   // In the commit, not after it: an Esc pressed as soon as a card is drawn must already find it there, or it would
   // leave without asking.
   useLayoutEffect(() => {
     panelOpen.current = openAnchor !== null && desktop;
-    cardOnScreen.current = showCard;
-  }, [openAnchor, desktop, showCard]);
+    askToStop.current = asksToStop;
+  }, [openAnchor, desktop, asksToStop]);
 
   const openInReader = (anchor: AncoraScheda) => {
     const searchParams = searchParamsFromAnchor(anchor);
@@ -280,7 +294,7 @@ export function ReviewSession() {
     triggerSearch(searchParams);
   };
 
-  const leave = () => (showCard ? setConfirmStop(true) : navigate(HOME_PATH));
+  const leave = () => (asksToStop ? setConfirmStop(true) : navigate(HOME_PATH));
 
   const skippedLine = skipped && (
     <p role="status" className="mb-4 text-sm text-slate-600 dark:text-slate-300">
@@ -333,7 +347,7 @@ export function ReviewSession() {
         <div className="flex min-h-0 flex-1">
           {/* Keyed by step, so each card starts at the top of its own scroll, however far the last answer was read. */}
           <div key={step} className="min-w-0 flex-1 overflow-y-auto">
-            <div className={cn(COLUMN, 'px-4 pb-8 pt-2 md:pt-8')}>
+            <div ref={cardColumn} className={cn(COLUMN, 'px-4 pb-8 pt-2 md:pt-8')}>
               {skippedLine}
               <ReviewCard card={current} revealed={revealed} focusKey={step} onOpenAnchor={(anchor) => setPanel({ step, anchor })} />
             </div>
@@ -375,6 +389,7 @@ export function ReviewSession() {
       <header className="relative shrink-0 px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
         <div className={cn(COLUMN, 'relative flex items-center gap-3')}>
           <button
+            ref={setStopButton}
             type="button"
             onClick={leave}
             aria-label={showCard ? 'Interrompi' : 'Chiudi'}
@@ -408,12 +423,17 @@ export function ReviewSession() {
         )}
       </header>
       {middle}
-      <ConfirmDialog
+      {/* K1b's confirmation, drawn from «Interrompi» (U1c): what happens, said with the session's count; going on is
+          the evident action (filled, the focus on it, Esc), stopping the outlined one; nothing destructive, no red. */}
+      <WireConfirm
         open={confirmStop}
         title="Interrompere il ripasso?"
-        message="Le schede già valutate restano registrate."
+        message={stopMessage(summary.reviewed, remaining)}
         confirmLabel="Interrompi"
-        cancelLabel="Continua"
+        cancelLabel="Continua il ripasso"
+        emphasis="cancel"
+        origin={stopButton}
+        focusBack={backToCard}
         onConfirm={() => navigate(HOME_PATH)}
         onCancel={() => setConfirmStop(false)}
       />

@@ -1,7 +1,7 @@
 import type { LingoMateria } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { maturity } from './cardMaturity';
-import { reviewScope } from './reviewQueue';
+import { reviewedCardsQuery, reviewScope } from './reviewQueue';
 import { readPreferences } from './studyPreferences';
 import { newCardsWhere } from './todayQueue';
 import { romeDay, startOfRomeDay } from './studyDay';
@@ -37,12 +37,9 @@ export async function readPercorso(userId: string, materia?: LingoMateria): Prom
   const scope = reviewScope(userId, materieComunita, materia);
   // New cards are counted in the database (the community's corpus can be large); only the cards the user
   // has reviewed come into memory, as in the progress read.
-  const [fresh, states] = await Promise.all([
+  const [fresh, reviewed] = await Promise.all([
     prisma.lingoCard.groupBy({ by: ['materia', 'istituto'], where: newCardsWhere(userId, scope), _count: { _all: true } }),
-    prisma.lingoStatoRipasso.findMany({
-      where: { utenteId: userId, card: scope },
-      select: { dueAt: true, lastReviewAt: true, card: { select: { materia: true, istituto: true } } },
-    }),
+    prisma.lingoCard.findMany(reviewedCardsQuery(userId, scope, { materia: true, istituto: true })),
   ]);
 
   const stops = new Map<string, InstituteStop>();
@@ -56,10 +53,12 @@ export async function readPercorso(userId: string, materia?: LingoMateria): Prom
     return stop;
   };
   for (const group of fresh) stopOf(group.materia, group.istituto).nuove = group._count._all;
-  for (const state of states) {
-    const stop = stopOf(state.card.materia, state.card.istituto);
-    stop[maturity(state.lastReviewAt, state.dueAt)] += 1;
-    if (state.dueAt < endOfToday) stop.dovute += 1;
+  for (const { materia: subject, istituto, statiRipasso } of reviewed) {
+    for (const state of statiRipasso) {
+      const stop = stopOf(subject, istituto);
+      stop[maturity(state.lastReviewAt, state.dueAt)] += 1;
+      if (state.dueAt < endOfToday) stop.dovute += 1;
+    }
   }
   return [...stops.values()].sort((a, b) => a.materia.localeCompare(b.materia) || a.istituto.localeCompare(b.istituto, 'it'));
 }

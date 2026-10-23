@@ -123,7 +123,7 @@ export function InlineNoteComposer({ anchorRect, anchorText, onSave, onClose }: 
                     <div
                         style={{ transformOrigin }}
                         className={cn(
-                            'relative w-[300px] rounded-lg shadow-xl border border-amber-300 dark:border-amber-700/60',
+                            'relative w-[300px] rounded-lg shadow-md border border-amber-300 dark:border-amber-700/60',
                             'bg-white dark:bg-slate-900 animate-in fade-in zoom-in-95 duration-150',
                         )}
                     >
@@ -167,7 +167,7 @@ export function InlineNoteComposer({ anchorRect, anchorText, onSave, onClose }: 
                                 className="w-full resize-none rounded-md border border-amber-500/40 bg-white dark:bg-slate-900 px-2 py-1.5 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
                             />
                             <div className="flex items-center justify-between mt-2">
-                                <span className="text-[10px] text-slate-400">⌘↵ per salvare</span>
+                                <span className="text-[11px] text-slate-600 dark:text-slate-400">⌘↵ per salvare</span>
                                 <button
                                     onClick={commit}
                                     disabled={draft.trim().length === 0}
