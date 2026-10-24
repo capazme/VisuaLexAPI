@@ -33,6 +33,8 @@ export interface DecisionViewProps {
   textSlot?: React.ReactNode;
   /** Beside the reader's anchors when the decision was found without its text (general discussions). */
   noTextSlot?: React.ReactNode;
+  /** The decision's heading: h4 in the practice (under its h3), h3 in the dossier (under «Giurisprudenza», D7a). */
+  headingLevel?: 3 | 4;
 }
 
 function Alert({ children }: { children: React.ReactNode }) {
@@ -69,13 +71,15 @@ function DecisionChoice({ identity, onChoose, className, children }: {
   );
 }
 
-function FoundView({ answer, onToast, actions, textSlot, noTextSlot }: {
+function FoundView({ answer, onToast, actions, textSlot, noTextSlot, headingLevel = 4 }: {
   answer: FoundDecision;
   onToast: ShowToast;
   actions?: React.ReactNode;
   textSlot?: React.ReactNode;
   noTextSlot?: React.ReactNode;
+  headingLevel?: 3 | 4;
 }) {
+  const Heading = headingLevel === 3 ? 'h3' : 'h4';
   // The source's own page, only ever over https: the address comes from our server, built on fixed
   // bases, so this is defence in depth.
   const sourceUrl = httpsUrl(answer.fonte.url);
@@ -94,15 +98,15 @@ function FoundView({ answer, onToast, actions, textSlot, noTextSlot }: {
 
   return (
     <article className="space-y-5">
-      {/* h4: the practice's name is an h3 and the acts' titles are h4 too. Focusable by script, so an
+      {/* h4: the practice's name is an h3 and the acts' titles are h4 too (h3 in the dossier). Focusable by script, so an
           entry that takes over from one merged into it can put the reader's focus on the decision. */}
-      <h4
+      <Heading
         tabIndex={-1}
         data-decision-heading
         className="text-xl font-semibold text-slate-900 dark:text-white rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
       >
         {formatDecisionHeading(answer.identita, answer.attributi)}
-      </h4>
+      </Heading>
       {answer.avvisi.map((notice, i) => (
         <Alert key={i}>{describeNotice(notice, answer.attributi)}</Alert>
       ))}
@@ -191,7 +195,7 @@ function unreachableMessage(fonte: string): string {
 
 /** The body of a decision, wherever it is drawn: a row, a window or the phone's reader. */
 export function DecisionView({
-  answer, reference, onRetry, onChooseCandidate, onOpenPalette, actions, textSlot, noTextSlot,
+  answer, reference, onRetry, onChooseCandidate, onOpenPalette, actions, textSlot, noTextSlot, headingLevel,
 }: DecisionViewProps) {
   const [toast, setToast] = useState<{ message: string; type: ToastProps['type'] } | null>(null);
   const linkClass = `inline-flex items-center text-primary-600 hover:underline dark:text-primary-400 ${TOUCH_TARGET_RESPONSIVE}`;
@@ -221,6 +225,7 @@ export function DecisionView({
         actions={actions}
         textSlot={textSlot}
         noTextSlot={noTextSlot}
+        headingLevel={headingLevel}
       />
     );
   } else if (answer.esito === 'ambigua') {
