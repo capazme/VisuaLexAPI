@@ -133,11 +133,17 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
     return result;
   }, [dossiers, searchQuery, selectedCategory, sectionKind, sortBy]);
 
-  // Open-on-dashboard: 0 norms → noop, 1 norm → direct, >1 → picker modal.
+  // Open-on-dashboard: 0 norms → its decisions alone (D7a), else noop; 1 norm → direct, >1 → picker modal.
   const handleQuickOpen = (dossier: Dossier) => {
     const groups = computeNormaGroups(dossier.items);
     if (groups.length === 0) {
-      showToast('Questo dossier non contiene articoli da aprire', 'info');
+      if (dossier.items.some((i) => i.type === 'sentenza')) {
+        // One practice holding them, no search to run, as from the dossier's page.
+        searchesIntoOnePractice(dossier, [], true);
+        navigate('/');
+        return;
+      }
+      showToast('Questo dossier non contiene articoli né sentenze da aprire', 'info');
       return;
     }
     if (groups.length === 1) {
@@ -402,7 +408,8 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
           )
         ) : (
           filteredDossiers.map((dossier, idx) => {
-            const hasNormaItems = dossier.items.some((i) => i.type === 'norma');
+            // An article or a decision to open (D7a: a dossier of decisions alone opens too).
+            const canOpen = dossier.items.some((i) => i.type === 'norma' || i.type === 'sentenza');
             const counts = computeItemCounts(dossier.items);
             // The acts it holds, named as the dossier names them (spec §10).
             const acts = actsSummary(layoutDossier(dossier.items));
@@ -436,8 +443,8 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); handleQuickOpen(dossier); }}
-                      disabled={!hasNormaItems}
-                      title={hasNormaItems ? 'Apri su Dashboard' : 'Nessun articolo da aprire'}
+                      disabled={!canOpen}
+                      title={canOpen ? 'Apri su Dashboard' : 'Niente da aprire'}
                       aria-label={`Apri ${dossier.title} su Dashboard`}
                       className={cn(ICON_BUTTON, 'disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent')}
                     >
@@ -447,7 +454,7 @@ export function DossierListView({ onSelect, showToast, trashCount = 0, onOpenTra
                       label={`Azioni su ${dossier.title}`}
                       triggerClassName={ICON_BUTTON}
                       items={[
-                        { label: 'Apri su Dashboard', icon: ExternalLink, onSelect: () => handleQuickOpen(dossier), disabled: !hasNormaItems },
+                        { label: 'Apri su Dashboard', icon: ExternalLink, onSelect: () => handleQuickOpen(dossier), disabled: !canOpen },
                         { label: 'Rinomina / Modifica', icon: Edit2, onSelect: () => setEditingDossier(dossier) },
                         { label: 'Elimina', icon: Trash2, danger: true, separatorBefore: true, onSelect: () => deleteDossierWithUndo(dossier, onTrashChanged) },
                       ]}

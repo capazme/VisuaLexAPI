@@ -21,6 +21,12 @@ export const SECTION_TILE = 'rounded-xl border border-slate-200 bg-white dark:bo
 /** A block's heading: the reader's serif, sentence case, no small capitals. */
 export const SECTION_HEADING = 'font-serif text-lg font-medium tracking-tight text-slate-900 dark:text-slate-50';
 
+/**
+ * A column's title when the dossier holds decisions (D7a): «Norme» on the left, «Giurisprudenza» on the right, a step
+ * over the acts' own headings.
+ */
+export const COLUMN_HEADING = 'mb-2 font-serif text-xl font-medium tracking-tight text-slate-900 dark:text-slate-50';
+
 /** The count beside a block's heading. */
 export const SECTION_COUNT = 'font-sans text-sm font-normal text-slate-600 dark:text-slate-400';
 
