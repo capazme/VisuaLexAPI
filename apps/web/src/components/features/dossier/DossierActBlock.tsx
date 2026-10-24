@@ -38,6 +38,8 @@ export interface DossierActBlockProps {
   attachedNotes?: Map<string, Extract<DossierItem, { type: 'note' }>[]>;
   onAddNote?: (item: DossierItem) => void;
   onRemoveNote?: (note: DossierItem) => void;
+  /** The article a decision's citation has just opened, ringed for a moment (D7d). */
+  flashedId?: string | null;
   /** 3 under the page's «Norme» (D7a, the decisions beside the acts), else 2. */
   headingLevel?: 2 | 3;
 }
@@ -149,6 +151,8 @@ export function DossierActBlock(props: DossierActBlockProps) {
           <MenuButton
             label={`Azioni su ${block.heading}`}
             triggerClassName={cn(ACTION_BUTTON, 'text-slate-500')}
+            // In the left column of two, which scrolls on its own (D7d), the last act's menu opens upwards.
+            placement="auto"
             items={[{ label: "Rimuovi l'atto dal dossier", icon: Trash2, danger: true, onSelect: props.onRemoveAct }]}
           >
             <MoreHorizontal size={18} />
@@ -174,6 +178,7 @@ export function DossierActBlock(props: DossierActBlockProps) {
               notes={props.attachedNotes?.get(item.id)}
               onAddNote={props.onAddNote ? () => props.onAddNote?.(item) : undefined}
               onRemoveNote={props.onRemoveNote}
+              isFlashing={props.flashedId === item.id}
             />
           ))}
         </div>

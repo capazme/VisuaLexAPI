@@ -8,6 +8,9 @@ import { sanitizeHTML } from '../../../utils/sanitizeHtml';
 import { fixtureText } from '../../../utils/__fixtures__/articleTexts';
 import { buildPassage } from '../../../utils/threadPassages';
 import type { Annotation, Highlight, ArticleDiscussionPassageSummary } from '../../../types';
+// The scroll: its own tests (`scrollParent.test.ts`); here, which anchor it is asked for.
+vi.mock('../../../utils/scrollParent', () => ({ scrollToMiddle: vi.fn() }));
+import { scrollToMiddle } from '../../../utils/scrollParent';
 
 const RAW = fixtureText('nrm-cc-1453');
 const PLAIN = RAW.replace(/\n/g, '');
@@ -97,15 +100,13 @@ describe('BlockAnnotationsPopover', () => {
     const { container, props } = setup();
     const dialog = await screen.findByRole('dialog', { name: TITLE });
     vi.useFakeTimers();
-    const scroll = vi.spyOn(Element.prototype, 'scrollIntoView');
     fireEvent.click(within(dialog).getAllByRole('button', { name: /Vai al passo/ })[0]);
     const anchor = container.querySelector('[data-note-id="n1"]')!;
     expect(props.onClose).toHaveBeenCalled();
-    expect(scroll.mock.contexts[0]).toBe(anchor);
+    expect(scrollToMiddle).toHaveBeenCalledExactlyOnceWith(anchor, 'smooth');
     expect(anchor.classList.contains('vlx-flash')).toBe(true);
     vi.advanceTimersByTime(1600);
     expect(anchor.classList.contains('vlx-flash')).toBe(false);
-    scroll.mockRestore();
   });
 
   it('edits a note in place', async () => {

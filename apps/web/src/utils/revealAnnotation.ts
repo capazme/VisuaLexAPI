@@ -1,3 +1,5 @@
+import { scrollToMiddle } from './scrollParent';
+
 export interface AnnotationTarget {
   kind: 'note' | 'highlight' | 'thread';
   id: string;
@@ -10,7 +12,9 @@ const quoted = (value: string): string => `"${value.replace(/["\\]/g, '\\$&')}"`
 
 /**
  * Takes the reader to an annotation in the article text: scrolls it to the
- * middle of the view and lets it glow for 1.6 s (`.vlx-flash`, index.css).
+ * middle of the scroller it reads in, that scroller alone (`scrollToMiddle`:
+ * in the dossier's two columns the other column and the page stay put), and
+ * lets it glow for 1.6 s (`.vlx-flash`, index.css).
  * Every piece of the mark glows — a highlight across two commi is two
  * elements, one saved before offsets existed is one per occurrence — and the
  * scroll goes to the first piece inside `near` (the block the reader came
@@ -26,7 +30,7 @@ export function revealAnnotation(root: ParentNode, target: AnnotationTarget, nea
   const pieces = [...root.querySelectorAll<HTMLElement>(`[${attribute}=${quoted(target.id)}]`)];
   if (pieces.length === 0) return false;
   const first = (near && pieces.find((piece) => near.contains(piece))) || pieces[0];
-  first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  scrollToMiddle(first, 'smooth');
   for (const piece of pieces) piece.classList.add('vlx-flash');
   window.setTimeout(() => {
     for (const piece of pieces) piece.classList.remove('vlx-flash');
