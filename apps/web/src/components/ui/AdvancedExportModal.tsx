@@ -3,6 +3,7 @@ import { Download, Copy, Check, FileText, StickyNote, Highlighter, Scale, FileCo
 import type { jsPDF } from 'jspdf';
 import { loadJsPdf } from '../../utils/loadJsPdf';
 import { cn } from '../../lib/utils';
+import { DISABLED, TOUCH_TARGET_RESPONSIVE } from '../../constants/interactions';
 import { Modal } from './Modal';
 import type { ArticleData } from '../../types';
 import { citeNorm, inForceCitation, shortNorm } from '../../utils/sources';
@@ -375,7 +376,7 @@ export function AdvancedExportModal({
           <button
             onClick={close}
             disabled={writingPdf}
-            className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
+            className={cn(TOUCH_TARGET_RESPONSIVE, DISABLED, 'px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background')}
           >
             Annulla
           </button>
@@ -384,6 +385,8 @@ export function AdvancedExportModal({
             disabled={writingPdf}
             aria-busy={writingPdf || undefined}
             className={cn(
+              TOUCH_TARGET_RESPONSIVE,
+              DISABLED,
               'px-6 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background',
               copied
                 ? 'bg-green-600 text-white'
@@ -424,6 +427,7 @@ export function AdvancedExportModal({
                 onClick={() => toggleSection(section.id)}
                 disabled={writingPdf}
                 className={cn(
+                  TOUCH_TARGET_RESPONSIVE,
                   'flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-left',
                   section.enabled
                     ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-300'
@@ -457,6 +461,7 @@ export function AdvancedExportModal({
                     onClick={() => toggleSection(section.id)}
                     disabled={writingPdf}
                     className={cn(
+                      TOUCH_TARGET_RESPONSIVE,
                       'flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-left',
                       section.enabled
                         ? 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300'
@@ -476,11 +481,12 @@ export function AdvancedExportModal({
 
         <div>
           <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Formato Esportazione</h3>
-          <div className="flex gap-2">
+          <div className="grid grid-cols-3 gap-2 sm:flex">
             <button
               onClick={() => setExportFormat('clipboard')}
               disabled={writingPdf}
               className={cn(
+                TOUCH_TARGET_RESPONSIVE,
                 'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
                 exportFormat === 'clipboard'
                   ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-300'
@@ -494,6 +500,7 @@ export function AdvancedExportModal({
               onClick={() => setExportFormat('markdown')}
               disabled={writingPdf}
               className={cn(
+                TOUCH_TARGET_RESPONSIVE,
                 'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
                 exportFormat === 'markdown'
                   ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-300'
@@ -507,6 +514,7 @@ export function AdvancedExportModal({
               onClick={() => setExportFormat('pdf')}
               disabled={writingPdf}
               className={cn(
+                TOUCH_TARGET_RESPONSIVE,
                 'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
                 exportFormat === 'pdf'
                   ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-300'
@@ -520,6 +528,7 @@ export function AdvancedExportModal({
               onClick={() => setExportFormat('rtf')}
               disabled={writingPdf}
               className={cn(
+                TOUCH_TARGET_RESPONSIVE,
                 'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
                 exportFormat === 'rtf'
                   ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-300'
@@ -533,6 +542,7 @@ export function AdvancedExportModal({
               onClick={() => setExportFormat('txt')}
               disabled={writingPdf}
               className={cn(
+                TOUCH_TARGET_RESPONSIVE,
                 'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
                 exportFormat === 'txt'
                   ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-300'
