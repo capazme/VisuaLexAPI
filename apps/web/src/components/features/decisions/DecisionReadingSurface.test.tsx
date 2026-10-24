@@ -419,7 +419,11 @@ describe('DecisionReadingSurface — the key passages', () => {
     // the text in a column that scrolls on its own, as the dossier's (D7d)
     render(<div data-testid="column" style={{ overflowY: 'auto' }}><DecisionReadingSurface identity={IDENTITY} testo={WITH_PASSAGES} attributi={{}} /></div>);
     const scroll = vi.fn();
-    screen.getByTestId('column').scrollTo = scroll as unknown as HTMLElement['scrollTo'];
+    const column = screen.getByTestId('column');
+    column.scrollTo = scroll as unknown as HTMLElement['scrollTo'];
+    // its text taller than it (jsdom lays nothing out)
+    Object.defineProperty(column, 'clientHeight', { value: 600 });
+    Object.defineProperty(column, 'scrollHeight', { value: 3000 });
     fireEvent.click(screen.getByRole('button', { name: 'Passaggi chiave (2), evidenziati automaticamente' }));
     const menu = screen.getByRole('menu');
     expect(menu).toHaveAccessibleDescription('Evidenziati automaticamente: non sono le tue evidenziazioni.');

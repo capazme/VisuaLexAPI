@@ -15,9 +15,16 @@ function setup() {
   column.scrollTo = vi.fn() as unknown as HTMLElement['scrollTo'];
   passage.scrollIntoView = vi.fn();
   column.getBoundingClientRect = () => rect(100, 600);
-  Object.defineProperty(column, 'clientHeight', { value: 600 });
+  overflow(column, 600, 3000);
+  overflow(page, 900, 4000);
   column.scrollTop = 300;
   return { page, column, passage };
+}
+
+/** jsdom lays nothing out: the box's height and its content's. */
+function overflow(el: HTMLElement, clientHeight: number, scrollHeight: number) {
+  Object.defineProperty(el, 'clientHeight', { value: clientHeight, configurable: true });
+  Object.defineProperty(el, 'scrollHeight', { value: scrollHeight, configurable: true });
 }
 
 describe('scrollParentOf', () => {
@@ -44,5 +51,29 @@ describe('scrollToMiddle', () => {
     passage.getBoundingClientRect = () => rect(1000, 900);
     scrollToMiddle(passage);
     expect(column.scrollTo).toHaveBeenCalledExactlyOnceWith({ top: 1200, behavior: 'auto' });
+  });
+
+  it('passes over an ancestor set to scroll whose content fits, and moves the one that overflows', () => {
+    const { page, column, passage } = setup();
+    // a panel with `overflow-y: auto` and nothing to scroll, inside the page that has
+    overflow(column, 600, 600);
+    page.getBoundingClientRect = () => rect(0, 900);
+    page.scrollTop = 0;
+    passage.getBoundingClientRect = () => rect(2000, 20);
+    scrollToMiddle(passage, 'smooth');
+    expect(column.scrollTo).not.toHaveBeenCalled();
+    // 0 + 2000 − (900 − 20) / 2
+    expect(page.scrollTo).toHaveBeenCalledExactlyOnceWith({ top: 1560, behavior: 'smooth' });
+    expect(passage.scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it('with no ancestor that scrolls, falls back on scrollIntoView, as every reader did before', () => {
+    const { page, column, passage } = setup();
+    overflow(column, 600, 600);
+    overflow(page, 900, 900);
+    scrollToMiddle(passage, 'smooth');
+    expect(column.scrollTo).not.toHaveBeenCalled();
+    expect(page.scrollTo).not.toHaveBeenCalled();
+    expect(passage.scrollIntoView).toHaveBeenCalledExactlyOnceWith({ block: 'center', behavior: 'smooth' });
   });
 });
