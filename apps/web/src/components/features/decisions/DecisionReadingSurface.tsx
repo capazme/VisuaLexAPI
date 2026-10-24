@@ -36,6 +36,7 @@ import type { ReadingBackEntry } from '../../../utils/readingBackStack';
 import { keyPassages } from '../../../utils/decisionKeyPassages';
 import { KeyPassagePopover } from './KeyPassagePopover';
 import { KeyPassagesMenu } from './KeyPassagesMenu';
+import { scrollToMiddle } from '../../../utils/scrollParent';
 
 // A decision's anchors are stored under its key with no article: the wire key is `<key>::art::`.
 const NO_ARTICLE = '';
@@ -231,8 +232,9 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
   const goToPassage = (index: number) => {
     const piece = contentRef.current?.querySelector<HTMLElement>(`[data-key-index="${index}"]`);
     if (!piece) return;
-    // at once, not smoothly: the popover opens on the passage already in view, and the keyboard's focus goes to it
-    piece.scrollIntoView({ block: 'center' });
+    // at once, not smoothly: the popover opens on the passage already in view, and the keyboard's focus goes to it; the
+    // scroller the text reads in alone (in the dossier's two columns the norms' column and the page stay put, D7d)
+    scrollToMiddle(piece);
     const pieces = contentRef.current?.querySelectorAll<HTMLElement>(`[data-key-index="${index}"]`) ?? [];
     pieces.forEach((p) => p.classList.add('vlx-flash'));
     window.setTimeout(() => pieces.forEach((p) => p.classList.remove('vlx-flash')), 1600);

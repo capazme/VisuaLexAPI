@@ -1765,7 +1765,10 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   columns from `lg`, «Norme» | «Giurisprudenza» (`COLUMN_HEADING`, a rule between them, each column in its own
   order), the norms first below `lg`; one kind alone takes the width, untitled as before. From `lg` each of the two
   scrolls on its own, at most the window's height (D7d, `COLUMN_SCROLLS`, `max-h-app-column`: the content area's padding
-  and `--page-foot` off it), so a decision read on the right stays put while a norm opens on the left. An act's identity is a code's name
+  and `--page-foot` off it), so a decision read on the right stays put while a norm opens on the left; each is a named
+  region («Norme», «Giurisprudenza (n)») and a tab stop with the focus ring, so the keyboard scrolls it. Whatever
+  scrolls a text to a passage there moves its own scroller alone (`utils/scrollParent.ts`: `scrollToMiddle` for «Vai al
+  passo» and `revealAnnotation`, gotcha 34): `scrollIntoView` would move the page and the other column too. An act's identity is a code's name
   (the codice civile with or without its R.D. is one act) or `tipo_atto|numero_atto|data`;
   its heading is a code's name or the server's `act_citation`, never formatted
   here (a muted fallback until the server answers); its articles sort by annex,
@@ -1889,12 +1892,14 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   came; «Apri la sentenza», the address, over it whatever came back. No tab holds it: no «Cerca nel testo», and a cited
   decision takes the reader to the workspace, `onLeave` (see «The host props»). A cited norm is the dossier's (D7d,
   `useCitedNorms` through `CitedNormsContext`, the surface's `citedNorms`, on the links the reader already draws, gotcha
-  23): one the dossier holds (`citedArticleOf`: a code by its name, any other act by type, number and the citation's year,
-  any year when the citation gives none; the article in any spelling, outside annexes; the text in force first) opens in
+  23): one the dossier holds (`citedArticleOf`: a code of `CODE_NAMES` by its name, any other act by its type, then by
+  number and year only where both sides give one — «art. 141 c.d.s.» gives neither, its entry may carry 285 and a date;
+  the article in any spelling, outside annexes; the text in force first) opens in
   the norms' column — a search hiding it cleared, the link clicked held at its height (`keepLinkAt`: the cleared search
   makes the decision's column a scroller again), its act unfolded, its row opened and scrolled to the column's top, the
   page moving only if the row is still off the window (`bringRowIntoView`, each scroller alone, gotcha 34), focused and
-  ringed for 1.6 s; the preview's button says «Apri tra le norme». One it does not hold opens nothing by itself: by the
+  ringed for 1.6 s (`flashedId`, drawn by React through `DossierActBlock` to `DossierArticleRow`'s `isFlashing`); the
+  preview's button says «Apri tra le norme». One it does not hold opens nothing by itself: by the
   link, `CitedNormChoice` offers «Apri su Dashboard» (the search of its text in force, as before) and «Aggiungi al
   dossier» (`AddToDossierPopover` on the norm as `/fetch_article_text` answers it); the preview's button, «Apri su
   Dashboard» there, still goes straight to Dashboard. The links take no keyboard focus, here as anywhere in the

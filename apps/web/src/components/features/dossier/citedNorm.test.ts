@@ -38,6 +38,27 @@ describe('citedArticleOf', () => {
     expect(citedArticleOf(pastOnly, cite({ act_type: 'legge', act_number: '241', date: '1990', article: '21' }))?.id).toBe('l241-21-old');
   });
 
+  it('reads a number or a year only where both sides give one: a code the page does not name, an entry with no date', () => {
+    const items = [
+      norma('cds141', { tipo_atto: 'codice della strada', numero_atto: '285', data: '1992-04-30', numero_articolo: '141' }),
+      norma('nav1', { tipo_atto: 'codice della navigazione', data: '', numero_articolo: '1' }),
+    ];
+    // «art. 141 c.d.s.»: no number, no year; the entry added through MCP has both
+    expect(citedArticleOf(items, cite({ act_type: 'codice della strada', article: '141' }))?.id).toBe('cds141');
+    // the entry has no date, the citation a year
+    expect(citedArticleOf(items, cite({ act_type: 'codice della navigazione', date: '1942', article: '1' }))?.id).toBe('nav1');
+    // both give a number, and they differ
+    expect(citedArticleOf(items, cite({ act_type: 'codice della strada', act_number: '286', article: '141' }))).toBeNull();
+  });
+
+  it('finds the implementing provisions of the codes, as the citation matcher names them', () => {
+    const items = [
+      norma('dacc23', { tipo_atto: "disposizioni per l'attuazione del codice civile e disposizioni transitorie", data: '1942-03-30', numero_articolo: '23' }),
+    ];
+    expect(citedArticleOf(items, cite({ act_type: "disposizioni per l'attuazione del Codice civile e disposizioni transitorie", article: '23' }))?.id).toBe('dacc23');
+    expect(citedArticleOf(items, cite({ act_type: "disposizioni per l'attuazione del Codice di procedura civile e disposizioni transitorie", article: '23' }))).toBeNull();
+  });
+
   it('holds nothing for another act, another year, another article, an annex’s article or a note’s words', () => {
     expect(citedArticleOf(ITEMS, cite({ act_type: 'codice penale', article: '2043' }))).toBeNull();
     expect(citedArticleOf(ITEMS, cite({ act_type: 'legge', act_number: '241', date: '1991', article: '21' }))).toBeNull();

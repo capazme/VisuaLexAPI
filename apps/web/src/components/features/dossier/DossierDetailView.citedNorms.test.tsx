@@ -213,11 +213,16 @@ describe('a norm a decision cites, not in the dossier (D7d)', () => {
 });
 
 describe('the columns (D7d)', () => {
-  it('from lg each column of two scrolls on its own, as tall as the window', () => {
+  it('from lg each column of two scrolls on its own, as tall as the window, a named region the keyboard reaches', () => {
     renderView();
     const norms = screen.getByRole('region', { name: 'Norme' });
-    const decisions = screen.getByRole('region', { name: 'Giurisprudenza (1)' }).parentElement!;
-    for (const column of [norms, decisions]) expect(column).toHaveClass('lg:max-h-app-column', 'lg:overflow-y-auto');
+    const decisions = screen.getByRole('region', { name: 'Giurisprudenza (1)' });
+    for (const column of [norms, decisions]) {
+      expect(column).toHaveClass('lg:max-h-app-column', 'lg:overflow-y-auto', 'focus-visible:ring-2');
+      expect(column).toHaveAttribute('tabindex', '0');
+    }
+    // the rule between them stays on the right column's frame, as tall as the taller column
+    expect(decisions.parentElement).toHaveClass('lg:border-l');
   });
 
   it('one kind alone keeps one column, scrolling with the page', () => {
@@ -225,5 +230,6 @@ describe('the columns (D7d)', () => {
     render(<MemoryRouter><DossierDetailView dossier={appStore.getState().dossiers[0]} onBack={() => {}} showToast={() => {}} /></MemoryRouter>);
     expect(screen.queryByRole('region', { name: 'Norme' })).toBeNull();
     expect(screen.getByRole('region', { name: L247 }).closest('.lg\\:overflow-y-auto')).toBeNull();
+    expect(screen.getByRole('region', { name: L247 }).closest('[tabindex="0"]')).toBeNull();
   });
 });

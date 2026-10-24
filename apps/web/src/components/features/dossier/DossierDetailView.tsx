@@ -193,8 +193,9 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     if (next.has(id)) next.delete(id); else next.add(id);
     return next;
   });
-  // A norm a decision cites, when the dossier holds it, opens in the norms' column (D7d). Stable callbacks: the
-  // context's value, and every decision's reader with it, changes only with the dossier.
+  // A norm a decision cites, when the dossier holds it, opens in the norms' column (D7d). Stable callbacks, so the
+  // context's value, and every decision's reader with it, changes only with the dossier, its acts and its search
+  // (`reveal` reads which items are on screen), not on every render.
   const unfoldAct = useCallback((key: string) => setFoldedActs((prev) => {
     if (!prev.has(key)) return prev;
     const next = new Set(prev);
@@ -502,6 +503,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
               block={block}
               // Under «Norme» when the decisions stand beside the acts.
               headingLevel={twoColumns ? 3 : 2}
+              flashedId={cited.flashedId}
               act={fullBlocks.get(block.key) ?? block}
               dragDisabled={hasFilter}
               isFolded={foldedActs.has(block.key)}
@@ -545,6 +547,9 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
       onToggleSelect={toggleItemSelection}
       onRemove={handleRemoveSingle}
       onToggleImportant={(item) => updateDossierItemStatus(dossier.id, item.id, item.status === 'important' ? 'unread' : 'important')}
+      // The right column scrolls on its own beside the norms (D7d): the section «Giurisprudenza» is the scroller.
+      className={twoColumns ? COLUMN_SCROLLS : undefined}
+      tabIndex={twoColumns ? 0 : undefined}
     />
   );
 
@@ -784,12 +789,13 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
                   <section
                     ref={cited.columnRef}
                     aria-labelledby={twoColumns ? 'dossier-norms-heading' : undefined}
+                    tabIndex={twoColumns ? 0 : undefined}
                     className={cn('min-w-0', twoColumns && cn('lg:pr-5', COLUMN_SCROLLS), layout.acts.length === 0 && 'hidden')}
                   >
                     {twoColumns && <h2 id="dossier-norms-heading" className={COLUMN_HEADING}>Norme</h2>}
                     {actsList}
                   </section>
-                  <div className={cn('min-w-0 empty:hidden', twoColumns && cn('border-slate-200 lg:border-l lg:pl-5 dark:border-slate-800', COLUMN_SCROLLS))}>{decisionsList}</div>
+                  <div className={cn('min-w-0 empty:hidden', twoColumns && 'border-slate-200 lg:border-l lg:pl-5 dark:border-slate-800')}>{decisionsList}</div>
                 </div>
               </CitedNormsContext.Provider>
             </>

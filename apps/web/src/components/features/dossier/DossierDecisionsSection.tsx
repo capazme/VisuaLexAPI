@@ -13,6 +13,9 @@ interface Props {
   onToggleSelect: (itemId: string) => void;
   onRemove: (item: DossierItem) => void;
   onToggleImportant: (item: DossierItem) => void;
+  /** The column's own scrolling, beside the norms (D7d): its classes, and a tab stop so the keyboard scrolls it. */
+  className?: string;
+  tabIndex?: number;
 }
 
 /**
@@ -22,10 +25,11 @@ interface Props {
  */
 export function DossierDecisionsSection({
   decisions, expandedIds, onToggleExpand, selectedIds, showCheckbox, onToggleSelect, onRemove, onToggleImportant,
+  className, tabIndex,
 }: Props) {
   if (decisions.length === 0) return null;
   return (
-    <section aria-labelledby="dossier-decisions-heading" className="min-w-0">
+    <section aria-labelledby="dossier-decisions-heading" tabIndex={tabIndex} className={cn('min-w-0', className)}>
       <h2 id="dossier-decisions-heading" className={COLUMN_HEADING}>
         Giurisprudenza <span className={SECTION_COUNT}>({decisions.length})</span>
       </h2>

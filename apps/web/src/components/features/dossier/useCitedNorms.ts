@@ -10,8 +10,8 @@ import { bringRowIntoView, citedArticleOf, keepLinkAt } from './citedNorm';
 /** How the dossier's decisions open the norms they cite (D7d); outside the dossier there is none. */
 export const CitedNormsContext = createContext<CitedNorms | null>(null);
 
-/** The row a cited norm opened: a ring for 1.6 s, as «Vai al passo» glows. No motion: it comes and goes at once. */
-const ROW_FLASH = ['ring-2', 'ring-inset', 'ring-amber-400'];
+/** How long the row a cited norm opened keeps its ring (`DossierArticleRow`'s `isFlashing`), as «Vai al passo» glows. */
+const FLASH_MS = 1600;
 
 type NormaItem = Extract<DossierItem, { type: 'norma' }>;
 
@@ -31,7 +31,7 @@ interface Options {
  * A norm a dossier's decision cites (D7d). Held by the dossier, it opens in the norms' column: the search that hides it
  * is cleared, its act unfolds (and folds again only when the user folds it), its row opens, comes into view without
  * moving the decision (`bringRowIntoView`; the link clicked is held where it was, `keepLinkAt`, the cleared search
- * having made the decision's column a scroller again), takes the focus and glows. Not held, a click offers the choice
+ * having made the decision's column a scroller again), takes the focus and is ringed for 1.6 s (`flashedId`). Not held, a click offers the choice
  * (`CitedNormChoice`: Dashboard, or a dossier) and opens nothing by itself; the preview's button, «Apri su Dashboard»
  * there, is already a choice, and goes to Dashboard as before.
  */
@@ -44,6 +44,10 @@ export function useCitedNorms({ items, visibleItems, acts, unfoldAct, expand, cl
   // `reveals` counts the requests.
   const pending = useRef<{ id: string; link: HTMLElement | null; linkTop: number } | null>(null);
   const [reveals, setReveals] = useState(0);
+  // The row ringed now; React draws the ring, never a class set from here.
+  const [flashedId, setFlashedId] = useState<string | null>(null);
+  const flashTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(flashTimer.current), []);
 
   useEffect(() => {
     const asked = pending.current;
@@ -57,12 +61,6 @@ export function useCitedNorms({ items, visibleItems, acts, unfoldAct, expand, cl
     if (!row) return;
     bringRowIntoView(row, column);
     row.querySelector<HTMLElement>('[aria-expanded]')?.focus({ preventScroll: true });
-    row.classList.add(...ROW_FLASH);
-    const timer = window.setTimeout(() => row.classList.remove(...ROW_FLASH), 1600);
-    return () => {
-      window.clearTimeout(timer);
-      row.classList.remove(...ROW_FLASH);
-    };
   }, [reveals]);
 
   const reveal = useCallback((item: NormaItem, link: HTMLElement | null) => {
@@ -72,6 +70,9 @@ export function useCitedNorms({ items, visibleItems, acts, unfoldAct, expand, cl
     expand(item.id);
     pending.current = { id: item.id, link, linkTop: link?.getBoundingClientRect().top ?? 0 };
     setReveals((n) => n + 1);
+    setFlashedId(item.id);
+    window.clearTimeout(flashTimer.current);
+    flashTimer.current = window.setTimeout(() => setFlashedId(null), FLASH_MS);
   }, [visibleItems, acts, clearSearch, unfoldAct, expand]);
 
   // As a decision read outside a practice opens a cited norm: a search of the text in force, on Dashboard.
@@ -98,5 +99,5 @@ export function useCitedNorms({ items, visibleItems, acts, unfoldAct, expand, cl
 
   const closeChoice = useCallback(() => setChoice(null), []);
 
-  return { citedNorms, columnRef, choice, closeChoice, openOnDashboard };
+  return { citedNorms, columnRef, choice, closeChoice, openOnDashboard, flashedId };
 }

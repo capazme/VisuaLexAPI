@@ -413,10 +413,13 @@ describe('DecisionReadingSurface — the key passages', () => {
     expect(container.querySelector('.key-passages-hidden')).toBeNull();
   });
 
-  it('lists them under «Passaggi chiave» with the legend, and takes the reader to one', async () => {
+  it('lists them under «Passaggi chiave» with the legend, and takes the reader to one, moving its scroller alone', async () => {
+    const intoView = vi.fn();
+    Element.prototype.scrollIntoView = intoView;
+    // the text in a column that scrolls on its own, as the dossier's (D7d)
+    render(<div data-testid="column" style={{ overflowY: 'auto' }}><DecisionReadingSurface identity={IDENTITY} testo={WITH_PASSAGES} attributi={{}} /></div>);
     const scroll = vi.fn();
-    Element.prototype.scrollIntoView = scroll;
-    mount();
+    screen.getByTestId('column').scrollTo = scroll as unknown as HTMLElement['scrollTo'];
     fireEvent.click(screen.getByRole('button', { name: 'Passaggi chiave (2), evidenziati automaticamente' }));
     const menu = screen.getByRole('menu');
     expect(menu).toHaveAccessibleDescription('Evidenziati automaticamente: non sono le tue evidenziazioni.');
@@ -425,7 +428,8 @@ describe('DecisionReadingSurface — the key passages', () => {
     expect(entries[1]).toBe('Dispositivo — «La Corte accoglie il ricorso»');
     expect(entries[2]).toBe('Nascondi i passaggi chiave');
     await act(async () => { fireEvent.click(within(menu).getAllByRole('menuitem')[0]); });
-    expect(scroll).toHaveBeenCalled();
+    expect(scroll).toHaveBeenCalledOnce();
+    expect(intoView).not.toHaveBeenCalled();
     expect(await screen.findByRole('dialog', { name: 'Principio di diritto, evidenziato automaticamente' })).toBeInTheDocument();
   });
 
