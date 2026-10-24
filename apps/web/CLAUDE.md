@@ -18,17 +18,19 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   columns from `lg`, three from `2xl`; `CardGroups`' `grid`), each with its front in Newsreader, its subject's dot,
   its state and its next review, and with one open the list is a column beside it; the filters (`CardFilters`) are one
   row from `lg` (the search a third, the selects, «Scritte da Claude» and «Da ripassare oggi»), behind «Filtri» under
-  1024 px; the act filter offers the acts of the cards listed,
+  1024 px; the search box's hint is «Cerca per istituto o domanda» from `sm`, «Cerca nelle schede» below, «Cerca» under 360 px (it was cut, Q1),
+  its name «Cerca nelle schede» at every width, and below `sm` «Per istituto o domanda» its description; the act filter offers the acts of the cards listed,
   keeping what a narrowed list hid until a deletion starts it over; each card shows the next review,
   `nextReviewLabel`, and «Da ripassare oggi» filters with `dovuteOggi`; «+ Nuova scheda», beside the page's
-  title (portalled into `StudiaPage`'s `actionSlot`, from the outlet's context) and as the empty list's action, opens `CardFormDialog` with `{ kind: 'create' }` and no article (no
+  title (portalled into `StudiaPage`'s `actionSlot`, from the outlet's context), and the empty list's «Scrivi la prima scheda» (Q1), open `CardFormDialog` with `{ kind: 'create' }` and no article (no
   fixed anchor, the reference field open, the anchors typed as «art. 1455 c.c.», which `POST /lingo/cards`
   resolves; saved with no anchor, the reference field stays open and takes the focus; the field has «Aggiungi»
   only — Esc or an empty «Aggiungi» closes it — so the dialog's «Annulla» is the one; the form's body goes back
   to the top once the dialog's first focus lands, which had left «Materia» scrolled out; a 502/503/504 says the
   service is not available at the moment, only a call with no answer asks to check the connection), and is drawn only while
   Normattiva answers (`useCardSources` over `cardSourcesAnswer`, the cached `/health/detailed`, read once per
-  mount; until it answers the empty list says only «Non hai ancora schede.», with the sources down it points to an
+  mount; the empty list says «Non hai ancora schede.» and what a card is (Q1), then, once the sources answer, the solid
+  «Scrivi la prima scheda» (the same form); until they answer it says no way to begin, with the sources down it points to an
   article and promises nothing; after the first card is saved the title's button takes the focus); the detail proposes a draft
   («Proponi alla comunità» asks for the notice through `AcceptTextDialog`, the one place a text to
   accept is drawn — every word from the server's version, the body as `TextParagraphs` plain text) and
@@ -43,7 +45,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   dell'articolo»); `VoteBar` sends Approvata at once and asks a reason for Migliorabile and Errata, and sits
   `sticky bottom-0` at every width (the keyboard moves to the next card's heading after a vote, back to the
   verdict after «Annulla»; below `md` no feedback button floats over it, nor over any page: there it is the user
-  menu's «Invia un commento», M1); the subject is remembered in `localStorage`; a vote that outlives a subject
+  menu's «Invia un commento», M1; from `md` it floats at the bar's right end, which keeps 56 px clear for it,
+  `md:pr-14`, G8c); the subject is remembered in `localStorage`; a vote that outlives a subject
   change only marks its card handled, and a 403 stops the queue with «Non sei più tra i validatori»; the queue is
   read only once the outlet's `validator` is `true` — while the account loads it waits, for someone the account
   says is not a validator it shows «Questa sezione è riservata…» with no request, which the server would refuse with
@@ -251,7 +254,12 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   «⋯» and «+»). `PageFrame.test.tsx` reads the section pages' files
   and fails on a title of their own, an icon in an `h1` or a root narrowed with `mx-auto max-w-…`. `Layout`'s content
   area keeps the scrollbar's room (`scrollbar-gutter: stable`) on every page but the search page: a page that grew past
-  the window as it loaded drew its 8 px bar and moved the centred column 4 px sideways. **The sections** (D-076, spec
+  the window as it loaded drew its 8 px bar and moved the centred column 4 px sideways. From `md`, for someone signed in
+  and on every page but the search page, it ends 16 px over the floating feedback button (G8c: it covered the last row
+  on the right, «Ripassa» of the last subject on «Oggi»): `--page-foot` (5.375 rem: the button's 24 px off the edge,
+  its 46 px and the air) as the bottom padding, which a page sized to the window takes off its height
+  (`GraphExplorerPage`, `DocumentReviewPage`'s columns: `var(--page-foot,2rem)`); a bar pinned to the bottom keeps the button's room at its right end
+  («Da validare»'s votes). **The sections** (D-076, spec
   `docs/superpowers/specs/2026-10-18-sections-switcher-design.md`): Corpus is the common core and no section;
   over it Opus, Gymnasium (the code's `studia`), Academia (development mode only) and Forum, in
   `features/sections/` (`sections.ts`: names, lines, icons, home addresses, `sectionForPath`; `useSection`: the
@@ -563,7 +571,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `secondary` (paper with an ink-200 hairline), `quiet` (text only) and `danger` (red-600) — `ghost` and
   `outline` are the earlier names of `quiet` and `secondary` —, no gradient, glow or hover lift, a minimum
   height of 36 px on a desktop and 44 px on a phone; `loading` keeps the label and puts a spinner in the
-  icon's place (`aria-busy`), `status="error" | "success"` shows the outcome of the last press. `Modal`
+  icon's place (`aria-busy`), `status="error" | "success"` shows the outcome of the last press. Its look is
+  `ui/buttonStyles.ts`'s `buttonClassName(variant, size)`, for a link that must look like one (the 404's «Torna alla
+  ricerca», `primary` `lg`: 44 px at every width). `Modal`
   enters in `dur.panel` on `ease.drawer`, growing from 0.97, and `Sheet` rises from its edge on the same
   timing (its «Chiudi» in ink-500, dark ink-400: over 3:1, since it is often the one way out); both only fade under reduced motion (`useReducedMotion`).
   `Sheet` gives the focus back to what had it as it opened, taken while it is first drawn: a field inside with
@@ -617,8 +627,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   **Motion** comes from `lib/motion.ts` (`ease`, `dur`, `spring.snappy` for panels and rows,
   `spring.gentle` for rare moments): no component types a spring or a curve, and a transition names what
   changes. A CSS transition that needs a spring takes `--ease-catch` (`index.css`, a damped spring sampled as a
-  `linear()` curve; the lesson bar's ink). `lib/motion.guard.test.ts` fails on a `transition-all` or a hand-typed spring; the Gymnasium
-  celebration's stamp is the one exception. A row or a list item takes a colour change on hover, never a
+  `linear()` curve; the lesson bar's ink). `lib/motion.guard.test.ts` fails on a `transition-all` or a hand-typed spring, with no exception
+  since the Gymnasium celebration's stamp is gone (G9). A row or a list item takes a colour change on hover, never a
   scale or a lift.
 
 ### The planner (Opus, wave 1)
@@ -1116,7 +1126,11 @@ and the full list, on the right the statistics and «Le tue materie» in one box
 rows), `sticky` at `top-8` while it fits in the content scroller with 32 px above and below (`useFitsInScroller`, a
 `ResizeObserver` on the box and the scroller; taller, its foot must scroll into reach) and the settings are closed. The
 document keeps the order the owner fixed (L-24) — missions, statistics, list — with the day first (G8), and the grid only
-places the right column; inside the tiles a sentence stops at `max-w-prose`. In that order:
+places the right column; inside the tiles a sentence stops at `max-w-prose`. With no mission once read (a server without
+the points, #253, or a failed read) the left column held the day block alone while the right ran past the window (G8c):
+«Le tue materie» leaves the box then for the left column, under the day block — from `xl` only, and before the
+statistics in the document, so the keyboard follows the eye; below `xl` nothing moves —; while the first read travels it
+stays in the box, and after a failed read it stays on the left while «Riprova» reads again. In that order:
 1. **The day block** (`missions/DayBlock`, G8, the page's entry; on a phone «Inizia il ripasso» within the first 400 px
    under the bar): a tile with the section's hue as a 4 px rule down its left edge (`--vlx-section-gymnasium`), a
    visually hidden `h2` «Il ripasso di oggi»; the day small, «lunedì 19 ottobre» (the title says «Oggi»; «lunedì 19
@@ -1160,8 +1174,9 @@ places the right column; inside the tiles a sentence stops at `max-w-prose`. In 
    list's `-mb-3` takes the last one's back). «Tutte le missioni» keeps to the words. The targets are settings, not
    missions (G8): no «Cambia…» under the bars; one line under the rows, «Obiettivo e nuove al giorno: nelle impostazioni»
    with the gear's icon, opens the study settings in the band and focuses them (at the community's subjects when the
-   new cards' mission has none to give). The goal's row takes the stamp once met, and the celebration's confetti start
-   from it. While the first read travels the rows hold their places; a failed read, or no card at all, is the day
+   new cards' mission has none to give). The goal's row keeps its line in sight (the red stamp that covered it is gone,
+   G9); the summary counts the missions done and open, and with none to count (every mission empty: nothing due,
+   nothing new) says «Oggi non c'è nulla da ripassare», never «0 di 0». While the first read travels the rows hold their places; a failed read, or no card at all, is the day
    block's to say.
 3. **«I tuoi progressi»** (`progress/StatsBand`), one band: `StreakBadge compact` (the «§», the count with the bundle
    of five being filled as tally marks beside it, `StreakTally` — the fifth is the stroke across the four in the
@@ -1191,7 +1206,7 @@ places the right column; inside the tiles a sentence stops at `max-w-prose`. In 
    bar of the three colours. From `xl` the band is the top of the right column, about 400 to 490 px: `aside` adds the `xl:` classes that stack it as on a phone (the
    week at the column's width). «Tutti i progressi →», a text link (44 px, not a button across the column, G8), leads to `/studia/progressi`: the trend, the
    coming days and the subjects' data live there alone (G3 removed the «Il tuo mese» sheet, so no chart is drawn twice).
-   **No text on «Oggi» or «Progressi» is under 11 px** (the stamp's date included, and since Y1 the session's compact stamp too):
+   **No text on «Oggi» or «Progressi» is under 11 px** (the goal's mark's date included, words beside the drawing):
    `typeScale.test.tsx` reads the files of `missions/` and `progress/` and fails on a `text-[Npx]` under 11 or an SVG
    `<text>`. `CARD_STATES`, in `tokens.ts`, are the band's, the institutes' and the page's.
 4. **«Le tue materie»** (`progress/SubjectList`, G8), under the band in the same box: it took the place of «Cosa ripassi»
@@ -1237,19 +1252,36 @@ a block, the three verdicts alike in `SECONDARY_BUTTON`; every control of `MyCar
 form itself (`CardForm`, shared with the reader) still drops to the desktop's sizes from `md`. While the first read travels the day block,
 the missions, the band, the subjects and the list keep their places at their final size; a failed first read stops the pulse, and the
 subjects say they could not be read under their heading (no second alert: the day block's «Riprova» reads them again). Colours are the app's tokens through `progress/tokens.ts` (ink is the
-primary scale's deep end, the stamp the one red, a subject's hue the category palette's CSS variable —
+primary scale's deep end, the goal's mark ink too (no red since G9), a subject's hue the category palette's CSS variable —
 procedura penale's is `--category-penal-procedure`, the violet it had when it borrowed Brocardi's `--brocardi`, now gone;
 `theme.test.ts` fails when a subject names a variable `index.css` does not declare in both themes); the charts are
 hand-drawn SVG laid out by the pure `progress/layout.ts`, which walks the server's Rome days in UTC and never reads
 the browser's zone. **The celebration** (`progress/Celebration.tsx`): once a day per browser
 (`useCelebratedToday`, `visualex.studia.festeggiato`, written when a celebration *starts*, so leaving halfway or a new
 read never replays it; a convenience, never the streak's source) — on the home when
-today counts with at least one review (confetti of «§» and «✓» from the stamp in the goal's row over the missions and the band — an absolute box on their grid rows, rows 1–2 below `xl` and row 1 across both columns from it —, `confetti.ts` pure, on a canvas,
-and the stamp «Obiettivo raggiunto» pressed in; the stamp stays at rest afterwards), and in the session on the grade
+the goal's mission is done with at least one review (confetti of «§» and «✓» from the goal's mark over the missions and the band — an absolute box on their grid rows, rows 1–2 below `xl` and row 1 across both columns from it —, `confetti.ts` pure, on a canvas,
+and the mark written once; whole afterwards), and in the session on the grade
 whose answer says `oggi.appenaRaggiunto` (`SessionCelebration`: a notice placed over the lesson's header row (the close button and the progress bar), never over the card
 or the grades; 1.5 s; no focus, no pointer, the keys untouched; an `aria-live`
 line says it to a screen reader). The confetti step by elapsed time (`confetti.ts`
-`stepsAt`), so they last 1.5 s on any screen. Under reduced motion nothing moves: no canvas, the end state only. The session's end screen adds the ring and the streak
+`stepsAt`), so they last 1.5 s on any screen. Under reduced motion nothing moves: no canvas, the end state only.
+**The goal's mark** (`progress/GoalMark`, G9; inspired by a sheet of hand-drawn ticks, written from scratch): a ring, a
+tick and a short stroke under it, each the outline of a broad-nib pen stroke generated once and kept as paths (heavier
+under 48 px), upright, in the one ink (`INK_TEXT`), with no text inside. It shows only when the goal is met and its
+mission done (`goalMissionDone`: `oggi.raggiunto` and the mission `fatta`): a day the streak counts with the mission
+empty (nothing due, nothing new) or open (a goal of the user's own under the mission's 10 reviews), or a mission done
+under a goal raised since (its credit stays the whole day), says so in the mission's line, with no mark and no
+celebration. In the day
+block (`DayBlock`, from the whole day's read, so a subject chosen neither hides nor redraws it), on a phone first, 72 px
+with «23 ottobre 2026 · giorno 3» beside it, never beside the large line; from `md` at the block's right, 96 px over
+those words, the block's right side kept for it. Written (`draw`) only by the celebration: a mask whose pen path is
+uncovered stroke by stroke (`.vlx-goal-mark-draw`, about 1 s, motion allowed only; each pen runs 3 units past its
+stroke's ends, so its butt ends never shave the thin tips at rest); on WebKit, which may not repaint a
+shape whose mask CSS animates (Safari, every browser on an iPhone or an iPad, `writesInMasks`), a short fade of the
+mark whole instead (`.vlx-goal-mark-fade`, A3's fallback). A page read again draws it whole. Its name, «Obiettivo raggiunto» (`role="img"`); the date is the words beside it. The
+session's notice has the same mark, small, beside its words at every width, on the same rule: only when the grade that
+makes the day count also does the goal's mission (its credit in the answer, `GoalMet.missione`); otherwise the words
+alone, and the day is not marked celebrated, so «Oggi» writes the mark the first time, once the mission is done. The session's end screen adds the ring and the streak
 (`SessionEndProgress`, the same read).
 **The small motions** (S2): the tally's new mark (the count pops with it), today's count landing in the ring
 (`GoalRing`'s `vlx-digit-land`: the new digit falls into place and takes on its weight, 360 ms, over its own place held
@@ -1467,7 +1499,8 @@ else its first lines (`previewLines`): the first lines of a Cassazione decision 
 **A decision in a list opens its preview** (spec `docs/superpowers/specs/2026-10-13-decision-preview-from-lists-design.md`):
 every list that names a decision our reader opens — «Giurisprudenza» under an article (`CaseLawRow`: the
 Cassazione, the Court of Justice's judgments; never an order or an opinion, which go to
-EUR-Lex), the Massimario's chips, a topic search's window, the Cronologia and a dossier's «Giurisprudenza» —
+EUR-Lex), the Massimario's chips, a topic search's window and the Cronologia (a dossier's «Giurisprudenza» reads its
+decisions in place since D7a) —
 opens the same body (`DecisionPreviewContent`, the hover popup's) at once on a click or Enter, through
 `useListDecisionPreview` (`useDecisionPreview().openPreview`, no delay; a second click on the estremi closes it)
 and `DecisionPreviewDialog`. On the desktop it is `PreviewFrame` as a non-modal `dialog` («Anteprima di …»)
@@ -1660,7 +1693,10 @@ instead), and the find window, the way back and the index reach the row or the w
 `hostTabId` and `CaseLawSection`'s `tabId` name the host a surface reads in: a practice (its row) or one of its windows
 (or the phone's reader), never a tab. They give the find window the id it registers the text root under (`findHostId` overrides
 it with the window's practice), the way-back entry its `tabId`, and the links they render their `besideId`. A surface with no
-host (a preview such as the palette's result card) registers and records nothing.
+host (a preview such as the palette's result card, a decision read in the dossier) registers and records nothing, and a
+decision's draws no «Cerca nel testo» (`DecisionReadingToolbar` without `onToggleFind`): the find window would have
+nothing of it to search. Off the search page (the dossier) its `onLeave` takes the reader to the workspace when a norm or
+a decision the text cites is sent there.
 
 ### Dossier
 
@@ -1678,7 +1714,9 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
 - **The page by act**: `dossierLayout.ts` (pure) turns the items into sections —
   the notes first (`DossierNotesSection`), then one `DossierActBlock` per act in
   the order the acts entered the dossier, then «Giurisprudenza»
-  (`DossierDecisionsSection`, the decisions in stored order). An act's identity is a code's name
+  (`DossierDecisionsSection`, the decisions in stored order). With acts and decisions both (D7a) they are two
+  columns from `lg`, «Norme» | «Giurisprudenza» (`COLUMN_HEADING`, a rule between them, each column in its own
+  order), the norms first below `lg`; one kind alone takes the width, untitled as before. An act's identity is a code's name
   (the codice civile with or without its R.D. is one act) or `tipo_atto|numero_atto|data`;
   its heading is a code's name or the server's `act_citation`, never formatted
   here (a muted fallback until the server answers); its articles sort by annex,
@@ -1794,8 +1832,25 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
 - **Decisions** (`type: 'sentenza'`): the item stores the identity, the attributes the item
   schema accepts and a label, never the text. They are added from the decision's reading surface
   («Aggiungi al dossier», `AddToDossierPopover` with `sentenza`) and listed after the acts under
-  «Giurisprudenza» (`DossierDecisionsSection`: each citation is a `DecisionLink` — its preview's «Apri la sentenza» goes to the decision's address — and
-  each row can be removed). The stored `etichetta` is a copy (source convention, D9):
+  «Giurisprudenza» (`DossierDecisionsSection`, D7a: each decision a row as an article's, `DossierDecisionRow` — the
+  checkbox while selecting, the arrow, the citation over «Aggiunta il …», the star, the removal, 44 px — opened in
+  place by `DossierDecisionReader`: the decision's own reader, `useDecisionAnswer` and `DecisionView` with
+  `DecisionReadingSurface`, never another, so notes, highlights and key passages work as anywhere and the text is the
+  reader's, gotcha 23; asked for only once opened; a decision without its text opens too and `DecisionView` says how it
+  came; «Apri la sentenza», the address, over it whatever came back. No tab holds it: no «Cerca nel testo», and a cited
+  norm or decision takes the reader to the workspace, `onLeave` (see «The host props»); its heading an h3 under
+  «Giurisprudenza», `DecisionView`'s `headingLevel`. The application that filed it is marked as an article's notes are,
+  `ClaudeMark` with `verb="aggiunta"` — «aggiunta da Claude Code», never «scritta» — from the item's own `createdBy`,
+  on the grey line rather than at the right (a long citation beside it was squeezed into a column on a phone).
+  No note count: the server takes a note about an article only, `assertArticleOfDossier`, and counting the notes and
+  highlights on each text would cost a read per decision.) «Seleziona tutti» takes
+  the decisions with the articles; «Apri tutto su Dashboard», on the page and on the list's card, opens a dossier of
+  decisions alone too, one practice holding them; «Espandi tutto» opens the articles only, each decision being a request
+  to its court's source, and leaves a decision open as it was; «Comprimi tutto» closes every row, the decisions too (in
+  a dossier of decisions alone it is all the button offers, once one is open). The block of acts is hidden, still
+  mounted, while no act is on screen. In two columns the
+  acts' headings are h3 under «Norme» (`headingLevel`), and the page keeps the same elements whatever the search leaves,
+  only their classes changing, so an open article is never remounted. The stored `etichetta` is a copy (source convention, D9):
   `decisionCitationOf` recomputes the citation from the identity and the attributes, every write
   sends it (`itemContentFor`, `serverItemFor`), the server recomputes it again on every write
   (`withDecisionLabel`), and every screen shows the recomputed one, never the copy.

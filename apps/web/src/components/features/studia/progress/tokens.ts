@@ -2,14 +2,14 @@ import type { ConteggiStati, Materia, StatoGiorno } from '../../../../types/stud
 
 /**
  * Direction D, «Registro vivo» (Studia progress spec §6.1): the app's own tokens, light and dark. Ink is the
- * deep end of the primary scale; the stamp is the one red; each subject takes a hue of the category palette.
+ * deep end of the primary scale; the goal's mark is the ink too (G9: the red stamp is gone); each subject takes a hue
+ * of the category palette.
  */
 export const INK_TEXT = 'text-primary-900 dark:text-primary-300';
 export const INK_BG = 'bg-primary-900 dark:bg-primary-300';
 export const INK_BORDER = 'border-primary-900 dark:border-primary-300';
 /** Text on an ink fill. */
 export const ON_INK = 'text-white dark:text-slate-950';
-export const STAMP = 'border-red-700 text-red-700 dark:border-red-400 dark:text-red-400';
 export const SUCCESS_TEXT = 'text-green-600 dark:text-green-400';
 export const MUTED_TEXT = 'text-slate-500 dark:text-slate-400';
 
