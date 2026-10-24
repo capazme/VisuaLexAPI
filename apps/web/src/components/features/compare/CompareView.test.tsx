@@ -67,6 +67,11 @@ describe('CompareView — the articles of the practices (spec §6.8)', () => {
 });
 
 describe('CompareView — a modal dialog, as the app\'s others', () => {
+  // The `offsetParent` spy below goes even when an assertion fails.
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   // jsdom lays nothing out: every element is «visible» to the trap, as in a browser.
   const laidOut = () => vi.spyOn(HTMLElement.prototype, 'offsetParent', 'get').mockImplementation(function (this: HTMLElement) {
     return this.parentElement;
@@ -93,7 +98,7 @@ describe('CompareView — a modal dialog, as the app\'s others', () => {
   });
 
   it('keeps Tab inside: past the last control to the first, before the first to the last, and in from the page', () => {
-    const offsetParent = laidOut();
+    laidOut();
     render(<><button type="button">Fuori</button><CompareView /></>);
     const dialog = screen.getByRole('dialog', { name: 'Confronta articoli' });
     const inside = focusables(dialog);
@@ -109,17 +114,19 @@ describe('CompareView — a modal dialog, as the app\'s others', () => {
     outside.focus();
     fireEvent.keyDown(outside, { key: 'Tab' });
     expect(first).toHaveFocus();
-    offsetParent.mockRestore();
   });
 
   it('leaves Esc and Tab to a dialog opened over it, and closes on Esc once it is the top-most', () => {
     const onClose = vi.fn();
-    const offsetParent = laidOut();
+    laidOut();
     const { rerender } = render(<><CompareView /><Modal isOpen onClose={onClose} title="Sopra"><button type="button">Dentro</button></Modal></>);
     const inner = screen.getByRole('button', { name: 'Dentro' });
     inner.focus();
-    // The comparison's trap would send the focus to its own first control.
+    // The comparison's trap would send the focus to its own first control (the dialog over it would pull it back after).
+    const intoComparison = vi.fn();
+    screen.getByRole('dialog', { name: 'Confronta articoli' }).addEventListener('focusin', intoComparison);
     fireEvent.keyDown(inner, { key: 'Tab' });
+    expect(intoComparison).not.toHaveBeenCalled();
     expect(screen.getByRole('dialog', { name: 'Sopra' })).toContainElement(document.activeElement as HTMLElement);
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -128,7 +135,6 @@ describe('CompareView — a modal dialog, as the app\'s others', () => {
     rerender(<><CompareView /><Modal isOpen={false} onClose={onClose} title="Sopra" /></>);
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(getCompareState().isOpen).toBe(false);
-    offsetParent.mockRestore();
   });
 });
 

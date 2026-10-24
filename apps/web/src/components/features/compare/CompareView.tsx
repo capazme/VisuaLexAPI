@@ -528,6 +528,12 @@ export function CompareView() {
   return (
     <AnimatePresence>
       <motion.div
+        // The dialog is the whole layer, not only the panel: a note it opens is portalled here (`CompareDialogRoot`),
+        // inside the dialog for a screen reader and the trap, and bounded by the window rather than by the panel.
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -545,10 +551,6 @@ export function CompareView() {
         }}
       >
         <motion.div
-          ref={dialogRef}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby={titleId}
           initial={{ opacity: 0, y: 20, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 20, scale: 0.98 }}

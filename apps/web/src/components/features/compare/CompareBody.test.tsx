@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, createEvent, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { parseArticleStructure } from '../../../utils/articleStructure';
 import { CompareView } from './CompareView';
@@ -249,6 +249,13 @@ describe('CompareView — versions', () => {
     const note = screen.getByRole('dialog', { name: `Aggiornamento (${chip.dataset.note})` });
     // Drawn inside the comparison, a modal dialog: outside it, a screen reader would not reach it and Tab would leave it.
     expect(screen.getByRole('dialog', { name: 'Confronta articoli' })).toContainElement(note);
+    // Tab from inside the note is the note's own (floating-ui's guards), not the comparison's trap.
+    const closeNote = within(note).getByRole('button', { name: 'Chiudi nota' });
+    closeNote.focus();
+    const tab = createEvent.keyDown(closeNote, { key: 'Tab' });
+    fireEvent(closeNote, tab);
+    expect(tab.defaultPrevented).toBe(false);
+    expect(closeNote).toHaveFocus();
     // Esc closes the note, not the comparison with it.
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('dialog', { name: /^Aggiornamento/ })).toBeNull();

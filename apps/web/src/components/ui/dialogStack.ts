@@ -1,7 +1,7 @@
 /**
- * The dialogs open, oldest first: `Modal` and `WireConfirm`. Each one registers its Tab trap and Esc handler on
- * `document`; with a dialog opened from another dialog, only the last one opened may act, or the parent would pull
- * the focus back from its child, or close with it.
+ * The dialogs open, oldest first: `Modal`, `WireConfirm` and `CompareView`. Each one registers its Tab trap on
+ * `document` and its Esc handler (on `document`, the comparison's on `window`); with a dialog opened from another
+ * dialog, only the last one opened may act, or the parent would pull the focus back from its child, or close with it.
  */
 const open: symbol[] = [];
 

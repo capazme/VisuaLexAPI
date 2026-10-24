@@ -1612,9 +1612,11 @@ the later text (G-357).
 a full-screen overlay (`data-find-overlay`) over two articles chosen from the practices, a search or the history; a
 modal dialog as `Modal` is (`role="dialog"`, `aria-modal`, named by its title «Confronta articoli»; the focus on «Chiudi
 il confronto» as it opens, Tab kept inside, the focus back as it closes, `useDialogFocus`; Esc only when it is the
-top-most and nothing inside took it). What it opens is portalled inside it, not in the body (`CompareDialogRoot`: the
-update notes' `UpdateNotePopover`, `portalRoot`), since a modal dialog hides from a screen reader what lies outside it
-and its trap would pull the focus out.
+top-most and nothing inside took it). The dialog is the whole layer, backdrop included, not only the panel: what it
+opens is portalled there, not in the body (`CompareDialogRoot`: the update notes' `UpdateNotePopover`, `portalRoot`),
+since a modal dialog hides from a screen reader what lies outside it and its trap would pull the focus out; on the
+layer the note is bounded by the window, not cut by the panel's edge. A popover portalled inside a dialog keeps its
+own Tab (`useDialogFocus` leaves a focus inside `[data-floating-ui-portal]` to floating-ui's guards).
 `Layout` mounts it — and so fetches its chunk — only from its first opening in the visit (`useCompareOpened`), a
 spinner where it will stand while the code arrives, and keeps it mounted after, as before (its full-screen choice
 survives a close); the spinner shows only while the comparison is open. Its code that cannot be fetched, or an error

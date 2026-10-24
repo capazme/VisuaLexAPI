@@ -30,6 +30,10 @@ export function useDialogFocus(
       if (e.key !== 'Tab' || !isTopmost()) return;
       const dialog = dialogRef.current;
       if (!dialog) return;
+      const active = document.activeElement;
+      // A popover portalled inside the dialog (floating-ui's, the comparison's update note) keeps its own Tab: its guards
+      // take the focus back next to its reference, which is inside the dialog too.
+      if (active instanceof Element && dialog.contains(active) && active.closest('[data-floating-ui-portal]')) return;
       const focusable = Array.from(
         dialog.querySelectorAll<HTMLElement>(
           'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
@@ -38,7 +42,6 @@ export function useDialogFocus(
       if (focusable.length === 0) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
-      const active = document.activeElement;
       if (e.shiftKey) {
         // From an element outside the list (the dialog itself, a wrapper focused with tabIndex -1) the browser would
         // step out of the dialog backwards: the last element takes it.
