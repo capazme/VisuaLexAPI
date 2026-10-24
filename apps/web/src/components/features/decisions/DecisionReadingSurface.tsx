@@ -40,6 +40,14 @@ import { KeyPassagesMenu } from './KeyPassagesMenu';
 // A decision's anchors are stored under its key with no article: the wire key is `<key>::art::`.
 const NO_ARTICLE = '';
 
+/** A host that holds norms of its own (the dossier, D7d): the norms the text cites are its to open. */
+export interface CitedNorms {
+  /** Whether the host holds the norm: the preview's button then says «Apri tra le norme». */
+  holds: (citation: ParsedCitationData) => boolean;
+  /** A click on a cited norm, with the link clicked; the preview's button, with none. */
+  open: (citation: ParsedCitationData, link: HTMLElement | null) => void;
+}
+
 export interface DecisionReadingSurfaceProps {
   identity: DecisionIdentity;
   testo: DecisionText;
@@ -67,6 +75,11 @@ export interface DecisionReadingSurfaceProps {
    * that page.
    */
   onLeave?: () => void;
+  /**
+   * The cited norms go to the host instead of a search (the dossier, D7d): it opens one it holds where it is, and
+   * offers the rest. The text and its links are the same either way (gotcha 23).
+   */
+  citedNorms?: CitedNorms;
 }
 
 /**
@@ -75,7 +88,7 @@ export interface DecisionReadingSurfaceProps {
  * it. Self-contained: it takes the decision as props and reaches only the store's search and
  * way-back actions, so any host can mount it.
  */
-export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, hostBlockId, findHostId, onLeave }: DecisionReadingSurfaceProps) {
+export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, hostBlockId, findHostId, onLeave, citedNorms }: DecisionReadingSurfaceProps) {
   const {
     triggerSearch, pushReadingBack, annotations, highlights, removeAnnotation, updateAnnotation,
     removeHighlight, loadAnnotationsForArticle, loadHighlightsForArticle, showKeyPassages, updateSettings,
@@ -235,7 +248,8 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
     [hostTabId, hostBlockId, label],
   );
 
-  const openCitation = useCallback((citation: ParsedCitationData) => {
+  const openCitation = useCallback((citation: ParsedCitationData, link: HTMLElement | null = null) => {
+    if (citedNorms) return citedNorms.open(citation, link);
     triggerSearch({
       act_type: citation.act_type,
       act_number: citation.act_number || '',
@@ -245,7 +259,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
       ...(hostTabId ? { besideId: hostTabId } : {}),
     });
     onLeave?.();
-  }, [triggerSearch, hostTabId, onLeave]);
+  }, [triggerSearch, hostTabId, onLeave, citedNorms]);
 
   const decisionLinks = useDecisionLinks({ besideId: hostTabId, origin, onOpened: onLeave });
   useCitationLinks(contentRef, { onOpen: openCitation, origin, showPreview, hidePreview, isHoveringPopupRef, decisions: decisionLinks.links });
@@ -423,6 +437,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
         article={preview.article}
         position={preview.position}
         onClose={hidePreview}
+        openLabel={citedNorms && preview.citation && citedNorms.holds(preview.citation) ? 'Apri tra le norme' : undefined}
         onOpenCitation={(citation) => {
           // the popup's own button is a jump like a click: the way back is recorded the same
           if (origin) pushReadingBack(origin);

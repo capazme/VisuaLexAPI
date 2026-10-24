@@ -459,6 +459,14 @@
   height: calc(100dvh - 4rem - var(--search-bar-height, 0px));
 }
 
+/* A dossier's column of two (D7d), at most the window's height less the content area's padding above it
+   (`p-8`) and its foot below (`--page-foot`, the floating feedback button's room; `p-8` without it) and the
+   search page's field: the columns fit the window once the page is scrolled to them, and each scrolls alone. */
+@utility max-h-app-column {
+  max-height: calc(100vh - 2rem - var(--page-foot, 2rem) - var(--search-bar-height, 0px));
+  max-height: calc(100dvh - 2rem - var(--page-foot, 2rem) - var(--search-bar-height, 0px));
+}
+
 /* ═══════════════════════════════════════════════════════════
    READING SURFACE — the structured article text
    Markup from utils/articleRender.ts. Every label here comes from CSS

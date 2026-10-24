@@ -17,8 +17,8 @@ export interface DecisionLinksOptions {
 }
 
 export interface CitationLinksOptions {
-  /** What a click on a citation does (a same-act jump, a search...). No handler, no click action. */
-  onOpen?: (parsed: ParsedCitationData) => void;
+  /** What a click on a citation does (a same-act jump, a search...), with the link clicked. No handler, no click action. */
+  onOpen?: (parsed: ParsedCitationData, link: HTMLElement) => void;
   /** Where the reader stands: recorded on the way-back stack before `onOpen` runs. */
   origin?: ReadingBackEntry;
   /** The norm preview: a surface that links only decisions leaves these three out. */
@@ -57,15 +57,15 @@ export function useCitationLinks(containerRef: RefObject<HTMLElement | null>, op
     const handleClick = (event: Event) => {
       const linked = (event.target as HTMLElement).closest('.citation-hover, .decision-cite');
       if (linked?.classList.contains('decision-cite')) return clickDecision(linked);
-      const citationElement = linked;
+      const citationElement = linked as HTMLElement | null;
       const citationData = citationElement?.getAttribute('data-citation');
-      if (!citationData) return;
+      if (!citationElement || !citationData) return;
       const parsed = deserializeCitation(citationData);
       const { onOpen, origin, hidePreview } = latest.current;
       if (!parsed || !onOpen) return;
       // Record where we are leaving from BEFORE jumping: one push covers every kind of jump.
       if (origin) pushReadingBack(origin);
-      onOpen(parsed);
+      onOpen(parsed, citationElement);
       hidePreview?.();
     };
 

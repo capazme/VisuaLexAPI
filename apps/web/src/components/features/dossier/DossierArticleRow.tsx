@@ -74,7 +74,8 @@ export function DossierArticleRow({
     + (byApp ? `, ${notes.length === 1 ? '' : 'una '}${claudeMarkSentence(byApp)}` : '');
 
   return (
-    <div className={cn(ROW, 'pl-3 transition-colors', isSelected ? 'bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800/40')}>
+    // `data-dossier-item`: a norm a decision cites opens this row (D7d, `useCitedNorms`).
+    <div data-dossier-item={item.id} className={cn(ROW, 'pl-3 transition-colors', isSelected ? 'bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800/40')}>
       {isImportant && <span aria-hidden className="absolute bottom-2 left-0 top-2 w-1 rounded bg-amber-400" />}
       <div className="flex items-start gap-1">
         {showCheckbox && (

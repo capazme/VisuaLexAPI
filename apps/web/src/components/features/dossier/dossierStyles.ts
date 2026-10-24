@@ -27,6 +27,12 @@ export const SECTION_HEADING = 'font-serif text-lg font-medium tracking-tight te
  */
 export const COLUMN_HEADING = 'mb-2 font-serif text-xl font-medium tracking-tight text-slate-900 dark:text-slate-50';
 
+/**
+ * A column of two from `lg` (D7d): as tall as the window less the page's padding and foot (`max-h-app-column`), scrolling
+ * on its own, so a decision read on the right stays put while a norm opens on the left, and the other way.
+ */
+export const COLUMN_SCROLLS = 'lg:max-h-app-column lg:overflow-y-auto';
+
 /** The count beside a block's heading. */
 export const SECTION_COUNT = 'font-sans text-sm font-normal text-slate-600 dark:text-slate-400';
 

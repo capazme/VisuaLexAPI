@@ -74,8 +74,10 @@ import { cn } from '../../../lib/utils';
 import { PageFrame } from '../../layout/PageFrame';
 import { sectionOfDossierKind } from '../../../features/sections/useSection';
 import { FOCUS_RING } from '../studia/progress/tokens';
-import { COLUMN_HEADING, HEADER_BUTTON, HEADER_ICON_BUTTON, HEADER_PRIMARY } from './dossierStyles';
+import { COLUMN_HEADING, COLUMN_SCROLLS, HEADER_BUTTON, HEADER_ICON_BUTTON, HEADER_PRIMARY } from './dossierStyles';
 import { FIELD, ICON_BUTTON } from '../planner/plannerStyles';
+import { CitedNormsContext, useCitedNorms } from './useCitedNorms';
+import { CitedNormChoice } from './CitedNormChoice';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -190,6 +192,20 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     const next = new Set(prev);
     if (next.has(id)) next.delete(id); else next.add(id);
     return next;
+  });
+  // A norm a decision cites, when the dossier holds it, opens in the norms' column (D7d).
+  const cited = useCitedNorms({
+    items: dossier.items,
+    visibleItems,
+    acts: fullLayout.acts,
+    unfoldAct: (key) => setFoldedActs((prev) => {
+      if (!prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    }),
+    expand: (id) => setExpandedIds((prev) => (prev.has(id) ? prev : new Set(prev).add(id))),
+    clearSearch: () => setItemSearchQuery(''),
   });
   const toggleFolded = (key: string) => setFoldedActs((prev) => {
     const next = new Set(prev);
@@ -763,15 +779,22 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
               {/* Acts and decisions both (D7a): two columns from lg, «Norme» | «Giurisprudenza», a rule between them;
                   below lg the norms, then the decisions. One kind alone takes the width, untitled as before. The same
                   elements either way, only their classes changing, so a search that leaves one kind remounts nothing
-                  (an open article keeps its text). */}
-              <div className={cn('flex flex-col gap-4', twoColumns && 'gap-6 lg:grid lg:grid-cols-2 lg:gap-0')}>
-                {/* Hidden, still mounted, while no act is on screen: no empty block and no gap over the decisions. */}
-                <section aria-labelledby={twoColumns ? 'dossier-norms-heading' : undefined} className={cn('min-w-0', twoColumns && 'lg:pr-5', layout.acts.length === 0 && 'hidden')}>
-                  {twoColumns && <h2 id="dossier-norms-heading" className={COLUMN_HEADING}>Norme</h2>}
-                  {actsList}
-                </section>
-                <div className={cn('min-w-0 empty:hidden', twoColumns && 'border-slate-200 lg:border-l lg:pl-5 dark:border-slate-800')}>{decisionsList}</div>
-              </div>
+                  (an open article keeps its text). From lg each column scrolls on its own, as tall as the window
+                  (D7d): a decision stays where it is read while a norm it cites opens beside it, and the other way. */}
+              <CitedNormsContext.Provider value={cited.citedNorms}>
+                <div className={cn('flex flex-col gap-4', twoColumns && 'gap-6 lg:grid lg:grid-cols-2 lg:gap-0')}>
+                  {/* Hidden, still mounted, while no act is on screen: no empty block and no gap over the decisions. */}
+                  <section
+                    ref={cited.columnRef}
+                    aria-labelledby={twoColumns ? 'dossier-norms-heading' : undefined}
+                    className={cn('min-w-0', twoColumns && cn('lg:pr-5', COLUMN_SCROLLS), layout.acts.length === 0 && 'hidden')}
+                  >
+                    {twoColumns && <h2 id="dossier-norms-heading" className={COLUMN_HEADING}>Norme</h2>}
+                    {actsList}
+                  </section>
+                  <div className={cn('min-w-0 empty:hidden', twoColumns && cn('border-slate-200 lg:border-l lg:pl-5 dark:border-slate-800', COLUMN_SCROLLS))}>{decisionsList}</div>
+                </div>
+              </CitedNormsContext.Provider>
             </>
           )}
         </div>
@@ -808,6 +831,17 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
             initialAct={treeNavigatorAct ?? undefined}
             onClose={() => setTreeNavigatorAct(undefined)}
             onImport={handleTreeImport}
+          />
+        )}
+
+        {cited.choice && (
+          <CitedNormChoice
+            key={cited.choice.link.dataset.cacheKey ?? cited.choice.citation.article}
+            citation={cited.choice.citation}
+            link={cited.choice.link}
+            onClose={cited.closeChoice}
+            onOpenOnDashboard={cited.openOnDashboard}
+            showToast={showToast}
           />
         )}
 

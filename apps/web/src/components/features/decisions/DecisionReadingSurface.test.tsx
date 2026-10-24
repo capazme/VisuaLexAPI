@@ -121,6 +121,20 @@ describe('DecisionReadingSurface', () => {
     expect(appStore.getState().readingBackStack).toEqual([]);
   });
 
+  it('hands a cited norm to a host that holds norms (the dossier, D7d), with the link: no search, nothing left, the text as it was', () => {
+    const open = vi.fn();
+    const onLeave = vi.fn();
+    const { container } = render(
+      <DecisionReadingSurface identity={IDENTITY} testo={TESTO} attributi={{}} onLeave={onLeave} citedNorms={{ holds: () => true, open }} />,
+    );
+    const link = container.querySelector<HTMLElement>('.citation-hover')!;
+    fireEvent.click(link);
+    expect(open).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ act_type: 'codice civile', article: '2043' }), link);
+    expect(appStore.getState().searchTrigger).toBeNull();
+    expect(onLeave).not.toHaveBeenCalled();
+    expect(textOf(container.querySelector('.vlx-decision')!)).toBe(decisionProjection(TESTO));
+  });
+
   // The real mount (ArticleBody -> SafeHTML -> DOMPurify), over every fixture. The carriage-return
   // fixture is a renderer-level case: the readers normalise CR to LF (italgiure:v4), so none
   // reaches a page, and the sanitiser's re-serialisation would read one as a line feed. A decision
