@@ -591,9 +591,10 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `SegmentedControl` (a choice in a form: the card's kind, a relation's end) slides a pill too, without the keyboard,
   reduced motion or a row's own `LayoutGroup`: U1 folds it in.
   `Modal` is portaled to `document.body`, so a dialog opened inside a reading window
-  (transformed, stacked) is not confined to it; each open `Modal` and `WireConfirm` is on a module-level
+  (transformed, stacked) is not confined to it; each open `Modal`, `WireConfirm` and `CompareView` is on a module-level
   stack (`ui/dialogStack.ts`) and only the top-most handles Tab (its focus trap, on `document`) and Esc, so a dialog opened
-  from a dialog keeps the keyboard.
+  from a dialog keeps the keyboard. `Modal` and `CompareView` share that focus (`ui/useDialogFocus.ts`): the stack, the
+  Tab trap, the focus given 50 ms after opening (to «Chiudi» unless told otherwise) and back to what had it on closing.
   `Button` has four variants (spec `2026-10-18-redesign-inchiostro` §5.1): `primary` (toga-600, white),
   `secondary` (paper with an ink-200 hairline), `quiet` (text only) and `danger` (red-600) — `ghost` and
   `outline` are the earlier names of `quiet` and `secondary` —, no gradient, glow or hover lift, a minimum
@@ -1608,7 +1609,12 @@ its column and the article is still compared). It only informs: «Vedi il testo 
 the later text (G-357).
 
 **«Confronta articoli»** (`features/compare/CompareView`, spec `docs/superpowers/specs/2026-10-13-compare-articles-design.md`):
-a full-screen overlay (`data-find-overlay`) over two articles chosen from the practices, a search or the history.
+a full-screen overlay (`data-find-overlay`) over two articles chosen from the practices, a search or the history; a
+modal dialog as `Modal` is (`role="dialog"`, `aria-modal`, named by its title «Confronta articoli»; the focus on «Chiudi
+il confronto» as it opens, Tab kept inside, the focus back as it closes, `useDialogFocus`; Esc only when it is the
+top-most and nothing inside took it). What it opens is portalled inside it, not in the body (`CompareDialogRoot`: the
+update notes' `UpdateNotePopover`, `portalRoot`), since a modal dialog hides from a screen reader what lies outside it
+and its trap would pull the focus out.
 `Layout` mounts it — and so fetches its chunk — only from its first opening in the visit (`useCompareOpened`), a
 spinner where it will stand while the code arrives, and keeps it mounted after, as before (its full-screen choice
 survives a close); the spinner shows only while the comparison is open. Its code that cannot be fetched, or an error
@@ -1886,7 +1892,8 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   came; «Apri la sentenza», the address, over it whatever came back. No tab holds it: no «Cerca nel testo», and a cited
   norm or decision takes the reader to the workspace, `onLeave` (see «The host props»); the row names it, so inside
   its full name is a quiet line of details, not a second and heavier title (`DecisionView`'s `title="line"`; the
-  practice keeps its h4). The application that filed it is marked as an article's notes are,
+  practice keeps its h4), and the opened decision is a region named by the row's citation (`aria-labelledby`, no new
+  words on screen), so a screen reader still finds it by its name. The application that filed it is marked as an article's notes are,
   `ClaudeMark` with `verb="aggiunta"` — «aggiunta da Claude Code», never «scritta» — from the item's own `createdBy`,
   on the grey line rather than at the right (a long citation beside it was squeezed into a column on a phone).
   No note count: the server takes a note about an article only, `assertArticleOfDossier`, and counting the notes and

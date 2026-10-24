@@ -102,6 +102,11 @@ describe('DossierDecisionsSection (D7a)', () => {
     expect(details.tagName).toBe('P');
     expect(details).toHaveClass('text-sm', 'text-slate-600');
     expect(screen.queryByRole('heading', { name: /^Corte di cassazione/ })).toBeNull();
+    // A screen reader still finds the decision by its name: the opened decision is a region named by the row's own
+    // citation (no new words on screen), the one the toggle controls.
+    const decision = screen.getByRole('region', { name: CASS });
+    expect(decision).toContainElement(motivazione);
+    expect(screen.getByRole('button', { name: `Comprimi ${CASS}` })).toHaveAttribute('aria-controls', decision.id);
     expect(fetchDecision).toHaveBeenCalledTimes(1);
     // The decision's own reading surface: its toolbar, without the find window it has no tab for.
     expect(screen.getByRole('button', { name: /Glosse sulla decisione/ })).toBeInTheDocument();

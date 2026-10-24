@@ -246,7 +246,13 @@ describe('CompareView — versions', () => {
     expect(container.querySelectorAll('[data-compare-row="tail"] .vlx-updates')).toHaveLength(2);
     const chip = container.querySelector<HTMLElement>('[data-side="left"] .vlx-ref')!;
     fireEvent.click(chip);
-    expect(screen.getByRole('dialog')).toHaveTextContent(`Aggiornamento (${chip.dataset.note})`);
+    const note = screen.getByRole('dialog', { name: `Aggiornamento (${chip.dataset.note})` });
+    // Drawn inside the comparison, a modal dialog: outside it, a screen reader would not reach it and Tab would leave it.
+    expect(screen.getByRole('dialog', { name: 'Confronta articoli' })).toContainElement(note);
+    // Esc closes the note, not the comparison with it.
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: /^Aggiornamento/ })).toBeNull();
+    expect(screen.getByRole('dialog', { name: 'Confronta articoli' })).toBeInTheDocument();
   });
 
   it('has no «Mostra Diff», no similarity and no ArticleDiff', () => {
@@ -338,17 +344,18 @@ describe('CompareView — a reference opens the note of its own column', () => {
   const withNote = (comma: string, note: string) =>
     `Art. 1.\n\n1. ${comma} (7)\n\n-------------\nAGGIORNAMENTO (7)\n\n ${note}`;
 
+  const noteDialog = () => screen.getByRole('dialog', { name: 'Aggiornamento (7)' });
+
   it('shows the right article\'s note from the right column, the left\'s from the left', () => {
     const a = compareArticle(withNote('Primo testo.', 'Nota dell\'articolo di sinistra.'), { numero_articolo: '1' }, 'art. 1 c.c.');
     const b = compareArticle(withNote('Secondo testo.', 'Nota dell\'articolo di destra.'), { numero_articolo: '2' }, 'art. 2 c.c.');
     const { container } = open(a, b);
     fireEvent.click(container.querySelector<HTMLElement>('[data-side="right"] .vlx-ref')!);
-    expect(screen.getByRole('dialog')).toHaveTextContent('Aggiornamento (7)');
-    expect(screen.getByRole('dialog')).toHaveTextContent('Nota dell\'articolo di destra.');
-    expect(screen.getByRole('dialog')).not.toHaveTextContent('sinistra');
+    expect(noteDialog()).toHaveTextContent('Nota dell\'articolo di destra.');
+    expect(noteDialog()).not.toHaveTextContent('sinistra');
     fireEvent.click(container.querySelector<HTMLElement>('[data-side="left"] .vlx-ref')!);
-    expect(screen.getByRole('dialog')).toHaveTextContent('Nota dell\'articolo di sinistra.');
-    expect(screen.getByRole('dialog')).not.toHaveTextContent('destra');
+    expect(noteDialog()).toHaveTextContent('Nota dell\'articolo di sinistra.');
+    expect(noteDialog()).not.toHaveTextContent('destra');
   });
 });
 
