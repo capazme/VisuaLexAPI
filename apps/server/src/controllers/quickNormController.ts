@@ -1,12 +1,14 @@
 import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
+import { atMostUnits } from '../utils/utf16Length';
 import { AppError } from '../middleware/errorHandler';
 
 // ── Validation ────────────────────────────────────────────────────────────
 
 const createQuickNormSchema = z.object({
-  label: z.string().min(1).max(300),
+  // In UTF-16 units, as the Forum counts a published label (`LIMITS.label`).
+  label: z.string().min(1).refine(...atMostUnits(300)),
   // SearchParams shape is owned by the frontend — we validate only the
   // keys that the server actually reads (none) and ship the blob as-is.
   searchParams: z.any().optional(),
@@ -14,7 +16,7 @@ const createQuickNormSchema = z.object({
 });
 
 const updateQuickNormSchema = z.object({
-  label: z.string().min(1).max(300).optional(),
+  label: z.string().min(1).refine(...atMostUnits(300)).optional(),
   searchParams: z.any().optional(),
   sourceUrl: z.string().optional().nullable(),
   // usageCount + lastUsedAt are updated by the dedicated `use` endpoint,

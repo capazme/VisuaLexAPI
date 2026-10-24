@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
+import { atLeastUnits } from '../utils/utf16Length';
 import { hashPassword } from '../utils/password';
 import { AppError } from '../middleware/errorHandler';
 import { deleteUserAccount } from '../lingo/deleteUserAccount';
@@ -9,7 +10,7 @@ import { deleteUserAccount } from '../lingo/deleteUserAccount';
 const createUserSchema = z.object({
   email: z.string().email(),
   username: z.string().min(3).max(50),
-  password: z.string().min(3),
+  password: z.string().refine(...atLeastUnits(3)),
   isAdmin: z.boolean().optional().default(false),
   isActive: z.boolean().optional().default(true),
 });
@@ -27,7 +28,7 @@ const updateUserSchema = z.object({
 });
 
 const resetPasswordSchema = z.object({
-  newPassword: z.string().min(3),
+  newPassword: z.string().refine(...atLeastUnits(3)),
 });
 
 /**
