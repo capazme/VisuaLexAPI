@@ -1616,7 +1616,9 @@ top-most and nothing inside took it). The dialog is the whole layer, backdrop in
 opens is portalled there, not in the body (`CompareDialogRoot`: the update notes' `UpdateNotePopover`, `portalRoot`),
 since a modal dialog hides from a screen reader what lies outside it and its trap would pull the focus out; on the
 layer the note is bounded by the window, not cut by the panel's edge. A popover portalled inside a dialog keeps its
-own Tab (`useDialogFocus` leaves a focus inside `[data-floating-ui-portal]` to floating-ui's guards).
+own Tab (`useDialogFocus` leaves a focus inside `[data-floating-ui-portal]` to floating-ui's guards, which hand it to
+the next tabbable after the popover's place, else its reference); should that be outside the dialog, the focus comes
+back to the dialog's first control.
 `Layout` mounts it — and so fetches its chunk — only from its first opening in the visit (`useCompareOpened`), a
 spinner where it will stand while the code arrives, and keeps it mounted after, as before (its full-screen choice
 survives a close); the spinner shows only while the comparison is open. Its code that cannot be fetched, or an error

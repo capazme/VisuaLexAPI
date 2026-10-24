@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useRef, type RefObject } from 'react';
 import { isTopmostDialog, openDialog } from './dialogStack';
 
+/** What Tab walks through in a dialog, in order: its visible controls (and the focused one, laid out or not). */
+function focusableIn(dialog: HTMLElement): HTMLElement[] {
+  return Array.from(
+    dialog.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+  ).filter((el) => el.offsetParent !== null || el === document.activeElement);
+}
+
 /**
  * A modal dialog's focus (`Modal`, `CompareView`): registered in `dialogStack` while open, Tab kept inside it (past
  * the last control back to the first, before the first to the last), the focus given to `initialFocus()` 50 ms after
@@ -32,13 +41,17 @@ export function useDialogFocus(
       if (!dialog) return;
       const active = document.activeElement;
       // A popover portalled inside the dialog (floating-ui's, the comparison's update note) keeps its own Tab: its guards
-      // take the focus back next to its reference, which is inside the dialog too.
-      if (active instanceof Element && dialog.contains(active) && active.closest('[data-floating-ui-portal]')) return;
-      const focusable = Array.from(
-        dialog.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
-        )
-      ).filter((el) => el.offsetParent !== null || el === document.activeElement);
+      // hand the focus to the next tabbable after the popover's place in the dialog, else to its reference. Should that
+      // land outside the dialog, the focus comes back to the dialog's first control, as the trap's own wrap would.
+      if (active instanceof Element && dialog.contains(active) && active.closest('[data-floating-ui-portal]')) {
+        window.setTimeout(() => {
+          const now = dialogRef.current;
+          if (!now || !isTopmost() || now.contains(document.activeElement)) return;
+          focusableIn(now)[0]?.focus();
+        }, 0);
+        return;
+      }
+      const focusable = focusableIn(dialog);
       if (focusable.length === 0) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
