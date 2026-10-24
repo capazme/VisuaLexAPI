@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense, Component, type ReactNode } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Sidebar } from './Sidebar';
@@ -20,7 +20,7 @@ import { FindWindow } from '../features/search/FindWindow';
 import { GlobalSearch } from '../features/search/GlobalSearch';
 import { SearchField } from '../features/search/SearchField';
 import { closeFindWindow, isWorkspaceCovered, openFindWindow } from '../../utils/findWindowControl';
-const CompareView = lazy(() => import('../features/compare/CompareView').then(m => ({ default: m.CompareView })));
+import { closeCompare, forgetCompareOpened, useCompare, useCompareOpened } from '../../hooks/useCompare';
 import { useTour } from '../../hooks/useTour';
 import { useConsentIfProvided } from '../../features/merlt/consent/useConsent';
 import { useAuth } from '../../hooks/useAuth';
@@ -38,6 +38,46 @@ import { usePageTitleInView } from './usePageTitleInView';
 import { PlannerHost } from '../features/planner/PlannerHost';
 import { useMediaQuery } from '../../hooks/useIsDesktop';
 
+const loadCompareView = () => import('../features/compare/CompareView').then(m => ({ default: m.CompareView }));
+// A new one after a failed fetch: `lazy` keeps a failure for good.
+let CompareView = lazy(loadCompareView);
+
+/**
+ * The comparison's code that cannot be fetched, or an error of the comparison while in use, closes it instead of taking
+ * the page down (on `develop` the whole app went blank), the error in the console and no words on screen. The next
+ * opening fetches it again: that mends a connection that dropped, not a file a deploy removed, which stays missing until
+ * the page is reloaded (as for a lazy route).
+ */
+class CompareBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: unknown) {
+    console.error('the comparison could not be loaded', error);
+    CompareView = lazy(loadCompareView);
+    closeCompare();
+    forgetCompareOpened();
+  }
+
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
+
+/** Where the comparison will stand while its code travels: only while it is open (closed meanwhile, nothing). */
+function CompareWaiting() {
+  const { isOpen } = useCompare();
+  if (!isOpen) return null;
+  return (
+    <div aria-hidden data-testid="compare-waiting" className={cn('pointer-events-none fixed inset-0 flex items-center justify-center', Z_INDEX.compare)}>
+      <span className="size-6 rounded-full border-2 border-primary-600 border-t-transparent animate-spin dark:border-primary-400 dark:border-t-transparent" />
+    </div>
+  );
+}
+
 export function Layout() {
   const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel, openCommandPalette } = useAppStore(useShallow(s => ({
     settings: s.settings,
@@ -48,6 +88,7 @@ export function Layout() {
     openCommandPalette: s.openCommandPalette,
   })));
   const { isAuthenticated } = useAuth();
+  const compareOpened = useCompareOpened();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
@@ -126,7 +167,7 @@ export function Layout() {
   // The search tour follows the welcome (a first visit lands on `/`): started here when the welcome
   // ends, since one tour at a time is on screen (`useTour`) and the search page asks only once. The
   // address is read when the welcome ends, not when this callback was made.
-  const { startTour, hasSeenTour, resetAndStartTour, tryStartTour } = useTour({
+  const { startTour, prepareTour, hasSeenTour, resetAndStartTour, tryStartTour } = useTour({
     theme: settings.theme as 'light' | 'dark',
     onComplete: (type) => {
       if (type === 'welcome' && window.location.pathname === '/') tryStartTour('search');
@@ -139,6 +180,7 @@ export function Layout() {
   const consentAsking = consent !== null && (consent.status === 'loading' || consent.needsAnswer);
   useEffect(() => {
     if (consentAsking) return;
+    if (!hasSeenTour('welcome')) prepareTour();
     // Small delay to ensure DOM is ready
     const timer = setTimeout(() => {
       if (!hasSeenTour('welcome')) {
@@ -146,7 +188,7 @@ export function Layout() {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [hasSeenTour, startTour, consentAsking]);
+  }, [hasSeenTour, prepareTour, startTour, consentAsking]);
 
   // Apply Theme & Typography Effects
   useEffect(() => {
@@ -410,11 +452,15 @@ export function Layout() {
       {/* Find in the text (Cmd/Ctrl+F, the reading toolbars' magnifier) */}
       <FindWindow />
 
-      {/* Heavy reader overlays are loaded only when their route/state needs them. */}
-      <Suspense fallback={null}>
-        {/* Article Compare View */}
-        <CompareView />
-      </Suspense>
+      {/* Heavy reader overlays are loaded only when their route/state needs them: the comparison on its first opening,
+          a spinner where it will stand while its code arrives and it is open. */}
+      {compareOpened && (
+        <CompareBoundary>
+          <Suspense fallback={<CompareWaiting />}>
+            <CompareView />
+          </Suspense>
+        </CompareBoundary>
+      )}
     </div>
   );
 }

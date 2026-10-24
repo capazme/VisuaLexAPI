@@ -30,8 +30,7 @@ describe('the motion rules', () => {
   });
 
   it('no component types a spring by hand', () => {
-    // The Gymnasium celebration's stamp stays as it is (spec §6.3, item 7).
-    const celebration = join('components', 'features', 'studia', 'progress', 'Celebration.tsx');
-    expect(offenders(/\b(stiffness|damping)\s*:/, [celebration])).toEqual([]);
+    // The Gymnasium celebration's stamp, the one exception, is gone (G9: the goal's mark is written in CSS).
+    expect(offenders(/\b(stiffness|damping)\s*:/)).toEqual([]);
   });
 });

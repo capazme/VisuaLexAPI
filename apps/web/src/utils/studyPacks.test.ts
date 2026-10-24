@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { STUDY_PACKS, packAlreadyAdded, packContent } from './studyPacks';
+import { loadStudyPacks, packAlreadyAdded, packContent } from './studyPacks';
 import { rebuildNormEntry } from './sources/normEntry';
 import type { Dossier } from '../types';
 
 describe('the ready-made study dossiers', () => {
-  it('are the twenty packs, each with its dossiers and, where needed, its key articles', () => {
+  it('are the twenty packs, each with its dossiers and, where needed, its key articles', async () => {
+    const STUDY_PACKS = await loadStudyPacks();
     expect(STUDY_PACKS).toHaveLength(20);
     const gdpr = STUDY_PACKS.find((p) => p.name.startsWith('GDPR'))!;
     expect(gdpr.dossiers.map((d) => d.title)).toEqual([
@@ -17,7 +18,8 @@ describe('the ready-made study dossiers', () => {
     expect(articles).not.toContain('15');
   });
 
-  it('carry only norms the server\'s rule rebuilds, so a pack is never refused', () => {
+  it('carry only norms the server\'s rule rebuilds, so a pack is never refused', async () => {
+    const STUDY_PACKS = await loadStudyPacks();
     for (const pack of STUDY_PACKS) {
       for (const dossier of pack.dossiers) {
         for (const item of dossier.items) {
@@ -29,13 +31,15 @@ describe('the ready-made study dossiers', () => {
     }
   });
 
-  it('send their dossiers and nothing else', () => {
+  it('send their dossiers and nothing else', async () => {
+    const STUDY_PACKS = await loadStudyPacks();
     const content = packContent(STUDY_PACKS[0]);
     expect(content.quickNorms).toEqual([]);
     expect(content.dossiers).toBe(STUDY_PACKS[0].dossiers);
   });
 
-  it('are marked as added when a dossier di studio holds each of their names', () => {
+  it('are marked as added when a dossier di studio holds each of their names', async () => {
+    const STUDY_PACKS = await loadStudyPacks();
     const pack = STUDY_PACKS[0];
     const mine = (kind: 'lavoro' | 'studio') => pack.dossiers.map((d): Pick<Dossier, 'title' | 'kind'> => ({ title: d.title, kind }));
     expect(packAlreadyAdded(pack, mine('studio'))).toBe(true);

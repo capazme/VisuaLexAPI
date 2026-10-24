@@ -11,7 +11,7 @@ const createHighlightSchema = z.object({
   startOffset: z.number().int().min(0),
   endOffset: z.number().int().min(0),
   note: z.string().optional(),
-  bookmarkId: z.string().uuid().optional().nullable(),
+  bookmarkId: z.string().guid().optional().nullable(),
 });
 
 const updateHighlightSchema = z.object({
