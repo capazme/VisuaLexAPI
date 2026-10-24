@@ -18,8 +18,8 @@ import { PAGE_CODE } from './pageCode';
 import { lazy, Suspense } from 'react';
 
 // The pages loaded with their route (P1, `pageCode.ts`); Ricerca, the sign-in page, a decision's address and «Pagina
-// non trovata» stay in the first chunk. They wait in the layout's `RoutePage`, «Crediti» in the `Suspense` around the
-// routes: nothing in their place, a failure that keeps the app.
+// non trovata» stay in the first chunk. They wait in the layout's `RoutePage`, «Crediti» at the root (below): nothing
+// in their place, a failure that keeps the app.
 const DossierPage = lazy(() => PAGE_CODE.dossier().then(m => ({ default: m.DossierPage })));
 const BulletinBoardPage = lazy(() => PAGE_CODE.forum().then(m => ({ default: m.BulletinBoardPage })));
 const HistoryView = lazy(() => PAGE_CODE.history().then(m => ({ default: m.HistoryView })));
@@ -94,143 +94,142 @@ function NotFoundPage() {
 function App() {
   return (
     <BrowserRouter>
-      {/* A page outside the layout loaded with its route («Crediti») waits here: a boundary on screen from the first
-          draw, so moving to it (the user menu, the sign-in page) keeps the screen it leaves until it is there. */}
-      <Suspense fallback={null}>
-        <Routes>
-          {/* Public routes */}
-          {/* Signing in and signing up, one page with two tabs: one parent route, so changing tab
-              (which replaces the address) keeps the page mounted and animates. */}
-          <Route element={<AuthPage />}>
-            <Route path="/login" element={null} />
-            <Route path="/register" element={null} />
-          </Route>
-          {/* The sources and their licences: public, so an attribution reads without an account. */}
-          <Route path="/crediti" element={<PageBoundary><CreditsPage /></PageBoundary>} />
-          {/* The OAuth consent page (MCP spike): signed in, outside the app layout. */}
-          <Route
-            path="/connect"
-            element={
-              <ProtectedRoute>
-                <ConnectPage />
-              </ProtectedRoute>
-            }
-          />
+      {/* No Suspense around the routes: a page outside the layout loaded with its route («Crediti») suspends the root,
+          so opened by its address the splash in `index.html` stays until it is there, and moved to from the app (the
+          user menu, the sign-in page) the router's transition keeps the screen it leaves. */}
+      <Routes>
+        {/* Public routes */}
+        {/* Signing in and signing up, one page with two tabs: one parent route, so changing tab
+            (which replaces the address) keeps the page mounted and animates. */}
+        <Route element={<AuthPage />}>
+          <Route path="/login" element={null} />
+          <Route path="/register" element={null} />
+        </Route>
+        {/* The sources and their licences: public, so an attribution reads without an account. */}
+        <Route path="/crediti" element={<PageBoundary><CreditsPage /></PageBoundary>} />
+        {/* The OAuth consent page (MCP spike): signed in, outside the app layout. */}
+        <Route
+          path="/connect"
+          element={
+            <ProtectedRoute>
+              <ConnectPage />
+            </ProtectedRoute>
+          }
+        />
 
-          {/* Protected app routes with layout */}
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <ConsentProvider>
-                  <Layout />
-                </ConsentProvider>
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<SearchPage />} />
-            <Route path="dossier" element={<DossierPage />} />
-            {/* Opus's planner (wave 1): «Oggi» is the section's home; «Dossier» stays at /dossier. */}
-            <Route path="opus" element={<OpusPage />}>
-              <Route index element={<Navigate to="oggi" replace />} />
-              <Route path="oggi" element={<TodayView />} />
-              <Route path="prossimi" element={<UpcomingView />} />
-              <Route path="ingresso" element={<InboxView />} />
-              <Route path="cestino" element={<TaskTrashView />} />
-            </Route>
-            <Route path="history" element={<HistoryView />} />
-            <Route path="environments" element={<EnvironmentsRedirect />} />
-            {/* The Forum's two areas: «Dossier pubblici» at its old address, «Community» a placeholder. */}
-            <Route path="forum" element={<BulletinBoardPage />} />
-            <Route path="forum/community" element={<ForumCommunityPage />} />
-            <Route path="documents" element={<DocumentReviewPage />} />
-            {/* How to connect an AI application through MCP, and the connected ones (user menu). */}
-            <Route path="collega-app" element={<ConnectAiAppPage />} />
-            {/* The MERL-T pages are development addresses (spec D6): without the development mode they
-                lead to «/». The server's guards (consent, validators, admins) stay the real barrier. */}
-            <Route
-              path="merlt"
-              element={
-                <DevRoute>
-                  <Suspense fallback={<div className="p-6 text-sm text-slate-500">Caricamento…</div>}>
-                    <MerltHubPage />
-                  </Suspense>
-                </DevRoute>
-              }
-            />
-            <Route
-              path="merlt/contribuisci"
-              element={
-                <DevRoute>
-                  <Suspense fallback={<div className="p-6 text-sm text-slate-500">Caricamento…</div>}>
-                    <ContribPage />
-                  </Suspense>
-                </DevRoute>
-              }
-            />
-            <Route
-              path="merlt/valida"
-              element={
-                <DevRoute>
-                  <Suspense fallback={<div className="p-6 text-sm text-slate-500">Caricamento…</div>}>
-                    <ValidationPage />
-                  </Suspense>
-                </DevRoute>
-              }
-            />
-            {/* Slice 4 absorb (Decision A): the Q&A page is gone — the graph is the
-                SOLE deliberation surface. Both the old ask route and the legacy
-                docs path redirect to /grafo, where the debate now lives. */}
-            <Route path="merlt/qa" element={<DevRoute><Navigate to="/grafo" replace /></DevRoute>} />
-            <Route path="merlt/chiedi" element={<DevRoute><Navigate to="/grafo" replace /></DevRoute>} />
-            <Route
-              path="grafo"
-              element={
-                <DevRoute>
-                  <Suspense fallback={<div className="p-6 text-sm text-slate-500">Caricamento…</div>}>
-                    <GraphExplorerPage />
-                  </Suspense>
-                </DevRoute>
-              }
-            />
-            {/* VisuaLex Studia: behind VITE_FEATURE_STUDIA; /studia opens the review; progressi the data; valida is the validators' queue. */}
-            {isStudiaEnabled() && (
-              <Route
-                path="studia"
-                element={
-                  <Suspense fallback={<div className="p-6 text-sm text-slate-500">Caricamento…</div>}>
-                    <StudiaPage />
-                  </Suspense>
-                }
-              >
-                <Route index element={<Navigate to="ripasso" replace />} />
-                <Route path="ripasso" element={<Suspense fallback={null}><ReviewHome /></Suspense>} />
-                <Route path="ripasso/sessione" element={<Suspense fallback={<LessonLoading />}><ReviewSession /></Suspense>} />
-                <Route path="progressi" element={<Suspense fallback={null}><ProgressPage /></Suspense>} />
-                <Route path="schede" element={<Suspense fallback={null}><MyCardsView /></Suspense>} />
-                <Route path="schede/:id" element={<Suspense fallback={null}><MyCardsView /></Suspense>} />
-                <Route path="valida" element={<Suspense fallback={null}><ValidationQueueView /></Suspense>} />
-              </Route>
-            )}
-            <Route path="sentenze" element={<DecisionAddress />} />
-            <Route path="sentenze/:corte/:numero/:anno" element={<DecisionAddress />} />
-            {/* Global 404 catch-all (inside the layout: sidebar stays visible) */}
-            <Route path="*" element={<NotFoundPage />} />
+        {/* Protected app routes with layout */}
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <ConsentProvider>
+                <Layout />
+              </ConsentProvider>
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<SearchPage />} />
+          <Route path="dossier" element={<DossierPage />} />
+          {/* Opus's planner (wave 1): «Oggi» is the section's home; «Dossier» stays at /dossier. */}
+          <Route path="opus" element={<OpusPage />}>
+            <Route index element={<Navigate to="oggi" replace />} />
+            <Route path="oggi" element={<TodayView />} />
+            <Route path="prossimi" element={<UpcomingView />} />
+            <Route path="ingresso" element={<InboxView />} />
+            <Route path="cestino" element={<TaskTrashView />} />
           </Route>
-
-          {/* Admin routes */}
+          <Route path="history" element={<HistoryView />} />
+          <Route path="environments" element={<EnvironmentsRedirect />} />
+          {/* The Forum's two areas: «Dossier pubblici» at its old address, «Community» a placeholder. */}
+          <Route path="forum" element={<BulletinBoardPage />} />
+          <Route path="forum/community" element={<ForumCommunityPage />} />
+          <Route path="documents" element={<DocumentReviewPage />} />
+          {/* How to connect an AI application through MCP, and the connected ones (user menu). */}
+          <Route path="collega-app" element={<ConnectAiAppPage />} />
+          {/* The MERL-T pages are development addresses (spec D6): without the development mode they
+              lead to «/». The server's guards (consent, validators, admins) stay the real barrier. */}
           <Route
-            path="/admin/*"
+            path="merlt"
             element={
-              <AdminRoute>
-                <Suspense fallback={<div className="flex items-center justify-center min-h-svh">Caricamento...</div>}>
-                  <AdminPage />
+              <DevRoute>
+                <Suspense fallback={<div className="p-6 text-sm text-slate-500">Caricamento…</div>}>
+                  <MerltHubPage />
                 </Suspense>
-              </AdminRoute>
+              </DevRoute>
             }
           />
-        </Routes>
-      </Suspense>
+          <Route
+            path="merlt/contribuisci"
+            element={
+              <DevRoute>
+                <Suspense fallback={<div className="p-6 text-sm text-slate-500">Caricamento…</div>}>
+                  <ContribPage />
+                </Suspense>
+              </DevRoute>
+            }
+          />
+          <Route
+            path="merlt/valida"
+            element={
+              <DevRoute>
+                <Suspense fallback={<div className="p-6 text-sm text-slate-500">Caricamento…</div>}>
+                  <ValidationPage />
+                </Suspense>
+              </DevRoute>
+            }
+          />
+          {/* Slice 4 absorb (Decision A): the Q&A page is gone — the graph is the
+              SOLE deliberation surface. Both the old ask route and the legacy
+              docs path redirect to /grafo, where the debate now lives. */}
+          <Route path="merlt/qa" element={<DevRoute><Navigate to="/grafo" replace /></DevRoute>} />
+          <Route path="merlt/chiedi" element={<DevRoute><Navigate to="/grafo" replace /></DevRoute>} />
+          <Route
+            path="grafo"
+            element={
+              <DevRoute>
+                <Suspense fallback={<div className="p-6 text-sm text-slate-500">Caricamento…</div>}>
+                  <GraphExplorerPage />
+                </Suspense>
+              </DevRoute>
+            }
+          />
+          {/* VisuaLex Studia: behind VITE_FEATURE_STUDIA; /studia opens the review; progressi the data; valida is the validators' queue. */}
+          {isStudiaEnabled() && (
+            <Route
+              path="studia"
+              element={
+                <Suspense fallback={<div className="p-6 text-sm text-slate-500">Caricamento…</div>}>
+                  <StudiaPage />
+                </Suspense>
+              }
+            >
+              <Route index element={<Navigate to="ripasso" replace />} />
+              <Route path="ripasso" element={<Suspense fallback={null}><ReviewHome /></Suspense>} />
+              <Route path="ripasso/sessione" element={<Suspense fallback={<LessonLoading />}><ReviewSession /></Suspense>} />
+              <Route path="progressi" element={<Suspense fallback={null}><ProgressPage /></Suspense>} />
+              <Route path="schede" element={<Suspense fallback={null}><MyCardsView /></Suspense>} />
+              <Route path="schede/:id" element={<Suspense fallback={null}><MyCardsView /></Suspense>} />
+              <Route path="valida" element={<Suspense fallback={null}><ValidationQueueView /></Suspense>} />
+            </Route>
+          )}
+          <Route path="sentenze" element={<DecisionAddress />} />
+          <Route path="sentenze/:corte/:numero/:anno" element={<DecisionAddress />} />
+          {/* Global 404 catch-all (inside the layout: sidebar stays visible) */}
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
+
+        {/* Admin routes */}
+        <Route
+          path="/admin/*"
+          element={
+            <AdminRoute>
+              <Suspense fallback={<div className="flex items-center justify-center min-h-svh">Caricamento...</div>}>
+                <AdminPage />
+              </Suspense>
+            </AdminRoute>
+          }
+        />
+      </Routes>
     </BrowserRouter>
   );
 }

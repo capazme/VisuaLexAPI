@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { lazy, type ReactElement } from 'react';
-import { Link, MemoryRouter, Outlet, Route, Routes } from 'react-router-dom';
+import { Link, MemoryRouter, Outlet, Route, Routes, useSearchParams } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { RoutePage } from '../RouteBoundary';
 
@@ -13,12 +13,18 @@ const Next = lazy(() => new Promise<{ default: () => ReactElement }>((resolve) =
   arrival.openNext = () => resolve({ default: () => <h1>La pagina seguente</h1> });
 }));
 const Missing = lazy(() => Promise.reject(new Error('Failed to fetch dynamically imported module')));
+/** A page that fails on one query («Dossier» with a dossier that breaks it), and draws on the bare address. */
+function Fragile() {
+  const [params] = useSearchParams();
+  if (params.get('dossier') === 'A') throw new Error('broken');
+  return <h1>Elenco dei dossier</h1>;
+}
 
 /** The layout's frame as `Layout` draws it: the page inside `RoutePage`. */
 function Frame() {
   return (
     <div data-testid="layout">
-      <nav><Link to="/altra">Altra</Link><Link to="/seguente">Seguente</Link></nav>
+      <nav><Link to="/altra">Altra</Link><Link to="/seguente">Seguente</Link><Link to="/fragile">Dossier</Link></nav>
       <main data-testid="page-place"><RoutePage><Outlet /></RoutePage></main>
     </div>
   );
@@ -32,6 +38,7 @@ const at = (path: string) => render(
         <Route path="mancante" element={<Missing />} />
         <Route path="altra" element={<h1>Un’altra pagina</h1>} />
         <Route path="seguente" element={<Next />} />
+        <Route path="fragile" element={<Fragile />} />
       </Route>
     </Routes>
   </MemoryRouter>,
@@ -70,6 +77,15 @@ describe('RoutePage — a page loaded with its route', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Riprova' }));
     expect(reload).toHaveBeenCalled();
     expect(error).toHaveBeenCalledWith('the page could not be shown', expect.anything());
+  });
+
+  it('draws the page again for the same address with another query, as its entry chosen again', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    at('/fragile?dossier=A');
+    expect(await screen.findByText('Si è verificato un errore.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('link', { name: 'Dossier' }));
+    expect(await screen.findByRole('heading', { name: 'Elenco dei dossier' })).toBeInTheDocument();
+    expect(screen.queryByText('Si è verificato un errore.')).toBeNull();
   });
 
   it('lets another address draw its page after a failure', async () => {

@@ -22,12 +22,16 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   ingress's Content-Security-Policy allows scripts from 'self' only (as `theme-boot.js`). Its name carries its hash,
   so an `index.html` always names its own build's map and a cached older one is never asked for.
   Inside the layout the lazy pages wait in `RoutePage` (`components/layout/RouteBoundary.tsx`, around `Layout`'s
-  outlet), «Crediti» in the `Suspense` around the routes: a boundary on screen from the first draw, with nothing in the page's place, so nothing stays once it is
+  outlet): a boundary on screen from the first draw, with nothing in the page's place, so nothing stays once it is
   there, and a navigation keeps the screen it leaves until the new page is ready (the router renders it in a
-  transition; a boundary mounted with the new page would show its fallback at once). The phone's bar names nothing
-  while nothing is drawn (`usePageTitleInView`). A page whose code cannot be fetched, or that fails in use, keeps the
-  layout and says «Si è verificato un errore.» with «Riprova», which reloads (the one mend for a file a deploy
-  removed; before P1 no boundary held it and the app went blank); another address draws its page again.
+  transition; a boundary mounted with the new page would show its fallback at once). «Crediti», outside the layout,
+  has no `Suspense` above it: it suspends the root, so opened by its address the splash of `index.html` stays until it
+  is there, and moved to from the app the router's transition keeps the screen it leaves. The phone's bar names
+  nothing while nothing is drawn (`usePageTitleInView`), and names the page if it then draws no `h1` (the error). A
+  page whose code cannot be fetched, or that fails in use, keeps the layout and says «Si è verificato un errore.» with
+  «Riprova», which reloads (the one mend for a file a deploy removed; before P1 no boundary held it and the app went
+  blank); any new navigation draws the page again (`useLocation().key`: the same address with another query, or its
+  entry chosen again, included).
   In the signed-in layout: `/` (search), `/dossier`, `/opus` (the planner, below: `OpusPage`
   over `oggi`, `prossimi`, `ingresso` and `cestino`; `/opus` redirects to `oggi`),
   `/studia` (VisuaLex Gymnasium, the study cards; the code keeps the name `studia`: `StudiaPage` with its views under

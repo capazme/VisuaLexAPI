@@ -4,13 +4,15 @@ import { buttonClassName } from '../ui/buttonStyles';
 import { cn } from '../../lib/utils';
 
 interface BoundaryProps {
-  pathname: string;
+  /** The navigation's key (`useLocation().key`): any new one draws the page again, the same address with another
+   *  query or chosen again from the sidebar included. */
+  navigation: string;
   children: ReactNode;
 }
 
 interface BoundaryState {
   failed: boolean;
-  /** Where it failed: another address draws its page again. */
+  /** The navigation it failed in: another one draws its page again. */
   at: string | null;
 }
 
@@ -27,12 +29,12 @@ class Boundary extends Component<BoundaryProps, BoundaryState> {
   }
 
   static getDerivedStateFromProps(props: BoundaryProps, state: BoundaryState): Partial<BoundaryState> | null {
-    return state.at !== null && state.at !== props.pathname ? { failed: false, at: null } : null;
+    return state.at !== null && state.at !== props.navigation ? { failed: false, at: null } : null;
   }
 
   componentDidCatch(error: unknown) {
     console.error('the page could not be shown', error);
-    this.setState({ at: this.props.pathname });
+    this.setState({ at: this.props.navigation });
   }
 
   render() {
@@ -48,10 +50,10 @@ class Boundary extends Component<BoundaryProps, BoundaryState> {
   }
 }
 
-/** A page's failure kept to its place (`Boundary`), for the address it failed at. */
+/** A page's failure kept to its place (`Boundary`), for the navigation it failed in. */
 export function PageBoundary({ children }: { children: ReactNode }) {
-  const { pathname } = useLocation();
-  return <Boundary pathname={pathname}>{children}</Boundary>;
+  const { key } = useLocation();
+  return <Boundary navigation={key}>{children}</Boundary>;
 }
 
 /**

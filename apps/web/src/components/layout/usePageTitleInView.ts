@@ -31,7 +31,11 @@ export function usePageTitleInView(scroller: HTMLElement | null, { enabled, rese
       if (!title) {
         // Nothing drawn yet (a page loaded with its route, on its way): no answer, so the bar does not name the page
         // only to clear it a moment later, when the title arrives in sight.
-        if (!scroller.firstElementChild?.firstElementChild) return;
+        // Not taken as seen: a page drawn later with no `h1` (the error in a page's place) must still name the page.
+        if (!scroller.firstElementChild?.firstElementChild) {
+          watched = undefined;
+          return;
+        }
         say(false);
         return;
       }

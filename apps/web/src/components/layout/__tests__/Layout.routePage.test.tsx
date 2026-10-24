@@ -21,6 +21,7 @@ vi.mock('../../../hooks/useTour', () => ({
 }));
 
 import { Layout } from '../Layout';
+import { pageName } from '../../../features/sections/pageNames';
 
 // A page whose code arrives when the test says, and one whose code cannot be had.
 const arrival = vi.hoisted(() => ({ open: () => {} }));
@@ -45,6 +46,15 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+/** A phone, with an observer that has not answered yet: the bar over the page, naming it once its title is out of sight. */
+function onAPhone() {
+  vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
+    matches: !/min-width/.test(query), media: query, onchange: null,
+    addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
+  }) as unknown as MediaQueryList);
+  vi.stubGlobal('IntersectionObserver', class { observe() {} disconnect() {} });
+}
+
 describe('Layout — the page loaded with its route', () => {
   it('waits in the outlet with nothing in its place, the layout drawn; the phone’s bar names nothing meanwhile', async () => {
     // A phone: the bar over the page, which names the page once its title is out of sight.
@@ -59,6 +69,14 @@ describe('Layout — the page loaded with its route', () => {
     expect(screen.queryByText('Dossier')).toBeNull();
     await act(async () => { arrival.open(); });
     expect(await screen.findByRole('heading', { level: 1, name: 'Dossier' })).toBeInTheDocument();
+  });
+
+  it('names the page in the phone’s bar when, after the wait, its place draws no title (the error)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    onAPhone();
+    at('/history');
+    expect(await screen.findByText('Si è verificato un errore.')).toBeInTheDocument();
+    expect(await screen.findByText(pageName('/history')!)).toBeInTheDocument();
   });
 
   it('keeps the layout when a page’s code cannot be had, with words the app has', async () => {
