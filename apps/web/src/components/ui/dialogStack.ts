@@ -1,7 +1,8 @@
 /**
- * The dialogs open, oldest first: `Modal`, `WireConfirm` and `CompareView`. Each one registers its Tab trap on
- * `document` and its Esc handler (on `document`, the comparison's on `window`); with a dialog opened from another
- * dialog, only the last one opened may act, or the parent would pull the focus back from its child, or close with it.
+ * The dialogs open, oldest first: `Modal`, `WireConfirm`, `CompareView` and `CommandPalette`. The first three register
+ * their Tab trap on `document` and their Esc handler (on `document`, the comparison's on `window`); with a dialog opened
+ * from another dialog, only the last one opened may act, or the parent would pull the focus back from its child, or
+ * close with it. The palette only takes its place (its focus is floating-ui's), so a dialog under it lets it be.
  */
 const open: symbol[] = [];
 

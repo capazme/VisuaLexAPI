@@ -595,6 +595,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   stack (`ui/dialogStack.ts`) and only the top-most handles Tab (its focus trap, on `document`) and Esc, so a dialog opened
   from a dialog keeps the keyboard. `Modal` and `CompareView` share that focus (`ui/useDialogFocus.ts`): the stack, the
   Tab trap, the focus given 50 ms after opening (to «Chiudi» unless told otherwise) and back to what had it on closing.
+  `CommandPalette` keeps its own focus (floating-ui's) but takes its place on the stack while open: ⌘K over a dialog
+  (the comparison) leaves Tab and Esc to the palette, whose box is portalled to the body, outside the dialog.
   `Button` has four variants (spec `2026-10-18-redesign-inchiostro` §5.1): `primary` (toga-600, white),
   `secondary` (paper with an ink-200 hairline), `quiet` (text only) and `danger` (red-600) — `ghost` and
   `outline` are the earlier names of `quiet` and `secondary` —, no gradient, glow or hover lift, a minimum
@@ -1610,9 +1612,10 @@ the later text (G-357).
 
 **«Confronta articoli»** (`features/compare/CompareView`, spec `docs/superpowers/specs/2026-10-13-compare-articles-design.md`):
 a full-screen overlay (`data-find-overlay`) over two articles chosen from the practices, a search or the history; a
-modal dialog as `Modal` is (`role="dialog"`, `aria-modal`, named by its title «Confronta articoli»; the focus on «Chiudi
-il confronto» as it opens, Tab kept inside, the focus back as it closes, `useDialogFocus`; Esc only when it is the
-top-most and nothing inside took it). The dialog is the whole layer, backdrop included, not only the panel: what it
+modal dialog in ARIA terms (`role="dialog"`, `aria-modal`, named by its title «Confronta articoli»), with `Modal`'s focus
+(`useDialogFocus`: the focus on «Chiudi il confronto» as it opens, Tab kept inside, the focus back as it closes; Esc
+only when it is the top-most and nothing inside took it) but not its scroll lock, and, as `Modal`, it does not make the
+page behind inert: what keeps the keyboard out of the page is the trap alone. The dialog is the whole layer, backdrop included, not only the panel: what it
 opens is portalled there, not in the body (`CompareDialogRoot`: the update notes' `UpdateNotePopover`, `portalRoot`),
 since a modal dialog hides from a screen reader what lies outside it and its trap would pull the focus out; on the
 layer the note is bounded by the window, not cut by the panel's edge. A popover portalled inside a dialog keeps its

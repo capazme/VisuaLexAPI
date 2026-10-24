@@ -20,6 +20,7 @@ import { SEARCH_FIELD_FORM_ID, returnWordsToSearchField } from '../../../utils/s
 import { citationSearchParams, useSearchQuery } from '../../../hooks/useSearchQuery';
 import { formatDecisionShort } from '../../../utils/decisionLinks';
 import { Button } from '../../ui/Button';
+import { openDialog } from '../../ui/dialogStack';
 import { filterPaletteActs, paletteActName, queryMatches, matchRanges } from './paletteActs';
 
 interface CommandPaletteProps {
@@ -479,6 +480,11 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
+
+  // On the dialogs' stack while open: opened over one (⌘K over the comparison), it keeps Tab and Esc, which that dialog's
+  // trap would otherwise take back, its box being portalled to the body, outside the dialog. Its own focus is floating-ui's.
+  const [stackToken] = useState(() => Symbol('palette'));
+  useEffect(() => (isOpen ? openDialog(stackToken) : undefined), [isOpen, stackToken]);
 
   // Handle Escape key. Only while open: a closed palette that took every Escape and called
   // `preventDefault` on it would hide it from whoever honours `defaultPrevented` (the rail's overlay).

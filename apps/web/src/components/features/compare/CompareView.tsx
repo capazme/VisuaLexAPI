@@ -500,8 +500,8 @@ export function CompareView() {
   // A phone's comparison is always the whole screen.
   const fullscreen = isFullscreen || !isDesktop;
 
-  // A modal dialog as the app's others (`Modal`): named by its title, the focus on «Chiudi» as it opens, Tab kept
-  // inside, the focus back to what had it once it closes.
+  // A modal dialog with `Modal`'s focus (not its scroll lock): named by its title, the focus on «Chiudi» as it opens, Tab
+  // kept inside, the focus back to what had it once it closes.
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
