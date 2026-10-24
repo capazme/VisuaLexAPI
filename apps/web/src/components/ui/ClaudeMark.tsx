@@ -6,6 +6,8 @@ interface Props {
   createdBy: DossierItem['createdBy'];
   /** A short form for the collapsed row, where room is tight. */
   compact?: boolean;
+  /** What the application did: «scritta», or «aggiunta» for a decision it filed (`claudeMarkSentence`). */
+  verb?: string;
 }
 
 /**
@@ -13,10 +15,10 @@ interface Props {
  * name is the one the application registered with, unverified: the sentence
  * says «applicazione collegata» so it reads as a label, not a guarantee.
  */
-export function ClaudeMark({ createdBy, compact = false }: Props) {
+export function ClaudeMark({ createdBy, compact = false, verb }: Props) {
   if (!createdBy) return null;
   const name = createdBy.clientName?.trim() || "un'applicazione collegata";
-  const sentence = claudeMarkSentence(createdBy);
+  const sentence = claudeMarkSentence(createdBy, verb);
   return (
     // Never wider than its row: an application's name can be long, and a mark that would not shrink pushed a phone's
     // page sideways in «Le mie schede» (G8b); its words wrap instead.

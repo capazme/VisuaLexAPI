@@ -21,6 +21,12 @@ describe('ClaudeMark', () => {
     expect(screen.getByText('Claude Code')).toBeInTheDocument();
   });
 
+  it('says what the application did with an entry it only filed: a decision is «aggiunta» (D7a)', () => {
+    render(<ClaudeMark createdBy={{ clientName: 'Claude Code' }} compact verb="aggiunta" />);
+    expect(screen.getByText('aggiunta da Claude Code (applicazione collegata)')).toHaveClass('sr-only');
+    expect(screen.queryByText(/scritta da/)).toBeNull();
+  });
+
   it('is never wider than its row: it shrinks and its words wrap (G8b)', () => {
     const { container } = render(<ClaudeMark createdBy={{ clientName: 'Un nome di applicazione lunghissimo che non finisce mai' }} compact />);
     const mark = container.firstElementChild!;

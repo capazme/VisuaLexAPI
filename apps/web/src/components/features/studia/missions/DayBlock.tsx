@@ -1,11 +1,13 @@
-import { useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect, useRef, type RefObject } from 'react';
 import { Link } from 'react-router-dom';
 import { fadeInEntries } from '../../../../features/sections/useEntriesEntrance';
 import { prefersReducedMotion } from '../../../../features/sections/sectionTransition';
 import { cn } from '../../../../lib/utils';
 import type { Materia, Progressi, TappaIstituto } from '../../../../types/studia';
 import { estimateLabel } from '../studiaLabels';
-import { formatDayLong } from '../progress/layout';
+import { GoalMark } from '../progress/GoalMark';
+import { formatDate, formatDayLong } from '../progress/layout';
+import { goalMissionDone } from './missions';
 import { nextDayLine, subjectsPhrase, todaySentence, todayState, todaySubjects } from '../progress/today';
 import { FOCUS_RING, INK_BG, INK_TEXT, MUTED_TEXT, ON_INK, SECONDARY_BUTTON, TILE } from '../progress/tokens';
 
@@ -32,6 +34,10 @@ export interface DayBlockProps {
   onOpenSettings: (target?: 'comunita') => void;
   /** The id of the settings' panel, which the block's settings buttons control. */
   settingsPanel?: string;
+  /** The goal's mark is written now, once (the celebration; the caller decides); otherwise drawn whole. */
+  drawGoal?: boolean;
+  /** The goal's mark and its words: where the celebration's confetti start. */
+  goalRef?: RefObject<HTMLDivElement | null>;
 }
 
 /** The page's one primary button (G8): wide, 48 px, full width on a phone; a key that presses into its ink edge. */
@@ -66,11 +72,17 @@ function DayLine({ day, subject }: { day: Progressi | null; subject?: string }) 
  * all, how to begin; a failed read says so and keeps the start. It enters with the sidebar's light cascade
  * (`fadeInEntries`, opacity only) once its content is first drawn, never under reduced motion.
  */
-export function DayBlock({ day, dayFailed, action, actionFailed, stops, onRetry, materia, subject, onAllSubjects, onStart, onOpenSettings, settingsPanel }: DayBlockProps) {
+export function DayBlock({
+  day, dayFailed, action, actionFailed, stops, onRetry, materia, subject, onAllSubjects, onStart, onOpenSettings, settingsPanel,
+  drawGoal = false, goalRef,
+}: DayBlockProps) {
   const filtered = subject !== undefined;
   const whole = todayState(day, dayFailed, false);
   const state = whole === 'empty' ? 'empty' : todayState(action, actionFailed || dayFailed, filtered);
   const met = day?.oggi.raggiunto ?? false;
+  // «Obiettivo raggiunto» only when the goal's mission is done (G9), whatever the streak counts: the whole day's, so a
+  // subject chosen (its read travelling, or nothing left in it) neither hides nor redraws it.
+  const goal = day && (whole === 'todo' || whole === 'done') && goalMissionDone(day) ? day : null;
 
   // The cascade, once, when the block first draws what it says (not while its places are held).
   const block = useRef<HTMLElement>(null);
@@ -92,12 +104,34 @@ export function DayBlock({ day, dayFailed, action, actionFailed, stops, onRetry,
       ref={block}
       aria-labelledby="studia-giorno"
       aria-busy={state === 'loading'}
-      // A tile with the section's hue as a rule down its left edge: the page's entry.
-      className={cn(TILE, 'grid justify-items-stretch gap-3 border-l-4 border-l-[color:var(--vlx-section-gymnasium)] dark:border-l-[color:var(--vlx-section-gymnasium)] p-5 md:justify-items-start md:p-7')}
+      // A tile with the section's hue as a rule down its left edge: the page's entry. With the goal's mark, its right
+      // side kept for it from `md`.
+      className={cn(
+        TILE,
+        'relative grid justify-items-stretch gap-3 border-l-4 border-l-[color:var(--vlx-section-gymnasium)] dark:border-l-[color:var(--vlx-section-gymnasium)] p-5 md:justify-items-start md:p-7',
+        goal && 'md:pr-44',
+      )}
     >
       <h2 id="studia-giorno" className="sr-only">
         Il ripasso di oggi
       </h2>
+      {goal && (
+        // The goal's mark (G9): on a phone first, over the date's line, 72 px with its words beside it, never beside the
+        // large line; from `md` at the block's right, 96 px over its words, in the room that side had empty. As wide as
+        // its content on a phone, so the confetti start from it, not the card's middle.
+        <div
+          ref={goalRef}
+          className="flex w-max max-w-full items-center gap-3 md:absolute md:right-7 md:top-1/2 md:w-36 md:-translate-y-1/2 md:flex-col md:gap-2 md:text-center"
+        >
+          <GoalMark size={96} draw={drawGoal} label="Obiettivo raggiunto" className={cn('h-[72px] w-[72px] md:h-24 md:w-24', INK_TEXT)} />
+          {/* «23 ottobre 2026 · giorno 3» on one line beside it; from `md` the date over the day, under it. */}
+          <p className={cn('text-sm font-medium tabular-nums', MUTED_TEXT)}>
+            <span className="md:block">{formatDate(goal.oggi.giorno)}</span>
+            <span className="md:hidden"> · </span>
+            <span className="md:block">giorno {goal.serie.attuale}</span>
+          </p>
+        </div>
+      )}
       <DayLine day={day} subject={subject} />
       {/* The date's place while the day's read travels — also when a subject's read answers first: on a phone two lines
           with a subject («mercoledì 21 ottobre · Diritto processuale penale»), one without (P1). */}

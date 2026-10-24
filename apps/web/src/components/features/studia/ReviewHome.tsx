@@ -8,6 +8,7 @@ import { MATERIA_LABEL } from './studiaLabels';
 import { DayBlock } from './missions/DayBlock';
 import { MissionList } from './missions/MissionList';
 import { TodayMissions } from './missions/TodayMissions';
+import { goalMissionDone } from './missions/missions';
 import { ConfettiBurst } from './progress/Celebration';
 import { STUDY_SETTINGS_PANEL, StatsBand } from './progress/StatsBand';
 import { SubjectList } from './progress/SubjectList';
@@ -110,14 +111,16 @@ export function ReviewHome() {
     setSettingsOpen(true);
     setFocusSettings((n) => n + 1);
   };
-  const stampRef = useRef<HTMLDivElement>(null);
+  const goalRef = useRef<HTMLDivElement>(null);
   const { celebratedBefore, markCelebrated } = useCelebratedToday();
   // The day whose burst has run its course on this page.
   const [burstDone, setBurstDone] = useState<string | null>(null);
-  // Once a day (progress spec decision 10): here, when the goal was met today with some review and this browser had
-  // not celebrated when the page opened (the session celebrates at the grade that closes it and marks the day the
-  // same way). It follows the data on screen, not the read's status, so a new read halfway does not cut it short.
-  const celebrate = data !== null && data.oggi.raggiunto && data.oggi.ripassi > 0 && !celebratedBefore(data.oggi.giorno) && burstDone !== data.oggi.giorno;
+  // Once a day (progress spec decision 10): here, when the goal's mission is done today with some review (G9: a day the
+  // streak counts with the mission empty or open says so in words, and is not celebrated) and this browser had not
+  // celebrated when the page opened (the session celebrates at the grade that closes it and marks the day the same
+  // way). It follows the data on screen, not the read's status, so a new read halfway does not cut it short. It writes
+  // the goal's mark in the day block, and the confetti start from it.
+  const celebrate = data !== null && goalMissionDone(data) && data.oggi.ripassi > 0 && !celebratedBefore(data.oggi.giorno) && burstDone !== data.oggi.giorno;
   // No mission on the left once the day's read has answered (a server without the points, #253, or a failed read):
   // from `xl` the left column held the day block alone, the right one ran past the window (G8c). «Le tue materie» goes
   // left then, under the day block, and before the statistics in the document, so the keyboard follows the eye; the
@@ -170,6 +173,8 @@ export function ReviewHome() {
           onStart={start}
           onOpenSettings={openSettingsFor}
           settingsPanel={STUDY_SETTINGS_PANEL}
+          drawGoal={celebrate}
+          goalRef={goalRef}
         />
       </div>
       <div className={cn('min-w-0 empty:hidden', split && LEFT)}>
@@ -178,8 +183,6 @@ export function ReviewHome() {
           dayFailed={day.status === 'error'}
           onOpenSettings={openSettingsFor}
           settingsPanel={STUDY_SETTINGS_PANEL}
-          celebrate={celebrate}
-          stampRef={stampRef}
         />
       </div>
       {/* With no mission, from `xl`: under the day block, the right column placed beside it by the grid. */}
@@ -201,12 +204,12 @@ export function ReviewHome() {
         />
         {!lonely && subjectList}
       </div>
-      {/* The confetti start from the stamp, in the goal's row, and fall over the day, the missions and the statistics
+      {/* The confetti start from the goal's mark, in the day block, and fall over the day, the missions and the statistics
           (with no mission, the subjects under the day), never further: an absolute box placed on their rows (the grid's area is its containing block), out of the
           flow, so mounting it moves nothing. */}
       {celebrate && data && (
         <div aria-hidden className={cn('pointer-events-none absolute inset-0 col-start-1 row-start-1 row-end-4', split && BURST)}>
-          <ConfettiBurst originRef={stampRef} onStart={() => markCelebrated(data.oggi.giorno)} onDone={() => setBurstDone(data.oggi.giorno)} />
+          <ConfettiBurst originRef={goalRef} onStart={() => markCelebrated(data.oggi.giorno)} onDone={() => setBurstDone(data.oggi.giorno)} />
         </div>
       )}
 
