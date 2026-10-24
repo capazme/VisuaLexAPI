@@ -1752,7 +1752,8 @@ it with the window's practice), the way-back entry its `tabId`, and the links th
 host (a preview such as the palette's result card, a decision read in the dossier) registers and records nothing, and a
 decision's draws no «Cerca nel testo» (`DecisionReadingToolbar` without `onToggleFind`): the find window would have
 nothing of it to search. Off the search page (the dossier) its `onLeave` takes the reader to the workspace when a norm or
-a decision the text cites is sent there.
+a decision the text cites is sent there; a host with norms of its own (the dossier, D7d) takes the cited norms instead,
+`citedNorms` (`holds`, `open(citation, link)`), and nothing is searched.
 
 ### Dossier
 
@@ -1772,7 +1773,12 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   the order the acts entered the dossier, then «Giurisprudenza»
   (`DossierDecisionsSection`, the decisions in stored order). With acts and decisions both (D7a) they are two
   columns from `lg`, «Norme» | «Giurisprudenza» (`COLUMN_HEADING`, a rule between them, each column in its own
-  order), the norms first below `lg`; one kind alone takes the width, untitled as before. An act's identity is a code's name
+  order), the norms first below `lg`; one kind alone takes the width, untitled as before. From `lg` each of the two
+  scrolls on its own, at most the window's height (D7d, `COLUMN_SCROLLS`, `max-h-app-column`: the content area's padding
+  and `--page-foot` off it), so a decision read on the right stays put while a norm opens on the left; each is a named
+  region («Norme», «Giurisprudenza (n)») and a tab stop with the focus ring, so the keyboard scrolls it. Whatever
+  scrolls a text to a passage there moves its own scroller alone (`utils/scrollParent.ts`: `scrollToMiddle` for «Vai al
+  passo» and `revealAnnotation`, gotcha 34): `scrollIntoView` would move the page and the other column too. An act's identity is a code's name
   (the codice civile with or without its R.D. is one act) or `tipo_atto|numero_atto|data`;
   its heading is a code's name or the server's `act_citation`, never formatted
   here (a muted fallback until the server answers); its articles sort by annex,
@@ -1894,10 +1900,24 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   `DecisionReadingSurface`, never another, so notes, highlights and key passages work as anywhere and the text is the
   reader's, gotcha 23; asked for only once opened; a decision without its text opens too and `DecisionView` says how it
   came; «Apri la sentenza», the address, over it whatever came back. No tab holds it: no «Cerca nel testo», and a cited
-  norm or decision takes the reader to the workspace, `onLeave` (see «The host props»); the row names it, so inside
-  its full name is a quiet line of details, not a second and heavier title (`DecisionView`'s `title="line"`; the
-  practice keeps its h4), and the opened decision is a region named by the row's citation (`aria-labelledby`, no new
-  words on screen), so a screen reader still finds it by its name. The application that filed it is marked as an article's notes are,
+  decision takes the reader to the workspace, `onLeave` (see «The host props»). A cited norm is the dossier's (D7d,
+  `useCitedNorms` through `CitedNormsContext`, the surface's `citedNorms`, on the links the reader already draws, gotcha
+  23): one the dossier holds (`citedArticleOf`: a code of `CODE_NAMES` by its name, any other act by its type, then by
+  number and year only where both sides give one — «art. 141 c.d.s.» gives neither, its entry may carry 285 and a date;
+  the article in any spelling, outside annexes; the text in force first) opens in
+  the norms' column — a search hiding it cleared, the link clicked held at its height (`keepLinkAt`: the cleared search
+  makes the decision's column a scroller again), its act unfolded, its row opened and scrolled to the column's top, the
+  page moving only if the row is still off the window (`bringRowIntoView`, each scroller alone, gotcha 34), focused and
+  ringed for 1.6 s (`flashedId`, drawn by React through `DossierActBlock` to `DossierArticleRow`'s `isFlashing`); the
+  preview's button says «Apri tra le norme». One it does not hold opens nothing by itself: by the
+  link, `CitedNormChoice` offers «Apri su Dashboard» (the search of its text in force, as before) and «Aggiungi al
+  dossier» (`AddToDossierPopover` on the norm as `/fetch_article_text` answers it); the preview's button, «Apri su
+  Dashboard» there, still goes straight to Dashboard. The links take no keyboard focus, here as anywhere in the
+  reader, so the keyboard reaches neither way (as before D7d). The acts' «⋯» opens upwards when the column has no room
+  below (`MenuButton`'s `placement="auto"`). The row names the decision, so inside its full name is a quiet line of
+  details, not a second and heavier title (`DecisionView`'s `title="line"`; the practice keeps its h4), and the
+  opened decision is a region named by the row's citation (`aria-labelledby`, no new words on screen), so a screen
+  reader still finds it by its name. The application that filed it is marked as an article's notes are,
   `ClaudeMark` with `verb="aggiunta"` — «aggiunta da Claude Code», never «scritta» — from the item's own `createdBy`,
   on the grey line rather than at the right (a long citation beside it was squeezed into a column on a phone).
   No note count: the server takes a note about an article only, `assertArticleOfDossier`, and counting the notes and

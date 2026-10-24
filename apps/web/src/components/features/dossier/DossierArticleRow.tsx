@@ -32,6 +32,8 @@ export interface DossierArticleRowProps {
   notes?: NoteItem[];
   onAddNote?: () => void;
   onRemoveNote?: (note: NoteItem) => void;
+  /** Ringed for a moment: a norm a decision cites has just opened it (D7d). */
+  isFlashing?: boolean;
 }
 
 /**
@@ -42,7 +44,7 @@ export interface DossierArticleRowProps {
 export function DossierArticleRow({
   item, rubrica, isSelected, showCheckbox, onToggleSelect, isExpanded, onToggleExpand,
   onOpenOnDashboard, onRemove, onToggleImportant, showToast,
-  notes = [], onAddNote, onRemoveNote,
+  notes = [], onAddNote, onRemoveNote, isFlashing = false,
 }: DossierArticleRowProps) {
   const [textRubrica, setTextRubrica] = useState<string | null>(null);
   const onArticle = useCallback((article: ArticleData) => {
@@ -74,7 +76,9 @@ export function DossierArticleRow({
     + (byApp ? `, ${notes.length === 1 ? '' : 'una '}${claudeMarkSentence(byApp)}` : '');
 
   return (
-    <div className={cn(ROW, 'pl-3 transition-colors', isSelected ? 'bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800/40')}>
+    // `data-dossier-item`: a norm a decision cites opens this row (D7d, `useCitedNorms`).
+    // The ring comes and goes at once: no motion (`transition-colors` leaves a box shadow alone).
+    <div data-dossier-item={item.id} className={cn(ROW, 'pl-3 transition-colors', isSelected ? 'bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800/40', isFlashing && 'ring-2 ring-inset ring-amber-400')}>
       {isImportant && <span aria-hidden className="absolute bottom-2 left-0 top-2 w-1 rounded bg-amber-400" />}
       <div className="flex items-start gap-1">
         {showCheckbox && (

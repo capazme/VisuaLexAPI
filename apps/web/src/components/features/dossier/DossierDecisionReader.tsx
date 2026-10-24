@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowUpRight } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
@@ -10,6 +10,7 @@ import { DecisionView } from '../decisions/DecisionView';
 import { DecisionReadingSurface } from '../decisions/DecisionReadingSurface';
 import { DecisionDiscussionsWithoutText } from '../decisions/DecisionDiscussionsWithoutText';
 import { useDecisionAnswer } from '../decisions/useDecisionAnswer';
+import { CitedNormsContext } from './useCitedNorms';
 
 interface Props {
   identity: DecisionIdentity;
@@ -21,8 +22,9 @@ interface Props {
  * (`DecisionReadingSurface`: the text as received, the notes and highlights on it, the key passages, gotcha 23), and,
  * when the decision came without its text, the anchors and discussions on it (`DecisionView` says how it came). Its
  * address stays one click away, «Apri la sentenza», over the decision whatever came back (an answer not found or a
- * source that is silent included). No tab holds it: the find window has nothing of it to search, and a norm or a
- * decision it cites opens in the workspace, which the page goes to. Nothing is recorded in the Cronologia, as for an
+ * source that is silent included). No tab holds it: the find window has nothing of it to search. A norm it cites is the
+ * dossier's to open (D7d, `CitedNormsContext`): one the dossier holds opens in the norms' column, the rest are offered;
+ * a decision it cites opens in the workspace, which the page goes to. Nothing is recorded in the Cronologia, as for an
  * article read here.
  */
 export function DossierDecisionReader({ identity }: Props) {
@@ -30,6 +32,7 @@ export function DossierDecisionReader({ identity }: Props) {
   const openPaletteWith = useAppStore((s) => s.openCommandPaletteWith);
   const { current, answer, retry, chooseCandidate } = useDecisionAnswer(identity);
   const toWorkspace = useCallback(() => navigate('/'), [navigate]);
+  const citedNorms = useContext(CitedNormsContext) ?? undefined;
 
   return (
     <div className="space-y-2">
@@ -49,7 +52,7 @@ export function DossierDecisionReader({ identity }: Props) {
         // The row names the decision: its full heading as a line of details, not a second title (D7a).
         title="line"
         textSlot={answer?.esito === 'trovata' ? (
-          <DecisionReadingSurface identity={answer.identita} testo={answer.testo} attributi={answer.attributi} onLeave={toWorkspace} />
+          <DecisionReadingSurface identity={answer.identita} testo={answer.testo} attributi={answer.attributi} onLeave={toWorkspace} citedNorms={citedNorms} />
         ) : undefined}
         noTextSlot={answer?.esito === 'trovata' ? (
           <DecisionDiscussionsWithoutText identity={answer.identita} attributi={answer.attributi} />
