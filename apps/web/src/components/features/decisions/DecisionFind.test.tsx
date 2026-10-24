@@ -57,8 +57,10 @@ afterEach(() => {
 });
 
 describe('«Cerca nel testo» on a decision', () => {
+  // In a tab: a reading place with none (the dossier's, D7a) draws no magnifier, the find window having nothing of it to
+  // search (`DecisionReadingToolbar.test.tsx`).
   it('has the magnifier on a decision with text, and no window until it is pressed', () => {
-    render(withWindow(surface()));
+    render(withWindow(inTab()));
     expect(magnifier()).toHaveAttribute('aria-pressed', 'false');
     expect(screen.queryByRole('search')).not.toBeInTheDocument();
   });
@@ -113,7 +115,7 @@ describe('«Cerca nel testo» on a decision', () => {
   });
 
   it('orders the buttons as the article does: discussion, then find', () => {
-    render(withWindow(surface()));
+    render(withWindow(inTab()));
     const discussion = screen.getByRole('button', { name: /Glosse/ });
     expect(discussion.compareDocumentPosition(magnifier()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
@@ -138,7 +140,7 @@ describe('«Cerca nel testo» on a decision', () => {
   it('Esc in the window does not reach the document, so an open panel stays open', () => {
     const onDocKey = vi.fn();
     document.addEventListener('keydown', onDocKey);
-    render(withWindow(surface()));
+    render(withWindow(inTab()));
     fireEvent.click(magnifier());
     fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'Escape' });
     document.removeEventListener('keydown', onDocKey);

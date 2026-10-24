@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Search, SlidersHorizontal } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { FIELD_TEXT } from '../../../constants/interactions';
+import { useMediaQuery } from '../../../hooks/useIsDesktop';
 import { Z_INDEX } from '../../../constants/zIndex';
 import type { Materia, StatoScheda, TipoScheda } from '../../../types/studia';
 import type { ActOption, FilterState } from './useMyCards';
@@ -65,6 +66,10 @@ function FilterSelect<T extends string>({ label, all, value, options, disabled, 
  */
 export function CardFilters({ value, onChange, search, onSearchChange, acts, row = true }: CardFiltersProps) {
   const [open, setOpen] = useState(false);
+  // `sm`, 640 px, and 360 px: the placeholder is markup, not a class.
+  const wide = useMediaQuery('(min-width: 640px)');
+  const narrow = !useMediaQuery('(min-width: 360px)');
+  const hintId = useId();
   const active = [value.materia, value.stato, value.tipo, value.normaKey].filter(Boolean).length + (value.daRileggere ? 1 : 0) + (value.dovuteOggi ? 1 : 0);
 
   return (
@@ -87,10 +92,19 @@ export function CardFilters({ value, onChange, search, onSearchChange, acts, row
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
             aria-label="Cerca nelle schede"
-            placeholder="Cerca per istituto o domanda"
+            aria-describedby={wide ? undefined : hintId}
+            // Below `sm` the long hint was cut («Cerca per istituto o domanc…», Q1): the field's own name instead (under
+            // 360 px, beside «Filtri», only «Cerca» fits), and what it searches told to a screen reader there (from
+            // `sm` the hint says it).
+            placeholder={wide ? 'Cerca per istituto o domanda' : narrow ? 'Cerca' : 'Cerca nelle schede'}
             maxLength={100}
             className={cn(CONTROL, FIELD_TEXT, 'w-full pl-9')}
           />
+          {!wide && (
+            <span id={hintId} className="sr-only">
+              Per istituto o domanda
+            </span>
+          )}
         </div>
         <button
           type="button"

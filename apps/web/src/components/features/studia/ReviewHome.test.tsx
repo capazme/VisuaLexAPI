@@ -79,6 +79,7 @@ beforeEach(() => {
 afterEach(() => {
   localStorage.removeItem(STORAGE_KEY);
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 /** The subject filter of «Le tue materie» (G8), which took the chips' place. */
@@ -91,6 +92,15 @@ const subjectRow = async (label: string) => {
   return within(group).getAllByRole('listitem').find((li) => li.querySelector('[data-subject-name]')?.textContent === label)!;
 };
 const START = /^(Inizia|Continua) il ripasso$/;
+const follows = (a: Element, b: Element) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
+/** A window `width` px wide, for `min-width` queries (jsdom matches none). */
+function windowOf(width: number) {
+  vi.stubGlobal('matchMedia', (query: string) => {
+    const min = Number(/min-width:\s*(\d+)px/.exec(query)?.[1] ?? Infinity);
+    return { matches: width >= min, media: query, addEventListener: () => {}, removeEventListener: () => {} };
+  });
+}
 
 describe('ReviewHome', () => {
   it('says what is on today, how far the goal is, and offers to start', async () => {
@@ -249,6 +259,70 @@ describe('ReviewHome', () => {
     expect(container.querySelector('[aria-busy="true"]')).toBeNull();
   });
 
+  // P1: on a phone the page moved when the read came (CLS 0.63): the places held were shorter than what took them.
+  describe('the places held as tall as what takes them (P1)', () => {
+    it('holds the day\'s line, the large line as a phone wraps it, the cost on two lines, and the mission rows as tall as theirs', () => {
+      progress.mockReturnValue(new Promise(() => {}));
+      renderHome();
+      const day = screen.getByRole('region', { name: 'Il ripasso di oggi' });
+      const held = [...day.querySelectorAll('[aria-hidden="true"]')].map((el) => el.className);
+      // One line for the date without a subject.
+      expect(held[0]).toMatch(/\bh-5\b.*\bw-40\b/);
+      expect(held[0]).not.toMatch(/max-md:h-10/);
+      // Two lines under 390 px, one from there and from `md`.
+      expect(held[1]).toMatch(/h-\[75px\].*min-\[390px\]:h-\[38px\].*md:h-11/);
+      expect(held[2]).toMatch(/\bh-10\b.*md:h-5/);
+      const rows = screen.getByRole('region', { name: 'Le missioni di oggi' }).querySelectorAll('.grid-cols-\\[24px_minmax\\(0\\,1fr\\)\\] > div:last-child');
+      expect([...rows].map((row) => ['h-[58px]', 'h-[84px]'].find((c) => row.classList.contains(c)))).toEqual(['h-[58px]', 'h-[58px]', 'h-[84px]']);
+      for (const row of rows) expect(row).toHaveClass('md:h-9');
+    });
+
+    it('holds two lines for the date on a phone with a subject remembered, and keeps it held while that subject\'s read answers first', async () => {
+      localStorage.setItem(STORAGE_KEY, 'DIRITTO_PROCESSUALE_PENALE');
+      progress.mockImplementation((materia?: string) => (materia ? Promise.resolve(answer(4, 2)) : new Promise(() => {})));
+      renderHome();
+      // The subject's read has answered, the day's has not: the block draws the subject's day, the date's place held.
+      expect(await screen.findByText('4 da ripassare, 2 nuove')).toBeInTheDocument();
+      const day = screen.getByRole('region', { name: 'Il ripasso di oggi' });
+      expect(day.querySelector('.w-40')).toHaveClass('h-5', 'max-md:h-10');
+    });
+
+    it('draws the date once with a subject chosen: no place held for it under the day\'s line while the subject\'s read travels', async () => {
+      localStorage.setItem(STORAGE_KEY, 'DIRITTO_PENALE');
+      progress.mockImplementation((materia?: string) => (materia ? new Promise(() => {}) : Promise.resolve(answer(18, 20))));
+      renderHome();
+      const day = await screen.findByRole('region', { name: 'Il ripasso di oggi' });
+      expect(await within(day).findByText(/^lunedì 19 ottobre/)).toBeInTheDocument();
+      expect(day.querySelector('.w-40')).toBeNull();
+    });
+
+    it('keeps two lines for the cost on a phone while the subjects\' read travels, and leaves the large line its own height', async () => {
+      percorso.mockReturnValue(new Promise(() => {}));
+      progress.mockResolvedValue(answer(18, 20));
+      renderHome();
+      const large = await screen.findByText('18 da ripassare, 20 nuove');
+      // No room kept once read: a short sentence leaves no empty line under it.
+      expect(large.className).not.toMatch(/min-h/);
+      expect(screen.getByText(/^circa \d+ minuti/)).toHaveClass('max-md:min-h-10');
+    });
+
+    it('lets the cost\'s line be its own height once the subjects have come', async () => {
+      progress.mockResolvedValue(answer(18, 20));
+      renderHome();
+      expect(await screen.findByText(/^circa \d+ minuti/)).not.toHaveClass('max-md:min-h-10');
+    });
+
+    it('wraps the subjects\' strip held in a plain box, so React never keeps the strip, a scroller, when they come', () => {
+      progress.mockReturnValue(new Promise(() => {}));
+      renderHome();
+      const mine = screen.getByRole('region', { name: 'Le tue materie' });
+      const box = mine.querySelector('h2 + div')!;
+      expect(box).toHaveAttribute('aria-hidden', 'true');
+      expect(box.className).toBe('');
+      expect(box.firstElementChild!.className).toMatch(/overflow-x-auto/);
+    });
+  });
+
   it('says what the subjects are missing when the progress cannot be read, and draws them once read again', async () => {
     progress.mockRejectedValueOnce(new Error('down'));
     renderHome();
@@ -339,37 +413,82 @@ describe('ReviewHome', () => {
     afterEach(() => {
       localStorage.removeItem(CELEBRATED_KEY);
     });
+    /** The goal met today and its mission done, as the server says it (G9: the mark follows the mission). */
+    const met = (over: Partial<Progressi['oggi']> = { ripassi: 12, raggiunto: true }, serie = 5): Progressi => ({
+      ...answer(0, 0, over, serie),
+      missioni: serverMissions({ obiettivo: { stato: 'fatta', progresso: { fatte: 10, di: 10 } } }),
+    });
+    const dayBlock = () => screen.getByRole('region', { name: 'Il ripasso di oggi' });
 
-    it('plays once when the goal was met today, stamps the goal\'s mission, and remembers the day', async () => {
-      progress.mockResolvedValue(answer(0, 0, { ripassi: 12, raggiunto: true }, 5));
+    it('plays once when the goal was met today, writes the goal\'s mark in the day block, and remembers the day', async () => {
+      progress.mockResolvedValue(met());
       renderHome();
-      expect(await screen.findByTestId('goal-stamp')).toHaveTextContent('Obiettivo raggiunto');
-      expect(screen.getByTestId('goal-stamp')).toHaveTextContent('19 ottobre 2026 · giorno 5');
-      expect(screen.getByTestId('goal-stamp').closest('li')).toHaveAttribute('data-missione', 'obiettivo');
+      const mark = await screen.findByTestId('goal-mark');
+      // In the day block (G9), never in the missions' rows; its date and day as words beside it.
+      expect(dayBlock()).toContainElement(mark);
+      expect(mark.closest('li')).toBeNull();
+      expect(within(dayBlock()).getByRole('img', { name: 'Obiettivo raggiunto' })).toBe(mark);
+      expect(mark.nextElementSibling).toHaveTextContent('19 ottobre 2026 · giorno 5');
+      // Written now, once.
+      expect(mark).toHaveClass('vlx-goal-mark-draw');
+      expect(screen.queryByTestId('goal-stamp')).toBeNull();
       await waitFor(() => expect(localStorage.getItem(CELEBRATED_KEY)).toBe('2026-10-19'));
     });
 
-    it('keeps the stamp at rest, without a new burst, once the day was celebrated', async () => {
+    it('draws the mark whole, without writing it again or a new burst, once the day was celebrated', async () => {
       localStorage.setItem(CELEBRATED_KEY, '2026-10-19');
-      progress.mockResolvedValue(answer(0, 0, { ripassi: 12, raggiunto: true }, 5));
+      progress.mockResolvedValue(met());
       const { container } = renderHome();
-      expect(await screen.findByTestId('goal-stamp')).toBeInTheDocument();
+      expect(await screen.findByTestId('goal-mark')).not.toHaveClass('vlx-goal-mark-draw');
       expect(container.querySelector('canvas')).toBeNull();
     });
 
+    // As the server sends it: the queue finished with no review counts the day, and leaves the goal's mission empty.
     it('does not celebrate a day that counted with nothing reviewed', async () => {
-      progress.mockResolvedValue(answer(0, 0, { ripassi: 0, raggiunto: true }, 5));
+      progress.mockResolvedValue({
+        ...answer(0, 0, { ripassi: 0, raggiunto: true }, 5),
+        missioni: serverMissions({ obiettivo: { stato: 'vuota', progresso: undefined } }),
+      });
       const { container } = renderHome();
-      expect(await screen.findByTestId('goal-stamp')).toBeInTheDocument();
+      await screen.findByRole('region', { name: 'Le missioni di oggi' });
+      expect(screen.queryByTestId('goal-mark')).toBeNull();
       expect(container.querySelector('canvas')).toBeNull();
       expect(localStorage.getItem(CELEBRATED_KEY)).toBeNull();
     });
 
+    // The credit stays the whole day: 10 reviews of a goal of 10, the mission done, the goal then raised to 15.
+    it('draws no mark and celebrates nothing when the goal was raised past a mission already done', async () => {
+      progress.mockResolvedValue({
+        ...answer(8, 0, { ripassi: 10, obiettivo: 15, raggiunto: false }, 5),
+        missioni: serverMissions({ obiettivo: { stato: 'fatta', progresso: { fatte: 10, di: 10 } } }),
+      });
+      const { container } = renderHome();
+      await screen.findByRole('region', { name: 'Le missioni di oggi' });
+      expect(screen.queryByTestId('goal-mark')).toBeNull();
+      expect(screen.queryByText(/Obiettivo raggiunto/)).toBeNull();
+      expect(screen.getByText('Ancora 5 ripassi per tenere viva la serie.')).toBeInTheDocument();
+      expect(container.querySelector('canvas')).toBeNull();
+      expect(localStorage.getItem(CELEBRATED_KEY)).toBeNull();
+    });
+
+    it('writes the mark once: when the burst is over the writing goes, and a new read does not bring it back', async () => {
+      vi.mocked(HTMLCanvasElement.prototype.getContext).mockReturnValue(fakeContext());
+      progress.mockResolvedValue(met());
+      const { container } = renderHome();
+      expect(await screen.findByTestId('goal-mark')).toHaveClass('vlx-goal-mark-draw');
+      await waitFor(() => expect(container.querySelector('canvas')).toBeNull(), { timeout: 3000 });
+      expect(screen.getByTestId('goal-mark')).not.toHaveClass('vlx-goal-mark-draw');
+      // A new read (a subject chosen): the mark stays whole.
+      await userEvent.setup().click(subjectChoice('Diritto penale'));
+      await waitFor(() => expect(progress).toHaveBeenCalledWith('DIRITTO_PENALE'));
+      expect(screen.getByTestId('goal-mark')).not.toHaveClass('vlx-goal-mark-draw');
+    });
+
     it('marks the day as the burst begins, so leaving halfway does not replay it', async () => {
       vi.mocked(HTMLCanvasElement.prototype.getContext).mockReturnValue(fakeContext());
-      progress.mockResolvedValue(answer(0, 0, { ripassi: 12, raggiunto: true }, 5));
+      progress.mockResolvedValue(met());
       const { container, unmount } = renderHome();
-      await screen.findByTestId('goal-stamp');
+      await screen.findByTestId('goal-mark');
       expect(container.querySelector('canvas')).not.toBeNull();
       // The day is written by the burst's mount effect, which React runs just after the canvas is in the page:
       // waited for, not read at once (a loaded machine reads between the two). The burst is still on (1.5 s).
@@ -378,15 +497,15 @@ describe('ReviewHome', () => {
       unmount();
 
       const again = renderHome();
-      expect(await screen.findByTestId('goal-stamp')).toBeInTheDocument();
+      expect(await screen.findByTestId('goal-mark')).toBeInTheDocument();
       expect(again.container.querySelector('canvas')).toBeNull();
     });
 
     it('keeps the burst through a new read (a subject chosen halfway), and takes the canvas away after 1.5 s', async () => {
       vi.mocked(HTMLCanvasElement.prototype.getContext).mockReturnValue(fakeContext());
-      progress.mockResolvedValue(answer(0, 0, { ripassi: 12, raggiunto: true }, 5));
+      progress.mockResolvedValue(met());
       const { container } = renderHome();
-      await screen.findByTestId('goal-stamp');
+      await screen.findByTestId('goal-mark');
       const canvas = container.querySelector('canvas');
       expect(canvas).not.toBeNull();
       await userEvent.setup().click(subjectChoice('Diritto penale'));
@@ -394,16 +513,16 @@ describe('ReviewHome', () => {
       await waitFor(() => expect(container.querySelector('canvas')).toBeNull(), { timeout: 3000 });
     });
 
-    it('moves nothing under reduced motion: no canvas, the stamp at rest, the day still marked', async () => {
+    it('moves nothing under reduced motion: no canvas, the mark whole, the day still marked', async () => {
       const original = window.matchMedia;
       window.matchMedia = ((query: string) => ({
         matches: query.includes('reduce'), media: query, onchange: null, addListener: () => {}, removeListener: () => {},
         addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
       })) as unknown as typeof window.matchMedia;
       try {
-        progress.mockResolvedValue(answer(0, 0, { ripassi: 12, raggiunto: true }, 5));
+        progress.mockResolvedValue(met());
         const { container } = renderHome();
-        await screen.findByTestId('goal-stamp');
+        await screen.findByTestId('goal-mark');
         await waitFor(() => expect(container.querySelector('canvas')).toBeNull());
         expect(HTMLCanvasElement.prototype.getContext).not.toHaveBeenCalled();
         expect(localStorage.getItem(CELEBRATED_KEY)).toBe('2026-10-19');
@@ -412,11 +531,55 @@ describe('ReviewHome', () => {
       }
     });
 
-    it('shows no stamp before the goal', async () => {
+    it('shows no mark before the goal', async () => {
       progress.mockResolvedValue(answer(3, 0));
       renderHome();
       await screen.findByText('3 da ripassare');
-      expect(screen.queryByTestId('goal-stamp')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('goal-mark')).not.toBeInTheDocument();
+    });
+
+    // G9, the case on Luca's screen: day 3 of the streak, nothing due, nothing new. The server counts the day with the
+    // queue finished (`raggiunto`, 0 reviews) and leaves the goal's mission empty: the page never says «Obiettivo
+    // raggiunto» for it.
+    it('says the day counts, with no mark, no burst and no «0 di 0», when the goal\'s mission is empty', async () => {
+      progress.mockResolvedValue({
+        ...answer(0, 0, { ripassi: 0, raggiunto: true }, 3),
+        missioni: serverMissions({ dovute: { stato: 'vuota' }, nuove: { stato: 'vuota' }, obiettivo: { stato: 'vuota', progresso: undefined } }),
+      });
+      const { container } = renderHome();
+      const missions = await screen.findByRole('region', { name: 'Le missioni di oggi' });
+      // Read and seen: the stamp no longer covers it, nor hides it from the eye.
+      expect(within(missions).getByText('Hai finito le schede del giorno: il giorno conta. Serie: 3 giorni.')).not.toHaveClass('sr-only');
+      expect(within(missions).getByText('Oggi non c\'è nulla da ripassare')).toBeInTheDocument();
+      expect(within(missions).queryByText(/0 di 0/)).toBeNull();
+      expect(screen.queryByTestId('goal-mark')).toBeNull();
+      expect(screen.queryByText(/Obiettivo raggiunto/)).toBeNull();
+      expect(container.querySelector('canvas')).toBeNull();
+      expect(localStorage.getItem(CELEBRATED_KEY)).toBeNull();
+    });
+
+    it('draws no mark for a goal of the user\'s own met under the mission\'s 10 reviews, and says what the points want', async () => {
+      progress.mockResolvedValue({
+        ...answer(2, 0, { ripassi: 6, obiettivo: 5, raggiunto: true }, 3),
+        missioni: serverMissions({ obiettivo: { stato: 'aperta', progresso: { fatte: 6, di: 10 } } }),
+      });
+      const { container } = renderHome();
+      const missions = await screen.findByRole('region', { name: 'Le missioni di oggi' });
+      expect(within(missions).getByText('Il giorno conta per la serie; per i punti della missione servono 10 ripassi.')).not.toHaveClass('sr-only');
+      // No mark, no burst, nothing celebrated: the goal's mission is still open.
+      expect(screen.queryByTestId('goal-mark')).toBeNull();
+      expect(screen.queryByText(/Obiettivo raggiunto/)).toBeNull();
+      expect(container.querySelector('canvas')).toBeNull();
+      expect(localStorage.getItem(CELEBRATED_KEY)).toBeNull();
+    });
+
+    it('keeps the mark while a subject\'s read travels, the day\'s goal being the whole day\'s', async () => {
+      localStorage.setItem(CELEBRATED_KEY, '2026-10-19');
+      localStorage.setItem(STORAGE_KEY, 'DIRITTO_PENALE');
+      progress.mockImplementation((materia?: string) => (materia ? new Promise(() => {}) : Promise.resolve(met())));
+      renderHome();
+      expect(await screen.findByTestId('goal-mark')).toBeInTheDocument();
+      expect(dayBlock()).toContainElement(screen.getByTestId('goal-mark'));
     });
   });
 
@@ -435,13 +598,60 @@ describe('ReviewHome', () => {
       const stats = screen.getByRole('region', { name: 'I tuoi progressi' });
       const list = screen.getByRole('region', { name: 'Tutte le missioni' });
       const mine = screen.getByRole('region', { name: 'Le tue materie' });
-      const follows = (a: Element, b: Element) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
       expect(follows(day, missions) && follows(missions, stats) && follows(stats, mine) && follows(mine, list)).toBe(true);
       // The grid places them; the document keeps the order on every width.
       expect(stats.parentElement).toHaveClass('xl:col-start-2', 'xl:row-span-full', 'xl:sticky', 'xl:self-start');
       expect(stats.parentElement).toContainElement(mine);
       for (const left of [day.parentElement!, missions.parentElement!, list.parentElement!]) expect(left).toHaveClass('xl:col-start-1');
       expect(stats.parentElement?.parentElement?.className).toMatch(/xl:grid-cols-\[minmax\(0,7fr\)_minmax\(0,5fr\)\]/);
+    });
+
+    it('sets «Le tue materie» under the day block from `xl` when there is no mission, first for the keyboard too, the statistics alone on the right (G8c)', async () => {
+      windowOf(1366);
+      const bare: Progressi = { ...answer(18, 8) };
+      delete bare.missioni;
+      progress.mockResolvedValue(bare);
+      const { container } = renderHome();
+      const day = await screen.findByRole('region', { name: 'Il ripasso di oggi' });
+      const stats = screen.getByRole('region', { name: 'I tuoi progressi' });
+      const mine = screen.getByRole('region', { name: 'Le tue materie' });
+      expect(stats.parentElement).not.toContainElement(mine);
+      expect(mine.parentElement).toHaveClass('xl:col-start-1');
+      expect(stats.parentElement).toHaveClass('xl:col-start-2', 'xl:row-span-full');
+      expect(follows(day, mine) && follows(mine, stats)).toBe(true);
+      // Two rows on the left: no empty third leaving its gaps under the subjects.
+      expect(container.querySelector('section')).toHaveClass('xl:grid-rows-[auto_auto_1fr]');
+    });
+
+    it('moves nothing below `xl`: one column, the day, the statistics, the subjects (G8c)', async () => {
+      windowOf(1024);
+      const bare: Progressi = { ...answer(18, 8) };
+      delete bare.missioni;
+      progress.mockResolvedValue(bare);
+      renderHome();
+      const stats = await screen.findByRole('region', { name: 'I tuoi progressi' });
+      expect(stats.parentElement).toContainElement(screen.getByRole('region', { name: 'Le tue materie' }));
+    });
+
+    it('keeps «Le tue materie» in the right column while the first read travels, as the list of missions is still to come (G8c)', async () => {
+      windowOf(1366);
+      progress.mockReturnValue(new Promise(() => {}));
+      renderHome();
+      const stats = await screen.findByRole('region', { name: 'I tuoi progressi' });
+      expect(stats.parentElement).toContainElement(screen.getByRole('region', { name: 'Le tue materie' }));
+    });
+
+    it('keeps «Le tue materie» on the left after a failed read while «Riprova» reads again (G8c)', async () => {
+      windowOf(1366);
+      progress.mockRejectedValueOnce(new Error('down'));
+      renderHome();
+      const alert = await screen.findByRole('alert');
+      const stats = screen.getByRole('region', { name: 'I tuoi progressi' });
+      await waitFor(() => expect(stats.parentElement).not.toContainElement(screen.getByRole('region', { name: 'Le tue materie' })));
+      progress.mockReturnValue(new Promise(() => {}));
+      await userEvent.setup().click(within(alert).getByRole('button', { name: 'Riprova' }));
+      expect(progress).toHaveBeenCalledTimes(2);
+      expect(screen.getByRole('region', { name: 'I tuoi progressi' }).parentElement).not.toContainElement(screen.getByRole('region', { name: 'Le tue materie' }));
     });
 
     it('says the subjects once, in one list: no chips and no road beside them (G8)', async () => {
@@ -490,12 +700,12 @@ describe('ReviewHome', () => {
       expect(await screen.findByText('circa 4 minuti · Diritto civile, Diritto amministrativo e altre 2')).toBeInTheDocument();
     });
 
-    it('stamps the day and offers «Continua il ripasso» once the goal is met with cards left', async () => {
+    it('marks the day and offers «Continua il ripasso» once the goal is met with cards left', async () => {
       localStorage.setItem('visualex.studia.festeggiato', '2026-10-19');
-      progress.mockResolvedValue(answer(4, 2, { ripassi: 12, raggiunto: true }, 5));
+      progress.mockResolvedValue({ ...answer(4, 2, { ripassi: 12, raggiunto: true }, 5), missioni: serverMissions({ obiettivo: { stato: 'fatta', progresso: { fatte: 10, di: 10 } } }) });
       renderHome();
       expect(await screen.findByRole('button', { name: 'Continua il ripasso' })).toBeEnabled();
-      expect(screen.getByTestId('goal-stamp')).toBeInTheDocument();
+      expect(within(screen.getByRole('region', { name: 'Il ripasso di oggi' })).getByTestId('goal-mark')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Inizia il ripasso' })).toBeNull();
       expect(screen.getByText('circa 2 minuti')).toBeInTheDocument();
       await userEvent.setup().click(screen.getByRole('button', { name: 'Continua il ripasso' }));
@@ -834,7 +1044,9 @@ describe('ReviewHome', () => {
       expect(rows[0].querySelector('.h-1')).not.toBeNull();
       expect(within(rows[0]).queryByRole('button')).toBeNull();
       expect(within(screen.getByRole('region', { name: 'Il ripasso di oggi' })).getByRole('button', { name: 'Continua il ripasso' })).toBeInTheDocument();
-      expect(within(rows[2]).getByTestId('goal-stamp')).toBeInTheDocument();
+      // The goal's mark is the day block's (G9), never the row's: its line is read under it.
+      expect(within(rows[2]).queryByTestId('goal-mark')).toBeNull();
+      expect(within(screen.getByRole('region', { name: 'Il ripasso di oggi' })).getByTestId('goal-mark')).toBeInTheDocument();
       localStorage.removeItem('visualex.studia.festeggiato');
     });
 

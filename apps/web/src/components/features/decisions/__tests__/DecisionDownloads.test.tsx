@@ -19,6 +19,21 @@ vi.mock('jspdf', async (importOriginal) => {
   return { ...real, jsPDF: Spied };
 });
 
+// jsPDF that cannot be loaded (offline, or a chunk a deploy removed), when a test asks for it.
+// Or held, for a test that acts while it loads.
+const { failLoad } = vi.hoisted(() => ({ failLoad: { next: false, held: null as Promise<void> | null } }));
+vi.mock('../../../../utils/loadJsPdf', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../../../../utils/loadJsPdf')>();
+  return {
+    loadJsPdf: async () => {
+      if (failLoad.held) await failLoad.held;
+      if (!failLoad.next) return real.loadJsPdf();
+      failLoad.next = false;
+      return Promise.reject(new Error('offline'));
+    },
+  };
+});
+
 const fetchOriginalPdf = vi.fn();
 vi.mock('../../../../services/decisionPdfService', () => ({ fetchOriginalPdf: (...a: unknown[]) => fetchOriginalPdf(...a) }));
 
@@ -35,6 +50,8 @@ const KEY = 'cassazione:civile:99999:2024';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  failLoad.next = false;
+  failLoad.held = null;
   appStore.setState({
     highlights: [], annotations: [],
     loadHighlightsForArticle: vi.fn(), loadAnnotationsForArticle: vi.fn(),
@@ -42,21 +59,65 @@ beforeEach(() => {
 });
 
 describe('DecisionDownloads', () => {
-  it('«Scarica PDF» saves a file named by the model', () => {
+  it('«Scarica PDF» saves a file named by the model', async () => {
     render(<DecisionDownloads answer={FOUND} identity={FOUND.identita} />);
     fireEvent.click(screen.getByRole('button', { name: /Scarica PDF/ }));
-    expect(save).toHaveBeenCalledWith('Cass_civ_sez_III_n_99999_2024.pdf');
+    // jsPDF comes on the first download: the save follows it.
+    await waitFor(() => expect(save).toHaveBeenCalledWith('Cass_civ_sez_III_n_99999_2024.pdf'));
   });
 
-  it('with the option, the decision\'s own highlights are in the PDF (and only those)', () => {
+  it('shows the wait for jsPDF in the button, its words as they are, and gives it back once saved', async () => {
+    render(<DecisionDownloads answer={FOUND} identity={FOUND.identita} />);
+    const button = screen.getByRole('button', { name: /Scarica PDF/ });
+    fireEvent.click(button);
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('aria-busy', 'true');
+    expect(button).toHaveTextContent('Scarica PDF');
+    await waitFor(() => expect(save).toHaveBeenCalled());
+    await waitFor(() => expect(button).toBeEnabled());
+    expect(button).not.toHaveAttribute('aria-busy');
+  });
+
+  it('when jsPDF cannot be loaded, says so as for a failed download and lets the user try again', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    failLoad.next = true;
+    render(<DecisionDownloads answer={FOUND} identity={FOUND.identita} />);
+    const button = screen.getByRole('button', { name: /Scarica PDF/ });
+    fireEvent.click(button);
+    expect(await screen.findByText('Download non riuscito: riprova.')).toBeInTheDocument();
+    expect(button).toBeEnabled();
+    expect(save).not.toHaveBeenCalled();
+    fireEvent.click(button);
+    await waitFor(() => expect(save).toHaveBeenCalledWith('Cass_civ_sez_III_n_99999_2024.pdf'));
+    expect(screen.queryByText('Download non riuscito: riprova.')).not.toBeInTheDocument();
+  });
+
+  it('saves nothing when the reader leaves the decision while jsPDF loads', async () => {
+    let open = () => {};
+    failLoad.held = new Promise<void>((resolve) => { open = resolve; });
+    const view = render(<DecisionDownloads answer={FOUND} identity={FOUND.identita} />);
+    fireEvent.click(screen.getByRole('button', { name: /Scarica PDF/ }));
+    view.unmount();
+    open();
+    await failLoad.held;
+    await vi.dynamicImportSettled();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    failLoad.held = null;
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it('with the option, the decision\'s own highlights are in the PDF (and only those)', async () => {
     const mine = { id: 'h1', normaKey: KEY, articleId: '', rangeSerialized: '', text: 'Secondo', color: 'yellow', startOffset: 16 } as Highlight;
     const other = { ...mine, id: 'h2', normaKey: 'cassazione:civile:1:2024' } as Highlight;
     appStore.setState({ highlights: [mine, other] });
     render(<DecisionDownloads answer={FOUND} identity={FOUND.identita} />);
     fireEvent.click(screen.getByRole('button', { name: /Scarica PDF/ }));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
     expect(rect).not.toHaveBeenCalled();
     fireEvent.click(screen.getByLabelText('Con le mie evidenziazioni e note'));
+    await waitFor(() => expect(screen.getByRole('button', { name: /Scarica PDF/ })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: /Scarica PDF/ }));
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
     expect(rect).toHaveBeenCalledTimes(1);
   });
 

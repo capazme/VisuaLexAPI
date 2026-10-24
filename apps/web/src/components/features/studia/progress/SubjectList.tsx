@@ -46,9 +46,10 @@ const LIST = cn('relative -m-1 flex snap-x gap-2 overflow-x-auto p-1 md:m-0 md:g
 const ITEM = 'w-60 shrink-0 snap-start md:w-auto';
 
 /**
- * «Le tue materie» (G8), in «Oggi»'s right column under the statistics, in the place of «Cosa ripassi» (the chips) and
- * «Il percorso» (the road), which said almost the same thing twice: the subject filter and the road in one list. On top
- * «Tutte le materie», then one row a subject in the road's order (`orderStops`) — its hue's dot, its name, «3 oggi»
+ * «Le tue materie» (G8), in «Oggi»'s right column under the statistics (under the day block when there is no mission,
+ * G8c), in the place of «Cosa ripassi» (the chips) and «Il percorso» (the road), which said almost the same thing
+ * twice: the subject filter and the road in one list.
+ * On top «Tutte le materie», then one row a subject in the road's order (`orderStops`) — its hue's dot, its name, «3 oggi»
  * (the cards due today, from the read by institute), a small bar of its consolidated share, and «Ripassa», a session
  * narrowed to it. A row pressed narrows the day block and its session, as the chips did, remembered for the area; the
  * chosen subject's institutes follow the list (`InstituteStops`, G5), each a session narrowed to it. The cards due
@@ -66,10 +67,15 @@ export function SubjectList({ materie, loading, reloading, selected, onSelect, p
           Le tue materie
         </h2>
         {loading ? (
-          <div aria-hidden className={LIST}>
-            {Array.from({ length: 6 }, (_, index) => (
-              <div key={index} className={cn(ITEM, 'h-[92px] rounded-xl bg-slate-100 motion-safe:animate-pulse md:h-11 dark:bg-slate-800/60')} />
-            ))}
+          // The strip inside a plain box, as the list's is inside its group: React keeps the box when the subjects come,
+          // never the strip, a scroller whose old place Chrome reads in its own coordinates — a shift of 0.11 on a phone
+          // that no one sees, below the fold (P1).
+          <div aria-hidden>
+            <div className={LIST}>
+              {Array.from({ length: 6 }, (_, index) => (
+                <div key={index} className={cn(ITEM, 'h-[92px] rounded-xl bg-slate-100 motion-safe:animate-pulse md:h-11 dark:bg-slate-800/60')} />
+              ))}
+            </div>
           </div>
         ) : (
           // No alert: the day block says it once, with «Riprova», which reads the subjects again too.

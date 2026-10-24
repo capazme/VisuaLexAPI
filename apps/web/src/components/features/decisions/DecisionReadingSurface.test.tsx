@@ -121,6 +121,20 @@ describe('DecisionReadingSurface', () => {
     expect(appStore.getState().readingBackStack).toEqual([]);
   });
 
+  it('hands a cited norm to a host that holds norms (the dossier, D7d), with the link: no search, nothing left, the text as it was', () => {
+    const open = vi.fn();
+    const onLeave = vi.fn();
+    const { container } = render(
+      <DecisionReadingSurface identity={IDENTITY} testo={TESTO} attributi={{}} onLeave={onLeave} citedNorms={{ holds: () => true, open }} />,
+    );
+    const link = container.querySelector<HTMLElement>('.citation-hover')!;
+    fireEvent.click(link);
+    expect(open).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ act_type: 'codice civile', article: '2043' }), link);
+    expect(appStore.getState().searchTrigger).toBeNull();
+    expect(onLeave).not.toHaveBeenCalled();
+    expect(textOf(container.querySelector('.vlx-decision')!)).toBe(decisionProjection(TESTO));
+  });
+
   // The real mount (ArticleBody -> SafeHTML -> DOMPurify), over every fixture. The carriage-return
   // fixture is a renderer-level case: the readers normalise CR to LF (italgiure:v4), so none
   // reaches a page, and the sanitiser's re-serialisation would read one as a line feed. A decision
@@ -399,10 +413,17 @@ describe('DecisionReadingSurface — the key passages', () => {
     expect(container.querySelector('.key-passages-hidden')).toBeNull();
   });
 
-  it('lists them under «Passaggi chiave» with the legend, and takes the reader to one', async () => {
+  it('lists them under «Passaggi chiave» with the legend, and takes the reader to one, moving its scroller alone', async () => {
+    const intoView = vi.fn();
+    Element.prototype.scrollIntoView = intoView;
+    // the text in a column that scrolls on its own, as the dossier's (D7d)
+    render(<div data-testid="column" style={{ overflowY: 'auto' }}><DecisionReadingSurface identity={IDENTITY} testo={WITH_PASSAGES} attributi={{}} /></div>);
     const scroll = vi.fn();
-    Element.prototype.scrollIntoView = scroll;
-    mount();
+    const column = screen.getByTestId('column');
+    column.scrollTo = scroll as unknown as HTMLElement['scrollTo'];
+    // its text taller than it (jsdom lays nothing out)
+    Object.defineProperty(column, 'clientHeight', { value: 600 });
+    Object.defineProperty(column, 'scrollHeight', { value: 3000 });
     fireEvent.click(screen.getByRole('button', { name: 'Passaggi chiave (2), evidenziati automaticamente' }));
     const menu = screen.getByRole('menu');
     expect(menu).toHaveAccessibleDescription('Evidenziati automaticamente: non sono le tue evidenziazioni.');
@@ -411,7 +432,8 @@ describe('DecisionReadingSurface — the key passages', () => {
     expect(entries[1]).toBe('Dispositivo — «La Corte accoglie il ricorso»');
     expect(entries[2]).toBe('Nascondi i passaggi chiave');
     await act(async () => { fireEvent.click(within(menu).getAllByRole('menuitem')[0]); });
-    expect(scroll).toHaveBeenCalled();
+    expect(scroll).toHaveBeenCalledOnce();
+    expect(intoView).not.toHaveBeenCalled();
     expect(await screen.findByRole('dialog', { name: 'Principio di diritto, evidenziato automaticamente' })).toBeInTheDocument();
   });
 
