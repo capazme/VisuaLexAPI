@@ -17,7 +17,7 @@ interface BoundaryState {
 /**
  * A page whose code cannot be fetched (a connection that dropped, a file a deploy removed) or that fails while in use:
  * the layout stays, and the page's place says so with words the app already has, «Si è verificato un errore.» and
- * «Riprova», which reloads (what mends a file a deploy removed). On `develop` the whole app went blank.
+ * «Riprova», which reloads (what mends a file a deploy removed). Before P1 no boundary held it, and the app went blank.
  */
 class Boundary extends Component<BoundaryProps, BoundaryState> {
   state: BoundaryState = { failed: false, at: null };
@@ -38,7 +38,7 @@ class Boundary extends Component<BoundaryProps, BoundaryState> {
   render() {
     if (!this.state.failed) return this.props.children;
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 p-6 text-center">
+      <div className="flex h-full min-h-[60vh] flex-col items-center justify-center gap-3 p-6 text-center">
         <p className="text-base text-slate-700 dark:text-slate-300">Si è verificato un errore.</p>
         <button type="button" onClick={() => window.location.reload()} className={cn(buttonClassName('primary', 'lg'), 'mt-2')}>
           Riprova
@@ -48,16 +48,21 @@ class Boundary extends Component<BoundaryProps, BoundaryState> {
   }
 }
 
+/** A page's failure kept to its place (`Boundary`), for the address it failed at. */
+export function PageBoundary({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation();
+  return <Boundary pathname={pathname}>{children}</Boundary>;
+}
+
 /**
- * Where a route's page is drawn (`Layout`'s outlet, the public «Crediti»): its code loaded with the route (`pageCode.ts`)
- * waits with nothing in its place, so nothing stays once it is there; a navigation keeps the page it leaves until the
- * new one is ready (the router renders it in a transition), and a failure is `Boundary`'s.
+ * Where the layout draws a route's page (`Layout`'s outlet): its code loaded with the route (`pageCode.ts`) waits with
+ * nothing in its place, so nothing stays once it is there; a navigation keeps the page it leaves until the new one is
+ * ready (the router renders it in a transition, and this boundary is already on screen); a failure is `Boundary`'s.
  */
 export function RoutePage({ children }: { children: ReactNode }) {
-  const { pathname } = useLocation();
   return (
-    <Boundary pathname={pathname}>
+    <PageBoundary>
       <Suspense fallback={null}>{children}</Suspense>
-    </Boundary>
+    </PageBoundary>
   );
 }

@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 
 const auth = vi.fn();
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => auth() }));
-vi.mock('../../features/connections', () => ({ ConnectedAppsSection: () => null }));
+vi.mock('../../features/connections/ConnectedAppsSection', () => ({ ConnectedAppsSection: () => null }));
 vi.mock('../../services/accountService', () => ({ accountService: {} }));
 
 import { SettingsModal } from './SettingsModal';

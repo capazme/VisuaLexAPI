@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
  * Whether the page's title (the first `h1` in the content scroller) is in sight under the phone's bar (G8): while it
  * is, the bar shows no name; scrolled out from under the bar, the bar names the page — the large titles of iOS.
  * An `IntersectionObserver` on the title with the scroller as its root and the bar's height taken off its top; a
- * `MutationObserver` finds the title again when the page draws it later (a route loaded on demand) or replaces it. A
+ * `MutationObserver` finds the title again when the page draws it later (a route loaded on demand: nothing is said
+ * while nothing is drawn) or replaces it. A
  * page with no `h1` reads as out of sight, so the bar names the page; so does a browser with no `IntersectionObserver`,
  * where the bar would otherwise stay empty.
  */
@@ -28,6 +29,9 @@ export function usePageTitleInView(scroller: HTMLElement | null, { enabled, rese
       observer?.disconnect();
       observer = null;
       if (!title) {
+        // Nothing drawn yet (a page loaded with its route, on its way): no answer, so the bar does not name the page
+        // only to clear it a moment later, when the title arrives in sight.
+        if (!scroller.firstElementChild?.firstElementChild) return;
         say(false);
         return;
       }
