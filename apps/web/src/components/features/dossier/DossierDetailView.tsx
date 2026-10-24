@@ -427,7 +427,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
       }));
       const blocks = buildPdfBlocks(dossier.items, texts, titles, { excerpts, marks, decisions });
 
-      const doc = writeDossierPdf(
+      const doc = await writeDossierPdf(
         { title: dossier.title, description: dossier.description, tags: dossier.tags, countsLine: pdfCountsLine(dossier.items, chosen), exportedOn: new Date().toLocaleDateString('it-IT') },
         blocks,
       );

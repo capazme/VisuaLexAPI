@@ -37,13 +37,13 @@ const drawn = () => calls
 const section = (...decisions: PdfDecision[]): PdfBlock[] => [{ kind: 'decisions', heading: 'Giurisprudenza', decisions }];
 
 describe('writeDossierPdf — «Giurisprudenza»', () => {
-  it('draws the decision as its own PDF does, headings in the dossier\'s face and the paragraphs in times', () => {
+  it('draws the decision as its own PDF does, headings in the dossier\'s face and the paragraphs in times', async () => {
     const model = decisionPdfModel(FOUND, {
       consultedOn: '2026-10-13',
       annotations: { highlights: [{ id: 'h', text: 'Secondo', startOffset: 'Primo paragrafo della motivazione.'.length } as never], notes: [{ id: 'f', text: 'Da rileggere' } as never] },
     });
     calls.length = 0;
-    writeDossierPdf(HEADER, section({ citation: 'Corte cost., n. 71/2020', model, excerpt: null }));
+    await writeDossierPdf(HEADER, section({ citation: 'Corte cost., n. 71/2020', model, excerpt: null }));
     const lines = drawn();
     // The header's band and the one painted mark.
     expect(lines.filter((l) => l.startsWith('rect'))).toHaveLength(2);
@@ -67,19 +67,19 @@ describe('writeDossierPdf — «Giurisprudenza»', () => {
     expect(lines.filter((l) => l.startsWith('setFont')).join('|')).toContain('times normal');
   });
 
-  it('says a decision that could not be read has no text available', () => {
+  it('says a decision that could not be read has no text available', async () => {
     calls.length = 0;
-    writeDossierPdf(HEADER, section({ citation: 'Corte cost., n. 71/2020', model: null, excerpt: null }));
+    await writeDossierPdf(HEADER, section({ citation: 'Corte cost., n. 71/2020', model: null, excerpt: null }));
     const text = drawn().filter((l) => l.startsWith('text')).join('\n');
     expect(text).toContain('Giurisprudenza');
     expect(text).toContain('Corte cost., n. 71/2020');
     expect(text).toContain(PDF_TEXT_UNAVAILABLE);
   });
 
-  it('«solo le parti»: the passages, their notes and the gaps, and no other text of the decision', () => {
+  it('«solo le parti»: the passages, their notes and the gaps, and no other text of the decision', async () => {
     const model = decisionPdfModel(FOUND, { consultedOn: '2026-10-13', annotations: { highlights: [], notes: [] } });
     calls.length = 0;
-    writeDossierPdf(HEADER, section({
+    await writeDossierPdf(HEADER, section({
       citation: 'Corte cost., n. 71/2020', model,
       excerpt: [{ kind: 'gap' }, { kind: 'passage', text: 'motivazione.\nSecondo', notes: ['Una nota'] }, { kind: 'gap' }],
     }));
@@ -92,10 +92,10 @@ describe('writeDossierPdf — «Giurisprudenza»', () => {
     expect(text.some((t) => t.includes('Primo paragrafo'))).toBe(false);
   });
 
-  it('marks that could not be read are said to be unavailable, for an article and for a decision, never «nothing marked»', () => {
+  it('marks that could not be read are said to be unavailable, for an article and for a decision, never «nothing marked»', async () => {
     const model = decisionPdfModel(FOUND, { consultedOn: '2026-10-13', annotations: { highlights: [], notes: [] } });
     calls.length = 0;
-    writeDossierPdf(HEADER, [
+    await writeDossierPdf(HEADER, [
       { kind: 'act', heading: 'Codice civile', title: null, articles: [
         { label: 'art. 1', notes: [], rubrica: null, versionLabel: null, text: 'x', missing: 'none', excerpt: [], marksUnavailable: true },
       ] },
@@ -106,19 +106,19 @@ describe('writeDossierPdf — «Giurisprudenza»', () => {
     expect(text).not.toContain('Nessuna parte evidenziata o annotata');
   });
 
-  it('a decision carries its source and the day it was read', () => {
+  it('a decision carries its source and the day it was read', async () => {
     const model = decisionPdfModel(FOUND, { consultedOn: '2026-10-13', annotations: { highlights: [], notes: [] } });
     calls.length = 0;
-    writeDossierPdf(HEADER, section({ citation: 'c', model, excerpt: null }));
+    await writeDossierPdf(HEADER, section({ citation: 'c', model, excerpt: null }));
     const text = drawn().filter((l) => l.startsWith('text')).map((l) => l.replace(/^text \S+ /, ''));
     expect(text).toContain(model.footer);
     expect(model.footer).toMatch(/^Fonte: Corte costituzionale — dati aperti · consultata il 13 ottobre 2026$/);
   });
 
-  it('a text with no marked passage says so, for an article and for a decision', () => {
+  it('a text with no marked passage says so, for an article and for a decision', async () => {
     const model = decisionPdfModel(FOUND, { consultedOn: '2026-10-13', annotations: { highlights: [], notes: [] } });
     calls.length = 0;
-    writeDossierPdf(HEADER, [
+    await writeDossierPdf(HEADER, [
       { kind: 'act', heading: 'Codice civile', title: null, articles: [
         { label: 'art. 1', notes: [], rubrica: null, versionLabel: null, text: 'x', missing: 'none', excerpt: [] },
       ] },
