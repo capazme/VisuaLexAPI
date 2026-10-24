@@ -9,7 +9,7 @@ import { changeMessage, compareNormaSnapshots } from '../utils/normaWatcher';
 const checkNormaSchema = z.object({
   normaKey: z.string().min(1).max(500),
   normaData: z.object({
-    norma_data: z.record(z.unknown()),
+    norma_data: z.record(z.string(), z.unknown()),
     article_text: z.string().max(2 * 1024 * 1024),
   }),
 });

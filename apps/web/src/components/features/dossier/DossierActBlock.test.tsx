@@ -50,6 +50,17 @@ describe('DossierActBlock', () => {
     expect(screen.getByText('Doveri e deontologia')).toBeInTheDocument();
   });
 
+  it('sizes its header by its own width, not the window\'s: in the left column of two (D7a) the name wraps and the actions keep their icons', () => {
+    renderBlock([item('3')]);
+    const section = screen.getByRole('region', { name: L247 });
+    expect(section).toHaveClass('@container');
+    expect(screen.getByText(L247)).toHaveClass('break-words', '@2xl:truncate');
+    expect(screen.getByRole('heading', { name: `${L247} 1 articolo` })).toHaveClass('flex-wrap', '@2xl:flex-nowrap');
+    for (const words of ['Apri tutto', 'Articoli']) expect(screen.getByText(words)).toHaveClass('hidden', 'lg:@2xl:inline');
+    // The names stay whole for a screen reader.
+    expect(screen.getByRole('button', { name: `Apri tutto ${L247} su Dashboard` })).toBeInTheDocument();
+  });
+
   it('heads an act the server has not named yet with the muted fallback', () => {
     renderBlock([item('3', null)]);
     const toggle = screen.getByRole('button', { name: 'legge n. 247' });

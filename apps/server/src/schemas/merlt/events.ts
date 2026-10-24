@@ -11,10 +11,10 @@ import { z } from 'zod';
 // 1. article:viewed
 export const articleViewedRequestSchema = z.object({
   articleUrn: z.string().min(1, 'articleUrn is required'),
-  normaVisitataId: z.string().uuid().optional(),
+  normaVisitataId: z.string().guid().optional(),
   dwellMs: z.number().int().nonnegative(),
   scrollMaxPct: z.number().min(0).max(100),
-  sessionId: z.string().uuid(),
+  sessionId: z.string().guid(),
 });
 export type ArticleViewedRequest = z.infer<typeof articleViewedRequestSchema>;
 
@@ -34,7 +34,7 @@ export type HighlightAnnotationRequest = z.infer<typeof highlightAnnotationReque
 export const dossierBookmarkRequestSchema = z.object({
   kind: z.enum(['dossier', 'bookmark']),
   articleUrn: z.string().min(1),
-  dossierId: z.string().uuid().optional(),
+  dossierId: z.string().guid().optional(),
   tags: z.array(z.string()).max(20).optional(),
 });
 export type DossierBookmarkRequest = z.infer<typeof dossierBookmarkRequestSchema>;
@@ -52,7 +52,7 @@ export type CitationClickedRequest = z.infer<typeof citationClickedRequestSchema
 // An older client's `originalAuthorId` is stripped here, never relayed.
 export const forumSignalRequestSchema = z.object({
   action: z.enum(['like', 'download', 'suggestion_accepted', 'suggestion_declined']),
-  sharedEnvId: z.string().uuid(),
+  sharedEnvId: z.string().guid(),
 });
 export type ForumSignalRequest = z.infer<typeof forumSignalRequestSchema>;
 

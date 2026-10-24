@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import type { User } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
+import { atLeastUnits } from '../utils/utf16Length';
 import { hashPassword, verifyPassword } from '../utils/password';
 import { generateAccessToken, generateRefreshToken, verifyToken, verifyTokenType } from '../utils/jwt';
 import { AppError } from '../middleware/errorHandler';
@@ -16,7 +17,7 @@ const passwordErrorMessage = 'Password must be at least 8 characters with 1 uppe
 const registerSchema = z.object({
   email: z.string().email(),
   username: z.string().min(3).max(50),
-  password: z.string().min(8).regex(passwordRegex, passwordErrorMessage),
+  password: z.string().refine(...atLeastUnits(8)).regex(passwordRegex, passwordErrorMessage),
 });
 
 const loginSchema = z.object({
@@ -30,7 +31,7 @@ const refreshSchema = z.object({
 
 const changePasswordSchema = z.object({
   current_password: z.string(),
-  new_password: z.string().min(8).regex(passwordRegex, passwordErrorMessage),
+  new_password: z.string().refine(...atLeastUnits(8)).regex(passwordRegex, passwordErrorMessage),
 });
 
 // Strict on purpose: an extra key (`devModeAllowed` above all) is refused, not stripped.

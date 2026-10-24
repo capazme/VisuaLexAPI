@@ -275,6 +275,23 @@ describe('ForumExploreView - the order of the page', () => {
     expect(screen.getByRole('region', { name: 'Pronti da VisuaLex' })).toBe(packs);
   });
 
+  // P1: the count's line came with the read and moved the cards down 44 px (CLS 0.12 on a phone), and the cards held in
+  // place were shorter than those that came (0.04 at 1920).
+  it('keeps the count\'s line, empty, and cards of the final height while the read travels, so nothing moves when it comes', () => {
+    setDesktop(true);
+    const { container, unmount } = renderView({ loading: true, environments: [], pagination: { page: 1, pages: 1, total: 0 } });
+    const held = container.querySelector('p[aria-hidden]');
+    expect(held).toHaveClass('h-5');
+    expect(held).toHaveTextContent('');
+    expect(screen.queryByText(/dossier pubblicat/)).toBeNull();
+    const placeholder = container.querySelector('.motion-safe\\:animate-pulse');
+    expect(placeholder).toHaveClass('min-h-[16.75rem]', 'md:min-h-[15.25rem]');
+    unmount();
+    const loaded = renderView({ environments: five, pagination: { page: 1, pages: 1, total: 5 } });
+    expect(screen.getByText('5 dossier pubblicati')).toHaveClass('text-sm');
+    expect(loaded.container.querySelector('p[aria-hidden].h-5')).toBeNull();
+  });
+
   it('heads the community\'s dossiers, for a screen reader, and «I più aggiunti» at the same level as the packs', async () => {
     setDesktop(false);
     listMock.mockResolvedValue({ data: [makeEnv('t1', 'Uno', 4)], pagination: { page: 1, limit: 3, total: 1, pages: 1 } });

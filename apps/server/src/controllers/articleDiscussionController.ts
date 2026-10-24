@@ -82,7 +82,7 @@ const createThreadSchema = anchorSchema.extend({
 const createCommentSchema = z.object({
   body: z.string({ message: 'Il testo è obbligatorio' }).trim().min(1, 'Il testo è obbligatorio')
     .max(10000, 'Il testo può avere al massimo 10000 caratteri'),
-  parentId: z.string().uuid('La risposta non è valida').optional().nullable(),
+  parentId: z.string().guid('La risposta non è valida').optional().nullable(),
 });
 
 const reportSchema = z.object({
