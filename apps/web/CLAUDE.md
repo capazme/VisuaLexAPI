@@ -6,7 +6,33 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
 
 ### Frontend (`apps/web/src`)
 
-- `App.tsx` — routing. In the signed-in layout: `/` (search), `/dossier`, `/opus` (the planner, below: `OpusPage`
+- `App.tsx` — routing. **Pages loaded with their route** (P1): Dossier, the Forum and its Community, Opus (its frame
+  and views in one fetch), «Analizza documento», the Cronologia, «Crediti» and «Collega un'app AI» are `lazy` routes,
+  as Gymnasium's, Academia's and the admin's were. Their modules are listed once in `pageCode.ts` (`PAGE_CODE`), which the routes,
+  the sidebar's entries (`preparePage`, as an entry is pointed at, touched or focused), the section switcher
+  (`SECTION_HOME_CODE`) and `main.tsx` (the address opened, fetched beside the sign-in check) share;
+  `pageCode.test.ts` refuses a static import of any of these pages by any path, and of a folder index that would
+  re-export one (the connections' was removed: «Collega un'app AI» was in it). Ricerca, the sign-in page, a
+  decision's address (`DecisionAddress`), `/connect` and «Pagina non trovata» stay in the first chunk. An address
+  opened directly fetches its lazy
+  page's code beside the first chunk, not after it: the build (`routePreload` in `vite.config.ts`, over
+  `ROUTE_PAGES`, which `pageCode.test.ts` keeps in step with `PAGE_CODE` and in the order of its prefixes) writes each
+  page's chunks into `assets/route-preload-<hash>.js` (~1.9 KB, outside the first chunk), which `index.html` loads
+  `async` and which adds a `modulepreload` for the address opened and no other. A file, not an inline script: the
+  ingress's Content-Security-Policy allows scripts from 'self' only (as `theme-boot.js`). Its name carries its hash,
+  so an `index.html` always names its own build's map and a cached older one is never asked for.
+  Inside the layout the lazy pages wait in `RoutePage` (`components/layout/RouteBoundary.tsx`, around `Layout`'s
+  outlet): a boundary on screen from the first draw, with nothing in the page's place, so nothing stays once it is
+  there, and a navigation keeps the screen it leaves until the new page is ready (the router renders it in a
+  transition; a boundary mounted with the new page would show its fallback at once). «Crediti», outside the layout,
+  has no `Suspense` above it: it suspends the root, so opened by its address the splash of `index.html` stays until it
+  is there, and moved to from the app the router's transition keeps the screen it leaves. The phone's bar names
+  nothing while nothing is drawn (`usePageTitleInView`), and names the page if it then draws no `h1` (the error). A
+  page whose code cannot be fetched, or that fails in use, keeps the layout and says «Si è verificato un errore.» with
+  «Riprova», which reloads (the one mend for a file a deploy removed; before P1 no boundary held it and the app went
+  blank); any new navigation draws the page again (`useLocation().key`: the same address with another query, or its
+  entry chosen again, included).
+  In the signed-in layout: `/` (search), `/dossier`, `/opus` (the planner, below: `OpusPage`
   over `oggi`, `prossimi`, `ingresso` and `cestino`; `/opus` redirects to `oggi`),
   `/studia` (VisuaLex Gymnasium, the study cards; the code keeps the name `studia`: `StudiaPage` with its views under
   `components/features/studia/`, `studiaService`; behind `VITE_FEATURE_STUDIA`, default on
@@ -291,8 +317,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   it synchronous), so the old page's picture holds for the new title, at most `HOLD_MAX` (150 ms), watched by a
   `MutationObserver` — the browser draws no frame, so no `requestAnimationFrame`, while the update is pending. A heading
   that already named the section before the swap (the dossier list's says the kind it last listed) is not taken until
-  that hold is over. The pages loaded on demand (Gymnasium's, Academia's) are fetched when the switcher opens
-  (`SECTION_HOME_CODE`, when the menu opens), or the first change would hold and fade into «Caricamento…». The
+  that hold is over. The pages loaded on demand (Opus's, Gymnasium's, Academia's, the Forum's) are fetched when the
+  switcher opens (`SECTION_HOME_CODE`), or the first change would play over the page it leaves (Opus, the Forum) or
+  fade into «Caricamento…» (Gymnasium, Academia), the new page coming after the hold. The
   switcher's mark passes to the new hue in 200 ms (`transition-colors duration-200`), the change's one touch of colour;
   the sidebar's new entries fade in, the first six 20 ms apart, the old ones simply go (`useEntriesEntrance`, Web
   Animations, opacity only, never on the sidebar's first draw). The section's entries are a `LayoutGroup` of their

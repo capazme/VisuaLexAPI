@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 // ---- mocks (hoisted) ----
@@ -26,6 +26,13 @@ vi.mock('../../../hooks/useForumNotifications', () => ({
 vi.mock('../../../store/useAppStore', () => ({
   useAppStore: (selector: (s: unknown) => unknown) =>
     selector({ quickNorms: [] }),
+}));
+
+// The pages loaded with their route: what the entries ask to fetch ahead.
+const prepared = vi.hoisted(() => ({ paths: [] as string[] }));
+vi.mock('../../../pageCode', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../pageCode')>()),
+  preparePage: (path: string) => { prepared.paths.push(path); },
 }));
 
 import { Sidebar } from '../Sidebar';
@@ -56,6 +63,20 @@ function navHrefs(): string[] {
 beforeEach(() => {
   isMerltEnabledMock.mockReturnValue(true);
   account.devMode = false;
+  prepared.paths = [];
+});
+
+describe('Sidebar — a page loaded with its route is fetched ahead (P1)', () => {
+  it('as its entry is pointed at, touched or focused', () => {
+    renderSidebar('/');
+    const dossier = screen.getAllByRole('link', { name: 'Dossier' })[0];
+    fireEvent.pointerEnter(dossier, { pointerType: 'mouse' });
+    expect(prepared.paths).toEqual(['/dossier']);
+    fireEvent.pointerDown(screen.getByRole('link', { name: 'Analizza documento' }));
+    expect(prepared.paths).toEqual(['/dossier', '/documents']);
+    fireEvent.focus(screen.getByRole('link', { name: /Ricerca/ }));
+    expect(prepared.paths).toEqual(['/dossier', '/documents', '/']);
+  });
 });
 
 // The MERL-T entries are Academia's, a section offered only in the development mode (sections spec S6, S12).

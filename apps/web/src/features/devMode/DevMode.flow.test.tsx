@@ -6,7 +6,7 @@ vi.mock('../../services/api', () => ({ get: vi.fn(), post: vi.fn(), put: vi.fn()
 vi.mock('../../hooks/useForumNotifications', () => ({
   useForumNotifications: () => ({ count: { total: 0, normaChanges: 0 }, markRead: vi.fn(), refetch: vi.fn() }),
 }));
-vi.mock('../connections', () => ({ ConnectedAppsSection: () => null }));
+vi.mock('../connections/ConnectedAppsSection', () => ({ ConnectedAppsSection: () => null }));
 vi.mock('../../services/accountService', () => ({ accountService: {} }));
 
 import { get, post, put } from '../../services/api';
