@@ -82,6 +82,9 @@ function routePreload(): Plugin {
 }
 
 // https://vitejs.dev/config/
+// The Python API: start.sh moves it off 5000 when VISUALEX_API_PORT says so (macOS AirPlay holds 5000).
+const PYTHON_API = `http://localhost:${process.env.VISUALEX_API_PORT || 5000}`
+
 export default defineConfig({
   plugins: [react(), routePreload()],
   // Pre-bundle the heavy graph lib at server start so the lazy GraphCanvas import
@@ -94,24 +97,24 @@ export default defineConfig({
     // A leading dot allows all subdomains, handy since ngrok-free URLs rotate.
     allowedHosts: ['*.ngrok-free.app', '.ngrok-free.app'],
     proxy: {
-      // Python API routes (port 5000)
-      '/fetch_norma_data': 'http://localhost:5000',
-      '/fetch_article_text': 'http://localhost:5000',
-      '/stream_article_text': 'http://localhost:5000',
-      '/fetch_brocardi_info': 'http://localhost:5000',
-      '/fetch_all_data': 'http://localhost:5000',
-      '/fetch_tree': 'http://localhost:5000',
-      '/fetch_rubriche': 'http://localhost:5000',
-      '/fetch_alias_catalog': 'http://localhost:5000',
-      '/fetch_decision': 'http://localhost:5000',
-      '/fetch_decision_pdf': 'http://localhost:5000',
-      '/search_decisions': 'http://localhost:5000',
-      '/search_eu_case_law': 'http://localhost:5000',
-      '/parse_query': 'http://localhost:5000',
-      '/extract_citations': 'http://localhost:5000',
-      '/export_pdf': 'http://localhost:5000',
-      '/version': 'http://localhost:5000',
-      '/health': 'http://localhost:5000',
+      // Python API routes (port 5000, or VISUALEX_API_PORT from start.sh)
+      '/fetch_norma_data': PYTHON_API,
+      '/fetch_article_text': PYTHON_API,
+      '/stream_article_text': PYTHON_API,
+      '/fetch_brocardi_info': PYTHON_API,
+      '/fetch_all_data': PYTHON_API,
+      '/fetch_tree': PYTHON_API,
+      '/fetch_rubriche': PYTHON_API,
+      '/fetch_alias_catalog': PYTHON_API,
+      '/fetch_decision': PYTHON_API,
+      '/fetch_decision_pdf': PYTHON_API,
+      '/search_decisions': PYTHON_API,
+      '/search_eu_case_law': PYTHON_API,
+      '/parse_query': PYTHON_API,
+      '/extract_citations': PYTHON_API,
+      '/export_pdf': PYTHON_API,
+      '/version': PYTHON_API,
+      '/health': PYTHON_API,
       // Node.js backend routes (port 3001)
       '/api': 'http://localhost:3001',
     }
