@@ -154,7 +154,7 @@ stack, with an active user: `E2E_EMAIL=… E2E_PASSWORD=… node apps/mcp/script
 
 | Symptom | Cause and fix |
 |---|---|
-| `Port 5000 in use` on a Mac | Usually macOS's AirPlay Receiver (`ControlCenter`), which comes back if killed: System Settings → General → AirDrop & Handoff → AirPlay Receiver off. |
+| `Port 5000 in use` on a Mac | Usually macOS's AirPlay Receiver (`ControlCenter`), which comes back if killed: System Settings → General → AirDrop & Handoff → AirPlay Receiver off, or move the Python API: `VISUALEX_API_PORT=5001 ./start.sh`. |
 | `Port 5000/3001/5173/3002 in use` | Another process holds it: find it with `lsof -i :5000`, stop it, start again. |
 | `prisma migrate deploy failed` | `DATABASE_URL` in `apps/server/.env` must point at `localhost:5436`, or the stack is down: `docker compose -f infra/compose.yml ps`. |
 | `Docker is not running` | Start Docker Desktop, wait until it says it is running, `./start.sh` again. |
