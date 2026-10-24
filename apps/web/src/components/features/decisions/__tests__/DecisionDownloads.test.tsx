@@ -20,11 +20,13 @@ vi.mock('jspdf', async (importOriginal) => {
 });
 
 // jsPDF that cannot be loaded (offline, or a chunk a deploy removed), when a test asks for it.
-const { failLoad } = vi.hoisted(() => ({ failLoad: { next: false } }));
+// Or held, for a test that acts while it loads.
+const { failLoad } = vi.hoisted(() => ({ failLoad: { next: false, held: null as Promise<void> | null } }));
 vi.mock('../../../../utils/loadJsPdf', async (importOriginal) => {
   const real = await importOriginal<typeof import('../../../../utils/loadJsPdf')>();
   return {
-    loadJsPdf: () => {
+    loadJsPdf: async () => {
+      if (failLoad.held) await failLoad.held;
       if (!failLoad.next) return real.loadJsPdf();
       failLoad.next = false;
       return Promise.reject(new Error('offline'));
@@ -48,6 +50,8 @@ const KEY = 'cassazione:civile:99999:2024';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  failLoad.next = false;
+  failLoad.held = null;
   appStore.setState({
     highlights: [], annotations: [],
     loadHighlightsForArticle: vi.fn(), loadAnnotationsForArticle: vi.fn(),
@@ -86,6 +90,20 @@ describe('DecisionDownloads', () => {
     fireEvent.click(button);
     await waitFor(() => expect(save).toHaveBeenCalledWith('Cass_civ_sez_III_n_99999_2024.pdf'));
     expect(screen.queryByText('Download non riuscito: riprova.')).not.toBeInTheDocument();
+  });
+
+  it('saves nothing when the reader leaves the decision while jsPDF loads', async () => {
+    let open = () => {};
+    failLoad.held = new Promise<void>((resolve) => { open = resolve; });
+    const view = render(<DecisionDownloads answer={FOUND} identity={FOUND.identita} />);
+    fireEvent.click(screen.getByRole('button', { name: /Scarica PDF/ }));
+    view.unmount();
+    open();
+    await failLoad.held;
+    await vi.dynamicImportSettled();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    failLoad.held = null;
+    expect(save).not.toHaveBeenCalled();
   });
 
   it('with the option, the decision\'s own highlights are in the PDF (and only those)', async () => {

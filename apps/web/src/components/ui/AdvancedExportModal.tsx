@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Download, Copy, Check, FileText, StickyNote, Highlighter, Scale, FileCode, FileType } from 'lucide-react';
 import type { jsPDF } from 'jspdf';
 import { loadJsPdf } from '../../utils/loadJsPdf';
@@ -51,6 +51,22 @@ export function AdvancedExportModal({
   const [copied, setCopied] = useState(false);
   // The PDF waits for jsPDF the first time: the button turns its icon into a spinner, its words as they are.
   const [writingPdf, setWritingPdf] = useState(false);
+  // A PDF that could not be written (jsPDF not loaded: offline, or a chunk a deploy removed) says so with the
+  // decision's words; the next export tries again.
+  const [pdfFailed, setPdfFailed] = useState(false);
+  // Open and mounted: a host that closes or unmounts the modal while jsPDF loads (StudyMode's Esc leaves the
+  // whole mode) cancels the download.
+  const live = useRef(isOpen);
+  useEffect(() => {
+    live.current = isOpen;
+    return () => { live.current = false; };
+  }, [isOpen]);
+
+  const close = () => {
+    if (writingPdf) return;
+    setPdfFailed(false);
+    onClose();
+  };
 
   const toggleSection = (id: string) => {
     setSections(prev => prev.map(s => (s.id === id ? { ...s, enabled: !s.enabled } : s)));
@@ -309,12 +325,15 @@ export function AdvancedExportModal({
       onClose();
     } else if (exportFormat === 'pdf') {
       setWritingPdf(true);
+      setPdfFailed(false);
       try {
         const doc = await buildPdf();
+        if (!live.current) return;
         doc.save(`VisuaLex_${norma_data.tipo_atto.replace(/\s+/g, '_')}_Art${norma_data.numero_articolo}.pdf`);
         onClose();
       } catch (err) {
         console.error('PDF export failed:', err);
+        setPdfFailed(true);
       } finally {
         setWritingPdf(false);
       }
@@ -345,7 +364,7 @@ export function AdvancedExportModal({
   return (
     <Modal
       isOpen={isOpen}
-      onClose={() => { if (!writingPdf) onClose(); }}
+      onClose={close}
       size="lg"
       title="Esporta Articolo"
       description={shortNorm(norma_data)}
@@ -354,7 +373,7 @@ export function AdvancedExportModal({
       footer={
         <>
           <button
-            onClick={onClose}
+            onClick={close}
             disabled={writingPdf}
             className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
           >
@@ -525,6 +544,7 @@ export function AdvancedExportModal({
             </button>
           </div>
         </div>
+        {pdfFailed && <p role="alert" className="text-sm text-amber-800 dark:text-amber-200">Download non riuscito: riprova.</p>}
       </div>
     </Modal>
   );

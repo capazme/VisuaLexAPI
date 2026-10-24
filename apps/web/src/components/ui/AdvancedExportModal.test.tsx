@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 const pdfLines: string[] = [];
+const pdfSaves: string[] = [];
 
 vi.mock('jspdf', () => ({
   jsPDF: class {
@@ -16,7 +17,9 @@ vi.mock('jspdf', () => ({
     text(line: string) {
       pdfLines.push(line);
     }
-    save() {}
+    save(name: string) {
+      pdfSaves.push(name);
+    }
   },
 }));
 
@@ -33,6 +36,10 @@ function holdJsPdf() {
   gate.held = { promise, open, fail };
   return gate.held;
 }
+
+afterEach(() => {
+  gate.held = null;
+});
 
 import { AdvancedExportModal } from './AdvancedExportModal';
 import type { ArticleData } from '../../types';
@@ -145,7 +152,36 @@ describe('AdvancedExportModal — nothing of Brocardi (D-078)', () => {
     held.open();
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
     expect(pdfLines).toContain('Qualunque fatto doloso o colposo.');
-    gate.held = null;
+  });
+
+  it('saves nothing when its host unmounts it while jsPDF loads (StudyMode\'s Esc leaves the whole mode)', async () => {
+    const held = holdJsPdf();
+    pdfSaves.length = 0;
+    const view = render(<AdvancedExportModal isOpen onClose={vi.fn()} articleData={articleData} annotations={[]} highlights={[]} />);
+    fireEvent.click(screen.getByRole('button', { name: 'PDF' }));
+    fireEvent.click(screen.getByRole('button', { name: /Scarica PDF/ }));
+    view.unmount();
+    held.open();
+    await held.promise;
+    await vi.dynamicImportSettled();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(pdfSaves).toEqual([]);
+  });
+
+  it('saves nothing when its host closes it while jsPDF loads', async () => {
+    const held = holdJsPdf();
+    pdfSaves.length = 0;
+    const onClose = vi.fn();
+    const view = render(<AdvancedExportModal isOpen onClose={onClose} articleData={articleData} annotations={[]} highlights={[]} />);
+    fireEvent.click(screen.getByRole('button', { name: 'PDF' }));
+    fireEvent.click(screen.getByRole('button', { name: /Scarica PDF/ }));
+    view.rerender(<AdvancedExportModal isOpen={false} onClose={onClose} articleData={articleData} annotations={[]} highlights={[]} />);
+    held.open();
+    await held.promise;
+    await vi.dynamicImportSettled();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(pdfSaves).toEqual([]);
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('when jsPDF cannot be loaded, gives the buttons back and stays open', async () => {
@@ -162,7 +198,12 @@ describe('AdvancedExportModal — nothing of Brocardi (D-078)', () => {
     expect(screen.getByRole('button', { name: 'Annulla' })).toBeEnabled();
     expect(onClose).not.toHaveBeenCalled();
     expect(error).toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('Download non riuscito: riprova.');
+    // The next export tries again and the words go.
     gate.held = null;
+    fireEvent.click(button);
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText('Download non riuscito: riprova.')).toBeNull();
     error.mockRestore();
   });
 });

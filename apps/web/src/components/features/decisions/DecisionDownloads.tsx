@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Download, FileText } from 'lucide-react';
 import { Button } from '../../ui/Button';
@@ -32,6 +32,12 @@ export function DecisionDownloads({ answer, identity }: { answer: FoundDecision;
   // Ours waits for jsPDF the first time: the button says so with its spinner, its words as they are.
   const [writing, setWriting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  // A reader that leaves the decision while jsPDF loads cancels the download.
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   // The reading surface loads them; a host without it would otherwise export nothing.
   useEffect(() => {
@@ -50,7 +56,8 @@ export function DecisionDownloads({ answer, identity }: { answer: FoundDecision;
     setWriting(true);
     try {
       const model = decisionPdfModel(answer, { consultedOn: todayInRome(), annotations: withMarks ? mine : undefined });
-      (await writeDecisionPdf(model)).save(model.fileName);
+      const doc = await writeDecisionPdf(model);
+      if (mounted.current) doc.save(model.fileName);
     } catch (error) {
       console.error('the decision PDF could not be written', error);
       setMessage('Download non riuscito: riprova.');
