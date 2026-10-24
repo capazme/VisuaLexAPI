@@ -104,7 +104,8 @@ let loading: Promise<typeof makeDriver> | null = null;
 
 /** driver.js and its stylesheet, fetched when a tour first starts and kept for the next: most visits show none, and
  *  they were in the chunk every page loads. Its stylesheet lands after `index.css`, as before, which overrides it with
- *  more specific rules. A load that fails is tried again at the next tour. */
+ *  more specific rules. A load that fails is tried again at the next tour: that mends a dropped connection, not a file a
+ *  deploy removed, which stays missing until the page is reloaded. */
 function loadDriver(): Promise<typeof makeDriver> {
     loading ??= Promise.all([import('driver.js'), import('driver.js/dist/driver.css')]).then(
         ([module]) => module.driver,

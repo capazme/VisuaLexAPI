@@ -19,13 +19,34 @@ import { FindWindow } from '../features/search/FindWindow';
 import { GlobalSearch } from '../features/search/GlobalSearch';
 import { SearchField } from '../features/search/SearchField';
 import { closeFindWindow, isWorkspaceCovered, openFindWindow } from '../../utils/findWindowControl';
-import { closeCompare, forgetCompareOpened, useCompareOpened } from '../../hooks/useCompare';
+import { closeCompare, forgetCompareOpened, useCompare, useCompareOpened } from '../../hooks/useCompare';
+import { useTour } from '../../hooks/useTour';
+import { useConsentIfProvided } from '../../features/merlt/consent/useConsent';
+import { useAuth } from '../../hooks/useAuth';
+import { useServiceHealth } from '../../hooks/useServiceHealth';
+import { serviceHealthLabel, serviceHealthNeedsNotice } from '../../utils/serviceHealth';
+import { PluginSlot } from '../../plugins/PluginSlot';
+import { spring } from '../../lib/motion';
+import { SECTIONS, sectionForPath } from '../../features/sections/sections';
+import { sectionStore } from '../../features/sections/useSection';
+import { MenuToggle, PhoneTopBar } from './PhoneTopBar';
+import { phoneBarTitle } from './phoneBarTitle';
+import { useHideOnScroll } from './useHideOnScroll';
+import { openSearchMenu } from '../../utils/searchFieldControl';
+import { usePageTitleInView } from './usePageTitleInView';
+import { PlannerHost } from '../features/planner/PlannerHost';
+import { useMediaQuery } from '../../hooks/useIsDesktop';
+
 const loadCompareView = () => import('../features/compare/CompareView').then(m => ({ default: m.CompareView }));
 // A new one after a failed fetch: `lazy` keeps a failure for good.
 let CompareView = lazy(loadCompareView);
 
-/** The comparison's code that cannot be fetched (a tab left open across a deploy, the connection gone) closes the
- *  comparison instead of taking the page down; the next opening fetches it again. */
+/**
+ * The comparison's code that cannot be fetched, or an error of the comparison while in use, closes it instead of taking
+ * the page down (on `develop` the whole app went blank), the error in the console and no words on screen. The next
+ * opening fetches it again: that mends a connection that dropped, not a file a deploy removed, which stays missing until
+ * the page is reloaded (as for a lazy route).
+ */
 class CompareBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
 
@@ -44,22 +65,17 @@ class CompareBoundary extends Component<{ children: ReactNode }, { failed: boole
     return this.state.failed ? null : this.props.children;
   }
 }
-import { useTour } from '../../hooks/useTour';
-import { useConsentIfProvided } from '../../features/merlt/consent/useConsent';
-import { useAuth } from '../../hooks/useAuth';
-import { useServiceHealth } from '../../hooks/useServiceHealth';
-import { serviceHealthLabel, serviceHealthNeedsNotice } from '../../utils/serviceHealth';
-import { PluginSlot } from '../../plugins/PluginSlot';
-import { spring } from '../../lib/motion';
-import { SECTIONS, sectionForPath } from '../../features/sections/sections';
-import { sectionStore } from '../../features/sections/useSection';
-import { MenuToggle, PhoneTopBar } from './PhoneTopBar';
-import { phoneBarTitle } from './phoneBarTitle';
-import { useHideOnScroll } from './useHideOnScroll';
-import { openSearchMenu } from '../../utils/searchFieldControl';
-import { usePageTitleInView } from './usePageTitleInView';
-import { PlannerHost } from '../features/planner/PlannerHost';
-import { useMediaQuery } from '../../hooks/useIsDesktop';
+
+/** Where the comparison will stand while its code travels: only while it is open (closed meanwhile, nothing). */
+function CompareWaiting() {
+  const { isOpen } = useCompare();
+  if (!isOpen) return null;
+  return (
+    <div aria-hidden data-testid="compare-waiting" className={cn('pointer-events-none fixed inset-0 flex items-center justify-center', Z_INDEX.compare)}>
+      <span className="size-6 rounded-full border-2 border-primary-600 border-t-transparent animate-spin dark:border-primary-400 dark:border-t-transparent" />
+    </div>
+  );
+}
 
 export function Layout() {
   const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel, openCommandPalette } = useAppStore(useShallow(s => ({
@@ -434,16 +450,10 @@ export function Layout() {
       <FindWindow />
 
       {/* Heavy reader overlays are loaded only when their route/state needs them: the comparison on its first opening,
-          a spinner where it will stand while its code arrives. */}
+          a spinner where it will stand while its code arrives and it is open. */}
       {compareOpened && (
         <CompareBoundary>
-          <Suspense
-            fallback={
-              <div aria-hidden className={cn('pointer-events-none fixed inset-0 flex items-center justify-center', Z_INDEX.compare)}>
-                <span className="size-6 rounded-full border-2 border-primary-600 border-t-transparent animate-spin dark:border-primary-400 dark:border-t-transparent" />
-              </div>
-            }
-          >
+          <Suspense fallback={<CompareWaiting />}>
             <CompareView />
           </Suspense>
         </CompareBoundary>

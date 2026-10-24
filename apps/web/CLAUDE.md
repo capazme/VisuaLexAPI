@@ -1554,8 +1554,11 @@ the later text (G-357).
 a full-screen overlay (`data-find-overlay`) over two articles chosen from the practices, a search or the history.
 `Layout` mounts it — and so fetches its chunk — only from its first opening in the visit (`useCompareOpened`), a
 spinner where it will stand while the code arrives, and keeps it mounted after, as before (its full-screen choice
-survives a close). Its code that cannot be fetched (a tab left open across a deploy, the connection gone) closes the
-comparison instead of taking the page down (`CompareBoundary`), and the next opening fetches it again;
+survives a close); the spinner shows only while the comparison is open. Its code that cannot be fetched, or an error
+of the comparison in use, closes it instead of taking the page down (`CompareBoundary`; on develop the app went
+blank), the error in the console, no words on screen; the next opening asks for the code again, which mends a dropped
+connection but not a file a deploy removed (missing until the page is reloaded, as for a lazy route — and for driver.js
+and the study packs);
 `lazyModules.guard.test.ts` refuses a static import of any module of `features/compare/` outside it. The
 body is `CompareBody`: `compareArticles` (`utils/articleCompare.ts`, pure, ranges only) pairs the commi — by printed
 number, else by words, else by place (one lone comma facing one) — and labels them (invariato / modificato / riscritto / aggiunto / abrogato) when it is the same

@@ -66,7 +66,8 @@ let loaded: StudyPack[] | undefined;
 
 /**
  * The packs, read from `data/exampleEnvironments.ts` on the first request and kept for the next: ~60 KB that every
- * page would otherwise load, for a band only the Forum shows. A load that fails is tried again on the next request.
+ * page would otherwise load, for a band only the Forum shows. A load that fails is tried again on the next request:
+ * that mends a dropped connection, not a file a deploy removed, which stays missing until the page is reloaded.
  */
 export function loadStudyPacks(): Promise<StudyPack[]> {
   packs ??= import('../data/exampleEnvironments').then(

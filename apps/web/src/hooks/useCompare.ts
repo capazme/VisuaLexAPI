@@ -128,7 +128,8 @@ export function useCompareOpened(): boolean {
   return useSyncExternalStore(subscribeToOpened, () => opened);
 }
 
-/** The comparison's code could not be fetched: `Layout` unmounts it, and fetches it again at the next opening. */
+/** The comparison's code could not be fetched, or it failed in use: `Layout` unmounts it, and asks for it again at the
+ *  next opening. */
 export function forgetCompareOpened() {
   opened = false;
   notifyListeners();
