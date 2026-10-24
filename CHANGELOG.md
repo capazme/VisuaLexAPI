@@ -12,6 +12,56 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.10.2] - 2026-10-24
+
+The phone first: a lighter first load and no layout shift on «Oggi» and the
+Forum; decisions that open in place in the dossier, the goal's mark written in
+ink, accessibility, and a security update. No migration.
+
+### Performance
+
+- jsPDF loaded on the first export, out of the initial chunk (−126 KB gzip).
+- Tours, study packs and the comparison loaded when used (−19 KB gzip).
+- Pages loaded with their route; an address opened directly preloads its page
+  through a small map written at build time (−112 KB gzip on the first chunk).
+- Places held as tall as what takes them on «Oggi» and the Forum: CLS on a
+  phone from 0.63 and 0.12 to 0.
+- A page whose code cannot be fetched, or that fails while in use, keeps the
+  layout with «Si è verificato un errore.» and «Riprova»; the comparison closes.
+
+### Dossier
+
+- Decisions open in place like acts, in two columns from lg (D7a); each column
+  scrolls on its own, and a norm cited in a decision opens on the left when it
+  is in the dossier (D7d).
+- The header's labels never wrap inside their buttons; the row wraps as a row
+  (D3b). Touches: the task field's hint whole, a decision's name as a line.
+
+### Gymnasium
+
+- «Obiettivo raggiunto» as a mark written in ink, drawn once; no mark and no
+  «0 di 0» when the day counts with nothing to review (G9).
+- «Oggi» without missions keeps its columns, and the page's foot clears the
+  feedback button (G8c).
+- Three touches for a first use: the cards' search hint, «Torna alla ricerca»
+  on a missing card, a line on what a card is (Q1).
+
+### Readers
+
+- The citation matcher knows cod. nav., cod. post. and c.g.c.
+
+### Accessibility
+
+- «Confronta articoli» is a dialog: role, name, focus kept and returned; the
+  command palette opened above it keeps Tab. The open decision in a dossier is
+  a named region.
+
+### Security
+
+- zod 4.6.7 in the server and the MCP (removed from the web, unused);
+  body-parser 1.20.9 and 2.4.0; multer 2.5.0; fast-uri 3.1.9. Italian messages,
+  status codes and lengths as before.
+
 ## [1.10.1] - 2026-10-23
 
 The afternoon's design across the app, a fix for Gymnasium on the phone that
