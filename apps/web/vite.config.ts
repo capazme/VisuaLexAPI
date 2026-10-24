@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto'
 import { resolve } from 'node:path'
-import { defineConfig, type Plugin } from 'vite'
-import type { OutputBundle, OutputChunk } from 'rollup'
+import { defineConfig, type Plugin, type Rollup } from 'vite'
 import react from '@vitejs/plugin-react'
 
 /**
@@ -23,22 +22,27 @@ export const ROUTE_PAGES: ReadonlyArray<readonly [string, readonly string[]]> = 
  * that `index.html` loads `async`; read before the app starts, it adds a `modulepreload` for the address opened, and
  * for no other. A file, not an inline script: the ingress's Content-Security-Policy allows scripts from 'self' only
  * (as `theme-boot.js`). Its name carries its content's hash, as every asset's: an `index.html` always names the map of
- * its own build, so a map cached from an older deploy is never asked for.
+ * its own build, so a map cached from an older deploy is never asked for. Scripts only: the app has one stylesheet;
+ * a lazy page with CSS of its own would still be styled before it draws (Vite's loader waits for it), only later.
  */
 function routePreload(): Plugin {
   let base = '/'
+  let assetsDir = 'assets'
   return {
     name: 'visualex-route-preload',
     apply: 'build',
     configResolved(config) {
+      // An absolute base: the map is read on any address, and a relative one would point under it.
+      if (!config.base.startsWith('/')) throw new Error(`route-preload: needs an absolute base, not ${config.base}`)
       base = config.base
+      assetsDir = config.build.assetsDir
     },
     transformIndexHtml: {
       order: 'post',
       handler(html, ctx) {
-        const bundle = ctx.bundle as OutputBundle | undefined
+        const bundle = ctx.bundle
         if (!bundle) return html
-        const chunks = Object.values(bundle).filter((output): output is OutputChunk => output.type === 'chunk')
+        const chunks = Object.values(bundle).filter((output): output is Rollup.OutputChunk => output.type === 'chunk')
         const entry = chunks.find((chunk) => chunk.isEntry)
         if (!entry) return html
         const byName = new Map(chunks.map((chunk) => [chunk.fileName, chunk]))
@@ -64,7 +68,7 @@ function routePreload(): Plugin {
           + 'for(var i=0;i<m.length;i++){var r=m[i][0];if(p===r||p.indexOf(r+"/")===0){'
           + 'for(var j=0;j<m[i][1].length;j++){var l=document.createElement("link");l.rel="modulepreload";'
           + 'l.crossOrigin="";l.href=b+m[i][1][j];document.head.appendChild(l)}return}}})();\n'
-        const fileName = `assets/route-preload-${createHash('sha256').update(source).digest('hex').slice(0, 8)}.js`
+        const fileName = `${assetsDir}/route-preload-${createHash('sha256').update(source).digest('hex').slice(0, 8)}.js`
         bundle[fileName] = {
           type: 'asset', fileName, name: 'route-preload.js', names: ['route-preload.js'],
           originalFileName: null, originalFileNames: [], source, needsCodeReference: false,

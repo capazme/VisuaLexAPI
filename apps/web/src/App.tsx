@@ -2,8 +2,8 @@ import { BrowserRouter, Routes, Route, Navigate, Link, useLocation } from 'react
 import { Layout } from './components/layout/Layout';
 import { SearchPage } from './pages/SearchPage';
 import { AuthPage } from './pages/AuthPage';
-// In the first chunk (P1, measured): opened directly, Dossier and the Forum drew their largest text later when their
-// code came after it, even with that code preloaded beside it.
+// In the first chunk (P1, measured): opened directly, Dossier and the Forum's «Dossier pubblici» drew their largest
+// text later when their code came after it, even with that code preloaded beside it.
 import { DossierPage } from './components/features/dossier/DossierPage';
 import { BulletinBoardPage } from './components/features/bulletin/BulletinBoardPage';
 import { ConsentProvider } from './features/merlt/consent/ConsentContext';
@@ -22,8 +22,8 @@ import { PAGE_CODE } from './pageCode';
 import { lazy, Suspense } from 'react';
 
 // The pages loaded with their route (P1, `pageCode.ts`); Ricerca, the sign-in page, Dossier, the Forum's «Dossier
-// pubblici», a decision's address and «Pagina non trovata» stay in the first chunk. They wait in the layout's `RoutePage`, «Crediti» in the `Suspense` around the
-// routes: nothing in their place, a failure that keeps the app.
+// pubblici», a decision's address and «Pagina non trovata» stay in the first chunk. They wait in the layout's
+// `RoutePage`, «Crediti» in the `Suspense` around the routes: nothing in their place, a failure that keeps the app.
 const HistoryView = lazy(() => PAGE_CODE.history().then(m => ({ default: m.HistoryView })));
 const ForumCommunityPage = lazy(() => PAGE_CODE.community().then(m => ({ default: m.ForumCommunityPage })));
 const DocumentReviewPage = lazy(() => PAGE_CODE.documents().then(m => ({ default: m.DocumentReviewPage })));

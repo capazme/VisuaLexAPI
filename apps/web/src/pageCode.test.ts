@@ -68,15 +68,21 @@ describe('the pages loaded with their route (P1)', () => {
       modules: [...modules.matchAll(/'src\/([^']+)\.tsx?'/g)].map((m) => m[1]).sort(),
     }));
     // The map holds every page loaded with its route, each under the address `pageCodeFor` gives it.
-    expect(listed.length).toBe(Object.keys(PAGE_CODE).length);
     const pageCode = readFileSync(join(src, 'pageCode.ts'), 'utf8');
+    const keys: string[] = [];
     for (const { prefix, modules } of listed) {
       const loader = pageCodeFor(prefix);
       const key = Object.entries(PAGE_CODE).find(([, code]) => code === loader)?.[0];
       expect(key, prefix).toBeDefined();
+      keys.push(key!);
+      // The script takes the first prefix an address starts with: a more specific one must come before.
+      const opens = (path: string) => listed.find((entry) => path === entry.prefix || path.startsWith(`${entry.prefix}/`))?.prefix;
+      expect(opens(prefix), prefix).toBe(prefix);
+      expect(opens(`${prefix}/x`), prefix).toBe(prefix);
       const line = pageCode.split('\n').find((l) => l.trimStart().startsWith(`${key}:`)) ?? '';
       const imported = [...line.matchAll(/import\('\.\/([^']+)'\)/g)].map((m) => m[1]).sort();
       expect(imported, prefix).toEqual(modules);
     }
+    expect(keys.sort()).toEqual(Object.keys(PAGE_CODE).sort());
   });
 });
