@@ -1,11 +1,10 @@
 import type { Dossier, DossierItem, Environment, EnvironmentCategory, QuickNorm } from '../types';
-import { exampleEnvironments } from '../data/exampleEnvironments';
 
 /**
  * The ready-made study dossiers (spec 2026-10-13-environments-into-forum, D12; the owner's answer 188): each of the
  * 20 example packs of `data/exampleEnvironments.ts` gives its 2–4 dossiers as dossiers di studio, plus one more,
  * «‹pack›: articoli chiave», with the pack's quick-norm articles that none of them holds. No quick norm is created.
- * The packs' data stays where it is; this module reads it as packs.
+ * The packs' data stays where it is; this module reads it as packs, when they are first asked for (`loadStudyPacks`).
  */
 export interface StudyPack {
   /** Stable across loads (the data's ids are random): the pack's name. */
@@ -62,7 +61,30 @@ export function packFromEnvironment(env: Environment): StudyPack {
   };
 }
 
-export const STUDY_PACKS: StudyPack[] = exampleEnvironments.map(packFromEnvironment);
+let packs: Promise<StudyPack[]> | null = null;
+let loaded: StudyPack[] | undefined;
+
+/**
+ * The packs, read from `data/exampleEnvironments.ts` on the first request and kept for the next: ~60 KB that every
+ * page would otherwise load, for a band only the Forum shows. A load that fails is tried again on the next request:
+ * that mends a dropped connection, not a file a deploy removed, which stays missing until the page is reloaded.
+ */
+export function loadStudyPacks(): Promise<StudyPack[]> {
+  packs ??= import('../data/exampleEnvironments').then(
+    (module) => (loaded = module.exampleEnvironments.map(packFromEnvironment)),
+    (error: unknown) => {
+      packs = null;
+      throw error;
+    },
+  );
+  return packs;
+}
+
+/** The packs if they are loaded already, so a band drawn again (back on the Forum, a width that moves it) shows them at
+ *  once instead of its waiting cards. */
+export function peekStudyPacks(): StudyPack[] | undefined {
+  return loaded;
+}
 
 /** What `POST /dossiers/import-study` takes for a pack: its dossiers, nothing else. */
 export function packContent(pack: StudyPack) {

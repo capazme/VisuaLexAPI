@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { scrollParentOf } from '../practice/practiceView';
 import { Search, Upload, Filter, ChevronDown, RefreshCw, Users, TrendingUp, Clock, Download, Trophy, X as XIcon } from 'lucide-react';
 import { CARD_GRID, SharedEnvironmentCard } from './SharedEnvironmentCard';
@@ -95,7 +95,10 @@ export function ForumExploreView({
   // The community's dossiers first, the Forum's reason (S7a); VisuaLex's packs after them — on a computer after the
   // grid, on a phone after its first two cards, so the first screen shows what the community published.
   const desktop = useIsDesktop();
-  const packs = <StudyPacksBand category={category} onAdded={onPacksAdded} onError={onPacksError} />;
+  // The packs load after the band: the strip is there to be brought up only once they are shown.
+  const [packsShown, setPacksShown] = useState(false);
+  const showPacks = useCallback(() => setPacksShown(true), []);
+  const packs = <StudyPacksBand category={category} onAdded={onPacksAdded} onError={onPacksError} onShown={showPacks} />;
   const cards = (list: SharedEnvironment[], offset = 0) => (
     <div className={GRID}>
       {list.map((env, idx) => (
@@ -171,7 +174,7 @@ export function ForumExploreView({
     // Once: the fragment leaves the address (the router's state kept), so going back to Explore from another tab, or
     // reloading, neither scrolls to the strip again nor takes the focus.
     window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}`);
-  }, [loading]);
+  }, [loading, packsShown]);
   const skeleton = (count: number) => (
     <div aria-hidden className={GRID}>
       {[...Array(count)].map((_, i) => (
