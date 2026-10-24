@@ -722,7 +722,9 @@ checks the files; «termine calcolato» comes with wave 2 and its warning), and 
   client): `useTaskView` and the count log a status only.
 - **Adding**: `QuickAddField` at the top of each view (a title and Enter, at 16 px on a phone; «Dettagli» opens dates,
   priority and dossier in a `ui/Collapsible` under the row, the box growing, its arrow turning, Esc closing it — U1b;
-  a line says where the task goes; a task that will not show in the view is announced); «c» (as in «compito») from anywhere opens
+  a line says where the task goes; a task that will not show in the view is announced; the field keeps its hint whole,
+  12 em of its own 16 px text whatever the text size, never wider than its line, the ＋ with it, and on a row too narrow
+  for it and its two buttons — a phone — the buttons go under it, at the right); «c» (as in «compito») from anywhere opens
   `TaskDialog` (`PlannerHost`, mounted by `Layout`; not in a field, with a modifier, or under a dialog,
   a menu or a `data-find-overlay`), with the dossier chosen on `/dossier?dossier=` and today's date on «Oggi» and
   «Prossimi giorni»; a task the page will not list is announced, as from the field; listed in the «?» dialog. No date
@@ -1882,8 +1884,9 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   `DecisionReadingSurface`, never another, so notes, highlights and key passages work as anywhere and the text is the
   reader's, gotcha 23; asked for only once opened; a decision without its text opens too and `DecisionView` says how it
   came; «Apri la sentenza», the address, over it whatever came back. No tab holds it: no «Cerca nel testo», and a cited
-  norm or decision takes the reader to the workspace, `onLeave` (see «The host props»); its heading an h3 under
-  «Giurisprudenza», `DecisionView`'s `headingLevel`. The application that filed it is marked as an article's notes are,
+  norm or decision takes the reader to the workspace, `onLeave` (see «The host props»); the row names it, so inside
+  its full name is a quiet line of details, not a second and heavier title (`DecisionView`'s `title="line"`; the
+  practice keeps its h4). The application that filed it is marked as an article's notes are,
   `ClaudeMark` with `verb="aggiunta"` — «aggiunta da Claude Code», never «scritta» — from the item's own `createdBy`,
   on the grey line rather than at the right (a long citation beside it was squeezed into a column on a phone).
   No note count: the server takes a note about an article only, `assertArticleOfDossier`, and counting the notes and
@@ -1893,7 +1896,9 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   to its court's source, and leaves a decision open as it was; «Comprimi tutto» closes every row, the decisions too (in
   a dossier of decisions alone it is all the button offers, once one is open). The block of acts is hidden, still
   mounted, while no act is on screen. In two columns the
-  acts' headings are h3 under «Norme» (`headingLevel`), and the page keeps the same elements whatever the search leaves,
+  acts' headings are h3 under «Norme» (`headingLevel`); an act's header follows its own width (`@container`): narrower
+  than 42 rem (672 px at the default text size) its name wraps, its count following the name's last words on their line (not on a line of its own), its
+  actions keeping their icons only; and the page keeps the same elements whatever the search leaves,
   only their classes changing, so an open article is never remounted. The stored `etichetta` is a copy (source convention, D9):
   `decisionCitationOf` recomputes the citation from the identity and the attributes, every write
   sends it (`itemContentFor`, `serverItemFor`), the server recomputes it again on every write

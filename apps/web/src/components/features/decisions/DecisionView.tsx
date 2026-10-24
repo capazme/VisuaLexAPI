@@ -4,6 +4,7 @@ import { Button } from '../../ui/Button';
 import { SkeletonText } from '../../ui/Skeleton';
 import { Toast, type ToastProps } from '../../ui/Toast';
 import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
+import { cn } from '../../../lib/utils';
 import type { DecisionIdentity, DecisionReference, FetchDecisionAnswer, FoundDecision } from '../../../types/decisions';
 import {
   decisionPath,
@@ -33,8 +34,11 @@ export interface DecisionViewProps {
   textSlot?: React.ReactNode;
   /** Beside the reader's anchors when the decision was found without its text (general discussions). */
   noTextSlot?: React.ReactNode;
-  /** The decision's heading: h4 in the practice (under its h3), h3 in the dossier (under «Giurisprudenza», D7a). */
-  headingLevel?: 3 | 4;
+  /**
+   * `heading`: the decision named in full over it, an h4 (the practice's name is an h3). `line`: a host whose row already
+   * names it (the dossier, D7a) — the same words as a quiet line of details, never a second, heavier title.
+   */
+  title?: 'heading' | 'line';
 }
 
 function Alert({ children }: { children: React.ReactNode }) {
@@ -71,15 +75,15 @@ function DecisionChoice({ identity, onChoose, className, children }: {
   );
 }
 
-function FoundView({ answer, onToast, actions, textSlot, noTextSlot, headingLevel = 4 }: {
+function FoundView({ answer, onToast, actions, textSlot, noTextSlot, title = 'heading' }: {
   answer: FoundDecision;
   onToast: ShowToast;
   actions?: React.ReactNode;
   textSlot?: React.ReactNode;
   noTextSlot?: React.ReactNode;
-  headingLevel?: 3 | 4;
+  title?: 'heading' | 'line';
 }) {
-  const Heading = headingLevel === 3 ? 'h3' : 'h4';
+  const Title = title === 'line' ? 'p' : 'h4';
   // The source's own page, only ever over https: the address comes from our server, built on fixed
   // bases, so this is defence in depth.
   const sourceUrl = httpsUrl(answer.fonte.url);
@@ -98,15 +102,20 @@ function FoundView({ answer, onToast, actions, textSlot, noTextSlot, headingLeve
 
   return (
     <article className="space-y-5">
-      {/* h4: the practice's name is an h3 and the acts' titles are h4 too (h3 in the dossier). Focusable by script, so an
-          entry that takes over from one merged into it can put the reader's focus on the decision. */}
-      <Heading
-        tabIndex={-1}
+      {/* h4: the practice's name is an h3 and the acts' titles are h4 too; a line of details where the host's row names
+          the decision (`title`). Focusable by script, so an entry that takes over from one merged into it can put the
+          reader's focus on the decision. */}
+      <Title
+        // Only a heading is focused by script (`DecisionEntryView`); a line of details is not a stop.
+        tabIndex={title === 'line' ? undefined : -1}
         data-decision-heading
-        className="text-xl font-semibold text-slate-900 dark:text-white rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+        className={cn(
+          'rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+          title === 'line' ? 'text-sm text-slate-600 dark:text-slate-400' : 'text-xl font-semibold text-slate-900 dark:text-white',
+        )}
       >
         {formatDecisionHeading(answer.identita, answer.attributi)}
-      </Heading>
+      </Title>
       {answer.avvisi.map((notice, i) => (
         <Alert key={i}>{describeNotice(notice, answer.attributi)}</Alert>
       ))}
@@ -195,7 +204,7 @@ function unreachableMessage(fonte: string): string {
 
 /** The body of a decision, wherever it is drawn: a row, a window or the phone's reader. */
 export function DecisionView({
-  answer, reference, onRetry, onChooseCandidate, onOpenPalette, actions, textSlot, noTextSlot, headingLevel,
+  answer, reference, onRetry, onChooseCandidate, onOpenPalette, actions, textSlot, noTextSlot, title,
 }: DecisionViewProps) {
   const [toast, setToast] = useState<{ message: string; type: ToastProps['type'] } | null>(null);
   const linkClass = `inline-flex items-center text-primary-600 hover:underline dark:text-primary-400 ${TOUCH_TARGET_RESPONSIVE}`;
@@ -225,7 +234,7 @@ export function DecisionView({
         actions={actions}
         textSlot={textSlot}
         noTextSlot={noTextSlot}
-        headingLevel={headingLevel}
+        title={title}
       />
     );
   } else if (answer.esito === 'ambigua') {
