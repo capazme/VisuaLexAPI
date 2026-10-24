@@ -1,9 +1,10 @@
-import { useEffect, type ReactNode, type RefObject } from 'react';
+import { useContext, useEffect, type ReactNode, type RefObject } from 'react';
 import { getUpdateNoteParagraphs } from '../../../utils/articleStructure';
 import type { CompareSide } from '../../../utils/articleCompare';
 import { useArticleTextInteractions } from '../../../hooks/useArticleTextInteractions';
 import { UpdateNotePopover } from '../search/UpdateNotePopover';
 import type { SideText } from './compareLayout';
+import { CompareDialogRoot } from './compareDialogRoot';
 
 /**
  * The update notes: a «(119)» opens its AGGIORNAMENTO note and the folded tail of each column
@@ -17,6 +18,8 @@ export function useCompareNotes(
   texts: Partial<Record<CompareSide, SideText>>,
 ): { updatesOpen: boolean; notePopover: ReactNode } {
   const { updatesOpen, openNote, closeNote } = useArticleTextInteractions(rootRef, resetKey, { contentKey });
+  // The note is drawn inside the comparison's dialog, not in the body (`CompareDialogRoot`).
+  const dialogRoot = useContext(CompareDialogRoot);
 
   // Every tail has a toggle; the hook keeps the first one's aria-expanded in step.
   useEffect(() => {
@@ -35,6 +38,7 @@ export function useCompareNotes(
         paragraphs={getUpdateNoteParagraphs(text.raw, note)}
         anchorEl={openNote.anchorEl}
         onClose={closeNote}
+        portalRoot={dialogRoot}
       />
     ) : null;
   return { updatesOpen, notePopover };

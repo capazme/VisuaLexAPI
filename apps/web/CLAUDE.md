@@ -591,9 +591,12 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `SegmentedControl` (a choice in a form: the card's kind, a relation's end) slides a pill too, without the keyboard,
   reduced motion or a row's own `LayoutGroup`: U1 folds it in.
   `Modal` is portaled to `document.body`, so a dialog opened inside a reading window
-  (transformed, stacked) is not confined to it; each open `Modal` and `WireConfirm` is on a module-level
+  (transformed, stacked) is not confined to it; each open `Modal`, `WireConfirm` and `CompareView` is on a module-level
   stack (`ui/dialogStack.ts`) and only the top-most handles Tab (its focus trap, on `document`) and Esc, so a dialog opened
-  from a dialog keeps the keyboard.
+  from a dialog keeps the keyboard. `Modal` and `CompareView` share that focus (`ui/useDialogFocus.ts`): the stack, the
+  Tab trap, the focus given 50 ms after opening (to «Chiudi» unless told otherwise) and back to what had it on closing.
+  `CommandPalette` keeps its own focus (floating-ui's) but takes its place on the stack while open: ⌘K over a dialog
+  (the comparison) leaves Tab and Esc to the palette, whose box is portalled to the body, outside the dialog.
   `Button` has four variants (spec `2026-10-18-redesign-inchiostro` §5.1): `primary` (toga-600, white),
   `secondary` (paper with an ink-200 hairline), `quiet` (text only) and `danger` (red-600) — `ghost` and
   `outline` are the earlier names of `quiet` and `secondary` —, no gradient, glow or hover lift, a minimum
@@ -1608,7 +1611,17 @@ its column and the article is still compared). It only informs: «Vedi il testo 
 the later text (G-357).
 
 **«Confronta articoli»** (`features/compare/CompareView`, spec `docs/superpowers/specs/2026-10-13-compare-articles-design.md`):
-a full-screen overlay (`data-find-overlay`) over two articles chosen from the practices, a search or the history.
+a full-screen overlay (`data-find-overlay`) over two articles chosen from the practices, a search or the history; a
+modal dialog in ARIA terms (`role="dialog"`, `aria-modal`, named by its title «Confronta articoli»), with `Modal`'s focus
+(`useDialogFocus`: the focus on «Chiudi il confronto» as it opens, Tab kept inside, the focus back as it closes; Esc
+only when it is the top-most and nothing inside took it) but not its scroll lock, and, as `Modal`, it does not make the
+page behind inert: what keeps the keyboard out of the page is the trap alone. The dialog is the whole layer, backdrop included, not only the panel: what it
+opens is portalled there, not in the body (`CompareDialogRoot`: the update notes' `UpdateNotePopover`, `portalRoot`),
+since a modal dialog hides from a screen reader what lies outside it and its trap would pull the focus out; on the
+layer the note is bounded by the window, not cut by the panel's edge. A popover portalled inside a dialog keeps its
+own Tab (`useDialogFocus` leaves a focus inside `[data-floating-ui-portal]` to floating-ui's guards, which hand it to
+the next tabbable after the popover's place, else its reference); should that be outside the dialog, the focus comes
+back to the dialog's first control.
 `Layout` mounts it — and so fetches its chunk — only from its first opening in the visit (`useCompareOpened`), a
 spinner where it will stand while the code arrives, and keeps it mounted after, as before (its full-screen choice
 survives a close); the spinner shows only while the comparison is open. Its code that cannot be fetched, or an error
@@ -1905,8 +1918,9 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   Dashboard» there, still goes straight to Dashboard. The links take no keyboard focus, here as anywhere in the
   reader, so the keyboard reaches neither way (as before D7d). The acts' «⋯» opens upwards when the column has no room
   below (`MenuButton`'s `placement="auto"`). The row names the decision, so inside its full name is a quiet line of
-  details, not a second and heavier title (`DecisionView`'s `title="line"`; the practice keeps its h4). The application
-  that filed it is marked as an article's notes are,
+  details, not a second and heavier title (`DecisionView`'s `title="line"`; the practice keeps its h4), and the
+  opened decision is a region named by the row's citation (`aria-labelledby`, no new words on screen), so a screen
+  reader still finds it by its name. The application that filed it is marked as an article's notes are,
   `ClaudeMark` with `verb="aggiunta"` — «aggiunta da Claude Code», never «scritta» — from the item's own `createdBy`,
   on the grey line rather than at the right (a long citation beside it was squeezed into a column on a phone).
   No note count: the server takes a note about an article only, `assertArticleOfDossier`, and counting the notes and

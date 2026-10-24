@@ -37,6 +37,7 @@ export function DossierDecisionRow({
   const added = formatTimestampLong(item.addedAt);
   const isImportant = item.status === 'important';
   const regionId = `dossier-item-content-${item.id}`;
+  const citationId = `dossier-item-citation-${item.id}`;
   // One object while the item stays: the reader asks the source again for a new reference, and the page redraws often.
   const identity = useMemo(() => identityOf(item.data), [item.data]);
   const byApp = item.createdBy ?? null;
@@ -81,7 +82,7 @@ export function DossierDecisionRow({
             className={cn('mt-0.5 flex-shrink-0 text-slate-500 transition-transform motion-reduce:transition-none dark:text-slate-400', !isExpanded && '-rotate-90')}
           />
           <span className="min-w-0 flex-1">
-            <span className={cn(ROW_TITLE, 'block font-medium [overflow-wrap:anywhere]')}>{citation}</span>
+            <span id={citationId} className={cn(ROW_TITLE, 'block font-medium [overflow-wrap:anywhere]')}>{citation}</span>
             {/* The application's mark on the grey line, not at the right as an article's signs: a citation is long, and
                 beside a mark it was squeezed into a column of words on a phone. */}
             {(added || byApp) && (
@@ -111,8 +112,10 @@ export function DossierDecisionRow({
           <Trash2 size={16} aria-hidden />
         </button>
       </div>
+      {/* Opened, the decision is a region named by the row's citation: its full name inside is a line of details, no
+          heading (D7a), so a screen reader still finds the decision by its name. */}
       {isExpanded && (
-        <div id={regionId} className="pb-3 pl-6 pr-2">
+        <div id={regionId} role="region" aria-labelledby={citationId} className="pb-3 pl-6 pr-2">
           <DossierDecisionReader identity={identity} />
         </div>
       )}
