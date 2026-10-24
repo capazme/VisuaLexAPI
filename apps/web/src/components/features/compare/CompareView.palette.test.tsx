@@ -7,6 +7,7 @@ vi.mock('../../../hooks/useTour', () => ({
 
 import { CompareView } from './CompareView';
 import { CommandPalette } from '../search/CommandPalette';
+import { Modal } from '../../ui/Modal';
 import { closeCompare, getCompareState, setCompareState } from '../../../hooks/useCompare';
 import { appStore } from '../../../store/useAppStore';
 
@@ -57,7 +58,8 @@ describe('CompareView — the search menu opened over it', () => {
     await new Promise((resolve) => setTimeout(resolve, 60));
     field.focus();
 
-    // The comparison's trap would take the key and send the focus to its own first control.
+    // The comparison's trap would take the key (`defaultPrevented`, the check that tells the two apart: jsdom moves no
+    // focus on Tab) and send the focus to its own first control.
     const intoComparison = vi.fn();
     comparison.addEventListener('focusin', intoComparison);
     for (const shiftKey of [false, true]) {
@@ -72,5 +74,15 @@ describe('CompareView — the search menu opened over it', () => {
     fireEvent.keyDown(field, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(getCompareState().isOpen).toBe(true);
+  });
+
+  it('leaves Esc to a dialog opened over the menu', () => {
+    asDesktop(true);
+    const onClose = vi.fn();
+    const onModalClose = vi.fn();
+    render(<><CommandPalette isOpen onClose={onClose} onSearch={vi.fn()} /><Modal isOpen onClose={onModalClose} title="Sopra" /></>);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onModalClose).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

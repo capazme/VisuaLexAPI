@@ -20,7 +20,7 @@ import { SEARCH_FIELD_FORM_ID, returnWordsToSearchField } from '../../../utils/s
 import { citationSearchParams, useSearchQuery } from '../../../hooks/useSearchQuery';
 import { formatDecisionShort } from '../../../utils/decisionLinks';
 import { Button } from '../../ui/Button';
-import { openDialog } from '../../ui/dialogStack';
+import { isTopmostDialog, openDialog } from '../../ui/dialogStack';
 import { filterPaletteActs, paletteActName, queryMatches, matchRanges } from './paletteActs';
 
 interface CommandPaletteProps {
@@ -487,11 +487,12 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   useEffect(() => (isOpen ? openDialog(stackToken) : undefined), [isOpen, stackToken]);
 
   // Handle Escape key. Only while open: a closed palette that took every Escape and called
-  // `preventDefault` on it would hide it from whoever honours `defaultPrevented` (the rail's overlay).
+  // `preventDefault` on it would hide it from whoever honours `defaultPrevented` (the rail's overlay). Only while it is the
+  // top-most dialog: one opened over it takes its own Esc.
   useEffect(() => {
     if (!isOpen) return undefined;
     const down = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && isTopmostDialog(stackToken)) {
         e.preventDefault();
         onClose();
       }
@@ -499,7 +500,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
 
     document.addEventListener('keydown', down);
     return () => document.removeEventListener('keydown', down);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, stackToken]);
 
   /** A choice made: the menu closes and the field is left empty. */
   const done = useCallback(() => {
