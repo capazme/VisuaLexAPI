@@ -7,7 +7,7 @@ import { cn } from '../../lib/utils';
 import { FIELD_TEXT } from '../../constants/interactions';
 import { Modal } from './Modal';
 import { accountService } from '../../services/accountService';
-import { ConnectedAppsSection } from '../../features/connections';
+import { ConnectedAppsSection } from '../../features/connections/ConnectedAppsSection';
 import { MerltDataSection } from '../../features/merlt/privacy/MerltDataSection';
 
 interface CommitInfo {

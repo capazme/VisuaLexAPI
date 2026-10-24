@@ -18,6 +18,7 @@ import type { ServiceHealthReading } from '../../hooks/useServiceHealth';
 import { ServiceHealthDot, ServiceHealthMenuEntry } from '../ui/ServiceHealthMenuEntry';
 import { serviceHealthLabel, serviceHealthNeedsNotice } from '../../utils/serviceHealth';
 import { Z_INDEX } from '../../constants/zIndex';
+import { preparePage } from '../../pageCode';
 import { spring } from '../../lib/motion';
 import type { SidebarLayout } from './sidebarWidth';
 import { plannerStore } from '../features/planner/plannerStore';
@@ -201,6 +202,10 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, badgeLabel, h
       }}
       // With its words written, the row needs no label of its own.
       {...(words ? {} : handlers)}
+      // A page loaded with its route (`pageCode.ts`) is fetched as its entry is pointed at, focused or touched.
+      onPointerEnter={(e: PointerEvent<HTMLAnchorElement>) => { preparePage(to); if (!words) handlers.onPointerEnter(e); }}
+      onPointerDown={() => preparePage(to)}
+      onFocus={(e: FocusEvent<HTMLAnchorElement>) => { preparePage(to); if (!words) handlers.onFocus(e); }}
     >
       {({ isActive }) => (
         <>

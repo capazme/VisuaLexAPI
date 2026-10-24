@@ -25,7 +25,7 @@ from visualex_api.tools.dossier_manager import dossier_manager
 from visualex_api.tools.norma import Norma, NormaVisitata
 from visualex_api.services.normattiva_scraper import NormattivaScraper
 from visualex_api.services.eurlex_scraper import EurlexScraper
-from visualex_api.services.pdfextractor import extract_pdf, cleanup_browser_pool, is_allowed_pdf_urn
+from visualex_api.services.pdfextractor import extract_pdf, cleanup_browser_pool, is_allowed_pdf_urn, sweep_exported_pdfs
 from visualex_api.services.akn_parser import comparable_article_key
 from visualex_api.tools.article_suffixes import other_ordinal_spelling
 from visualex_api.services import act_dates, massimario_portal
@@ -52,7 +52,7 @@ from visualex_api.services.decisions.resolver import (
     get_resolver,
     sweep_decision_caches,
 )
-from visualex_api.tools.urngenerator import complete_request_date, pdf_cache_path
+from visualex_api.tools.urngenerator import complete_request_date, export_url, pdf_cache_path
 from visualex_api.tools.cache_manager import prune_normattiva_cache
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import article_input_error, parse_article_input, normalize_act_type
@@ -248,7 +248,8 @@ class NormaController:
     async def _sweep_caches(self):
         """Expired court-decision cache entries are deleted at start and then every
         DECISION_CACHE_SWEEP_SECONDS: the filesystem cache deletes one only when its key is
-        read again. The Normattiva pages are pruned on the same beat (cache_manager's rule).
+        read again. The Normattiva pages are pruned on the same beat (cache_manager's rule),
+        and the exported PDFs older than two days are deleted (`sweep_exported_pdfs`).
         A failed sweep is logged and the next one runs on time."""
         while True:
             try:
@@ -259,6 +260,12 @@ class NormaController:
                 await prune_normattiva_cache()
             except Exception:
                 log.exception("Normattiva cache prune failed")
+            try:
+                removed = await asyncio.to_thread(sweep_exported_pdfs, os.path.join(os.getcwd(), "download"))
+                if removed:
+                    log.info("Exported PDFs swept", removed=removed)
+            except Exception:
+                log.exception("Exported PDF sweep failed")
             await asyncio.sleep(DECISION_CACHE_SWEEP_SECONDS)
 
 
@@ -820,13 +827,9 @@ class NormaController:
         read fails the first page is served as it was, its validity saying when it starts.
         """
         article_text, url = await scraper.get_document(nv)
-        validity = await self._validity_for(scraper, nv, url)
-        if (validity is None and _asks_for_text_in_force(nv) and isinstance(scraper, NormattivaScraper)
-                and await self._page_left_the_cache(scraper, url)):
-            # The text comes from the scraper's memory (a day from when it was filled)
-            # and the page from the persistent cache (a day from when it was written):
-            # after a restart the page can expire first, and without it a later version
-            # would go out unrecognised. Read it once more.
+        if _asks_for_text_in_force(nv):
+            validity = await self._validity_of_page(scraper, nv, url)
+        else:
             validity = await self._validity_for(scraper, nv, url)
         later = bool(validity and _asks_for_text_in_force(nv) and starts_after_today(validity))
         if upcoming_asked:
@@ -862,7 +865,20 @@ class NormaController:
         except Exception as exc:  # noqa: BLE001 - the page already read still stands
             log.warning("Text in force today could not be read", error=str(exc))
             return None
-        return text_today, url_today, await self._validity_for(scraper, nv, url_today)
+        return text_today, url_today, await self._validity_of_page(scraper, nv, url_today)
+
+    async def _validity_of_page(self, scraper, nv, url):
+        """`_validity_for`, reading the page once more when it has left the cache.
+
+        The text comes from the scraper's memory (a day from when it was filled) and the
+        page from the persistent cache (a day from when it was written): after a restart
+        the page can expire first, and without it a later version would go out
+        unrecognised, and today's text without its window."""
+        validity = await self._validity_for(scraper, nv, url)
+        if (validity is None and isinstance(scraper, NormattivaScraper)
+                and await self._page_left_the_cache(scraper, url)):
+            validity = await self._validity_for(scraper, nv, url)
+        return validity
 
     async def _later_version(self, scraper, nv, article_text, url, validity, later, until):
         """The text not in force yet, asked for explicitly (G-357), or the article's error
@@ -1877,7 +1893,11 @@ class NormaController:
                 return jsonify({'error': 'URN mancante'}), 400
             if not is_allowed_pdf_urn(urn):
                 return jsonify({'error': 'URN non valido: sono ammessi solo URL normattiva.it'}), 400
-            urn = urn.strip()
+            # Normattiva's address rebuilt from the URN, an undated one at today (G-355).
+            try:
+                urn = export_url(urn.strip(), today_in_rome().isoformat())
+            except ValueError:
+                return jsonify({'error': 'URN non valido: serve un indirizzo /uri-res/N2Ls?urn:nir:… di normattiva.it'}), 400
 
             log.info("Received data for export_pdf", data=data)
             # The same folder extract_pdf downloads into: the cached copy is a file in it.
@@ -1908,13 +1928,11 @@ class NormaController:
             if not exists_extracted or size_extracted == 0:
                 raise Exception("Il PDF estratto risulta vuoto o non esistente.")
 
-            # Copy to cache location if different
+            # Move to the cache location if different: a copy left the download behind,
+            # a second file of the same act under the name Normattiva suggested.
             if extracted_pdf_path != pdf_path:
-                def copy_file(src, dst):
-                    with open(src, 'rb') as fsrc, open(dst, 'wb') as fdst:
-                        fdst.write(fsrc.read())
-                await asyncio.to_thread(copy_file, extracted_pdf_path, pdf_path)
-                log.info(f"PDF copiato in cache: {pdf_path}")
+                await asyncio.to_thread(os.replace, extracted_pdf_path, pdf_path)
+                log.info(f"PDF spostato in cache: {pdf_path}")
             else:
                 log.info("PDF estratto usato come cache.")
 

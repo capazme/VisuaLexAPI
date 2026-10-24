@@ -88,7 +88,7 @@ const MAX_SUGGESTION_BYTES = 512 * 1024;
 
 const suggestionItemSchema = z.object({
   itemType: z.enum(['annotation', 'highlight', 'dossier', 'quickNorm', 'alias']),
-  payload: z.unknown(),
+  payload: z.unknown().optional(),
 });
 
 const createSuggestionSchema = z.object({

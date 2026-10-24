@@ -427,7 +427,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
       }));
       const blocks = buildPdfBlocks(dossier.items, texts, titles, { excerpts, marks, decisions });
 
-      const doc = writeDossierPdf(
+      const doc = await writeDossierPdf(
         { title: dossier.title, description: dossier.description, tags: dossier.tags, countsLine: pdfCountsLine(dossier.items, chosen), exportedOn: new Date().toLocaleDateString('it-IT') },
         blocks,
       );
@@ -535,14 +535,17 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     />
   );
 
-  // The header's actions in one row (D3), each 44 px as the planner's controls (S7c).
+  // The header's actions in one row (D3), each 44 px as the planner's controls (S7c). A label never wraps inside its
+  // button (D3b): when the window is narrow the row wraps, as a row. Only on the buttons: their menus wrap their items.
+  const rowPrimary = cn(HEADER_PRIMARY, 'whitespace-nowrap');
+  const rowButton = cn(HEADER_BUTTON, 'whitespace-nowrap');
   const actions = (
     <div className="flex flex-wrap items-center gap-2">
       <button
         type="button"
         onClick={handleOpenAllOnDashboard}
         disabled={!hasNormaItems && !hasDecisions}
-        className={HEADER_PRIMARY}
+        className={rowPrimary}
       >
         <ExternalLink size={16} aria-hidden />
         <span>Apri tutto<span className="hidden sm:inline"> su Dashboard</span></span>
@@ -550,7 +553,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
       <MenuButton
         label="Aggiungi"
         align="left"
-        triggerClassName={HEADER_BUTTON}
+        triggerClassName={rowButton}
         items={[
           { label: 'Articoli da una norma', icon: TreeDeciduous, onSelect: () => setTreeNavigatorAct(null) },
           { label: 'Nota', icon: StickyNote, onSelect: () => setNoteTarget({ heading: 'Aggiungi una nota al dossier' }) },
@@ -563,7 +566,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
       <MenuButton
         label="Esporta"
         align="left"
-        triggerClassName={HEADER_BUTTON}
+        triggerClassName={rowButton}
         items={[
           { label: 'PDF', icon: Download, onSelect: () => setPdfDialogOpen(true), disabled: !!pdfProgress },
           { label: 'Copia link di condivisione', icon: Share2, onSelect: () => void copyShareLink() },
@@ -574,7 +577,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         <Download size={16} aria-hidden />
         <span className="hidden sm:inline">Esporta</span>
       </MenuButton>
-      <DossierForumActions dossier={dossier} showToast={showToast} buttonClassName={HEADER_BUTTON} />
+      <DossierForumActions dossier={dossier} showToast={showToast} buttonClassName={rowButton} />
       <MenuButton
         label="Altre azioni"
         triggerClassName={HEADER_ICON_BUTTON}
@@ -607,7 +610,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
 
       {/* In the sections' frame (W2, S7c): the dossier's name as the title, in the reader's serif and with no icon,
           wrapping at the column's width; its section's phrase over it; the description under it; then the tags, the
-          line of the facts and the actions in one row, under the title at every width — beside it, a long name was
+          line of the facts, and the actions as one row under them, at every width — beside it, a long name was
           squeezed into a narrow column (seen at 1366 px). */}
       <PageFrame
         // A name of one long word (a file's, an address) wraps too, as a task's title does: never a page wider than a phone.
