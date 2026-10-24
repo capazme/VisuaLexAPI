@@ -37,6 +37,23 @@ beforeEach(() => {
 });
 
 describe('DossierListView — the quick-open of a card', () => {
+  // D7a: a dossier of decisions alone opens them, as from its page; before, the card's button was disabled.
+  it('opens a dossier of decisions alone in one practice holding them, no search to run', () => {
+    const decisions: Dossier = { id: 'd1', title: 'Pratica Rossi', createdAt: '2026-08-01T10:00:00.000Z', items: [
+      { id: 's1', type: 'sentenza', addedAt: '', data: { corte: 'cassazione', archivio: 'civile', numero: 28994, anno: 2019, etichetta: 'Cass. civ. 28994/2019' } },
+    ] };
+    appStore.setState({ dossiers: [decisions], practices: [], activePracticeId: null, searchTrigger: null, searchQueue: [] });
+    render(<MemoryRouter><DossierListView onSelect={() => {}} showToast={() => {}} /></MemoryRouter>);
+    const button = screen.getByRole('button', { name: 'Apri Pratica Rossi su Dashboard' });
+    expect(button).toBeEnabled();
+    fireEvent.click(button);
+    const { practices, searchTrigger, searchQueue } = appStore.getState();
+    expect(practices).toHaveLength(1);
+    expect(practices[0].decisions.map((d) => d.reference.numero)).toEqual([28994]);
+    expect(searchTrigger).toBeNull();
+    expect(searchQueue).toEqual([]);
+  });
+
   it('opens a single past group as that text, in the dossier\'s practice', () => {
     open([PAST]);
     const { searchQueue, practices } = appStore.getState();

@@ -1499,7 +1499,8 @@ else its first lines (`previewLines`): the first lines of a Cassazione decision 
 **A decision in a list opens its preview** (spec `docs/superpowers/specs/2026-10-13-decision-preview-from-lists-design.md`):
 every list that names a decision our reader opens — «Giurisprudenza» under an article (`CaseLawRow`: the
 Cassazione, the Court of Justice's judgments; never an order or an opinion, which go to
-EUR-Lex), the Massimario's chips, a topic search's window, the Cronologia and a dossier's «Giurisprudenza» —
+EUR-Lex), the Massimario's chips, a topic search's window and the Cronologia (a dossier's «Giurisprudenza» reads its
+decisions in place since D7a) —
 opens the same body (`DecisionPreviewContent`, the hover popup's) at once on a click or Enter, through
 `useListDecisionPreview` (`useDecisionPreview().openPreview`, no delay; a second click on the estremi closes it)
 and `DecisionPreviewDialog`. On the desktop it is `PreviewFrame` as a non-modal `dialog` («Anteprima di …»)
@@ -1692,7 +1693,10 @@ instead), and the find window, the way back and the index reach the row or the w
 `hostTabId` and `CaseLawSection`'s `tabId` name the host a surface reads in: a practice (its row) or one of its windows
 (or the phone's reader), never a tab. They give the find window the id it registers the text root under (`findHostId` overrides
 it with the window's practice), the way-back entry its `tabId`, and the links they render their `besideId`. A surface with no
-host (a preview such as the palette's result card) registers and records nothing.
+host (a preview such as the palette's result card, a decision read in the dossier) registers and records nothing, and a
+decision's draws no «Cerca nel testo» (`DecisionReadingToolbar` without `onToggleFind`): the find window would have
+nothing of it to search. Off the search page (the dossier) its `onLeave` takes the reader to the workspace when a norm or
+a decision the text cites is sent there.
 
 ### Dossier
 
@@ -1710,7 +1714,9 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
 - **The page by act**: `dossierLayout.ts` (pure) turns the items into sections —
   the notes first (`DossierNotesSection`), then one `DossierActBlock` per act in
   the order the acts entered the dossier, then «Giurisprudenza»
-  (`DossierDecisionsSection`, the decisions in stored order). An act's identity is a code's name
+  (`DossierDecisionsSection`, the decisions in stored order). With acts and decisions both (D7a) they are two
+  columns from `lg`, «Norme» | «Giurisprudenza» (`COLUMN_HEADING`, a rule between them, each column in its own
+  order), the norms first below `lg`; one kind alone takes the width, untitled as before. An act's identity is a code's name
   (the codice civile with or without its R.D. is one act) or `tipo_atto|numero_atto|data`;
   its heading is a code's name or the server's `act_citation`, never formatted
   here (a muted fallback until the server answers); its articles sort by annex,
@@ -1826,8 +1832,25 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
 - **Decisions** (`type: 'sentenza'`): the item stores the identity, the attributes the item
   schema accepts and a label, never the text. They are added from the decision's reading surface
   («Aggiungi al dossier», `AddToDossierPopover` with `sentenza`) and listed after the acts under
-  «Giurisprudenza» (`DossierDecisionsSection`: each citation is a `DecisionLink` — its preview's «Apri la sentenza» goes to the decision's address — and
-  each row can be removed). The stored `etichetta` is a copy (source convention, D9):
+  «Giurisprudenza» (`DossierDecisionsSection`, D7a: each decision a row as an article's, `DossierDecisionRow` — the
+  checkbox while selecting, the arrow, the citation over «Aggiunta il …», the star, the removal, 44 px — opened in
+  place by `DossierDecisionReader`: the decision's own reader, `useDecisionAnswer` and `DecisionView` with
+  `DecisionReadingSurface`, never another, so notes, highlights and key passages work as anywhere and the text is the
+  reader's, gotcha 23; asked for only once opened; a decision without its text opens too and `DecisionView` says how it
+  came; «Apri la sentenza», the address, over it whatever came back. No tab holds it: no «Cerca nel testo», and a cited
+  norm or decision takes the reader to the workspace, `onLeave` (see «The host props»); its heading an h3 under
+  «Giurisprudenza», `DecisionView`'s `headingLevel`. The application that filed it is marked as an article's notes are,
+  `ClaudeMark` with `verb="aggiunta"` — «aggiunta da Claude Code», never «scritta» — from the item's own `createdBy`,
+  on the grey line rather than at the right (a long citation beside it was squeezed into a column on a phone).
+  No note count: the server takes a note about an article only, `assertArticleOfDossier`, and counting the notes and
+  highlights on each text would cost a read per decision.) «Seleziona tutti» takes
+  the decisions with the articles; «Apri tutto su Dashboard», on the page and on the list's card, opens a dossier of
+  decisions alone too, one practice holding them; «Espandi tutto» opens the articles only, each decision being a request
+  to its court's source, and leaves a decision open as it was; «Comprimi tutto» closes every row, the decisions too (in
+  a dossier of decisions alone it is all the button offers, once one is open). The block of acts is hidden, still
+  mounted, while no act is on screen. In two columns the
+  acts' headings are h3 under «Norme» (`headingLevel`), and the page keeps the same elements whatever the search leaves,
+  only their classes changing, so an open article is never remounted. The stored `etichetta` is a copy (source convention, D9):
   `decisionCitationOf` recomputes the citation from the identity and the attributes, every write
   sends it (`itemContentFor`, `serverItemFor`), the server recomputes it again on every write
   (`withDecisionLabel`), and every screen shows the recomputed one, never the copy.

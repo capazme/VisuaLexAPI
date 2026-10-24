@@ -34,6 +34,8 @@ vi.mock('./dossierPdf', async (importOriginal) => {
 vi.mock('./dossierPdfMarks', () => ({ loadPdfMarks: pdf.loadPdfMarks }));
 vi.mock('../../../utils/actStructureCache', () => ({ fetchActRubriche: async () => ({ title: 'Titolo' }) }));
 vi.mock('./DossierItemReader', () => ({ DossierItemReader: () => null }));
+// A decision's reader asks its court: what is tested here is the page (its own tests: `DossierDecisionsSection.test.tsx`).
+vi.mock('./DossierDecisionReader', () => ({ DossierDecisionReader: () => null }));
 // The act's index, reduced to what it hands over: this many articles of a law.
 const tree = vi.hoisted(() => ({ count: 0 }));
 vi.mock('./TreeNavigatorModal', () => ({
@@ -270,12 +272,86 @@ describe('DossierDetailView — decisions', () => {
   it('lists a decision under «Giurisprudenza», after the acts, never among the notes', () => {
     renderView(withDecision);
     const decisions = screen.getByRole('region', { name: 'Giurisprudenza (1)' });
-    expect(within(decisions).getByRole('link', { name: CITATION })).toHaveAttribute('href', '/sentenze/corte-costituzionale/1/2014');
+    // A row opened in place, as an article's (D7a), no more a link to a preview.
+    expect(within(decisions).getByRole('button', { name: `Espandi ${CITATION}` })).toHaveAttribute('aria-expanded', 'false');
     expect(within(screen.getByRole('region', { name: /Note \(1\)/ })).queryByText(CITATION)).toBeNull();
     const lastAct = screen.getByRole('region', { name: L49 });
     expect(lastAct.compareDocumentPosition(decisions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // Not a note: the header's count of decisions comes with the dossier-by-act round's PR 3.
     expect(screen.getByText(/2 atti · 3 articoli · 1 nota/)).toBeInTheDocument();
+  });
+
+  it('sets the acts and the decisions in two columns from lg, «Norme» | «Giurisprudenza», the norms first below it (D7a)', () => {
+    renderView(withDecision);
+    const norms = screen.getByRole('region', { name: 'Norme' });
+    const decisions = screen.getByRole('region', { name: 'Giurisprudenza (1)' });
+    expect(within(norms).getByRole('region', { name: L247 })).toBeInTheDocument();
+    expect(within(norms).getByRole('region', { name: L49 })).toBeInTheDocument();
+    expect(norms).not.toContainElement(decisions);
+    expect(norms.compareDocumentPosition(decisions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const grid = norms.parentElement!;
+    expect(grid).toHaveClass('flex', 'flex-col', 'lg:grid', 'lg:grid-cols-2');
+    // The acts under «Norme», a level down.
+    expect(within(norms).getByRole('heading', { level: 3, name: `${L247} 2 articoli` })).toBeInTheDocument();
+    // The rule between the columns, from lg only.
+    expect(decisions.parentElement).toHaveClass('lg:border-l', 'lg:pl-5');
+    expect(grid).toContainElement(decisions);
+  });
+
+  it('keeps one column, with no «Norme» title, when the dossier holds no decision', () => {
+    renderView();
+    expect(screen.queryByRole('region', { name: 'Norme' })).toBeNull();
+    expect(screen.queryByRole('region', { name: /^Giurisprudenza/ })).toBeNull();
+    expect(screen.getByRole('region', { name: L247 })).toBeInTheDocument();
+  });
+
+  it('gives the decisions alone the whole width', () => {
+    renderView({ ...withDecision, items: withDecision.items.filter((i) => i.type === 'sentenza') });
+    const decisions = screen.getByRole('region', { name: 'Giurisprudenza (1)' });
+    expect(screen.queryByRole('region', { name: 'Norme' })).toBeNull();
+    expect(decisions.parentElement?.className ?? '').not.toMatch(/lg:border-l/);
+  });
+
+  it('selects the decisions with the articles, «Seleziona tutti» taking both', () => {
+    renderView(withDecision);
+    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Seleziona elementi' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Seleziona tutti' }));
+    expect(screen.getByText('4 selezionati')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Giurisprudenza (1)' })).getByRole('button', { name: 'Deseleziona elemento' })).toBeInTheDocument();
+  });
+
+  it('keeps the acts mounted while a search leaves one kind on screen', () => {
+    renderView(withDecision);
+    const act247 = screen.getByRole('region', { name: L247 });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Cerca negli elementi del dossier' }), { target: { value: '247' } });
+    expect(screen.queryByRole('region', { name: /^Giurisprudenza/ })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Norme' })).toBeNull();
+    expect(screen.getByRole('region', { name: L247 })).toBe(act247);
+  });
+
+  it('«Espandi tutto» opens the articles and leaves an open decision open', () => {
+    renderView(withDecision);
+    fireEvent.click(screen.getByRole('button', { name: `Espandi ${CITATION}` }));
+    fireEvent.click(screen.getByRole('button', { name: 'Espandi tutto' }));
+    expect(screen.getByRole('button', { name: `Comprimi ${CITATION}` })).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Comprimi tutto' }));
+    expect(screen.getByRole('button', { name: `Espandi ${CITATION}` })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('in a dossier of decisions alone, opens nothing with «Espandi tutto» but closes an open decision with «Comprimi tutto»', () => {
+    renderView({ ...withDecision, items: withDecision.items.filter((i) => i.type === 'sentenza') });
+    expect(screen.getByRole('button', { name: 'Espandi tutto' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: `Espandi ${CITATION}` }));
+    fireEvent.click(screen.getByRole('button', { name: 'Comprimi tutto' }));
+    expect(screen.getByRole('button', { name: `Espandi ${CITATION}` })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('button', { name: 'Espandi tutto' })).toBeDisabled();
+  });
+
+  it('draws no empty block of acts over the decisions alone', () => {
+    renderView({ ...withDecision, items: withDecision.items.filter((i) => i.type === 'sentenza') });
+    const column = screen.getByRole('region', { name: 'Giurisprudenza (1)' }).parentElement!;
+    expect(column.previousElementSibling).toHaveClass('hidden');
   });
 
   it('finds a decision by its citation', () => {
@@ -532,6 +608,28 @@ describe('DossierDetailView — in the frame, in the planner\'s shape (S7c)', ()
     expect(screen.getByRole('button', { name: 'Aggiungi' })).toHaveClass('min-h-[44px]', 'min-w-[44px]');
     expect(screen.getByRole('button', { name: 'Altre azioni' })).toHaveClass('h-11', 'w-11');
     for (const button of within(row).getAllByRole('button')) expect(button.className).not.toMatch(/md:min-h-0/);
+  });
+
+  it('keeps a long title clear of the actions: they come after the description and the facts, each label on one line (D3b)', () => {
+    const title = 'Ransomware EVST – pagamento del riscatto e fondi pubblici, profili di responsabilità';
+    renderView({ ...dossier, title, description: 'Richiesta di riscatto ricevuta il 3 ottobre' });
+    const heading = screen.getByRole('heading', { level: 1, name: title });
+    const open = screen.getByRole('button', { name: 'Apri tutto su Dashboard' });
+    const row = open.parentElement!;
+    // Nothing beside the title: the header holds only the section's phrase, the title and the description.
+    expect(heading.closest('header')!.querySelector('button')).toBeNull();
+    // After the line of the facts.
+    expect(screen.getByText(/creato il/).compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The row wraps as a row when the window is narrow, never a label inside its button.
+    expect(row).toHaveClass('flex-wrap');
+    const buttons = ['Apri tutto su Dashboard', 'Aggiungi', 'Esporta', 'Pubblica nel Forum'].map((name) => screen.getByRole('button', { name }));
+    for (const button of buttons) expect(button).toHaveClass('whitespace-nowrap');
+    expect(row.lastElementChild).toContainElement(screen.getByRole('button', { name: 'Altre azioni' }));
+  });
+
+  it('keeps the Forum\'s label on one line once the dossier is published (D3b)', () => {
+    renderView({ ...dossier, published: { sharedEnvironmentId: 'e1', version: 3, isActive: true, updatedAt: '' } });
+    expect(screen.getByRole('button', { name: 'Forum: Nel Forum · v3' })).toHaveClass('whitespace-nowrap', 'min-h-[44px]');
   });
 
   it('draws an article as a row of two levels — the article, a grey line, the signs — with 44 px controls', () => {
