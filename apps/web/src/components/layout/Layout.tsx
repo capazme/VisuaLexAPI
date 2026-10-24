@@ -19,6 +19,7 @@ import { FindWindow } from '../features/search/FindWindow';
 import { GlobalSearch } from '../features/search/GlobalSearch';
 import { SearchField } from '../features/search/SearchField';
 import { closeFindWindow, isWorkspaceCovered, openFindWindow } from '../../utils/findWindowControl';
+import { useCompareOpened } from '../../hooks/useCompare';
 const CompareView = lazy(() => import('../features/compare/CompareView').then(m => ({ default: m.CompareView })));
 import { useTour } from '../../hooks/useTour';
 import { useConsentIfProvided } from '../../features/merlt/consent/useConsent';
@@ -47,6 +48,7 @@ export function Layout() {
     openCommandPalette: s.openCommandPalette,
   })));
   const { isAuthenticated } = useAuth();
+  const compareOpened = useCompareOpened();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
@@ -407,11 +409,19 @@ export function Layout() {
       {/* Find in the text (Cmd/Ctrl+F, the reading toolbars' magnifier) */}
       <FindWindow />
 
-      {/* Heavy reader overlays are loaded only when their route/state needs them. */}
-      <Suspense fallback={null}>
-        {/* Article Compare View */}
-        <CompareView />
-      </Suspense>
+      {/* Heavy reader overlays are loaded only when their route/state needs them: the comparison on its first opening,
+          a spinner where it will stand while its code arrives. */}
+      {compareOpened && (
+        <Suspense
+          fallback={
+            <div aria-hidden className={cn('pointer-events-none fixed inset-0 flex items-center justify-center', Z_INDEX.compare)}>
+              <span className="size-6 rounded-full border-2 border-primary-600 border-t-transparent animate-spin dark:border-primary-400 dark:border-t-transparent" />
+            </div>
+          }
+        >
+          <CompareView />
+        </Suspense>
+      )}
     </div>
   );
 }

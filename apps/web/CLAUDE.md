@@ -1551,7 +1551,10 @@ its column and the article is still compared). It only informs: «Vedi il testo 
 the later text (G-357).
 
 **«Confronta articoli»** (`features/compare/CompareView`, spec `docs/superpowers/specs/2026-10-13-compare-articles-design.md`):
-a full-screen overlay (`data-find-overlay`) over two articles chosen from the practices, a search or the history. The
+a full-screen overlay (`data-find-overlay`) over two articles chosen from the practices, a search or the history.
+`Layout` mounts it — and so fetches its chunk — only from its first opening in the visit (`useCompareOpened`), a
+spinner where it will stand while the code arrives, and keeps it mounted after, as before (its full-screen choice
+survives a close); `lazyModules.guard.test.ts` refuses a static import of it outside `features/compare/`. The
 body is `CompareBody`: `compareArticles` (`utils/articleCompare.ts`, pure, ranges only) pairs the commi — by printed
 number, else by words, else by place (one lone comma facing one) — and labels them (invariato / modificato / riscritto / aggiunto / abrogato) when it is the same
 article in two versions, each citable (`describeVersion`; a side whose window misses the day asked for, or that
@@ -2332,12 +2335,15 @@ meant to stay split; add new features as new files, not inside the shells:
   pubblicati» (`showOwnerActions`), never on Explore; where a card is too narrow the action goes under them, whole. «I
   più aggiunti» is an `h2`, last on the page. Then «Pronti da VisuaLex» (`StudyPacksBand`, over
   `utils/studyPacks.ts`: the 20 packs of `data/exampleEnvironments.ts`, each a pack's dossiers plus «‹pack›: articoli
-  chiave»): one row of compact cards that scrolls sideways (`#pronti`, `tabIndex 0`, so the keyboard scrolls it past
+  chiave»; `loadStudyPacks` imports the data, ~60 KB, when the band first asks, so it is not in the chunk every page
+  loads — meanwhile the heading and five cards of the packs' size hold their place, every category holding packs; a
+  load that fails leaves the band out): one row of compact cards that scrolls sideways (`#pronti`, `tabIndex 0`, so the keyboard scrolls it past
   packs already added), every pack in it — on a computer after the grid and its pages; on a phone right after the
   community's first two dossiers (or their places while a read travels, or the empty state), in a fixed place so it is
   never mounted again while a new read travels, the rest under a hidden `h2` «Altri dossier della comunità»
   (`useIsDesktop`, one place or the other); it follows Explore's category and adds a pack through `import-study`; the
-  empty dossier list's «Pronti da VisuaLex» goes to `/forum#pronti`, where Explore, once read, scrolls the content
+  empty dossier list's «Pronti da VisuaLex» goes to `/forum#pronti`, where Explore, once read and once the band says its
+  packs are shown (`onShown`), scrolls the content
   scroller alone to the strip under the phone's bar (`scroll-padding-top`, gotcha 34) and focuses it, once: the fragment
   then leaves the address (`history.replaceState`, the router's state kept), so another tab and back, or a reload, do not
   jump again. One list of categories, `utils/forumCategories.ts`. `EnvironmentContentViewer` (the tree of a
@@ -2446,6 +2452,10 @@ meant to stay split; add new features as new files, not inside the shells:
   driver.js's «×» «Chiudi» in `onPopoverRender` (driver.js writes «Close» and has no option for it; `TOUR_UI`). A tour is closed, unseen (asked again next time), when the window
   passes to another layout (768 and 1024 px) or the element of its step is no longer drawn: driver.js redrew the veil at
   its old size (Y1); and a focus driver.js gives its buttons with no key pressed shows no ring (`data-pointer-focus`).
+  driver.js and its stylesheet are fetched when a tour first starts (`loadDriver` in `useTour`), not with every page;
+  the steps, the guards and the screen are read once it is here, and a `stopTour` meanwhile cancels the start;
+  `lazyModules.guard.test.ts` refuses a static import of it. `index.css` still overrides its stylesheet, which lands
+  after it as before.
   `SearchPanel` mounts them (imported statically: the table is the app's main surface; `PDFViewer`, Study Mode and
   `CompareView` stay behind `lazy()`), one layout per breakpoint (`useIsDesktop`); a decision opened from any link lands in its practice
   and opens beside on the desktop (the window a link was clicked in is never the one a third window

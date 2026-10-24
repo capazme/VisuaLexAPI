@@ -32,6 +32,8 @@ vi.mock('driver.js/dist/driver.css', () => ({}));
 import { useTour } from './useTour';
 import { TOUR_STORAGE_KEY, TOUR_VERSION } from '../config/tourConfig';
 
+// driver.js comes with the first tour: the import, then what waited for it.
+const settle = () => act(async () => { await vi.dynamicImportSettled(); });
 const seen = (type: string) => JSON.parse(localStorage.getItem(TOUR_STORAGE_KEY) ?? '{"completed":{}}').completed[type] === true;
 
 beforeEach(() => {
@@ -51,37 +53,37 @@ afterEach(() => {
 });
 
 describe('useTour — one tour at a time', () => {
-  it('a second tour asked while one is on screen is not started over it, and stays unseen', () => {
+  it('a second tour asked while one is on screen is not started over it, and stays unseen', async () => {
     const first = renderHook(() => useTour());
     const second = renderHook(() => useTour());
-    act(() => { first.result.current.tryStartTour('welcome'); second.result.current.tryStartTour('search'); vi.advanceTimersByTime(400); });
+    await act(async () => { first.result.current.tryStartTour('welcome'); second.result.current.tryStartTour('search'); await vi.advanceTimersByTimeAsync(400); }); await settle();
     expect(made).toHaveLength(1);
     expect(seen('search')).toBe(false);
   });
 
-  it('once the first is closed the next can start', () => {
+  it('once the first is closed the next can start', async () => {
     const first = renderHook(() => useTour());
-    act(() => { first.result.current.tryStartTour('welcome'); vi.advanceTimersByTime(400); });
+    await act(async () => { first.result.current.tryStartTour('welcome'); await vi.advanceTimersByTimeAsync(400); }); await settle();
     act(() => { made[0].options.onDestroyStarted?.(); });
     expect(seen('welcome')).toBe(true);
     const second = renderHook(() => useTour());
-    act(() => { second.result.current.tryStartTour('search'); vi.advanceTimersByTime(400); });
+    await act(async () => { second.result.current.tryStartTour('search'); await vi.advanceTimersByTimeAsync(400); }); await settle();
     expect(made).toHaveLength(2);
   });
 
-  it('a tour seen while the request waited is not started', () => {
+  it('a tour seen while the request waited is not started', async () => {
     const { result } = renderHook(() => useTour());
-    act(() => { result.current.tryStartTour('welcome'); });
+    await act(async () => { result.current.tryStartTour('welcome'); });
     localStorage.setItem(TOUR_STORAGE_KEY, JSON.stringify({ version: TOUR_VERSION, completed: { welcome: true } }));
-    act(() => { vi.advanceTimersByTime(400); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(400); }); await settle();
     expect(made).toHaveLength(0);
   });
 });
 
 describe('useTour — the popover speaks Italian', () => {
-  it('names driver.js\'s close button «Chiudi» on every step (driver.js writes «Close» and has no option for it)', () => {
+  it('names driver.js\'s close button «Chiudi» on every step (driver.js writes «Close» and has no option for it)', async () => {
     const { result } = renderHook(() => useTour());
-    act(() => { result.current.startTour('welcome'); });
+    await act(async () => { result.current.startTour('welcome'); }); await settle();
     const closeButton = document.createElement('button');
     closeButton.setAttribute('aria-label', 'Close');
     made[0].options.onPopoverRender?.({ closeButton, wrapper: document.createElement('div') });
@@ -98,9 +100,9 @@ describe('useTour — the focus it gives (Y1)', () => {
     return { wrapper, closeButton };
   };
 
-  it('a focus given to its ✕ after a click shows no ring until it leaves', () => {
+  it('a focus given to its ✕ after a click shows no ring until it leaves', async () => {
     const { result } = renderHook(() => useTour());
-    act(() => { result.current.startTour('welcome'); });
+    await act(async () => { result.current.startTour('welcome'); }); await settle();
     window.dispatchEvent(new Event('pointerdown'));
     const p = popover();
     made[0].options.onPopoverRender?.(p);
@@ -110,19 +112,19 @@ describe('useTour — the focus it gives (Y1)', () => {
     expect(p.closeButton).not.toHaveAttribute('data-pointer-focus');
   });
 
-  it('a tour that starts after some typing still gives its first focus no ring', () => {
+  it('a tour that starts after some typing still gives its first focus no ring', async () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
     const { result } = renderHook(() => useTour());
-    act(() => { result.current.startTour('welcome'); });
+    await act(async () => { result.current.startTour('welcome'); }); await settle();
     const p = popover();
     made[0].options.onPopoverRender?.(p);
     p.closeButton.focus();
     expect(p.closeButton).toHaveAttribute('data-pointer-focus');
   });
 
-  it('after a key pressed in the tour, the focus keeps its ring', () => {
+  it('after a key pressed in the tour, the focus keeps its ring', async () => {
     const { result } = renderHook(() => useTour());
-    act(() => { result.current.startTour('welcome'); });
+    await act(async () => { result.current.startTour('welcome'); }); await settle();
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab' }));
     const p = popover();
     made[0].options.onPopoverRender?.(p);
@@ -140,9 +142,9 @@ describe('useTour — a window that changes its layout (Y1)', () => {
     });
   };
 
-  it('closes the tour when the window passes to another layout, and leaves it unseen', () => {
+  it('closes the tour when the window passes to another layout, and leaves it unseen', async () => {
     const { result } = renderHook(() => useTour());
-    act(() => { result.current.startTour('welcome'); });
+    await act(async () => { result.current.startTour('welcome'); }); await settle();
     resizeTo(1100);
     expect(made[0].active).toBe(true);
     resizeTo(390);
@@ -150,9 +152,9 @@ describe('useTour — a window that changes its layout (Y1)', () => {
     expect(seen('welcome')).toBe(false);
   });
 
-  it('closes it when the element it points at is no longer drawn', () => {
+  it('closes it when the element it points at is no longer drawn', async () => {
     const { result } = renderHook(() => useTour());
-    act(() => { result.current.startTour('welcome'); });
+    await act(async () => { result.current.startTour('welcome'); }); await settle();
     const element = document.getElementById('tour-sidebar')!;
     made[0].element = element;
     element.getClientRects = () => [{}] as unknown as DOMRectList;
@@ -163,11 +165,20 @@ describe('useTour — a window that changes its layout (Y1)', () => {
     expect(made[0].active).toBe(false);
   });
 
-  it('stops listening once the tour is gone', () => {
+  it('stops listening once the tour is gone', async () => {
     const remove = vi.spyOn(window, 'removeEventListener');
     const { result } = renderHook(() => useTour());
-    act(() => { result.current.startTour('welcome'); });
+    await act(async () => { result.current.startTour('welcome'); }); await settle();
     act(() => { made[0].destroy(); });
     expect(remove).toHaveBeenCalledWith('resize', expect.any(Function));
+  });
+});
+
+describe('useTour — driver.js comes with the first tour', () => {
+  it('a tour stopped while driver.js is on its way does not start', async () => {
+    const { result } = renderHook(() => useTour());
+    act(() => { result.current.startTour('welcome'); result.current.stopTour(); });
+    await settle();
+    expect(made).toHaveLength(0);
   });
 });

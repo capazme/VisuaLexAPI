@@ -1,9 +1,15 @@
-import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, beforeAll, describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import { createPortal } from 'react-dom';
 import { ForumExploreView } from './ForumExploreView';
 import { sharedEnvironmentService } from '../../../services/sharedEnvironmentService';
 import type { SharedEnvironment } from '../../../types';
+import { loadStudyPacks } from '../../../utils/studyPacks';
+
+// The packs' data, read once for the file: its first load (a large module) is not what these tests time.
+beforeAll(async () => {
+  await loadStudyPacks();
+});
 
 vi.mock('../../../services/sharedEnvironmentService', () => ({
   sharedEnvironmentService: { list: vi.fn() },
@@ -281,7 +287,7 @@ describe('ForumExploreView - the order of the page', () => {
     expect(await screen.findByRole('heading', { level: 2, name: 'I più aggiunti' })).toBeInTheDocument();
   });
 
-  it('brings «Pronti da VisuaLex» to the top of the content and focuses it, from /forum#pronti', () => {
+  it('brings «Pronti da VisuaLex» to the top of the content and focuses it, from /forum#pronti', async () => {
     setDesktop(true);
     window.history.replaceState(null, '', '/forum#pronti');
     const scrollTo = vi.fn();
@@ -291,7 +297,8 @@ describe('ForumExploreView - the order of the page', () => {
     document.body.append(scroller);
     try {
       const { unmount } = render(<ForumExploreViewIn into={scroller} />);
-      expect(scrollTo).toHaveBeenCalledTimes(1);
+      // The packs load after the band: the jump waits for them.
+      await waitFor(() => expect(scrollTo).toHaveBeenCalledTimes(1));
       expect(document.activeElement).toBe(document.getElementById('pronti'));
       // The fragment leaves the address after the jump, the rest of it kept.
       expect(window.location.hash).toBe('');
@@ -300,6 +307,7 @@ describe('ForumExploreView - the order of the page', () => {
       unmount();
       (document.activeElement as HTMLElement | null)?.blur();
       render(<ForumExploreViewIn into={scroller} />);
+      await screen.findByRole('list', { name: 'Pronti da VisuaLex' });
       expect(scrollTo).toHaveBeenCalledTimes(1);
       expect(document.activeElement).not.toBe(document.getElementById('pronti'));
     } finally {

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useSyncExternalStore } from 'react';
 import type { ArticleData } from '../types';
 
 export interface CompareArticle {
@@ -29,7 +29,11 @@ let compareState: CompareState = {
 type CompareListener = (state: CompareState) => void;
 const listeners = new Set<CompareListener>();
 
+// Opened at least once in this visit: the comparison's code is loaded from then on (`useCompareOpened`).
+let opened = false;
+
 function notifyListeners() {
+  if (compareState.isOpen) opened = true;
   listeners.forEach((listener) => listener({ ...compareState }));
 }
 
@@ -108,6 +112,20 @@ export function removeCompareArticle(side: 'left' | 'right') {
     };
   }
   notifyListeners();
+}
+
+const subscribeToOpened = (onChange: () => void) => {
+  const listener = () => onChange();
+  listeners.add(listener);
+  return () => { listeners.delete(listener); };
+};
+
+/**
+ * True from the first time the comparison opens, for the rest of the visit: `Layout` mounts `CompareView` only then,
+ * so its chunk is not fetched with every page. Kept mounted after, as before (its full-screen choice survives a close).
+ */
+export function useCompareOpened(): boolean {
+  return useSyncExternalStore(subscribeToOpened, () => opened);
 }
 
 /**
