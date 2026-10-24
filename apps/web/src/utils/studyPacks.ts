@@ -62,6 +62,7 @@ export function packFromEnvironment(env: Environment): StudyPack {
 }
 
 let packs: Promise<StudyPack[]> | null = null;
+let loaded: StudyPack[] | undefined;
 
 /**
  * The packs, read from `data/exampleEnvironments.ts` on the first request and kept for the next: ~60 KB that every
@@ -69,13 +70,19 @@ let packs: Promise<StudyPack[]> | null = null;
  */
 export function loadStudyPacks(): Promise<StudyPack[]> {
   packs ??= import('../data/exampleEnvironments').then(
-    (module) => module.exampleEnvironments.map(packFromEnvironment),
+    (module) => (loaded = module.exampleEnvironments.map(packFromEnvironment)),
     (error: unknown) => {
       packs = null;
       throw error;
     },
   );
   return packs;
+}
+
+/** The packs if they are loaded already, so a band drawn again (back on the Forum, a width that moves it) shows them at
+ *  once instead of its waiting cards. */
+export function peekStudyPacks(): StudyPack[] | undefined {
+  return loaded;
 }
 
 /** What `POST /dossiers/import-study` takes for a pack: its dossiers, nothing else. */

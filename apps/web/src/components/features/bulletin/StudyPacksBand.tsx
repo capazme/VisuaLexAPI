@@ -3,7 +3,7 @@ import { Check, FolderPlus } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { dossierService } from '../../../services/dossierService';
 import { getErrorMessage } from '../../../utils/errors';
-import { loadStudyPacks, packAlreadyAdded, packContent, type StudyPack } from '../../../utils/studyPacks';
+import { loadStudyPacks, packAlreadyAdded, packContent, peekStudyPacks, type StudyPack } from '../../../utils/studyPacks';
 import { cn } from '../../../lib/utils';
 import type { EnvironmentCategory, StudyImportReport } from '../../../types';
 
@@ -36,7 +36,7 @@ export function StudyPacksBand({ category, onAdded, onError, onShown }: Props) {
   // Added in this visit: marked at once, before the dossier list is read again, so a second tap makes no second copy.
   const [addedNow, setAddedNow] = useState<ReadonlySet<string>>(new Set());
   // `undefined` while they load, `null` when they could not be loaded: the band is left out, as a help it is.
-  const [all, setAll] = useState<StudyPack[] | null | undefined>(undefined);
+  const [all, setAll] = useState<StudyPack[] | null | undefined>(peekStudyPacks);
   useEffect(() => {
     let live = true;
     loadStudyPacks().then(
@@ -69,7 +69,7 @@ export function StudyPacksBand({ category, onAdded, onError, onShown }: Props) {
   };
 
   return (
-    <section aria-labelledby="study-packs" className="min-w-0 space-y-3">
+    <section aria-labelledby="study-packs" aria-busy={packs === undefined || undefined} className="min-w-0 space-y-3">
       <div className="flex flex-wrap items-baseline gap-x-2">
         <h2 id="study-packs" className="font-serif text-xl font-medium tracking-tight text-slate-900 dark:text-slate-50">
           Pronti da VisuaLex

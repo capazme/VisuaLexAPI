@@ -5,11 +5,20 @@ import { loadStudyPacks, packContent, type StudyPack } from '../../../utils/stud
 import { StudyPacksBand } from './StudyPacksBand';
 
 const service = vi.hoisted(() => ({ importStudy: vi.fn() }));
-// The packs' data that cannot be loaded (a chunk a deploy removed), when a test asks for it.
-const load = vi.hoisted(() => ({ fail: false }));
+// The packs' data still on its way (`release` brings it) or that cannot be loaded (a chunk a deploy removed), when a
+// test asks for it; otherwise loaded, as after a first visit.
+const load = vi.hoisted(() => ({ fail: false, held: false, release: () => {} }));
 vi.mock('../../../utils/studyPacks', async (importOriginal) => {
   const real = await importOriginal<typeof import('../../../utils/studyPacks')>();
-  return { ...real, loadStudyPacks: () => (load.fail ? Promise.reject(new Error('offline')) : real.loadStudyPacks()) };
+  return {
+    ...real,
+    peekStudyPacks: () => (load.fail || load.held ? undefined : real.peekStudyPacks()),
+    loadStudyPacks: () => {
+      if (load.fail) return Promise.reject(new Error('offline'));
+      if (load.held) return new Promise((resolve) => { load.release = () => resolve(real.loadStudyPacks()); });
+      return real.loadStudyPacks();
+    },
+  };
 });
 vi.mock('../../../services/dossierService', () => ({ dossierService: service }));
 
@@ -17,6 +26,7 @@ vi.mock('../../../services/dossierService', () => ({ dossierService: service }))
 let STUDY_PACKS: StudyPack[];
 beforeEach(async () => {
   load.fail = false;
+  load.held = false;
   STUDY_PACKS = await loadStudyPacks();
   service.importStudy.mockReset().mockResolvedValue({ dossiers: [] });
   appStore.setState({ dossiers: [] });
@@ -66,11 +76,20 @@ describe('StudyPacksBand', () => {
   });
 
   it('while the packs load, keeps their place: the heading and cards of their size, then the packs', async () => {
+    load.held = true;
     render(<StudyPacksBand category="all" onAdded={vi.fn()} onError={vi.fn()} />);
     expect(screen.getByRole('heading', { name: 'Pronti da VisuaLex' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Pronti da VisuaLex' })).toHaveAttribute('aria-busy', 'true');
     expect(screen.queryByRole('list')).toBeNull();
     expect(screen.queryAllByRole('listitem')).toHaveLength(0);
+    load.release();
     expect(await screen.findByRole('list', { name: 'Pronti da VisuaLex' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Pronti da VisuaLex' })).not.toHaveAttribute('aria-busy');
+  });
+
+  it('drawn again once they are loaded, shows the packs at once (back on the Forum)', () => {
+    render(<StudyPacksBand category="all" onAdded={vi.fn()} onError={vi.fn()} />);
+    expect(screen.getByRole('list', { name: 'Pronti da VisuaLex' })).toBeInTheDocument();
   });
 
   it('leaves the band out when the packs cannot be loaded', async () => {

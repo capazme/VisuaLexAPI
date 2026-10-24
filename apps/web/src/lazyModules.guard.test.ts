@@ -31,11 +31,13 @@ describe('what every page loads leaves out the tours, the study packs and the co
   });
 
   it('the study packs\' data comes only when the band asks for it (loadStudyPacks)', () => {
-    expect(offenders(staticImport('[./]*(?:\\.\\./)*data/exampleEnvironments'))).toEqual([]);
+    expect(offenders(staticImport('[./]*(?:\\.\\./)*data/exampleEnvironments(?:\\.ts)?'))).toEqual([]);
   });
 
   it('the comparison comes only when it first opens (Layout\'s lazy import)', () => {
     const inCompare = (file: string) => file.startsWith(join('components', 'features', 'compare') + '/');
-    expect(offenders(staticImport('[./]*(?:[\\w-]+/)*compare(?:/CompareView|/index)?'), inCompare)).toEqual([]);
+    // Any module of the folder, by any path (with `allowImportingTsExtensions`, `.tsx` too): CompareBody and the rest
+    // came with it.
+    expect(offenders(staticImport('[./]*(?:[\\w-]+/)*compare(?:/[^\'"]*)?'), inCompare)).toEqual([]);
   });
 });

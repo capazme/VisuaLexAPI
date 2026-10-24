@@ -1554,7 +1554,9 @@ the later text (G-357).
 a full-screen overlay (`data-find-overlay`) over two articles chosen from the practices, a search or the history.
 `Layout` mounts it — and so fetches its chunk — only from its first opening in the visit (`useCompareOpened`), a
 spinner where it will stand while the code arrives, and keeps it mounted after, as before (its full-screen choice
-survives a close); `lazyModules.guard.test.ts` refuses a static import of it outside `features/compare/`. The
+survives a close). Its code that cannot be fetched (a tab left open across a deploy, the connection gone) closes the
+comparison instead of taking the page down (`CompareBoundary`), and the next opening fetches it again;
+`lazyModules.guard.test.ts` refuses a static import of any module of `features/compare/` outside it. The
 body is `CompareBody`: `compareArticles` (`utils/articleCompare.ts`, pure, ranges only) pairs the commi — by printed
 number, else by words, else by place (one lone comma facing one) — and labels them (invariato / modificato / riscritto / aggiunto / abrogato) when it is the same
 article in two versions, each citable (`describeVersion`; a side whose window misses the day asked for, or that
@@ -2336,8 +2338,9 @@ meant to stay split; add new features as new files, not inside the shells:
   più aggiunti» is an `h2`, last on the page. Then «Pronti da VisuaLex» (`StudyPacksBand`, over
   `utils/studyPacks.ts`: the 20 packs of `data/exampleEnvironments.ts`, each a pack's dossiers plus «‹pack›: articoli
   chiave»; `loadStudyPacks` imports the data, ~60 KB, when the band first asks, so it is not in the chunk every page
-  loads — meanwhile the heading and five cards of the packs' size hold their place, every category holding packs; a
-  load that fails leaves the band out): one row of compact cards that scrolls sideways (`#pronti`, `tabIndex 0`, so the keyboard scrolls it past
+  loads — meanwhile the heading and five cards drawn like the packs' (a name on two lines, the count, the 44 px
+  button) hold their place, `aria-busy`, every category holding packs; once loaded, a band drawn again shows them at
+  once (`peekStudyPacks`); a load that fails leaves the band out): one row of compact cards that scrolls sideways (`#pronti`, `tabIndex 0`, so the keyboard scrolls it past
   packs already added), every pack in it — on a computer after the grid and its pages; on a phone right after the
   community's first two dossiers (or their places while a read travels, or the empty state), in a fixed place so it is
   never mounted again while a new read travels, the rest under a hidden `h2` «Altri dossier della comunità»
@@ -2452,8 +2455,10 @@ meant to stay split; add new features as new files, not inside the shells:
   driver.js's «×» «Chiudi» in `onPopoverRender` (driver.js writes «Close» and has no option for it; `TOUR_UI`). A tour is closed, unseen (asked again next time), when the window
   passes to another layout (768 and 1024 px) or the element of its step is no longer drawn: driver.js redrew the veil at
   its old size (Y1); and a focus driver.js gives its buttons with no key pressed shows no ring (`data-pointer-focus`).
-  driver.js and its stylesheet are fetched when a tour first starts (`loadDriver` in `useTour`), not with every page;
-  the steps, the guards and the screen are read once it is here, and a `stopTour` meanwhile cancels the start;
+  driver.js and its stylesheet are fetched when a tour first starts (`loadDriver` in `useTour`), not with every page —
+  ahead, while the tour waits for its delay (`prepareTour`: `tryStartTour`, `resetAndStartTour`, `Layout`'s welcome);
+  the steps, the guards and the screen are read once it is here, and a `stopTour` or the surface unmounting meanwhile
+  cancels the start;
   `lazyModules.guard.test.ts` refuses a static import of it. `index.css` still overrides its stylesheet, which lands
   after it as before.
   `SearchPanel` mounts them (imported statically: the table is the app's main surface; `PDFViewer`, Study Mode and

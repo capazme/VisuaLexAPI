@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { Driver, driver as makeDriver } from 'driver.js';
 import {
     TOUR_VERSION,
@@ -130,6 +130,8 @@ export function useTour(options: UseTourOptions = {}) {
     // Each start and each stop takes a new turn: a start still waiting for driver.js gives up when something else was
     // asked of this hook meanwhile.
     const turnRef = useRef(0);
+    // A surface that goes away while driver.js loads takes its tour with it.
+    useEffect(() => () => { turnRef.current += 1; }, []);
 
     // Check if a specific tour has been completed
     const hasSeenTour = useCallback((tourType: TourType = 'welcome'): boolean => {
@@ -257,11 +259,18 @@ export function useTour(options: UseTourOptions = {}) {
 
     // Reset all tours and immediately start the welcome tour.
     // Declared after startTour so it isn't referenced before declaration.
+    // driver.js fetched while a tour waits for its delay, so the download overlaps a wait the tour had anyway; a failure
+    // is told by the start itself, which loads it again.
+    const prepareTour = useCallback((): void => {
+        loadDriver().catch(() => {});
+    }, []);
+
     const resetAndStartTour = useCallback((tourType: TourType = 'welcome'): void => {
+        prepareTour();
         resetTour(tourType);
         // Small delay to ensure state is saved
         setTimeout(() => startTour(tourType), 100);
-    }, [resetTour, startTour]);
+    }, [prepareTour, resetTour, startTour]);
 
     // Stop tour programmatically
     const stopTour = useCallback((): void => {
@@ -275,12 +284,13 @@ export function useTour(options: UseTourOptions = {}) {
     // Try to start a contextual tour if not seen
     const tryStartTour = useCallback((tourType: TourType): void => {
         if (!hasSeenTour(tourType)) {
+            prepareTour();
             // Small delay to ensure DOM is ready; seen again when it fires, for a tour completed meanwhile
             setTimeout(() => {
                 if (!hasSeenTour(tourType)) startTour(tourType);
             }, 300);
         }
-    }, [hasSeenTour, startTour]);
+    }, [hasSeenTour, prepareTour, startTour]);
 
     // Get current tour version
     const getTourVersion = useCallback((): number => {
@@ -289,6 +299,7 @@ export function useTour(options: UseTourOptions = {}) {
 
     return {
         startTour,
+        prepareTour,
         stopTour,
         resetTour,
         resetAndStartTour,

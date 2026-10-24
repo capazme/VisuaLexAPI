@@ -180,5 +180,16 @@ describe('useTour — driver.js comes with the first tour', () => {
     act(() => { result.current.startTour('welcome'); result.current.stopTour(); });
     await settle();
     expect(made).toHaveLength(0);
+    // Asked again, it starts: the load had settled.
+    await act(async () => { result.current.startTour('welcome'); }); await settle();
+    expect(made).toHaveLength(1);
+  });
+
+  it('a surface that goes away while driver.js is on its way takes its tour with it', async () => {
+    const { result, unmount } = renderHook(() => useTour());
+    act(() => { result.current.startTour('welcome'); });
+    unmount();
+    await settle();
+    expect(made).toHaveLength(0);
   });
 });
