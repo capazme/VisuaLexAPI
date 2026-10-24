@@ -6,13 +6,20 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
 
 ### Frontend (`apps/web/src`)
 
-- `App.tsx` — routing. **Pages loaded with their route** (P1): Dossier, the Forum and its Community, Opus (its frame
-  and views in one fetch), «Analizza documento», the Cronologia, «Crediti» and «Collega un'app AI» are `lazy` routes,
-  as Gymnasium's, Academia's and the admin's were; Ricerca, the sign-in page, a decision's address (`DecisionAddress`),
-  `/connect` and «Pagina non trovata» stay in the first chunk. Their modules are listed once in `pageCode.ts`
+- `App.tsx` — routing. **Pages loaded with their route** (P1): the Forum's Community, Opus (its frame and views in one
+  fetch), «Analizza documento», the Cronologia, «Crediti» and «Collega un'app AI» are `lazy` routes, as Gymnasium's,
+  Academia's and the admin's were; Ricerca, the sign-in page, Dossier, the Forum's «Dossier pubblici», a decision's
+  address (`DecisionAddress`), `/connect` and «Pagina non trovata» stay in the first chunk — Dossier and «Dossier
+  pubblici» by measure: opened directly, their largest text came later than on develop even with their code preloaded
+  beside the first chunk. Their modules are listed once in `pageCode.ts`
   (`PAGE_CODE`), which the routes, the sidebar's entries (`preparePage`, as an entry is pointed at, touched or
   focused), the section switcher (`SECTION_HOME_CODE`) and `main.tsx` (the address opened, fetched beside the sign-in
-  check) share; `pageCode.test.ts` refuses a static import of any of them by any path, and of a folder index that
+  check) share. An address opened directly fetches its page's code beside the first chunk, not after it: the build
+  (`routePreload` in `vite.config.ts`, over `ROUTE_PAGES`, which `pageCode.test.ts` keeps in step with `PAGE_CODE`)
+  writes each page's chunks into `assets/route-preload-<hash>.js`, which `index.html` loads `async` and which adds a
+  `modulepreload` for the address opened and no other (~1.9 KB, outside the first chunk). A file, not an inline
+  script: the ingress's Content-Security-Policy allows scripts from 'self' only (as `theme-boot.js`); its name carries
+  its hash, so an `index.html` always names its own build's map and a cached older one is never asked for; `pageCode.test.ts` refuses a static import of any of them by any path, and of a folder index that
   would re-export one (the connections' was removed: «Collega un'app AI» was in it). Inside the layout they wait in
   `RoutePage` (`components/layout/RouteBoundary.tsx`, around `Layout`'s outlet), «Crediti» in the `Suspense` around the
   routes: a boundary on screen from the first draw, with nothing in the page's place, so nothing stays once it is
@@ -306,8 +313,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   it synchronous), so the old page's picture holds for the new title, at most `HOLD_MAX` (150 ms), watched by a
   `MutationObserver` — the browser draws no frame, so no `requestAnimationFrame`, while the update is pending. A heading
   that already named the section before the swap (the dossier list's says the kind it last listed) is not taken until
-  that hold is over. The pages loaded on demand (Opus's, Gymnasium's, Academia's, the Forum's) are fetched when the
-  switcher opens (`SECTION_HOME_CODE`), or the first change would play over the page it leaves (Opus, the Forum) or
+  that hold is over. The pages loaded on demand (Opus's, Gymnasium's, Academia's) are fetched when the
+  switcher opens (`SECTION_HOME_CODE`), or the first change would play over the page it leaves (Opus) or
   fade into «Caricamento…» (Gymnasium, Academia), the new page coming after the hold. The
   switcher's mark passes to the new hue in 200 ms (`transition-colors duration-200`), the change's one touch of colour;
   the sidebar's new entries fade in, the first six 20 ms apart, the old ones simply go (`useEntriesEntrance`, Web
