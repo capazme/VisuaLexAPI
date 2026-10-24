@@ -1,6 +1,6 @@
 # Gymnasium — study courses from one's own material (A1a)
 
-**Status:** draft, 23 October 2026. The flow and the web part are written; the server part (§7) is a list of
+**Status:** draft, 23 October 2026; four of the five decisions of §11 answered on 24 October. The flow and the web part are written; the server part (§7) is a list of
 what the web needs, to be written by the server side before the spec is approved. Design only: no code, no
 migration yet.
 **Target:** release 1.11.
@@ -42,7 +42,7 @@ what is left to later rounds (§10).
 
 | Word | Meaning |
 | --- | --- |
-| **corso** (UI: «Percorso», §11.1) | a user's private course: a title, a subject, an ordered list of modules |
+| **corso** (UI: «Percorso», decided in §11) | a user's private course: a title, a subject, an ordered list of modules |
 | **modulo** | one day's unit: 5–10 pages of the material, split into blocks |
 | **blocco** | 10–15 minutes of reading within a module, closed by a recall |
 | **verifica** | the module's test: pre-questions, recall questions, a quiz, one open question |
@@ -92,7 +92,8 @@ law. Numbers of minutes, words and thresholds are inferences.
    already returns until it is recalled (`useReviewSession.ts`): that is the successive relearning the flow
    asks for, and nothing changes there. Earlier modules' cards stay in the review, so the review is
    cumulative by construction.
-9. **The next module** is offered from the next Rome day, and before it the course's due cards (§11.2).
+9. **The next module** is offered from the next Rome day, after the course's due cards, as a suggestion with
+   one tap: never locked (§11).
 
 ### 3.1 Drafts the learner cannot check in advance
 
@@ -177,14 +178,14 @@ The server side's estimate (22 October): 2–3 days of a session, with one migra
 
 A new mission **«Completa un modulo»**: credited when the module's quiz reaches the threshold of step 6
 (70%), once per module, never for reading or for time spent (rewards for mere completion lower intrinsic
-motivation: data, secondary source). Its weight is open (§11.3); the existing missions for due and new cards
+motivation: data, secondary source). It is worth **30 XP** (§11); the existing missions for due and new cards
 already reward the recalls on the following days.
 
 ## 9. Privacy and rights
 
 - **The declaration** before the first save, as a versioned text the user accepts: the material is the user's
   own or the user holds the rights to use it; it stays private; VisuaLex keeps only the text of the saved
-  modules. Its wording is the owners' (§11.5).
+  modules. Its wording is the owners', still to be written (§11).
 - **Private by construction.** No read returns another user's course; nothing of a course reaches the
   community, the graph or a shared environment in A1a.
 - **The assistant reads the module's text.** Sending it to the assistant's provider is the user's choice of
@@ -204,14 +205,17 @@ already reward the recalls on the following days.
 | self-assessment of the open answer with a rubric | **A3:** publishing to the community with mandatory review, an attestation tied to delayed mastery, not completion |
 | the «Completa un modulo» mission | writing practice (parere, atto) with worked examples and fading: its own spec |
 
-## 11. Decisions (open)
+## 11. Decisions
 
-1. **The name in the UI:** «Percorsi» (the owners' word), or «Corsi»? Recommended: «Percorsi»; code stays `corso`.
-2. **The next module:** offered after the course's due cards as a suggestion with one tap, or locked until they
-   are done? Recommended: a suggestion (inference: a lock on a bad day ends the habit).
-3. **The mission's weight and threshold:** recommended 30 XP at 70%, between «Scrivi» (25) and «Caso» (40).
-4. **Highlights in A1a** only for the session, or saved? Recommended: session only (§3, step 3).
-5. **The declaration's wording:** the owners'.
+Answered by the owners on 24 October («come raccomandi»), except the fifth.
+
+1. **The name in the UI: «Percorsi».** The code stays `corso` (§2).
+2. **The next module is a suggestion,** offered after the course's due cards with one tap, never locked
+   (inference: a lock on a bad day ends the habit).
+3. **The mission: 30 XP at 70%,** between «Scrivi» (25) and «Caso» (40) (§8).
+4. **Highlights in A1a live only for the session** (§3, step 3).
+5. **The declaration's wording:** open; the owners write it later. Until then the versioned text of §9 has
+   no first version, and A1a cannot ship without one.
 
 ## 12. Testing
 
