@@ -1,6 +1,7 @@
 # The MCP's next tools (N2), with notes on decisions (D7c) and passages proposed by the assistant (D7b) — Design
 
-Date: 23 October 2026. **Status: a proposal. Nothing is built.**
+Date: 23 October 2026. **Status: a proposal. Nothing is built.** Luca's questions (L1–L8) were decided on
+24 October 2026; the other developer's (G1–G9) are open (§10).
 
 It touches four things:
 - `apps/mcp`;
@@ -230,7 +231,7 @@ cited through the dossier once added. The description of `omnilex_leggi_testo_vo
 | No tool publishes to the Forum (owner, question 189) | `apps/mcp/CLAUDE.md` | **Holds.** The Forum tools search, read and import only (§6, B4). |
 | Deleting needs a confirmation the model cannot fill | `confirm.ts`; three destructive tools pinned by test | **Holds.** No new tool deletes. Withdrawing proposals is the user's, in the web app. |
 | Law and decision texts are never rewritten (rule 23) | root `CLAUDE.md` | **Holds.** The text is read, never written. The passages are located by the server (Part III). |
-| No practice data beyond what is needed | second round; `deletionMessage` names entries only by stored data | **Holds, with a cost.** Two tools now carry practice data out of the server: the texts (A2) and the tasks (A3), whose titles can name a client. Each sits behind a group of its own, off until the user switches it on (§2.4). The owner's notice on «Collega un'app AI» and `/connect` («no clients' personal data there, or only trusted AI apps», 13 October) must be rewritten for them: an owner's decision (G7, L1). |
+| No practice data beyond what is needed | second round; `deletionMessage` names entries only by stored data | **Holds, with a cost.** Two tools now carry practice data out of the server: the texts (A2) and the tasks (A3), whose titles can name a client. Each sits behind a group of its own, off until the user switches it on (§2.4). The owner's notice on «Collega un'app AI» and `/connect` («no clients' personal data there, or only trusted AI apps», 13 October) must be rewritten for them: an owner's decision (G7; L1 is decided, yes). |
 | The AI never overwrites what the user validated (N1) | the N1 answer, 21 October | **Holds.** Nothing edits the user's notes, highlights or cards. Completing a task (B3) changes its state, not its words. A proposal, once confirmed, is the user's, and the read tool no longer lists it. |
 | Everything the AI writes is marked; what anchors in a text is confirmable (D7b) | D7b | **Holds, with two additions.** Notes, entries, dossiers and cards already carry the connection's mark. Tasks get it (migration 2, B2). An import from the Forum through MCP (B4) marks the new dossier and its entries, and brings no notes, highlights or shortcuts, which would land in the user's article-wide tables with no mark. Passages stay proposals until confirmed. |
 | **No tool updates or moves** | `apps/mcp/CLAUDE.md`, `delegatedRoutes.ts:7`, the name test | **To revise, narrowly** (G5). The practice needs one update: the user tells the assistant «fatto». So there is one exception, `omnilex_completa_compito`. It covers non-repeating tasks of the user's dossiers. It is marked, and undone from the web app (`POST /tasks/:id/reopen`). Ticking closes the task's subtasks too, as in the app. It refuses a repeating task, whose tick moves a date (`tasks/tasks.ts:352`) and has no undo but the web's. Reopening a task clears its
@@ -275,7 +276,7 @@ the counter `text` are what limit them.
 |---|---|---|
 | C1 | Publishing to the Forum | The owner's decision 189: publishing is a human act, with its preview and privacy check. |
 | C2 | Searching norms or case law, a norm's text outside a dossier, deadline calculators | `mcp-legal-it` (§4). |
-| C3 | Renaming a dossier, starring, moving entries, editing or archiving a note | These update the user's own content: §5's rule holds. Starring would also have to write the web's `_dossierMeta` envelope, not `status`. Moving an entry carries a practice's data into another practice. The user does all of these in two clicks. |
+| C3 | Renaming a dossier, starring, moving entries, editing or archiving a note | These update the user's own content: §5's rule holds. Starring would also have to write the web's `_dossierMeta` envelope, not `status`. Moving an entry carries a practice's data into another practice. The user does all of these in two clicks. Luca, 24 October 2026: no for now (L5). |
 | C4 | The dossier's PDF as a file | It is built in the browser, and a server copy would be a second renderer to keep identical. A4 gives the page's address instead. |
 | C5 | Comparing articles | Web only. The model compares two texts read with A2 by itself. |
 | C6 | «What changed in my dossiers' norms» | Watches are not tied to dossiers. The feature comes first (a product decision), then a read tool. |
@@ -369,7 +370,7 @@ used when a note is created (`:344`) and when one is reattached (`:385`).
    - A note about a chosen decision prints under it.
    - A note about a decision not chosen for the PDF goes to the «Note» block, labelled «Nota su <citazione>»
      (today `noteLine`, `dossierPdf.ts:214`, prints it without context). So it is never lost while the
-     counts still count it. Question L6.
+     counts still count it. Decided: L6, yes (24 October 2026).
 5. **Publication** already labels such a note «Nota su <citazione>» (`dossierPublication.ts:171`).
 
 ### 7.3 One pull request or two: **two**
@@ -392,7 +393,7 @@ used when a note is created (`:344`) and when one is reattached (`:385`).
 ## 8. The design
 
 D7b in detail. Its two tools are A2 and B1 of the catalogue (§6), and its questions are G2, G3, G4, G7, G9 and
-L7 (§10).
+L7 (§10). L7 is decided: yes (24 October 2026).
 
 ### 8.1 What this changes, and why it is safe now
 
@@ -826,7 +827,8 @@ way. The difference is where the model's words land, and P6 keeps them inside th
 ## 9. The order of the work
 
 Each line is one pull request. «G» is the other developer's approval, «L» Luca's. Migrations are named, not
-created, and must be reserved in the owners' register.
+created, and must be reserved in the owners' register. The L questions are decided (§10, 24 October 2026),
+so an L in «Waits for» is met; the G questions are open.
 
 | # | Pull request | Areas | Migration | Approval | Waits for |
 |---|---|---|---|---|---|
@@ -850,6 +852,14 @@ The N1 proposal also expects a migration, so the first to reach the register tak
 Each has a recommendation. The real codes (G-n, L-n) are given in the owners' register; here they are
 numbered for reference.
 
+**Where they stand, 24 October 2026.** Luca answered the eight L questions «Ok come raccomandi»: yes to L1–L4 and
+L6–L8, no for now to L5. The G questions stay open:
+- **G2** (the texts leaving through MCP) and **G7** (the words of consent) touch personal data, and wait for
+  Luca's spoken confirmation;
+- the others may go ahead on Luca's ok, with a note to the other developer afterwards.
+
+No piece of §9 starts until the owners give the word.
+
 ### For the other developer (G)
 
 | # | Question | Recommendation |
@@ -866,22 +876,22 @@ numbered for reference.
 
 ### For Luca (L)
 
-| # | Question | Recommendation |
-|---|---|---|
-| L1 | The assistant reads a dossier's tasks (A3): title, description, labels, days, priority, the dossier's name. Inbox tasks are left out. They leave through MCP under the group «Pratica», off by default. The connect page's notice says so. | Yes. |
-| L2 | The assistant completes a non-repeating task when told («fatto»): marked «completato da Claude Code», with its subtasks, undone in the app (B3). | Yes. |
-| L3 | The assistant reads «cosa ho da ripassare oggi» and the progress per institute (B5), never XP. | Yes. |
-| L4 | The assistant searches and reads the Forum's public dossiers, and imports one as the user's own study copy (B4). The copy is marked, and brings no notes, highlights or shortcuts. The assistant never publishes. | Yes, after A. |
-| L5 | Renaming a dossier, starring, moving entries, editing notes through MCP (C3). | No for now: the user does it in two clicks, and these change the user's own content. |
-| L6 | D7c in the PDF: a note about a decision not chosen for the PDF prints under «Note», labelled «Nota su <citazione>». | Yes. |
-| L7 | D7b's look (Part III, P7–P8): a dashed underline; «Proposto dall'IA · Claude Code … · da confermare»; «Conferma / Modifica / Rimuovi»; no «Conferma tutte». | Yes. |
-| L8 | A task added by the assistant (B2) gets a planned day, never a deadline: the deadline stays only what the user wrote. | Yes. |
+| # | Question | Recommendation | Decided |
+|---|---|---|---|
+| L1 | The assistant reads a dossier's tasks (A3): title, description, labels, days, priority, the dossier's name. Inbox tasks are left out. They leave through MCP under the group «Pratica», off by default. The connect page's notice says so. | Yes. | **Yes**, 24 October 2026. |
+| L2 | The assistant completes a non-repeating task when told («fatto»): marked «completato da Claude Code», with its subtasks, undone in the app (B3). | Yes. | **Yes**, 24 October 2026. |
+| L3 | The assistant reads «cosa ho da ripassare oggi» and the progress per institute (B5), never XP. | Yes. | **Yes**, 24 October 2026. |
+| L4 | The assistant searches and reads the Forum's public dossiers, and imports one as the user's own study copy (B4). The copy is marked, and brings no notes, highlights or shortcuts. The assistant never publishes. | Yes, after A. | **Yes, after A**, 24 October 2026. |
+| L5 | Renaming a dossier, starring, moving entries, editing notes through MCP (C3). | No for now: the user does it in two clicks, and these change the user's own content. | **No for now**, 24 October 2026. |
+| L6 | D7c in the PDF: a note about a decision not chosen for the PDF prints under «Note», labelled «Nota su <citazione>». | Yes. | **Yes**, 24 October 2026. |
+| L7 | D7b's look (Part III, P7–P8): a dashed underline; «Proposto dall'IA · Claude Code … · da confermare»; «Conferma / Modifica / Rimuovi»; no «Conferma tutte». | Yes. | **Yes**, 24 October 2026. |
+| L8 | A task added by the assistant (B2) gets a planned day, never a deadline: the deadline stays only what the user wrote. | Yes. | **Yes**, 24 October 2026. |
 
 ## 11. Cost and risk
 
 | Level | Pieces | Time | Risk |
 |---|---|---|---|
-| A | 1a, 1b, 2, 3, 4, 5 | about 6 days: instructions and budget 0.5; the groups (server, web, MCP) 2; D7c 0.5 + 1 (web); texts and address 1.5; tasks read 0.5 | **Low to medium.** No migration; add-only or read-only. The groups touch consent, an authorization area. The real exposure is the texts and task titles leaving, which G1, G2, G7 and L1 decide. |
+| A | 1a, 1b, 2, 3, 4, 5 | about 6 days: instructions and budget 0.5; the groups (server, web, MCP) 2; D7c 0.5 + 1 (web); texts and address 1.5; tasks read 0.5 | **Low to medium.** No migration; add-only or read-only. The groups touch consent, an authorization area. The real exposure is the texts and task titles leaving, which G1, G2 and G7 decide (L1: yes, 24 October 2026). |
 | B | 6–10 | about 9 days: D7b 2.5 + 2 (web); tasks 1.5 + 0.5 (web); study 0.5; Forum 2 | **Medium.** Two migrations and two revised rules (G5, G6). The Forum brings other people's text into the model's context: answers are data, never instructions, and the tool says so. D7b depends on the server reading exactly the text the browser reads (§8.5). |
 | B6 | N1 | by N1's design | As N1 says. It must fit the budget. |
 | C | — | — | — |
