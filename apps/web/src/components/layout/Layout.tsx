@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Sidebar } from './Sidebar';
+import { RoutePage } from './RouteBoundary';
 import { useDesktopSidebar } from './sidebarWidth';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
@@ -369,7 +370,9 @@ export function Layout() {
             // whose practice row is the window less `p-8` (`h-app-row`).
             isAuthenticated && !onSearchPage && 'md:[--page-foot:5.375rem] md:pb-[var(--page-foot)]',
           )}>
-            <Outlet />
+            <RoutePage>
+              <Outlet />
+            </RoutePage>
           </div>
         </div>
       </main>

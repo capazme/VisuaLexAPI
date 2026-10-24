@@ -6,7 +6,17 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
 
 ### Frontend (`apps/web/src`)
 
-- `App.tsx` — routing. In the signed-in layout: `/` (search), `/dossier`, `/opus` (the planner, below: `OpusPage`
+- `App.tsx` — routing. **Pages loaded with their route** (P1): every page but Ricerca (`/`) and the sign-in page is a
+  `lazy` route — Dossier, the Forum and its Community, Opus (its frame and views in one fetch), «Analizza documento»,
+  the Cronologia, «Crediti», «Collega un'app AI», besides Gymnasium, Academia and the admin. Their modules are listed
+  once in `pageCode.ts` (`PAGE_CODE`), which the routes, the sidebar's entries (`preparePage`, fetched as an entry is
+  pointed at, touched or focused) and the section switcher (`SECTION_HOME_CODE`) share; `pageCode.test.ts` refuses a
+  static import of any of them, and of `features/connections`' index, which re-exports «Collega un'app AI». They wait
+  in `RoutePage` (`components/layout/RouteBoundary.tsx`; the layout's outlet and «Crediti»): `Suspense` with nothing in
+  the page's place, so nothing stays once it is there, and a navigation keeps the page it leaves until the new one is
+  ready (the router renders it in a transition). A page whose code cannot be fetched, or that fails in use, keeps the
+  layout and says «Si è verificato un errore.» with «Riprova», which reloads (the one mend for a file a deploy
+  removed; on develop the app went blank); another address draws its page again. In the signed-in layout: `/` (search), `/dossier`, `/opus` (the planner, below: `OpusPage`
   over `oggi`, `prossimi`, `ingresso` and `cestino`; `/opus` redirects to `oggi`),
   `/studia` (VisuaLex Gymnasium, the study cards; the code keeps the name `studia`: `StudiaPage` with its views under
   `components/features/studia/`, `studiaService`; behind `VITE_FEATURE_STUDIA`, default on
@@ -291,7 +301,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   it synchronous), so the old page's picture holds for the new title, at most `HOLD_MAX` (150 ms), watched by a
   `MutationObserver` — the browser draws no frame, so no `requestAnimationFrame`, while the update is pending. A heading
   that already named the section before the swap (the dossier list's says the kind it last listed) is not taken until
-  that hold is over. The pages loaded on demand (Gymnasium's, Academia's) are fetched when the switcher opens
+  that hold is over. The pages loaded on demand (Opus's, Gymnasium's, Academia's, the Forum's) are fetched when the switcher opens
   (`SECTION_HOME_CODE`, when the menu opens), or the first change would hold and fade into «Caricamento…». The
   switcher's mark passes to the new hue in 200 ms (`transition-colors duration-200`), the change's one touch of colour;
   the sidebar's new entries fade in, the first six 20 ms apart, the old ones simply go (`useEntriesEntrance`, Web
