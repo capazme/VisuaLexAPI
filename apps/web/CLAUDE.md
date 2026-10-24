@@ -6,7 +6,33 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
 
 ### Frontend (`apps/web/src`)
 
-- `App.tsx` — routing. In the signed-in layout: `/` (search), `/dossier`, `/opus` (the planner, below: `OpusPage`
+- `App.tsx` — routing. **Pages loaded with their route** (P1): Dossier, the Forum and its Community, Opus (its frame
+  and views in one fetch), «Analizza documento», the Cronologia, «Crediti» and «Collega un'app AI» are `lazy` routes,
+  as Gymnasium's, Academia's and the admin's were. Their modules are listed once in `pageCode.ts` (`PAGE_CODE`), which the routes,
+  the sidebar's entries (`preparePage`, as an entry is pointed at, touched or focused), the section switcher
+  (`SECTION_HOME_CODE`) and `main.tsx` (the address opened, fetched beside the sign-in check) share;
+  `pageCode.test.ts` refuses a static import of any of these pages by any path, and of a folder index that would
+  re-export one (the connections' was removed: «Collega un'app AI» was in it). Ricerca, the sign-in page, a
+  decision's address (`DecisionAddress`), `/connect` and «Pagina non trovata» stay in the first chunk. An address
+  opened directly fetches its lazy
+  page's code beside the first chunk, not after it: the build (`routePreload` in `vite.config.ts`, over
+  `ROUTE_PAGES`, which `pageCode.test.ts` keeps in step with `PAGE_CODE` and in the order of its prefixes) writes each
+  page's chunks into `assets/route-preload-<hash>.js` (~1.9 KB, outside the first chunk), which `index.html` loads
+  `async` and which adds a `modulepreload` for the address opened and no other. A file, not an inline script: the
+  ingress's Content-Security-Policy allows scripts from 'self' only (as `theme-boot.js`). Its name carries its hash,
+  so an `index.html` always names its own build's map and a cached older one is never asked for.
+  Inside the layout the lazy pages wait in `RoutePage` (`components/layout/RouteBoundary.tsx`, around `Layout`'s
+  outlet): a boundary on screen from the first draw, with nothing in the page's place, so nothing stays once it is
+  there, and a navigation keeps the screen it leaves until the new page is ready (the router renders it in a
+  transition; a boundary mounted with the new page would show its fallback at once). «Crediti», outside the layout,
+  has no `Suspense` above it: it suspends the root, so opened by its address the splash of `index.html` stays until it
+  is there, and moved to from the app the router's transition keeps the screen it leaves. The phone's bar names
+  nothing while nothing is drawn (`usePageTitleInView`), and names the page if it then draws no `h1` (the error). A
+  page whose code cannot be fetched, or that fails in use, keeps the layout and says «Si è verificato un errore.» with
+  «Riprova», which reloads (the one mend for a file a deploy removed; before P1 no boundary held it and the app went
+  blank); any new navigation draws the page again (`useLocation().key`: the same address with another query, or its
+  entry chosen again, included).
+  In the signed-in layout: `/` (search), `/dossier`, `/opus` (the planner, below: `OpusPage`
   over `oggi`, `prossimi`, `ingresso` and `cestino`; `/opus` redirects to `oggi`),
   `/studia` (VisuaLex Gymnasium, the study cards; the code keeps the name `studia`: `StudiaPage` with its views under
   `components/features/studia/`, `studiaService`; behind `VITE_FEATURE_STUDIA`, default on
@@ -291,8 +317,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   it synchronous), so the old page's picture holds for the new title, at most `HOLD_MAX` (150 ms), watched by a
   `MutationObserver` — the browser draws no frame, so no `requestAnimationFrame`, while the update is pending. A heading
   that already named the section before the swap (the dossier list's says the kind it last listed) is not taken until
-  that hold is over. The pages loaded on demand (Gymnasium's, Academia's) are fetched when the switcher opens
-  (`SECTION_HOME_CODE`, when the menu opens), or the first change would hold and fade into «Caricamento…». The
+  that hold is over. The pages loaded on demand (Opus's, Gymnasium's, Academia's, the Forum's) are fetched when the
+  switcher opens (`SECTION_HOME_CODE`), or the first change would play over the page it leaves (Opus, the Forum) or
+  fade into «Caricamento…» (Gymnasium, Academia), the new page coming after the hold. The
   switcher's mark passes to the new hue in 200 ms (`transition-colors duration-200`), the change's one touch of colour;
   the sidebar's new entries fade in, the first six 20 ms apart, the old ones simply go (`useEntriesEntrance`, Web
   Animations, opacity only, never on the sidebar's first draw). The section's entries are a `LayoutGroup` of their
@@ -695,7 +722,9 @@ checks the files; «termine calcolato» comes with wave 2 and its warning), and 
   client): `useTaskView` and the count log a status only.
 - **Adding**: `QuickAddField` at the top of each view (a title and Enter, at 16 px on a phone; «Dettagli» opens dates,
   priority and dossier in a `ui/Collapsible` under the row, the box growing, its arrow turning, Esc closing it — U1b;
-  a line says where the task goes; a task that will not show in the view is announced); «c» (as in «compito») from anywhere opens
+  a line says where the task goes; a task that will not show in the view is announced; the field keeps its hint whole,
+  12 em of its own 16 px text whatever the text size, never wider than its line, the ＋ with it, and on a row too narrow
+  for it and its two buttons — a phone — the buttons go under it, at the right); «c» (as in «compito») from anywhere opens
   `TaskDialog` (`PlannerHost`, mounted by `Layout`; not in a field, with a modifier, or under a dialog,
   a menu or a `data-find-overlay`), with the dossier chosen on `/dossier?dossier=` and today's date on «Oggi» and
   «Prossimi giorni»; a task the page will not list is announced, as from the field; listed in the «?» dialog. No date
@@ -1130,7 +1159,16 @@ places the right column; inside the tiles a sentence stops at `max-w-prose`. Wit
 the points, #253, or a failed read) the left column held the day block alone while the right ran past the window (G8c):
 «Le tue materie» leaves the box then for the left column, under the day block — from `xl` only, and before the
 statistics in the document, so the keyboard follows the eye; below `xl` nothing moves —; while the first read travels it
-stays in the box, and after a failed read it stays on the left while «Riprova» reads again. In that order:
+stays in the box, and after a failed read it stays on the left while «Riprova» reads again. The places held while the
+reads travel are as tall as what takes them (P1, phone CLS 0.63 → 0), and only while they travel — no room is kept once
+read: the date's line while the day's read travels, also when a subject's read answers first (two lines on a phone with
+a subject); the large line on two lines under 390 px, where «23 da ripassare, 15 nuove» wraps, one from there; the cost
+on two below `md`, and kept on two there while the subjects' read travels (it says the subjects once they come); the
+missions' rows 58, 58 and 84 px on a phone, as theirs (the goal's with its line); «Le tue materie»'s strip held inside a
+plain box, so React never keeps the strip, a scroller Chrome measured in its own coordinates, as the list's group. The
+heights are a day's with cards to review and missions: a day done or a subject chosen leaves a small shift (CLS ≤ 0.03);
+with no mission at all (a server without the points, no card yet) the missions' place goes when the read comes (0.15–0.22,
+from 0.48–0.57 before). In that order:
 1. **The day block** (`missions/DayBlock`, G8, the page's entry; on a phone «Inizia il ripasso» within the first 400 px
    under the bar): a tile with the section's hue as a 4 px rule down its left edge (`--vlx-section-gymnasium`), a
    visually hidden `h2` «Il ripasso di oggi»; the day small, «lunedì 19 ottobre» (the title says «Oggi»; «lunedì 19
@@ -1467,7 +1505,7 @@ own data (decided by the owner, 8 Oct 2026).
 **Downloads** (`DecisionDownloads`, among `DecisionView`'s actions for a found decision):
 «Scarica PDF» is a PDF of ours (`decisionPdf.ts`: `decisionPdfModel` is pure,
 `writeDecisionPdf` draws it with jsPDF through `utils/pdfWriter.ts`, the page layout the
-dossier's PDF shares), optionally «Con le mie evidenziazioni e note» (placed by `resolveAnchors`
+dossier's PDF shares; the button waits with the `Button` spinner while jsPDF loads), optionally «Con le mie evidenziazioni e note» (placed by `resolveAnchors`
 over the same projection; free notes follow the text; anchors that no longer land are listed under
 «Non ritrovate nel testo attuale», switchable with the `includeUnmatched` option of
 `decisionPdfModel`); «PDF originale della Corte», for the Cassazione only, is the court's own file
@@ -1570,7 +1608,15 @@ its column and the article is still compared). It only informs: «Vedi il testo 
 the later text (G-357).
 
 **«Confronta articoli»** (`features/compare/CompareView`, spec `docs/superpowers/specs/2026-10-13-compare-articles-design.md`):
-a full-screen overlay (`data-find-overlay`) over two articles chosen from the practices, a search or the history. The
+a full-screen overlay (`data-find-overlay`) over two articles chosen from the practices, a search or the history.
+`Layout` mounts it — and so fetches its chunk — only from its first opening in the visit (`useCompareOpened`), a
+spinner where it will stand while the code arrives, and keeps it mounted after, as before (its full-screen choice
+survives a close); the spinner shows only while the comparison is open. Its code that cannot be fetched, or an error
+of the comparison in use, closes it instead of taking the page down (`CompareBoundary`; on develop the app went
+blank), the error in the console, no words on screen; the next opening asks for the code again, which mends a dropped
+connection but not a file a deploy removed (missing until the page is reloaded, as for a lazy route — and for driver.js
+and the study packs);
+`lazyModules.guard.test.ts` refuses a static import of any module of `features/compare/` outside it. The
 body is `CompareBody`: `compareArticles` (`utils/articleCompare.ts`, pure, ranges only) pairs the commi — by printed
 number, else by words, else by place (one lone comma facing one) — and labels them (invariato / modificato / riscritto / aggiunto / abrogato) when it is the same
 article in two versions, each citable (`describeVersion`; a side whose window misses the day asked for, or that
@@ -1852,9 +1898,10 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   link, `CitedNormChoice` offers «Apri su Dashboard» (the search of its text in force, as before) and «Aggiungi al
   dossier» (`AddToDossierPopover` on the norm as `/fetch_article_text` answers it); the preview's button, «Apri su
   Dashboard» there, still goes straight to Dashboard. The links take no keyboard focus, here as anywhere in the
-  reader, so the keyboard reaches neither way (as before D7d). The acts' «⋯» opens upwards when the column has no room below (`MenuButton`'s
-  `placement="auto"`). Its heading an h3 under
-  «Giurisprudenza», `DecisionView`'s `headingLevel`. The application that filed it is marked as an article's notes are,
+  reader, so the keyboard reaches neither way (as before D7d). The acts' «⋯» opens upwards when the column has no room
+  below (`MenuButton`'s `placement="auto"`). The row names the decision, so inside its full name is a quiet line of
+  details, not a second and heavier title (`DecisionView`'s `title="line"`; the practice keeps its h4). The application
+  that filed it is marked as an article's notes are,
   `ClaudeMark` with `verb="aggiunta"` — «aggiunta da Claude Code», never «scritta» — from the item's own `createdBy`,
   on the grey line rather than at the right (a long citation beside it was squeezed into a column on a phone).
   No note count: the server takes a note about an article only, `assertArticleOfDossier`, and counting the notes and
@@ -1864,7 +1911,9 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   to its court's source, and leaves a decision open as it was; «Comprimi tutto» closes every row, the decisions too (in
   a dossier of decisions alone it is all the button offers, once one is open). The block of acts is hidden, still
   mounted, while no act is on screen. In two columns the
-  acts' headings are h3 under «Norme» (`headingLevel`), and the page keeps the same elements whatever the search leaves,
+  acts' headings are h3 under «Norme» (`headingLevel`); an act's header follows its own width (`@container`): narrower
+  than 42 rem (672 px at the default text size) its name wraps, its count following the name's last words on their line (not on a line of its own), its
+  actions keeping their icons only; and the page keeps the same elements whatever the search leaves,
   only their classes changing, so an open article is never remounted. The stored `etichetta` is a copy (source convention, D9):
   `decisionCitationOf` recomputes the citation from the identity and the attributes, every write
   sends it (`itemContentFor`, `serverItemFor`), the server recomputes it again on every write
@@ -1872,6 +1921,19 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   `parseSentenzaContent` (dossierUtils) mirrors `apps/server/src/schemas/decisionItem.ts`:
   change both together. Every switch over item types ends in `assertNever`, so a new type cannot
   fall silently into "note".
+- **jsPDF is loaded on the first export** (`utils/loadJsPdf.ts`, a dynamic `import()` kept for the next
+  export and retried after a failed load — a chunk a deploy removed keeps failing until the page is
+  reloaded, as a lazy route does): with pako and fast-png it is ~120 KB compressed that every page,
+  sign-in included, would otherwise download. Its users — `writeDossierPdf`, `writeDecisionPdf`,
+  `AdvancedExportModal` — are async and name jsPDF with `import type` only; `loadJsPdf.guard.test.ts`
+  refuses, in any source file, a value import or re-export of it or of what it brings. A button that
+  writes a PDF shows the wait (spinner, disabled, `aria-busy`) with its own label, no new text; a load
+  that fails says what a failed write already said («Download non riuscito: riprova.», which «Esporta
+  articolo» borrows; the dossier's toast). «Esporta articolo» cannot be closed or changed while its PDF
+  waits, as `DossierPdfDialog`; a host that closes or unmounts it meanwhile (StudyMode's Esc leaves the
+  whole mode), or a reader who leaves a decision, cancels the download. `pdfIdentity.test.tsx` holds the bytes of a dossier, a
+  decision and an article PDF (date, time zone and `Math.random` fixed), so a change in how jsPDF is
+  reached cannot change the file.
 - **The PDF** (`dossierPdf.ts`) is grouped the same way and prints each
   article's text as the reader shows it, fetched through `articleFetchCache` —
   never a stored `article_text`, which items added through MCP or «Importa da
@@ -2364,7 +2426,10 @@ meant to stay split; add new features as new files, not inside the shells:
   Suggerimenti» (`ForumTabs`, drawn by `ui/SegmentedTabs`: short labels «Esplora · Miei · Suggeriti» sharing the row in
   equal parts below `sm`, whole from it — at 320 px the last was cut, S7a; the views, `ForumExploreView`,
   `ForumMyEnvironmentsView`, `ForumSuggestionsView`, in its `SegmentedTabPanel`, their order in `forumSections.ts`); the titles of «Dossier pubblici» and «Community» come from `features/sections/pageNames.ts`; Explore's filters are one row
-  from `sm` and, on a phone, the search across with the category («Tutte»), the order and the 44 px refresh under it, M1. «Pubblica un dossier»
+  from `sm` and, on a phone, the search across with the category («Tutte»), the order and the 44 px refresh under it, M1. While
+  Explore's read travels the count's line is kept, empty, and the cards held are as tall as a card that came (P1, CLS 0.12
+  on a phone and 0.04 at 1920 → 0; the height of a full card, a title on two lines, a description and labels: a short
+  card that comes leaves a smaller shift upwards). «Pubblica un dossier»
   is `PublishDossierPicker` (the user's dossiers not yet in the Forum, then the dossier's own
   `PublishDossierDialog`; the Forum never publishes a workspace); «Modifica» on a published dossier
   (`EditSharedEnvironmentModal`) edits its name, description, category and tags only — what it holds changes
@@ -2388,12 +2453,16 @@ meant to stay split; add new features as new files, not inside the shells:
   pubblicati» (`showOwnerActions`), never on Explore; where a card is too narrow the action goes under them, whole. «I
   più aggiunti» is an `h2`, last on the page. Then «Pronti da VisuaLex» (`StudyPacksBand`, over
   `utils/studyPacks.ts`: the 20 packs of `data/exampleEnvironments.ts`, each a pack's dossiers plus «‹pack›: articoli
-  chiave»): one row of compact cards that scrolls sideways (`#pronti`, `tabIndex 0`, so the keyboard scrolls it past
+  chiave»; `loadStudyPacks` imports the data, ~60 KB, when the band first asks, so it is not in the chunk every page
+  loads — meanwhile the heading and five cards drawn like the packs' (a name on two lines, the count, the 44 px
+  button) hold their place, `aria-busy`, every category holding packs; once loaded, a band drawn again shows them at
+  once (`peekStudyPacks`); a load that fails leaves the band out): one row of compact cards that scrolls sideways (`#pronti`, `tabIndex 0`, so the keyboard scrolls it past
   packs already added), every pack in it — on a computer after the grid and its pages; on a phone right after the
   community's first two dossiers (or their places while a read travels, or the empty state), in a fixed place so it is
   never mounted again while a new read travels, the rest under a hidden `h2` «Altri dossier della comunità»
   (`useIsDesktop`, one place or the other); it follows Explore's category and adds a pack through `import-study`; the
-  empty dossier list's «Pronti da VisuaLex» goes to `/forum#pronti`, where Explore, once read, scrolls the content
+  empty dossier list's «Pronti da VisuaLex» goes to `/forum#pronti`, where Explore, once read and once the band says its
+  packs are shown (`onShown`), scrolls the content
   scroller alone to the strip under the phone's bar (`scroll-padding-top`, gotcha 34) and focuses it, once: the fragment
   then leaves the address (`history.replaceState`, the router's state kept), so another tab and back, or a reload, do not
   jump again. One list of categories, `utils/forumCategories.ts`. `EnvironmentContentViewer` (the tree of a
@@ -2502,6 +2571,12 @@ meant to stay split; add new features as new files, not inside the shells:
   driver.js's «×» «Chiudi» in `onPopoverRender` (driver.js writes «Close» and has no option for it; `TOUR_UI`). A tour is closed, unseen (asked again next time), when the window
   passes to another layout (768 and 1024 px) or the element of its step is no longer drawn: driver.js redrew the veil at
   its old size (Y1); and a focus driver.js gives its buttons with no key pressed shows no ring (`data-pointer-focus`).
+  driver.js and its stylesheet are fetched when a tour first starts (`loadDriver` in `useTour`), not with every page —
+  ahead, while the tour waits for its delay (`prepareTour`: `tryStartTour`, `resetAndStartTour`, `Layout`'s welcome);
+  the steps, the guards and the screen are read once it is here, and a `stopTour` or the surface unmounting meanwhile
+  cancels the start;
+  `lazyModules.guard.test.ts` refuses a static import of it. `index.css` still overrides its stylesheet, which lands
+  after it as before.
   `SearchPanel` mounts them (imported statically: the table is the app's main surface; `PDFViewer`, Study Mode and
   `CompareView` stay behind `lazy()`), one layout per breakpoint (`useIsDesktop`); a decision opened from any link lands in its practice
   and opens beside on the desktop (the window a link was clicked in is never the one a third window

@@ -28,7 +28,7 @@ vi.mock('./dossierPdf', async (importOriginal) => {
     loadDossierTexts: pdf.loadDossierTexts,
     loadDossierDecisions: pdf.loadDossierDecisions,
     buildPdfBlocks: (...args: Parameters<typeof real.buildPdfBlocks>) => { pdf.built.push(args); return real.buildPdfBlocks(...args); },
-    writeDossierPdf: (...args: unknown[]) => { pdf.written.push(args); return { save: pdf.save }; },
+    writeDossierPdf: async (...args: unknown[]) => { pdf.written.push(args); return { save: pdf.save }; },
   };
 });
 vi.mock('./dossierPdfMarks', () => ({ loadPdfMarks: pdf.loadPdfMarks }));
@@ -124,7 +124,8 @@ describe('DossierDetailView — the page by act', () => {
     renderView();
     expect(screen.getAllByRole('heading', { name: `${L247} 2 articoli` })).toHaveLength(1);
     const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent ?? '');
-    expect(headings.filter((h) => h.startsWith('l. '))).toEqual([`${L247}2 articoli`, `${L49}1 articolo`]);
+    // The count twice in the text: in the name's flow while narrow (hidden from a screen reader), and the heading's own.
+    expect(headings.filter((h) => h.startsWith('l. '))).toEqual([`${L247}2 articoli2 articoli`, `${L49}1 articolo1 articolo`]);
     const block = screen.getByRole('region', { name: L247 });
     expect(within(block).getAllByText(/^art\. \d+$/).map((el) => el.textContent)).toEqual(['art. 1', 'art. 3']);
   });

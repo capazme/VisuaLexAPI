@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { scrollParentOf } from '../practice/practiceView';
 import { Search, Upload, Filter, ChevronDown, RefreshCw, Users, TrendingUp, Clock, Download, Trophy, X as XIcon } from 'lucide-react';
 import { CARD_GRID, SharedEnvironmentCard } from './SharedEnvironmentCard';
@@ -95,7 +95,10 @@ export function ForumExploreView({
   // The community's dossiers first, the Forum's reason (S7a); VisuaLex's packs after them — on a computer after the
   // grid, on a phone after its first two cards, so the first screen shows what the community published.
   const desktop = useIsDesktop();
-  const packs = <StudyPacksBand category={category} onAdded={onPacksAdded} onError={onPacksError} />;
+  // The packs load after the band: the strip is there to be brought up only once they are shown.
+  const [packsShown, setPacksShown] = useState(false);
+  const showPacks = useCallback(() => setPacksShown(true), []);
+  const packs = <StudyPacksBand category={category} onAdded={onPacksAdded} onError={onPacksError} onShown={showPacks} />;
   const cards = (list: SharedEnvironment[], offset = 0) => (
     <div className={GRID}>
       {list.map((env, idx) => (
@@ -171,11 +174,12 @@ export function ForumExploreView({
     // Once: the fragment leaves the address (the router's state kept), so going back to Explore from another tab, or
     // reloading, neither scrolls to the strip again nor takes the focus.
     window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}`);
-  }, [loading]);
+  }, [loading, packsShown]);
   const skeleton = (count: number) => (
     <div aria-hidden className={GRID}>
       {[...Array(count)].map((_, i) => (
-        <div key={i} className="overflow-hidden rounded-xl border border-slate-200 bg-white motion-safe:animate-pulse dark:border-slate-700 dark:bg-slate-900">
+        // As tall as a card that has come (P1: the grid grew 159 px under the strip at 1920, 209 on a phone).
+        <div key={i} className="min-h-[16.75rem] overflow-hidden rounded-xl border border-slate-200 bg-white motion-safe:animate-pulse md:min-h-[15.25rem] dark:border-slate-700 dark:bg-slate-900">
           <div className="space-y-3 p-4">
             <div className="h-5 w-3/4 rounded bg-slate-100 dark:bg-slate-800" />
             <div className="h-4 w-1/2 rounded bg-slate-100 dark:bg-slate-800" />
@@ -314,8 +318,10 @@ export function ForumExploreView({
         />
       )}
 
-      {/* Results count */}
-      {!loading && (
+      {/* Results count; while the read travels its line is kept, empty, so the cards do not move down when it comes (P1). */}
+      {loading ? (
+        <p aria-hidden className="h-5" />
+      ) : (
         <p className="text-sm text-slate-500 dark:text-slate-400">
           {pagination.total} {pagination.total === 1 ? 'dossier pubblicato' : 'dossier pubblicati'}
         </p>

@@ -270,7 +270,15 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
         'La nota resta segnata come scritta da questa applicazione. Aggiunge soltanto: non modifica né cancella note.',
       inputSchema: {
         dossier: z.string().min(1).max(200).describe('Id del dossier, o il suo nome esatto'),
-        testo: z.string().trim().min(1).max(MAX_NOTE_LENGTH).describe('Il testo della nota'),
+        // `.max` gives the schema's maxLength, in code points under zod 4; the refinement keeps the server's count,
+        // UTF-16 units, so a note too long for the server is refused here, as with zod 3.
+        testo: z
+          .string()
+          .trim()
+          .min(1)
+          .max(MAX_NOTE_LENGTH)
+          .refine((text) => text.length <= MAX_NOTE_LENGTH, `Too big: expected string to have <=${MAX_NOTE_LENGTH} characters`)
+          .describe('Il testo della nota'),
         voce: z.string().min(1).max(64).optional().describe('L’id dell’articolo del dossier a cui si riferisce la nota'),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
