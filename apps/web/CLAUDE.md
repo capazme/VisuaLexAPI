@@ -1130,7 +1130,16 @@ places the right column; inside the tiles a sentence stops at `max-w-prose`. Wit
 the points, #253, or a failed read) the left column held the day block alone while the right ran past the window (G8c):
 «Le tue materie» leaves the box then for the left column, under the day block — from `xl` only, and before the
 statistics in the document, so the keyboard follows the eye; below `xl` nothing moves —; while the first read travels it
-stays in the box, and after a failed read it stays on the left while «Riprova» reads again. In that order:
+stays in the box, and after a failed read it stays on the left while «Riprova» reads again. The places held while the
+reads travel are as tall as what takes them (P1, phone CLS 0.63 → 0), and only while they travel — no room is kept once
+read: the date's line while the day's read travels, also when a subject's read answers first (two lines on a phone with
+a subject); the large line on two lines under 390 px, where «23 da ripassare, 15 nuove» wraps, one from there; the cost
+on two below `md`, and kept on two there while the subjects' read travels (it says the subjects once they come); the
+missions' rows 58, 58 and 84 px on a phone, as theirs (the goal's with its line); «Le tue materie»'s strip held inside a
+plain box, so React never keeps the strip, a scroller Chrome measured in its own coordinates, as the list's group. The
+heights are a day's with cards to review and missions: a day done or a subject chosen leaves a small shift (CLS ≤ 0.03);
+with no mission at all (a server without the points, no card yet) the missions' place goes when the read comes (0.15–0.22,
+from 0.48–0.57 before). In that order:
 1. **The day block** (`missions/DayBlock`, G8, the page's entry; on a phone «Inizia il ripasso» within the first 400 px
    under the bar): a tile with the section's hue as a 4 px rule down its left edge (`--vlx-section-gymnasium`), a
    visually hidden `h2` «Il ripasso di oggi»; the day small, «lunedì 19 ottobre» (the title says «Oggi»; «lunedì 19
@@ -2349,7 +2358,10 @@ meant to stay split; add new features as new files, not inside the shells:
   Suggerimenti» (`ForumTabs`, drawn by `ui/SegmentedTabs`: short labels «Esplora · Miei · Suggeriti» sharing the row in
   equal parts below `sm`, whole from it — at 320 px the last was cut, S7a; the views, `ForumExploreView`,
   `ForumMyEnvironmentsView`, `ForumSuggestionsView`, in its `SegmentedTabPanel`, their order in `forumSections.ts`); the titles of «Dossier pubblici» and «Community» come from `features/sections/pageNames.ts`; Explore's filters are one row
-  from `sm` and, on a phone, the search across with the category («Tutte»), the order and the 44 px refresh under it, M1. «Pubblica un dossier»
+  from `sm` and, on a phone, the search across with the category («Tutte»), the order and the 44 px refresh under it, M1. While
+  Explore's read travels the count's line is kept, empty, and the cards held are as tall as a card that came (P1, CLS 0.12
+  on a phone and 0.04 at 1920 → 0; the height of a full card, a title on two lines, a description and labels: a short
+  card that comes leaves a smaller shift upwards). «Pubblica un dossier»
   is `PublishDossierPicker` (the user's dossiers not yet in the Forum, then the dossier's own
   `PublishDossierDialog`; the Forum never publishes a workspace); «Modifica» on a published dossier
   (`EditSharedEnvironmentModal`) edits its name, description, category and tags only — what it holds changes

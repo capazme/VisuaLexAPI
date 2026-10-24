@@ -67,10 +67,15 @@ export function SubjectList({ materie, loading, reloading, selected, onSelect, p
           Le tue materie
         </h2>
         {loading ? (
-          <div aria-hidden className={LIST}>
-            {Array.from({ length: 6 }, (_, index) => (
-              <div key={index} className={cn(ITEM, 'h-[92px] rounded-xl bg-slate-100 motion-safe:animate-pulse md:h-11 dark:bg-slate-800/60')} />
-            ))}
+          // The strip inside a plain box, as the list's is inside its group: React keeps the box when the subjects come,
+          // never the strip, a scroller whose old place Chrome reads in its own coordinates — a shift of 0.11 on a phone
+          // that no one sees, below the fold (P1).
+          <div aria-hidden>
+            <div className={LIST}>
+              {Array.from({ length: 6 }, (_, index) => (
+                <div key={index} className={cn(ITEM, 'h-[92px] rounded-xl bg-slate-100 motion-safe:animate-pulse md:h-11 dark:bg-slate-800/60')} />
+              ))}
+            </div>
           </div>
         ) : (
           // No alert: the day block says it once, with «Riprova», which reads the subjects again too.

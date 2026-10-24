@@ -175,7 +175,8 @@ export function ForumExploreView({
   const skeleton = (count: number) => (
     <div aria-hidden className={GRID}>
       {[...Array(count)].map((_, i) => (
-        <div key={i} className="overflow-hidden rounded-xl border border-slate-200 bg-white motion-safe:animate-pulse dark:border-slate-700 dark:bg-slate-900">
+        // As tall as a card that has come (P1: the grid grew 159 px under the strip at 1920, 209 on a phone).
+        <div key={i} className="min-h-[16.75rem] overflow-hidden rounded-xl border border-slate-200 bg-white motion-safe:animate-pulse md:min-h-[15.25rem] dark:border-slate-700 dark:bg-slate-900">
           <div className="space-y-3 p-4">
             <div className="h-5 w-3/4 rounded bg-slate-100 dark:bg-slate-800" />
             <div className="h-4 w-1/2 rounded bg-slate-100 dark:bg-slate-800" />
@@ -314,8 +315,10 @@ export function ForumExploreView({
         />
       )}
 
-      {/* Results count */}
-      {!loading && (
+      {/* Results count; while the read travels its line is kept, empty, so the cards do not move down when it comes (P1). */}
+      {loading ? (
+        <p aria-hidden className="h-5" />
+      ) : (
         <p className="text-sm text-slate-500 dark:text-slate-400">
           {pagination.total} {pagination.total === 1 ? 'dossier pubblicato' : 'dossier pubblicati'}
         </p>
