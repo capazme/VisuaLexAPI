@@ -1,11 +1,12 @@
 /**
- * The pages loaded with their route (P1): their code is not in the chunk every page loads, sign-in included. Ricerca,
- * the sign-in page, Dossier and the Forum's «Dossier pubblici» stay there (measured: opened directly, the last two drew
- * their largest text later). One place for the modules, so `App.tsx`'s `lazy` routes, the sidebar's entries and
+ * The pages loaded with their route (P1): their code is not in the chunk every page loads, sign-in included. Ricerca
+ * and the sign-in page stay there. One place for the modules, so `App.tsx`'s `lazy` routes, the sidebar's entries and
  * the section switcher (`SECTION_HOME_CODE`) ask for the same files.
  */
 export const PAGE_CODE = {
+  dossier: () => import('./components/features/dossier/DossierPage'),
   history: () => import('./components/features/history/HistoryView'),
+  forum: () => import('./components/features/bulletin/BulletinBoardPage'),
   community: () => import('./components/features/bulletin/ForumCommunityPage'),
   documents: () => import('./components/features/documents/DocumentReviewPage'),
   credits: () => import('./pages/CreditsPage'),
@@ -18,8 +19,10 @@ const under = (pathname: string, root: string) => pathname === root || pathname.
 
 /** The code an address's page waits for, if it is loaded with its route. */
 export function pageCodeFor(pathname: string): (() => Promise<unknown>) | null {
+  if (under(pathname, '/dossier')) return PAGE_CODE.dossier;
   if (under(pathname, '/history')) return PAGE_CODE.history;
   if (under(pathname, '/forum/community')) return PAGE_CODE.community;
+  if (under(pathname, '/forum')) return PAGE_CODE.forum;
   if (under(pathname, '/documents')) return PAGE_CODE.documents;
   if (under(pathname, '/crediti')) return PAGE_CODE.credits;
   if (under(pathname, '/collega-app')) return PAGE_CODE.connectAiApp;
