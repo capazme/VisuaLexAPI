@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DossierItem } from '../../../types';
 import type { ParsedCitationData } from '../../../utils/citationMatcher';
-import { bringRowIntoView, citedArticleOf } from './citedNorm';
+import { bringRowIntoView, citedArticleOf, keepLinkAt } from './citedNorm';
 
 const norma = (id: string, data: Extract<DossierItem, { type: 'norma' }>['data']): DossierItem => ({ id, type: 'norma', addedAt: '', data });
 const cite = (c: Partial<ParsedCitationData> & Pick<ParsedCitationData, 'act_type' | 'article'>): ParsedCitationData => ({ confidence: 0.95, ...c });
@@ -49,42 +49,88 @@ describe('citedArticleOf', () => {
 });
 
 describe('bringRowIntoView', () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    document.body.innerHTML = '';
+  });
 
   const rect = (top: number) => ({ top, bottom: top + 44, left: 0, right: 0, width: 0, height: 44, x: 0, y: top, toJSON: () => ({}) });
 
-  function setup(overflowY: string, rowTopAfter: number) {
+  // The page's scroller (scroll padding 64 px, the phone's bar) > the column > the row.
+  function setup(columnOverflow: 'auto' | 'visible', rowTopAfter: number) {
+    const page = document.createElement('div');
     const column = document.createElement('section');
     const row = document.createElement('div');
+    page.appendChild(column);
     column.appendChild(row);
-    document.body.appendChild(column);
-    vi.spyOn(window, 'getComputedStyle').mockReturnValue({ overflowY } as CSSStyleDeclaration);
+    document.body.appendChild(page);
+    const styles = new Map<Element, Partial<CSSStyleDeclaration>>([
+      [page, { overflowY: 'auto', scrollPaddingTop: '64px' }],
+      [column, { overflowY: columnOverflow, scrollPaddingTop: 'auto' }],
+    ]);
+    vi.spyOn(window, 'getComputedStyle').mockImplementation((el) => (styles.get(el) ?? { overflowY: 'visible' }) as CSSStyleDeclaration);
+    page.getBoundingClientRect = () => rect(0);
+    page.scrollTop = 1000;
     column.getBoundingClientRect = () => rect(100);
-    column.scrollTop = 0;
     let scrolled = false;
     column.scrollTo = vi.fn(() => { scrolled = true; }) as unknown as typeof column.scrollTo;
+    page.scrollTo = vi.fn() as unknown as typeof page.scrollTo;
     row.getBoundingClientRect = () => rect(scrolled ? rowTopAfter : 900);
     row.scrollIntoView = vi.fn();
-    return { column, row };
+    return { page, column, row };
   }
 
   it('from lg scrolls the column alone, the row to its top, when the row is then in sight', () => {
-    const { column, row } = setup('auto', 108);
+    const { page, column, row } = setup('auto', 108);
     bringRowIntoView(row, column);
     expect(column.scrollTo).toHaveBeenCalledExactlyOnceWith({ top: 792 });
-    expect(row.scrollIntoView).not.toHaveBeenCalled();
+    expect(page.scrollTo).not.toHaveBeenCalled();
   });
 
-  it('moves the page too only when the row is still off the window', () => {
-    const { column, row } = setup('auto', -200);
+  it('moves the page too, alone, only when the row is still off the window', () => {
+    const { page, column, row } = setup('auto', -200);
     bringRowIntoView(row, column);
-    expect(row.scrollIntoView).toHaveBeenCalledExactlyOnceWith({ block: 'start' });
+    expect(page.scrollTo).toHaveBeenCalledExactlyOnceWith({ top: 1000 - 200 - 64 });
   });
 
-  it('stacked below lg, scrolls the page to the row', () => {
-    const { column, row } = setup('visible', 0);
+  it('stacked below lg, scrolls the page to the row, under its scroll padding, never through scrollIntoView', () => {
+    const { page, column, row } = setup('visible', 0);
     bringRowIntoView(row, column);
     expect(column.scrollTo).not.toHaveBeenCalled();
-    expect(row.scrollIntoView).toHaveBeenCalledExactlyOnceWith({ block: 'start' });
+    expect(page.scrollTo).toHaveBeenCalledExactlyOnceWith({ top: 1000 + 900 - 64 });
+    expect(row.scrollIntoView).not.toHaveBeenCalled();
+  });
+});
+
+describe('keepLinkAt', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    document.body.innerHTML = '';
+  });
+
+  it('puts the link back at its height by moving the scroller it reads in', () => {
+    const column = document.createElement('div');
+    const link = document.createElement('span');
+    column.appendChild(link);
+    document.body.appendChild(column);
+    vi.spyOn(window, 'getComputedStyle').mockImplementation((el) => ({ overflowY: el === column ? 'auto' : 'visible' }) as CSSStyleDeclaration);
+    column.scrollTop = 0;
+    column.scrollTo = vi.fn() as unknown as typeof column.scrollTo;
+    link.getBoundingClientRect = () => ({ top: 2400 } as DOMRect);
+    keepLinkAt(link, 400);
+    expect(column.scrollTo).toHaveBeenCalledExactlyOnceWith({ top: 2000 });
+  });
+
+  it('does nothing for a link gone from the page, or one still where it was', () => {
+    const link = document.createElement('span');
+    expect(() => keepLinkAt(link, 400)).not.toThrow();
+    const column = document.createElement('div');
+    column.appendChild(link);
+    document.body.appendChild(column);
+    vi.spyOn(window, 'getComputedStyle').mockImplementation((el) => ({ overflowY: el === column ? 'auto' : 'visible' }) as CSSStyleDeclaration);
+    column.scrollTo = vi.fn() as unknown as typeof column.scrollTo;
+    link.getBoundingClientRect = () => ({ top: 400 } as DOMRect);
+    keepLinkAt(link, 400);
+    expect(column.scrollTo).not.toHaveBeenCalled();
   });
 });

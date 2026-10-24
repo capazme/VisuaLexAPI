@@ -42,7 +42,7 @@ const NO_ARTICLE = '';
 
 /** A host that holds norms of its own (the dossier, D7d): the norms the text cites are its to open. */
 export interface CitedNorms {
-  /** Whether the host holds the norm: the preview's button then says «Apri tra le norme». */
+  /** Whether the host holds the norm: the preview's button then says «Apri tra le norme», else «Apri su Dashboard». */
   holds: (citation: ParsedCitationData) => boolean;
   /** A click on a cited norm, with the link clicked; the preview's button, with none. */
   open: (citation: ParsedCitationData, link: HTMLElement | null) => void;
@@ -437,7 +437,8 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
         article={preview.article}
         position={preview.position}
         onClose={hidePreview}
-        openLabel={citedNorms && preview.citation && citedNorms.holds(preview.citation) ? 'Apri tra le norme' : undefined}
+        // In the dossier: «Apri tra le norme» for a norm it holds, else Dashboard, as the dossier's own buttons say.
+        openLabel={citedNorms && preview.citation ? (citedNorms.holds(preview.citation) ? 'Apri tra le norme' : 'Apri su Dashboard') : undefined}
         onOpenCitation={(citation) => {
           // the popup's own button is a jump like a click: the way back is recorded the same
           if (origin) pushReadingBack(origin);

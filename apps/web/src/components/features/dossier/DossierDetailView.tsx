@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Trash2,
   ArrowLeft,
@@ -193,20 +193,17 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     if (next.has(id)) next.delete(id); else next.add(id);
     return next;
   });
-  // A norm a decision cites, when the dossier holds it, opens in the norms' column (D7d).
-  const cited = useCitedNorms({
-    items: dossier.items,
-    visibleItems,
-    acts: fullLayout.acts,
-    unfoldAct: (key) => setFoldedActs((prev) => {
-      if (!prev.has(key)) return prev;
-      const next = new Set(prev);
-      next.delete(key);
-      return next;
-    }),
-    expand: (id) => setExpandedIds((prev) => (prev.has(id) ? prev : new Set(prev).add(id))),
-    clearSearch: () => setItemSearchQuery(''),
-  });
+  // A norm a decision cites, when the dossier holds it, opens in the norms' column (D7d). Stable callbacks: the
+  // context's value, and every decision's reader with it, changes only with the dossier.
+  const unfoldAct = useCallback((key: string) => setFoldedActs((prev) => {
+    if (!prev.has(key)) return prev;
+    const next = new Set(prev);
+    next.delete(key);
+    return next;
+  }), []);
+  const expand = useCallback((id: string) => setExpandedIds((prev) => (prev.has(id) ? prev : new Set(prev).add(id))), []);
+  const clearSearch = useCallback(() => setItemSearchQuery(''), []);
+  const cited = useCitedNorms({ items: dossier.items, visibleItems, acts: fullLayout.acts, unfoldAct, expand, clearSearch });
   const toggleFolded = (key: string) => setFoldedActs((prev) => {
     const next = new Set(prev);
     if (next.has(key)) next.delete(key); else next.add(key);

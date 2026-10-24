@@ -182,9 +182,17 @@ describe('a norm a decision cites, not in the dossier (D7d)', () => {
     fetched.fetchArticleForNorma.mockRejectedValue(new Error('Testo non disponibile'));
     const text = renderView();
     fireEvent.click(within(text).getByText('art. 2043 c.c.'));
-    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi al dossier' }));
+    // the dialog's own first focus, then the keyboard's on «Aggiungi al dossier»
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Apri su Dashboard' })).toHaveFocus());
+    const add = screen.getByRole('button', { name: 'Aggiungi al dossier' });
+    add.focus();
+    fireEvent.click(add);
+    // read: the button says so and keeps the focus
+    expect(screen.getByRole('button', { name: 'Cerco la norma…' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('button', { name: 'Cerco la norma…' })).toHaveFocus();
     expect(await screen.findByRole('alert')).toHaveTextContent('Non riesco a leggere la norma citata: riprova, o aprila su Dashboard.');
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Aggiungi al dossier' })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Aggiungi al dossier' })).toHaveAttribute('aria-disabled', 'false'));
+    expect(screen.getByRole('button', { name: 'Aggiungi al dossier' })).toHaveFocus();
     expect(screen.getByRole('button', { name: 'Apri su Dashboard' })).toBeInTheDocument();
   });
 

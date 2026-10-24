@@ -1843,13 +1843,17 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   came; «Apri la sentenza», the address, over it whatever came back. No tab holds it: no «Cerca nel testo», and a cited
   decision takes the reader to the workspace, `onLeave` (see «The host props»). A cited norm is the dossier's (D7d,
   `useCitedNorms` through `CitedNormsContext`, the surface's `citedNorms`, on the links the reader already draws, gotcha
-  23): one the dossier holds (`citedArticleOf`: the act as the page groups it, else type, number and the citation's year;
-  the article in any spelling, outside annexes; the text in force first) opens in the norms' column — a search hiding it
-  cleared, its act unfolded, its row opened, scrolled into view in its column alone (`bringRowIntoView`), focused and
+  23): one the dossier holds (`citedArticleOf`: a code by its name, any other act by type, number and the citation's year,
+  any year when the citation gives none; the article in any spelling, outside annexes; the text in force first) opens in
+  the norms' column — a search hiding it cleared, the link clicked held at its height (`keepLinkAt`: the cleared search
+  makes the decision's column a scroller again), its act unfolded, its row opened and scrolled to the column's top, the
+  page moving only if the row is still off the window (`bringRowIntoView`, each scroller alone, gotcha 34), focused and
   ringed for 1.6 s; the preview's button says «Apri tra le norme». One it does not hold opens nothing by itself: by the
   link, `CitedNormChoice` offers «Apri su Dashboard» (the search of its text in force, as before) and «Aggiungi al
-  dossier» (`AddToDossierPopover` on the norm as `/fetch_article_text` answers it); the preview's «Apri nella pratica»
-  still goes to Dashboard. Its heading an h3 under
+  dossier» (`AddToDossierPopover` on the norm as `/fetch_article_text` answers it); the preview's button, «Apri su
+  Dashboard» there, still goes straight to Dashboard. The links take no keyboard focus, here as anywhere in the
+  reader, so the keyboard reaches neither way (as before D7d). The acts' «⋯» opens upwards when the column has no room below (`MenuButton`'s
+  `placement="auto"`). Its heading an h3 under
   «Giurisprudenza», `DecisionView`'s `headingLevel`. The application that filed it is marked as an article's notes are,
   `ClaudeMark` with `verb="aggiunta"` — «aggiunta da Claude Code», never «scritta» — from the item's own `createdBy`,
   on the grey line rather than at the right (a long citation beside it was squeezed into a column on a phone).

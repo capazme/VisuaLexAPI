@@ -145,6 +145,8 @@ export function DossierActBlock(props: DossierActBlockProps) {
           <MenuButton
             label={`Azioni su ${block.heading}`}
             triggerClassName={cn(ACTION_BUTTON, 'text-slate-500')}
+            // In the left column of two, which scrolls on its own (D7d), the last act's menu opens upwards.
+            placement="auto"
             items={[{ label: "Rimuovi l'atto dal dossier", icon: Trash2, danger: true, onSelect: props.onRemoveAct }]}
           >
             <MoreHorizontal size={18} />

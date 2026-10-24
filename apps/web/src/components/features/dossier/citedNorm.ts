@@ -2,6 +2,7 @@ import type { DossierItem } from '../../../types';
 import type { ParsedCitationData } from '../../../utils/citationMatcher';
 import { normalizeArticleId } from '../../../utils/treeUtils';
 import { requestIsHistorical } from '../../../utils/versionDisplay';
+import { scrollParentOf } from '../practice/practiceView';
 import { actKeyOf, codeName, shownAnnex } from './dossierLayout';
 
 type NormaItem = Extract<DossierItem, { type: 'norma' }>;
@@ -37,22 +38,36 @@ export function citedArticleOf(items: DossierItem[], citation: ParsedCitationDat
 /**
  * Brings a row of the norms' column into view without moving the decision beside it. From `lg` the column scrolls on
  * its own: only it moves, the row to its top, and the page only if the row is still off the window (a page scrolled
- * past the columns' top). Stacked below `lg`, the page scrolls to the row. At once, as «Vai al passo»: the focus goes
+ * past the columns' top). Stacked below `lg`, the page scrolls to the row, under its scroll padding (the phone's bar).
+ * Each scroller is moved alone, never through `scrollIntoView` (gotcha 34). At once, as «Vai al passo»: the focus goes
  * there next.
  */
 export function bringRowIntoView(row: HTMLElement, column: HTMLElement | null): void {
-  const scrolls = column !== null && getComputedStyle(column).overflowY === 'auto';
-  if (!scrolls) {
-    row.scrollIntoView({ block: 'start' });
-    return;
+  if (column && getComputedStyle(column).overflowY === 'auto') {
+    // 8 px of air over the row, as under a heading.
+    const top = row.getBoundingClientRect().top - column.getBoundingClientRect().top + column.scrollTop - 8;
+    column.scrollTo({ top: Math.max(0, top) });
+    // A row taller than the window is not a reason to move the page: only its top has to be in sight.
+    const rowTop = row.getBoundingClientRect().top;
+    if (rowTop >= 0 && rowTop <= window.innerHeight - ROW_IN_SIGHT) return;
   }
-  // 8 px of air over the row, as under a heading.
-  const top = row.getBoundingClientRect().top - column.getBoundingClientRect().top + column.scrollTop - 8;
-  column.scrollTo({ top: Math.max(0, top) });
-  // A row taller than the window is not a reason to move the page: only its top has to be in sight.
-  const rowTop = row.getBoundingClientRect().top;
-  if (rowTop < 0 || rowTop > window.innerHeight - ROW_IN_SIGHT) row.scrollIntoView({ block: 'start' });
+  const page = scrollParentOf(column && getComputedStyle(column).overflowY === 'auto' ? column : row);
+  if (!page) return;
+  const padding = parseFloat(getComputedStyle(page).scrollPaddingTop) || 0;
+  page.scrollTo({ top: Math.max(0, row.getBoundingClientRect().top - page.getBoundingClientRect().top + page.scrollTop - padding) });
 }
 
 /** How much of a row must show above the window's bottom edge: its first line, 44 px. */
 const ROW_IN_SIGHT = 44;
+
+/**
+ * Puts a link back at the height it had (`top`, from `getBoundingClientRect`) by moving the scroller it reads in: the
+ * decision's column, or the page. A search cleared to open a norm turns the decision's column into a scroller of its
+ * own again, back at its top; the reader stays at the words clicked.
+ */
+export function keepLinkAt(link: HTMLElement, top: number): void {
+  if (!link.isConnected) return;
+  const scroller = scrollParentOf(link);
+  const moved = link.getBoundingClientRect().top - top;
+  if (scroller && moved !== 0) scroller.scrollTo({ top: Math.max(0, scroller.scrollTop + moved) });
+}

@@ -30,7 +30,7 @@ interface Props {
 }
 
 const CHOICE = cn(
-  'flex min-h-[44px] w-full items-center gap-2 rounded-lg px-2 text-left text-sm text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-wait disabled:text-slate-500 dark:text-slate-200 dark:hover:bg-slate-800 dark:disabled:text-slate-400',
+  'flex min-h-[44px] w-full items-center gap-2 rounded-lg px-2 text-left text-sm text-slate-700 transition-colors hover:bg-slate-100 aria-disabled:cursor-wait aria-disabled:text-slate-500 dark:text-slate-200 dark:hover:bg-slate-800 dark:aria-disabled:text-slate-400',
   FOCUS_RING,
 );
 
@@ -65,6 +65,7 @@ export function CitedNormChoice({ citation, link, onClose, onOpenOnDashboard, sh
   const { getFloatingProps } = useInteractions([dismiss, role]);
 
   const addToDossier = async () => {
+    if (reading) return;
     setReading(true);
     setFailed(false);
     try {
@@ -114,7 +115,8 @@ export function CitedNormChoice({ citation, link, onClose, onOpenOnDashboard, sh
               <ExternalLink size={16} aria-hidden className="shrink-0" />
               Apri su Dashboard
             </button>
-            <button type="button" onClick={() => void addToDossier()} disabled={reading} className={CHOICE}>
+            {/* `aria-disabled`, not `disabled`, while the norm is read: the focus stays on the button. */}
+            <button type="button" onClick={() => void addToDossier()} aria-disabled={reading} aria-busy={reading} className={CHOICE}>
               <FolderPlus size={16} aria-hidden className="shrink-0" />
               {reading ? 'Cerco la norma…' : 'Aggiungi al dossier'}
             </button>

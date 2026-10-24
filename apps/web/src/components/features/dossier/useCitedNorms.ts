@@ -5,7 +5,7 @@ import type { DossierItem } from '../../../types';
 import type { ParsedCitationData } from '../../../utils/citationMatcher';
 import type { CitedNorms } from '../decisions/DecisionReadingSurface';
 import type { ActBlock } from './dossierLayout';
-import { bringRowIntoView, citedArticleOf } from './citedNorm';
+import { bringRowIntoView, citedArticleOf, keepLinkAt } from './citedNorm';
 
 /** How the dossier's decisions open the norms they cite (D7d); outside the dossier there is none. */
 export const CitedNormsContext = createContext<CitedNorms | null>(null);
@@ -30,24 +30,28 @@ interface Options {
 /**
  * A norm a dossier's decision cites (D7d). Held by the dossier, it opens in the norms' column: the search that hides it
  * is cleared, its act unfolds (and folds again only when the user folds it), its row opens, comes into view without
- * moving the decision (`bringRowIntoView`), takes the focus and glows. Not held, a click offers the choice
- * (`CitedNormChoice`: Dashboard, or a dossier) and opens nothing by itself; the preview's «Apri nella pratica» is
- * already a choice, and goes to Dashboard as before.
+ * moving the decision (`bringRowIntoView`; the link clicked is held where it was, `keepLinkAt`, the cleared search
+ * having made the decision's column a scroller again), takes the focus and glows. Not held, a click offers the choice
+ * (`CitedNormChoice`: Dashboard, or a dossier) and opens nothing by itself; the preview's button, «Apri su Dashboard»
+ * there, is already a choice, and goes to Dashboard as before.
  */
 export function useCitedNorms({ items, visibleItems, acts, unfoldAct, expand, clearSearch }: Options) {
   const navigate = useNavigate();
   const triggerSearch = useAppStore((s) => s.triggerSearch);
   const columnRef = useRef<HTMLElement>(null);
   const [choice, setChoice] = useState<{ citation: ParsedCitationData; link: HTMLElement } | null>(null);
-  // The row to bring into view once the render that opens it is drawn; `reveals` counts the requests.
-  const pending = useRef<string | null>(null);
+  // The row to bring into view once the render that opens it is drawn, and the link clicked with its height then;
+  // `reveals` counts the requests.
+  const pending = useRef<{ id: string; link: HTMLElement | null; linkTop: number } | null>(null);
   const [reveals, setReveals] = useState(0);
 
   useEffect(() => {
-    const id = pending.current;
+    const asked = pending.current;
     const column = columnRef.current;
-    if (!id || !column) return;
+    if (!asked || !column) return;
     pending.current = null;
+    if (asked.link) keepLinkAt(asked.link, asked.linkTop);
+    const { id } = asked;
     const rows = column.querySelectorAll<HTMLElement>('[data-dossier-item]');
     const row = Array.from(rows).find((el) => el.dataset.dossierItem === id);
     if (!row) return;
@@ -61,12 +65,12 @@ export function useCitedNorms({ items, visibleItems, acts, unfoldAct, expand, cl
     };
   }, [reveals]);
 
-  const reveal = useCallback((item: NormaItem) => {
+  const reveal = useCallback((item: NormaItem, link: HTMLElement | null) => {
     if (!visibleItems.some((i) => i.id === item.id)) clearSearch();
     const act = acts.find((a) => a.articles.some((i) => i.id === item.id));
     if (act) unfoldAct(act.key);
     expand(item.id);
-    pending.current = item.id;
+    pending.current = { id: item.id, link, linkTop: link?.getBoundingClientRect().top ?? 0 };
     setReveals((n) => n + 1);
   }, [visibleItems, acts, clearSearch, unfoldAct, expand]);
 
@@ -86,7 +90,7 @@ export function useCitedNorms({ items, visibleItems, acts, unfoldAct, expand, cl
     holds: (citation) => citedArticleOf(items, citation) !== null,
     open: (citation, link) => {
       const item = citedArticleOf(items, citation);
-      if (item) reveal(item);
+      if (item) reveal(item, link);
       else if (link) setChoice({ citation, link });
       else openOnDashboard(citation);
     },

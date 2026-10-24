@@ -32,8 +32,9 @@ export interface MenuButtonProps {
   triggerClassName?: string;
   align?: 'left' | 'right';
   /** Where the list opens: under the trigger (default), or over it for a trigger at the bottom of
-   *  the screen (the bar of practices). */
-  placement?: 'below' | 'above';
+   *  the screen (the bar of practices); `auto` takes the side with room, inside the box that clips it (a column that
+   *  scrolls on its own, else the window), measured each time it opens. */
+  placement?: 'below' | 'above' | 'auto';
   /** A line of explanation over the items, read with the menu but never focused. */
   heading?: string;
   /** Classes for the list (a wider one, a capped height that scrolls), merged over the default `w-56`. */
@@ -53,6 +54,8 @@ export function MenuButton({ label, items, children, triggerClassName, align = '
   // null = closed; otherwise which item takes the focus once the menu is drawn.
   const [openAt, setOpenAt] = useState<'first' | 'last' | null>(null);
   const open = openAt !== null;
+  // `auto`: the side chosen at the opening.
+  const [opensAbove, setOpensAbove] = useState(placement === 'above');
   const wrapperRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -61,6 +64,11 @@ export function MenuButton({ label, items, children, triggerClassName, align = '
   const enabled = items.map((item, index) => (item.disabled ? -1 : index)).filter((index) => index >= 0);
   const focusItem = (index: number | undefined) => {
     if (index !== undefined) itemRefs.current[index]?.focus();
+  };
+
+  const openMenu = (at: 'first' | 'last') => {
+    if (placement === 'auto' && triggerRef.current) setOpensAbove(roomAbove(triggerRef.current, items.length + (heading ? 1 : 0)));
+    setOpenAt(at);
   };
 
   const close = (returnFocus: boolean) => {
@@ -90,10 +98,10 @@ export function MenuButton({ label, items, children, triggerClassName, align = '
     // Enter and Space are the button's own click, which opens it.
     if (event.key === 'ArrowDown') {
       event.preventDefault();
-      setOpenAt('first');
+      openMenu('first');
     } else if (event.key === 'ArrowUp') {
       event.preventDefault();
-      setOpenAt('last');
+      openMenu('last');
     } else if (event.key === 'Escape' && open) {
       event.preventDefault();
       close(true);
@@ -125,7 +133,7 @@ export function MenuButton({ label, items, children, triggerClassName, align = '
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        onClick={() => (open ? close(false) : setOpenAt('first'))}
+        onClick={() => (open ? close(false) : openMenu('first'))}
         onKeyDown={onTriggerKey}
         className={cn(
           'inline-flex items-center gap-2 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
@@ -144,7 +152,7 @@ export function MenuButton({ label, items, children, triggerClassName, align = '
           className={cn(
             Z_INDEX.dropdown,
             'absolute w-56 rounded-lg border border-slate-200 bg-white py-1 shadow-md dark:border-slate-700 dark:bg-slate-800',
-            placement === 'above' ? 'bottom-full mb-1' : 'mt-1',
+            (placement === 'auto' ? opensAbove : placement === 'above') ? 'bottom-full mb-1' : 'mt-1',
             align === 'right' ? 'right-0' : 'left-0',
             menuClassName,
           )}
@@ -203,4 +211,27 @@ export function MenuButton({ label, items, children, triggerClassName, align = '
       )}
     </div>
   );
+}
+
+/**
+ * Whether a list of `rows` (44 px each, the phone's height and the most a row takes) fits only over the trigger: the
+ * room is counted inside the nearest ancestor that clips (a column scrolling on its own), else the window.
+ */
+const CLIPS = new Set(['auto', 'scroll', 'hidden', 'clip']);
+
+function roomAbove(trigger: HTMLElement, rows: number): boolean {
+  const needed = rows * 44 + 12;
+  let top = 0;
+  let bottom = window.innerHeight;
+  for (let el = trigger.parentElement; el; el = el.parentElement) {
+    if (CLIPS.has(getComputedStyle(el).overflowY)) {
+      const box = el.getBoundingClientRect();
+      top = Math.max(top, box.top);
+      bottom = Math.min(bottom, box.bottom);
+      break;
+    }
+  }
+  const at = trigger.getBoundingClientRect();
+  const below = bottom - at.bottom;
+  return below < needed && at.top - top > below;
 }
