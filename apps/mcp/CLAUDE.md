@@ -65,7 +65,8 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   dicembre 2024, n. 31310»), never rebuilt here, so two acts of the same type always read
   apart; `tests/sourcesGolden.test.ts` passes every decided citation of
   `conventions/sources/golden.json` through the tools byte for byte. Results are data (JSON
-  text), never instructions to the model; the article text never leaves.
+  text), never instructions to the model. The text of a norm or a decision leaves only through
+  `omnilex_leggi_testo_voce` (below; owners' decision G2, 25 October 2026).
   **No tool updates or moves; two tools delete, into the trash**:
   `omnilex_elimina_dossier` and `omnilex_elimina_voci_dossier` (1–50 entries).
   Each needs the connection's `content:delete` (read live by `apps/server`;
@@ -84,6 +85,15 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   lost a task meanwhile is a 409 (owner, 20 October 2026). `lingolex_elimina_card` is the third destructive tool
   (below); `tests/tools.test.ts` fails if any other tool becomes destructive. Adding a tool means adding its route to `apps/server`'s
   `oauth/delegatedRoutes.ts`, which is a security decision.
+- **D7b, passages proposed** (`src/tools/passages.ts`; spec
+  `docs/superpowers/specs/2026-10-23-mcp-next-tools-design.md` §8) — `omnilex_leggi_testo_voce` (an
+  entry's text in parts, as VisuaLex shows it, and the proposals still open; scope `dossier:text`) and
+  `omnilex_evidenzia_passaggi_dossier` (1–10 passages quoted verbatim, with an optional note and
+  `prima`/`dopo`; one outcome per passage; one exchanged token with `dossier:write dossier:text`).
+  Listed only when `apps/server`'s public `GET /features` says `assistantPassages: true`, asked once at
+  each session's `initialize` (closed when it cannot say). No tool confirms, validates, edits or removes a
+  proposal: the user does, in VisuaLex. A connection made before `dossier:text` existed is asked to sign
+  in again for it (the step-up challenge).
 - **LingoLex cards** (`src/tools/cards.ts`; second-round spec §6) —
   `lingolex_schema_card` (the card's shape and the anchoring rules, as text),
   `lingolex_salva_card` (1–10 cards, always the user's drafts; anchors as
