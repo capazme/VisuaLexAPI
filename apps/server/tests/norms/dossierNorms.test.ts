@@ -203,7 +203,8 @@ describe('POST /api/dossiers/:id/norms', () => {
 
   it('carries the annex a reference names into the norm, its URN and its citation', async () => {
     const response = await addNorms(alice, dossierId, ['art. 29 d.lgs. 104/2010 (All. 2)']);
-    expect(response.body.results[0]).toMatchObject({ outcome: 'added', display: 'art. 29, d.lgs. 2 luglio 2010, n. 104 (Allegato 2)' });
+    // Annex 2 of d.lgs. 104/2010 is the c.p.a.: cited by its sigla, whichever way it was named (G-360, G-369).
+    expect(response.body.results[0]).toMatchObject({ outcome: 'added', display: 'art. 29 c.p.a.' });
     expect(normaDataBodies[0]).toMatchObject({ act_number: '104', article: '29', annex: '2' });
     const [item] = await prisma.dossierItem.findMany({ where: { dossierId } });
     expect(item.content).toMatchObject({ allegato: '2', urn: `${DLGS_104}:2~art29` });
