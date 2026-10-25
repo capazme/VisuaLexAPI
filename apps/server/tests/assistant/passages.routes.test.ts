@@ -315,6 +315,23 @@ describe('D7b — an entry’s text and the passages proposed on it', () => {
       expect((await propose([{ testo: 'il risarcimento del danno', prima: 'a'.repeat(201) }])).status).toBe(400);
       expect((await propose([{ testo: 'il risarcimento del danno', nota: 'a\u0007b' }])).status).toBe(400);
       expect((await propose([{ testo: 'il risarcimento del danno', colore: 'viola' }])).status).toBe(400);
+      expect(await prisma.highlight.count()).toBe(0);
+    });
+
+    it('refuses red, the sign of a note «da rivedere», in words, and keeps the three colours the assistant chooses', async () => {
+      const red = await propose([{ testo: 'il risarcimento del danno' }, { testo: 'la risoluzione del contratto', colore: 'rosso' }]);
+      expect(red.status).toBe(400);
+      expect(red.body.detail).toBe('Il rosso non si sceglie: è il segno di una nota «da rivedere». Usa giallo (punto centrale), verde (condizione o presupposto) o blu (definizione o eccezione).');
+      expect(await prisma.highlight.count()).toBe(0);
+      expect((await propose([{ testo: 'il risarcimento del danno', colore: ' Rosso ' }])).body.detail).toMatch(/^Il rosso non si sceglie/);
+      const ok = await propose([
+        { testo: 'il risarcimento del danno', colore: 'giallo' },
+        { testo: 'la risoluzione del contratto', colore: 'verde' },
+        { testo: "Dalla data della domanda di risoluzione l'inadempiente", colore: 'blu' },
+      ]);
+      expect(ok.body.passaggi.map((p: { colore: string }) => p.colore)).toEqual(['giallo', 'verde', 'blu']);
+      const stored = await prisma.highlight.findMany({ orderBy: { startOffset: 'asc' }, select: { color: true } });
+      expect(stored.map((h) => h.color).sort()).toEqual(['blue', 'green', 'yellow']);
     });
 
     it('charges two points and one passage each, and gives back the refused ones', async () => {
