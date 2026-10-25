@@ -816,9 +816,10 @@ def _extract_eurlex_rubriche(soup):
 # "del 27 aprile 2016", "dell'8 giugno 2000": the line between an act's name and its subject.
 # A digit after it: «DEL PARLAMENTO EUROPEO…», an act's name split over two lines, is no date.
 _EURLEX_DATE_LINE = re.compile(r"^dell?['’\s]\s*\d", re.IGNORECASE)
-# The legacy page's description: "Direttiva 2002/58/CE del Parlamento europeo e del Consiglio, del 12 luglio 2002, relativa al …".
+# The legacy page's description: "Direttiva 2002/58/CE del Parlamento europeo e del Consiglio, del 12 luglio 2002, relativa al …";
+# an older act's has no commas round the date ("Direttiva 85/374/CEE del Consiglio del 25 luglio 1985 relativa al …").
 _EURLEX_DESCRIPTION_SUBJECT = re.compile(
-    r",\s*dell?['’\s]\s*\d{1,2}[°º]?\s+\S+\s+\d{4}\s*,\s*(.+)$", re.IGNORECASE | re.DOTALL)
+    r"(?:,\s*|\s+)dell?['’\s]\s*\d{1,2}[°º]?\s+\S+\s+\d{4}\s*,?\s*(.+)$", re.IGNORECASE | re.DOTALL)
 
 
 def _eurlex_subject(lines):
@@ -881,8 +882,10 @@ def _extract_eurlex_title(soup):
                                          "about": lambda about: bool(about) and about.rstrip("/").endswith("/ita")})
     for meta in (soup.find("meta", attrs={"name": "DC.description"}), eli_title):
         match = _EURLEX_DESCRIPTION_SUBJECT.search((meta.get("content") or "") if meta else "")
-        if match:
-            return " ".join(match.group(1).split())
+        subject = " ".join(match.group(1).split()) if match else ""
+        # A note in brackets after the date («(GU L 210 …)») is no subject, as in `_eurlex_subject`.
+        if subject and not (subject.startswith("(") and subject.endswith(")")):
+            return subject
     return ""
 
 
