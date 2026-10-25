@@ -1031,12 +1031,15 @@ changed. A shape per state, never colour alone. The dossier's rows carry the tra
 tick, nothing if the application wrote nothing; its words («2 da validare · 1 da rivedere») are its `title` and
 in the row's name, its counts the server's `assistant_notes` on the item (`serverFieldsFromApi`).
 
-The colour picker (`SelectionPopup`) suggests what each colour is for (`HIGHLIGHT_COLOR_MEANINGS`: yellow «Punto
-centrale», green «Condizione o presupposto», blue «Definizione o eccezione», red «Da rivedere»): the reader's convention,
-a hint above the four swatches (so a popup clipped at the top loses the hint, not the controls; sideways the popup
-is moved 8 px inside the window by its measured box, a `marginLeft` set as it is drawn), each swatch named in
-Italian with its meaning, any colour still free for anything. The MCP tool gives an application the same meanings and
-refuses red (`apps/mcp/src/tools/passages.ts`).
+The colour of new highlights is chosen once, in the reading bar (H1, the owner's decision; `settings.highlightColor`,
+kept on this device with the other reading settings, yellow until chosen): `HighlightColorMenu` beside «Evidenziazioni»
+on a computer (`ReadingToolbar`, its compact form too), its four choices closing the «⋯» on a phone, in the decision's
+bar, in Study Mode's header, and with the dossier reader's actions (it has no bar). The menu offers the four as
+`menuitemradio`, each with what it is suggested for (`HIGHLIGHT_COLOR_MEANINGS`: yellow «Punto centrale», green
+«Condizione o presupposto», blue «Definizione o eccezione», red «Da rivedere»), a hint: any colour is free for
+anything. `SelectionPopup` never asks: «Evidenzia» (named «Evidenzia in giallo», its icon in the colour) and H
+highlight at once in it; sideways the popup is moved 8 px inside the window by its measured box (a `marginLeft` set as
+it is drawn). The MCP tool gives an application the same meanings and refuses red (`apps/mcp/src/tools/passages.ts`).
 
 The wiring follows the server's contract (`services/assistantService.ts`). `GET /api/features` says whether the
 feature is on, read as the app starts (`useAuth`) and as the dossier page mounts; a 404 «Non disponibile» from a

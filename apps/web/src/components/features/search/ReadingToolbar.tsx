@@ -8,6 +8,9 @@ import type { VersionChip } from '../../../utils/versionDisplay';
 import { MenuButton, type MenuItem } from '../../ui/MenuButton';
 import { VersionStatusChip } from './VersionStatusChip';
 import { NotesHighlightsButtons } from './NotesHighlightsButtons';
+import { HighlightColorMenu } from './HighlightColorMenu';
+import { highlightColorItems } from './highlightColorItems';
+import { useAppStore } from '../../../store/useAppStore';
 import { namedAnnex } from '../../../utils/sources';
 
 export interface ReadingToolbarProps {
@@ -124,6 +127,10 @@ export function ReadingToolbar({
     const exportLockedReason = copyLockedReason ?? lockedReason;
 
     /** The tools behind «⋯» (R3: three in words, the rest here), the phone's adding what its row does not show. */
+    // The colour of new highlights (H1): a menu of its own beside «Evidenziazioni» on a computer; on a phone, where the
+    // row has no room, its four choices close the «⋯».
+    const highlightColor = useAppStore((s) => s.settings.highlightColor);
+    const updateSettings = useAppStore((s) => s.updateSettings);
     const moreItems = (phone: boolean): MenuItem[] => [
         ...(compact ? [] : [{
             label: isPinnedQuick ? 'Togli dalle norme rapide' : 'Aggiungi alle norme rapide',
@@ -157,6 +164,7 @@ export function ReadingToolbar({
             { label: 'Testo alla data…', icon: Clock, onSelect: onOpenVersionInput },
             { label: 'Confronta con…', icon: GitCompare, onSelect: onCompare },
         ]),
+        ...(phone ? highlightColorItems(highlightColor, (color) => updateSettings({ highlightColor: color }), { separatorBefore: true, prefix: 'Evidenzia in ' }) : []),
     ];
 
     // The annex as the source convention names it: never a code's own (the codice civile is Allegato 2 of its decree).
@@ -230,6 +238,7 @@ export function ReadingToolbar({
                     onToggleHighlights={onToggleHighlightsPeek}
                     lockedReason={lockedReason}
                 />
+                <HighlightColorMenu labelled triggerClassName={ACTION} />
                 {!compact && dossierButton(dossierButtonRef)}
                 <div ref={desktopMoreRef} className="contents">
                     <MenuButton label="Altre azioni sull’articolo" triggerClassName={ACTION} items={moreItems(false)}>

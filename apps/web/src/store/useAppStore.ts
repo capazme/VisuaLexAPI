@@ -559,6 +559,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     focusMode: false,
     splitView: false,
     showKeyPassages: true,
+    highlightColor: 'yellow',
     studyMode: {
         fontSize: 18,
         lineHeight: 1.8,

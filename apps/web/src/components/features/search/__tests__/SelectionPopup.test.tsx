@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { useRef } from 'react';
 import { SelectionPopup } from '../SelectionPopup';
+import { appStore } from '../../../../store/useAppStore';
 
 const TEXT = "Si applica l'art. 2043 c.c. ai danni ingiusti.";
 const RECT = { x: 40, y: 120, width: 90, height: 18 };
@@ -167,6 +168,24 @@ describe('SelectionPopup: a past text (copyOnly)', () => {
     fireEvent.keyDown(window, { key: 'n' });
     expect(onHighlight).not.toHaveBeenCalled();
     expect(onAddNote).not.toHaveBeenCalled();
+  });
+
+  it('highlights at once in the colour chosen in the reading bar, by its button or H, never asking (H1)', async () => {
+    appStore.setState((st) => ({ settings: { ...st.settings, highlightColor: 'green' } }));
+    try {
+      const onHighlight = vi.fn();
+      render(<Harness onHighlight={onHighlight} />);
+      await selectText('art. 2043 c.c.');
+      fireEvent.click(await screen.findByRole('button', { name: 'Evidenzia in verde' }));
+      expect(onHighlight).toHaveBeenCalledWith('art. 2043 c.c.', 'green', TEXT.indexOf('art. 2043'));
+      // No colour to pick in the popup any more.
+      expect(screen.queryByRole('list', { name: 'Uso suggerito dei colori' })).toBeNull();
+      await selectText('art. 2043 c.c.');
+      fireEvent.keyDown(window, { key: 'h' });
+      expect(onHighlight).toHaveBeenLastCalledWith('art. 2043 c.c.', 'green', TEXT.indexOf('art. 2043'));
+    } finally {
+      appStore.setState((st) => ({ settings: { ...st.settings, highlightColor: 'yellow' } }));
+    }
   });
 
   it('keeps the shortcuts for a text in force (the control for the test above)', async () => {

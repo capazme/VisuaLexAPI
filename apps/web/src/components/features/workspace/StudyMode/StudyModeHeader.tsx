@@ -4,6 +4,7 @@ import { cn } from '../../../../lib/utils';
 import type { ArticleData } from '../../../../types';
 import type { StudyModeTheme } from './StudyMode';
 import { spring } from '../../../../lib/motion';
+import { HighlightColorMenu } from '../../search/HighlightColorMenu';
 
 interface StudyModeHeaderProps {
   visible: boolean;
@@ -173,6 +174,9 @@ export function StudyModeHeader({
                   <StickyNote size={14} className="sm:w-4 sm:h-4" />
                 </button>
               )}
+
+              {/* The colour of new highlights (H1), as in the reading bar. */}
+              <HighlightColorMenu triggerClassName={cn('p-1.5 sm:p-2 rounded-md', styles.button)} />
 
               <div className="hidden sm:block w-px h-5 bg-slate-200 dark:bg-slate-700 mx-1" />
 

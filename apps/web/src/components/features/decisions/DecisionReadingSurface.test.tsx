@@ -242,49 +242,53 @@ describe('DecisionReadingSurface — notes and highlights', () => {
     expect(loadAnnotations).toHaveBeenCalledWith(KEY, '');
     expect(container.querySelector('mark')?.textContent).toBe('fondato');
     await selectText(container, 3, 10);
-    fireEvent.click(await screen.findByTitle('Evidenzia (H)'));
-    fireEvent.click(await screen.findByTitle('Evidenzia in yellow'));
+    // One click, in the colour chosen in the reading bar (H1): yellow until another is chosen.
+    fireEvent.click(await screen.findByRole('button', { name: 'Evidenzia in giallo' }));
     expect(addHighlight).toHaveBeenCalledWith(KEY, '', 'ricorso', expect.any(String), 'yellow', 3);
   });
 
-  it('the colour picker suggests what each colour is for, as a hint (D7b)', async () => {
+  it('the colour is chosen once in the reading bar, with what each is suggested for, and every new highlight takes it (H1)', async () => {
     const { container } = render(<DecisionReadingSurface identity={IDENTITY} testo={MOTIVAZIONE} attributi={{}} />);
-    await selectText(container, 3, 10);
-    fireEvent.click(await screen.findByTitle('Evidenzia (H)'));
-    const legend = await screen.findByRole('list', { name: 'Uso suggerito dei colori' });
-    expect(within(legend).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
-      'giallo: Punto centrale', 'verde: Condizione o presupposto', 'rosso: Da rivedere', 'blu: Definizione o eccezione',
+    fireEvent.click(screen.getByRole('button', { name: 'Colore delle evidenziazioni: giallo' }));
+    const menu = screen.getByRole('menu', { name: 'Colore delle evidenziazioni: giallo' });
+    const choices = within(menu).getAllByRole('menuitemradio');
+    expect(choices.map((c) => c.textContent)).toEqual([
+      'GialloPunto centrale', 'VerdeCondizione o presupposto', 'RossoDa rivedere', 'BluDefinizione o eccezione',
     ]);
-    // Each swatch says its colour in Italian and what it is suggested for; any may still be chosen for anything.
-    expect(screen.getByRole('button', { name: 'Evidenzia in giallo — Punto centrale' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Evidenzia in rosso — Da rivedere' }));
+    expect(choices[0]).toHaveAttribute('aria-checked', 'true');
+    // Any colour, whatever it is suggested for.
+    fireEvent.click(choices[2]);
+    expect(appStore.getState().settings.highlightColor).toBe('red');
+    expect(screen.getByRole('button', { name: 'Colore delle evidenziazioni: rosso' })).toBeInTheDocument();
+    await selectText(container, 3, 10);
+    // Never asked again: one click, or H.
+    expect(screen.queryByRole('list', { name: 'Uso suggerito dei colori' })).toBeNull();
+    fireEvent.click(await screen.findByRole('button', { name: 'Evidenzia in rosso' }));
     expect(addHighlight).toHaveBeenCalledWith(KEY, '', 'ricorso', expect.any(String), 'red', 3);
+    appStore.setState((s) => ({ settings: { ...s.settings, highlightColor: 'yellow' } }));
   });
 
-  it('the colour picker is kept inside a narrow window by its measured width, either side (D7b)', async () => {
+  it.each([
+    ['past the right edge', { left: 200, right: 450 }, '-138px'],
+    ['past the left edge', { left: -40, right: 210 }, '48px'],
+  ])('the selection\'s popup is kept 8 px inside a narrow window, %s', async (_, at, nudge) => {
     const width = window.innerWidth;
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 320 });
-    // The popup measures 250 px; first drawn past the right edge, then past the left.
-    let at = { left: 200, right: 450 };
+    // The popup's box measures 250 px, its positioning element and the box drawn in it alike.
     const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
-      const nudge = parseFloat(this.style.marginLeft || '0');
-      const box = this.classList.contains('-translate-x-1/2')
-        ? { left: at.left + nudge, right: at.right + nudge, top: 0, bottom: 0, width: 250, height: 100 }
+      const positioner = this.classList.contains('-translate-x-1/2') ? this
+        : this.parentElement?.classList.contains('-translate-x-1/2') ? this.parentElement : null;
+      const shift = parseFloat(positioner?.style.marginLeft || '0');
+      const box = positioner
+        ? { left: at.left + shift, right: at.right + shift, top: 0, bottom: 0, width: 250, height: 50 }
         : { left: 0, right: 0, top: 0, bottom: 0, width: 0, height: 0 };
       return { ...box, x: box.left, y: box.top, toJSON: () => ({}) } as DOMRect;
     });
     try {
       const { container } = render(<DecisionReadingSurface identity={IDENTITY} testo={MOTIVAZIONE} attributi={{}} />);
       await selectText(container, 3, 10);
-      fireEvent.click(await screen.findByTitle('Evidenzia (H)'));
-      const popup = (await screen.findByRole('list', { name: 'Uso suggerito dei colori' })).closest<HTMLElement>('.-translate-x-1\\/2')!;
-      // 450 − 312: moved 138 px left, its right edge 8 px inside the window.
-      expect(popup.style.marginLeft).toBe('-138px');
-      fireEvent.click(screen.getByRole('button', { name: 'Chiudi i colori' }));
-      at = { left: -40, right: 210 };
-      fireEvent.click(await screen.findByTitle('Evidenzia (H)'));
-      await screen.findByRole('list', { name: 'Uso suggerito dei colori' });
-      expect(popup.style.marginLeft).toBe('48px');
+      const popup = (await screen.findByTitle('Evidenzia (H)')).closest<HTMLElement>('.-translate-x-1\\/2')!;
+      expect(popup.style.marginLeft).toBe(nudge);
     } finally {
       spy.mockRestore();
       Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });

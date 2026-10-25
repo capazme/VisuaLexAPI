@@ -73,6 +73,16 @@ describe('DossierItemReader — annotations on the text', () => {
   });
 });
 
+describe('DossierItemReader — the colour of new highlights (H1)', () => {
+  it('has no bar of its own: the colour is chosen with its actions', async () => {
+    vi.mocked(fetchArticleForNorma).mockResolvedValue({ article_text: RAW, norma_data: norma });
+    appStore.setState({ highlights: [], annotations: [] });
+    render(<DossierItemReader norma={norma} onOpenOnDashboard={() => {}} showToast={() => {}} />);
+    const trigger = await screen.findByRole('button', { name: 'Colore delle evidenziazioni: giallo' });
+    expect(trigger).toHaveTextContent('Colore');
+  });
+});
+
 describe('DossierItemReader — onArticle', () => {
   it('hands the fetched article to the row, so a row with no rubrica can take it from the text', async () => {
     vi.mocked(fetchArticleForNorma).mockResolvedValue({ article_text: RAW, norma_data: norma });
