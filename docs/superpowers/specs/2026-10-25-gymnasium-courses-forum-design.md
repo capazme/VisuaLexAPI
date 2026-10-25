@@ -1,7 +1,7 @@
 # Gymnasium — publishing, exploring and importing courses in the Forum (A3)
 
-**Status:** draft of the idea, 25 October 2026. It fixes what the A1 spec must make possible and the questions
-the owners must answer; the detailed design comes after A1 is built. Design only: no code, no migration.
+**Status:** draft of the idea, 25 October 2026, with one owner's answers of that day (§9); the licence waits for
+both owners. It fixes what the A1 spec must make possible; the detailed design comes after A1 is built. Design only: no code, no migration.
 **Target:** after A1 (release 1.11) and A2; not before.
 **Depends on:** `2026-10-23-gymnasium-courses-design.md` (A1: courses, enrolments, competences, mastery, the
 course's dossier). **Builds on:** the Forum's public dossiers (`SharedEnvironment`: publish, versions,
@@ -35,15 +35,20 @@ A course can be published only when:
 - every norm and decision it cites still resolves;
 - the author accepts a **publication declaration**, a versioned text distinct from A1's: the material is the
   author's own work, or used with its author's consent; the course is published under the licence of §6;
-- the author confirms the review of every item, since in A1 the author met each item only once, as a learner.
+- the author confirms the review of every item, on a screen that shows them one by one, since in A1 the author
+  met each item only once, as a learner;
+- a **preview** shows the course as others will see it, with a privacy check (names, personal data, client
+  facts), as public dossiers have.
 
+**Publishing and enrolling are human acts in the web:** no MCP tool publishes or enrols (decision 189).
 The course's dossier is published with it as a public dossier, through the existing mechanism, and linked
 from the course's page.
 
 ## 4. The Forum's «Percorsi»
 
 - **A third area** beside «Dossier pubblici» and «Community»: `/forum/percorsi`.
-- **The list:** title, subject, the free topic, «a cura di» the author, the number of competences and modules,
+- **The list:** title, subject, the free topic, «a cura di» the author (name or pseudonym, and a qualification
+  «dichiarata dall'autore»), the number of competences and modules,
   the estimated days at the stated daily time, the signs of §5, the rating.
 - **Filters:** subject, topic, «Verificato» only, length.
 - **The course's page:** the competences, the modules' titles and lengths, the dossier, the author's note, the
@@ -54,8 +59,14 @@ from the course's page.
 
 ## 5. Validation and signs
 
+**«Verificato», per module** (25 October, «come raccomandi»): each module (its lesson and its items) is approved
+by validators with the card threshold (`SOGLIA_APPROVAZIONI`, today 2); an «errata» sends the module back to
+the author instead of archiving the course; the course is «Verificato» when every module is. Validators need not
+pass the course first: reviewing and passing are separate signs.
+
+
 Two signs, never merged into one:
-- **«Superato da N»:** how many learners passed it, shown only from a minimum (for example 5), so that no
+- **«Superato da N»:** how many learners passed it, shown only from 5 learners (decided 25 October), so that no
   single learner is identifiable; with their mean rating.
 - **«Verificato»:** the content (lessons, items, model answers) reviewed by validators, with the threshold
   rule of the validation spec; a learner's flags go to the author and count against it.
@@ -65,9 +76,12 @@ carry error rates of 1–45% in the studies found.
 
 ## 6. Licence and rights
 
-- **Licence:** D-056 already puts prompts, rubrics, card schemas and one's own tracks under CC BY-NC-SA 4.0;
-  the recommendation is that a published course and its items follow it (no commercial reuse by others,
-  attribution, share-alike; the author stays free). To be confirmed by the owners (§9).
+- **Licence:** one owner chose CC BY-NC-SA 4.0 on 25 October, after D-056 (prompts, rubrics, card schemas and
+  one's own tracks under CC BY-NC-SA 4.0). Licences are decided by both owners together, and two facts weigh on
+  it: the notice under which cards are proposed today (`PROPOSTA_SCHEDA` v1) says **CC BY-SA 4.0**, so a
+  course under NC-SA would hold cards under another licence; and P-023 (CC BY-SA 4.0 for every public
+  contribution) is still a proposal. Under BY-SA the licence itself lets VisuaLex use the work; under NC-SA
+  VisuaLex needs a licence of its own from the author in the terms of use.
 - **Rights:** only the author's own material, or material used with its author's consent; the declaration of
   §3 says so, and the reports of the Forum handle the rest. Whether a course built from someone else's
   lectures is an elaboration of their work is an inference to be checked by the owners, not advice.
@@ -77,11 +91,18 @@ carry error rates of 1–45% in the studies found.
 - A published version is frozen: enrolments refer to it.
 - The author's change is a new version; enrolled learners see «C'è una versione nuova» with what changed, and
   move to it or not. Mastery already acquired on unchanged competences is kept (inference: to be designed).
-- Withdrawal hides the course from the Forum; enrolled learners keep studying the version they have.
+- **Withdrawal** (25 October): by the author, the course leaves the Forum and enrolled learners keep studying the
+  version they have; by the administrator for a question of rights (someone else's material), access ends for
+  everyone, with a notice (inference: serving it on would still reproduce the contested material).
+
+**Derivatives.** CC licences with share-alike allow a learner to publish a modified version. Recommended, in
+two steps: first **«Proponi modifiche»** to the author, with the Forum's suggestions mechanism; an accepted
+proposal makes its author a **co-author** of the next version. Then, if the author declines or does not answer
+within 30 days, the learner may publish their own version, shown as «tratto da <course> di <author>». After A3.
 
 ## 8. Attestation and incentives
 
-- **Attestation:** for a learner who passes a course with «Verificato»: a page that anyone can open from a
+- **Attestation** (25 October: only on «Verificato» courses): for a learner who passes a course with «Verificato»: a page that anyone can open from a
   link, with the course, its author, the competences and the date; it says «percorso superato su VisuaLex»
   and is not an academic title or a continuing-education credit. A personal choice to create it.
 - **No points for enrolments,** which would reward volume. A mission for the author when a course earns
@@ -89,12 +110,12 @@ carry error rates of 1–45% in the studies found.
 
 ## 9. Questions for the owners
 
-1. The licence of §6: CC BY-NC-SA 4.0, as D-056?
-2. The author's name on a published course: their name, or a pseudonym of their choice?
-3. «Verificato»: how many validators, and do they have to pass the course first?
-4. The minimum for «Superato da N»: 5?
-5. Enrolled learners on a withdrawn course: keep studying, as recommended?
-6. The attestation: on «Verificato» courses only, as recommended?
+Answered by one owner on 25 October: the author's name chosen per course, the account's name by default, an
+optional qualification shown as «dichiarata dall'autore»; «Verificato» per module (§5); «Superato da N» from 5;
+withdrawal as in §7; the attestation only on «Verificato» courses. Open:
+
+1. **The licence** (§6), for both owners: CC BY-NC-SA 4.0, or CC BY-SA 4.0 as the cards' notice already says?
+2. **Derivatives** (§7): «Proponi modifiche» first, one's own version after 30 days?
 
 ## 10. What A1 must already allow
 
