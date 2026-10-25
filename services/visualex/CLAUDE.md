@@ -350,7 +350,7 @@ POST unless noted, JSON bodies.
   served meanwhile. The mapping (`reference_identity`) reads the codes by name through
   `codice_urn`, the State acts by type, number and date (a code cited by its enacting decree, the
   c.p.a. as d.lgs. 104/2010, lands in its annex, and so does an act whose text is its annex,
-  `act_default_annex`: the TULPS as r.d. 773/1931), and an ordinal suffix from
+  `act_default_annex`: the TULPS as r.d. 773/1931, the legge fallimentare as r.d. 267/1942), and an ordinal suffix from
   `article_suffixes`; regional acts, statutes, treaties and the repealed codes name nothing.
   Measured on 19 October 2026: 46,607 massime, 148,158 links to an article or an act, 37,664
   entries left unmapped. The index's file is named by its version (`INDEX_NAME`, raised when the

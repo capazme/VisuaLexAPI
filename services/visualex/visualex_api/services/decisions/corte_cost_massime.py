@@ -69,7 +69,7 @@ PAGE_SIZE = 20  # art. 3 Cost. is named by some 17,600 massime: the route answer
 # the first build waits this long for an answer; past it the route says the index is being made
 FIRST_BUILD_WAIT = 25.0
 _DOWNLOAD_TIMEOUT = aiohttp.ClientTimeout(total=180)
-INDEX_NAME = "massime-v2.sqlite3"  # raise the version when the index's shape or mapping changes
+INDEX_NAME = "massime-v3.sqlite3"  # raise the version when the index's shape or mapping changes
 SOURCE = {"nome": "Corte costituzionale — dati aperti", "licenza": "CC BY-SA 3.0",
           "url": DOWNLOAD_PAGE}
 ATTRIBUTION = "Massime: Corte costituzionale — dati aperti, CC BY-SA 3.0"
@@ -164,7 +164,7 @@ def _act_head(entry: dict) -> str | None:
     if act in _ANNEXED:
         annexed = _ANNEXED[act]
         return f"stato:{annexed}" if annexed else None
-    # an act whose text is its annex (the TULPS, annex 1 of r.d. 773/1931: G-351)
+    # an act whose text is its annex (the TULPS, annex 1 of r.d. 773/1931, G-351; the legge fallimentare and others)
     annex = act_default_annex(act)
     return f"stato:{act}:{annex}" if annex else f"stato:{act}"
 

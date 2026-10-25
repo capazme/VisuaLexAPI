@@ -68,6 +68,8 @@ def test_an_entry_names_the_article_the_convention_names(golden_id, written):
     (entry("legge", "21", "nonies", numero="241", data="07/08/1990"), f"{R}legge:1990-08-07;241~art21nonies"),
     (entry("legge", "10", "BIS", numero="241", data="7/8/1990"), f"{R}legge:1990-08-07;241~art10bis"),
     (entry("decreto legge", "4", numero="262", data="03/10/2006"), f"{R}decreto.legge:2006-10-03;262~art4"),
+    # the legge fallimentare is annex 1 of its decree (ANNEXED_ACTS, #337)
+    (entry("regio decreto", "67", numero="267", data="16/03/1942"), f"{R}regio.decreto:1942-03-16;267:1~art67"),
     (entry("codice della strada (d.lgs. 30.4.1992, n. 285)", "186"), f"{R}decreto.legislativo:1992-04-30;285~art186"),
     (entry("codice di procedura penale (nuovo)", "444"), f"{R}decreto.del.presidente.della.repubblica:1988-09-22;447~art444"),
     # a part of the article in the suffix's field: the article is the identity
