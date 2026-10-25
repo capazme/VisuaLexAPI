@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Trash2,
   ArrowLeft,
@@ -74,8 +74,10 @@ import { cn } from '../../../lib/utils';
 import { PageFrame } from '../../layout/PageFrame';
 import { sectionOfDossierKind } from '../../../features/sections/useSection';
 import { FOCUS_RING } from '../studia/progress/tokens';
-import { HEADER_BUTTON, HEADER_ICON_BUTTON, HEADER_PRIMARY } from './dossierStyles';
+import { COLUMN_HEADING, COLUMN_SCROLLS, HEADER_BUTTON, HEADER_ICON_BUTTON, HEADER_PRIMARY } from './dossierStyles';
 import { FIELD, ICON_BUTTON } from '../planner/plannerStyles';
+import { CitedNormsContext, useCitedNorms } from './useCitedNorms';
+import { CitedNormChoice } from './CitedNormChoice';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -191,19 +193,36 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     if (next.has(id)) next.delete(id); else next.add(id);
     return next;
   });
+  // A norm a decision cites, when the dossier holds it, opens in the norms' column (D7d). Stable callbacks, so the
+  // context's value, and every decision's reader with it, changes only with the dossier, its acts and its search
+  // (`reveal` reads which items are on screen), not on every render.
+  const unfoldAct = useCallback((key: string) => setFoldedActs((prev) => {
+    if (!prev.has(key)) return prev;
+    const next = new Set(prev);
+    next.delete(key);
+    return next;
+  }), []);
+  const expand = useCallback((id: string) => setExpandedIds((prev) => (prev.has(id) ? prev : new Set(prev).add(id))), []);
+  const clearSearch = useCallback(() => setItemSearchQuery(''), []);
+  const cited = useCitedNorms({ items: dossier.items, visibleItems, acts: fullLayout.acts, unfoldAct, expand, clearSearch });
   const toggleFolded = (key: string) => setFoldedActs((prev) => {
     const next = new Set(prev);
     if (next.has(key)) next.delete(key); else next.add(key);
     return next;
   });
-  const allExpanded = visibleArticleIds.length > 0 && visibleArticleIds.every(id => expandedIds.has(id));
-  // "Espandi tutto" opens every block and every article; "Comprimi tutto" closes the articles only.
+  // "Espandi tutto" opens every block and every article, a decision open staying open (D7a: never all the decisions,
+  // each a request to its court's source); "Comprimi tutto" closes every row, the decisions too — the only thing it
+  // offers in a dossier of decisions alone, once one is open.
+  const visibleDecisionIds = layout.decisions.map((item) => item.id);
+  const allExpanded = visibleArticleIds.length > 0
+    ? visibleArticleIds.every((id) => expandedIds.has(id))
+    : visibleDecisionIds.some((id) => expandedIds.has(id));
   const toggleExpandAll = () => {
     if (allExpanded) {
       setExpandedIds(new Set());
     } else {
       setFoldedActs(new Set());
-      setExpandedIds(new Set(visibleArticleIds));
+      setExpandedIds((prev) => new Set([...prev, ...visibleArticleIds]));
     }
   };
 
@@ -234,9 +253,9 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     });
   };
 
-  // The articles on screen: notes carry no checkbox, so selecting "all" must not take them.
+  // The articles and the decisions on screen: notes carry no checkbox, so selecting "all" must not take them.
   const selectAllItems = () => {
-    setSelectedItems(new Set(visibleArticleIds));
+    setSelectedItems(new Set([...visibleArticleIds, ...visibleDecisionIds]));
   };
 
   const clearSelection = () => setSelectedItems(new Set());
@@ -286,8 +305,15 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
     triggerMultiSearch(paramsList);
   };
 
+  const hasDecisions = fullLayout.decisions.length > 0;
   const handleOpenAllOnDashboard = () => {
-    if (normaGroups.length === 0) return;
+    // Decisions alone (D7a): one practice holding them, no search to run.
+    if (normaGroups.length === 0) {
+      if (!hasDecisions) return;
+      searchesIntoOnePractice(dossier, [], true);
+      navigate('/');
+      return;
+    }
     if (normaGroups.length === 1) {
       openGroupsOnDashboard(normaGroups, true);
       return;
@@ -415,7 +441,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
       }));
       const blocks = buildPdfBlocks(dossier.items, texts, titles, { excerpts, marks, decisions });
 
-      const doc = writeDossierPdf(
+      const doc = await writeDossierPdf(
         { title: dossier.title, description: dossier.description, tags: dossier.tags, countsLine: pdfCountsLine(dossier.items, chosen), exportedOn: new Date().toLocaleDateString('it-IT') },
         blocks,
       );
@@ -456,15 +482,88 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   };
 
   const hasNormaItems = dossier.items.some((i) => i.type === 'norma');
+  const twoColumns = layout.acts.length > 0 && layout.decisions.length > 0;
 
-  // The header's actions in one row (D3), each 44 px as the planner's controls (S7c).
+  // The acts, in the order dragged; the decisions, in stored order (D7a: each column its own).
+  const actsList = (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleActDragEnd}
+      accessibility={{
+        announcements: dragAnnouncements,
+        screenReaderInstructions: { draggable: "Per spostare l'atto premi Spazio, poi le frecce su e giù, e di nuovo Spazio per lasciarlo; Esc annulla." },
+      }}
+    >
+      <SortableContext items={layout.acts.map((a) => a.key)} strategy={verticalListSortingStrategy}>
+        <div className="space-y-3">
+          {layout.acts.map((block) => (
+            <DossierActBlock
+              key={block.key}
+              block={block}
+              // Under «Norme» when the decisions stand beside the acts.
+              headingLevel={twoColumns ? 3 : 2}
+              flashedId={cited.flashedId}
+              act={fullBlocks.get(block.key) ?? block}
+              dragDisabled={hasFilter}
+              isFolded={foldedActs.has(block.key)}
+              onToggleFold={() => toggleFolded(block.key)}
+              expandedIds={expandedIds}
+              onToggleExpand={toggleExpanded}
+              selectedIds={selectedItems}
+              showCheckbox={showBulkActions}
+              onToggleSelect={toggleItemSelection}
+              // The whole act, even while the search shows only some of its articles.
+              onOpenAct={() => openGroupsOnDashboard((fullBlocks.get(block.key) ?? block).groups)}
+              onAddArticles={() => setTreeNavigatorAct({
+                tipo_atto: block.articles[0].data.tipo_atto,
+                numero_atto: block.articles[0].data.numero_atto || '',
+                data: block.articles[0].data.data || '',
+              })}
+              onRemoveAct={() => handleRemoveAct(fullBlocks.get(block.key) ?? block)}
+              onOpenItem={openItemOnDashboard}
+              onRemoveItem={handleRemoveSingle}
+              onToggleImportant={(item) => updateDossierItemStatus(dossier.id, item.id, item.status === 'important' ? 'unread' : 'important')}
+              showToast={showToast}
+              attachedNotes={layout.attached}
+              onAddNote={(item) => setNoteTarget({
+                aboutItemId: item.id,
+                heading: `Nota su ${item.citation ?? (item.type === 'norma' ? `art. ${item.data.numero_articolo}` : 'questo articolo')}`,
+              })}
+              onRemoveNote={handleRemoveSingle}
+            />
+          ))}
+        </div>
+      </SortableContext>
+    </DndContext>
+  );
+  const decisionsList = (
+    <DossierDecisionsSection
+      decisions={layout.decisions}
+      expandedIds={expandedIds}
+      onToggleExpand={toggleExpanded}
+      selectedIds={selectedItems}
+      showCheckbox={showBulkActions}
+      onToggleSelect={toggleItemSelection}
+      onRemove={handleRemoveSingle}
+      onToggleImportant={(item) => updateDossierItemStatus(dossier.id, item.id, item.status === 'important' ? 'unread' : 'important')}
+      // The right column scrolls on its own beside the norms (D7d): the section «Giurisprudenza» is the scroller.
+      className={twoColumns ? COLUMN_SCROLLS : undefined}
+      tabIndex={twoColumns ? 0 : undefined}
+    />
+  );
+
+  // The header's actions in one row (D3), each 44 px as the planner's controls (S7c). A label never wraps inside its
+  // button (D3b): when the window is narrow the row wraps, as a row. Only on the buttons: their menus wrap their items.
+  const rowPrimary = cn(HEADER_PRIMARY, 'whitespace-nowrap');
+  const rowButton = cn(HEADER_BUTTON, 'whitespace-nowrap');
   const actions = (
     <div className="flex flex-wrap items-center gap-2">
       <button
         type="button"
         onClick={handleOpenAllOnDashboard}
-        disabled={!hasNormaItems}
-        className={HEADER_PRIMARY}
+        disabled={!hasNormaItems && !hasDecisions}
+        className={rowPrimary}
       >
         <ExternalLink size={16} aria-hidden />
         <span>Apri tutto<span className="hidden sm:inline"> su Dashboard</span></span>
@@ -472,7 +571,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
       <MenuButton
         label="Aggiungi"
         align="left"
-        triggerClassName={HEADER_BUTTON}
+        triggerClassName={rowButton}
         items={[
           { label: 'Articoli da una norma', icon: TreeDeciduous, onSelect: () => setTreeNavigatorAct(null) },
           { label: 'Nota', icon: StickyNote, onSelect: () => setNoteTarget({ heading: 'Aggiungi una nota al dossier' }) },
@@ -485,7 +584,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
       <MenuButton
         label="Esporta"
         align="left"
-        triggerClassName={HEADER_BUTTON}
+        triggerClassName={rowButton}
         items={[
           { label: 'PDF', icon: Download, onSelect: () => setPdfDialogOpen(true), disabled: !!pdfProgress },
           { label: 'Copia link di condivisione', icon: Share2, onSelect: () => void copyShareLink() },
@@ -496,7 +595,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         <Download size={16} aria-hidden />
         <span className="hidden sm:inline">Esporta</span>
       </MenuButton>
-      <DossierForumActions dossier={dossier} showToast={showToast} buttonClassName={HEADER_BUTTON} />
+      <DossierForumActions dossier={dossier} showToast={showToast} buttonClassName={rowButton} />
       <MenuButton
         label="Altre azioni"
         triggerClassName={HEADER_ICON_BUTTON}
@@ -529,7 +628,7 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
 
       {/* In the sections' frame (W2, S7c): the dossier's name as the title, in the reader's serif and with no icon,
           wrapping at the column's width; its section's phrase over it; the description under it; then the tags, the
-          line of the facts and the actions in one row, under the title at every width — beside it, a long name was
+          line of the facts, and the actions as one row under them, at every width — beside it, a long name was
           squeezed into a narrow column (seen at 1366 px). */}
       <PageFrame
         // A name of one long word (a file's, an address) wraps too, as a task's title does: never a page wider than a phone.
@@ -590,7 +689,9 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
             <button
               type="button"
               onClick={toggleExpandAll}
-              className={cn(HEADER_BUTTON, 'justify-center whitespace-nowrap')}
+              // Decisions alone: nothing to open, only open ones to close.
+              disabled={visibleArticleIds.length === 0 && !allExpanded}
+              className={cn(HEADER_BUTTON, 'justify-center whitespace-nowrap disabled:opacity-40')}
               aria-pressed={allExpanded}
             >
               {allExpanded ? <ChevronsDownUp size={14} /> : <ChevronsUpDown size={14} />}
@@ -677,54 +778,26 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
           ) : (
             <>
               <DossierNotesSection notes={layout.notes} onRemove={handleRemoveSingle} />
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleActDragEnd}
-                accessibility={{
-                  announcements: dragAnnouncements,
-                  screenReaderInstructions: { draggable: "Per spostare l'atto premi Spazio, poi le frecce su e giù, e di nuovo Spazio per lasciarlo; Esc annulla." },
-                }}
-              >
-                <SortableContext items={layout.acts.map((a) => a.key)} strategy={verticalListSortingStrategy}>
-                  <div className="space-y-3">
-                    {layout.acts.map((block) => (
-                      <DossierActBlock
-                        key={block.key}
-                        block={block}
-                        act={fullBlocks.get(block.key) ?? block}
-                        dragDisabled={hasFilter}
-                        isFolded={foldedActs.has(block.key)}
-                        onToggleFold={() => toggleFolded(block.key)}
-                        expandedIds={expandedIds}
-                        onToggleExpand={toggleExpanded}
-                        selectedIds={selectedItems}
-                        showCheckbox={showBulkActions}
-                        onToggleSelect={toggleItemSelection}
-                        // The whole act, even while the search shows only some of its articles.
-                        onOpenAct={() => openGroupsOnDashboard((fullBlocks.get(block.key) ?? block).groups)}
-                        onAddArticles={() => setTreeNavigatorAct({
-                          tipo_atto: block.articles[0].data.tipo_atto,
-                          numero_atto: block.articles[0].data.numero_atto || '',
-                          data: block.articles[0].data.data || '',
-                        })}
-                        onRemoveAct={() => handleRemoveAct(fullBlocks.get(block.key) ?? block)}
-                        onOpenItem={openItemOnDashboard}
-                        onRemoveItem={handleRemoveSingle}
-                        onToggleImportant={(item) => updateDossierItemStatus(dossier.id, item.id, item.status === 'important' ? 'unread' : 'important')}
-                        showToast={showToast}
-                        attachedNotes={layout.attached}
-                        onAddNote={(item) => setNoteTarget({
-                          aboutItemId: item.id,
-                          heading: `Nota su ${item.citation ?? (item.type === 'norma' ? `art. ${item.data.numero_articolo}` : 'questo articolo')}`,
-                        })}
-                        onRemoveNote={handleRemoveSingle}
-                      />
-                    ))}
-                  </div>
-                </SortableContext>
-              </DndContext>
-              <DossierDecisionsSection decisions={layout.decisions} onRemove={handleRemoveSingle} />
+              {/* Acts and decisions both (D7a): two columns from lg, «Norme» | «Giurisprudenza», a rule between them;
+                  below lg the norms, then the decisions. One kind alone takes the width, untitled as before. The same
+                  elements either way, only their classes changing, so a search that leaves one kind remounts nothing
+                  (an open article keeps its text). From lg each column scrolls on its own, as tall as the window
+                  (D7d): a decision stays where it is read while a norm it cites opens beside it, and the other way. */}
+              <CitedNormsContext.Provider value={cited.citedNorms}>
+                <div className={cn('flex flex-col gap-4', twoColumns && 'gap-6 lg:grid lg:grid-cols-2 lg:gap-0')}>
+                  {/* Hidden, still mounted, while no act is on screen: no empty block and no gap over the decisions. */}
+                  <section
+                    ref={cited.columnRef}
+                    aria-labelledby={twoColumns ? 'dossier-norms-heading' : undefined}
+                    tabIndex={twoColumns ? 0 : undefined}
+                    className={cn('min-w-0', twoColumns && cn('lg:pr-5', COLUMN_SCROLLS), layout.acts.length === 0 && 'hidden')}
+                  >
+                    {twoColumns && <h2 id="dossier-norms-heading" className={COLUMN_HEADING}>Norme</h2>}
+                    {actsList}
+                  </section>
+                  <div className={cn('min-w-0 empty:hidden', twoColumns && 'border-slate-200 lg:border-l lg:pl-5 dark:border-slate-800')}>{decisionsList}</div>
+                </div>
+              </CitedNormsContext.Provider>
             </>
           )}
         </div>
@@ -761,6 +834,17 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
             initialAct={treeNavigatorAct ?? undefined}
             onClose={() => setTreeNavigatorAct(undefined)}
             onImport={handleTreeImport}
+          />
+        )}
+
+        {cited.choice && (
+          <CitedNormChoice
+            key={cited.choice.link.dataset.cacheKey ?? cited.choice.citation.article}
+            citation={cited.choice.citation}
+            link={cited.choice.link}
+            onClose={cited.closeChoice}
+            onOpenOnDashboard={cited.openOnDashboard}
+            showToast={showToast}
           />
         )}
 

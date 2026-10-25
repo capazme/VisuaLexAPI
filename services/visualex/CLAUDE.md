@@ -5,7 +5,11 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
 ### Python API (`services/visualex`)
 
 - **`app.py`** (this folder): main server, UI + API. **`services/visualex/visualex_api/app.py`**:
-  alternative server with `/api/*` prefix and Swagger.
+  alternative server with `/api/*` prefix and Swagger. It is not deployed (`asgi.py` serves
+  the root app) and it does **not** apply the in-force rules: no `validity`, no
+  `reject_future_version_date`, an undated request served as Normattiva answers it (G-355,
+  G-357, G-358 are the root app's). Never deploy it as it is; its `/api/export_pdf` follows
+  the root app's. Retiring or porting it goes with the move to the mcp-legal-it shell.
 - **`services/`** — `normattiva_scraper.py`, `eurlex_scraper.py`,
   `brocardi_scraper.py` (switched off, below), `pdfextractor.py` (Playwright pool),
   `http_client.py` (the shared throttled aiohttp client — TLS verification on;
@@ -346,7 +350,13 @@ POST unless noted, JSON bodies.
   «T-612/17», «Corte giust., causa 26/62»: a case before 1989 only after the court's name): the case's letter names the court, whatever name precedes it.
   No request leaves. Anything else is a 400 `richiesta_non_valida`. Design:
   docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md §2.1
-- `/export_pdf` — PDF via Playwright (rejects non-Normattiva URNs — SSRF guard)
+- `/export_pdf` — PDF via Playwright (rejects non-Normattiva URNs — SSRF guard). An
+  undated URN is exported as the text in force today, `!vig=<today>` in Europe/Rome
+  (`export_url`, G-355); a dated one or `@originale` as asked. The file is cached in
+  `download/` under the act's type, date, number, annex and version (`urn_to_filename`;
+  until 21 October 2026 the number and the year alone, so acts and versions shared a file),
+  and the PDFs there older than two days are deleted on the six-hour sweep
+  (`sweep_exported_pdfs`, top-level `.pdf` files only)
 - `GET /history` — server-side search history
 - `GET /health/detailed` — probes Normattiva and EUR-Lex **for
   real**, on the shared client and circuit breakers. One result is cached
@@ -358,7 +368,8 @@ POST unless noted, JSON bodies.
 `/fetch_article_text` and `/fetch_all_data` (Normattiva only; absent when the page
 cannot be read): `{state, valid_from, valid_to, version_number, act_updated,
 request_in_window}`, dates in ISO form. It is the source's own statement of which
-version came back; `norma_data.data_versione` is only the date the caller sent. A
+version came back; `norma_data.data_versione` is only the date the caller sent (except for
+`upcoming: true`, below, where it is the later text's first day). A
 `version_date` after today (Europe/Rome) is a 400 — Normattiva would answer with the
 current text and say nothing — and so is one that cannot be read as a date.
 
@@ -370,13 +381,27 @@ one not in force yet (art. 3 d.P.R. 131/1986 on 21 October 2026: repealed from 1
 January 2027). When the page's window starts after today (`starts_after_today`), the
 handlers read the article at today (`!vig=<today>`) and serve that text, its `url` and
 its `validity`, with the later version in `upcoming` (owner, G-355;
-`NormaController._document_in_force`): `{change: "abrogated" | "amended", valid_from,
-version_number}`, absent otherwise. `norma_data` stays the request's (no date), so the
-key notes and highlights are stored under does not move. The first page stands as before,
-its `validity` saying when it starts, when today's cannot be read and when nothing is in
-force today (today's page is `not_yet`, an article inserted from a later day, or itself
-starts after today). The text comes from the scraper's memory and the page from the
-persistent cache, which can expire first after a restart: for an undated request whose
+`NormaController._document_in_force`): `{change: "abrogated" | "amended" | "inserted",
+valid_from, version_number}`, absent otherwise. `norma_data` stays the request's (no
+date), so the key notes and highlights are stored under does not move. When nothing is
+in force today (today's page is `not_yet`: an article inserted from a later day) the
+later text is served as before, with `upcoming.change` `"inserted"` and `not_in_force:
+true` (G-358): it is the text that will come into force, so the request's key stays. The
+first page stands as before, its `validity` saying when it starts, when today's cannot
+be read or itself starts after today. The later text of an article can be asked for
+explicitly with `upcoming: true` (G-357; alone, or with a `version_date` after today, which
+is otherwise a 400): the undated page, always with `not_in_force: true`, `upcoming`
+describing it (`change` `null` when today's page cannot be read, since an amendment then
+cannot be told from an insertion), its `validity` with `request_in_window: true`, and
+`norma_data` dated to the day it comes into force (`versione: "vigente"`, `data_versione:
+valid_from`; `norma_data.urn` stays the undated page's, as `url`), so it reads as a text at
+a day, never as the text in force. None published, none in force on the day named, or a
+page that cannot be read is the article's error, in a 200 like any other («Nessuna
+versione non ancora in vigore …», «… entra in vigore il …», «Non riesco a leggere la
+vigenza …»). `upcoming` with «originale», or with a day up to today, is a 400. A web that
+reopens a saved text dated after today must send `upcoming: true` with it, and must not
+cache the answer under the key of an undated request. The text comes from
+the scraper's memory and the page from the persistent cache, which can expire first after a restart: for an undated request whose
 page has left the cache it is read once more, so a later version is never served
 unrecognised (and a watched norm does not flip between two texts).
 
@@ -631,11 +656,19 @@ Breaking one of these breaks the product. Read before editing.
     become a directory part of the cached PDF's path, read from and copied to.
     `urn_to_filename` now returns a bare file name (`[A-Za-z0-9._-]`, never hidden), and
     `pdf_cache_path(urn, directory)` is the only way a cache path is built: a file
-    directly inside `download/`. Any new path derived from a request goes through the
-    same kind of gate; `tests/test_pdf_cache_path.py` lists the attempts.
+    directly inside `download/`. The name is read from the query of a `/uri-res/N2Ls`
+    address alone (`_exported_urn`; any other path, a path parameter or a fragment is a 400):
+    the browser reads the path too and resolves its `..`, so a name read from anywhere in
+    the address let one act be cached, for everyone, under another's name. The query is
+    read whole against a strict grammar (`_EXPORTABLE_URN`: one URN, one version marker)
+    and the browser opens the address rebuilt from it (`export_url`). Each export
+    downloads to a name of its own (`export-<uuid>.pdf`) and is moved to the cache name, so
+    two exports at once never take each other's file. Any new path derived from a request
+    goes through the same kind of gate; `tests/test_pdf_cache_path.py` lists the attempts.
 
 31. **The window a page states is the only statement of which version came back.**
-    `NormaVisitata.data_versione` is the date the caller *sent*, echoed. Normattiva
+    `NormaVisitata.data_versione` is the date the caller *sent*, echoed (a request for the
+    later text, `upcoming: true`, answers its first day instead). Normattiva
     answers a date after today with the current text and no sign (hence
     `reject_future_version_date`), and a date before an article existed with a page
     whose text reads "NON ANCORA ESISTENTE O VIGENTE". Read the window from the page

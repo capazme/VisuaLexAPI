@@ -77,8 +77,6 @@ export interface MissionRowProps {
   mission: Mission;
   /** A thin bar of the share under the title, 4 px (today's missions, G8; the full list keeps to the words). */
   bar?: boolean;
-  /** The note is said to a screen reader only (the goal's line, when the stamp says it to the eye). */
-  quietNote?: boolean;
   /** At the end of the title's line, in place of the count: «In arrivo». */
   aside?: ReactNode;
   /** What can be done about it, under the title. */
@@ -93,7 +91,7 @@ export interface MissionRowProps {
 }
 
 /** One mission: its mark, its title and state, «8 di 18» and its points (and the bar), its note, and its action. */
-export function MissionRow({ mission, bar = false, quietNote = false, aside, children, ink, layout = false }: MissionRowProps) {
+export function MissionRow({ mission, bar = false, aside, children, ink, layout = false }: MissionRowProps) {
   const { progress } = mission;
   // A mission done is full, also the goal the server counted with the queue finished under it.
   const share = mission.status === 'fatta' ? 1 : progress && progress.of > 0 ? Math.min(1, progress.done / progress.of) : 0;
@@ -140,7 +138,7 @@ export function MissionRow({ mission, bar = false, quietNote = false, aside, chi
             <span className={cn('block h-full rounded-full transition-[width] duration-500 ease-out motion-reduce:transition-none', INK_BG)} style={{ width: `${share * 100}%` }} />
           </span>
         )}
-        {mission.note && <p className={cn('max-w-prose text-sm', MUTED_TEXT, quietNote && 'sr-only')}>{mission.note}</p>}
+        {mission.note && <p className={cn('max-w-prose text-sm', MUTED_TEXT)}>{mission.note}</p>}
         {children}
       </div>
     </motion.li>

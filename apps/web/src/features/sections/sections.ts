@@ -1,4 +1,5 @@
 import { Briefcase, GraduationCap, Landmark, Users, type LucideIcon } from 'lucide-react';
+import { PAGE_CODE } from '../../pageCode';
 
 /** The four sections over the common core, Corpus (D-076; spec 2026-10-18-sections-switcher). */
 export type SectionId = 'opus' | 'gymnasium' | 'academia' | 'forum';
@@ -32,6 +33,8 @@ export const SECTION_PHRASES = {
   gymnasium: 'la tua palestra giuridica',
   opus: 'la tua officina giuridica',
   forum: 'il luogo del dibattito giuridico',
+  // Bill and the owner's choice for S7b, 22 October 2026.
+  academia: 'il laboratorio del diritto',
 } as const satisfies Partial<Record<SectionId, string>>;
 
 /** A section with a phrase. */
@@ -44,11 +47,21 @@ export function sectionKicker(id: PhrasedSection): string {
 }
 
 /**
+ * The line over a page of any section, or nothing for a section with no phrase yet (a new one): its pages pass their
+ * `kicker` all the same, and the line appears as soon as its phrase is written above.
+ */
+export function kickerOf(id: SectionId): string | null {
+  return id in SECTION_PHRASES ? sectionKicker(id as PhrasedSection) : null;
+}
+
+/**
  * The code of a section's home where it is loaded on demand (`App.tsx`'s `lazy` routes): fetched when the switcher
  * opens, so the change (T1) finds the page there instead of fading into «Caricamento…». The same modules as the
  * routes', so the same files.
  */
 export const SECTION_HOME_CODE: Partial<Record<SectionId, () => Promise<unknown>>> = {
+  opus: PAGE_CODE.opus,
+  forum: PAGE_CODE.forum,
   gymnasium: () => Promise.all([import('../../components/features/studia/StudiaPage'), import('../../components/features/studia/ReviewHome')]),
   academia: () => import('../../pages/MerltHubPage'),
 };

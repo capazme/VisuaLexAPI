@@ -36,8 +36,22 @@ vi.mock('../components/layout/Layout', async () => {
 // Page stubs (keep the router test light — pages pull the store/services).
 vi.mock('../pages/SearchPage', () => ({ SearchPage: () => <div data-testid="search-page" /> }));
 vi.mock('../pages/AuthPage', () => ({ AuthPage: () => <div /> }));
-vi.mock('../components/features/dossier/DossierPage', () => ({ DossierPage: () => <div /> }));
-vi.mock('../components/features/history/HistoryView', () => ({ HistoryView: () => <div /> }));
+// Loaded with their route (P1, `pageCode.ts`): vi.mock intercepts the dynamic import() too.
+vi.mock('../components/features/dossier/DossierPage', () => ({ DossierPage: () => <div data-testid="dossier-page" /> }));
+vi.mock('../components/features/history/HistoryView', () => ({ HistoryView: () => <div data-testid="history-page" /> }));
+vi.mock('../components/features/documents/DocumentReviewPage', () => ({ DocumentReviewPage: () => <div data-testid="documents-page" /> }));
+vi.mock('../features/connections/ConnectAiAppPage', () => ({ ConnectAiAppPage: () => <div data-testid="connect-ai-app-page" /> }));
+vi.mock('../pages/CreditsPage', () => ({ CreditsPage: () => <div data-testid="credits-page" /> }));
+vi.mock('../components/features/planner/OpusPage', async () => {
+  const { Outlet } = await import('react-router-dom');
+  return { OpusPage: () => <div data-testid="opus-page"><Outlet /></div> };
+});
+vi.mock('../components/features/planner/OpusViews', () => ({
+  TodayView: () => <h2>Oggi</h2>,
+  UpcomingView: () => <h2>Prossimi giorni</h2>,
+  InboxView: () => <h2>Lista d’ingresso</h2>,
+  TaskTrashView: () => <h2>Cestino</h2>,
+}));
 vi.mock('../components/features/bulletin/BulletinBoardPage', () => ({ BulletinBoardPage: () => <div data-testid="forum" /> }));
 // Lazy-loaded pages (vi.mock also intercepts dynamic import()).
 vi.mock('../pages/AdminPage', () => ({ AdminPage: () => <div /> }));
@@ -55,8 +69,10 @@ vi.mock('../services/studiaService', () => ({
     get: vi.fn().mockRejectedValue({ status: 404 }),
     queue: vi.fn().mockResolvedValue({ cards: [] }),
     vote: vi.fn().mockRejectedValue({ status: 404 }),
-    // The strip over Le mie schede and Da validare reads the progress (Gymnasium spec §5.1).
+    // The strip over Da validare reads the progress (Gymnasium spec §5.1), and its settings, mounted closed, the
+    // study preferences (U1b).
     progress: vi.fn().mockRejectedValue({ status: 404 }),
+    preferences: vi.fn().mockRejectedValue({ status: 404 }),
   },
 }));
 vi.mock('../components/features/studia/ReviewHome', () => ({ ReviewHome: () => <h2>Ripasso di oggi</h2> }));
@@ -122,6 +138,44 @@ describe('App routing', () => {
     expect(screen.getByTestId('layout')).toBeInTheDocument();
     const backLink = screen.getByRole('link', { name: 'Torna alla ricerca' });
     expect(backLink).toHaveAttribute('href', '/');
+    // A button's look, 44 px at every width (Q1): `Button`'s primary, large.
+    expect(backLink).toHaveClass('min-h-11', 'bg-toga-600', 'rounded-md');
+    expect(backLink.className).not.toMatch(/md:min-h-(8|9)\b/);
+  });
+
+  // The pages loaded with their route (P1): each at its address, inside the layout.
+  it.each([
+    ['/dossier', 'dossier-page'],
+    ['/history', 'history-page'],
+    ['/documents', 'documents-page'],
+    ['/collega-app', 'connect-ai-app-page'],
+  ])('loads %s’s page with its route, inside the layout', async (path, testId) => {
+    renderAt(path);
+    expect(await screen.findByTestId(testId)).toBeInTheDocument();
+    expect(screen.getByTestId('layout')).toBeInTheDocument();
+  });
+
+  it('opens Opus at «Oggi», its frame and its view loaded together', async () => {
+    renderAt('/opus');
+    expect(await screen.findByRole('heading', { name: 'Oggi' })).toBeInTheDocument();
+    expect(screen.getByTestId('opus-page')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/opus/oggi');
+  });
+
+  it.each([
+    ['/opus/prossimi', 'Prossimi giorni'],
+    ['/opus/ingresso', 'Lista d’ingresso'],
+    ['/opus/cestino', 'Cestino'],
+  ])('opens %s in Opus’s frame', async (path, heading) => {
+    renderAt(path);
+    expect(await screen.findByRole('heading', { name: heading })).toBeInTheDocument();
+    expect(screen.getByTestId('opus-page')).toBeInTheDocument();
+  });
+
+  it('loads «Crediti» with its route, public, outside the layout', async () => {
+    renderAt('/crediti');
+    expect(await screen.findByTestId('credits-page')).toBeInTheDocument();
+    expect(screen.queryByTestId('layout')).toBeNull();
   });
 
   it('lazy-loads the MERL-T hub at /merlt', async () => {

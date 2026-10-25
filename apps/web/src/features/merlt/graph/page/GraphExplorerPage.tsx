@@ -2,6 +2,9 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } fro
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertCircle, Download, EyeOff, Loader2, Maximize2, Network, Upload, X } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
+import { FOCUS_RING } from '../../../../constants/interactions';
+import { PageFrame } from '../../../../components/layout/PageFrame';
+import { GRAPH_PAGE } from '../../../sections/pageNames';
 import type { SearchParams } from '../../../../types';
 import { useAppStore } from '../../../../store/useAppStore';
 import { isMerltGraphEnabled } from '../featureFlag';
@@ -306,6 +309,25 @@ export function GraphExplorerPage(): React.ReactElement {
     // Expanding = the jurist is looking at the debate again → clear the pulse.
     if (!next) setDibattitoBadge(false);
   }, [columnCollapsed, setColumnCollapsedPersist]);
+  // S7b: on an empty graph — no centre, no node or relation chosen, no question asked — the column stays a rail, not a
+  // third of the width for a debate about nothing; the rail opens it by hand, and whatever fills it opens it. Not
+  // persisted: the stored preference is the user's own collapse.
+  const [openedByHand, setOpenedByHand] = useState(false);
+  const hasGraphFocus = Boolean(urn) || selectedNodeId !== null || selectedEdge !== null || qa.turns.length > 0;
+  // Once something filled it, the column stays open when the graph empties again (a centre cleared): only the user's
+  // own collapse closes it then. Derived during render (react-hooks/set-state-in-effect).
+  if (hasGraphFocus && !openedByHand) setOpenedByHand(true);
+  const columnClosed = columnCollapsed || (!hasGraphFocus && !openedByHand);
+  const toggleColumn = useCallback((): void => {
+    if (columnClosed) {
+      setOpenedByHand(true);
+      // Closed only by the empty graph: opening it is seeing the debate, as the toggle's expand is.
+      if (columnCollapsed) toggleColumnCollapsed();
+      else setDibattitoBadge(false);
+      return;
+    }
+    toggleColumnCollapsed();
+  }, [columnClosed, columnCollapsed, toggleColumnCollapsed]);
 
   // Audit item 4: the docked column's width is a draggable splitter, clamped to
   // [COLUMN_WIDTH_MIN, COLUMN_WIDTH_MAX] and persisted the same way the collapse
@@ -1056,51 +1078,38 @@ export function GraphExplorerPage(): React.ReactElement {
   }
 
   return (
-    // The window less the layout's padding: below lg it starts the page under the phone's
-    // bar (4.5rem and the iPhone's top edge on top, then 1rem, or 2rem from md, at the bottom); from lg, 2rem each side.
-    <div className="flex h-[calc(100dvh-5.5rem-env(safe-area-inset-top))] flex-col md:h-[calc(100dvh-6.5rem-env(safe-area-inset-top))] lg:h-[calc(100dvh-4rem)]">
-      <header className="flex flex-col flex-wrap gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800 sm:flex-row sm:items-center">
-        <div className="flex items-center gap-2">
-          <Network className="h-5 w-5 text-primary-600" />
-          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Grafo giuridico</h1>
-        </div>
-        <div className="sm:max-w-xs sm:flex-1">
-          <GraphSearchBox onSelect={handleSelect} />
-        </div>
-        {/* Distinct "Chiedi al grafo" ask affordance (design §3): message icon,
-            prefilled with the current center. Single-composer rule: on desktop it
-            shows ONLY when the column is collapsed (otherwise the column's own
-            bottom composer is the ask surface — no duplication). Below md it always
-            shows: the docked column is replaced by the mobile bottom-sheet. */}
-        <div className={cn('sm:max-w-sm sm:flex-1', !columnCollapsed && 'md:hidden')}>
-          <AskGraphField
-            contextItems={contextChips}
-            onRemoveContext={handleRemoveContext}
-            disabled={!qaAskable}
-            busy={qaBusy}
-            onAsk={handleAsk}
-          />
-        </div>
-        {urn && (
-          <DepthSelector depth={depth} layout={layout} onDepthChange={setDepth} onLayoutChange={setLayout} />
-        )}
-        <div className="flex items-center gap-1">
+    // In the sections' frame (W2, S7b): the page's name as the title, in the reader's serif and with no icon, its tools
+    // beside it, then the search wide under it. The window less the layout's padding: below lg it starts the page under
+    // the phone's bar (4.5rem and the iPhone's top edge on top, then 1rem at the bottom, or from md the page's foot,
+    // `--page-foot`: 2rem, more under the feedback button); from lg, 2rem on top and the foot at the bottom.
+    <PageFrame
+      title={GRAPH_PAGE}
+      // L-37: «Academia · il laboratorio del diritto» over the page's name.
+      kicker="academia"
+      // On a phone the canvas needs the height: no line there, and the slice's tools beside the title as icons.
+      line={<span className="hidden md:inline">Le relazioni tra norme, principi e concetti.</span>}
+      actionBeside
+      className="h-[calc(100dvh-5.5rem-env(safe-area-inset-top))] gap-4 md:h-[calc(100dvh-4.5rem-var(--page-foot,2rem)-env(safe-area-inset-top))] lg:h-[calc(100dvh-2rem-var(--page-foot,2rem))]"
+      action={
+        <>
           <button
             type="button"
             onClick={handleExportSlice}
             disabled={graph.status !== 'success' || nodes.length === 0}
             title="Esporta lo slice corrente come file locale"
-            className="flex items-center gap-1 rounded border border-slate-300 px-2 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            aria-label="Esporta slice"
+            className={SLICE_BUTTON}
           >
-            <Download size={14} /> Esporta slice
+            <Download size={16} aria-hidden /> <span className="hidden md:inline">Esporta slice</span>
           </button>
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
             title="Carica e visualizza uno slice salvato localmente"
-            className="flex items-center gap-1 rounded border border-slate-300 px-2 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            aria-label="Carica slice"
+            className={SLICE_BUTTON}
           >
-            <Upload size={14} /> Carica slice
+            <Upload size={16} aria-hidden /> <span className="hidden md:inline">Carica slice</span>
           </button>
           <input
             ref={fileInputRef}
@@ -1113,300 +1122,329 @@ export function GraphExplorerPage(): React.ReactElement {
               e.target.value = '';
             }}
           />
+        </>
+      }
+    >
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex flex-col gap-3 border-b border-slate-200 pb-3 dark:border-slate-800 md:flex-row md:items-start">
+          <div className="min-w-0 md:flex-1">
+            <GraphSearchBox onSelect={handleSelect} />
+          </div>
+          {/* Distinct "Chiedi al grafo" ask affordance (design §3): message icon,
+              prefilled with the current center. Single-composer rule: on desktop it
+              shows ONLY when the column is closed (otherwise the column's own
+              bottom composer is the ask surface — no duplication). Below md it always
+              shows: the docked column is replaced by the mobile bottom-sheet. */}
+          <div className={cn('min-w-0 md:flex-1', !columnClosed && 'md:hidden')}>
+            <AskGraphField
+              contextItems={contextChips}
+              onRemoveContext={handleRemoveContext}
+              disabled={!qaAskable}
+              busy={qaBusy}
+              onAsk={handleAsk}
+            />
+          </div>
+          {urn && (
+            <DepthSelector depth={depth} layout={layout} onDepthChange={setDepth} onLayoutChange={setLayout} />
+          )}
         </div>
-      </header>
 
-      <BreadcrumbHistory entries={entries} onNavigate={(u) => goToCenter(u, labelFor(u, entries))} />
+        <BreadcrumbHistory entries={entries} onNavigate={(u) => goToCenter(u, labelFor(u, entries))} />
 
-      <div className="flex min-h-0 flex-1">
-        <main className="relative min-h-0 flex-1">
-          {activeWalk ? (
-            // MARQUEE feature (moved to the main canvas per user feedback: the
-            // docked column's ~170px slot was too cramped for a 60+ edge walk).
-            // Takes over the WHOLE main region — same precedence as the
-            // imported-slice view below — restoring the article subgraph /
-            // empty state on close.
-            <Suspense fallback={<CanvasSkeleton />}>
-              <GraphTraversalPlayer walk={activeWalk} onClose={() => setActiveWalk(null)} />
-            </Suspense>
-          ) : importedElements ? (
-            <div className="relative h-full">
-              <div className="absolute left-3 top-3 z-20 flex items-center gap-2 rounded-md bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 shadow dark:bg-amber-950/40 dark:text-amber-300">
-                Slice locale (sola lettura)
-                <button
-                  type="button"
-                  onClick={() => setImportedSlice(null)}
-                  className="flex items-center gap-0.5 rounded px-1 hover:bg-amber-100 dark:hover:bg-amber-900/40"
-                  aria-label="Chiudi slice locale"
-                >
-                  <X size={12} /> Chiudi
-                </button>
-              </div>
+        <div className="flex min-h-0 flex-1">
+          <main className="relative min-h-0 flex-1">
+            {activeWalk ? (
+              // MARQUEE feature (moved to the main canvas per user feedback: the
+              // docked column's ~170px slot was too cramped for a 60+ edge walk).
+              // Takes over the WHOLE main region — same precedence as the
+              // imported-slice view below — restoring the article subgraph /
+              // empty state on close.
               <Suspense fallback={<CanvasSkeleton />}>
+                <GraphTraversalPlayer walk={activeWalk} onClose={() => setActiveWalk(null)} />
+              </Suspense>
+            ) : importedElements ? (
+              <div className="relative h-full">
+                <div className="absolute left-3 top-3 z-20 flex items-center gap-2 rounded-md bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 shadow dark:bg-amber-950/40 dark:text-amber-300">
+                  Slice locale (sola lettura)
+                  <button
+                    type="button"
+                    onClick={() => setImportedSlice(null)}
+                    className="flex items-center gap-0.5 rounded px-1 hover:bg-amber-100 dark:hover:bg-amber-900/40"
+                    aria-label="Chiudi slice locale"
+                  >
+                    <X size={12} /> Chiudi
+                  </button>
+                </div>
+                <Suspense fallback={<CanvasSkeleton />}>
+                  <GraphCanvas
+                    nodes={importedElements.nodes}
+                    edges={importedElements.edges}
+                    layout={layout}
+                    height="100%"
+                    hiddenNodeTypes={new Set()}
+                    hiddenEdgeTypes={new Set()}
+                    highlightNodeType={null}
+                    onNodeClick={() => {}}
+                    onNodeDblClick={() => {}}
+                  />
+                </Suspense>
+              </div>
+            ) : !urn ? (
+              <EmptyState sources={latestSources} onSelectSource={handleSourceCenter} />
+            ) : graph.status === 'loading' || graph.status === 'idle' ? (
+              // F1: 'loading' only happens when NOTHING was ever rendered (the
+              // hook hands back 'revalidating' + previous elements otherwise), so
+              // the full skeleton is strictly a first-load affair.
+              <CanvasSkeleton />
+            ) : graph.status === 'error' ? (
+              <ErrorState onRetry={graph.refetch} />
+            ) : graph.data.nodes.length === 0 ? (
+              // C3: a concept center with an empty subgraph means "no neighbours /
+              // not found" — NOT an article to (re-)ingest. No spinner, no
+              // "Articolo non indicizzabile", no retry.
+              !centerIsArticle ? (
+                <ConceptEmptyState />
+              ) : // The ingestion trigger failed: distinct copy per cause (design §3.4).
+              triggerError === 'consent' ? (
+                <IngestionErrorState
+                  tone="amber"
+                  message="Per costruire il grafo serve il consenso."
+                  onRetry={retryIngestion}
+                />
+              ) : triggerError === 'unavailable' || job.status === 'timeout' ? (
+                // 5xx/network trigger failure OR polling budget/job timeout:
+                // MERL-T is unreachable or too slow — never an unbounded spinner.
+                <IngestionErrorState
+                  tone="red"
+                  message="Grafo non raggiungibile — riprova più tardi."
+                  onRetry={retryIngestion}
+                />
+              ) : job.status === 'failed' || job.status === 'completed' ? (
+                <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
+                  <AlertCircle className="h-8 w-8 text-amber-500" />
+                  <p className="text-slate-500 dark:text-slate-400">Articolo non indicizzabile nel grafo.</p>
+                  <button
+                    type="button"
+                    onClick={graph.refetch}
+                    className="rounded bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                  >
+                    Riprova
+                  </button>
+                </div>
+              ) : (
+                <div role="status" className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
+                  <p className="text-slate-500 dark:text-slate-400">Indicizzazione in corso…</p>
+                </div>
+              )
+            ) : (
+              <Suspense fallback={<CanvasSkeleton />}>
+                {/* Top-left overlay stack: the "nascondi giurisprudenza" pill and
+                    the filter panel share ONE flex column — both used to sit at
+                    the same absolute left-3/top-3 slot and collided. */}
+                <div className="absolute left-3 top-3 z-20 flex w-60 max-w-[80%] flex-col items-start gap-2">
+                  {/* Primary "nascondi giurisprudenza" control (design §4/§8): the
+                      one real legibility lever, promoted out of the filter panel.
+                      Default-on while a deliberation is active. */}
+                  <button
+                    type="button"
+                    onClick={() => setHideJurisManual(!hideJurisprudence)}
+                    aria-pressed={hideJurisprudence}
+                    title="Nascondi le sentenze per alleggerire il grafo"
+                    className={cn(
+                      'flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
+                      hideJurisprudence
+                        ? 'border-primary-200 bg-primary-50 text-primary-700 dark:border-primary-900 dark:bg-primary-950/40 dark:text-primary-300'
+                        : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800',
+                    )}
+                  >
+                    <EyeOff size={14} /> Nascondi giurisprudenza
+                  </button>
+                  <GraphFilterPanel
+                    nodeTypes={typeCounts.nodes}
+                    edgeTypes={typeCounts.edges}
+                    hiddenNodeTypes={hiddenNodeTypes}
+                    hiddenEdgeTypes={hiddenEdgeTypes}
+                    onToggleNodeType={(t) => setHiddenNodeTypes((s) => toggleHidden(s, t))}
+                    onToggleEdgeType={(t) => setHiddenEdgeTypes((s) => toggleHidden(s, t))}
+                    onSetAllNodes={(hidden) =>
+                      setHiddenNodeTypes(hidden ? new Set(typeCounts.nodes.map((n) => n.type)) : new Set())
+                    }
+                    onSetAllEdges={(hidden) =>
+                      setHiddenEdgeTypes(hidden ? new Set(typeCounts.edges.map((e) => e.type)) : new Set())
+                    }
+                    onHoverType={setHighlightType}
+                  />
+                  {/* Audit item 2: on-canvas caption for the deliberation overlay —
+                      the canon corona's colours otherwise have no legend anywhere
+                      on the page. Hidden when there is no active deliberation. */}
+                  {deliberationOverlay && <CanonLegend unresolvedCenter={centerUnresolved} />}
+                </div>
                 <GraphCanvas
-                  nodes={importedElements.nodes}
-                  edges={importedElements.edges}
+                  ref={canvasRef}
+                  nodes={canvasElements.nodes}
+                  edges={canvasElements.edges}
                   layout={layout}
                   height="100%"
-                  hiddenNodeTypes={new Set()}
-                  hiddenEdgeTypes={new Set()}
-                  highlightNodeType={null}
-                  onNodeClick={() => {}}
-                  onNodeDblClick={() => {}}
-                />
-              </Suspense>
-            </div>
-          ) : !urn ? (
-            <EmptyState sources={latestSources} onSelectSource={handleSourceCenter} />
-          ) : graph.status === 'loading' || graph.status === 'idle' ? (
-            // F1: 'loading' only happens when NOTHING was ever rendered (the
-            // hook hands back 'revalidating' + previous elements otherwise), so
-            // the full skeleton is strictly a first-load affair.
-            <CanvasSkeleton />
-          ) : graph.status === 'error' ? (
-            <ErrorState onRetry={graph.refetch} />
-          ) : graph.data.nodes.length === 0 ? (
-            // C3: a concept center with an empty subgraph means "no neighbours /
-            // not found" — NOT an article to (re-)ingest. No spinner, no
-            // "Articolo non indicizzabile", no retry.
-            !centerIsArticle ? (
-              <ConceptEmptyState />
-            ) : // The ingestion trigger failed: distinct copy per cause (design §3.4).
-            triggerError === 'consent' ? (
-              <IngestionErrorState
-                tone="amber"
-                message="Per costruire il grafo serve il consenso."
-                onRetry={retryIngestion}
-              />
-            ) : triggerError === 'unavailable' || job.status === 'timeout' ? (
-              // 5xx/network trigger failure OR polling budget/job timeout:
-              // MERL-T is unreachable or too slow — never an unbounded spinner.
-              <IngestionErrorState
-                tone="red"
-                message="Grafo non raggiungibile — riprova più tardi."
-                onRetry={retryIngestion}
-              />
-            ) : job.status === 'failed' || job.status === 'completed' ? (
-              <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
-                <AlertCircle className="h-8 w-8 text-amber-500" />
-                <p className="text-slate-500 dark:text-slate-400">Articolo non indicizzabile nel grafo.</p>
-                <button
-                  type="button"
-                  onClick={graph.refetch}
-                  className="rounded bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                >
-                  Riprova
-                </button>
-              </div>
-            ) : (
-              <div role="status" className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
-                <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
-                <p className="text-slate-500 dark:text-slate-400">Indicizzazione in corso…</p>
-              </div>
-            )
-          ) : (
-            <Suspense fallback={<CanvasSkeleton />}>
-              {/* Top-left overlay stack: the "nascondi giurisprudenza" pill and
-                  the filter panel share ONE flex column — both used to sit at
-                  the same absolute left-3/top-3 slot and collided. */}
-              <div className="absolute left-3 top-3 z-20 flex w-60 max-w-[80%] flex-col items-start gap-2">
-                {/* Primary "nascondi giurisprudenza" control (design §4/§8): the
-                    one real legibility lever, promoted out of the filter panel.
-                    Default-on while a deliberation is active. */}
-                <button
-                  type="button"
-                  onClick={() => setHideJurisManual(!hideJurisprudence)}
-                  aria-pressed={hideJurisprudence}
-                  title="Nascondi le sentenze per alleggerire il grafo"
-                  className={cn(
-                    'flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500',
-                    hideJurisprudence
-                      ? 'border-primary-200 bg-primary-50 text-primary-700 dark:border-primary-900 dark:bg-primary-950/40 dark:text-primary-300'
-                      : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800',
-                  )}
-                >
-                  <EyeOff size={14} /> Nascondi giurisprudenza
-                </button>
-                <GraphFilterPanel
-                  nodeTypes={typeCounts.nodes}
-                  edgeTypes={typeCounts.edges}
-                  hiddenNodeTypes={hiddenNodeTypes}
+                  centerNodeId={centerNodeId}
+                  hiddenNodeTypes={effectiveHiddenNodeTypes}
                   hiddenEdgeTypes={hiddenEdgeTypes}
-                  onToggleNodeType={(t) => setHiddenNodeTypes((s) => toggleHidden(s, t))}
-                  onToggleEdgeType={(t) => setHiddenEdgeTypes((s) => toggleHidden(s, t))}
-                  onSetAllNodes={(hidden) =>
-                    setHiddenNodeTypes(hidden ? new Set(typeCounts.nodes.map((n) => n.type)) : new Set())
-                  }
-                  onSetAllEdges={(hidden) =>
-                    setHiddenEdgeTypes(hidden ? new Set(typeCounts.edges.map((e) => e.type)) : new Set())
-                  }
-                  onHoverType={setHighlightType}
+                  highlightNodeType={highlightType}
+                  highlightNodeIds={effectiveSourceHighlightIds}
+                  selectedNodeId={selectedNodeId}
+                  selectedEdgeId={selectedEdgeId}
+                  pulseNodeId={pendingExpandId ?? hoveredSourceId}
+                  onCanvasClick={handleCanvasClick}
+                  onNodeClick={handleNodeClick}
+                  onNodeDblClick={handleNodeExpand}
+                  onEdgeClick={handleEdgeClick}
                 />
-                {/* Audit item 2: on-canvas caption for the deliberation overlay —
-                    the canon corona's colours otherwise have no legend anywhere
-                    on the page. Hidden when there is no active deliberation. */}
-                {deliberationOverlay && <CanonLegend unresolvedCenter={centerUnresolved} />}
-              </div>
-              <GraphCanvas
-                ref={canvasRef}
-                nodes={canvasElements.nodes}
-                edges={canvasElements.edges}
-                layout={layout}
-                height="100%"
-                centerNodeId={centerNodeId}
-                hiddenNodeTypes={effectiveHiddenNodeTypes}
-                hiddenEdgeTypes={hiddenEdgeTypes}
-                highlightNodeType={highlightType}
-                highlightNodeIds={effectiveSourceHighlightIds}
-                selectedNodeId={selectedNodeId}
-                selectedEdgeId={selectedEdgeId}
-                pulseNodeId={pendingExpandId ?? hoveredSourceId}
-                onCanvasClick={handleCanvasClick}
-                onNodeClick={handleNodeClick}
-                onNodeDblClick={handleNodeExpand}
-                onEdgeClick={handleEdgeClick}
-              />
-              {/* F1: revalidation veil — the previous graph stays live under a
-                  thin progress bar + corner chip while the new data loads. */}
-              {graph.status === 'revalidating' && (
-                <>
-                  <div className="absolute inset-x-0 top-0 z-20 h-0.5 animate-pulse bg-primary-500/80" />
-                  <div
-                    role="status"
-                    className="absolute right-3 top-3 z-20 flex items-center gap-1.5 rounded-full bg-white/85 px-2.5 py-1 text-xs font-medium text-slate-600 shadow-sm backdrop-blur dark:bg-slate-900/85 dark:text-slate-300"
+                {/* F1: revalidation veil — the previous graph stays live under a
+                    thin progress bar + corner chip while the new data loads. */}
+                {graph.status === 'revalidating' && (
+                  <>
+                    <div className="absolute inset-x-0 top-0 z-20 h-0.5 animate-pulse bg-primary-500/80" />
+                    <div
+                      role="status"
+                      className="absolute right-3 top-3 z-20 flex items-center gap-1.5 rounded-full bg-white/85 px-2.5 py-1 text-xs font-medium text-slate-600 shadow-sm backdrop-blur dark:bg-slate-900/85 dark:text-slate-300"
+                    >
+                      <Loader2 size={12} className="animate-spin text-primary-500" />
+                      Aggiornamento del grafo…
+                    </div>
+                  </>
+                )}
+                {/* P1.9: dismissable "evidenza fonti" chip — the sources emphasis
+                    fades the rest of the graph, so it must be one click to clear. */}
+                {sourceHighlightIds && !sourceFadeDismissed && (
+                  <button
+                    type="button"
+                    onClick={() => setSourceFadeDismissed(true)}
+                    aria-label="Rimuovi evidenza fonti"
+                    title="Rimuovi l'evidenza delle fonti consultate"
+                    className="absolute bottom-3 left-3 z-20 flex items-center gap-1 rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700 shadow-sm transition-colors hover:bg-primary-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-primary-900 dark:bg-primary-950/40 dark:text-primary-300 dark:hover:bg-primary-950/60"
                   >
-                    <Loader2 size={12} className="animate-spin text-primary-500" />
-                    Aggiornamento del grafo…
-                  </div>
-                </>
-              )}
-              {/* P1.9: dismissable "evidenza fonti" chip — the sources emphasis
-                  fades the rest of the graph, so it must be one click to clear. */}
-              {sourceHighlightIds && !sourceFadeDismissed && (
+                    <X size={12} /> Evidenza fonti
+                  </button>
+                )}
+                {/* F4 honest truncation: "Mostro N di M relazioni" + Carica di più. */}
+                <GraphTruncationChip data={graphData} centerNodeId={centerNodeId} limit={limit} loading={graph.status === 'revalidating'} onLoadMore={setLimit} />
+                {/* P1.7: one-click re-fit after zoom/pan wanderings. */}
                 <button
                   type="button"
-                  onClick={() => setSourceFadeDismissed(true)}
-                  aria-label="Rimuovi evidenza fonti"
-                  title="Rimuovi l'evidenza delle fonti consultate"
-                  className="absolute bottom-3 left-3 z-20 flex items-center gap-1 rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700 shadow-sm transition-colors hover:bg-primary-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-primary-900 dark:bg-primary-950/40 dark:text-primary-300 dark:hover:bg-primary-950/60"
+                  onClick={() => canvasRef.current?.fit()}
+                  title="Adatta il grafo alla vista"
+                  className="absolute bottom-3 right-3 z-20 flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
                 >
-                  <X size={12} /> Evidenza fonti
+                  <Maximize2 size={14} /> Adatta alla vista
                 </button>
-              )}
-              {/* F4 honest truncation: "Mostro N di M relazioni" + Carica di più. */}
-              <GraphTruncationChip data={graphData} centerNodeId={centerNodeId} limit={limit} loading={graph.status === 'revalidating'} onLoadMore={setLimit} />
-              {/* P1.7: one-click re-fit after zoom/pan wanderings. */}
-              <button
-                type="button"
-                onClick={() => canvasRef.current?.fit()}
-                title="Adatta il grafo alla vista"
-                className="absolute bottom-3 right-3 z-20 flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-              >
-                <Maximize2 size={14} /> Adatta alla vista
-              </button>
-            </Suspense>
-          )}
-        </main>
+              </Suspense>
+            )}
+          </main>
 
-        {/* Audit item 4: draggable splitter between the canvas and the docked
-            column. Hidden on mobile (bottom-sheet instead) and while collapsed
-            (the thin rail is the extreme of the resize range). */}
-        {!columnCollapsed && (
+          {/* Audit item 4: draggable splitter between the canvas and the docked
+              column. Hidden on mobile (bottom-sheet instead) and while collapsed
+              (the thin rail is the extreme of the resize range). */}
+          {!columnClosed && (
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Ridimensiona il pannello del dibattito"
+              aria-valuenow={columnWidth}
+              aria-valuemin={COLUMN_WIDTH_MIN}
+              aria-valuemax={COLUMN_WIDTH_MAX}
+              tabIndex={0}
+              onMouseDown={handleSplitterMouseDown}
+              onKeyDown={handleSplitterKeyDown}
+              className="hidden w-1.5 shrink-0 cursor-col-resize bg-transparent transition-colors hover:bg-primary-300/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 md:block"
+            />
+          )}
+
+          {/* Docked deliberation column (design §4): the canvas is `flex-1`, so a
+              fixed-width sibling reflows it to `calc(100% − columnWidth)` — no
+              imperative padding. Dual-tab: Dibattito (the absorbed Q&A) / Nodo
+              (details). Width is draggable (audit item 4), clamped + persisted. */}
           <div
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="Ridimensiona il pannello del dibattito"
-            aria-valuenow={columnWidth}
-            aria-valuemin={COLUMN_WIDTH_MIN}
-            aria-valuemax={COLUMN_WIDTH_MAX}
-            tabIndex={0}
-            onMouseDown={handleSplitterMouseDown}
-            onKeyDown={handleSplitterKeyDown}
-            className="hidden w-1.5 shrink-0 cursor-col-resize bg-transparent transition-colors hover:bg-primary-300/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 md:block"
+            className={cn(
+              'hidden shrink-0 overflow-hidden md:block',
+              !isResizingColumn && 'transition-[width] duration-200',
+              // 48 px: the rail's button keeps 44 inside its border.
+              columnClosed && 'w-12',
+            )}
+            style={columnClosed ? undefined : { width: columnWidth }}
+          >
+            <DeliberationColumn
+              activeTab={activeTab}
+              onTabChange={switchTab}
+              collapsed={columnClosed}
+              onToggleCollapse={toggleColumn}
+              turns={qa.turns}
+              onAsk={handleAsk}
+              contextItems={contextChips}
+              onRemoveContext={handleRemoveContext}
+              onAddToContext={handleAddToContext}
+              contextIds={contextIds}
+              onRetry={qa.retry}
+              onCancel={qa.cancel}
+              onSourceCenter={handleSourceCenter}
+              onSourceHover={handleSourceHover}
+              onOpenNorm={handleOpenNorm}
+              onFollowReasoning={handleFollowReasoning}
+              onLoadHistoryTurn={qa.loadHistoryTurn}
+              onRate={qa.rate}
+              onRateSource={qa.rateSrc}
+              onDetailed={qa.detailed}
+              onConfirmSource={qa.confirm}
+              onRefine={handleRefine}
+              selectedNode={selectedNode}
+              selectedEdge={selectedEdge}
+              expertContributions={expertContributions}
+              canContribute={canContribute}
+              // Steering is scoped to the deliberation's own center (defect #10):
+              // off-scope the canon steer hides with the rest of the overlay.
+              onPreferCanon={scopeMatches ? qa.prefer : undefined}
+              // No settled trace → undefined → the column hides the edge steer
+              // entirely (steering needs a deliberation to attach to).
+              onPreferRelation={latestTraceId ? handlePreferRelation : undefined}
+              onOpenConsent={() => setConsentDialogOpen(true)}
+              qaAskable={qaAskable}
+              askBusy={qaBusy}
+              dibattitoBadge={dibattitoBadge}
+              scopeChip={scopeChip}
+              canonFocus={canonFocus}
+              nodesById={nodesById}
+              edges={edges}
+              onRecenter={handleRecenter}
+              onCloseNode={() => {
+                clearGraphSelection();
+                switchTab('dibattito');
+              }}
+            />
+          </div>
+        </div>
+
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            isVisible
+            onClose={() => setToast(null)}
           />
         )}
 
-        {/* Docked deliberation column (design §4): the canvas is `flex-1`, so a
-            fixed-width sibling reflows it to `calc(100% − columnWidth)` — no
-            imperative padding. Dual-tab: Dibattito (the absorbed Q&A) / Nodo
-            (details). Width is draggable (audit item 4), clamped + persisted. */}
-        <div
-          className={cn(
-            'hidden shrink-0 overflow-hidden md:block',
-            !isResizingColumn && 'transition-[width] duration-200',
-            columnCollapsed && 'w-11',
-          )}
-          style={columnCollapsed ? undefined : { width: columnWidth }}
-        >
-          <DeliberationColumn
-            activeTab={activeTab}
-            onTabChange={switchTab}
-            collapsed={columnCollapsed}
-            onToggleCollapse={toggleColumnCollapsed}
-            turns={qa.turns}
-            onAsk={handleAsk}
-            contextItems={contextChips}
-            onRemoveContext={handleRemoveContext}
-            onAddToContext={handleAddToContext}
-            contextIds={contextIds}
-            onRetry={qa.retry}
-            onCancel={qa.cancel}
-            onSourceCenter={handleSourceCenter}
-            onSourceHover={handleSourceHover}
-            onOpenNorm={handleOpenNorm}
-            onFollowReasoning={handleFollowReasoning}
-            onLoadHistoryTurn={qa.loadHistoryTurn}
-            onRate={qa.rate}
-            onRateSource={qa.rateSrc}
-            onDetailed={qa.detailed}
-            onConfirmSource={qa.confirm}
-            onRefine={handleRefine}
-            selectedNode={selectedNode}
-            selectedEdge={selectedEdge}
-            expertContributions={expertContributions}
-            canContribute={canContribute}
-            // Steering is scoped to the deliberation's own center (defect #10):
-            // off-scope the canon steer hides with the rest of the overlay.
-            onPreferCanon={scopeMatches ? qa.prefer : undefined}
-            // No settled trace → undefined → the column hides the edge steer
-            // entirely (steering needs a deliberation to attach to).
-            onPreferRelation={latestTraceId ? handlePreferRelation : undefined}
-            onOpenConsent={() => setConsentDialogOpen(true)}
-            qaAskable={qaAskable}
-            askBusy={qaBusy}
-            dibattitoBadge={dibattitoBadge}
-            scopeChip={scopeChip}
-            canonFocus={canonFocus}
-            nodesById={nodesById}
-            edges={edges}
-            onRecenter={handleRecenter}
-            onCloseNode={() => {
-              clearGraphSelection();
-              switchTab('dibattito');
-            }}
-          />
-        </div>
+        {/* Consent dialog opened from the "pesa di più questo canone" upsell (§5 L2):
+            lets the jurist grant `full` consent so the steer control unlocks. Mounted
+            only while open — the dialog consumes `useConsent()` unconditionally, so
+            gating the mount keeps it inert (and provider-free) until actually needed. */}
+        {consentDialogOpen && (
+          <ConsentDialog open onClose={() => setConsentDialogOpen(false)} />
+        )}
       </div>
-
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          isVisible
-          onClose={() => setToast(null)}
-        />
-      )}
-
-      {/* Consent dialog opened from the "pesa di più questo canone" upsell (§5 L2):
-          lets the jurist grant `full` consent so the steer control unlocks. Mounted
-          only while open — the dialog consumes `useConsent()` unconditionally, so
-          gating the mount keeps it inert (and provider-free) until actually needed. */}
-      {consentDialogOpen && (
-        <ConsentDialog open onClose={() => setConsentDialogOpen(false)} />
-      )}
-    </div>
+    </PageFrame>
   );
 }
+
+/** The page's tools beside its title (S7b): 44 px, their words with their icon. */
+const SLICE_BUTTON = `inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-40 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 ${FOCUS_RING}`;
 
 /** Best-known label for a breadcrumb urn (falls back to the urn itself). */
 function labelFor(urn: string, entries: ReturnType<typeof useBreadcrumbHistory>['entries']): string {
