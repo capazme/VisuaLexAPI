@@ -137,7 +137,9 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   (`dossier:write` **and** `dossier:text`, an exchanged token only; 1–10 passages, two points and one of
   the counter `passage` each, the refused ones given back) finds each quote in the text the reader
   reads (`assistant/locateQuote.ts`: whitespace runs match whitespace runs or nothing, every other
-  character as written; `prima`/`dopo` choose among occurrences), stores the projection's own slice at
+  character as written; `prima`/`dopo` choose among occurrences; a colour among `giallo` the central point,
+  `verde` a condition or a premise, `blu` a definition or an exception, owner, 25 October 2026: `rosso` is
+  refused with its reason, being the sign of a note «da rivedere»), stores the projection's own slice at
   its offset (root rule 23), and answers one outcome per passage. The text is fetched once per call
   from the Python API as the web fetches it (`assistant/entryText.ts`: ports of `buildItemKey`,
   `uniqueArticleIdFromNorma`, the body of `fetchArticleForNorma`, `describeVersion`'s `readOnly`,

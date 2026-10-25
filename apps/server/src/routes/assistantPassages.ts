@@ -29,8 +29,11 @@ const NO_TEXT = 'Questa voce non ha un testo: è una nota.';
 const NOT_YET = 'Il testo non è ancora disponibile, riprova tra poco.';
 const NOT_IN_FORCE = 'Questa voce mostra un testo non in vigore: le evidenziazioni non si vedrebbero.';
 
-const COLOURS = { giallo: 'yellow', verde: 'green', rosso: 'red', blu: 'blue' } as const;
+// What each colour means (owner, 25 October 2026): yellow the central point, green a condition or a premise, blue a
+// definition or an exception. Red is not the assistant's to choose: it is the sign of a note «da rivedere».
+const COLOURS = { giallo: 'yellow', verde: 'green', blu: 'blue' } as const;
 const COLOUR_WORDS: Record<string, string> = { yellow: 'giallo', green: 'verde', red: 'rosso', blue: 'blu' };
+const NO_RED = 'Il rosso non si sceglie: è il segno di una nota «da rivedere». Usa giallo (punto centrale), verde (condizione o presupposto) o blu (definizione o eccezione).';
 
 // Plain text, as notes: new lines and tabs, nothing else below U+0020.
 const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
@@ -113,7 +116,7 @@ const passagesSchema = z
         z
           .object({
             testo: z.string().min(QUOTE_MIN).max(QUOTE_MAX),
-            colore: z.enum(['giallo', 'verde', 'rosso', 'blu']).default('giallo'),
+            colore: z.enum(['giallo', 'verde', 'blu']).default('giallo'),
             nota: z
               .string()
               .trim()
@@ -142,6 +145,9 @@ const REFUSED = {
 
 router.post('/dossiers/:id/items/:itemId/passages', async (req, res) => {
   await requireSwitch();
+  // Said in words before the schema's own refusal, which would only name the field.
+  const asked = (req.body as { passaggi?: unknown } | undefined)?.passaggi;
+  if (Array.isArray(asked) && asked.some((p) => (p as { colore?: unknown } | null)?.colore === 'rosso')) throw new AppError(400, NO_RED);
   const { passaggi } = passagesSchema.parse(req.body);
   // A proposal is the assistant's by definition: the user's session highlights by itself.
   if (!req.delegation) throw new AppError(403, 'Solo un’applicazione collegata propone passaggi.');

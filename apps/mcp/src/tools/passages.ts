@@ -66,9 +66,10 @@ export function registerPassageTools(server: McpServer, config: McpConfig, run: 
     {
       title: 'Proponi passaggi evidenziati',
       description:
-        `Propone all’utente da 1 a ${MAX_PASSAGES} passaggi evidenziati, con una nota facoltativa, in una norma o sentenza del dossier. ` +
-        'Cita alla lettera il testo di omnilex_leggi_testo_voce; se le parole compaiono più volte aggiungi prima o dopo. ' +
-        'Restano proposte finché l’utente non le valida: non puoi modificarle né rimuoverle. Non scrivere nelle note dati personali non richiesti.',
+        `Propone da 1 a ${MAX_PASSAGES} passaggi evidenziati, con nota facoltativa, in una norma o sentenza del dossier. ` +
+        'Colori: giallo punto centrale, verde condizione o presupposto, blu definizione o eccezione. ' +
+        'Cita alla lettera da omnilex_leggi_testo_voce; se le parole si ripetono aggiungi prima o dopo. ' +
+        'Restano proposte finché l’utente non le valida: non puoi modificarle né rimuoverle. Niente dati personali non richiesti nelle note.',
       inputSchema: {
         dossier: z.string().min(1).max(200).describe('Id del dossier, o il suo nome esatto'),
         voce: z.string().min(1).max(64).describe('L’id della voce, da omnilex_leggi_dossier'),
@@ -76,7 +77,7 @@ export function registerPassageTools(server: McpServer, config: McpConfig, run: 
           .array(
             z.object({
               testo: z.string().min(15).max(2000).describe('Le parole esatte del testo'),
-              colore: z.enum(['giallo', 'verde', 'rosso', 'blu']).optional(),
+              colore: z.enum(['giallo', 'verde', 'blu']).optional(),
               nota: z.string().trim().min(1).max(4000).optional().describe('Testo semplice'),
               prima: z.string().max(200).optional().describe('Le parole subito prima, per distinguere'),
               dopo: z.string().max(200).optional().describe('Le parole subito dopo, per distinguere'),

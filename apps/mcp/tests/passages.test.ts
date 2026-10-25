@@ -122,6 +122,18 @@ describe('omnilex_evidenzia_passaggi_dossier', () => {
     await client.close();
   });
 
+  it('says what each colour means, and offers no red: the user’s sign of a note «da rivedere»', async () => {
+    const client = await connect();
+    const tool = (await client.listTools()).tools.find((t) => t.name === 'omnilex_evidenzia_passaggi_dossier')!;
+    expect(tool.description).toContain('giallo punto centrale, verde condizione o presupposto, blu definizione o eccezione');
+    const colours = (tool.inputSchema as { properties: { passaggi: { items: { properties: { colore: { enum: string[] } } } } } }).properties.passaggi.items.properties.colore.enum;
+    expect(colours).toEqual(['giallo', 'verde', 'blu']);
+    const red = await client.callTool({ name: 'omnilex_evidenzia_passaggi_dossier', arguments: { dossier: 'd1', voce: 'i1', passaggi: [{ testo: 'cagiona ad altri un danno ingiusto', colore: 'rosso' }] } });
+    expect(red.isError).toBe(true);
+    expect(env.stub.apiCalls.filter((c) => c.method === 'POST')).toHaveLength(0);
+    await client.close();
+  });
+
   it('refuses more than ten passages and a quote under fifteen characters before calling', async () => {
     const client = await connect();
     const many = Array.from({ length: 11 }, () => ({ testo: 'cagiona ad altri un danno ingiusto' }));
