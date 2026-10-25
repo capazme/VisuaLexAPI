@@ -81,7 +81,15 @@ async function checkWatch(watch: { id: string; userId: string; normaKey: string;
     body: JSON.stringify(requestBody(normaData)),
     signal: AbortSignal.timeout(30_000),
   });
-  if (!response.ok) { await touch(); return; }
+  if (!response.ok) {
+    // A 4xx is the request itself (a norm saved with «originale» and a date, refused since the
+    // API reads a date as the text in force that day): it will not heal on its own, so say so.
+    if (response.status >= 400 && response.status < 500) {
+      console.warn(`[norma-watcher] ${watch.normaKey}: the API refused the saved request (${response.status})`);
+    }
+    await touch();
+    return;
+  }
   const payload = await response.json() as unknown;
   const article = Array.isArray(payload) ? payload[0] as Record<string, unknown> | undefined : undefined;
   if (!article || article.error) { await touch(); return; }

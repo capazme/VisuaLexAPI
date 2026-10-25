@@ -138,6 +138,11 @@ function searchParams(value: unknown, keys: readonly string[]): Check<Json> {
       out[key] = t;
     }
   }
+  // A date asks for the text in force that day (G-353): with «originale» the search asks for two
+  // texts, which the API refuses (400).
+  if (out.version === 'originale' && out.version_date) {
+    return { ok: false, reason: 'versione originale con una data della versione' };
+  }
   return { ok: true, value: out };
 }
 

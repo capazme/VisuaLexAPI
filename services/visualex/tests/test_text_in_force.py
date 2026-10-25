@@ -289,3 +289,34 @@ class TestTheLaterTextOfAnInsertedArticle:
         scraper.cache = FakeCache({BASE: "<html>no window</html>"})
         [result] = await ask(controller, endpoint, requested(), scraper=scraper, body={"upcoming": True})
         assert "Non riesco a leggere la vigenza" in result["error"]
+
+
+class TestOriginalWithADate:
+    """«originale» with a `version_date` asks for two texts: a date asks for the text in force
+    on that day (G-353), and the date silently won. Refused (400) before any request leaves, as
+    mcp-legal-it refuses it; neither the web nor the MCP server writes the pair."""
+
+    @pytest.fixture
+    def client(self):
+        from app import NormaController
+
+        with patch("app.add_to_history"):
+            yield NormaController().app.test_client()
+
+    @pytest.mark.parametrize("endpoint", ["/fetch_norma_data", "/fetch_article_text", "/fetch_all_data", "/stream_article_text"])
+    @pytest.mark.parametrize("version", ["originale", " Originale "])
+    async def test_the_pair_is_a_400(self, client, endpoint, version):
+        with patch("visualex_api.services.normattiva_scraper.NormattivaScraper.get_document",
+                   AsyncMock(side_effect=AssertionError("no request may leave"))):
+            response = await client.post(endpoint, json={"act_type": "legge", "date": "1990-08-07", "act_number": "241",
+                                                         "article": "2", "version": version, "version_date": "2020-01-01"})
+        assert response.status_code == 400
+        assert "originale" in (await response.get_json())["error"]
+
+    def test_each_alone_is_accepted(self):
+        from visualex_api.services.normattiva_validity import reject_original_with_a_date
+
+        reject_original_with_a_date("originale", None)
+        reject_original_with_a_date("originale", "  ")
+        reject_original_with_a_date("vigente", "2020-01-01")
+        reject_original_with_a_date(None, "2020-01-01")

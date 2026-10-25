@@ -134,7 +134,8 @@ export async function importStudyDossiers(userId: string, content: PublishedCont
       ? prisma.annotation.findMany({ where: { userId, normaKey: { in: keys } }, select: { normaKey: true, content: true, textContext: true, position: true } })
       : [],
     keys.length && marks.length
-      ? prisma.highlight.findMany({ where: { userId, normaKey: { in: keys } }, select: { normaKey: true, text: true, startOffset: true, endOffset: true } })
+      // The user's own highlights: an assistant's mark (D7b) shows only on its dossier entry, so it is not one.
+      ? prisma.highlight.findMany({ where: { userId, normaKey: { in: keys }, createdByClientId: null }, select: { normaKey: true, text: true, startOffset: true, endOffset: true } })
       : [],
     options.addShortcuts && content.quickNorms.length ? prisma.quickNorm.findMany({ where: { userId }, select: { label: true } }) : [],
     options.addShortcuts && content.customAliases?.length ? prisma.customAlias.findMany({ where: { userId }, select: { trigger: true } }) : [],

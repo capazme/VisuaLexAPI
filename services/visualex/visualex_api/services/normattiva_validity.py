@@ -417,6 +417,22 @@ def read_upcoming_request(version: Any, version_date: Any, today: Optional[date]
     return day
 
 
+def reject_original_with_a_date(version: Any, version_date: Any) -> None:
+    """Refuse «originale» together with a `version_date` (400).
+
+    A date asks for the text in force on that day (owner, G-353), so the pair asks for two
+    texts at once: until 25 October 2026 the date silently won, while mcp-legal-it refuses the
+    pair as invalid. Neither the web nor the MCP server writes it; a norm saved with both is
+    asked again only as it was saved.
+    """
+    if (isinstance(version, str) and version.strip().lower() == "originale"
+            and isinstance(version_date, str) and version_date.strip()):
+        raise ValidationError(
+            "version_date non si combina con la versione originale: una data chiede il testo "
+            "in vigore quel giorno; togli la data per il testo originale"
+        )
+
+
 def reject_future_version_date(version_date: Any, today: Optional[date] = None) -> None:
     """Refuse a `version_date` later than today (Europe/Rome).
 

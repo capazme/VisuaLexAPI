@@ -33,6 +33,7 @@ from visualex_api.services.normattiva_validity import (
     read_upcoming_request,
     read_validity,
     reject_future_version_date,
+    reject_original_with_a_date,
     starts_after_today,
     today_in_rome,
     upcoming_change,
@@ -457,6 +458,7 @@ class NormaController:
         if upcoming_asked:
             read_upcoming_request(data.get('version'), data.get('version_date'))
         else:
+            reject_original_with_a_date(data.get('version'), data.get('version_date'))
             reject_future_version_date(data.get('version_date'))
 
         act_type = data.get('act_type')

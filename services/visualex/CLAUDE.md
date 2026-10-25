@@ -137,10 +137,19 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     them and those codici lost their default annex. `ANNEXED_ACTS` (with
     `act_default_annex`) does the same for an act cited by type, date and number whose text
     is its annex: the TULPS is annex 1 of r.d. 773/1931 (G-351), so «r.d. 773/1931, art. 86»
-    is stored and keyed with `allegato: "1"` and its URN is `…;773:1~art86`. A code's
+    is stored and keyed with `allegato: "1"` and its URN is `…;773:1~art86`; so are the legge
+    fallimentare (r.d. 267/1942), the c.p.p. minorile (d.P.R. 448/1988) and the testo unico sulle
+    successioni e donazioni (d.lgs. 346/1990), whose decree's own art. 1 approves the annexed text
+    (found on 25 October 2026; no other act of the codes table or of `ATTI_DENOMINATI` has that shape). A code's
     default annex and such an act's annex are never named in a citation (`sources.py`, and
     the server's, the web's and MERL-T's copies); the TS mirrors and MERL-T's copy of
-    `ANNEXED_ACTS` are pinned to this one by their tests
+    `ANNEXED_ACTS` are pinned to this one by their tests. `ANNEX_SIGLE` / `ANNEX_HEADINGS`
+    (keyed «<decree>:<annex>») give an annex of a code's decree, or an act of the codes table,
+    a sigla and a heading of its own (G-369: «disp. att. c.p.a.», «c.p.m.g.», «disp. att. c.p.p.»);
+    `sources._named` reads the sigla by the annex a norm sits in, so another annex of a code's
+    decree is never the code, and an annex with no sigla is cited by the decree with
+    «(Allegato N)». The parser reads each sigla back as the code and its annex; the same
+    copies are pinned the same way
   - `map.py` also holds `BROCARDI_CODICI` (label → page, one row per source at
     brocardi.it/fonti.html) and `find_brocardi_url(tipo, numero, data)`, which
     `brocardi_scraper.do_know` asks — unused since Brocardi was switched off (D-078). The lookup is **by identity**: every label
@@ -367,10 +376,12 @@ request_in_window}`, dates in ISO form. It is the source's own statement of whic
 version came back; `norma_data.data_versione` is only the date the caller sent (except for
 `upcoming: true`, below, where it is the later text's first day). A
 `version_date` after today (Europe/Rome) is a 400 — Normattiva would answer with the
-current text and say nothing — and so is one that cannot be read as a date.
+current text and say nothing — and so is one that cannot be read as a date, and one with
+`version: "originale"` (a date asks for the text in force that day, G-353; mcp-legal-it refuses the pair too).
 
-A date always asks for the text in force on that day, with or without «vigente» and
-over «originale» (owner, G-353; `append_version_info` writes `!vig=<day>`, and the AKN
+A date always asks for the text in force on that day, with or without «vigente» (owner,
+G-353; a request pairing it with «originale» is refused, above, and inside the API the date
+still wins: `append_version_info` writes `!vig=<day>`, and the AKN
 fallback reads the export at that day, never the original from today's). A request
 with no date is the text in force: Normattiva answers it with its latest version, also
 one not in force yet (art. 3 d.P.R. 131/1986 on 21 October 2026: repealed from 1
