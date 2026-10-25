@@ -386,7 +386,7 @@ export function HistoryView() {
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 overflow-clip">
                 {/* Timeline with grouped dates. No inner scroll: the page is the
                     scroll context so the action dropdown isn't clipped. Sticky date
-                    headers attach to the next overflow ancestor. */}
+                    headers attach to the page's scroller, under the phone's bar. */}
                 <div className="p-3 md:p-6">
                     {loading ? (
                         <div className="p-8 text-center">

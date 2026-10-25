@@ -61,7 +61,7 @@ describe('SettingsModal — «Modalità sviluppo»', () => {
       </MemoryRouter>,
     );
     for (const name of [/Chiaro/, /Scuro/, /Ricomincia il tour guidato/, /Pannello Admin/]) {
-      expect(screen.getByRole('button', { name })).toHaveClass('min-h-[44px]');
+      expect(screen.getByRole('button', { name })).toHaveClass('min-h-[44px]', 'md:min-h-0');
     }
     const sizes = screen.getByRole('group', { name: 'Dimensione testo' }).querySelectorAll('button');
     expect(sizes).toHaveLength(4);
