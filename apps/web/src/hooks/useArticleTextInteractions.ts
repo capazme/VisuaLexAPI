@@ -10,7 +10,8 @@ export function proposedPassageAt(target: EventTarget | null): HTMLElement | nul
   if (!(target instanceof Element)) return null;
   const mark = target.closest<HTMLElement>('mark[data-proposed]');
   if (!mark || target.closest('a, .citation-hover, .decision-cite, .vlx-ref') || mark.closest('.highlights-hidden')) return null;
-  return mark;
+  // Only where its block has a sign, the popover's anchor (a text drawn flat has none): else a note under it opens.
+  return mark.closest('.vlx-b, .vlx-dec-para')?.querySelector(':scope > .vlx-sign') ? mark : null;
 }
 
 export interface OpenUpdateNote {

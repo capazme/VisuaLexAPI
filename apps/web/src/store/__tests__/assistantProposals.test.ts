@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../services/assistantService', () => ({
   assistantService: {
-    features: vi.fn(), listProposals: vi.fn(), setProposalState: vi.fn(), editProposalNote: vi.fn(), removeProposal: vi.fn(), removeProposalOnExit: vi.fn(),
+    features: vi.fn(), listProposals: vi.fn(), setProposalState: vi.fn(), editProposalNote: vi.fn(), removeProposal: vi.fn(), removeProposalOnExit: vi.fn(), refreshForExit: vi.fn(async () => {}),
     setNoteEntryState: vi.fn(), editNoteEntryText: vi.fn(),
   },
 }));
@@ -32,7 +32,9 @@ const dossier = {
   ],
 } as unknown as Dossier;
 const counts = () => appStore.getState().dossiers[0].items[0].assistantNotes;
-const notFound = (detail: string) => Object.assign(new Error('404'), { response: { status: 404, data: { detail } } });
+// As `apiClient`'s interceptor rejects: `{ status, message, data }`.
+const refused = (status: number, detail: string) => ({ status, message: detail, data: { detail } });
+const notFound = (detail: string) => refused(404, detail);
 const lastNotification = () => notificationStore.getState().entries.at(-1)!;
 
 beforeEach(() => {
@@ -89,6 +91,16 @@ describe('D7b proposals — the flag', () => {
     expect(counts()).toBeNull();
   });
 
+  it('an answer to a request made before a logout is not taken', async () => {
+    let answer: (v: { assistantPassages: boolean }) => void = () => {};
+    vi.mocked(assistantService.features).mockReturnValueOnce(new Promise((resolve) => { answer = resolve; }));
+    const asking = loadAssistantFeatures();
+    resetAssistantProposals();
+    answer({ assistantPassages: true });
+    await asking;
+    expect(assistantProposalsStore.getState().enabled).toBe(false);
+  });
+
   it('calls made while one is in flight share it', async () => {
     await Promise.all([loadAssistantFeatures(), loadAssistantFeatures(), loadAssistantFeatures()]);
     expect(assistantService.features).toHaveBeenCalledTimes(1);
@@ -135,7 +147,7 @@ describe('D7b proposals — the note\'s state', () => {
   });
 
   it('a refused write changes nothing and says why', async () => {
-    vi.mocked(assistantService.setProposalState).mockRejectedValueOnce(Object.assign(new Error('409'), { response: { status: 409, data: { detail: 'Questo passaggio non ha una nota' } } }));
+    vi.mocked(assistantService.setProposalState).mockRejectedValueOnce(refused(409, 'Questo passaggio non ha una nota'));
     await setProposalState('d1', 'a1', 'p1', 'validated');
     expect(assistantProposalsStore.getState().byItem.a1[0].note?.state).toBe('proposed');
     expect(counts()).toEqual({ proposed: 1, validated: 0, review: 0 });
@@ -185,35 +197,50 @@ describe('D7b proposals — the bin and «Annulla»', () => {
     removeProposal('d1', 'a1', 'p1');
     window.dispatchEvent(new Event('pagehide'));
     expect(assistantService.removeProposalOnExit).toHaveBeenCalledWith('d1', 'a1', 'p1');
-    closeNotification(lastNotification().id, 'timeout');
+    // Its notification went with it; the page going again sends nothing more.
+    expect(notificationStore.getState().entries.some((e) => e.message === 'Passaggio rimosso')).toBe(false);
+    window.dispatchEvent(new Event('pagehide'));
     expect(assistantService.removeProposalOnExit).toHaveBeenCalledTimes(1);
     expect(assistantService.removeProposal).not.toHaveBeenCalled();
   });
 
-  it('its reader going sends it at once; read again meanwhile, it is not drawn back, and the light stays right', async () => {
+  it('its reader going sends it at once, and takes its «Annulla» away; read again meanwhile, it is not drawn back', async () => {
     removeProposal('d1', 'a1', 'p1');
     // Read again while the notification still offers «Annulla»: the server still has it.
     await loadProposals('d1', 'a1');
     expect(assistantProposalsStore.getState().byItem.a1.map((p) => p.id)).toEqual(['p2']);
     flushRemovals('a1');
     expect(assistantService.removeProposal).toHaveBeenCalledWith('d1', 'a1', 'p1');
-    // «Annulla» once sent changes nothing, and the light is not counted twice.
-    await undoNotification(lastNotification().id);
-    expect(assistantProposalsStore.getState().byItem.a1.map((p) => p.id)).toEqual(['p2']);
+    expect(notificationStore.getState().entries.some((e) => e.message === 'Passaggio rimosso')).toBe(false);
     expect(counts()).toBeNull();
   });
 
-  it('a refused DELETE after a reading that already drew it back counts it once', async () => {
+  it('read while its DELETE is out, it is not drawn back; a refused DELETE then puts it back with its count', async () => {
     let refuse: (e: unknown) => void = () => {};
     vi.mocked(assistantService.removeProposal).mockReturnValueOnce(new Promise((_, reject) => { refuse = reject; }));
     removeProposal('d1', 'a1', 'p1');
     flushRemovals('a1');
-    // Read again before the server answers the DELETE: it still has the passage.
     await loadProposals('d1', 'a1');
-    expect(assistantProposalsStore.getState().byItem.a1.map((p) => p.id)).toEqual(['p1', 'p2']);
+    expect(assistantProposalsStore.getState().byItem.a1.map((p) => p.id)).toEqual(['p2']);
     refuse(notFound('Proposta non trovata'));
-    await vi.waitFor(() => expect(lastNotification()).toMatchObject({ type: 'error' }));
+    await vi.waitFor(() => expect(lastNotification()).toMatchObject({ type: 'error', message: 'Proposta non trovata' }));
     expect(assistantProposalsStore.getState().byItem.a1.map((p) => p.id)).toEqual(['p1', 'p2']);
+    expect(counts()).toEqual({ proposed: 1, validated: 0, review: 0 });
+  });
+
+  it('a removal refreshes the token now, for an exit that could not', () => {
+    removeProposal('d1', 'a1', 'p1');
+    expect(assistantService.refreshForExit).toHaveBeenCalledTimes(1);
+  });
+
+  it('a write answered after the bin was pressed draws and counts nothing', async () => {
+    let answer: (p: Proposal) => void = () => {};
+    vi.mocked(assistantService.setProposalState).mockReturnValueOnce(new Promise((resolve) => { answer = resolve; }));
+    const writing = setProposalState('d1', 'a1', 'p1', 'validated');
+    removeProposal('d1', 'a1', 'p1');
+    answer({ ...p1, note: aiNote('Il creditore.', 'validated') });
+    await writing;
+    expect(assistantProposalsStore.getState().byItem.a1.map((p) => p.id)).toEqual(['p2']);
     expect(counts()).toBeNull();
   });
 
@@ -262,7 +289,7 @@ describe('D7b — a note entry an application wrote', () => {
   });
 
   it('a refused write leaves it as it was and says why', async () => {
-    vi.mocked(assistantService.setNoteEntryState).mockRejectedValueOnce(Object.assign(new Error('409'), { response: { status: 409, data: { detail: "Questa voce non è una nota dell'IA" } } }));
+    vi.mocked(assistantService.setNoteEntryState).mockRejectedValueOnce(refused(409, "Questa voce non è una nota dell'IA"));
     await setNoteEntryState('d1', note(), 'validated');
     expect(note().assistantNote?.state).toBe('proposed');
     expect(lastNotification()).toMatchObject({ type: 'error', message: "Questa voce non è una nota dell'IA" });

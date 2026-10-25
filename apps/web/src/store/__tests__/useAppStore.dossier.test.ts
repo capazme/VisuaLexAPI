@@ -245,6 +245,13 @@ describe('trashing a note an application wrote (D7b)', () => {
         expect(light()).toEqual({ proposed: 1, validated: 0, review: 0 });
     });
 
+    it('trashed with its article and refused, the article comes back with its count as it was', async () => {
+        seed();
+        vi.mocked(dossierService.trashItems).mockRejectedValue(new Error('boom'));
+        await appStore.getState().trashDossierItems('d1', ['a1', 'n1']);
+        expect(light()).toEqual({ proposed: 1, validated: 0, review: 1 });
+    });
+
     it('gives it back when the server refuses', async () => {
         seed();
         vi.mocked(dossierService.trashItems).mockRejectedValue(new Error('boom'));

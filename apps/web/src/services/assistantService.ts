@@ -1,5 +1,6 @@
 import { apiClient } from './api';
 import { getAccessToken } from './authService';
+import { getFreshAccessToken } from './api';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 import type { AiReviewState, Proposal } from '../types';
@@ -47,6 +48,11 @@ export const assistantService = {
    * The same removal as the page goes (`pagehide`): a `keepalive` fetch, which the browser carries out after the page
    * is gone, where an ordinary request is often cancelled. Nothing waits for its answer.
    */
+  /** Refreshes the session's token now if it is about to expire: the exit's removal cannot refresh it. */
+  async refreshForExit(): Promise<void> {
+    await getFreshAccessToken().catch(() => null);
+  },
+
   removeProposalOnExit(dossierId: string, itemId: string, proposalId: string): void {
     const token = getAccessToken();
     void fetch(`${API_BASE_URL}${proposal(dossierId, itemId, proposalId)}`, {

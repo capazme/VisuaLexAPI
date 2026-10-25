@@ -77,6 +77,8 @@ describe('AiReviewControls', () => {
     fireEvent.change(field, { target: { value: '  ' } });
     fireEvent.blur(field);
     expect(props.onReviewComment).not.toHaveBeenCalled();
+    // The words the server keeps come back: they were not cleared.
+    expect(field).toHaveValue('Manca il comma 2.');
   });
 
   it('Enter in «Cosa non va?» saves it', () => {

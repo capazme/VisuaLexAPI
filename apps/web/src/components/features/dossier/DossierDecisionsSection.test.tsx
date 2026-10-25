@@ -8,7 +8,7 @@ const fetchDecision = vi.fn();
 vi.mock('../../../services/decisionService', () => ({ fetchDecision: (...a: unknown[]) => fetchDecision(...a) }));
 vi.mock('./AddToDossierPopover', () => ({ AddToDossierPopover: () => null }));
 vi.mock('../../../services/assistantService', () => ({
-  assistantService: { features: vi.fn(), listProposals: vi.fn(async () => []), setProposalState: vi.fn(), editProposalNote: vi.fn(), removeProposal: vi.fn(), removeProposalOnExit: vi.fn() },
+  assistantService: { features: vi.fn(), listProposals: vi.fn(async () => []), setProposalState: vi.fn(), editProposalNote: vi.fn(), removeProposal: vi.fn(), removeProposalOnExit: vi.fn(), refreshForExit: vi.fn(async () => {}) },
 }));
 
 import { appStore } from '../../../store/useAppStore';

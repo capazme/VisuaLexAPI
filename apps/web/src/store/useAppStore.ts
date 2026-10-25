@@ -1696,10 +1696,16 @@ const appStore = createStore<AppState>()(
 
                 // An application's note leaving takes its count off the light of the article it is about (D7b);
                 // a rollback gives it back.
+                // Only the articles still in the dossier are shifted, and only those are shifted back (an article trashed
+                // with its note comes back with its count as it was).
+                const shifted = new Set<string>();
                 const shiftNoteCounts = (d: Dossier, back: boolean) => {
                     for (const { item } of removed) {
                         if (item.type !== 'note' || !item.assistantNote || !item.aboutItemId) continue;
+                        if (back && !shifted.has(item.id)) continue;
                         const about = d.items.find(i => i.id === item.aboutItemId);
+                        if (!about) continue;
+                        if (!back) shifted.add(item.id);
                         shiftAiReviewCount(about, back ? null : item.assistantNote.state, back ? item.assistantNote.state : null);
                     }
                 };

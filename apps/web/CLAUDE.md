@@ -1039,9 +1039,11 @@ reader's own highlights (a decision's downloads keep only the reader's); one who
 the text (`LooseHighlightsList`, `UnmatchedAnchors`), to be removed through its route. Each
 write takes the server's answer and moves the row's light by one (the old state down, the new up). The bin removes at
 once and offers «Annulla»; the `DELETE` leaves when the notification closes, when the entry's reader goes (its row
-closed: opening it again reads what the server holds, and a removal still waiting is never drawn back), or at
-`pagehide` as a `keepalive` fetch, never after a logout drops it. Each write reads the state it replaces as the answer
-lands, so two quick clicks move the light once. A 404 «Non disponibile» also clears the items' `assistantNotes` and
+closed), or at `pagehide` as a `keepalive` fetch (the removal refreshes the token first, since that fetch cannot), never
+after a logout drops it. Sent early, its notification goes too, «Annulla» with it. A reading never draws back a removal
+waiting or out; a refused `DELETE` puts the passage and its count back. Each write reads the state it replaces as the
+answer lands, so two quick clicks move the light once, and one answered after the bin draws nothing. Errors are read
+as `apiClient` rejects them (`{ status, message, data }`): the server's `detail` is what the notification says. A 404 «Non disponibile» also clears the items' `assistantNotes` and
 `assistantNote`, so no light or control stays; a logout empties the store; a share link or a JSON export carries
 neither field (`shareableDossier`). Trashing a note entry an application wrote takes its count off its article's light
 (`trashDossierItems`, `shiftAiReviewCount`). A note entry an application wrote (`assistantNote` on the item, contract §3) has the same controls
