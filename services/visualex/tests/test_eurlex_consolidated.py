@@ -756,6 +756,33 @@ class TestGluedHeading:
         assert _heads_article(heading, f"Articolo {article}") is heads
 
 
+class TestTitleAsTheJournalPrintsIt:
+    def test_the_ai_act_keeps_the_journals_comma(self):
+        # «(CE) n, 300/2008» is the Official Journal's own Italian title (OJ and consolidated page alike): we show it as published, never corrected.
+        title = _extract_eurlex_title(soup_of("aiact_consolidated_20260727_title_trimmed.html"))
+        assert title.startswith("che stabilisce regole armonizzate sull'intelligenza artificiale e modifica i regolamenti "
+                                "(CE) n, 300/2008, (UE) n, 167/2013, (UE) n, 168/2013, (UE) 2018/858")
+        assert title.endswith("(UE) 2020/1828 (regolamento sull'intelligenza artificiale)")
+
+    @pytest.mark.parametrize("fixture,subject", [
+        ("dir_85_374_eli_title_trimmed.html",
+         "relativa al ravvicinamento delle disposizioni legislative, regolamentari ed amministrative degli "
+         "Stati Membri in materia di responsabilità per danno da prodotti difettosi"),
+        ("dir_64_221_eli_title_trimmed.html",
+         "per il coordinamento dei provvedimenti speciali riguardanti il trasferimento e il soggiorno degli "
+         "stranieri, giustificati da motivi d'ordine pubblico, di pubblica sicurezza e di sanità pubblica"),
+    ])
+    def test_an_older_title_without_commas_round_its_date(self, fixture, subject):
+        # «… del Consiglio del 25 luglio 1985 relativa al …»: the subject was '' while the date needed commas.
+        assert _extract_eurlex_title(soup_of(fixture)) == subject
+
+    def test_a_title_without_a_date_still_says_nothing(self):
+        # Reg. 17/1962 names itself «CEE Consiglio: Regolamento n. 17 : Primo regolamento …»: no date, no subject.
+        page = ('<meta about="http://data.europa.eu/eli/reg/1962/17/oj/ita" content="CEE Consiglio: Regolamento n. 17 : '
+                'Primo regolamento d\'applicazione degli articoli 85 e 86 del trattato" lang="it" property="eli:title"/>')
+        assert _extract_eurlex_title(BeautifulSoup(page, "html.parser")) == ""
+
+
 class TestConsolidatedTitleFromTheFirstRun:
     def test_the_gdpr_consolidated_has_its_subject_in_title_doc_first(self):
         # CELEX 02016R0679-20160504: `title-doc-last` holds only «(Testo rilevante ai fini del SEE)».
