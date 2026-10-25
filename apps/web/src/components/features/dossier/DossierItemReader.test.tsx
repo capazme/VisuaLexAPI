@@ -79,7 +79,16 @@ describe('DossierItemReader — the colour of new highlights (H1)', () => {
     appStore.setState({ highlights: [], annotations: [] });
     render(<DossierItemReader norma={norma} onOpenOnDashboard={() => {}} showToast={() => {}} />);
     const trigger = await screen.findByRole('button', { name: 'Colore delle evidenziazioni: giallo' });
-    expect(trigger).toHaveTextContent('Colore');
+    expect(trigger).toHaveTextContent('Colore: giallo');
+  });
+
+  it('offers none on a text read only, which takes no highlight', async () => {
+    // A past text: highlights are keyed by article, not by version (`describeVersion`).
+    vi.mocked(fetchArticleForNorma).mockResolvedValue({ article_text: RAW, norma_data: norma, validity: { state: 'historical' } as never });
+    appStore.setState({ highlights: [], annotations: [] });
+    render(<DossierItemReader norma={norma} onOpenOnDashboard={() => {}} showToast={() => {}} />);
+    await screen.findByRole('button', { name: /Copia citazione/ });
+    expect(screen.queryByRole('button', { name: /^Colore delle evidenziazioni/ })).toBeNull();
   });
 });
 

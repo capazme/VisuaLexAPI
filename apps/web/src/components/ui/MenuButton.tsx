@@ -13,6 +13,10 @@ export interface MenuItem {
   danger?: boolean;
   disabled?: boolean;
   separatorBefore?: boolean;
+  /** A section's title drawn over this item, under its separator (a phone's «⋯» holding a setting among actions). */
+  sectionHeading?: string;
+  /** The item's name when its words alone would not say it (a choice under a `sectionHeading`). */
+  ariaLabel?: string;
   /** A line under the label (the section switcher's). */
   description?: string;
   /** Set on a choice among items (the active section): the item becomes a `menuitemradio`. */
@@ -165,11 +169,18 @@ export function MenuButton({ label, items, children, triggerClassName, align = '
           {items.map((item, index) => (
             <div key={item.label}>
               {item.separatorBefore && <div className="my-1 border-t border-slate-200 dark:border-slate-700" aria-hidden />}
+              {/* Seen, not read: the items under it carry it in their `ariaLabel`. */}
+              {item.sectionHeading && (
+                <p aria-hidden className="px-3 pb-1 pt-1.5 text-xs font-medium leading-snug text-slate-500 dark:text-slate-400">
+                  {item.sectionHeading}
+                </p>
+              )}
               <button
                 ref={(el) => { itemRefs.current[index] = el; }}
                 type="button"
                 role={item.checked === undefined ? 'menuitem' : 'menuitemradio'}
                 aria-checked={item.checked}
+                aria-label={item.ariaLabel}
                 disabled={item.disabled}
                 tabIndex={-1}
                 onClick={(event) => { close(true); item.onSelect(event); }}

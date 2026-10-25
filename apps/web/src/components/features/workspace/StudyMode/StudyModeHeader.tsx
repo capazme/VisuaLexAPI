@@ -176,7 +176,7 @@ export function StudyModeHeader({
               )}
 
               {/* The colour of new highlights (H1), as in the reading bar. */}
-              <HighlightColorMenu triggerClassName={cn('p-1.5 sm:p-2 rounded-md', styles.button)} />
+              <HighlightColorMenu triggerClassName={cn('min-h-[44px] min-w-[44px] justify-center rounded-md p-1.5 sm:p-2 md:min-h-0 md:min-w-0', styles.button)} />
 
               <div className="hidden sm:block w-px h-5 bg-slate-200 dark:bg-slate-700 mx-1" />
 

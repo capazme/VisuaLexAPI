@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react
 import { Highlighter, StickyNote, Copy, Search, Flag, MessageCircle, GraduationCap } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
-import { getHighlightSwatch, highlightColorName, type HighlightColor } from '../../../utils/highlightColors';
+import { HIGHLIGHT_ICON_ON_DARK, highlightColorName, type HighlightColor } from '../../../utils/highlightColors';
 import { useAppStore } from '../../../store/useAppStore';
 import { getSelectionAnchor } from '../../../utils/selectionOffset';
 
@@ -131,9 +131,9 @@ export function SelectionPopup({
     }, 10);
   }, [containerRef, textRootRef, hidePopup]);
 
-  // Moved sideways to stay 8 px inside the window, from its measured box, once drawn and again when it changes size or
-  // place: the colour picker with its legend is far wider than the 160 px the position's clamp supposes (D7b), and a
-  // phone's edge cut its close button. A style written on the element, not state: nothing else draws again.
+  // Moved sideways to stay 8 px inside the window, from its measured box, once drawn and again when it moves: the
+  // position's clamp counts in the container, not the window, and a phone's edge once cut the popup (D7b). A style
+  // written on the element, not state: nothing else draws again.
   useLayoutEffect(() => {
     const el = popupRef.current;
     if (!popup.visible || !el) return;
@@ -287,9 +287,10 @@ export function SelectionPopup({
                   className="p-2.5 hover:bg-slate-700 transition-colors flex items-center gap-1.5 text-sm"
                   title="Evidenzia (H)"
                   aria-label={`Evidenzia in ${highlightColorName(highlightColor)}`}
+                  aria-keyshortcuts="h"
                 >
                   {/* In the colour it will take. */}
-                  <Highlighter size={16} aria-hidden style={{ color: getHighlightSwatch(highlightColor) }} />
+                  <Highlighter size={16} aria-hidden className={HIGHLIGHT_ICON_ON_DARK[highlightColor]} />
                 </button>
                 <div className="w-px h-5 bg-slate-700" />
                 <button

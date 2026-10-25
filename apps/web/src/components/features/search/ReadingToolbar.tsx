@@ -126,7 +126,7 @@ export function ReadingToolbar({
     // carries no version: anything that may not be copied, or is a reading, stays in.
     const exportLockedReason = copyLockedReason ?? lockedReason;
 
-    /** The tools behind «⋯» (R3: three in words, the rest here), the phone's adding what its row does not show. */
+    /** The tools behind «⋯» (R3: the reading's own in words, the rest here), the phone's adding what its row does not show. */
     // The colour of new highlights (H1): a menu of its own beside «Evidenziazioni» on a computer; on a phone, where the
     // row has no room, its four choices close the «⋯».
     const highlightColor = useAppStore((s) => s.settings.highlightColor);
@@ -164,7 +164,8 @@ export function ReadingToolbar({
             { label: 'Testo alla data…', icon: Clock, onSelect: onOpenVersionInput },
             { label: 'Confronta con…', icon: GitCompare, onSelect: onCompare },
         ]),
-        ...(phone ? highlightColorItems(highlightColor, (color) => updateSettings({ highlightColor: color }), { separatorBefore: true, prefix: 'Evidenzia in ' }) : []),
+        // The colour of new highlights (H1), last: a setting, under its own title. Not on a text that takes none.
+        ...(phone && !lockedReason ? highlightColorItems(highlightColor, (color) => updateSettings({ highlightColor: color }), { section: true }) : []),
     ];
 
     // The annex as the source convention names it: never a code's own (the codice civile is Allegato 2 of its decree).
@@ -218,13 +219,19 @@ export function ReadingToolbar({
             <div className={cn('ml-auto flex flex-shrink-0 items-center md:hidden', !compact && '-mr-3')}>
                 {!compact && dossierButton(undefined, true)}
                 <div ref={phoneMoreRef} className="contents">
-                    <MenuButton label="Altre azioni sull’articolo" triggerClassName={ACTION} items={moreItems(true)}>
+                    {/* Its list is long (the colours close it): capped under the bar, it scrolls on its own. */}
+                    <MenuButton
+                        label="Altre azioni sull’articolo"
+                        triggerClassName={ACTION}
+                        items={moreItems(true)}
+                        menuClassName="max-h-[calc(100dvh-12rem)] overflow-y-auto overscroll-contain"
+                    >
                         <MoreHorizontal size={18} aria-hidden />
                     </MenuButton>
                 </div>
             </div>
 
-            {/* A computer: three tools in words, then «⋯». */}
+            {/* A computer: the tools in words («Note», «Evidenziazioni», «Colore», «Al dossier»), then «⋯». */}
             <div className="hidden flex-shrink-0 items-center gap-1 md:flex">
                 <NotesHighlightsButtons
                     labelled
@@ -238,7 +245,7 @@ export function ReadingToolbar({
                     onToggleHighlights={onToggleHighlightsPeek}
                     lockedReason={lockedReason}
                 />
-                <HighlightColorMenu labelled triggerClassName={ACTION} />
+                {!lockedReason && <HighlightColorMenu labelled triggerClassName={ACTION} />}
                 {!compact && dossierButton(dossierButtonRef)}
                 <div ref={desktopMoreRef} className="contents">
                     <MenuButton label="Altre azioni sull’articolo" triggerClassName={ACTION} items={moreItems(false)}>

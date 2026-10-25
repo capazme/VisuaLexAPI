@@ -879,10 +879,13 @@ HTML with highlight `<mark>`s and wavy note anchors), and the toolbar
 (`ReadingToolbar`; R3, «prima il testo»: one line over the text with a hairline, no box — the status in words,
 `VersionStatusChip`, «In vigore dal 1° gennaio 2005» with the date in full, and «Allegato N» (`shownAnnex`: never a
 code's own); on a computer «Note» and
-«Evidenziazioni» with their counts (`NotesHighlightsButtons labelled`), «Al dossier», then «⋯» («Altre azioni
-sull’articolo»: the quick norm, the glosse, «Cerca nel testo», «Copia», «Condividi link», «Esporta…», «Testo alla
-data…», «Confronta con…»); on a phone «Al dossier» (its icon) and «⋯» on the status's row, «⋯» adding Study Mode and the source (the compact bar of a window and of the phone's
-reader: «Note», «Evidenziazioni» and «⋯» with the glosse, «Cerca nel testo» and «Copia»; on a phone «⋯» alone); quiet
+«Evidenziazioni» with their counts (`NotesHighlightsButtons labelled`), «Colore» (`HighlightColorMenu`, H1, below),
+«Al dossier», then «⋯» («Altre azioni sull’articolo»: the quick norm, the glosse, «Cerca nel testo», «Copia»,
+«Condividi link», «Esporta…», «Testo alla data…», «Confronta con…»); on a phone «Al dossier» (its icon) and «⋯» on the
+status's row, «⋯» adding Study Mode, the source and, last under its own title, the four colours (the compact bar of a
+window and of the phone's reader: «Note», «Evidenziazioni», «Colore» and «⋯» with the glosse, «Cerca nel testo» and
+«Copia»; on a phone «⋯» alone, the colours in it); «Colore» and the colours are not offered on a text that takes no
+highlight (`lockedReason`); quiet
 neutral buttons, 36 px on a computer and 44 on a phone; «Cerca nel testo» says «Chiudi la ricerca nel testo» only while
 the window is pointed at this very text (`useFindWindowScopedTo(…, exact)`), else it points the window here. Nothing of it is inside the text root, root rule 23). Keys are `buildItemKey(norma)` and
 `uniqueArticleIdFromNorma(norma)` from `utils/normaKeys.ts` — the dossier reader
@@ -1032,14 +1035,21 @@ tick, nothing if the application wrote nothing; its words («2 da validare · 1 
 in the row's name, its counts the server's `assistant_notes` on the item (`serverFieldsFromApi`).
 
 The colour of new highlights is chosen once, in the reading bar (H1, the owner's decision; `settings.highlightColor`,
-kept on this device with the other reading settings, yellow until chosen): `HighlightColorMenu` beside «Evidenziazioni»
-on a computer (`ReadingToolbar`, its compact form too), its four choices closing the «⋯» on a phone, in the decision's
-bar, in Study Mode's header, and with the dossier reader's actions (it has no bar). The menu offers the four as
-`menuitemradio`, each with what it is suggested for (`HIGHLIGHT_COLOR_MEANINGS`: yellow «Punto centrale», green
-«Condizione o presupposto», blue «Definizione o eccezione», red «Da rivedere»), a hint: any colour is free for
-anything. `SelectionPopup` never asks: «Evidenzia» (named «Evidenzia in giallo», its icon in the colour) and H
-highlight at once in it; sideways the popup is moved 8 px inside the window by its measured box (a `marginLeft` set as
-it is drawn). The MCP tool gives an application the same meanings and refuses red (`apps/mcp/src/tools/passages.ts`).
+kept on this device with the other reading settings, yellow until chosen, and yellow again for a save holding
+anything else — the persist `merge` checks it, `isHighlightColor`): `HighlightColorMenu` beside «Evidenziazioni» on a
+computer (`ReadingToolbar`, its compact form too; «Colore: giallo», a dot of the highlight's tint inside its ink), its
+four choices closing the «⋯» on a phone under their own title («Colore delle nuove evidenziazioni», each named
+«Nuove evidenziazioni in verde, …» so it reads as a setting, not as «highlight now»), in the decision's bar, in Study
+Mode's header, and with the dossier reader's actions (it has no bar); never on a text that takes no highlight. The
+menu offers the four as `menuitemradio`, each with what it is suggested for (`HIGHLIGHT_COLOR_MEANINGS`: yellow
+«Punto centrale», green «Condizione o presupposto», blue «Definizione o eccezione», red «Da rivedere»), a hint: any
+colour is free for anything. Every way of highlighting takes it: `SelectionPopup` never asks — «Evidenzia» (named
+«Evidenzia in giallo», `aria-keyshortcuts="h"`) and H highlight at once in it, its icon in the colour bright on the
+popup's dark surface (`HIGHLIGHT_ICON_ON_DARK`, never the highlight's tint, dark in the dark theme and transparent
+while highlights are hidden) —, a key passage's «Fai tua», and Study Mode's keys 1–4, which highlight in their colour
+and make it the one chosen. Sideways the popup is moved 8 px inside the window by its measured box (a `marginLeft`
+set as it is drawn). Study Mode's own keys leave alone a key a menu took or one pressed in a menu (Esc there closes the
+menu, not Study Mode), and H and N while text is selected (the popup's). The MCP tool gives an application the same meanings and refuses red (`apps/mcp/src/tools/passages.ts`).
 
 The wiring follows the server's contract (`services/assistantService.ts`). `GET /api/features` says whether the
 feature is on, read as the app starts (`useAuth`) and as the dossier page mounts; a 404 «Non disponibile» from a
@@ -2440,7 +2450,7 @@ other route fails.
 **Inchiostro everywhere** (Y1, `lib/inchiostro.guard.test.ts` reads the sources): an action and the focus are
 `primary-*` (toga), everything else `slate-*` (ink), a section its hue (`--vlx-section-*`); no `blue-*`, `indigo-*`,
 `purple-*` or `violet-*` (the first two were aliases of toga, the others hues of no section) but in the colour keys the
-test lists with their reason (the courts' chips, the kinds of a suggestion's items); no text
+test lists with their reason (the courts' chips, the kinds of a suggestion's items, a highlight's four colours); no text
 under 11 px (px, a length or rem); elevation by kind — cards `shadow-sm` or a border, menus and popovers `shadow-md`,
 windows and dialogs `shadow-lg`, never `xl` or `2xl`; in the dark `index.css` draws `shadow-md` and up as a hairline and a
 drop —; flat paper, no gradient but the skeleton's shimmer and the comparison's hatch (`GapCell`); `index.css`'s

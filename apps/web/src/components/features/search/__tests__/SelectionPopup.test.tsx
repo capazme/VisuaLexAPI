@@ -170,24 +170,6 @@ describe('SelectionPopup: a past text (copyOnly)', () => {
     expect(onAddNote).not.toHaveBeenCalled();
   });
 
-  it('highlights at once in the colour chosen in the reading bar, by its button or H, never asking (H1)', async () => {
-    appStore.setState((st) => ({ settings: { ...st.settings, highlightColor: 'green' } }));
-    try {
-      const onHighlight = vi.fn();
-      render(<Harness onHighlight={onHighlight} />);
-      await selectText('art. 2043 c.c.');
-      fireEvent.click(await screen.findByRole('button', { name: 'Evidenzia in verde' }));
-      expect(onHighlight).toHaveBeenCalledWith('art. 2043 c.c.', 'green', TEXT.indexOf('art. 2043'));
-      // No colour to pick in the popup any more.
-      expect(screen.queryByRole('list', { name: 'Uso suggerito dei colori' })).toBeNull();
-      await selectText('art. 2043 c.c.');
-      fireEvent.keyDown(window, { key: 'h' });
-      expect(onHighlight).toHaveBeenLastCalledWith('art. 2043 c.c.', 'green', TEXT.indexOf('art. 2043'));
-    } finally {
-      appStore.setState((st) => ({ settings: { ...st.settings, highlightColor: 'yellow' } }));
-    }
-  });
-
   it('keeps the shortcuts for a text in force (the control for the test above)', async () => {
     const onHighlight = vi.fn();
     render(<Harness onHighlight={onHighlight} />);
@@ -196,3 +178,43 @@ describe('SelectionPopup: a past text (copyOnly)', () => {
     expect(onHighlight).toHaveBeenCalledWith('art. 2043 c.c.', 'yellow', TEXT.indexOf('art. 2043'));
   });
 });
+
+describe('SelectionPopup: the colour chosen in the reading bar (H1)', () => {
+  it('highlights at once in it, by its button or H, never asking', async () => {
+    appStore.setState((st) => ({ settings: { ...st.settings, highlightColor: 'green' } }));
+    try {
+      const onHighlight = vi.fn();
+      render(<Harness onHighlight={onHighlight} />);
+      await selectText('art. 2043 c.c.');
+      const button = await screen.findByRole('button', { name: 'Evidenzia in verde' });
+      expect(button).toHaveAttribute('aria-keyshortcuts', 'h');
+      fireEvent.click(button);
+      expect(onHighlight).toHaveBeenCalledExactlyOnceWith('art. 2043 c.c.', 'green', TEXT.indexOf('art. 2043'));
+      // No colour to pick in the popup any more.
+      expect(screen.queryByRole('list', { name: 'Uso suggerito dei colori' })).toBeNull();
+      onHighlight.mockClear();
+      await selectText('art. 2043 c.c.');
+      fireEvent.keyDown(window, { key: 'h' });
+      expect(onHighlight).toHaveBeenCalledExactlyOnceWith('art. 2043 c.c.', 'green', TEXT.indexOf('art. 2043'));
+    } finally {
+      appStore.setState((st) => ({ settings: { ...st.settings, highlightColor: 'yellow' } }));
+    }
+  });
+
+  it.each([
+    ['yellow', 'giallo', 'text-yellow-300'],
+    ['blue', 'blu', 'text-blue-300'],
+  ] as const)('draws its icon in %s bright on the popup\'s dark surface, never in the highlight\'s tint (it may be hidden)', async (color, name, ink) => {
+    appStore.setState((st) => ({ settings: { ...st.settings, highlightColor: color } }));
+    try {
+      render(<Harness onHighlight={vi.fn()} />);
+      await selectText('art. 2043 c.c.');
+      const icon = (await screen.findByRole('button', { name: `Evidenzia in ${name}` })).querySelector('svg')!;
+      expect(icon).toHaveClass(ink);
+      expect(icon.getAttribute('style') ?? '').not.toMatch(/--hl-/);
+    } finally {
+      appStore.setState((st) => ({ settings: { ...st.settings, highlightColor: 'yellow' } }));
+    }
+  });
+});
+

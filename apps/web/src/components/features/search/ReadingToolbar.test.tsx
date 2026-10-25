@@ -216,6 +216,12 @@ describe('ReadingToolbar — a past text is a reading', () => {
         expect(within(phoneMenu).getByRole('menuitem', { name: /Modalità studio/ })).toBeDisabled();
     });
 
+    it('offers no colour for new highlights, on a text that takes none (H1)', () => {
+        const { container } = setup({ lockedReason: READ_ONLY_REASON });
+        expect(within(desktopRow(container)).queryByRole('button', { name: /^Colore delle evidenziazioni/ })).toBeNull();
+        expect(within(openMore(phoneRow(container))).queryAllByRole('menuitemradio')).toEqual([]);
+    });
+
     it('leaves the reading tools alone', () => {
         const { container } = setup({ lockedReason: READ_ONLY_REASON });
         screen.getAllByRole('button', { name: 'Al dossier' }).forEach((button) => expect(button).toBeEnabled());
@@ -356,7 +362,8 @@ describe('ReadingToolbar — the colour of new highlights, chosen once (H1)', ()
         const { container } = setup();
         const row = desktopRow(container);
         const trigger = within(row).getByRole('button', { name: 'Colore delle evidenziazioni: giallo' });
-        expect(trigger).toHaveTextContent('Colore');
+        // The colour in words, not in a pale dot alone.
+        expect(trigger).toHaveTextContent('Colore: giallo');
         fireEvent.click(trigger);
         const menu = within(row).getByRole('menu');
         const choices = within(menu).getAllByRole('menuitemradio');
@@ -366,18 +373,26 @@ describe('ReadingToolbar — the colour of new highlights, chosen once (H1)', ()
             ['RossoDa rivedere', 'false'],
             ['BluDefinizione o eccezione', 'false'],
         ]);
+        expect(choices[0]).toHaveAccessibleName('Giallo, punto centrale');
         fireEvent.click(choices[1]);
         expect(color()).toBe('green');
         expect(within(row).getByRole('button', { name: 'Colore delle evidenziazioni: verde' })).toBeInTheDocument();
     });
 
-    it('on a phone, where the row has no room: its four choices close the «⋯»', () => {
+    it('on a phone, where the row has no room: its four choices close the «⋯», under a title, as a setting', () => {
         const { container } = setup();
         const menu = openMore(phoneRow(container));
+        // Long now: capped under the bar, it scrolls on its own, so the last colour is never off the screen.
+        expect(menu).toHaveClass('overflow-y-auto', 'max-h-[calc(100dvh-12rem)]');
+        expect(within(menu).getByText('Colore delle nuove evidenziazioni')).toBeInTheDocument();
         const choices = within(menu).getAllByRole('menuitemradio');
+        // Named for what they set, never «Evidenzia in…», which reads as «highlight now».
+        expect(choices.map((c) => c.getAttribute('aria-label'))).toEqual([
+            'Nuove evidenziazioni in giallo, punto centrale', 'Nuove evidenziazioni in verde, condizione o presupposto',
+            'Nuove evidenziazioni in rosso, da rivedere', 'Nuove evidenziazioni in blu, definizione o eccezione',
+        ]);
         expect(choices.map((c) => c.textContent)).toEqual([
-            'Evidenzia in gialloPunto centrale', 'Evidenzia in verdeCondizione o presupposto',
-            'Evidenzia in rossoDa rivedere', 'Evidenzia in bluDefinizione o eccezione',
+            'GialloPunto centrale', 'VerdeCondizione o presupposto', 'RossoDa rivedere', 'BluDefinizione o eccezione',
         ]);
         expect(choices[0]).toHaveAttribute('aria-checked', 'true');
         fireEvent.click(choices[3]);

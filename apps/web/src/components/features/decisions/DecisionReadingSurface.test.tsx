@@ -41,6 +41,8 @@ beforeEach(() => {
     loadHighlightsForArticle: loadHighlights, loadAnnotationsForArticle: loadAnnotations,
     addHighlight, addAnnotation, removeHighlight, removeAnnotation, pushReadingBack,
   });
+  // The colour of new highlights as it starts (H1): a test that chooses another never leaks it.
+  appStore.setState((s) => ({ settings: { ...s.settings, highlightColor: 'yellow' } }));
 });
 
 const H = { id: 'h1', normaKey: KEY, articleId: '', rangeSerialized: '', text: 'ricorso', color: 'green', startOffset: 3 } as Highlight;
@@ -265,7 +267,6 @@ describe('DecisionReadingSurface — notes and highlights', () => {
     expect(screen.queryByRole('list', { name: 'Uso suggerito dei colori' })).toBeNull();
     fireEvent.click(await screen.findByRole('button', { name: 'Evidenzia in rosso' }));
     expect(addHighlight).toHaveBeenCalledWith(KEY, '', 'ricorso', expect.any(String), 'red', 3);
-    appStore.setState((s) => ({ settings: { ...s.settings, highlightColor: 'yellow' } }));
   });
 
   it.each([
@@ -485,7 +486,11 @@ describe('DecisionReadingSurface — the key passages', () => {
     expect(await screen.findByRole('dialog', { name: 'Principio di diritto, evidenziato automaticamente' })).toBeInTheDocument();
   });
 
-  it('«Fai tua» on a passage makes one highlight of the reader\'s, with its words and offset', async () => {
+  it.each([
+    ['yellow until another is chosen', undefined, 'yellow'],
+    ['in the colour chosen in the bar (H1)', 'blue', 'blue'],
+  ] as const)('«Fai tua» on a passage makes one highlight of the reader\'s, with its words and offset, %s', async (_, chosen, color) => {
+    if (chosen) appStore.setState((s) => ({ settings: { ...s.settings, highlightColor: chosen } }));
     const { container } = mount();
     const plain = decisionProjection(WITH_PASSAGES);
     const piece = container.querySelector<HTMLElement>('[data-key-passage="principio"]')!;
@@ -493,7 +498,7 @@ describe('DecisionReadingSurface — the key passages', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Principio di diritto, evidenziato automaticamente' });
     expect(within(dialog).getByText('Evidenziato automaticamente: non è una tua evidenziazione.')).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Fai tua (evidenzia)' }));
-    expect(addHighlight).toHaveBeenCalledExactlyOnceWith(KEY, '', PRINCIPLE, '', 'yellow', plain.indexOf(PRINCIPLE));
+    expect(addHighlight).toHaveBeenCalledExactlyOnceWith(KEY, '', PRINCIPLE, '', color, plain.indexOf(PRINCIPLE));
     expect(screen.queryByRole('dialog', { name: /evidenziato automaticamente/ })).toBeNull();
   });
 

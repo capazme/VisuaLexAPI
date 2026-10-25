@@ -12,6 +12,7 @@ import { useArticleMarkers } from '../../../../hooks/useArticleMarkers';
 import { useArticleTextInteractions } from '../../../../hooks/useArticleTextInteractions';
 import { getRubricText, getUpdateNoteParagraphs, parseArticleStructure } from '../../../../utils/articleStructure';
 import { UpdateNotePopover } from '../../search/UpdateNotePopover';
+import { useAppStore } from '../../../../store/useAppStore';
 
 const COLOR_SHORTCUTS: Record<string, 'yellow' | 'green' | 'red' | 'blue'> = {
   '1': 'yellow',
@@ -108,6 +109,7 @@ export function StudyModeContent({
     () => norma_data.allegato ? `all${norma_data.allegato}:${norma_data.numero_articolo}` : norma_data.numero_articolo,
     [norma_data.allegato, norma_data.numero_articolo],
   );
+  const updateSettings = useAppStore((s) => s.updateSettings);
   const handleHighlight = useCallback(
     (text: string, color: 'yellow' | 'green' | 'red' | 'blue', startOffset: number) => {
       const alreadyHighlighted = highlights.some(h =>
@@ -126,7 +128,9 @@ export function StudyModeContent({
   });
 
   // Colour shortcut: 1/2/3/4 highlight the current selection when it
-  // sits inside the article body. Runs in the capture phase with
+  // sits inside the article body, and make that colour the one chosen for
+  // new highlights, as the bar's menu does (H1): the next highlight, by
+  // the popup or H, takes it too. Runs in the capture phase with
   // stopImmediatePropagation so the theme shortcut in
   // useStudyModeShortcuts (also bound to 1/2/3 on window) doesn't also
   // fire and flip the theme while the user wanted a yellow highlight.
@@ -151,13 +155,14 @@ export function StudyModeContent({
 
       e.preventDefault();
       e.stopImmediatePropagation();
+      updateSettings({ highlightColor: color });
       handleHighlight(anchor.text, color, anchor.startOffset);
       selection.removeAllRanges();
     };
 
     window.addEventListener('keydown', onKeyDown, { capture: true });
     return () => window.removeEventListener('keydown', onKeyDown, { capture: true });
-  }, [handleHighlight]);
+  }, [handleHighlight, updateSettings]);
 
   // Handle note from selection popup; the offset is document-relative
   // already, so the anchor resolves on the dashboard and in the dossier too.
