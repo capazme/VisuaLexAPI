@@ -848,8 +848,10 @@ def _extract_eurlex_title(soup):
                                          "about": lambda about: bool(about) and about.rstrip("/").endswith("/ita")})
     for meta in (soup.find("meta", attrs={"name": "DC.description"}), eli_title):
         match = _EURLEX_DESCRIPTION_SUBJECT.search((meta.get("content") or "") if meta else "")
-        if match:
-            return " ".join(match.group(1).split())
+        subject = " ".join(match.group(1).split()) if match else ""
+        # A note in brackets after the date («(GU L 210 …)») is no subject, as in `_eurlex_subject`.
+        if subject and not (subject.startswith("(") and subject.endswith(")")):
+            return subject
     return ""
 
 

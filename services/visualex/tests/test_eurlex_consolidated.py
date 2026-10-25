@@ -776,6 +776,17 @@ class TestTitleAsTheJournalPrintsIt:
         # «… del Consiglio del 25 luglio 1985 relativa al …»: the subject was '' while the date needed commas.
         assert _extract_eurlex_title(soup_of(fixture)) == subject
 
+    @pytest.mark.parametrize("content,subject", [
+        ("Direttiva 2001/29/CE del Parlamento europeo e del Consiglio dell'11 luglio 2001 concernente l'armonizzazione",
+         "concernente l'armonizzazione"),
+        ("Direttiva 93/13/CEE del Consiglio, del 5 aprile 1993 concernente le clausole abusive", "concernente le clausole abusive"),
+        ("Direttiva 93/13/CEE del Consiglio del 5 aprile 1993, concernente le clausole abusive", "concernente le clausole abusive"),
+        ("Direttiva 85/374/CEE del Consiglio del 25 luglio 1985 (GU L 210 del 7.8.1985)", ""),
+    ])
+    def test_the_date_read_with_or_without_its_commas(self, content, subject):
+        page = f'<meta about="http://data.europa.eu/eli/dir/1/1/oj/ita" content="{content}" lang="it" property="eli:title"/>'
+        assert _extract_eurlex_title(BeautifulSoup(page, "html.parser")) == subject
+
     def test_a_title_without_a_date_still_says_nothing(self):
         # Reg. 17/1962 names itself «CEE Consiglio: Regolamento n. 17 : Primo regolamento …»: no date, no subject.
         page = ('<meta about="http://data.europa.eu/eli/reg/1962/17/oj/ita" content="CEE Consiglio: Regolamento n. 17 : '
