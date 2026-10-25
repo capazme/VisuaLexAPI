@@ -518,6 +518,38 @@ def is_quoted_heading(element) -> bool:
             or element.find_parent("td") is not None)
 
 
+# A legacy OJ page can glue an article's heading to the end of the paragraph before it: dir.
+# 85/374 reads «… l'interruzione della prescrizione. Articolo 11</p>», so art. 11 was not listed,
+# not found, and its text was served at the end of art. 10's.
+_GLUED_HEADING = re.compile(r"[.;:]\s+((?:Articolo|Article)\s+(\d+))$")
+_HEADING_TAGS = ['p', 'div', 'span', 'h1', 'h2', 'h3', 'h4']
+
+
+def glued_headings(soup):
+    """The article headings glued to the end of a class-less paragraph, as {number: (paragraph,
+    where the heading starts in its stripped text)}. Only the article right after the one before
+    it, and never one that an element of its own heads: a sentence ending «… Articolo 11» is
+    otherwise a reference, not a heading."""
+    own = set()
+    for elem in soup.find_all(_HEADING_TAGS):
+        number = None if is_quoted_heading(elem) else eurlex_heading_number(elem.get_text(strip=True))
+        if number:
+            own.add(number)
+    found, previous = {}, None
+    for elem in soup.find_all(_HEADING_TAGS):
+        text = elem.get_text(strip=True)
+        number = None if is_quoted_heading(elem) else eurlex_heading_number(text)
+        if number:
+            previous = number
+            continue
+        match = _GLUED_HEADING.search(text) if elem.name == 'p' and not elem.get('class') else None
+        if (match and match.group(2) not in own and previous is not None and previous.isdigit()
+                and int(match.group(2)) == int(previous) + 1):
+            found[match.group(2)] = (elem, match.start(1))
+            previous = match.group(2)
+    return found
+
+
 # An ordinal after a heading's number: a whole word («15 bis», «15 BIS», «15-bis»), or a lower-case
 # ordinal glued to the capital that opens the text after it, as a class-less page whose heading and
 # text share an element reads «Articolo 15 bisTesto». A capital after a lower-case ordinal never
@@ -611,8 +643,9 @@ async def _parse_eurlex_tree(soup, normurn, link=False, details=False):
     if count_articles == 0:
         logging.info("ti-section/ti-art not found, falling back to pattern search")
 
+        glued = {id(elem): number for number, (elem, _) in glued_headings(soup).items()}
         # Cerca tutti gli elementi che potrebbero contenere articoli o sezioni
-        for elem in soup.find_all(['p', 'div', 'span', 'h1', 'h2', 'h3', 'h4']):
+        for elem in soup.find_all(_HEADING_TAGS):
             text = elem.get_text(strip=True)
 
             # Check for sections first (when details=True)
@@ -629,6 +662,7 @@ async def _parse_eurlex_tree(soup, normurn, link=False, details=False):
 
             # Check for articles
             article_num = None if is_quoted_heading(elem) else eurlex_heading_number(text)
+            article_num = article_num or glued.get(id(elem))
             if article_num:
                 if article_num not in seen_articles:
                     seen_articles.add(article_num)

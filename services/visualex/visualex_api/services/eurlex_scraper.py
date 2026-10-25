@@ -9,7 +9,7 @@ from ..tools.sys_op import BaseScraper
 from ..tools.exceptions import DocumentNotFoundError, NetworkError, ValidationError
 from ..tools.cache_manager import get_cache_manager
 from ..tools.selectors import EURLexSelectors
-from ..tools.treextractor import HEADING_ORDINAL, is_quoted_heading, strip_amendment_markers
+from ..tools.treextractor import HEADING_ORDINAL, glued_headings, is_quoted_heading, strip_amendment_markers
 from .akn_parser import normalize_article_key
 from ..tools.article_suffixes import ARTICLE_SUFFIX_ALTERNATION
 
@@ -485,6 +485,15 @@ class EurlexScraper(BaseScraper):
                     log.debug("Found article in eli-subdivision")
                     break
 
+        # Strategy 5: a heading glued to the end of the paragraph before it (`glued_headings`). Only
+        # a class-less page has one, so a page whose heading carries a class is not walked for it.
+        glued = glued_headings(soup) if article_section is None or not article_section.get('class') else {}
+        heading = None
+        if not article_section and str(article).strip() in glued:
+            article_section, start = glued[str(article).strip()]
+            heading = article_section.get_text(strip=True)[start:]
+            log.debug("Found article glued to the end of a paragraph")
+
         if not article_section:
             log.warning(f"Article {article} not found in the document after all strategies")
             raise DocumentNotFoundError(
@@ -493,8 +502,9 @@ class EurlexScraper(BaseScraper):
             )
 
         log.debug("Article found, extracting text")
-        full_text = [article_section.get_text(strip=True)]
+        full_text = [heading or article_section.get_text(strip=True)]
         element = article_section.find_next_sibling()
+        glued_at = {id(elem): start for elem, start in glued.values()}
 
         # Detect end of article by finding next article
         next_article_pattern = re.compile(r'^Articolo\s+\d+|^Article\s+\d+|^Art\.\s+\d+', re.IGNORECASE)
@@ -507,6 +517,12 @@ class EurlexScraper(BaseScraper):
             elem_text = element.get_text(strip=True) if element.name else ''
             if next_article_pattern.match(elem_text):
                 log.debug("Next article section found (text pattern), stopping extraction")
+                break
+            if id(element) in glued_at:
+                # The paragraph is this article's, up to the next one's heading glued to its end.
+                if elem_text[:glued_at[id(element)]].rstrip():
+                    full_text.append(elem_text[:glued_at[id(element)]].rstrip())
+                log.debug("Next article glued to the end of a paragraph, stopping extraction")
                 break
             if element.name in ['p', 'div', 'span']:
                 text = element.get_text(strip=True)

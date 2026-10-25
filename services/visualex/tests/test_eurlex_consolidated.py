@@ -810,3 +810,43 @@ class TestConsolidatedTitleFromTheFirstRun:
                 '<p class="oj-doc-ti">del 27 aprile 2016</p>'
                 '<p class="oj-doc-ti">relativo alla protezione delle persone fisiche</p></div>')
         assert _extract_eurlex_title(BeautifulSoup(page, "html.parser")) == "relativo alla protezione delle persone fisiche"
+
+
+class TestHeadingGluedToTheParagraphBefore:
+    """Dir. 85/374's legacy OJ page reads «… l'interruzione della prescrizione. Articolo 11</p>»: art. 11
+    was not listed, not found, and its text was served at the end of art. 10's
+    (fixtures/eurlex/README.md)."""
+
+    URL = "https://eur-lex.europa.eu/eli/dir/1985/374/oj/ita"
+
+    async def test_the_index_lists_art_11(self):
+        result, count, _ = await _parse_eurlex_tree(soup_of("dir_85_374_eli_legacy_text_trimmed.html"), self.URL)
+        assert [item["numero"] for item in result] == [str(n) for n in range(1, 23)] and count == 22
+
+    async def test_art_11_is_served_from_its_glued_heading(self):
+        text = await EurlexScraper().extract_article_text(soup_of("dir_85_374_eli_legacy_text_trimmed.html"), "11")
+        assert text.startswith("Articolo 11\nGli stati membri prevedono nella loro legislazione che i diritti conferiti")
+        assert text.endswith("un procedimento giudiziario contro il produttore.")
+
+    async def test_art_10_stops_before_it(self):
+        # Art. 10's text loses the tail it carried until now: the heading and the whole of art. 11.
+        text = await EurlexScraper().extract_article_text(soup_of("dir_85_374_eli_legacy_text_trimmed.html"), "10")
+        assert text.startswith("Articolo 10\n1. Gli stati membri prevedono")
+        assert text.endswith("che disciplinano la sospensione o l'interruzione della prescrizione.")
+        assert "Articolo 11" not in text
+
+    async def test_art_12_is_unchanged(self):
+        text = await EurlexScraper().extract_article_text(soup_of("dir_85_374_eli_legacy_text_trimmed.html"), "12")
+        assert text.startswith("Articolo 12\nLa responsabilità del produttore") and "Articolo 13" not in text
+
+    @pytest.mark.parametrize("page", [
+        # A sentence ending on an article that has a heading of its own is a reference.
+        "<p>Articolo 1</p><p>Testo. Articolo 2</p><p>Articolo 2</p><p>Testo.</p>",
+        # Not the article right after the one before it.
+        "<p>Articolo 1</p><p>Testo. Articolo 5</p><p>Altro.</p>",
+        # A paragraph with a class is not a legacy page's.
+        '<p>Articolo 1</p><p class="oj-normal">Testo. Articolo 2</p><p>Altro.</p>',
+    ])
+    def test_only_the_next_article_with_no_heading_of_its_own(self, page):
+        from visualex_api.tools.treextractor import glued_headings
+        assert glued_headings(BeautifulSoup(page, "html.parser")) == {}
