@@ -281,13 +281,30 @@ def export_url(urn, today):
     return _N2LS + pdf_urn_in_force(_exported_urn(urn), today)
 
 
+# The parts of an exportable URN, in their places (the grammar of `_EXPORTABLE_URN`).
+_URN_PARTS = re.compile(
+    r"urn:nir:(?P<authority>[a-z]+(?:\.[a-z]+)*):(?P<kind>[a-z]+(?:\.[a-z]+)*)(?::(?P<date>\d{4}(?:-\d{2}-\d{2})?))?"
+    r"(?:;(?P<number>[0-9A-Za-z.-]+))?(?::(?P<annex>[0-9A-Za-z]+))?(?:~art[0-9A-Za-z.-]+)?"
+    r"(?P<version>!vig=(?:\d{4}-\d{2}-\d{2})?|@originale)?",
+    re.ASCII,
+)
+
+
+def export_version_date(url):
+    """The day an export's address asks for (`!vig=<day>`), or None: the original, or no day."""
+    match = re.search(r"!vig=(\d{4}-\d{2}-\d{2})", url or "")
+    return match.group(1) if match else None
+
+
 def urn_to_filename(urn):
     """
-    Converts a URN to a filename: the act (type, date, number, annex) and its version.
+    Converts a URN to a filename: the act (authority, type, date, number, annex) and its version.
 
-    The article is left out: the export is the act's. Until 21 October 2026 the name was
-    the number and the year alone, so acts of different types with the same number and
-    year, and an act's versions, shared one cached file.
+    The article is left out: the export is the act's. Each part has its place, joined by «_»,
+    which no part of the grammar holds, so two URNs never share a name: until 21 October 2026
+    the name was the number and the year alone, and until 25 October it dropped the authority
+    and read «:» and «;» alike. A name over the limit is refused (ValueError), never cut: a
+    cut would drop the version.
 
     Arguments:
     urn -- The URN string
@@ -296,16 +313,15 @@ def urn_to_filename(urn):
     str -- The generated filename: always a bare file name, safe to join to a directory
     """
     logging.info(f"Converting URN to filename: {urn}")
-    exported = _exported_urn(urn)
-    try:
-        act = exported.split('stato:')[1].split('~')[0]
-    except IndexError:
-        logging.error("Invalid URN format")
+    parts = _URN_PARTS.fullmatch(_exported_urn(urn))
+    if not parts:
         raise ValueError("Invalid URN format")
-    act = _VERSION_IN_URN.sub("", act).replace("!vig=", "")
-    version = _VERSION_IN_URN.search(exported)
-    marker = version.group(0).replace("!vig=", "_vig_").replace("@", "_") if version else ""
-    filename = _safe_filename(f"{act}{marker}.pdf".replace(":", "_").replace(";", "_"))
+    version = parts["version"] or ""
+    version = "originale" if version == "@originale" else version.replace("!vig=", "vig") if version else ""
+    name = "_".join(parts[key] or "" for key in ("authority", "kind", "date", "number", "annex")) + f"_{version}.pdf"
+    if len(name) > _MAX_FILENAME:
+        raise ValueError("URN too long for a file name")
+    filename = _safe_filename(name)
     logging.info(f"Generated filename: {filename}")
     return filename
 

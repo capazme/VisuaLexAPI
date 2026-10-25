@@ -29,17 +29,32 @@ def fixed_today(monkeypatch):
 @pytest.mark.parametrize(
     "urn, expected",
     [
-        (BASE + "legge:1990-08-07;241", "legge_1990-08-07_241.pdf"),
-        (BASE + "decreto.legislativo:2001-06-08;231", "decreto.legislativo_2001-06-08_231.pdf"),
-        (BASE + "regio.decreto:1942-03-16;262:2~art2043", "regio.decreto_1942-03-16_262_2.pdf"),
-        (BASE + "costituzione:1947-12-27", "costituzione_1947-12-27.pdf"),
-        (BASE + "legge:1990-08-07;241!vig=2026-10-21", "legge_1990-08-07_241_vig_2026-10-21.pdf"),
-        (BASE + "regio.decreto:1942-03-16;262:2~art2043!vig=2020-01-01", "regio.decreto_1942-03-16_262_2_vig_2020-01-01.pdf"),
-        (BASE + "legge:1990-08-07;241@originale", "legge_1990-08-07_241_originale.pdf"),
+        (BASE + "legge:1990-08-07;241", "stato_legge_1990-08-07_241__.pdf"),
+        (BASE + "decreto.legislativo:2001-06-08;231", "stato_decreto.legislativo_2001-06-08_231__.pdf"),
+        (BASE + "regio.decreto:1942-03-16;262:2~art2043", "stato_regio.decreto_1942-03-16_262_2_.pdf"),
+        (BASE + "costituzione:1947-12-27", "stato_costituzione_1947-12-27___.pdf"),
+        (BASE + "legge:1990-08-07;241!vig=2026-10-21", "stato_legge_1990-08-07_241__vig2026-10-21.pdf"),
+        (BASE + "regio.decreto:1942-03-16;262:2~art2043!vig=2020-01-01", "stato_regio.decreto_1942-03-16_262_2_vig2020-01-01.pdf"),
+        (BASE + "legge:1990-08-07;241@originale", "stato_legge_1990-08-07_241__originale.pdf"),
     ],
 )
 def test_a_legitimate_act_keeps_a_readable_name(urn, expected):
     assert urn_to_filename(urn) == expected
+
+
+def test_the_authority_and_the_separators_name_the_file_too():
+    # Until 25 October 2026 the name dropped the authority and read «:» and «;» alike.
+    urns = ["urn:nir:stato:legge:1990-08-07;241!vig=2026-10-21", "urn:nir:a.stato:legge:1990-08-07;241!vig=2026-10-21",
+            "urn:nir:regione.lazio:legge:1990-08-07;241!vig=2026-10-21", "urn:nir:stato:legge:1990-08-07;241:1!vig=2026-10-21",
+            "urn:nir:stato:legge:1990-08-07;2411!vig=2026-10-21"]
+    assert len({urn_to_filename(urn) for urn in urns}) == len(urns)
+    assert urn_to_filename(urns[2]) == "regione.lazio_legge_1990-08-07_241__vig2026-10-21.pdf"
+
+
+def test_a_name_over_the_limit_is_refused_never_cut():
+    # A cut dropped the version marker at the end: two versions could share a file.
+    with pytest.raises(ValueError):
+        urn_to_filename("urn:nir:stato:legge:1990-08-07;" + "1" * 200 + "!vig=2026-10-21")
 
 
 def test_acts_and_versions_never_share_a_file():
@@ -75,7 +90,7 @@ def test_only_the_query_of_a_n2ls_address_names_the_file(urn):
 
 def test_a_bare_urn_still_names_its_file():
     assert urn_to_filename("urn:nir:stato:legge:1990-08-07;241!vig=2020-01-01") == \
-        "legge_1990-08-07_241_vig_2020-01-01.pdf"
+        "stato_legge_1990-08-07_241__vig2020-01-01.pdf"
 
 
 @pytest.mark.parametrize("server", ["root", "api"])
@@ -164,7 +179,7 @@ async def test_the_export_never_writes_outside_the_download_folder(tmp_path, mon
     response = await client.post("/export_pdf", json={"urn": BASE + "legge:1990-08-07;.hidden"})
     assert response.status_code == 200
     assert (await response.get_data()).startswith(b"%PDF")
-    assert [p.name for p in (work / "download").iterdir()] == ["legge_1990-08-07_.hidden_vig_2026-10-21.pdf"]
+    assert [p.name for p in (work / "download").iterdir()] == ["stato_legge_1990-08-07_.hidden__vig2026-10-21.pdf"]
 
     # The second request is served from that cache, from the same folder.
     again = await client.post("/export_pdf", json={"urn": BASE + "legge:1990-08-07;.hidden"})
@@ -195,7 +210,7 @@ async def test_an_undated_export_is_dated_today_and_cached_under_that_name(tmp_p
     assert response.status_code == 200
     assert asked == [BASE + "legge:1990-08-07;241!vig=2026-10-21"]
     # Moved, not copied: no second file under the name Normattiva suggested.
-    assert sorted(p.name for p in (work / "download").iterdir()) == ["legge_1990-08-07_241_vig_2026-10-21.pdf"]
+    assert sorted(p.name for p in (work / "download").iterdir()) == ["stato_legge_1990-08-07_241__vig2026-10-21.pdf"]
 
     dated = await client.post(route, json={"urn": BASE + "legge:1990-08-07;241!vig=2020-01-01"})
     assert dated.status_code == 200
@@ -246,7 +261,7 @@ async def test_the_api_twin_exports_through_extract_pdf(tmp_path, monkeypatch, f
     assert response.status_code == 200
     assert (await response.get_data()).startswith(b"%PDF")
     assert asked == [urn]
-    assert (work / "download" / "legge_1990-08-07_241_vig_2026-10-21.pdf").read_bytes() == b"%PDF-1.4 test"
+    assert (work / "download" / "stato_legge_1990-08-07_241__vig2026-10-21.pdf").read_bytes() == b"%PDF-1.4 test"
 
     # Served from the cache the second time: no new extraction.
     again = await client.post("/api/export_pdf", json={"urn": urn})
@@ -256,3 +271,47 @@ async def test_the_api_twin_exports_through_extract_pdf(tmp_path, monkeypatch, f
     refused = await client.post("/api/export_pdf", json={"urn": "http://127.0.0.1:5000/"})
     assert refused.status_code == 400
     assert asked == [urn]
+
+
+@pytest.mark.parametrize("server", ["root", "api"])
+async def test_a_future_day_is_a_400_before_the_browser(tmp_path, monkeypatch, fixed_today, server):
+    # As for an article (reject_future_version_date): Normattiva would export today's text under it.
+    import visualex_api.app as api_module
+
+    module, route = (app_module, "/export_pdf") if server == "root" else (api_module, "/api/export_pdf")
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "download").mkdir()
+    asked = []
+
+    async def fake_extract(urn):
+        asked.append(urn)
+        raise AssertionError("the browser must not be opened")
+
+    monkeypatch.setattr(module, "extract_pdf", fake_extract)
+    client = module.NormaController().app.test_client()
+    response = await client.post(route, json={"urn": BASE + "legge:1990-08-07;241!vig=2027-01-01"})
+    assert response.status_code == 400
+    assert "futura" in (await response.get_json())["error"]
+    assert asked == []
+
+
+@pytest.mark.parametrize("server", ["root", "api"])
+async def test_another_authority_is_exported_not_a_500(tmp_path, monkeypatch, fixed_today, server):
+    import visualex_api.app as api_module
+
+    module, route = (app_module, "/export_pdf") if server == "root" else (api_module, "/api/export_pdf")
+    work = tmp_path / "work"
+    (work / "download").mkdir(parents=True)
+    monkeypatch.chdir(work)
+
+    async def fake_extract(urn):
+        target = work / "download" / "export-1.pdf"
+        target.write_bytes(b"%PDF-1.4 test")
+        return str(target)
+
+    monkeypatch.setattr(module, "extract_pdf", fake_extract)
+    client = module.NormaController().app.test_client()
+    url = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:regione.lazio:legge:2000-01-01;5"
+    response = await client.post(route, json={"urn": url})
+    assert response.status_code == 200
+    assert [p.name for p in (work / "download").iterdir()] == ["regione.lazio_legge_2000-01-01_5__vig2026-10-21.pdf"]

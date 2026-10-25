@@ -346,11 +346,13 @@ POST unless noted, JSON bodies.
   docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md §2.1
 - `/export_pdf` — PDF via Playwright (rejects non-Normattiva URNs — SSRF guard). An
   undated URN is exported as the text in force today, `!vig=<today>` in Europe/Rome
-  (`export_url`, G-355); a dated one or `@originale` as asked. The file is cached in
-  `download/` under the act's type, date, number, annex and version (`urn_to_filename`;
-  until 21 October 2026 the number and the year alone, so acts and versions shared a file),
-  and the PDFs there older than two days are deleted on the six-hour sweep
-  (`sweep_exported_pdfs`, top-level `.pdf` files only)
+  (`export_url`, G-355); a dated one or `@originale` as asked, and a day after today is a
+  400, as for an article. The file is cached in `download/` under the act's authority, type,
+  date, number, annex and version, each in its place joined by «_», which no part of a URN
+  holds (`urn_to_filename`; until 21 October 2026 the number and the year alone, until 25
+  October without the authority and with «:» and «;» read alike); a name over 150
+  characters is a 400, never cut. The PDFs there older than two days are deleted on the
+  six-hour sweep (`sweep_exported_pdfs`, top-level `.pdf` files only)
 - `GET /history` — server-side search history
 - `GET /health/detailed` — probes Normattiva and EUR-Lex **for
   real**, on the shared client and circuit breakers. One result is cached
@@ -376,7 +378,10 @@ January 2027). When the page's window starts after today (`starts_after_today`),
 handlers read the article at today (`!vig=<today>`) and serve that text, its `url` and
 its `validity`, with the later version in `upcoming` (owner, G-355;
 `NormaController._document_in_force`): `{change: "abrogated" | "amended" | "inserted",
-valid_from, version_number}`, absent otherwise. `norma_data` stays the request's (no
+valid_from, version_number}`, absent otherwise, with `versions_between: n` when the version
+numbers show `n` other versions not in force yet before it: Normattiva's undated page is the
+latest version and a date after today answers today's text, so those cannot be read, and a
+request for a day they cover says so («… in vigore il … non si può leggere …»). `norma_data` stays the request's (no
 date), so the key notes and highlights are stored under does not move. When nothing is
 in force today (today's page is `not_yet`: an article inserted from a later day) the
 later text is served as before, with `upcoming.change` `"inserted"` and `not_in_force:

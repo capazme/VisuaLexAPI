@@ -36,6 +36,7 @@ from visualex_api.services.normattiva_validity import (
     starts_after_today,
     today_in_rome,
     upcoming_change,
+    versions_between,
 )
 from types import SimpleNamespace
 
@@ -52,7 +53,7 @@ from visualex_api.services.decisions.resolver import (
     get_resolver,
     sweep_decision_caches,
 )
-from visualex_api.tools.urngenerator import complete_request_date, export_url, pdf_cache_path
+from visualex_api.tools.urngenerator import complete_request_date, export_url, export_version_date, pdf_cache_path
 from visualex_api.tools.cache_manager import prune_normattiva_cache
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import article_input_error, parse_article_input, normalize_act_type
@@ -851,7 +852,7 @@ class NormaController:
             return article_text, url, validity, {}
         log.info("Served the text in force today instead of a later version",
                  later_from=validity.get('valid_from'), url=str(url_today)[:120])
-        return text_today, url_today, validity_today, {'upcoming': upcoming_change(validity)}
+        return text_today, url_today, validity_today, {'upcoming': upcoming_change(validity, today=validity_today)}
 
     async def _text_today(self, scraper, nv):
         """`(text, url, validity)` of the article at today, its validity judged against an
@@ -889,11 +890,19 @@ class NormaController:
         if not later:
             raise ResourceNotFoundError(f"Nessuna versione non ancora in vigore per {nv}")
         valid_from = validity['valid_from']
+        today = await self._text_today(scraper, nv)
+        inserted = bool(today and today[2] and today[2].get('state') == 'not_yet')
         if until and valid_from > until:
+            between = 0 if inserted else versions_between(validity, today[2] if today else None)
+            if between:
+                # The day falls before the latest version, and other versions come first:
+                # Normattiva shows only the latest, so the one of that day cannot be read.
+                raise ResourceNotFoundError(
+                    f"La versione di {nv} in vigore il {until} non si può leggere: prima di quella che "
+                    f"entra in vigore il {valid_from} ce ne sono altre {between}, che Normattiva non mostra a parte")
             raise ResourceNotFoundError(
                 f"La versione non ancora in vigore di {nv} entra in vigore il {valid_from}")
-        today = await self._text_today(scraper, nv)
-        upcoming = upcoming_change(validity, inserted=bool(today and today[2] and today[2].get('state') == 'not_yet'))
+        upcoming = upcoming_change(validity, inserted=inserted, today=today[2] if today else None)
         if (today is None or today[2] is None) and upcoming['change'] == 'amended':
             # Today's page could not be read: an amendment cannot be told from an insertion.
             upcoming['change'] = None
@@ -1893,15 +1902,21 @@ class NormaController:
                 return jsonify({'error': 'URN mancante'}), 400
             if not is_allowed_pdf_urn(urn):
                 return jsonify({'error': 'URN non valido: sono ammessi solo URL normattiva.it'}), 400
-            # Normattiva's address rebuilt from the URN, an undated one at today (G-355).
+            # Normattiva's address rebuilt from the URN, an undated one at today (G-355); a day
+            # after today is refused as for an article (Normattiva would export today's text
+            # under it), and the cache name is built before anything else: a URN it cannot
+            # name is a 400, never a 500 later.
             try:
                 urn = export_url(urn.strip(), today_in_rome().isoformat())
+                reject_future_version_date(export_version_date(urn))
+                # The same folder extract_pdf downloads into: the cached copy is a file in it.
+                pdf_path = pdf_cache_path(urn, os.path.join(os.getcwd(), "download"))
+            except ValidationError as exc:
+                return jsonify({'error': str(exc)}), 400
             except ValueError:
                 return jsonify({'error': 'URN non valido: serve un indirizzo /uri-res/N2Ls?urn:nir:… di normattiva.it'}), 400
 
             log.info("Received data for export_pdf", data=data)
-            # The same folder extract_pdf downloads into: the cached copy is a file in it.
-            pdf_path = pdf_cache_path(urn, os.path.join(os.getcwd(), "download"))
 
             # Check if PDF already exists in cache
             file_exists = await asyncio.to_thread(os.path.exists, pdf_path)
