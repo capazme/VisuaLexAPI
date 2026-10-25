@@ -1028,9 +1028,12 @@ The wiring follows the server's contract (`services/assistantService.ts`). `GET 
 feature is on, read as the app starts (`useAuth`) and as the dossier page mounts; a 404 «Non disponibile» from a
 route turns it off again. `store/assistantProposals.ts` is a store of its own, keyed by entry id and filled by the
 entry's reader from `…/items/:itemId/proposals`: the marks never enter the app's highlights, so Study Mode, the Forum,
-environments and the PDF never receive one, whatever the note's state. `DossierItemReader` takes its `itemId` and the
-dossier from `CurrentDossierContext` (`DossierDetailView`), asks nothing on a text shown read-only, and draws the
-proposals with the reader's highlights; one whose words no longer land is listed under the text, to be removed. Each
+environments and the PDF never receive one, whatever the note's state. `useEntryProposals` serves the entry's
+reader: an article's `DossierItemReader` and a decision's `DecisionReadingSurface` (its `dossierItemId`, from
+`DossierDecisionRow`), each given its entry's id, the dossier from `CurrentDossierContext` (`DossierDetailView`). It asks
+nothing outside a dossier entry, with the feature off or on a text shown read-only, and draws the proposals with the
+reader's own highlights (a decision's downloads keep only the reader's); one whose words no longer land is listed under
+the text (`LooseHighlightsList`, `UnmatchedAnchors`), to be removed through its route. Each
 write takes the server's answer and moves the row's light by one (the old state down, the new up). The bin removes at
 once and offers «Annulla»; the `DELETE` leaves when the notification closes, or at `pagehide`, never after a logout
 drops it. A note entry an application wrote (`assistantNote` on the item, contract §3) has the same controls

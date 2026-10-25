@@ -111,7 +111,7 @@ export function DossierDecisionRow({
           heading (D7a), so a screen reader still finds the decision by its name. */}
       {isExpanded && (
         <div id={regionId} role="region" aria-labelledby={citationId} className="pb-3 pl-6 pr-2">
-          <DossierDecisionReader identity={identity} />
+          <DossierDecisionReader identity={identity} itemId={item.id} />
         </div>
       )}
     </div>

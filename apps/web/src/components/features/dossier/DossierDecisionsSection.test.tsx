@@ -7,12 +7,18 @@ import type { FetchDecisionAnswer } from '../../../types/decisions';
 const fetchDecision = vi.fn();
 vi.mock('../../../services/decisionService', () => ({ fetchDecision: (...a: unknown[]) => fetchDecision(...a) }));
 vi.mock('./AddToDossierPopover', () => ({ AddToDossierPopover: () => null }));
+vi.mock('../../../services/assistantService', () => ({
+  assistantService: { features: vi.fn(), listProposals: vi.fn(async () => []), setProposalState: vi.fn(), editProposalNote: vi.fn(), removeProposal: vi.fn() },
+}));
 
 import { appStore } from '../../../store/useAppStore';
 import { forgetDecision } from '../../../utils/decisionFetchCache';
 import type { DossierItem } from '../../../types';
 import { DossierDecisionsSection } from './DossierDecisionsSection';
 import { DossierDecisionRow } from './DossierDecisionRow';
+import { CurrentDossierContext } from './currentDossier';
+import { assistantProposalsStore } from '../../../store/assistantProposals';
+import { assistantService } from '../../../services/assistantService';
 import type { SentenzaItem } from './dossierLayout';
 
 // Stored with labels of an older style: the rows show the citation recomputed (source convention, Q9).
@@ -210,6 +216,20 @@ describe('DossierDecisionsSection (D7a)', () => {
     );
     expect(screen.getByRole('button', { name: `Espandi ${CASS}, 1 da validare · 2 validati` })).toBeInTheDocument();
     expect(screen.getByTitle('1 da validare · 2 validati')).toHaveAttribute('data-ai-review', 'proposed');
+  });
+
+  it('opened in a dossier, its reader asks what an application proposed on that entry (D7b)', async () => {
+    fetchDecision.mockResolvedValue(found({ motivazione: MOTIVAZIONE }));
+    assistantProposalsStore.setState({ enabled: true, byItem: {} });
+    render(
+      <MemoryRouter initialEntries={['/dossier']}>
+        <CurrentDossierContext.Provider value="d1"><Section decisions={[cass]} /></CurrentDossierContext.Provider>
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: `Espandi ${CASS}` }));
+    await screen.findByRole('region', { name: 'Motivazione' });
+    await waitFor(() => expect(assistantService.listProposals).toHaveBeenCalledWith('d1', 's1'));
+    assistantProposalsStore.setState({ enabled: false, byItem: {} });
   });
 
   it('removes a decision as the other rows do', () => {

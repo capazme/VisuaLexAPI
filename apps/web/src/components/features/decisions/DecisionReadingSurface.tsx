@@ -19,6 +19,7 @@ import { ArticleDiscussionPanel } from '../search/ArticleDiscussionPanel';
 import { PassageThreadsStatus } from '../search/PassageThreadsStatus';
 import { DecisionReadingToolbar } from './DecisionReadingToolbar';
 import { UnmatchedAnchors } from './UnmatchedAnchors';
+import { useEntryProposals } from '../../../hooks/useEntryProposals';
 import { useAnnotationActions } from '../../../hooks/useAnnotationActions';
 import { useInlineNoteAnchors } from '../../../hooks/useInlineNoteAnchors';
 import { useArticleTextInteractions } from '../../../hooks/useArticleTextInteractions';
@@ -81,6 +82,11 @@ export interface DecisionReadingSurfaceProps {
    * offers the rest. The text and its links are the same either way (gotcha 23).
    */
   citedNorms?: CitedNorms;
+  /**
+   * The dossier entry it is read in (D7b): what an application proposed on that entry is drawn and acted on here, and
+   * only here; never in the decision's downloads.
+   */
+  dossierItemId?: string;
 }
 
 /**
@@ -89,7 +95,7 @@ export interface DecisionReadingSurfaceProps {
  * it. Self-contained: it takes the decision as props and reaches only the store's search and
  * way-back actions, so any host can mount it.
  */
-export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, hostBlockId, findHostId, onLeave, citedNorms }: DecisionReadingSurfaceProps) {
+export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, hostBlockId, findHostId, onLeave, citedNorms, dossierItemId }: DecisionReadingSurfaceProps) {
   const {
     triggerSearch, pushReadingBack, annotations, highlights, removeAnnotation, updateAnnotation,
     removeHighlight, loadAnnotationsForArticle, loadHighlightsForArticle, showKeyPassages, updateSettings,
@@ -130,6 +136,13 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
     [highlights, key],
   );
 
+  // What an application proposed on the dossier entry (D7b): drawn with the reader's marks, never in their downloads.
+  const { highlights: proposalHighlights, actions: proposalActions, isProposal } = useEntryProposals(dossierItemId, key, NO_ARTICLE);
+  const shownHighlights = useMemo(
+    () => (proposalHighlights.length ? [...decisionHighlights, ...proposalHighlights] : decisionHighlights),
+    [decisionHighlights, proposalHighlights],
+  );
+
   const plain = useMemo(() => decisionProjection(testo), [testo]);
   const structure = useMemo(() => decisionStructure(testo), [testo]);
 
@@ -159,28 +172,32 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
   const html = useMemo(
     () => wrapDecisionCitationsInHtml(
       wrapCitationsInHtml(renderDecisionHtml({
-        testo, highlights: decisionHighlights, annotations: decisionNotes, signs: true,
+        testo, highlights: shownHighlights, annotations: decisionNotes, signs: true,
         threads: locatedThreads, focusedThreadId, keyPassages: passages,
       })),
       { within, selfPath },
     ),
-    [testo, decisionHighlights, decisionNotes, locatedThreads, focusedThreadId, within, selfPath, passages],
+    [testo, shownHighlights, decisionNotes, locatedThreads, focusedThreadId, within, selfPath, passages],
   );
 
   // What each paragraph's sign counts, for the popover it opens (the renderer derives the signs
   // from the same structure through the same module).
   const blockGroups = useMemo(
-    () => groupAnnotationsByBlock(plain, structure, decisionHighlights, decisionNotes, locatedThreads),
-    [plain, structure, decisionHighlights, decisionNotes, locatedThreads],
+    () => groupAnnotationsByBlock(plain, structure, shownHighlights, decisionNotes, locatedThreads),
+    [plain, structure, shownHighlights, decisionNotes, locatedThreads],
   );
   const { openBlock, closeBlock } = useArticleTextInteractions(contentRef, key, { contentKey: html });
   const openGroup = openBlock === null ? undefined : blockGroups[openBlock];
 
   // What no longer lands is listed under the text (a free note has no anchor: the panel holds it).
   const lost = useMemo(
-    () => unmatchedAnchors(testo, decisionHighlights, decisionNotes),
-    [testo, decisionHighlights, decisionNotes],
+    () => unmatchedAnchors(testo, shownHighlights, decisionNotes),
+    [testo, shownHighlights, decisionNotes],
   );
+  const removeListed = (id: string) => {
+    if (proposalActions && isProposal(id)) proposalActions.remove(id);
+    else removeHighlight(id);
+  };
 
   const [isNotesOpen, setIsNotesOpen] = useState(false);
   const [notesButtonEl, setNotesButtonEl] = useState<HTMLButtonElement | null>(null);
@@ -400,7 +417,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
         highlights={lost.highlights}
         annotations={lost.annotations}
         reason="changed"
-        onRemoveHighlight={removeHighlight}
+        onRemoveHighlight={removeListed}
         onRemoveAnnotation={removeAnnotation}
       />
       {openBlock !== null && hasAnnotations(openGroup) && (
@@ -417,6 +434,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
           onUpdateNote={updateAnnotation}
           onRemoveNote={removeAnnotation}
           onRemoveHighlight={removeHighlight}
+          proposalActions={proposalActions}
         />
       )}
       <ArticleDiscussionPanel

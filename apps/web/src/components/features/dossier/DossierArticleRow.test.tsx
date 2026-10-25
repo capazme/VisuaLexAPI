@@ -3,7 +3,8 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 
 // The reader fetches the article; the row's own behaviour is what is under test.
 vi.mock('./DossierItemReader', () => ({
-  DossierItemReader: () => <div data-testid="reader">testo</div>,
+  // The entry it reads: what an application proposed on it is drawn there (D7b).
+  DossierItemReader: ({ itemId }: { itemId?: string }) => <div data-testid="reader" data-item={itemId}>testo</div>,
 }));
 
 import { DossierArticleRow, type DossierArticleRowProps } from './DossierArticleRow';
@@ -142,6 +143,7 @@ describe('DossierArticleRow notes', () => {
       </CurrentDossierContext.Provider>,
     );
     expect(screen.getByRole('checkbox', { name: "Proposto dall'IA, confermi?" })).toBeInTheDocument();
+    expect(screen.getByTestId('reader')).toHaveAttribute('data-item', 'i1');
     const bins = screen.getAllByRole('button', { name: 'Rimuovi nota' });
     expect(bins).toHaveLength(2);
     fireEvent.click(bins[0]);

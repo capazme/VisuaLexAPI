@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { RefreshCw, Copy, ExternalLink } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
@@ -20,12 +20,7 @@ import { getUpdateNoteParagraphs, parseArticleStructure } from '../../../utils/a
 import { describeBlock, groupAnnotationsByBlock, hasAnnotations, highlightsWithoutSign } from '../../../utils/articleAnnotations';
 import type { Annotation, ArticleData, Highlight, NormaVisitata } from '../../../types';
 import { highlightColorName } from '../../../utils/highlightColors';
-import { proposalHighlight } from '../../../utils/aiReview';
-import {
-  assistantProposalsStore, editProposalNote, loadProposals, removeProposal, setProposalState,
-} from '../../../store/assistantProposals';
-import type { ProposalActions } from '../search/BlockAnnotationsPopover';
-import { CurrentDossierContext } from './currentDossier';
+import { useEntryProposals } from '../../../hooks/useEntryProposals';
 
 interface Props {
   norma: NormaVisitata;
@@ -147,31 +142,8 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
   const rawText = state.phase === 'ready' ? (state.article.article_text || '') : '';
   const structure = useMemo(() => parseArticleStructure(rawText), [rawText]);
 
-  // What an application proposed on this entry (D7b): its own route, its own store, never the app's highlights. A text
-  // shown read-only has none (the server refuses them there).
-  const dossierId = useContext(CurrentDossierContext);
-  const assistantOn = assistantProposalsStore((s) => s.enabled);
-  const entryProposals = assistantProposalsStore((s) => (itemId ? s.byItem[itemId] : undefined));
-  // The dossier to ask, or null when this reader asks nothing.
-  const proposalsOf = assistantOn && itemId && !readOnly ? dossierId : null;
-  useEffect(() => {
-    if (proposalsOf && itemId) void loadProposals(proposalsOf, itemId);
-  }, [proposalsOf, itemId]);
-  const proposalHighlights = useMemo(
-    () => (proposalsOf && entryProposals ? entryProposals.map((p) => proposalHighlight(p, itemKey, uniqueArticleId)) : NO_HIGHLIGHTS),
-    [proposalsOf, entryProposals, itemKey, uniqueArticleId],
-  );
-  const proposalActions = useMemo<ProposalActions | undefined>(() => {
-    if (!proposalsOf || !itemId) return undefined;
-    const d = proposalsOf;
-    return {
-      validate: (id, validated) => void setProposalState(d, itemId, id, validated ? 'validated' : 'proposed'),
-      flag: (id, flagged) => void setProposalState(d, itemId, id, flagged ? 'review' : 'proposed'),
-      comment: (id, text) => void setProposalState(d, itemId, id, 'review', text),
-      editNote: (id, text) => void editProposalNote(d, itemId, id, text),
-      remove: (id) => removeProposal(d, itemId, id),
-    };
-  }, [proposalsOf, itemId]);
+  // What an application proposed on this entry (D7b): its own route, its own store, never the app's highlights.
+  const { highlights: proposalHighlights, actions: proposalActions, isProposal } = useEntryProposals(itemId, itemKey, uniqueArticleId, readOnly);
   const withProposals = useMemo(
     () => (proposalHighlights.length ? [...articleHighlights, ...proposalHighlights] : articleHighlights),
     [articleHighlights, proposalHighlights],
@@ -192,7 +164,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
     [readOnly, withProposals, blockGroups],
   );
   const removeLoose = (id: string) => {
-    if (proposalActions && proposalHighlights.some((h) => h.id === id)) proposalActions.remove(id);
+    if (proposalActions && isProposal(id)) proposalActions.remove(id);
     else removeHighlight(id);
   };
   // Update-note references, the foldable AGGIORNAMENTO tail and the
