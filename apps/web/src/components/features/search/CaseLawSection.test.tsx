@@ -145,7 +145,7 @@ describe('CaseLawSection', () => {
     expect(cc).toHaveBeenCalledExactlyOnceWith(NORMA.urn, 1, undefined);
   });
 
-  it('asks the Costituzione\'s article for the massime where it is at issue first (G-289)', async () => {
+  it('asks the Costituzione\'s article for the massime where it is a parameter (G-376)', async () => {
     const { searchCorteCostMassime } = await import('../../../services/corteCostMassimeService');
     const cc = vi.mocked(searchCorteCostMassime);
     cc.mockClear();
@@ -153,7 +153,7 @@ describe('CaseLawSection', () => {
     show({ norma: { tipo_atto: 'Costituzione', data: '', numero_atto: '', numero_articolo: '3', urn }, articleUrn: urn });
     await userEvent.click(toggle());
     await screen.findByRole('link', { name: 'Fonte: Corte costituzionale, dati aperti, CC BY-SA 3.0' });
-    expect(cc).toHaveBeenCalledExactlyOnceWith(urn, 1, 'norma');
+    expect(cc).toHaveBeenCalledExactlyOnceWith(urn, 1, 'parametro');
   });
 
   it('gives an act of the Union no Corte costituzionale block', async () => {

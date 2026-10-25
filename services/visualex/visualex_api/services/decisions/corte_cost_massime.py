@@ -513,8 +513,8 @@ async def search_massime(urn: Any, pagina: Any = 1, ruolo: Any = None,
     """(the answer, the status): `risultati` 200 (a page of `PAGE_SIZE`, newest first),
     `richiesta_non_valida` 400, `fonte_non_raggiungibile` 503 (with `in_preparazione` while
     the first index is made). A `ruolo` (`norma` or `parametro`) keeps the massime that name the
-    article in that role, and `totale` counts those; `per_ruolo` always counts both (G-289: on
-    the Costituzione the web asks for `norma` first, and offers the rest)."""
+    article in that role, and `totale` counts those; `per_ruolo` always counts both (G-376: on
+    the Costituzione the web asks for `parametro`, and offers `norma`)."""
     errors = {}
     identity = article_identity(urn)
     if identity is None:

@@ -99,69 +99,73 @@ describe('CorteCostMassimeBlock', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
-  it('on the Costituzione asks first for the massime at issue, and adds the others on «Anche come parametro» (G-289)', async () => {
-    const atIssue = { ...REAL, numero: '1', testo: 'Norma oggetto.' };
+  it('on the Costituzione shows the massime where the article is a parameter, and narrows on «Solo come norma oggetto» (G-376)', async () => {
     const asMeasure = { ...REAL, numero: '2', testo: 'Parametro.', ruoli: ['parametro' as const] };
-    service.mockResolvedValueOnce(page([atIssue], 1, 1, { norma: 1, parametro: 17593 }))
-      .mockResolvedValueOnce(page([asMeasure, atIssue], 17594, 1, { norma: 1, parametro: 17593 }))
-      .mockResolvedValueOnce(page([atIssue], 1, 1, { norma: 1, parametro: 17593 }));
+    const both = { ...REAL, numero: '1', testo: 'Norma oggetto e parametro.', ruoli: ['norma' as const, 'parametro' as const] };
+    const counts = { norma: 1, parametro: 17593 };
+    service.mockResolvedValueOnce(page([asMeasure, both], 17593, 1, counts))
+      .mockResolvedValueOnce(page([both], 1, 1, counts))
+      .mockResolvedValueOnce(page([asMeasure, both], 17593, 1, counts));
     showConstitution();
-    expect(await screen.findByText('Norma oggetto.')).toBeInTheDocument();
-    expect(service).toHaveBeenLastCalledWith(COST_3, 1, 'norma');
-    expect(screen.getByText('1 massima in cui l’articolo è norma oggetto')).toBeInTheDocument();
-    const toggle = screen.getByRole('checkbox', { name: 'Anche come parametro (17.593)' });
+    expect(await screen.findByText('Parametro.')).toBeInTheDocument();
+    expect(service).toHaveBeenLastCalledWith(COST_3, 1, 'parametro');
+    expect(screen.getByText('17.593 massime in cui l’articolo è parametro')).toBeInTheDocument();
+    const toggle = screen.getByRole('checkbox', { name: 'Solo come norma oggetto (1)' });
     expect(toggle).not.toBeChecked();
     await userEvent.click(toggle);
-    expect(await screen.findByText('Parametro.')).toBeInTheDocument();
-    expect(service).toHaveBeenLastCalledWith(COST_3, 1, undefined);
-    expect(screen.getByText('17.594 massime')).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: 'Anche come parametro (17.593)' })).toBeChecked();
-    await userEvent.click(screen.getByRole('checkbox'));
     expect(await screen.findByText('1 massima in cui l’articolo è norma oggetto')).toBeInTheDocument();
     expect(service).toHaveBeenLastCalledWith(COST_3, 1, 'norma');
+    expect(screen.queryByText('Parametro.')).toBeNull();
+    expect(screen.getByRole('checkbox', { name: 'Solo come norma oggetto (1)' })).toBeChecked();
+    await userEvent.click(screen.getByRole('checkbox'));
+    expect(await screen.findByText('Parametro.')).toBeInTheDocument();
+    expect(service).toHaveBeenLastCalledWith(COST_3, 1, 'parametro');
   });
 
   it('keeps the list and the checkbox (and its focus) on screen while the other role is asked', async () => {
     let answer: (a: CorteCostMassimeAnswer) => void = () => {};
-    service.mockResolvedValueOnce(page([REAL], 1, 1, { norma: 1, parametro: 3 }))
+    const counts = { norma: 1, parametro: 3 };
+    service.mockResolvedValueOnce(page([REAL, { ...REAL, numero: '2', testo: 'Parametro.' }], 3, 1, counts))
       .mockReturnValueOnce(new Promise((resolve) => { answer = resolve; }));
     showConstitution();
-    expect(await screen.findByText(REAL.testo)).toBeInTheDocument();
+    expect(await screen.findByText('Parametro.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('checkbox'));
-    const box = screen.getByRole('checkbox', { name: 'Anche come parametro (3)' });
+    const box = screen.getByRole('checkbox', { name: 'Solo come norma oggetto (1)' });
     expect(box).toBeChecked();
     expect(box).toHaveFocus();
-    expect(screen.getByText(REAL.testo).closest('[aria-busy="true"]')).not.toBeNull();
+    expect(screen.getByText('Parametro.').closest('[aria-busy="true"]')).not.toBeNull();
     expect(screen.queryByRole('status')).toBeNull();
-    answer(page([REAL, { ...REAL, numero: '2', testo: 'Parametro.' }], 4, 1, { norma: 1, parametro: 3 }));
-    expect(await screen.findByText('Parametro.')).toBeInTheDocument();
+    answer(page([REAL], 1, 1, counts));
+    expect(await screen.findByText('1 massima in cui l’articolo è norma oggetto')).toBeInTheDocument();
+    expect(screen.queryByText('Parametro.')).toBeNull();
     expect(document.querySelector('[aria-busy="true"]')).toBeNull();
     expect(screen.getByRole('checkbox')).toHaveFocus();
   });
 
-  it('on the Costituzione says when no massima has the article at issue, and keeps the way to the others', async () => {
-    service.mockResolvedValueOnce(page([], 0, 1, { norma: 0, parametro: 40 }))
-      .mockResolvedValueOnce(page([REAL], 40, 1, { norma: 0, parametro: 40 }));
+  it('on the Costituzione says when no massima has the article as a parameter, and keeps the way to those at issue', async () => {
+    service.mockResolvedValueOnce(page([], 0, 1, { norma: 2, parametro: 0 }))
+      .mockResolvedValueOnce(page([REAL], 2, 1, { norma: 2, parametro: 0 }));
     showConstitution();
-    expect(await screen.findByText('Nessuna massima della Corte costituzionale ha questo articolo come norma oggetto.')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Anche come parametro (40)' }));
+    expect(await screen.findByText('Nessuna massima della Corte costituzionale ha questo articolo come parametro.')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Solo come norma oggetto (2)' }));
     expect(await screen.findByText(REAL.testo)).toBeInTheDocument();
   });
 
   it('on the Costituzione loads the next page in the same role', async () => {
     const first = Array.from({ length: 20 }, (_, i) => massima(String(1000 + i), 2020, 100 - i, `Massima ${i}.`));
-    service.mockResolvedValueOnce(page(first, 21, 1, { norma: 21, parametro: 5 }))
-      .mockResolvedValueOnce(page([massima('9', 1990, 1, 'L’ultima.')], 21, 2, { norma: 21, parametro: 5 }));
+    service.mockResolvedValueOnce(page(first, 21, 1, { norma: 0, parametro: 21 }))
+      .mockResolvedValueOnce(page([massima('9', 1990, 1, 'L’ultima.')], 21, 2, { norma: 0, parametro: 21 }));
     showConstitution();
     await userEvent.click(await screen.findByRole('button', { name: 'Mostra altre massime (1)' }));
     expect(await screen.findByText('L’ultima.')).toBeInTheDocument();
-    expect(service).toHaveBeenLastCalledWith(COST_3, 2, 'norma');
+    expect(service).toHaveBeenLastCalledWith(COST_3, 2, 'parametro');
   });
 
-  it('on the Costituzione offers no switch when no massima has it as a parameter', async () => {
-    service.mockResolvedValueOnce(page([REAL], 1, 1, { norma: 1, parametro: 0 }));
+  it('on the Costituzione offers no switch when no massima has the article at issue', async () => {
+    service.mockResolvedValueOnce(page([REAL], 1, 1, { norma: 0, parametro: 1 }));
     showConstitution();
     expect(await screen.findByText(REAL.testo)).toBeInTheDocument();
+    expect(screen.getByText('1 massima in cui l’articolo è parametro')).toBeInTheDocument();
     expect(screen.queryByRole('checkbox')).toBeNull();
   });
 

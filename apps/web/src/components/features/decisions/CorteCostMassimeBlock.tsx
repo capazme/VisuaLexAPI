@@ -13,7 +13,7 @@ import { CaseLawRow } from '../search/caseLaw/CaseLawRow';
 interface CorteCostMassimeBlockProps {
   /** The article's identity, as `norma_data.urn` gives it. */
   articleUrn: string;
-  /** An article of the Costituzione: the massime where it is at issue first, the rest on request (G-289). */
+  /** An article of the Costituzione: the massime where it is a parameter, those at issue on request (G-376). */
   constitution?: boolean;
   /** Where a decision opens beside (a practice or one of its windows), and the way back. */
   besideId?: string;
@@ -25,6 +25,15 @@ type Problem = Exclude<CorteCostMassimeAnswer, { esito: 'risultati' }>;
 
 const CREDIT_ID = 'corte-costituzionale';
 const formatCount = (n: number): string => new Intl.NumberFormat('it-IT').format(n);
+
+const IN_ROLE: Record<CorteCostRuolo, string> = {
+  norma: ' in cui l’articolo è norma oggetto',
+  parametro: ' in cui l’articolo è parametro',
+};
+const EMPTY_IN_ROLE: Record<CorteCostRuolo, string> = {
+  norma: 'Nessuna massima della Corte costituzionale ha questo articolo come norma oggetto.',
+  parametro: 'Nessuna massima della Corte costituzionale ha questo articolo come parametro.',
+};
 
 const TIPO_LABEL = { sentenza: 'Sentenza', ordinanza: 'Ordinanza' } as const;
 const RUOLO_LABEL = { norma: 'Norma oggetto', parametro: 'Parametro' } as const;
@@ -46,15 +55,18 @@ const problemMessage = (problem: Problem): string => {
  * deliberately plain first version: the design of the block is Inchiostro's (Luca), and it does not
  * yet take the section's year and text filters, which would narrow only the page loaded. Loaded when
  * the block appears (the section opens); 20 at a time, the newest decision first. On the Costituzione,
- * where an article is the measure of thousands of massime, it asks first for those where the article
- * is the provision at issue, and «anche come parametro» adds the others (G-289). The line under the
- * massime is the credits' own entry, linked to it (G-287).
+ * whose articles are almost only the measure of other provisions (one massima in the archive has one at
+ * issue, some 78,000 as a parameter), it shows the massime where the article is a parameter, and «Solo
+ * come norma oggetto» narrows to those where it is at issue (G-376, in place of G-289's order). Any
+ * other article shows every massima. The line under the massime is the credits' own entry (G-287).
  */
 export function CorteCostMassimeBlock({ articleUrn, constitution = false, besideId, backEntry }: CorteCostMassimeBlockProps) {
   const [attempt, setAttempt] = useState(0);
-  // the article «anche come parametro» was chosen for: another article starts from the massime at issue again
-  const [withParameterFor, setWithParameterFor] = useState<string | null>(null);
-  const ruolo = constitution && withParameterFor !== articleUrn ? 'norma' : undefined;
+  // the article «solo come norma oggetto» was chosen for: another article starts from its parameters again
+  const [onlyAtIssueFor, setOnlyAtIssueFor] = useState<string | null>(null);
+  const ruolo: CorteCostRuolo | undefined = constitution
+    ? (onlyAtIssueFor === articleUrn ? 'norma' : 'parametro')
+    : undefined;
   // the answer is tied to the article and the role it answers, so another one shows "loading" without a state set in the effect
   const asked = `${articleUrn}|${ruolo ?? ''}|${attempt}`;
   const [result, setResult] = useState<{
@@ -141,16 +153,17 @@ export function CorteCostMassimeBlock({ articleUrn, constitution = false, beside
     </p>
   );
 
-  const asParameter = listed.per_ruolo.parametro;
-  const parameterSwitch = constitution && (ruolo === undefined || listedRole === undefined || asParameter > 0) && (
+  const atIssue = listed.per_ruolo.norma;
+  // drawn when there is something to narrow to, or to undo
+  const roleSwitch = constitution && (ruolo === 'norma' || listedRole === 'norma' || atIssue > 0) && (
     <label className={cn('inline-flex cursor-pointer items-center gap-2 text-sm text-slate-700 dark:text-slate-200', TOUCH_TARGET_RESPONSIVE)}>
       <input
         type="checkbox"
         className="h-4 w-4 shrink-0 accent-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-        checked={ruolo === undefined}
-        onChange={(e) => setWithParameterFor(e.target.checked ? articleUrn : null)}
+        checked={ruolo === 'norma'}
+        onChange={(e) => setOnlyAtIssueFor(e.target.checked ? articleUrn : null)}
       />
-      <span>Anche come parametro ({formatCount(asParameter)})</span>
+      <span>Solo come norma oggetto ({formatCount(atIssue)})</span>
     </label>
   );
 
@@ -158,11 +171,9 @@ export function CorteCostMassimeBlock({ articleUrn, constitution = false, beside
     return (
       <div className="space-y-2" aria-busy={switching || undefined}>
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          {listedRole === 'norma'
-            ? 'Nessuna massima della Corte costituzionale ha questo articolo come norma oggetto.'
-            : 'Nessuna massima della Corte costituzionale nomina questo articolo.'}
+          {listedRole ? EMPTY_IN_ROLE[listedRole] : 'Nessuna massima della Corte costituzionale nomina questo articolo.'}
         </p>
-        {parameterSwitch}
+        {roleSwitch}
         {credit}
       </div>
     );
@@ -173,9 +184,9 @@ export function CorteCostMassimeBlock({ articleUrn, constitution = false, beside
       {credit}
       <p className="text-sm text-slate-700 dark:text-slate-200">
         {listed.totale === 1 ? '1 massima' : `${formatCount(listed.totale)} massime`}
-        {listedRole === 'norma' && ' in cui l’articolo è norma oggetto'}
+        {listedRole && IN_ROLE[listedRole]}
       </p>
-      {parameterSwitch}
+      {roleSwitch}
       <ul className="divide-y divide-slate-200 dark:divide-slate-700">
         {shown.map((m) => (
           <CaseLawRow

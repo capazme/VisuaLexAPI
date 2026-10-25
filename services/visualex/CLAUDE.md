@@ -328,8 +328,8 @@ POST unless noted, JSON bodies.
 - `/search_corte_cost_massime` — the Corte costituzionale's massime that name an article (G-281):
   `{urn, pagina?, ruolo?}` (`urn` the article's `norma_data.urn`, read through `normalize_norm_urn`; a State
   act's article only; `ruolo` `norma` or `parametro` keeps the massime that name it in that role, each still
-  with all its `ruoli`, and `totale` counts those, while `per_ruolo` counts both: G-289, the web asks
-  `norma` first on the Costituzione) → `esito` risultati (a page of 20, newest decision first: per massima its
+  with all its `ruoli`, and `totale` counts those, while `per_ruolo` counts both: the web asks
+  `parametro` on the Costituzione and offers `norma`, G-376) → `esito` risultati (a page of 20, newest decision first: per massima its
   `numero`, `titolo`, `testo` verbatim, `ruoli` — `norma` when the article is a provision at issue,
   `parametro` when it is what one was measured against — and `pronuncia` with `identita`, `tipo`,
   dates and the Court's page; `totale`, `per_ruolo`, `fonte`, `attribuzione` «Massime: Corte

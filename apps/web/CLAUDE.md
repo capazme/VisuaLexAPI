@@ -961,9 +961,11 @@ block; G-281): the Court's open-data massime that name the article, asked of `/s
 massime», each a `CaseLawRow` (the decision as a `DecisionLink`, its kind, «Norma oggetto» or «Parametro», the
 massima's number, the heading chain, the text verbatim), credited with the `corte-costituzionale` entry of
 `data/credits.ts` linked to `/crediti#corte-costituzionale` in a new tab (G-287: not the route's `attribuzione`,
-which stays for other clients). On an article of the Costituzione (`constitution`, from `tipo_atto`) it asks first
-for the massime where the article is the provision at issue (`ruolo: 'norma'`) and a checkbox «Anche come parametro
-(N)» adds the rest (G-289; per article, back off on the next one; not drawn when no massima has it as a parameter).
+which stays for other clients). On an article of the Costituzione (`constitution`, from `tipo_atto`) it shows the
+massime where the article is a parameter (`ruolo: 'parametro'`), and a checkbox «Solo come norma oggetto (N)» narrows
+to those where it is the provision at issue (G-376, which replaced G-289's order: in the whole archive one massima has an
+article of the Costituzione at issue, some 78,000 as a parameter; per article, off again on the next one; not drawn
+when no massima has the article at issue). Any other article shows every massima, with no filter.
 A plain first version: its design is Inchiostro's (Luca), and it does not yet read the section's
 filters (the list is paged by the server, so they would narrow only the page loaded).
 **An act of the Union has the Court of Justice's block** (`EuCaseLawBlock`, in place of the Cassazione's) for a
