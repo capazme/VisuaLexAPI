@@ -103,7 +103,7 @@ export function SearchField() {
           )}
         >
           <Search size={18} aria-hidden className="pointer-events-none absolute left-3 text-slate-400" />
-          <span className={cn('min-w-0 flex-1 truncate', value ? 'text-slate-900 dark:text-white' : 'text-slate-400')}>{value || placeholder}</span>
+          <span className={cn('min-w-0 flex-1 truncate', value ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400')}>{value || placeholder}</span>
           {/* ⌘K (Ctrl K) opens it from anywhere on the page; said where a keyboard is likely. */}
           <kbd aria-hidden className="ml-2 hidden shrink-0 rounded border border-slate-200 px-1 text-[11px] font-semibold text-slate-500 md:inline dark:border-slate-700 dark:text-slate-400">
             {PALETTE_SHORTCUT}

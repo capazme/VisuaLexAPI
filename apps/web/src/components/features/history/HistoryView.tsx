@@ -380,7 +380,10 @@ export function HistoryView() {
             }
         >
             <NormaChangesSection onOpen={handleOpenNorma} />
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+            {/* `overflow-clip`, not `hidden`, for the rounded corners: `hidden` made this card the date labels' scroll
+                container, so on a phone they pinned 56 px (the bar's height) below its top, over the first entry and
+                under an empty band (M1). */}
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 overflow-clip">
                 {/* Timeline with grouped dates. No inner scroll: the page is the
                     scroll context so the action dropdown isn't clipped. Sticky date
                     headers attach to the next overflow ancestor. */}

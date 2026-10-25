@@ -193,7 +193,7 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                             onClick={() => updateSettings({ theme: 'light' })}
                             aria-pressed={settings.theme === 'light'}
                             className={cn(
-                                "flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-[color,background-color,border-color,box-shadow]",
+                                "flex min-h-[44px] items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-[color,background-color,border-color,box-shadow]",
                                 settings.theme === 'light'
                                     ? "bg-white dark:bg-slate-700 shadow-sm text-primary-600 dark:text-primary-400"
                                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
@@ -205,7 +205,7 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                             onClick={() => updateSettings({ theme: 'dark' })}
                             aria-pressed={settings.theme === 'dark'}
                             className={cn(
-                                "flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-[color,background-color,border-color,box-shadow]",
+                                "flex min-h-[44px] items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-[color,background-color,border-color,box-shadow]",
                                 settings.theme === 'dark'
                                     ? "bg-white dark:bg-slate-700 shadow-sm text-primary-600 dark:text-primary-400"
                                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
@@ -230,7 +230,8 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                                         aria-pressed={settings.fontSize === value}
                                         title={label}
                                         className={cn(
-                                            "w-8 h-8 flex items-center justify-center rounded font-bold transition-colors",
+                                            // 44 px on a phone (M1), 32 from md.
+                                            "h-11 w-11 md:h-8 md:w-8 flex items-center justify-center rounded font-bold transition-colors",
                                             sizeClass,
                                             settings.fontSize === value
                                                 ? "bg-primary-600 text-white"
@@ -279,7 +280,7 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                                 // Small delay to let modal close animation complete
                                 setTimeout(() => onRestartTour(), 200);
                             }}
-                            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors text-sm font-medium"
+                            className="w-full flex min-h-[44px] items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors text-sm font-medium"
                         >
                             <HelpCircle size={16} />
                             Ricomincia il tour guidato
@@ -337,7 +338,7 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                                 onClose();
                                 navigate('/admin');
                             }}
-                            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors text-sm font-medium"
+                            className="w-full flex min-h-[44px] items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors text-sm font-medium"
                         >
                             <Shield size={16} />
                             Pannello Admin
