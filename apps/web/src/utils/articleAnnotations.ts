@@ -194,7 +194,7 @@ export function signColors(highlights: readonly Highlight[]): HighlightColor[] {
 export const isProposal = (h: Highlight): h is Highlight & { proposal: HighlightProposal } => !!h.proposal;
 
 /**
- * A proposed passage with the application's note (D7b, the owner's decision of 25 October, 10:06): the note, not the
+ * A proposed passage with the application's note (D7b): the note, not the
  * highlight, has a state. A passage without one is a plain mark of known origin, removable, with no state.
  */
 export const hasAiNote = (h: Highlight): boolean => !!h.proposal?.note;

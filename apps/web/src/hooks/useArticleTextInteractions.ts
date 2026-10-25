@@ -1,5 +1,18 @@
 import { useCallback, useEffect, useLayoutEffect, useState, type RefObject } from 'react';
 
+/**
+ * The passage an application proposed, its note still open (D7b), that a click lands on, or null: not when it lands on
+ * something with a click of its own inside it (a reference, a citation, a link), nor with the highlights hidden. Such
+ * a click opens its block's popover here, and the readers' note handlers leave it alone, whatever order the listeners
+ * were added in (a note of the reader's under it would be edited by half).
+ */
+export function proposedPassageAt(target: EventTarget | null): HTMLElement | null {
+  if (!(target instanceof Element)) return null;
+  const mark = target.closest<HTMLElement>('mark[data-proposed]');
+  if (!mark || target.closest('a, .citation-hover, .decision-cite, .vlx-ref') || mark.closest('.highlights-hidden')) return null;
+  return mark;
+}
+
 export interface OpenUpdateNote {
   id: string;
   /** The "(119)" chip the note was opened from — the popover's anchor. */
@@ -108,8 +121,9 @@ export function useArticleTextInteractions(
         });
         return true;
       }
-      // A passage an application proposed, its note still open (D7b): its block's popover, where it is acted on.
-      const proposed = target.closest<HTMLElement>('[data-proposed]');
+      // A passage an application proposed, its note still open (D7b): its block's popover, where it is acted on. Not
+      // what has a click of its own inside it (a reference, a citation, a link), nor with the highlights hidden.
+      const proposed = proposedPassageAt(target);
       if (proposed && container.contains(proposed)) {
         const sign = proposed.closest('.vlx-b, .vlx-dec-para')?.querySelector<HTMLElement>(':scope > .vlx-sign');
         const index = Number(sign?.dataset.block);
@@ -147,11 +161,7 @@ export function useArticleTextInteractions(
     };
 
     const onClick = (e: MouseEvent) => {
-      if (!(e.target instanceof Element) || !activate(e.target)) return;
-      e.preventDefault();
-      // A proposed passage never opens a note's own popover (the reader's handler on the same element, after this one):
-      // a note under it would be edited by half.
-      if (e.target.closest('[data-proposed]')) e.stopImmediatePropagation();
+      if (e.target instanceof Element && activate(e.target)) e.preventDefault();
     };
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Enter' && e.key !== ' ') return;

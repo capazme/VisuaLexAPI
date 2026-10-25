@@ -74,6 +74,14 @@ describe('the notes an application wrote in a dossier (D7b)', () => {
     expect(screen.getByText('Sul danno.')).toBeInTheDocument();
   });
 
+  it('outside a dossier page, the words and the bin alone', () => {
+    const onRemove = vi.fn();
+    render(<DossierNotesSection notes={[byApp]} onRemove={onRemove} />);
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Rimuovi nota' }));
+    expect(onRemove).toHaveBeenCalledWith(byApp);
+  });
+
   it('its bin is the row\'s own removal', () => {
     const onRemove = renderNotes([byApp]);
     fireEvent.click(screen.getByRole('button', { name: 'Rimuovi nota' }));

@@ -46,6 +46,7 @@ import {
     highlightStoreToCreate,
 } from '../utils/storeApiMappers';
 import { serverFieldsFromApi, dossierFromApi, dossierItemFromApi, itemContentFor, serverItemFor } from '../components/features/dossier/dossierUtils';
+import { shiftAiReviewCount } from '../utils/aiReview';
 
 // ── Environment wire ↔ store converters ───────────────────────────────
 // The server stores the per-slice content (dossiers / quickNorms / aliases /
@@ -1693,10 +1694,22 @@ const appStore = createStore<AppState>()(
                     return null;
                 }
 
+                // An application's note leaving takes its count off the light of the article it is about (D7b);
+                // a rollback gives it back.
+                const shiftNoteCounts = (d: Dossier, back: boolean) => {
+                    for (const { item } of removed) {
+                        if (item.type !== 'note' || !item.assistantNote || !item.aboutItemId) continue;
+                        const about = d.items.find(i => i.id === item.aboutItemId);
+                        shiftAiReviewCount(about, back ? null : item.assistantNote.state, back ? item.assistantNote.state : null);
+                    }
+                };
                 // Optimistic update
                 set((state) => {
                     const d = state.dossiers.find(x => x.id === dossierId);
-                    if (d) d.items = d.items.filter(i => !wanted.has(i.id));
+                    if (d) {
+                        d.items = d.items.filter(i => !wanted.has(i.id));
+                        shiftNoteCounts(d, false);
+                    }
                 });
 
                 try {
@@ -1716,6 +1729,7 @@ const appStore = createStore<AppState>()(
                         for (const { item, index } of removed) {
                             if (!d.items.some(i => i.id === item.id)) d.items.splice(Math.min(index, d.items.length), 0, item);
                         }
+                        shiftNoteCounts(d, true);
                     });
                     get().pushSyncError('Impossibile rimuovere dal dossier. Riprova.');
                     return null;

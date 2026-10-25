@@ -1,9 +1,11 @@
 import { useContext, useState, type ReactNode } from 'react';
+import { Trash2 } from 'lucide-react';
 import type { AssistantNoteEntry, DossierItem } from '../../../types';
 import { AiReviewControls } from '../search/AiReviewControls';
 import { NoteEditBox } from '../search/NoteEditBox';
 import { editNoteEntryText, setNoteEntryState } from '../../../store/assistantProposals';
 import { CurrentDossierContext } from './currentDossier';
+import { ROW_REMOVE } from './dossierStyles';
 
 type NoteItem = Extract<DossierItem, { type: 'note' }>;
 
@@ -26,7 +28,18 @@ export function AiNoteEntryReview({ note, children, meta, onRemove }: Props) {
   const dossierId = useContext(CurrentDossierContext);
   const [draft, setDraft] = useState<string | null>(null);
   const review = note.assistantNote;
-  if (!dossierId) return <>{children}{meta}</>;
+  // Outside a dossier page nothing can be asked of the server: the words and the bin alone.
+  if (!dossierId) {
+    return (
+      <>
+        {children}
+        {meta}
+        <button type="button" onClick={onRemove} aria-label="Rimuovi nota" className={ROW_REMOVE}>
+          <Trash2 size={15} aria-hidden />
+        </button>
+      </>
+    );
+  }
   const commit = () => {
     const text = draft?.trim() ?? '';
     // As a note's: only a changed, non-empty text is saved.

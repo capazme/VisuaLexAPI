@@ -18,8 +18,7 @@ export interface ProposalCardProps {
 
 /**
  * A passage an application proposed on a dossier entry (D7b): its colour as a stripe, its words, the note on it, then
- * what the user does with the note (`AiReviewControls`): the note has the state, not the highlight (the owner's
- * decision of 25 October, 10:06). The pencil edits the note in place, as the note cards do (`NoteEditBox`); a saved
+ * what the user does with the note (`AiReviewControls`): the note has the state, not the highlight. The pencil edits the note in place, as the note cards do (`NoteEditBox`); a saved
  * change makes it «Validato, modificato da te». A passage with no note is a mark of known origin: «Evidenziato
  * dall'IA» and the bin, nothing to validate.
  */

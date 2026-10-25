@@ -840,14 +840,16 @@
   cursor: pointer;
 }
 
-/* Flagged «Da rivedere»: the dashed line turns red (the popover's flag says it in words). */
+/* Flagged «Da rivedere»: the dashed line turns red and thicker, not colour alone (the popover's flag says it in words). */
 .vlx-art .vlx-proposed[data-proposed="review"] {
+  text-decoration-thickness: 2.5px;
   @apply decoration-red-600 dark:decoration-red-400;
 }
 
 .highlights-hidden .vlx-art .vlx-proposed,
 .vlx-art.highlights-hidden .vlx-proposed {
   text-decoration-line: none;
+  cursor: auto;
 }
 
 /* The words of the discussion open in the panel. A tint and an underline,

@@ -6,7 +6,7 @@ import {
   dossierItemFromApi, dossierFromApi,
   parseSentenzaContent, decisionCitationOf, sentenzaFromDecision, serverItemFor, itemContentFor, dossierContainsDecision,
   validateImportedDossier, dossierSuggestionPayload, importReport, importCounts, importReasonsText, importToastType,
-  encodeDossierShare, decodeDossierShare,
+  encodeDossierShare, decodeDossierShare, shareableDossier,
 } from './dossierUtils';
 import { buildItemKey } from '../../../utils/normaKeys';
 import type { ArticleData, Dossier, DossierItem, NormaVisitata } from '../../../types';
@@ -616,5 +616,21 @@ describe('shareableDossier — what leaves the account', () => {
     expect(decoded).not.toHaveProperty('published');
     expect(decoded).not.toHaveProperty('forumBlocked');
     expect(decoded.kind).toBe('studio');
+  });
+
+  it('carries nothing of how its owner reviewed what an application wrote (D7b)', () => {
+    const d: Dossier = { id: 'd', title: 'T', createdAt: '2026-10-14', items: [
+      { id: 'a', type: 'norma', addedAt: '', data: { tipo_atto: 'codice civile', numero_articolo: '1453' }, assistantNotes: { proposed: 1, validated: 0, review: 1 } },
+      { id: 'n', type: 'note', addedAt: '', data: 'Mia versione.', createdBy: { clientName: 'Claude Code' }, assistantNote: {
+        state: 'review', stateChangedAt: null, reviewComment: 'Troppo generica.', originalText: 'Sua.', edited: true, editedAt: null, editedBy: { username: 'utente' } } },
+    ] } as Dossier;
+    const shared = shareableDossier(d);
+    const decoded = JSON.parse(decodeDossierShare(encodeDossierShare(d)));
+    for (const items of [shared.items, decoded.items]) {
+      expect(items[0]).not.toHaveProperty('assistantNotes');
+      expect(items[1]).not.toHaveProperty('assistantNote');
+    }
+    expect(JSON.stringify(decoded)).not.toContain('Troppo generica.');
+    expect(decoded.items[1]).toMatchObject({ data: 'Mia versione.', createdBy: { clientName: 'Claude Code' } });
   });
 });

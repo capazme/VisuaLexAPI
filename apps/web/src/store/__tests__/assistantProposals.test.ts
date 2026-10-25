@@ -2,15 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../services/assistantService', () => ({
   assistantService: {
-    features: vi.fn(), listProposals: vi.fn(), setProposalState: vi.fn(), editProposalNote: vi.fn(), removeProposal: vi.fn(),
+    features: vi.fn(), listProposals: vi.fn(), setProposalState: vi.fn(), editProposalNote: vi.fn(), removeProposal: vi.fn(), removeProposalOnExit: vi.fn(),
     setNoteEntryState: vi.fn(), editNoteEntryText: vi.fn(),
   },
 }));
 
 import { assistantService } from '../../services/assistantService';
 import {
-  assistantProposalsStore, editNoteEntryText, editProposalNote, loadAssistantFeatures, loadProposals, removeProposal,
-  setNoteEntryState, setProposalState,
+  assistantProposalsStore, editNoteEntryText, editProposalNote, flushRemovals, loadAssistantFeatures, loadProposals,
+  removeProposal, resetAssistantProposals, setNoteEntryState, setProposalState,
 } from '../assistantProposals';
 import { appStore } from '../useAppStore';
 import { notificationStore, closeNotification, undoNotification, resetNotifications } from '../../components/ui/notifications/notifications';
@@ -68,15 +68,40 @@ describe('D7b proposals — the flag', () => {
     expect(assistantProposalsStore.getState().enabled).toBe(false);
   });
 
-  it('switched off since: a «Non disponibile» 404 hides every proposal; another 404 does not', async () => {
+  it('switched off since: a «Non disponibile» 404 hides every proposal, light and note state; another 404 does not', async () => {
     await loadAssistantFeatures();
     await loadProposals('d1', 'a1');
     vi.mocked(assistantService.listProposals).mockRejectedValueOnce(notFound('Voce non trovata'));
     await loadProposals('d1', 'other');
     expect(assistantProposalsStore.getState().enabled).toBe(true);
-    vi.mocked(assistantService.listProposals).mockRejectedValueOnce(notFound('Non disponibile'));
-    await loadProposals('d1', 'a1');
+    vi.mocked(assistantService.setProposalState).mockRejectedValueOnce(notFound('Non disponibile'));
+    await setProposalState('d1', 'a1', 'p1', 'validated');
     expect(assistantProposalsStore.getState()).toEqual({ enabled: false, byItem: {} });
+    expect(counts()).toBeNull();
+    expect(appStore.getState().dossiers[0].items[1].assistantNote).toBeNull();
+  });
+
+  it('the server saying off, once on, switches off the same way', async () => {
+    await loadAssistantFeatures();
+    vi.mocked(assistantService.features).mockResolvedValueOnce({ assistantPassages: false });
+    await loadAssistantFeatures();
+    expect(assistantProposalsStore.getState().enabled).toBe(false);
+    expect(counts()).toBeNull();
+  });
+
+  it('calls made while one is in flight share it', async () => {
+    await Promise.all([loadAssistantFeatures(), loadAssistantFeatures(), loadAssistantFeatures()]);
+    expect(assistantService.features).toHaveBeenCalledTimes(1);
+  });
+
+  it('a logout empties it, and a removal waiting is not sent as the page goes', async () => {
+    await loadAssistantFeatures();
+    await loadProposals('d1', 'a1');
+    removeProposal('d1', 'a1', 'p1');
+    resetAssistantProposals();
+    expect(assistantProposalsStore.getState()).toEqual({ enabled: false, byItem: {} });
+    window.dispatchEvent(new Event('pagehide'));
+    expect(assistantService.removeProposalOnExit).not.toHaveBeenCalled();
   });
 });
 
@@ -99,6 +124,13 @@ describe('D7b proposals — the note\'s state', () => {
     await editProposalNote('d1', 'a1', 'p1', 'Mia.');
     expect(assistantService.editProposalNote).toHaveBeenCalledWith('d1', 'a1', 'p1', 'Mia.');
     expect(assistantProposalsStore.getState().byItem.a1[0].note?.text).toBe('Mia.');
+    expect(counts()).toEqual({ proposed: 0, validated: 1, review: 0 });
+  });
+
+  it('two clicks in a row move the light once', async () => {
+    const validated = { ...p1, note: aiNote('Il creditore.', 'validated') };
+    vi.mocked(assistantService.setProposalState).mockResolvedValue(validated);
+    await Promise.all([setProposalState('d1', 'a1', 'p1', 'validated'), setProposalState('d1', 'a1', 'p1', 'validated')]);
     expect(counts()).toEqual({ proposed: 0, validated: 1, review: 0 });
   });
 
@@ -149,12 +181,46 @@ describe('D7b proposals — the bin and «Annulla»', () => {
     expect(lastNotification()).toMatchObject({ type: 'error', message: 'Proposta non trovata' });
   });
 
-  it('the page going sends it at once, and only once', () => {
+  it('the page going sends it at once, by the exit\'s own request, and only once', () => {
     removeProposal('d1', 'a1', 'p1');
     window.dispatchEvent(new Event('pagehide'));
-    expect(assistantService.removeProposal).toHaveBeenCalledTimes(1);
+    expect(assistantService.removeProposalOnExit).toHaveBeenCalledWith('d1', 'a1', 'p1');
     closeNotification(lastNotification().id, 'timeout');
-    expect(assistantService.removeProposal).toHaveBeenCalledTimes(1);
+    expect(assistantService.removeProposalOnExit).toHaveBeenCalledTimes(1);
+    expect(assistantService.removeProposal).not.toHaveBeenCalled();
+  });
+
+  it('its reader going sends it at once; read again meanwhile, it is not drawn back, and the light stays right', async () => {
+    removeProposal('d1', 'a1', 'p1');
+    // Read again while the notification still offers «Annulla»: the server still has it.
+    await loadProposals('d1', 'a1');
+    expect(assistantProposalsStore.getState().byItem.a1.map((p) => p.id)).toEqual(['p2']);
+    flushRemovals('a1');
+    expect(assistantService.removeProposal).toHaveBeenCalledWith('d1', 'a1', 'p1');
+    // «Annulla» once sent changes nothing, and the light is not counted twice.
+    await undoNotification(lastNotification().id);
+    expect(assistantProposalsStore.getState().byItem.a1.map((p) => p.id)).toEqual(['p2']);
+    expect(counts()).toBeNull();
+  });
+
+  it('a refused DELETE after a reading that already drew it back counts it once', async () => {
+    let refuse: (e: unknown) => void = () => {};
+    vi.mocked(assistantService.removeProposal).mockReturnValueOnce(new Promise((_, reject) => { refuse = reject; }));
+    removeProposal('d1', 'a1', 'p1');
+    flushRemovals('a1');
+    // Read again before the server answers the DELETE: it still has the passage.
+    await loadProposals('d1', 'a1');
+    expect(assistantProposalsStore.getState().byItem.a1.map((p) => p.id)).toEqual(['p1', 'p2']);
+    refuse(notFound('Proposta non trovata'));
+    await vi.waitFor(() => expect(lastNotification()).toMatchObject({ type: 'error' }));
+    expect(assistantProposalsStore.getState().byItem.a1.map((p) => p.id)).toEqual(['p1', 'p2']);
+    expect(counts()).toBeNull();
+  });
+
+  it('flushing another entry\'s reader sends nothing of this one', () => {
+    removeProposal('d1', 'a1', 'p1');
+    flushRemovals('other');
+    expect(assistantService.removeProposal).not.toHaveBeenCalled();
   });
 
   it('at logout (every notification dropped) nothing is sent, not even as the page goes', () => {

@@ -67,6 +67,18 @@ describe('AiReviewControls', () => {
     expect(props.onReviewComment).toHaveBeenCalledWith('Manca il comma 3.');
   });
 
+  it('«Cosa non va?» shows the server\'s words again when they change, and an emptied field sends nothing', () => {
+    const { props, rerender } = setup({ state: 'review', reviewComment: null });
+    expect(screen.getByRole('textbox', { name: 'Cosa non va?' })).toHaveValue('');
+    rerender(<AiReviewControls {...props} state="review" reviewComment="Manca il comma 2." />);
+    const field = screen.getByRole('textbox', { name: 'Cosa non va?' });
+    expect(field).toHaveValue('Manca il comma 2.');
+    expect(field).toHaveAttribute('maxLength', '500');
+    fireEvent.change(field, { target: { value: '  ' } });
+    fireEvent.blur(field);
+    expect(props.onReviewComment).not.toHaveBeenCalled();
+  });
+
   it('Enter in «Cosa non va?» saves it', () => {
     const { props } = setup({ state: 'review' });
     const field = screen.getByRole('textbox', { name: 'Cosa non va?' });

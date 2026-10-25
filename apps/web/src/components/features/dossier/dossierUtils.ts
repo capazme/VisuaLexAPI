@@ -352,11 +352,20 @@ export function dossierItemFromApi(api: DossierItemApi): DossierItem {
 const SHARE_PREFIX = 'u8.';
 
 /** A dossier as it leaves the account (a share link, a JSON file): without its copy in the Forum or the
- *  admin's block, which are its owner's alone. */
+ *  admin's block, which are its owner's alone, nor how its owner reviewed what an application wrote (D7b: the
+ *  states, «Cosa non va?», who edited, the application's own words), which stays in the dossier. */
 export function shareableDossier(dossier: Dossier): Omit<Dossier, 'published' | 'forumBlocked'> {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- left out on purpose
   const { published, forumBlocked, ...shareable } = dossier;
-  return shareable;
+  return {
+    ...shareable,
+    items: shareable.items.map((item) => {
+      if (item.assistantNotes === undefined && item.assistantNote === undefined) return item;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars -- left out on purpose
+      const { assistantNotes, assistantNote, ...rest } = item;
+      return rest as DossierItem;
+    }),
+  };
 }
 
 export function encodeDossierShare(dossier: Dossier): string {

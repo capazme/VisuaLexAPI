@@ -5,6 +5,7 @@ import { notify, UNDO_MS } from '../components/ui/notifications/notifications';
 import type { AiReviewState, DossierItem, Proposal } from '../types';
 import { dossierItemFromApi } from '../components/features/dossier/dossierUtils';
 import type { DossierItemApi } from '../services/dossierService';
+import { shiftAiReviewCount } from '../utils/aiReview';
 
 /**
  * What applications proposed on dossier entries (D7b, the server's contract): a store of its own, keyed by entry id,
@@ -23,43 +24,68 @@ const errorDetail = (error: unknown, fallback: string): string => {
   const detail = (error as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
   return typeof detail === 'string' && detail ? detail : fallback;
 };
-const isNotFound = (error: unknown) => (error as { response?: { status?: number } })?.response?.status === 404;
+const isSwitchedOff = (error: unknown) =>
+  (error as { response?: { status?: number } })?.response?.status === 404 && errorDetail(error, '') === 'Non disponibile';
 
-/** A 404 from a route of the feature: it is off now. Its proposals and states go. */
+/** Removals waiting for their notification to close, by proposal: sent at once when their reader or the page goes. */
+const pendingRemovals = new Map<string, { itemId: string; send: (onExit?: boolean) => void }>();
+
+/**
+ * Off, now or from a route's 404 «Non disponibile»: the proposals go, and so do the states the dossier's items carry
+ * (the rows' lights, the note entries' controls) until the server says on again.
+ */
 function switchOff() {
+  assistantProposalsStore.setState({ enabled: false, byItem: {} });
+  appStore.setState((s) => {
+    for (const d of s.dossiers) {
+      for (const item of d.items) {
+        if (item.assistantNotes) item.assistantNotes = null;
+        if (item.assistantNote) item.assistantNote = null;
+      }
+    }
+  });
+}
+
+/** At logout: nothing of the last account's dossiers stays in memory. */
+export function resetAssistantProposals() {
+  pendingRemovals.clear();
   assistantProposalsStore.setState({ enabled: false, byItem: {} });
 }
 
-/** Read at app start and when the dossier page mounts; no polling. */
-export async function loadAssistantFeatures(): Promise<void> {
-  try {
-    const { assistantPassages } = await assistantService.features();
-    assistantProposalsStore.setState((s) => (assistantPassages ? { enabled: true } : { enabled: false, byItem: s.enabled ? {} : s.byItem }));
-  } catch {
-    assistantProposalsStore.setState({ enabled: false });
-  }
+let featuresInFlight: Promise<void> | null = null;
+
+/** Read at app start and when the dossier page mounts; no polling. Calls made while one is in flight share it. */
+export function loadAssistantFeatures(): Promise<void> {
+  featuresInFlight ??= (async () => {
+    try {
+      const { assistantPassages } = await assistantService.features();
+      if (assistantPassages) assistantProposalsStore.setState({ enabled: true });
+      else if (assistantProposalsStore.getState().enabled) switchOff();
+    } catch {
+      assistantProposalsStore.setState({ enabled: false });
+    } finally {
+      featuresInFlight = null;
+    }
+  })();
+  return featuresInFlight;
 }
 
 export async function loadProposals(dossierId: string, itemId: string): Promise<void> {
   if (!assistantProposalsStore.getState().enabled) return;
   try {
     const proposals = await assistantService.listProposals(dossierId, itemId);
-    assistantProposalsStore.setState((s) => ({ byItem: { ...s.byItem, [itemId]: proposals } }));
+    // One still waiting behind «Annulla» is not back: the server has it until its notification closes.
+    const shown = proposals.filter((p) => !pendingRemovals.has(p.id));
+    assistantProposalsStore.setState((s) => ({ byItem: { ...s.byItem, [itemId]: shown } }));
   } catch (error) {
-    if (isNotFound(error) && errorDetail(error, '') === 'Non disponibile') switchOff();
+    if (isSwitchedOff(error)) switchOff();
   }
 }
 
-/** The row's light follows each write: the old state's count down one, the new one's up one (contract §5). */
 function moveCount(dossierId: string, itemId: string, from: AiReviewState | null, to: AiReviewState | null) {
   if (from === to) return;
   appStore.setState((s) => {
-    const item = s.dossiers.find((d) => d.id === dossierId)?.items.find((i) => i.id === itemId);
-    if (!item) return;
-    const counts = { proposed: 0, validated: 0, review: 0, ...(item.assistantNotes ?? {}) };
-    if (from) counts[from] = Math.max(0, counts[from] - 1);
-    if (to) counts[to] += 1;
-    item.assistantNotes = counts.proposed + counts.validated + counts.review > 0 ? counts : null;
+    shiftAiReviewCount(s.dossiers.find((d) => d.id === dossierId)?.items.find((i) => i.id === itemId), from, to);
   });
 }
 
@@ -73,13 +99,14 @@ const stateOf = (itemId: string, proposalId: string): AiReviewState | null =>
   assistantProposalsStore.getState().byItem[itemId]?.find((p) => p.id === proposalId)?.note?.state ?? null;
 
 async function write(dossierId: string, itemId: string, proposalId: string, run: () => Promise<Proposal>) {
-  const before = stateOf(itemId, proposalId);
   try {
     const next = await run();
+    // The state it had is read as the answer lands, not as the request left: two clicks in a row move the light once.
+    const before = stateOf(itemId, proposalId);
     replace(itemId, next);
     moveCount(dossierId, itemId, before, next.note?.state ?? null);
   } catch (error) {
-    if (isNotFound(error) && errorDetail(error, '') === 'Non disponibile') switchOff();
+    if (isSwitchedOff(error)) switchOff();
     notify({ type: 'error', message: errorDetail(error, 'Modifica non salvata'), duration: 5000 });
   }
 }
@@ -93,18 +120,21 @@ export function editProposalNote(dossierId: string, itemId: string, proposalId: 
   return write(dossierId, itemId, proposalId, () => assistantService.editProposalNote(dossierId, itemId, proposalId, text));
 }
 
-/** Removals waiting for their notification to close: sent at once when the page goes. */
-const pendingRemovals = new Map<string, () => void>();
-
 if (typeof window !== 'undefined') {
   window.addEventListener('pagehide', () => {
-    for (const send of [...pendingRemovals.values()]) send();
+    for (const { send } of [...pendingRemovals.values()]) send(true);
   });
+}
+
+/** The entry's reader goes (its row closed, the page left): what waits behind «Annulla» there is sent now. */
+export function flushRemovals(itemId: string) {
+  for (const { itemId: of, send } of [...pendingRemovals.values()]) if (of === itemId) send();
 }
 
 /**
  * The bin: the passage goes at once, the notification offers «Annulla», and the `DELETE` leaves when the notification
- * closes (or the page goes); «Annulla» puts it back where it was. A refused `DELETE` puts it back with an error.
+ * closes, the entry's reader goes, or the page goes; «Annulla» puts it back where it was. A refused `DELETE` puts it
+ * back with an error.
  */
 export function removeProposal(dossierId: string, itemId: string, proposalId: string) {
   const list = assistantProposalsStore.getState().byItem[itemId] ?? [];
@@ -112,41 +142,51 @@ export function removeProposal(dossierId: string, itemId: string, proposalId: st
   if (index === -1) return;
   const removed = list[index];
   const putBack = () => {
+    let back = false;
     assistantProposalsStore.setState((s) => {
       const now = s.byItem[itemId] ?? [];
       if (now.some((p) => p.id === proposalId)) return s;
+      back = true;
       const at = Math.min(index, now.length);
       return { byItem: { ...s.byItem, [itemId]: [...now.slice(0, at), removed, ...now.slice(at)] } };
     });
-    moveCount(dossierId, itemId, null, removed.note?.state ?? null);
+    if (back) moveCount(dossierId, itemId, null, removed.note?.state ?? null);
   };
   assistantProposalsStore.setState((s) => ({ byItem: { ...s.byItem, [itemId]: (s.byItem[itemId] ?? []).filter((p) => p.id !== proposalId) } }));
   moveCount(dossierId, itemId, removed.note?.state ?? null, null);
 
-  let sent = false;
-  const send = () => {
-    if (sent) return;
-    sent = true;
+  let settled = false;
+  const send = (onExit = false) => {
+    if (settled) return;
+    settled = true;
     pendingRemovals.delete(proposalId);
+    // As the page goes an ordinary request is often cancelled: the exit's own keeps going.
+    if (onExit) {
+      assistantService.removeProposalOnExit(dossierId, itemId, proposalId);
+      return;
+    }
     assistantService.removeProposal(dossierId, itemId, proposalId).catch((error) => {
       putBack();
       notify({ type: 'error', message: errorDetail(error, 'Passaggio non rimosso'), duration: 5000 });
     });
   };
-  pendingRemovals.set(proposalId, send);
+  pendingRemovals.set(proposalId, { itemId, send });
   notify({
     type: 'info',
     message: 'Passaggio rimosso',
     duration: UNDO_MS,
     onUndo: () => {
-      sent = true;
+      if (settled) return;
+      settled = true;
       pendingRemovals.delete(proposalId);
       putBack();
     },
-    // At logout every notification goes at once (`dropped`), and what it held is not carried out, now or at `pagehide`.
+    // At logout every notification goes at once (`dropped`), and what it held is not carried out, now or later.
     onClose: (reason) => {
-      if (reason === 'dropped') pendingRemovals.delete(proposalId);
-      else if (reason !== 'undo') send();
+      if (reason === 'dropped') {
+        settled = true;
+        pendingRemovals.delete(proposalId);
+      } else if (reason !== 'undo') send();
     },
   });
 }
@@ -158,18 +198,20 @@ type NoteItem = Extract<DossierItem, { type: 'note' }>;
  * of the article it is about moves by one.
  */
 async function writeNoteEntry(dossierId: string, note: NoteItem, run: () => Promise<DossierItemApi>) {
-  const before = note.assistantNote?.state ?? null;
   try {
     const next = dossierItemFromApi(await run());
     appStore.setState((s) => {
-      const item = s.dossiers.find((d) => d.id === dossierId)?.items.find((i) => i.id === note.id);
-      if (!item || item.type !== 'note' || next.type !== 'note') return;
+      const d = s.dossiers.find((x) => x.id === dossierId);
+      const item = d?.items.find((i) => i.id === note.id);
+      if (!d || !item || item.type !== 'note' || next.type !== 'note') return;
+      // As for a passage: the state it had as the answer lands.
+      const before = item.assistantNote?.state ?? null;
       item.data = next.data;
       item.assistantNote = next.assistantNote ?? null;
+      if (item.aboutItemId) shiftAiReviewCount(d.items.find((i) => i.id === item.aboutItemId), before, item.assistantNote?.state ?? null);
     });
-    if (note.aboutItemId) moveCount(dossierId, note.aboutItemId, before, next.assistantNote?.state ?? null);
   } catch (error) {
-    if (isNotFound(error) && errorDetail(error, '') === 'Non disponibile') switchOff();
+    if (isSwitchedOff(error)) switchOff();
     notify({ type: 'error', message: errorDetail(error, 'Modifica non salvata'), duration: 5000 });
   }
 }

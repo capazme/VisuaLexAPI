@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 vi.mock('../../../services/assistantService', () => ({
   assistantService: {
-    features: vi.fn(), listProposals: vi.fn(), setProposalState: vi.fn(), editProposalNote: vi.fn(), removeProposal: vi.fn(),
+    features: vi.fn(), listProposals: vi.fn(), setProposalState: vi.fn(), editProposalNote: vi.fn(), removeProposal: vi.fn(), removeProposalOnExit: vi.fn(),
   },
 }));
 
@@ -15,6 +15,7 @@ import { DecisionReadingSurface } from './DecisionReadingSurface';
 import { decisionProjection } from '../../../utils/decisionRender';
 import { aiNote } from '../../../utils/__fixtures__/assistantNote';
 import type { Proposal } from '../../../types';
+import { resetNotifications } from '../../ui/notifications/notifications';
 import type { DecisionIdentity } from '../../../types/decisions';
 
 const IDENTITY: DecisionIdentity = { corte: 'cassazione', archivio: 'civile', numero: 99999, anno: 2024 };
@@ -38,6 +39,8 @@ const renderSurface = (itemId?: string) => render(
     <DecisionReadingSurface identity={IDENTITY} testo={TESTO} attributi={{}} dossierItemId={itemId} />
   </CurrentDossierContext.Provider>,
 );
+
+afterEach(() => resetNotifications());
 
 beforeEach(() => {
   vi.clearAllMocks();

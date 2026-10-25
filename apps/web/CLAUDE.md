@@ -1006,17 +1006,18 @@ every measurement, because every edit redraws the text. Its focus management
 is modal: with no element in the text for floating-ui to bridge Tab back to,
 Tab cycles inside and Esc returns to the sign.
 
-**Passages an application proposed** (D7b, spec
-`docs/superpowers/specs/2026-10-23-mcp-next-tools-design.md` §8, with the owner's three states of 25 October)
-are highlights with a `proposal` (`types/index.ts`, `HighlightProposal`): only a dossier entry's reader is
-ever given one. The state is the application's note's, not the highlight's (the owner, 25 October 10:06): a
+**Passages an application proposed** (D7b: the MCP design's §8, in the documentation pull request #318, as the
+server's contract for the first cut revises it) are highlights with a `proposal` (`types/index.ts`, `HighlightProposal`): only a dossier entry's reader is
+ever given one. The state is the application's note's, not the highlight's: a
 passage with no note is a plain mark titled «Evidenziato dall'IA», removable, outside every count and with no
 checkbox (`hasAiNote`). Until its note is validated («da validare» or «Da rivedere», `isOpenProposal`), `highlightOpen` adds
 `data-proposed` and `.vlx-proposed` — a dashed line, red once flagged — and the sign adds the sparkle
 (`.vlx-sign-proposed`) and names them apart («…; 2 passaggi proposti dall'IA: 1 da validare · 1 da rivedere»,
 `signAriaLabel`), as its `title` too; still no text node, and the projection tests run with proposals on. A click on
 such a passage opens its block's popover (`useArticleTextInteractions`, in an article's comma or a decision's
-paragraph), never the popover of a note of the reader's under it. The
+paragraph), unless it lands on something with a click of its own (a reference, a citation, a link) or the
+highlights are hidden; the readers' note handlers skip what `proposedPassageAt` returns, whatever order the listeners were added in,
+so a note of the reader's under it never opens. The
 popover lists them first, only when given `proposalActions`, as `ProposalCard`s: the passage, its note, then
 `AiReviewControls` — a real checkbox «Proposto dall'IA, confermi?» → «Validato» (or «Validato, modificato da
 te») with the green tick, the flag «Da rivedere» with its optional «Cosa non va?», the pencil (the note edited
@@ -1037,8 +1038,13 @@ nothing outside a dossier entry, with the feature off or on a text shown read-on
 reader's own highlights (a decision's downloads keep only the reader's); one whose words no longer land is listed under
 the text (`LooseHighlightsList`, `UnmatchedAnchors`), to be removed through its route. Each
 write takes the server's answer and moves the row's light by one (the old state down, the new up). The bin removes at
-once and offers «Annulla»; the `DELETE` leaves when the notification closes, or at `pagehide`, never after a logout
-drops it. A note entry an application wrote (`assistantNote` on the item, contract §3) has the same controls
+once and offers «Annulla»; the `DELETE` leaves when the notification closes, when the entry's reader goes (its row
+closed: opening it again reads what the server holds, and a removal still waiting is never drawn back), or at
+`pagehide` as a `keepalive` fetch, never after a logout drops it. Each write reads the state it replaces as the answer
+lands, so two quick clicks move the light once. A 404 «Non disponibile» also clears the items' `assistantNotes` and
+`assistantNote`, so no light or control stays; a logout empties the store; a share link or a JSON export carries
+neither field (`shareableDossier`). Trashing a note entry an application wrote takes its count off its article's light
+(`trashDossierItems`, `shiftAiReviewCount`). A note entry an application wrote (`assistantNote` on the item, contract §3) has the same controls
 (`AiNoteEntryReview`, in the free notes and under an article; its bin is the row's own removal): its writes replace
 the item's text and state from the answer and move the light of the article it is about.
 

@@ -18,6 +18,7 @@ import { useArticleCards } from '../components/features/studia/useArticleCards';
 import { fetchDecisionCached } from '../utils/decisionFetchCache';
 import { appStore } from '../store/useAppStore';
 import { useAuth } from './useAuth';
+import { assistantProposalsStore } from '../store/assistantProposals';
 
 const REF = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 99999, anno: 2024 };
 
@@ -57,6 +58,16 @@ describe('useAuth — logout', () => {
     expect(next.result.current.status).toBe('loading');
     await waitFor(() => expect(next.result.current.status).toBe('ready'));
     expect(studiaService.forArticle).toHaveBeenCalledTimes(2);
+  });
+
+  it('forgets what applications proposed on the last reader\'s dossiers (D7b)', async () => {
+    assistantProposalsStore.setState({ enabled: true, byItem: { a1: [] } });
+    const { result } = renderHook(() => useAuth());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    act(() => { result.current.logout(); });
+
+    expect(assistantProposalsStore.getState()).toEqual({ enabled: false, byItem: {} });
   });
 
   it('forgets what Gymnasium last drew here: the last reader’s points and level (G-316)', async () => {

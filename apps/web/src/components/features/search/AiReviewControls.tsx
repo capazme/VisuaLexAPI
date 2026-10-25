@@ -15,7 +15,10 @@ export interface AiReviewControlsProps {
     onValidate: (validated: boolean) => void;
     /** The flag: on marks it «Da rivedere», off goes back to «da validare». */
     onFlag: (flagged: boolean) => void;
-    /** The few words of «Cosa non va?», saved as the field is left (empty clears them). */
+    /**
+     * The few words of «Cosa non va?», saved as the field is left when changed. An emptied field sends nothing: the
+     * server keeps the last words for the second cut, and shows them again.
+     */
     onReviewComment: (text: string) => void;
     /** The pencil: the caller opens the note's editing. */
     onEdit: () => void;
@@ -30,7 +33,7 @@ export interface AiReviewControlsProps {
 const ACTION = 'flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2';
 
 /**
- * What the user does with an item an application wrote (D7b, Luca's three states): a real checkbox, «Proposto dall'IA,
+ * What the user does with an item an application wrote (D7b, its note's three states): a real checkbox, «Proposto dall'IA,
  * confermi?», ticked «Validato» with the green tick (or «Validato, modificato da te»); then the flag «Da rivedere», with
  * its short «Cosa non va?» below; the pencil; the bin. Once the text was changed, «Vedi la versione dell'IA» shows the
  * application's own beside it. Each state has its own shape — the tick, the flag, the empty box — never colour alone.
@@ -41,7 +44,6 @@ export function AiReviewControls({
     const validated = state === 'validated';
     const flagged = state === 'review';
     const [showOriginal, setShowOriginal] = useState(false);
-    const [comment, setComment] = useState(reviewComment ?? '');
     const originalId = useId();
 
     return (
@@ -123,20 +125,32 @@ export function AiReviewControls({
                     <p className="flex items-center gap-1.5 text-xs font-semibold text-red-700 dark:text-red-400">
                         <Flag size={12} aria-hidden className="fill-current" /> Da rivedere
                     </p>
-                    <label className="mt-1 block text-xs text-slate-700 dark:text-slate-300">
-                        Cosa non va?
-                        <input
-                            type="text"
-                            value={comment}
-                            maxLength={300}
-                            onChange={(e) => setComment(e.target.value)}
-                            onBlur={() => { if (comment.trim() !== (reviewComment ?? '')) onReviewComment(comment.trim()); }}
-                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
-                            className="mt-0.5 block min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500/40 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
-                        />
-                    </label>
+                    {/* Drawn again whenever the server's words change (a new flag shows the last ones it kept). */}
+                    <ReviewComment key={reviewComment ?? ''} saved={reviewComment} onSave={onReviewComment} />
                 </div>
             )}
         </div>
+    );
+}
+
+/** «Cosa non va?»: a few words, up to the server's 500, saved as the field is left (or on Enter) when changed. */
+function ReviewComment({ saved, onSave }: { saved: string | null; onSave: (text: string) => void }) {
+    const [comment, setComment] = useState(saved ?? '');
+    return (
+        <label className="mt-1 block text-xs text-slate-700 dark:text-slate-300">
+            Cosa non va?
+            <input
+                type="text"
+                value={comment}
+                maxLength={500}
+                onChange={(e) => setComment(e.target.value)}
+                onBlur={() => {
+                    const text = comment.trim();
+                    if (text && text !== (saved ?? '')) onSave(text);
+                }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+                className="mt-0.5 block min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500/40 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+            />
+        </label>
     );
 }

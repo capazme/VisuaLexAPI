@@ -1,10 +1,10 @@
-import { beforeEach, describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 
 vi.mock('../../../utils/articleFetchCache', () => ({ fetchArticleForNorma: vi.fn() }));
 vi.mock('../../../services/assistantService', () => ({
   assistantService: {
-    features: vi.fn(), listProposals: vi.fn(), setProposalState: vi.fn(), editProposalNote: vi.fn(), removeProposal: vi.fn(),
+    features: vi.fn(), listProposals: vi.fn(), setProposalState: vi.fn(), editProposalNote: vi.fn(), removeProposal: vi.fn(), removeProposalOnExit: vi.fn(),
   },
 }));
 
@@ -18,6 +18,7 @@ import { assistantService } from '../../../services/assistantService';
 import { assistantProposalsStore } from '../../../store/assistantProposals';
 import { CurrentDossierContext } from './currentDossier';
 import { aiNote } from '../../../utils/__fixtures__/assistantNote';
+import { resetNotifications } from '../../ui/notifications/notifications';
 
 const norma: NormaVisitata = { tipo_atto: 'codice civile', numero_atto: '262', data: '1942-03-16', numero_articolo: '1453' };
 const RAW = fixtureText('nrm-cc-1453');
@@ -99,6 +100,8 @@ describe('DossierItemReader — what an application proposed on the entry (D7b)'
     </CurrentDossierContext.Provider>,
   );
 
+  afterEach(() => resetNotifications());
+
   beforeEach(() => {
     vi.mocked(fetchArticleForNorma).mockResolvedValue({ article_text: RAW, norma_data: norma });
     vi.mocked(assistantService.listProposals).mockResolvedValue([noted, bare, lost]);
@@ -139,6 +142,17 @@ describe('DossierItemReader — what an application proposed on the entry (D7b)'
     await screen.findByText('Altre evidenziazioni');
     fireEvent.click(screen.getByRole('button', { name: 'Rimuovi evidenziazione' }));
     await waitFor(() => expect(assistantProposalsStore.getState().byItem.a1.map((p) => p.id)).toEqual(['p1', 'p2']));
+  });
+
+  it('closed while a removal waits behind «Annulla», it sends that removal at once', async () => {
+    vi.mocked(assistantService.removeProposal).mockClear();
+    vi.mocked(assistantService.removeProposal).mockResolvedValue();
+    const { unmount } = renderReader();
+    await screen.findByText('Altre evidenziazioni');
+    fireEvent.click(screen.getByRole('button', { name: 'Rimuovi evidenziazione' }));
+    expect(assistantService.removeProposal).not.toHaveBeenCalled();
+    unmount();
+    expect(assistantService.removeProposal).toHaveBeenCalledWith('d1', 'a1', 'p3');
   });
 
   it('asks nothing with the feature off, or outside a dossier entry', async () => {

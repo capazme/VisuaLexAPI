@@ -2,7 +2,7 @@ import { useContext, useEffect, useMemo } from 'react';
 import type { Highlight } from '../types';
 import { proposalHighlight } from '../utils/aiReview';
 import {
-  assistantProposalsStore, editProposalNote, loadProposals, removeProposal, setProposalState,
+  assistantProposalsStore, editProposalNote, flushRemovals, loadProposals, removeProposal, setProposalState,
 } from '../store/assistantProposals';
 import type { ProposalActions } from '../components/features/search/BlockAnnotationsPopover';
 import { CurrentDossierContext } from '../components/features/dossier/currentDossier';
@@ -23,7 +23,11 @@ export function useEntryProposals(itemId: string | undefined, normaKey: string, 
   const proposalsOf = enabled && itemId && !readOnly ? dossierId : null;
 
   useEffect(() => {
-    if (proposalsOf && itemId) void loadProposals(proposalsOf, itemId);
+    if (!proposalsOf || !itemId) return;
+    void loadProposals(proposalsOf, itemId);
+    // The reader goes (its row closed): a removal waiting behind «Annulla» is sent now, so opening the row again reads
+    // what the server holds.
+    return () => flushRemovals(itemId);
   }, [proposalsOf, itemId]);
 
   const highlights = useMemo(

@@ -48,3 +48,15 @@ type NoteItem = Extract<DossierItem, { type: 'note' }>;
 
 /** A note entry with the state an application's note has (and the feature on: the server sends null otherwise). */
 export const hasAssistantNote = (note: NoteItem): note is NoteItem & { assistantNote: AssistantNoteEntry } => !!note.assistantNote;
+
+/**
+ * The row's light follows a change of one note (contract §5): the old state's count down one, the new one's up one;
+ * null for none. On a draft item (immer), the norm or decision the note is on or about.
+ */
+export function shiftAiReviewCount(item: DossierItem | undefined, from: AiReviewState | null, to: AiReviewState | null): void {
+  if (!item || from === to) return;
+  const counts = { proposed: 0, validated: 0, review: 0, ...(item.assistantNotes ?? {}) };
+  if (from) counts[from] = Math.max(0, counts[from] - 1);
+  if (to) counts[to] += 1;
+  item.assistantNotes = counts.proposed + counts.validated + counts.review > 0 ? counts : null;
+}

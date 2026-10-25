@@ -1,4 +1,7 @@
 import { apiClient } from './api';
+import { getAccessToken } from './authService';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 import type { AiReviewState, Proposal } from '../types';
 import type { DossierItemApi } from './dossierService';
 
@@ -38,6 +41,19 @@ export const assistantService = {
 
   async removeProposal(dossierId: string, itemId: string, proposalId: string): Promise<void> {
     await apiClient.delete(proposal(dossierId, itemId, proposalId));
+  },
+
+  /**
+   * The same removal as the page goes (`pagehide`): a `keepalive` fetch, which the browser carries out after the page
+   * is gone, where an ordinary request is often cancelled. Nothing waits for its answer.
+   */
+  removeProposalOnExit(dossierId: string, itemId: string, proposalId: string): void {
+    const token = getAccessToken();
+    void fetch(`${API_BASE_URL}${proposal(dossierId, itemId, proposalId)}`, {
+      method: 'DELETE',
+      keepalive: true,
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }).catch(() => {});
   },
 
   /** A note entry an application wrote (contract §3). */

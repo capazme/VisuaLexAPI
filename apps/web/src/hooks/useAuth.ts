@@ -6,7 +6,7 @@ import * as authService from '../services/authService';
 import { subscribeToUser } from '../services/authEvents';
 import type { UserResponse } from '../types/api';
 import { appStore } from '../store/useAppStore';
-import { loadAssistantFeatures } from '../store/assistantProposals';
+import { loadAssistantFeatures, resetAssistantProposals } from '../store/assistantProposals';
 import { getErrorMessage } from '../utils/errors';
 import { clearDecisionCache } from '../utils/decisionFetchCache';
 import { clearDecisionSearchCache } from '../utils/decisionSearchCache';
@@ -161,6 +161,7 @@ export function useAuth() {
     clearArticleCardsCache();
     clearConsentRead();
     forgetSeenProgress();
+    resetAssistantProposals();
     setState({
       user: null,
       loading: false,
