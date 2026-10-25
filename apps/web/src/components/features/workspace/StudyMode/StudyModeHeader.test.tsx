@@ -25,7 +25,10 @@ describe('StudyModeHeader — the colour of new highlights (H1)', () => {
         onThemeChange={vi.fn()}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Colore delle evidenziazioni: giallo' }));
+    const trigger = screen.getByRole('button', { name: 'Colore: giallo (nuove evidenziazioni)' });
+    // A dot alone: its words in a tooltip.
+    expect(trigger).toHaveAttribute('title', 'Colore delle nuove evidenziazioni: giallo');
+    fireEvent.click(trigger);
     fireEvent.click(within(screen.getByRole('menu')).getAllByRole('menuitemradio')[2]);
     expect(appStore.getState().settings.highlightColor).toBe('red');
   });

@@ -10,15 +10,15 @@ const DOT: Record<HighlightColor, string> = {
   blue: 'fill-[hsl(var(--hl-blue-bg))] text-[hsl(var(--hl-blue-fg))]',
 };
 
-/** The title over the four in a menu of actions. */
-export const SECTION_HEADING = 'Colore delle nuove evidenziazioni';
+/** The title over the four: their own menu's, and in a menu of actions. Each colour's meaning is a suggestion. */
+export const SECTION_HEADING = 'Colore delle nuove evidenziazioni — uso suggerito';
 
 const capitalised = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /**
  * The four colours as a menu's choices (H1): the one chosen ticked (`menuitemradio`), each with what it is suggested
- * for under it (`HIGHLIGHT_COLOR_MEANINGS`, a hint: any colour is free for anything), and named «Giallo, punto
- * centrale». `section`, for a menu that holds actions too (a phone's «⋯»): a separator and a title over the four, so
+ * for under it (`HIGHLIGHT_COLOR_MEANINGS`, a hint: any colour is free for anything), and named «Giallo, uso
+ * suggerito: punto centrale». `section`, for a menu that holds actions too (a phone's «⋯»): a separator and a title over the four, so
  * they read as a setting and not as «highlight now», and each one's name says what it sets.
  */
 export function highlightColorItems(
@@ -31,7 +31,7 @@ export function highlightColorItems(
     const meaning = HIGHLIGHT_COLOR_MEANINGS[color].toLowerCase();
     return {
       label: capitalised(name),
-      ariaLabel: section ? `Nuove evidenziazioni in ${name}, ${meaning}` : `${capitalised(name)}, ${meaning}`,
+      ariaLabel: section ? `Nuove evidenziazioni in ${name}, uso suggerito: ${meaning}` : `${capitalised(name)}, uso suggerito: ${meaning}`,
       description: HIGHLIGHT_COLOR_MEANINGS[color],
       icon: Circle,
       iconClassName: DOT[color],

@@ -1,7 +1,7 @@
 import { useAppStore } from '../../../store/useAppStore';
 import { highlightColorName } from '../../../utils/highlightColors';
 import { MenuButton } from '../../ui/MenuButton';
-import { highlightColorItems } from './highlightColorItems';
+import { highlightColorItems, SECTION_HEADING } from './highlightColorItems';
 
 export interface HighlightColorMenuProps {
   /** The trigger's look: with its words («Colore: giallo»), as the article's reading row; or the dot alone. */
@@ -24,8 +24,10 @@ export function HighlightColorMenu({ labelled = false, triggerClassName, classNa
   const name = highlightColorName(color);
   return (
     <MenuButton
-      label={`Colore delle evidenziazioni: ${name}`}
-      heading="Colore delle nuove evidenziazioni (sotto, un uso suggerito)"
+      // The name starts with the words shown («Colore: giallo», WCAG 2.5.3); a dot alone says them in its tooltip.
+      label={`Colore: ${name} (nuove evidenziazioni)`}
+      title={labelled ? undefined : `Colore delle nuove evidenziazioni: ${name}`}
+      heading={SECTION_HEADING}
       items={highlightColorItems(color, (next) => updateSettings({ highlightColor: next }))}
       triggerClassName={triggerClassName}
       className={className}

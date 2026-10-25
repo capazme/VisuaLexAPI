@@ -78,7 +78,7 @@ describe('DossierItemReader — the colour of new highlights (H1)', () => {
     vi.mocked(fetchArticleForNorma).mockResolvedValue({ article_text: RAW, norma_data: norma });
     appStore.setState({ highlights: [], annotations: [] });
     render(<DossierItemReader norma={norma} onOpenOnDashboard={() => {}} showToast={() => {}} />);
-    const trigger = await screen.findByRole('button', { name: 'Colore delle evidenziazioni: giallo' });
+    const trigger = await screen.findByRole('button', { name: 'Colore: giallo (nuove evidenziazioni)' });
     expect(trigger).toHaveTextContent('Colore: giallo');
   });
 
@@ -88,7 +88,7 @@ describe('DossierItemReader — the colour of new highlights (H1)', () => {
     appStore.setState({ highlights: [], annotations: [] });
     render(<DossierItemReader norma={norma} onOpenOnDashboard={() => {}} showToast={() => {}} />);
     await screen.findByRole('button', { name: /Copia citazione/ });
-    expect(screen.queryByRole('button', { name: /^Colore delle evidenziazioni/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Colore: / })).toBeNull();
   });
 });
 

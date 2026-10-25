@@ -106,7 +106,7 @@ describe('ReadingToolbar — three tools in words, the rest behind «⋯» (R3)'
     it('on a computer: «Note», «Evidenziazioni», «Al dossier» and «⋯»', () => {
         const { container } = setup({ notesCount: 2, highlightsCount: 3 });
         const names = within(desktopRow(container)).getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent);
-        expect(names).toEqual(['Note, 2', 'Evidenziazioni, 3', 'Colore delle evidenziazioni: giallo', 'Al dossier', 'Altre azioni sull’articolo']);
+        expect(names).toEqual(['Note, 2', 'Evidenziazioni, 3', 'Colore: giallo (nuove evidenziazioni)', 'Al dossier', 'Altre azioni sull’articolo']);
         // The count is seen beside the word.
         expect(within(desktopRow(container)).getByRole('button', { name: 'Note, 2' })).toHaveTextContent('Note2');
     });
@@ -218,7 +218,7 @@ describe('ReadingToolbar — a past text is a reading', () => {
 
     it('offers no colour for new highlights, on a text that takes none (H1)', () => {
         const { container } = setup({ lockedReason: READ_ONLY_REASON });
-        expect(within(desktopRow(container)).queryByRole('button', { name: /^Colore delle evidenziazioni/ })).toBeNull();
+        expect(within(desktopRow(container)).queryByRole('button', { name: /^Colore: / })).toBeNull();
         expect(within(openMore(phoneRow(container))).queryAllByRole('menuitemradio')).toEqual([]);
     });
 
@@ -334,7 +334,7 @@ describe('ReadingToolbar — the compact form of a light window (spec §4.1)', (
         const { container } = setup({ compact: true, find, url: 'https://example.org/x' });
         const row = desktopRow(container);
         expect(within(row).getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent))
-            .toEqual(['Note', 'Evidenziazioni', 'Colore delle evidenziazioni: giallo', 'Altre azioni sull’articolo']);
+            .toEqual(['Note', 'Evidenziazioni', 'Colore: giallo (nuove evidenziazioni)', 'Altre azioni sull’articolo']);
         expect(entryNames(openMore(row))).toEqual(['Glosse sull’articolo', 'Cerca nel testo', 'Copia']);
     });
 
@@ -361,11 +361,15 @@ describe('ReadingToolbar — the colour of new highlights, chosen once (H1)', ()
     it('on a computer: a menu of its own beside «Evidenziazioni», each colour with what it is suggested for', () => {
         const { container } = setup();
         const row = desktopRow(container);
-        const trigger = within(row).getByRole('button', { name: 'Colore delle evidenziazioni: giallo' });
-        // The colour in words, not in a pale dot alone.
+        const trigger = within(row).getByRole('button', { name: 'Colore: giallo (nuove evidenziazioni)' });
+        // The colour in words, not in a pale dot alone; the name starts with those words (WCAG 2.5.3).
         expect(trigger).toHaveTextContent('Colore: giallo');
+        expect(trigger.getAttribute('aria-label')).toMatch(new RegExp(`^${trigger.textContent}`));
+        expect(trigger).not.toHaveAttribute('title');
         fireEvent.click(trigger);
         const menu = within(row).getByRole('menu');
+        // The meanings are a suggestion, and the menu says so.
+        expect(menu).toHaveAccessibleDescription('Colore delle nuove evidenziazioni — uso suggerito');
         const choices = within(menu).getAllByRole('menuitemradio');
         expect(choices.map((c) => [c.textContent, c.getAttribute('aria-checked')])).toEqual([
             ['GialloPunto centrale', 'true'],
@@ -373,10 +377,10 @@ describe('ReadingToolbar — the colour of new highlights, chosen once (H1)', ()
             ['RossoDa rivedere', 'false'],
             ['BluDefinizione o eccezione', 'false'],
         ]);
-        expect(choices[0]).toHaveAccessibleName('Giallo, punto centrale');
+        expect(choices[0]).toHaveAccessibleName('Giallo, uso suggerito: punto centrale');
         fireEvent.click(choices[1]);
         expect(color()).toBe('green');
-        expect(within(row).getByRole('button', { name: 'Colore delle evidenziazioni: verde' })).toBeInTheDocument();
+        expect(within(row).getByRole('button', { name: 'Colore: verde (nuove evidenziazioni)' })).toBeInTheDocument();
     });
 
     it('on a phone, where the row has no room: its four choices close the «⋯», under a title, as a setting', () => {
@@ -384,12 +388,14 @@ describe('ReadingToolbar — the colour of new highlights, chosen once (H1)', ()
         const menu = openMore(phoneRow(container));
         // Long now: capped under the bar, it scrolls on its own, so the last colour is never off the screen.
         expect(menu).toHaveClass('overflow-y-auto', 'max-h-[calc(100dvh-12rem)]');
-        expect(within(menu).getByText('Colore delle nuove evidenziazioni')).toBeInTheDocument();
+        expect(within(menu).getByText('Colore delle nuove evidenziazioni — uso suggerito')).toBeInTheDocument();
         const choices = within(menu).getAllByRole('menuitemradio');
         // Named for what they set, never «Evidenzia in…», which reads as «highlight now».
         expect(choices.map((c) => c.getAttribute('aria-label'))).toEqual([
-            'Nuove evidenziazioni in giallo, punto centrale', 'Nuove evidenziazioni in verde, condizione o presupposto',
-            'Nuove evidenziazioni in rosso, da rivedere', 'Nuove evidenziazioni in blu, definizione o eccezione',
+            'Nuove evidenziazioni in giallo, uso suggerito: punto centrale',
+            'Nuove evidenziazioni in verde, uso suggerito: condizione o presupposto',
+            'Nuove evidenziazioni in rosso, uso suggerito: da rivedere',
+            'Nuove evidenziazioni in blu, uso suggerito: definizione o eccezione',
         ]);
         expect(choices.map((c) => c.textContent)).toEqual([
             'GialloPunto centrale', 'VerdeCondizione o presupposto', 'RossoDa rivedere', 'BluDefinizione o eccezione',

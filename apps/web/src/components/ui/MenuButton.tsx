@@ -30,6 +30,8 @@ export interface MenuItem {
 export interface MenuButtonProps {
   /** The trigger's accessible name. */
   label: string;
+  /** The trigger's tooltip, for one with no words of its own (a colour's dot). */
+  title?: string;
   items: MenuItem[];
   /** The trigger's content: an icon, or an icon and a word. */
   children: ReactNode;
@@ -54,7 +56,7 @@ export interface MenuButtonProps {
  * and End move, Escape and Tab close, focus returns to the trigger, a click
  * outside closes. Clicks never reach the card it sits in. The dossier's menus.
  */
-export function MenuButton({ label, items, children, triggerClassName, align = 'right', placement = 'below', heading, menuClassName, className, onOpen }: MenuButtonProps) {
+export function MenuButton({ label, title, items, children, triggerClassName, align = 'right', placement = 'below', heading, menuClassName, className, onOpen }: MenuButtonProps) {
   // null = closed; otherwise which item takes the focus once the menu is drawn.
   const [openAt, setOpenAt] = useState<'first' | 'last' | null>(null);
   const open = openAt !== null;
@@ -134,6 +136,7 @@ export function MenuButton({ label, items, children, triggerClassName, align = '
         ref={triggerRef}
         type="button"
         aria-label={label}
+        title={title}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}

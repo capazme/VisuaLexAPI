@@ -251,8 +251,11 @@ describe('DecisionReadingSurface — notes and highlights', () => {
 
   it('the colour is chosen once in the reading bar, with what each is suggested for, and every new highlight takes it (H1)', async () => {
     const { container } = render(<DecisionReadingSurface identity={IDENTITY} testo={MOTIVAZIONE} attributi={{}} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Colore delle evidenziazioni: giallo' }));
-    const menu = screen.getByRole('menu', { name: 'Colore delle evidenziazioni: giallo' });
+    const trigger = screen.getByRole('button', { name: 'Colore: giallo (nuove evidenziazioni)' });
+    // The bar's dot alone: its words in a tooltip.
+    expect(trigger).toHaveAttribute('title', 'Colore delle nuove evidenziazioni: giallo');
+    fireEvent.click(trigger);
+    const menu = screen.getByRole('menu', { name: 'Colore: giallo (nuove evidenziazioni)' });
     const choices = within(menu).getAllByRole('menuitemradio');
     expect(choices.map((c) => c.textContent)).toEqual([
       'GialloPunto centrale', 'VerdeCondizione o presupposto', 'RossoDa rivedere', 'BluDefinizione o eccezione',
@@ -261,7 +264,7 @@ describe('DecisionReadingSurface — notes and highlights', () => {
     // Any colour, whatever it is suggested for.
     fireEvent.click(choices[2]);
     expect(appStore.getState().settings.highlightColor).toBe('red');
-    expect(screen.getByRole('button', { name: 'Colore delle evidenziazioni: rosso' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Colore: rosso (nuove evidenziazioni)' })).toBeInTheDocument();
     await selectText(container, 3, 10);
     // Never asked again: one click, or H.
     expect(screen.queryByRole('list', { name: 'Uso suggerito dei colori' })).toBeNull();

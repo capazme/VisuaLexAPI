@@ -1037,11 +1037,13 @@ in the row's name, its counts the server's `assistant_notes` on the item (`serve
 The colour of new highlights is chosen once, in the reading bar (H1, the owner's decision; `settings.highlightColor`,
 kept on this device with the other reading settings, yellow until chosen, and yellow again for a save holding
 anything else — the persist `merge` checks it, `isHighlightColor`): `HighlightColorMenu` beside «Evidenziazioni» on a
-computer (`ReadingToolbar`, its compact form too; «Colore: giallo», a dot of the highlight's tint inside its ink), its
-four choices closing the «⋯» on a phone under their own title («Colore delle nuove evidenziazioni», each named
-«Nuove evidenziazioni in verde, …» so it reads as a setting, not as «highlight now»), in the decision's bar, in Study
-Mode's header, and with the dossier reader's actions (it has no bar); never on a text that takes no highlight. The
-menu offers the four as `menuitemradio`, each with what it is suggested for (`HIGHLIGHT_COLOR_MEANINGS`: yellow
+computer (`ReadingToolbar`, its compact form too; «Colore: giallo», a dot of the highlight's tint inside its ink, named
+«Colore: giallo (nuove evidenziazioni)» — the name starts with the words shown, WCAG 2.5.3 —; where the dot stands
+alone, the decision's bar and Study Mode's header, its words are its `title`), its four choices closing the «⋯» on a
+phone under their own title («Colore delle nuove evidenziazioni — uso suggerito», each named «Nuove evidenziazioni in
+verde, uso suggerito: …» so it reads as a setting, not as «highlight now»), in the decision's bar, in Study Mode's
+header, and with the dossier reader's actions (it has no bar); never on a text that takes no highlight. The menu, under
+the same title, offers the four as `menuitemradio`, each with what it is suggested for (`HIGHLIGHT_COLOR_MEANINGS`: yellow
 «Punto centrale», green «Condizione o presupposto», blue «Definizione o eccezione», red «Da rivedere»), a hint: any
 colour is free for anything. Every way of highlighting takes it: `SelectionPopup` never asks — «Evidenzia» (named
 «Evidenzia in giallo», `aria-keyshortcuts="h"`) and H highlight at once in it, its icon in the colour bright on the
