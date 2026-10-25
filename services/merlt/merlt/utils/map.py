@@ -57,6 +57,12 @@ def extract_codice_details(codice_name: str) -> dict | None:
 # of the API's ANNEXED_ACTS (visualex_api/tools/map.py).
 ANNEXED_ACTS = {
     "regio.decreto:1931-06-18;773": "1",
+    # The legge fallimentare, the c.p.p. minorile and the testo unico sulle successioni e
+    # donazioni: the decree approves the text as its annex 1 (checked on Normattiva, 25 October
+    # 2026: a dispositivo of one or two articles, «È approvato il testo, allegato…»).
+    "regio.decreto:1942-03-16;267": "1",
+    "decreto.del.presidente.della.repubblica:1988-09-22;448": "1",
+    "decreto.legislativo:1990-10-31;346": "1",
 }
 
 # An annex of a code's decree, or an act of the codes table, cited by a sigla of its own and
