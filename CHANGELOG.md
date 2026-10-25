@@ -12,6 +12,36 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.10.3] - 2026-10-25
+
+Passages and notes an assistant proposes in a dossier, validated by hand (D7b,
+first cut), and the readers' corrections from the inventory of mcp-legal-it.
+One migration.
+
+### Dossier and MCP
+
+- An assistant connected through MCP reads the text of a dossier's norm or
+  decision (`omnilex_leggi_testo_voce`, scope `dossier:text`) and proposes
+  passages with a note (`omnilex_evidenzia_passaggi_dossier`): the server finds
+  the quoted words in the real text and stores its own slice (rule 23).
+- In the dossier each assistant note is «da validare», «Validato» (or
+  «modificato da te», the assistant's original kept), or «Da rivedere» with a
+  comment; a mark per row sums them. No tool confirms, edits or removes.
+- Behind a switch (`app_switches`), off by default; the consent's words name
+  the text that goes to the connected application's provider.
+- Migration `20261027100000_assistant_proposed_marks`.
+
+### Readers
+
+- The c.p.a., the cod. nav., the cod. post. and the c.g.c. by their sigla.
+- EUR-Lex: an article quoted by an amending act is never served as the act's
+  own; older acts' titles read without commas round the date; dir. 85/374's
+  art. 11 is listed and served.
+- Three acts whose text is their decree's annex 1 are read from the annex; a
+  request for the original at a date is refused, also in imports and quick
+  norms.
+- The exported PDF's cache name and the review of #279 and #281.
+
 ## [1.10.2] - 2026-10-24
 
 The phone first: a lighter first load and no layout shift on «Oggi» and the
