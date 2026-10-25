@@ -207,6 +207,67 @@ class TestConsolidatedArticleText:
         assert text.startswith("Articolo 1")
         assert "Oggetto e finalità" in text
 
+    async def test_oj_missing_article_is_not_served_as_a_longer_number(self):
+        # "Articolo 17" starts with "Articolo 1": a page without art. 1 used to
+        # answer a request for it with art. 17 (inventory row 3.1).
+        soup = soup_of("gdpr_oj_trimmed.html")
+        soup.find("p", class_="oj-ti-art", string="Articolo 1").decompose()
+        with pytest.raises(DocumentNotFoundError):
+            await EurlexScraper().extract_article_text(soup, "1")
+        text17 = await EurlexScraper().extract_article_text(soup, "17")
+        assert text17.startswith("Articolo 17")
+
+    async def test_oj_missing_article_in_a_class_less_page(self):
+        # The legacy page reaches the eli-subdivision strategy last; the same
+        # guard holds there.
+        html = ('<html><body><div class="eli-subdivision">'
+                '<p>Articolo 17</p><p>Diritto alla cancellazione</p>'
+                '</div></body></html>')
+        with pytest.raises(DocumentNotFoundError):
+            await EurlexScraper().extract_article_text(BeautifulSoup(html, "html.parser"), "1")
+
+    @pytest.mark.parametrize("markup", ["oj-ti-art, nbsp", "oj-ti-art", "class with art", "class-less", "eli-subdivision"])
+    async def test_oj_article_15_is_never_served_as_15_bis(self, markup):
+        # Synthetic page (fixtures/eurlex/README.md): its only article 15 is «Articolo 15 bis».
+        # A request for art. 15 was served art. 15 bis, the wrong article as the one asked
+        # (the class of inventory row 3.1). The suffix served must be the one asked, none for none.
+        html = (FIXTURES / "synthetic_oj_article_15_bis.html").read_text(encoding="utf-8")
+        if markup != "oj-ti-art, nbsp":
+            html = html.replace("&nbsp;", " ")
+        if markup == "class with art":
+            html = html.replace('class="oj-ti-art"', 'class="title-art"')
+        elif markup == "class-less":
+            html = re.sub(r' class="[^"]*"', "", html)
+        elif markup == "eli-subdivision":
+            html = re.sub(r' class="[^"]*"', "", html).replace("<body>", '<body><div class="eli-subdivision">')
+        scraper = EurlexScraper()
+        with pytest.raises(DocumentNotFoundError):
+            await scraper.extract_article_text(BeautifulSoup(html, "html.parser"), "15")
+        if markup != "eli-subdivision":  # one subdivision holds every article: no boundary to test
+            text14 = await scraper.extract_article_text(BeautifulSoup(html, "html.parser"), "14")
+            assert text14.split("\n")[:3] == ["Articolo\xa014" if "nbsp" in markup else "Articolo 14",
+                                               "Disposizioni generali", "Testo dell'articolo 14."]
+        # The article that is there opens, asked in any spelling, non-breaking spaces included.
+        for spelling in ("15 bis", "15-bis", "15bis"):
+            asked = await scraper.extract_article_text(BeautifulSoup(html, "html.parser"), spelling)
+            assert asked.replace("\xa0", " ").split("\n")[:2] == ["Articolo 15 bis", "Articolo inserito"], spelling
+
+    @pytest.mark.parametrize("heading,article,heads", [
+        ("Articolo 15 bis", "15", False),
+        ("Articolo 15bis", "15", False),
+        ("Articolo 15-ter", "15", False),
+        ("Articolo 15 quinquiesdecies", "15", False),
+        ("Articolo 15 bis", "15 bis", True),
+        ("Articolo 15 bis decies", "15 bis", False),
+        ("Articolo 150", "15", False),
+        ("Articolo 15", "15", True),
+        ("Articolo 15Terzi", "15", True),     # a rubrica run on, not an ordinal
+        ("Articolo 15 Bisogna", "15", True),
+    ])
+    def test_the_number_ends_with_the_heading(self, heading, article, heads):
+        from visualex_api.services.eurlex_scraper import _heads_article
+        assert _heads_article(heading, f"Articolo {article}") is heads
+
     async def test_inline_amendment_markers_are_not_text(self):
         soup = soup_of("eprivacy_consolidated_20091219.html")
         scraper = EurlexScraper()
@@ -445,6 +506,18 @@ class TestEurlexTitle:
             "delle comunicazioni elettroniche (direttiva relativa alla vita privata e alle comunicazioni elettroniche)"
         )
 
+    def test_an_eli_page_without_a_description_reads_its_italian_eli_title(self):
+        # The /eli/ address of a legacy act (dir. 2002/58) has no DC.description: the title was ''.
+        assert _extract_eurlex_title(soup_of("eprivacy_eli_legacy_trimmed.html")) == (
+            "relativa al trattamento dei dati personali e alla tutela della vita privata nel settore "
+            "delle comunicazioni elettroniche (direttiva relativa alla vita privata e alle comunicazioni elettroniche)"
+        )
+
+    def test_never_a_title_in_another_language(self):
+        soup = soup_of("eprivacy_eli_legacy_trimmed.html")
+        soup.find("meta", attrs={"property": "eli:title", "lang": "it"}).decompose()
+        assert _extract_eurlex_title(soup) == ""
+
     def test_a_flat_page_takes_the_first_run_only(self):
         flat = GDPR_TITLE.replace('<div class="eli-main-title" id="tit_1">', "<div>").replace(
             '<div class="eli-subdivision" id="anx_1"><p class="oj-doc-ti">ALLEGATO I</p></div>',
@@ -470,6 +543,39 @@ class TestStripAmendmentMarkers:
         assert strip_amendment_markers("►M2 Sicurezza del trattamento ◄") == "Sicurezza del trattamento"
         assert strip_amendment_markers("personali»: ◄ violazione") == "personali»: violazione"
         assert strip_amendment_markers("Articolo 5") == "Articolo 5"
+
+
+class TestWhitespaceRunsAreLinear:
+    """`\\s*[►◄▼]…` and `\\s+([.,;:)])` restarted at every blank of a run and scanned the rest of
+    it each time: 0.85 s a pass on 20,000 blanks, three passes per element (consolidated path).
+    Matched now only from a run's first blank, with the same result."""
+
+    OLD_MARK = re.compile(r"\s*[►◄▼](?:[A-Z]\d*)?\s*")
+    OLD_PUNCT = re.compile(r"\s+([.,;:)])")
+
+    def test_same_result_as_the_quadratic_patterns(self):
+        import random
+        from visualex_api.services.eurlex_scraper import _SPACE_BEFORE_PUNCTUATION
+        from visualex_api.tools.treextractor import _AMENDMENT_MARK
+
+        rng = random.Random(20261022)
+        alphabet = [" ", " ", "\xa0", "\n", "\t", "►", "◄", "▼", "M", "B", "2", "a", "x", ".", ",", ";", ")", "("]
+        for _ in range(5000):
+            text = "".join(rng.choice(alphabet) for _ in range(rng.randint(0, 24)))
+            assert _AMENDMENT_MARK.sub(" ", text) == self.OLD_MARK.sub(" ", text), repr(text)
+            assert _SPACE_BEFORE_PUNCTUATION.sub(r"\1", text) == self.OLD_PUNCT.sub(r"\1", text), repr(text)
+
+    @pytest.mark.parametrize("blank", [" ", "\xa0", "\n"])
+    def test_a_long_run_of_blanks_costs_linear_time(self, blank):
+        import time
+        from visualex_api.services.eurlex_scraper import _cons_text
+
+        text = "x" + blank * 50_000 + "x"
+        start = time.perf_counter()
+        assert strip_amendment_markers(text) == (text if blank == "\n" else "x x")
+        _cons_text(BeautifulSoup(f"<p>{text}</p>", "html.parser"))
+        # Before: about 5 s for these 50,000 blanks. A linear pass takes milliseconds.
+        assert time.perf_counter() - start < 0.5
 
 
 class TestConsolidatedTree:
@@ -529,12 +635,18 @@ class TestConsolidatedTree:
 
 class TestTreeFailuresAreNotKept:
     async def test_a_failed_page_is_asked_again(self):
+        from types import SimpleNamespace
         from unittest.mock import AsyncMock, patch
         from visualex_api.tools import treextractor
         url = "https://eur-lex.europa.eu/legal-content/IT/TXT/HTML/?uri=CELEX:32099R9999"
         page = (FIXTURES / "gdpr_oj_trimmed.html").read_text(encoding="utf-8")
         fetch = AsyncMock(side_effect=[RuntimeError("waf"), page])
+        # the scraper's copy of the page, which the tree reads first: empty, and kept out of
+        # the repository's download/cache
+        eurlex_copy = SimpleNamespace(get=AsyncMock(return_value=None), set=AsyncMock())
+        manager = SimpleNamespace(get_persistent=lambda namespace: eurlex_copy)
         with patch.object(treextractor, "_fetch_with_playwright", fetch), \
+                patch.object(treextractor, "get_cache_manager", lambda: manager), \
                 patch.object(treextractor._tree_cache, "get", AsyncMock(return_value=None)), \
                 patch.object(treextractor._tree_cache, "set", AsyncMock()):
             _, count, _ = await treextractor.get_tree(url, details=True, return_metadata=True)

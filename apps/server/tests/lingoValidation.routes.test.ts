@@ -248,9 +248,9 @@ describe('voting', () => {
     const card = await makeCard(alice.id, 'PROPOSTA_COMMUNITY');
     const first = await vote(carol, card.id, { giudizio: 'APPROVATA' });
     expect(first.status).toBe(200);
-    expect(first.body).toEqual({ stato: 'PROPOSTA_COMMUNITY' });
+    expect(first.body).toMatchObject({ stato: 'PROPOSTA_COMMUNITY' });
     const second = await vote(dave, card.id, { giudizio: 'APPROVATA', motivazione: '  Chiara.  ' });
-    expect(second.body).toEqual({ stato: 'VALIDATA' });
+    expect(second.body).toMatchObject({ stato: 'VALIDATA' });
     expect(await state(card.id)).toBe('VALIDATA');
     const votes = await prisma.lingoValidazioneCard.findMany({ where: { cardId: card.id }, orderBy: { createdAt: 'asc' } });
     expect(votes.map((v) => [v.utenteId, v.giudizio, v.motivazione])).toEqual([[carol.id, 'APPROVATA', null], [dave.id, 'APPROVATA', 'Chiara.']]);
@@ -259,7 +259,7 @@ describe('voting', () => {
   it('archives a card on one «errata» with a reason', async () => {
     const card = await makeCard(alice.id, 'PROPOSTA_COMMUNITY');
     const response = await vote(carol, card.id, { giudizio: 'ERRATA', motivazione: 'La norma citata è abrogata.' });
-    expect(response.body).toEqual({ stato: 'ARCHIVIATA' });
+    expect(response.body).toMatchObject({ stato: 'ARCHIVIATA' });
     expect(await state(card.id)).toBe('ARCHIVIATA');
   });
 
@@ -271,7 +271,7 @@ describe('voting', () => {
     });
     const response = await vote(carol, card.id, { giudizio: 'ERRATA', motivazione: 'La norma citata è abrogata.' });
     expect(response.status).toBe(200);
-    expect(response.body).toEqual({ stato: 'ARCHIVIATA' });
+    expect(response.body).toMatchObject({ stato: 'ARCHIVIATA' });
     expect(await prisma.lingoCard.findUnique({ where: { id: card.id } })).toBeNull();
     expect(await prisma.lingoValidazioneCard.count({ where: { cardId: card.id } })).toBe(0);
     expect(await prisma.lingoCardAncora.count({ where: { cardId: card.id } })).toBe(0);
@@ -290,7 +290,7 @@ describe('voting', () => {
 
   it('leaves the card proposed on a «migliorabile»', async () => {
     const card = await makeCard(alice.id, 'PROPOSTA_COMMUNITY');
-    expect((await vote(carol, card.id, { giudizio: 'MIGLIORABILE', motivazione: 'Aggiungi un esempio.' })).body).toEqual({ stato: 'PROPOSTA_COMMUNITY' });
+    expect((await vote(carol, card.id, { giudizio: 'MIGLIORABILE', motivazione: 'Aggiungi un esempio.' })).body).toMatchObject({ stato: 'PROPOSTA_COMMUNITY' });
   });
 
   it('requires a reason unless approving, and refuses a long, blank or NUL reason', async () => {

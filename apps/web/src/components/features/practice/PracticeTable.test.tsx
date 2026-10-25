@@ -53,7 +53,7 @@ describe('PracticeTable (spec §3.1)', () => {
     expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('l. 24/2017');
     expect(screen.getByText('1 atto · 2 articoli · 1 sentenza')).toBeInTheDocument();
     expect(screen.getByTestId('practice-column')).toBeInTheDocument();
-    expect(screen.getByText(/Giurisprudenza \(1\)/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Giurisprudenza (1)' })).toBeInTheDocument();
   });
 
   it('switching the active practice switches the table', () => {
@@ -94,14 +94,12 @@ describe('PracticeTable (spec §3.1)', () => {
     expect(s().practices[0].label).toBe('Terza');
   });
 
-  it('«Chiudi la pratica» asks first, naming what is not touched', () => {
+  it('«Chiudi la pratica» closes at once, with no confirmation: «Annulla» is in the notification (K1a)', () => {
     s().createPractice('Da chiudere');
     render(table());
     fireEvent.click(screen.getByRole('button', { name: 'Altre azioni per la pratica Da chiudere' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Chiudi la pratica' }));
-    const dialog = screen.getByRole('alertdialog');
-    expect(dialog).toHaveTextContent('Gli atti e le sentenze della pratica verranno tolti dal tavolo. Dossier, note ed evidenziazioni non saranno toccati.');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Chiudi la pratica' }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
     expect(s().practices).toEqual([]);
   });
 

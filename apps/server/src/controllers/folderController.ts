@@ -10,7 +10,7 @@ const createFolderSchema = z.object({
   description: z.string().optional(),
   color: z.string().optional(),
   icon: z.string().optional(),
-  parent_id: z.string().uuid().optional().nullable(),
+  parent_id: z.string().guid().optional().nullable(),
   position: z.number().int().min(0).optional(),
 });
 
@@ -22,17 +22,17 @@ const updateFolderSchema = z.object({
 });
 
 const moveFolderSchema = z.object({
-  parent_id: z.string().uuid().optional().nullable(),
+  parent_id: z.string().guid().optional().nullable(),
   position: z.number().int().min(0).optional(),
 });
 
 const bulkDeleteSchema = z.object({
-  folder_ids: z.array(z.string().uuid()).min(1),
+  folder_ids: z.array(z.string().guid()).min(1),
 });
 
 const bulkMoveSchema = z.object({
-  folder_ids: z.array(z.string().uuid()).min(1),
-  target_parent_id: z.string().uuid().optional().nullable(),
+  folder_ids: z.array(z.string().guid()).min(1),
+  target_parent_id: z.string().guid().optional().nullable(),
 });
 
 // Helper: Check circular reference

@@ -120,8 +120,9 @@ apps/web/src/
 │   │   └── Sidebar.tsx        # Navigation sidebar
 │   │
 │   └── auth/                  # Authentication components
-│       ├── LoginForm.tsx
-│       ├── RegisterForm.tsx
+│       ├── AuthPage.tsx       # /login and /register: one page, two tabs
+│       ├── LoginForm.tsx      # the «Accedi» tab
+│       ├── RegisterForm.tsx   # the «Registrati» tab
 │       ├── ProtectedRoute.tsx
 │       └── AdminRoute.tsx
 │
@@ -162,6 +163,7 @@ apps/web/src/
 │   └── tourConfig.ts          # Onboarding tour steps
 │
 └── pages/                     # Page components
+    ├── AuthPage.tsx
     └── SearchPage.tsx
 ```
 
@@ -203,7 +205,6 @@ apps/web/src/
 | Package | Purpose |
 |---------|---------|
 | `axios` | HTTP client |
-| `zod` | Schema validation |
 | `date-fns` | Date formatting |
 | `dompurify` | HTML sanitization |
 | `jspdf` | PDF generation |
@@ -230,8 +231,7 @@ apps/web/src/
 │   ├── /forum           → BulletinBoardPage
 │   └── /environments    → redirects to /forum (keeps ?import=)
 
-/login                   → LoginPage (public)
-/register                → RegisterPage (public)
+/login, /register        → AuthPage (public; one parent route, a tab each)
 /admin/*                 → AdminPage (AdminRoute, lazy loaded)
 ```
 

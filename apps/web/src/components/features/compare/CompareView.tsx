@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useEffect, useId, useRef, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ArrowLeftRight, Maximize2, Minimize2, FileText, Search, Loader2, Layers, ChevronRight, ChevronLeft, Zap, Calendar, Clock } from 'lucide-react';
 import { useCompare, openCompareWithArticle, type CompareArticle } from '../../../hooks/useCompare';
@@ -9,16 +9,19 @@ import { CompareBody } from './CompareBody';
 import { readSide, tailRange } from './compareLayout';
 import { TextCell } from './compareParts';
 import { useCompareNotes } from './useCompareNotes';
+import { CompareDialogRoot } from './compareDialogRoot';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { parseLegalCitation, isSearchReady, formatParsedCitation, toSearchParams } from '../../../utils/citationParser';
 import { parseItalianDate } from '../../../utils/dateUtils';
 import { versionTabSuffix } from '../../../utils/versionDisplay';
 import { practiceArticleKey } from '../../../utils/practice';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
+import { useDialogFocus } from '../../ui/useDialogFocus';
 import { FOCUS_RING } from '../../../constants/interactions';
 import type { ArticleData } from '../../../types';
 import { legalFetch } from '../../../services/legalFetch';
 import { shortNorm } from '../../../utils/sources';
+import { spring } from '../../../lib/motion';
 
 // A past text must not be listed, compared or diffed under the label of the text in force.
 function versionSuffixOf(article: ArticleData): string {
@@ -122,7 +125,6 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
         act_type: params.act_type,
         article: params.article,
         version: version === 'data' ? 'vigente' : version,
-        show_brocardi_info: false,
       };
 
       // Only add optional fields if they have actual values
@@ -252,7 +254,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
                   <button
                     key={item.id}
                     onClick={() => handleSelectArticle(item)}
-                    className="w-full flex items-center gap-3 p-3 text-left rounded-lg hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-all group"
+                    className="w-full flex items-center gap-3 p-3 text-left rounded-lg hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-colors group"
                   >
                     <div className="w-10 h-10 rounded-lg bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 flex items-center justify-center font-bold text-sm shrink-0">
                       {item.article.norma_data.numero_articolo}
@@ -317,7 +319,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
                       {isSearching ? 'Cercando...' : 'Cerca'}
                     </button>
                   ) : (
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">
+                    <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase">
                       Completa la ricerca
                     </span>
                   )}
@@ -336,7 +338,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
                 <button
                   onClick={() => setVersion('vigente')}
                   className={cn(
-                    "flex-1 px-3 py-2 text-xs font-bold rounded-lg transition-all",
+                    "flex-1 px-3 py-2 text-xs font-bold rounded-lg transition-[color,background-color,border-color,box-shadow]",
                     version === 'vigente'
                       ? "bg-primary-500 text-white shadow-sm"
                       : "bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600"
@@ -347,7 +349,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
                 <button
                   onClick={() => setVersion('originale')}
                   className={cn(
-                    "flex-1 px-3 py-2 text-xs font-bold rounded-lg transition-all",
+                    "flex-1 px-3 py-2 text-xs font-bold rounded-lg transition-[color,background-color,border-color,box-shadow]",
                     version === 'originale'
                       ? "bg-amber-500 text-white shadow-sm"
                       : "bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600"
@@ -358,9 +360,9 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
                 <button
                   onClick={() => setVersion('data')}
                   className={cn(
-                    "flex-1 px-3 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1",
+                    "flex-1 px-3 py-2 text-xs font-bold rounded-lg transition-[color,background-color,border-color,box-shadow] flex items-center justify-center gap-1",
                     version === 'data'
-                      ? "bg-blue-500 text-white shadow-sm"
+                      ? "bg-primary-500 text-white shadow-sm"
                       : "bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-600"
                   )}
                 >
@@ -372,18 +374,18 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
               {/* Date input when "data" is selected */}
               {version === 'data' && (
                 <div className="flex items-center gap-2 animate-in slide-in-from-top-2 duration-200">
-                  <Calendar size={14} className="text-blue-500 shrink-0" />
+                  <Calendar size={14} className="text-primary-500 shrink-0" />
                   <input
                     type="text"
                     value={versionDate}
                     onChange={(e) => setVersionDate(e.target.value)}
                     placeholder="es. 01/01/2020 o 2020"
-                    className="flex-1 px-3 py-2 text-sm border border-blue-200 dark:border-blue-800 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className="flex-1 px-3 py-2 text-sm border border-primary-200 dark:border-primary-800 rounded-lg bg-white dark:bg-slate-700 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                   />
                 </div>
               )}
 
-              <p className="text-[10px] text-slate-400">
+              <p className="text-[11px] text-slate-600 dark:text-slate-400">
                 {version === 'vigente' && 'Testo attualmente in vigore'}
                 {version === 'originale' && 'Testo originale alla data di pubblicazione'}
                 {version === 'data' && 'Testo vigente alla data specificata'}
@@ -400,8 +402,8 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
                   <p>• <code className="bg-white dark:bg-slate-700 px-1 rounded">art 1 cost</code> - Costituzione</p>
                   <p>• <code className="bg-white dark:bg-slate-700 px-1 rounded">d.lgs 50/2016 art 36</code> - Decreto legislativo</p>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-2 pt-2 border-t border-slate-200 dark:border-slate-700">
-                  Premi <kbd className="px-1 py-0.5 bg-white dark:bg-slate-700 rounded text-[9px] font-bold">Enter</kbd> per cercare
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+                  Premi <kbd className="px-1 py-0.5 bg-white dark:bg-slate-700 rounded text-[11px] font-bold">Enter</kbd> per cercare
                 </p>
               </div>
             )}
@@ -425,7 +427,7 @@ function ArticleSelectorPanel({ side }: ArticleSelectorPanelProps) {
                   <button
                     key={item.id}
                     onClick={() => handleSelectArticle(item)}
-                    className="w-full flex items-center gap-3 p-3 text-left rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-primary-300 dark:hover:border-primary-700 transition-all group"
+                    className="w-full flex items-center gap-3 p-3 text-left rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-primary-300 dark:hover:border-primary-700 transition-colors group"
                   >
                     <div className="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-sm shrink-0">
                       {item.article.norma_data.numero_articolo}
@@ -498,10 +500,17 @@ export function CompareView() {
   // A phone's comparison is always the whole screen.
   const fullscreen = isFullscreen || !isDesktop;
 
-  // Handle escape key
+  // A modal dialog with `Modal`'s focus (not its scroll lock): named by its title, the focus on «Chiudi» as it opens, Tab
+  // kept inside, the focus back to what had it once it closes.
+  const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const isTopmost = useDialogFocus(isOpen, dialogRef, () => closeRef.current);
+
+  // Handle escape key: not when a dialog opened over it, or something inside, took it.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
+      if (e.key === 'Escape' && isOpen && !e.defaultPrevented && isTopmost()) {
         if (isFullscreen) {
           setIsFullscreen(false);
         } else {
@@ -512,13 +521,19 @@ export function CompareView() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, isFullscreen, close]);
+  }, [isOpen, isFullscreen, close, isTopmost]);
 
   if (!isOpen) return null;
 
   return (
     <AnimatePresence>
       <motion.div
+        // The dialog is the whole layer, not only the panel: a note it opens is portalled here (`CompareDialogRoot`),
+        // inside the dialog for a screen reader and the trap, and bounded by the window rather than by the panel.
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -539,9 +554,9 @@ export function CompareView() {
           initial={{ opacity: 0, y: 20, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 20, scale: 0.98 }}
-          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+          transition={spring.snappy}
           className={cn(
-            "bg-white dark:bg-slate-900 shadow-2xl overflow-hidden flex flex-col",
+            "bg-white dark:bg-slate-900 shadow-lg overflow-hidden flex flex-col",
             fullscreen
               ? "fixed inset-0 rounded-none"
               : "fixed inset-4 md:inset-8 lg:inset-12 rounded-2xl"
@@ -569,7 +584,7 @@ export function CompareView() {
                 </div>
               )}
               <div className="min-w-0">
-                <h2 className="font-bold text-base md:text-lg text-slate-900 dark:text-white truncate">
+                <h2 id={titleId} className="font-bold text-base md:text-lg text-slate-900 dark:text-white truncate">
                   Confronta articoli
                 </h2>
                 {isDesktop && (
@@ -607,6 +622,7 @@ export function CompareView() {
 
               {/* Close */}
               <button
+                ref={closeRef}
                 onClick={close}
                 className="p-2.5 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 inline-flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 rounded-lg transition-colors"
                 title="Chiudi (Esc)"
@@ -617,7 +633,8 @@ export function CompareView() {
             </div>
           </div>
 
-          {/* Content */}
+          {/* Content: what it opens is portalled inside the dialog (`CompareDialogRoot`). */}
+          <CompareDialogRoot.Provider value={dialogRef}>
           {isComplete && leftArticle && rightArticle ? (
             <CompareBody
               key={`${leftArticle.label}#${rightArticle.label}`}
@@ -632,6 +649,7 @@ export function CompareView() {
               <ArticlePanel article={rightArticle} side="right" onRemove={() => remove('right')} />
             </div>
           )}
+          </CompareDialogRoot.Provider>
         </motion.div>
       </motion.div>
     </AnimatePresence>

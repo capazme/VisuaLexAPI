@@ -23,8 +23,11 @@ router.use(authenticate);
 // («Seleziona tutto» on a long dossier is still one action, one trash entry).
 const itemsSchema = z.object({ itemIds: z.array(z.string().min(1).max(64)).min(1).max(50) }).strict();
 const ownItemsSchema = z.object({ itemIds: z.array(z.string().min(1).max(64)).min(1).max(5000) }).strict();
-// The entries the user saw in the confirmation dialog: the whole dossier moves only if it still holds exactly these.
-const dossierSchema = z.object({ itemIds: z.array(z.string().min(1).max(64)).max(5000) }).strict();
+// The entries the user saw in the confirmation dialog, and the number of planner tasks it told them: the whole
+// dossier moves only if it still holds exactly these.
+const dossierSchema = z
+  .object({ itemIds: z.array(z.string().min(1).max(64)).max(5000), taskCount: z.number().int().min(0).max(1_000_000) })
+  .strict();
 const restoreSchema = z.object({ targetDossierId: z.string().min(1).max(64).optional() }).strict();
 
 /** Who is deleting: the connected application of an exchanged token, else the user's own session. */
@@ -41,8 +44,8 @@ function connectedApplication(req: Request): DeletedBy {
 
 router.post('/dossiers/:id/trash', async (req, res) => {
   const by = connectedApplication(req);
-  const { itemIds } = dossierSchema.parse(req.body);
-  res.json(await trashDossier(req.user!.id, req.params.id, itemIds, by));
+  const { itemIds, taskCount } = dossierSchema.parse(req.body);
+  res.json(await trashDossier(req.user!.id, req.params.id, { itemIds, taskCount }, by));
 });
 
 router.post('/dossiers/:id/trash-items', async (req, res) => {

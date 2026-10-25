@@ -5,7 +5,9 @@ import { prisma } from '../lib/prisma';
 import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { hasNoNul } from '../lingo/noNul';
+import { settleMissions } from '../lingo/missions';
 import { readProgress } from '../lingo/progress';
+import { readPercorso } from '../lingo/percorso';
 import { previewIntervals, reviewScope } from '../lingo/reviewQueue';
 import { serialize } from '../lingo/serializeCard';
 import { computeStreak } from '../lingo/streak';
@@ -33,7 +35,22 @@ router.use(authenticate);
 const MAX_DUE_PER_SESSION = 500;
 const MAX_COMMUNITY_SUBJECTS = Object.keys(LingoMateria).length;
 
-const sessionSchema = z.object({ materia: z.nativeEnum(LingoMateria).optional() });
+const subjectQuerySchema = z.object({ materia: z.nativeEnum(LingoMateria).optional() });
+const sessionSchema = z
+  .object({
+    materia: z.nativeEnum(LingoMateria).optional(),
+    istituto: z
+      .string({ error: (issue) => (issue.input === undefined ? undefined : 'Istituto non valido.') })
+      .trim()
+      .min(1, 'L’istituto non può essere vuoto.')
+      .max(200, 'L’istituto è troppo lungo (al massimo 200 caratteri).')
+      .refine(hasNoNul, { message: 'L’istituto contiene un carattere non valido.' })
+      .optional(),
+  })
+  .refine((query) => query.istituto === undefined || query.materia !== undefined, {
+    message: 'L’istituto richiede la materia.',
+    path: ['istituto'],
+  });
 const gradeSchema = z
   .object({
     cardId: z.string().min(1).max(64).refine(hasNoNul, { message: 'Identificativo non valido.' }),
@@ -51,25 +68,33 @@ const preferencesSchema = z
 
 const cardNotFound = () => new AppError(404, 'Scheda non trovata.');
 
+// `?materia=` narrows the session to a subject; `?istituto=` (only with `materia`) to one institute of it, matched
+// exactly as `/percorso` lists it. Either way the day's queue is not marked finished.
 router.get('/sessione', async (req, res) => {
   const userId = req.user!.id;
-  const { materia } = sessionSchema.parse(req.query);
+  const { materia, istituto } = sessionSchema.parse(req.query);
   const today = romeDay(new Date());
 
   const { nuoveAlGiorno, materieComunita } = await readPreferences(prisma, userId);
-  const scope = reviewScope(userId, materieComunita, materia);
+  const scope = reviewScope(userId, materieComunita, materia, istituto);
 
   const due = dueWhere(userId, scope, today);
-  const [dovute, dueRows, introduced] = await Promise.all([
+  const [dovute, dueStates, introduced] = await Promise.all([
     prisma.lingoStatoRipasso.count({ where: due }),
-    prisma.lingoStatoRipasso.findMany({
-      where: due,
-      include: { card: { include: { ancore: true } } },
-      orderBy: [{ dueAt: 'asc' }, { cardId: 'asc' }],
-      take: MAX_DUE_PER_SESSION,
-    }),
+    prisma.lingoStatoRipasso.findMany({ where: due, orderBy: [{ dueAt: 'asc' }, { cardId: 'asc' }], take: MAX_DUE_PER_SESSION }),
     introducedToday(prisma, userId, today),
   ]);
+  // The cards apart, by id: one gone since the states were read (its author's trash, the account's deletion) is
+  // left out. Read as the state's relation, Prisma's second statement found no card and the session was a 500
+  // (tests/lingoCardGoneMidRead.test.ts).
+  const dueCards = new Map(
+    (await prisma.lingoCard.findMany({ where: { id: { in: dueStates.map((state) => state.cardId) } }, include: { ancore: true } }))
+      .map((card) => [card.id, card]),
+  );
+  const dueRows = dueStates.flatMap((state) => {
+    const card = dueCards.get(state.cardId);
+    return card ? [{ ...state, card }] : [];
+  });
 
   const newSlots = Math.max(0, nuoveAlGiorno - introduced);
   const newCards = newSlots === 0
@@ -80,9 +105,17 @@ router.get('/sessione', async (req, res) => {
         orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
         take: newSlots,
       });
-  // Nothing left in the whole queue (not just in one subject): today counts (Studia progress spec D7).
+  // Nothing left in the whole queue (not just in one subject or institute): today counts (Studia progress spec D7).
+  // In one transaction with the missions it may complete («obiettivo», «settimana»: a settle only credits today and
+  // this week, so left to a later read they could be lost at midnight). The user row first, in key share: the same
+  // lock order as the progress read, so an account deletion and this read never deadlock (Gymnasium XP spec §5.1).
   if (!materia && dovute === 0 && newCards.length === 0 && (await queueFinished(prisma, userId, today))) {
-    await markQueueFinished(prisma, userId, today);
+    await prisma.$transaction(async (tx) => {
+      const user = await tx.$queryRaw<unknown[]>`SELECT 1 FROM users WHERE id = ${userId} FOR KEY SHARE`;
+      if (user.length !== 1 || !(await queueFinished(tx, userId, today))) return;
+      await markQueueFinished(tx, userId, today);
+      await settleMissions(tx, userId, today, { tipo: 'lettura' });
+    });
   }
 
   const cards = [
@@ -94,6 +127,28 @@ router.get('/sessione', async (req, res) => {
     ...newCards.map((card) => ({ ...serialize(card), nuova: true, comunita: card.autoreId !== userId, anteprima: previewIntervals(null, 0) })),
   ];
   res.json({ conteggi: { dovute, nuove: newCards.length }, cards });
+});
+
+// Today's counts and nothing else (G-356): the cards due by the end of today in Rome and the new ones today still
+// allows, over the whole scope, as `/sessione` counts them. A read for another page (Opus's «Oggi»): unlike
+// `/sessione` and `/progressi`, it never marks the day's queue finished, settles a mission or credits points, and
+// writes no row at all. Takes no parameters.
+const countsSchema = z.object({}).strict();
+
+router.get('/conteggi', async (req, res) => {
+  const userId = req.user!.id;
+  countsSchema.parse(req.query);
+  const today = romeDay(new Date());
+
+  const { nuoveAlGiorno, materieComunita } = await readPreferences(prisma, userId);
+  const scope = reviewScope(userId, materieComunita);
+  const [dovute, introduced, available] = await Promise.all([
+    prisma.lingoStatoRipasso.count({ where: dueWhere(userId, scope, today) }),
+    introducedToday(prisma, userId, today),
+    prisma.lingoCard.count({ where: newCardsWhere(userId, scope) }),
+  ]);
+  const nuove = Math.min(Math.max(0, nuoveAlGiorno - introduced), available);
+  res.json({ giorno: today, dovute, nuove });
 });
 
 router.post('/revisioni', async (req, res) => {
@@ -114,13 +169,13 @@ router.post('/revisioni', async (req, res) => {
 
     // The scope is read with the user's current preferences: a card that left the pool since the session was fetched is refused.
     const { materieComunita } = await readPreferences(tx, userId);
-    const inScope = await tx.lingoCard.findFirst({ where: { AND: [{ id: cardId }, reviewScope(userId, materieComunita)] }, select: { id: true } });
+    const inScope = await tx.lingoCard.findFirst({ where: { AND: [{ id: cardId }, reviewScope(userId, materieComunita)] }, select: { id: true, materia: true } });
     if (!inScope) throw cardNotFound();
 
     const previous = await tx.lingoStatoRipasso.findUnique({ where: { utenteId_cardId: { utenteId: userId, cardId } } });
     if (previous && romeDay(previous.lastReviewAt) === today) {
       const dueDay = romeDay(previous.dueAt);
-      return { registrata: false, prossimoRipasso: dueDay, scheduledDays: daysBetween(today, dueDay), day: null };
+      return { registrata: false, prossimoRipasso: dueDay, scheduledDays: daysBetween(today, dueDay), day: null, xp: null };
     }
 
     const elapsedDays = previous ? Math.max(0, daysBetween(romeDay(previous.lastReviewAt), today)) : 0;
@@ -133,7 +188,8 @@ router.post('/revisioni', async (req, res) => {
       create: { utenteId: userId, cardId, stability: result.stability, difficulty: result.difficulty, dueAt, lastReviewAt: now, reps: 1, lapses: 0 },
       update: { stability: result.stability, difficulty: result.difficulty, dueAt, lastReviewAt: now, reps: (previous?.reps ?? 0) + 1, lapses: (previous?.lapses ?? 0) + lapse },
     });
-    await tx.lingoRevisioneSRS.create({
+    const log = await tx.lingoRevisioneSRS.create({
+      select: { id: true },
       data: {
         utenteId: userId,
         cardId,
@@ -145,14 +201,20 @@ router.post('/revisioni', async (req, res) => {
         durataMs: durataMs ?? null,
       },
     });
-    const day = await recordGradeDay(tx, userId, today, { isNew: !previous, wrong: rating === 1 });
-    return { registrata: true, prossimoRipasso: romeDay(dueAt), scheduledDays: result.scheduledDays, day };
+    // Due by the end of today, as `dueWhere` reads it: only these grades count toward «dovute» (G-334).
+    const wasDue = previous !== null && previous.dueAt < startOfRomeDay(today, 1);
+    const day = await recordGradeDay(tx, userId, today, { isNew: !previous, wrong: rating === 1, wasDue });
+    // Last, after today's day row: the missions this grade completes (Gymnasium XP spec §5.1). Never fails the grade.
+    const xp = await settleMissions(tx, userId, today, {
+      tipo: 'revisione', logId: log.id, cardId, materia: inScope.materia, isNew: !previous, intervallo: result.scheduledDays,
+    });
+    return { registrata: true, prossimoRipasso: romeDay(dueAt), scheduledDays: result.scheduledDays, day, xp };
   }).catch((error: unknown) => {
     // Belt: a card that vanished under the insert is a missing card, never a 500.
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') throw cardNotFound();
     throw error;
   });
-  const { day, ...recorded } = answer;
+  const { day, xp, ...recorded } = answer;
   if (day === null) {
     res.json(recorded);
     return;
@@ -162,13 +224,24 @@ router.post('/revisioni', async (req, res) => {
     ...recorded,
     // What the session needs to celebrate the goal at the grade that closes it (Studia progress spec §5.3).
     oggi: { giorno: today, ripassi: day.ripassi, obiettivo: day.obiettivo, raggiunto: day.after, appenaRaggiunto: day.after && !day.before, serie },
+    xp,
   });
 });
 
 // Everything the Studia dashboard draws, in one read (Studia progress spec §5.2).
 router.get('/progressi', async (req, res) => {
-  const { materia } = sessionSchema.parse(req.query);
+  const { materia } = subjectQuerySchema.parse(req.query);
   res.json(await readProgress(req.user!.id, materia));
+});
+
+// The user's review scope counted by institute, for the road of a subject (Gymnasium restyle spec §6, G5).
+// Each stop: `nuove` never reviewed, `apprendimento` / `consolidate` reviewed with an interval under / at least
+// `CONSOLIDATED_DAYS`, `dovute` reviewed and due by the end of today in Rome (a subset of the last two).
+// Same scope as the session, `?materia=` optional. Definitions: `lingo/percorso.ts`.
+const percorsoSchema = z.object({ materia: z.nativeEnum(LingoMateria, { error: 'Materia non valida.' }).optional() });
+router.get('/percorso', async (req, res) => {
+  const { materia } = percorsoSchema.parse(req.query);
+  res.json(await readPercorso(req.user!.id, materia));
 });
 
 router.get('/preferenze', async (req, res) => {

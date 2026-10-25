@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ArticleData } from '../../../types';
 
@@ -40,6 +40,7 @@ function row(practiceId: string, actId: string, data: ArticleData, extra: Partia
 
 beforeEach(() => {
   readers.length = 0;
+  appStore.setState({ quickNorms: [] });
 });
 
 describe('PracticeArticleRow (spec §3.2)', () => {
@@ -50,6 +51,40 @@ describe('PracticeArticleRow (spec §3.2)', () => {
     expect(screen.getByText('Risarcimento per fatto illecito')).toBeInTheDocument();
     // a code's annex is never shown
     expect(screen.queryByText(/All\./)).toBeNull();
+  });
+
+  it('says in its header that the article is among the quick norms, open or folded (R3b)', () => {
+    const { practiceId, actId } = setUp([CC_2043]);
+    appStore.setState({ quickNorms: [] });
+    const { rerender } = render(row(practiceId, actId, CC_2043));
+    expect(screen.queryByTitle('Tra le norme rapide')).toBeNull();
+    act(() => {
+      appStore.setState({
+        quickNorms: [{
+          id: 'q1', label: 'art. 2043 c.c.', createdAt: '2026-10-01T00:00:00.000Z', usageCount: 0,
+          searchParams: { act_type: CC_2043.norma_data.tipo_atto, act_number: CC_2043.norma_data.numero_atto || '', date: CC_2043.norma_data.data || '', article: '2043', version: 'vigente' },
+        }],
+      });
+    });
+    rerender(row(practiceId, actId, CC_2043));
+    // Said in the toggle's name (its children are not read), seen as a bolt; the remove button's name unchanged.
+    expect(screen.getByRole('button', { name: /^Espandi art\. 2043 c\.c\., tra le norme rapide$/ })).toBeInTheDocument();
+    expect(screen.getByTitle('Tra le norme rapide')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Togli dal tavolo art\. 2043 c\.c\.$/ })).toBeInTheDocument();
+  });
+
+  it('says nothing of a quick norm on a past text: the quick norm opens the text in force', () => {
+    const { practiceId, actId } = setUp([PAST_5], L24);
+    act(() => {
+      appStore.setState({
+        quickNorms: [{
+          id: 'q2', label: 'art. 5', createdAt: '2026-10-01T00:00:00.000Z', usageCount: 0,
+          searchParams: { act_type: PAST_5.norma_data.tipo_atto, act_number: PAST_5.norma_data.numero_atto || '', date: PAST_5.norma_data.data || '', article: '5', version: 'vigente' },
+        }],
+      });
+    });
+    render(row(practiceId, actId, PAST_5));
+    expect(screen.queryByTitle('Tra le norme rapide')).toBeNull();
   });
 
   it('closed, it mounts no reader; its header opens it, and only the header toggles', () => {

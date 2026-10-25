@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react';
-import { Download, Copy, Check, ChevronDown, ChevronRight, FileText, BookOpen, StickyNote, Highlighter, Scale, FileCode, FileType } from 'lucide-react';
-import { jsPDF } from 'jspdf';
+import { useEffect, useRef, useState } from 'react';
+import { Download, Copy, Check, FileText, StickyNote, Highlighter, Scale, FileCode, FileType } from 'lucide-react';
+import type { jsPDF } from 'jspdf';
+import { loadJsPdf } from '../../utils/loadJsPdf';
 import { cn } from '../../lib/utils';
+import { DISABLED, TOUCH_TARGET_RESPONSIVE } from '../../constants/interactions';
 import { Modal } from './Modal';
-import type { ArticleData, MassimaStructured } from '../../types';
-import { DOCTRINE_ATTRIBUTION, LATIN_MAXIMS_LABEL } from '../../utils/doctrineLabel';
+import type { ArticleData } from '../../types';
 import { citeNorm, inForceCitation, shortNorm } from '../../utils/sources';
 import { todayInRome } from '../../utils/dateUtils';
 
@@ -38,89 +39,43 @@ export function AdvancedExportModal({
   annotations,
   highlights,
 }: AdvancedExportModalProps) {
-  const { article_text, norma_data, brocardi_info } = articleData;
+  const { article_text, norma_data } = articleData;
 
   const [sections, setSections] = useState<ExportSection[]>([
     { id: 'text', label: 'Testo Articolo', icon: <FileText size={16} />, enabled: true },
     { id: 'citation', label: 'Citazione', icon: <Scale size={16} />, enabled: true },
-    { id: 'brocardi', label: LATIN_MAXIMS_LABEL, icon: <BookOpen size={16} />, enabled: false },
-    { id: 'ratio', label: 'Ratio Legis', icon: <BookOpen size={16} />, enabled: false },
-    { id: 'spiegazione', label: 'Spiegazione', icon: <BookOpen size={16} />, enabled: false },
-    { id: 'massime', label: 'Massime', icon: <Scale size={16} />, enabled: false },
     { id: 'notes', label: 'Note Personali', icon: <StickyNote size={16} />, enabled: annotations.length > 0 },
     { id: 'highlights', label: 'Evidenziazioni', icon: <Highlighter size={16} />, enabled: highlights.length > 0 },
   ]);
 
-  // React Compiler advisory: it declines to take over this component's manual
-  // memoization (the JSX-bearing lazy useState above makes it bail). The deps
-  // here are correct and the memo works at runtime — optimization hint only.
-  // eslint-disable-next-line react-hooks/preserve-manual-memoization
-  const massimeList = useMemo(() => {
-    if (!brocardi_info?.Massime || !Array.isArray(brocardi_info.Massime)) return [];
-    return brocardi_info.Massime
-      .filter(m => {
-        if (!m) return false;
-        const text = typeof m === 'string' ? m : (m as MassimaStructured).massima;
-        return text && text.replace(/<[^>]*>/g, '').trim().length > 0;
-      })
-      .map((m, idx) => {
-        const text = typeof m === 'string' ? m : (m as MassimaStructured).massima;
-        return {
-          id: `massima-${idx}`,
-          text: text.replace(/<[^>]*>/g, '').trim(),
-          html: text,
-          selected: false,
-        };
-      });
-  }, [brocardi_info?.Massime]);
-
-  const [selectedMassime, setSelectedMassime] = useState<Set<string>>(new Set());
-  const [massimeExpanded, setMassimeExpanded] = useState(false);
   const [exportFormat, setExportFormat] = useState<ExportFormat>('clipboard');
   const [copied, setCopied] = useState(false);
+  // The PDF waits for jsPDF the first time: the button turns its icon into a spinner, its words as they are.
+  const [writingPdf, setWritingPdf] = useState(false);
+  // A PDF that could not be written (jsPDF not loaded: offline, or a chunk a deploy removed) says so with the
+  // decision's words; the next export tries again.
+  const [pdfFailed, setPdfFailed] = useState(false);
+  // Open and mounted: a host that closes or unmounts the modal while jsPDF loads (StudyMode's Esc leaves the
+  // whole mode) cancels the download.
+  const live = useRef(isOpen);
+  useEffect(() => {
+    live.current = isOpen;
+    return () => { live.current = false; };
+  }, [isOpen]);
+
+  const close = () => {
+    if (writingPdf) return;
+    setPdfFailed(false);
+    onClose();
+  };
 
   const toggleSection = (id: string) => {
     setSections(prev => prev.map(s => (s.id === id ? { ...s, enabled: !s.enabled } : s)));
   };
 
-  const toggleMassima = (id: string) => {
-    setSelectedMassime(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
-
-  const selectAllMassime = () => {
-    if (selectedMassime.size === massimeList.length) {
-      setSelectedMassime(new Set());
-    } else {
-      setSelectedMassime(new Set(massimeList.map(m => m.id)));
-    }
-  };
-
   const isSectionEnabled = (id: string) => sections.find(s => s.id === id)?.enabled ?? false;
 
-  /**
-   * The doctrine sections (Latin maxims, ratio, explanation, massime) all come
-   * from the same source: each export credits it once, under the heading of the
-   * first of them it writes. Returns a fresh one-shot per export.
-   */
-  const makeCreditOnce = () => {
-    let credited = false;
-    return (write: () => void) => {
-      if (credited) return;
-      credited = true;
-      write();
-    };
-  };
-
   const generateExportContent = () => {
-    const creditOnce = makeCreditOnce();
     const parts: string[] = [];
     const plainText = (txt: string) => txt.replace(/<[^>]*>/g, '').replace(/\n/g, ' ').trim();
 
@@ -133,42 +88,6 @@ export function AdvancedExportModal({
     if (isSectionEnabled('citation')) {
       parts.push('\n--- Citazione ---');
       parts.push(inForceCitation(norma_data, todayInRome()));
-      parts.push('');
-    }
-
-    if (isSectionEnabled('brocardi') && brocardi_info?.Brocardi) {
-      parts.push(`\n=== ${LATIN_MAXIMS_LABEL.toUpperCase()} ===`);
-      creditOnce(() => parts.push(DOCTRINE_ATTRIBUTION));
-      if (Array.isArray(brocardi_info.Brocardi)) {
-        brocardi_info.Brocardi.forEach(b => parts.push(`- ${plainText(b)}`));
-      } else {
-        parts.push(plainText(brocardi_info.Brocardi));
-      }
-      parts.push('');
-    }
-
-    if (isSectionEnabled('ratio') && brocardi_info?.Ratio) {
-      parts.push('\n=== RATIO LEGIS ===');
-      creditOnce(() => parts.push(DOCTRINE_ATTRIBUTION));
-      parts.push(plainText(brocardi_info.Ratio));
-      parts.push('');
-    }
-
-    if (isSectionEnabled('spiegazione') && brocardi_info?.Spiegazione) {
-      parts.push('\n=== SPIEGAZIONE ===');
-      creditOnce(() => parts.push(DOCTRINE_ATTRIBUTION));
-      parts.push(plainText(brocardi_info.Spiegazione));
-      parts.push('');
-    }
-
-    if (isSectionEnabled('massime') && selectedMassime.size > 0) {
-      parts.push('\n=== MASSIME SELEZIONATE ===');
-      creditOnce(() => parts.push(DOCTRINE_ATTRIBUTION));
-      massimeList
-        .filter(m => selectedMassime.has(m.id))
-        .forEach((m, idx) => {
-          parts.push(`\n[${idx + 1}] ${m.text}`);
-        });
       parts.push('');
     }
 
@@ -192,7 +111,6 @@ export function AdvancedExportModal({
   };
 
   const generateRtfContent = () => {
-    const creditOnce = makeCreditOnce();
     const escape = (text: string) => text.replace(/\\/g, '\\\\').replace(/{/g, '\\{').replace(/}/g, '\\}');
     const plainText = (txt: string) => escape(txt.replace(/<[^>]*>/g, '').replace(/\n/g, '\\par ').trim());
 
@@ -206,42 +124,6 @@ export function AdvancedExportModal({
 
     if (isSectionEnabled('citation')) {
       rtf += `\\f0\\fs18\\i ${escape(inForceCitation(norma_data, todayInRome()))}\\i0\\par\\par`;
-    }
-
-    if (isSectionEnabled('brocardi') && brocardi_info?.Brocardi) {
-      rtf += `\\f0\\fs20\\b ${LATIN_MAXIMS_LABEL}:\\b0\\par`;
-      creditOnce(() => { rtf += `\\f1\\fs16\\i ${DOCTRINE_ATTRIBUTION}\\i0\\par`; });
-      if (Array.isArray(brocardi_info.Brocardi)) {
-        brocardi_info.Brocardi.forEach(b => {
-          rtf += `\\f1\\fs18 - ${plainText(b)}\\par`;
-        });
-      } else {
-        rtf += `\\f1\\fs18 ${plainText(brocardi_info.Brocardi)}\\par`;
-      }
-      rtf += '\\par';
-    }
-
-    if (isSectionEnabled('ratio') && brocardi_info?.Ratio) {
-      rtf += `\\f0\\fs20\\b Ratio Legis:\\b0\\par`;
-      creditOnce(() => { rtf += `\\f1\\fs16\\i ${DOCTRINE_ATTRIBUTION}\\i0\\par`; });
-      rtf += `\\f1\\fs18 ${plainText(brocardi_info.Ratio)}\\par\\par`;
-    }
-
-    if (isSectionEnabled('spiegazione') && brocardi_info?.Spiegazione) {
-      rtf += `\\f0\\fs20\\b Spiegazione:\\b0\\par`;
-      creditOnce(() => { rtf += `\\f1\\fs16\\i ${DOCTRINE_ATTRIBUTION}\\i0\\par`; });
-      rtf += `\\f1\\fs18 ${plainText(brocardi_info.Spiegazione)}\\par\\par`;
-    }
-
-    if (isSectionEnabled('massime') && selectedMassime.size > 0) {
-      rtf += `\\f0\\fs20\\b Massime Selezionate (${selectedMassime.size}):\\b0\\par`;
-      creditOnce(() => { rtf += `\\f1\\fs16\\i ${DOCTRINE_ATTRIBUTION}\\i0\\par`; });
-      rtf += '\\par';
-      massimeList
-        .filter(m => selectedMassime.has(m.id))
-        .forEach((m, idx) => {
-          rtf += `\\f1\\fs18 [${idx + 1}] ${plainText(m.text)}\\par\\par`;
-        });
     }
 
     if (isSectionEnabled('notes') && annotations.length > 0) {
@@ -273,7 +155,6 @@ export function AdvancedExportModal({
    * distinguishes them in a mono-color reader.
    */
   const generateMarkdownContent = () => {
-    const creditOnce = makeCreditOnce();
     const plainText = (txt: string) => txt.replace(/<[^>]*>/g, '').replace(/\n{3,}/g, '\n\n').trim();
     const lines: string[] = [];
 
@@ -292,46 +173,6 @@ export function AdvancedExportModal({
     if (isSectionEnabled('citation')) {
       lines.push(`> ${inForceCitation(norma_data, todayInRome())}`);
       lines.push('');
-    }
-
-    if (isSectionEnabled('brocardi') && brocardi_info?.Brocardi) {
-      lines.push(`## ${LATIN_MAXIMS_LABEL}`);
-      lines.push('');
-      creditOnce(() => lines.push(`_${DOCTRINE_ATTRIBUTION}_`, ''));
-      if (Array.isArray(brocardi_info.Brocardi)) {
-        brocardi_info.Brocardi.forEach((b) => lines.push(`- ${plainText(b)}`));
-      } else {
-        lines.push(plainText(brocardi_info.Brocardi));
-      }
-      lines.push('');
-    }
-
-    if (isSectionEnabled('ratio') && brocardi_info?.Ratio) {
-      lines.push('## Ratio legis');
-      lines.push('');
-      creditOnce(() => lines.push(`_${DOCTRINE_ATTRIBUTION}_`, ''));
-      lines.push(plainText(brocardi_info.Ratio));
-      lines.push('');
-    }
-
-    if (isSectionEnabled('spiegazione') && brocardi_info?.Spiegazione) {
-      lines.push('## Spiegazione');
-      lines.push('');
-      creditOnce(() => lines.push(`_${DOCTRINE_ATTRIBUTION}_`, ''));
-      lines.push(plainText(brocardi_info.Spiegazione));
-      lines.push('');
-    }
-
-    if (isSectionEnabled('massime') && selectedMassime.size > 0) {
-      lines.push(`## Massime (${selectedMassime.size})`);
-      lines.push('');
-      creditOnce(() => lines.push(`_${DOCTRINE_ATTRIBUTION}_`, ''));
-      massimeList
-        .filter((m) => selectedMassime.has(m.id))
-        .forEach((m, idx) => {
-          lines.push(`**[${idx + 1}]** ${plainText(m.text)}`);
-          lines.push('');
-        });
     }
 
     if (isSectionEnabled('highlights') && highlights.length > 0) {
@@ -378,10 +219,11 @@ export function AdvancedExportModal({
    * layout intentionally simple (serif body, bold H2s, plain bullet
    * lists) — the goal is a readable printable, not a typeset document.
    */
-  const buildPdf = (): jsPDF => {
-    const creditOnce = makeCreditOnce();
+  const buildPdf = async (): Promise<jsPDF> => {
     const plainText = (txt: string) => txt.replace(/<[^>]*>/g, '').replace(/\n{3,}/g, '\n\n').trim();
-    const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait' });
+    // jsPDF is loaded here, on the export.
+    const JsPdf = await loadJsPdf();
+    const doc = new JsPdf({ unit: 'pt', format: 'a4', orientation: 'portrait' });
     const margin = 48;
     const width = doc.internal.pageSize.getWidth();
     const height = doc.internal.pageSize.getHeight();
@@ -426,39 +268,6 @@ export function AdvancedExportModal({
 
     if (isSectionEnabled('citation')) {
       writeParagraph(inForceCitation(norma_data, todayInRome()), { size: 10, italic: true, color: [82, 82, 91] });
-    }
-
-    if (isSectionEnabled('brocardi') && brocardi_info?.Brocardi) {
-      writeHeading(LATIN_MAXIMS_LABEL);
-      creditOnce(() => writeParagraph(DOCTRINE_ATTRIBUTION, { size: 10, italic: true, color: [82, 82, 91], gapAfter: 4 }));
-      if (Array.isArray(brocardi_info.Brocardi)) {
-        brocardi_info.Brocardi.forEach((b) => writeParagraph(`• ${plainText(b)}`, { size: 11, gapAfter: 4 }));
-        y += 4;
-      } else {
-        writeParagraph(plainText(brocardi_info.Brocardi), { size: 11 });
-      }
-    }
-
-    if (isSectionEnabled('ratio') && brocardi_info?.Ratio) {
-      writeHeading('Ratio legis');
-      creditOnce(() => writeParagraph(DOCTRINE_ATTRIBUTION, { size: 10, italic: true, color: [82, 82, 91], gapAfter: 4 }));
-      writeParagraph(plainText(brocardi_info.Ratio), { size: 11 });
-    }
-
-    if (isSectionEnabled('spiegazione') && brocardi_info?.Spiegazione) {
-      writeHeading('Spiegazione');
-      creditOnce(() => writeParagraph(DOCTRINE_ATTRIBUTION, { size: 10, italic: true, color: [82, 82, 91], gapAfter: 4 }));
-      writeParagraph(plainText(brocardi_info.Spiegazione), { size: 11 });
-    }
-
-    if (isSectionEnabled('massime') && selectedMassime.size > 0) {
-      writeHeading(`Massime (${selectedMassime.size})`);
-      creditOnce(() => writeParagraph(DOCTRINE_ATTRIBUTION, { size: 10, italic: true, color: [82, 82, 91], gapAfter: 4 }));
-      massimeList
-        .filter((m) => selectedMassime.has(m.id))
-        .forEach((m, idx) => {
-          writeParagraph(`[${idx + 1}] ${plainText(m.text)}`, { size: 10, gapAfter: 6 });
-        });
     }
 
     if (isSectionEnabled('highlights') && highlights.length > 0) {
@@ -516,9 +325,19 @@ export function AdvancedExportModal({
       URL.revokeObjectURL(link.href);
       onClose();
     } else if (exportFormat === 'pdf') {
-      const doc = buildPdf();
-      doc.save(`VisuaLex_${norma_data.tipo_atto.replace(/\s+/g, '_')}_Art${norma_data.numero_articolo}.pdf`);
-      onClose();
+      setWritingPdf(true);
+      setPdfFailed(false);
+      try {
+        const doc = await buildPdf();
+        if (!live.current) return;
+        doc.save(`VisuaLex_${norma_data.tipo_atto.replace(/\s+/g, '_')}_Art${norma_data.numero_articolo}.pdf`);
+        onClose();
+      } catch (err) {
+        console.error('PDF export failed:', err);
+        setPdfFailed(true);
+      } finally {
+        setWritingPdf(false);
+      }
     } else if (exportFormat === 'rtf') {
       const rtfContent = generateRtfContent();
       const blob = new Blob([rtfContent], { type: 'application/rtf' });
@@ -543,12 +362,10 @@ export function AdvancedExportModal({
     }
   };
 
-  const hasBrocardiContent = brocardi_info && (brocardi_info.Brocardi || brocardi_info.Ratio || brocardi_info.Spiegazione || massimeList.length > 0);
-
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={close}
       size="lg"
       title="Esporta Articolo"
       description={shortNorm(norma_data)}
@@ -557,14 +374,19 @@ export function AdvancedExportModal({
       footer={
         <>
           <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
+            onClick={close}
+            disabled={writingPdf}
+            className={cn(TOUCH_TARGET_RESPONSIVE, DISABLED, 'px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background')}
           >
             Annulla
           </button>
           <button
             onClick={handleExport}
+            disabled={writingPdf}
+            aria-busy={writingPdf || undefined}
             className={cn(
+              TOUCH_TARGET_RESPONSIVE,
+              DISABLED,
               'px-6 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background',
               copied
                 ? 'bg-green-600 text-white'
@@ -583,7 +405,11 @@ export function AdvancedExportModal({
               </>
             ) : (
               <>
-                <Download size={16} />
+                {writingPdf ? (
+                  <span className="size-4 rounded-full border-2 border-current border-t-transparent animate-spin" aria-hidden="true" />
+                ) : (
+                  <Download size={16} />
+                )}
                 Scarica {exportFormat.toUpperCase()}
               </>
             )}
@@ -599,7 +425,9 @@ export function AdvancedExportModal({
               <button
                 key={section.id}
                 onClick={() => toggleSection(section.id)}
+                disabled={writingPdf}
                 className={cn(
+                  TOUCH_TARGET_RESPONSIVE,
                   'flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-left',
                   section.enabled
                     ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-300'
@@ -613,102 +441,6 @@ export function AdvancedExportModal({
             ))}
           </div>
         </div>
-
-        {hasBrocardiContent && (
-          <div>
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Approfondimenti e dottrina</h3>
-            <div className="grid grid-cols-2 gap-2">
-              {sections.filter(s => ['brocardi', 'ratio', 'spiegazione'].includes(s.id)).map(section => {
-                const hasContent =
-                  (section.id === 'brocardi' && brocardi_info?.Brocardi) ||
-                  (section.id === 'ratio' && brocardi_info?.Ratio) ||
-                  (section.id === 'spiegazione' && brocardi_info?.Spiegazione);
-
-                if (!hasContent) return null;
-
-                return (
-                  <button
-                    key={section.id}
-                    onClick={() => toggleSection(section.id)}
-                    className={cn(
-                      'flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-left',
-                      section.enabled
-                        ? 'bg-brocardi/10 border-brocardi/30 text-brocardi-foreground dark:text-brocardi'
-                        : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
-                    )}
-                  >
-                    {section.icon}
-                    <span className="text-sm font-medium">{section.label}</span>
-                    {section.enabled && <Check size={14} className="ml-auto" />}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {massimeList.length > 0 && (
-          <div>
-            <button
-              onClick={() => {
-                setMassimeExpanded(!massimeExpanded);
-                if (!massimeExpanded) {
-                  toggleSection('massime');
-                }
-              }}
-              className="flex items-center gap-2 w-full text-left"
-            >
-              {massimeExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                Massime ({massimeList.length} disponibili)
-              </h3>
-              {selectedMassime.size > 0 && (
-                <span className="ml-auto text-xs bg-brocardi/15 text-brocardi-foreground dark:text-brocardi px-2 py-0.5 rounded-full">
-                  {selectedMassime.size} selezionate
-                </span>
-              )}
-            </button>
-
-            {massimeExpanded && (
-              <div className="mt-3 space-y-2">
-                <button
-                  onClick={selectAllMassime}
-                  className="text-xs text-primary-600 dark:text-primary-400 hover:underline mb-2"
-                >
-                  {selectedMassime.size === massimeList.length ? 'Deseleziona tutte' : 'Seleziona tutte'}
-                </button>
-
-                <div className="max-h-64 overflow-y-auto space-y-2 border border-slate-200 dark:border-slate-700 rounded-lg p-2">
-                  {massimeList.map((massima, idx) => (
-                    <label
-                      key={massima.id}
-                      className={cn(
-                        'flex items-start gap-3 p-2 rounded-lg cursor-pointer transition-colors',
-                        selectedMassime.has(massima.id)
-                          ? 'bg-brocardi/10'
-                          : 'hover:bg-slate-50 dark:hover:bg-slate-800'
-                      )}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedMassime.has(massima.id)}
-                        onChange={() => toggleMassima(massima.id)}
-                        className="mt-1 rounded border-slate-300 dark:border-slate-600 text-brocardi focus:ring-brocardi"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <span className="text-xs font-semibold text-slate-400 mb-1 block">#{idx + 1}</span>
-                        <p className="text-sm text-slate-700 dark:text-slate-300 line-clamp-3">
-                          {massima.text.substring(0, 200)}
-                          {massima.text.length > 200 && '...'}
-                        </p>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
 
         {(annotations.length > 0 || highlights.length > 0) && (
           <div>
@@ -727,7 +459,9 @@ export function AdvancedExportModal({
                   <button
                     key={section.id}
                     onClick={() => toggleSection(section.id)}
+                    disabled={writingPdf}
                     className={cn(
+                      TOUCH_TARGET_RESPONSIVE,
                       'flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-left',
                       section.enabled
                         ? 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300'
@@ -747,10 +481,12 @@ export function AdvancedExportModal({
 
         <div>
           <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Formato Esportazione</h3>
-          <div className="flex gap-2">
+          <div className="grid grid-cols-3 gap-2 sm:flex">
             <button
               onClick={() => setExportFormat('clipboard')}
+              disabled={writingPdf}
               className={cn(
+                TOUCH_TARGET_RESPONSIVE,
                 'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
                 exportFormat === 'clipboard'
                   ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-300'
@@ -762,7 +498,9 @@ export function AdvancedExportModal({
             </button>
             <button
               onClick={() => setExportFormat('markdown')}
+              disabled={writingPdf}
               className={cn(
+                TOUCH_TARGET_RESPONSIVE,
                 'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
                 exportFormat === 'markdown'
                   ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-300'
@@ -774,7 +512,9 @@ export function AdvancedExportModal({
             </button>
             <button
               onClick={() => setExportFormat('pdf')}
+              disabled={writingPdf}
               className={cn(
+                TOUCH_TARGET_RESPONSIVE,
                 'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
                 exportFormat === 'pdf'
                   ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-300'
@@ -786,7 +526,9 @@ export function AdvancedExportModal({
             </button>
             <button
               onClick={() => setExportFormat('rtf')}
+              disabled={writingPdf}
               className={cn(
+                TOUCH_TARGET_RESPONSIVE,
                 'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
                 exportFormat === 'rtf'
                   ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-300'
@@ -798,7 +540,9 @@ export function AdvancedExportModal({
             </button>
             <button
               onClick={() => setExportFormat('txt')}
+              disabled={writingPdf}
               className={cn(
+                TOUCH_TARGET_RESPONSIVE,
                 'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
                 exportFormat === 'txt'
                   ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-300'
@@ -810,6 +554,7 @@ export function AdvancedExportModal({
             </button>
           </div>
         </div>
+        {pdfFailed && <p role="alert" className="text-sm text-amber-800 dark:text-amber-200">Download non riuscito: riprova.</p>}
       </div>
     </Modal>
   );

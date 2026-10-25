@@ -19,6 +19,8 @@ export interface ClientStep {
   block?: boolean;
   /** What `code` is, for the copy button's name («il comando per Claude Code»). */
   codeLabel?: string;
+  /** A page to open for this step, outside VisuaLex (a new tab). */
+  link?: { href: string; label: string };
 }
 
 export interface AiClient {

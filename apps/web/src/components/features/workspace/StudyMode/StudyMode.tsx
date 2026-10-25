@@ -6,7 +6,6 @@ import { useStudyModeShortcuts } from './hooks/useStudyModeShortcuts';
 import { StudyModeHeader } from './StudyModeHeader';
 import { StudyModeContent } from './StudyModeContent';
 import { StudyModeToolsPanel } from './StudyModeToolsPanel';
-import { StudyModeBrocardiPopover } from './StudyModeBrocardiPopover';
 import { StudyModeSettings } from './StudyModeSettings';
 import { AdvancedExportModal } from '../../../ui/AdvancedExportModal';
 import { cn } from '../../../../lib/utils';
@@ -23,7 +22,6 @@ export interface StudyModeProps {
   articles?: ArticleData[];
   /** Callback when navigating between articles. Only needed if articles array is provided */
   onNavigate?: (articleId: string) => void;
-  onCrossReferenceNavigate?: (articleNumber: string, normaData: NormaVisitata) => void;
   /** Label for the norma. If not provided, generated from article data */
   normaLabel?: string;
   allArticleIds?: string[];
@@ -55,7 +53,6 @@ function normaToSearchParams(norma: NormaVisitata): SearchParams {
     date: norma.data || '',
     article: norma.numero_articolo?.toString() || '',
     version: (norma.versione === 'originale' ? 'originale' : 'vigente') as 'vigente' | 'originale',
-    show_brocardi_info: true,
   };
 }
 
@@ -70,7 +67,6 @@ export function StudyMode({
   article,
   articles: articlesProp,
   onNavigate,
-  onCrossReferenceNavigate,
   normaLabel: normaLabelProp,
 }: StudyModeProps) {
   // Handle single article mode: create single-element array if not provided.
@@ -121,7 +117,6 @@ export function StudyMode({
   const [showExport, setShowExport] = useState(false);
   const [noteInputFocused, setNoteInputFocused] = useState(false);
   const [showToolsPanel, setShowToolsPanel] = useState(false);
-  const [showBrocardi, setShowBrocardi] = useState(false);
 
   // When the user picks "Aggiungi nota" from the in-article selection
   // popup, we capture the selected span here and show it as a chip in
@@ -176,10 +171,6 @@ export function StudyMode({
   const handleFontSize = useCallback((delta: number) => {
     setFontSize(prev => Math.min(32, Math.max(14, prev + delta)));
   }, [setFontSize]);
-
-  const handleToggleBrocardi = useCallback(() => {
-    setShowBrocardi(prev => !prev);
-  }, []);
 
   const handleToggleTools = useCallback(() => {
     setShowToolsPanel(prev => !prev);
@@ -295,7 +286,6 @@ export function StudyMode({
     onClose,
     onNavigate: handleNavigate,
     onFontSize: handleFontSize,
-    onToggleBrocardi: handleToggleBrocardi,
     onToggleTools: handleToggleTools,
     onToggleSettings: handleToggleSettings,
     onTheme: setTheme,
@@ -388,7 +378,7 @@ export function StudyMode({
         data-find-overlay=""
         style={isFullscreen ? undefined : windowStyle}
         className={cn(
-          "fixed z-[130] flex flex-col shadow-2xl overflow-hidden",
+          "fixed z-[130] flex flex-col shadow-lg overflow-hidden",
           isFullscreen && "inset-0",
           !isFullscreen && "rounded-2xl border",
           isDragging && "cursor-grabbing select-none",
@@ -418,8 +408,6 @@ export function StudyMode({
           isDragging={isDragging}
           showToolsPanel={showToolsPanel}
           onToggleTools={handleToggleTools}
-          showBrocardi={showBrocardi}
-          onToggleBrocardi={handleToggleBrocardi}
           onExport={() => setShowExport(true)}
         />
 
@@ -455,22 +443,12 @@ export function StudyMode({
             highlights={articleHighlights}
             annotations={articleAnnotations}
             normaKey={normaKey}
-            footnotes={article.brocardi_info?.Footnotes ?? []}
             onAddHighlight={addHighlight}
             onRequestAddNote={(anchor) => {
               setNoteAnchor(anchor);
               setShowToolsPanel(true);
               setNoteInputFocused(true);
             }}
-            onCrossReferenceNavigate={onCrossReferenceNavigate}
-          />
-
-          {/* Brocardi Popover - positioned in corner */}
-          <StudyModeBrocardiPopover
-            visible={showBrocardi}
-            onClose={() => setShowBrocardi(false)}
-            brocardiInfo={article.brocardi_info ?? undefined}
-            theme={theme}
           />
         </div>
 
@@ -493,7 +471,6 @@ export function StudyMode({
           </div>
           <div className="hidden sm:flex items-center gap-4">
             <span><kbd className={cn("px-1.5 py-0.5 rounded text-xs font-mono", theme === 'dark' ? 'bg-slate-700 text-slate-300' : theme === 'sepia' ? 'bg-[#e4d4b8] text-[#5c4b37]' : 'bg-white border border-slate-200 shadow-sm text-slate-600')}>T</kbd> Note</span>
-            <span><kbd className={cn("px-1.5 py-0.5 rounded text-xs font-mono", theme === 'dark' ? 'bg-slate-700 text-slate-300' : theme === 'sepia' ? 'bg-[#e4d4b8] text-[#5c4b37]' : 'bg-white border border-slate-200 shadow-sm text-slate-600')}>B</kbd> Dottrina</span>
             <span><kbd className={cn("px-1.5 py-0.5 rounded text-xs font-mono", theme === 'dark' ? 'bg-slate-700 text-slate-300' : theme === 'sepia' ? 'bg-[#e4d4b8] text-[#5c4b37]' : 'bg-white border border-slate-200 shadow-sm text-slate-600')}>S</kbd> Settings</span>
           </div>
         </div>

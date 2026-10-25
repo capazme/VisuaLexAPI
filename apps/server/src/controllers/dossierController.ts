@@ -3,6 +3,7 @@ import { Prisma, DossierItemType } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
+import { atMostUnits } from '../utils/utf16Length';
 import { AppError } from '../middleware/errorHandler';
 import { resolveReferences } from '../norms/resolveReference';
 import { decisionKeyOf, resolveDecisionReferences, type DecisionOutcome } from '../norms/resolveDecisions';
@@ -48,18 +49,22 @@ function serializeItem(i: ItemRow) {
 }
 
 /**
- * What a dossier route includes besides the row: the entries in order, and the
- * dossier's copy in the Forum (owner-only: every dossier route is scoped to its owner).
+ * What a dossier route includes besides the row: the entries in order, the
+ * dossier's copy in the Forum (owner-only: every dossier route is scoped to its owner),
+ * and how many planner tasks it holds.
  */
 const DOSSIER_INCLUDE = {
   items: { orderBy: { position: 'asc' } },
   publishedCopy: { select: { id: true, currentVersion: true, isActive: true, updatedAt: true } },
+  _count: { select: { tasks: true } },
 } satisfies Prisma.DossierInclude;
 
 type PublishedCopyRow = { id: string; currentVersion: number; isActive: boolean; updatedAt: Date };
 
 /** A dossier as every route answers it. */
-function serializeDossier(d: Prisma.DossierGetPayload<object> & { items: ItemRow[]; publishedCopy: PublishedCopyRow | null }) {
+function serializeDossier(
+  d: Prisma.DossierGetPayload<object> & { items: ItemRow[]; publishedCopy: PublishedCopyRow | null; _count: { tasks: number } },
+) {
   return {
     id: d.id,
     name: d.name,
@@ -84,6 +89,9 @@ function serializeDossier(d: Prisma.DossierGetPayload<object> & { items: ItemRow
     updated_at: d.updatedAt,
     created_by: createdBy(d),
     items: d.items.map(serializeItem),
+    // Its planner tasks, done and trashed ones too: all go to the trash with the dossier. A count, never
+    // a title: a connected application reads it to tell the user, in the deletion's confirmation.
+    task_count: d._count.tasks,
   };
 }
 
@@ -91,7 +99,8 @@ function serializeDossier(d: Prisma.DossierGetPayload<object> & { items: ItemRow
 const dossierKindSchema = z.enum(['lavoro', 'studio']);
 
 const createDossierSchema = z.object({
-  name: z.string().min(1).max(200),
+  // In UTF-16 units, as the Forum counts a published dossier's title (`LIMITS.title`).
+  name: z.string().min(1).refine(...atMostUnits(200)),
   description: z.string().optional(),
   color: z.string().optional(),
   tags: z.array(z.string()).optional(),
@@ -99,7 +108,7 @@ const createDossierSchema = z.object({
 });
 
 const updateDossierSchema = z.object({
-  name: z.string().min(1).max(200).optional(),
+  name: z.string().min(1).refine(...atMostUnits(200)).optional(),
   description: z.string().optional().nullable(),
   color: z.string().optional().nullable(),
   tags: z.array(z.string()).optional(),
@@ -216,7 +225,7 @@ export const updateDossier = async (req: Request, res: Response) => {
 };
 
 const importStudySchema = z.object({
-  content: z.unknown(),
+  content: z.unknown().optional(),
   addNotes: z.boolean().default(true),
   addHighlights: z.boolean().default(true),
 });
@@ -314,7 +323,8 @@ const noteSchema = z
       .string()
       .trim()
       .min(1)
-      .max(MAX_NOTE_LENGTH)
+      // In UTF-16 units, as the Forum's and the proposals' checks count a note.
+      .refine(...atMostUnits(MAX_NOTE_LENGTH))
       .refine((text) => !CONTROL.test(text), 'Caratteri di controllo non ammessi.'),
     // Not `.uuid()`: any id that is not a norm of this dossier gets the same answer below.
     aboutItemId: z.string().min(1).max(64).optional(),
@@ -477,7 +487,7 @@ export const moveDossierItem = async (req: Request, res: Response) => {
         _max: { position: true },
       });
 
-      return tx.dossierItem.update({
+      const moved = await tx.dossierItem.update({
         // Scoped by dossierId: the ownership check above proves the source
         // dossier is ours, not that the item belongs to it.
         where: { id: itemId, dossierId: source.id },
@@ -488,6 +498,9 @@ export const moveDossierItem = async (req: Request, res: Response) => {
           aboutItemId: null,
         },
       });
+      // A task is about an entry of its own dossier too: the tasks stay in the source, without the entry.
+      await tx.task.updateMany({ where: { dossierItemId: moved.id }, data: { dossierItemId: null } });
+      return moved;
     });
 
     res.json(serializeItem(item));

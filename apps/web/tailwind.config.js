@@ -76,10 +76,6 @@ export default {
         input: 'var(--input)',
         ring: 'var(--ring)',
         // Feature-specific colors (from CSS variables)
-        brocardi: {
-          DEFAULT: 'var(--color-brocardi)',
-          foreground: 'var(--color-brocardi-foreground)',
-        },
         tree: {
           DEFAULT: 'var(--color-tree)',
           foreground: 'var(--color-tree-foreground)',

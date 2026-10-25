@@ -26,18 +26,19 @@ export function DossierRecentlyRemoved({ entries, dossiers, onRestore, onPurge, 
   const regionId = 'dossier-recently-removed';
   return (
     <section aria-labelledby="dossier-recently-removed-heading" className="mt-6 border-t border-slate-200 pt-3 dark:border-slate-700">
-      <h3 id="dossier-recently-removed-heading">
+      <h2 id="dossier-recently-removed-heading">
         <button
           type="button"
           aria-expanded={open}
           aria-controls={open ? regionId : undefined}
           onClick={() => setOpen((v) => !v)}
-          className="inline-flex min-h-[44px] items-center gap-2 rounded-md text-sm font-medium text-slate-600 hover:text-slate-900 md:min-h-0 dark:text-slate-300 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          // 44 px at every width, as the planner's controls (S7c).
+          className="inline-flex min-h-[44px] items-center gap-2 rounded-md text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
         >
-          <ChevronDown size={16} aria-hidden className={cn('transition-transform', !open && '-rotate-90')} />
+          <ChevronDown size={16} aria-hidden className={cn('transition-transform motion-reduce:transition-none', !open && '-rotate-90')} />
           Rimossi di recente ({entries.length}) — ripristina
         </button>
-      </h3>
+      </h2>
       {open && (
         <ul id={regionId} className="mt-2 space-y-2">
           {entries.map((entry) => (

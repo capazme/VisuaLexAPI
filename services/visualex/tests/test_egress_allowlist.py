@@ -66,6 +66,17 @@ def test_the_allowlist_is_not_vacuous():
         ("https://www.normattiva.it.evil.test/phish", False),
         ("http://169.254.169.254/latest/meta-data/", False),
         ("not-a-url", False),
+        # The browser's reading of the host, not only urlparse's: a backslash is a slash to
+        # Chromium, tabs and newlines are dropped, credentials hide the real host.
+        ("http://169.254.169.254\\@eur-lex.europa.eu/", False),
+        ("https://www.normattiva.it\\.evil.test/", False),
+        ("http://169.254.169.254\t@eur-lex.europa.eu/", False),
+        ("https://user:pw@www.normattiva.it/", False),
+        ("ftp://www.normattiva.it/", False),
+        ("file://www.normattiva.it/etc/passwd", False),
+        # Brocardi is no longer a source (D-078): refused at request time.
+        ("https://www.brocardi.it/codice-civile/", False),
+        ("https://brocardi.it/x", False),
     ],
 )
 def test_is_allowed(url, expected):

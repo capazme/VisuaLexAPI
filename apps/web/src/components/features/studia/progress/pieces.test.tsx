@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
+import { HIDDEN_SCROLLBAR } from '../../../../constants/interactions';
 import { render, screen, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { GiornoAttivita, Progressi } from '../../../../types/studia';
-import { ActivityCalendar } from './ActivityCalendar';
 import { describeDay } from './layout';
 import { CardStatesBar } from './CardStatesBar';
 import { DueForecast } from './DueForecast';
@@ -57,47 +57,19 @@ describe('StreakBadge', () => {
   });
 });
 
-describe('ActivityCalendar', () => {
+describe('describeDay', () => {
   const today = '2026-10-21';
   const calendario = [day('2026-10-14', { ripassi: 40, nuove: 6, sbagliate: 3 }), day('2026-10-15', { ripassi: 0, valido: false, riposo: true }), day('2026-10-20', { ripassi: 4, valido: false })];
 
   it('says each kind of day in words', () => {
-    expect(describeDay({ giorno: '2026-10-14', day: calendario[0], column: 0, row: 0 }, today)).toBe('mercoledì 14 ottobre: 40 ripassi · 6 nuove · 3 sbagliate · obiettivo raggiunto');
+    expect(describeDay({ giorno: '2026-10-14', day: calendario[0], column: 0, row: 0 }, today)).toBe('mercoledì 14 ottobre: 40 ripassi, 6 nuove, 3 sbagliate, obiettivo raggiunto');
     expect(describeDay({ giorno: '2026-10-15', day: calendario[1], column: 0, row: 0 }, today)).toBe('giovedì 15 ottobre: giorno di riposo, la serie regge');
     expect(describeDay({ giorno: '2026-10-16', day: null, column: 0, row: 0 }, today)).toBe('venerdì 16 ottobre: nessun ripasso');
-    expect(describeDay({ giorno: today, day: day(today, { ripassi: 1, nuove: 1, sbagliate: 1, valido: false }), column: 0, row: 0 }, today)).toBe('Oggi, mercoledì 21 ottobre: 1 ripasso · 1 nuova · 1 sbagliata');
+    expect(describeDay({ giorno: today, day: day(today, { ripassi: 1, nuove: 1, sbagliate: 1, valido: false }), column: 0, row: 0 }, today)).toBe('Oggi, mercoledì 21 ottobre: 1 ripasso, 1 nuova, 1 sbagliata');
     // A day with nothing to do that counted (the queue was empty).
-    expect(describeDay({ giorno: '2026-10-17', day: day('2026-10-17', { ripassi: 0 }), column: 0, row: 0 }, today)).toBe('sabato 17 ottobre: niente da ripassare · obiettivo raggiunto');
+    expect(describeDay({ giorno: '2026-10-17', day: day('2026-10-17', { ripassi: 0 }), column: 0, row: 0 }, today)).toBe('sabato 17 ottobre: niente da ripassare, obiettivo raggiunto');
   });
 
-  it('is one tab stop that sums up the range, and the arrows walk the days and the weeks', async () => {
-    render(<ActivityCalendar calendario={calendario} today={today} weeks={12} />);
-    const grid = screen.getByRole('group', { name: 'Calendario dei ripassi dal 3 agosto 2026 a oggi: 44 ripassi in 2 giorni' });
-    await userEvent.setup().tab();
-    expect(grid).toHaveFocus();
-    const readout = () => document.getElementById(grid.getAttribute('aria-describedby')!)!.textContent;
-    expect(readout()).toBe('Passa sopra un giorno, o toccalo, per i dettagli.');
-    fireEvent.keyDown(grid, { key: 'ArrowUp' }); // from today, the day before
-    expect(readout()).toBe('martedì 20 ottobre: 4 ripassi');
-    fireEvent.keyDown(grid, { key: 'ArrowLeft' }); // a week back
-    expect(readout()).toBe('martedì 13 ottobre: nessun ripasso');
-    fireEvent.keyDown(grid, { key: 'ArrowDown' });
-    expect(readout()).toBe('mercoledì 14 ottobre: 40 ripassi · 6 nuove · 3 sbagliate · obiettivo raggiunto');
-    fireEvent.keyDown(grid, { key: 'Home' });
-    expect(readout()).toBe('lunedì 3 agosto: nessun ripasso');
-    fireEvent.keyDown(grid, { key: 'ArrowUp' }); // held at the first day
-    expect(readout()).toBe('lunedì 3 agosto: nessun ripasso');
-    fireEvent.keyDown(grid, { key: 'End' });
-    expect(readout()).toBe('Oggi, mercoledì 21 ottobre: nessun ripasso');
-  });
-
-  it('answers a hover and a tap on a day', () => {
-    const { container } = render(<ActivityCalendar calendario={calendario} today={today} weeks={12} />);
-    fireEvent.pointerEnter(container.querySelector('[data-day="2026-10-15"]')!);
-    expect(screen.getByText('giovedì 15 ottobre: giorno di riposo, la serie regge')).toBeInTheDocument();
-    fireEvent.click(container.querySelector('[data-day="2026-10-14"]')!);
-    expect(screen.getByText(/mercoledì 14 ottobre: 40 ripassi/)).toBeInTheDocument();
-  });
 });
 
 describe('CardStatesBar', () => {
@@ -110,11 +82,37 @@ describe('CardStatesBar', () => {
     expect(screen.getByText('Nuove: 1 scheda (25%)', { selector: 'p' })).toBeInTheDocument();
   });
 
+  it('gives each segment a 44 px box at every width, the colour drawn inside it', () => {
+    render(<CardStatesBar stati={{ nuove: 15, apprendimento: 30, consolidate: 13 }} />);
+    for (const segment of screen.getAllByRole('button')) {
+      // jsdom measures nothing: the box is h-11 with no `md:` height, the colour an inset span.
+      expect(segment).toHaveClass('h-11');
+      expect(segment.className).not.toMatch(/\bmd:(?:min-h|h)-/);
+      expect(segment.firstElementChild).toHaveClass('absolute', 'md:inset-y-2');
+    }
+  });
+
   it('draws no segment for an empty state, and says when there is nothing', () => {
     const { rerender } = render(<CardStatesBar stati={{ nuove: 0, apprendimento: 3, consolidate: 0 }} />);
     expect(screen.getAllByRole('button')).toHaveLength(1);
     rerender(<CardStatesBar stati={{ nuove: 0, apprendimento: 0, consolidate: 0 }} />);
     expect(screen.getByText('Nessuna scheda da studiare, per ora.')).toBeInTheDocument();
+  });
+
+  it('rounds the three shares to add up to 100, and never writes «0%» for a state with cards', () => {
+    // 1, 1 and 1 would round to 33 each (99): the largest remainder gives the first the point left.
+    const { rerender } = render(<CardStatesBar stati={{ nuove: 1, apprendimento: 1, consolidate: 1 }} />);
+    expect(screen.getAllByRole('definition').map((dd) => dd.textContent)).toEqual(['134%', '133%', '133%']);
+    // 1 of 400 rounds to none: «<1%», and the other two still add up to 100.
+    rerender(<CardStatesBar stati={{ nuove: 1, apprendimento: 200, consolidate: 199 }} />);
+    expect(screen.getAllByRole('definition').map((dd) => dd.textContent)).toEqual(['1<1%', '20050%', '19950%']);
+    expect(screen.getByRole('button', { name: 'Nuove: 1 scheda (<1%)' })).toBeInTheDocument();
+  });
+
+  it('writes the three states by name, count and share, not by colour alone', () => {
+    render(<CardStatesBar stati={{ nuove: 1, apprendimento: 2, consolidate: 1 }} />);
+    expect(screen.getAllByRole('term').map((dt) => dt.textContent)).toEqual(['Nuove', 'In apprendimento', 'Consolidate']);
+    expect(screen.getAllByRole('definition').map((dd) => dd.textContent)).toEqual(['125%', '250%', '125%']);
   });
 });
 
@@ -130,6 +128,29 @@ describe('DueForecast', () => {
     expect(screen.getByText('Domani: 1 scheda da ripassare')).toBeInTheDocument();
     fireEvent.click(container.querySelector('[data-day="2026-10-21"]')!);
     expect(screen.getByText('mer 21: 5 schede da ripassare')).toBeInTheDocument();
+  });
+
+  it('writes its scale beside the drawing, each label on its own line, and marks today', () => {
+    const { container } = render(<DueForecast prossimi={prossimi} />);
+    // The tallest bar is 30: the scale is 0, 15 and 30, outside the SVG.
+    const scale = [...container.querySelectorAll('.text-right span.absolute')].map((label) => label.textContent);
+    expect(scale).toEqual(['0', '15', '30']);
+    expect(container.querySelector('svg')!.textContent).toBe('');
+    expect(screen.getByText('oggi')).toHaveClass('font-semibold');
+  });
+
+  it('draws a day with nothing due as a hollow mark, not a gap', () => {
+    const empty = prossimi.map((d, i) => ({ ...d, schede: i === 3 ? 0 : d.schede }));
+    const { container } = render(<DueForecast prossimi={empty} />);
+    expect(container.querySelector('[data-day="2026-10-22"] [data-empty]')).not.toBeNull();
+    expect(container.querySelectorAll('[data-empty]')).toHaveLength(1);
+    fireEvent.click(container.querySelector('[data-day="2026-10-22"]')!);
+    expect(screen.getByText('gio 22: 0 schede da ripassare')).toBeInTheDocument();
+  });
+
+  it('keeps a scale of four digits whole', () => {
+    const { container } = render(<DueForecast prossimi={prossimi.map((d, i) => ({ ...d, schede: i === 0 ? 9999 : 0 }))} />);
+    expect([...container.querySelectorAll('.text-right span.absolute')].map((label) => label.textContent)).toEqual(['0', '5000', '10.000']);
   });
 });
 
@@ -153,9 +174,21 @@ describe('the subject filter', () => {
     await userEvent.setup().click(civil);
     expect(onSelect).toHaveBeenLastCalledWith('DIRITTO_CIVILE');
     rerender(<SubjectProgress materie={materie} selected="DIRITTO_CIVILE" onSelect={onSelect} />);
+    expect(screen.getByRole('button', { name: /Diritto penale/ })).not.toHaveClass('opacity-50');
     expect(screen.getByRole('button', { name: /Diritto civile/ })).toHaveAttribute('aria-pressed', 'true');
     await userEvent.setup().click(screen.getByRole('button', { name: /Diritto civile/ }));
     expect(onSelect).toHaveBeenLastCalledWith(undefined);
+  });
+
+  it('orders the subjects as «Oggi»\'s road, each with its three states in words and its reviews of 30 days', () => {
+    render(<SubjectProgress materie={materie} selected={undefined} onSelect={vi.fn()} />);
+    const names = screen.getAllByRole('button').map((b) => b.textContent!.match(/^Diritto [a-z ]+?(?=\d|Nessuna)/)?.[0]);
+    // Open cards (new plus in learning) first, then by name.
+    expect(names).toEqual(['Diritto civile', 'Diritto processuale civile', 'Diritto amministrativo', 'Diritto processuale penale', 'Diritto penale']);
+    const civil = screen.getByRole('button', { name: /Diritto civile/ });
+    expect(civil).toHaveTextContent('20 nuove · 28 in apprendimento · 104 consolidate');
+    expect(screen.getByRole('button', { name: /Diritto penale/ })).toHaveTextContent('Nessun ripasso negli ultimi 30 giorni');
+    expect(screen.queryByText(/da ripassare/)).toBeNull();
   });
 
   it('offers «Tutte le materie» and the five subjects as chips, one pressed', async () => {
@@ -163,6 +196,13 @@ describe('the subject filter', () => {
     render(<SubjectChips selected="DIRITTO_PENALE" onSelect={onSelect} />);
     const group = screen.getByRole('group', { name: 'Materia' });
     expect(within(group).getAllByRole('button')).toHaveLength(6);
+    // 44 px tall at every width, a computer too.
+    for (const chip of within(group).getAllByRole('button')) {
+      expect(chip).toHaveClass('min-h-[44px]');
+      expect(chip.className).not.toMatch(/\bmd:(?:min-h|h|py)-/);
+    }
+    // A phone's sideways row with no bar drawn: in dark mode it showed light (theme.test.ts checks the CSS).
+    expect(group).toHaveClass(...HIDDEN_SCROLLBAR.split(' '));
     expect(within(group).getByRole('button', { name: 'Diritto penale' })).toHaveAttribute('aria-pressed', 'true');
     expect(within(group).getByRole('button', { name: 'Tutte le materie' })).toHaveAttribute('aria-pressed', 'false');
     await userEvent.setup().click(within(group).getByRole('button', { name: 'Tutte le materie' }));

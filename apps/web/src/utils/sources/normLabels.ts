@@ -12,7 +12,7 @@
 import type { NormaVisitata } from '../../types';
 import { formatDateForCitation, withPreposition } from '../dateUtils';
 import { isEuropeanAct } from '../versionDisplay';
-import { ACT_TYPES, CODES_TABLE, EU_ACTS, NAMED_ACTS, NAMED_HEADINGS } from './actTypes';
+import { ACT_TYPES, ANNEXED_ACTS, CODES_TABLE, EU_ACTS, NAMED_ACTS, NAMED_HEADINGS } from './actTypes';
 
 /** The fields a label reads: a stored `norma_data`, or what a parser or a search gives. */
 export type LabelledNorm = Partial<Pick<NormaVisitata, 'tipo_atto' | 'tipo_atto_reale' | 'numero_atto' | 'data' | 'allegato' | 'numero_articolo'>>;
@@ -52,6 +52,12 @@ function realType(norm: LabelledNorm): { type: string; date: string; number: str
   return { type: type || key(norm.tipo_atto), date, number };
 }
 
+/** Whether `annex` is the text of an act cited by type, date and number (`ANNEXED_ACTS`: the TULPS). */
+function isAnnexedActText(norm: LabelledNorm, annex: string): boolean {
+  const { type, date, number } = realType(norm);
+  return ANNEXED_ACTS[`${type.replace(/ /g, '.')}:${date};${number}`] === annex;
+}
+
 function act(norm: LabelledNorm, short: boolean): { act: string; joiner: string } {
   const kind = key(norm.tipo_atto);
   const named = NAMED_ACTS[kind];
@@ -81,9 +87,18 @@ function act(norm: LabelledNorm, short: boolean): { act: string; joiner: string 
 function annex(norm: LabelledNorm, short: boolean): string {
   const value = text(norm.allegato);
   const kind = key(norm.tipo_atto);
-  // A code's annex is the code itself (c.c. is Allegato 2 of r.d. 262/1942): never named.
+  // A code's annex is the code itself (c.c. is Allegato 2 of r.d. 262/1942): never named,
+  // also for a code cited by its decree (the codice del turismo is «d.lgs. 23 maggio 2011, n. 79»).
   if (!value || NAMED_ACTS[kind] || EU_ACTS[kind]) return '';
+  if ((CODES_BY_NAME.get(kind) ?? '').endsWith(`:${value}`)) return '';
+  if (isAnnexedActText(norm, value)) return '';
   return short ? ` (All. ${value})` : ` (Allegato ${value})`;
+}
+
+/** The annex a label names, as the convention writes it («A», «2»), or '' when none is named: never a code's own, an
+ *  act of the Union's or the text of an annexed act (the TULPS). What a surface shows as «Allegato N» (R3). */
+export function namedAnnex(norm: LabelledNorm): string {
+  return annex(norm, false) ? text(norm.allegato) : '';
 }
 
 /** «art. 2, l. 7 agosto 1990, n. 241», «art. 2043 c.c.», «art. 5, reg. (UE) 2016/679». */

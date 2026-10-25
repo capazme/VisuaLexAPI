@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 const pdfLines: string[] = [];
+const pdfSaves: string[] = [];
 
 vi.mock('jspdf', () => ({
   jsPDF: class {
@@ -16,9 +17,29 @@ vi.mock('jspdf', () => ({
     text(line: string) {
       pdfLines.push(line);
     }
-    save() {}
+    save(name: string) {
+      pdfSaves.push(name);
+    }
   },
 }));
+
+// jsPDF's arrival, held by a test that wants to act while it waits; otherwise it comes at once.
+const { gate } = vi.hoisted(() => ({ gate: { held: null as null | { promise: Promise<void>; open: () => void; fail: () => void } } }));
+vi.mock('../../utils/loadJsPdf', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../../utils/loadJsPdf')>();
+  return { loadJsPdf: async () => { if (gate.held) await gate.held.promise; return real.loadJsPdf(); } };
+});
+function holdJsPdf() {
+  let open = () => {};
+  let fail = () => {};
+  const promise = new Promise<void>((resolve, reject) => { open = resolve; fail = () => reject(new Error('offline')); });
+  gate.held = { promise, open, fail };
+  return gate.held;
+}
+
+afterEach(() => {
+  gate.held = null;
+});
 
 import { AdvancedExportModal } from './AdvancedExportModal';
 import type { ArticleData } from '../../types';
@@ -26,30 +47,17 @@ import type { ArticleData } from '../../types';
 const articleData: ArticleData = {
   article_text: 'Qualunque fatto doloso o colposo.',
   norma_data: { tipo_atto: 'codice civile', data: '1942-03-16', numero_articolo: '2043' },
-  brocardi_info: {
-    position: null,
-    link: null,
-    Brocardi: ['Neminem laedere'],
-    Ratio: 'La ratio della norma.',
-    Spiegazione: 'La spiegazione.',
-    Massime: null,
-  },
 };
+// An article as a reader that never reloaded may still hold it from before D-078 (no Brocardi text here)
+const legacyArticle = {
+  ...articleData,
+  brocardi_info: { position: null, link: null, Brocardi: ['Neminem laedere'], Ratio: 'La ratio della norma.', Spiegazione: 'La spiegazione.', Massime: ['Una massima.'] },
+} as unknown as ArticleData;
 
-function renderModal() {
+function renderModal(data: ArticleData = articleData) {
   return render(
-    <AdvancedExportModal isOpen onClose={() => {}} articleData={articleData} annotations={[]} highlights={[]} />,
+    <AdvancedExportModal isOpen onClose={() => {}} articleData={data} annotations={[]} highlights={[]} />,
   );
-}
-
-function enableDoctrineSections() {
-  fireEvent.click(screen.getByRole('button', { name: /Locuzioni latine/ }));
-  fireEvent.click(screen.getByRole('button', { name: /Ratio Legis/ }));
-  fireEvent.click(screen.getByRole('button', { name: /Spiegazione/ }));
-}
-
-function occurrences(haystack: string, needle: string): number {
-  return haystack.split(needle).length - 1;
 }
 
 let blobs: Blob[];
@@ -63,7 +71,9 @@ function readBlob(blob: Blob): Promise<string> {
   });
 }
 
-describe('AdvancedExportModal — the doctrine is credited to its source', () => {
+const BROCARDI_WORDS = /Brocardi|Neminem|ratio della norma|spiegazione|massima|Locuzioni|Ratio Legis|Massime/i;
+
+describe('AdvancedExportModal — nothing of Brocardi (D-078)', () => {
   beforeEach(() => {
     pdfLines.length = 0;
     blobs = [];
@@ -79,56 +89,122 @@ describe('AdvancedExportModal — the doctrine is credited to its source', () =>
     vi.restoreAllMocks();
   });
 
-  it('copies the text with the credit once, under the first doctrine heading', async () => {
+  it('offers the text, the citation and the reader\'s own, and no doctrine section, whatever the article still holds', () => {
+    renderModal(legacyArticle);
+    expect(screen.getByRole('button', { name: /Testo Articolo/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Citazione/ })).toBeInTheDocument();
+    expect(screen.queryByText(/Approfondimenti|dottrina/i)).toBeNull();
+    expect(screen.queryByText(BROCARDI_WORDS)).toBeNull();
+  });
+
+  it('copies the text and nothing of Brocardi', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
-    renderModal();
-    enableDoctrineSections();
+    renderModal(legacyArticle);
     fireEvent.click(screen.getByRole('button', { name: /Copia negli appunti/ }));
     await waitFor(() => expect(writeText).toHaveBeenCalled());
     const content = writeText.mock.calls[0][0] as string;
-    expect(content).toContain('=== LOCUZIONI LATINE ===\nFonte: Brocardi.it');
-    expect(occurrences(content, 'Fonte: Brocardi.it')).toBe(1);
+    expect(content).toContain('Qualunque fatto doloso o colposo.');
+    expect(content).not.toMatch(BROCARDI_WORDS);
   });
 
-  it('writes the credit in the Markdown export', async () => {
-    renderModal();
-    enableDoctrineSections();
-    fireEvent.click(screen.getByRole('button', { name: 'MD' }));
-    fireEvent.click(screen.getByRole('button', { name: /Scarica MARKDOWN/ }));
+  it.each([['MD', /Scarica MARKDOWN/], ['RTF', /Scarica RTF/], ['TXT', /Scarica TXT/]])('writes the %s file with the text and nothing of Brocardi', async (format, download) => {
+    renderModal(legacyArticle);
+    fireEvent.click(screen.getByRole('button', { name: format }));
+    fireEvent.click(screen.getByRole('button', { name: download }));
     const content = await readBlob(blobs[0]);
-    expect(content).toContain('## Locuzioni latine\n\n_Fonte: Brocardi.it_');
-    expect(occurrences(content, 'Fonte: Brocardi.it')).toBe(1);
+    expect(content).toContain('Qualunque fatto doloso o colposo.');
+    expect(content).not.toMatch(BROCARDI_WORDS);
   });
 
-  it('writes the credit in the RTF export', async () => {
-    renderModal();
-    enableDoctrineSections();
-    fireEvent.click(screen.getByRole('button', { name: 'RTF' }));
-    fireEvent.click(screen.getByRole('button', { name: /Scarica RTF/ }));
-    const content = await readBlob(blobs[0]);
-    expect(content).toContain('Locuzioni latine:');
-    expect(occurrences(content, 'Fonte: Brocardi.it')).toBe(1);
-  });
-
-  it('writes the credit in the PDF export', () => {
-    renderModal();
-    enableDoctrineSections();
+  it('writes the PDF with the text and nothing of Brocardi', async () => {
+    renderModal(legacyArticle);
     fireEvent.click(screen.getByRole('button', { name: 'PDF' }));
     fireEvent.click(screen.getByRole('button', { name: /Scarica PDF/ }));
-    const at = pdfLines.indexOf('Locuzioni latine');
-    expect(at).toBeGreaterThan(-1);
-    expect(pdfLines[at + 1]).toBe('Fonte: Brocardi.it');
-    expect(pdfLines.filter((line) => line === 'Fonte: Brocardi.it')).toHaveLength(1);
+    // jsPDF comes on the first export: the lines follow it.
+    await waitFor(() => expect(pdfLines).toContain('Qualunque fatto doloso o colposo.'));
+    expect(pdfLines.join('\n')).not.toMatch(BROCARDI_WORDS);
   });
 
-  it('writes no credit when no doctrine section is exported', async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
-    renderModal();
-    fireEvent.click(screen.getByRole('button', { name: /Copia negli appunti/ }));
-    await waitFor(() => expect(writeText).toHaveBeenCalled());
-    expect(writeText.mock.calls[0][0]).not.toContain('Brocardi.it');
+  it('shows the wait for jsPDF in «Scarica PDF», its words as they are', async () => {
+    const onClose = vi.fn();
+    render(<AdvancedExportModal isOpen onClose={onClose} articleData={articleData} annotations={[]} highlights={[]} />);
+    fireEvent.click(screen.getByRole('button', { name: 'PDF' }));
+    const button = screen.getByRole('button', { name: /Scarica PDF/ });
+    fireEvent.click(button);
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('aria-busy', 'true');
+    expect(button).toHaveTextContent('Scarica PDF');
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+
+  it('cannot be closed while the PDF waits for jsPDF, and closes once it is saved', async () => {
+    const held = holdJsPdf();
+    const onClose = vi.fn();
+    render(<AdvancedExportModal isOpen onClose={onClose} articleData={articleData} annotations={[]} highlights={[]} />);
+    fireEvent.click(screen.getByRole('button', { name: 'PDF' }));
+    fireEvent.click(screen.getByRole('button', { name: /Scarica PDF/ }));
+    expect(screen.getByRole('button', { name: 'Annulla' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Copia' })).toBeDisabled();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.click(screen.getByRole('button', { name: 'Annulla' }));
+    expect(onClose).not.toHaveBeenCalled();
+    held.open();
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(pdfLines).toContain('Qualunque fatto doloso o colposo.');
+  });
+
+  it('saves nothing when its host unmounts it while jsPDF loads (StudyMode\'s Esc leaves the whole mode)', async () => {
+    const held = holdJsPdf();
+    pdfSaves.length = 0;
+    const view = render(<AdvancedExportModal isOpen onClose={vi.fn()} articleData={articleData} annotations={[]} highlights={[]} />);
+    fireEvent.click(screen.getByRole('button', { name: 'PDF' }));
+    fireEvent.click(screen.getByRole('button', { name: /Scarica PDF/ }));
+    view.unmount();
+    held.open();
+    await held.promise;
+    await vi.dynamicImportSettled();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(pdfSaves).toEqual([]);
+  });
+
+  it('saves nothing when its host closes it while jsPDF loads', async () => {
+    const held = holdJsPdf();
+    pdfSaves.length = 0;
+    const onClose = vi.fn();
+    const view = render(<AdvancedExportModal isOpen onClose={onClose} articleData={articleData} annotations={[]} highlights={[]} />);
+    fireEvent.click(screen.getByRole('button', { name: 'PDF' }));
+    fireEvent.click(screen.getByRole('button', { name: /Scarica PDF/ }));
+    view.rerender(<AdvancedExportModal isOpen={false} onClose={onClose} articleData={articleData} annotations={[]} highlights={[]} />);
+    held.open();
+    await held.promise;
+    await vi.dynamicImportSettled();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(pdfSaves).toEqual([]);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('when jsPDF cannot be loaded, gives the buttons back and stays open', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const held = holdJsPdf();
+    const onClose = vi.fn();
+    render(<AdvancedExportModal isOpen onClose={onClose} articleData={articleData} annotations={[]} highlights={[]} />);
+    fireEvent.click(screen.getByRole('button', { name: 'PDF' }));
+    const button = screen.getByRole('button', { name: /Scarica PDF/ });
+    fireEvent.click(button);
+    held.fail();
+    await waitFor(() => expect(button).toBeEnabled());
+    expect(button).not.toHaveAttribute('aria-busy');
+    expect(screen.getByRole('button', { name: 'Annulla' })).toBeEnabled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('Download non riuscito: riprova.');
+    // The next export tries again and the words go.
+    gate.held = null;
+    fireEvent.click(button);
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText('Download non riuscito: riprova.')).toBeNull();
+    error.mockRestore();
   });
 });
 

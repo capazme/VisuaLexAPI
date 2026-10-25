@@ -19,7 +19,6 @@ const createQuickNorm = (
         date: date || '',
         article,
         version: 'vigente',
-        show_brocardi_info: false,
     },
     createdAt: new Date().toISOString(),
     usageCount: 0,

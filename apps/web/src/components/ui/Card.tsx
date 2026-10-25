@@ -1,5 +1,6 @@
 import { forwardRef, type HTMLAttributes, type ReactNode } from 'react';
 import { cn } from '../../lib/utils';
+import { HOVER_LIFT, TRANSITION } from '../../constants/interactions';
 
 export interface CardProps extends HTMLAttributes<HTMLDivElement> {
   variant?: 'default' | 'glass' | 'elevated' | 'glass-elevated' | 'outline';
@@ -9,7 +10,7 @@ export interface CardProps extends HTMLAttributes<HTMLDivElement> {
 
 export const Card = forwardRef<HTMLDivElement, CardProps>(
   ({ variant = 'default', hover = false, children, className, ...props }, ref) => {
-    const baseStyles = 'rounded-xl transition-all duration-200 ease-smooth-out';
+    const baseStyles = cn('rounded-xl', hover && TRANSITION);
 
     const variantStyles = {
       default: cn(
@@ -29,7 +30,7 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
       ),
       elevated: cn(
         'bg-white dark:bg-slate-800',
-        'shadow-lg border border-transparent dark:border-slate-700'
+        'shadow-sm border border-slate-200 dark:border-slate-700'
       ),
       'glass-elevated': cn(
         'bg-white/80 dark:bg-slate-900/80',
@@ -39,8 +40,9 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
       ),
     };
 
+    // A card that lifts stands alone: a row or a list item takes the colour change only (HOVER_LIFT).
     const hoverStyles = hover
-      ? 'hover:shadow-md hover:border-slate-300 dark:hover:border-slate-600 hover:-translate-y-0.5 cursor-pointer'
+      ? cn('hover:shadow-md hover:border-slate-300 dark:hover:border-slate-600 cursor-pointer', HOVER_LIFT)
       : '';
 
     return (

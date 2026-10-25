@@ -1,28 +1,82 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense, Component, type ReactNode } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Sidebar } from './Sidebar';
+import { RoutePage } from './RouteBoundary';
+import { useDesktopSidebar } from './sidebarWidth';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { SettingsModal } from '../ui/SettingsModal';
 import { FeedbackButton } from '../ui/FeedbackButton';
+import { FeedbackModal } from '../ui/FeedbackModal';
 import { ChangelogNotification } from '../ui/ChangelogNotification';
-import { UndoToastContainer } from '../ui/Toast';
+import { NotificationHost } from '../ui/Toast';
 import { SyncErrorToast } from '../ui/SyncErrorToast';
 import { KeyboardShortcutsModal } from '../ui/KeyboardShortcutsModal';
 import { cn } from '../../lib/utils';
 import { Z_INDEX } from '../../constants/zIndex';
 import { FindWindow } from '../features/search/FindWindow';
 import { GlobalSearch } from '../features/search/GlobalSearch';
-import { SearchField, SEARCH_BAR_HEIGHT } from '../features/search/SearchField';
+import { SearchField } from '../features/search/SearchField';
 import { closeFindWindow, isWorkspaceCovered, openFindWindow } from '../../utils/findWindowControl';
-const CompareView = lazy(() => import('../features/compare/CompareView').then(m => ({ default: m.CompareView })));
+import { closeCompare, forgetCompareOpened, useCompare, useCompareOpened } from '../../hooks/useCompare';
 import { useTour } from '../../hooks/useTour';
 import { useConsentIfProvided } from '../../features/merlt/consent/useConsent';
 import { useAuth } from '../../hooks/useAuth';
-import { ServiceHealthBanner } from '../ui/ServiceHealthBanner';
+import { useServiceHealth } from '../../hooks/useServiceHealth';
+import { serviceHealthLabel, serviceHealthNeedsNotice } from '../../utils/serviceHealth';
 import { PluginSlot } from '../../plugins/PluginSlot';
+import { spring } from '../../lib/motion';
+import { SECTIONS, sectionForPath } from '../../features/sections/sections';
+import { sectionStore } from '../../features/sections/useSection';
+import { MenuToggle, PhoneTopBar } from './PhoneTopBar';
+import { phoneBarTitle } from './phoneBarTitle';
+import { useHideOnScroll } from './useHideOnScroll';
+import { openSearchMenu } from '../../utils/searchFieldControl';
+import { usePageTitleInView } from './usePageTitleInView';
+import { PlannerHost } from '../features/planner/PlannerHost';
+import { useMediaQuery } from '../../hooks/useIsDesktop';
+
+const loadCompareView = () => import('../features/compare/CompareView').then(m => ({ default: m.CompareView }));
+// A new one after a failed fetch: `lazy` keeps a failure for good.
+let CompareView = lazy(loadCompareView);
+
+/**
+ * The comparison's code that cannot be fetched, or an error of the comparison while in use, closes it instead of taking
+ * the page down (on `develop` the whole app went blank), the error in the console and no words on screen. The next
+ * opening fetches it again: that mends a connection that dropped, not a file a deploy removed, which stays missing until
+ * the page is reloaded (as for a lazy route).
+ */
+class CompareBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: unknown) {
+    console.error('the comparison could not be loaded', error);
+    CompareView = lazy(loadCompareView);
+    closeCompare();
+    forgetCompareOpened();
+  }
+
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
+
+/** Where the comparison will stand while its code travels: only while it is open (closed meanwhile, nothing). */
+function CompareWaiting() {
+  const { isOpen } = useCompare();
+  if (!isOpen) return null;
+  return (
+    <div aria-hidden data-testid="compare-waiting" className={cn('pointer-events-none fixed inset-0 flex items-center justify-center', Z_INDEX.compare)}>
+      <span className="size-6 rounded-full border-2 border-primary-600 border-t-transparent animate-spin dark:border-primary-400 dark:border-t-transparent" />
+    </div>
+  );
+}
 
 export function Layout() {
   const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel, openCommandPalette } = useAppStore(useShallow(s => ({
@@ -34,24 +88,75 @@ export function Layout() {
     openCommandPalette: s.openCommandPalette,
   })));
   const { isAuthenticated } = useAuth();
+  const compareOpened = useCompareOpened();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  // From `xl` the desktop column shows its words unless the user narrowed it (remembered in the browser).
+  const desktopSidebar = useDesktopSidebar();
+  const reduceMotion = useReducedMotion();
+  // The desktop column's width as it is drawn (0 when hidden or in Focus mode), set as `--sidebar-width` for
+  // what would float beside it from `lg`; nothing does since the services pill went into the user menu (S1).
+  const desktopSidebarWidth = sidebarVisible && !settings.focusMode ? desktopSidebar.width : 0;
   const navigate = useNavigate();
   // The find window searches the workspace, which is drawn only on the search page (spec §13.1).
   const { pathname } = useLocation();
   const onSearchPage = pathname === '/';
-  // The review's grade bar and the validators' vote bar are pinned to the bottom edge on a phone,
-  // where the feedback button and the services pill would cover them.
-  const inReviewSession = pathname.startsWith('/studia/ripasso/sessione');
-  const onValidationQueue = pathname === '/studia/valida' || pathname.startsWith('/studia/valida/');
-  const barPinnedAtBottom = inReviewSession || onValidationQueue;
   // The search page's field sits above its content, outside the scroller, so it is always on screen
   // (spec 2026-10-13-fixed-search-design.md); Focus mode hides it, ⌘K still opens the palette.
   const showSearchBar = onSearchPage && !settings.focusMode;
-  // Below lg the menu button floats at the top left over the content: every page starts under it,
-  // except the search page, whose field sits beside it.
-  const headerBesideMenuButton = onSearchPage;
+  // Below lg a bar sits at the top of every page (M1): the search page's is its field, with the menu button beside it;
+  // every other page has `PhoneTopBar` over its content area, and starts under it. Focus mode draws neither.
+  // Gymnasium's lesson covers the shell (`LessonFrame`): no bar under it for Tab to reach.
+  const inLesson = /^\/studia\/ripasso\/sessione(\/|$)/.test(pathname);
+  const showPhoneBar = !onSearchPage && !settings.focusMode && !inLesson;
+  const storedSection = sectionStore((s) => s.section);
+  const sectionName = SECTIONS.find((s) => s.id === (sectionForPath(pathname) ?? storedSection))?.name ?? 'VisuaLex';
+  const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
+  const [phoneBarElement, setPhoneBarElement] = useState<HTMLElement | null>(null);
+  const phoneBar = useHideOnScroll(scroller, { enabled: showPhoneBar && !sidebarOpen, resetKey: pathname, bar: phoneBarElement });
+  // The bar's name (G8, as iOS's large titles): nothing in the middle while the page's own title is in sight under the
+  // bar — it says the name already —, the page's name once the title has scrolled out (`PhoneTopBar` fades it in). A
+  // page with no `h1` has its name at once.
+  const titleInView = usePageTitleInView(scroller, { enabled: showPhoneBar, resetKey: pathname, bar: phoneBarElement });
+  const barTitle = titleInView ? '' : phoneBarTitle(pathname, sectionName);
+  // The services' probe, once for both copies of the sidebar and running with the menu closed (S1): its
+  // status is the user menu's «Stato dei servizi», and a fault is a dot on the user button and, on a
+  // phone, on the button that opens the drawer, whose names say it.
+  const serviceHealth = useServiceHealth();
+  const servicesNotice = serviceHealthNeedsNotice(serviceHealth.snapshot.overall);
+  // Closing the drawer (an entry, a link, the backdrop) puts its controls out of reach (`inert`): the focus they held goes
+  // to the menu button, where a dialog an entry opens gives it back and a section's new title may still take it.
+  const menuToggleRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const closeDrawer = () => {
+    setSidebarOpen(false);
+    const active = document.activeElement;
+    if (!active || active === document.body || drawerRef.current?.contains(active)) menuToggleRef.current?.focus({ preventScroll: true });
+  };
+  // Esc closes the drawer and gives the focus to the button that opened it, wherever the focus was (opening it from the
+  // bar leaves the focus on that button). An Esc a control inside took (the user menu, the section switcher) or an
+  // overlay over the drawer (a modal dialog, a sheet, the palette) is theirs. Only while the drawer is drawn: a window
+  // widened past `lg` with it open hides it by CSS and keeps the state, and its Esc belongs to the page (gotcha 26).
+  const drawerDrawn = !useMediaQuery('(min-width: 1024px)');
+  useEffect(() => {
+    if (!sidebarOpen || !drawerDrawn) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented || isWorkspaceCovered()) return;
+      e.preventDefault();
+      setSidebarOpen(false);
+      menuToggleRef.current?.focus({ preventScroll: true });
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [sidebarOpen, drawerDrawn]);
+  const menuToggle = {
+    buttonRef: menuToggleRef,
+    open: sidebarOpen,
+    onToggle: () => setSidebarOpen(!sidebarOpen),
+    notice: servicesNotice ? serviceHealthLabel(serviceHealth.snapshot.overall).toLowerCase() : undefined,
+  };
 
   // Leaving the search page closes the window: its matches are in practices no longer on screen.
   useEffect(() => {
@@ -62,7 +167,7 @@ export function Layout() {
   // The search tour follows the welcome (a first visit lands on `/`): started here when the welcome
   // ends, since one tour at a time is on screen (`useTour`) and the search page asks only once. The
   // address is read when the welcome ends, not when this callback was made.
-  const { startTour, hasSeenTour, resetAndStartTour, tryStartTour } = useTour({
+  const { startTour, prepareTour, hasSeenTour, resetAndStartTour, tryStartTour } = useTour({
     theme: settings.theme as 'light' | 'dark',
     onComplete: (type) => {
       if (type === 'welcome' && window.location.pathname === '/') tryStartTour('search');
@@ -75,6 +180,7 @@ export function Layout() {
   const consentAsking = consent !== null && (consent.status === 'loading' || consent.needsAnswer);
   useEffect(() => {
     if (consentAsking) return;
+    if (!hasSeenTour('welcome')) prepareTour();
     // Small delay to ensure DOM is ready
     const timer = setTimeout(() => {
       if (!hasSeenTour('welcome')) {
@@ -82,7 +188,7 @@ export function Layout() {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [hasSeenTour, startTour, consentAsking]);
+  }, [hasSeenTour, prepareTour, startTour, consentAsking]);
 
   // Apply Theme & Typography Effects
   useEffect(() => {
@@ -114,11 +220,14 @@ export function Layout() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       // Don't trigger shortcuts when typing in inputs
-      const isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement).tagName);
+      // An element that stands for a field (the search page's field, `data-text-field`) is typed on too: «?» there is a letter.
+      const target = e.target as HTMLElement;
+      const isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || Boolean(target.closest?.('[data-text-field]'));
 
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        openCommandPalette();
+        // The search page's field grows into the menu with its words; elsewhere the menu opens empty (R2).
+        openSearchMenu();
       }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'b') {
         e.preventDefault();
@@ -155,7 +264,10 @@ export function Layout() {
   }, [navigate, updateSettings, settings.focusMode, toggleSidebar, toggleSearchPanel, openCommandPalette, onSearchPage]);
 
   return (
-    <div className="h-app overflow-hidden flex bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300">
+    <div
+      className="h-app overflow-hidden flex bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300"
+      style={{ ['--sidebar-width' as string]: `${desktopSidebarWidth}px` }}
+    >
       {/* Mobile Overlay */}
       {sidebarOpen && (
         <motion.div
@@ -163,7 +275,7 @@ export function Layout() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
+          onClick={closeDrawer}
         />
       )}
 
@@ -171,10 +283,10 @@ export function Layout() {
       <motion.div
         initial={false}
         animate={{
-          width: sidebarVisible && !settings.focusMode ? 64 : 0,
+          width: desktopSidebarWidth,
           opacity: sidebarVisible && !settings.focusMode ? 1 : 0,
         }}
-        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        transition={reduceMotion ? { duration: 0 } : spring.snappy}
         className="hidden lg:block flex-shrink-0 h-full"
       >
         {sidebarVisible && !settings.focusMode && (
@@ -182,31 +294,48 @@ export function Layout() {
             theme={settings.theme}
             toggleTheme={toggleTheme}
             isOpen={true}
+            layout={desktopSidebar.layout}
+            onToggleWide={desktopSidebar.toggle}
             closeMobile={() => { }}
             openSettings={() => setSettingsOpen(true)}
             openKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
+            openFeedback={isAuthenticated ? () => setFeedbackOpen(true) : undefined}
+            serviceHealth={serviceHealth}
           />
         )}
       </motion.div>
 
       {/* Mobile Sidebar */}
       {!settings.focusMode && (
-        <div className="lg:hidden">
+        <div ref={drawerRef} className="lg:hidden">
           <Sidebar
             theme={settings.theme}
             toggleTheme={toggleTheme}
             isOpen={sidebarOpen}
-            closeMobile={() => setSidebarOpen(false)}
+            layout="drawer"
+            closeMobile={closeDrawer}
             openSettings={() => setSettingsOpen(true)}
             openKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
+            openFeedback={isAuthenticated ? () => setFeedbackOpen(true) : undefined}
+            serviceHealth={serviceHealth}
           />
         </div>
       )}
 
       <main
-        className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative"
-        // The practice's columns (`h-app-row`) are the viewport less this bar.
-        style={showSearchBar ? { ['--search-bar-height' as string]: SEARCH_BAR_HEIGHT } : undefined}
+        className={cn(
+          // `isolate`: a stacking context of its own, as it has always been (gotcha 22).
+          'isolate flex-1 flex flex-col min-w-0 h-full overflow-hidden relative',
+          // It holds the focus a closing «Novità» gives back (`focusPage`), with no ring around the whole page.
+          'focus:outline-none',
+          // The practice's columns (`h-app-row`) are the viewport less the search bar: 56 px below lg (and the iPhone's
+          // top edge), 72 from it.
+          showSearchBar && '[--search-bar-height:calc(3.5rem+env(safe-area-inset-top))] lg:[--search-bar-height:4.5rem]',
+          // Where a page's sticky row pins (`top-[var(--phone-bar-offset,0px)]`, «Le mie schede»'s filters): under the
+          // phone's bar while it is on screen, at the top once it has slid away, and at the top from lg.
+          showPhoneBar && 'max-lg:[--phone-bar-offset:calc(3.5rem+env(safe-area-inset-top))]',
+          showPhoneBar && phoneBar.hidden && 'max-md:[--phone-bar-offset:0px]',
+        )}
       >
         {/* Floating Focus Toggle */}
         <motion.button
@@ -215,58 +344,77 @@ export function Layout() {
           onClick={() => updateSettings({ focusMode: !settings.focusMode })}
           id="tour-focus-toggle"
           className={cn(
-            'hidden md:block fixed top-4 right-4 z-50 p-2.5 rounded-xl transition-all duration-200',
-            'backdrop-blur-xl shadow-lg border',
+            // 44 px, the touch target (it was 42: a 20 px icon in 10 px of padding and a 1 px border).
+            'hidden md:grid place-items-center h-11 w-11 fixed top-4 right-4 z-50 rounded-xl transition-colors',
+            // Between md and lg it sits inside the bar's right end, centred on its 56 px.
+            !settings.focusMode && 'max-lg:right-1 max-lg:top-[calc(env(safe-area-inset-top)+0.375rem)]',
+            'shadow-sm border',
             settings.focusMode
-              ? 'bg-primary-600/90 text-white border-transparent hover:bg-primary-500/90'
-              : 'bg-white/80 dark:bg-slate-900/80 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700'
+              ? 'bg-primary-600 text-white border-transparent hover:bg-primary-700'
+              : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-300 hover:text-slate-800 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700'
           )}
           title={settings.focusMode ? 'Esci da Focus Mode (Cmd+Space)' : 'Focus Mode (Cmd+Space)'}
         >
           {settings.focusMode ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
         </motion.button>
 
-        {/* Mobile Menu Button */}
-        {!settings.focusMode && (
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            aria-label={sidebarOpen ? 'Chiudi il menu' : 'Apri il menu'}
-            aria-expanded={sidebarOpen}
-            className="lg:hidden fixed top-4 left-4 z-50 p-2.5 rounded-xl backdrop-blur-xl shadow-lg bg-white/80 dark:bg-slate-900/80 text-slate-600 dark:text-slate-300 border border-slate-200/50 dark:border-slate-700/50"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <line x1="3" y1="12" x2="21" y2="12" />
-              <line x1="3" y1="6" x2="21" y2="6" />
-              <line x1="3" y1="18" x2="21" y2="18" />
-            </svg>
-          </motion.button>
+        {showPhoneBar && (
+          <PhoneTopBar
+            menu={menuToggle}
+            title={barTitle}
+            hidden={phoneBar.hidden}
+            onReveal={phoneBar.reveal}
+            barRef={setPhoneBarElement}
+            onSearch={openCommandPalette}
+          />
         )}
 
         {showSearchBar && (
           <div
             data-testid="search-bar"
-            style={{ height: SEARCH_BAR_HEIGHT }}
-            // Below lg the menu button floats at the top left: the field starts beside it. From md the
-            // Focus toggle floats at the top right: the field ends before it. Positioned in the dropdown
-            // band, so the line under the field paints over the practice's sticky headings (its blur
-            // makes the bar a stacking context, gotcha 22) and under the floating buttons.
-            className={cn('relative flex flex-shrink-0 items-center justify-center border-b', Z_INDEX.dropdown, 'border-slate-200 bg-white/80 pl-[4.5rem] pr-4 backdrop-blur-xl md:pr-[4.5rem] lg:pl-8 dark:border-slate-800 dark:bg-slate-900/80')}
+            // The phone's bar on this page (M1): 56 px below lg, the menu button beside the field and the iPhone's top
+            // edge above it; 72 px from lg. From md the Focus toggle floats at the top right: the field ends before it.
+            // Positioned in the dropdown band, so the line under the field paints over the practice's sticky headings
+            // (its blur makes the bar a stacking context, gotcha 22) and under the floating buttons.
+            className={cn(
+              'relative flex h-[var(--search-bar-height)] flex-shrink-0 items-center justify-center gap-1 border-b', Z_INDEX.dropdown,
+              'border-slate-200 bg-white/80 pl-1 pr-4 pt-[env(safe-area-inset-top)] backdrop-blur-xl md:pr-[3.25rem] lg:pl-8 lg:pr-[4.5rem] lg:pt-0 dark:border-slate-800 dark:bg-slate-900/80',
+            )}
           >
+            <MenuToggle {...menuToggle} />
             <SearchField />
           </div>
         )}
 
-        {/* Content Area */}
-        <div className="flex-1 overflow-y-auto w-full h-full">
+        {/* Content Area. `vlx-page`: the one part a section change's View Transition animates (index.css, T1); the
+            sidebar, the floating buttons and the search bar stay still. */}
+        <div
+          ref={setScroller}
+          className={cn(
+            'vlx-page flex-1 overflow-y-auto w-full h-full',
+            // A page that grows past the window («Oggi», «Progressi», «Collega un'app AI», as it loads) drew its 8 px bar
+            // and moved the centred column 4 px to the left: the room is kept. Not on the search page, whose practice row
+            // is the scroller's height (`h-app-row`) and would only lose 8 px to an empty gutter.
+            !onSearchPage && '[scrollbar-gutter:stable]',
+            // What the keyboard's focus or an anchor scrolls to stops under the phone's bar, not behind it (WCAG 2.4.11).
+            showPhoneBar && 'max-lg:scroll-pt-[calc(3.5rem+env(safe-area-inset-top)+0.5rem)]',
+          )}
+        >
           <div data-testid="layout-content" className={cn(
             'max-w-7xl mx-auto p-4 md:p-8',
-            // The button is about 42 px from top-4: 4.5rem clears it (md: again, or md:p-8 wins).
-            !settings.focusMode && !headerBesideMenuButton && 'pt-[4.5rem] md:pt-[4.5rem] lg:pt-8',
-            settings.focusMode && 'max-w-4xl py-12'
+            // Under the phone's bar, 56 px and the iPhone's top edge, with the page's 16 px of air (md: again, or
+            // md:p-8 wins).
+            showPhoneBar && 'pt-[calc(4.5rem+env(safe-area-inset-top))] md:pt-[calc(4.5rem+env(safe-area-inset-top))] lg:pt-8',
+            settings.focusMode && 'max-w-4xl py-12',
+            // The feedback button floats over the page's foot from md, signed in: 24 px off the edge and 46 px tall, and
+            // 16 px of air over it, so the last row («Ripassa» of the last subject) scrolls clear of it (G8c). In
+            // `--page-foot`, which a page sized to the window takes off its height (the graph's). Not on the search page,
+            // whose practice row is the window less `p-8` (`h-app-row`).
+            isAuthenticated && !onSearchPage && 'md:[--page-foot:5.375rem] md:pb-[var(--page-foot)]',
           )}>
-            <Outlet />
+            <RoutePage>
+              <Outlet />
+            </RoutePage>
           </div>
         </div>
       </main>
@@ -276,14 +424,16 @@ export function Layout() {
       {/* Keyboard Shortcuts Modal */}
       <KeyboardShortcutsModal isOpen={keyboardShortcutsOpen} onClose={() => setKeyboardShortcutsOpen(false)} />
 
-      {/* Feedback Button - only for authenticated users */}
-      {isAuthenticated && <FeedbackButton className={barPinnedAtBottom ? 'max-md:hidden' : undefined} />}
+      {/* Feedback, for a signed-in user: the floating button from md; on a phone, where it covered the foot of every
+          page (the bars pinned to the bottom, «6 di 10» in the progress card), the user menu's «Invia un commento» (M1). */}
+      {isAuthenticated && <FeedbackButton className="max-md:hidden" onOpen={() => setFeedbackOpen(true)} />}
+      <FeedbackModal isOpen={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
 
       {/* Version changelog notification */}
       <ChangelogNotification />
 
       {/* Global Undo Toast Container */}
-      <UndoToastContainer />
+      <NotificationHost />
 
       {/* MERL-T global plugin slot — Layout-level side-effect mounts
           (forum-signal tracker, etc.). Renders null but keeps subscribers
@@ -293,19 +443,24 @@ export function Layout() {
       {/* Global sync error toast (highlights / annotations save/load) */}
       <SyncErrorToast />
 
-      <ServiceHealthBanner className={barPinnedAtBottom ? 'max-md:hidden' : undefined} />
-
       {/* The palette (⌘K) and the managers it opens, on every page */}
       <GlobalSearch />
+
+      {/* The planner's quick add («c»), its toast and the count beside «Oggi», on every page */}
+      <PlannerHost enabled={isAuthenticated} />
 
       {/* Find in the text (Cmd/Ctrl+F, the reading toolbars' magnifier) */}
       <FindWindow />
 
-      {/* Heavy reader overlays are loaded only when their route/state needs them. */}
-      <Suspense fallback={null}>
-        {/* Article Compare View */}
-        <CompareView />
-      </Suspense>
+      {/* Heavy reader overlays are loaded only when their route/state needs them: the comparison on its first opening,
+          a spinner where it will stand while its code arrives and it is open. */}
+      {compareOpened && (
+        <CompareBoundary>
+          <Suspense fallback={<CompareWaiting />}>
+            <CompareView />
+          </Suspense>
+        </CompareBoundary>
+      )}
     </div>
   );
 }

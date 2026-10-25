@@ -36,9 +36,18 @@ import type { ReadingBackEntry } from '../../../utils/readingBackStack';
 import { keyPassages } from '../../../utils/decisionKeyPassages';
 import { KeyPassagePopover } from './KeyPassagePopover';
 import { KeyPassagesMenu } from './KeyPassagesMenu';
+import { scrollToMiddle } from '../../../utils/scrollParent';
 
 // A decision's anchors are stored under its key with no article: the wire key is `<key>::art::`.
 const NO_ARTICLE = '';
+
+/** A host that holds norms of its own (the dossier, D7d): the norms the text cites are its to open. */
+export interface CitedNorms {
+  /** Whether the host holds the norm: the preview's button then says «Apri tra le norme», else «Apri su Dashboard». */
+  holds: (citation: ParsedCitationData) => boolean;
+  /** A click on a cited norm, with the link clicked; the preview's button, with none. */
+  open: (citation: ParsedCitationData, link: HTMLElement | null) => void;
+}
 
 export interface DecisionReadingSurfaceProps {
   identity: DecisionIdentity;
@@ -61,6 +70,17 @@ export interface DecisionReadingSurfaceProps {
    * §6.6). Only the find window's registration, pressed state and opener read it.
    */
   findHostId?: string;
+  /**
+   * A norm or a decision the text cites was sent to the workspace (a search, a decision's window): a host off the
+   * search page (the dossier) goes there, where it is drawn. Without it nothing moves, as in the workspace, which is
+   * that page.
+   */
+  onLeave?: () => void;
+  /**
+   * The cited norms go to the host instead of a search (the dossier, D7d): it opens one it holds where it is, and
+   * offers the rest. The text and its links are the same either way (gotcha 23).
+   */
+  citedNorms?: CitedNorms;
 }
 
 /**
@@ -69,7 +89,7 @@ export interface DecisionReadingSurfaceProps {
  * it. Self-contained: it takes the decision as props and reaches only the store's search and
  * way-back actions, so any host can mount it.
  */
-export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, hostBlockId, findHostId }: DecisionReadingSurfaceProps) {
+export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, hostBlockId, findHostId, onLeave, citedNorms }: DecisionReadingSurfaceProps) {
   const {
     triggerSearch, pushReadingBack, annotations, highlights, removeAnnotation, updateAnnotation,
     removeHighlight, loadAnnotationsForArticle, loadHighlightsForArticle, showKeyPassages, updateSettings,
@@ -212,8 +232,9 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
   const goToPassage = (index: number) => {
     const piece = contentRef.current?.querySelector<HTMLElement>(`[data-key-index="${index}"]`);
     if (!piece) return;
-    // at once, not smoothly: the popover opens on the passage already in view, and the keyboard's focus goes to it
-    piece.scrollIntoView({ block: 'center' });
+    // at once, not smoothly: the popover opens on the passage already in view, and the keyboard's focus goes to it; the
+    // scroller the text reads in alone (in the dossier's two columns the norms' column and the page stay put, D7d)
+    scrollToMiddle(piece);
     const pieces = contentRef.current?.querySelectorAll<HTMLElement>(`[data-key-index="${index}"]`) ?? [];
     pieces.forEach((p) => p.classList.add('vlx-flash'));
     window.setTimeout(() => pieces.forEach((p) => p.classList.remove('vlx-flash')), 1600);
@@ -229,19 +250,20 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
     [hostTabId, hostBlockId, label],
   );
 
-  const openCitation = useCallback((citation: ParsedCitationData) => {
+  const openCitation = useCallback((citation: ParsedCitationData, link: HTMLElement | null = null) => {
+    if (citedNorms) return citedNorms.open(citation, link);
     triggerSearch({
       act_type: citation.act_type,
       act_number: citation.act_number || '',
       date: citation.date || '',
       article: citation.article,
       version: 'vigente',
-      show_brocardi_info: true,
       ...(hostTabId ? { besideId: hostTabId } : {}),
     });
-  }, [triggerSearch, hostTabId]);
+    onLeave?.();
+  }, [triggerSearch, hostTabId, onLeave, citedNorms]);
 
-  const decisionLinks = useDecisionLinks({ besideId: hostTabId, origin });
+  const decisionLinks = useDecisionLinks({ besideId: hostTabId, origin, onOpened: onLeave });
   useCitationLinks(contentRef, { onOpen: openCitation, origin, showPreview, hidePreview, isHoveringPopupRef, decisions: decisionLinks.links });
 
   const showToast = (message: string, type: ToastProps['type']) => setToast({ message, type });
@@ -294,7 +316,8 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
         isDiscussionOpen={discussion.open}
         onToggleDiscussion={discussion.toggle}
         isFindOpen={isFindOpen}
-        onToggleFind={(wasPressed) => (wasPressed ? closeFindWindow() : openFindWindow({ tabId: findHost, targetKey: key, returnFocus: findButtonRef.current }))}
+        // No host, no find window: nothing of this text is registered for it to search (the dossier).
+        onToggleFind={findHost ? (wasPressed) => (wasPressed ? closeFindWindow() : openFindWindow({ tabId: findHost, targetKey: key, returnFocus: findButtonRef.current })) : undefined}
         findButtonRef={findButtonRef}
         keyPassages={(
           <KeyPassagesMenu
@@ -416,6 +439,8 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
         article={preview.article}
         position={preview.position}
         onClose={hidePreview}
+        // In the dossier: «Apri tra le norme» for a norm it holds, else Dashboard, as the dossier's own buttons say.
+        openLabel={citedNorms && preview.citation ? (citedNorms.holds(preview.citation) ? 'Apri tra le norme' : 'Apri su Dashboard') : undefined}
         onOpenCitation={(citation) => {
           // the popup's own button is a jump like a click: the way back is recorded the same
           if (origin) pushReadingBack(origin);

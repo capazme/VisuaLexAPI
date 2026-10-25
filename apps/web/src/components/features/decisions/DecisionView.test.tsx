@@ -81,6 +81,16 @@ describe('DecisionView', () => {
     expect(heading).toHaveAttribute('tabindex', '-1');
   });
 
+  it('names the decision in a quiet line of details where the host\'s row names it already (the dossier, D7a)', () => {
+    view(FOUND, { title: 'line' });
+    expect(screen.queryByRole('heading')).toBeNull();
+    const line = screen.getByText(/Sez\. VII penale · Sentenza n\. 99999\/2024/);
+    expect(line.tagName).toBe('P');
+    expect(line).toHaveClass('text-sm');
+    expect(line).not.toHaveClass('text-xl', 'font-semibold');
+    expect(line).toHaveAttribute('data-decision-heading');
+  });
+
   it('announces the loading in a status that is not inside a busy container', () => {
     view(null);
     const status = screen.getByRole('status');

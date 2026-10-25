@@ -19,7 +19,6 @@ export function matchesSearchFilters(article: ArticleData, filters?: SearchFilte
   if (!filters) return true;
 
   if (filters.source !== 'all' && sourceOf(article) !== filters.source) return false;
-  if (filters.hasBrocardi && !article.brocardi_info) return false;
   if (filters.onlyHistorical && !article.versionInfo?.isHistorical) return false;
 
   const year = yearOf(article.norma_data?.data_versione || article.norma_data?.data);
@@ -32,7 +31,23 @@ export function matchesSearchFilters(article: ArticleData, filters?: SearchFilte
 export function defaultSearchFilters(): SearchFilters {
   return {
     source: 'all',
-    hasBrocardi: false,
     onlyHistorical: false,
   };
+}
+
+/**
+ * How many of the palette's filters narrow a search: the source, «Solo versioni storiche», and the
+ * years (one filter, from either end or both).
+ */
+export function countActiveFilters(filters: SearchFilters): number {
+  return (filters.source !== 'all' ? 1 : 0)
+    + (filters.onlyHistorical ? 1 : 0)
+    + (filters.yearFrom !== undefined || filters.yearTo !== undefined ? 1 : 0);
+}
+
+/** The filters' state in words, beside their disclosure: «Nessun filtro», «1 filtro attivo», «2 filtri attivi». */
+export function activeFiltersLabel(filters: SearchFilters): string {
+  const count = countActiveFilters(filters);
+  if (count === 0) return 'Nessun filtro';
+  return count === 1 ? '1 filtro attivo' : `${count} filtri attivi`;
 }

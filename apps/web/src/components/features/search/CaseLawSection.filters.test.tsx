@@ -35,11 +35,6 @@ const NORMA: NormaVisitata = {
   tipo_atto: 'codice civile', numero_articolo: '2043', data: '1942-03-16', numero_atto: '262', allegato: '2',
   urn: 'urn:nir:stato:regio.decreto:1942-03-16;262:2~art2043',
 };
-const MASSIME = [
-  { autorita: 'Cass. civ.', numero: '31191', anno: '2025', massima: 'La responsabilità del custode.' },
-  { autorita: 'Cass. civ.', numero: '100', anno: '2019', massima: 'Il nesso causale.' },
-  { autorita: 'Cons. Stato', numero: '10', anno: '2020', massima: 'Il provvedimento.' },
-];
 const hit = (numero: number, anno: number, deposito: string, frammento: string) => ({
   identita: { corte: 'cassazione' as const, archivio: 'civile' as const, numero, anno },
   attributi: { data_deposito: deposito }, trovata: 'testo' as const, frammento: { testo: frammento, evidenziati: [] as Array<[number, number]> },
@@ -87,7 +82,7 @@ afterEach(() => { window.matchMedia = savedMatchMedia; });
 async function openAll() {
   render(
     <MemoryRouter>
-      <CaseLawSection norma={NORMA} massime={MASSIME} articleUrn={NORMA.urn} tabId="tab-1" />
+      <CaseLawSection norma={NORMA} articleUrn={NORMA.urn} tabId="tab-1" />
     </MemoryRouter>,
   );
   await userEvent.click(screen.getByRole('button', { name: 'Giurisprudenza' }));
@@ -96,30 +91,28 @@ async function openAll() {
   await userEvent.click(await screen.findByRole('button', { name: /Nelle rassegne della Cassazione/ }));
   await screen.findByText('Passo sul risarcimento.');
 }
-const massimeLabels = () => screen.getAllByRole('link', { name: /^Cass\. civ\., n\. (31191|100)\// }).map((a) => a.textContent);
+const cassazioneLabels = () => screen.getAllByRole('link', { name: /^Cass\. civ\., n\. (24908|500)\// }).map((a) => a.textContent);
 
 describe('CaseLawSection — one control for every source', () => {
   it('draws the years and the text filter once, above the blocks', async () => {
     await openAll();
     expect(screen.getAllByRole('group', { name: 'Anni' })).toHaveLength(1);
     expect(screen.getAllByRole('searchbox')).toHaveLength(1);
-    expect(screen.queryByRole('combobox')).toBeNull(); // Brocardi's own «Tutti gli anni» select is gone
+    expect(screen.queryByRole('combobox')).toBeNull(); // no block brings a select of its own
   });
 
   it('counts the years of every block together, newest first', async () => {
     await openAll();
     const chips = within(screen.getByRole('group', { name: 'Anni delle decisioni' })).getAllByRole('button').map((b) => b.textContent);
-    // massime 2025, 2020, 2019 · Cassazione 2026, 2019 · rassegne 2024, 2016
-    expect(chips).toEqual(['2026 (1)', '2025 (1)', '2024 (1)', '2020 (1)', '2019 (2)', '2016 (1)']);
+    // Cassazione 2026, 2019 · rassegne 2024, 2016
+    expect(chips).toEqual(['2026 (1)', '2024 (1)', '2019 (1)', '2016 (1)']);
   });
 
   it('a chip narrows every block, and pressing it again lifts the filter', async () => {
     await openAll();
-    const chip = screen.getByRole('button', { name: '2019 (2)' });
+    const chip = screen.getByRole('button', { name: '2019 (1)' });
     await userEvent.click(chip);
     expect(chip).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: '1 di 3 massime' })).toBeInTheDocument();
-    expect(massimeLabels()).toEqual(['Cass. civ., n. 100/2019']);
     // the Cassazione is asked again for that year, from the first page; its hits are the archive's
     await screen.findByText('Cass. civ., n. 500/2019');
     expect(vi.mocked(searchDecisions)).toHaveBeenLastCalledWith(expect.anything(), 1, 'indice', { dal: 2019, al: 2019 });
@@ -128,16 +121,17 @@ describe('CaseLawSection — one control for every source', () => {
     expect(screen.queryByText('Passo sulla responsabilità aquiliana.')).toBeNull();
     expect(screen.queryByText('Passo sul risarcimento.')).toBeNull();
     expect(screen.getByText('Nessun passo caricato con i filtri selezionati.')).toBeInTheDocument();
-    await userEvent.click(chip);
-    expect(screen.getByRole('button', { name: '3 di 3 massime' })).toBeInTheDocument();
-    expect(screen.getByText('Passo sul risarcimento.')).toBeInTheDocument();
+    // the chip is drawn again as the Cassazione's answer comes back: pressed, and found by its year
+    const pressed = screen.getByRole('button', { name: /^2019/ });
+    expect(pressed).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(pressed);
+    expect(await screen.findByText('Passo sul risarcimento.')).toBeInTheDocument();
   });
 
   it('a range typed «dal / al» narrows them too, and keeps the passages of the years it covers', async () => {
     await openAll();
     await userEvent.type(screen.getByRole('textbox', { name: 'Dall’anno' }), '2020');
     await userEvent.type(screen.getByRole('textbox', { name: 'All’anno' }), '2026');
-    expect(screen.getByRole('button', { name: '2 di 3 massime' })).toBeInTheDocument();
     expect(screen.getByText('Passo sulla responsabilità aquiliana.')).toBeInTheDocument();
     expect(screen.queryByText('Passo sul risarcimento.')).toBeNull();
     expect(await screen.findByText('1 decisione dal 2020 al 2026 nell’archivio pubblico della Cassazione (dal 4 gennaio 2021)')).toBeInTheDocument();
@@ -147,11 +141,10 @@ describe('CaseLawSection — one control for every source', () => {
   });
 
   it('a range set before the Cassazione is searched asks nothing until the button is pressed', async () => {
-    render(<MemoryRouter><CaseLawSection norma={NORMA} massime={MASSIME} articleUrn={NORMA.urn} tabId="tab-1" /></MemoryRouter>);
+    render(<MemoryRouter><CaseLawSection norma={NORMA} articleUrn={NORMA.urn} tabId="tab-1" /></MemoryRouter>);
     await userEvent.click(screen.getByRole('button', { name: 'Giurisprudenza' }));
     await userEvent.type(screen.getByRole('textbox', { name: 'Dall’anno' }), '2019');
     await userEvent.type(screen.getByRole('textbox', { name: 'All’anno' }), '2019');
-    expect(screen.getByRole('button', { name: '1 di 3 massime' })).toBeInTheDocument();
     expect(vi.mocked(searchDecisions)).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: 'Cerca nell’archivio della Cassazione' }));
     expect(await screen.findByText('Cass. civ., n. 500/2019')).toBeInTheDocument();
@@ -163,8 +156,8 @@ describe('CaseLawSection — one control for every source', () => {
     vi.mocked(searchDecisions).mockReset().mockResolvedValue(withCounts('indice'));
     await openAll();
     expect(screen.getByRole('button', { name: /^2026 \(circa 1200\)/ })).toBeInTheDocument();
-    // a year the archive counts and no hit loaded shows too, with the massime's own rows added
-    expect(screen.getByRole('button', { name: /^2019 \(circa 801\)/ })).toBeInTheDocument();
+    // the archive's count stands for the hits loaded of that year
+    expect(screen.getByRole('button', { name: /^2019 \(circa 800\)/ })).toBeInTheDocument();
   });
 
   it('counts the text search exactly', async () => {
@@ -177,40 +170,39 @@ describe('CaseLawSection — one control for every source', () => {
   it('a half-typed year narrows nothing yet', async () => {
     await openAll();
     await userEvent.type(screen.getByRole('textbox', { name: 'Dall’anno' }), '20');
-    expect(screen.getByRole('button', { name: '3 di 3 massime' })).toBeInTheDocument();
+    expect(screen.getByText('Passo sul risarcimento.')).toBeInTheDocument();
+    expect(screen.getByText('Passo sulla responsabilità aquiliana.')).toBeInTheDocument();
+    expect(vi.mocked(searchDecisions)).toHaveBeenCalledTimes(1);
   });
 
   it('finds an accented word without the accent, in every block', async () => {
     await openAll();
     await userEvent.type(screen.getByRole('searchbox'), 'responsabilita');
-    expect(screen.getByRole('button', { name: '1 di 3 massime' })).toBeInTheDocument();
-    expect(screen.getByText('La responsabilità del custode.')).toBeInTheDocument();
     expect(screen.getByText('Passo sulla responsabilità aquiliana.')).toBeInTheDocument();
     expect(screen.queryByText('Passo sul risarcimento.')).toBeNull();
     expect(screen.getByText('Nessuna delle 2 decisioni caricate corrisponde ai filtri.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Azzera i filtri' }));
-    expect(screen.getByRole('button', { name: '3 di 3 massime' })).toBeInTheDocument();
+    expect(screen.getByText('Passo sul risarcimento.')).toBeInTheDocument();
   });
 
   it('reverses the order of every block', async () => {
     await openAll();
-    expect(massimeLabels()).toEqual(['Cass. civ., n. 31191/2025', 'Cass. civ., n. 100/2019']);
+    expect(cassazioneLabels()).toEqual(['Cass. civ., n. 24908/2026', 'Cass. civ., n. 500/2019']);
     await userEvent.click(screen.getByRole('button', { name: 'Dal più recente' }));
     expect(screen.getByRole('button', { name: 'Dal meno recente' })).toBeInTheDocument();
-    expect(massimeLabels()).toEqual(['Cass. civ., n. 100/2019', 'Cass. civ., n. 31191/2025']);
+    expect(cassazioneLabels()).toEqual(['Cass. civ., n. 500/2019', 'Cass. civ., n. 24908/2026']);
     const chips = within(screen.getByRole('group', { name: 'Anni delle decisioni' })).getAllByRole('button').map((b) => b.textContent);
     expect(chips[0]).toBe('2016 (1)');
   });
 
   it('forgets the filters when the article changes', async () => {
     const { rerender } = render(
-      <MemoryRouter><CaseLawSection norma={NORMA} massime={MASSIME} articleUrn="a" tabId="t" /></MemoryRouter>,
+      <MemoryRouter><CaseLawSection norma={NORMA} articleUrn="a" tabId="t" /></MemoryRouter>,
     );
     await userEvent.click(screen.getByRole('button', { name: 'Giurisprudenza' }));
     await userEvent.type(screen.getByRole('searchbox'), 'custode');
-    expect(screen.getByRole('button', { name: '1 di 3 massime' })).toBeInTheDocument();
-    rerender(<MemoryRouter><CaseLawSection norma={NORMA} massime={MASSIME} articleUrn="b" tabId="t" /></MemoryRouter>);
-    expect(screen.getByRole('button', { name: '3 di 3 massime' })).toBeInTheDocument();
+    expect(screen.getByRole('searchbox')).toHaveValue('custode');
+    rerender(<MemoryRouter><CaseLawSection norma={NORMA} articleUrn="b" tabId="t" /></MemoryRouter>);
     expect(screen.getByRole('searchbox')).toHaveValue('');
   });
 });
@@ -219,7 +211,7 @@ describe('CaseLawSection — on a phone', () => {
   beforeEach(() => { desktop = false; });
 
   it('keeps the controls behind «Filtri», a 44 px target', async () => {
-    render(<MemoryRouter><CaseLawSection norma={NORMA} massime={MASSIME} articleUrn={NORMA.urn} tabId="tab-1" /></MemoryRouter>);
+    render(<MemoryRouter><CaseLawSection norma={NORMA} articleUrn={NORMA.urn} tabId="tab-1" /></MemoryRouter>);
     await userEvent.click(screen.getByRole('button', { name: 'Giurisprudenza' }));
     const filtri = screen.getByRole('button', { name: 'Filtri' });
     expect(filtri).toHaveClass('min-h-[44px]');
@@ -235,13 +227,16 @@ describe('CaseLawSection — on a phone', () => {
     expect(filtri).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByRole('searchbox')).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Anni' })).toBeInTheDocument();
-    for (const control of [screen.getByRole('searchbox'), screen.getByRole('textbox', { name: 'Dall’anno' }), screen.getByRole('button', { name: /^2025/ })]) {
+    for (const control of [screen.getByRole('searchbox'), screen.getByRole('textbox', { name: 'Dall’anno' }), screen.getByRole('textbox', { name: 'All’anno' })]) {
       expect(control).toHaveClass('min-h-[44px]');
     }
+    // a year's chip too, once a block has reported its years (the Massimario's passages: 2024, 2016)
+    await userEvent.click(await screen.findByRole('button', { name: /Nelle rassegne della Cassazione/ }));
+    expect(await screen.findByRole('button', { name: /^2024/ })).toHaveClass('min-h-[44px]');
   });
 
   it('shows the filters in use on the button, and the blocks one under the other with no scrolling box of their own', async () => {
-    render(<MemoryRouter><CaseLawSection norma={NORMA} massime={MASSIME} articleUrn={NORMA.urn} tabId="tab-1" /></MemoryRouter>);
+    render(<MemoryRouter><CaseLawSection norma={NORMA} articleUrn={NORMA.urn} tabId="tab-1" /></MemoryRouter>);
     await userEvent.click(screen.getByRole('button', { name: 'Giurisprudenza' }));
     await userEvent.click(screen.getByRole('button', { name: 'Filtri' }));
     await userEvent.type(screen.getByRole('searchbox'), 'custode');
@@ -265,27 +260,24 @@ describe('CaseLawSection — on an act of the Union', () => {
       esito: 'risultati', celex: '32016R0679', articolo: '6', totale: 2, troncato: false,
       decisioni: [eu('JUDG', 97, 2023, '2025-03-03'), eu('ORDER', 123, 2020, '2021-05-05')],
     });
-    render(<MemoryRouter><CaseLawSection norma={GDPR} massime={MASSIME} articleUrn={GDPR.urn} tabId="tab-1" /></MemoryRouter>);
+    render(<MemoryRouter><CaseLawSection norma={GDPR} articleUrn={GDPR.urn} tabId="tab-1" /></MemoryRouter>);
     await userEvent.click(screen.getByRole('button', { name: 'Giurisprudenza' }));
     await screen.findByText('Corte giust. UE, C-97/23');
   }
 
-  it('counts the Court of Justice\'s years with the massime\'s, in the section\'s chips', async () => {
+  it('counts the Court of Justice\'s years in the section\'s chips', async () => {
     await openGdpr();
     const chips = within(screen.getByRole('group', { name: 'Anni delle decisioni' })).getAllByRole('button').map((b) => b.textContent);
-    // massime 2025, 2020, 2019 · Court of Justice 2025, 2021
-    expect(chips).toEqual(['2025 (2)', '2021 (1)', '2020 (1)', '2019 (1)']);
+    expect(chips).toEqual(['2025 (1)', '2021 (1)']);
   });
 
-  it('narrows the Court of Justice\'s block together with the massime when a chip is pressed', async () => {
+  it('narrows the Court of Justice\'s block when a chip is pressed', async () => {
     await openGdpr();
-    expect(screen.getByRole('button', { name: '3 di 3 massime' })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: '2025 (2)' }));
-    expect(screen.getByRole('button', { name: '1 di 3 massime' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: '2025 (1)' }));
     expect(screen.getByText('1 di 2 decisioni')).toBeInTheDocument();
     expect(screen.getByText('Corte giust. UE, C-97/23')).toBeInTheDocument();
     expect(screen.queryByText(/C-123\/20/)).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: '2025 (2)' }));
+    await userEvent.click(screen.getByRole('button', { name: '2025 (1)' }));
     expect(screen.getByText('2 decisioni')).toBeInTheDocument();
   });
 
@@ -301,7 +293,7 @@ describe('CaseLawSection — on an act of the Union', () => {
 describe('CaseLawSection — one press, one request', () => {
   // The development server runs every effect twice (StrictMode): the search is asked for once all the same
   it.each([false, true])('asks the archive once for a range set before the button, strict mode %s', async (strict) => {
-    const ui = <MemoryRouter><CaseLawSection norma={NORMA} massime={MASSIME} articleUrn={NORMA.urn} tabId="tab-1" /></MemoryRouter>;
+    const ui = <MemoryRouter><CaseLawSection norma={NORMA} articleUrn={NORMA.urn} tabId="tab-1" /></MemoryRouter>;
     render(strict ? <StrictMode>{ui}</StrictMode> : ui);
     await userEvent.click(screen.getByRole('button', { name: 'Giurisprudenza' }));
     await userEvent.type(screen.getByRole('textbox', { name: 'Dall’anno' }), '2024');

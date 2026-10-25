@@ -5,6 +5,7 @@ A real aiohttp server on 127.0.0.1 answers; the egress check is patched open for
 that address and the waits are patched to zero. Nothing leaves the machine.
 """
 import asyncio
+import time
 
 import pytest
 from aiohttp import web
@@ -77,11 +78,109 @@ class TestMaxRetries:
         assert portal.hits == 1
         assert raised.value.status_code is None
 
+    async def test_a_spent_budget_gives_up_without_waiting_for_retry_after(self, client):
+        """No attempt follows, so a Retry-After of a minute is not slept through."""
+        async def busy(request):
+            return web.Response(status=429, text="no", headers={"Retry-After": "60"})
+
+        app = web.Application()
+        app.router.add_get("/", busy)
+        server = TestServer(app)
+        await server.start_server()
+        try:
+            async with asyncio.timeout(5):
+                with pytest.raises(NetworkError) as raised:
+                    await client.request("GET", str(server.make_url("/")), max_retries=0)
+        finally:
+            await server.close()
+        assert raised.value.status_code == 429
+        assert raised.value.retry_after == 60.0
+
     async def test_one_retry_makes_two_attempts(self, client):
         async with Portal([503]) as portal:
             with pytest.raises(NetworkError):
                 await client.request("GET", portal.url, max_retries=1)
         assert portal.hits == 2
+
+
+class TestRetryAfterOutlivesTheCall:
+    """A spent budget gives up at once, but the Retry-After is not dropped: the next
+    request to the same source waits it out (act_dates asks again in a loop of URNs)."""
+
+    @staticmethod
+    async def _busy_then_ok(retry_after, busy=1):
+        hits = []
+
+        async def handler(request):
+            hits.append(time.monotonic())
+            if len(hits) <= busy:
+                return web.Response(status=429, text="no", headers={"Retry-After": retry_after})
+            return web.Response(status=200, text="ok")
+
+        app = web.Application()
+        app.router.add_get("/", handler)
+        server = TestServer(app)
+        await server.start_server()
+        return server, hits
+
+    @pytest.mark.parametrize("max_retries", [0, 1])
+    async def test_the_next_request_from_the_same_loop_waits_for_retry_after(self, client, max_retries):
+        # Every attempt of the first call is refused, so its budget is spent on 429s.
+        server, hits = await self._busy_then_ok("0.6", busy=max_retries + 1)
+        url = str(server.make_url("/"))
+        try:
+            results = []
+            for _ in range(2):  # the caller's own loop, as act_dates.resolve_many
+                try:
+                    results.append((await client.request(
+                        "GET", url, source="normattiva", max_retries=max_retries)).status)
+                except NetworkError as exc:
+                    results.append(exc.status_code)
+                if results[-1] == 200:
+                    break
+        finally:
+            await server.close()
+        assert results == [429, 200]
+        assert len(hits) == max_retries + 2
+        assert hits[-1] - hits[-2] >= 0.55
+
+    async def test_the_pause_holds_only_the_source_that_asked(self, client):
+        server, hits = await self._busy_then_ok("60")
+        url = str(server.make_url("/"))
+        try:
+            async with asyncio.timeout(5):
+                with pytest.raises(NetworkError):
+                    await client.request("GET", url, source="normattiva", max_retries=0)
+                result = await client.request("GET", url, source="eurlex", max_retries=0)
+        finally:
+            await server.close()
+        assert result.status == 200
+
+
+    async def test_our_own_backoff_does_not_pause_the_source(self, client, monkeypatch):
+        """A page that always fails (no Retry-After) must not slow the next request down."""
+        monkeypatch.setattr(hc, "HTTP_INITIAL_BACKOFF", 5.0)
+        async with Portal([503, 200]) as portal:
+            async with asyncio.timeout(2):
+                with pytest.raises(NetworkError):
+                    await client.request("GET", portal.url, source="normattiva", max_retries=0)
+                result = await client.request("GET", portal.url, source="normattiva", max_retries=0)
+        assert result.status == 200
+
+    async def test_a_pause_longer_than_the_limit_is_refused_at_once(self, client):
+        server, hits = await self._busy_then_ok(str(hc.ThrottledHttpClient.MAX_PAUSE_WAIT + 30))
+        url = str(server.make_url("/"))
+        try:
+            async with asyncio.timeout(5):
+                with pytest.raises(NetworkError):
+                    await client.request("GET", url, source="normattiva", max_retries=0)
+                with pytest.raises(NetworkError) as raised:
+                    await client.request("GET", url, source="normattiva", max_retries=0)
+        finally:
+            await server.close()
+        assert len(hits) == 1  # the source was not asked again
+        assert raised.value.status_code == 429
+        assert raised.value.retry_after > hc.ThrottledHttpClient.MAX_PAUSE_WAIT
 
 
 class TestDefaultBudgetUnchanged:

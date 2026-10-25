@@ -15,8 +15,6 @@ is actually enforced today:
 | `dati.cortecostituzionale.it` | Corte costituzionale — dati aperti (CC BY-SA 3.0) |
 | `www.giustizia-amministrativa.it` | Giustizia amministrativa — Consiglio di Stato e TAR (ricerca dei provvedimenti) |
 | `mdp.giustizia-amministrativa.it` | Giustizia amministrativa — Consiglio di Stato e TAR (testi dei provvedimenti) |
-| `brocardi.it` | Brocardi.it — annotazioni dottrinali (fonte privata) |
-| `www.brocardi.it` | Brocardi.it — annotazioni dottrinali (fonte privata) |
 | `www.portaledelmassimario.ipzs.it` | Portale del Massimario — Corte di cassazione (realizzazione Istituto Poligrafico e Zecca dello Stato) |
 
 The list lives as data in `visualex_api/tools/egress.py`.
@@ -39,24 +37,28 @@ Two mechanisms, with different guarantees:
 
 ### Not yet covered
 
-Three paths reach the network without passing `is_allowed()`. They are known and
+Two paths reach the network without passing `is_allowed()`. They are known and
 open, not oversights:
 
-- **`POST /fetch_tree`.** The caller-supplied `urn` goes to
-  `tools/treextractor.get_tree`, which opens its own `aiohttp` session
-  (`treextractor.py`, the `aiohttp.ClientSession` in `get_tree`) instead of using
-  the shared client. An arbitrary URL in that field is fetched — including one
-  pointing at a host on the deployment's internal network. Routing this call
-  through `ThrottledHttpClient` is the fix and is not done yet.
-- **Playwright navigation.** `page.goto()` in `tools/treextractor.py`,
-  `services/eurlex_scraper.py` and `services/pdfextractor.py` drives a real
-  browser and never consults the allowlist. `POST /export_pdf` has its own,
-  narrower guard (`is_allowed_pdf_urn`, Normattiva URNs only); the other two do
-  not.
+- **Playwright navigation.** `page.goto()` in `services/eurlex_scraper.py` and
+  `services/pdfextractor.py` drives a real browser and never consults the
+  allowlist. `POST /export_pdf` has its own, narrower guard (`is_allowed_pdf_urn`,
+  Normattiva URNs only); the EUR-Lex scraper has none. `tools/treextractor.py`
+  checks the host of the URL before it starts the browser (below), but no
+  browser re-checks the hosts a page then loads or redirects to.
 - **Redirects.** Every `ThrottledHttpClient` (the shared one and the
   court-decision readers') checks the host of the URL it is given. `aiohttp`
   follows redirects by default and none of them re-checks the target, so an
   allowed host that answers with a 302 can move the request somewhere unlisted.
+
+`POST /fetch_tree` was a third path until 21 October 2026: its caller-supplied
+`urn` was fetched by `tools/treextractor.get_tree` on an `aiohttp` session of its
+own. The tree now checks `is_allowed()` before any visit, by the client or by the
+browser, visits only Normattiva's or EUR-Lex's host, and fetches a Normattiva
+page through the shared `ThrottledHttpClient` (`tests/test_tree_variants.py`).
+`is_allowed()` refuses what a browser would read as another host than Python
+does: a backslash, a control character, credentials before the host, a scheme
+other than http(s) (`tests/test_egress_allowlist.py`).
 
 If you are evaluating this server for client work, treat the table above as the
 list of sources it consults on its own initiative, and this section as the list

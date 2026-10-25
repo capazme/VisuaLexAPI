@@ -4,10 +4,6 @@ import { practiceArticleKey, type BesideRef, type Practice } from '../../../util
 import { citeNorm } from '../../../utils/sources';
 import { versionTabSuffix } from '../../../utils/versionDisplay';
 
-/** The words of «Chiudi la pratica»'s confirmation (spec §3.1): the scope and what is not touched. */
-export const CLOSE_PRACTICE_MESSAGE =
-  'Gli atti e le sentenze della pratica verranno tolti dal tavolo. Dossier, note ed evidenziazioni non saranno toccati.';
-
 /** Whether a practice holds nothing to draw: no act, no decision, no topic search. */
 export function isEmptyPractice(practice: Practice): boolean {
   return practice.acts.length === 0 && practice.decisions.length === 0 &&
@@ -55,11 +51,5 @@ export function titleOf(subject: Subject | null): string {
   return `${citeNorm(norma_data)}${versionTabSuffix({ version: norma_data.versione, versionDate: norma_data.data_versione })}`;
 }
 
-/** The nearest ancestor that scrolls: the page's content scroller, which the results area sits in. */
-export function scrollParentOf(el: HTMLElement): HTMLElement | null {
-  for (let node = el.parentElement; node && node !== document.body; node = node.parentElement) {
-    const { overflowY } = getComputedStyle(node);
-    if (overflowY === 'auto' || overflowY === 'scroll') return node;
-  }
-  return null;
-}
+/** The nearest ancestor that scrolls (`utils/scrollParent.ts`): the page's content scroller, which the results area sits in. */
+export { scrollParentOf } from '../../../utils/scrollParent';

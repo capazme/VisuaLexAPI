@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { studiaService } from '../../../services/studiaService';
 import { invalidateArticleCards } from '../../../utils/articleCardsCache';
-import type { Giudizio, Materia, Scheda } from '../../../types/studia';
+import type { Giudizio, Materia, Scheda, XpEsito } from '../../../types/studia';
 
 /** Cards asked for at a time; the server allows 1–20. */
 const PAGE = 10;
@@ -12,6 +12,12 @@ export type QueueStatus = 'loading' | 'ready' | 'empty' | 'forbidden' | 'error';
 
 /** What became of a vote: the view says it in words. */
 export type VoteOutcome = 'voted' | 'gone' | 'already' | 'forbidden' | 'failed';
+
+/** A vote's outcome, and on a vote stored the points it earned (Gymnasium XP spec §3.5: for the act, whatever the verdict). */
+export interface VoteResult {
+  outcome: VoteOutcome;
+  xp?: XpEsito;
+}
 
 interface QueueState {
   /** The subject these cards answer (`''` for all); another subject in use means they are not this one's. */
@@ -31,8 +37,13 @@ const statusOf = (error: unknown): number | undefined => (error as { status?: nu
  * background when few are left. A vote moves to the next card; a card gone (404) or already voted
  * (409) is skipped. A 403 — from the queue or from a vote — means the user is no longer a validator,
  * and the queue stops. Another subject starts over.
+ *
+ * `validator` is what the account says: the queue is read for a validator (`true`), never for someone
+ * the account says is not one (`false`, the refusal at once, with no request the server would refuse),
+ * not before the account is known (`undefined`, still loading), and, when the account could not be read
+ * (`null`), anyway: the server decides, as it did before the account was asked.
  */
-export function useValidationQueue(materia: Materia | undefined) {
+export function useValidationQueue(materia: Materia | undefined, validator: boolean | null | undefined) {
   const key = materia ?? '';
   const [state, setState] = useState<QueueState>(FRESH);
   const [voting, setVoting] = useState(false);
@@ -78,8 +89,8 @@ export function useValidationQueue(materia: Materia | undefined) {
     reading.current = false;
     keyNow.current = key;
     handled.current = new Set();
-    void read(generation.current);
-  }, [read, key]);
+    if (validator === true || validator === null) void read(generation.current);
+  }, [read, key, validator]);
 
   const retry = useCallback(() => {
     generation.current += 1;
@@ -88,10 +99,11 @@ export function useValidationQueue(materia: Materia | undefined) {
     void read(generation.current);
   }, [read]);
 
-  const current = state.key === key && !state.failure ? (state.cards[0] ?? null) : null;
+  const current = validator !== false && validator !== undefined && state.key === key && !state.failure ? (state.cards[0] ?? null) : null;
 
   let status: QueueStatus;
-  if (state.key !== key) status = 'loading';
+  if (validator === false) status = 'forbidden';
+  else if (validator === undefined || state.key !== key) status = 'loading';
   else if (state.failure) status = state.failure;
   else if (state.cards.length > 0) status = 'ready';
   else status = state.dry ? 'empty' : 'loading';
@@ -103,20 +115,20 @@ export function useValidationQueue(materia: Materia | undefined) {
     if (left <= RUNNING_LOW && !state.dry) void read(generation.current);
   };
 
-  const vote = async (giudizio: Giudizio, motivazione?: string): Promise<VoteOutcome> => {
-    if (!current || voting) return 'failed';
+  const vote = async (giudizio: Giudizio, motivazione?: string): Promise<VoteResult> => {
+    if (!current || voting) return { outcome: 'failed' };
     const cardId = current.id;
     // This render's `read` and `advance` answer the subject the vote was cast for. If the subject
     // changes (or the queue starts over) while the vote is on its way, they must not write again.
     const gen = generation.current;
     setVoting(true);
     try {
-      await studiaService.vote(cardId, giudizio, motivazione);
+      const answer = await studiaService.vote(cardId, giudizio, motivazione);
       // The community's counts under the article have moved.
       invalidateArticleCards();
       if (gen === generation.current) advance(cardId);
       else handled.current.add(cardId);
-      return 'voted';
+      return answer.xp ? { outcome: 'voted', xp: answer.xp } : { outcome: 'voted' };
     } catch (error) {
       const code = statusOf(error);
       if (code === 403) {
@@ -125,14 +137,14 @@ export function useValidationQueue(materia: Materia | undefined) {
         generation.current += 1;
         reading.current = false;
         setState({ key: keyNow.current, cards: [], dry: true, failure: 'forbidden' });
-        return 'forbidden';
+        return { outcome: 'forbidden' };
       }
       if (code === 404 || code === 409) {
         if (gen === generation.current) advance(cardId);
         else handled.current.add(cardId);
-        return code === 404 ? 'gone' : 'already';
+        return { outcome: code === 404 ? 'gone' : 'already' };
       }
-      return 'failed';
+      return { outcome: 'failed' };
     } finally {
       setVoting(false);
     }

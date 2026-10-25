@@ -7,6 +7,8 @@ vi.mock('../../../services/dossierService', () => ({
 import { dossierService } from '../../../services/dossierService';
 import { appStore } from '../../../store/useAppStore';
 import { PracticeBar } from './PracticeBar';
+import { registerUndoToastListener, type UndoToast } from '../../../hooks/useUndoableAction';
+import { resetNotifications } from '../../ui/notifications/notifications';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { L24, article } from '../../../utils/__fixtures__/savedWorkspaces';
 
@@ -75,31 +77,50 @@ describe('PracticeBar (spec §5)', () => {
     expect(screen.getByRole('textbox', { name: 'Nome della pratica' })).toHaveValue('Nuova pratica');
   });
 
-  it('a chip\'s «⋯» closes the practice only after the confirmation', () => {
+  it('a chip\'s «⋯» closes the practice at once, with «Annulla» and no confirmation (K1a)', async () => {
     const a = s().createPractice('Da chiudere');
     s().createPractice('Resta');
-    render(<PracticeBar />);
-    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni per la pratica Da chiudere' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Chiudi la pratica' }));
-    const dialog = screen.getByRole('alertdialog');
-    expect(dialog).toHaveTextContent('Dossier, note ed evidenziazioni non saranno toccati.');
-    expect(s().practices.some((p) => p.id === a)).toBe(true);
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Chiudi la pratica' }));
-    expect(s().practices.map((p) => p.label)).toEqual(['Resta']);
+    s().setActivePractice(a);
+    let shown: UndoToast | null = null;
+    const unregister = registerUndoToastListener((t) => { shown = t; });
+    try {
+      render(<PracticeBar />);
+      fireEvent.click(screen.getByRole('button', { name: 'Altre azioni per la pratica Da chiudere' }));
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Chiudi la pratica' }));
+      expect(screen.queryByRole('alertdialog')).toBeNull();
+      expect(s().practices.map((p) => p.label)).toEqual(['Resta']);
+      await act(async () => {});
+      expect(shown!.message).toBe('Pratica «Da chiudere» chiusa');
+      await act(async () => { await shown!.onUndo(); });
+      expect(s().practices.map((p) => p.label)).toEqual(['Da chiudere', 'Resta']);
+      expect(s().activePracticeId).toBe(a);
+    } finally {
+      unregister();
+      resetNotifications();
+    }
   });
 
-  it('«Chiudi tutte» after its confirmation, then a reload, shows no practice', () => {
+  it('«Chiudi tutte» at once, then a reload, shows no practice; «Annulla» puts them all back', async () => {
     s().createPractice('Una');
     s().createPractice('Due');
-    render(<PracticeBar />);
-    fireEvent.click(screen.getByRole('button', { name: 'Chiudi tutte le pratiche' }));
-    const dialog = screen.getByRole('alertdialog');
-    expect(dialog).toHaveTextContent('Le 2 pratiche aperte verranno tolte dal tavolo.');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Chiudi tutte' }));
-    expect(s().practices).toEqual([]);
-    const saved = JSON.parse(JSON.stringify(options().partialize(s())));
-    const reloaded = options().merge(saved, s());
-    expect(reloaded.practices).toEqual([]);
+    let shown: UndoToast | null = null;
+    const unregister = registerUndoToastListener((t) => { shown = t; });
+    try {
+      render(<PracticeBar />);
+      fireEvent.click(screen.getByRole('button', { name: 'Chiudi tutte le pratiche' }));
+      expect(screen.queryByRole('alertdialog')).toBeNull();
+      expect(s().practices).toEqual([]);
+      const saved = JSON.parse(JSON.stringify(options().partialize(s())));
+      const reloaded = options().merge(saved, s());
+      expect(reloaded.practices).toEqual([]);
+      await act(async () => {});
+      expect(shown!.message).toBe('2 pratiche chiuse');
+      await act(async () => { await shown!.onUndo(); });
+      expect(s().practices.map((p) => p.label)).toEqual(['Una', 'Due']);
+    } finally {
+      unregister();
+      resetNotifications();
+    }
   });
 
   it('collapses to «N pratiche» and opens again', () => {

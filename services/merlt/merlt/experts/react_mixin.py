@@ -55,7 +55,7 @@ _CANON_STRATEGY: Dict[str, Dict[str, str]] = {
     },
     "principles": {
         "canone": "teleologico / ratio legis (principî e finalità della norma)",
-        "tools": "fetch_law_article (PRIMA, per il testo della norma), principle_lookup (principî giuridici), cerca_brocardi (dottrina e massime — solo per articoli di codici)",
+        "tools": "fetch_law_article (PRIMA, per il testo della norma), principle_lookup (principî giuridici)",
     },
     "precedent": {
         "canone": "giurisprudenziale (orientamenti e precedenti)",
@@ -979,7 +979,7 @@ Decidi quale strumento usare per raccogliere le informazioni utili al TUO canone
             prompt += (
                 "\n## STRATEGIA — FASE 1 (LOCALIZZA)\n"
                 "Non hai ancora fonti. Parti con `semantic_search` (o una ricerca "
-                "testuale come cerca_brocardi / cerca_giurisprudenza) per individuare "
+                "testuale come cerca_giurisprudenza) per individuare "
                 "le norme e le fonti rilevanti per la query.\n"
             )
         else:
@@ -999,12 +999,11 @@ Decidi quale strumento usare per raccogliere le informazioni utili al TUO canone
 
         prompt += """
 ## REGOLE FORMATO IDENTIFICATORI (rispettale per non far fallire lo strumento)
-- Strumenti su riferimento testuale (cite_law, cerca_brocardi): passa la forma UMANA "art. N <atto>" (es. "art. 2043 codice civile"). NON passare un URL o un urn.
+- Strumenti su riferimento testuale (cite_law): passa la forma UMANA "art. N <atto>" (es. "art. 2043 codice civile"). NON passare un URL o un urn.
 - Per il TESTO di un articolo usa `fetch_law_article` (act_type + article): gestisce sia i codici sia le leggi/decreti NUMERATI (es. legge 241/1990, D.Lgs. 231/2001). `cite_law` risolve bene solo i codici e i testi unici noti — sugli atti numerati fallisce, quindi NON usarlo per leggi/decreti con un numero.
 - Strumenti sul grafo/nodo (graph_search): passa una chiave-nodo REALE tra quelle elencate sopra (chiave-grafo / URL completo) oppure gli estremi reali (es. "Cass. 12345/2024"). NON inventare 'urn:norma:...' né UUID.
 - Usa SOLO gli identificatori elencati nei RIFERIMENTI/URN qui sopra. (semantic_search, definition_lookup e principle_lookup accettano invece testo libero.)
 - graph_search.relation_types: ometti (esplora tutte le relazioni) oppure indica al massimo 2-3 tipi.
-- `cerca_brocardi` funziona SOLO sugli articoli dei CODICI (es. "art. 2043 codice civile"); su leggi/decreti numerati o alias (es. "Statuto dei lavoratori", "GDPR") dà "atto non riconosciuto". Per quelle norme usa `fetch_law_article` per il testo, NON cerca_brocardi.
 - `leggi_sentenza`/`leggi_*` (lettura di UNA sentenza) richiedono gli estremi completi (anno + numero) di una pronuncia GIÀ trovata: non chiamarli finché non hai quegli estremi da una ricerca (`cerca_giurisprudenza`, `giurisprudenza_su_norma`). Per CERCARE sentenze usa i tool di ricerca, non quelli di lettura.
 - Passa a ogni strumento SOLO i parametri che dichiara: non aggiungere campi extra "per sicurezza" (es. `sezione` a `giurisprudenza_su_norma`, che non lo prevede) — un parametro non previsto fa fallire l'intera chiamata.
 

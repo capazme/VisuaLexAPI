@@ -34,16 +34,16 @@ describe('DossierForumActions', () => {
 
   it('cannot publish a dossier the admin withdrew from the Forum (question 190)', () => {
     show({ ...base, forumBlocked: true });
-    expect(screen.getByRole('button', { name: 'Ritirato dal Forum' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Ritirato dai dossier pubblici' })).toBeDisabled();
   });
 
   it('says the state of the copy and withdraws it, reading the dossier again', async () => {
     const { showToast, refreshDossier } = show({ ...base, published: published(true) });
     fireEvent.click(screen.getByRole('button', { name: 'Forum: Nel Forum · v3' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Ritira dal Forum' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Ritira dai dossier pubblici' }));
     await waitFor(() => expect(service.withdraw).toHaveBeenCalledWith('e1'));
     await waitFor(() => expect(refreshDossier).toHaveBeenCalledWith('d'));
-    expect(showToast).toHaveBeenCalledWith('Dossier ritirato dal Forum', 'success');
+    expect(showToast).toHaveBeenCalledWith('Copia pubblicata ritirata', 'success');
   });
 
   it('republishes a copy its author withdrew, never one the admin withdrew', () => {
@@ -55,9 +55,11 @@ describe('DossierForumActions', () => {
   it('deletes the copy only after a danger confirmation', async () => {
     show({ ...base, published: published(true) });
     fireEvent.click(screen.getByRole('button', { name: 'Forum: Nel Forum · v3' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Elimina dal Forum' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Elimina dai dossier pubblici' }));
     expect(service.delete).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Elimina dal Forum' }));
+    // Its buttons answer once they have risen into sight (K1b).
+    await waitFor(() => expect(screen.getByRole('alertdialog')).toHaveAttribute('data-ready'));
+    fireEvent.click(screen.getByRole('button', { name: 'Elimina dai dossier pubblici' }));
     await waitFor(() => expect(service.delete).toHaveBeenCalledWith('e1'));
   });
 });

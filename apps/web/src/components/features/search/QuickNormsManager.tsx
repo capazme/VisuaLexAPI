@@ -10,6 +10,7 @@ import { cn } from '../../../lib/utils';
 import { getActTypesByGroup } from '../../../constants/actTypes';
 import { useTour } from '../../../hooks/useTour';
 import { AttributionChip } from '../bulletin/AttributionChip';
+import { spring } from '../../../lib/motion';
 
 interface QuickNormsManagerProps {
   isOpen: boolean;
@@ -101,7 +102,6 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
       date: actDate,
       article: article || '1',
       version: 'vigente',
-      show_brocardi_info: true
     };
 
     if (!validateSearchParams(searchParams)) {
@@ -155,7 +155,7 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+        transition={spring.snappy}
         className={cn(
           'relative w-full max-w-2xl max-h-[85vh] overflow-hidden',
           'bg-white/85 dark:bg-slate-900/85 backdrop-blur-2xl',
@@ -174,7 +174,7 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl hover:bg-slate-100/80 dark:hover:bg-slate-800/80 text-slate-500 transition-all"
+            className="p-2 rounded-xl hover:bg-slate-100/80 dark:hover:bg-slate-800/80 text-slate-500 transition-colors"
           >
             <X size={20} />
           </button>
@@ -193,7 +193,7 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
               <button
                 onClick={() => setInputMode('manual')}
                 className={cn(
-                  'flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                  'flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-[color,background-color,border-color,box-shadow]',
                   inputMode === 'manual'
                     ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white'
                     : 'text-slate-600 dark:text-slate-400'
@@ -205,7 +205,7 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
               <button
                 onClick={() => setInputMode('url')}
                 className={cn(
-                  'flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                  'flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-[color,background-color,border-color,box-shadow]',
                   inputMode === 'url'
                     ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-900 dark:text-white'
                     : 'text-slate-600 dark:text-slate-400'
@@ -234,12 +234,12 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
                       urlError
                         ? 'border-red-300 dark:border-red-700'
                         : 'border-slate-200 dark:border-slate-700',
-                      'focus:outline-none focus:ring-2 focus:ring-blue-500/30'
+                      'focus:outline-none focus:ring-2 focus:ring-primary-500/30'
                     )}
                   />
                   <button
                     onClick={handleUrlParse}
-                    className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors"
+                    className="px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-sm font-medium transition-colors"
                   >
                     Importa
                   </button>
@@ -264,7 +264,7 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
                     <select
                       value={actType}
                       onChange={(e) => setActType(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                      className="w-full px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
                     >
                       {Object.entries(getActTypesByGroup()).map(([group, acts]) => (
                         <optgroup key={group} label={group}>
@@ -284,7 +284,7 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
                       value={article}
                       onChange={(e) => setArticle(e.target.value)}
                       placeholder="es. 2043"
-                      className="w-full px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                      className="w-full px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
                     />
                   </div>
                 </div>
@@ -299,7 +299,7 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
                       value={actNumber}
                       onChange={(e) => setActNumber(e.target.value)}
                       placeholder="es. 241"
-                      className="w-full px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                      className="w-full px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
                     />
                   </div>
                   <div>
@@ -311,7 +311,7 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
                       value={actDate}
                       onChange={(e) => setActDate(e.target.value)}
                       placeholder="aaaa-mm-gg"
-                      className="w-full px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                      className="w-full px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
                     />
                   </div>
                 </div>
@@ -325,14 +325,14 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
                     value={customLabel}
                     onChange={(e) => setCustomLabel(e.target.value)}
                     placeholder="es. Risarcimento del danno"
-                    className="w-full px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                    className="w-full px-3 py-2 rounded-xl text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
                   />
                 </div>
 
                 <button
                   onClick={handleAddQuickNorm}
                   disabled={!actType || !article}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white rounded-xl text-sm font-medium transition-colors disabled:cursor-not-allowed"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white rounded-xl text-sm font-medium transition-colors disabled:cursor-not-allowed"
                 >
                   <Plus size={18} />
                   Aggiungi ai Preferiti
@@ -374,7 +374,7 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
                               if (e.key === 'Enter') handleSaveEdit();
                               if (e.key === 'Escape') handleCancelEdit();
                             }}
-                            className="flex-1 px-3 py-1.5 rounded-lg text-sm bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                            className="flex-1 px-3 py-1.5 rounded-lg text-sm bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
                             autoFocus
                           />
                           <button
@@ -422,7 +422,7 @@ export function QuickNormsManager({ isOpen, onClose, onSearch }: QuickNormsManag
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => handleStartEdit(qn)}
-                            className="p-2 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg text-slate-500 hover:text-blue-600"
+                            className="p-2 hover:bg-primary-100 dark:hover:bg-primary-900/30 rounded-lg text-slate-500 hover:text-primary-600"
                             title="Rinomina"
                           >
                             <Pencil size={16} />

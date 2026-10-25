@@ -30,7 +30,7 @@ const DESCRIPTION_MAX = 500;
 const TAGS_MAX = 10;
 const TAG_MAX = 30;
 
-const INPUT = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500';
+const INPUT = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
 const LINK_BUTTON = `rounded px-2 text-sm font-medium text-primary-600 hover:underline dark:text-primary-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${TOUCH_TARGET_RESPONSIVE}`;
 
 // The owner's wording (14 October 2026, question 186), with his added sentence on manuals.
@@ -39,7 +39,7 @@ const WARNING = [
   'Le note appartengono all’articolo, non al dossier: controlla anche quelle scritte per altre pratiche.',
   'Non pubblicare dati personali dei clienti o di altre persone, né fatti di una pratica che le rendano riconoscibili.',
   'Non copiare testi di manuali o commentari.',
-  'Se ritiri il dossier dal Forum, chi l’ha già scaricato ne conserva la copia.',
+  'Se ritiri il dossier, chi l’ha già scaricato ne conserva la copia.',
 ];
 
 /** A text with the personal data the machine found marked, every character kept (plain text, never HTML). */

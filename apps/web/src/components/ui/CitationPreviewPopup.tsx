@@ -23,6 +23,8 @@ interface CitationPreviewPopupProps {
   position: { top: number; left: number };
   onClose: () => void;
   onOpenCitation: (citation: ParsedCitationData) => void;
+  /** The open button's words, when the host opens the norm elsewhere than in a practice (the dossier's own norms). */
+  openLabel?: string;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
   /** When true (full-consent contributor), show the NER ✓/✗/Correggi bar. */
@@ -40,6 +42,7 @@ export function CitationPreviewPopup({
   position,
   onClose,
   onOpenCitation,
+  openLabel = 'Apri nella pratica',
   onMouseEnter,
   onMouseLeave,
   nerFeedbackEnabled,
@@ -74,7 +77,7 @@ export function CitationPreviewPopup({
       title={citation ? formatCitationLabel(citation) : null}
       badge={
         citation && citation.confidence < 0.8 ? (
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 shrink-0">
+          <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 shrink-0">
             ~
           </span>
         ) : null
@@ -90,13 +93,13 @@ export function CitationPreviewPopup({
             disabled={isLoading}
             className={cn(
               "w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
-              "bg-blue-600 hover:bg-blue-700 text-white",
+              "bg-primary-600 hover:bg-primary-700 text-white",
               "disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed",
               "dark:disabled:bg-slate-700 dark:disabled:text-slate-500"
             )}
           >
             <ExternalLink size={14} />
-            Apri nella pratica
+            {openLabel}
           </button>
           {citation && nerFeedbackEnabled && onNerFeedback && (
             <div className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800">

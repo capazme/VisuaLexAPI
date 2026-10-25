@@ -47,7 +47,7 @@ vi.mock('../decisions/DecisionEntryView', async () => {
       <div data-testid="decision-reader">
         n. {reference.numero}
         <button type="button" onClick={() => store.getState().triggerSearch({
-          ...(env.citation ?? { act_type: 'codice civile', act_number: '', date: '', article: '2043', version: 'vigente', show_brocardi_info: false }),
+          ...(env.citation ?? { act_type: 'codice civile', act_number: '', date: '', article: '2043', version: 'vigente' }),
           besideId: hostId,
         } as never)}>
           Cita l'art. 2043 c.c.
@@ -75,7 +75,7 @@ import { articleWindowId, decisionWindowId, practiceArticleKey } from '../../../
 
 const s = () => appStore.getState();
 const CC = { tipo_atto: 'codice civile', data: '1942-03-16', numero_atto: '262', url: 'urn:nir:stato:regio.decreto:1942-03-16;262' };
-const ccArticle = (n: string) => ({ article_text: `Art. ${n}\nTesto ${n}.`, norma_data: { ...CC, numero_articolo: n }, brocardi_info: null });
+const ccArticle = (n: string) => ({ article_text: `Art. ${n}\nTesto ${n}.`, norma_data: { ...CC, numero_articolo: n } });
 const REF = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 99999, anno: 2024 };
 const panel = () => render(<MemoryRouter><SearchPanel /></MemoryRouter>);
 const windowLabels = () => screen.queryAllByTestId('reading-window').map((w) => w.getAttribute('data-window-id'));
@@ -170,14 +170,14 @@ describe('SearchPanel with the windows beside (spec §4.5)', () => {
   it('a citation that switches annex still opens its article beside the window, and the main text\'s stray row goes with its window', async () => {
     const DLGS = { tipo_atto: 'decreto legislativo', data: '2008-04-09', numero_atto: '81', url: 'urn:nir:stato:decreto.legislativo:2008-04-09;81' };
     const dlgs = (n: string, allegato?: string) => ({
-      article_text: `Art. ${n}\nTesto ${n}.`, norma_data: { ...DLGS, numero_articolo: n, ...(allegato ? { allegato } : {}) }, brocardi_info: null,
+      article_text: `Art. ${n}\nTesto ${n}.`, norma_data: { ...DLGS, numero_articolo: n, ...(allegato ? { allegato } : {}) },
     });
     env.annex.ENABLED = true;
     env.tree = { metadata: { annexes: [
       { number: null, label: 'Testo', article_count: 3, article_numbers: ['1', '2', '3'] },
       { number: '2', label: 'Allegato 2', article_count: 20, article_numbers: ['5', '6'] },
     ] } };
-    env.citation = { act_type: 'decreto legislativo', act_number: '81', date: '2008', article: '5', version: 'vigente', show_brocardi_info: false };
+    env.citation = { act_type: 'decreto legislativo', act_number: '81', date: '2008', article: '5', version: 'vigente' };
     env.stream = (params) => (params.annex === '2' ? [dlgs('5', '2')] : [dlgs('5')]);
     const p = s().createPractice('P');
     const { decisionId } = s().openDecision(REF, { practiceId: p });
@@ -219,7 +219,7 @@ describe('SearchPanel with the windows beside (spec §4.5)', () => {
     await waitFor(() => expect(wrapper.style.bottom).toBe('174px'));
   });
 
-  it('on a phone it floats above the services pill and the feedback button, which sit under it', async () => {
+  it('on a phone it floats above the feedback button, which sits under it', async () => {
     env.desktop = false;
     const { practiceId, actId } = s().addArticlesToPractice(null, L24, [article(L24, '5')]);
     s().pushReadingBack({ tabId: practiceId, blockId: actId, articleId: '5', label: 'art. 5 l. 24/2017' });

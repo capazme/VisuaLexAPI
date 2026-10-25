@@ -1,18 +1,21 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
-const tour = vi.hoisted(() => ({ onComplete: undefined as undefined | ((t: string) => void) }));
+const tour = vi.hoisted(() => ({ onComplete: undefined as undefined | ((t: string) => void), tryStartTour: vi.fn() }));
 vi.mock('../../../hooks/useTour', () => ({
   useTour: (options?: { onComplete?: (t: string) => void }) => {
     tour.onComplete = options?.onComplete;
-    return { tryStartTour: vi.fn(), startTour: vi.fn(), hasSeenTour: () => true };
+    return { tryStartTour: tour.tryStartTour, startTour: vi.fn(), hasSeenTour: () => true };
   },
 }));
 
 import { CommandPalette } from './CommandPalette';
 import { appStore } from '../../../store/useAppStore';
 import { isWorkspaceCovered } from '../../../utils/findWindowControl';
+import { subscribeSearchField, type SearchFieldRequest } from '../../../utils/searchFieldControl';
 
 /**
  * The palette parses the query on the client, against the ~40 acts in
@@ -66,7 +69,7 @@ describe('CommandPalette — act names the client does not carry', () => {
     expect(fetch).toHaveBeenCalledWith('/parse_query', expect.objectContaining({ method: 'POST' }));
 
     // Resolved: the hint flips from "completa" to "ricerca".
-    await waitFor(() => expect(screen.getByText(/Invio Ricerca/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Apri l'articolo/)).toBeInTheDocument());
   });
 
   it('does not ask the server for a query the client already resolved', async () => {
@@ -80,7 +83,7 @@ describe('CommandPalette — act names the client does not carry', () => {
     // could have fired, and a slow typist (a loaded machine) could fire it on a half-typed query.
     await settle();
 
-    await waitFor(() => expect(screen.getByText(/Invio Ricerca/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Apri l'articolo/)).toBeInTheDocument());
     // Scoped to /parse_query on purpose: the palette also fetches the alias
     // catalog on open, and that call is unrelated to citation resolution.
     expect(fetch).not.toHaveBeenCalledWith('/parse_query', expect.anything());
@@ -98,7 +101,7 @@ describe('CommandPalette — act names the client does not carry', () => {
 
     // A backend that stopped answering must not be silent (CLAUDE.md gotcha 18).
     await waitFor(() => expect(errors.length).toBeGreaterThan(0));
-    expect(screen.queryByText(/Invio Ricerca/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Apri l'articolo/)).not.toBeInTheDocument();
   });
 });
 
@@ -123,7 +126,7 @@ describe('CommandPalette — the annex a citation names', () => {
 
     await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 1 tusl (All. A)');
     await settle();
-    await waitFor(() => expect(screen.getByText(/Invio Ricerca/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Apri l'articolo/)).toBeInTheDocument());
     await user.keyboard('{Enter}');
 
     expect(onSearch).toHaveBeenCalledWith(expect.objectContaining({ act_number: '81', annex: 'A' }));
@@ -155,7 +158,7 @@ describe('CommandPalette — reaching the alias manager', () => {
     appStore.setState({ customAliases: [] });
     renderPalette();
 
-    expect(screen.getByText(/Crea il tuo primo alias/i)).toBeInTheDocument();
+    expect(screen.getByText('Crea un alias')).toBeInTheDocument();
   });
 
   it('opens the manager from that entry', async () => {
@@ -163,7 +166,7 @@ describe('CommandPalette — reaching the alias manager', () => {
     const user = userEvent.setup();
     renderPalette();
 
-    await user.click(screen.getByText(/Crea il tuo primo alias/i));
+    await user.click(screen.getByText('Crea un alias'));
 
     // The palette closes first, then hands over — hence the wait.
     await waitFor(() => expect(appStore.getState().aliasManagerOpen).toBe(true));
@@ -313,8 +316,9 @@ describe('CommandPalette — a decision named in the box', () => {
     await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'Cass. civ. 99999/2024');
 
     // the visible line, and the one live region (mounted from the start) that announces it
-    expect(await screen.findByText('Sentenza → Cass. civ., n. 99999/2024')).toBeInTheDocument();
-    expect(screen.getByText('Invio apre')).toBeInTheDocument();
+    // One row says it, the chosen one (Bill: no second line saying the same).
+    expect(await screen.findByText(/Apri la sentenza/)).toBeInTheDocument();
+    expect(screen.queryByText(/Sentenza →|Invio apre/)).toBeNull();
     expect(screen.getByRole('status')).toHaveTextContent('Sentenza: Cass. civ., n. 99999/2024. Invio per aprire.');
 
     await user.keyboard('{Enter}');
@@ -334,7 +338,7 @@ describe('CommandPalette — a decision named in the box', () => {
     // a norm query is answered by the server first, then the box turns into a decision
     await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 18 statuto dei lavoratori');
     await settle();
-    await waitFor(() => expect(screen.getByText(/Invio Ricerca/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Apri l'articolo/)).toBeInTheDocument());
     await user.clear(screen.getByPlaceholderText(/art 2043 cc/i));
     await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'Cass. civ. 99999/2024');
     await user.keyboard('{Enter}');
@@ -361,8 +365,8 @@ describe('CommandPalette — a decision named in the box', () => {
     const user = userEvent.setup();
     renderPalette();
     await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 2043 cc');
-    await waitFor(() => expect(screen.getByText(/Invio Ricerca/i)).toBeInTheDocument());
-    expect(screen.queryByText(/Sentenza →/)).toBeNull();
+    await waitFor(() => expect(screen.getByText(/Apri l'articolo/)).toBeInTheDocument());
+    expect(screen.queryByText(/Apri la sentenza/)).toBeNull();
   });
 
   it('does not read a decision when the first word is a custom alias trigger', async () => {
@@ -378,7 +382,7 @@ describe('CommandPalette — a decision named in the box', () => {
 
     await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'cass 99999/2024');
 
-    expect(screen.queryByText(/Sentenza →/)).toBeNull();
+    expect(screen.queryByText(/Apri la sentenza/)).toBeNull();
     await user.keyboard('{Enter}');
     expect(openDecision).not.toHaveBeenCalled();
   });
@@ -418,7 +422,7 @@ describe('CommandPalette — a citation handed over as it opens', () => {
     appStore.setState({ commandPaletteQuery: 'Cass. civ., n. 99999/2024' });
     renderPalette();
     expect(screen.getByPlaceholderText(/art 2043 cc/i)).toHaveValue('Cass. civ., n. 99999/2024');
-    expect(await screen.findByText('Sentenza → Cass. civ., n. 99999/2024')).toBeInTheDocument();
+    expect(await screen.findByText(/Apri la sentenza/)).toBeInTheDocument();
     expect(appStore.getState().commandPaletteQuery).toBeNull();
   });
 });
@@ -522,5 +526,152 @@ describe('CommandPalette — Escape', () => {
     document.dispatchEvent(event);
     expect(event.defaultPrevented).toBe(true);
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('CommandPalette — sizes on a phone (the owner\'s pass of 20 October 2026)', () => {
+  it('writes no text under 11 px', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/components/features/search/CommandPalette.tsx'), 'utf8');
+    const sizes = [...source.matchAll(/text-\[(\d+)px\]/g)].map((m) => Number(m[1]));
+    expect(sizes.filter((px) => px < 11)).toEqual([]);
+  });
+
+  it('gives the crumb and «Gestisci» 44 px on a phone, and names the close button', async () => {
+    appStore.setState({ quickNorms: [] });
+    renderPalette();
+    expect(screen.getByRole('button', { name: 'Gestisci' })).toHaveClass('min-h-[44px]', 'md:min-h-0');
+    fireEvent.click(screen.getByRole('option', { name: 'Codice civile · c.c.' }));
+    expect(await screen.findByRole('button', { name: 'Torna indietro: Codice civile' })).toHaveClass('min-h-[44px]');
+    expect(screen.getByRole('button', { name: 'Chiudi' })).toHaveClass('min-h-[44px]', 'min-w-[44px]');
+  });
+});
+
+describe('CommandPalette — the search page\'s field\'s rules, now its own (R2)', () => {
+  const original = appStore.getState();
+
+  it('waits for the server when Enter comes first, then searches the act it named', async () => {
+    const user = fakeTimeUser();
+    const onSearch = renderPalette();
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 18 statuto dei lavoratori{Enter}');
+    expect(onSearch).not.toHaveBeenCalled();
+    expect(screen.getByRole('status')).toHaveTextContent('la ricerca parte appena lo trovo');
+    await settle();
+    await waitFor(() => expect(onSearch).toHaveBeenCalledTimes(1));
+    expect(onSearch.mock.calls[0][0]).toMatchObject({ act_type: 'legge', act_number: '300', article: '18' });
+  });
+
+  it('a new Enter is needed once the words changed while it waited, even back to the same words', async () => {
+    const user = fakeTimeUser();
+    const onSearch = renderPalette();
+    const box = screen.getByPlaceholderText(/art 2043 cc/i);
+    await user.type(box, 'art 18 statuto dei lavoratori{Enter}');
+    await user.type(box, 'x{Backspace}');
+    await settle();
+    await waitFor(() => expect(screen.getByText(/Apri l'articolo/)).toBeInTheDocument());
+    expect(onSearch).not.toHaveBeenCalled();
+  });
+
+  it('counts an alias once, when Enter runs it, not again as its steps are completed', async () => {
+    const trackAliasUsage = vi.fn();
+    appStore.setState({
+      trackAliasUsage,
+      customAliases: [
+        { id: 'a1', trigger: 'mioatto', expandTo: 'legge 241/1990', type: 'reference', searchParams: { act_type: 'legge', act_number: '241', date: '1990-08-07' }, usageCount: 0, createdAt: '' },
+      ],
+    } as never);
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ recognized: false }) })));
+    const user = fakeTimeUser();
+    const onSearch = renderPalette();
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'mioatto');
+    await settle();
+    await user.keyboard('{Enter}');
+    expect(trackAliasUsage).toHaveBeenCalledTimes(1);
+    await user.type(await screen.findByPlaceholderText(/^Articolo/i), '3{Enter}');
+    expect(onSearch).toHaveBeenCalledTimes(1);
+    expect(trackAliasUsage).toHaveBeenCalledTimes(1);
+    appStore.setState({ trackAliasUsage: original.trackAliasUsage, customAliases: original.customAliases } as never);
+  });
+
+  it('says a ready citation once, in its row with «↵», not again in a line under the box (Bill)', async () => {
+    const user = userEvent.setup();
+    renderPalette();
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 2043 cc');
+    expect(screen.getByText(/Apri l'articolo/)).toBeInTheDocument();
+    expect(screen.queryByText(/Invio cerca/)).toBeNull();
+    // The line under the box keeps its help, seen: no preview of the citation in its place.
+    const help = document.getElementById('command-palette-help')!;
+    expect(help).not.toHaveClass('sr-only');
+    expect(help).toHaveTextContent(/^Scrivi una citazione/);
+  });
+
+  it('an Enter that ends an IME composition searches nothing', async () => {
+    const user = userEvent.setup();
+    const onSearch = renderPalette();
+    const box = screen.getByPlaceholderText(/art 2043 cc/i);
+    await user.type(box, 'art 2043 cc');
+    fireEvent.keyDown(box, { key: 'Enter', isComposing: true });
+    expect(onSearch).not.toHaveBeenCalled();
+  });
+
+  it('does not search once closed: Esc during the wait drops it', async () => {
+    const user = fakeTimeUser();
+    const onSearch = vi.fn();
+    const { rerender } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={onSearch} />);
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 18 statuto dei lavoratori{Enter}');
+    rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={onSearch} />);
+    await settle();
+    expect(onSearch).not.toHaveBeenCalled();
+  });
+
+  it('leaves Enter to the row the arrows chose, even while the server is still reading the words', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ recognized: false }) })));
+    const user = fakeTimeUser();
+    const onSearch = renderPalette();
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'procedura');
+    await user.keyboard('{ArrowDown}{Enter}');
+    // An act was picked: its next step, not a wait that would end in a topic search.
+    expect(await screen.findByRole('button', { name: /^Torna indietro:/ })).toBeInTheDocument();
+    await settle();
+    expect(onSearch).not.toHaveBeenCalled();
+  });
+
+  it('starts its tour only on an empty opening: opened with words, the tour would take the letters that follow', () => {
+    tour.tryStartTour.mockClear();
+    appStore.setState({ commandPaletteQuery: 'art 2' } as never);
+    const { unmount } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    expect(tour.tryStartTour).not.toHaveBeenCalled();
+    unmount();
+    appStore.setState({ commandPaletteQuery: null } as never);
+    renderPalette();
+    expect(tour.tryStartTour).toHaveBeenCalledWith('commandPalette');
+  });
+
+  it('opened again right after a close, starts at its first step with no old words', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    await user.click(screen.getByRole('option', { name: 'Codice civile · c.c.' }));
+    rerender(<CommandPalette isOpen={false} onClose={vi.fn()} onSearch={vi.fn()} />);
+    rerender(<CommandPalette isOpen onClose={vi.fn()} onSearch={vi.fn()} />);
+    expect(screen.getByPlaceholderText(/art 2043 cc/i)).toHaveValue('');
+    expect(screen.queryByRole('button', { name: /^Torna indietro:/ })).toBeNull();
+  });
+
+  it('gives its words back to the field when it closes with no choice, and empties the field after one', async () => {
+    const heard: SearchFieldRequest[] = [];
+    const unsubscribe = subscribeSearchField((request) => heard.push(request));
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const { rerender } = render(<CommandPalette isOpen onClose={onClose} onSearch={vi.fn()} />);
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 2043 cc');
+    rerender(<CommandPalette isOpen={false} onClose={onClose} onSearch={vi.fn()} />);
+    expect(heard).toEqual([{ text: 'art 2043 cc', open: false }]);
+
+    rerender(<CommandPalette isOpen onClose={onClose} onSearch={vi.fn()} />);
+    await user.clear(screen.getByPlaceholderText(/art 2043 cc/i));
+    await user.type(screen.getByPlaceholderText(/art 2043 cc/i), 'art 2043 cc{Enter}');
+    expect(onClose).toHaveBeenCalled();
+    rerender(<CommandPalette isOpen={false} onClose={onClose} onSearch={vi.fn()} />);
+    expect(heard.at(-1)).toEqual({ text: '', open: false });
+    unsubscribe();
   });
 });

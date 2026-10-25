@@ -144,3 +144,16 @@ describe.each(['UTC', 'America/New_York', 'Europe/Rome', 'Pacific/Auckland'])(
     });
   }
 );
+
+// The Monday that opens a Rome week, the period of the weekly mission (Gymnasium XP spec §5.1 «settimana»).
+describe('mondayOf', () => {
+  it('gives the Monday of the week, Monday to Sunday', async () => {
+    const { mondayOf } = await import('../../../src/lingo/studyDay');
+    expect(mondayOf('2026-10-19')).toBe('2026-10-19'); // a Monday
+    expect(mondayOf('2026-10-20')).toBe('2026-10-19');
+    expect(mondayOf('2026-10-25')).toBe('2026-10-19'); // a Sunday, the night clocks go back
+    expect(mondayOf('2026-10-26')).toBe('2026-10-26');
+    expect(mondayOf('2027-01-01')).toBe('2026-12-28'); // across a year's end
+    expect(() => mondayOf('2026-02-30')).toThrow(RangeError);
+  });
+});

@@ -1,4 +1,5 @@
-import { jsPDF } from 'jspdf';
+import type { jsPDF } from 'jspdf';
+import { loadJsPdf } from '../../../utils/loadJsPdf';
 import type { Annotation, DossierItem, Highlight } from '../../../types';
 import type { FoundDecision } from '../../../types/decisions';
 import { resolveAnchors } from '../../../utils/articleAnnotations';
@@ -9,7 +10,7 @@ import { fetchDecisionCached } from '../../../utils/decisionFetchCache';
 import { identityOf } from '../../../utils/decisionLinks';
 import { isAnchoredNote } from '../../../utils/decisionRender';
 import { describeVersion, historicalItemLabel } from '../../../utils/versionDisplay';
-import { articleLabel, layoutDossier } from './dossierLayout';
+import { articleLabel, countsLine, layoutDossier } from './dossierLayout';
 import { decisionCitationOf } from './dossierUtils';
 import {
   BODY as DECISION_BODY, LEADING as DECISION_LEADING,
@@ -122,6 +123,11 @@ export async function loadDossierTexts(
     }
   }));
   return texts;
+}
+
+/** The PDF's line of counts: the page's, with only the decisions chosen for it — the others are not printed. */
+export function pdfCountsLine(items: DossierItem[], decisionIds: ReadonlySet<string>): string {
+  return countsLine(items.filter((item) => item.type !== 'sentenza' || decisionIds.has(item.id)));
 }
 
 const DECISION_FETCHES_AT_ONCE = 3;
@@ -313,9 +319,10 @@ function drawPdfDecision(w: PdfWriter, decision: PdfDecision): void {
   drawDecisionTail(w, model);
 }
 
-/** Draws the dossier's PDF: the header, then the sections `buildPdfBlocks` made. */
-export function writeDossierPdf(header: DossierPdfHeader, blocks: PdfBlock[]): jsPDF {
-  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+/** Draws the dossier's PDF: the header, then the sections `buildPdfBlocks` made. jsPDF is loaded here, on the export. */
+export async function writeDossierPdf(header: DossierPdfHeader, blocks: PdfBlock[]): Promise<jsPDF> {
+  const JsPdf = await loadJsPdf();
+  const doc = new JsPdf({ unit: 'pt', format: 'a4' });
   const w = createPdfWriter(doc, { footerLeft: `${header.title} · VisuaLex` });
   const { ensureSpace, write } = w;
 

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { motion } from 'framer-motion';
+import { spring } from '../../lib/motion';
 import { cn } from '../../lib/utils';
 
 export interface SegmentedControlOption {
@@ -67,7 +68,7 @@ export function SegmentedControl({
             className={cn(
               'flex-1 relative flex items-center justify-center gap-2 font-medium',
               'transition-colors duration-150',
-              'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-primary/50',
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-toga-500 focus-visible:ring-offset-background',
               'disabled:opacity-40 disabled:cursor-not-allowed',
               buttonSizeStyles[size],
               isActive
@@ -79,7 +80,7 @@ export function SegmentedControl({
               <motion.div
                 layoutId={layoutId}
                 className="absolute inset-0 bg-white dark:bg-slate-700 rounded-lg shadow-sm border border-slate-200/50 dark:border-slate-600"
-                transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+                transition={spring.snappy}
               />
             )}
 

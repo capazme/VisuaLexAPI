@@ -1,5 +1,5 @@
-import type { ArticleData, ArticleValidity, NormaVisitata, SearchParams, ValidityState } from '../types';
-import { addDaysToIsoDate, formatDateDashed, formatDateForCitation, formatDateForDisplay, parseItalianDate, withPreposition } from './dateUtils';
+import type { ArticleData, ArticleUpcoming, ArticleValidity, NormaVisitata, SearchParams, ValidityState } from '../types';
+import { addDaysToIsoDate, formatDateForCitation, formatDateForDisplay, parseItalianDate, todayInRome, withPreposition } from './dateUtils';
 
 /**
  * What a reader is told about the version of the text on screen.
@@ -24,6 +24,9 @@ export const READ_ONLY_REASON = 'Non disponibile su un testo storico';
 export const NOT_YET_REASON = 'Non disponibile: l’articolo non esisteva a quella data';
 export const UNRELIABLE_REASON = 'Non disponibile: la versione restituita non comprende la data richiesta';
 
+/** An ISO day, as the server writes `upcoming.valid_from`. */
+const ISO_DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 const SOURCE_NOTE = 'Testo consolidato di Normattiva, a fini informativi: fa fede la Gazzetta Ufficiale.';
 
 function textOf(value: unknown): string | undefined {
@@ -36,9 +39,8 @@ function asksForOriginal(version: unknown): boolean {
 
 /**
  * Whether the request asked for a past text: the original, or a date. It is the
- * request, not the page, and mirrors `is_historical_request` on the server —
- * the two decide the same thing, one to keep Brocardi out, one to switch the
- * annotation tools off.
+ * request, not the page, and reads it the way `is_historical_request` on the
+ * server does; here it switches the annotation tools off.
  */
 export function requestIsHistorical(request: VersionRequest | null | undefined): boolean {
   if (!request) return false;
@@ -99,13 +101,14 @@ export function isEuropeanAct(tipoAtto: string | null | undefined): boolean {
 }
 
 export interface VersionChip {
-  tone: ValidityState;
+  /** `upcoming`: the text in force today, which a later text will repeal or change (G-355). */
+  tone: ValidityState | 'upcoming';
   label: string;
   title: string;
 }
 
 export type BannerAction = 'go_current' | 'copy_citation' | 'open_next_day' | 'pick_date';
-export type BannerKind = 'historical' | 'not_yet' | 'unreliable' | 'current_in_window';
+export type BannerKind = 'historical' | 'not_yet' | 'unreliable' | 'current_in_window' | 'upcoming';
 
 export interface VersionBanner {
   kind: BannerKind;
@@ -128,10 +131,13 @@ export interface VersionDisplay {
    * wrong words.
    */
   readOnly: boolean;
-  /** Brocardi's commentary and massime carry no date: shown only with the text in force. */
-  doctrineVisible: boolean;
   /** Whether a "nel testo in vigore al …" citation may be made. */
   canCite: boolean;
+  /**
+   * The window a citation reads, when it is not the source's `validity`: past the day of an announced change (V1),
+   * today's text is a past one, cited «nel testo in vigore dal … al …», never as the text in force.
+   */
+  citeAs?: ArticleValidity;
   /**
    * Whether the text may be copied, exported or added to a dossier. Not an
    * article that did not exist yet (the served text is a notice), and not a
@@ -153,21 +159,22 @@ export interface VersionDisplay {
 }
 
 function chipFor(validity: ArticleValidity): VersionChip {
-  const from = validity.valid_from ? formatDateDashed(validity.valid_from) : '';
-  const to = validity.valid_to ? formatDateDashed(validity.valid_to) : '';
+  // The days in full, as a lawyer writes them (R3): «dal 1° gennaio 2005», «dall'8 agosto».
+  const from = validity.valid_from ? withPreposition('dal', formatDateForCitation(validity.valid_from)) : '';
+  const to = validity.valid_to ? withPreposition('al', formatDateForCitation(validity.valid_to)) : '';
   const version = validity.version_number ? ` Versione n. ${validity.version_number}.` : '';
   const title = `${SOURCE_NOTE}${version}`;
   switch (validity.state) {
     case 'current':
-      return { tone: 'current', label: from ? `In vigore dal ${from}` : 'In vigore', title };
+      return { tone: 'current', label: from ? `In vigore ${from}` : 'In vigore', title };
     case 'historical':
       return {
         tone: 'historical',
-        label: `Testo storico${from || to ? ' ·' : ''}${from ? ` dal ${from}` : ''}${to ? ` al ${to}` : ''}`,
+        label: `Testo storico${from || to ? ' ·' : ''}${from ? ` ${from}` : ''}${to ? ` ${to}` : ''}`,
         title,
       };
     case 'abrogated':
-      return { tone: 'abrogated', label: from ? `Abrogato dal ${from}` : 'Abrogato', title };
+      return { tone: 'abrogated', label: from ? `Abrogato ${from}` : 'Abrogato', title };
     case 'not_yet':
       return { tone: 'not_yet', label: 'Non ancora esistente', title };
   }
@@ -208,7 +215,7 @@ function bannerFor(
       body: `${window}, secondo il testo consolidato di Normattiva (a fini informativi). Non è il testo attuale. `
         + 'Il testo in vigore a una data non dice quale disciplina si applichi al fatto: possono contare '
         + 'disposizioni transitorie, efficacia retroattiva o norme più favorevoli.',
-      note: 'Dottrina, massime, note ed evidenziazioni non sono mostrate su un testo storico.',
+      note: 'Note ed evidenziazioni non sono mostrate su un testo storico.',
       actions: canCite ? ['go_current', 'copy_citation'] : ['go_current'],
     };
   }
@@ -216,6 +223,51 @@ function bannerFor(
     return { kind: 'current_in_window', body: 'La data richiesta cade nel testo attuale.', actions: [] };
   }
   return null;
+}
+
+/**
+ * The article that will change (G-355, V1): the text served is today's and the source has already published a later
+ * one. Beside the text, informing only: the later text is not served yet (G-357 will). A practice keeps its articles
+ * in the browser, never read again: past the day, the same answer says it in the past tense, and that the text on
+ * screen was in force until the day before.
+ */
+function upcomingBanner(upcoming: ArticleUpcoming, validity: ArticleValidity | undefined, passed: boolean): VersionBanner {
+  const from = withPreposition('dal', formatDateForCitation(upcoming.valid_from));
+  const day = from.charAt(0).toUpperCase() + from.slice(1);
+  const repealed = upcoming.change === 'abrogated';
+  if (passed) {
+    // A practice keeps its articles: past the day, today's text is a past one.
+    const lastDay = addDaysToIsoDate(upcoming.valid_from, -1);
+    return {
+      kind: 'upcoming',
+      title: `${day} questo articolo ${repealed ? 'è abrogato' : 'è cambiato'}.`,
+      body: `Qui leggi il testo in vigore fino ${withPreposition('al', formatDateForCitation(lastDay))}: non è più il testo attuale.`,
+      actions: [],
+    };
+  }
+  const since = validity?.valid_from ? `, ${withPreposition('dal', formatDateForCitation(validity.valid_from))}` : '';
+  return {
+    kind: 'upcoming',
+    title: `${day} questo articolo ${repealed ? 'è abrogato' : 'cambia'}.`,
+    body: `Qui leggi il testo in vigore oggi${since}.`,
+    actions: [],
+  };
+}
+
+function upcomingChip(upcoming: ArticleUpcoming, validity: ArticleValidity | undefined, today: VersionChip | null, passed: boolean): VersionChip {
+  // The day in full, as the banner writes it («dal 1° gennaio 2027», «dall'8 agosto 2027»): the chip names what the
+  // banner says, «Abrogato» for a repeal before and after the day, «Cambia» / «Cambiato» for an amendment.
+  const from = withPreposition('dal', formatDateForCitation(upcoming.valid_from));
+  const repealed = upcoming.change === 'abrogated';
+  const word = repealed ? 'Abrogato' : passed ? 'Cambiato' : 'Cambia';
+  const what = repealed ? 'è abrogato' : passed ? 'è cambiato' : 'cambia';
+  const version = validity?.version_number ? ` Versione n. ${validity.version_number}.` : '';
+  const day = from.charAt(0).toUpperCase() + from.slice(1);
+  return {
+    tone: 'upcoming',
+    label: `${word} ${from}`,
+    title: `${today ? `${today.label}. ` : ''}${day} questo articolo ${what}.${version} ${SOURCE_NOTE}`,
+  };
 }
 
 /**
@@ -229,6 +281,9 @@ function bannerFor(
 export function describeVersion(
   validity: ArticleValidity | undefined,
   request: VersionRequest | null | undefined,
+  upcoming?: ArticleUpcoming,
+  /** Today in Rome (ISO): the day the source's windows are read against; given by the tests. */
+  today: string = todayInRome(),
 ): VersionDisplay {
   const asked = requestIsHistorical(request);
   const requestedDay = textOf(request?.data_versione);
@@ -251,12 +306,35 @@ export function describeVersion(
   const notYet = validity?.state === 'not_yet';
   const canCite = !notYet && !unreliable;
 
+  const chip = validity ? chipFor(validity) : null;
+  const banner = validity ? bannerFor(validity, requestedDay, canCite) : null;
+  // A later text announced only beside today's: a text asked for by date or as the original says nothing of it; a
+  // change the web does not know (G-357 adds more), or none, says nothing; a text the source puts in force after today
+  // is not «in vigore oggi».
+  const willChange = (upcoming?.change === 'abrogated' || upcoming?.change === 'amended')
+    && ISO_DAY_RE.test(upcoming.valid_from ?? '')
+    && !asked && !banner
+    && validity?.state !== 'abrogated' && validity?.state !== 'not_yet'
+    && !(validity?.valid_from && validity.valid_from > today);
+
+  const passed = willChange && upcoming!.valid_from <= today;
+  const citeAs: ArticleValidity | undefined = passed
+    ? {
+      state: 'historical',
+      valid_from: validity?.valid_from ?? null,
+      valid_to: addDaysToIsoDate(upcoming!.valid_from, -1),
+      version_number: validity?.version_number ?? null,
+      act_updated: validity?.act_updated ?? null,
+      request_in_window: null,
+    }
+    : undefined;
+
   return {
-    chip: validity ? chipFor(validity) : null,
-    banner: validity ? bannerFor(validity, requestedDay, canCite) : null,
+    ...(citeAs ? { citeAs } : {}),
+    chip: willChange ? upcomingChip(upcoming!, validity, chip, passed) : chip,
+    banner: willChange ? upcomingBanner(upcoming!, validity, passed) : banner,
     textVisible: !notYet,
     readOnly,
-    doctrineVisible: !asked && !readOnly,
     canCite,
     canCopyOrSave: !notYet && !unreliable,
     copyBlockedReason: notYet ? NOT_YET_REASON : unreliable ? UNRELIABLE_REASON : undefined,
@@ -267,8 +345,8 @@ export function describeVersion(
 export type TextAtDateChoice = { kind: 'date'; date: string } | { kind: 'original' };
 
 /**
- * The search the "Testo alla data" dialog sends. Doctrine is not requested (the
- * server would refuse it anyway), and the annex is kept: the old modal dropped it.
+ * The search the "Testo alla data" dialog sends. The annex is kept: the old
+ * modal dropped it.
  */
 export function buildTextAtDateParams(norma: NormaVisitata, choice: TextAtDateChoice): SearchParams {
   return {
@@ -278,7 +356,6 @@ export function buildTextAtDateParams(norma: NormaVisitata, choice: TextAtDateCh
     article: norma.numero_articolo,
     version: choice.kind === 'original' ? 'originale' : 'vigente',
     ...(choice.kind === 'date' ? { version_date: choice.date } : {}),
-    show_brocardi_info: false,
     ...(norma.allegato ? { annex: norma.allegato } : {}),
   };
 }

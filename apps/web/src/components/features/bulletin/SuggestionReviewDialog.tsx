@@ -65,7 +65,7 @@ export function SuggestionReviewDialog({ suggestion, onTake, onDecline, onClose 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-lg w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-start justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
           <div>
@@ -165,7 +165,7 @@ export function SuggestionReviewDialog({ suggestion, onTake, onDecline, onClose 
         {/* Decline popover (inline modal) */}
         {declineTargetId && (
           <div className="absolute inset-0 z-10 flex items-center justify-center p-4 bg-black/40">
-            <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-md p-5">
+            <div className="bg-white dark:bg-slate-900 rounded-xl shadow-lg w-full max-w-md p-5">
               <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-2">Rifiuta questo item</h3>
               <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
                 Puoi opzionalmente aggiungere una nota per il suggeritore (max 500 caratteri).

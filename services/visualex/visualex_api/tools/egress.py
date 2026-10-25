@@ -6,12 +6,13 @@ here as data, `tests/test_egress_allowlist.py` fails the build if a URL literal
 appears for a host not listed, and `is_allowed()` is checked at request time in
 ThrottledHttpClient.
 
-That runtime check covers the `ThrottledHttpClient` instances only (the shared
-one and the decision readers' own). `POST /fetch_tree` reaches the network
-through treextractor's own aiohttp session, Playwright's `page.goto()` never
-consults this module, and the client does not re-check a redirect target.
-SECURITY.md ("Not yet covered") lists those three gaps; do not describe this list
-as an enforced boundary until they are closed.
+That runtime check covers the `ThrottledHttpClient` instances (the shared one
+and the decision readers' own), which carry the Normattiva tree too, and
+treextractor checks it before it starts a browser. Playwright's `page.goto()` in
+the EUR-Lex scraper and the PDF export never consults this module, no browser
+re-checks what a page loads, and the client does not re-check a redirect target.
+SECURITY.md ("Not yet covered") lists those gaps; do not describe this list as an
+enforced boundary until they are closed.
 
 The server sends no telemetry and has no analytics endpoint. Every host below is
 a source consulted to answer a legal question, or fetched for MERL-T's ingestion
@@ -40,19 +41,16 @@ ALLOWED_HOSTS: dict[str, str] = {
     # The administrative courts: the decisions search and the documents (CdS/TAR design note, 2026-10-12).
     "www.giustizia-amministrativa.it": "Giustizia amministrativa — Consiglio di Stato e TAR (ricerca dei provvedimenti)",
     "mdp.giustizia-amministrativa.it": "Giustizia amministrativa — Consiglio di Stato e TAR (testi dei provvedimenti)",
-    # --- Private ---
-    # The only non-institutional source. Brocardi supplies doctrinal notes and
-    # case-law abstracts, never the text of a norm: that always comes from
-    # Normattiva or EUR-Lex. Two spellings are in use across the codebase
-    # (services/brocardi_scraper.py uses the bare form, tools/map.py the www one),
-    # so both are declared.
-    "brocardi.it": "Brocardi.it — annotazioni dottrinali (fonte privata)",
-    "www.brocardi.it": "Brocardi.it — annotazioni dottrinali (fonte privata)",
 }
 
 #: Strings that look like hosts but are never fetched.
 NON_NETWORK_HOSTS: dict[str, str] = {
     "localhost": "default CORS origins and the frontend link in a JSON response",
+    # Brocardi is no longer a source (D-078): no route calls the scraper, and
+    # ThrottledHttpClient refuses these hosts. The scraper and its tables still
+    # name them until they are deleted.
+    "brocardi.it": "the switched-off Brocardi scraper (services/brocardi_scraper.py); never fetched",
+    "www.brocardi.it": "the switched-off Brocardi tables (tools/map.py); never fetched",
     "www.normattiva.it.evil.com": (
         "appears only inside the comment in services/pdfextractor.py explaining "
         "why the SSRF guard compares hosts exactly"
@@ -84,8 +82,19 @@ NON_NETWORK_HOSTS: dict[str, str] = {
 
 
 def is_allowed(url: str) -> bool:
-    """True when `url`'s host is one the running server may contact."""
+    """True when `url`'s host is one the running server may contact.
+
+    The host must be the one every client reads, Python's `urlparse` as the browser:
+    Chromium reads a backslash as a slash and drops tabs and newlines, so an internal
+    address followed by a backslash and `@eur-lex.europa.eu/` is EUR-Lex to `urlparse`
+    and the internal address to Playwright. A backslash, a control character, credentials
+    before the host or a scheme other than http(s) is refused.
+    """
+    if not isinstance(url, str) or "\\" in url or any(ord(c) < 0x20 or ord(c) == 0x7F for c in url):
+        return False
     try:
-        return (urlparse(url).hostname or "") in ALLOWED_HOSTS
+        parsed = urlparse(url)
+        return (parsed.scheme in ("http", "https") and "@" not in parsed.netloc
+                and (parsed.hostname or "") in ALLOWED_HOSTS)
     except ValueError:
         return False

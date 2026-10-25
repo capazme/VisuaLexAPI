@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Loader2, UploadCloud } from 'lucide-react';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
+import { PAGE_TITLE } from '../../../components/layout/PageFrame';
 import { useMerltFeatures } from '../useMerltFeatures';
 import { UploadDropzone } from './UploadDropzone';
 import { CandidateReviewList } from './CandidateReviewList';
@@ -135,13 +136,10 @@ export function ContribPage() {
   return (
     <div className="space-y-6">
       <header>
-        <Link to="/merlt" className="mb-2 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700">
+        <Link to="/merlt" className="mb-2 inline-flex min-h-[44px] items-center gap-1 rounded text-sm text-slate-500 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0 dark:text-slate-400 dark:hover:text-slate-200">
           <ArrowLeft size={14} /> MERL-T
         </Link>
-        <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900 dark:text-white">
-          <UploadCloud className="text-primary-500" />
-          Apprendi dai miei appunti
-        </h1>
+        <h1 className={PAGE_TITLE}>Apprendi dai miei appunti</h1>
         <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
           Carica i tuoi appunti: MERL-T propone nodi per il grafo giuridico, che tu rivedi e promuovi
           alla validazione della community. Il testo caricato resta privato finché non lo riformuli e

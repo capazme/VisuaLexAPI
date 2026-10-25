@@ -43,7 +43,7 @@ export function AdminRoute({ children }: AdminRouteProps) {
   // Show access denied if not admin
   if (!isAdmin) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 px-4">
+      <div className="min-h-svh flex items-center justify-center bg-slate-50 dark:bg-slate-900 px-4">
         <div className="max-w-md w-full text-center">
           <div className="inline-flex items-center justify-center w-20 h-20 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full mb-6">
             <ShieldAlert size={40} />
@@ -57,7 +57,7 @@ export function AdminRoute({ children }: AdminRouteProps) {
           </p>
           <a
             href="/"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-medium transition-colors"
           >
             Torna alla Home
           </a>

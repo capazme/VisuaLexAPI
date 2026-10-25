@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Minus, Plus, Sun, Moon, BookOpen } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import type { StudyModeTheme } from './StudyMode';
+import { spring } from '../../../../lib/motion';
 
 interface StudyModeSettingsProps {
   isOpen: boolean;
@@ -68,9 +69,9 @@ export function StudyModeSettings({
             initial={{ opacity: 0, scale: 0.95, y: -10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -10 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            transition={spring.snappy}
             className={cn(
-              "fixed z-40 rounded-xl shadow-2xl border overflow-hidden",
+              "fixed z-40 rounded-xl shadow-md border overflow-hidden",
               // Mobile: nearly full width, centered horizontally
               "left-4 right-4 top-16 w-auto",
               // Desktop: fixed width and position
@@ -94,14 +95,14 @@ export function StudyModeSettings({
             <div className="p-4 space-y-6">
               {/* Theme Selection */}
               <div>
-                <label className={cn("text-[10px] font-bold uppercase tracking-wider mb-3 block opacity-70", styles.muted)}>
+                <label className={cn("text-[11px] font-bold uppercase tracking-wider mb-3 block opacity-70", styles.muted)}>
                   Tema
                 </label>
                 <div className="flex gap-2">
                   <button
                     onClick={() => onThemeChange('light')}
                     className={cn(
-                      "flex-1 flex flex-col items-center gap-2 p-3 rounded-lg border transition-all",
+                      "flex-1 flex flex-col items-center gap-2 p-3 rounded-lg border transition-[color,background-color,border-color,box-shadow]",
                       theme === 'light'
                         ? 'border-yellow-500 bg-yellow-50 shadow-sm'
                         : cn('border-transparent', styles.button)
@@ -113,7 +114,7 @@ export function StudyModeSettings({
                   <button
                     onClick={() => onThemeChange('sepia')}
                     className={cn(
-                      "flex-1 flex flex-col items-center gap-2 p-3 rounded-lg border transition-all",
+                      "flex-1 flex flex-col items-center gap-2 p-3 rounded-lg border transition-[color,background-color,border-color,box-shadow]",
                       theme === 'sepia'
                         ? 'border-amber-500 bg-amber-50 shadow-sm'
                         : cn('border-transparent', styles.button)
@@ -125,14 +126,14 @@ export function StudyModeSettings({
                   <button
                     onClick={() => onThemeChange('dark')}
                     className={cn(
-                      "flex-1 flex flex-col items-center gap-2 p-3 rounded-lg border transition-all",
+                      "flex-1 flex flex-col items-center gap-2 p-3 rounded-lg border transition-[color,background-color,border-color,box-shadow]",
                       theme === 'dark'
-                        ? 'border-blue-500 bg-slate-800 shadow-sm'
+                        ? 'border-primary-500 bg-slate-800 shadow-sm'
                         : cn('border-transparent', styles.button)
                     )}
                   >
-                    <Moon size={20} className={theme === 'dark' ? 'text-blue-400' : styles.muted} />
-                    <span className={cn("text-xs font-medium", theme === 'dark' ? 'text-blue-200' : styles.muted)}>Scuro</span>
+                    <Moon size={20} className={theme === 'dark' ? 'text-primary-400' : styles.muted} />
+                    <span className={cn("text-xs font-medium", theme === 'dark' ? 'text-primary-200' : styles.muted)}>Scuro</span>
                   </button>
                 </div>
               </div>
@@ -140,7 +141,7 @@ export function StudyModeSettings({
               {/* Font Size */}
               <div id="tour-study-typography">
                 <div className="flex items-center justify-between mb-3">
-                  <label className={cn("text-[10px] font-bold uppercase tracking-wider opacity-70", styles.muted)}>
+                  <label className={cn("text-[11px] font-bold uppercase tracking-wider opacity-70", styles.muted)}>
                     Dimensione testo
                   </label>
                   <span className={cn("text-xs font-mono font-medium opacity-70", styles.text)}>
@@ -188,7 +189,7 @@ export function StudyModeSettings({
               {/* Line Height */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <label className={cn("text-[10px] font-bold uppercase tracking-wider opacity-70", styles.muted)}>
+                  <label className={cn("text-[11px] font-bold uppercase tracking-wider opacity-70", styles.muted)}>
                     Interlinea
                   </label>
                   <span className={cn("text-xs font-mono font-medium opacity-70", styles.text)}>

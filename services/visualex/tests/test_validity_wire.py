@@ -3,8 +3,9 @@
 The three handlers that serve an article from the Normattiva scraper add
 `validity` next to `article_text`. It is read from the page the scraper cached,
 so the text itself must come through untouched: every stored highlight and note
-is pinned to it (root CLAUDE.md, rule 23). A request for a past text never asks
-Brocardi, and a date after today is refused before any request is made.
+is pinned to it (root CLAUDE.md, rule 23). Brocardi is no longer a source
+(D-078): no handler asks it, even for a client that still sends
+`show_brocardi_info`. A date after today is refused before any request is made.
 """
 import json
 from types import SimpleNamespace
@@ -21,11 +22,8 @@ URN = "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:legge:1990-08-07;241
 # reach the client byte for byte.
 TEXT = "Art. 3\n\n1.  Ogni provvedimento è motivato.\r\n2. Fine del  testo. àèìòù"
 PAGE = synthetic(dal="25-12-2003", al="29-12-2007", label="Art. 3", version=7, updated="11/08/2026")
-BROCARDI = ("Libro I", {"Brocardi": ["Nemo iudex"]}, "https://www.brocardi.it/x")
 
 ARTICLE_ENDPOINTS = ["/stream_article_text", "/fetch_article_text", "/fetch_all_data"]
-# The three places that call `brocardi_scraper.get_info`.
-BROCARDI_ENDPOINTS = ["/stream_article_text", "/fetch_brocardi_info", "/fetch_all_data"]
 
 
 class FakeCache:
@@ -65,11 +63,15 @@ async def controller():
     await ctrl.fetch_queue.stop()
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def brocardi():
-    scraper = SimpleNamespace(get_info=AsyncMock(return_value=BROCARDI))
-    with patch("app.brocardi_scraper", scraper):
-        yield scraper
+    """Any call into the Brocardi scraper, from any instance, fails the test."""
+    from visualex_api.services.brocardi_scraper import BrocardiScraper
+
+    guard = AsyncMock(side_effect=AssertionError("Brocardi must not be reached"))
+    with patch.object(BrocardiScraper, "get_info", guard), \
+            patch.object(BrocardiScraper, "request_document", guard):
+        yield guard
 
 
 @pytest.fixture(autouse=True)
@@ -154,40 +156,33 @@ class TestARangeAtOneDate:
         assert "validity" not in results[2]
 
 
-class TestBrocardiIsNotAskedForAPastText:
-    @pytest.mark.parametrize("endpoint", BROCARDI_ENDPOINTS)
-    async def test_the_text_in_force_still_gets_its_doctrine(self, controller, brocardi, endpoint):
-        await ask(controller, endpoint, requested(version="vigente"))
-        brocardi.get_info.assert_awaited_once()
-
-    @pytest.mark.parametrize("endpoint", BROCARDI_ENDPOINTS)
-    @pytest.mark.parametrize("version,version_date", [
-        ("vigente", "2007-12-29"),
-        ("originale", None),
-        ("originale", ""),
-        (None, "2007-12-29"),
-    ])
-    async def test_a_past_text_never_does(self, controller, brocardi, endpoint, version, version_date):
+class TestBrocardiIsNeverAsked:
+    @pytest.mark.parametrize("endpoint", ARTICLE_ENDPOINTS)
+    @pytest.mark.parametrize("version,version_date", [("vigente", None), ("vigente", "2007-12-29"), ("originale", None)])
+    async def test_no_article_carries_a_brocardi_field(self, controller, brocardi, endpoint, version, version_date):
         [result] = await ask(controller, endpoint, requested(version=version, version_date=version_date))
-        brocardi.get_info.assert_not_awaited()
-        assert not result.get("brocardi_info")
-
-    @pytest.mark.parametrize("endpoint", ["/stream_article_text", "/fetch_all_data"])
-    async def test_a_past_text_does_not_wait_for_the_slowest_source(self, controller, brocardi, endpoint):
-        """The stream used to gather the text and Brocardi, so a historical read
-        took as long as the slower of the two."""
-        brocardi.get_info = AsyncMock(side_effect=AssertionError("Brocardi must not be reached"))
-        [result] = await ask(controller, endpoint, requested(version="vigente", version_date="2007-12-29"))
         assert result["article_text"] == TEXT
+        assert "brocardi_info" not in result
         assert "brocardi_error" not in result
-        assert not result.get("brocardi_info")
+        brocardi.assert_not_awaited()
+
+    async def test_the_old_route_answers_410_without_reading_the_request(self, controller, brocardi):
+        build = AsyncMock(side_effect=AssertionError("no norm may be built"))
+        with patch.object(NormaController, "create_norma_visitata_from_data", build):
+            response = await controller.app.test_client().post(
+                "/fetch_brocardi_info", json={"act_type": "codice civile", "article": "2043"}
+            )
+        assert response.status_code == 410
+        assert "Brocardi" in (await response.get_json())["error"]
+        build.assert_not_awaited()
+        brocardi.assert_not_awaited()
 
 
 class TestAFutureDateIsRefusedBeforeAnyRequest:
     BODY = {"act_type": "legge", "act_number": "241", "date": "1990-08-07", "article": "3",
             "version": "vigente", "version_date": "2999-01-01"}
 
-    @pytest.mark.parametrize("endpoint", ["/fetch_norma_data", "/fetch_brocardi_info"] + ARTICLE_ENDPOINTS)
+    @pytest.mark.parametrize("endpoint", ["/fetch_norma_data"] + ARTICLE_ENDPOINTS)
     async def test_every_door_answers_400_and_says_why(self, controller, endpoint):
         scraper = normattiva_serving()
         with patch("app.normattiva_scraper", scraper), \

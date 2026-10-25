@@ -26,106 +26,19 @@ export interface NormaVisitata {
     urn?: string; // The specific URN for this article/version
 }
 
-// Structured massima from jurisprudence
-export interface MassimaStructured {
-    autorita: string | null;  // "Cass. civ.", "Corte cost.", etc.
-    numero: string | null;    // "123"
-    anno: string | null;      // "2021"
-    massima: string;          // Cleaned text content
-}
-
-// Article cited in relazioni
-export interface ArticoloCitato {
-    numero: string;
-    titolo: string;
-    url: string;
-}
-
-// Historical relazione (Guardasigilli)
-export interface RelazioneContent {
-    tipo: string;             // "libro_obbligazioni" | "codice_civile"
-    titolo: string;
-    numero_paragrafo: string | null;
-    testo: string;
-    articoli_citati: ArticoloCitato[];
-}
-
-// Relazione for Constitution
-export interface RelazioneCostituzione {
-    titolo: string;
-    autore: string;
-    anno: number;
-    testo: string;
-}
-
-// Footnote (nota a piè di pagina)
-export interface Footnote {
-    numero: number;
-    testo: string;
-    tipo: 'nota' | 'riferimento' | 'footnote';
-}
-
-// Related Article (articolo precedente/successivo)
-export interface RelatedArticle {
-    numero: string;
-    url: string;
-    titolo?: string;
-}
-
-export interface RelatedArticles {
-    previous?: RelatedArticle;
-    next?: RelatedArticle;
-}
-
-// Glossary entry (voce del dizionario giuridico Brocardi)
-export interface GlossaryEntry {
-    termine: string;
-    url: string;
-    dizionario_id: string;
-}
-
-// Cross Reference (riferimento incrociato)
-export interface CrossReference {
-    articolo: string;
-    tipo_atto?: string;
-    url: string;
-    sezione: 'brocardi' | 'ratio' | 'spiegazione' | 'massime';
-    testo?: string;
-}
-
-export interface BrocardiInfo {
-    position: string | null;
-    link: string | null;
-    Brocardi: string[] | null;
-    Ratio: string | null;
-    Spiegazione: string | null;
-    // Massime: supports both legacy string[] and new structured format
-    Massime: (string | MassimaStructured)[] | null;
-    // Historical relations (Guardasigilli)
-    Relazioni?: RelazioneContent[] | null;
-    // Constitution relation (Meuccio Ruini)
-    RelazioneCostituzione?: RelazioneCostituzione | null;
-    // Footnotes (note a piè di pagina)
-    Footnotes?: Footnote[] | null;
-    // Related Articles (articoli correlati)
-    RelatedArticles?: RelatedArticles | null;
-    // Cross References (riferimenti incrociati)
-    CrossReferences?: CrossReference[] | null;
-    // Brocardi legal-dictionary links for terms used in the article
-    Glossario?: GlossaryEntry[] | null;
-}
-
 export interface ArticleData {
     article_text?: string;
     url?: string;
     norma_data: NormaVisitata;
-    brocardi_info?: BrocardiInfo | null;
-    /** Set by the server when Brocardi was asked and did not answer (no `brocardi_info` then). */
-    brocardi_error?: string;
     error?: string;
     queue_position?: number;
     /** What the source's own page says about the text it served; absent when it cannot be read. */
     validity?: ArticleValidity;
+    /**
+     * A later text the source has already published for an article served as today's (G-355): absent when there is
+     * none. The text served stays today's, its `validity.valid_to` the day before.
+     */
+    upcoming?: ArticleUpcoming;
     /**
      * What was ASKED for, not what came back: `isHistorical` is true for a date or for the
      * original text, even when the answer turns out to be the text in force. What came back is
@@ -138,6 +51,16 @@ export interface ArticleData {
 }
 
 export type ValidityState = 'current' | 'historical' | 'not_yet' | 'abrogated';
+
+/**
+ * What a later text does to the article, and from which day (ISO): the server's `upcoming` (G-355). The web reads
+ * `abrogated` and `amended`; any other value (G-357 adds more) or none says nothing.
+ */
+export interface ArticleUpcoming {
+    change: string | null;
+    valid_from: string;
+    version_number: number | null;
+}
 
 /**
  * The window of days a Normattiva page states for the text it served (dates in
@@ -160,7 +83,6 @@ export interface ArticleValidity {
 
 export interface SearchFilters {
     source: 'all' | 'normattiva' | 'eurlex';
-    hasBrocardi: boolean;
     onlyHistorical: boolean;
     yearFrom?: number;
     yearTo?: number;
@@ -173,7 +95,6 @@ export interface SearchParams {
     article: string;
     version: 'vigente' | 'originale';
     version_date?: string;
-    show_brocardi_info: boolean;
     filters?: SearchFilters;
     annex?: string; // Optional annex number/letter (e.g., "1", "2", "A", "B")
     tabLabel?: string; // Optional custom label for the practice a search creates

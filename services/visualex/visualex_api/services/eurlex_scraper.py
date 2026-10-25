@@ -11,6 +11,7 @@ from ..tools.cache_manager import get_cache_manager
 from ..tools.selectors import EURLexSelectors
 from ..tools.treextractor import strip_amendment_markers
 from .akn_parser import normalize_article_key
+from ..tools.article_suffixes import ARTICLE_SUFFIX_ALTERNATION
 
 # Configure structured logger
 log = structlog.get_logger()
@@ -128,6 +129,11 @@ def _element_classes(element) -> set:
     return set(element.get("class", []) or [])
 
 
+# Blanks before closing punctuation, matched only from the run's first blank (see
+# `_AMENDMENT_MARK` in treextractor): `\s+([.,;:)])` restarted at every blank of a long run.
+_SPACE_BEFORE_PUNCTUATION = re.compile(r"(?<!\s)\s++([.,;:)])")
+
+
 def _cons_text(element) -> str:
     # A `modref` marker ("▼M2", or "▼M2 —————" for a deleted point) is a
     # sibling of the article title only on older pages; a recent consolidation
@@ -144,7 +150,7 @@ def _cons_text(element) -> str:
     # read "1 quater ." while "1 bis." elsewhere keeps the period inside the
     # span, and "lettera a )" / "articolo 14 bis , paragrafo 2" likewise.
     # Consolidated path only: the OJ extractor never comes through here.
-    text = re.sub(r"\s+([.,;:)])", r"\1", text)
+    text = _SPACE_BEFORE_PUNCTUATION.sub(r"\1", text)
     # The same separator lands after an opening bracket: a footnote reference
     # is literal parens around a superscript link, (<a><span>1</span></a>),
     # and read "( 1 )" — the page shows "(1)".
@@ -212,6 +218,25 @@ def _cons_lines(element) -> list[str]:
     for point in points:
         lines.extend(_cons_lines(point))
     return lines
+
+
+# An ordinal right after a heading's number ("Articolo 15 bis", "Articolo 15bis"), a whole
+# word: "Articolo 1 Terzi" is art. 1 with its rubrica run on, not an ordinal.
+_ORDINAL_AFTER_NUMBER = re.compile(
+    rf"[\s\-]*+(?:{ARTICLE_SUFFIX_ALTERNATION})(?![^\W\d_])", re.IGNORECASE)
+
+
+def _number_ends_here(rest) -> bool:
+    """True when the heading's number ends where `rest` starts: no digit and no ordinal follow."""
+    return not rest[:1].isdigit() and not _ORDINAL_AFTER_NUMBER.match(rest)
+
+
+def _heads_article(text, pattern) -> bool:
+    """True when `text` opens with the heading `pattern` ("Articolo 1") and the
+    number ends there: "Articolo 17" does not head article 1, or a request for a
+    missing art. 1 would be served art. 17; nor does "Articolo 15 bis" head
+    article 15 (the suffix served must be the one asked, none for none)."""
+    return text.startswith(pattern) and _number_ends_here(text[len(pattern):])
 
 
 def _cons_find_title(soup, article):
@@ -412,7 +437,7 @@ class EurlexScraper(BaseScraper):
 
         # Strategy 1: Look for <p class="ti-art"> (original selector)
         for pattern in search_patterns:
-            article_section = soup.find(lambda tag: tag.name == 'p' and 'ti-art' in tag.get('class', []) and tag.get_text(strip=True).startswith(pattern))
+            article_section = soup.find(lambda tag: tag.name == 'p' and 'ti-art' in tag.get('class', []) and _heads_article(tag.get_text(strip=True), pattern))
             if article_section:
                 log.debug(f"Found article with ti-art class using pattern: {pattern}")
                 break
@@ -420,15 +445,28 @@ class EurlexScraper(BaseScraper):
         # Strategy 2: Look for any element with class containing 'art' or 'title'
         if not article_section:
             for pattern in search_patterns:
-                article_section = soup.find(lambda tag: tag.get('class') and any('art' in c.lower() or 'title' in c.lower() for c in tag.get('class', [])) and tag.get_text(strip=True).startswith(pattern))
+                article_section = soup.find(lambda tag: tag.get('class') and any('art' in c.lower() or 'title' in c.lower() for c in tag.get('class', [])) and _heads_article(tag.get_text(strip=True), pattern))
                 if article_section:
                     log.debug(f"Found article with art/title class using pattern: {pattern}")
                     break
 
-        # Strategy 3: Look for any element whose text matches article pattern exactly
+        # Strategy 3: Look for any element whose text matches article pattern exactly. The modern
+        # OJ page writes "Articolo\xa0N", which only this one reads; the number must end there,
+        # as in `_heads_article`, or art. 15 asked would be served "Articolo 15 bis". An article
+        # asked with its suffix («15 bis», «15-bis», «15bis») reads "Articolo\xa015\xa0bis" too.
         if not article_section:
-            article_regex = re.compile(rf'^Articolo\s+{re.escape(str(article))}\b', re.IGNORECASE)
-            article_section = soup.find(lambda tag: tag.name in ['p', 'div', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'] and article_regex.match(tag.get_text(strip=True)))
+            asked = re.fullmatch(rf'(\d+)[\s\-]*({ARTICLE_SUFFIX_ALTERNATION})?', str(article).strip(), re.IGNORECASE)
+            if asked:
+                spelled = asked.group(1) + (rf'[\s\-]*{asked.group(2)}' if asked.group(2) else '')
+            else:
+                spelled = re.escape(str(article))
+            article_regex = re.compile(rf'^Articolo\s+{spelled}\b', re.IGNORECASE)
+
+            def heads_by_regex(text):
+                match = article_regex.match(text)
+                return bool(match) and _number_ends_here(text[match.end():])
+
+            article_section = soup.find(lambda tag: tag.name in ['p', 'div', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'] and heads_by_regex(tag.get_text(strip=True)))
             if article_section:
                 log.debug("Found article using regex text match")
 
@@ -436,7 +474,7 @@ class EurlexScraper(BaseScraper):
         if not article_section:
             subdivisions = soup.find_all('div', class_=lambda c: c and 'eli-subdivision' in c)
             for subdiv in subdivisions:
-                title_elem = subdiv.find(['p', 'span', 'div'], string=lambda s: s and any(s.strip().startswith(p) for p in search_patterns))
+                title_elem = subdiv.find(['p', 'span', 'div'], string=lambda s: s and any(_heads_article(s.strip(), p) for p in search_patterns))
                 if title_elem:
                     article_section = subdiv
                     log.debug("Found article in eli-subdivision")

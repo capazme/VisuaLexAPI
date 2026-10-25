@@ -45,9 +45,34 @@ describe('DossierActBlock', () => {
     renderBlock([item('3'), item('1')]);
     expect(screen.getAllByRole('heading', { name: `${L247} 2 articoli` })).toHaveLength(1);
     expect(screen.getByText("Nuova disciplina dell'ordinamento della professione forense")).toBeInTheDocument();
-    expect(screen.getByText('2 articoli')).toBeInTheDocument();
+    // Twice in the page: in the name's flow while the block is narrow (hidden from a screen reader), and the heading's own.
+    expect(screen.getAllByText('2 articoli')).toHaveLength(2);
     expect(screen.getAllByText(/^art\. \d+$/).map((el) => el.textContent)).toEqual(['art. 1', 'art. 3']);
     expect(screen.getByText('Doveri e deontologia')).toBeInTheDocument();
+  });
+
+  it('sizes its header by its own width, not the window\'s: in the left column of two (D7a) the name wraps and the actions keep their icons', () => {
+    renderBlock([item('3')]);
+    const section = screen.getByRole('region', { name: L247 });
+    expect(section).toHaveClass('@container');
+    expect(screen.getByText(L247)).toHaveClass('break-words', '@2xl:truncate');
+    expect(screen.getByRole('heading', { name: `${L247} 1 articolo` })).toHaveClass('flex-wrap', '@2xl:flex-nowrap');
+    for (const words of ['Apri tutto', 'Articoli']) expect(screen.getByText(words)).toHaveClass('hidden', 'lg:@2xl:inline');
+    // The names stay whole for a screen reader.
+    expect(screen.getByRole('button', { name: `Apri tutto ${L247} su Dashboard` })).toBeInTheDocument();
+  });
+
+  it('keeps the count on the name\'s line while narrow, a screen reader hearing it once (the left column at 1024 px)', () => {
+    renderBlock([item('3'), item('1')]);
+    const [inFlow, own] = screen.getAllByText('2 articoli');
+    // In the toggle, after the name's words, gone where the block is wide; the toggle's name is the act's alone.
+    expect(inFlow).toHaveAttribute('aria-hidden', 'true');
+    expect(inFlow).toHaveClass('whitespace-nowrap', '@2xl:hidden');
+    expect(inFlow.parentElement).toHaveTextContent(`${L247}2 articoli`);
+    expect(screen.getByRole('button', { name: L247 })).toContainElement(inFlow);
+    // Its own: visible where the block is wide, read always.
+    expect(own).toHaveClass('sr-only', '@2xl:not-sr-only');
+    expect(own).not.toHaveAttribute('aria-hidden');
   });
 
   it('heads an act the server has not named yet with the muted fallback', () => {

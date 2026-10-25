@@ -7,6 +7,7 @@ import type { StudyModeTheme } from './StudyMode';
 import { HIGHLIGHT_STYLES, parseInlineStyle } from '../../../../utils/highlightColors';
 import { revealAnnotation } from '../../../../utils/revealAnnotation';
 import { StudyModeSummary } from './StudyModeSummary';
+import { spring } from '../../../../lib/motion';
 
 interface StudyModeToolsPanelProps {
   visible: boolean;
@@ -148,13 +149,13 @@ export function StudyModeToolsPanel({
           initial={{ x: '-100%', opacity: 0.8 }}
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: '-100%', opacity: 0.8 }}
-          transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+          transition={spring.snappy}
           onMouseEnter={onMouseEnter}
           onMouseLeave={onMouseLeave}
           style={{ touchAction: 'pan-y' }}
           className={cn(
             // Base styles
-            "absolute z-10 flex flex-col shadow-xl",
+            "absolute z-10 flex flex-col shadow-md",
             // Mobile: bottom sheet style. `overscroll-contain` stops the
             // content scroll from bubbling up to the article body (rubber
             // banding past the top of the notes list was pulling the
@@ -251,12 +252,12 @@ export function StudyModeToolsPanel({
                       <p className={cn("text-sm whitespace-pre-wrap pr-6 leading-relaxed", styles.text)}>
                         {note.text}
                       </p>
-                      <p className={cn("text-[10px] mt-2 font-medium opacity-60", styles.muted)}>
+                      <p className={cn("text-[11px] mt-2 font-medium opacity-60", styles.muted)}>
                         {new Date(note.createdAt).toLocaleString()}
                       </p>
                       <button
                         onClick={() => onRemoveAnnotation(note.id)}
-                        className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-600 transition-all"
+                        className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-600 transition-[color,background-color,border-color,opacity]"
                       >
                         <X size={14} />
                       </button>
@@ -293,7 +294,7 @@ export function StudyModeToolsPanel({
                         </p>
                         <button
                           onClick={() => onRemoveHighlight(h.id)}
-                          className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-600 transition-all"
+                          className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-600 transition-[color,background-color,border-color,opacity]"
                         >
                           <X size={14} />
                         </button>
@@ -351,7 +352,7 @@ export function StudyModeToolsPanel({
                   <Send size={16} />
                 </button>
               </div>
-              <p className={cn("text-[10px] mt-1.5 text-right opacity-70", styles.muted)}>
+              <p className={cn("text-[11px] mt-1.5 text-right opacity-70", styles.muted)}>
                 Premi ⌘+Enter per salvare
               </p>
             </div>

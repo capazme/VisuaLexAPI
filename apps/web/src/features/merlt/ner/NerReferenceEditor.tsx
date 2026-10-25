@@ -89,7 +89,7 @@ export function NerReferenceEditor({
           type="button"
           disabled={!canSave}
           onClick={save}
-          className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-700"
+          className="rounded-md bg-primary-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-primary-700 disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-700"
         >
           Salva
         </button>

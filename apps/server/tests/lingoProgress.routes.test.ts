@@ -242,7 +242,8 @@ describe('the progress read', () => {
     for (const at of instants) {
       await prisma.lingoRevisioneSRS.create({ data: { utenteId: alice.id, cardId: c.id, dataRevisione: new Date(at), rating: 3, scheduledDays: 1, stability: 1, difficulty: 5 } });
     }
-    for (const day of ['2027-03-27', '2027-03-28', '2027-03-29']) await storedRow(alice, day);
+    // The whole days as the grades would have stored them; the narrowed calendar counts from the log.
+    for (const [day, ripassi] of [['2027-03-27', 1], ['2027-03-28', 2], ['2027-03-29', 1]] as const) await storedRow(alice, day, { ripassi });
     setClock('2027-03-30T08:00:00Z');
     a = longLived(alice); // signed under the moved clock: the first one has expired by then
 

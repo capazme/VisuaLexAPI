@@ -36,7 +36,7 @@ export type TourType = keyof typeof TOUR_KEYS;
 // ==================== PAGE TOURS ====================
 
 /**
- * Welcome Tour - Prima visita assoluta (3 step)
+ * Welcome Tour - Prima visita assoluta (4 step)
  */
 export const WELCOME_STEPS: DriveStep[] = [
     {
@@ -51,7 +51,7 @@ export const WELCOME_STEPS: DriveStep[] = [
         element: '#tour-section-switcher',
         popover: {
             title: 'Le sezioni',
-            description: 'Da questa icona passi da una sezione all\'altra: Opus per il lavoro, Gymnasium per lo studio, il Forum per la comunità. La barra laterale cambia con la sezione.',
+            description: 'Da qui passi da una sezione all\'altra: Opus per il lavoro, Gymnasium per lo studio, il Forum per la comunità. Dove la barra scrive il nome della sezione, il nome riporta alla sua pagina principale e la freccia accanto apre le altre. La barra laterale cambia con la sezione.',
             side: 'right',
             align: 'start',
         }
@@ -60,7 +60,7 @@ export const WELCOME_STEPS: DriveStep[] = [
         element: '#tour-sidebar',
         popover: {
             title: 'Navigazione Principale',
-            description: 'In ogni sezione trovi in cima la Ricerca e l\'analisi di un documento; sotto, gli strumenti della sezione, come i Dossier in Opus o il Ripasso in Gymnasium. La Cronologia è nel menu del tuo profilo, in basso.',
+            description: 'In ogni sezione trovi in cima la Ricerca e l\'analisi di un documento; sotto, gli strumenti della sezione, come i Dossier in Opus o Oggi e Le mie schede in Gymnasium. La Cronologia è nel menu del tuo profilo, in basso.',
             side: 'right',
             align: 'center',
         }
@@ -88,7 +88,7 @@ export const SEARCH_STEPS: DriveStep[] = [
         element: '#tour-search-field',
         popover: {
             title: 'Cerca una Norma',
-            description: 'Scrivi qui una citazione naturale, come "art. 2043 cc" o "Cass. civ. 10787/2024", e premi Invio: non serve compilare dei campi. Il campo resta sempre in cima alla pagina, e ogni risultato finisce sul tavolo di una pratica.',
+            description: 'Scrivi qui una citazione naturale, come "art. 2043 cc" o "Cass. civ. 10787/2024": il campo si apre nel menu di ricerca, e Invio cerca. Non serve compilare dei campi. Il campo resta sempre in cima alla pagina, e ogni risultato finisce sul tavolo di una pratica.',
             side: 'bottom',
             align: 'center',
         }
@@ -157,15 +157,6 @@ export const DOSSIER_STEPS: DriveStep[] = [
         }
     },
     {
-        element: '#tour-dossier-filters',
-        popover: {
-            title: 'Filtri per Tag',
-            description: 'Clicca sui tag per filtrare i dossier. Puoi combinare più tag per ricerche precise.',
-            side: 'bottom',
-            align: 'start',
-        }
-    },
-    {
         element: '#tour-dossier-sort',
         popover: {
             title: 'Ordinamento',
@@ -175,10 +166,19 @@ export const DOSSIER_STEPS: DriveStep[] = [
         }
     },
     {
+        element: '#tour-dossier-filters',
+        popover: {
+            title: 'Filtra per categoria',
+            description: 'Scegli una categoria dal menu per vedere solo i dossier che la portano; «Tutte le categorie» li mostra di nuovo tutti.',
+            side: 'bottom',
+            align: 'end',
+        }
+    },
+    {
         element: '#tour-dossier-card',
         popover: {
             title: 'Card Dossier',
-            description: 'Ogni card mostra titolo, tag, quante norme e note contiene e l\'ultimo aggiornamento. Clicca per aprire.',
+            description: 'Ogni card mostra titolo, tag, quante norme, note e sentenze contiene e quando l\'hai creato. Clicca per aprire.',
             side: 'right',
             align: 'center',
         }
@@ -208,7 +208,7 @@ export const DOSSIER_STEPS: DriveStep[] = [
 export const HISTORY_STEPS: DriveStep[] = [
     {
         popover: {
-            title: 'Cronologia Ricerche',
+            title: 'Cronologia',
             description: 'Qui trovi tutte le tue ricerche passate. Nulla va perso, puoi sempre recuperare ciò che hai consultato.',
             side: 'over',
             align: 'center',
@@ -253,7 +253,7 @@ export const HISTORY_STEPS: DriveStep[] = [
 ];
 
 /**
- * Forum Page Tour - the community's dossiers di studio (6 step)
+ * Forum Page Tour - «Dossier pubblici», the community's dossiers di studio (6 step)
  *
  * Introduced ex novo when the page was renamed from Bacheca to Forum.
  * List-view-only: steps anchor on the Publish CTA, the tab nav, the
@@ -265,8 +265,8 @@ export const HISTORY_STEPS: DriveStep[] = [
 export const FORUM_STEPS: DriveStep[] = [
     {
         popover: {
-            title: 'Forum',
-            description: 'I dossier di studio pubblicati dalla comunità: aggiungili ai tuoi dossier, pubblica i tuoi e suggerisci contenuti agli altri. In cima trovi i dossier di studio pronti di VisuaLex.',
+            title: 'Dossier pubblici',
+            description: 'I dossier di studio pubblicati dalla comunità: aggiungili ai tuoi dossier, pubblica i tuoi e suggerisci contenuti agli altri. Dopo i dossier della comunità trovi quelli pronti di VisuaLex.',
             side: 'over',
             align: 'center',
         }
@@ -321,14 +321,14 @@ export const FORUM_STEPS: DriveStep[] = [
 // ==================== FEATURE TOURS ====================
 
 /**
- * Command Palette Tour - Ricerca veloce (4 step)
+ * Command Palette Tour - Ricerca veloce (3 step)
  */
 export const COMMAND_PALETTE_STEPS: DriveStep[] = [
     {
         element: '[cmdk-input]',
         popover: {
-            title: 'Ricerca Intelligente',
-            description: 'Scrivi citazioni naturali: "art 2043 cc", "legge 241/1990", "costituzione art 1". Il sistema le interpreta automaticamente.',
+            title: 'Ricerca intelligente',
+            description: 'Scrivi la citazione come la scriveresti: "art. 2043 c.c.", "l. 241/1990", "Cass. civ. 10787/2024". Mentre scrivi, il campo filtra anche l\'elenco degli atti.',
             side: 'bottom',
             align: 'center',
         }
@@ -336,26 +336,17 @@ export const COMMAND_PALETTE_STEPS: DriveStep[] = [
     {
         element: '#command-palette-results',
         popover: {
-            title: 'Risultati e Suggerimenti',
-            description: 'Naviga con le frecce, premi Invio per selezionare. I risultati si aggiornano mentre digiti.',
+            title: 'Scegli l\'atto',
+            description: 'Gli atti per gruppo, con la loro sigla: scegline uno con un clic, o con le frecce e Invio; poi il menu chiede l\'articolo (per una legge o un decreto, prima numero e anno).',
             side: 'bottom',
-            align: 'center',
-        }
-    },
-    {
-        element: '#command-palette-brocardi-toggle',
-        popover: {
-            title: 'Opzione dottrina',
-            description: 'Attiva per ottenere spiegazioni, ratio legis e massime giurisprudenziali insieme al testo.',
-            side: 'top',
             align: 'center',
         }
     },
     {
         element: '#command-palette-quick-norms',
         popover: {
-            title: 'Norme Rapide',
-            description: 'Le tue norme preferite appaiono qui per un accesso immediato. Premi il numero per selezionarle.',
+            title: 'A portata di mano',
+            description: 'I tuoi preferiti e i tuoi alias: gli atti che apri spesso, a un clic. Il fulmine su un articolo lo aggiunge ai preferiti.',
             side: 'bottom',
             align: 'center',
         }
@@ -509,7 +500,7 @@ export const PRACTICE_STEPS: DriveStep[] = [
 ];
 
 /**
- * Practice Act Tour - Esplorazione di un atto (7 step)
+ * Practice Act Tour - Esplorazione di un atto (6 step)
  */
 export const PRACTICE_ACT_STEPS: DriveStep[] = [
     {
@@ -563,15 +554,6 @@ export const PRACTICE_ACT_STEPS: DriveStep[] = [
             title: 'Barra Strumenti',
             description: 'In una riga aperta: note personali, evidenziatore, glosse, ricerca nel testo, copia, esportazione e altro.',
             side: 'bottom',
-            align: 'center',
-        }
-    },
-    {
-        element: '.brocardi-display',
-        popover: {
-            title: 'Dottrina e spiegazioni',
-            description: 'Ratio legis, massime giurisprudenziali e riferimenti. Attiva "Includi dottrina" nella ricerca.',
-            side: 'top',
             align: 'center',
         }
     }
@@ -633,4 +615,6 @@ export const TOUR_UI = {
     prevBtnText: 'Indietro',
     doneBtnText: 'Fine',
     progressText: '{{current}} di {{total}}',
+    // driver.js names its «×» «Close» and has no option for it: `useTour` renames it on every step.
+    closeBtnLabel: 'Chiudi',
 } as const;

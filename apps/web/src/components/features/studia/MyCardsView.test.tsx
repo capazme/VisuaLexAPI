@@ -1,28 +1,36 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { MemoryRouter, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 
 vi.mock('../../../services/studiaService', () => ({
   studiaService: { list: vi.fn(), get: vi.fn(), trash: vi.fn(), create: vi.fn(), update: vi.fn(), propose: vi.fn(), withdraw: vi.fn() },
 }));
+
+vi.mock('../../../services/healthService', () => ({ cardSourcesAnswer: vi.fn() }));
+vi.mock('../../../services/trashService', () => ({ trashService: { restore: vi.fn() } }));
 
 vi.mock('../../../utils/articleCardsCache', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../utils/articleCardsCache')>()),
   invalidateArticleCards: vi.fn(),
 }));
 
+import { cardSourcesAnswer } from '../../../services/healthService';
 import { studiaService } from '../../../services/studiaService';
 import { invalidateArticleCards } from '../../../utils/articleCardsCache';
 import { appStore } from '../../../store/useAppStore';
 import type { Scheda, StatoScheda } from '../../../types/studia';
 import { MyCardsView } from './MyCardsView';
+import { trashService } from '../../../services/trashService';
+import { registerUndoToastListener, type UndoToast } from '../../../hooks/useUndoableAction';
+import { resetNotifications } from '../../ui/notifications/notifications';
 
 const list = vi.mocked(studiaService.list);
 const get = vi.mocked(studiaService.get);
 const trash = vi.mocked(studiaService.trash);
 const propose = vi.mocked(studiaService.propose);
 const withdraw = vi.mocked(studiaService.withdraw);
+const sources = vi.mocked(cardSourcesAnswer);
 
 const CIVILE_URN = 'urn:nir:stato:regio.decreto:1942-03-16;262:2~art1453';
 const LEGGE_URN = 'urn:nir:stato:legge:1990-08-07;241~art2';
@@ -79,6 +87,9 @@ beforeEach(() => {
   withdraw.mockReset();
   vi.mocked(invalidateArticleCards).mockClear();
   list.mockResolvedValue(page(FIVE));
+  sources.mockReset();
+  sources.mockResolvedValue(true);
+  vi.mocked(studiaService.create).mockReset();
   appStore.setState({ searchTrigger: null });
 });
 
@@ -90,19 +101,109 @@ afterEach(() => {
 describe('«Le mie schede», the list', () => {
   it('groups the cards by subject and institute, in the order the server gives', async () => {
     renderView();
-    await screen.findByRole('heading', { level: 3, name: /Diritto civile/ });
-    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Diritto civile3 schede', 'Diritto penale2 schede']);
-    expect(screen.getAllByRole('heading', { level: 4 }).map((h) => h.textContent)).toEqual([
+    // Under the page's title (the frame's h1): the subjects h2, their institutes h3.
+    await screen.findByRole('heading', { level: 2, name: /Diritto civile/ });
+    expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Diritto civile3 schede', 'Diritto penale2 schede']);
+    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
       'Contratto1 scheda', 'Risoluzione per inadempimento2 schede', 'Reato2 schede',
     ]);
     expect(screen.getAllByRole('link')).toHaveLength(5);
     expect(list).toHaveBeenCalledWith(expect.objectContaining({ ordine: 'materia' }));
   });
 
-  it('invites to write the first card when there is none', async () => {
+  it('invites to write the first card from here when there is none and the sources answer', async () => {
     list.mockResolvedValue(page([]));
     renderView();
-    expect(await screen.findByText('Nessuna scheda ancora. Aprine una da un articolo con “+ Nuova scheda”, o chiedi a Claude di scriverne.')).toBeInTheDocument();
+    expect(await screen.findByText('Non hai ancora schede.')).toBeInTheDocument();
+    // What a card is (Q1).
+    expect(screen.getByText(/Una scheda è una domanda e la sua risposta, fondate su un articolo, ad esempio «art\. 1455 c\.c\.»/)).toBeInTheDocument();
+    // On one line: the citation's spaces are non-breaking (the matcher's normalizer reads them as spaces).
+    expect(screen.getByText(/Una scheda è/).textContent).toContain('«art.\u00a01455\u00a0c.c.»');
+    // The heading's «+ Nuova scheda», and the empty list's solid «Scrivi la prima scheda», the same form.
+    expect(screen.getAllByRole('button', { name: '+ Nuova scheda' })).toHaveLength(1);
+    const first = await screen.findByRole('button', { name: 'Scrivi la prima scheda' });
+    expect(first).toHaveClass('min-h-[44px]', 'font-semibold');
+    // Solid ink: the block's one action (`INK_BUTTON`).
+    expect(first).toHaveClass('bg-primary-900', 'dark:bg-primary-300');
+    expect(screen.getByRole('link', { name: 'Ricerca' })).toHaveAttribute('href', '/');
+    await userEvent.setup().click(first);
+    expect(await screen.findByRole('dialog', { name: 'Nuova scheda' })).toBeInTheDocument();
+  });
+
+  it('points to an article, and promises no button, when the sources do not answer', async () => {
+    sources.mockResolvedValue(false);
+    list.mockResolvedValue(page([]));
+    renderView();
+    expect(await screen.findByText(/Per cominciare, apri un articolo dalla/)).toBeInTheDocument();
+    expect(screen.getByText(/e scegli «\+ Nuova scheda» sotto il testo, o chiedi a Claude di scriverne\./)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '+ Nuova scheda' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Scrivi la prima scheda' })).toBeNull();
+    expect(screen.getByText(/Una scheda è una domanda e la sua risposta/)).toBeInTheDocument();
+  });
+
+  it('says only what a card is while the sources have not answered: the way to begin is not said twice', async () => {
+    sources.mockReturnValue(new Promise(() => {}));
+    list.mockResolvedValue(page([]));
+    renderView();
+    expect(await screen.findByText('Non hai ancora schede.')).toBeInTheDocument();
+    expect(screen.getByText(/Una scheda è una domanda e la sua risposta/)).toBeInTheDocument();
+    expect(screen.queryByText(/Per cominciare/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Scrivi la prima scheda' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '+ Nuova scheda' })).toBeNull();
+  });
+
+  it('offers no «+ Nuova scheda» while the sources have not answered yet', async () => {
+    sources.mockReturnValue(new Promise(() => {}));
+    renderView();
+    // The cards are listed all the same; the page's title is the frame's (`StudiaPage`, L-37).
+    expect(await screen.findAllByRole('link')).toHaveLength(5);
+    expect(screen.queryByRole('heading', { level: 2, name: 'Le mie schede' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '+ Nuova scheda' })).toBeNull();
+  });
+
+  it('lays the cards out as tiles across the page with no card open, each with its front, subject, state and next review (G8)', async () => {
+    list.mockResolvedValue(page([card('r1', { prossimoRipasso: '2099-03-04' }), card('r2')]));
+    renderView();
+    const tile = await screen.findByRole('link', { name: /Domanda r1\?/ });
+    expect(tile.closest('ul')).toHaveClass('lg:grid-cols-2', '2xl:grid-cols-3');
+    expect(within(tile).getByText('Domanda r1?')).toHaveClass('font-serif');
+    expect(tile).toHaveTextContent('Diritto civile');
+    expect(tile).toHaveTextContent('Bozza');
+    expect(tile).toHaveTextContent('Prossimo ripasso: 4 marzo 2099');
+    // No column held empty for a card not chosen.
+    expect(screen.queryByText(/Scegli una scheda/)).toBeNull();
+  });
+
+  it('puts the list in one column beside the card once one is open (G8)', async () => {
+    renderView('/studia/schede/r1');
+    await screen.findByRole('article', { name: 'Scheda' });
+    expect(screen.getByRole('link', { name: /Domanda r1\?/ }).closest('ul')).not.toHaveClass('lg:grid-cols-2');
+    // The filters keep the narrow column's layout: the search across it, not a third of a row.
+    const filters = screen.getByRole('group', { name: 'Filtri' });
+    expect(filters.className).not.toMatch(/\blg:flex\b/);
+    expect(screen.getByRole('searchbox', { name: 'Cerca nelle schede' }).closest('div.flex')?.className).not.toMatch(/lg:w-1\/3/);
+  });
+
+  it('draws «+ Nuova scheda» beside the page\'s title, in the place the frame gives it', async () => {
+    const slot = document.createElement('div');
+    document.body.append(slot);
+    try {
+      render(
+        <MemoryRouter initialEntries={['/studia/schede']}>
+          <Routes>
+            <Route element={<Outlet context={{ validator: false, actionSlot: slot }} />}>
+              <Route path="/studia/schede" element={<MyCardsView />} />
+            </Route>
+          </Routes>
+        </MemoryRouter>,
+      );
+      await screen.findAllByRole('link');
+      const button = await screen.findByRole('button', { name: '+ Nuova scheda' });
+      expect(slot).toContainElement(button);
+      expect(screen.getAllByRole('button', { name: '+ Nuova scheda' })).toHaveLength(1);
+    } finally {
+      slot.remove();
+    }
   });
 
   it('says so, and offers to clear the filters, when they leave nothing', async () => {
@@ -264,8 +365,6 @@ describe('«Le mie schede», the act filter after a deletion', () => {
   const deleteCard = async (id: string) => {
     const detail = await screen.findByRole('article', { name: 'Scheda' });
     await userEvent.setup().click(within(detail).getByRole('button', { name: 'Elimina' }));
-    const dialog = await screen.findByRole('alertdialog');
-    await userEvent.setup().click(within(dialog).getByRole('button', { name: 'Elimina' }));
     await waitFor(() => expect(trash).toHaveBeenCalledWith([id]));
   };
 
@@ -419,29 +518,31 @@ describe('«Le mie schede», the actions a state allows', () => {
 });
 
 describe('«Le mie schede», delete', () => {
-  const openConfirm = async () => {
-    renderView('/studia/schede/r1');
-    const detail = await screen.findByRole('article', { name: 'Scheda' });
-    await userEvent.setup().click(within(detail).getByRole('button', { name: 'Elimina' }));
-    return screen.findByRole('alertdialog');
-  };
-
-  it('asks first, saying where the card goes', async () => {
-    const dialog = await openConfirm();
-    expect(dialog).toHaveTextContent('La scheda va nel cestino per 30 giorni. Le altre schede non sono toccate.');
-    expect(trash).not.toHaveBeenCalled();
-    await userEvent.setup().click(within(dialog).getByRole('button', { name: 'Annulla' }));
-    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
-    expect(trash).not.toHaveBeenCalled();
+  let shown: UndoToast | null;
+  let unregister: () => void;
+  beforeEach(() => {
+    shown = null;
+    unregister = registerUndoToastListener((t) => { shown = t; });
+  });
+  afterEach(() => {
+    unregister();
+    resetNotifications();
   });
 
-  it('moves the card to the trash, says so, and returns to the list', async () => {
+  /** Opens the card, then (`listAfter`) what the list answers once it is gone, then presses «Elimina». */
+  const pressDelete = async (listAfter?: Scheda[]) => {
+    renderView('/studia/schede/r1');
+    const detail = await screen.findByRole('article', { name: 'Scheda' });
+    if (listAfter) list.mockResolvedValue(page(listAfter));
+    await userEvent.setup().click(within(detail).getByRole('button', { name: 'Elimina' }));
+  };
+
+  it('moves the card to the trash at once, with «Annulla» and no confirmation, and returns to the list (K1a)', async () => {
     trash.mockResolvedValue({ trashId: 't1', moved: ['r1'], notFound: [], notDeletable: [] });
-    const dialog = await openConfirm();
-    list.mockResolvedValue(page(FIVE.filter((c) => c.id !== 'r1')));
-    await userEvent.setup().click(within(dialog).getByRole('button', { name: 'Elimina' }));
+    await pressDelete(FIVE.filter((c) => c.id !== 'r1'));
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(trash).toHaveBeenCalledWith(['r1']);
-    expect(await screen.findByText('Scheda nel cestino')).toBeInTheDocument();
+    await waitFor(() => expect(shown?.message).toBe('Scheda nel cestino'));
     // The row under the article must not go on counting it.
     expect(invalidateArticleCards).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('where')).toHaveTextContent('/studia/schede');
@@ -449,28 +550,95 @@ describe('«Le mie schede», delete', () => {
     expect(screen.queryByRole('article')).not.toBeInTheDocument();
   });
 
+  it('«Annulla» takes the card back out of the trash and lists it again', async () => {
+    trash.mockResolvedValue({ trashId: 't1', moved: ['r1'], notFound: [], notDeletable: [] });
+    vi.mocked(trashService.restore).mockResolvedValue({ dossierId: null });
+    await pressDelete(FIVE.filter((c) => c.id !== 'r1'));
+    await waitFor(() => expect(shown).not.toBeNull());
+    list.mockResolvedValue(page(FIVE));
+    await act(async () => { await shown!.onUndo(); });
+    expect(trashService.restore).toHaveBeenCalledWith('t1');
+    expect(invalidateArticleCards).toHaveBeenCalledTimes(2);
+    expect(await screen.findByRole('link', { name: /Domanda r1\?/ })).toBeInTheDocument();
+  });
+
+  it('says plainly when «Annulla» cannot reach the trash', async () => {
+    trash.mockResolvedValue({ trashId: 't1', moved: ['r1'], notFound: [], notDeletable: [] });
+    vi.mocked(trashService.restore).mockRejectedValue(new Error('down'));
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await pressDelete();
+    await waitFor(() => expect(shown).not.toBeNull());
+    await act(async () => { await shown!.onUndo(); });
+    expect(appStore.getState().lastSyncError?.message).toBe('Non riesco a ripristinare la scheda ora: è nel Cestino, ripristinala da lì.');
+    error.mockRestore();
+  });
+
   it('says plainly when the card can no longer be deleted, and stays on it', async () => {
     trash.mockResolvedValue({ moved: [], notFound: [], notDeletable: ['r1'] });
-    const dialog = await openConfirm();
-    await userEvent.setup().click(within(dialog).getByRole('button', { name: 'Elimina' }));
+    await pressDelete();
     expect(await screen.findByText(/non si può eliminare nello stato in cui si trova/)).toBeInTheDocument();
     expect(invalidateArticleCards).not.toHaveBeenCalled();
     expect(screen.getByTestId('where')).toHaveTextContent('/studia/schede/r1');
+    expect(shown).toBeNull();
   });
 
   it('says plainly when the card is gone already', async () => {
     trash.mockResolvedValue({ moved: [], notFound: ['r1'], notDeletable: [] });
-    const dialog = await openConfirm();
-    await userEvent.setup().click(within(dialog).getByRole('button', { name: 'Elimina' }));
+    await pressDelete();
     expect(await screen.findByText(/La scheda non c’è più/)).toBeInTheDocument();
   });
 
   it('says what failed and what to do when the trash cannot be reached', async () => {
     trash.mockRejectedValue(new Error('down'));
-    const dialog = await openConfirm();
-    await userEvent.setup().click(within(dialog).getByRole('button', { name: 'Elimina' }));
+    await pressDelete();
     expect(await screen.findByText('Non sono riuscito a spostare la scheda nel cestino. Riprova.')).toBeInTheDocument();
     expect(screen.getByTestId('where')).toHaveTextContent('/studia/schede/r1');
+  });
+});
+
+describe('«Le mie schede», a new card', () => {
+  it('opens the form with no article from the heading, and shows the card once saved', async () => {
+    const user = userEvent.setup();
+    const created = card('n1', { domanda: 'Quando?', istituto: 'Risoluzione' });
+    vi.mocked(studiaService.create).mockResolvedValue({ outcome: 'created', id: 'n1' });
+    renderView();
+    await screen.findAllByRole('link');
+    await user.click(await screen.findByRole('button', { name: '+ Nuova scheda' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Nuova scheda' });
+    expect(within(dialog).queryByText('principale')).toBeNull();
+    await user.selectOptions(within(dialog).getByLabelText('Materia'), 'DIRITTO_CIVILE');
+    await user.type(within(dialog).getByLabelText('Istituto'), 'Risoluzione');
+    await user.type(within(dialog).getByLabelText('Domanda'), 'Quando?');
+    await user.type(within(dialog).getByLabelText('Risposta'), 'Se inadempiente.');
+    await user.type(within(dialog).getByLabelText('Riferimento dell’ancora'), 'art. 1455 c.c.');
+    list.mockClear();
+    list.mockResolvedValue(page([created, ...FIVE]));
+    await user.click(within(dialog).getByRole('button', { name: 'Salva' }));
+    expect(vi.mocked(studiaService.create).mock.calls[0][0].ancore).toEqual([{ riferimento: 'art. 1455 c.c.', principale: true }]);
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/studia/schede/n1'));
+    await waitFor(() => expect(list).toHaveBeenCalled());
+    expect(await screen.findByText('Scheda salvata')).toBeInTheDocument();
+  });
+
+  it('opens the same form from the empty list, and gives the focus to the heading’s button once the first card is saved', async () => {
+    const user = userEvent.setup();
+    vi.mocked(studiaService.create).mockResolvedValue({ outcome: 'created', id: 'n1' });
+    list.mockResolvedValue(page([]));
+    renderView();
+    await screen.findByText('Non hai ancora schede.');
+    const fromHeading = screen.getByRole('button', { name: '+ Nuova scheda' });
+    const fromEmpty = await screen.findByRole('button', { name: 'Scrivi la prima scheda' });
+    await user.click(fromEmpty);
+    const dialog = await screen.findByRole('dialog', { name: 'Nuova scheda' });
+    await user.selectOptions(within(dialog).getByLabelText('Materia'), 'DIRITTO_CIVILE');
+    await user.type(within(dialog).getByLabelText('Istituto'), 'Risoluzione');
+    await user.type(within(dialog).getByLabelText('Domanda'), 'Quando?');
+    await user.type(within(dialog).getByLabelText('Risposta'), 'Se inadempiente.');
+    await user.type(within(dialog).getByLabelText('Riferimento dell’ancora'), 'art. 1455 c.c.');
+    list.mockResolvedValue(page([card('n1')]));
+    await user.click(within(dialog).getByRole('button', { name: 'Salva' }));
+    await waitFor(() => expect(screen.queryByText('Non hai ancora schede.')).toBeNull());
+    expect(fromHeading).toHaveFocus();
   });
 });
 

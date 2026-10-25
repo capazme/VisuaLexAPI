@@ -1,8 +1,9 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ChevronLeft, ChevronRight, Settings, Zap, Sun, Moon, BookOpen, Maximize2, Minimize2, GripHorizontal, StickyNote, Lightbulb, Download } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Settings, Zap, Sun, Moon, BookOpen, Maximize2, Minimize2, GripHorizontal, StickyNote, Download } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import type { ArticleData } from '../../../../types';
 import type { StudyModeTheme } from './StudyMode';
+import { spring } from '../../../../lib/motion';
 
 interface StudyModeHeaderProps {
   visible: boolean;
@@ -23,8 +24,6 @@ interface StudyModeHeaderProps {
   isDragging?: boolean;
   showToolsPanel?: boolean;
   onToggleTools?: () => void;
-  showBrocardi?: boolean;
-  onToggleBrocardi?: () => void;
   onExport?: () => void;
 }
 
@@ -65,8 +64,6 @@ export function StudyModeHeader({
   isDragging,
   showToolsPanel,
   onToggleTools,
-  showBrocardi,
-  onToggleBrocardi,
   onExport
 }: StudyModeHeaderProps) {
   const styles = THEME_HEADER_STYLES[theme];
@@ -80,7 +77,7 @@ export function StudyModeHeader({
           initial={{ y: '-100%', opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: '-100%', opacity: 0 }}
-          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+          transition={spring.snappy}
           className={cn(
             "absolute top-0 left-0 right-0 z-20 border-b",
             styles.bg,
@@ -177,20 +174,6 @@ export function StudyModeHeader({
                 </button>
               )}
 
-              {onToggleBrocardi && (
-                <button
-                  id="tour-study-brocardi"
-                  onClick={onToggleBrocardi}
-                  className={cn(
-                    "p-1.5 sm:p-2 rounded-md transition-colors",
-                    showBrocardi ? 'text-amber-600 bg-amber-50 dark:bg-amber-900/30 dark:text-amber-400' : styles.button
-                  )}
-                  title="Approfondimenti (B)"
-                >
-                  <Lightbulb size={14} className="sm:w-4 sm:h-4" />
-                </button>
-              )}
-
               <div className="hidden sm:block w-px h-5 bg-slate-200 dark:bg-slate-700 mx-1" />
 
               {/* Quick Theme Toggle - hidden on mobile, use settings instead */}
@@ -201,7 +184,7 @@ export function StudyModeHeader({
                 <button
                   onClick={() => onThemeChange('light')}
                   className={cn(
-                    "p-1 rounded-md transition-all",
+                    "p-1 rounded-md transition-[color,background-color,border-color,box-shadow]",
                     theme === 'light' ? 'bg-white shadow-sm text-yellow-500' : 'text-slate-400 hover:text-slate-500'
                   )}
                   title="Tema chiaro (1)"
@@ -211,7 +194,7 @@ export function StudyModeHeader({
                 <button
                   onClick={() => onThemeChange('sepia')}
                   className={cn(
-                    "p-1 rounded-md transition-all",
+                    "p-1 rounded-md transition-[color,background-color,border-color,box-shadow]",
                     theme === 'sepia' ? 'bg-white shadow-sm text-amber-600' : 'text-slate-400 hover:text-slate-500'
                   )}
                   title="Tema seppia (2)"
@@ -221,8 +204,8 @@ export function StudyModeHeader({
                 <button
                   onClick={() => onThemeChange('dark')}
                   className={cn(
-                    "p-1 rounded-md transition-all",
-                    theme === 'dark' ? 'bg-slate-700 shadow-sm text-blue-400' : 'text-slate-400 hover:text-slate-500'
+                    "p-1 rounded-md transition-[color,background-color,border-color,box-shadow]",
+                    theme === 'dark' ? 'bg-slate-700 shadow-sm text-primary-400' : 'text-slate-400 hover:text-slate-500'
                   )}
                   title="Tema scuro (3)"
                 >

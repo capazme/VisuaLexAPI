@@ -1,10 +1,11 @@
 import { motion } from 'framer-motion';
+import { dur, ease } from '../../lib/motion';
 import { cn } from '../../lib/utils';
 
 export interface ProgressBarProps {
   value?: number;
   max?: number;
-  variant?: 'default' | 'success' | 'warning' | 'brocardi';
+  variant?: 'default' | 'success' | 'warning';
   size?: 'sm' | 'md';
   indeterminate?: boolean;
   label?: string;
@@ -33,7 +34,6 @@ export function ProgressBar({
     default: 'bg-primary-500',
     success: 'bg-emerald-500',
     warning: 'bg-amber-500',
-    brocardi: 'bg-brocardi',
   };
 
   return (
@@ -72,11 +72,12 @@ export function ProgressBar({
             transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
           />
         ) : (
+          // A scale, not a width: the fill moves on the compositor, in a panel's time (≤ 300 ms on UI).
           <motion.div
-            className={cn('h-full rounded-full', fillVariants[variant])}
-            initial={{ width: 0 }}
-            animate={{ width: `${percentage}%` }}
-            transition={{ duration: 0.4, ease: 'easeOut' }}
+            className={cn('h-full w-full origin-left rounded-full', fillVariants[variant])}
+            initial={{ transform: 'scaleX(0)' }}
+            animate={{ transform: `scaleX(${percentage / 100})` }}
+            transition={{ duration: dur.panel, ease: ease.out }}
           />
         )}
       </div>

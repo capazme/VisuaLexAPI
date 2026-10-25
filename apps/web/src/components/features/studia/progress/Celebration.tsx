@@ -1,10 +1,9 @@
 import { useEffect, useRef, type RefObject } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
 import { Z_INDEX } from '../../../../constants/zIndex';
 import { cn } from '../../../../lib/utils';
 import { FRAMES, fade, spawn, step, stepsAt } from './confetti';
-import { formatDate } from './layout';
-import { INK_TEXT, STAMP, SUCCESS_TEXT, TILE } from './tokens';
+import { GoalMark } from './GoalMark';
+import { INK_TEXT, SUCCESS_TEXT, TILE } from './tokens';
 
 /** How long the session's notice stays: decision 6, «gone in under 1.5 seconds». */
 export const SESSION_NOTICE_MS = 1500;
@@ -13,7 +12,7 @@ function prefersReducedMotion(): boolean {
   return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-/** The colours of the confetti, read from the theme through classes: ink, stamp red, primary, green, amber. */
+/** The colours of the confetti, read from the theme through classes: ink, red, primary, green, amber. */
 const PALETTE = [INK_TEXT, 'text-red-700 dark:text-red-400', 'text-primary-500', SUCCESS_TEXT, 'text-amber-500 dark:text-amber-400'];
 
 export interface ConfettiBurstProps {
@@ -102,44 +101,10 @@ export function ConfettiBurst({ originRef, onStart, onDone }: ConfettiBurstProps
   );
 }
 
-export interface GoalStampProps {
-  giorno: string;
-  serie: number;
-  /** Pressed in now (the celebration); otherwise drawn at rest. */
-  press: boolean;
-  /** The small one, for the session's notice. */
-  compact?: boolean;
-  className?: string;
-}
-
-/** The stamp «Obiettivo raggiunto · 13 ottobre 2026 · giorno 13», in the one red, slightly askew. */
-export function GoalStamp({ giorno, serie, press, compact = false, className }: GoalStampProps) {
-  const reduce = useReducedMotion();
-  return (
-    <motion.div
-      aria-hidden
-      data-testid="goal-stamp"
-      initial={press && !reduce ? { scale: 2.4, opacity: 0, rotate: -8 } : false}
-      animate={{ scale: 1, opacity: 1, rotate: -8 }}
-      transition={{ type: 'spring', stiffness: 520, damping: 24, delay: 0.25 }}
-      className={cn(
-        'pointer-events-none w-max rounded border-[3px] border-double text-center font-serif uppercase leading-tight tracking-[0.12em] mix-blend-multiply dark:mix-blend-normal',
-        compact ? 'px-1.5 py-0.5' : 'px-2.5 py-1',
-        STAMP,
-        className,
-      )}
-    >
-      <span className={cn('block font-bold', compact ? 'text-[10px]' : 'text-xs md:text-sm')}>Obiettivo raggiunto</span>
-      <span className={cn('block tracking-wide', compact ? 'text-[8px]' : 'text-[10px]')}>
-        {formatDate(giorno)} · giorno {serie}
-      </span>
-    </motion.div>
-  );
-}
-
 export interface SessionCelebrationProps {
-  giorno: string;
   serie: number;
+  /** The goal's mission done by this grade: the mark beside the words (G9); otherwise the words alone. */
+  mark: boolean;
   /** Called as the notice appears: the day is marked celebrated at once (decision 10). */
   onStart: () => void;
   /** Called when the notice has been on screen for `SESSION_NOTICE_MS`. */
@@ -147,13 +112,14 @@ export interface SessionCelebrationProps {
 }
 
 /**
- * The goal closing during a review (Studia progress spec §6.4): a notice over the session's header row
- * («Restano N · Interrompi»), never over the card or the grades, with the stamp and the confetti inside it.
- * It sits in the page, so it scrolls away with the header rather than float over a long answer; it takes no
- * focus and no pointer (the button under it stays usable), so the keys keep working. Gone in 1.5 s
- * (decision 6). Under reduced motion it is the same notice, still.
+ * The goal closing during a review (Studia progress spec §6.4): a notice over the lesson's header row (the
+ * close button and the progress bar, Gymnasium spec §5.4), never over the card or the grades, with the goal's mark and
+ * the confetti inside it. It is placed in that row, not fixed over the screen; it takes no focus and no pointer
+ * (the button under it stays usable), so the keys keep working. Gone in 1.5 s (decision 6). The mark is «Oggi»'s, small,
+ * written beside the words (G9: it took the place of the red stamp), and on the same rule: only with the goal's mission
+ * done by this grade (`mark`), the words alone otherwise; under reduced motion the same notice, still.
  */
-export function SessionCelebration({ giorno, serie, onStart, onDone }: SessionCelebrationProps) {
+export function SessionCelebration({ serie, mark, onStart, onDone }: SessionCelebrationProps) {
   const start = useRef(onStart);
   const done = useRef(onDone);
   useEffect(() => {
@@ -168,17 +134,18 @@ export function SessionCelebration({ giorno, serie, onStart, onDone }: SessionCe
 
   return (
     <div data-testid="session-celebration" className={cn('pointer-events-none absolute inset-x-0 top-0 flex justify-center', Z_INDEX.dropdown)}>
-      <div className={cn(TILE, 'relative flex w-full max-w-md items-center justify-between gap-3 overflow-hidden px-3 py-1.5 shadow-lg')}>
-        {/* The confetti first, so the words and the stamp are drawn over them. */}
+      <div className={cn(TILE, 'relative flex w-full max-w-md items-center justify-center gap-3 overflow-hidden px-3 py-1.5 shadow-lg')}>
+        {/* The confetti first, so the mark and the words are drawn over them. */}
         <ConfettiBurst />
+        {mark && <GoalMark size={32} draw className={cn('relative', INK_TEXT)} />}
+        {/* Its words beside it at every width now that the mark is small (the stamp left them no room under 400 px). */}
         <p className={cn('relative font-serif text-sm font-semibold leading-tight', INK_TEXT)} aria-hidden>
-          {/* On a phone the stamp says it: one line keeps the notice clear of the card. */}
+          {/* On a phone the streak alone: one line keeps the notice clear of the card. */}
           <span className="hidden sm:block">Obiettivo di oggi raggiunto</span>
           <span className="block sm:font-normal">
             Serie di {serie} {serie === 1 ? 'giorno' : 'giorni'}
           </span>
         </p>
-        <GoalStamp giorno={giorno} serie={serie} press compact className="relative shrink-0" />
       </div>
     </div>
   );

@@ -1,17 +1,20 @@
 import { LingoMateria, Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { maturity } from './cardMaturity';
-import { reviewScope } from './reviewQueue';
+import { readMissions, settleMissions, type MissioneLetta, type XpCredito } from './missions';
+import { reviewedCardsQuery, reviewScope } from './reviewQueue';
 import { computeStreak, type DayState } from './streak';
-import { countedDays, dateToDay, dayToDate, markQueueFinished } from './studyDays';
+import { countedDays, dateToDay, dayToDate, markQueueFinished, romeDayStartSql } from './studyDays';
 import { readPreferences } from './studyPreferences';
 import { addDays, daysBetween, romeDay } from './studyDay';
 import { dueWhere, introducedToday, newCardsWhere, queueFinished } from './todayQueue';
+import { levelNow, type XpLivello } from './xpLedger';
 
 /**
  * Everything the Studia dashboard draws, in one read (Studia progress spec §4, §5.2). `materia` narrows the
  * cards by state, the calendar's counts and the coming days; today's goal, the streak and whether a day
- * counted are always the whole day's, because the goal is.
+ * counted are always the whole day's, because the goal is. So are the level, the missions and the credits this
+ * read wrote (Gymnasium XP spec §5.3): the read settles the missions first, in a transaction of its own.
  *
  * In SQL a review's Rome day is `(data_revisione AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Rome'`: the
  * column is a TIMESTAMP without a zone holding UTC, and read straight as Rome time it would be off by one
@@ -20,8 +23,6 @@ import { dueWhere, introducedToday, newCardsWhere, queueFinished } from './today
  * the scan to the window asked for.
  */
 
-/** 00:00 in Rome of `day`, as the UTC TIMESTAMP the review columns hold. */
-const romeDayStartSql = (day: string) => Prisma.sql`((${day}::date)::timestamp AT TIME ZONE 'Europe/Rome') AT TIME ZONE 'UTC'`;
 
 export const CALENDAR_WEEKS = 26;
 export const FORECAST_DAYS = 14;
@@ -42,6 +43,10 @@ export interface Progress {
   materie: (StateCounts & { materia: LingoMateria; ripassi30: number })[];
   calendario: { giorno: string; ripassi: number; nuove: number; sbagliate: number; valido: boolean; riposo: boolean }[];
   prossimi: { giorno: string; schede: number }[];
+  livello: XpLivello;
+  missioni: MissioneLetta[];
+  /** The credits this read wrote: a mission completed with no grade (the queue finished, a subject switched off). */
+  crediti: XpCredito[];
 }
 
 /** The Monday that starts the calendar: the week `CALENDAR_WEEKS - 1` weeks before this one. */
@@ -58,14 +63,24 @@ export async function readProgress(userId: string, materia?: LingoMateria): Prom
   const scopeAll = reviewScope(userId, materieComunita);
   const scope = reviewScope(userId, materieComunita, materia);
 
+  // First, in one transaction: a finished queue makes today count, and the missions it or anything else completed
+  // without a grade are credited (Gymnasium XP spec §5.1). The user row first, in key share: `markQueueFinished`
+  // on an existing day row locks it without touching a foreign key, and the credit's insert would then wait on the
+  // user row while an account deletion, holding it, waits on the day row. A deleted user settles nothing.
+  const { finishedNow, crediti } = await prisma.$transaction(async (tx) => {
+    const user = await tx.$queryRaw<unknown[]>`SELECT 1 FROM users WHERE id = ${userId} FOR KEY SHARE`;
+    if (user.length !== 1) return { finishedNow: false, crediti: [] };
+    const finished = await queueFinished(tx, userId, today);
+    if (finished) await markQueueFinished(tx, userId, today);
+    return { finishedNow: finished, crediti: (await settleMissions(tx, userId, today, { tipo: 'lettura' })).crediti };
+  });
+
   // Today: the session's counts for the subject asked, and the goal over the whole day.
-  const [dovute, introduced, available, finishedNow] = await Promise.all([
+  const [dovute, introduced, available] = await Promise.all([
     prisma.lingoStatoRipasso.count({ where: dueWhere(userId, scope, today) }),
     introducedToday(prisma, userId, today),
     prisma.lingoCard.count({ where: newCardsWhere(userId, scope) }),
-    queueFinished(prisma, userId, today),
   ]);
-  if (finishedNow) await markQueueFinished(prisma, userId, today);
   const todayRow = await prisma.lingoGiornataStudio.findUnique({ where: { utenteId_giorno: { utenteId: userId, giorno: dayToDate(today) } } });
   const ripassiOggi = todayRow?.ripassi ?? 0;
   const raggiunto = ripassiOggi >= ripassiAlGiorno || (todayRow?.codaFinita ?? false) || finishedNow;
@@ -73,21 +88,20 @@ export async function readProgress(userId: string, materia?: LingoMateria): Prom
   const streak = computeStreak(await countedDays(prisma, userId), today, raggiunto);
 
   // The cards by state, by subject, and the coming days, from the review states in scope.
-  const [states, fresh] = await Promise.all([
-    prisma.lingoStatoRipasso.findMany({
-      where: { utenteId: userId, card: scopeAll },
-      select: { dueAt: true, lastReviewAt: true, card: { select: { materia: true } } },
-    }),
+  const [reviewedCards, fresh] = await Promise.all([
+    prisma.lingoCard.findMany(reviewedCardsQuery(userId, scopeAll, { materia: true })),
     prisma.lingoCard.groupBy({ by: ['materia'], where: newCardsWhere(userId, scopeAll), _count: { _all: true } }),
   ]);
   const bySubject = new Map(SUBJECTS.map((s) => [s, zeroCounts()]));
   for (const group of fresh) bySubject.get(group.materia)!.nuove = group._count._all;
   const forecast = new Array<number>(FORECAST_DAYS).fill(0);
-  for (const state of states) {
-    bySubject.get(state.card.materia)![maturity(state.lastReviewAt, state.dueAt)] += 1;
-    if (materia && state.card.materia !== materia) continue;
-    const ahead = Math.max(0, daysBetween(today, romeDay(state.dueAt))); // overdue counts today
-    if (ahead < FORECAST_DAYS) forecast[ahead] += 1;
+  for (const { materia: subject, statiRipasso } of reviewedCards) {
+    for (const state of statiRipasso) {
+      bySubject.get(subject)![maturity(state.lastReviewAt, state.dueAt)] += 1;
+      if (materia && subject !== materia) continue;
+      const ahead = Math.max(0, daysBetween(today, romeDay(state.dueAt))); // overdue counts today
+      if (ahead < FORECAST_DAYS) forecast[ahead] += 1;
+    }
   }
   const stati = zeroCounts();
   for (const [subject, counts] of bySubject) {
@@ -117,12 +131,16 @@ export async function readProgress(userId: string, materia?: LingoMateria): Prom
     const giorno = dateToDay(row.giorno);
     const counts = narrowed ? (narrowed.get(giorno) ?? { ripassi: 0, nuove: 0, sbagliate: 0 }) : row;
     const valido = giorno === today ? raggiunto : row.valido;
+    // A row with no review that did not count is not a study day: one written only by validation votes.
+    if (row.ripassi === 0 && !valido) continue;
     days.set(giorno, { giorno, ripassi: counts.ripassi, nuove: counts.nuove, sbagliate: counts.sbagliate, valido, riposo: false });
   }
   for (const giorno of streak.riposi) {
     if (giorno < start) continue;
     days.set(giorno, { ...(days.get(giorno) ?? { giorno, ripassi: 0, nuove: 0, sbagliate: 0, valido: false }), riposo: true });
   }
+
+  const [livello, missioni] = await Promise.all([levelNow(prisma, userId, today), readMissions(prisma, userId, today)]);
 
   return {
     oggi: { giorno: today, ripassi: ripassiOggi, obiettivo: ripassiAlGiorno, raggiunto, dovute, nuove: Math.min(available, Math.max(0, nuoveAlGiorno - introduced)) },
@@ -131,6 +149,9 @@ export async function readProgress(userId: string, materia?: LingoMateria): Prom
     materie: SUBJECTS.map((subject) => ({ materia: subject, ...bySubject.get(subject)!, ripassi30: recentBySubject.get(subject) ?? 0 })),
     calendario: [...days.values()].sort((a, b) => (a.giorno < b.giorno ? -1 : 1)),
     prossimi: forecast.map((schede, ahead) => ({ giorno: addDays(today, ahead), schede })),
+    livello,
+    missioni,
+    crediti,
   };
 }
 

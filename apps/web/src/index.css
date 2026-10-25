@@ -18,23 +18,6 @@
   --color-primary: hsl(var(--primary));
   --color-primary-foreground: hsl(var(--primary-foreground));
 
-  /* Full primary scale. The semantic --color-primary above resolves to the
-     app primary (blue-600 hue in light, blue-500 in dark); numbered utilities
-     (bg-primary-600, ring-primary-500, text-primary-700, …) used across the
-     MERL-T surfaces only generate CSS if each step is declared in @theme.
-     Values are the Tailwind blue scale, which contains both theme primaries,
-     so the palette stays coherent. */
-  --color-primary-50: hsl(213.8 100% 96.9%);
-  --color-primary-100: hsl(214.3 94.6% 92.7%);
-  --color-primary-200: hsl(213.3 96.9% 87.3%);
-  --color-primary-300: hsl(211.7 96.4% 78.4%);
-  --color-primary-400: hsl(213.1 93.9% 67.8%);
-  --color-primary-500: hsl(217.2 91.2% 59.8%);
-  --color-primary-600: hsl(221.2 83.2% 53.3%);
-  --color-primary-700: hsl(224.3 76.3% 48%);
-  --color-primary-800: hsl(225.9 70.7% 40.2%);
-  --color-primary-900: hsl(224.4 64.3% 32.9%);
-  --color-primary-950: hsl(226.2 57% 21%);
   --color-secondary: hsl(var(--secondary));
   --color-secondary-foreground: hsl(var(--secondary-foreground));
   --color-muted: hsl(var(--muted));
@@ -48,8 +31,6 @@
   --color-ring: hsl(var(--ring));
 
   /* Feature-specific semantic colors */
-  --color-brocardi: hsl(var(--brocardi));
-  --color-brocardi-foreground: hsl(var(--brocardi-foreground));
   --color-tree: hsl(var(--tree));
   --color-tree-foreground: hsl(var(--tree-foreground));
   --color-quicknorm: hsl(var(--quicknorm));
@@ -61,24 +42,96 @@
   --color-warning: hsl(var(--warning));
   --color-warning-foreground: hsl(var(--warning-foreground));
 
-  /* Primary scale — Blue.
-     These lived in tailwind.config.js, which is a v3-style config: Tailwind v4
-     never loads it without an `@config` directive, so every `primary-<number>`
-     class in the app generated nothing at all. Declared here instead, where v4
-     actually reads them. Values are Tailwind's own blue, unchanged from the
-     config. `--color-primary` above is a different token and stays as it is:
-     `bg-primary` and `primary-500` are not the same thing. */
-  --color-primary-50: #eff6ff;
-  --color-primary-100: #dbeafe;
-  --color-primary-200: #bfdbfe;
-  --color-primary-300: #93c5fd;
-  --color-primary-400: #60a5fa;
-  --color-primary-500: #3b82f6;
-  --color-primary-600: #2563eb;
-  --color-primary-700: #1d4ed8;
-  --color-primary-800: #1e40af;
-  --color-primary-900: #1e3a8a;
-  --color-primary-950: #172554;
+  /* «Inchiostro» (spec 2026-10-18-redesign-inchiostro §4.1): ink, from warm paper to cool ink, and
+     toga, the one accent. The app spends ~6 200 raw slate/gray/blue classes against ~800 semantic
+     ones, so the Tailwind scales it uses are aliased here: one file re-skins every surface.
+     Red, amber, emerald, purple and the highlight, category and find tokens keep their meaning
+     and are not touched. `theme.test.ts` checks the contrast of the pairs the app relies on. */
+  --color-ink-50: oklch(98.4% 0.004 85);
+  --color-ink-100: oklch(96.2% 0.006 85);
+  --color-ink-200: oklch(92.4% 0.008 80);
+  --color-ink-300: oklch(86.5% 0.010 75);
+  --color-ink-400: oklch(70.5% 0.014 250);
+  --color-ink-500: oklch(55.6% 0.018 255);
+  --color-ink-600: oklch(45.5% 0.022 258);
+  --color-ink-700: oklch(37.5% 0.026 260);
+  --color-ink-800: oklch(28.5% 0.028 262);
+  --color-ink-900: oklch(21.5% 0.030 263);
+  --color-ink-950: oklch(15.5% 0.026 264);
+  --color-toga-50: oklch(97% 0.015 262);
+  --color-toga-100: oklch(93.5% 0.032 262);
+  --color-toga-200: oklch(88% 0.058 262);
+  --color-toga-300: oklch(79.5% 0.095 262);
+  --color-toga-400: oklch(68% 0.135 262);
+  --color-toga-500: oklch(57% 0.165 262);
+  --color-toga-600: oklch(48.5% 0.165 262);
+  --color-toga-700: oklch(41.5% 0.145 262);
+  --color-toga-800: oklch(35% 0.120 262);
+  --color-toga-900: oklch(29.5% 0.095 262);
+  --color-toga-950: oklch(21% 0.070 262);
+
+  /* `primary-<number>` once lived in tailwind.config.js, which v4 never loads (gotcha 29); it is
+     declared here. `--color-primary` (above) is a different token: `bg-primary` ≠ `primary-500`. */
+  --color-primary-50: var(--color-toga-50); --color-primary-100: var(--color-toga-100);
+  --color-primary-200: var(--color-toga-200); --color-primary-300: var(--color-toga-300);
+  --color-primary-400: var(--color-toga-400); --color-primary-500: var(--color-toga-500);
+  --color-primary-600: var(--color-toga-600); --color-primary-700: var(--color-toga-700);
+  --color-primary-800: var(--color-toga-800); --color-primary-900: var(--color-toga-900);
+  --color-primary-950: var(--color-toga-950);
+  --color-blue-50: var(--color-toga-50); --color-blue-100: var(--color-toga-100);
+  --color-blue-200: var(--color-toga-200); --color-blue-300: var(--color-toga-300);
+  --color-blue-400: var(--color-toga-400); --color-blue-500: var(--color-toga-500);
+  --color-blue-600: var(--color-toga-600); --color-blue-700: var(--color-toga-700);
+  --color-blue-800: var(--color-toga-800); --color-blue-900: var(--color-toga-900);
+  --color-blue-950: var(--color-toga-950);
+  --color-indigo-50: var(--color-toga-50); --color-indigo-100: var(--color-toga-100);
+  --color-indigo-200: var(--color-toga-200); --color-indigo-300: var(--color-toga-300);
+  --color-indigo-400: var(--color-toga-400); --color-indigo-500: var(--color-toga-500);
+  --color-indigo-600: var(--color-toga-600); --color-indigo-700: var(--color-toga-700);
+  --color-indigo-800: var(--color-toga-800); --color-indigo-900: var(--color-toga-900);
+  --color-indigo-950: var(--color-toga-950);
+  --color-slate-50: var(--color-ink-50); --color-slate-100: var(--color-ink-100);
+  --color-slate-200: var(--color-ink-200); --color-slate-300: var(--color-ink-300);
+  --color-slate-400: var(--color-ink-400); --color-slate-500: var(--color-ink-500);
+  --color-slate-600: var(--color-ink-600); --color-slate-700: var(--color-ink-700);
+  --color-slate-800: var(--color-ink-800); --color-slate-900: var(--color-ink-900);
+  --color-slate-950: var(--color-ink-950);
+  --color-gray-50: var(--color-ink-50); --color-gray-100: var(--color-ink-100);
+  --color-gray-200: var(--color-ink-200); --color-gray-300: var(--color-ink-300);
+  --color-gray-400: var(--color-ink-400); --color-gray-500: var(--color-ink-500);
+  --color-gray-600: var(--color-ink-600); --color-gray-700: var(--color-ink-700);
+  --color-gray-800: var(--color-ink-800); --color-gray-900: var(--color-ink-900);
+  --color-gray-950: var(--color-ink-950);
+  --color-zinc-50: var(--color-ink-50); --color-zinc-100: var(--color-ink-100);
+  --color-zinc-200: var(--color-ink-200); --color-zinc-300: var(--color-ink-300);
+  --color-zinc-400: var(--color-ink-400); --color-zinc-500: var(--color-ink-500);
+  --color-zinc-600: var(--color-ink-600); --color-zinc-700: var(--color-ink-700);
+  --color-zinc-800: var(--color-ink-800); --color-zinc-900: var(--color-ink-900);
+  --color-zinc-950: var(--color-ink-950);
+  --color-neutral-50: var(--color-ink-50); --color-neutral-100: var(--color-ink-100);
+  --color-neutral-200: var(--color-ink-200); --color-neutral-300: var(--color-ink-300);
+  --color-neutral-400: var(--color-ink-400); --color-neutral-500: var(--color-ink-500);
+  --color-neutral-600: var(--color-ink-600); --color-neutral-700: var(--color-ink-700);
+  --color-neutral-800: var(--color-ink-800); --color-neutral-900: var(--color-ink-900);
+  --color-neutral-950: var(--color-ink-950);
+
+  /* Elevation is two shadows: a hairline for things on the page, a ring and a soft drop for things
+     floating over it. Redefined here so the existing shadow-* classes follow. */
+  --shadow-xs: 0 1px 0 rgb(18 25 39 / 0.04);
+  --shadow-sm: 0 1px 0 rgb(18 25 39 / 0.04), 0 1px 2px rgb(18 25 39 / 0.06);
+  --shadow: 0 1px 0 rgb(18 25 39 / 0.04), 0 1px 2px rgb(18 25 39 / 0.06);
+  --shadow-md: 0 1px 0 rgb(18 25 39 / 0.04), 0 2px 6px -1px rgb(18 25 39 / 0.08);
+  --shadow-lg: 0 0 0 1px rgb(18 25 39 / 0.06), 0 12px 32px -8px rgb(18 25 39 / 0.18);
+  --shadow-xl: 0 0 0 1px rgb(18 25 39 / 0.06), 0 12px 32px -8px rgb(18 25 39 / 0.18);
+  --shadow-2xl: 0 0 0 1px rgb(18 25 39 / 0.06), 0 24px 48px -12px rgb(18 25 39 / 0.22);
+
+  /* Motion (spec §4.4). Tailwind reads these for its own utilities, so every transition-* and
+     ease-out class already in the code follows; `lib/motion.ts` mirrors them for Framer Motion. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --default-transition-duration: 160ms;
+  --default-transition-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
 
   /* The review card's reveal (VisuaLex Studia): the hairline draws, then the answer unfolds.
      Used only as `motion-safe:animate-vlx-rule` / `motion-safe:animate-vlx-unfold`. */
@@ -93,48 +146,67 @@
     to { opacity: 1; transform: none; }
   }
 
+  /* The note after a grade in Gymnasium's lesson («Torna tra 3 giorni»): it rises in, holds, and fades
+     within its second on screen. Used only as `motion-safe:animate-vlx-note`; still under reduced motion. */
+  --animate-vlx-note: vlx-note 1000ms var(--ease-out) both;
+  @keyframes vlx-note {
+    0% { opacity: 0; translate: 0 4px; }
+    15% { opacity: 1; translate: 0 0; }
+    80% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  /* Type (spec §4.2): Newsreader to read and for titles, Geist for the interface, Geist Mono for
+     identifiers. Self-hosted through @fontsource-variable (imported in main.tsx). */
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Newsreader Variable', ui-serif, Georgia, serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, SFMono-Regular, monospace;
+
   /* Radius */
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
+  --radius-xl: 10px;
+  --radius-2xl: 14px;
+  --radius-3xl: 14px;
 }
 
 /* ═══════════════════════════════════════════════════════════
    LIGHT THEME
    ═══════════════════════════════════════════════════════════ */
 @layer base {
+  /* The semantic tokens keep the HSL-triplet form (code reads `hsl(var(--x))`); their values are
+     the ink and toga steps of the @theme block: paper ink-50, text ink-900, rule ink-200, accent toga-600. */
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 40 34% 97.6%;
+    --foreground: 220 37% 11.3%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 220 37% 11.3%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 220 37% 11.3%;
 
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 220 66% 44%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 40 22% 94.5%;
+    --secondary-foreground: 220 37% 11.3%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 40 22% 94.5%;
+    --muted-foreground: 216 11% 35%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 40 22% 94.5%;
+    --accent-foreground: 220 37% 11.3%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
+    --border: 37 16% 89.5%;
+    --input: 37 16% 89.5%;
+    --ring: 220 66% 54.3%;
 
     /* Feature colors — light */
-    --brocardi: 270 60% 62%;
-    --brocardi-foreground: 270 80% 20%;
     --tree: 160 84% 39%;
     --tree-foreground: 160 80% 15%;
     --quicknorm: 38 92% 50%;
@@ -146,7 +218,7 @@
     --warning: 38 92% 50%;
     --warning-foreground: 38 80% 15%;
 
-    --radius: 0.5rem;
+    --radius: 0.375rem;
 
     /* Environment category palette — light theme */
     --category-compliance: 262 83% 58%;
@@ -155,6 +227,11 @@
     --category-administrative: 38 92% 50%;
     --category-eu: 160 84% 39%;
     --category-other: 220 9% 46%;
+    /* Gymnasium's procedura penale (studia/progress/tokens.ts): the violet it always had */
+    --category-penal-procedure: 270 60% 62%;
+    /* A subject's hue drawn as a line on the light card (G7, «Il tuo andamento»): a fifth darker, so every hue keeps
+       3:1 on white (amministrativo is 2.1:1 as it is); `theme.test.ts` checks it. */
+    --vlx-trend-shade: black 20%;
 
     /* Text highlight tokens — light theme */
     --hl-yellow-bg: 48 96% 89%;
@@ -177,33 +254,33 @@
      DARK THEME
      ═══════════════════════════════════════════════════════════ */
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 221 55% 5.9%;
+    --foreground: 40 22% 94.5%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 220 37% 11.3%;
+    --card-foreground: 40 22% 94.5%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 220 37% 11.3%;
+    --popover-foreground: 40 22% 94.5%;
 
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 219 77% 66.8%;
+    --primary-foreground: 221 55% 5.9%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 219 24% 17.8%;
+    --secondary-foreground: 40 22% 94.5%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 70%;
+    --muted: 219 24% 17.8%;
+    --muted-foreground: 211 8% 63.2%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 219 24% 17.8%;
+    --accent-foreground: 40 22% 94.5%;
 
     --destructive: 0 70% 60%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    --border: 219 24% 17.8%;
+    --input: 219 24% 17.8%;
+    --ring: 219 77% 66.8%;
 
     /* Environment category palette — dark theme (slightly brighter for visibility) */
     --category-compliance: 255 86% 69%;
@@ -212,6 +289,9 @@
     --category-administrative: 43 96% 56%;
     --category-eu: 158 64% 52%;
     --category-other: 218 11% 65%;
+    --category-penal-procedure: 270 60% 70%;
+    /* On the dark card the hues already clear 3:1: no shade. */
+    --vlx-trend-shade: transparent 0%;
 
     /* Text highlight tokens — dark theme (inverted: dark saturated bg, light fg) */
     --hl-yellow-bg: 21 91% 30%;
@@ -230,8 +310,6 @@
     --vlx-find-current-fg: 285 60% 12%;
 
     /* Feature colors — dark (reduced intensity, higher opacity bg) */
-    --brocardi: 270 60% 70%;
-    --brocardi-foreground: 270 30% 90%;
     --tree: 160 60% 55%;
     --tree-foreground: 160 30% 90%;
     --quicknorm: 38 70% 55%;
@@ -258,6 +336,20 @@
     font-feature-settings: "rlig" 1, "calt" 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    font-optical-sizing: auto;
+    /* No grey flash on every tap; pressed states carry the feedback. */
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* On a phone (mobile-native baseline): the document never scrolls (Layout's root is h-app), so
+     pull-to-refresh only ever interrupted reading; no font inflation in landscape; a tap on a control
+     fires at once. No user-select:none: many controls carry titles and citations worth copying. */
+  html, body {
+    overscroll-behavior: none;
+    -webkit-text-size-adjust: 100%;
+  }
+  button, a, [role="button"] {
+    touch-action: manipulation;
   }
 
   button:focus-visible,
@@ -277,12 +369,14 @@
   html[data-font-size="large"]  { font-size: 18px; }
   html[data-font-size="xlarge"] { font-size: 20px; }
 
-  /* Accessibility: respect reduced motion */
+  /* Accessibility: reduced motion means fewer and gentler, not zero. Nothing moves; colour and
+     opacity still change, briefly, because they tell the reader that something happened. */
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
+      transition-property: color, background-color, border-color, opacity, box-shadow !important;
+      transition-duration: 150ms !important;
       scroll-behavior: auto !important;
     }
   }
@@ -327,13 +421,25 @@
   background: transparent;
 }
 
+/* The dark thumb is a rule of its own: `@apply dark:…` here compiles to
+   `::-webkit-scrollbar-thumb:where(.dark, .dark *)`, a pseudo-class after a
+   pseudo-element, which the browser drops, so every dark scrollbar kept the
+   light thumb. The dark scope goes before the pseudo-element instead. */
 ::-webkit-scrollbar-thumb {
-  @apply bg-slate-300 dark:bg-slate-700 rounded-full;
+  @apply bg-slate-300 rounded-full;
   transition: background-color 0.15s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-slate-400 dark:bg-slate-600;
+  @apply bg-slate-400;
+}
+
+:where(.dark, .dark *)::-webkit-scrollbar-thumb {
+  @apply bg-slate-700;
+}
+
+:where(.dark, .dark *)::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-600;
 }
 
 /* The page's height: the dynamic viewport where it is supported (a phone browser's `100vh` is taller
@@ -353,6 +459,14 @@
   height: calc(100dvh - 4rem - var(--search-bar-height, 0px));
 }
 
+/* A dossier's column of two (D7d), at most the window's height less the content area's padding above it
+   (`p-8`) and its foot below (`--page-foot`, the floating feedback button's room; `p-8` without it) and the
+   search page's field: the columns fit the window once the page is scrolled to them, and each scrolls alone. */
+@utility max-h-app-column {
+  max-height: calc(100vh - 2rem - var(--page-foot, 2rem) - var(--search-bar-height, 0px));
+  max-height: calc(100dvh - 2rem - var(--page-foot, 2rem) - var(--search-bar-height, 0px));
+}
+
 /* ═══════════════════════════════════════════════════════════
    READING SURFACE — the structured article text
    Markup from utils/articleRender.ts. Every label here comes from CSS
@@ -366,9 +480,14 @@
   --vlx-indent: 1.75em;    /* item indent per level */
   max-width: 68ch;
   margin-inline: auto;
-  font-size: 1.125rem;
-  line-height: 1.7;
+  font-size: 1.1875rem;
+  line-height: 1.65;
   overflow-wrap: break-word;
+  /* Inchiostro (spec §4.2, §5.3.1): Newsreader at its text size, balanced rag, old-style figures in
+     prose. Presentation only: no character of the text changes (root rule 23). */
+  font-optical-sizing: auto;
+  font-variant-numeric: oldstyle-nums proportional-nums;
+  text-wrap: pretty;
   @apply font-serif text-slate-800 dark:text-slate-200;
 }
 
@@ -411,18 +530,21 @@
 }
 
 .vlx-art .vlx-heading {
-  margin-bottom: 0.1em;
-  font-size: 0.78em;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  margin-bottom: 0.15em;
+  font-size: 0.74em;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  font-variant-numeric: lining-nums tabular-nums;
   @apply font-sans text-slate-500 dark:text-slate-400;
 }
 
 .vlx-art .vlx-rubrica {
   margin-bottom: 0.9em;
-  font-size: 1.22em;
-  font-weight: 600;
-  line-height: 1.35;
+  font-size: 1.32em;
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
   @apply text-slate-900 dark:text-slate-50;
 }
 
@@ -462,7 +584,8 @@
   margin-right: 0.25em;
   text-indent: 0;
   white-space: nowrap;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: lining-nums tabular-nums;
+  @apply text-slate-500 dark:text-slate-400;
 }
 
 .vlx-art .vlx-comma .vlx-marker {
@@ -1015,3 +1138,334 @@
 .dark .resize-handle {
   background: linear-gradient(135deg, transparent 50%, hsl(215 16% 47% / 0.4) 50%);
 }
+
+/* A floating surface in the dark is a lighter plane with a hairline, never a glow; a menu or a popover
+   (`shadow-md`, Y1) the same hairline with a shorter drop. Only `--tw-shadow` is set: the utility's own
+   `box-shadow` composes it after the rings, so a focus ring (`focus-visible:ring-*`) still shows over it
+   — a `box-shadow` written here, outside the layers, replaced the ring (WCAG 2.4.7). Unlayered, so it
+   wins over the utilities' `--tw-shadow`. */
+.dark :is(.shadow-lg, .shadow-xl, .shadow-2xl) {
+  --tw-shadow: 0 0 0 1px var(--color-ink-700), 0 16px 40px -12px rgb(0 0 0 / 0.6);
+}
+.dark .shadow-md {
+  --tw-shadow: 0 0 0 1px var(--color-ink-700), 0 8px 24px -10px rgb(0 0 0 / 0.55);
+}
+
+/* The book mark (ui/BookMark, and the splash in index.html): the cover traces, then the spine; while
+   something loads it breathes. The trace only with motion allowed: the global reduced-motion rule cuts durations, not
+   delays, and the spine's 420 ms of delay with a `both` fill kept it hidden that long; under reduced motion the
+   book is drawn at once. */
+.vlx-book path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 100;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .vlx-book-draw path { animation: vlx-book-trace 600ms var(--ease-in-out) both; }
+  .vlx-book-draw path:last-child { animation-duration: 260ms; animation-delay: 420ms; }
+}
+.vlx-book-breathe { animation: vlx-book-breathe 1.4s ease-in-out 700ms infinite alternate; }
+@keyframes vlx-book-trace { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+@keyframes vlx-book-breathe { to { opacity: 0.4; } }
+
+/* The goal's mark (G9, `GoalMark`): each stroke is an outline uncovered by a mask whose pen path is written — the ring,
+   then the tick, then the stroke under it, about a second in all, once. The pen paths carry `pathLength="1"`, so one
+   dash of 1 and a gap of 2 cover the whole path at an offset of 0 and none of it at 1. Only with motion allowed, and
+   filling backwards only: under reduced motion, and once written, the mark is whole and still. */
+.vlx-goal-mark-pen { stroke-dasharray: 1 2; }
+@media (prefers-reduced-motion: no-preference) {
+  .vlx-goal-mark-draw .vlx-goal-mark-pen { animation: vlx-goal-mark-write 560ms var(--ease-in-out) backwards; }
+  .vlx-goal-mark-draw mask:nth-of-type(2) .vlx-goal-mark-pen { animation-duration: 300ms; animation-delay: 520ms; }
+  .vlx-goal-mark-draw mask:nth-of-type(3) .vlx-goal-mark-pen { animation-duration: 220ms; animation-delay: 800ms; }
+  /* WebKit (`writesInMasks`): the mark whole, coming in. */
+  .vlx-goal-mark-fade { animation: vlx-goal-mark-fade 400ms var(--ease-out) backwards; }
+}
+@keyframes vlx-goal-mark-write { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes vlx-goal-mark-fade { from { opacity: 0; } }
+
+/* The sign-in's wordmark written in ink (A3, `AuthPage`): one face, one ink, one gesture. The book traces itself
+   (0–450 ms); a faint, blurred copy of «VisuaLex» comes out from under a mask whose soft edge is the pen's tip
+   (250–950 ms), and the ink, the word itself, follows it 100 ms behind under its own (350–1050 ms), so each letter is
+   faint and soft before it is sharp; the copy fades as the ink ends, then the line under it rises 4 px into view
+   (1050–1250 ms). The word is one text throughout. Everything fills backwards only, and `AuthPage` drops the copy
+   and the mask at the end: no mask, no filter is left. On WebKit for iOS (`inkMark.ts`) the word only fades in from
+   the left, no mask, no blur. Only with motion allowed — the global rule cuts the durations, not the delays, and a
+   delayed `backwards` would hide the line for a second; under reduced motion the page fades in through that rule's
+   150 ms opacity transition. Without `@property` (Safari before 16.4) an edge cannot be interpolated: the word
+   shows whole halfway through, never hidden for good. */
+@property --vlx-ink-edge { syntax: '<percentage>'; inherits: false; initial-value: 112%; }
+@media (prefers-reduced-motion: no-preference) {
+  .vlx-ink-book path { animation: vlx-book-trace 450ms var(--ease-out) backwards; }
+  .vlx-ink-book path:last-child { animation-duration: 200ms; animation-delay: 250ms; }
+  .vlx-ink-word, .vlx-ink-bleed {
+    mask-image: linear-gradient(to right, #000 calc(var(--vlx-ink-edge) - 12%), transparent var(--vlx-ink-edge));
+  }
+  /* The waits inside the keyframes, not delays: a registered property in a delay's backwards fill read its initial
+     value (the word whole) once the timeline was set by hand. */
+  .vlx-ink-word { animation: vlx-ink-write 1050ms linear backwards; }
+  .vlx-ink-bleed { animation: vlx-ink-bleed 1050ms linear backwards; }
+  .vlx-ink-plain { animation: vlx-ink-plain 800ms var(--ease-out) 250ms backwards; }
+  .vlx-ink-line { animation: vlx-ink-rise 200ms var(--ease-out) 1050ms backwards; }
+}
+/* The copy is never seen outside its writing, whatever the motion setting becomes. */
+.vlx-ink-bleed { opacity: 0; filter: blur(1.5px); pointer-events: none; }
+@keyframes vlx-ink-write { 0%, 33.33% { --vlx-ink-edge: 0%; } to { --vlx-ink-edge: 112%; } }
+@keyframes vlx-ink-bleed {
+  0%, 23.81% { --vlx-ink-edge: 0%; opacity: 0.4; }
+  90.48% { --vlx-ink-edge: 112%; opacity: 0.4; }
+  to { --vlx-ink-edge: 112%; opacity: 0; }
+}
+@keyframes vlx-ink-plain { from { opacity: 0; translate: -6px 0; } }
+@keyframes vlx-ink-rise { from { opacity: 0; translate: 0 4px; } }
+
+/* ═══════════════════════════════════════════════════════════
+   ENTRANCES — animate-in, fade-in, zoom-in-N, slide-in-from-*
+   33 elements in 25 files were written with these classes, but no plugin defined them, so they
+   generated no CSS and nothing animated (the same silent failure as `primary-<number>`, gotcha 29).
+   Each class adds only its own animation, and it moves the element with the individual `translate`
+   and `scale` properties, which compose with the `transform` floating-ui positions with instead of
+   replacing it (gotcha 10). Popovers are seen tens of times a day: at most 200 ms, ease-out.
+   ═══════════════════════════════════════════════════════════ */
+@keyframes vlx-none {}
+@keyframes vlx-enter-fade { from { opacity: var(--vlx-enter-opacity, 0); } }
+@keyframes vlx-enter-zoom { from { scale: var(--vlx-enter-scale, 0.95); } }
+@keyframes vlx-enter-slide { from { translate: var(--vlx-enter-x, 0) var(--vlx-enter-y, 0); } }
+
+@utility animate-in {
+  animation-name: var(--vlx-fade, vlx-none), var(--vlx-zoom, vlx-none), var(--vlx-slide, vlx-none);
+  animation-duration: min(var(--tw-duration, 180ms), 200ms);
+  animation-timing-function: var(--ease-out);
+  /* backwards, never both: a fill that outlives the entrance keeps a containing block and a stacking
+     context on the element (gotcha 22), so a non-portalled fixed modal inside it lands off-screen. */
+  animation-fill-mode: backwards;
+}
+@utility fade-in { --vlx-fade: vlx-enter-fade; }
+@utility fade-in-* { --vlx-fade: vlx-enter-fade; --vlx-enter-opacity: calc(--value(integer) * 1%); }
+@utility zoom-in-* { --vlx-zoom: vlx-enter-zoom; --vlx-enter-scale: calc(--value(integer) * 1%); }
+/* Each slide writes both axes: custom properties inherit, so an error box sliding from the top inside a
+   panel that slid from the side would otherwise come in on the diagonal. */
+@utility slide-in-from-bottom { --vlx-slide: vlx-enter-slide; --vlx-enter-x: 0; --vlx-enter-y: 100%; }
+@utility slide-in-from-bottom-* { --vlx-slide: vlx-enter-slide; --vlx-enter-x: 0; --vlx-enter-y: calc(--value(integer) * var(--spacing)); }
+@utility slide-in-from-top-* { --vlx-slide: vlx-enter-slide; --vlx-enter-x: 0; --vlx-enter-y: calc(--value(integer) * var(--spacing) * -1); }
+@utility slide-in-from-right-* { --vlx-slide: vlx-enter-slide; --vlx-enter-y: 0; --vlx-enter-x: calc(--value(integer) * var(--spacing)); }
+@utility slide-in-from-left-* { --vlx-slide: vlx-enter-slide; --vlx-enter-y: 0; --vlx-enter-x: calc(--value(integer) * var(--spacing) * -1); }
+
+/* The tours (driver.js, `popoverClass: 'visualex-tour-popover'` in hooks/useTour.ts): the paper surface,
+   the interface face, the primary button. Doubled class, so it wins over driver.css whichever loads last. */
+.driver-popover.visualex-tour-popover {
+  max-width: 340px;
+  padding: 20px 20px 16px;
+  border-radius: 14px;
+  background: #fff;
+  color: var(--color-ink-900);
+  font-family: var(--font-sans);
+  box-shadow: 0 0 0 1px rgb(18 25 39 / 0.06), 0 12px 32px -8px rgb(18 25 39 / 0.22);
+}
+.dark .driver-popover.visualex-tour-popover {
+  background: var(--color-ink-900);
+  color: var(--color-ink-100);
+  box-shadow: 0 0 0 1px var(--color-ink-700), 0 16px 40px -12px rgb(0 0 0 / 0.6);
+}
+.driver-popover.visualex-tour-popover .driver-popover-title {
+  padding-right: 28px; /* clear of the close button */
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+.driver-popover.visualex-tour-popover .driver-popover-description {
+  margin-top: 6px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--color-ink-600);
+}
+.dark .driver-popover.visualex-tour-popover .driver-popover-description { color: var(--color-ink-300); }
+.driver-popover.visualex-tour-popover .driver-popover-footer { margin-top: 16px; }
+.driver-popover.visualex-tour-popover .driver-popover-progress-text {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink-500);
+}
+.dark .driver-popover.visualex-tour-popover .driver-popover-progress-text { color: var(--color-ink-400); }
+/* Every button of the tour is a 44 px target (driver.css draws them 28 px), with a focus ring
+   (driver.css takes the outline away). driver.js writes `display: block` on them inline at every step
+   (and `none` to hide one), so the label is centred by its line height, never by a display of ours:
+   42 px of line and 1 px of border above and below (driver.css's border-box). */
+.driver-popover.visualex-tour-popover .driver-popover-footer button {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 6px;
+  border: 1px solid var(--color-ink-200);
+  background: transparent;
+  color: inherit;
+  font: 500 13px/42px var(--font-sans);
+  text-shadow: none;
+  transition: background-color 160ms var(--ease-out), transform 120ms var(--ease-out);
+}
+.driver-popover.visualex-tour-popover .driver-popover-footer button:active { transform: scale(0.97); }
+.driver-popover.visualex-tour-popover .driver-popover-footer .driver-popover-next-btn {
+  border-color: transparent;
+  background: var(--color-toga-600);
+  color: #fff;
+}
+.dark .driver-popover.visualex-tour-popover .driver-popover-footer .driver-popover-next-btn {
+  background: var(--color-toga-400);
+  color: var(--color-ink-950);
+}
+.driver-popover.visualex-tour-popover .driver-popover-footer .driver-popover-btn-disabled { opacity: 0.4; }
+.driver-popover.visualex-tour-popover .driver-popover-close-btn {
+  width: 44px;
+  height: 44px;
+  line-height: 44px;
+  font-size: 22px;
+  color: var(--color-ink-500);
+}
+.dark .driver-popover.visualex-tour-popover .driver-popover-close-btn { color: var(--color-ink-400); }
+/* Not a focus driver.js gave with no key pressed (`data-pointer-focus`, `useTour`): the ✕ drew its square after a click. */
+.driver-popover.visualex-tour-popover .driver-popover-footer button:focus-visible:not([data-pointer-focus]),
+.driver-popover.visualex-tour-popover .driver-popover-close-btn:focus-visible:not([data-pointer-focus]) {
+  outline: 2px solid var(--color-toga-500);
+  outline-offset: 2px;
+}
+.driver-popover.visualex-tour-popover .driver-popover-arrow-side-top { border-top-color: #fff; }
+.driver-popover.visualex-tour-popover .driver-popover-arrow-side-bottom { border-bottom-color: #fff; }
+.driver-popover.visualex-tour-popover .driver-popover-arrow-side-left { border-left-color: #fff; }
+.driver-popover.visualex-tour-popover .driver-popover-arrow-side-right { border-right-color: #fff; }
+.dark .driver-popover.visualex-tour-popover .driver-popover-arrow-side-top { border-top-color: var(--color-ink-900); }
+.dark .driver-popover.visualex-tour-popover .driver-popover-arrow-side-bottom { border-bottom-color: var(--color-ink-900); }
+.dark .driver-popover.visualex-tour-popover .driver-popover-arrow-side-left { border-left-color: var(--color-ink-900); }
+.dark .driver-popover.visualex-tour-popover .driver-popover-arrow-side-right { border-right-color: var(--color-ink-900); }
+
+/* Section hue (spec §4.1): the switcher's mark, and nothing else that carries meaning. The same hues colour
+   Gymnasium's small motions (the tally's stroke, the mission's drop, the lesson bar's head); none of those carries
+   meaning either. On a change of section the mark passes to the new hue (`SectionSwitcher`, T1). */
+:root {
+  --vlx-section-opus: var(--color-toga-600);
+  --vlx-section-gymnasium: oklch(31% 0.09 268);
+  --vlx-section-academia: oklch(55% 0.09 70);
+  --vlx-section-forum: oklch(55% 0.08 190);
+  /* The lesson bar's head runs ahead of the ink: the section's hue, lighter where the ink is dark. */
+  --vlx-gymnasium-wash: oklch(64% 0.1 268);
+  /* The lesson bar's ink (G8): the section's hue at a step that reads as a colour, over 3:1 on its track. */
+  --vlx-gymnasium-bar: oklch(48% 0.14 268);
+}
+.dark {
+  --vlx-section-opus: var(--color-toga-500);
+  --vlx-section-gymnasium: oklch(45% 0.11 268);
+  --vlx-section-academia: oklch(60% 0.09 70);
+  --vlx-section-forum: oklch(58% 0.08 190);
+  --vlx-gymnasium-wash: oklch(45% 0.11 268);
+  --vlx-gymnasium-bar: oklch(70% 0.12 268);
+}
+.vlx-section-mark { background: var(--vlx-section-opus); }
+.vlx-section-mark[data-section="gymnasium"] { background: var(--vlx-section-gymnasium); }
+.vlx-section-mark[data-section="academia"] { background: var(--vlx-section-academia); }
+.vlx-section-mark[data-section="forum"] { background: var(--vlx-section-forum); }
+
+/* «Analizza documento»'s box (D6): the frame's dashes stand still at rest — nothing moves for ever on an open page
+   (Bill) —, turn slowly under a mouse or with the keyboard's focus on the box, and run while a file is dragged over
+   the window, by their offset alone (two periods of «8 6»); a hidden tab stops them all. The row's bar, while a
+   document is read, is a segment that slides, never a share it does not know. Still under reduced motion. */
+@keyframes vlx-dash-turn { to { stroke-dashoffset: -28; } }
+.vlx-dash { animation: vlx-dash-turn 3.2s linear infinite; animation-play-state: paused; }
+.group:hover .vlx-dash, .group:focus-visible .vlx-dash { animation-play-state: running; }
+.vlx-dash-run { animation: vlx-dash-turn 0.8s linear infinite; }
+.group[data-tab-hidden] .vlx-dash, .group[data-tab-hidden] .vlx-dash-run { animation-play-state: paused; }
+@keyframes vlx-bar-slide { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
+.vlx-bar-slide { animation: vlx-bar-slide 1.1s var(--ease-in-out) infinite; }
+@keyframes vlx-shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-6px); } 40% { transform: translateX(5px); } 60% { transform: translateX(-3px); } 80% { transform: translateX(2px); } }
+.vlx-shake { animation: vlx-shake 300ms var(--ease-out) 1; }
+@media (prefers-reduced-motion: reduce) {
+  .vlx-dash, .vlx-dash-run, .vlx-bar-slide, .vlx-shake { animation: none; }
+  /* A still quarter would read as a share: the whole track, faint, says «at work» and no amount. */
+  .vlx-bar-slide { width: 100%; opacity: 0.45; }
+}
+
+/* Gymnasium's small motions (S2). Each plays once for what grew since this browser last drew it
+   (`progress/seenProgress.ts`); under reduced motion none moves and the final state is drawn at once. */
+
+/* A mission done (today's missions): its words in a quieter ink, struck through in the section's hue. Done just now,
+   the ink crosses the words first — a band of the hue running left to right, leaving them done behind it — as the
+   drop fills the box (`MissionMark`, `MISSION_INK_MS`). */
+:root { --vlx-todo-ink: var(--color-ink-900); --vlx-done-ink: var(--color-ink-600); }
+.dark { --vlx-todo-ink: var(--color-ink-50); --vlx-done-ink: var(--color-ink-300); }
+.vlx-mission-done {
+  color: var(--vlx-done-ink);
+  text-decoration: line-through 1.5px var(--vlx-section-gymnasium);
+}
+.vlx-mission-inking {
+  color: transparent;
+  background: linear-gradient(90deg, var(--vlx-done-ink) 0 33%, var(--vlx-section-gymnasium) 33% 40%, var(--vlx-todo-ink) 47% 100%) 100% 0 / 300% 100% no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  text-decoration: line-through 1.5px;
+  animation: vlx-ink-through 320ms var(--ease-in-out) 300ms both;
+}
+@keyframes vlx-ink-through {
+  from { background-position: 100% 0; text-decoration-color: transparent; }
+  75% { text-decoration-color: transparent; }
+  to { background-position: 0 0; text-decoration-color: var(--vlx-section-gymnasium); }
+}
+
+/* Today's count when it grew: the new digit falls into place, overshoots a hair, squashes and takes on its weight
+   (from a regular weight to the ring's own semibold). Under 400 ms. */
+.vlx-digit-land { animation: vlx-digit-land 360ms var(--ease-out) backwards; }
+@keyframes vlx-digit-land {
+  0% { translate: 0 -0.45em; opacity: 0; font-weight: 400; }
+  55% { translate: 0 0.05em; scale: 1.05 0.93; opacity: 1; }
+  100% { translate: 0 0; scale: 1 1; }
+}
+
+/* The lesson's bar: the head runs ahead in the section's hue, the ink catches up a moment later on a spring
+   (`--ease-catch`, a damped spring sampled as a `linear()` curve, a hair of overshoot), then the bar trembles by a
+   pixel (`ReviewSession`, Web Animations). */
+:root {
+  /* ζ 0.75, ω 9 over the transition's length: 2.8 % of overshoot, settled at the end. */
+  --ease-catch: linear(0, 0.054, 0.1792, 0.3334, 0.4894, 0.6308, 0.7498, 0.844, 0.9143, 0.9638, 0.9962, 1.0154, 1.0251, 1.0283, 1.0273, 1.0241, 1.0198, 1.0153, 1.0112, 1.0077, 1.0049, 1.0028, 1.0013, 1.0003, 0.9996, 1);
+}
+.vlx-lesson-head { background: var(--vlx-gymnasium-wash); }
+.vlx-lesson-ink { background: var(--vlx-gymnasium-bar); }
+
+@media (prefers-reduced-motion: reduce) {
+  .vlx-mission-inking { animation: none; background-position: 0 0; text-decoration-color: var(--vlx-section-gymnasium); }
+  .vlx-digit-land { animation: none; }
+}
+
+/* Changing section (T1): the page's content fades out (100 ms), then the new one fades in rising by 5 px (140 ms):
+   240 ms, no overlap, nothing over the screen (`features/sections/sectionTransition.ts`). The sidebar, the floating
+   buttons, the search bar and the rest of the screen hold still; the groups do not move either, or their default
+   250 ms would outlast the change. A tap goes through the pictures to the page under them (it also ends the change).
+   Entering from the sign-in page there is no old page to wait for. */
+/* Named only while a transition runs (`lib/pageTransition.ts`): a name makes a stacking context (gotcha 22). The root
+   does not blend: its two pictures are not cross-faded, the new one covers the old (the default `plus-lighter` would
+   add them, the old sidebar's entries showing through the new). */
+.vlx-page-changing .vlx-page { view-transition-name: vlx-page; }
+/* The phone's bar (M1) lies over the content area: named too, so the page's picture does not paint over it; it holds
+   still, its two pictures not blended. */
+.vlx-page-changing .vlx-phone-bar { view-transition-name: vlx-phone-bar; }
+::view-transition-old(vlx-phone-bar),
+::view-transition-new(vlx-phone-bar) { mix-blend-mode: normal; animation: none; }
+::view-transition-group(vlx-phone-bar) { animation: none; }
+::view-transition { pointer-events: none; }
+::view-transition-old(root),
+::view-transition-new(root) { mix-blend-mode: normal; }
+::view-transition-old(root),
+::view-transition-new(root),
+::view-transition-group(root),
+::view-transition-group(vlx-page) { animation: none; }
+::view-transition-old(vlx-page) { animation: vlx-page-out 100ms var(--ease-out) both; }
+::view-transition-new(vlx-page) { animation: vlx-page-in 140ms var(--ease-out) 100ms both; }
+::view-transition-new(vlx-page):only-child { animation-delay: 0ms; }
+@keyframes vlx-page-out { to { opacity: 0; } }
+@keyframes vlx-page-in { from { opacity: 0; translate: 0 5px; } }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}
+/* The new section's title takes the focus after the change; chosen with a pointer it shows no ring. The browser
+   counts that focus, given by the script after a focused menu entry, as visible, so `FOCUS_RING`'s `:focus-visible`
+   alone would draw it. Unlayered, so it wins over the utilities; the attribute goes with the focus. */
+[data-pointer-focus]:focus { outline: none; box-shadow: none; }

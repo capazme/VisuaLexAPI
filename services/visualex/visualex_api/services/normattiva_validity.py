@@ -30,7 +30,7 @@ from bs4 import BeautifulSoup, Tag
 from ..tools.article_suffixes import ARTICLE_SUFFIX_ALTERNATION
 from ..tools.exceptions import ValidationError
 from ..tools.text_op import parse_date
-from .akn_parser import normalize_article_key
+from .akn_parser import comparable_article_key
 
 log = structlog.get_logger()
 
@@ -262,7 +262,7 @@ def extract_validity(
     text = body.get_text(" ", strip=True)
     if article:
         label = _LABEL.search(text[:400])
-        if label is None or normalize_article_key(label.group(1)) != normalize_article_key(article):
+        if label is None or comparable_article_key(label.group(1)) != comparable_article_key(article):
             log.info("Validity not read: the page is not the article asked for",
                      asked=article, found=label.group(1) if label else None)
             return None
@@ -331,6 +331,46 @@ def is_historical_request(version: Any, version_date: Any) -> bool:
     return isinstance(version_date, str) and bool(version_date.strip())
 
 
+class Upcoming(TypedDict):
+    """The wire shape: `upcoming` next to `validity` when the source has published a text
+    not in force yet: next to today's text (G-355), next to an article inserted from a
+    later day (G-358), or describing the later text asked for explicitly (G-357)."""
+
+    change: Optional[str]            # "abrogated", "amended", "inserted"; None when it cannot be told
+    valid_from: str                  # ISO day the later text comes into force
+    version_number: Optional[int]
+
+
+def starts_after_today(validity: Optional[Validity], today: Optional[date] = None) -> bool:
+    """Whether the page's text comes into force after today (Europe/Rome).
+
+    Normattiva answers an undated request with its latest version, also one that is
+    not in force yet: art. 3 d.P.R. 131/1986, read on 21 October 2026, came back
+    repealed from 1 January 2027. Such a page is `abrogated` or `current` by its own
+    words; this is the question its window answers.
+    """
+    valid_from = (validity or {}).get("valid_from")
+    if not valid_from:
+        return False
+    return valid_from > (today or _today_in_rome()).isoformat()
+
+
+def upcoming_change(validity: Validity, inserted: bool = False) -> Upcoming:
+    """What a later text does to the article: insert it (nothing is in force today),
+    repeal it, or change it."""
+    change = "inserted" if inserted else "abrogated" if validity.get("state") == "abrogated" else "amended"
+    return {
+        "change": change,
+        "valid_from": validity["valid_from"],
+        "version_number": validity.get("version_number"),
+    }
+
+
+def today_in_rome() -> date:
+    """Today in Rome: the day the source's windows are read against."""
+    return _today_in_rome()
+
+
 def _today_in_rome() -> date:
     try:
         return datetime.now(ZoneInfo("Europe/Rome")).date()
@@ -340,16 +380,37 @@ def _today_in_rome() -> date:
         return datetime.now(timezone(timedelta(hours=2))).date()
 
 
+def read_upcoming_request(version: Any, version_date: Any, today: Optional[date] = None) -> Optional[str]:
+    """For a request that asks explicitly for the text not in force yet (`upcoming: true`,
+    G-357): the day it names (ISO), or None when it names none. Refused (400) with
+    «originale», and with a day that cannot be read or is not after today: the text in
+    force on a day up to today is an ordinary dated request."""
+    if isinstance(version, str) and version.strip().lower() == "originale":
+        raise ValidationError("upcoming non si combina con la versione originale")
+    if not (isinstance(version_date, str) and version_date.strip()):
+        return None
+    day = _iso_day(version_date)
+    if day is None:
+        raise ValidationError(f"version_date non valida: {version_date.strip()[:40]}")
+    if date.fromisoformat(day) <= (today or _today_in_rome()):
+        raise ValidationError("con upcoming la data dev'essere successiva a oggi, o assente")
+    return day
+
+
 def reject_future_version_date(version_date: Any, today: Optional[date] = None) -> None:
     """Refuse a `version_date` later than today (Europe/Rome).
 
     Normattiva answers a future date with the current text and says nothing, so
     the reader would be shown today's text under a date it was not asked for.
-    A value that is not a readable date is left to the existing parsing path.
+    A value that is not a readable date is refused too: since a date always asks for
+    the text in force on that day (G-353), it is read for every request, and one
+    that cannot be read would fail later as a 500.
     """
+    if not (isinstance(version_date, str) and version_date.strip()):
+        return
     day = _iso_day(version_date)
     if day is None:
-        return
+        raise ValidationError(f"version_date non valida: {version_date.strip()[:40]}")
     if date.fromisoformat(day) > (today or _today_in_rome()):
         raise ValidationError(
             "version_date non può essere futura: Normattiva restituirebbe il testo attuale, "

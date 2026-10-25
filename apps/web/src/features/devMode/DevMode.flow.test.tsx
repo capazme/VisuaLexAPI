@@ -6,7 +6,7 @@ vi.mock('../../services/api', () => ({ get: vi.fn(), post: vi.fn(), put: vi.fn()
 vi.mock('../../hooks/useForumNotifications', () => ({
   useForumNotifications: () => ({ count: { total: 0, normaChanges: 0 }, markRead: vi.fn(), refetch: vi.fn() }),
 }));
-vi.mock('../connections', () => ({ ConnectedAppsSection: () => null }));
+vi.mock('../connections/ConnectedAppsSection', () => ({ ConnectedAppsSection: () => null }));
 vi.mock('../../services/accountService', () => ({ accountService: {} }));
 
 import { get, post, put } from '../../services/api';
@@ -35,7 +35,7 @@ describe('the development mode, end to end in the web', () => {
   it('turned on in Impostazioni, shows Grafo and opens the development page at once; off, it takes both away', async () => {
     render(
       <MemoryRouter initialEntries={['/grafo']}>
-        <Sidebar theme="light" isOpen closeMobile={vi.fn()} openSettings={vi.fn()} openKeyboardShortcuts={vi.fn()} toggleTheme={vi.fn()} />
+        <Sidebar theme="light" isOpen closeMobile={vi.fn()} openSettings={vi.fn()} openKeyboardShortcuts={vi.fn()} toggleTheme={vi.fn()} serviceHealth={{ snapshot: { overall: 'online', services: [], checkedAt: '' }, refresh: vi.fn() }} />
         <SettingsModal isOpen onClose={vi.fn()} />
         <Routes>
           <Route path="/" element={<p>Pagina di ricerca</p>} />

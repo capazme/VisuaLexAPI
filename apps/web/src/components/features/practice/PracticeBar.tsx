@@ -15,7 +15,7 @@ import { useAppStore } from '../../../store/useAppStore';
 import { useCompare } from '../../../hooks/useCompare';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
-import { ConfirmDialog } from '../../ui/ConfirmDialog';
+import { closeAllPracticesWithUndo } from './practiceUndo';
 import { PracticeChip } from './PracticeChip';
 
 const NEW_PRACTICE_LABEL = 'Nuova pratica';
@@ -35,15 +35,13 @@ const HEADER_BUTTON =
 export function PracticeBar({ onHeightChange }: { onHeightChange?: (height: number | null) => void } = {}) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [barNode, setBarNode] = useState<HTMLDivElement | null>(null);
-  const [closeAllOpen, setCloseAllOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const ids = useAppStore(useShallow((s) => s.practices.map((p) => p.id)));
   const activePracticeId = useAppStore((s) => s.activePracticeId);
   const commandPaletteOpen = useAppStore((s) => s.commandPaletteOpen);
-  const { createPractice, reorderPractices, closeAllPractices } = useAppStore(useShallow((s) => ({
+  const { createPractice, reorderPractices } = useAppStore(useShallow((s) => ({
     createPractice: s.createPractice,
     reorderPractices: s.reorderPractices,
-    closeAllPractices: s.closeAllPractices,
   })));
   const { isOpen: isCompareOpen } = useCompare();
 
@@ -85,7 +83,8 @@ export function PracticeBar({ onHeightChange }: { onHeightChange?: (height: numb
 
   return (
     <>
-      <div ref={setBarNode} id="tour-practice-bar" className={cn('fixed bottom-6 left-1/2 -translate-x-1/2', Z_INDEX.dock)}>
+      {/* At the bottom left of the column, beside the sidebar, not over the middle of the text (R3). */}
+      <div ref={setBarNode} id="tour-practice-bar" className={cn('fixed bottom-6 left-[calc(var(--sidebar-width,0px)+1.5rem)]', Z_INDEX.dock)}>
         {!isExpanded ? (
           <button
             type="button"
@@ -100,13 +99,13 @@ export function PracticeBar({ onHeightChange }: { onHeightChange?: (height: numb
         ) : (
           <nav
             aria-label="Pratiche"
-            className="rounded-2xl border border-slate-200/60 bg-white/95 shadow-2xl ring-1 ring-black/5 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/95"
+            className="rounded-2xl border border-slate-200/60 bg-white/95 shadow-md ring-1 ring-black/5 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/95"
           >
             <div className="flex items-center justify-between gap-4 rounded-t-2xl border-b border-slate-200/60 bg-slate-50/50 px-4 py-2 dark:border-slate-800 dark:bg-slate-900/50">
               <div className="flex items-center gap-2">
                 <Layers size={14} aria-hidden className="text-primary-500" />
-                <span className="text-xs font-bold uppercase tracking-widest text-slate-600 dark:text-slate-400">Pratiche</span>
-                <span className="rounded-md bg-primary-100 px-1.5 py-0.5 text-xs font-bold text-primary-700 dark:bg-primary-900/50 dark:text-primary-300">
+                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Pratiche</span>
+                <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                   {ids.length}
                 </span>
               </div>
@@ -117,7 +116,7 @@ export function PracticeBar({ onHeightChange }: { onHeightChange?: (height: numb
                 </button>
                 <button
                   type="button"
-                  onClick={() => setCloseAllOpen(true)}
+                  onClick={closeAllPracticesWithUndo}
                   aria-label="Chiudi tutte le pratiche"
                   title="Chiudi tutte"
                   className={cn(HEADER_BUTTON, 'hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30')}
@@ -138,7 +137,7 @@ export function PracticeBar({ onHeightChange }: { onHeightChange?: (height: numb
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={ids} strategy={horizontalListSortingStrategy}>
                 {/* Wraps rather than scrolls: a scrolling row would clip the chips' menus. */}
-                <div className="flex max-w-[90vw] flex-wrap gap-2 p-3">
+                <div className="flex max-w-[calc(100vw-var(--sidebar-width,0px)-3rem)] flex-wrap gap-2 p-3">
                   {ids.map((id) => (
                     <PracticeChip
                       key={id}
@@ -154,18 +153,6 @@ export function PracticeBar({ onHeightChange }: { onHeightChange?: (height: numb
           </nav>
         )}
       </div>
-      <ConfirmDialog
-        open={closeAllOpen}
-        variant="danger"
-        title="Chiudere tutte le pratiche?"
-        message={`${ids.length === 1 ? 'La pratica aperta verrà tolta' : `Le ${ids.length} pratiche aperte verranno tolte`} dal tavolo. Dossier, segnalibri, note ed evidenziazioni non saranno toccati.`}
-        confirmLabel="Chiudi tutte"
-        onConfirm={() => {
-          setCloseAllOpen(false);
-          closeAllPractices();
-        }}
-        onCancel={() => setCloseAllOpen(false)}
-      />
     </>
   );
 }

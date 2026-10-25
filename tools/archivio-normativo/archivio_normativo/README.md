@@ -9,7 +9,7 @@ built on the VisuaLex API. Design and rationale:
 
 - The VisuaLex Python API running locally (`cd services/visualex && source
   .venv/bin/activate && python app.py`, port 5000). The archive never starts it.
-- For enrichment beyond Brocardi (case law, Consulta, Garante, EU↔IT): the
+- For enrichment (case law, Consulta, Garante, EU↔IT): the
   `legal-it` MCP server, reachable through the command in
   `providers.legalit.command` (or `LEGALIT_MCP_COMMAND`, a JSON list), and
   `pip install -r tools/archivio-normativo/requirements-archivio.txt` in the
@@ -28,7 +28,7 @@ python -m archivio_normativo build --dry-run                 # what would happen
 python -m archivio_normativo build                           # everything in the manifest
 python -m archivio_normativo build --only cc,gdpr            # some acts
 python -m archivio_normativo build --area privacy-digitale
-python -m archivio_normativo build --only dlgs-231-2001 --enrich brocardi,giurisprudenza
+python -m archivio_normativo build --only dlgs-231-2001 --enrich giurisprudenza
 python -m archivio_normativo build --full                    # ignore fingerprints (monthly)
 python -m archivio_normativo build --resume                  # continue the interrupted run
 python -m archivio_normativo build --rate 0 --only cc        # no pacing towards VisuaLex (tests, a local API)
@@ -37,6 +37,9 @@ python -m archivio_normativo render                          # rewrite the Markd
 python -m archivio_normativo report                          # last run
 python -m archivio_normativo export --jsonl units.jsonl
 ```
+
+The `brocardi` kind (alias `annotazioni`) is retired: Brocardi is no longer a
+source (D-078), and the manifest refuses it.
 
 Output goes to `--out` (default `archivio_out/`, gitignored):
 `archivio.sqlite`, `INDICE.md`, one `<area>/<id>.md` per act, `logs/`.

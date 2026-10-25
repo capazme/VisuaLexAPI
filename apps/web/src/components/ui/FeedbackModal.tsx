@@ -14,7 +14,7 @@ interface FeedbackModalProps {
 const feedbackTypes: { value: FeedbackType; label: string; icon: React.ElementType; color: string }[] = [
   { value: 'bug', label: 'Bug', icon: Bug, color: 'text-red-500' },
   { value: 'suggestion', label: 'Suggerimento', icon: Lightbulb, color: 'text-amber-500' },
-  { value: 'other', label: 'Altro', icon: HelpCircle, color: 'text-blue-500' },
+  { value: 'other', label: 'Altro', icon: HelpCircle, color: 'text-primary-500' },
 ];
 
 export function FeedbackModal({ isOpen, onClose, onSuccess }: FeedbackModalProps) {
@@ -88,7 +88,7 @@ export function FeedbackModal({ isOpen, onClose, onSuccess }: FeedbackModalProps
                     type="button"
                     onClick={() => setType(ft.value)}
                     className={cn(
-                      'flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 transition-all',
+                      'flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 transition-colors',
                       isSelected
                         ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
                         : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
@@ -124,7 +124,7 @@ export function FeedbackModal({ isOpen, onClose, onSuccess }: FeedbackModalProps
               }
               rows={5}
               className={cn(
-                'w-full px-4 py-3 rounded-xl border transition-all resize-none',
+                'w-full px-4 py-3 rounded-xl border transition-colors resize-none',
                 'bg-slate-50 dark:bg-slate-800',
                 'border-slate-200 dark:border-slate-700',
                 'text-slate-900 dark:text-white placeholder-slate-400',
@@ -156,7 +156,7 @@ export function FeedbackModal({ isOpen, onClose, onSuccess }: FeedbackModalProps
               type="submit"
               disabled={isSubmitting || message.trim().length < 10}
               className={cn(
-                'flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium transition-all',
+                'flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium transition-[color,background-color,border-color,opacity]',
                 'bg-primary-600 hover:bg-primary-700 text-white',
                 'disabled:opacity-50 disabled:cursor-not-allowed'
               )}

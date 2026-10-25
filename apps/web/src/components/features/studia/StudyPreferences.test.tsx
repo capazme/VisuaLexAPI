@@ -20,6 +20,13 @@ async function opened(onChanged = vi.fn()) {
   return { user, onChanged };
 }
 
+/** The community's subjects, one level down (G6): opened. */
+async function withCommunity(onChanged = vi.fn()) {
+  const opened_ = await opened(onChanged);
+  await opened_.user.click(screen.getByRole('button', { name: /^Schede della comunità · / }));
+  return opened_;
+}
+
 beforeEach(() => {
   preferences.mockReset();
   savePreferences.mockReset();
@@ -46,7 +53,7 @@ describe('StudyPreferences', () => {
       expect(goal).toHaveValue(20);
       await user.clear(goal);
       await user.type(goal, '35');
-      await user.click(screen.getByRole('button', { name: 'Salva: nuove schede al giorno' }));
+      await user.tab();
       expect(savePreferences).toHaveBeenCalledWith({ nuoveAlGiorno: 35 });
       await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
       expect(screen.getByRole('status')).toHaveTextContent('Salvato');
@@ -57,11 +64,25 @@ describe('StudyPreferences', () => {
       const goal = screen.getByLabelText('Nuove schede al giorno');
       await user.clear(goal);
       if (text) await user.type(goal, text);
-      await user.click(screen.getByRole('button', { name: 'Salva: nuove schede al giorno' }));
+      await user.tab();
       expect(screen.getByRole('alert')).toHaveTextContent('Inserisci un numero da 1 a 200.');
       expect(goal).toHaveAttribute('aria-invalid', 'true');
       expect(savePreferences).not.toHaveBeenCalled();
       expect(onChanged).not.toHaveBeenCalled();
+    });
+
+    it('saves on Enter too, sends nothing for a number left as it was, and has no «Salva» (G6)', async () => {
+      savePreferences.mockResolvedValue({ nuoveAlGiorno: 30, ripassiAlGiorno: 10, materieComunita: [] });
+      const { user } = await opened();
+      expect(screen.queryByRole('button', { name: /^Salva/ })).toBeNull();
+      const goal = screen.getByLabelText('Nuove schede al giorno');
+      await user.click(goal);
+      await user.tab();
+      expect(savePreferences).not.toHaveBeenCalled();
+      await user.clear(goal);
+      await user.type(goal, '30{Enter}');
+      expect(savePreferences).toHaveBeenCalledWith({ nuoveAlGiorno: 30 });
+      expect(await screen.findByRole('status')).toHaveTextContent('Salvato');
     });
 
     it('accepts the ends of the range', async () => {
@@ -70,7 +91,7 @@ describe('StudyPreferences', () => {
       const goal = screen.getByLabelText('Nuove schede al giorno');
       await user.clear(goal);
       await user.type(goal, '200');
-      await user.click(screen.getByRole('button', { name: 'Salva: nuove schede al giorno' }));
+      await user.tab();
       expect(savePreferences).toHaveBeenCalledWith({ nuoveAlGiorno: 200 });
     });
   });
@@ -84,7 +105,7 @@ describe('StudyPreferences', () => {
       expect(goal).toHaveAccessibleDescription('Quanti ripassi tengono viva la serie. Vale anche finire le schede del giorno.');
       await user.clear(goal);
       await user.type(goal, '15');
-      await user.click(screen.getByRole('button', { name: 'Salva: ripassi al giorno' }));
+      await user.tab();
       expect(savePreferences).toHaveBeenCalledWith({ ripassiAlGiorno: 15 });
       await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
       expect(screen.getByLabelText('Nuove schede al giorno')).toHaveValue(20);
@@ -95,7 +116,7 @@ describe('StudyPreferences', () => {
       const goal = screen.getByLabelText('Ripassi al giorno');
       await user.clear(goal);
       await user.type(goal, '0');
-      await user.click(screen.getByRole('button', { name: 'Salva: ripassi al giorno' }));
+      await user.tab();
       expect(screen.getByRole('alert')).toHaveTextContent('Inserisci un numero da 1 a 200.');
       expect(savePreferences).not.toHaveBeenCalled();
     });
@@ -103,7 +124,7 @@ describe('StudyPreferences', () => {
 
   describe('the community’s subjects', () => {
     it('explains the switches and has one for each subject, all off at first', async () => {
-      await opened();
+      await withCommunity();
       expect(screen.getByText('Schede validate dalla comunità, per materia')).toBeInTheDocument();
       const switches = screen.getAllByRole('switch');
       expect(switches.map((s) => s.textContent)).toEqual([
@@ -114,7 +135,7 @@ describe('StudyPreferences', () => {
 
     it('sends a subject switched on, shows what the server kept, and tells the view to count again', async () => {
       savePreferences.mockResolvedValue({ nuoveAlGiorno: 20, ripassiAlGiorno: 10, materieComunita: ['DIRITTO_CIVILE'] });
-      const { user, onChanged } = await opened();
+      const { user, onChanged } = await withCommunity();
       await user.click(screen.getByRole('switch', { name: 'Diritto civile' }));
       expect(savePreferences).toHaveBeenCalledWith({ materieComunita: ['DIRITTO_CIVILE'] });
       await waitFor(() => expect(screen.getByRole('switch', { name: 'Diritto civile' })).toHaveAttribute('aria-checked', 'true'));
@@ -122,22 +143,35 @@ describe('StudyPreferences', () => {
       expect(screen.getByRole('switch', { name: 'Diritto penale' })).toHaveAttribute('aria-checked', 'false');
     });
 
-    it('does not report on the daily goal, nor overwrite a goal being typed', async () => {
-      savePreferences.mockResolvedValue({ nuoveAlGiorno: 20, ripassiAlGiorno: 10, materieComunita: ['DIRITTO_CIVILE'] });
-      const { user } = await opened();
+    it('saves a number left for a switch, then the switch, one after the other, and keeps both (G6)', async () => {
+      savePreferences
+        .mockResolvedValueOnce({ nuoveAlGiorno: 45, ripassiAlGiorno: 10, materieComunita: [] })
+        .mockResolvedValueOnce({ nuoveAlGiorno: 45, ripassiAlGiorno: 10, materieComunita: ['DIRITTO_CIVILE'] });
+      const { user } = await withCommunity();
       const goal = screen.getByLabelText('Nuove schede al giorno');
       await user.clear(goal);
       await user.type(goal, '45');
       await user.click(screen.getByRole('switch', { name: 'Diritto civile' }));
       await waitFor(() => expect(screen.getByRole('switch', { name: 'Diritto civile' })).toHaveAttribute('aria-checked', 'true'));
-      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      expect(savePreferences.mock.calls.map(([changes]) => changes)).toEqual([{ nuoveAlGiorno: 45 }, { materieComunita: ['DIRITTO_CIVILE'] }]);
       expect(goal).toHaveValue(45);
+    });
+
+    it('sits one level down, closed, with how many are on (G6)', async () => {
+      preferences.mockResolvedValue({ nuoveAlGiorno: 20, ripassiAlGiorno: 10, materieComunita: ['DIRITTO_PENALE'] });
+      const { user } = await opened();
+      const level = screen.getByRole('button', { name: 'Schede della comunità · 1 di 5' });
+      expect(level).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.queryByRole('switch')).toBeNull();
+      await user.click(level);
+      expect(level).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getAllByRole('switch')).toHaveLength(5);
     });
 
     it('switches one off, keeping the others', async () => {
       preferences.mockResolvedValue({ nuoveAlGiorno: 20, ripassiAlGiorno: 10, materieComunita: ['DIRITTO_CIVILE', 'DIRITTO_PENALE'] });
       savePreferences.mockResolvedValue({ nuoveAlGiorno: 20, ripassiAlGiorno: 10, materieComunita: ['DIRITTO_PENALE'] });
-      const { user } = await opened();
+      const { user } = await withCommunity();
       await waitFor(() => expect(screen.getByRole('switch', { name: 'Diritto civile' })).toHaveAttribute('aria-checked', 'true'));
       await user.click(screen.getByRole('switch', { name: 'Diritto civile' }));
       expect(savePreferences).toHaveBeenCalledWith({ materieComunita: ['DIRITTO_PENALE'] });
@@ -146,7 +180,7 @@ describe('StudyPreferences', () => {
 
     it('leaves the switch as it was, and says so, when the server refuses', async () => {
       savePreferences.mockRejectedValue(new Error('down'));
-      const { user, onChanged } = await opened();
+      const { user, onChanged } = await withCommunity();
       await user.click(screen.getByRole('switch', { name: 'Diritto civile' }));
       expect(await screen.findByRole('alert')).toHaveTextContent('Non sono riuscito a salvare. Riprova.');
       expect(screen.getByRole('switch', { name: 'Diritto civile' })).toHaveAttribute('aria-checked', 'false');

@@ -31,7 +31,7 @@ describe('the tours and the sidebar', () => {
   it('every sidebar target exists in the sidebar a user without the development mode sees', () => {
     render(
       <MemoryRouter>
-        <Sidebar theme="light" isOpen closeMobile={vi.fn()} openSettings={vi.fn()} openKeyboardShortcuts={vi.fn()} toggleTheme={vi.fn()} />
+        <Sidebar theme="light" isOpen closeMobile={vi.fn()} openSettings={vi.fn()} openKeyboardShortcuts={vi.fn()} toggleTheme={vi.fn()} serviceHealth={{ snapshot: { overall: 'online', services: [], checkedAt: '' }, refresh: vi.fn() }} />
       </MemoryRouter>,
     );
     expect(sidebarSelectors.length).toBeGreaterThan(0);

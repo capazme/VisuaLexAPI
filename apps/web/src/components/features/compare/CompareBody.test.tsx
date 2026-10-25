@@ -1,5 +1,5 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { act, cleanup, createEvent, fireEvent, render, screen, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseArticleStructure } from '../../../utils/articleStructure';
 import { CompareView } from './CompareView';
 import { closeCompare, setCompareState, type CompareArticle } from '../../../hooks/useCompare';
@@ -239,14 +239,46 @@ describe('CompareView — versions', () => {
     expect(document.querySelectorAll('.vlx-del, .vlx-ins')).toHaveLength(0);
   });
 
-  it('folds the update notes under each column and opens a note from its reference', () => {
+  it('folds the update notes under each column and opens a note from its reference', async () => {
     const raw = fixtureText('nrm-cc-1284');
     const { container } = open(past(raw), compareArticle(edited(raw)));
     showAll();
     expect(container.querySelectorAll('[data-compare-row="tail"] .vlx-updates')).toHaveLength(2);
     const chip = container.querySelector<HTMLElement>('[data-side="left"] .vlx-ref')!;
-    fireEvent.click(chip);
-    expect(screen.getByRole('dialog')).toHaveTextContent(`Aggiornamento (${chip.dataset.note})`);
+    const comparison = screen.getByRole('dialog', { name: 'Confronta articoli' });
+    // The comparison's own first focus (50 ms after it opens) is given before anything below.
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 60)); });
+    const openNote = () => {
+      fireEvent.click(chip);
+      return screen.getByRole('dialog', { name: `Aggiornamento (${chip.dataset.note})` });
+    };
+    // Drawn inside the comparison, a modal dialog: outside it, a screen reader would not reach it and Tab would leave it.
+    expect(comparison).toContainElement(openNote());
+    // Esc closes the note, not the comparison with it.
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: /^Aggiornamento/ })).toBeNull();
+    expect(comparison).toBeInTheDocument();
+
+    // Tab from inside the note is the note's own (floating-ui's guards), not the comparison's trap.
+    const closeNote = within(openNote()).getByRole('button', { name: 'Chiudi nota' });
+    closeNote.focus();
+    const tab = createEvent.keyDown(closeNote, { key: 'Tab' });
+    fireEvent(closeNote, tab);
+    expect(tab.defaultPrevented).toBe(false);
+    // Should the guards hand it to something after the comparison, the focus comes back into it. (jsdom lays nothing
+    // out: every element is «visible» to the trap, as in a browser.)
+    const laidOut = vi.spyOn(HTMLElement.prototype, 'offsetParent', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.parentElement;
+    });
+    const behind = document.body.appendChild(document.createElement('button'));
+    try {
+      behind.focus();
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+      expect(comparison).toContainElement(document.activeElement as HTMLElement);
+    } finally {
+      laidOut.mockRestore();
+      behind.remove();
+    }
   });
 
   it('has no «Mostra Diff», no similarity and no ArticleDiff', () => {
@@ -338,17 +370,18 @@ describe('CompareView — a reference opens the note of its own column', () => {
   const withNote = (comma: string, note: string) =>
     `Art. 1.\n\n1. ${comma} (7)\n\n-------------\nAGGIORNAMENTO (7)\n\n ${note}`;
 
+  const noteDialog = () => screen.getByRole('dialog', { name: 'Aggiornamento (7)' });
+
   it('shows the right article\'s note from the right column, the left\'s from the left', () => {
     const a = compareArticle(withNote('Primo testo.', 'Nota dell\'articolo di sinistra.'), { numero_articolo: '1' }, 'art. 1 c.c.');
     const b = compareArticle(withNote('Secondo testo.', 'Nota dell\'articolo di destra.'), { numero_articolo: '2' }, 'art. 2 c.c.');
     const { container } = open(a, b);
     fireEvent.click(container.querySelector<HTMLElement>('[data-side="right"] .vlx-ref')!);
-    expect(screen.getByRole('dialog')).toHaveTextContent('Aggiornamento (7)');
-    expect(screen.getByRole('dialog')).toHaveTextContent('Nota dell\'articolo di destra.');
-    expect(screen.getByRole('dialog')).not.toHaveTextContent('sinistra');
+    expect(noteDialog()).toHaveTextContent('Nota dell\'articolo di destra.');
+    expect(noteDialog()).not.toHaveTextContent('sinistra');
     fireEvent.click(container.querySelector<HTMLElement>('[data-side="left"] .vlx-ref')!);
-    expect(screen.getByRole('dialog')).toHaveTextContent('Nota dell\'articolo di sinistra.');
-    expect(screen.getByRole('dialog')).not.toHaveTextContent('destra');
+    expect(noteDialog()).toHaveTextContent('Nota dell\'articolo di sinistra.');
+    expect(noteDialog()).not.toHaveTextContent('destra');
   });
 });
 

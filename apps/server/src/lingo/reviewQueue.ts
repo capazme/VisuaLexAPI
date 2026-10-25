@@ -15,7 +15,7 @@ export const REVIEWABLE_OWN_STATES: LingoCardStato[] = ['BOZZA_PERSONALE', 'PROP
 /**
  * The cards a user may review (spec decision 8): their own that are drafts,
  * proposed or validated, and the community's validated ones in the subjects
- * they switched on, optionally narrowed to one subject. Never «da rivedere»
+ * they switched on, optionally narrowed to one subject and, within it, to one institute. Never «da rivedere»
  * or archived.
  *
  * The community branch does not say `autoreId != me`: in SQL that drops a card
@@ -23,14 +23,30 @@ export const REVIEWABLE_OWN_STATES: LingoCardStato[] = ['BOZZA_PERSONALE', 'PROP
  * A card of one's own that is validated is matched by the first branch already.
  * With no subjects on, `in: []` matches nothing.
  */
-export function reviewScope(userId: string, materieComunita: LingoMateria[], materia?: LingoMateria): Prisma.LingoCardWhereInput {
+export function reviewScope(userId: string, materieComunita: LingoMateria[], materia?: LingoMateria, istituto?: string): Prisma.LingoCardWhereInput {
   const scope: Prisma.LingoCardWhereInput = {
     OR: [
       { autoreId: userId, stato: { in: REVIEWABLE_OWN_STATES } },
       { stato: 'VALIDATA', materia: { in: materieComunita } },
     ],
   };
-  return materia ? { AND: [scope, { materia }] } : scope;
+  if (!materia) return scope;
+  // An institute only exists within a subject, and is matched exactly as `/percorso` returns it.
+  return { AND: [scope, { materia }, ...(istituto === undefined ? [] : [{ istituto }])] };
+}
+
+/**
+ * The cards in `scope` the user has a review state for, each with that state. The cards first and their states
+ * second, the order Prisma reads a relation in: a card gone between the two statements (the account's deletion,
+ * its author's trash) takes its states with it and counts nothing. The other way round, the states first and
+ * their card as a relation, the second statement found no card and the read was a 500
+ * (tests/lingoCardGoneMidRead.test.ts).
+ */
+export function reviewedCardsQuery<S extends Prisma.LingoCardSelect>(userId: string, scope: Prisma.LingoCardWhereInput, card: S) {
+  return {
+    where: { AND: [scope, { statiRipasso: { some: { utenteId: userId } } }] },
+    select: { ...card, statiRipasso: { where: { utenteId: userId }, select: { dueAt: true, lastReviewAt: true } } },
+  } satisfies Prisma.LingoCardFindManyArgs;
 }
 
 /** The days to the next review that each grade would give: what the four buttons show. `state` is null for a new card. */

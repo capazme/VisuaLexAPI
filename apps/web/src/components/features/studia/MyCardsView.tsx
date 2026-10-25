@@ -1,20 +1,25 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { studiaService } from '../../../services/studiaService';
-import { useAppStore } from '../../../store/useAppStore';
+import { appStore, useAppStore } from '../../../store/useAppStore';
 import { invalidateArticleCards } from '../../../utils/articleCardsCache';
 import type { AncoraScheda, Scheda } from '../../../types/studia';
-import { ConfirmDialog } from '../../ui/ConfirmDialog';
-import { EmptyState } from '../../ui/EmptyState';
+import { showUndoToast } from '../../../hooks/useUndoableAction';
+import { trashService } from '../../../services/trashService';
 import { Toast } from '../../ui/Toast';
 import { CardDetail, type CardDetailProps } from './CardDetail';
 import { CardFilters } from './CardFilters';
 import { CardGroups } from './CardGroups';
+import type { CardFormMode } from './CardForm';
 import { CardFormDialog } from './CardFormDialog';
+import { FOCUS_RING, INK_BUTTON, INK_TEXT, MUTED_TEXT, QUIET_BUTTON, SECONDARY_BUTTON, TILE } from './progress/tokens';
+import type { StudiaOutletContext } from './StudiaPage';
 import { anchorActLabel, searchParamsFromAnchor } from './studiaLabels';
+import { useCardSources } from './useCardSources';
 import { NO_FILTERS, useMyCards, type ActOption, type CardQuery, type FilterState } from './useMyCards';
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -72,6 +77,46 @@ function useCardDetail(card: Scheda): { card: Scheda; failed: boolean; retry: ()
   return { card: shown, failed: needsDetail && failedFor === asked, retry };
 }
 
+/**
+ * The list with no card yet: what a card is, and how to begin. From here with «Scrivi la prima scheda» (Q1: the block's
+ * one solid action, the form «+ Nuova scheda» opens) when the sources answer (the form checks every anchor against
+ * them); from an article, or through Claude, in any case. While the sources have not answered, no way to begin yet:
+ * it is not said twice in two ways.
+ */
+function NoCardsYet({ sources, onNew }: { sources: boolean | undefined; onNew: () => void }) {
+  const search = (
+    // In a sentence: 44 px to a finger by its padding, taken back by its margins so no line moves (G8b), as the
+    // notes' link in a dossier.
+    <Link to="/" className={cn('-my-3 inline-block py-3 font-medium underline underline-offset-2', FOCUS_RING)}>
+      Ricerca
+    </Link>
+  );
+  return (
+    <div className={cn(TILE, 'grid justify-items-stretch gap-3 p-4 md:justify-items-start md:p-6')}>
+      <p className={cn('font-serif text-xl leading-snug md:text-2xl', INK_TEXT)}>Non hai ancora schede.</p>
+      <p className="max-w-prose text-sm text-slate-700 dark:text-slate-200">
+        {/* The citation on one line: non-breaking spaces. */}
+        Una scheda è una domanda e la sua risposta, fondate su un articolo, ad esempio {'«art.\u00a01455\u00a0c.c.»'}: il
+        ripasso in «Oggi» te la ripropone quando stai per dimenticarla.
+      </p>
+      {sources === undefined ? null : sources ? (
+        <>
+          <button type="button" aria-haspopup="dialog" onClick={onNew} className={cn(INK_BUTTON, 'w-full px-6 md:w-auto')}>
+            Scrivi la prima scheda
+          </button>
+          <p className="max-w-prose text-sm text-slate-700 dark:text-slate-200">
+            Puoi anche aprire un articolo dalla {search} e scegliere «+ Nuova scheda» sotto il testo, o chiedere a Claude di scriverne.
+          </p>
+        </>
+      ) : (
+        <p className="max-w-prose text-sm text-slate-700 dark:text-slate-200">
+          Per cominciare, apri un articolo dalla {search} e scegli «+ Nuova scheda» sotto il testo, o chiedi a Claude di scriverne.
+        </p>
+      )}
+    </div>
+  );
+}
+
 /** The detail of a card, completed with what its own address carries (`useCardDetail`). */
 function DetailOf({ card, ...rest }: CardDetailProps) {
   const full = useCardDetail(card);
@@ -105,15 +150,24 @@ function withActsOf(
 }
 
 /**
- * «Le mie schede»: the user's cards by subject and institute, behind a sticky filter row, with
- * the selected card beside the list (a phone shows one or the other). The selection is the route:
- * `/studia/schede/:id`.
+ * «Le mie schede»: the user's cards by subject and institute, behind a sticky filter row, across the page's width as a
+ * grid of tiles (G8); with a card selected, the list in one column and the card beside it (a phone shows one or the
+ * other). The selection is the route: `/studia/schede/:id`. «+ Nuova scheda», beside the page's title (`StudiaPage`'s
+ * slot) and in the empty list, opens the form with no article — only while the sources answer (`useCardSources`).
  */
 export function MyCardsView() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  // Beside the page's title; drawn in the view's own row where no frame gives a place (the view alone).
+  const actionSlot = useOutletContext<StudiaOutletContext | undefined>()?.actionSlot;
   const desktop = useIsDesktop();
   const triggerSearch = useAppStore((s) => s.triggerSearch);
+  const sources = useCardSources();
+  const canWrite = sources === true;
+  // After a card is created the dialog gives the focus back to the button that opened it, which may be the
+  // empty list's and go with it: the heading's button takes it instead.
+  const newCardButton = useRef<HTMLButtonElement>(null);
+  const focusAfterCreate = useRef(false);
 
   const [filterState, setFilterState] = useState<FilterState>(NO_FILTERS);
   const [search, setSearch] = useState('');
@@ -170,8 +224,14 @@ export function MyCardsView() {
   // undefined: still being read; null: it is not there.
   const selected = listed ?? (fetched && fetched.id === id ? fetched.card : undefined);
 
-  const [edit, setEdit] = useState<{ card: Scheda; open: boolean } | null>(null);
-  const [toDelete, setToDelete] = useState<Scheda | null>(null);
+  const [form, setForm] = useState<{ mode: CardFormMode; open: boolean } | null>(null);
+  const openNew = () => setForm({ mode: { kind: 'create' }, open: true });
+  const formOpen = form?.open === true;
+  useEffect(() => {
+    if (formOpen || !focusAfterCreate.current) return;
+    focusAfterCreate.current = false;
+    newCardButton.current?.focus();
+  }, [formOpen]);
   const [toast, setToast] = useState<ToastState>(null);
 
   const openAnchor = (anchor: AncoraScheda) => {
@@ -182,21 +242,43 @@ export function MyCardsView() {
   };
 
   const handleSaved = (savedId: string) => {
+    if (form?.mode.kind === 'create') focusAfterCreate.current = true;
     setFetched(null);
     void refresh();
     navigate(`${LIST_PATH}/${encodeURIComponent(savedId)}`);
   };
 
-  const confirmDelete = async () => {
-    const card = toDelete;
-    setToDelete(null);
-    if (!card) return;
+  // No confirmation: the card goes to the trash for 30 days and the notification's «Annulla» takes it back out (K1a).
+  // One trash call per card: a double click on «Elimina» must not send a second one.
+  const deleting = useRef<string | null>(null);
+  const deleteCard = async (card: Scheda) => {
+    if (deleting.current === card.id) return;
+    deleting.current = card.id;
     try {
       const outcome = await studiaService.trash([card.id]);
       setRestartActs(true);
       // The cards under an article are read again where they are shown next.
       if (outcome.moved.length > 0) invalidateArticleCards();
-      if (outcome.moved.includes(card.id)) {
+      if (outcome.moved.includes(card.id) && outcome.trashId) {
+        const trashId = outcome.trashId;
+        void showUndoToast({
+          action: () => trashId,
+          undo: async (id) => {
+            try {
+              await trashService.restore(id);
+            } catch (error) {
+              console.error('Failed to restore a deleted card:', card.id, error);
+              // The page may be gone by now (the notification is the app's): the app's error line, not this page's toast.
+              appStore.getState().pushSyncError('Non riesco a ripristinare la scheda ora: è nel Cestino, ripristinala da lì.');
+              throw error;
+            }
+            invalidateArticleCards();
+            setRestartActs(true);
+            void refresh();
+          },
+          message: 'Scheda nel cestino',
+        });
+      } else if (outcome.moved.includes(card.id)) {
         setToast({ message: 'Scheda nel cestino', type: 'success' });
       } else if (outcome.notDeletable.includes(card.id)) {
         setToast({ message: 'Questa scheda non si può eliminare nello stato in cui si trova. Ho aggiornato l’elenco.', type: 'error' });
@@ -214,6 +296,8 @@ export function MyCardsView() {
       void refresh();
     } catch {
       setToast({ message: 'Non sono riuscito a spostare la scheda nel cestino. Riprova.', type: 'error' });
+    } finally {
+      deleting.current = null;
     }
   };
 
@@ -231,96 +315,92 @@ export function MyCardsView() {
     settleSearch('');
   };
   const showList = desktop || !id;
+  // With a card open on a computer the list is a column beside it; without one the cards take the page's width.
+  const beside = desktop && Boolean(id);
+  const newCard = canWrite && (
+    <button ref={newCardButton} type="button" aria-haspopup="dialog" onClick={openNew} className={SECONDARY_BUTTON}>
+      + Nuova scheda
+    </button>
+  );
 
   return (
-    <section className="md:grid md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] md:items-start md:gap-6">
-      <h2 className="sr-only">Le mie schede</h2>
+    <section className="space-y-4 pb-8">
+      {newCard && (actionSlot ? createPortal(newCard, actionSlot) : <div className="flex justify-end">{newCard}</div>)}
 
-      {showList && (
-        <div className="min-w-0">
-          <CardFilters value={filterState} onChange={setFilterState} search={search} onSearchChange={setSearch} acts={actOptions} />
-          <div className="pt-4">
-            {error && (
-              <div role="alert" className="mb-3 flex flex-wrap items-center gap-3 text-sm text-red-600 dark:text-red-400">
-                {error}
-                <button type="button" onClick={() => void refresh()} className="min-h-[44px] rounded px-2 font-medium underline md:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
-                  Riprova
-                </button>
-              </div>
-            )}
-            {loading && cards.length === 0 && !error && <p className="text-sm text-slate-500 dark:text-slate-400">Carico le schede…</p>}
-            {!loading && !error && cards.length === 0 &&
-              (filtered ? (
-                <div className="space-y-2 py-8 text-center text-sm text-slate-600 dark:text-slate-300">
-                  <p>Nessuna scheda con questi filtri.</p>
-                  <button type="button" onClick={resetFilters} className="min-h-[44px] rounded px-2 font-medium text-primary-700 underline md:min-h-0 dark:text-primary-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
-                    Azzera i filtri
+      <div className={cn(beside && 'grid grid-cols-[minmax(0,5fr)_minmax(0,7fr)] items-start gap-6')}>
+        {showList && (
+          <div className="min-w-0">
+            <CardFilters value={filterState} onChange={setFilterState} search={search} onSearchChange={setSearch} acts={actOptions} row={!beside} />
+            <div className="pt-4">
+              {error && (
+                <div role="alert" className="mb-3 flex flex-wrap items-center gap-x-3 text-sm text-red-700 dark:text-red-400">
+                  {error}
+                  <button type="button" onClick={() => void refresh()} className={cn('min-h-[44px] rounded px-1 font-medium underline', FOCUS_RING)}>
+                    Riprova
                   </button>
                 </div>
-              ) : (
-                <EmptyState variant="generic" title="Nessuna scheda ancora. Aprine una da un articolo con “+ Nuova scheda”, o chiedi a Claude di scriverne." />
-              ))}
-            <CardGroups groups={groups} selectedId={id} folded={folded} onToggleFold={toggleFold} />
-            {hasMore && (
-              <button
-                type="button"
-                onClick={loadMore}
-                disabled={loading}
-                className="mt-4 min-h-[44px] w-full rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-60 md:min-h-0 md:py-1.5 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-              >
-                Mostra altre schede
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {id ? (
-        <div className={cn('min-w-0 pt-2 md:pt-3', desktop && 'sticky top-0 max-h-screen overflow-y-auto pb-4')}>
-          {selected ? (
-            <DetailOf
-              // Its confirmations and pending request belong to this card: another one starts clean.
-              key={selected.id}
-              card={selected}
-              onBack={desktop ? undefined : () => navigate(LIST_PATH)}
-              onEdit={() => setEdit({ card: selected, open: true })}
-              onDelete={() => setToDelete(selected)}
-              onOpenAnchor={openAnchor}
-              onChanged={handleChanged}
-            />
-          ) : (
-            <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
-              <p>{selected === null ? 'Questa scheda non c’è più.' : 'Carico la scheda…'}</p>
-              {!desktop && (
-                <button type="button" onClick={() => navigate(LIST_PATH)} className="min-h-[44px] rounded px-2 font-medium text-primary-700 underline dark:text-primary-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
-                  Indietro
+              )}
+              {loading && cards.length === 0 && !error && <p className={cn('text-sm', MUTED_TEXT)}>Carico le schede…</p>}
+              {!loading && !error && cards.length === 0 &&
+                (filtered ? (
+                  <div className="grid justify-items-center gap-1 rounded-2xl border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200">
+                    <p>Nessuna scheda con questi filtri.</p>
+                    <button type="button" onClick={resetFilters} className={cn(QUIET_BUTTON, 'mx-0 justify-self-center underline')}>
+                      Azzera i filtri
+                    </button>
+                  </div>
+                ) : (
+                  <NoCardsYet sources={sources} onNew={openNew} />
+                ))}
+              <CardGroups groups={groups} selectedId={id} folded={folded} onToggleFold={toggleFold} grid={!beside} />
+              {hasMore && (
+                <button type="button" onClick={loadMore} disabled={loading} className={cn(SECONDARY_BUTTON, 'mt-4 w-full disabled:opacity-60')}>
+                  Mostra altre schede
                 </button>
               )}
             </div>
-          )}
-        </div>
-      ) : (
-        desktop && cards.length > 0 && <p className="pt-4 text-sm text-slate-500 dark:text-slate-400">Scegli una scheda dall’elenco per leggerla.</p>
-      )}
+          </div>
+        )}
+
+        {id && (
+          <div className={cn('min-w-0 pt-2 md:pt-0', desktop && 'sticky top-[var(--phone-bar-offset,0px)] max-h-[calc(100dvh-var(--phone-bar-offset,0px))] overflow-y-auto pb-4')}>
+            {/* The outline under the page's title: the card's own headings (h3, h4) sit under this, on a phone with no list
+                beside it, on a computer beside the subjects' h2. */}
+            <h2 className="sr-only">La scheda scelta</h2>
+            {selected ? (
+              <DetailOf
+                // Its confirmations and pending request belong to this card: another one starts clean.
+                key={selected.id}
+                card={selected}
+                onBack={desktop ? undefined : () => navigate(LIST_PATH)}
+                onEdit={() => setForm({ mode: { kind: 'edit', card: selected }, open: true })}
+                onDelete={() => void deleteCard(selected)}
+                onOpenAnchor={openAnchor}
+                onChanged={handleChanged}
+              />
+            ) : (
+              <div className="grid justify-items-start gap-2 text-sm text-slate-700 dark:text-slate-200">
+                <p>{selected === null ? 'Questa scheda non c’è più.' : 'Carico la scheda…'}</p>
+                {!desktop && (
+                  <button type="button" onClick={() => navigate(LIST_PATH)} className={QUIET_BUTTON}>
+                    Indietro
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Kept mounted: its «Scheda salvata» toast outlives the dialog. */}
-      {edit && (
+      {form && (
         <CardFormDialog
-          open={edit.open}
-          mode={{ kind: 'edit', card: edit.card }}
-          onClose={() => setEdit((current) => current && { ...current, open: false })}
+          open={form.open}
+          mode={form.mode}
+          onClose={() => setForm((current) => current && { ...current, open: false })}
           onSaved={handleSaved}
         />
       )}
-      <ConfirmDialog
-        open={toDelete !== null}
-        variant="danger"
-        title="Eliminare questa scheda?"
-        message="La scheda va nel cestino per 30 giorni. Le altre schede non sono toccate."
-        confirmLabel="Elimina"
-        onConfirm={() => void confirmDelete()}
-        onCancel={() => setToDelete(null)}
-      />
       <div className={cn('fixed left-0 top-0', Z_INDEX.toast)}>
         <Toast message={toast?.message ?? ''} type={toast?.type ?? 'success'} isVisible={toast !== null} onClose={() => setToast(null)} />
       </div>

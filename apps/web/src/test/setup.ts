@@ -12,7 +12,7 @@ configure({ asyncUtilTimeout: 5000 })
 // A test of the tours themselves mocks `useTour` (or the module) in its own file, which wins.
 vi.mock('../hooks/useTour', () => ({
   useTour: () => ({
-    startTour: vi.fn(), stopTour: vi.fn(), resetTour: vi.fn(), resetAndStartTour: vi.fn(),
+    startTour: vi.fn(), prepareTour: vi.fn(), stopTour: vi.fn(), resetTour: vi.fn(), resetAndStartTour: vi.fn(),
     hasSeenTour: () => true, tryStartTour: vi.fn(), getTourVersion: () => 0, isActive: () => false, isMobile: () => false,
   }),
   holdTours: vi.fn(),
@@ -85,4 +85,11 @@ if (typeof window !== 'undefined' && !window.ResizeObserver) {
 // into the command palette throw before it can assert anything.
 if (typeof Element !== 'undefined' && !Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = () => {};
+}
+
+// jsdom has no canvas: its getContext logs «Not implemented» and answers null. Answer null quietly, as a browser
+// that cannot draw would; the celebration then skips its drawing, and a test of a drawing
+// spies on it with a context of its own.
+if (typeof HTMLCanvasElement !== 'undefined') {
+  HTMLCanvasElement.prototype.getContext = (() => null) as typeof HTMLCanvasElement.prototype.getContext
 }

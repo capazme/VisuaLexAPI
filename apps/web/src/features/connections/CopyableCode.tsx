@@ -48,11 +48,12 @@ export function CopyableCode({ code, label, block = false }: CopyableCodeProps) 
         >
           {code}
         </code>
+        {/* 44 px tall at every width, not only on a phone: the page is read at a desk with a trackpad too. */}
         <button
           type="button"
           onClick={() => void copy()}
           aria-label={`Copia ${label}`}
-          className="inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-md bg-white px-2 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 transition-colors duration-150 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0 md:py-1 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700 dark:hover:bg-slate-700"
+          className="inline-flex min-h-[44px] shrink-0 items-center gap-1 rounded-md bg-white px-3 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200 transition-colors duration-150 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700 dark:hover:bg-slate-700"
         >
           {state === 'copied' ? <Check size={14} aria-hidden /> : <Copy size={14} aria-hidden />}
           {state === 'copied' ? 'Copiato' : 'Copia'}

@@ -3,6 +3,7 @@ import { createStore } from 'zustand/vanilla';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { v4 as uuidv4 } from 'uuid';
+import { resetNotifications } from '../components/ui/notifications/notifications';
 import type { AppSettings, Bookmark, Dossier, DossierItem, DossierKind, DossierNormaData, DossierSentenzaData, Annotation, Highlight, Norma, NormaVisitata, ArticleData, SearchParams, QuickNorm, CustomAlias, Environment } from '../types';
 import { getErrorMessage } from '../utils/errors';
 import {
@@ -17,9 +18,9 @@ import type { DecisionIdentity, DecisionReference, DecisionSearchQuery } from '.
 import { decisionPath, formatDecisionShort, identityOf } from '../utils/decisionLinks';
 import {
     addArticles, articleRowKey, besideAfterOpen, besideRefFor, DEFAULT_PRACTICE_LABEL, DEFAULT_SEARCH_LABEL, decisionRowKey,
-    findPracticeArticle, holdsSubject, labelOr, mergeDecisionEntries, practiceArticleKey,
+    findPracticeArticle, holdsSubject, labelOr, MAX_BESIDE, mergeDecisionEntries, practiceArticleKey,
     practiceLabel, sameBesideSubject, sameDecision, sanitizePractices, subjectOfRef, type BesideRef, type Practice,
-    type PracticeDecision, type PracticeSubject,
+    type PracticeAct, type PracticeDecision, type PracticeSubject,
 } from '../utils/practice';
 import { shortAct } from '../utils/sources';
 import { DECISIONS_PRACTICE_LABEL, practiceNoticeText, practicesFromTabs } from '../utils/practiceMigration';
@@ -226,6 +227,12 @@ interface AppState {
     closePractice: (id: string) => void;
     /** Empties the table; a reload shows no practice (§5). */
     closeAllPractices: () => void;
+    /**
+     * «Annulla» after closing practices (K1a): puts back those that are not open, each at the index it had (or the end),
+     * with their open rows; `activeId` becomes active again if it is among them. What was opened meanwhile stays.
+     * False when there was nothing to put back: «Annulla» then says so, never «Ripristinato».
+     */
+    reopenPractices: (closed: { practice: Practice; index: number }[], rows: Record<string, true>, activeId: string | null) => boolean;
     /** Ignored for an id that names no practice. */
     setActivePractice: (id: string) => void;
     reorderPractices: (fromIndex: number, toIndex: number) => void;
@@ -262,6 +269,13 @@ interface AppState {
     removePracticeArticle: (practiceId: string, actId: string, articleKey: string) => void;
     /** Takes the act off the table with its rows, its reveal, its windows and the structure window it owned. */
     removePracticeAct: (practiceId: string, actId: string) => void;
+    /**
+     * «Annulla» after `removePracticeAct` (K1a): the act back at `index` in its practice with its open rows, and the
+     * windows it had beside back at their places while the row has room (two). The same act added again meanwhile
+     * (under a new id) takes the removed articles instead of a second copy of the act. False when the practice is gone
+     * (closed meanwhile): nothing to put the act back into, and «Annulla» says so.
+     */
+    restorePracticeAct: (practiceId: string, act: PracticeAct, index: number, beside: { ref: BesideRef; index: number }[], rows: Record<string, true>) => boolean;
     /**
      * «Sposta in un'altra pratica» (T13): the act keeps its id, its articles and its open rows. Into
      * a practice that already holds the act (`actKeyOf`) it joins that act, whose id it takes, and
@@ -686,6 +700,23 @@ const appStore = createStore<AppState>()(
                 state.phoneReader = null;
             }),
 
+            reopenPractices: (closed, rows, activeId) => {
+                const openNow = new Set(get().practices.map((p) => p.id));
+                if (closed.every(({ practice }) => openNow.has(practice.id))) return false;
+                set((state) => {
+                const open = new Set(state.practices.map((p) => p.id));
+                const back = closed.filter(({ practice }) => !open.has(practice.id)).sort((a, b) => a.index - b.index);
+                if (back.length === 0) return;
+                for (const { practice, index } of back) state.practices.splice(Math.min(index, state.practices.length), 0, practice);
+                for (const [key, on] of Object.entries(rows)) {
+                    if (back.some(({ practice }) => key.startsWith(`${practice.id}/`))) state.practiceRows[key] = on;
+                }
+                if (activeId && back.some(({ practice }) => practice.id === activeId)) activate(state, activeId);
+                else if (state.activePracticeId === null) state.activePracticeId = back[0].practice.id;
+                });
+                return true;
+            },
+
             setActivePractice: (id) => {
                 const { practices, activePracticeId } = get();
                 if (activePracticeId === id || !practices.some((p) => p.id === id)) return;
@@ -794,6 +825,30 @@ const appStore = createStore<AppState>()(
                 if (state.structureWindow.blockId === actId) state.structureWindow.blockId = null;
                 dropRows(state, `${practiceId}/${actId}/`);
                 });
+            },
+
+            restorePracticeAct: (practiceId, act, index, beside, rows) => {
+                const before = get().practices.find((p) => p.id === practiceId);
+                if (!before) return false;
+                if (before.acts.some((a) => a.id === act.id)) return true;
+                set((state) => {
+                const practice = state.practices.find((p) => p.id === practiceId);
+                if (!practice) return;
+                const again = practice.acts.find((a) => a.key === act.key);
+                if (again) {
+                    // Added again meanwhile: the removed articles join it; its own windows and rows stay as they are.
+                    practice.acts = addArticles(practice.acts, act.norma, act.articles, () => again.id).acts;
+                    return;
+                }
+                practice.acts.splice(Math.min(index, practice.acts.length), 0, act);
+                for (const { ref, index: at } of [...beside].sort((a, b) => a.index - b.index)) {
+                    if (practice.beside.length >= MAX_BESIDE) break;
+                    if (practice.beside.some((b) => b.id === ref.id || sameBesideSubject(b, ref))) continue;
+                    practice.beside.splice(Math.min(at, practice.beside.length), 0, ref);
+                }
+                Object.assign(state.practiceRows, rows);
+                });
+                return true;
             },
 
             moveActToPractice: (actId, fromPracticeId, to) => {
@@ -1148,6 +1203,8 @@ const appStore = createStore<AppState>()(
             },
 
             clearUserData: () => {
+                // The notifications on screen go, without carrying out what they held (an import waiting for its «Annulla»).
+                resetNotifications();
                 // The backup of the last user's saved tabs (`backupV0`) goes too: a shared browser keeps nothing of them.
                 removeV0Backup();
                 set((state) => {
@@ -2041,13 +2098,13 @@ const appStore = createStore<AppState>()(
                 // always 401 and only burn rate-limit points — skip it.
                 if (!isAuthenticated()) return;
                 // Batch: cache by the article root (suffix-free) so the
-                // article body + every brocardi sub-section share a single
+                // article body + every sub-section (the old /brocardi/ ones) share a single
                 // round trip via normaKeyPrefix.
                 const articleRoot = articleRootOf(articleId);
                 const cacheKey = `${normaKey}::${articleRoot}`;
                 if (get().loadedAnnotationKeys[cacheKey]) return;
                 // Mark BEFORE awaiting so concurrent mounts (StrictMode,
-                // rapid article switches, MarkableBrocardiSection siblings)
+                // rapid article switches)
                 // coalesce onto the first in-flight request. Cleared on
                 // error so retries on the next mount still work.
                 set((state) => { state.loadedAnnotationKeys[cacheKey] = true; });
@@ -2057,7 +2114,7 @@ const appStore = createStore<AppState>()(
                     const mapped = server.map(annotationApiToStore);
                     set((state) => {
                         // Replace every annotation whose articleId sits under
-                        // this article root (main body + /brocardi/* sections)
+                        // this article root (main body + its sub-sections)
                         // so server state wins over stale local entries.
                         state.annotations = state.annotations
                             .filter(a => !(

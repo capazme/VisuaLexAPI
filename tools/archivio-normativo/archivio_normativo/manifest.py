@@ -63,12 +63,21 @@ KIND_GROUPS: dict[str, tuple[str, ...]] = {
 }
 
 
+#: Kinds that can no longer be asked for. Brocardi is no longer a source (D-078):
+#: the API sends no annotations, so the kind would refetch every article forever.
+RETIRED_KINDS: dict[str, str] = {
+    "brocardi": "Brocardi is no longer a source (D-078); its annotations are not available",
+}
+
+
 def expand_kinds(names: Iterable[str]) -> tuple[str, ...]:
     """Resolve aliases and groups into concrete kinds, order kept, no repeats."""
     out: list[str] = []
     for raw in names:
         name = str(raw).strip().lower()
         name = KIND_ALIASES.get(name, name)
+        if name in RETIRED_KINDS:
+            raise ManifestError(f"enrichment kind {raw!r} is retired: {RETIRED_KINDS[name]}")
         expanded = KIND_GROUPS.get(name, (name,))
         for kind in expanded:
             if kind not in KINDS:

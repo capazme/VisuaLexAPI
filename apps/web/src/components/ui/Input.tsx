@@ -1,5 +1,6 @@
 import { forwardRef, useId, useState, type InputHTMLAttributes, type ReactNode } from 'react';
 import { cn } from '../../lib/utils';
+import { FIELD_TEXT } from '../../constants/interactions';
 
 export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> {
   label?: string;
@@ -57,17 +58,12 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           </label>
         )}
 
-        <div
-          className={cn(
-            'relative group transition-all duration-200 ease-smooth-out',
-            isFocused && ''
-          )}
-        >
+        <div className="relative group">
           {icon && (
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <div
                 className={cn(
-                  'transition-colors duration-200',
+                  'transition-colors duration-150',
                   isFocused ? 'text-primary-500' : 'text-slate-400 dark:text-slate-500'
                 )}
               >
@@ -83,14 +79,16 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             aria-describedby={describedByIds}
             className={cn(
               'w-full py-2.5 border rounded-lg',
-              'transition-all duration-200 ease-smooth-out outline-none',
+              // Colours only: the focus ring is a box-shadow and appears at once.
+              'transition-colors duration-150 ease-out outline-none',
               'text-slate-900 dark:text-slate-100',
               'placeholder:text-slate-400 dark:placeholder:text-slate-500',
-              'text-sm font-medium',
+              FIELD_TEXT,
+              'font-medium',
               // Disabled state
               'disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-100 dark:disabled:bg-slate-800',
               // Focus states - using focus-visible for better keyboard accessibility
-              'focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary/50 focus:border-primary-500 focus:outline-none',
+              'focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-toga-500 focus-visible:ring-offset-background focus:border-primary-500 focus:outline-none',
               inputVariants[variant],
               icon ? 'pl-10 pr-4' : 'px-4',
               className

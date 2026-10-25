@@ -93,7 +93,7 @@ describe('decisionPdfModel', () => {
 });
 
 describe('writeDecisionPdf', () => {
-  it('writes a long decision with marks over many pages', () => {
+  it('writes a long decision with marks over many pages', async () => {
     const paragraph = 'Il ricorrente deduce la violazione dell\'art. 2043 c.c. e sostiene che il giudice di merito abbia errato. '.repeat(8).trim();
     const motivazione = Array.from({ length: 150 }, () => paragraph).join('\n\n');
     const answer = { ...FOUND, testo: { motivazione } };
@@ -101,7 +101,7 @@ describe('writeDecisionPdf', () => {
       consultedOn: '2026-10-05',
       annotations: { highlights: [{ id: 'h', text: 'violazione', startOffset: 22, color: 'yellow' } as never], notes: [] },
     });
-    const doc = writeDecisionPdf(model);
+    const doc = await writeDecisionPdf(model);
     expect(doc.getNumberOfPages()).toBeGreaterThanOrEqual(30);
   });
 });

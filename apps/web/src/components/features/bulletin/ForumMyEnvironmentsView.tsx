@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Package, Upload } from 'lucide-react';
-import { SharedEnvironmentCard } from './SharedEnvironmentCard';
+import { CARD_GRID, SharedEnvironmentCard } from './SharedEnvironmentCard';
 import { VersionHistoryModal } from './VersionHistoryModal';
+import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import type { SharedEnvironment } from '../../../types';
 
 interface ForumMyEnvironmentsViewProps {
@@ -40,7 +41,7 @@ export function ForumMyEnvironmentsView({
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className={CARD_GRID}>
         {[...Array(3)].map((_, i) => (
           <div
             key={i}
@@ -70,7 +71,7 @@ export function ForumMyEnvironmentsView({
         </p>
         <button
           onClick={onPublishClick}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+          className={`inline-flex ${TOUCH_TARGET_RESPONSIVE} items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors`}
         >
           <Upload size={16} />
           Pubblica un dossier
@@ -84,7 +85,7 @@ export function ForumMyEnvironmentsView({
       <p className="text-sm text-slate-500 dark:text-slate-400">
         {environments.length} {environments.length === 1 ? 'dossier pubblicato' : 'dossier pubblicati'}
       </p>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className={CARD_GRID}>
         {environments.map((env) => {
           const current = restored[env.id] ?? env;
           return (

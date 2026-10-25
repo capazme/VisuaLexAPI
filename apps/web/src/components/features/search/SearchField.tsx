@@ -1,187 +1,115 @@
-import { useEffect, useEffectEvent, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
-import { Gavel, Search, SlidersHorizontal, Tag, Zap } from 'lucide-react';
+import { useEffect, useRef, useState, type KeyboardEvent, type ClipboardEvent } from 'react';
+import { Search } from 'lucide-react';
 import { cn } from '../../../lib/utils';
-import { FOCUS_RING } from '../../../constants/interactions';
+import { FIELD_TEXT } from '../../../constants/interactions';
 import { useAppStore } from '../../../store/useAppStore';
-import { citationSearchParams, useSearchQuery } from '../../../hooks/useSearchQuery';
-import { useSearchActions } from '../../../hooks/useSearchActions';
-import { subscribeSearchField } from '../../../utils/searchFieldControl';
-import { defaultSearchFilters } from '../../../utils/searchFilters';
-import { formatDecisionShort } from '../../../utils/decisionLinks';
+import { PALETTE_SHORTCUT, SEARCH_FIELD_FORM_ID, subscribeSearchField } from '../../../utils/searchFieldControl';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 
-/** The field's height, which `Layout` subtracts from the practice's columns (`--search-bar-height`). */
-export const SEARCH_BAR_HEIGHT = '4.5rem';
-
 /**
- * The search page's field, always on screen above the practices (spec
- * `2026-10-13-fixed-search-design.md`). It reads what is typed as the palette does (`useSearchQuery`):
- * Enter opens a decision, searches a complete norm in the active practice, or searches a topic in the
- * Cassazione's decisions; a norm that still lacks its number, date or article goes on in the palette,
- * with the words already typed, which asks for the rest. «Opzioni» (⌘K) opens the palette with its
- * filters, aliases and the grid of acts. No practice is closed.
+ * The search page's field, always on screen above the practices (spec `2026-10-13-fixed-search-design.md`), and the
+ * door to the search menu (R2): a click, Enter, the arrows, a key typed on it (which goes on in the menu's box) or ⌘K
+ * grow it into the menu, in the same place, with its words; Tab only brings the focus (a focus changes no context,
+ * WCAG 3.2.1 — Bill's choice) — one field: what the menu reads, its first row, Enter, the acts, favourites, aliases,
+ * filters and the steps are all the menu's (`CommandPalette`). The menu closing without a choice gives its words back
+ * here; a choice empties it.
  */
 export function SearchField() {
   const [value, setValue] = useState('');
-  // Enter pressed while the server was still naming the act: the words it was pressed on.
-  const [pendingQuery, setPendingQuery] = useState<string | null>(null);
-  // The line under the field shows while it has the focus: it never sits over the practice unasked.
-  const [focused, setFocused] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const { decisionRef, parsedCitation, citationReady, citationPreview, resolvingRemotely, topic } = useSearchQuery(value);
-  const actions = useSearchActions();
-  // On a phone the examples do not fit: the placeholder says what the field takes, and stops there.
-  const isDesktop = useIsDesktop();
-  const trackAliasUsage = useAppStore((s) => s.trackAliasUsage);
+  const valueRef = useRef(value);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const isOpen = useAppStore((s) => s.commandPaletteOpen);
   const openCommandPaletteWith = useAppStore((s) => s.openCommandPaletteWith);
   const openCommandPalette = useAppStore((s) => s.openCommandPalette);
+  // On a phone the examples do not fit: the placeholder says what the field takes, and stops there.
+  const isDesktop = useIsDesktop();
 
-  useEffect(() => subscribeSearchField(({ text }) => {
+  useEffect(() => {
+    valueRef.current = value;
+  });
+
+  /** Grows into the menu with `words` (the field's own, by default). */
+  const open = (words = valueRef.current) => {
+    if (words.trim()) openCommandPaletteWith(words);
+    else openCommandPalette();
+  };
+  const openRef = useRef(open);
+  useEffect(() => {
+    openRef.current = open;
+  });
+
+  // Requests from elsewhere: the empty page and ⌘K open the menu; the sidebar's «Ricerca» puts only the cursor on
+  // the field (`focus`); the menu closing gives its words back (`open: false`).
+  useEffect(() => subscribeSearchField(({ text, open: grow = true, focus }) => {
     if (text !== undefined) setValue(text);
-    setPendingQuery(null);
-    inputRef.current?.focus();
+    if (focus) {
+      buttonRef.current?.focus();
+    } else if (grow) openRef.current(text ?? valueRef.current);
   }), []);
 
-  const run = () => {
-    const words = value.trim();
-    setPendingQuery(null);
-    if (!words) return;
-    if (decisionRef) {
-      actions.openDecision(decisionRef);
-    } else if (resolvingRemotely) {
-      // The server is still naming the act (the client's own reading, if any, is incomplete): the
-      // search runs as soon as it has answered.
-      setPendingQuery(value);
-      return;
-    } else if (parsedCitation) {
-      if (citationReady) {
-        // Counted when the alias runs; a norm handed to the palette is counted there.
-        if (parsedCitation.fromAlias && parsedCitation.aliasId) trackAliasUsage(parsedCitation.aliasId);
-        actions.search(citationSearchParams(parsedCitation, { showBrocardi: true, filters: defaultSearchFilters() }));
-      } else {
-        // The act is named, its number, date or article is not: the palette asks for them.
-        openCommandPaletteWith(words);
-      }
-    } else if (topic) {
-      actions.openTopic(topic);
-    } else {
-      openCommandPaletteWith(words);
-    }
-    setValue('');
-  };
-
-  // The answer Enter was waiting for has come: run it, once. A change of the words drops the wait.
-  const runWhenAnswered = useEffectEvent(() => run());
-  useEffect(() => {
-    if (pendingQuery !== null && pendingQuery === value && !resolvingRemotely) runWhenAnswered();
-  }, [pendingQuery, value, resolvingRemotely]);
-
-  const onSubmit = (event: FormEvent) => {
+  // Pasted on it, the words go on in the menu, after its own (a button takes no paste of its own: Ctrl/⌘+V reaches it as
+  // a key with a modifier, which `onKeyDown` leaves alone).
+  const onPaste = (event: ClipboardEvent<HTMLButtonElement>) => {
+    const pasted = event.clipboardData.getData('text').replace(/\s+/g, ' ').trim();
+    if (!pasted) return;
     event.preventDefault();
-    run();
+    open(valueRef.current ? `${valueRef.current} ${pasted}` : pasted);
   };
 
-  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Escape' && value) {
+  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    // A letter typed on the field goes on in the menu, after its words; Enter, Space and the arrows open it.
+    // AltGr (Ctrl and Alt on Windows) writes «@», «#», «[» on an Italian keyboard: a character too.
+    const writes = !event.metaKey && (!event.ctrlKey || event.getModifierState('AltGraph'));
+    if (event.key.length === 1 && writes && !event.nativeEvent.isComposing) {
+      event.preventDefault();
+      open(valueRef.current + event.key);
+    } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      // (Enter and Space press the button: its click opens it.)
+      event.preventDefault();
+      open();
+    } else if (event.key === 'Escape' && valueRef.current) {
+      // Esc empties the words, as it did.
       event.preventDefault();
       setValue('');
-      setPendingQuery(null);
     }
   };
 
-  const openOptions = () => {
-    const words = value.trim();
-    if (words) openCommandPaletteWith(words);
-    else openCommandPalette();
-    setValue('');
-    setPendingQuery(null);
-  };
-
-  const waiting = pendingQuery !== null && pendingQuery === value;
-  const hint = !value.trim() ? null
-    : decisionRef ? { tone: 'ready' as const, icon: Gavel, text: `Sentenza → ${formatDecisionShort(decisionRef)}`, action: 'Invio apre' }
-    : parsedCitation && citationPreview ? {
-        tone: parsedCitation.fromAlias ? 'alias' as const : citationReady ? 'ready' as const : 'partial' as const,
-        icon: parsedCitation.fromAlias ? Tag : Zap,
-        text: `${parsedCitation.fromAlias ? 'tramite alias → ' : ''}${citationPreview}`,
-        action: citationReady ? 'Invio cerca' : 'Invio completa',
-      }
-    : resolvingRemotely ? { tone: 'muted' as const, icon: Search, text: waiting ? 'Cerco l’atto… la ricerca parte appena lo trovo' : 'Cerco l’atto…', action: '' }
-    : topic ? { tone: 'ready' as const, icon: Gavel, text: `Cerca «${topic}» nelle sentenze della Cassazione`, action: 'Invio cerca' }
-    : null;
-  const announcement = !hint ? '' : `${hint.text}.${hint.action ? ` ${hint.action}.` : ''}`;
-
+  const placeholder = isDesktop ? 'Norma, sentenza o tema: art. 2043 c.c., Cass. civ. 10787/2024' : 'Norma, sentenza o tema';
   return (
     <div className="relative w-full max-w-3xl">
-      <form role="search" aria-label="Ricerca" onSubmit={onSubmit} className="flex items-center gap-2">
-        <div className="relative flex min-w-0 flex-1 items-center">
-          <Search size={18} aria-hidden className="pointer-events-none absolute left-3 text-slate-400" />
-          <input
-            ref={inputRef}
-            id="tour-search-field"
-            type="search"
-            enterKeyHint="search"
-            autoComplete="off"
-            spellCheck={false}
-            value={value}
-            onChange={(event) => {
-              setValue(event.target.value);
-              // A wait belongs to the words Enter was pressed on: new words need a new Enter.
-              setPendingQuery(null);
-            }}
-            onKeyDown={onKeyDown}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            aria-label="Cerca una norma, una sentenza o un tema"
-            aria-describedby="search-field-status"
-            placeholder={isDesktop ? 'Norma, sentenza o tema: art. 2043 c.c., Cass. civ. 10787/2024' : 'Norma, sentenza o tema'}
-            className={cn(
-              'h-11 w-full min-w-0 rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-base text-slate-900 shadow-sm placeholder:text-slate-400 md:text-sm',
-              'dark:border-slate-700 dark:bg-slate-900 dark:text-white',
-              'focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30',
-            )}
-          />
-        </div>
+      <form id={SEARCH_FIELD_FORM_ID} role="search" aria-label="Ricerca" onSubmit={(event) => event.preventDefault()} className="flex items-center">
         <button
+          ref={buttonRef}
           type="button"
-          onClick={openOptions}
-          aria-label="Altre opzioni di ricerca (⌘K)"
-          title="Filtri, alias e tutti gli atti (⌘K)"
+          id="tour-search-field"
+          aria-label={value ? `Cerca una norma, una sentenza o un tema: ${value}` : 'Cerca una norma, una sentenza o un tema'}
+          aria-haspopup="dialog"
+          aria-expanded={isOpen}
+          onClick={(event) => {
+            // Safari and a phone's tap do not focus a button: focused, it is where the menu gives the focus back.
+            event.currentTarget.focus();
+            open();
+          }}
+          onKeyDown={onKeyDown}
+          onPaste={onPaste}
+          // It stands for a field: «?», ⌘Z and the other shortcuts of a page leave it alone.
+          data-text-field=""
           className={cn(
-            'inline-flex h-11 min-w-[44px] flex-shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 shadow-sm transition-colors duration-150 hover:bg-slate-50',
-            'dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800',
-            FOCUS_RING,
+            // The field's type size (`FIELD_TEXT`, 16 px at least on a phone, «piccolo» included), as the box it opens.
+            'relative flex h-11 w-full min-w-0 items-center rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-left shadow-sm',
+            FIELD_TEXT,
+            'dark:border-slate-700 dark:bg-slate-900',
+            'cursor-text hover:border-slate-300 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30 dark:hover:border-slate-600',
           )}
         >
-          <SlidersHorizontal size={16} aria-hidden />
-          <span className="hidden sm:inline">Opzioni</span>
-          <kbd className="hidden rounded border border-slate-200 px-1 text-[10px] font-semibold text-slate-400 md:inline dark:border-slate-700">⌘K</kbd>
+          <Search size={18} aria-hidden className="pointer-events-none absolute left-3 text-slate-400" />
+          <span className={cn('min-w-0 flex-1 truncate', value ? 'text-slate-900 dark:text-white' : 'text-slate-400')}>{value || placeholder}</span>
+          {/* ⌘K (Ctrl K) opens it from anywhere on the page; said where a keyboard is likely. */}
+          <kbd aria-hidden className="ml-2 hidden shrink-0 rounded border border-slate-200 px-1 text-[11px] font-semibold text-slate-500 md:inline dark:border-slate-700 dark:text-slate-400">
+            {PALETTE_SHORTCUT}
+          </kbd>
         </button>
       </form>
-
-      {/* One live region for the field's life, its text changing; the visible line is aria-hidden. */}
-      <p id="search-field-status" role="status" className="sr-only">{announcement}</p>
-
-      {hint && (focused || waiting) && (
-        <div
-          aria-hidden
-          data-testid="search-field-hint"
-          className="absolute inset-x-0 top-full z-10 mt-1 flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg dark:border-slate-700 dark:bg-slate-900"
-        >
-          <hint.icon
-            size={14}
-            className={cn(
-              'flex-shrink-0',
-              hint.tone === 'ready' && 'text-emerald-600 dark:text-emerald-400',
-              hint.tone === 'alias' && 'text-indigo-600 dark:text-indigo-400',
-              hint.tone === 'partial' && 'text-amber-600 dark:text-amber-400',
-              hint.tone === 'muted' && 'animate-pulse text-slate-400',
-            )}
-          />
-          <span className="min-w-0 flex-1 truncate font-medium text-slate-700 dark:text-slate-200">{hint.text}</span>
-          {hint.action && <span className="flex-shrink-0 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{hint.action}</span>}
-        </div>
-      )}
     </div>
   );
 }

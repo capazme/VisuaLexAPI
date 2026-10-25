@@ -204,8 +204,8 @@ class LiveEnrichmentRequest(BaseModel):
 
     # Opzioni
     include_brocardi: bool = Field(
-        True,
-        description="Includere enrichment da Brocardi.it"
+        False,
+        description="Ignorato: Brocardi non è più una fonte (D-078)"
     )
     extract_entities: bool = Field(
         True,

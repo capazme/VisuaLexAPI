@@ -73,6 +73,24 @@ export function searchParamsFromAnchor(anchor: Pick<AncoraScheda, 'urn'>): Searc
   return norma ? searchParamsFromNorma(norma) : null;
 }
 
+/**
+ * The seconds a card is guessed to take, behind the home's «circa N minuti» (Gymnasium spec §5.1, open
+ * decision 1): an estimate, never a promise, until the server can give the user's own average.
+ */
+export const SECONDS_PER_CARD = 20;
+
+/** The minutes `cards` cards are guessed to take: `ceil(cards × SECONDS_PER_CARD / 60)`; 0 for none. */
+export function estimatedMinutes(cards: number): number {
+  return cards > 0 ? Math.ceil((cards * SECONDS_PER_CARD) / 60) : 0;
+}
+
+/** «circa 9 minuti», «circa 1 minuto»; null when there is no card. */
+export function estimateLabel(cards: number): string | null {
+  const minutes = estimatedMinutes(cards);
+  if (minutes === 0) return null;
+  return `circa ${minutes} ${minutes === 1 ? 'minuto' : 'minuti'}`;
+}
+
 const MONTHS = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
 
 /**

@@ -79,8 +79,10 @@ export function CompareBody({ left, right, onRemove }: CompareBodyProps) {
     const display = describeVersion(article.validity, {
       versione: article.norma_data.versione,
       data_versione: article.norma_data.data_versione,
-    });
-    return !display.canCite && display.banner ? [{ side, banner: display.banner, hidden: !display.textVisible }] : [];
+    }, article.upcoming);
+    // An article that will change says so too (V1), above its column; it is still compared.
+    const says = !display.canCite || display.banner?.kind === 'upcoming';
+    return says && display.banner ? [{ side, banner: display.banner, hidden: !display.textVisible }] : [];
   });
   // An article that did not exist yet has no text to read (the reader hides it): nothing is compared.
   const nothingToCompare = warnings.some((w) => w.hidden);
@@ -116,7 +118,7 @@ export function CompareBody({ left, right, onRemove }: CompareBodyProps) {
                 onlyChanges ? 'bg-primary-600' : 'bg-slate-300 dark:bg-slate-600',
               )}
             >
-              <span className={cn('absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all', onlyChanges ? 'left-[1.1rem]' : 'left-0.5')} />
+              <span className={cn('absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform', onlyChanges && 'translate-x-[0.975rem]')} />
             </span>
             Solo le modifiche
           </button>

@@ -1,9 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import type { ArticleData, SearchParams } from '../../../types';
-import { BrocardiDisplay } from './BrocardiDisplay';
 import { CaseLawSection } from './CaseLawSection';
-import { searchNorma } from '../../../utils/decisionSearchNorma';
-import { massimeStateOf } from './massimeState';
 import { ExternalLink } from 'lucide-react';
 import { AskMerltEntry } from './AskMerltEntry';
 import { useAppStore } from '../../../store/useAppStore';
@@ -33,12 +30,13 @@ import { InlineNoteComposer } from './InlineNoteComposer';
 import { ArticleBody } from './ArticleBody';
 import { closeFindWindow, openFindWindow } from '../../../utils/findWindowControl';
 import { useFindWindowScopedTo } from '../../../hooks/useFindWindowScopedTo';
+import { quickNormParamsOf } from '../../../utils/quickNormParams';
 import { ArticleDiscussionPanel } from './ArticleDiscussionPanel';
 import { UpdateNotePopover } from './UpdateNotePopover';
 import { BlockAnnotationsPopover } from './BlockAnnotationsPopover';
 import { LooseHighlightsList } from './LooseHighlightsList';
 import { useArticleTextInteractions } from '../../../hooks/useArticleTextInteractions';
-import { getUpdateNoteParagraphs, parseArticleStructure } from '../../../utils/articleStructure';
+import { getRubricText, getUpdateNoteParagraphs, isNotice, parseArticleStructure } from '../../../utils/articleStructure';
 import { PluginSlot } from '../../../plugins/PluginSlot';
 import { MERLT_EVENT_TYPES, publishMerltEvent } from '../../../features/merlt/merltEventBus';
 import { useMerltFeatures } from '../../../features/merlt/useMerltFeatures';
@@ -62,7 +60,6 @@ import { useRegisterFindRoot } from '../../../hooks/useRegisterFindRoot';
 import { plainText } from '../../../utils/threadPassages';
 import { PassageThreadsStatus } from './PassageThreadsStatus';
 import { VersionBanner } from './VersionBanner';
-import { ClosedSection } from './ClosedSection';
 import { TextAtDateDialog } from './TextAtDateDialog';
 import { formatNormCitation, unversionedCitation, withCitation } from '../../../utils/citation';
 import { formatDateForDisplay, todayInRome } from '../../../utils/dateUtils';
@@ -98,7 +95,7 @@ interface ArticleTabContentProps {
     readingOrigin?: { tabId: string; blockId: string; articleKey?: string };
     /**
      * The host this article is read in when it has no act to come back to (a preview): a decision
-     * cited in its massime opens beside that host, with no way-back entry.
+     * opened from its «Giurisprudenza» opens beside that host, with no way-back entry.
      * `readingOrigin` wins when both are given.
      */
     tabId?: string;
@@ -111,7 +108,7 @@ interface ArticleTabContentProps {
     findHostId?: string;
     /**
      * `row` (default): the article as the table's row shows it. `beside`: in a light
-     * window (spec §4.1): the compact reading bar, Brocardi in a closed section, and none of Studio,
+     * window (spec §4.1): the compact reading bar, and none of Studio,
      * the Studia row, «Chiedi a MERL-T» or the graph rail. Only the siblings of the text root change.
      */
     variant?: 'row' | 'beside';
@@ -119,7 +116,7 @@ interface ArticleTabContentProps {
 
 export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyMode, readingOrigin, tabId, findHostId, variant = 'row' }: ArticleTabContentProps) {
     const isBeside = variant === 'beside';
-    const { article_text, norma_data, brocardi_info, url, versionInfo } = data;
+    const { article_text, norma_data, url, versionInfo } = data;
     // Flattened to scalars so the citation listener effect below depends on
     // stable values: an inline `readingOrigin` object would change identity on
     // every render and re-attach the listeners each time.
@@ -167,7 +164,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // actually mounts. Using ref.current in render triggers the
     // react-hooks/refs lint and can miss the post-mount update.
     const [notesButtonEl, setNotesButtonEl] = useState<HTMLButtonElement | null>(null);
-    const [showMoreMenu, setShowMoreMenu] = useState(false);
     const [showCopyModal, setShowCopyModal] = useState(false);
     const [showAdvancedExport, setShowAdvancedExport] = useState(false);
     const [showVersionInput, setShowVersionInput] = useState(false);
@@ -180,7 +176,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // not persisted across sessions.
     const [highlightsHidden, setHighlightsHidden] = useState(false);
     const contentRef = useRef<HTMLDivElement>(null);
-    // The find window searches ArticleBody's text root only: not Brocardi, not the case law below it.
+    // The find window searches ArticleBody's text root only: not the case law below it.
     const textRootRef = useRef<HTMLDivElement>(null);
     // The cards row owns the card form; the selection popup opens it through this.
     const cardsRowRef = useRef<ArticleCardsHandle>(null);
@@ -218,7 +214,9 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const findTargetKey = useMemo(() => `${itemKey}|${versionKey(norma_data)}`, [itemKey, norma_data]);
     const findHost = findHostId ?? originTabId ?? tabId;
     useRegisterFindRoot(findHost, findTargetKey, shortNorm(norma_data), textRootRef);
-    const isFindOpen = useFindWindowScopedTo(findHost, findTargetKey);
+    // Exact (R3): «Cerca nel testo» is a menu entry, and on a practice the window covers with no text pointed at it
+    // points the window here; only on this very text does it say «Chiudi».
+    const isFindOpen = useFindWindowScopedTo(findHost, findTargetKey, true);
     const isSavedArticle = useMemo(
         () => bookmarks.some(bookmark => bookmark.normaKey === itemKey),
         [bookmarks, itemKey],
@@ -228,9 +226,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
 
     // What the source says about the text that came back, and what that switches
     // off. A past text is a reading: notes, highlights and discussions are keyed
-    // by article, not by version, so they would attach to the wrong words, and
-    // Brocardi's commentary carries no date.
-    const display = useMemo(() => describeVersion(data.validity, norma_data), [data.validity, norma_data]);
+    // by article, not by version, so they would attach to the wrong words.
+    const display = useMemo(() => describeVersion(data.validity, norma_data, data.upcoming), [data.validity, norma_data, data.upcoming]);
     const readOnly = display.readOnly;
     // The study cards anchor to the text in force only.
     const cardsHistorical = readOnly || !!versionInfo?.isHistorical;
@@ -247,7 +244,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     const citationNow = () => (display.canCite
         ? formatNormCitation({
             norma: norma_data,
-            validity: data.validity,
+            validity: display.citeAs ?? data.validity,
             requestedDate,
             original: !requestedDate && requestIsHistorical(norma_data),
             consultedAt: todayInRome(),
@@ -284,8 +281,9 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         [highlights, itemKey, uniqueArticleId],
     );
 
-    // Panel list (notes + highlights summary) includes brocardi sub-sections
-    // so users see everything they've saved for this article in one place.
+    // Panel list (notes + highlights summary) includes the article's sub-sections (the
+    // `<article>/<section>` ids the Brocardi sections were marked under, D-078), so users see
+    // everything they've saved for this article in one place.
     const allPanelAnnotations = useMemo(() => {
         const subSectionPrefix = `${uniqueArticleId}/`;
         return annotations.filter(a =>
@@ -308,7 +306,7 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
     // The reader's marks, as every surface that renders them does them (hooks/useAnnotationActions).
     // The MERL-T events are the article's own.
     const {
-        noteAnchor, composerRect, clearAnchor, openComposer,
+        noteAnchor, composerRect, clearAnchor,
         handlePopupHighlight, handlePopupAddNote, handleAddNote, closeComposer, commitComposer,
     } = useAnnotationActions({
         key: itemKey,
@@ -403,15 +401,11 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         container.classList.toggle('highlights-hidden', highlightsHidden);
     }, [highlightsHidden]);
 
-    const quickNormParams = useMemo(() => ({
-        act_type: norma_data.tipo_atto,
-        act_number: norma_data.numero_atto || '',
-        date: norma_data.data || '',
-        article: norma_data.numero_articolo,
-        annex: norma_data.allegato,
-        version: 'vigente' as const,
-        show_brocardi_info: true,
-    }), [norma_data.tipo_atto, norma_data.numero_atto, norma_data.data, norma_data.numero_articolo, norma_data.allegato]);
+    const quickNormParams = useMemo(
+        () => quickNormParamsOf(norma_data),
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- the fields it reads, not the object
+        [norma_data.tipo_atto, norma_data.numero_atto, norma_data.data, norma_data.numero_articolo, norma_data.allegato],
+    );
 
     const isPinnedQuick = isQuickNorm(quickNormParams);
 
@@ -515,7 +509,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 annex: norma_data.allegato,
                 version: (norma_data.versione as 'vigente' | 'originale') || 'vigente',
                 version_date: norma_data.data_versione || '',
-                show_brocardi_info: !requestIsHistorical(norma_data)
             };
             const shareUrl = buildSearchDeepLink(params, uniqueArticleId);
             await navigator.clipboard.writeText(shareUrl);
@@ -523,13 +516,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         } catch {
             showToast('Errore durante la copia del link', 'error');
         }
-    };
-
-    // Brocardi sub-sections: same tooltip-composer flow as the article body.
-    // The anchor offset is relative to the sub-section's textContent, so the
-    // scopedArticleId carries the sub-section identifier.
-    const handleBrocardiAddNote = (scopedArticleId: string, text: string, startOffset: number, rect: { x: number; y: number; width: number; height: number }) => {
-        openComposer({ anchorText: text, startOffset, scopedArticleId }, rect);
     };
 
     // Handler for SelectionPopup copy action. The popup stays on a text that may
@@ -589,7 +575,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
             date: citation.date || '',
             article: citation.article,
             version: 'vigente',
-            show_brocardi_info: true,
         });
     }, [norma_data.urn, article_text, canContribute, triggerSearch]);
 
@@ -730,8 +715,8 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         () => groupAnnotationsByBlock(article_text || '', structure, shownHighlights, shownAnnotations, shownThreads),
         [article_text, structure, shownHighlights, shownAnnotations, shownThreads],
     );
-    // Highlights no sign can reach — the Brocardi sections', and those whose
-    // text changed — keep a list of their own, so they can still be removed.
+    // Highlights no sign can reach — those of a sub-section no longer shown (Brocardi's, D-078),
+    // and those whose text changed — keep a list of their own, so they can still be removed.
     const looseHighlights = useMemo(
         () => (readOnly ? NO_HIGHLIGHTS : highlightsWithoutSign(allPanelHighlights, blockGroups)),
         [readOnly, allPanelHighlights, blockGroups],
@@ -775,7 +760,6 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 date: parsed.date || '',
                 article: parsed.article,
                 version: 'vigente',
-                show_brocardi_info: true,
             });
         }
     }, [onCrossReferenceNavigate, norma_data, triggerSearch]);
@@ -789,42 +773,17 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
         decisions: decisionLinks.links,
     });
 
-    const showBrocardi = brocardi_info !== undefined && display.doctrineVisible;
-    const brocardiDisplay = showBrocardi ? (
-        <BrocardiDisplay
-            info={brocardi_info}
-            caseLaw={{ norma: searchNorma(norma_data), normaLabel: citeNorm(norma_data), tabId: originTabId ?? tabId }}
-            itemKey={itemKey}
-            uniqueArticleId={uniqueArticleId}
-            onRequestAddNote={handleBrocardiAddNote}
-            decisionLinks={{ besideId: originTabId ?? tabId, origin: citationOrigin }}
-            currentNorma={{
-                tipo_atto: norma_data.tipo_atto,
-                data: norma_data.data,
-                numero_atto: norma_data.numero_atto
-            }}
-            onArticleClick={(articleNumber, tipoAtto) => {
-                // Se è la stessa norma e onCrossReferenceNavigate è disponibile, usalo
-                if (tipoAtto.toLowerCase() === norma_data.tipo_atto.toLowerCase() && onCrossReferenceNavigate) {
-                    onCrossReferenceNavigate(articleNumber, norma_data);
-                } else {
-                    // Altrimenti cerca l'articolo nella pratica
-                    const isSameActType = tipoAtto.toLowerCase() === norma_data.tipo_atto.toLowerCase();
-                    triggerSearch({
-                        act_type: tipoAtto,
-                        act_number: isSameActType && norma_data.numero_atto ? norma_data.numero_atto : '',
-                        date: isSameActType && norma_data.data ? norma_data.data : '',
-                        article: articleNumber,
-                        version: 'vigente',
-                        show_brocardi_info: true,
-                    });
-                }
-            }}
-        />
-    ) : null;
+    // «Cerca sentenze sul tema dell'articolo» searches the Cassazione by the rubric, when the text has one:
+    // not a notice the source served in its place (an article that did not exist yet, one repealed or
+    // suppressed, an omission), whether or not the source's page said what the text is (`validity`).
+    const rubric = useMemo(() => {
+        if (!display.textVisible || data.validity?.state === 'abrogated') return null;
+        const text = getRubricText(article_text || '', structure);
+        return text && !isNotice(text) ? text : null;
+    }, [display.textVisible, data.validity?.state, article_text, structure]);
 
     return (
-        <div className="animate-in fade-in duration-300 relative">
+        <div className="animate-in fade-in duration-200 relative">
             <ReadingToolbar
                 normaData={norma_data}
                 versionChip={display.chip}
@@ -839,11 +798,9 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 highlightsButtonRef={setHighlightsButtonEl}
                 highlightsCount={readOnly ? 0 : allPanelHighlights.length}
                 isDiscussionOpen={discussion.open}
-                showMoreMenu={showMoreMenu}
                 onToggleNotes={() => setIsPeekOpen(v => !v)}
                 onToggleHighlightsPeek={() => setIsHighlightsPeekOpen(v => !v)}
                 onToggleDiscussion={discussion.toggle}
-                onToggleMoreMenu={setShowMoreMenu}
                 isPinnedQuick={isPinnedQuick}
                 onToggleQuickNorm={handleToggleQuickNorm}
                 onMobileCopy={handleMobileCopy}
@@ -1025,28 +982,16 @@ export function ArticleTabContent({ data, onCrossReferenceNavigate, onOpenStudyM
                 />
             )}
 
-            {/* In a light window Brocardi is folded into a closed section, ahead of «Giurisprudenza». */}
-            {showBrocardi && isBeside && <ClosedSection title="Brocardi">{brocardiDisplay}</ClosedSection>}
-
-            {/* «Giurisprudenza»: the massime Brocardi gives (only where the doctrine is shown), the
-                Massimario's reviews and the Cassazione on request. It stays on a past text. */}
+            {/* «Giurisprudenza»: the Massimario's reviews, the Cassazione on request and a topic search
+                by the rubric. It stays on a past text. */}
             <CaseLawSection
                 norma={norma_data}
-                massime={brocardi_info?.Massime ?? null}
-                // Brocardi answered (info present), or failed (error present); not asked: no subsection
-                massimeState={massimeStateOf(display.doctrineVisible, brocardi_info, data.brocardi_error)}
-                brocardiLink={brocardi_info?.link}
+                topic={rubric}
                 articleUrn={norma_data.urn}
                 tabId={originTabId ?? tabId}
                 backEntry={decisionBackEntry}
                 isHistorical={readOnly}
             />
-
-            {showBrocardi && !isBeside && (
-                <div className="mt-8 border-t border-slate-200 dark:border-slate-800 pt-6">
-                    {brocardiDisplay}
-                </div>
-            )}
 
             {url && (
                 <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
