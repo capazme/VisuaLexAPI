@@ -39,3 +39,6 @@ Added 2026-10-22:
 - `gdpr_consolidated_20160504_title_trimmed.html` — the consolidated GDPR
   (`CELEX:02016R0679-20160504`, captured 2026-10-22), trimmed to its `title-doc-first` and
   `title-doc-last` paragraphs: the last holds only the EEA note, the subject is in the first.
+- `dir_85_374_eli_legacy_text_trimmed.html` — the legacy OJ page of dir. 85/374
+  (`/eli/dir/1985/374/oj/ita`, captured 2026-10-25), trimmed to its text (`div#TexteOnly`):
+  art. 11's heading is glued to the end of art. 10's last paragraph.
