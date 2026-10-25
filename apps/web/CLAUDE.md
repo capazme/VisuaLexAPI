@@ -1009,7 +1009,9 @@ Tab cycles inside and Esc returns to the sign.
 **Passages an application proposed** (D7b, spec
 `docs/superpowers/specs/2026-10-23-mcp-next-tools-design.md` §8, with the owner's three states of 25 October)
 are highlights with a `proposal` (`types/index.ts`, `HighlightProposal`): only a dossier entry's reader is
-ever given one. Until validated («da validare» or «Da rivedere», `isOpenProposal`), `highlightOpen` adds
+ever given one. The state is the application's note's, not the highlight's (the owner, 25 October 10:06): a
+passage with no note is a plain mark titled «Evidenziato dall'IA», removable, outside every count and with no
+checkbox (`hasAiNote`). Until its note is validated («da validare» or «Da rivedere», `isOpenProposal`), `highlightOpen` adds
 `data-proposed` and `.vlx-proposed` — a dashed line, red once flagged — and the sign adds the sparkle
 (`.vlx-sign-proposed`) and names them apart («…; 2 passaggi proposti dall'IA: 1 da validare · 1 da rivedere»,
 `signAriaLabel`), as its `title` too; still no text node, and the projection tests run with proposals on. The

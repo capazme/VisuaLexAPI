@@ -193,8 +193,14 @@ export function signColors(highlights: readonly Highlight[]): HighlightColor[] {
 /** A passage an application proposed (D7b), validated or not. */
 export const isProposal = (h: Highlight): h is Highlight & { proposal: HighlightProposal } => !!h.proposal;
 
-/** A proposal the user has not validated yet («da validare» or «Da rivedere»): dashed in the text, named apart on the sign. */
-export const isOpenProposal = (h: Highlight): boolean => !!h.proposal && h.proposal.state !== 'validated';
+/**
+ * A proposed passage with the application's note (D7b, the owner's decision of 25 October, 10:06): the note, not the
+ * highlight, has a state. A passage without one is a plain mark of known origin, removable, with no state.
+ */
+export const hasAiNote = (h: Highlight): boolean => !!h.proposal?.note?.trim();
+
+/** A note on a passage the user has not validated yet («da validare» or «Da rivedere»): dashed in the text, named apart on the sign. */
+export const isOpenProposal = (h: Highlight): boolean => hasAiNote(h) && h.proposal!.state !== 'validated';
 
 /**
  * What a screen reader hears on a sign: "2 note e 1 evidenziazione in questo passo". The passages an application

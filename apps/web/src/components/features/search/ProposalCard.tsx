@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Trash2 } from 'lucide-react';
 import type { Highlight, HighlightProposal } from '../../../types';
 import { getHighlightSwatch } from '../../../utils/highlightColors';
 import { AiReviewControls } from './AiReviewControls';
@@ -18,8 +18,10 @@ export interface ProposalCardProps {
 
 /**
  * A passage an application proposed on a dossier entry (D7b): its colour as a stripe, its words, the note on it, then
- * what the user does with it (`AiReviewControls`). The pencil edits the note in place, as the note cards do
- * (`NoteEditBox`); a saved change makes the passage «Validato, modificato da te».
+ * what the user does with the note (`AiReviewControls`): the note has the state, not the highlight (the owner's
+ * decision of 25 October, 10:06). The pencil edits the note in place, as the note cards do (`NoteEditBox`); a saved
+ * change makes it «Validato, modificato da te». A passage with no note is a mark of known origin: «Evidenziato
+ * dall'IA» and the bin, nothing to validate.
  */
 export function ProposalCard({ highlight, onValidate, onFlag, onReviewComment, onEditNote, onRemove }: ProposalCardProps) {
     const { proposal } = highlight;
@@ -31,6 +33,28 @@ export function ProposalCard({ highlight, onValidate, onFlag, onReviewComment, o
         if (text && text !== note) onEditNote(text);
         setDraft(null);
     };
+    if (!note && draft === null) {
+        return (
+            <div className="relative overflow-hidden rounded-lg border border-slate-200 bg-slate-50 py-1 pl-3.5 pr-1 text-sm dark:border-slate-700 dark:bg-slate-800/50">
+                <span aria-hidden className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: getHighlightSwatch(highlight.color) }} />
+                <p className="line-clamp-3 pr-1.5 pt-1 text-slate-800 dark:text-slate-200">&ldquo;{highlight.text}&rdquo;</p>
+                <div className="flex items-center gap-1">
+                    <p className="flex min-w-0 flex-1 items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
+                        <Sparkles size={12} aria-hidden className="shrink-0" /> Evidenziato dall'IA
+                    </p>
+                    <button
+                        type="button"
+                        onClick={onRemove}
+                        aria-label="Rimuovi il passaggio"
+                        title="Rimuovi il passaggio"
+                        className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 motion-reduce:transition-none dark:text-slate-400 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                    >
+                        <Trash2 size={14} aria-hidden />
+                    </button>
+                </div>
+            </div>
+        );
+    }
     return (
         <div className="relative overflow-hidden rounded-lg border border-slate-200 bg-slate-50 py-2 pl-3.5 pr-1 text-sm dark:border-slate-700 dark:bg-slate-800/50">
             <span aria-hidden className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: getHighlightSwatch(highlight.color) }} />

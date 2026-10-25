@@ -43,7 +43,8 @@ describe('the projection invariant — every real text', () => {
       // Passages an application proposed (D7b), waiting or validated: highlights of their own kind, never a character.
       for (const [i, h] of highlights.entries()) {
         const state = (['pending', 'review', 'validated'] as const)[i % 4 - 1];
-        if (state) h.proposal = { clientName: 'Claude Code', reviewComment: null, originalNote: null, note: `nota ${i}`, state };
+        // h5 has no note: a plain mark of known origin, with no state (the note has it).
+        if (state) h.proposal = { clientName: 'Claude Code', reviewComment: null, originalNote: null, note: i === 5 ? null : `nota ${i}`, state };
       }
       const annotations: Annotation[] = [];
       for (let i = 0; i < 6; i++) {
@@ -90,7 +91,7 @@ describe('the projection invariant — every real text', () => {
         expect(found.map((e) => e.textContent).join('')).toBe(h.text);
         const walker = document.createTreeWalker(found[0], NodeFilter.SHOW_TEXT);
         expect(plainOffsetAt(div, walker.nextNode()!, 0)).toBe(h.startOffset);
-        const waiting = h.proposal && h.proposal.state !== 'validated' ? h.proposal.state : null;
+        const waiting = h.proposal?.note && h.proposal.state !== 'validated' ? h.proposal.state : null;
         for (const e of found) expect(e.getAttribute('data-proposed'), h.id).toBe(waiting);
       }
       // Focused thread pieces join to thread words, no extra elements for unfocused threads
@@ -119,7 +120,7 @@ describe('the projection invariant — every real text', () => {
           expect(sign?.getAttribute('data-notes'), `block ${i}: sign notes`).toBe(String(groups[i].notes.length));
           expect(sign?.getAttribute('data-highlights'), `block ${i}: sign highlights`).toBe(String(groups[i].highlights.length));
           expect(sign?.getAttribute('data-threads'), `block ${i}: sign threads`).toBe(String(groups[i].threads.length));
-          const waiting = groups[i].highlights.filter((h) => h.proposal && h.proposal.state !== 'validated').length;
+          const waiting = groups[i].highlights.filter((h) => h.proposal?.note && h.proposal.state !== 'validated').length;
           expect(sign?.getAttribute('data-proposed') ?? '0', `block ${i}: sign proposals`).toBe(String(waiting));
         }
       });
@@ -376,8 +377,20 @@ describe('annotation signs', () => {
     expect(div.textContent).toBe(plain);
   });
 
+  it('a passage the application marked with no note is a plain mark of known origin, outside the count', () => {
+    const bare: Highlight = { ...hl('b', 'contraenti', at('contraenti')), proposal: { clientName: 'Claude Code', note: null, state: 'pending', reviewComment: null, originalNote: null } };
+    const div = mount(render(raw, { signs: true, highlights: [bare] }));
+    const mark = div.querySelector('[data-highlight="b"]')!;
+    expect(mark.hasAttribute('data-proposed')).toBe(false);
+    expect(mark.classList.contains('vlx-proposed')).toBe(false);
+    expect(mark.getAttribute('title')).toBe("Evidenziato dall'IA");
+    const sign = signOf(div, 2)!;
+    expect(sign.getAttribute('aria-label')).toBe('1 evidenziazione in questo passo');
+    expect(sign.hasAttribute('data-proposed')).toBe(false);
+  });
+
   it('a block with proposals only is named by them alone; a sign without any keeps no title', () => {
-    const p: Highlight = { ...hl('p', 'contraenti', at('contraenti')), proposal: { clientName: null, note: null, state: 'pending', reviewComment: null, originalNote: null } };
+    const p: Highlight = { ...hl('p', 'contraenti', at('contraenti')), proposal: { clientName: null, note: 'Rileva.', state: 'pending', reviewComment: null, originalNote: null } };
     expect(signOf(mount(render(raw, { signs: true, highlights: [p] })), 2)!.getAttribute('aria-label'))
       .toBe("1 passaggio proposto dall'IA: 1 da validare");
     const plainSign = signOf(mount(render(raw, { signs: true, highlights: [hl('h', 'contraenti', at('contraenti'))] })), 2)!;

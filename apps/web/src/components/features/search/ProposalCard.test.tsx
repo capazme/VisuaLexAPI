@@ -57,15 +57,19 @@ describe('ProposalCard', () => {
     expect(screen.getByText('Il danno da inadempimento.')).toBeInTheDocument();
   });
 
-  it('a passage without a note can be given one with the pencil', () => {
+  it('a passage without a note is a mark of known origin: no checkbox, no flag, no pencil, only the bin', () => {
     const { props } = setup({ note: null });
-    expect(screen.queryByText('Il danno da inadempimento.')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Modifica la nota del passaggio' }));
-    const box = screen.getByRole('textbox', { name: 'Nota del passaggio' });
-    expect(box).toHaveValue('');
-    fireEvent.change(box, { target: { value: 'Da citare.' } });
-    fireEvent.blur(box);
-    expect(props.onEditNote).toHaveBeenCalledWith('Da citare.');
+    expect(screen.getByText(/risarcimento del danno/)).toBeInTheDocument();
+    expect(screen.getByText("Evidenziato dall'IA")).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(screen.getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['Rimuovi il passaggio']);
+    fireEvent.click(screen.getByRole('button', { name: 'Rimuovi il passaggio' }));
+    expect(props.onRemove).toHaveBeenCalledTimes(1);
+  });
+
+  it('a blank note counts as none', () => {
+    setup({ note: '   ' });
+    expect(screen.queryByRole('checkbox')).toBeNull();
   });
 
   it('a note the user changed: «Validato, modificato da te» and the application\'s own one click away', () => {
