@@ -147,7 +147,8 @@ router.post('/dossiers/:id/items/:itemId/passages', async (req, res) => {
   await requireSwitch();
   // Said in words before the schema's own refusal, which would only name the field.
   const asked = (req.body as { passaggi?: unknown } | undefined)?.passaggi;
-  if (Array.isArray(asked) && asked.some((p) => (p as { colore?: unknown } | null)?.colore === 'rosso')) throw new AppError(400, NO_RED);
+  const isRed = (colour: unknown) => typeof colour === 'string' && colour.trim().toLowerCase() === 'rosso';
+  if (Array.isArray(asked) && asked.some((p) => isRed((p as { colore?: unknown } | null)?.colore))) throw new AppError(400, NO_RED);
   const { passaggi } = passagesSchema.parse(req.body);
   // A proposal is the assistant's by definition: the user's session highlights by itself.
   if (!req.delegation) throw new AppError(403, 'Solo un’applicazione collegata propone passaggi.');

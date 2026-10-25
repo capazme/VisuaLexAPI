@@ -323,6 +323,7 @@ describe('D7b — an entry’s text and the passages proposed on it', () => {
       expect(red.status).toBe(400);
       expect(red.body.detail).toBe('Il rosso non si sceglie: è il segno di una nota «da rivedere». Usa giallo (punto centrale), verde (condizione o presupposto) o blu (definizione o eccezione).');
       expect(await prisma.highlight.count()).toBe(0);
+      expect((await propose([{ testo: 'il risarcimento del danno', colore: ' Rosso ' }])).body.detail).toMatch(/^Il rosso non si sceglie/);
       const ok = await propose([
         { testo: 'il risarcimento del danno', colore: 'giallo' },
         { testo: 'la risoluzione del contratto', colore: 'verde' },

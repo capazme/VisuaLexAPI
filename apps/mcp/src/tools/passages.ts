@@ -77,7 +77,7 @@ export function registerPassageTools(server: McpServer, config: McpConfig, run: 
           .array(
             z.object({
               testo: z.string().min(15).max(2000).describe('Le parole esatte del testo'),
-              colore: z.enum(['giallo', 'verde', 'blu']).optional(),
+              colore: z.enum(['giallo', 'verde', 'blu']).optional().describe('Giallo se manca; mai rosso, che è dell’utente'),
               nota: z.string().trim().min(1).max(4000).optional().describe('Testo semplice'),
               prima: z.string().max(200).optional().describe('Le parole subito prima, per distinguere'),
               dopo: z.string().max(200).optional().describe('Le parole subito dopo, per distinguere'),
