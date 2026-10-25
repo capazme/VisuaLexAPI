@@ -257,7 +257,7 @@ def build_index(bundles: Iterable[Path], target: Path, signature: str) -> dict[s
     fd, tmp_name = tempfile.mkstemp(dir=target.parent, prefix=f"{target.name}.", suffix=".tmp")
     os.close(fd)
     tmp = Path(tmp_name)
-    counts = {"massime": 0, "senza_testo": 0, "riferimenti": 0, "non_mappati": 0}
+    counts = {"massime": 0, "senza_testo": 0, "senza_numero": 0, "riferimenti": 0, "non_mappati": 0}
     try:
         db = sqlite3.connect(tmp)
         try:
@@ -289,10 +289,15 @@ def _index_record(db: sqlite3.Connection, year: int, record: dict, counts: dict[
         if not testo:
             counts["senza_testo"] += 1
             continue
+        numero = str(massima.get("numero") or "").strip()
+        if not numero:
+            # the number is the massima's identity (the web keys and deduplicates by it); none on 2026-10-25
+            counts["senza_numero"] += 1
+            continue
         cursor = db.execute(
             "INSERT INTO massime (numero, anno, numero_pronuncia, tipo, data_decisione,"
             " data_deposito, titolo, testo) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (str(massima.get("numero") or "").strip(), int(anno), int(numero_pronuncia),
+            (numero, int(anno), int(numero_pronuncia),
              _TIPI.get(str(record.get("tipologia_pronuncia") or "").strip().upper()),
              _iso(record.get("data_decisione")), _iso(record.get("data_deposito")),
              massima_text(massima.get("titolo")), testo))

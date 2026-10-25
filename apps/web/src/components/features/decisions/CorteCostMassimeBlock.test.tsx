@@ -121,6 +121,24 @@ describe('CorteCostMassimeBlock', () => {
     expect(service).toHaveBeenLastCalledWith(COST_3, 1, 'norma');
   });
 
+  it('keeps the list and the checkbox (and its focus) on screen while the other role is asked', async () => {
+    let answer: (a: CorteCostMassimeAnswer) => void = () => {};
+    service.mockResolvedValueOnce(page([REAL], 1, 1, { norma: 1, parametro: 3 }))
+      .mockReturnValueOnce(new Promise((resolve) => { answer = resolve; }));
+    showConstitution();
+    expect(await screen.findByText(REAL.testo)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('checkbox'));
+    const box = screen.getByRole('checkbox', { name: 'Anche come parametro (3)' });
+    expect(box).toBeChecked();
+    expect(box).toHaveFocus();
+    expect(screen.getByText(REAL.testo).closest('[aria-busy="true"]')).not.toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
+    answer(page([REAL, { ...REAL, numero: '2', testo: 'Parametro.' }], 4, 1, { norma: 1, parametro: 3 }));
+    expect(await screen.findByText('Parametro.')).toBeInTheDocument();
+    expect(document.querySelector('[aria-busy="true"]')).toBeNull();
+    expect(screen.getByRole('checkbox')).toHaveFocus();
+  });
+
   it('on the Costituzione says when no massima has the article at issue, and keeps the way to the others', async () => {
     service.mockResolvedValueOnce(page([], 0, 1, { norma: 0, parametro: 40 }))
       .mockResolvedValueOnce(page([REAL], 40, 1, { norma: 0, parametro: 40 }));

@@ -213,6 +213,15 @@ def test_the_index_keeps_one_role_when_asked(tmp_path):
     assert query_index(tmp_path / "i.sqlite3", cost_3, 2, 1, "norma")[0][0]["numero"] == "100"
 
 
+def test_a_massima_without_its_number_is_left_out(tmp_path):
+    record = synthetic(2001, 1, 2, [entry("codice civile", "2043")])
+    record["massime"][1]["numero"] = " "
+    (tmp_path / "b.zip").write_bytes(make_bundle({"2001": [record]}))
+    counts = build_index([tmp_path / "b.zip"], tmp_path / "i.sqlite3", "s")
+    assert (counts["massime"], counts["senza_numero"]) == (1, 1)
+    assert [r["numero"] for r in query_index(tmp_path / "i.sqlite3", CC_2043)[0]] == ["100"]
+
+
 def test_an_index_of_an_earlier_version_is_dropped(tmp_path):
     (tmp_path / "massime-v1.sqlite3").write_bytes(b"old")
     (tmp_path / INDEX_NAME).write_bytes(b"current")

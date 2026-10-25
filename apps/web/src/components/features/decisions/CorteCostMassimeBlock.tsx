@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { RotateCw } from 'lucide-react';
-import type { CorteCostMassima, CorteCostMassimeAnswer } from '../../../types/decisions';
+import type { CorteCostMassima, CorteCostMassimeAnswer, CorteCostRuolo } from '../../../types/decisions';
 import { cn } from '../../../lib/utils';
 import { TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
 import { formatDateItalianLong } from '../../../utils/dateUtils';
@@ -57,7 +57,9 @@ export function CorteCostMassimeBlock({ articleUrn, constitution = false, beside
   const ruolo = constitution && withParameterFor !== articleUrn ? 'norma' : undefined;
   // the answer is tied to the article and the role it answers, so another one shows "loading" without a state set in the effect
   const asked = `${articleUrn}|${ruolo ?? ''}|${attempt}`;
-  const [result, setResult] = useState<{ asked: string; answer: CorteCostMassimeAnswer } | null>(null);
+  const [result, setResult] = useState<{
+    asked: string; article: string; ruolo: CorteCostRuolo | undefined; answer: CorteCostMassimeAnswer;
+  } | null>(null);
   const [more, setMore] = useState<{ asked: string; massime: CorteCostMassima[]; pagina: number } | null>(null);
   // which article's next page is on its way, and which one's failed: another article starts clean
   const [loadingMore, setLoadingMore] = useState<string | null>(null);
@@ -71,12 +73,19 @@ export function CorteCostMassimeBlock({ articleUrn, constitution = false, beside
         return { esito: 'fonte_non_raggiungibile', fonte: 'rete' };
       })
       .then((answer) => {
-        if (current) setResult({ asked, answer });
+        if (current) setResult({ asked, article: articleUrn, ruolo, answer });
       });
     return () => { current = false; };
   }, [articleUrn, ruolo, asked]);
 
-  const answer = result && result.asked === asked ? result.answer : null;
+  const fresh = result && result.asked === asked ? result : null;
+  // a change of role keeps the article's last list on screen, busy, so the checkbox just pressed stays (and keeps the focus)
+  const stale = !fresh && result && result.article === articleUrn && result.answer.esito === 'risultati' ? result : null;
+  const switching = stale !== null;
+  const answer = (fresh ?? stale)?.answer;
+  // the role of the list on screen: the one asked, or while switching the one the old list answered
+  const listedRole = (fresh ?? stale)?.ruolo;
+  const listedKey = (fresh ?? stale)?.asked;
   if (!answer) {
     return <p role="status" className="text-sm text-slate-500 dark:text-slate-400">Ricerca nelle massime della Corte costituzionale…</p>;
   }
@@ -96,7 +105,7 @@ export function CorteCostMassimeBlock({ articleUrn, constitution = false, beside
   }
 
   const listed: Listed = answer;
-  const extra = more && more.asked === asked ? more : null;
+  const extra = more && more.asked === listedKey ? more : null;
   const shown = extra ? [...listed.massime, ...extra.massime] : listed.massime;
   const lastPage = extra ? extra.pagina : listed.pagina;
 
@@ -133,7 +142,7 @@ export function CorteCostMassimeBlock({ articleUrn, constitution = false, beside
   );
 
   const asParameter = listed.per_ruolo.parametro;
-  const parameterSwitch = constitution && (ruolo === undefined || asParameter > 0) && (
+  const parameterSwitch = constitution && (ruolo === undefined || listedRole === undefined || asParameter > 0) && (
     <label className={cn('inline-flex cursor-pointer items-center gap-2 text-sm text-slate-700 dark:text-slate-200', TOUCH_TARGET_RESPONSIVE)}>
       <input
         type="checkbox"
@@ -147,9 +156,9 @@ export function CorteCostMassimeBlock({ articleUrn, constitution = false, beside
 
   if (listed.totale === 0) {
     return (
-      <div className="space-y-2">
+      <div className="space-y-2" aria-busy={switching || undefined}>
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          {ruolo === 'norma'
+          {listedRole === 'norma'
             ? 'Nessuna massima della Corte costituzionale ha questo articolo come norma oggetto.'
             : 'Nessuna massima della Corte costituzionale nomina questo articolo.'}
         </p>
@@ -160,11 +169,11 @@ export function CorteCostMassimeBlock({ articleUrn, constitution = false, beside
   }
 
   return (
-    <div className="space-y-3">
+    <div className={cn('space-y-3', switching && 'opacity-60')} aria-busy={switching || undefined}>
       {credit}
       <p className="text-sm text-slate-700 dark:text-slate-200">
         {listed.totale === 1 ? '1 massima' : `${formatCount(listed.totale)} massime`}
-        {ruolo === 'norma' && ' in cui l’articolo è norma oggetto'}
+        {listedRole === 'norma' && ' in cui l’articolo è norma oggetto'}
       </p>
       {parameterSwitch}
       <ul className="divide-y divide-slate-200 dark:divide-slate-700">
@@ -192,7 +201,7 @@ export function CorteCostMassimeBlock({ articleUrn, constitution = false, beside
       {moreFailed === asked && (
         <p role="alert" className="text-sm text-slate-700 dark:text-slate-200">Le altre massime non sono arrivate: riprova.</p>
       )}
-      {shown.length < listed.totale && (
+      {!switching && shown.length < listed.totale && (
         <button
           type="button"
           onClick={loadMore}
