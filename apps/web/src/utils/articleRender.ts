@@ -25,7 +25,6 @@ import { countAiReview } from './aiReview';
 import type { ArticleStructure, DecorationKind, StructureBlock, TextRange } from './articleStructure';
 import {
   groupAnchorsByBlock,
-  hasAiNote,
   isOpenProposal,
   resolveAnchors,
   signAriaLabel,
@@ -131,8 +130,8 @@ export function highlightOpen(h: Highlight): string {
   const style = HIGHLIGHT_STYLES[h.color] ?? HIGHLIGHT_STYLES.yellow;
   // A passage an application proposed, its note not yet validated (D7b): dashed underneath (`.vlx-proposed`).
   if (isOpenProposal(h)) {
-    const review = h.proposal?.state === 'review';
-    return `<mark style="${style}" data-highlight="${escapeAttr(h.id)}" data-proposed="${review ? 'review' : 'pending'}" class="highlight-mark vlx-proposed"`
+    const review = h.proposal?.note?.state === 'review';
+    return `<mark style="${style}" data-highlight="${escapeAttr(h.id)}" data-proposed="${review ? 'review' : 'proposed'}" class="highlight-mark vlx-proposed"`
       + ` title="${review ? "Proposto dall'IA, da rivedere" : "Proposto dall'IA, da validare"}">`;
   }
   // A passage it marked with no note: a plain mark, its origin in its title.
@@ -276,8 +275,8 @@ export function signHtml(index: number, group: BlockAnnotations | undefined): st
   // The passages an application proposed, their notes not yet validated (D7b): the application's sparkle and their
   // count, named apart; one with no note is a plain mark. `data-highlights` still counts them, so «Nascondi evidenziazioni» hides them with the rest.
   // Only they give the sign a `title`: the sparkle alone would not say what it is.
-  const counts = countAiReview(group.highlights.flatMap((h) => (hasAiNote(h) ? [h.proposal!.state] : [])));
-  const proposed = counts.pending + counts.review;
+  const counts = countAiReview(group.highlights.flatMap((h) => (h.proposal?.note ? [h.proposal.note.state] : [])));
+  const proposed = counts.proposed + counts.review;
   const label = signAriaLabel(notes, highlights - proposed, threads, counts);
   let html =
     `<span class="vlx-sign" role="button" tabindex="0" aria-haspopup="dialog" data-block="${index}"` +

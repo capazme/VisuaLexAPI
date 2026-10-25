@@ -170,19 +170,33 @@ export function unpackItemContent(content: unknown): { data: unknown; status?: '
   return _dossierMeta?.important ? { data: rest, status: 'important' } : { data: rest };
 }
 
-type ServerFields = Pick<DossierItem, 'citation' | 'actCitation' | 'aboutItemId' | 'createdBy'>;
+type ServerFields = Pick<DossierItem, 'citation' | 'actCitation' | 'aboutItemId' | 'createdBy' | 'assistantNotes' | 'assistantNote'>;
 
 // What only the server says about an item (its names, the article a note is
-// about, who wrote it), copied only when it said it: an answer from an older
-// server leaves the fields absent, and the page falls back.
+// about, who wrote it, how its application's notes stand — D7b), copied only
+// when it said it: an answer from an older server leaves the fields absent,
+// and the page falls back.
 export function serverFieldsFromApi(
-  api: Pick<DossierItemApi, 'citation' | 'act_citation' | 'about_item_id' | 'created_by'>,
+  api: Pick<DossierItemApi, 'citation' | 'act_citation' | 'about_item_id' | 'created_by' | 'assistant_notes' | 'assistant_note'>,
 ): ServerFields {
+  const note = api.assistant_note;
   return {
     ...(api.citation !== undefined ? { citation: api.citation } : {}),
     ...(api.act_citation !== undefined ? { actCitation: api.act_citation } : {}),
     ...(api.about_item_id !== undefined ? { aboutItemId: api.about_item_id } : {}),
     ...(api.created_by !== undefined ? { createdBy: api.created_by } : {}),
+    ...(api.assistant_notes !== undefined ? { assistantNotes: api.assistant_notes } : {}),
+    ...(note !== undefined ? {
+      assistantNote: note && {
+        state: note.state,
+        stateChangedAt: note.state_changed_at,
+        reviewComment: note.review_comment,
+        originalText: note.original_text,
+        edited: note.edited,
+        editedAt: note.edited_at,
+        editedBy: note.edited_by,
+      },
+    } : {}),
   };
 }
 

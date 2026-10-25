@@ -25,7 +25,8 @@ export interface ProposalCardProps {
  */
 export function ProposalCard({ highlight, onValidate, onFlag, onReviewComment, onEditNote, onRemove }: ProposalCardProps) {
     const { proposal } = highlight;
-    const note = proposal.note?.trim() ?? '';
+    const aiNote = proposal.note;
+    const note = aiNote?.text.trim() ?? '';
     const [draft, setDraft] = useState<string | null>(null);
     const commit = () => {
         const text = draft?.trim() ?? '';
@@ -33,7 +34,7 @@ export function ProposalCard({ highlight, onValidate, onFlag, onReviewComment, o
         if (text && text !== note) onEditNote(text);
         setDraft(null);
     };
-    if (!note && draft === null) {
+    if (!aiNote) {
         return (
             <div className="relative overflow-hidden rounded-lg border border-slate-200 bg-slate-50 py-1 pl-3.5 pr-1 text-sm dark:border-slate-700 dark:bg-slate-800/50">
                 <span aria-hidden className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: getHighlightSwatch(highlight.color) }} />
@@ -70,10 +71,10 @@ export function ProposalCard({ highlight, onValidate, onFlag, onReviewComment, o
                 </p>
             )}
             <AiReviewControls
-                state={proposal.state}
-                edited={proposal.originalNote !== null}
-                original={proposal.originalNote}
-                reviewComment={proposal.reviewComment}
+                state={aiNote.state}
+                edited={aiNote.edited}
+                original={aiNote.edited ? aiNote.assistantText : null}
+                reviewComment={aiNote.reviewComment}
                 onValidate={onValidate}
                 onFlag={onFlag}
                 onReviewComment={onReviewComment}

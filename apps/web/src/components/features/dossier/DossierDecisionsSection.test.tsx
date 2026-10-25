@@ -204,12 +204,12 @@ describe('DossierDecisionsSection (D7a)', () => {
   it('shows the traffic light of what an application wrote on a decision, and says it in the row\'s name (D7b)', () => {
     render(
       <DossierDecisionRow
-        item={cass} isSelected={false} showCheckbox={false} onToggleSelect={() => {}} isExpanded={false}
-        onToggleExpand={() => {}} onRemove={() => {}} onToggleImportant={() => {}} aiReview={{ pending: 1, validated: 2, review: 0 }}
+        item={{ ...cass, assistantNotes: { proposed: 1, validated: 2, review: 0 } }} isSelected={false} showCheckbox={false}
+        onToggleSelect={() => {}} isExpanded={false} onToggleExpand={() => {}} onRemove={() => {}} onToggleImportant={() => {}}
       />,
     );
     expect(screen.getByRole('button', { name: `Espandi ${CASS}, 1 da validare · 2 validati` })).toBeInTheDocument();
-    expect(screen.getByTitle('1 da validare · 2 validati')).toHaveAttribute('data-ai-review', 'pending');
+    expect(screen.getByTitle('1 da validare · 2 validati')).toHaveAttribute('data-ai-review', 'proposed');
   });
 
   it('removes a decision as the other rows do', () => {

@@ -208,22 +208,62 @@ export interface Highlight {
 }
 
 /**
- * Where the user stands on what an application wrote (D7b): «da validare» until they act, «Validato» once they
- * tick it (or change its note), «Da rivedere» when they flag it.
+ * Where the user stands on a note an application wrote (D7b, the contract's `NoteState`): «da validare» until they act,
+ * «Validato» once they tick it (or change it), «Da rivedere» when they flag it. The note has the state, never the mark.
  */
-export type AiReviewState = 'pending' | 'validated' | 'review';
+export type AiReviewState = 'proposed' | 'validated' | 'review';
 
-/** Who proposed a passage, what they noted on it, and what the user made of it (D7b). */
+/** An application's note on a passage it proposed (D7b contract §5). */
+export interface AssistantNote {
+    /** The note shown now ('' if the user emptied it). */
+    text: string;
+    /** The application's own, never changed: «Vedi la versione dell'IA». */
+    assistantText: string;
+    state: AiReviewState;
+    stateChangedAt: string | null;
+    /** «Cosa non va?», given only while the state is `review`. */
+    reviewComment: string | null;
+    /** The user changed the text: «Validato, modificato da te». */
+    edited: boolean;
+    editedAt: string | null;
+    editedBy: { username: string } | null;
+}
+
+/** A passage an application proposed on one dossier entry, as `GET /api/dossiers/:id/items/:itemId/proposals` gives it. */
+export interface Proposal {
+    id: string;
+    normaKey: string;
+    text: string;
+    color: 'yellow' | 'green' | 'red' | 'blue';
+    startOffset: number;
+    endOffset: number;
+    createdAt: string;
+    dossierItemId: string;
+    proposedBy: { clientName: string | null };
+    assistantRange: { startOffset: number; text: string };
+    rangeEdited: boolean;
+    rangeEditedAt: string | null;
+    rangeEditedBy: { username: string } | null;
+    /** null: a mark with no note, of known origin, with no state. */
+    note: AssistantNote | null;
+}
+
+/** On a highlight drawn from a `Proposal`: who proposed it and its note, the one thing with a state. */
 export interface HighlightProposal {
     /** The application's registered name, unverified. */
     clientName: string | null;
-    /** The passage's note as it stands, plain text: the application's, or the user's once they changed it. */
-    note: string | null;
+    note: AssistantNote | null;
+}
+
+/** A note entry an application wrote in a dossier (D7b contract §3), its state and its original. */
+export interface AssistantNoteEntry {
     state: AiReviewState;
-    /** «Cosa non va?»: the user's few words on a passage flagged «Da rivedere». */
+    stateChangedAt: string | null;
     reviewComment: string | null;
-    /** The application's own note, kept once the user changed it («Vedi la versione dell'IA»); null while unchanged. */
-    originalNote: string | null;
+    originalText: string;
+    edited: boolean;
+    editedAt: string | null;
+    editedBy: { username: string } | null;
 }
 
 /** A dossier di lavoro holds a practice (it may carry a client's data); a dossier di studio a topic studied. */
@@ -270,6 +310,10 @@ interface DossierItemBase {
     aboutItemId?: string | null;
     // The connected application that wrote it (through MCP); null for the user.
     createdBy?: { clientName: string | null } | null;
+    // D7b: how the application's notes on a norm or a decision stand (the row's light), and the state of a note entry
+    // an application wrote; null with the feature off or nothing written, absent before the server said.
+    assistantNotes?: { proposed: number; validated: number; review: number } | null;
+    assistantNote?: AssistantNoteEntry | null;
 }
 
 export type DossierItem =

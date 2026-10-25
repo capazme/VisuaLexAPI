@@ -2,13 +2,22 @@ import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 
 vi.mock('../../../utils/articleFetchCache', () => ({ fetchArticleForNorma: vi.fn() }));
+vi.mock('../../../services/assistantService', () => ({
+  assistantService: {
+    features: vi.fn(), listProposals: vi.fn(), setProposalState: vi.fn(), editProposalNote: vi.fn(), removeProposal: vi.fn(),
+  },
+}));
 
 import { fetchArticleForNorma } from '../../../utils/articleFetchCache';
 import { DossierItemReader } from './DossierItemReader';
 import { appStore } from '../../../store/useAppStore';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
 import { fixtureText } from '../../../utils/__fixtures__/articleTexts';
-import type { Highlight, NormaVisitata } from '../../../types';
+import type { Highlight, NormaVisitata, Proposal } from '../../../types';
+import { assistantService } from '../../../services/assistantService';
+import { assistantProposalsStore } from '../../../store/assistantProposals';
+import { CurrentDossierContext } from './currentDossier';
+import { aiNote } from '../../../utils/__fixtures__/assistantNote';
 
 const norma: NormaVisitata = { tipo_atto: 'codice civile', numero_atto: '262', data: '1942-03-16', numero_articolo: '1453' };
 const RAW = fixtureText('nrm-cc-1453');
@@ -70,5 +79,80 @@ describe('DossierItemReader — onArticle', () => {
     const onArticle = vi.fn();
     render(<DossierItemReader norma={norma} onOpenOnDashboard={() => {}} showToast={() => {}} onArticle={onArticle} />);
     await waitFor(() => expect(onArticle).toHaveBeenCalledWith(expect.objectContaining({ article_text: RAW })));
+  });
+});
+
+describe('DossierItemReader — what an application proposed on the entry (D7b)', () => {
+  const at = (words: string) => PLAIN.indexOf(words);
+  const proposal = (id: string, words: string, note: Proposal['note']): Proposal => ({
+    id, normaKey: `${buildItemKey(norma)}::art::${uniqueArticleIdFromNorma(norma)}`, text: words, color: 'yellow',
+    startOffset: at(words), endOffset: at(words) + words.length, createdAt: '2026-10-25T09:00:00Z', dossierItemId: 'a1',
+    proposedBy: { clientName: 'Claude Code' }, assistantRange: { startOffset: at(words), text: words },
+    rangeEdited: false, rangeEditedAt: null, rangeEditedBy: null, note,
+  });
+  const noted = proposal('p1', 'contraenti', aiNote('La parte adempiente.'));
+  const bare = proposal('p2', 'obbligazioni', null);
+  const lost = { ...proposal('p3', 'parole che non ci sono', null), startOffset: 12 };
+  const renderReader = (itemId: string | null = 'a1') => render(
+    <CurrentDossierContext.Provider value="d1">
+      <DossierItemReader norma={norma} onOpenOnDashboard={() => {}} showToast={() => {}} itemId={itemId ?? undefined} />
+    </CurrentDossierContext.Provider>,
+  );
+
+  beforeEach(() => {
+    vi.mocked(fetchArticleForNorma).mockResolvedValue({ article_text: RAW, norma_data: norma });
+    vi.mocked(assistantService.listProposals).mockResolvedValue([noted, bare, lost]);
+    vi.mocked(assistantService.setProposalState).mockResolvedValue({ ...noted, note: aiNote('La parte adempiente.', 'validated') });
+    appStore.setState({ highlights: [], annotations: [] });
+    assistantProposalsStore.setState({ enabled: true, byItem: {} });
+  });
+
+  it('draws them on its own entry: the noted one dashed, the bare one a plain mark; the sign names the open note', async () => {
+    const { container } = renderReader();
+    await waitFor(() => expect(container.querySelector('[data-highlight="p1"]')).not.toBeNull());
+    expect(assistantService.listProposals).toHaveBeenCalledWith('d1', 'a1');
+    expect(container.querySelector('[data-highlight="p1"]')).toHaveAttribute('data-proposed', 'proposed');
+    expect(container.querySelector('[data-highlight="p2"]')).not.toHaveAttribute('data-proposed');
+    expect(container.querySelector('.vlx-sign[data-block="2"]')?.getAttribute('aria-label')).toContain("1 passaggio proposto dall'IA: 1 da validare");
+    // The text is the text.
+    expect(container.querySelector('.vlx-art')?.textContent).toContain(PLAIN.slice(0, 40));
+    // Never in the app's own highlights.
+    expect(appStore.getState().highlights).toEqual([]);
+  });
+
+  it('its popover validates the note through the entry\'s route', async () => {
+    const { container } = renderReader();
+    const sign = await waitFor(() => {
+      const found = container.querySelector<HTMLElement>('.vlx-sign[data-block="2"]');
+      if (!found?.dataset.proposed) throw new Error('no sign yet');
+      return found;
+    });
+    fireEvent.click(sign);
+    const dialog = await screen.findByRole('dialog', { name: /Annotazioni · Nei contratti/ });
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: "Proposto dall'IA, confermi?" }));
+    await waitFor(() => expect(assistantService.setProposalState).toHaveBeenCalledWith('d1', 'a1', 'p1', 'validated', undefined));
+    await waitFor(() => expect(within(dialog).getByRole('checkbox', { name: 'Validato' })).toBeChecked());
+  });
+
+  it('a proposal whose words are no longer there is listed under the text, to be removed', async () => {
+    renderReader();
+    await screen.findByText('Altre evidenziazioni');
+    fireEvent.click(screen.getByRole('button', { name: 'Rimuovi evidenziazione' }));
+    await waitFor(() => expect(assistantProposalsStore.getState().byItem.a1.map((p) => p.id)).toEqual(['p1', 'p2']));
+  });
+
+  it('asks nothing with the feature off, or outside a dossier entry', async () => {
+    vi.mocked(assistantService.listProposals).mockClear();
+    // Off, even what the store still held is not drawn.
+    assistantProposalsStore.setState({ enabled: false, byItem: { a1: [noted] } });
+    const { container, unmount } = renderReader();
+    await waitFor(() => expect(container.querySelector('.vlx-art')).not.toBeNull());
+    expect(container.querySelector('[data-highlight="p1"]')).toBeNull();
+    unmount();
+    assistantProposalsStore.setState({ enabled: true, byItem: {} });
+    const other = renderReader(null);
+    await waitFor(() => expect(other.container.querySelector('.vlx-art')).not.toBeNull());
+    expect(assistantService.listProposals).not.toHaveBeenCalled();
+    expect(other.container.querySelector('[data-proposed]')).toBeNull();
   });
 });

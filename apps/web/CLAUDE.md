@@ -1022,7 +1022,18 @@ in place in `NoteEditBox`, shared with `NoteCard`), the bin, and «Vedi la versi
 changed. A shape per state, never colour alone. The dossier's rows carry the traffic light (`AiReviewSignal`,
 `utils/aiReview.ts`): a red flag if one item is to review, else a yellow dashed ring if one waits, else a green
 tick, nothing if the application wrote nothing; its words («2 da validare · 1 da rivedere») are its `title` and
-in the row's name. Not yet wired to the server: the routes' contract is still being fixed.
+in the row's name, its counts the server's `assistant_notes` on the item (`serverFieldsFromApi`).
+
+The wiring follows the server's contract (`services/assistantService.ts`). `GET /api/features` says whether the
+feature is on, read as the app starts (`useAuth`) and as the dossier page mounts; a 404 «Non disponibile» from a
+route turns it off again. `store/assistantProposals.ts` is a store of its own, keyed by entry id and filled by the
+entry's reader from `…/items/:itemId/proposals`: the marks never enter the app's highlights, so Study Mode, the Forum,
+environments and the PDF never receive one, whatever the note's state. `DossierItemReader` takes its `itemId` and the
+dossier from `CurrentDossierContext` (`DossierDetailView`), asks nothing on a text shown read-only, and draws the
+proposals with the reader's highlights; one whose words no longer land is listed under the text, to be removed. Each
+write takes the server's answer and moves the row's light by one (the old state down, the new up). The bin removes at
+once and offers «Annulla»; the `DELETE` leaves when the notification closes, or at `pagehide`, never after a logout
+drops it.
 
 The "Evidenziazioni" box under
 the article now lists only what no sign can reach (`LooseHighlightsList`,

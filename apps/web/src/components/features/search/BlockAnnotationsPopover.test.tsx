@@ -11,6 +11,7 @@ import type { Annotation, Highlight, ArticleDiscussionPassageSummary } from '../
 // The scroll: its own tests (`scrollParent.test.ts`); here, which anchor it is asked for.
 vi.mock('../../../utils/scrollParent', () => ({ scrollToMiddle: vi.fn() }));
 import { scrollToMiddle } from '../../../utils/scrollParent';
+import { aiNote } from '../../../utils/__fixtures__/assistantNote';
 
 const RAW = fixtureText('nrm-cc-1453');
 const PLAIN = RAW.replace(/\n/g, '');
@@ -100,7 +101,7 @@ describe('BlockAnnotationsPopover', () => {
     const p1: Highlight = {
       id: 'p1', normaKey: 'k', articleId: '1', rangeSerialized: '', text: 'contraenti', color: 'yellow',
       startOffset: PLAIN.indexOf('contraenti'),
-      proposal: { clientName: 'Claude Code', note: 'La parte non inadempiente.', state: 'pending', reviewComment: null, originalNote: null },
+      proposal: { clientName: 'Claude Code', note: aiNote('La parte non inadempiente.') },
     };
     const actions = () => ({ validate: vi.fn(), flag: vi.fn(), comment: vi.fn(), editNote: vi.fn(), remove: vi.fn() });
 
@@ -125,7 +126,7 @@ describe('BlockAnnotationsPopover', () => {
 
     it('«Cosa non va?» goes to its own id', async () => {
       const proposalActions = actions();
-      setup([{ ...p1, proposal: { ...p1.proposal!, state: 'review' } }], [], { proposalActions });
+      setup([{ ...p1, proposal: { ...p1.proposal!, note: aiNote('La parte non inadempiente.', 'review') } }], [], { proposalActions });
       const dialog = await screen.findByRole('dialog', { name: TITLE });
       const field = within(dialog).getByRole('textbox', { name: 'Cosa non va?' });
       fireEvent.change(field, { target: { value: 'Il passo è un altro.' } });
@@ -148,7 +149,7 @@ describe('BlockAnnotationsPopover', () => {
 
     it('a validated one stays listed with them, ticked, so it can be unticked', async () => {
       const proposalActions = actions();
-      setup([{ ...p1, proposal: { ...p1.proposal!, state: 'validated' } }], [], { proposalActions });
+      setup([{ ...p1, proposal: { ...p1.proposal!, note: aiNote('La parte non inadempiente.', 'validated') } }], [], { proposalActions });
       const dialog = await screen.findByRole('dialog', { name: TITLE });
       const box = within(dialog).getByRole('checkbox', { name: 'Validato' });
       expect(box).toBeChecked();

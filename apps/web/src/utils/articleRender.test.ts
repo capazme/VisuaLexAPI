@@ -8,6 +8,7 @@ import { ARTICLE_FIXTURES, fixtureText } from './__fixtures__/articleTexts';
 import { buildPassage } from './threadPassages';
 import type { Annotation, Highlight } from '../types';
 import { openFindOn, wordOf } from './__fixtures__/openFind';
+import { aiNote } from './__fixtures__/assistantNote';
 
 const hl = (id: string, text: string, startOffset: number, color: Highlight['color'] = 'yellow'): Highlight => ({
   id, normaKey: 'k', articleId: '1', rangeSerialized: '', text, color, startOffset,
@@ -42,9 +43,9 @@ describe('the projection invariant — every real text', () => {
       }
       // Passages an application proposed (D7b), waiting or validated: highlights of their own kind, never a character.
       for (const [i, h] of highlights.entries()) {
-        const state = (['pending', 'review', 'validated'] as const)[i % 4 - 1];
+        const state = (['proposed', 'review', 'validated'] as const)[i % 4 - 1];
         // h5 has no note: a plain mark of known origin, with no state (the note has it).
-        if (state) h.proposal = { clientName: 'Claude Code', reviewComment: null, originalNote: null, note: i === 5 ? null : `nota ${i}`, state };
+        if (state) h.proposal = { clientName: 'Claude Code', note: i === 5 ? null : aiNote(`nota ${i}`, state) };
       }
       const annotations: Annotation[] = [];
       for (let i = 0; i < 6; i++) {
@@ -91,7 +92,7 @@ describe('the projection invariant — every real text', () => {
         expect(found.map((e) => e.textContent).join('')).toBe(h.text);
         const walker = document.createTreeWalker(found[0], NodeFilter.SHOW_TEXT);
         expect(plainOffsetAt(div, walker.nextNode()!, 0)).toBe(h.startOffset);
-        const waiting = h.proposal?.note && h.proposal.state !== 'validated' ? h.proposal.state : null;
+        const waiting = h.proposal?.note && h.proposal.note.state !== 'validated' ? h.proposal.note.state : null;
         for (const e of found) expect(e.getAttribute('data-proposed'), h.id).toBe(waiting);
       }
       // Focused thread pieces join to thread words, no extra elements for unfocused threads
@@ -120,7 +121,7 @@ describe('the projection invariant — every real text', () => {
           expect(sign?.getAttribute('data-notes'), `block ${i}: sign notes`).toBe(String(groups[i].notes.length));
           expect(sign?.getAttribute('data-highlights'), `block ${i}: sign highlights`).toBe(String(groups[i].highlights.length));
           expect(sign?.getAttribute('data-threads'), `block ${i}: sign threads`).toBe(String(groups[i].threads.length));
-          const waiting = groups[i].highlights.filter((h) => h.proposal?.note && h.proposal.state !== 'validated').length;
+          const waiting = groups[i].highlights.filter((h) => h.proposal?.note && h.proposal.note.state !== 'validated').length;
           expect(sign?.getAttribute('data-proposed') ?? '0', `block ${i}: sign proposals`).toBe(String(waiting));
         }
       });
@@ -346,12 +347,12 @@ describe('annotation signs', () => {
   });
 
   it('names the passages an application proposed apart on the sign, with its sparkle and a title (D7b)', () => {
-    const as = (state: 'pending' | 'review' | 'validated') => (h: Highlight): Highlight => ({ ...h, proposal: { clientName: 'Claude Code', reviewComment: null, originalNote: null, note: 'Rileva.', state } });
+    const as = (state: 'proposed' | 'review' | 'validated') => (h: Highlight): Highlight => ({ ...h, proposal: { clientName: 'Claude Code', note: aiNote('Rileva.', state) } });
     const div = mount(render(raw, {
       signs: true,
       annotations: [note('n1', 'prestazioni corrispettive', at('prestazioni corrispettive'))],
       highlights: [
-        as('pending')(hl('p1', 'contraenti', at('contraenti'), 'green')),
+        as('proposed')(hl('p1', 'contraenti', at('contraenti'), 'green')),
         as('review')(hl('p2', 'obbligazioni', at('obbligazioni'))),
         as('validated')(hl('p3', 'risarcimento', at('risarcimento'), 'blue')),
       ],
@@ -365,7 +366,7 @@ describe('annotation signs', () => {
     expect(sign.querySelector('.vlx-sign-proposed')?.getAttribute('data-count')).toBe('2');
     expect(sign.textContent).toBe('');
     // In the text: the open ones dashed and named by their state, the validated one as the user's own.
-    for (const [id, state, title] of [['p1', 'pending', 'da validare'], ['p2', 'review', 'da rivedere']]) {
+    for (const [id, state, title] of [['p1', 'proposed', 'da validare'], ['p2', 'review', 'da rivedere']]) {
       const mark = div.querySelector(`[data-highlight="${id}"]`)!;
       expect(mark.classList.contains('vlx-proposed')).toBe(true);
       expect(mark.getAttribute('data-proposed')).toBe(state);
@@ -378,7 +379,7 @@ describe('annotation signs', () => {
   });
 
   it('a passage the application marked with no note is a plain mark of known origin, outside the count', () => {
-    const bare: Highlight = { ...hl('b', 'contraenti', at('contraenti')), proposal: { clientName: 'Claude Code', note: null, state: 'pending', reviewComment: null, originalNote: null } };
+    const bare: Highlight = { ...hl('b', 'contraenti', at('contraenti')), proposal: { clientName: 'Claude Code', note: null } };
     const div = mount(render(raw, { signs: true, highlights: [bare] }));
     const mark = div.querySelector('[data-highlight="b"]')!;
     expect(mark.hasAttribute('data-proposed')).toBe(false);
@@ -390,7 +391,7 @@ describe('annotation signs', () => {
   });
 
   it('a block with proposals only is named by them alone; a sign without any keeps no title', () => {
-    const p: Highlight = { ...hl('p', 'contraenti', at('contraenti')), proposal: { clientName: null, note: 'Rileva.', state: 'pending', reviewComment: null, originalNote: null } };
+    const p: Highlight = { ...hl('p', 'contraenti', at('contraenti')), proposal: { clientName: null, note: aiNote('Rileva.') } };
     expect(signOf(mount(render(raw, { signs: true, highlights: [p] })), 2)!.getAttribute('aria-label'))
       .toBe("1 passaggio proposto dall'IA: 1 da validare");
     const plainSign = signOf(mount(render(raw, { signs: true, highlights: [hl('h', 'contraenti', at('contraenti'))] })), 2)!;

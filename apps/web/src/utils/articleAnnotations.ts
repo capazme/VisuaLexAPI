@@ -197,22 +197,22 @@ export const isProposal = (h: Highlight): h is Highlight & { proposal: Highlight
  * A proposed passage with the application's note (D7b, the owner's decision of 25 October, 10:06): the note, not the
  * highlight, has a state. A passage without one is a plain mark of known origin, removable, with no state.
  */
-export const hasAiNote = (h: Highlight): boolean => !!h.proposal?.note?.trim();
+export const hasAiNote = (h: Highlight): boolean => !!h.proposal?.note;
 
 /** A note on a passage the user has not validated yet («da validare» or «Da rivedere»): dashed in the text, named apart on the sign. */
-export const isOpenProposal = (h: Highlight): boolean => hasAiNote(h) && h.proposal!.state !== 'validated';
+export const isOpenProposal = (h: Highlight): boolean => !!h.proposal?.note && h.proposal.note.state !== 'validated';
 
 /**
  * What a screen reader hears on a sign: "2 note e 1 evidenziazione in questo passo". The passages an application
  * proposed and the user has not validated (D7b) come last, apart, in the row's words: "1 nota in questo passo;
  * 2 passaggi proposti dall'IA: 1 da validare · 1 da rivedere". `highlights` leaves them out.
  */
-export function signAriaLabel(notes: number, highlights: number, threads = 0, proposals: Pick<AiReviewCounts, 'pending' | 'review'> = { pending: 0, review: 0 }): string {
+export function signAriaLabel(notes: number, highlights: number, threads = 0, proposals: Pick<AiReviewCounts, 'proposed' | 'review'> = { proposed: 0, review: 0 }): string {
   const parts: string[] = [];
   if (notes > 0) parts.push(`${notes} ${notes === 1 ? 'nota' : 'note'}`);
   if (highlights > 0) parts.push(`${highlights} ${highlights === 1 ? 'evidenziazione' : 'evidenziazioni'}`);
   if (threads > 0) parts.push(`${threads} ${threads === 1 ? 'glossa' : 'glosse'}`);
-  const open = proposals.pending + proposals.review;
+  const open = proposals.proposed + proposals.review;
   const proposed = open > 0
     ? `${open} ${open === 1 ? 'passaggio proposto' : 'passaggi proposti'} dall'IA: ${aiReviewSummary({ ...proposals, validated: 0 })}`
     : '';

@@ -4,7 +4,7 @@ import { AiReviewControls, type AiReviewControlsProps } from './AiReviewControls
 
 function setup(over: Partial<AiReviewControlsProps> = {}) {
   const props: AiReviewControlsProps = {
-    state: 'pending', edited: false, original: null, reviewComment: null,
+    state: 'proposed', edited: false, original: null, reviewComment: null,
     onValidate: vi.fn(), onFlag: vi.fn(), onReviewComment: vi.fn(), onEdit: vi.fn(), onRemove: vi.fn(),
     editLabel: 'Modifica la nota del passaggio', removeLabel: 'Rimuovi il passaggio',
     ...over,

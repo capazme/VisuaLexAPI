@@ -12,7 +12,7 @@ export function AiReviewSignal({ counts, className }: { counts: AiReviewCounts; 
   const signal = aiReviewSignal(counts);
   if (!signal) return null;
   const summary = aiReviewSummary(counts);
-  const Icon = signal === 'review' ? Flag : signal === 'pending' ? CircleDashed : CircleCheck;
+  const Icon = signal === 'review' ? Flag : signal === 'proposed' ? CircleDashed : CircleCheck;
   return (
     <span
       data-ai-review={signal}
@@ -21,7 +21,7 @@ export function AiReviewSignal({ counts, className }: { counts: AiReviewCounts; 
         'inline-flex shrink-0 items-center',
         className,
         signal === 'review' && 'text-red-600 dark:text-red-400',
-        signal === 'pending' && 'text-amber-600 dark:text-amber-400',
+        signal === 'proposed' && 'text-amber-600 dark:text-amber-400',
         signal === 'validated' && 'text-emerald-600 dark:text-emerald-400',
       )}
     >

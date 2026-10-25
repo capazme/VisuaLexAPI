@@ -1,13 +1,16 @@
 import { describe, it, expect, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { ProposalCard, type ProposalCardProps } from './ProposalCard';
-import type { HighlightProposal } from '../../../types';
+import type { AssistantNote } from '../../../types';
+import { aiNote } from '../../../utils/__fixtures__/assistantNote';
 
-function setup(over: Partial<HighlightProposal> = {}) {
+/** `note: null`: a mark with no note. */
+function setup(over: Partial<AssistantNote> | { note: null } = {}) {
+  const note = 'note' in over && over.note === null ? null : aiNote('Il danno da inadempimento.', 'proposed', over as Partial<AssistantNote>);
   const props: ProposalCardProps = {
     highlight: {
       id: 'p1', normaKey: 'k', articleId: '1', rangeSerialized: '', text: 'risarcimento del danno', color: 'green', startOffset: 10,
-      proposal: { clientName: 'Claude Code', note: 'Il danno da inadempimento.', state: 'pending', reviewComment: null, originalNote: null, ...over },
+      proposal: { clientName: 'Claude Code', note },
     },
     onValidate: vi.fn(), onFlag: vi.fn(), onReviewComment: vi.fn(), onEditNote: vi.fn(), onRemove: vi.fn(),
   };
@@ -67,13 +70,13 @@ describe('ProposalCard', () => {
     expect(props.onRemove).toHaveBeenCalledTimes(1);
   });
 
-  it('a blank note counts as none', () => {
-    setup({ note: '   ' });
-    expect(screen.queryByRole('checkbox')).toBeNull();
+  it('a note the user emptied is still the application\'s, with its state', () => {
+    setup({ text: '', edited: true, state: 'validated' });
+    expect(screen.getByRole('checkbox', { name: 'Validato, modificato da te' })).toBeChecked();
   });
 
   it('a note the user changed: «Validato, modificato da te» and the application\'s own one click away', () => {
-    setup({ state: 'validated', note: 'La mia nota.', originalNote: 'Il danno da inadempimento.' });
+    setup({ state: 'validated', text: 'La mia nota.', edited: true });
     expect(screen.getByRole('checkbox', { name: 'Validato, modificato da te' })).toBeChecked();
     expect(screen.getByText('La mia nota.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: "Vedi la versione dell'IA" }));

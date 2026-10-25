@@ -6,6 +6,7 @@ import * as authService from '../services/authService';
 import { subscribeToUser } from '../services/authEvents';
 import type { UserResponse } from '../types/api';
 import { appStore } from '../store/useAppStore';
+import { loadAssistantFeatures } from '../store/assistantProposals';
 import { getErrorMessage } from '../utils/errors';
 import { clearDecisionCache } from '../utils/decisionFetchCache';
 import { clearDecisionSearchCache } from '../utils/decisionSearchCache';
@@ -53,6 +54,8 @@ export function useAuth() {
         if (!store.isDataLoaded && !store.isLoadingData) {
           store.fetchUserData();
         }
+        // D7b: whether the server proposes passages at all.
+        void loadAssistantFeatures();
       } catch (error) {
         setState({
           user: null,
@@ -132,6 +135,7 @@ export function useAuth() {
 
       // Fetch user data from API after successful login
       appStore.getState().fetchUserData();
+      void loadAssistantFeatures();
 
       return user;
     } catch (error) {

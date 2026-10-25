@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { CheckSquare, ChevronDown, Square, Star, Trash2 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
-import { aiReviewSummary, type AiReviewCounts } from '../../../utils/aiReview';
+import { aiReviewSummary } from '../../../utils/aiReview';
 import { AiReviewSignal } from '../../ui/AiReviewSignal';
 import { identityOf } from '../../../utils/decisionLinks';
 import { DossierDecisionReader } from './DossierDecisionReader';
@@ -19,8 +19,6 @@ export interface DossierDecisionRowProps {
   onToggleExpand: () => void;
   onRemove: () => void;
   onToggleImportant: () => void;
-  /** Where the user stands on what an application wrote on this decision (D7b): the row's traffic light. */
-  aiReview?: AiReviewCounts;
 }
 
 /**
@@ -32,7 +30,7 @@ export interface DossierDecisionRowProps {
  * read per decision.
  */
 export function DossierDecisionRow({
-  item, isSelected, showCheckbox, onToggleSelect, isExpanded, onToggleExpand, onRemove, onToggleImportant, aiReview,
+  item, isSelected, showCheckbox, onToggleSelect, isExpanded, onToggleExpand, onRemove, onToggleImportant,
 }: DossierDecisionRowProps) {
   const citation = decisionCitationOf(item.data);
   const added = formatTimestampLong(item.addedAt);
@@ -42,6 +40,8 @@ export function DossierDecisionRow({
   // One object while the item stays: the reader asks the source again for a new reference, and the page redraws often.
   const identity = useMemo(() => identityOf(item.data), [item.data]);
   // The traffic light sits inside the toggle, whose name replaces it for a screen reader: the name says it.
+  // The application's notes on this decision, as the server counts them (`assistant_notes`, D7b).
+  const aiReview = item.assistantNotes ?? null;
   const reviewSummary = aiReview ? aiReviewSummary(aiReview) : '';
   const rowLabel = `${isExpanded ? 'Comprimi' : 'Espandi'} ${citation}` + (reviewSummary ? `, ${reviewSummary}` : '');
 

@@ -8,7 +8,7 @@ import { DossierItemReader } from './DossierItemReader';
 import { shownAnnex } from './dossierLayout';
 import { ClaudeMark } from '../../ui/ClaudeMark';
 import { AiReviewSignal } from '../../ui/AiReviewSignal';
-import { aiReviewSummary, type AiReviewCounts } from '../../../utils/aiReview';
+import { aiReviewSummary } from '../../../utils/aiReview';
 import { formatTimestampLong } from './dossierUtils';
 import { FOCUS_RING } from '../studia/progress/tokens';
 import { ROW, ROW_ICON, ROW_LINE, ROW_REMOVE, ROW_TITLE } from './dossierStyles';
@@ -35,8 +35,6 @@ export interface DossierArticleRowProps {
   onRemoveNote?: (note: NoteItem) => void;
   /** Ringed for a moment: a norm a decision cites has just opened it (D7d). */
   isFlashing?: boolean;
-  /** Where the user stands on what an application wrote on this entry (D7b): the row's traffic light. */
-  aiReview?: AiReviewCounts;
 }
 
 /**
@@ -47,7 +45,7 @@ export interface DossierArticleRowProps {
 export function DossierArticleRow({
   item, rubrica, isSelected, showCheckbox, onToggleSelect, isExpanded, onToggleExpand,
   onOpenOnDashboard, onRemove, onToggleImportant, showToast,
-  notes = [], onAddNote, onRemoveNote, isFlashing = false, aiReview,
+  notes = [], onAddNote, onRemoveNote, isFlashing = false,
 }: DossierArticleRowProps) {
   const [textRubrica, setTextRubrica] = useState<string | null>(null);
   const onArticle = useCallback((article: ArticleData) => {
@@ -76,7 +74,9 @@ export function DossierArticleRow({
   // it for a screen reader: the name has to say it. No application's mark on the
   // row (D7b): each note carries its own once the row is open.
   const notesLabel = notes.length === 0 || isExpanded ? '' : `, ${notes.length === 1 ? '1 nota' : `${notes.length} note`}`;
-  // The traffic light too, open or closed: what is left to check stays said.
+  // The traffic light too, open or closed: what is left to check stays said. The server counts the application's
+  // notes on this entry (`assistant_notes`, D7b); null with nothing written or the feature off.
+  const aiReview = item.assistantNotes ?? null;
   const reviewSummary = aiReview ? aiReviewSummary(aiReview) : '';
   const reviewLabel = reviewSummary ? `, ${reviewSummary}` : '';
 
@@ -207,6 +207,7 @@ export function DossierArticleRow({
           )}
           <DossierItemReader
             norma={item.data}
+            itemId={item.id}
             onOpenOnDashboard={onOpenOnDashboard}
             showToast={showToast}
             onArticle={onArticle}
