@@ -1345,7 +1345,8 @@ class NormaController:
 
     async def search_corte_cost_massime(self):
         """The Corte costituzionale's massime that name an article, from the court's open data
-        (G-281): `{urn, pagina?}`, `urn` the article's identity as `norma_data.urn` gives it.
+        (G-281): `{urn, pagina?, ruolo?}`, `urn` the article's identity as `norma_data.urn` gives
+        it, `ruolo` `norma` or `parametro` to keep the massime naming it in that role (G-289).
         JSON with `esito`: risultati 200 (a page of 20, newest first, the text verbatim, with
         the source and the licence line), richiesta_non_valida 400, fonte_non_raggiungibile 503
         (`in_preparazione` while the first index is being built), errore_interno 500 (a bug: a
@@ -1358,7 +1359,8 @@ class NormaController:
             return jsonify({'esito': 'richiesta_non_valida',
                             'errori': {'body': 'atteso un oggetto JSON'}}), 400
         try:
-            answer, status = await search_corte_cost_massime_route(body.get('urn'), body.get('pagina'))
+            answer, status = await search_corte_cost_massime_route(
+                body.get('urn'), body.get('pagina'), body.get('ruolo'))
         except Exception:
             log.exception("Corte costituzionale massime search failed unexpectedly")
             return jsonify({'esito': 'errore_interno'}), 500

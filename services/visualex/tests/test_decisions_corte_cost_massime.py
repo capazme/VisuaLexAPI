@@ -14,6 +14,7 @@ from visualex_api.services.decisions import corte_cost_massime
 from visualex_api.services.decisions.corte_cost_massime import (
     ATTRIBUTION,
     BUNDLES,
+    INDEX_NAME,
     CorteCostMassime,
     MassimeUnavailable,
     build_index,
@@ -190,6 +191,35 @@ def test_the_index_is_paged(tmp_path):
     assert second[-1]["pronuncia"]["identita"]["numero"] == 1
 
 
+def test_the_index_keeps_one_role_when_asked(tmp_path):
+    # G-289: on the Costituzione the web asks for the massime where the article is at issue first
+    art3 = entry("Costituzione", "3")
+    at_issue, measure, both = (synthetic(2001, n, 1, []) for n in (1, 2, 3))
+    at_issue["massime"][0]["norme"] = [art3]
+    measure["massime"][0]["parametri"] = [art3]
+    both["massime"][0]["norme"] = both["massime"][0]["parametri"] = [art3]
+    (tmp_path / "b.zip").write_bytes(make_bundle({"2001": [at_issue, measure, both]}))
+    build_index([tmp_path / "b.zip"], tmp_path / "i.sqlite3", "s")
+    cost_3 = f"{R}costituzione~art3"
+    every, counts = query_index(tmp_path / "i.sqlite3", cost_3)
+    assert [r["numero"] for r in every] == ["300", "200", "100"]
+    assert counts == {"totale": 3, "norma": 2, "parametro": 2}
+    norma, same = query_index(tmp_path / "i.sqlite3", cost_3, ruolo="norma")
+    assert same == counts
+    # a massima naming it both ways keeps both roles
+    assert [(r["numero"], r["ruoli"]) for r in norma] == [("300", ["norma", "parametro"]), ("100", ["norma"])]
+    parametro, _ = query_index(tmp_path / "i.sqlite3", cost_3, ruolo="parametro")
+    assert [r["numero"] for r in parametro] == ["300", "200"]
+    assert query_index(tmp_path / "i.sqlite3", cost_3, 2, 1, "norma")[0][0]["numero"] == "100"
+
+
+def test_an_index_of_an_earlier_version_is_dropped(tmp_path):
+    (tmp_path / "massime-v1.sqlite3").write_bytes(b"old")
+    (tmp_path / INDEX_NAME).write_bytes(b"current")
+    corte_cost_massime._drop_old_indexes(tmp_path)
+    assert sorted(p.name for p in tmp_path.iterdir()) == [INDEX_NAME]
+
+
 def test_a_changed_layout_is_an_error_not_an_empty_index(tmp_path):
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as outer:
@@ -354,12 +384,27 @@ async def test_the_route_answers_an_article_without_massime(client, reader):
     ({"urn": CC_2043, "pagina": 0}, "pagina"),
     ({"urn": CC_2043, "pagina": "2"}, "pagina"),
     ({"urn": CC_2043, "pagina": True}, "pagina"),
+    ({"urn": CC_2043, "ruolo": "entrambi"}, "ruolo"),
+    ({"urn": CC_2043, "ruolo": ["norma"]}, "ruolo"),
 ])
 async def test_the_route_names_the_bad_fields(client, reader, payload, field):
     resp = await client.post("/search_corte_cost_massime", json=payload)
     assert resp.status_code == 400
     body = await resp.get_json()
     assert body["esito"] == "richiesta_non_valida" and set(body["errori"]) == {field}
+
+
+async def test_the_route_keeps_one_role(client, reader):
+    resp = await client.post("/search_corte_cost_massime", json={"urn": f"{R}costituzione~art27", "ruolo": "norma"})
+    body = await resp.get_json()
+    assert resp.status_code == 200 and body["ruolo"] == "norma"
+    assert (body["totale"], body["massime"]) == (0, [])
+    assert body["per_ruolo"] == {"norma": 0, "parametro": 1}
+    resp = await client.post("/search_corte_cost_massime", json={"urn": f"{R}costituzione~art27", "ruolo": "parametro"})
+    body = await resp.get_json()
+    assert body["totale"] == 1 and [m["numero"] for m in body["massime"]] == ["43415"]
+    resp = await client.post("/search_corte_cost_massime", json={"urn": f"{R}costituzione~art27"})
+    assert (await resp.get_json())["ruolo"] is None
 
 
 @pytest.mark.parametrize("payload", [None, [], "x", 3])

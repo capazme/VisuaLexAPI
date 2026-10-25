@@ -326,8 +326,10 @@ POST unless noted, JSON bodies.
   Measured on 13 October 2026 for a regulation or a directive: 0.06 to 0.8 s, 35 to 114 decisions
   (5 to 25 KB with `identita`). Design: docs/superpowers/specs/2026-10-12-case-law-section-design.md
 - `/search_corte_cost_massime` — the Corte costituzionale's massime that name an article (G-281):
-  `{urn, pagina?}` (`urn` the article's `norma_data.urn`, read through `normalize_norm_urn`; a State
-  act's article only) → `esito` risultati (a page of 20, newest decision first: per massima its
+  `{urn, pagina?, ruolo?}` (`urn` the article's `norma_data.urn`, read through `normalize_norm_urn`; a State
+  act's article only; `ruolo` `norma` or `parametro` keeps the massime that name it in that role, each still
+  with all its `ruoli`, and `totale` counts those, while `per_ruolo` counts both: G-289, the web asks
+  `norma` first on the Costituzione) → `esito` risultati (a page of 20, newest decision first: per massima its
   `numero`, `titolo`, `testo` verbatim, `ruoli` — `norma` when the article is a provision at issue,
   `parametro` when it is what one was measured against — and `pronuncia` with `identita`, `tipo`,
   dates and the Court's page; `totale`, `per_ruolo`, `fonte`, `attribuzione` «Massime: Corte
@@ -338,10 +340,13 @@ POST unless noted, JSON bodies.
   failed refresh not retried for an hour, and the index on disk (about 110 MB, built in about 2 s)
   served meanwhile. The mapping (`reference_identity`) reads the codes by name through
   `codice_urn`, the State acts by type, number and date (a code cited by its enacting decree, the
-  c.p.a. as d.lgs. 104/2010, lands in its annex), and an ordinal suffix from
+  c.p.a. as d.lgs. 104/2010, lands in its annex, and so does an act whose text is its annex,
+  `act_default_annex`: the TULPS as r.d. 773/1931), and an ordinal suffix from
   `article_suffixes`; regional acts, statutes, treaties and the repealed codes name nothing.
   Measured on 19 October 2026: 46,607 massime, 148,158 links to an article or an act, 37,664
-  entries left unmapped. The massime are not anchors (root rule 23 does not bind them yet)
+  entries left unmapped. The index's file is named by its version (`INDEX_NAME`, raised when the
+  mapping or the shape changes); a build removes the files of the other versions. The massime
+  are not anchors (root rule 23 does not bind them yet)
 - `/fetch_decision_pdf` — `{corte: cassazione, archivio, numero, anno}` → the court's original
   PDF of a decision as `application/pdf` bytes (an attachment), the ones a lookup cached or
   fetched once; `non_disponibile` 404, fonte_non_raggiungibile 503, richiesta_non_valida 400.

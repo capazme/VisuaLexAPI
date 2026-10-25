@@ -180,7 +180,12 @@ export function CaseLawSection({ norma, topic, articleUrn, tabId, backEntry, isH
                 <h4 id={`${panelId}-corte-cost`} className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                   Corte costituzionale — massime
                 </h4>
-                <CorteCostMassimeBlock articleUrn={articleUrn} besideId={tabId} backEntry={backEntry} />
+                <CorteCostMassimeBlock
+                  articleUrn={articleUrn}
+                  constitution={norma.tipo_atto?.trim().toLowerCase() === 'costituzione'}
+                  besideId={tabId}
+                  backEntry={backEntry}
+                />
               </section>
             )}
 

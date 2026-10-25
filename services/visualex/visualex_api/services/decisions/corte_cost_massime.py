@@ -44,7 +44,7 @@ import structlog
 
 from ...tools.article_suffixes import ARTICLE_ORDINAL_SUFFIXES
 from ...tools.config import PERSISTENT_CACHE_DIR
-from ...tools.map import NORMATTIVA_URN_CODICI, codice_urn
+from ...tools.map import NORMATTIVA_URN_CODICI, act_default_annex, codice_urn
 from ...tools.sources import NORMATTIVA_RESOLVER, normalize_norm_urn
 from .corte_cost import _CP1252, _TIPI, PAGE_URL, _iso, _store_bundle
 from .http import decisions_http_client, http_headers
@@ -69,10 +69,11 @@ PAGE_SIZE = 20  # art. 3 Cost. is named by some 17,600 massime: the route answer
 # the first build waits this long for an answer; past it the route says the index is being made
 FIRST_BUILD_WAIT = 25.0
 _DOWNLOAD_TIMEOUT = aiohttp.ClientTimeout(total=180)
-INDEX_NAME = "massime-v1.sqlite3"  # raise the version when the index's shape or mapping changes
+INDEX_NAME = "massime-v2.sqlite3"  # raise the version when the index's shape or mapping changes
 SOURCE = {"nome": "Corte costituzionale — dati aperti", "licenza": "CC BY-SA 3.0",
           "url": DOWNLOAD_PAGE}
 ATTRIBUTION = "Massime: Corte costituzionale — dati aperti, CC BY-SA 3.0"
+ROLES = ("norma", "parametro")  # how a massima names an article: at issue, or as the measure
 
 
 # --- From an entry of `norme` or `parametri` to an article's identity ----------------------
@@ -163,7 +164,9 @@ def _act_head(entry: dict) -> str | None:
     if act in _ANNEXED:
         annexed = _ANNEXED[act]
         return f"stato:{annexed}" if annexed else None
-    return f"stato:{act}"
+    # an act whose text is its annex (the TULPS, annex 1 of r.d. 773/1931: G-351)
+    annex = act_default_annex(act)
+    return f"stato:{act}:{annex}" if annex else f"stato:{act}"
 
 
 def reference_identity(entry: dict) -> str | None:
@@ -315,11 +318,12 @@ def _key(identity: str) -> str:
     return identity[len(_PREFIX):] if identity.startswith(_PREFIX) else identity
 
 
-def query_index(index: Path, identity: str, page: int = 1,
-                size: int = PAGE_SIZE) -> tuple[list[dict], dict[str, int]]:
+def query_index(index: Path, identity: str, page: int = 1, size: int = PAGE_SIZE,
+                ruolo: str | None = None) -> tuple[list[dict], dict[str, int]]:
     """One page of the massime that name `identity`, newest decision first, and how many name
-    it in each role (`norma`, `parametro`, and `totale`: a massima can hold both). Read-only,
-    synchronous."""
+    it in each role (`norma`, `parametro`, and `totale`: a massima can hold both). With a
+    `ruolo`, the page holds only the massime that name it in that role (each still with all
+    its `ruoli`); the counts stay those of every role. Read-only, synchronous."""
     key = _key(identity)
     db = sqlite3.connect(f"file:{index}?mode=ro", uri=True)
     try:
@@ -330,9 +334,11 @@ def query_index(index: Path, identity: str, page: int = 1,
         rows = db.execute(
             "SELECT m.numero, m.anno, m.numero_pronuncia, m.tipo, m.data_decisione,"
             " m.data_deposito, m.titolo, m.testo, group_concat(r.ruolo)"
-            " FROM refs r JOIN massime m ON m.id = r.massima WHERE r.key = ?"
-            " GROUP BY m.id ORDER BY m.anno DESC, m.numero_pronuncia DESC, m.id"
-            " LIMIT ? OFFSET ?", (key, size, (page - 1) * size)).fetchall()
+            " FROM refs r JOIN massime m ON m.id = r.massima WHERE r.key = :key"
+            " GROUP BY m.id HAVING :ruolo IS NULL OR sum(r.ruolo = :ruolo) > 0"
+            " ORDER BY m.anno DESC, m.numero_pronuncia DESC, m.id"
+            " LIMIT :size OFFSET :offset",
+            {"key": key, "ruolo": ruolo, "size": size, "offset": (page - 1) * size}).fetchall()
     finally:
         db.close()
     return [{
@@ -399,6 +405,7 @@ class CorteCostMassime:
             if not self.index.exists() or await asyncio.to_thread(_signature, self.index) != signature:
                 counts = await asyncio.to_thread(build_index, paths, self.index, signature)
                 log.info("Corte costituzionale massime indexed", **counts)
+                await asyncio.to_thread(_drop_old_indexes, self.cache_dir)
             self._checked_at, self._failed_at = self.clock(), None
         except Exception as exc:  # a cancellation is not an Exception: it propagates
             self._failed_at = self.clock()
@@ -435,13 +442,14 @@ class CorteCostMassime:
             raise MassimeUnavailable(preparing=False) from None
         return self.index
 
-    async def massime_for(self, identity: str,
-                          page: int = 1) -> tuple[list[dict], dict[str, int], int | None]:
-        """A page of the massime that name an article (or an act), the counts by role, and
-        when the index was built."""
+    async def massime_for(self, identity: str, page: int = 1, ruolo: str | None = None,
+                          ) -> tuple[list[dict], dict[str, int], int | None]:
+        """A page of the massime that name an article (or an act), in one role or in any, the
+        counts by role, and when the index was built."""
         index = await self._ready()
         try:
-            rows, counts = await asyncio.to_thread(query_index, index, identity, page)
+            rows, counts = await asyncio.to_thread(query_index, index, identity, page,
+                                                   PAGE_SIZE, ruolo)
             built_at = await asyncio.to_thread(index_built_at, index)
         except sqlite3.DatabaseError as exc:
             # a damaged index: dropped, so the next request builds it again from the bundles
@@ -450,6 +458,13 @@ class CorteCostMassime:
             self._checked_at = self._failed_at = None
             raise MassimeUnavailable(preparing=True) from None
         return rows, counts, built_at
+
+
+def _drop_old_indexes(cache_dir: Path) -> None:
+    """The indexes of an earlier `INDEX_NAME` (about 110 MB each): no reader opens them again."""
+    for old in cache_dir.glob("massime-v*.sqlite3"):
+        if old.name != INDEX_NAME:
+            old.unlink(missing_ok=True)
 
 
 def _signature(index: Path) -> str | None:
@@ -488,11 +503,13 @@ def article_identity(urn: Any) -> str | None:
     return identity
 
 
-async def search_massime(urn: Any, pagina: Any = 1,
+async def search_massime(urn: Any, pagina: Any = 1, ruolo: Any = None,
                          reader: CorteCostMassime | None = None) -> tuple[dict, int]:
     """(the answer, the status): `risultati` 200 (a page of `PAGE_SIZE`, newest first),
     `richiesta_non_valida` 400, `fonte_non_raggiungibile` 503 (with `in_preparazione` while
-    the first index is made)."""
+    the first index is made). A `ruolo` (`norma` or `parametro`) keeps the massime that name the
+    article in that role, and `totale` counts those; `per_ruolo` always counts both (G-289: on
+    the Costituzione the web asks for `norma` first, and offers the rest)."""
     errors = {}
     identity = article_identity(urn)
     if identity is None:
@@ -501,17 +518,21 @@ async def search_massime(urn: Any, pagina: Any = 1,
         pagina = 1
     if isinstance(pagina, bool) or not isinstance(pagina, int) or not 1 <= pagina <= 10_000:
         errors["pagina"] = "atteso un intero da 1 a 10000"
+    if ruolo is not None and ruolo not in ROLES:
+        errors["ruolo"] = "atteso «norma» o «parametro»"
     if errors:
         return {"esito": "richiesta_non_valida", "errori": errors}, 400
     try:
         massime, counts, built_at = await (reader or get_massime_reader()).massime_for(
-            identity, pagina)
+            identity, pagina, ruolo)
     except MassimeUnavailable as exc:
         return {"esito": "fonte_non_raggiungibile", "fonte": "corte_costituzionale",
                 "in_preparazione": exc.preparing}, 503
-    return {"esito": "risultati", "urn": identity, "pagina": pagina,
-            "per_pagina": PAGE_SIZE, "totale": counts["totale"],
-            "per_ruolo": {"norma": counts.get("norma", 0), "parametro": counts.get("parametro", 0)},
+    per_ruolo = {role: counts.get(role, 0) for role in ROLES}
+    return {"esito": "risultati", "urn": identity, "pagina": pagina, "ruolo": ruolo,
+            "per_pagina": PAGE_SIZE,
+            "totale": per_ruolo[ruolo] if ruolo else counts["totale"],
+            "per_ruolo": per_ruolo,
             "massime": massime,
             "fonte": SOURCE, "attribuzione": ATTRIBUTION,
             "aggiornato_al": (time.strftime("%Y-%m-%d", time.localtime(built_at))

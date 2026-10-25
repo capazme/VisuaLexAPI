@@ -192,6 +192,9 @@ export type EuCaseLawAnswer =
   | { esito: 'fonte_non_raggiungibile'; fonte: string }
   | { esito: 'errore_interno' };
 
+/** How a massima names an article: a provision at issue (`norma`) or what one was measured against (`parametro`). */
+export type CorteCostRuolo = 'norma' | 'parametro';
+
 /** A massima of the Corte costituzionale's open data, as `/search_corte_cost_massime` gives it: the text verbatim. */
 export interface CorteCostMassima {
   /** The Court's number of the massima. */
@@ -200,7 +203,7 @@ export interface CorteCostMassima {
   titolo: string;
   testo: string;
   /** How the massima names the article: a provision at issue (`norma`), a parameter (`parametro`), or both. */
-  ruoli: Array<'norma' | 'parametro'>;
+  ruoli: CorteCostRuolo[];
   pronuncia: {
     identita: { corte: 'corte_costituzionale'; numero: number; anno: number };
     tipo: 'sentenza' | 'ordinanza' | null;
@@ -213,7 +216,9 @@ export interface CorteCostMassima {
 
 export type CorteCostMassimeAnswer =
   | {
-      esito: 'risultati'; urn: string; pagina: number; per_pagina: number; totale: number;
+      esito: 'risultati'; urn: string; pagina: number; per_pagina: number;
+      /** The massime the list holds: in the role asked (`ruolo`), else in any. */
+      totale: number; ruolo?: CorteCostRuolo | null;
       per_ruolo: { norma: number; parametro: number }; massime: CorteCostMassima[];
       fonte: { nome: string; licenza: string; url: string }; attribuzione: string; aggiornato_al: string | null;
     }

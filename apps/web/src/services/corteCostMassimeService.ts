@@ -1,6 +1,6 @@
 /** POST /search_corte_cost_massime through legalFetch (G-281). */
 import { legalFetch } from './legalFetch';
-import type { CorteCostMassimeAnswer } from '../types/decisions';
+import type { CorteCostMassimeAnswer, CorteCostRuolo } from '../types/decisions';
 
 /** The four answers the route writes: a new one fails to compile here. */
 const ESITI: Record<CorteCostMassimeAnswer['esito'], true> = {
@@ -18,15 +18,20 @@ function isAnswer(body: unknown): body is CorteCostMassimeAnswer {
 }
 
 /**
- * A page of the Corte costituzionale's massime that name an article (`urn`: the article's `norma_data.urn`).
+ * A page of the Corte costituzionale's massime that name an article (`urn`: the article's `norma_data.urn`),
+ * in one role when `ruolo` is given (`norma`: the article is the provision at issue; G-289).
  * Like `searchEuCaseLaw`, it answers a `fonte_non_raggiungibile` for a response that is not the route's
  * (the quota, the ingress, the login gate) and rejects when no response arrives.
  */
-export async function searchCorteCostMassime(urn: string, pagina = 1): Promise<CorteCostMassimeAnswer> {
+export async function searchCorteCostMassime(
+  urn: string,
+  pagina = 1,
+  ruolo?: CorteCostRuolo,
+): Promise<CorteCostMassimeAnswer> {
   const response = await legalFetch('/search_corte_cost_massime', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ urn, pagina }),
+    body: JSON.stringify(ruolo ? { urn, pagina, ruolo } : { urn, pagina }),
   });
   if (response.status === 429) return { esito: 'fonte_non_raggiungibile', fonte: 'quota' };
   let body: unknown = null;
