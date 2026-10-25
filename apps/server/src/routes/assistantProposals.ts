@@ -98,7 +98,8 @@ router.put('/dossiers/:id/items/:itemId/proposals/:proposalId/note', requireSwit
 const rangeSchema = z
   .object({
     startOffset: z.number().int().min(0),
-    text: z.string().min(1).max(2000),
+    // A user's own highlight has no cap; this one keeps a whole article's worth.
+    text: z.string().min(1).max(100_000),
   })
   .strict();
 

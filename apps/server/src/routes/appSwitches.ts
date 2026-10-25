@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
 import { requireAdmin } from '../middleware/admin';
@@ -6,16 +6,16 @@ import { AppError } from '../middleware/errorHandler';
 import { isAppSwitchKey, isSwitchOn, listSwitches, setSwitch } from '../assistant/switches';
 
 /**
- * The runtime switches: what the web app and the MCP server read (`GET /features`, public: it says only
- * which features are on, and the MCP server asks it before a session lists its tools, with no token), and the
- * administrator's side (`/admin/switches`, none of it delegated). Mounted before the routers that
- * authenticate every `/api` request they see.
+ * `GET /api/features`, what the web app and the MCP server read: public (it says only which features are
+ * on, and the MCP server asks it with no token before a session lists its tools), mounted in `app.ts`
+ * before the limiters.
  */
-const router = Router();
-
-router.get('/features', async (_req, res) => {
+export async function features(_req: Request, res: Response) {
   res.json({ assistantPassages: await isSwitchOn('assistant_passages') });
-});
+}
+
+/** The administrator's side of the runtime switches (`/admin/switches`, none of it delegated). */
+const router = Router();
 
 router.use('/admin/switches', authenticate, requireAdmin);
 

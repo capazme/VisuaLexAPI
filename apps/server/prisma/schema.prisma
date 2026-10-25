@@ -1592,7 +1592,7 @@ model AssistantNoteVersion {
 }
 
 // A switch an administrator turns on and off at runtime, one row per key (D7b's `assistant_passages`, off
-// by default: a missing row is off). The keys are in src/lib/appSwitches.ts; the author is a plain id.
+// by default: a missing row is off). The keys are in src/assistant/switches.ts; the author is a plain id.
 model AppSwitch {
   key       String   @id
   enabled   Boolean  @default(false)

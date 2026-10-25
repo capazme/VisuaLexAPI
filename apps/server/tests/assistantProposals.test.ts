@@ -257,6 +257,22 @@ describe('D7b — the assistant’s proposals, for the web app', () => {
     });
   });
 
+  describe('a study import beside an assistant’s mark', () => {
+    it('adds the user’s highlight on the same words: the assistant’s mark is not one of the user’s', async () => {
+      const p = await proposal(alice.id, itemId);
+      const imported = await request(app).post('/api/dossiers/import-study').set(authHeader(alice)).send({
+        content: {
+          dossiers: [{ title: 'Studio', items: [{ type: 'norma', data: NORM }] }],
+          quickNorms: [],
+          annotations: [],
+          highlights: [{ normaKey: KEY.split('::art::')[0], articleId: '1453', text: p.text, color: 'yellow', startOffset: p.startOffset }],
+        },
+      });
+      expect(imported.status).toBe(201);
+      expect(await prisma.highlight.count({ where: { userId: alice.id, normaKey: KEY, createdByClientId: null } })).toBe(1);
+    });
+  });
+
   describe('the assistant’s note entries and the light on each entry', () => {
     let noteId: string;
     beforeEach(async () => {

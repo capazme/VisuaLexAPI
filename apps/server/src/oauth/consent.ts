@@ -8,7 +8,6 @@ export const AUTHORIZATION_CODE_LIFETIME_MS = 60 * 1000;
 /** What each scope lets an application do, as the consent page says it. */
 export const SCOPE_LABELS: Record<string, string> = {
   'dossier:read': 'Leggere i tuoi dossier: i nomi e le norme che contengono',
-  // Draft words for D7b, for the owner's final reading before the deploy.
   'dossier:write':
     'Creare dossier, aggiungervi norme e note ed evidenziarne passaggi come proposte che validi tu (non può modificare nulla; per eliminare serve il permesso qui sotto)',
   'dossier:text':

@@ -168,6 +168,8 @@ export async function trashDossier(
     // moved to the trash) is committed first and lands in the payload, and one that comes after
     // waits and then finds no task. Otherwise the payload would keep the task as it was.
     await tx.$queryRaw`SELECT id FROM tasks WHERE dossier_id = ${dossierId} AND user_id = ${userId} ORDER BY id FOR UPDATE`;
+    // Its entries too, for an assistant's note whose state or text changes in flight (D7b).
+    await tx.$queryRaw`SELECT id FROM dossier_items WHERE dossier_id = ${dossierId} ORDER BY id FOR UPDATE`;
     const dossier = await tx.dossier.findFirst({
       where: { id: dossierId, userId },
       include: {
@@ -229,6 +231,9 @@ export async function trashDossierItems(
     const dossier = await tx.dossier.findFirst({ where: { id: dossierId, userId } });
     if (!dossier) throw new AppError(404, 'Dossier not found');
     const wanted = [...new Set(itemIds)];
+    // The entries are locked before they are read: a state change or an edit of an assistant's note in flight
+    // (D7b, which locks the entry's row alone) lands in the payload, one that comes after finds no entry.
+    await tx.$queryRaw`SELECT id FROM dossier_items WHERE id IN (${Prisma.join(wanted)}) AND dossier_id = ${dossierId} ORDER BY id FOR UPDATE`;
     const items = await tx.dossierItem.findMany({ where: { id: { in: wanted }, dossierId }, orderBy: { position: 'asc' } });
     if (items.length === 0) throw new AppError(404, 'Nessuna delle voci indicate è in questo dossier.');
     const moved = items.map((item) => item.id);

@@ -420,8 +420,10 @@ export const updateDossierItem = async (req: Request, res: Response) => {
     // `assistant_note`, the edit is stamped and the note becomes «validata, modificata da te».
     if (existing?.noteState && data.content !== undefined) {
       if (typeof data.content !== 'string' || !data.content.trim()) throw new AppError(400, 'La nota dell’IA si modifica come testo.');
+      // Trimmed, as `PUT …/text` stores it.
+      data.content = data.content.trim();
       const shown = typeof existing.content === 'string' ? existing.content : null;
-      assistantEdit = noteEdit(shown, data.content, req.user!.id, new Date());
+      assistantEdit = noteEdit(shown, data.content as string, req.user!.id, new Date());
     }
     if (existing?.itemType === 'sentenza') {
       if (data.content !== undefined) {

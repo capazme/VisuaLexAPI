@@ -11,8 +11,8 @@ import { isSwitchOn } from './switches';
  * removable), with no state. A note starts `proposed` (yellow), becomes `validated` (green; «modificato da
  * te» once edited) or `review` (red, with an optional comment kept for the second cut). The model's
  * original is never overwritten. Two holders: a highlight the assistant proposed on a dossier entry, and a
- * note entry the assistant wrote in a dossier. Neither the state, nor the comment, nor an edit is ever
- * shown to a connected application in this cut.
+ * note entry the assistant wrote in a dossier. Neither the state nor the comment is ever shown to a connected
+ * application in this cut; an edited note entry's text is, as every entry's content in the dossier's answer.
  */
 
 export const REVIEW_COMMENT_MAX = 500;

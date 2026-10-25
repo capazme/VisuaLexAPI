@@ -6,7 +6,7 @@ import { AppError } from '../middleware/errorHandler';
 import { atMostUnits } from '../utils/utf16Length';
 import { citeStoredItem } from '../norms/decisionCitation';
 import { isSwitchOn } from '../assistant/switches';
-import { EntryHasNoText, TextUnavailable, readEntryText, type EntryText } from '../assistant/entryText';
+import { EntryHasNoText, SourceHasNoText, TextUnavailable, readEntryText, type EntryText } from '../assistant/entryText';
 import { CONTEXT_MAX, QUOTE_MAX, QUOTE_MIN, locateQuote } from '../assistant/locateQuote';
 import { ASSISTANT_NOTE_MAX } from '../assistant/notes';
 
@@ -54,6 +54,7 @@ async function textOf(item: { itemType: string; content: unknown }): Promise<Ent
     return await readEntryText(item);
   } catch (error) {
     if (error instanceof EntryHasNoText) throw new AppError(400, NO_TEXT);
+    if (error instanceof SourceHasNoText) throw new AppError(400, 'La fonte non ha il testo di questa voce.');
     if (error instanceof TextUnavailable) throw new AppError(503, NOT_YET);
     throw error;
   }
@@ -79,15 +80,17 @@ const partSchema = z.object({ parte: z.coerce.number().int().min(1).max(1000).de
 
 router.get('/dossiers/:id/items/:itemId/text', async (req, res) => {
   await requireSwitch();
+  // For a connected application only: the web reads the text through the Python API, under its own quota.
+  if (!req.delegation) throw new AppError(403, 'Solo un’applicazione collegata legge il testo da qui.');
   const { parte } = partSchema.parse({ parte: req.query.parte ?? req.query.part });
   const item = await entryOf(req);
   const text = await textOf(item);
   const all = pages(text.display);
   if (parte > all.length) throw new AppError(400, `Il testo ha ${all.length} ${all.length === 1 ? 'parte' : 'parti'}.`);
-  // Only what the model proposed and the user has not taken up: never the user's own marks, a validated or a
-  // flagged note, an edit, a comment, or boundaries the user moved (§8.9).
+  // Only what this application proposed and the user has not taken up: never another application's, the
+  // user's own marks, a validated or a flagged note, an edit, a comment, or boundaries the user moved (§8.9).
   const open = await prisma.highlight.findMany({
-    where: { userId: req.user!.id, dossierItemId: item.id, createdByClientId: { not: null }, OR: [{ noteState: null }, { noteState: 'proposed' }] },
+    where: { userId: req.user!.id, dossierItemId: item.id, createdByClientId: req.delegation.clientId, OR: [{ noteState: null }, { noteState: 'proposed' }] },
     orderBy: [{ assistantStartOffset: 'asc' }, { createdAt: 'asc' }],
     select: { assistantText: true, color: true, assistantNote: true },
   });
@@ -151,16 +154,18 @@ router.post('/dossiers/:id/items/:itemId/passages', async (req, res) => {
     // The dossier's lock, as the trash takes it: two calls cannot pass the limit together, and no row is
     // written while the entry goes to the trash (which then finds it gone, or waits and takes it along).
     const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM dossiers WHERE id = ${item.dossierId} AND user_id = ${req.user!.id} FOR UPDATE`;
-    if (locked.length === 0 || (await tx.dossierItem.count({ where: { id: item.id, dossierId: item.dossierId } })) === 0) {
-      throw new AppError(404, 'Voce non trovata');
-    }
+    const now = locked.length === 0 ? null : await tx.dossierItem.findFirst({ where: { id: item.id, dossierId: item.dossierId }, select: { content: true } });
+    if (!now) throw new AppError(404, 'Voce non trovata');
+    // The entry changed while its text was read (another version, say): the offsets would point into the old text.
+    if (JSON.stringify(now.content) !== JSON.stringify(item.content)) throw new AppError(409, 'La voce è cambiata mentre ne leggevo il testo.');
     // The entry's own marks only: the user's highlights are never consulted, so the answer never tells the
     // model what the user marked (§8.9).
     const existing = await tx.highlight.findMany({
       where: { userId: req.user!.id, dossierItemId: item.id, createdByClientId: { not: null } },
-      select: { startOffset: true, text: true, noteState: true },
+      select: { assistantStartOffset: true, assistantText: true, noteState: true },
     });
-    const taken = new Set(existing.map((h) => `${h.startOffset}:${h.text}`));
+    // Where the model put them, never where the user moved them: the answer must not tell a move.
+    const taken = new Set(existing.map((h) => `${h.assistantStartOffset}:${h.assistantText}`));
     let open = existing.filter((h) => h.noteState !== 'validated').length;
     const result: Outcome[] = [];
     for (const passage of passaggi) {

@@ -133,6 +133,8 @@ export interface EntryText {
 
 export class EntryHasNoText extends Error {}
 export class TextUnavailable extends Error {}
+/** The source says it has no such decision: asking again will not help. */
+export class SourceHasNoText extends Error {}
 
 /** A budget of 60 seconds for the fetch (§8.5): a cold decision can take minutes at its source. */
 export const TEXT_BUDGET_MS = 60_000;
@@ -185,6 +187,7 @@ async function readDecision(content: unknown, signal: AbortSignal): Promise<Entr
     ...(identity.provvedimento ? { provvedimento: identity.provvedimento } : {}),
   };
   const { status, data } = await postLegalApi('/fetch_decision', reference, { signal });
+  if (status === 404 && data.esito === 'non_trovata') throw new SourceHasNoText();
   const testo = data.testo as DecisionText | undefined;
   const found = data.identita as { corte: string; numero: number; anno: number; archivio?: string; sede?: string; provvedimento?: string } | undefined;
   if (status !== 200 || data.esito !== 'trovata' || !testo || typeof testo !== 'object' || !found) {

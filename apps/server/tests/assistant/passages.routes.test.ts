@@ -141,6 +141,24 @@ describe('D7b — an entry’s text and the passages proposed on it', () => {
       ]);
     });
 
+    it('lists another application’s proposals to no one but it, and reads nothing for a session', async () => {
+      await propose([{ testo: 'il risarcimento del danno', nota: 'Fatti della pratica.' }]);
+      const other = (await delegatedToken(alice, 'dossier:read dossier:write dossier:text')).apiToken;
+      const seen = await request(app).get(`/api/dossiers/${dossierId}/items/${normId}/text`).set({ Authorization: `Bearer ${other}` });
+      expect(seen.body.proposte).toEqual([]);
+      expect((await text()).body.proposte).toHaveLength(1);
+      const session = await request(app).get(`/api/dossiers/${dossierId}/items/${normId}/text`).set(authHeader(alice));
+      expect(session.status).toBe(403);
+    });
+
+    it('says a decision the source does not know has no text to read, not «try again»', async () => {
+      nock.cleanAll();
+      nock(API).post('/fetch_decision').times(5).reply(() => [404, { esito: 'non_trovata', motivo: 'inesistente' }]);
+      const response = await text(decisionId);
+      expect(response.status).toBe(400);
+      expect(response.body.detail).toBe('La fonte non ha il testo di questa voce.');
+    });
+
     it('cuts a long text in pages at a line end', async () => {
       const long = Array.from({ length: 3000 }, (_, i) => `Riga ${i}: il testo continua con altre parole.`).join('\n');
       nock.cleanAll();
@@ -225,6 +243,15 @@ describe('D7b — an entry’s text and the passages proposed on it', () => {
       await request(app).post('/api/highlights').set(authHeader(alice)).send({ normaKey: KEY, text: 'il risarcimento del danno', color: 'red', startOffset: at, endOffset: at + 25 });
       const first = await propose([{ testo: 'il risarcimento del danno' }, { testo: 'il risarcimento del danno' }]);
       expect(first.body.passaggi.map((p: { esito: string; motivo?: string }) => p.motivo ?? p.esito)).toEqual(['proposto', 'già proposto in questo punto']);
+    });
+
+    it('judges a repeat by where the model put a mark, never by where the user moved it', async () => {
+      const first = await propose([{ testo: 'il risarcimento del danno' }]);
+      const projection = RAW.replace(/\n/g, '');
+      const moved = projection.indexOf('la risoluzione del contratto');
+      await prisma.highlight.update({ where: { id: first.body.passaggi[0].id }, data: { startOffset: moved, text: 'la risoluzione del contratto', endOffset: moved + 28 } });
+      const again = await propose([{ testo: 'il risarcimento del danno' }, { testo: 'la risoluzione del contratto' }]);
+      expect(again.body.passaggi.map((p: { esito: string; motivo?: string }) => p.motivo ?? p.esito)).toEqual(['già proposto in questo punto', 'proposto']);
     });
 
     it('proposes on a decision, in its projection, under its key with no article', async () => {
