@@ -149,6 +149,27 @@
       "labels": {"citation": {"value": "art. 86, r.d. 18 giugno 1931, n. 773", "status": "decided"}, "short": {"value": "art. 86 r.d. 773/1931", "status": "decided"}, "act_heading": {"value": "r.d. 18 giugno 1931, n. 773", "status": "decided"}, "authority": {"value": "Re", "status": "proposed"}}
     },
     {
+      "id": "rd-267-1942-1",
+      "note": "An act whose text is its annex, as the TULPS (G-351): the legge fallimentare is annex 1 of r.d. 267/1942, whose own art. 1 approves it, so the article is keyed by the annex and the annex is never named in the label (G-359). Found on Normattiva on 25 October 2026.",
+      "input": {"tipo_atto": "regio decreto", "numero_atto": "267", "data": "1942-03-16", "allegato": "1", "numero_articolo": "1"},
+      "identity": {"article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:regio.decreto:1942-03-16;267:1~art1", "status": "current"}},
+      "labels": {"citation": {"value": "art. 1, r.d. 16 marzo 1942, n. 267", "status": "decided"}, "short": {"value": "art. 1 r.d. 267/1942", "status": "decided"}}
+    },
+    {
+      "id": "dpr-448-1988-1",
+      "note": "An act whose text is its annex, as the TULPS (G-351): the c.p.p. minorile (disposizioni sul processo penale a carico di imputati minorenni) is annex 1 of d.p.r. 448/1988, whose own art. 1 approves it, so the article is keyed by the annex and the annex is never named in the label (G-359). Found on Normattiva on 25 October 2026.",
+      "input": {"tipo_atto": "decreto del presidente della repubblica", "numero_atto": "448", "data": "1988-09-22", "allegato": "1", "numero_articolo": "1"},
+      "identity": {"article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.del.presidente.della.repubblica:1988-09-22;448:1~art1", "status": "current"}},
+      "labels": {"citation": {"value": "art. 1, d.p.r. 22 settembre 1988, n. 448", "status": "decided"}, "short": {"value": "art. 1 d.p.r. 448/1988", "status": "decided"}}
+    },
+    {
+      "id": "dlgs-346-1990-1",
+      "note": "An act whose text is its annex, as the TULPS (G-351): the testo unico sulle successioni e donazioni is annex 1 of d.lgs. 346/1990, whose own art. 1 approves it, so the article is keyed by the annex and the annex is never named in the label (G-359). Found on Normattiva on 25 October 2026.",
+      "input": {"tipo_atto": "decreto legislativo", "numero_atto": "346", "data": "1990-10-31", "allegato": "1", "numero_articolo": "1"},
+      "identity": {"article": {"value": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legislativo:1990-10-31;346:1~art1", "status": "current"}},
+      "labels": {"citation": {"value": "art. 1, d.lgs. 31 ottobre 1990, n. 346", "status": "decided"}, "short": {"value": "art. 1 d.lgs. 346/1990", "status": "decided"}}
+    },
+    {
       "id": "dlgs-385-1993-127",
       "note": "An act dated on the first of a month: «1°», as the Gazzetta Ufficiale writes it (decided).",
       "input": {"tipo_atto": "decreto legislativo", "numero_atto": "385", "data": "1993-09-01", "numero_articolo": "127"},

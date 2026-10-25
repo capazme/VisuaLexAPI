@@ -104,6 +104,12 @@ CODE_ROWS_OF_SEVERAL_CODES = frozenset({"codici penali militari di pace e di gue
 # actTypes.ts and in MERL-T's utils/map.py.
 ANNEXED_ACTS = {
     "regio.decreto:1931-06-18;773": "1",
+    # The legge fallimentare, the c.p.p. minorile and the testo unico sulle successioni e
+    # donazioni: the decree approves the text as its annex 1 (checked on Normattiva, 25 October
+    # 2026: a dispositivo of one or two articles, «È approvato il testo, allegato…»).
+    "regio.decreto:1942-03-16;267": "1",
+    "decreto.del.presidente.della.repubblica:1988-09-22;448": "1",
+    "decreto.legislativo:1990-10-31;346": "1",
 }
 
 
