@@ -371,8 +371,9 @@ version came back; `norma_data.data_versione` is only the date the caller sent (
 current text and say nothing — and so is one that cannot be read as a date, and one with
 `version: "originale"` (a date asks for the text in force that day, G-353; mcp-legal-it refuses the pair too).
 
-A date always asks for the text in force on that day, with or without «vigente» and
-over «originale» (owner, G-353; `append_version_info` writes `!vig=<day>`, and the AKN
+A date always asks for the text in force on that day, with or without «vigente» (owner,
+G-353; a request pairing it with «originale» is refused, above, and inside the API the date
+still wins: `append_version_info` writes `!vig=<day>`, and the AKN
 fallback reads the export at that day, never the original from today's). A request
 with no date is the text in force: Normattiva answers it with its latest version, also
 one not in force yet (art. 3 d.P.R. 131/1986 on 21 October 2026: repealed from 1
