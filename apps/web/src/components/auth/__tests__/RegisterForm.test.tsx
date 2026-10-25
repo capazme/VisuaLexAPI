@@ -70,7 +70,8 @@ describe('RegisterForm', () => {
     fill({ email: 'avv@studio.it', username: 'avv_rossi', password: 'Segreta123', confirm: 'Segreta123' });
     submit();
     expect(await screen.findByRole('alert')).toHaveTextContent('already exists');
-    await waitFor(() => expect(within(panel()).getByLabelText('Email')).toHaveFocus());
+    // In the commit that enables the form again (a layout effect): no wait needed.
+    expect(within(panel()).getByLabelText('Email')).toHaveFocus();
   });
 
   it('shows one eye for both password fields, a 44 px button with its name', () => {
@@ -93,16 +94,21 @@ describe('RegisterForm', () => {
   it('after signing up, the wait for approval in the same card, and «Torna ad Accedi» back to the tab', async () => {
     renderAuth('/register');
     fill({ email: 'avv@studio.it', username: 'avv_rossi', password: 'Segreta123', confirm: 'Segreta123' });
-    // Where the focus is the moment the confirmation enters the page: what `findByRole` sees when it finds it (its
-    // MutationObserver fires in a microtask after React's commit). The focus must already be there, not on the body.
+    // Where the focus is the moment the confirmation enters the page, in the microtask after React's commit, where
+    // `findByRole`'s own observer finds it. A focus moved by a passive effect is not there yet (it runs in a later
+    // task of React's scheduler): this caught the flake at every run, where the bare `toHaveFocus` lost only a race.
     let focusWhenShown: Element | null | undefined;
     const observer = new MutationObserver(() => {
       if (focusWhenShown === undefined && screen.queryByRole('heading', { name: 'Registrazione completata' })) focusWhenShown = document.activeElement;
     });
     observer.observe(document.body, { childList: true, subtree: true });
-    submit();
-    const heading = await screen.findByRole('heading', { name: 'Registrazione completata' });
-    observer.disconnect();
+    let heading: HTMLElement;
+    try {
+      submit();
+      heading = await screen.findByRole('heading', { name: 'Registrazione completata' });
+    } finally {
+      observer.disconnect();
+    }
     expect(focusWhenShown).toBe(heading);
     expect(heading).toHaveFocus();
     expect(within(panel()).getByText('È in attesa di approvazione da parte di un amministratore.')).toBeInTheDocument();
