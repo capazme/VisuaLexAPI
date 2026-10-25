@@ -193,12 +193,10 @@ describe('DossierDecisionsSection (D7a)', () => {
     expect(onToggleImportant).toHaveBeenCalledWith(cass);
   });
 
-  it('marks a decision Claude filed, as an article\'s notes are, and says it in the row\'s name', () => {
+  it('draws no mark of the application that filed a decision, on screen or in the row\'s name (D7b)', () => {
     renderSection([{ ...cass, createdBy: { clientName: 'Claude Code (visualex)' } }, cost]);
-    const filed = screen.getByRole('button', { name: `Espandi ${CASS}, aggiunta da Claude Code (visualex) (applicazione collegata)` });
-    expect(within(filed).getByText('Claude Code (visualex)')).toBeInTheDocument();
-    expect(within(filed).getByText('aggiunta da Claude Code (visualex) (applicazione collegata)')).toHaveClass('sr-only');
-    // The user's own carries none.
+    expect(screen.getByRole('button', { name: `Espandi ${CASS}` })).toBeInTheDocument();
+    expect(screen.queryByText(/Claude Code/)).toBeNull();
     expect(screen.getByRole('button', { name: `Espandi ${COST}` })).toBeInTheDocument();
   });
 

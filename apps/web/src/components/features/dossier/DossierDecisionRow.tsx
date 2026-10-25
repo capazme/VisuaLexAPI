@@ -2,8 +2,6 @@ import { useMemo } from 'react';
 import { CheckSquare, ChevronDown, Square, Star, Trash2 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { identityOf } from '../../../utils/decisionLinks';
-import { ClaudeMark } from '../../ui/ClaudeMark';
-import { claudeMarkSentence } from '../../ui/claudeMarkSentence';
 import { DossierDecisionReader } from './DossierDecisionReader';
 import { decisionCitationOf, formatTimestampLong } from './dossierUtils';
 import type { SentenzaItem } from './dossierLayout';
@@ -25,9 +23,8 @@ export interface DossierDecisionRowProps {
  * One decision of «Giurisprudenza», a row as an article's (D7a, `DossierArticleRow`): the checkbox while selecting, the
  * toggle with its arrow, the citation over a grey line («Aggiunta il …»), then the star and the removal, 44 px at every
  * width; the decision read in place (`DossierDecisionReader`), asked for only once the row is opened. The citation is
- * recomputed from the stored identity, never the stored copy (source convention, Q9). The application that filed it, as
- * an article's notes are marked («aggiunta da Claude Code», `createdBy`, which the server records on every item). No
- * note count: a note of the dossier is about an article only, and the notes and highlights on the text would cost a
+ * recomputed from the stored identity, never the stored copy (source convention, Q9). The application that filed it
+ * (`createdBy`) is not drawn on the row (D7b): the server keeps it, the export carries it. No note count: a note of the dossier is about an article only, and the notes and highlights on the text would cost a
  * read per decision.
  */
 export function DossierDecisionRow({
@@ -40,9 +37,7 @@ export function DossierDecisionRow({
   const citationId = `dossier-item-citation-${item.id}`;
   // One object while the item stays: the reader asks the source again for a new reference, and the page redraws often.
   const identity = useMemo(() => identityOf(item.data), [item.data]);
-  const byApp = item.createdBy ?? null;
-  // The mark sits inside the toggle, whose name replaces it for a screen reader: the name says it.
-  const rowLabel = `${isExpanded ? 'Comprimi' : 'Espandi'} ${citation}` + (byApp ? `, ${claudeMarkSentence(byApp, 'aggiunta')}` : '');
+  const rowLabel = `${isExpanded ? 'Comprimi' : 'Espandi'} ${citation}`;
 
   return (
     <div className={cn(ROW, 'pl-3 transition-colors', isSelected ? 'bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800/40')}>
@@ -83,14 +78,7 @@ export function DossierDecisionRow({
           />
           <span className="min-w-0 flex-1">
             <span id={citationId} className={cn(ROW_TITLE, 'block font-medium [overflow-wrap:anywhere]')}>{citation}</span>
-            {/* The application's mark on the grey line, not at the right as an article's signs: a citation is long, and
-                beside a mark it was squeezed into a column of words on a phone. */}
-            {(added || byApp) && (
-              <span className={cn(ROW_LINE, 'mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1')}>
-                {added && <span>Aggiunta il {added}</span>}
-                {byApp && <ClaudeMark createdBy={byApp} compact verb="aggiunta" />}
-              </span>
-            )}
+            {added && <span className={cn(ROW_LINE, 'mt-0.5 block')}>Aggiunta il {added}</span>}
           </span>
         </div>
         <button

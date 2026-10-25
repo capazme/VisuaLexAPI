@@ -105,11 +105,11 @@ describe('DossierArticleRow notes', () => {
     { id: 'n1', type: 'note' as const, data: 'Sul danno ingiusto.', addedAt: '2026-10-04T10:00:00Z', createdBy: { clientName: 'Claude Code' } },
     { id: 'n2', type: 'note' as const, data: 'Mia nota.', addedAt: '2026-10-04T11:00:00Z', createdBy: null },
   ];
-  it('counts its notes on the closed row, with the mark of the application that wrote one', () => {
+  it('counts its notes on the closed row, without the mark of the application that wrote one (D7b)', () => {
     renderRow(normaItem, { notes });
     expect(screen.getByTitle('2 note')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Espandi codice civile 262 articolo 2043, 2 note, una scritta da Claude Code (applicazione collegata)' })).toBeInTheDocument();
-    expect(screen.getByText('Claude Code')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Espandi codice civile 262 articolo 2043, 2 note' })).toBeInTheDocument();
+    expect(screen.queryByText(/Claude Code/)).toBeNull();
     expect(screen.queryByText('Sul danno ingiusto.')).toBeNull();
   });
   it('shows its notes above the text when open, and adds and removes one', () => {

@@ -1817,8 +1817,10 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   through MCP. A note about an article (`aboutItemId`) sits with it: a count on
   the closed row, the notes above the text when open, «Aggiungi una nota
   all'articolo»; a note whose article is no longer in the dossier shows among
-  the free notes. An entry an application wrote carries `ClaudeMark` (`components/ui/`,
-  shared with Studia, its sentence `claudeMarkSentence` beside it; «scritta da Claude Code (applicazione collegata)», from `createdBy`). An undone removal
+  the free notes. A note an application wrote carries `ClaudeMark` (`components/ui/`,
+  shared with Studia, its sentence `claudeMarkSentence` beside it; «scritta da Claude Code (applicazione collegata)», from `createdBy`).
+  The rows of articles and decisions carry none, in their name neither (D7b): who filed them stays in the database and
+  the account export. An undone removal
   keeps the ids (question 181): «Annulla» restores the trash entry, so a note stays
   about its article and Claude's mark survives, as in the MCP trash. The note dialog closes only once
   the server has the note, so a refused note keeps its text.
@@ -1920,10 +1922,8 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   below (`MenuButton`'s `placement="auto"`). The row names the decision, so inside its full name is a quiet line of
   details, not a second and heavier title (`DecisionView`'s `title="line"`; the practice keeps its h4), and the
   opened decision is a region named by the row's citation (`aria-labelledby`, no new words on screen), so a screen
-  reader still finds it by its name. The application that filed it is marked as an article's notes are,
-  `ClaudeMark` with `verb="aggiunta"` — «aggiunta da Claude Code», never «scritta» — from the item's own `createdBy`,
-  on the grey line rather than at the right (a long citation beside it was squeezed into a column on a phone).
-  No note count: the server takes a note about an article only, `assertArticleOfDossier`, and counting the notes and
+  reader still finds it by its name. The application that filed it is not drawn on the row (D7b, as an article's
+  row); the item's `createdBy` stays. No note count: the server takes a note about an article only, `assertArticleOfDossier`, and counting the notes and
   highlights on each text would cost a read per decision.) «Seleziona tutti» takes
   the decisions with the articles; «Apri tutto su Dashboard», on the page and on the list's card, opens a dossier of
   decisions alone too, one practice holding them; «Espandi tutto» opens the articles only, each decision being a request
