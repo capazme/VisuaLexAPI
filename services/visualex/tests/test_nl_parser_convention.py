@@ -241,3 +241,12 @@ class TestAnnexSigle:
     def test_a_code_sigla_names_no_annex(self, label, act_type):
         params = parse_nl_query(label).to_api_params()
         assert params["act_type"] == act_type and "annex" not in params
+
+    @pytest.mark.parametrize("text", ["cod. post. telecom.", "cod post telecom", "cod.post.telecom."])
+    def test_a_longer_spelling_of_a_sigla_is_read_whole(self, text):
+        # «cod. post.» used to be read and «telecom.» left in the text (review of #310).
+        from visualex_api.tools.nl_parser import _extract_annex_sigla
+
+        assert _extract_annex_sigla(text) == ("", "codice postale e delle telecomunicazioni", None)
+        params = parse_nl_query(f"art. 20 {text}").to_api_params()
+        assert params["act_type"] == "codice postale e delle telecomunicazioni" and params["article"] == "20"
