@@ -1004,7 +1004,61 @@ beside it when the margin has room, else below or above it, never over the
 passage it lists — through a virtual reference that finds the sign again on
 every measurement, because every edit redraws the text. Its focus management
 is modal: with no element in the text for floating-ui to bridge Tab back to,
-Tab cycles inside and Esc returns to the sign. The "Evidenziazioni" box under
+Tab cycles inside and Esc returns to the sign.
+
+**Passages an application proposed** (D7b: the MCP design's §8, in the documentation pull request #318, as the
+server's contract for the first cut revises it) are highlights with a `proposal` (`types/index.ts`, `HighlightProposal`): only a dossier entry's reader is
+ever given one. The state is the application's note's, not the highlight's: a
+passage with no note is a plain mark titled «Evidenziato dall'IA», removable, outside every count and with no
+checkbox (`hasAiNote`). Until its note is validated («da validare» or «Da rivedere», `isOpenProposal`), `highlightOpen` adds
+`data-proposed` and `.vlx-proposed` — a dashed line, red once flagged — and the sign adds the sparkle
+(`.vlx-sign-proposed`) and names them apart («…; 2 passaggi proposti dall'IA: 1 da validare · 1 da rivedere»,
+`signAriaLabel`), as its `title` too; still no text node, and the projection tests run with proposals on. A click on
+such a passage opens its block's popover (`useArticleTextInteractions`, in an article's comma or a decision's
+paragraph), unless it lands on something with a click of its own (a reference, a citation, a link) or the
+highlights are hidden; the readers' note handlers skip what `proposedPassageAt` returns, whatever order the listeners were added in,
+so a note of the reader's under it never opens. The
+popover lists them first, only when given `proposalActions`, as `ProposalCard`s: the passage, its note, then
+`AiReviewControls` — a real checkbox «Proposto dall'IA, confermi?» → «Validato» (or «Validato, modificato da
+te») with the green tick, the flag «Da rivedere» with its optional «Cosa non va?», the pencil (the note edited
+in place in `NoteEditBox`, shared with `NoteCard`), the bin, and «Vedi la versione dell'IA» once the note was
+changed. A shape per state, never colour alone. The dossier's rows carry the traffic light (`AiReviewSignal`,
+`utils/aiReview.ts`): a red flag if one item is to review, else a yellow dashed ring if one waits, else a green
+tick, nothing if the application wrote nothing; its words («2 da validare · 1 da rivedere») are its `title` and
+in the row's name, its counts the server's `assistant_notes` on the item (`serverFieldsFromApi`).
+
+The wiring follows the server's contract (`services/assistantService.ts`). `GET /api/features` says whether the
+feature is on, read as the app starts (`useAuth`) and as the dossier page mounts; a 404 «Non disponibile» from a
+route turns it off again. `store/assistantProposals.ts` is a store of its own, keyed by entry id and filled by the
+entry's reader from `…/items/:itemId/proposals`: the marks never enter the app's highlights, so Study Mode, the Forum,
+environments and the PDF never receive one, whatever the note's state. `useEntryProposals` serves the entry's
+reader: an article's `DossierItemReader` and a decision's `DecisionReadingSurface` (its `dossierItemId`, from
+`DossierDecisionRow`), each given its entry's id, the dossier from `CurrentDossierContext` (`DossierDetailView`). It asks
+nothing outside a dossier entry, with the feature off or on a text shown read-only, and draws the proposals with the
+reader's own highlights (a decision's downloads keep only the reader's); one whose words no longer land is listed under
+the text at every width, as the application's, with its note and the popover's actions (`LostProposalsList`), never
+in the reader's own boxes (`LooseHighlightsList`, desktop only, and `UnmatchedAnchors`). Each
+write takes the server's answer and moves the row's light by one (the old state down, the new up). The bin removes at
+once and offers «Annulla»; the `DELETE` leaves when the notification closes, when the entry's reader goes (its row
+closed), or at `pagehide` as a `keepalive` fetch (the removal refreshes the token first, since that fetch cannot), never
+after a logout drops it. Sent early, its notification goes too, «Annulla» with it. A reading never draws back a removal
+waiting or out; a refused `DELETE` puts the passage and its count back. Each write reads the state it replaces as the
+answer lands, and only the latest action's answer is taken (an earlier one landing after it is dropped); while a write
+is out the checkbox and the flag wait (`busy`, `aria-disabled`, still focusable). An answer landing while the passage
+waits behind «Annulla» is what «Annulla» puts back, the server's state. A 404 «Proposta non trovata», on a write or a
+`DELETE`, is a removal done: no error, nothing put back. Errors are read as `apiClient` rejects them (`{ status,
+message, data }`): the server's `detail` is what the notification says. A state that changes is said in a `status`
+region; the focus comes back to the pencil after editing, and to the popover after a bin; «Cosa non va?» also saves on
+Esc. On a narrow card the three buttons go under the label (`flex-wrap`). The flag is read once as the app starts
+(with the user's data) and as the dossier page mounts; on again after an off, the dossiers are read again for their
+lights. A 404 «Non disponibile» also clears the items' `assistantNotes` and
+`assistantNote`, so no light or control stays; a logout empties the store; a share link or a JSON export carries
+neither field (`shareableDossier`). Trashing a note entry an application wrote takes its count off its article's light
+(`trashDossierItems`, `shiftAiReviewCount`). A note entry an application wrote (`assistantNote` on the item, contract §3) has the same controls
+(`AiNoteEntryReview`, in the free notes and under an article; its bin is the row's own removal): its writes replace
+the item's text and state from the answer and move the light of the article it is about.
+
+The "Evidenziazioni" box under
 the article now lists only what no sign can reach (`LooseHighlightsList`,
 desktop): highlights made in the Brocardi sections (`<article>/brocardi/ratio|spiegazione`, still
 loaded by the prefix queries and labelled «Sezione non più disponibile · Ratio» since the sections went,
@@ -1817,8 +1871,10 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   through MCP. A note about an article (`aboutItemId`) sits with it: a count on
   the closed row, the notes above the text when open, «Aggiungi una nota
   all'articolo»; a note whose article is no longer in the dossier shows among
-  the free notes. An entry an application wrote carries `ClaudeMark` (`components/ui/`,
-  shared with Studia, its sentence `claudeMarkSentence` beside it; «scritta da Claude Code (applicazione collegata)», from `createdBy`). An undone removal
+  the free notes. Nothing on the dossier's page draws who wrote an entry (D7b): not the rows of articles and
+  decisions, in their name neither, nor the notes, whose application's ones say it by their validation
+  (`AiNoteEntryReview`). `createdBy` stays in the database, the account export and the PDF, which writes
+  `claudeMarkSentence` («scritta da Claude Code (applicazione collegata)»); `ClaudeMark` is Studia's now. An undone removal
   keeps the ids (question 181): «Annulla» restores the trash entry, so a note stays
   about its article and Claude's mark survives, as in the MCP trash. The note dialog closes only once
   the server has the note, so a refused note keeps its text.
@@ -1920,10 +1976,8 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   below (`MenuButton`'s `placement="auto"`). The row names the decision, so inside its full name is a quiet line of
   details, not a second and heavier title (`DecisionView`'s `title="line"`; the practice keeps its h4), and the
   opened decision is a region named by the row's citation (`aria-labelledby`, no new words on screen), so a screen
-  reader still finds it by its name. The application that filed it is marked as an article's notes are,
-  `ClaudeMark` with `verb="aggiunta"` — «aggiunta da Claude Code», never «scritta» — from the item's own `createdBy`,
-  on the grey line rather than at the right (a long citation beside it was squeezed into a column on a phone).
-  No note count: the server takes a note about an article only, `assertArticleOfDossier`, and counting the notes and
+  reader still finds it by its name. The application that filed it is not drawn on the row (D7b, as an article's
+  row); the item's `createdBy` stays. No note count: the server takes a note about an article only, `assertArticleOfDossier`, and counting the notes and
   highlights on each text would cost a read per decision.) «Seleziona tutti» takes
   the decisions with the articles; «Apri tutto su Dashboard», on the page and on the list's card, opens a dossier of
   decisions alone too, one practice holding them; «Espandi tutto» opens the articles only, each decision being a request
