@@ -1004,7 +1004,25 @@ beside it when the margin has room, else below or above it, never over the
 passage it lists — through a virtual reference that finds the sign again on
 every measurement, because every edit redraws the text. Its focus management
 is modal: with no element in the text for floating-ui to bridge Tab back to,
-Tab cycles inside and Esc returns to the sign. The "Evidenziazioni" box under
+Tab cycles inside and Esc returns to the sign.
+
+**Passages an application proposed** (D7b, spec
+`docs/superpowers/specs/2026-10-23-mcp-next-tools-design.md` §8, with the owner's three states of 25 October)
+are highlights with a `proposal` (`types/index.ts`, `HighlightProposal`): only a dossier entry's reader is
+ever given one. Until validated («da validare» or «Da rivedere», `isOpenProposal`), `highlightOpen` adds
+`data-proposed` and `.vlx-proposed` — a dashed line, red once flagged — and the sign adds the sparkle
+(`.vlx-sign-proposed`) and names them apart («…; 2 passaggi proposti dall'IA: 1 da validare · 1 da rivedere»,
+`signAriaLabel`), as its `title` too; still no text node, and the projection tests run with proposals on. The
+popover lists them first, only when given `proposalActions`, as `ProposalCard`s: the passage, its note, then
+`AiReviewControls` — a real checkbox «Proposto dall'IA, confermi?» → «Validato» (or «Validato, modificato da
+te») with the green tick, the flag «Da rivedere» with its optional «Cosa non va?», the pencil (the note edited
+in place in `NoteEditBox`, shared with `NoteCard`), the bin, and «Vedi la versione dell'IA» once the note was
+changed. A shape per state, never colour alone. The dossier's rows carry the traffic light (`AiReviewSignal`,
+`utils/aiReview.ts`): a red flag if one item is to review, else a yellow dashed ring if one waits, else a green
+tick, nothing if the application wrote nothing; its words («2 da validare · 1 da rivedere») are its `title` and
+in the row's name. Not yet wired to the server: the routes' contract is still being fixed.
+
+The "Evidenziazioni" box under
 the article now lists only what no sign can reach (`LooseHighlightsList`,
 desktop): highlights made in the Brocardi sections (`<article>/brocardi/ratio|spiegazione`, still
 loaded by the prefix queries and labelled «Sezione non più disponibile · Ratio» since the sections went,

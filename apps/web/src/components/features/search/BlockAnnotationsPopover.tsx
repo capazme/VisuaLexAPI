@@ -13,7 +13,7 @@ import {
 } from '@floating-ui/react';
 import { LocateFixed, MessageCircle, Trash2, X } from 'lucide-react';
 import type { ArticleDiscussionPassageSummary, Highlight } from '../../../types';
-import type { BlockAnnotations } from '../../../utils/articleAnnotations';
+import { isProposal, type BlockAnnotations } from '../../../utils/articleAnnotations';
 import { getHighlightSwatch } from '../../../utils/highlightColors';
 import { getTransformOrigin } from '../../../utils/floatingOrigin';
 import { signReference } from '../../../utils/blockAnchorRect';
@@ -23,6 +23,7 @@ import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { AttributionChip } from '../bulletin/AttributionChip';
 import { NoteCard } from './NoteCard';
+import { ProposalCard } from './ProposalCard';
 
 export interface BlockAnnotationsPopoverProps {
     /** The element holding the article text (ArticleBody's contentRef). */
@@ -45,13 +46,26 @@ export interface BlockAnnotationsPopoverProps {
     onOpenThread?: (threadId: string) => void;
     /** Fingerprint of the text on screen, to tell a discussion opened on another text. */
     textHash?: string | null;
+    /** What the user does with a passage an application proposed (D7b); only a dossier entry's reader has proposals. */
+    proposalActions?: ProposalActions;
+}
+
+/** A proposed passage's actions, by its id (`ProposalCard`). */
+export interface ProposalActions {
+    validate: (id: string, validated: boolean) => void;
+    flag: (id: string, flagged: boolean) => void;
+    comment: (id: string, text: string) => void;
+    editNote: (id: string, text: string) => void;
+    /** The caller's notice offers «Annulla». */
+    remove: (id: string) => void;
 }
 
 /**
  * The annotations of one block of an article, opened from its sign in the
  * margin or at the end of the block (round B). Lists the block's notes —
  * edit and delete in place — and its highlights — remove — each with
- * "Vai al passo". Esc and the close button give focus back to the sign; a
+ * "Vai al passo". The passages an application proposed come first (D7b,
+ * `ProposalCard`): validated, flagged for review, their note edited, removed. Esc and the close button give focus back to the sign; a
  * press outside closes it and leaves focus where the reader pressed.
  */
 export function BlockAnnotationsPopover({
@@ -66,6 +80,7 @@ export function BlockAnnotationsPopover({
     onRemoveHighlight,
     onOpenThread,
     textHash,
+    proposalActions,
 }: BlockAnnotationsPopoverProps) {
     const titleId = useId();
     // Where focus goes on close: the sign after Esc, the close button or "Vai
@@ -124,6 +139,9 @@ export function BlockAnnotationsPopover({
     const { getFloatingProps } = useInteractions([dismiss, role]);
 
     const total = group.notes.length + group.highlights.length + group.threads.length;
+    // Only a reader that can act on them lists proposals apart; none other is ever given one.
+    const proposals = proposalActions ? group.highlights.filter(isProposal) : [];
+    const highlights = proposalActions ? group.highlights.filter((h) => !isProposal(h)) : group.highlights;
     const remove = (run: () => void) => {
         run();
         // The block's last annotation takes the sign with it.
@@ -185,6 +203,22 @@ export function BlockAnnotationsPopover({
                             </button>
                         </div>
                         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+                            {proposals.length > 0 && (
+                                <section className="space-y-2">
+                                    <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Proposte dell'IA</h4>
+                                    {proposalActions && proposals.map((proposal) => (
+                                        <ProposalCard
+                                            key={proposal.id}
+                                            highlight={proposal}
+                                            onValidate={(validated) => proposalActions.validate(proposal.id, validated)}
+                                            onFlag={(flagged) => proposalActions.flag(proposal.id, flagged)}
+                                            onReviewComment={(text) => proposalActions.comment(proposal.id, text)}
+                                            onEditNote={(text) => proposalActions.editNote(proposal.id, text)}
+                                            onRemove={() => remove(() => proposalActions.remove(proposal.id))}
+                                        />
+                                    ))}
+                                </section>
+                            )}
                             {group.notes.length > 0 && (
                                 <section className="space-y-2">
                                     <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Note</h4>
@@ -204,10 +238,10 @@ export function BlockAnnotationsPopover({
                                     ))}
                                 </section>
                             )}
-                            {group.highlights.length > 0 && (
+                            {highlights.length > 0 && (
                                 <section className="space-y-2">
                                     <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Evidenziazioni</h4>
-                                    {group.highlights.map((highlight) => (
+                                    {highlights.map((highlight) => (
                                         <HighlightCard
                                             key={highlight.id}
                                             highlight={highlight}

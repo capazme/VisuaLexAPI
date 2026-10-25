@@ -12,6 +12,7 @@ import { appStore } from '../../../store/useAppStore';
 import { forgetDecision } from '../../../utils/decisionFetchCache';
 import type { DossierItem } from '../../../types';
 import { DossierDecisionsSection } from './DossierDecisionsSection';
+import { DossierDecisionRow } from './DossierDecisionRow';
 import type { SentenzaItem } from './dossierLayout';
 
 // Stored with labels of an older style: the rows show the citation recomputed (source convention, Q9).
@@ -198,6 +199,17 @@ describe('DossierDecisionsSection (D7a)', () => {
     expect(screen.getByRole('button', { name: `Espandi ${CASS}` })).toBeInTheDocument();
     expect(screen.queryByText(/Claude Code/)).toBeNull();
     expect(screen.getByRole('button', { name: `Espandi ${COST}` })).toBeInTheDocument();
+  });
+
+  it('shows the traffic light of what an application wrote on a decision, and says it in the row\'s name (D7b)', () => {
+    render(
+      <DossierDecisionRow
+        item={cass} isSelected={false} showCheckbox={false} onToggleSelect={() => {}} isExpanded={false}
+        onToggleExpand={() => {}} onRemove={() => {}} onToggleImportant={() => {}} aiReview={{ pending: 1, validated: 2, review: 0 }}
+      />,
+    );
+    expect(screen.getByRole('button', { name: `Espandi ${CASS}, 1 da validare · 2 validati` })).toBeInTheDocument();
+    expect(screen.getByTitle('1 da validare · 2 validati')).toHaveAttribute('data-ai-review', 'pending');
   });
 
   it('removes a decision as the other rows do', () => {

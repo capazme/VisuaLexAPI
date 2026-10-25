@@ -30,7 +30,7 @@ function rng(seed: number) {
 
 describe('the projection invariant — every real text', () => {
   it.each(ARTICLE_FIXTURES.map((f) => [f.id, f.text] as const))(
-    '%s: text nodes spell article_text minus \\n; every mark sits at its offset',
+    '%s: text nodes spell article_text minus \\n; every mark sits at its offset, proposals on',
     (_id, raw) => {
       const plain = raw.replace(/\n/g, '');
       const next = rng(raw.length);
@@ -39,6 +39,11 @@ describe('the projection invariant — every real text', () => {
         const a = Math.floor(next() * (plain.length - 1));
         const len = 1 + Math.floor(next() * Math.min(80, plain.length - a - 1));
         highlights.push(hl(`h${i}`, plain.slice(a, a + len), a));
+      }
+      // Passages an application proposed (D7b), waiting or validated: highlights of their own kind, never a character.
+      for (const [i, h] of highlights.entries()) {
+        const state = (['pending', 'review', 'validated'] as const)[i % 4 - 1];
+        if (state) h.proposal = { clientName: 'Claude Code', reviewComment: null, originalNote: null, note: `nota ${i}`, state };
       }
       const annotations: Annotation[] = [];
       for (let i = 0; i < 6; i++) {
@@ -85,6 +90,8 @@ describe('the projection invariant — every real text', () => {
         expect(found.map((e) => e.textContent).join('')).toBe(h.text);
         const walker = document.createTreeWalker(found[0], NodeFilter.SHOW_TEXT);
         expect(plainOffsetAt(div, walker.nextNode()!, 0)).toBe(h.startOffset);
+        const waiting = h.proposal && h.proposal.state !== 'validated' ? h.proposal.state : null;
+        for (const e of found) expect(e.getAttribute('data-proposed'), h.id).toBe(waiting);
       }
       // Focused thread pieces join to thread words, no extra elements for unfocused threads
       if (focusedThreadId) {
@@ -112,6 +119,8 @@ describe('the projection invariant — every real text', () => {
           expect(sign?.getAttribute('data-notes'), `block ${i}: sign notes`).toBe(String(groups[i].notes.length));
           expect(sign?.getAttribute('data-highlights'), `block ${i}: sign highlights`).toBe(String(groups[i].highlights.length));
           expect(sign?.getAttribute('data-threads'), `block ${i}: sign threads`).toBe(String(groups[i].threads.length));
+          const waiting = groups[i].highlights.filter((h) => h.proposal && h.proposal.state !== 'validated').length;
+          expect(sign?.getAttribute('data-proposed') ?? '0', `block ${i}: sign proposals`).toBe(String(waiting));
         }
       });
     },
@@ -333,6 +342,48 @@ describe('annotation signs', () => {
     expect(sign.querySelector('.vlx-sign-notes')?.getAttribute('data-count')).toBe('2');
     expect(pieces(sign, '.vlx-sign-dot').map((d) => d.getAttribute('data-color'))).toEqual(['green', 'yellow']);
     expect(div.querySelectorAll('.vlx-sign')).toHaveLength(1);
+  });
+
+  it('names the passages an application proposed apart on the sign, with its sparkle and a title (D7b)', () => {
+    const as = (state: 'pending' | 'review' | 'validated') => (h: Highlight): Highlight => ({ ...h, proposal: { clientName: 'Claude Code', reviewComment: null, originalNote: null, note: 'Rileva.', state } });
+    const div = mount(render(raw, {
+      signs: true,
+      annotations: [note('n1', 'prestazioni corrispettive', at('prestazioni corrispettive'))],
+      highlights: [
+        as('pending')(hl('p1', 'contraenti', at('contraenti'), 'green')),
+        as('review')(hl('p2', 'obbligazioni', at('obbligazioni'))),
+        as('validated')(hl('p3', 'risarcimento', at('risarcimento'), 'blue')),
+      ],
+    }));
+    const sign = signOf(div, 2)!;
+    const label = "1 nota e 1 evidenziazione in questo passo; 2 passaggi proposti dall'IA: 1 da validare · 1 da rivedere";
+    expect(sign.getAttribute('aria-label')).toBe(label);
+    expect(sign.getAttribute('title')).toBe(label);
+    expect(sign.getAttribute('data-highlights')).toBe('3');
+    expect(sign.getAttribute('data-proposed')).toBe('2');
+    expect(sign.querySelector('.vlx-sign-proposed')?.getAttribute('data-count')).toBe('2');
+    expect(sign.textContent).toBe('');
+    // In the text: the open ones dashed and named by their state, the validated one as the user's own.
+    for (const [id, state, title] of [['p1', 'pending', 'da validare'], ['p2', 'review', 'da rivedere']]) {
+      const mark = div.querySelector(`[data-highlight="${id}"]`)!;
+      expect(mark.classList.contains('vlx-proposed')).toBe(true);
+      expect(mark.getAttribute('data-proposed')).toBe(state);
+      expect(mark.getAttribute('title')).toBe(`Proposto dall'IA, ${title}`);
+    }
+    const own = div.querySelector('[data-highlight="p3"]')!;
+    expect(own.classList.contains('vlx-proposed')).toBe(false);
+    expect(own.hasAttribute('data-proposed')).toBe(false);
+    expect(div.textContent).toBe(plain);
+  });
+
+  it('a block with proposals only is named by them alone; a sign without any keeps no title', () => {
+    const p: Highlight = { ...hl('p', 'contraenti', at('contraenti')), proposal: { clientName: null, note: null, state: 'pending', reviewComment: null, originalNote: null } };
+    expect(signOf(mount(render(raw, { signs: true, highlights: [p] })), 2)!.getAttribute('aria-label'))
+      .toBe("1 passaggio proposto dall'IA: 1 da validare");
+    const plainSign = signOf(mount(render(raw, { signs: true, highlights: [hl('h', 'contraenti', at('contraenti'))] })), 2)!;
+    expect(plainSign.hasAttribute('title')).toBe(false);
+    expect(plainSign.hasAttribute('data-proposed')).toBe(false);
+    expect(plainSign.querySelector('.vlx-sign-proposed')).toBeNull();
   });
 
   it('adds no text: the sign is empty and sits after the block\'s text, outside every mark', () => {

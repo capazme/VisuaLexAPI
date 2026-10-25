@@ -9,9 +9,10 @@
  * shows. Offsets are plain-text offsets — `article_text` without its
  * newlines (CLAUDE.md gotcha 23).
  */
-import type { Annotation, Highlight, ArticleDiscussionPassageSummary } from '../types';
+import type { Annotation, Highlight, HighlightProposal, ArticleDiscussionPassageSummary } from '../types';
 import type { ArticleStructure, StructureBlock } from './articleStructure';
 import { HIGHLIGHT_COLORS, type HighlightColor } from './highlightColors';
+import { aiReviewSummary, type AiReviewCounts } from './aiReview';
 
 /** A passage discussion located in the text on screen (never a detached one). */
 export interface LocatedThread {
@@ -189,16 +190,31 @@ export function signColors(highlights: readonly Highlight[]): HighlightColor[] {
   return out;
 }
 
-/** What a screen reader hears on a sign: "2 note e 1 evidenziazione in questo passo". */
-export function signAriaLabel(notes: number, highlights: number, threads = 0): string {
+/** A passage an application proposed (D7b), validated or not. */
+export const isProposal = (h: Highlight): h is Highlight & { proposal: HighlightProposal } => !!h.proposal;
+
+/** A proposal the user has not validated yet («da validare» or «Da rivedere»): dashed in the text, named apart on the sign. */
+export const isOpenProposal = (h: Highlight): boolean => !!h.proposal && h.proposal.state !== 'validated';
+
+/**
+ * What a screen reader hears on a sign: "2 note e 1 evidenziazione in questo passo". The passages an application
+ * proposed and the user has not validated (D7b) come last, apart, in the row's words: "1 nota in questo passo;
+ * 2 passaggi proposti dall'IA: 1 da validare · 1 da rivedere". `highlights` leaves them out.
+ */
+export function signAriaLabel(notes: number, highlights: number, threads = 0, proposals: Pick<AiReviewCounts, 'pending' | 'review'> = { pending: 0, review: 0 }): string {
   const parts: string[] = [];
   if (notes > 0) parts.push(`${notes} ${notes === 1 ? 'nota' : 'note'}`);
   if (highlights > 0) parts.push(`${highlights} ${highlights === 1 ? 'evidenziazione' : 'evidenziazioni'}`);
   if (threads > 0) parts.push(`${threads} ${threads === 1 ? 'glossa' : 'glosse'}`);
-  if (parts.length === 0) return 'in questo passo';
-  if (parts.length === 1) return `${parts[0]} in questo passo`;
-  if (parts.length === 2) return `${parts[0]} e ${parts[1]} in questo passo`;
-  return `${parts.slice(0, -1).join(', ')} e ${parts[parts.length - 1]} in questo passo`;
+  const open = proposals.pending + proposals.review;
+  const proposed = open > 0
+    ? `${open} ${open === 1 ? 'passaggio proposto' : 'passaggi proposti'} dall'IA: ${aiReviewSummary({ ...proposals, validated: 0 })}`
+    : '';
+  if (parts.length === 0) return proposed || 'in questo passo';
+  const own = parts.length === 1
+    ? `${parts[0]} in questo passo`
+    : `${parts.slice(0, -1).join(', ')} e ${parts[parts.length - 1]} in questo passo`;
+  return proposed ? `${own}; ${proposed}` : own;
 }
 
 const OPENING_CHARS = 48;

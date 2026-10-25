@@ -7,6 +7,8 @@ import type { ArticleData, DossierItem } from '../../../types';
 import { DossierItemReader } from './DossierItemReader';
 import { shownAnnex } from './dossierLayout';
 import { ClaudeMark } from '../../ui/ClaudeMark';
+import { AiReviewSignal } from '../../ui/AiReviewSignal';
+import { aiReviewSummary, type AiReviewCounts } from '../../../utils/aiReview';
 import { formatTimestampLong } from './dossierUtils';
 import { FOCUS_RING } from '../studia/progress/tokens';
 import { ROW, ROW_ICON, ROW_LINE, ROW_REMOVE, ROW_TITLE } from './dossierStyles';
@@ -33,6 +35,8 @@ export interface DossierArticleRowProps {
   onRemoveNote?: (note: NoteItem) => void;
   /** Ringed for a moment: a norm a decision cites has just opened it (D7d). */
   isFlashing?: boolean;
+  /** Where the user stands on what an application wrote on this entry (D7b): the row's traffic light. */
+  aiReview?: AiReviewCounts;
 }
 
 /**
@@ -43,7 +47,7 @@ export interface DossierArticleRowProps {
 export function DossierArticleRow({
   item, rubrica, isSelected, showCheckbox, onToggleSelect, isExpanded, onToggleExpand,
   onOpenOnDashboard, onRemove, onToggleImportant, showToast,
-  notes = [], onAddNote, onRemoveNote, isFlashing = false,
+  notes = [], onAddNote, onRemoveNote, isFlashing = false, aiReview,
 }: DossierArticleRowProps) {
   const [textRubrica, setTextRubrica] = useState<string | null>(null);
   const onArticle = useCallback((article: ArticleData) => {
@@ -72,6 +76,9 @@ export function DossierArticleRow({
   // it for a screen reader: the name has to say it. No application's mark on the
   // row (D7b): each note carries its own once the row is open.
   const notesLabel = notes.length === 0 || isExpanded ? '' : `, ${notes.length === 1 ? '1 nota' : `${notes.length} note`}`;
+  // The traffic light too, open or closed: what is left to check stays said.
+  const reviewSummary = aiReview ? aiReviewSummary(aiReview) : '';
+  const reviewLabel = reviewSummary ? `, ${reviewSummary}` : '';
 
   return (
     // `data-dossier-item`: a norm a decision cites opens this row (D7d, `useCitedNorms`).
@@ -96,7 +103,7 @@ export function DossierArticleRow({
         <div
           role="button"
           tabIndex={0}
-          aria-label={rowLabel + notesLabel}
+          aria-label={rowLabel + notesLabel + reviewLabel}
           aria-expanded={isExpanded}
           aria-controls={isExpanded ? regionId : undefined}
           onClick={onToggleExpand}
@@ -137,6 +144,7 @@ export function DossierArticleRow({
                 <span className="sr-only">{notes.length === 1 ? 'nota' : 'note'}</span>
               </span>
             )}
+            {aiReview && <AiReviewSignal counts={aiReview} />}
           </span>
         </div>
         <button

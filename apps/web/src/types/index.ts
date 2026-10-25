@@ -200,6 +200,30 @@ export interface Highlight {
     startOffset?: number;
     sourceSuggestionId?: string | null;
     originalAuthor?: OriginalAuthor | null;
+    /**
+     * A passage a connected application proposed on one dossier entry (D7b): drawn only on that entry, never in the
+     * app's own highlights. Absent on the user's own highlights.
+     */
+    proposal?: HighlightProposal | null;
+}
+
+/**
+ * Where the user stands on what an application wrote (D7b): «da validare» until they act, «Validato» once they
+ * tick it (or change its note), «Da rivedere» when they flag it.
+ */
+export type AiReviewState = 'pending' | 'validated' | 'review';
+
+/** Who proposed a passage, what they noted on it, and what the user made of it (D7b). */
+export interface HighlightProposal {
+    /** The application's registered name, unverified. */
+    clientName: string | null;
+    /** The passage's note as it stands, plain text: the application's, or the user's once they changed it. */
+    note: string | null;
+    state: AiReviewState;
+    /** «Cosa non va?»: the user's few words on a passage flagged «Da rivedere». */
+    reviewComment: string | null;
+    /** The application's own note, kept once the user changed it («Vedi la versione dell'IA»); null while unchanged. */
+    originalNote: string | null;
 }
 
 /** A dossier di lavoro holds a practice (it may carry a client's data); a dossier di studio a topic studied. */

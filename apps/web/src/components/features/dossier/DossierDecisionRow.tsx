@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { CheckSquare, ChevronDown, Square, Star, Trash2 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
+import { aiReviewSummary, type AiReviewCounts } from '../../../utils/aiReview';
+import { AiReviewSignal } from '../../ui/AiReviewSignal';
 import { identityOf } from '../../../utils/decisionLinks';
 import { DossierDecisionReader } from './DossierDecisionReader';
 import { decisionCitationOf, formatTimestampLong } from './dossierUtils';
@@ -17,6 +19,8 @@ export interface DossierDecisionRowProps {
   onToggleExpand: () => void;
   onRemove: () => void;
   onToggleImportant: () => void;
+  /** Where the user stands on what an application wrote on this decision (D7b): the row's traffic light. */
+  aiReview?: AiReviewCounts;
 }
 
 /**
@@ -28,7 +32,7 @@ export interface DossierDecisionRowProps {
  * read per decision.
  */
 export function DossierDecisionRow({
-  item, isSelected, showCheckbox, onToggleSelect, isExpanded, onToggleExpand, onRemove, onToggleImportant,
+  item, isSelected, showCheckbox, onToggleSelect, isExpanded, onToggleExpand, onRemove, onToggleImportant, aiReview,
 }: DossierDecisionRowProps) {
   const citation = decisionCitationOf(item.data);
   const added = formatTimestampLong(item.addedAt);
@@ -37,7 +41,9 @@ export function DossierDecisionRow({
   const citationId = `dossier-item-citation-${item.id}`;
   // One object while the item stays: the reader asks the source again for a new reference, and the page redraws often.
   const identity = useMemo(() => identityOf(item.data), [item.data]);
-  const rowLabel = `${isExpanded ? 'Comprimi' : 'Espandi'} ${citation}`;
+  // The traffic light sits inside the toggle, whose name replaces it for a screen reader: the name says it.
+  const reviewSummary = aiReview ? aiReviewSummary(aiReview) : '';
+  const rowLabel = `${isExpanded ? 'Comprimi' : 'Espandi'} ${citation}` + (reviewSummary ? `, ${reviewSummary}` : '');
 
   return (
     <div className={cn(ROW, 'pl-3 transition-colors', isSelected ? 'bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800/40')}>
@@ -80,6 +86,7 @@ export function DossierDecisionRow({
             <span id={citationId} className={cn(ROW_TITLE, 'block font-medium [overflow-wrap:anywhere]')}>{citation}</span>
             {added && <span className={cn(ROW_LINE, 'mt-0.5 block')}>Aggiunta il {added}</span>}
           </span>
+          {aiReview && <AiReviewSignal counts={aiReview} className="pt-1" />}
         </div>
         <button
           type="button"

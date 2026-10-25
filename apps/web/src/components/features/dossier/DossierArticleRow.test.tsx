@@ -112,6 +112,22 @@ describe('DossierArticleRow notes', () => {
     expect(screen.queryByText(/Claude Code/)).toBeNull();
     expect(screen.queryByText('Sul danno ingiusto.')).toBeNull();
   });
+  it('shows the traffic light of what an application wrote, and says it in the row\'s name, open or closed (D7b)', () => {
+    const aiReview = { pending: 2, validated: 0, review: 1 };
+    const { unmount } = renderRow(normaItem, { notes, aiReview });
+    expect(screen.getByRole('button', { name: 'Espandi codice civile 262 articolo 2043, 2 note, 2 da validare · 1 da rivedere' })).toBeInTheDocument();
+    expect(screen.getByTitle('2 da validare · 1 da rivedere')).toHaveAttribute('data-ai-review', 'review');
+    unmount();
+    renderRow(normaItem, { notes, aiReview, isExpanded: true });
+    expect(screen.getByRole('button', { name: 'Comprimi codice civile 262 articolo 2043, 2 da validare · 1 da rivedere' })).toBeInTheDocument();
+  });
+
+  it('draws no light where the application wrote nothing', () => {
+    renderRow(normaItem, { notes, aiReview: { pending: 0, validated: 0, review: 0 } });
+    expect(document.querySelector('[data-ai-review]')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Espandi codice civile 262 articolo 2043, 2 note' })).toBeInTheDocument();
+  });
+
   it('shows its notes above the text when open, and adds and removes one', () => {
     const onAddNote = vi.fn();
     const onRemoveNote = vi.fn();
