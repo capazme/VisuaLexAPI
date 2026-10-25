@@ -1023,7 +1023,9 @@ popover lists them first, only when given `proposalActions`, as `ProposalCard`s:
 `AiReviewControls` — a real checkbox «Proposto dall'IA, confermi?» → «Validato» (or «Validato, modificato da
 te») with the green tick, «Da rivedere» while flagged, the flag «Da rivedere» with its optional «Cosa non va?», the pencil (the note edited
 in place in `NoteEditBox`, shared with `NoteCard`, here `explicit`: «Salva» and «Annulla» under it, Enter saves,
-Shift+Enter a new line, Esc cancels without closing the popover, leaving the box saves nothing), the bin, and «Vedi la versione dell'IA» once the note was
+Shift+Enter a new line, Esc cancels without closing the popover, leaving the box saves nothing; a changed text is
+never dropped without «Scartare la modifica?» — «Continua» or «Scarta» —, asked by «Annulla» or Esc, and by the
+popover's X, Esc or «Vai al passo», which a press outside never closes while a note is edited), the bin, and «Vedi la versione dell'IA» once the note was
 changed. A shape per state, never colour alone. The dossier's rows carry the traffic light (`AiReviewSignal`,
 `utils/aiReview.ts`): a red flag if one item is to review, else a yellow dashed ring if one waits, else a green
 tick, nothing if the application wrote nothing; its words («2 da validare · 1 da rivedere») are its `title` and
@@ -1031,7 +1033,8 @@ in the row's name, its counts the server's `assistant_notes` on the item (`serve
 
 The colour picker (`SelectionPopup`) suggests what each colour is for (`HIGHLIGHT_COLOR_MEANINGS`: yellow «Punto
 centrale», green «Condizione o presupposto», blue «Definizione o eccezione», red «Da rivedere»): the reader's convention,
-a hint above the four swatches (so a popup clipped at the top loses the hint, not the controls), each swatch named in
+a hint above the four swatches (so a popup clipped at the top loses the hint, not the controls; sideways the popup
+is moved 8 px inside the window by its measured box, a `marginLeft` set as it is drawn), each swatch named in
 Italian with its meaning, any colour still free for anything. The MCP tool still accepts red from an application and
 does not tell it these meanings in this cut.
 

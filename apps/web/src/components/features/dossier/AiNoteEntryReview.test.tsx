@@ -77,6 +77,17 @@ describe('the notes an application wrote in a dossier (D7b)', () => {
     expect(editNoteEntryText).toHaveBeenCalledWith('d1', byApp, 'Sul danno ingiusto.');
   });
 
+  it('a changed text is not dropped by «Annulla» without asking', () => {
+    renderNotes([byApp]);
+    fireEvent.click(screen.getByRole('button', { name: 'Modifica la nota' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Testo della nota' }), { target: { value: 'Altro.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Annulla' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Scartare la modifica?');
+    fireEvent.click(screen.getByRole('button', { name: 'Scarta' }));
+    expect(screen.queryByRole('textbox', { name: 'Testo della nota' })).toBeNull();
+    expect(editNoteEntryText).not.toHaveBeenCalled();
+  });
+
   it('changed: «Validato, modificato da te», and the application\'s words one click away', () => {
     renderNotes([{ ...byApp, data: 'Mia versione.', assistantNote: review({ state: 'validated', edited: true }) }]);
     expect(screen.getByRole('checkbox', { name: 'Validato, modificato da te' })).toBeChecked();

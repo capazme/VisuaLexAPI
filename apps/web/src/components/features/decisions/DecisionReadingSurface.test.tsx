@@ -261,6 +261,36 @@ describe('DecisionReadingSurface — notes and highlights', () => {
     expect(addHighlight).toHaveBeenCalledWith(KEY, '', 'ricorso', expect.any(String), 'red', 3);
   });
 
+  it('the colour picker is kept inside a narrow window by its measured width, either side (D7b)', async () => {
+    const width = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 320 });
+    // The popup measures 250 px; first drawn past the right edge, then past the left.
+    let at = { left: 200, right: 450 };
+    const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const nudge = parseFloat(this.style.marginLeft || '0');
+      const box = this.classList.contains('-translate-x-1/2')
+        ? { left: at.left + nudge, right: at.right + nudge, top: 0, bottom: 0, width: 250, height: 100 }
+        : { left: 0, right: 0, top: 0, bottom: 0, width: 0, height: 0 };
+      return { ...box, x: box.left, y: box.top, toJSON: () => ({}) } as DOMRect;
+    });
+    try {
+      const { container } = render(<DecisionReadingSurface identity={IDENTITY} testo={MOTIVAZIONE} attributi={{}} />);
+      await selectText(container, 3, 10);
+      fireEvent.click(await screen.findByTitle('Evidenzia (H)'));
+      const popup = (await screen.findByRole('list', { name: 'Uso suggerito dei colori' })).closest<HTMLElement>('.-translate-x-1\\/2')!;
+      // 450 − 312: moved 138 px left, its right edge 8 px inside the window.
+      expect(popup.style.marginLeft).toBe('-138px');
+      fireEvent.click(screen.getByRole('button', { name: 'Chiudi i colori' }));
+      at = { left: -40, right: 210 };
+      fireEvent.click(await screen.findByTitle('Evidenzia (H)'));
+      await screen.findByRole('list', { name: 'Uso suggerito dei colori' });
+      expect(popup.style.marginLeft).toBe('48px');
+    } finally {
+      spy.mockRestore();
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
+    }
+  });
+
   it('anchors a note on the selection, with the composer on the words', async () => {
     const { container } = render(<DecisionReadingSurface identity={IDENTITY} testo={MOTIVAZIONE} attributi={{}} />);
     await selectText(container, 3, 10);

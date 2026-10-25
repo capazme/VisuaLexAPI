@@ -74,16 +74,50 @@ describe('ProposalCard', () => {
     let box = edit();
     fireEvent.change(box, { target: { value: 'Altro' } });
     fireEvent.click(screen.getByRole('button', { name: 'Annulla' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Scarta' }));
     box = edit();
     fireEvent.change(box, { target: { value: 'Altro ancora' } });
     const outside = vi.fn();
     document.addEventListener('keydown', outside);
     fireEvent.keyDown(box, { key: 'Escape' });
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Continua' }), { key: 'Escape' });
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Nota del passaggio' }), { key: 'Escape' });
+    fireEvent.click(screen.getByRole('button', { name: 'Scarta' }));
     document.removeEventListener('keydown', outside);
-    // The popover around it listens on the document: Esc closes the editing, not the popover.
+    // The popover around it listens on the document: Esc, in the box or on its question, never reaches it.
     expect(outside).not.toHaveBeenCalled();
     expect(props.onEditNote).not.toHaveBeenCalled();
     expect(screen.getByText('Il danno da inadempimento.')).toBeInTheDocument();
+  });
+
+  it('a changed text is never dropped without asking: «Annulla» or Esc ask «Scartare la modifica?»', () => {
+    const { props } = setup();
+    const box = edit();
+    fireEvent.change(box, { target: { value: 'Altro' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Annulla' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Scartare la modifica?');
+    // «Continua»: back to the text, as it was typed.
+    fireEvent.click(screen.getByRole('button', { name: 'Continua' }));
+    expect(screen.getByRole('textbox', { name: 'Nota del passaggio' })).toHaveValue('Altro');
+    expect(screen.getByRole('textbox', { name: 'Nota del passaggio' })).toHaveFocus();
+    // Esc asks the same; Esc again keeps it.
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Nota del passaggio' }), { key: 'Escape' });
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Continua' }), { key: 'Escape' });
+    expect(screen.queryByRole('alert')).toBeNull();
+    // «Scarta» drops it.
+    fireEvent.click(screen.getByRole('button', { name: 'Annulla' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Scarta' }));
+    expect(screen.queryByRole('textbox', { name: 'Nota del passaggio' })).toBeNull();
+    expect(props.onEditNote).not.toHaveBeenCalled();
+  });
+
+  it('an unchanged text is left at once, with nothing asked', () => {
+    setup();
+    edit();
+    fireEvent.click(screen.getByRole('button', { name: 'Annulla' }));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Nota del passaggio' })).toBeNull();
   });
 
   it('an unchanged or empty text saves nothing', () => {

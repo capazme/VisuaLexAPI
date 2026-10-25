@@ -1,4 +1,4 @@
-import { useCallback, useId, useLayoutEffect, useRef, type RefObject } from 'react';
+import { useCallback, useId, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import {
     FloatingFocusManager,
     FloatingPortal,
@@ -100,12 +100,40 @@ export function BlockAnnotationsPopover({
         onClose();
     }, [findSign, onClose]);
 
+    // The application's notes being edited here (D7b), by proposal: while one is, an outside press keeps the popover
+    // open; over a changed one, its X, Esc or «Vai al passo» first ask in that card «Scartare la modifica?».
+    const [drafts, setDrafts] = useState<Record<string, 'clean' | 'dirty'>>({});
+    const reportDraft = useCallback((id: string, state: 'none' | 'clean' | 'dirty') => {
+        setDrafts((d) => {
+            if (state === 'none') {
+                if (!(id in d)) return d;
+                const rest = { ...d };
+                delete rest[id];
+                return rest;
+            }
+            return d[id] === state ? d : { ...d, [id]: state };
+        });
+    }, []);
+    const [closeAsk, setCloseAsk] = useState<{ id: string; refocus: boolean } | null>(null);
+    const requestClose = (refocus: boolean): boolean => {
+        const dirty = Object.keys(drafts).find((id) => drafts[id] === 'dirty');
+        if (!dirty) return false;
+        setCloseAsk({ id: dirty, refocus });
+        return true;
+    };
+    const closeOrAsk = (refocus: boolean) => { if (!requestClose(refocus)) close(refocus); };
+    const answerClose = (discarded: boolean) => {
+        const ask = closeAsk;
+        setCloseAsk(null);
+        if (discarded && ask) close(ask.refocus);
+    };
+
     // Placed against the whole block (blockAnchorRect): beside it when the
     // margin has room, else below it, else above it — never over the passage
     // it lists, wherever the container query put the sign.
     const { refs, floatingStyles, context, placement, isPositioned, update } = useFloating({
         open: true,
-        onOpenChange: (open, _event, reason) => { if (!open) close(reason === 'escape-key'); },
+        onOpenChange: (open, _event, reason) => { if (!open) closeOrAsk(reason === 'escape-key'); },
         placement: 'right-start',
         middleware: [
             offset(8),
@@ -131,6 +159,8 @@ export function BlockAnnotationsPopover({
         // the popover shut (useArticleTextInteractions); closing here first
         // would let that click open it again.
         outsidePress: (event) => {
+            // A note being edited is never lost to a stray click.
+            if (Object.keys(drafts).length > 0) return false;
             const sign = findSign();
             return !(sign && event.target instanceof Node && sign.contains(event.target));
         },
@@ -150,6 +180,7 @@ export function BlockAnnotationsPopover({
         else refs.floating.current?.focus();
     };
     const goTo = (target: AnnotationTarget) => {
+        if (requestClose(true)) return;
         const sign = findSign();
         const container = containerRef.current;
         close(true);
@@ -197,7 +228,7 @@ export function BlockAnnotationsPopover({
                             </h3>
                             <button
                                 type="button"
-                                onClick={() => close(true)}
+                                onClick={() => closeOrAsk(true)}
                                 aria-label="Chiudi annotazioni"
                                 className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0 md:min-w-0 md:p-1 dark:hover:bg-slate-800 dark:hover:text-slate-200"
                             >
@@ -217,6 +248,9 @@ export function BlockAnnotationsPopover({
                                             onReviewComment={(text) => proposalActions.comment(proposal.id, text)}
                                             onEditNote={(text) => proposalActions.editNote(proposal.id, text)}
                                             onRemove={() => remove(() => proposalActions.remove(proposal.id))}
+                                            onDraftState={(state) => reportDraft(proposal.id, state)}
+                                            closeRequested={closeAsk?.id === proposal.id}
+                                            onCloseAnswer={answerClose}
                                         />
                                     ))}
                                 </section>

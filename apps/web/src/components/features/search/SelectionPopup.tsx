@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { Highlighter, StickyNote, Copy, Search, Flag, MessageCircle, GraduationCap, X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
@@ -129,6 +129,21 @@ export function SelectionPopup({
       });
     }, 10);
   }, [containerRef, textRootRef, hidePopup]);
+
+  // Moved sideways to stay 8 px inside the window, from its measured box, once drawn and again when it changes size or
+  // place: the colour picker with its legend is far wider than the 160 px the position's clamp supposes (D7b), and a
+  // phone's edge cut its close button. A style written on the element, not state: nothing else draws again.
+  useLayoutEffect(() => {
+    const el = popupRef.current;
+    if (!popup.visible || !el) return;
+    el.style.marginLeft = '0px';
+    const box = el.getBoundingClientRect();
+    const margin = 8;
+    let nudge = 0;
+    if (box.left < margin) nudge = margin - box.left;
+    else if (box.right > window.innerWidth - margin) nudge = window.innerWidth - margin - box.right;
+    el.style.marginLeft = `${nudge}px`;
+  }, [popup.visible, popup.x, popup.y, showColorPicker]);
 
   // Handle mousedown outside popup to hide it
   useEffect(() => {
