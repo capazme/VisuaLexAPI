@@ -278,11 +278,26 @@ def _extract_annex(text: str) -> tuple[str, Optional[str]]:
 # a label reads back to the annex it was written from. Longest first; each dot may be left out or
 # followed by a space («disp att cpa» is not the c.p.a., «disp att cc» not the c.c.), and a sigla
 # is never read inside a word.
+def _sigla_pattern(sigla: str) -> "re.Pattern[str]":
+    return re.compile(r"(?<![\w.])" + r"\.?\s*".join(re.escape(part.strip()) for part in sigla.rstrip(".").split("."))
+                      + r"\.?(?![\w])")
+
+
+_SIGLE = {identity: sigla for identity, sigla in SIGLA_BY_ANNEX.items()
+          if "." in sigla and (identity in ANNEX_SIGLE or " " in sigla)}
+# A longer spelling of the same act that opens with one of these sigle («cod. post. telecom.»
+# for «cod. post.») is read whole, or its tail («telecom.») was left in the text.
+_LONGER_SPELLINGS = {
+    alias: identity
+    for identity, sigla in _SIGLE.items()
+    for alias, act in NORMATTIVA_SEARCH.items()
+    if alias.lower().startswith(sigla) and alias.lower() != sigla
+    and (code_row_of_annex(identity) or ("",))[0].lower() == act.lower()
+}
 _ANNEX_SIGLA_PATTERNS = [
-    (re.compile(r"(?<![\w.])" + r"\.?\s*".join(re.escape(part.strip()) for part in sigla.rstrip(".").split("."))
-                + r"\.?(?![\w])"), identity)
-    for identity, sigla in sorted(SIGLA_BY_ANNEX.items(), key=lambda item: -len(item[1]))
-    if "." in sigla and (identity in ANNEX_SIGLE or " " in sigla)
+    (_sigla_pattern(sigla), identity)
+    for sigla, identity in sorted({**{s: i for i, s in _SIGLE.items()}, **_LONGER_SPELLINGS}.items(),
+                                  key=lambda item: -len(item[0]))
 ]
 
 
