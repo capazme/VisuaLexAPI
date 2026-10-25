@@ -114,7 +114,8 @@ Answered by one owner on 25 October: the author's name chosen per course, the ac
 optional qualification shown as «dichiarata dall'autore»; «Verificato» per module (§5); «Superato da N» from 5;
 withdrawal as in §7; the attestation only on «Verificato» courses. Open:
 
-1. **The licence** (§6), for both owners: CC BY-NC-SA 4.0, or CC BY-SA 4.0 as the cards' notice already says?
+1. **The licence** (§6): CC BY-SA 4.0, as the cards' notice already says, so one licence covers a course and its
+   cards and VisuaLex needs no licence of its own. One owner agreed on 25 October; the other's answer is awaited.
 2. **Derivatives** (§7): «Proponi modifiche» first, one's own version after 30 days?
 
 ## 10. What A1 must already allow
