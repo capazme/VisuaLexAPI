@@ -53,7 +53,7 @@ from visualex_api.services.decisions.resolver import (
     get_resolver,
     sweep_decision_caches,
 )
-from visualex_api.tools.urngenerator import complete_request_date, export_url, export_version_date, pdf_cache_path
+from visualex_api.tools.urngenerator import URN_TOO_LONG, complete_request_date, export_url, export_version_date, pdf_cache_path
 from visualex_api.tools.cache_manager import prune_normattiva_cache
 from visualex_api.tools.treextractor import get_tree
 from visualex_api.tools.text_op import article_input_error, parse_article_input, normalize_act_type
@@ -897,9 +897,10 @@ class NormaController:
             if between:
                 # The day falls before the latest version, and other versions come first:
                 # Normattiva shows only the latest, so the one of that day cannot be read.
+                others = "ce n'è un'altra" if between == 1 else f"ce ne sono altre {between}"
                 raise ResourceNotFoundError(
-                    f"La versione di {nv} in vigore il {until} non si può leggere: prima di quella che "
-                    f"entra in vigore il {valid_from} ce ne sono altre {between}, che Normattiva non mostra a parte")
+                    f"Non so dire quale versione di {nv} sia in vigore il {until}: prima di quella che "
+                    f"entra in vigore il {valid_from} {others}, che Normattiva non mostra a parte")
             raise ResourceNotFoundError(
                 f"La versione non ancora in vigore di {nv} entra in vigore il {valid_from}")
         upcoming = upcoming_change(validity, inserted=inserted, today=today[2] if today else None)
@@ -1913,7 +1914,9 @@ class NormaController:
                 pdf_path = pdf_cache_path(urn, os.path.join(os.getcwd(), "download"))
             except ValidationError as exc:
                 return jsonify({'error': str(exc)}), 400
-            except ValueError:
+            except ValueError as exc:
+                if str(exc) == URN_TOO_LONG:
+                    return jsonify({'error': 'URN troppo lungo per l\'esportazione'}), 400
                 return jsonify({'error': 'URN non valido: serve un indirizzo /uri-res/N2Ls?urn:nir:… di normattiva.it'}), 400
 
             log.info("Received data for export_pdf", data=data)

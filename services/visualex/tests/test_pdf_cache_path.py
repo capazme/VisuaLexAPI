@@ -315,3 +315,12 @@ async def test_another_authority_is_exported_not_a_500(tmp_path, monkeypatch, fi
     response = await client.post(route, json={"urn": url})
     assert response.status_code == 200
     assert [p.name for p in (work / "download").iterdir()] == ["regione.lazio_legge_2000-01-01_5__vig2026-10-21.pdf"]
+
+
+async def test_a_name_over_the_limit_says_so(tmp_path, monkeypatch, fixed_today):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "download").mkdir()
+    client = NormaController().app.test_client()
+    response = await client.post("/export_pdf", json={"urn": BASE + "legge:1990-08-07;" + "1" * 200})
+    assert response.status_code == 400
+    assert "troppo lungo" in (await response.get_json())["error"]

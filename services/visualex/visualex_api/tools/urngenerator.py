@@ -281,6 +281,8 @@ def export_url(urn, today):
     return _N2LS + pdf_urn_in_force(_exported_urn(urn), today)
 
 
+URN_TOO_LONG = "URN too long for a file name"
+
 # The parts of an exportable URN, in their places (the grammar of `_EXPORTABLE_URN`).
 _URN_PARTS = re.compile(
     r"urn:nir:(?P<authority>[a-z]+(?:\.[a-z]+)*):(?P<kind>[a-z]+(?:\.[a-z]+)*)(?::(?P<date>\d{4}(?:-\d{2}-\d{2})?))?"
@@ -320,7 +322,7 @@ def urn_to_filename(urn):
     version = "originale" if version == "@originale" else version.replace("!vig=", "vig") if version else ""
     name = "_".join(parts[key] or "" for key in ("authority", "kind", "date", "number", "annex")) + f"_{version}.pdf"
     if len(name) > _MAX_FILENAME:
-        raise ValueError("URN too long for a file name")
+        raise ValueError(URN_TOO_LONG)
     filename = _safe_filename(name)
     logging.info(f"Generated filename: {filename}")
     return filename

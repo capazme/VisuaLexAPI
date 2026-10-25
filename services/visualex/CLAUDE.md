@@ -381,7 +381,7 @@ its `validity`, with the later version in `upcoming` (owner, G-355;
 valid_from, version_number}`, absent otherwise, with `versions_between: n` when the version
 numbers show `n` other versions not in force yet before it: Normattiva's undated page is the
 latest version and a date after today answers today's text, so those cannot be read, and a
-request for a day they cover says so («… in vigore il … non si può leggere …»). `norma_data` stays the request's (no
+request for a day they cover says so («Non so dire quale versione … sia in vigore il …»). `norma_data` stays the request's (no
 date), so the key notes and highlights are stored under does not move. When nothing is
 in force today (today's page is `not_yet`: an article inserted from a later day) the
 later text is served as before, with `upcoming.change` `"inserted"` and `not_in_force:

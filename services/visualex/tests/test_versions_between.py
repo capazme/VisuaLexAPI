@@ -61,6 +61,6 @@ class TestTwoLaterVersions:
     async def test_a_day_of_the_version_in_between_cannot_be_read(self, controller, brocardi, endpoint):
         [result] = await ask(controller, endpoint, requested(), scraper=_scraper(),
                              body={"upcoming": True, "version_date": "2027-06-30"})
-        assert "in vigore il 2027-06-30 non si può leggere" in result["error"]
-        assert "ce ne sono altre 1" in result["error"]
+        assert "Non so dire quale versione" in result["error"] and "in vigore il 2027-06-30" in result["error"]
+        assert "ce n'è un'altra, che Normattiva" in result["error"]
         assert "article_text" not in result
