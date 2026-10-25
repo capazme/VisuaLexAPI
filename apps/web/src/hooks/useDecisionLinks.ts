@@ -9,9 +9,10 @@ import { useDecisionPreview } from './useDecisionPreview';
  * What a reading surface needs for the decisions its text cites: `links` for `useCitationLinks`
  * (`decisions`) and `popupProps` for `DecisionPreviewPopup`. A click or the popup's button records the
  * way back from `origin`, then opens the decision beside `besideId` (the practice, window or phone
- * reader the text is read in: `openDecision`'s `fromLink` rule, the asker never replaced).
+ * reader the text is read in: `openDecision`'s `fromLink` rule, the asker never replaced). `onOpened` follows: a
+ * surface off the search page (the dossier) goes there, where the decision is drawn.
  */
-export function useDecisionLinks({ besideId, origin }: { besideId?: string; origin?: ReadingBackEntry }) {
+export function useDecisionLinks({ besideId, origin, onOpened }: { besideId?: string; origin?: ReadingBackEntry; onOpened?: () => void }) {
   const openDecision = useAppStore((s) => s.openDecision);
   const pushReadingBack = useAppStore((s) => s.pushReadingBack);
   const preview = useDecisionPreview();
@@ -19,8 +20,11 @@ export function useDecisionLinks({ besideId, origin }: { besideId?: string; orig
   const isHoveringPopupRef = useRef(false);
 
   const onOpen = useCallback(
-    (reference: DecisionReference) => { openDecision(reference, { fromLink: true, besideId }); },
-    [openDecision, besideId],
+    (reference: DecisionReference) => {
+      openDecision(reference, { fromLink: true, besideId });
+      onOpened?.();
+    },
+    [openDecision, besideId, onOpened],
   );
 
   const links = useMemo<DecisionLinksOptions>(

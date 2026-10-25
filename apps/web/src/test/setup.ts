@@ -12,7 +12,7 @@ configure({ asyncUtilTimeout: 5000 })
 // A test of the tours themselves mocks `useTour` (or the module) in its own file, which wins.
 vi.mock('../hooks/useTour', () => ({
   useTour: () => ({
-    startTour: vi.fn(), stopTour: vi.fn(), resetTour: vi.fn(), resetAndStartTour: vi.fn(),
+    startTour: vi.fn(), prepareTour: vi.fn(), stopTour: vi.fn(), resetTour: vi.fn(), resetAndStartTour: vi.fn(),
     hasSeenTour: () => true, tryStartTour: vi.fn(), getTourVersion: () => 0, isActive: () => false, isMobile: () => false,
   }),
   holdTours: vi.fn(),

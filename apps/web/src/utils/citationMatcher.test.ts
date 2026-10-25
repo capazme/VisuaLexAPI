@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { extractCitations, isSameCitationTarget, wrapCitationsInHtml } from './citationMatcher';
+import { CODES_TABLE } from './sources/actTypes';
 
 // The in-text matcher feeds the citation preview popup. Article texts cite EU
 // acts in their official spelling — "regolamento (UE) 2016/679" — so the
@@ -419,8 +420,118 @@ describe('extractCitations — an abbreviation is not the head of a longer one',
     expect(read('art. 5 c. p. p.')).toEqual([['art. 5 c. p. p.', 'codice di procedura penale', '5']]);
   });
 
+  it('the fully spaced «c. p. a.» is the codice del processo amministrativo, never «c. p.»', () => {
+    expect(read('art. 29 c. p. a.')).toEqual([['art. 29 c. p. a.', 'codice del processo amministrativo', '29']]);
+    expect(read('artt. 1 e 2 c. p. a.')[0]).toEqual(['artt. 1 e 2 c. p. a.', 'codice del processo amministrativo', '1']);
+    expect(extractCitations('art. 29 c. p. a.').map((c) => c.parsed.act_type)).toEqual(['codice del processo amministrativo']);
+    // …while «c. p.» before a word that starts with «a» is still the codice penale
+    expect(read('art. 29 c. p. altrimenti')[0]).toEqual(['art. 29 c. p.', 'codice penale', '29']);
+  });
+
   it('a final "c.p." before the next sentence still links', () => {
     expect(read('previsto dall\'art. 110 c.p. Il ricorso è infondato')).toEqual([["dall'art. 110 c.p.", 'codice penale', '110']]);
+  });
+});
+
+// Four codes the matcher did not know: with the codice civile as the norm in reading, «art. 52 c.g.c.»
+// linked to art. 52 c.c., «art. 69 cod. nav.» to «art. 6» c.c. (the number lost a digit to get past
+// the lookahead that excludes «cod»), «art. 20 cod. post.» to «art. 2» c.c.; with no norm in
+// reading they were not links at all. The act types are the convention's identities
+// (conventions/sources/golden.json: cpa-29, cod-nav-69, cod-postale-20, cgc-52), keys of CODES_TABLE.
+describe('extractCitations — c.p.a., cod. nav., cod. post., c.g.c.', () => {
+  const civile = { tipo_atto: 'codice civile' } as never;
+  const read = (text: string, norma?: never) =>
+    extractCitations(text, norma).map((c) => [c.text, c.parsed.act_type, c.parsed.article]);
+
+  const codes = [
+    { text: 'art. 29 c.p.a.', act: 'codice del processo amministrativo', urn: 'decreto.legislativo:2010-07-02;104:2', article: '29' },
+    { text: 'art. 69 cod. nav.', act: 'codice della navigazione', urn: 'regio.decreto:1942-03-30;327:1', article: '69' },
+    { text: 'art. 20 cod. post.', act: 'codice postale e delle telecomunicazioni', urn: 'decreto.del.presidente.della.repubblica:1973-03-29;156:1', article: '20' },
+    { text: 'art. 52 c.g.c.', act: 'codice di giustizia contabile', urn: 'decreto.legislativo:2016-08-26;174:1', article: '52' },
+  ];
+
+  for (const code of codes) {
+    it(`«${code.text}» is the ${code.act}, with the codice civile in reading`, () => {
+      expect(read(`ai sensi dell'${code.text} il ricorso`, civile)).toEqual([[`dell'${code.text}`, code.act, code.article]]);
+    });
+
+    it(`«${code.text}» is the ${code.act}, with no norm in reading`, () => {
+      expect(read(code.text)).toEqual([[code.text, code.act, code.article]]);
+      expect(CODES_TABLE[code.act]).toBe(code.urn);
+    });
+
+    it(`«${code.text}» is wrapped without a character changed (root rule 23)`, () => {
+      const text = `Si veda l'${code.text}, e l'art. 2043 c.c.`;
+      const html = wrapCitationsInHtml(text, civile);
+      expect(html.match(/class="citation-hover"/g)).toHaveLength(2);
+      expect(html.replace(/<[^>]+>/g, '')).toBe(text);
+    });
+  }
+
+  it('the other ways of writing them', () => {
+    expect(read('art. 69 c. nav.', civile)).toEqual([['art. 69 c. nav.', 'codice della navigazione', '69']]);
+    expect(read('art. 69 cod.nav.', civile)).toEqual([['art. 69 cod.nav.', 'codice della navigazione', '69']]);
+    expect(read('art. 69 cod nav', civile)).toEqual([['art. 69 cod nav', 'codice della navigazione', '69']]);
+    expect(read('art. 20 cod.post.', civile)).toEqual([['art. 20 cod.post.', 'codice postale e delle telecomunicazioni', '20']]);
+    expect(read('art. 52 c.g.c', civile)).toEqual([['art. 52 c.g.c', 'codice di giustizia contabile', '52']]);
+    expect(read('art. 52 cgc', civile)).toEqual([['art. 52 cgc', 'codice di giustizia contabile', '52']]);
+    expect(read('art. 52 c. g. c.', civile)).toEqual([['art. 52 c. g. c.', 'codice di giustizia contabile', '52']]);
+    expect(read('artt. 52 e 53 c.g.c.', civile)[0][1]).toBe('codice di giustizia contabile');
+    expect(read('art. 69, comma 2, cod. nav.', civile)).toEqual([['art. 69, comma 2, cod. nav.', 'codice della navigazione', '69']]);
+  });
+
+  it('none of them takes the place of «c.c.», «c.p.» or «c.p.c.»', () => {
+    expect(read('art. 52 c.c.', civile)).toEqual([['art. 52 c.c.', 'codice civile', '52']]);
+    expect(read('art. 52 c.p.', civile)).toEqual([['art. 52 c.p.', 'codice penale', '52']]);
+    expect(read('art. 52 c.p.c.', civile)).toEqual([['art. 52 c.p.c.', 'codice di procedura civile', '52']]);
+    expect(read('art. 52 c.p.a.', civile)).toEqual([['art. 52 c.p.a.', 'codice del processo amministrativo', '52']]);
+    expect(read('art. 69 c.n.', civile)).toEqual([['art. 69 c.n.', 'codice della navigazione', '69']]);
+    expect(read('art. 5 cod. pen.', civile)).toEqual([['art. 5 cod. pen.', 'codice penale', '5']]);
+  });
+
+  it('a longer word is not one of them', () => {
+    expect(read('art. 52 c.g.c.i. prevede')).toEqual([]);
+    expect(read('art. 69 cod. navig.')).toEqual([]);
+    expect(read('art. 20 cod. postale')).toEqual([]);
+  });
+
+  it('«art. 69 cod. nav.» never becomes «art. 6»', () => {
+    for (const norma of [undefined, civile]) {
+      for (const text of ['art. 69 cod. nav.', 'art. 69 cod. navig.', "l'art. 69 cod. della navigazione", 'art. 69 Cod. Nav.']) {
+        const found = extractCitations(text, norma);
+        expect(found.map((c) => c.parsed.article)).not.toContain('6');
+        expect(found.map((c) => c.text)).not.toContain('art. 6');
+      }
+    }
+  });
+
+  it('a number or a suffix is never cut to get past an act the norm in reading is not', () => {
+    expect(read('art. 20 cod. xyz', civile)).toEqual([]);
+    expect(read('art. 5-bis cod. xyz', civile)).toEqual([]);
+    expect(read('artt. 8 e 19 cod. xyz', civile)).toEqual([]);
+    expect(read('art. 20 e poi', civile)).toEqual([['art. 20', 'codice civile', '20']]);
+    expect(read('art. 5-bis e poi', civile)).toEqual([['art. 5-bis', 'codice civile', '5-bis']]);
+    expect(read('artt. 8 e 19 e poi', civile).map((c) => c[2])).toEqual(['8', '19']);
+  });
+
+  it('nor is a comma or a letter clause, which an act after it still keeps from the norm in reading', () => {
+    expect(read('art. 69, comma 2, cod. xyz', civile)).toEqual([]);
+    expect(read('art. 5, comma 12 cod. xyz', civile)).toEqual([]);
+    expect(read('art. 5, lett. abc cod. xyz', civile)).toEqual([]);
+    expect(read('art. 5, comma 2, e poi', civile)).toEqual([['art. 5, comma 2', 'codice civile', '5']]);
+  });
+
+  it('a word that begins with «cost» or «cod» is not a code', () => {
+    expect(read('gli artt. 5 e 6 costituiscono il nucleo', civile).map((c) => c[2])).toEqual(['5', '6']);
+    expect(read('gli artt. 52 e 53 codificano', civile).map((c) => c[2])).toEqual(['52', '53']);
+    expect(read("l'art. 5, comma 2, costituisce", civile)).toEqual([['art. 5, comma 2', 'codice civile', '5']]);
+    // …while the code's own words still are
+    expect(read("l'art. 5 costituzionale", civile)).toEqual([]);
+    expect(read('art. 5 Costit.', civile)).toEqual([]);
+    expect(read('art. 5 costit', civile)).toEqual([]);
+    expect(read('artt. 5 e 6 Costit.', civile)).toEqual([]);
+    expect(read('artt. 5 e 6 codice della crisi', civile)).toEqual([]);
+    expect(read('artt. 5 e 6 cod xyz', civile)).toEqual([]);
   });
 });
 

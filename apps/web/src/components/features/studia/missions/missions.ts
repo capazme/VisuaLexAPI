@@ -176,6 +176,17 @@ export function missionOrder(missions: readonly Mission[], holding: ReadonlySet<
   return [...missions.filter((m) => !sinks(m)), ...missions.filter(sinks)];
 }
 
+/**
+ * The goal is met and its mission done (G9): the one thing that draws «Obiettivo raggiunto». A day the streak counts
+ * with the mission empty (nothing due, nothing new) or open (a goal of the user's own under the mission's 10 reviews) is
+ * not: its line says why the day counts, with no mark that says the goal was met. Nor is a mission done under a goal
+ * raised since (10 reviews, the credit taken, the goal then set to 15): the credit stays the whole day, the goal is
+ * not met, and the line says what is left.
+ */
+export function goalMissionDone(data: Progressi): boolean {
+  return data.oggi.raggiunto && (data.missioni?.some((mission) => mission.id === 'obiettivo' && mission.stato === 'fatta') ?? false);
+}
+
 /** «2 di 3»: the missions done, of those that have something to do today. */
 export function missionSummary(missions: readonly Mission[]): { done: number; of: number } {
   const counted = missions.filter((m) => m.status === 'fatta' || m.status === 'aperta');

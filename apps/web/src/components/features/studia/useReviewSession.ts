@@ -45,6 +45,9 @@ function isForOtherControl(target: EventTarget | null, key: string): boolean {
   return key === ' ' && target.closest('button, a[href], [role="button"]') !== null;
 }
 
+/** The grade that made the day count, and whether it also did the goal's mission (`missione`: the mark is drawn). */
+export type GoalMet = OggiDelVoto & { missione: boolean };
+
 /**
  * The review queue of a session. It is read once; the head is `current`. Space shows the answer,
  * 1–4 grade it (only once shown). The first grade of a card is sent to the server, with the time
@@ -71,7 +74,7 @@ export function useReviewSession(materia?: Materia, { istituto, paused = false, 
   const [nextDue, setNextDue] = useState<number | null>(null);
   // Today's goal as the last recorded grade left it, and the grade that made the day count (Studia progress spec §5.3).
   const [today, setToday] = useState<OggiDelVoto | null>(null);
-  const [goalMet, setGoalMet] = useState<OggiDelVoto | null>(null);
+  const [goalMet, setGoalMet] = useState<GoalMet | null>(null);
   // What the last recorded grade earned, numbered so the same points earned twice show twice (G1c).
   const [xpGain, setXpGain] = useState<XpGainValue | null>(null);
   const gains = useRef(0);
@@ -153,7 +156,9 @@ export function useReviewSession(materia?: Materia, { istituto, paused = false, 
           setNextDue((before) => (before === null ? outcome.scheduledDays : Math.min(before, outcome.scheduledDays)));
           if (outcome.oggi) {
             setToday(outcome.oggi);
-            if (outcome.oggi.appenaRaggiunto) setGoalMet(outcome.oggi);
+            // The goal's mission done by the same grade (its credit in the answer): the lesson draws the mark, as «Oggi»
+            // does (G9); a goal of one's own under the mission's 10 reviews, or the queue finished under it, gets words.
+            if (outcome.oggi.appenaRaggiunto) setGoalMet({ ...outcome.oggi, missione: outcome.xp?.crediti.some((credit) => credit.missione === 'obiettivo') ?? false });
           }
           if (outcome.xp) {
             const gain = gainOf(++gains.current, outcome.xp);

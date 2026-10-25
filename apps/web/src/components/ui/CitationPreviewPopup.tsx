@@ -23,6 +23,8 @@ interface CitationPreviewPopupProps {
   position: { top: number; left: number };
   onClose: () => void;
   onOpenCitation: (citation: ParsedCitationData) => void;
+  /** The open button's words, when the host opens the norm elsewhere than in a practice (the dossier's own norms). */
+  openLabel?: string;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
   /** When true (full-consent contributor), show the NER ✓/✗/Correggi bar. */
@@ -40,6 +42,7 @@ export function CitationPreviewPopup({
   position,
   onClose,
   onOpenCitation,
+  openLabel = 'Apri nella pratica',
   onMouseEnter,
   onMouseLeave,
   nerFeedbackEnabled,
@@ -96,7 +99,7 @@ export function CitationPreviewPopup({
             )}
           >
             <ExternalLink size={14} />
-            Apri nella pratica
+            {openLabel}
           </button>
           {citation && nerFeedbackEnabled && onNerFeedback && (
             <div className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800">

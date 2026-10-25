@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useEffect, useId, useRef, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ArrowLeftRight, Maximize2, Minimize2, FileText, Search, Loader2, Layers, ChevronRight, ChevronLeft, Zap, Calendar, Clock } from 'lucide-react';
 import { useCompare, openCompareWithArticle, type CompareArticle } from '../../../hooks/useCompare';
@@ -9,12 +9,14 @@ import { CompareBody } from './CompareBody';
 import { readSide, tailRange } from './compareLayout';
 import { TextCell } from './compareParts';
 import { useCompareNotes } from './useCompareNotes';
+import { CompareDialogRoot } from './compareDialogRoot';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { parseLegalCitation, isSearchReady, formatParsedCitation, toSearchParams } from '../../../utils/citationParser';
 import { parseItalianDate } from '../../../utils/dateUtils';
 import { versionTabSuffix } from '../../../utils/versionDisplay';
 import { practiceArticleKey } from '../../../utils/practice';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
+import { useDialogFocus } from '../../ui/useDialogFocus';
 import { FOCUS_RING } from '../../../constants/interactions';
 import type { ArticleData } from '../../../types';
 import { legalFetch } from '../../../services/legalFetch';
@@ -498,10 +500,17 @@ export function CompareView() {
   // A phone's comparison is always the whole screen.
   const fullscreen = isFullscreen || !isDesktop;
 
-  // Handle escape key
+  // A modal dialog with `Modal`'s focus (not its scroll lock): named by its title, the focus on «Chiudi» as it opens, Tab
+  // kept inside, the focus back to what had it once it closes.
+  const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const isTopmost = useDialogFocus(isOpen, dialogRef, () => closeRef.current);
+
+  // Handle escape key: not when a dialog opened over it, or something inside, took it.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
+      if (e.key === 'Escape' && isOpen && !e.defaultPrevented && isTopmost()) {
         if (isFullscreen) {
           setIsFullscreen(false);
         } else {
@@ -512,13 +521,19 @@ export function CompareView() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, isFullscreen, close]);
+  }, [isOpen, isFullscreen, close, isTopmost]);
 
   if (!isOpen) return null;
 
   return (
     <AnimatePresence>
       <motion.div
+        // The dialog is the whole layer, not only the panel: a note it opens is portalled here (`CompareDialogRoot`),
+        // inside the dialog for a screen reader and the trap, and bounded by the window rather than by the panel.
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -569,7 +584,7 @@ export function CompareView() {
                 </div>
               )}
               <div className="min-w-0">
-                <h2 className="font-bold text-base md:text-lg text-slate-900 dark:text-white truncate">
+                <h2 id={titleId} className="font-bold text-base md:text-lg text-slate-900 dark:text-white truncate">
                   Confronta articoli
                 </h2>
                 {isDesktop && (
@@ -607,6 +622,7 @@ export function CompareView() {
 
               {/* Close */}
               <button
+                ref={closeRef}
                 onClick={close}
                 className="p-2.5 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 inline-flex items-center justify-center bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 rounded-lg transition-colors"
                 title="Chiudi (Esc)"
@@ -617,7 +633,8 @@ export function CompareView() {
             </div>
           </div>
 
-          {/* Content */}
+          {/* Content: what it opens is portalled inside the dialog (`CompareDialogRoot`). */}
+          <CompareDialogRoot.Provider value={dialogRef}>
           {isComplete && leftArticle && rightArticle ? (
             <CompareBody
               key={`${leftArticle.label}#${rightArticle.label}`}
@@ -632,6 +649,7 @@ export function CompareView() {
               <ArticlePanel article={rightArticle} side="right" onRemove={() => remove('right')} />
             </div>
           )}
+          </CompareDialogRoot.Provider>
         </motion.div>
       </motion.div>
     </AnimatePresence>

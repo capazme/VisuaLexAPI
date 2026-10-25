@@ -7,6 +7,10 @@ import '@fontsource-variable/geist'
 import '@fontsource-variable/geist-mono'
 import './index.css'
 import App from './App.tsx'
+import { preparePage } from './pageCode'
+
+// A page loaded with its route, opened by its address: its code is fetched beside the sign-in check, not after it.
+preparePage(window.location.pathname)
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
