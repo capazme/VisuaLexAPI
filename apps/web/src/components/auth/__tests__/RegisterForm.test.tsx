@@ -93,8 +93,17 @@ describe('RegisterForm', () => {
   it('after signing up, the wait for approval in the same card, and «Torna ad Accedi» back to the tab', async () => {
     renderAuth('/register');
     fill({ email: 'avv@studio.it', username: 'avv_rossi', password: 'Segreta123', confirm: 'Segreta123' });
+    // Where the focus is the moment the confirmation enters the page: what `findByRole` sees when it finds it (its
+    // MutationObserver fires in a microtask after React's commit). The focus must already be there, not on the body.
+    let focusWhenShown: Element | null | undefined;
+    const observer = new MutationObserver(() => {
+      if (focusWhenShown === undefined && screen.queryByRole('heading', { name: 'Registrazione completata' })) focusWhenShown = document.activeElement;
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
     submit();
     const heading = await screen.findByRole('heading', { name: 'Registrazione completata' });
+    observer.disconnect();
+    expect(focusWhenShown).toBe(heading);
     expect(heading).toHaveFocus();
     expect(within(panel()).getByText('È in attesa di approvazione da parte di un amministratore.')).toBeInTheDocument();
     expect(screen.getByRole('tablist')).toBeInTheDocument();
