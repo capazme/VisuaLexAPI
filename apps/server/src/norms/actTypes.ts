@@ -105,6 +105,10 @@ export const CODES_TABLE: Readonly<Record<string, string>> = {
  */
 export const ANNEXED_ACTS: Readonly<Record<string, string>> = {
   'regio.decreto:1931-06-18;773': '1',
+  // The legge fallimentare, the c.p.p. minorile, the testo unico sulle successioni e donazioni.
+  'regio.decreto:1942-03-16;267': '1',
+  'decreto.del.presidente.della.repubblica:1988-09-22;448': '1',
+  'decreto.legislativo:1990-10-31;346': '1',
 };
 
 /**

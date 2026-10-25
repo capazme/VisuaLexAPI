@@ -13,6 +13,9 @@ import bookmarkRoutes from './routes/bookmarks';
 import highlightRoutes from './routes/highlights';
 import annotationRoutes from './routes/annotations';
 import dossierRoutes from './routes/dossiers';
+import assistantProposalRoutes from './routes/assistantProposals';
+import assistantPassageRoutes from './routes/assistantPassages';
+import appSwitchRoutes, { features } from './routes/appSwitches';
 import trashRoutes from './routes/trash';
 import feedbackRoutes from './routes/feedback';
 import historyRoutes from './routes/history';
@@ -73,6 +76,11 @@ app.get('/api/auth/verify', ...createScrapeGate(config.scrape));
 // exchanges for all its users from one address, which the anonymous tier
 // (100 a minute per address) would throttle.
 app.use(createOAuthRouter(oauthConfig));
+
+// Which features are on (D7b): public, and before every limiter, like the OAuth endpoints above: the MCP
+// server asks it with no token at each session's start, for all its users from one address, and a 429 would
+// leave a session without its tools for its whole life.
+app.get('/api/features', features);
 
 // An exchanged token from the MCP server (spec section 5): verified, held to its
 // table of routes, scopes and daily quota, before the general limiter so that
@@ -144,6 +152,8 @@ app.use('/api/lingo/srs', lingoSrsRoutes);
 app.use('/api/tasks', taskRoutes);
 // The consent page and the connected applications (MCP spike), same reason.
 app.use('/api/oauth', oauthAccountRoutes);
+// The runtime switches' administration (GET /features is mounted above, before the limiters).
+app.use('/api', appSwitchRoutes);
 app.use('/api', authRoutes);
 app.use('/api', adminRoutes);
 app.use('/api', folderRoutes);
@@ -151,6 +161,10 @@ app.use('/api', bookmarkRoutes);
 app.use('/api', highlightRoutes);
 app.use('/api', annotationRoutes);
 app.use('/api', dossierRoutes);
+// D7b: the web app's routes for the assistant's proposals and notes (behind the `assistant_passages` switch).
+app.use('/api', assistantProposalRoutes);
+// D7b: an entry's text and the passages a connected application proposes on it (delegated, behind the same switch).
+app.use('/api', assistantPassageRoutes);
 app.use('/api', trashRoutes);
 app.use('/api', feedbackRoutes);
 app.use('/api/history', historyRoutes);
