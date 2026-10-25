@@ -47,7 +47,7 @@ import {
 } from '../utils/storeApiMappers';
 import { serverFieldsFromApi, dossierFromApi, dossierItemFromApi, itemContentFor, serverItemFor } from '../components/features/dossier/dossierUtils';
 import { shiftAiReviewCount } from '../utils/aiReview';
-import { isRemovalPending, removeWithUndo } from './deferredRemovals';
+import { isRemovalPending, removeWithUndo, savingDone, savingStarted } from './deferredRemovals';
 
 // ── Environment wire ↔ store converters ───────────────────────────────
 // The server stores the per-slice content (dossiers / quickNorms / aliases /
@@ -2060,6 +2060,8 @@ const appStore = createStore<AppState>()(
                 };
                 set((state) => { state.annotations.push(optimistic); });
 
+                // Removed before the server answers: the removal waits for the server's id (`deferredRemovals`).
+                savingStarted(`annotation:${tempId}`);
                 annotationService
                     .create(annotationStoreToCreate(optimistic))
                     .then((serverAnnotation) => {
@@ -2068,8 +2070,15 @@ const appStore = createStore<AppState>()(
                             const idx = state.annotations.findIndex(a => a.id === tempId);
                             if (idx !== -1) state.annotations[idx] = mapped;
                         });
+                        savingDone(`annotation:${tempId}`, {
+                            key: `annotation:${mapped.id}`,
+                            path: `/annotations/${encodeURIComponent(mapped.id)}`,
+                            remove: () => annotationService.delete(mapped.id),
+                            item: mapped,
+                        });
                     })
                     .catch((err) => {
+                        savingDone(`annotation:${tempId}`, null);
                         console.error('Failed to sync annotation:', err);
                         set((state) => {
                             state.annotations = state.annotations.filter(a => a.id !== tempId);
@@ -2079,7 +2088,7 @@ const appStore = createStore<AppState>()(
             },
 
             // Behind «Annulla» (`removeWithUndo`): off the screen at once, sent when its notification closes or the page
-            // goes. A 404 is a removal done: the entry may have been a local-only optimistic insert.
+            // goes or is hidden. A 404 is a removal done; one still being created is removed under the server's id.
             removeAnnotation: (id) => {
                 const index = get().annotations.findIndex(a => a.id === id);
                 if (index === -1) return;
@@ -2092,9 +2101,10 @@ const appStore = createStore<AppState>()(
                     message: 'Nota rimossa',
                     path: `/annotations/${encodeURIComponent(id)}`,
                     remove: () => annotationService.delete(id),
-                    putBack: () => set((state) => {
-                        if (state.annotations.some(a => a.id === id)) return;
-                        state.annotations.splice(Math.min(index, state.annotations.length), 0, previous);
+                    item: previous,
+                    putBack: (item) => set((state) => {
+                        if (state.annotations.some(a => a.id === item.id)) return;
+                        state.annotations.splice(Math.min(index, state.annotations.length), 0, item);
                     }),
                     onRefused: (err) => {
                         console.error('Failed to sync annotation delete:', err);
@@ -2184,6 +2194,8 @@ const appStore = createStore<AppState>()(
                     return;
                 }
 
+                // Removed before the server answers: the removal waits for the server's id (`deferredRemovals`).
+                savingStarted(`highlight:${tempId}`);
                 highlightService
                     .create(wirePayload)
                     .then((serverHighlight) => {
@@ -2192,8 +2204,15 @@ const appStore = createStore<AppState>()(
                             const idx = state.highlights.findIndex(h => h.id === tempId);
                             if (idx !== -1) state.highlights[idx] = mapped;
                         });
+                        savingDone(`highlight:${tempId}`, {
+                            key: `highlight:${mapped.id}`,
+                            path: `/highlights/${encodeURIComponent(mapped.id)}`,
+                            remove: () => highlightService.delete(mapped.id),
+                            item: mapped,
+                        });
                     })
                     .catch((err) => {
+                        savingDone(`highlight:${tempId}`, null);
                         console.error('Failed to sync highlight:', err);
                         set((state) => {
                             state.highlights = state.highlights.filter(h => h.id !== tempId);
@@ -2215,9 +2234,10 @@ const appStore = createStore<AppState>()(
                     message: 'Evidenziazione rimossa',
                     path: `/highlights/${encodeURIComponent(id)}`,
                     remove: () => highlightService.delete(id),
-                    putBack: () => set((state) => {
-                        if (state.highlights.some(h => h.id === id)) return;
-                        state.highlights.splice(Math.min(index, state.highlights.length), 0, previous);
+                    item: previous,
+                    putBack: (item) => set((state) => {
+                        if (state.highlights.some(h => h.id === item.id)) return;
+                        state.highlights.splice(Math.min(index, state.highlights.length), 0, item);
                     }),
                     onRefused: (err) => {
                         console.error('Failed to sync highlight delete:', err);

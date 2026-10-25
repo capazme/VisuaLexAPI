@@ -249,6 +249,14 @@ describe('D7b proposals — the bin and «Annulla»', () => {
     expect(assistantService.removeProposal).not.toHaveBeenCalled();
   });
 
+  it('the tab hidden (a phone may discard it unannounced) sends it at once, as the page going does', () => {
+    removeProposal('d1', 'a1', 'p1');
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+    expect(assistantService.removeProposalOnExit).toHaveBeenCalledWith('d1', 'a1', 'p1');
+  });
+
   it('its reader going sends it at once, and takes its «Annulla» away; read again meanwhile, it is not drawn back', async () => {
     removeProposal('d1', 'a1', 'p1');
     // Read again while the notification still offers «Annulla»: the server still has it.

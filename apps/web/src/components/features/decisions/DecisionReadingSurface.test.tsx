@@ -267,7 +267,7 @@ describe('DecisionReadingSurface — notes and highlights', () => {
     // The popup measures 250 px; first drawn past the right edge, then past the left.
     let at = { left: 200, right: 450 };
     // The box drawn is the positioning element's first child; the positioning element itself, absolute in a narrow
-    // container, is narrower (Bill's 390 px window: the box at 149–398 while its container stopped short).
+    // container, is narrower (a 390 px window: the box at 149–398 while its container stopped short).
     const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
       const positioner = this.parentElement?.classList.contains('-translate-x-1/2') ? this.parentElement : null;
       const self = this.classList.contains('-translate-x-1/2');
