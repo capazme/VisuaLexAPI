@@ -803,7 +803,7 @@ class TestHeadingGluedToTheParagraphBefore:
 
     @pytest.mark.parametrize("page", [
         # A sentence ending on an article that has a heading of its own is a reference.
-        "<p>Articolo 1</p><p>Testo, come all'Articolo 2</p><p>Articolo 2</p><p>Testo.</p>",
+        "<p>Articolo 1</p><p>Testo. Articolo 2</p><p>Articolo 2</p><p>Testo.</p>",
         # Not the article right after the one before it.
         "<p>Articolo 1</p><p>Testo. Articolo 5</p><p>Altro.</p>",
         # A paragraph with a class is not a legacy page's.

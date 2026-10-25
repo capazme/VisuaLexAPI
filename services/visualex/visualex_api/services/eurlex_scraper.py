@@ -485,8 +485,9 @@ class EurlexScraper(BaseScraper):
                     log.debug("Found article in eli-subdivision")
                     break
 
-        # Strategy 5: a heading glued to the end of the paragraph before it (`glued_headings`)
-        glued = glued_headings(soup)
+        # Strategy 5: a heading glued to the end of the paragraph before it (`glued_headings`). Only
+        # a class-less page has one, so a page whose heading carries a class is not walked for it.
+        glued = glued_headings(soup) if article_section is None or not article_section.get('class') else {}
         heading = None
         if not article_section and str(article).strip() in glued:
             article_section, start = glued[str(article).strip()]
