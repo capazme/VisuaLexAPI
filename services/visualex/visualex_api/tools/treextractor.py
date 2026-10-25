@@ -518,6 +518,51 @@ def is_quoted_heading(element) -> bool:
             or element.find_parent("td") is not None)
 
 
+# A legacy OJ page can glue an article's heading to the end of the paragraph before it: dir.
+# 85/374 reads «… l'interruzione della prescrizione. Articolo 11</p>», so art. 11 was not listed,
+# not found, and its text was served at the end of art. 10's.
+_GLUED_HEADING = re.compile(r"[.;:]\s+((?:Articolo|Article)\s+(\d+))$")
+_HEADING_TAGS = ['p', 'div', 'span', 'h1', 'h2', 'h3', 'h4']
+
+
+def _body_follows(elem) -> bool:
+    """Whether the next sibling with text is an article's body, not another heading or nothing."""
+    sibling = elem.find_next_sibling()
+    while sibling is not None:
+        text = sibling.get_text(strip=True)
+        if text:
+            return eurlex_heading_number(text) is None
+        sibling = sibling.find_next_sibling()
+    return False
+
+
+def glued_headings(soup):
+    """The article headings glued to the end of a class-less paragraph, as {number: (paragraph,
+    where the heading starts in its stripped text)}. Only the article right after the one before
+    it, never one that an element of its own heads, and only with a body after it: a sentence
+    ending «… Articolo 11» is otherwise a reference, not a heading. Nor a paragraph quoted in the
+    act or set in a table cell (`is_quoted_heading`): there it is another act's text."""
+    own = set()
+    for elem in soup.find_all(_HEADING_TAGS):
+        number = None if is_quoted_heading(elem) else eurlex_heading_number(elem.get_text(strip=True))
+        if number:
+            own.add(number)
+    found, previous = {}, None
+    for elem in soup.find_all(_HEADING_TAGS):
+        text = elem.get_text(strip=True)
+        number = None if is_quoted_heading(elem) else eurlex_heading_number(text)
+        if number:
+            previous = number
+            continue
+        match = _GLUED_HEADING.search(text) if elem.name == 'p' and not elem.get('class') else None
+        if (match and match.group(2) not in own and previous is not None and previous.isdigit()
+                and int(match.group(2)) == int(previous) + 1
+                and not is_quoted_heading(elem) and _body_follows(elem)):
+            found[match.group(2)] = (elem, match.start(1))
+            previous = match.group(2)
+    return found
+
+
 # An ordinal after a heading's number: a whole word («15 bis», «15 BIS», «15-bis»), or a lower-case
 # ordinal glued to the capital that opens the text after it, as a class-less page whose heading and
 # text share an element reads «Articolo 15 bisTesto». A capital after a lower-case ordinal never
@@ -611,8 +656,9 @@ async def _parse_eurlex_tree(soup, normurn, link=False, details=False):
     if count_articles == 0:
         logging.info("ti-section/ti-art not found, falling back to pattern search")
 
+        glued = {id(elem): number for number, (elem, _) in glued_headings(soup).items()}
         # Cerca tutti gli elementi che potrebbero contenere articoli o sezioni
-        for elem in soup.find_all(['p', 'div', 'span', 'h1', 'h2', 'h3', 'h4']):
+        for elem in soup.find_all(_HEADING_TAGS):
             text = elem.get_text(strip=True)
 
             # Check for sections first (when details=True)
@@ -629,6 +675,7 @@ async def _parse_eurlex_tree(soup, normurn, link=False, details=False):
 
             # Check for articles
             article_num = None if is_quoted_heading(elem) else eurlex_heading_number(text)
+            article_num = article_num or glued.get(id(elem))
             if article_num:
                 if article_num not in seen_articles:
                     seen_articles.add(article_num)
@@ -782,9 +829,13 @@ def _extract_eurlex_rubriche(soup):
 # "del 27 aprile 2016", "dell'8 giugno 2000": the line between an act's name and its subject.
 # A digit after it: «DEL PARLAMENTO EUROPEO…», an act's name split over two lines, is no date.
 _EURLEX_DATE_LINE = re.compile(r"^dell?['’\s]\s*\d", re.IGNORECASE)
-# The legacy page's description: "Direttiva 2002/58/CE del Parlamento europeo e del Consiglio, del 12 luglio 2002, relativa al …".
+# The legacy page's description: "Direttiva 2002/58/CE del Parlamento europeo e del Consiglio, del 12 luglio 2002, relativa al …";
+# an older act's has no commas round the date ("Direttiva 85/374/CEE del Consiglio del 25 luglio 1985 relativa al …").
+# The blanks before "del" are matched only from a run's first one (`(?<!\s)`), or a search restarted
+# at every blank of a long run and scanned the rest of it each time: 0.75 s on 20,000 blanks. Same
+# matches as `(?:,\s*|\s+)del…`.
 _EURLEX_DESCRIPTION_SUBJECT = re.compile(
-    r",\s*dell?['’\s]\s*\d{1,2}[°º]?\s+\S+\s+\d{4}\s*,\s*(.+)$", re.IGNORECASE | re.DOTALL)
+    r"(?:,|(?<!\s)\s)\s*dell?['’\s]\s*\d{1,2}[°º]?\s+\S+\s+\d{4}\s*,?\s*(.+)$", re.IGNORECASE | re.DOTALL)
 
 
 def _eurlex_subject(lines):
@@ -847,8 +898,10 @@ def _extract_eurlex_title(soup):
                                          "about": lambda about: bool(about) and about.rstrip("/").endswith("/ita")})
     for meta in (soup.find("meta", attrs={"name": "DC.description"}), eli_title):
         match = _EURLEX_DESCRIPTION_SUBJECT.search((meta.get("content") or "") if meta else "")
-        if match:
-            return " ".join(match.group(1).split())
+        subject = " ".join(match.group(1).split()) if match else ""
+        # A note in brackets after the date («(GU L 210 …)») is no subject, as in `_eurlex_subject`.
+        if subject and not (subject.startswith("(") and subject.endswith(")")):
+            return subject
     return ""
 
 
