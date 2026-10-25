@@ -71,7 +71,7 @@ export const MAX_DECISIONS = 10;
 export const MAX_DOSSIER_NAME = 100;
 export const MAX_NOTE_LENGTH = 4000;
 
-interface ApiDossierItem {
+export interface ApiDossierItem {
   id: string;
   item_type: string;
   title: string;
@@ -84,7 +84,7 @@ interface ApiDossierItem {
   /** For a note: the entry (an article) it is about, or null. */
   about_item_id?: string | null;
 }
-interface ApiDossier {
+export interface ApiDossier {
   id: string;
   name: string;
   description?: string | null;
@@ -104,7 +104,7 @@ const data = (value: unknown): CallToolResult => ({ content: [{ type: 'text', te
 const kindOf = (d: ApiDossier): 'lavoro' | 'studio' => (d.kind === 'studio' ? 'studio' : 'lavoro');
 
 /** The dossier a tool names, by id or by its exact name; an ambiguous name is an error. */
-async function findDossier(config: McpConfig, caller: Caller, dossier: string): Promise<ApiDossier> {
+export async function findDossier(config: McpConfig, caller: Caller, dossier: string): Promise<ApiDossier> {
   const all = await callApi<ApiDossier[]>(config, caller, 'dossier:read', '/dossiers');
   const byId = all.find((d) => d.id === dossier);
   if (byId) return byId;

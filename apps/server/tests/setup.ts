@@ -121,6 +121,7 @@ beforeEach(async () => {
       "lingo_testi_versioni",
       "oauth_tokens",
       "trash_entries",
+      "app_switches",
       "oauth_authorization_codes",
       "oauth_grants",
       "oauth_authorization_requests",
