@@ -124,7 +124,9 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `assertArticleOfDossier` is the one check behind both routes.
 - **D7b: passages and notes an assistant proposes, validated by hand** (spec
   `docs/superpowers/specs/2026-10-23-mcp-next-tools-design.md` §8, as its first cut revised it on
-  25 October 2026; migration `20261027100000_assistant_proposed_marks`). Behind the runtime switch
+  25 October 2026; migration `20261027100000_assistant_proposed_marks`). The colours of the assistant's passages
+  mean (owner, 25 October 2026): `giallo` the central point, `verde` a condition or a premise, `blu` a definition
+  or an exception; `rosso` is not the assistant's to choose, being the sign of a note «da rivedere». Behind the runtime switch
   `assistant_passages` (`assistant/switches.ts`, table `app_switches`, a missing row is off; `GET
   /api/features` is public, mounted before every limiter, and answers `{ assistantPassages }` from five
   seconds' memory, which an admin's change clears; an admin switches it with `PUT
@@ -137,7 +139,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   (`dossier:write` **and** `dossier:text`, an exchanged token only; 1–10 passages, two points and one of
   the counter `passage` each, the refused ones given back) finds each quote in the text the reader
   reads (`assistant/locateQuote.ts`: whitespace runs match whitespace runs or nothing, every other
-  character as written; `prima`/`dopo` choose among occurrences), stores the projection's own slice at
+  character as written; `prima`/`dopo` choose among occurrences; the colour is `giallo`, `verde` or `blu`, and
+  `rosso` is refused with its reason), stores the projection's own slice at
   its offset (root rule 23), and answers one outcome per passage. The text is fetched once per call
   from the Python API as the web fetches it (`assistant/entryText.ts`: ports of `buildItemKey`,
   `uniqueArticleIdFromNorma`, the body of `fetchArticleForNorma`, `describeVersion`'s `readOnly`,
