@@ -118,6 +118,11 @@ export function rebuildNormEntry(raw: unknown): NormEntryCheck {
   const dataVersione = textOf(r.data_versione);
   if (dataVersione) {
     if (!ISO_DAY.test(dataVersione)) return { ok: false, reason: `Data della versione non valida (${shown(dataVersione)})` };
+    // A date asks for the text in force that day (G-353): with «originale» the entry asks for two
+    // texts, and the API refuses the pair (400), so an entry saved with both would never open.
+    if (entry.versione === 'originale') {
+      return { ok: false, reason: `Versione originale con una data della versione (${shown(dataVersione)})` };
+    }
     entry.data_versione = dataVersione;
   }
   // The addresses never reach a citation: kept when they are the sources', else left out.
