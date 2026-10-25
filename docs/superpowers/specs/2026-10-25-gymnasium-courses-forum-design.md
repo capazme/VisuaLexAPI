@@ -1,7 +1,6 @@
 # Gymnasium — publishing, exploring and importing courses in the Forum (A3)
 
-**Status:** draft of the idea, 25 October 2026, with one owner's answers of that day (§9); the licence waits for
-both owners. It fixes what the A1 spec must make possible; the detailed design comes after A1 is built. Design only: no code, no migration.
+**Status:** draft of the idea, 25 October 2026, with the owners' answers of that day (§9) and the licence (G-374). It fixes what the A1 spec must make possible; the detailed design comes after A1 is built. Design only: no code, no migration.
 **Target:** after A1 (release 1.11) and A2; not before.
 **Depends on:** `2026-10-23-gymnasium-courses-design.md` (A1: courses, enrolments, competences, mastery, the
 course's dossier). **Builds on:** the Forum's public dossiers (`SharedEnvironment`: publish, versions,
@@ -76,12 +75,9 @@ carry error rates of 1–45% in the studies found.
 
 ## 6. Licence and rights
 
-- **Licence:** one owner chose CC BY-NC-SA 4.0 on 25 October, after D-056 (prompts, rubrics, card schemas and
-  one's own tracks under CC BY-NC-SA 4.0). Licences are decided by both owners together, and two facts weigh on
-  it: the notice under which cards are proposed today (`PROPOSTA_SCHEDA` v1) says **CC BY-SA 4.0**, so a
-  course under NC-SA would hold cards under another licence; and P-023 (CC BY-SA 4.0 for every public
-  contribution) is still a proposal. Under BY-SA the licence itself lets VisuaLex use the work; under NC-SA
-  VisuaLex needs a licence of its own from the author in the terms of use.
+- **Licence: CC BY-SA 4.0** (G-374, both owners, 25 October), as the notice under which cards are proposed
+  (`PROPOSTA_SCHEDA` v1): one licence for a course and its cards, and the licence itself lets VisuaLex use the
+  work. D-056 (CC BY-NC-SA 4.0) concerns VisuaLex's own didactic material, not the users'.
 - **Rights:** only the author's own material, or material used with its author's consent; the declaration of
   §3 says so, and the reports of the Forum handle the rest. Whether a course built from someone else's
   lectures is an elaboration of their work is an inference to be checked by the owners, not advice.
@@ -114,8 +110,7 @@ Answered by one owner on 25 October: the author's name chosen per course, the ac
 optional qualification shown as «dichiarata dall'autore»; «Verificato» per module (§5); «Superato da N» from 5;
 withdrawal as in §7; the attestation only on «Verificato» courses. Open:
 
-1. **The licence** (§6): CC BY-SA 4.0, as the cards' notice already says, so one licence covers a course and its
-   cards and VisuaLex needs no licence of its own. One owner agreed on 25 October; the other's answer is awaited.
+1. ~~The licence~~: closed, G-374 (§6).
 2. **Derivatives** (§7): «Proponi modifiche» first, one's own version after 30 days?
 
 ## 10. What A1 must already allow

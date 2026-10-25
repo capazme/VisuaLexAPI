@@ -1,9 +1,9 @@
 # Gymnasium — study courses built by the user's assistant (A1)
 
-**Status:** draft, rewritten on 25 October 2026 after the owners widened the idea (§1), with the owners'
-answers of that day and the web review of the same day. The server part (§10) is a list of what the rest
-needs, to be written by the server side before the spec is approved. Design only: no code, no migration yet.
-**Target:** release 1.11.
+**Status:** draft, 25 October 2026: complete. The flow, the screens and the tools (§1–§9, §11–§15) are the web
+side's; the server (§10) is the server side's; one owner answered the server's questions (§10.14, G-377) on
+25 October, the other's answer is awaited. Design only: no code yet.
+**Target:** release 1.11, **ready by 30 October 2026** (the owners' date, §13).
 **Decisions it rests on** (codes of the owners' decision register, and the owners' answers in chat):
 - **G-362 (ok, 22 October):** the exception to principle 2 of the Studia specification (no uploads), narrowed:
   only what is saved into a course reaches the server, private to its user, under a declaration that the user
@@ -72,16 +72,17 @@ by institute (restyle spec, G5).
 4. **The user corrects it and confirms.** Nothing is written in VisuaLex before the confirmation.
 5. **The assistant builds it**, in this order: the study dossier with a group per module (§7); the course
    with its competences; each module, with its lesson and its verification in one call; the cards; the first
-   final exam. The course is «in preparazione» until every module and the exam exist; a module can be studied
-   as soon as it exists.
+   final exam. The course is «in preparazione» while it has fewer live modules than the programme planned, or
+   no exam yet; a module can be studied as soon as it exists.
 6. **The user reviews it in «Percorsi»** (§6): reads any lesson not yet started, deletes a module, or the whole
    course.
 
 **What the schema tells the assistant**, as rules:
 - **the lesson is the user's material, reorganized:** faithful to it, in clear Italian, with nothing the
   material does not say; what is missing is pointed out in the chat, not invented;
-- **every norm cited resolves** as a card anchor does; a citation that does not resolve is left out and told
-  to the user;
+- **every norm and decision is put in the course's dossier first,** where the dossier tools resolve it; the
+  lesson cites the dossier's entries, never a reference of its own (§10.3), and what does not resolve is left
+  out and told to the user;
 - **decisions come from the sources only,** found with VisuaLex's or mcp-legal-it's tools, never from memory;
 - **every question serves a named competence,** and the rules of §5 on shares, distractors and the open
   question hold;
@@ -105,6 +106,10 @@ A worked example is in §4.1.
 - **The final exam** opens when every module is done: at least two application questions per competence and
   one open question in the form of a short opinion (questione, regola, esito) with a rubric. Passed at 70%
   overall and at least 60% on each competence, the same no-compensation shape as the bar exam's written tests.
+  An exam needs at least five live cards per competence (§10.7).
+- **Self-assessment does not count** (G-377, Q6): the rubric's ticks on an open question, in a module or in the
+  exam, are shown and never scored, for mastery or for the pass, until A2's correction by the assistant;
+  otherwise a learner ticking every box would pass alone. In A1 writing is practised, not measured.
 - **If it is not passed,** it closes. From the third Rome day after, the page says «Chiedi al tuo assistente un
   nuovo esame» and lists the competences under 60%, which the review has meanwhile offered; the assistant
   writes a new exam with different questions (§9). An exam is never shown twice.
@@ -121,10 +126,11 @@ A course of 10 modules, one a day; competence C3 is served by modules 2 and 6.
   prossima vale dal giorno 9».
 - **Days 3–8:** the review offers C3's cards; day 6, module 6: 8 answers, 7 right (88%), but only 4 days after
   day 2, so it does not complete C3.
-- **Day 9:** the review offers 5 cards of C3, 4 graded «Bene» (80%): the second valid session at 80%, 7 days
-  after the first. **C3 «acquisita».**
-- **Day 23:** 5 cards, 2 right (40%): **«da riprendere»**, back in the review more often, two more sessions
-  7 days apart to bring it back.
+- **Day 9:** the day C3's next session can count, the course's review adds **check cards** (§10.7, G-377 Q10):
+  C3's cards already reviewed, due or not, up to five. 4 graded «Bene» (80%): the second valid session at 80%,
+  7 days after the first. **C3 «acquisita».**
+- **Day 23:** 5 check cards, 2 right (40%): **«da riprendere»**; its check cards come first, once a week, and two
+  more sessions 7 days apart bring it back.
 - **Day 11:** with the ten modules done, the final exam opens. The course is «superato» when the exam is passed
   and every competence is «acquisita»: a competence served first by module 10 cannot be before day 17, so a
   course ends at the earliest a week after its last module.
@@ -162,9 +168,12 @@ minutes, words and thresholds are inferences.
 ### 5.1 Drafts the learner cannot check in advance
 
 A learner cannot review a quiz before taking it without spoiling it. In a private course every item has
-«Segnala un errore» once answered; a flagged item is withdrawn from that enrolment, left out of mastery, and
-counted in the module's judgement. The assistant reads the flags (§9) and adds a corrected module or item.
-Review before use is mandatory when a course is published (A3).
+«Segnala un errore» once answered. **A flag changes no score** (G-377, Q7): not the module's quiz percentage, not
+an exam's result, not mastery; otherwise flagging the items one got wrong would raise the score (10 answers, 3
+wrong and flagged, 7 of 7). The flag goes to the assistant (§9), which adds a **corrected module** (on the server
+a correction is always a whole module: a frozen module takes no new item). Once the correction is live, the user
+withdraws the old module in the web, and only then do its items leave mastery. A wrong item weighs until its
+correction, which is what the flag asks for. Review before use is mandatory when a course is published (A3).
 
 ## 6. Screens (`apps/web`)
 
@@ -188,7 +197,10 @@ course, a course «in preparazione», an item with a very long explanation.
    - the **competences**, each with its state and its numbers (§4);
    - the **modules** in order, each «da iniziare», «in corso» or «fatto», with the competences it serves and
      «creato da <app>»; a module not yet started can be read and deleted;
-   - **«in preparazione»** says what is missing and gives the sentence to copy into the assistant;
+   - **«in preparazione»** says what is missing («9 di 10 moduli», «manca l'esame», «C4 ha 3 schede su 5») and
+     gives the sentence to copy into the assistant; beside a module's deletion, **«Il programma finisce qui»**
+     lowers the planned modules so that the exam can open (G-377, Q11);
+   - a module superseded by a correction offers «Ritira questo modulo»;
    - the **final exam:** locked, open, not passed («Chiedi al tuo assistente un nuovo esame» from the third day),
      passed;
    - the **dossier** of the course, one link, opening on the course's groups;
@@ -232,14 +244,15 @@ course, a course «in preparazione», an item with a very long explanation.
 The tools sit in a group of their own, **«Percorsi»**, off by default and switched on by the user, as the
 groups of N2: they count against the context budget only for those who use them. Names in the style of the
 existing tools, descriptions in Italian, the same `run` and `callApi` path. **No tool replaces or moves
-anything** (the MCP's rule): a correction is a new module or a new item, and the one it supersedes is withdrawn
-by the user in the web or, if unused, removed by the assistant.
+anything** (the MCP's rule): a correction is a new module that names the one it supersedes, which the user
+withdraws in the web. The assistant deletes nothing: an unused module is deleted by the user in the web, and the
+destructive tools stay three (G-377, Q9).
 
 | Tool | What |
 | --- | --- |
 | `lingolex_schema_card` | as today, extended with the rules of §3, §4 and §5 and the shape of a course, a module and an exam, to read before anything else |
 | `lingolex_crea_percorso` | creates a course: title, subject, competences, the dossier it starts from; refused with a link until the declaration is accepted |
-| `lingolex_aggiungi_modulo` | adds a module to a course, lesson and verification together: order, title, competences, the lesson split into blocks, the norms it cites (resolved as anchors), pre-questions, recall questions per block, quiz (options, the right one, an explanation per option), open question with the hybrid's options, model answer and rubric; every item names its competences |
+| `lingolex_aggiungi_modulo` | adds a module to a course, lesson and verification together: order, title, competences, the lesson split into blocks in the format of §10.3, its citations as the course dossier's entries (no call to the sources), the module it corrects if any, pre-questions, recall questions per block, quiz (options, the right one, an explanation per option), open question with the hybrid's options, model answer and rubric; every item names its competences |
 | `lingolex_aggiungi_esame` | adds a final exam; refused while one is open or before three Rome days after a failed one |
 | `lingolex_percorsi` | read-only: the user's courses, or one course with its structure and the user's outcomes (flagged items, judgements, competences «in corso» or «da riprendere»), so that the assistant can correct and, in A2, reinforce |
 | `lingolex_salva_card` | as today, with optional `modulo` and `competenze`: a module's cards enter the review only after the module is done |
@@ -653,6 +666,8 @@ schema, migrations: `.github/CODEOWNERS`).
 - **«Supera un percorso»:** 100 XP when a course becomes «superato», once per course, only for courses of at
   least 3 competences and 3 modules, so that a one-question course earns nothing (decided 25 October, to be
   corrected in use).
+- **The daily net** (G-377, Q5): «Completa un modulo» pays at most two modules a Rome day; a third is credited
+  the next day, never lost. The daily ceiling goes from 300 to 450.
 - Points never weigh a vote (G-318). The existing missions for due and new cards already reward the recalls on
   the following days.
 
@@ -671,7 +686,8 @@ schema, migrations: `.github/CODEOWNERS`).
   > ☐ Dichiaro di avere il diritto di usare il materiale da cui creo i miei percorsi · [Accetto]
 
 - **Private by construction:** no read returns another user's course or enrolment; nothing of a course reaches
-  the community, the graph or a shared environment in A1.
+  the community, the graph or a shared environment in A1. A course's cards go to the trash with it and are never
+  proposed to the community in A1 (G-377, Q8).
 - **Instruction injection:** the schema tells the assistant that the material is data (§3).
 - **Rights in someone else's material** (inference, not advice): a course built from another author's handout
   or lectures is an elaboration of that work; the declaration covers it for private use, and A3 does not
@@ -690,13 +706,24 @@ schema, migrations: `.github/CODEOWNERS`).
 state and the declaration; (b) reading and recall; (c) quiz and end; (d) the final exam and mastery. The
 dossier's groups come with their own spec.
 
+**Ready by 30 October** (the owners, 25 October: the owners meet that evening). Against the estimate of §10.13
+(about 9 days of server and MCP work) this holds only with the work in parallel and a narrower cut, which the
+orchestrator plans:
+- **in the cut:** S1, S2 and M1 of §10.13 and the web's (a)–(d), the web built on the agreed contract while the
+  server is written;
+- **after the date:** the dossier's groups (the course links its dossier as a whole meanwhile), highlights
+  (§14), A1b;
+- **the critical path:** M1 waits for #318's groups (1b): without them no course can be created, since creation
+  is the assistant's. Either 1b lands early in the week, or the owners decide how «Percorsi» ships before it.
+
 ## 14. Decisions
 
 Answered on 24 October: the name «Percorsi»; the next module a suggestion; the mission at 30 XP and 70%;
 highlights for the session only. Answered on 25 October («ok», «come raccomandi»): mastery as in §4; the exam
 at 70% overall and 60% per competence, a new exam from the assistant after three days; «Supera un percorso»
 at 100 XP with the minimums of §11; the dossier kept when its course is deleted; the declaration's text of §12;
-groups in the dossier instead of sections (§7). Open:
+groups in the dossier instead of sections (§7); the server's eight choices of §10.14 (G-377, Q4–Q11, one owner;
+the other's answer awaited); the licence of A3 (G-374) and «Analizza documento» (G-375). Open:
 
 1. **Highlights in A1:** a minimal way from the keyboard and by touch (select, then «Evidenzia»), or out of A1
    given their low value in the evidence? Recommended: out of A1, back with the author's saved highlights in A2.
