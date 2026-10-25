@@ -47,6 +47,7 @@ import {
 } from '../utils/storeApiMappers';
 import { serverFieldsFromApi, dossierFromApi, dossierItemFromApi, itemContentFor, serverItemFor } from '../components/features/dossier/dossierUtils';
 import { shiftAiReviewCount } from '../utils/aiReview';
+import { isRemovalPending, removeWithUndo } from './deferredRemovals';
 
 // ── Environment wire ↔ store converters ───────────────────────────────
 // The server stores the per-slice content (dossiers / quickNorms / aliases /
@@ -2077,19 +2078,28 @@ const appStore = createStore<AppState>()(
                     });
             },
 
+            // Behind «Annulla» (`removeWithUndo`): off the screen at once, sent when its notification closes or the page
+            // goes. A 404 is a removal done: the entry may have been a local-only optimistic insert.
             removeAnnotation: (id) => {
-                const previous = get().annotations.find(a => a.id === id);
+                const index = get().annotations.findIndex(a => a.id === id);
+                if (index === -1) return;
+                const previous = get().annotations[index];
                 set((state) => {
                     state.annotations = state.annotations.filter(a => a.id !== id);
                 });
-                if (!previous) return;
-                // 404 is fine: entry may have been a local-only optimistic
-                // insert that never reached the server.
-                annotationService.delete(id).catch((err) => {
-                    if (err?.status === 404) return;
-                    console.error('Failed to sync annotation delete:', err);
-                    set((state) => { state.annotations.push(previous); });
-                    get().pushSyncError('Impossibile eliminare la nota. Riprova.');
+                removeWithUndo({
+                    key: `annotation:${id}`,
+                    message: 'Nota rimossa',
+                    path: `/annotations/${encodeURIComponent(id)}`,
+                    remove: () => annotationService.delete(id),
+                    putBack: () => set((state) => {
+                        if (state.annotations.some(a => a.id === id)) return;
+                        state.annotations.splice(Math.min(index, state.annotations.length), 0, previous);
+                    }),
+                    onRefused: (err) => {
+                        console.error('Failed to sync annotation delete:', err);
+                        get().pushSyncError('Impossibile eliminare la nota. Riprova.');
+                    },
                 });
             },
 
@@ -2131,7 +2141,8 @@ const appStore = createStore<AppState>()(
                 try {
                     const wirePrefix = buildWireNormaKeyPrefix(normaKey, articleRoot);
                     const server = await annotationService.getByNormaKeyPrefix(wirePrefix);
-                    const mapped = server.map(annotationApiToStore);
+                    // One waiting behind «Annulla» is not drawn back: the server still has it until then.
+                    const mapped = server.map(annotationApiToStore).filter(a => !isRemovalPending(`annotation:${a.id}`));
                     set((state) => {
                         // Replace every annotation whose articleId sits under
                         // this article root (main body + its sub-sections)
@@ -2191,17 +2202,27 @@ const appStore = createStore<AppState>()(
                     });
             },
 
+            // As a note's: behind «Annulla», sent when its notification closes or the page goes.
             removeHighlight: (id) => {
-                const previous = get().highlights.find(h => h.id === id);
+                const index = get().highlights.findIndex(h => h.id === id);
+                if (index === -1) return;
+                const previous = get().highlights[index];
                 set((state) => {
                     state.highlights = state.highlights.filter(h => h.id !== id);
                 });
-                if (!previous) return;
-                highlightService.delete(id).catch((err) => {
-                    if (err?.status === 404) return;
-                    console.error('Failed to sync highlight delete:', err);
-                    set((state) => { state.highlights.push(previous); });
-                    get().pushSyncError('Impossibile eliminare l\'evidenziazione. Riprova.');
+                removeWithUndo({
+                    key: `highlight:${id}`,
+                    message: 'Evidenziazione rimossa',
+                    path: `/highlights/${encodeURIComponent(id)}`,
+                    remove: () => highlightService.delete(id),
+                    putBack: () => set((state) => {
+                        if (state.highlights.some(h => h.id === id)) return;
+                        state.highlights.splice(Math.min(index, state.highlights.length), 0, previous);
+                    }),
+                    onRefused: (err) => {
+                        console.error('Failed to sync highlight delete:', err);
+                        get().pushSyncError('Impossibile eliminare l\'evidenziazione. Riprova.');
+                    },
                 });
             },
 
@@ -2218,7 +2239,8 @@ const appStore = createStore<AppState>()(
                 try {
                     const wirePrefix = buildWireNormaKeyPrefix(normaKey, articleRoot);
                     const server = await highlightService.getByNormaKeyPrefix(wirePrefix);
-                    const mapped = server.map(highlightApiToStore);
+                    // One waiting behind «Annulla» is not drawn back: the server still has it until then.
+                    const mapped = server.map(highlightApiToStore).filter(h => !isRemovalPending(`highlight:${h.id}`));
                     set((state) => {
                         state.highlights = state.highlights
                             .filter(h => !(

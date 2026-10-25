@@ -1034,7 +1034,8 @@ in the row's name, its counts the server's `assistant_notes` on the item (`serve
 The colour picker (`SelectionPopup`) suggests what each colour is for (`HIGHLIGHT_COLOR_MEANINGS`: yellow «Punto
 centrale», green «Condizione o presupposto», blue «Definizione o eccezione», red «Da rivedere»): the reader's convention,
 a hint above the four swatches (so a popup clipped at the top loses the hint, not the controls; sideways the popup
-is moved 8 px inside the window by its measured box, a `marginLeft` set as it is drawn), each swatch named in
+is moved 8 px inside the window by its drawn box — the positioning element's first child, the positioning element
+being `w-max` — a `marginLeft` set as it is drawn), each swatch named in
 Italian with its meaning, any colour still free for anything. The MCP tool gives an application the same meanings and
 refuses red (`apps/mcp/src/tools/passages.ts`).
 
@@ -2355,7 +2356,12 @@ coherent.
 people (K1a, the owner's L-35): an action whose «Annulla» puts everything back on the
 server (the 30-day trash, or a write held until the notification is gone, as an import
 of more than 100 articles from an act's index) asks nothing and offers «Annulla»
-(`showUndoToast`); browser-only state (the practices) likewise. A held write checks, when it runs, that
+(`showUndoToast`); browser-only state (the practices) likewise. Removing a highlight or a note of the reader's
+(`removeHighlight`, `removeAnnotation`) is such a held write too (`store/deferredRemovals.ts`, the D7b bin's pattern):
+off the screen at once, «Evidenziazione rimossa» / «Nota rimossa» with «Annulla», the `DELETE` sent as the
+notification closes or at once as the page goes (`pagehide`, a `keepalive` fetch, the token refreshed as it was
+removed); «Annulla» puts it back where it was; a refused `DELETE` puts it back with the sync error, a 404 is a removal
+done; a reading meanwhile does not draw it back; a logout drops it unsent. A held write checks, when it runs, that
 its target is still there (the import does not write into a dossier deleted meanwhile), and while it waits the
 browser asks before the page is left (`beforeunload`). Otherwise never
 `window.confirm`: use `components/ui/ConfirmDialog` with `variant="danger"`, and word

@@ -261,16 +261,22 @@ describe('DecisionReadingSurface — notes and highlights', () => {
     expect(addHighlight).toHaveBeenCalledWith(KEY, '', 'ricorso', expect.any(String), 'red', 3);
   });
 
-  it('the colour picker is kept inside a narrow window by its measured width, either side (D7b)', async () => {
+  it('the colour picker is kept inside a narrow window by its drawn box, either side (D7b)', async () => {
     const width = window.innerWidth;
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 320 });
     // The popup measures 250 px; first drawn past the right edge, then past the left.
     let at = { left: 200, right: 450 };
+    // The box drawn is the positioning element's first child; the positioning element itself, absolute in a narrow
+    // container, is narrower (Bill's 390 px window: the box at 149–398 while its container stopped short).
     const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
-      const nudge = parseFloat(this.style.marginLeft || '0');
-      const box = this.classList.contains('-translate-x-1/2')
+      const positioner = this.parentElement?.classList.contains('-translate-x-1/2') ? this.parentElement : null;
+      const self = this.classList.contains('-translate-x-1/2');
+      const nudge = parseFloat((positioner ?? this).style.marginLeft || '0');
+      const box = positioner
         ? { left: at.left + nudge, right: at.right + nudge, top: 0, bottom: 0, width: 250, height: 100 }
-        : { left: 0, right: 0, top: 0, bottom: 0, width: 0, height: 0 };
+        : self
+          ? { left: at.left + nudge, right: at.left + nudge + 150, top: 0, bottom: 0, width: 150, height: 100 }
+          : { left: 0, right: 0, top: 0, bottom: 0, width: 0, height: 0 };
       return { ...box, x: box.left, y: box.top, toJSON: () => ({}) } as DOMRect;
     });
     try {

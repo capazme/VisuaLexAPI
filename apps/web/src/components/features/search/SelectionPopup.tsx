@@ -137,7 +137,9 @@ export function SelectionPopup({
     const el = popupRef.current;
     if (!popup.visible || !el) return;
     el.style.marginLeft = '0px';
-    const box = el.getBoundingClientRect();
+    // The visible box, not the positioning element: absolute in a narrow container, that one shrinks to the
+    // container's room while the box inside keeps its width (measured 149–398 in a 390 px window).
+    const box = (el.firstElementChild ?? el).getBoundingClientRect();
     const margin = 8;
     let nudge = 0;
     if (box.left < margin) nudge = margin - box.left;
@@ -269,7 +271,8 @@ export function SelectionPopup({
     <div
       ref={popupRef}
       className={cn(
-        'absolute transform -translate-x-1/2 -translate-y-full',
+        // As wide as what it holds, not as the room left in its container: centred on the selection as it is.
+        'absolute w-max transform -translate-x-1/2 -translate-y-full',
         'animate-in fade-in zoom-in-95 duration-150',
         Z_INDEX.floating
       )}
