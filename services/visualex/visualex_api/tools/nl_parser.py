@@ -296,7 +296,7 @@ _LONGER_SPELLINGS = {
 }
 _ANNEX_SIGLA_PATTERNS = [
     (_sigla_pattern(sigla), identity)
-    for sigla, identity in sorted({**{s: i for i, s in _SIGLE.items()}, **_LONGER_SPELLINGS}.items(),
+    for sigla, identity in sorted([(s, i) for i, s in _SIGLE.items()] + list(_LONGER_SPELLINGS.items()),
                                   key=lambda item: -len(item[0]))
 ]
 
