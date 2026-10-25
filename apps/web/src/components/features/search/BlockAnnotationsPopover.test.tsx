@@ -11,6 +11,7 @@ import type { Annotation, Highlight, ArticleDiscussionPassageSummary } from '../
 // The scroll: its own tests (`scrollParent.test.ts`); here, which anchor it is asked for.
 vi.mock('../../../utils/scrollParent', () => ({ scrollToMiddle: vi.fn() }));
 import { scrollToMiddle } from '../../../utils/scrollParent';
+import { aiNote } from '../../../utils/__fixtures__/assistantNote';
 
 const RAW = fixtureText('nrm-cc-1453');
 const PLAIN = RAW.replace(/\n/g, '');
@@ -94,6 +95,75 @@ describe('BlockAnnotationsPopover', () => {
     expect(within(dialog).getAllByRole('heading', { level: 4 }).map((h) => h.textContent)).toEqual(['Note', 'Evidenziazioni']);
     expect(within(dialog).getByText('Vedi Cass. 2020')).toBeInTheDocument();
     expect(within(dialog).getByText(/risarcimento del danno/)).toBeInTheDocument();
+  });
+
+  describe('the passages an application proposed (D7b)', () => {
+    const p1: Highlight = {
+      id: 'p1', normaKey: 'k', articleId: '1', rangeSerialized: '', text: 'contraenti', color: 'yellow',
+      startOffset: PLAIN.indexOf('contraenti'),
+      proposal: { clientName: 'Claude Code', note: aiNote('La parte non inadempiente.') },
+    };
+    const actions = () => ({ validate: vi.fn(), flag: vi.fn(), comment: vi.fn(), editNote: vi.fn(), remove: vi.fn() });
+
+    it('come first, each acting on its own id', async () => {
+      const proposalActions = actions();
+      setup([h1, p1], [n1], { proposalActions });
+      const dialog = await screen.findByRole('dialog', { name: TITLE });
+      expect(within(dialog).getAllByRole('heading', { level: 4 }).map((h) => h.textContent)).toEqual(["Proposte dell'IA", 'Note', 'Evidenziazioni']);
+      expect(within(dialog).getByText('La parte non inadempiente.')).toBeInTheDocument();
+      fireEvent.click(within(dialog).getByRole('checkbox', { name: "Proposto dall'IA, confermi?" }));
+      expect(proposalActions.validate).toHaveBeenCalledWith('p1', true);
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Da rivedere' }));
+      expect(proposalActions.flag).toHaveBeenCalledWith('p1', true);
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Modifica la nota del passaggio' }));
+      const box = within(dialog).getByRole('textbox', { name: 'Nota del passaggio' });
+      fireEvent.change(box, { target: { value: 'Il creditore.' } });
+      fireEvent.blur(box);
+      expect(proposalActions.editNote).toHaveBeenCalledWith('p1', 'Il creditore.');
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Rimuovi il passaggio' }));
+      expect(proposalActions.remove).toHaveBeenCalledWith('p1');
+    });
+
+    it('«Cosa non va?» goes to its own id', async () => {
+      const proposalActions = actions();
+      setup([{ ...p1, proposal: { ...p1.proposal!, note: aiNote('La parte non inadempiente.', 'review') } }], [], { proposalActions });
+      const dialog = await screen.findByRole('dialog', { name: TITLE });
+      const field = within(dialog).getByRole('textbox', { name: 'Cosa non va?' });
+      fireEvent.change(field, { target: { value: 'Il passo è un altro.' } });
+      fireEvent.blur(field);
+      expect(proposalActions.comment).toHaveBeenCalledWith('p1', 'Il passo è un altro.');
+    });
+
+    it('the last one removed closes the popover, as any last annotation; another stays, the focus on the popover', async () => {
+      const first = setup([h1, p1], [], { proposalActions: actions() });
+      let dialog = await screen.findByRole('dialog', { name: TITLE });
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Rimuovi il passaggio' }));
+      expect(first.props.onClose).not.toHaveBeenCalled();
+      expect(dialog).toHaveFocus();
+      first.unmount();
+      document.body.innerHTML = '';
+      const only = setup([p1], [], { proposalActions: actions() });
+      dialog = await screen.findByRole('dialog', { name: TITLE });
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Rimuovi il passaggio' }));
+      expect(only.props.onClose).toHaveBeenCalled();
+    });
+
+    it('a validated one stays listed with them, ticked, so it can be unticked', async () => {
+      const proposalActions = actions();
+      setup([{ ...p1, proposal: { ...p1.proposal!, note: aiNote('La parte non inadempiente.', 'validated') } }], [], { proposalActions });
+      const dialog = await screen.findByRole('dialog', { name: TITLE });
+      const box = within(dialog).getByRole('checkbox', { name: 'Validato' });
+      expect(box).toBeChecked();
+      fireEvent.click(box);
+      expect(proposalActions.validate).toHaveBeenCalledWith('p1', false);
+    });
+
+    it('a reader that cannot act on them lists none apart', async () => {
+      setup([h1, p1], [n1]);
+      const dialog = await screen.findByRole('dialog', { name: TITLE });
+      expect(within(dialog).queryByRole('checkbox')).toBeNull();
+      expect(within(dialog).getAllByRole('heading', { level: 4 }).map((h) => h.textContent)).toEqual(['Note', 'Evidenziazioni']);
+    });
   });
 
   it('"Vai al passo" closes, scrolls the text to the anchor and makes it flash', async () => {

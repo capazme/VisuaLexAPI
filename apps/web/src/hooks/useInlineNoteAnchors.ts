@@ -1,5 +1,6 @@
 import { useEffect, useState, type RefObject } from 'react';
 import type { Annotation } from '../types';
+import { proposedPassageAt } from './useArticleTextInteractions';
 
 /**
  * A tap on a wavy `.note-anchor` underline in the text opens that single note's compact popover
@@ -17,6 +18,8 @@ export function useInlineNoteAnchors(
     const container = containerRef.current;
     if (!container) return;
     const handler = (e: MouseEvent) => {
+      // A passage an application proposed answers with its block's popover instead (D7b, `useArticleTextInteractions`).
+      if (proposedPassageAt(e.target)) return;
       const target = (e.target as HTMLElement | null)?.closest<HTMLElement>('.note-anchor');
       if (!target) return;
       const noteId = target.getAttribute('data-note-id');

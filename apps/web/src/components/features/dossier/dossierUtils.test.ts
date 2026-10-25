@@ -6,7 +6,7 @@ import {
   dossierItemFromApi, dossierFromApi,
   parseSentenzaContent, decisionCitationOf, sentenzaFromDecision, serverItemFor, itemContentFor, dossierContainsDecision,
   validateImportedDossier, dossierSuggestionPayload, importReport, importCounts, importReasonsText, importToastType,
-  encodeDossierShare, decodeDossierShare,
+  encodeDossierShare, decodeDossierShare, shareableDossier,
 } from './dossierUtils';
 import { buildItemKey } from '../../../utils/normaKeys';
 import type { ArticleData, Dossier, DossierItem, NormaVisitata } from '../../../types';
@@ -327,6 +327,27 @@ describe('dossierItemFromApi', () => {
     const note = dossierItemFromApi({ ...base, id: 'n', item_type: 'note', content: 'appunto' });
     expect(note).toEqual({ id: 'n', type: 'note', data: 'appunto', addedAt: base.created_at });
   });
+  it('reads how the application\'s notes stand (D7b): a norm\'s light, a note entry\'s state', () => {
+    const norm = dossierItemFromApi({
+      ...base, id: 'a', item_type: 'norm', content: { tipo_atto: 'codice civile', numero_articolo: '1453' },
+      assistant_notes: { proposed: 2, validated: 0, review: 1 }, assistant_note: null,
+    });
+    expect(norm).toMatchObject({ assistantNotes: { proposed: 2, validated: 0, review: 1 }, assistantNote: null });
+    const note = dossierItemFromApi({
+      ...base, id: 'n', item_type: 'note', content: 'Mia.', created_by: { clientName: 'Claude Code' }, assistant_notes: null,
+      assistant_note: {
+        state: 'review', state_changed_at: '2026-10-25T09:00:00Z', review_comment: 'Manca il comma 2.', original_text: 'Sua.',
+        edited: true, edited_at: '2026-10-25T09:05:00Z', edited_by: { username: 'utente' },
+      },
+    });
+    expect(note).toMatchObject({
+      assistantNotes: null,
+      assistantNote: {
+        state: 'review', stateChangedAt: '2026-10-25T09:00:00Z', reviewComment: 'Manca il comma 2.', originalText: 'Sua.',
+        edited: true, editedAt: '2026-10-25T09:05:00Z', editedBy: { username: 'utente' },
+      },
+    });
+  });
 });
 
 const SENTENZA = { corte: 'cassazione', archivio: 'penale', numero: 99999, anno: 2024, sezione: '7',
@@ -595,5 +616,21 @@ describe('shareableDossier — what leaves the account', () => {
     expect(decoded).not.toHaveProperty('published');
     expect(decoded).not.toHaveProperty('forumBlocked');
     expect(decoded.kind).toBe('studio');
+  });
+
+  it('carries nothing of how its owner reviewed what an application wrote (D7b)', () => {
+    const d: Dossier = { id: 'd', title: 'T', createdAt: '2026-10-14', items: [
+      { id: 'a', type: 'norma', addedAt: '', data: { tipo_atto: 'codice civile', numero_articolo: '1453' }, assistantNotes: { proposed: 1, validated: 0, review: 1 } },
+      { id: 'n', type: 'note', addedAt: '', data: 'Mia versione.', createdBy: { clientName: 'Claude Code' }, assistantNote: {
+        state: 'review', stateChangedAt: null, reviewComment: 'Troppo generica.', originalText: 'Sua.', edited: true, editedAt: null, editedBy: { username: 'utente' } } },
+    ] } as Dossier;
+    const shared = shareableDossier(d);
+    const decoded = JSON.parse(decodeDossierShare(encodeDossierShare(d)));
+    for (const items of [shared.items, decoded.items]) {
+      expect(items[0]).not.toHaveProperty('assistantNotes');
+      expect(items[1]).not.toHaveProperty('assistantNote');
+    }
+    expect(JSON.stringify(decoded)).not.toContain('Troppo generica.');
+    expect(decoded.items[1]).toMatchObject({ data: 'Mia versione.', createdBy: { clientName: 'Claude Code' } });
   });
 });

@@ -4,6 +4,8 @@ import { MemoryRouter } from 'react-router-dom';
 
 // What each act block asks its title and rubriche for.
 const actDetailsAskedFor = vi.hoisted(() => [] as { key: string; articles: unknown[] }[]);
+// D7b's flag: asked as the dossier page mounts and as the app starts; off here, with no request leaving the test.
+vi.mock('../../../services/assistantService', () => ({ assistantService: { features: vi.fn(async () => ({ assistantPassages: false })) } }));
 vi.mock('./useActDetails', () => ({
   useActDetails: (block: { key: string; articles: unknown[] }) => {
     actDetailsAskedFor.push(block);

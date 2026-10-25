@@ -786,6 +786,7 @@
 .vlx-art {
   --vlx-note-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 9a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z'/%3E%3Cpath d='M15 3v5a1 1 0 0 0 1 1h5'/%3E%3C/svg%3E");
   --vlx-thread-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719'/%3E%3C/svg%3E");
+  --vlx-proposed-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z'/%3E%3C/svg%3E");
 }
 
 .vlx-art .vlx-sign-threads {
@@ -806,6 +807,49 @@
 .vlx-art .vlx-sign-threads::after {
   content: attr(data-count);
   font-variant-numeric: tabular-nums;
+}
+
+/* The passages an application proposed and the user has not validated (D7b): its sparkle and their count on the
+   block's sign, the colour and a dashed line in the text. */
+.vlx-art .vlx-sign-proposed {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.vlx-art .vlx-sign-proposed::before {
+  content: '';
+  width: 0.8rem;
+  height: 0.8rem;
+  background-color: currentColor;
+  -webkit-mask: var(--vlx-proposed-icon) center / contain no-repeat;
+  mask: var(--vlx-proposed-icon) center / contain no-repeat;
+}
+
+.vlx-art .vlx-sign-proposed::after {
+  content: attr(data-count);
+  font-variant-numeric: tabular-nums;
+}
+
+.vlx-art .vlx-proposed {
+  text-decoration-line: underline;
+  text-decoration-style: dashed;
+  text-decoration-color: currentColor;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* Flagged «Da rivedere»: the dashed line turns red and thicker, not colour alone (the popover's flag says it in words). */
+.vlx-art .vlx-proposed[data-proposed="review"] {
+  text-decoration-thickness: 2.5px;
+  @apply decoration-red-600 dark:decoration-red-400;
+}
+
+.highlights-hidden .vlx-art .vlx-proposed,
+.vlx-art.highlights-hidden .vlx-proposed {
+  text-decoration-line: none;
+  cursor: auto;
 }
 
 /* The words of the discussion open in the panel. A tint and an underline,
@@ -893,6 +937,7 @@
 /* "Nascondi evidenziazioni" means the plain text: the dots go, and so does a
    sign that holds only highlights. */
 .highlights-hidden .vlx-art .vlx-sign-dot,
+.highlights-hidden .vlx-art .vlx-sign-proposed,
 .highlights-hidden .vlx-art .vlx-sign[data-notes="0"][data-threads="0"] {
   display: none;
 }

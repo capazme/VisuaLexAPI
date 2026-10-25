@@ -6,8 +6,9 @@ import { getRubricText, parseArticleStructure } from '../../../utils/articleStru
 import type { ArticleData, DossierItem } from '../../../types';
 import { DossierItemReader } from './DossierItemReader';
 import { shownAnnex } from './dossierLayout';
-import { ClaudeMark } from '../../ui/ClaudeMark';
-import { claudeMarkSentence } from '../../ui/claudeMarkSentence';
+import { AiReviewSignal } from '../../ui/AiReviewSignal';
+import { AiNoteEntryReview } from './AiNoteEntryReview';
+import { aiReviewSummary, hasAssistantNote } from '../../../utils/aiReview';
 import { formatTimestampLong } from './dossierUtils';
 import { FOCUS_RING } from '../studia/progress/tokens';
 import { ROW, ROW_ICON, ROW_LINE, ROW_REMOVE, ROW_TITLE } from './dossierStyles';
@@ -69,11 +70,15 @@ export function DossierArticleRow({
   const rowLabel = `${verb} ${named}`
     + (historicalLabel ? `, ${historicalLabel.charAt(0).toLowerCase()}${historicalLabel.slice(1)}` : '');
   const regionId = `dossier-item-content-${item.id}`;
-  const byApp = notes.find((n) => n.createdBy)?.createdBy ?? null;
-  // The closed row's note count and mark sit inside the toggle, whose own name
-  // replaces them for a screen reader: the name has to say them.
-  const notesLabel = notes.length === 0 || isExpanded ? '' : `, ${notes.length === 1 ? '1 nota' : `${notes.length} note`}`
-    + (byApp ? `, ${notes.length === 1 ? '' : 'una '}${claudeMarkSentence(byApp)}` : '');
+  // The closed row's note count sits inside the toggle, whose own name replaces
+  // it for a screen reader: the name has to say it. No application's mark on the
+  // row (D7b): each note carries its own once the row is open.
+  const notesLabel = notes.length === 0 || isExpanded ? '' : `, ${notes.length === 1 ? '1 nota' : `${notes.length} note`}`;
+  // The traffic light too, open or closed: what is left to check stays said. The server counts the application's
+  // notes on this entry (`assistant_notes`, D7b); null with nothing written or the feature off.
+  const aiReview = item.assistantNotes ?? null;
+  const reviewSummary = aiReview ? aiReviewSummary(aiReview) : '';
+  const reviewLabel = reviewSummary ? `, ${reviewSummary}` : '';
 
   return (
     // `data-dossier-item`: a norm a decision cites opens this row (D7d, `useCitedNorms`).
@@ -98,7 +103,7 @@ export function DossierArticleRow({
         <div
           role="button"
           tabIndex={0}
-          aria-label={rowLabel + notesLabel}
+          aria-label={rowLabel + notesLabel + reviewLabel}
           aria-expanded={isExpanded}
           aria-controls={isExpanded ? regionId : undefined}
           onClick={onToggleExpand}
@@ -139,7 +144,7 @@ export function DossierArticleRow({
                 <span className="sr-only">{notes.length === 1 ? 'nota' : 'note'}</span>
               </span>
             )}
-            {notes.length > 0 && !isExpanded && byApp && <ClaudeMark createdBy={byApp} compact />}
+            {aiReview && <AiReviewSignal counts={aiReview} />}
           </span>
         </div>
         <button
@@ -167,17 +172,24 @@ export function DossierArticleRow({
           {/* The article's notes first, then its text (spec §6). */}
           {(notes.length > 0 || onAddNote) && (
             <div className="mb-2 mt-1 space-y-1.5">
-              {notes.map((note) => (
+              {notes.map((note) => {
+                const words = <p className="whitespace-pre-wrap text-sm text-slate-800 dark:text-slate-200">{note.data}</p>;
+                const meta = (
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                    <span>{formatTimestampLong(note.addedAt)}</span>
+                  </div>
+                );
+                // A note an application wrote: its state, the pencil and its bin under it (D7b).
+                const reviewed = hasAssistantNote(note) && onRemoveNote;
+                return (
                 <div key={note.id} className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 dark:border-amber-900/50 dark:bg-amber-950/20">
                   <StickyNote size={14} aria-hidden className="mt-0.5 flex-shrink-0 text-amber-600" />
                   <div className="min-w-0 flex-1">
-                    <p className="whitespace-pre-wrap text-sm text-slate-800 dark:text-slate-200">{note.data}</p>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                      <span>{formatTimestampLong(note.addedAt)}</span>
-                      <ClaudeMark createdBy={note.createdBy ?? null} />
-                    </div>
+                    {reviewed
+                      ? <AiNoteEntryReview note={note} meta={meta} onRemove={() => onRemoveNote(note)}>{words}</AiNoteEntryReview>
+                      : <>{words}{meta}</>}
                   </div>
-                  {onRemoveNote && (
+                  {onRemoveNote && !reviewed && (
                     <button
                       type="button"
                       onClick={() => onRemoveNote(note)}
@@ -188,7 +200,8 @@ export function DossierArticleRow({
                     </button>
                   )}
                 </div>
-              ))}
+                );
+              })}
               {onAddNote && (
                 <button
                   type="button"
@@ -202,6 +215,7 @@ export function DossierArticleRow({
           )}
           <DossierItemReader
             norma={item.data}
+            itemId={item.id}
             onOpenOnDashboard={onOpenOnDashboard}
             showToast={showToast}
             onArticle={onArticle}
