@@ -140,7 +140,13 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     is stored and keyed with `allegato: "1"` and its URN is `…;773:1~art86`. A code's
     default annex and such an act's annex are never named in a citation (`sources.py`, and
     the server's, the web's and MERL-T's copies); the TS mirrors and MERL-T's copy of
-    `ANNEXED_ACTS` are pinned to this one by their tests
+    `ANNEXED_ACTS` are pinned to this one by their tests. `ANNEX_SIGLE` / `ANNEX_HEADINGS`
+    (keyed «<decree>:<annex>») give an annex of a code's decree, or an act of the codes table,
+    a sigla and a heading of its own (G-369: «disp. att. c.p.a.», «c.p.m.g.», «disp. att. c.p.p.»);
+    `sources._named` reads the sigla by the annex a norm sits in, so another annex of a code's
+    decree is never the code, and an annex with no sigla is cited by the decree with
+    «(Allegato N)». The parser reads each sigla back as the code and its annex; the same
+    copies are pinned the same way
   - `map.py` also holds `BROCARDI_CODICI` (label → page, one row per source at
     brocardi.it/fonti.html) and `find_brocardi_url(tipo, numero, data)`, which
     `brocardi_scraper.do_know` asks — unused since Brocardi was switched off (D-078). The lookup is **by identity**: every label
