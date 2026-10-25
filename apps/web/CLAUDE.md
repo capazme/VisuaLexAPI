@@ -1028,11 +1028,15 @@ never dropped without «Scartare la modifica?» — «Continua» or «Scarta» �
 popover's X, Esc or «Vai al passo», which a press outside never closes while a note is edited), the bin, and «Vedi la versione dell'IA» once the note was
 changed. Every proposal, a bare mark too and one that no longer lands, offers «Sposta l’evidenziazione» (the
 passage's boundaries by hand: Luca, «l'evidenziatura l'IA me la fa, però devo poterla modificare»): the popover closes,
-the reader shows `MoveProposalBar` (fixed at the foot, the page's width on a phone) with the passage's words selected in
-the text and the focus on it, and the selection popup is off meanwhile (`ArticleBody`'s `selectionPopup`). The new words
+the reader shows `MoveProposalBar` (portalled, fixed at the foot, the page's width on a phone; one on the page at a
+time, `assistantProposalsStore.moving`, which a removal or the feature switched off ends) with the passage's words
+selected in the text (only when they are still at their offset) and the focus on it; meanwhile the selection popup is off
+(`ArticleBody`'s `selectionPopup`) and a click in the text opens nothing (a drag ends with one, on the very passage), and
+a changed note in the popover asks first («Scartare la modifica?»). The new words
 are a drag or a touch, or Maiusc+frecce from the keyboard (Ctrl or Alt a word at a time, `Selection.modify`, wherever
-the focus is) with «Sposta l'inizio» / «Sposta la fine» choosing the edge (`setBaseAndExtent`); the help line and those
-two buttons are hidden on a coarse pointer. They are read as a highlight of the user's is (`getSelectionAnchor` over the
+the focus is but in a field, under a dialog or on a key already taken) with «Sposta l'inizio» / «Sposta la fine»
+choosing the edge (`setBaseAndExtent`; a backward drag makes it the start); the help line and those two buttons are
+hidden on a coarse pointer. The focus goes back to the block's sign after a move or «Annulla». They are read as a highlight of the user's is (`getSelectionAnchor` over the
 reader's text root, its projection; root rule 23), 1–2000 characters, and «Sposta qui» or Enter sends them
 (`PUT …/proposals/:id/range`, `moveProposal` in the store, the note's state unchanged); Esc leaves. Once moved, the card
 offers «Vedi l'evidenziazione dell'IA» (`HighlightProposal.originalText`, the server's `assistantRange`).

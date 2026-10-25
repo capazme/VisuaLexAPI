@@ -148,7 +148,7 @@ describe('DossierItemReader — what an application proposed on the entry (D7b)'
     });
     fireEvent.click(sign);
     const dialog = await screen.findByRole('dialog', { name: /Annotazioni · Nei contratti/ });
-    fireEvent.click(within(dialog).getAllByRole('button', { name: 'Sposta l’evidenziazione' })[0]);
+    fireEvent.click(within(dialog).getAllByRole('button', { name: "Sposta l'evidenziazione" })[0]);
     await waitFor(() => expect(screen.queryByRole('dialog', { name: /Annotazioni/ })).toBeNull());
     const bar = screen.getByRole('group', { name: "Sposta l'evidenziazione" });
     expect(window.getSelection()!.toString()).toBe('contraenti');

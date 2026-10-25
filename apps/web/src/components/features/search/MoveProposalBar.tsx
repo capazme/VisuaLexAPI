@@ -1,19 +1,25 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { createPortal } from 'react-dom';
 import { MoveHorizontal } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { getSelectionAnchor, rangeFromPlainOffsets } from '../../../utils/selectionOffset';
 import { scrollToMiddle } from '../../../utils/scrollParent';
+import { isEditableTarget } from '../../ui/notifications/undoShortcut';
+import { isWorkspaceCovered } from '../../../utils/findWindowControl';
 
 /** The server's bounds for a passage's words (D7b contract §2.3). */
 export const MOVE_MIN = 1;
 export const MOVE_MAX = 2000;
+/** What the live region reads of the words selected: enough to know where they are, not two thousand characters. */
+const SAID_MAX = 80;
 
 type Edge = 'start' | 'end';
 
 export interface MoveProposalBarProps {
     /** The reader's text root: the selection is read there, as a highlight of the user's is (`getSelectionAnchor`). */
     textRootRef: RefObject<HTMLElement | null>;
+    proposalId: string;
     /** Where the passage is now, in the reader's projection. */
     startOffset: number;
     text: string;
@@ -22,36 +28,53 @@ export interface MoveProposalBarProps {
     onCancel: () => void;
 }
 
+const sameWords = (a: string, b: string) => a.replace(/\s+/g, ' ').trim().toLowerCase() === b.replace(/\s+/g, ' ').trim().toLowerCase();
+
+/** Whether the selection runs backwards (its moving end, the focus, before its anchor). */
+function isBackward(selection: Selection): boolean {
+    if (!selection.anchorNode || !selection.focusNode) return false;
+    if (selection.anchorNode === selection.focusNode) return selection.focusOffset < selection.anchorOffset;
+    return !!(selection.anchorNode.compareDocumentPosition(selection.focusNode) & Node.DOCUMENT_POSITION_PRECEDING);
+}
+
 /**
  * «Sposta l'evidenziazione» (D7b): the passage's words selected in the text, the user selects new ones (a drag, a touch,
  * or Maiusc+frecce from the keyboard, a word at a time with Ctrl or Alt), and «Sposta qui» saves them. The selection is
  * read as a highlight of the user's is, so the offset is in the renderer's projection and no character of the text
  * changes; the note keeps its state. «Sposta l'inizio» / «Sposta la fine» say which edge the keys move. Enter saves, Esc
- * leaves. The selection popup is off meanwhile (the reader passes `selectionPopup={false}` to `ArticleBody`).
+ * leaves — never a key a field, a dialog or another control took. While it is open a click in the text opens nothing
+ * (a drag ends with one, on the very passage being moved), and the selection popup is off (`ArticleBody`'s
+ * `selectionPopup`). One bar on the page at a time (`assistantProposalsStore.moving`).
  */
-export function MoveProposalBar({ textRootRef, startOffset, text, onSave, onCancel }: MoveProposalBarProps) {
+export function MoveProposalBar({ textRootRef, proposalId, startOffset, text, onSave, onCancel }: MoveProposalBarProps) {
     const barRef = useRef<HTMLDivElement>(null);
     const [edge, setEdge] = useState<Edge>('end');
     const [current, setCurrent] = useState<{ startOffset: number; text: string } | null>(null);
     const [outside, setOutside] = useState(false);
+    // What the bar opened on: a save that changes nothing (the same words, read again) is not one.
+    const opened = useRef<{ startOffset: number; text: string } | null>(null);
 
-    // The passage's words selected, the end as the moving edge, and the focus on the bar: the keys move the selection.
+    // The passage's words selected — only when they are still at their offset —, the end as the moving edge, and the
+    // focus on the bar: the keys move the selection.
     useLayoutEffect(() => {
         const root = textRootRef.current;
         const range = root ? rangeFromPlainOffsets(root, startOffset, startOffset + text.length) : null;
         const selection = window.getSelection();
-        if (range && selection) {
+        if (range && selection && sameWords(range.toString(), text)) {
             selection.removeAllRanges();
             selection.addRange(range);
+            opened.current = getSelectionAnchor(root, selection);
             const mark = range.startContainer.parentElement;
             if (mark) scrollToMiddle(mark);
+        } else {
+            selection?.removeAllRanges();
         }
         barRef.current?.focus({ preventScroll: true });
         // Only on opening: the words are the user's to change from here.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // What is selected now, read as a highlight of the user's is.
+    // What is selected now, read as a highlight of the user's is; the edge the keys move follows the selection's way.
     useEffect(() => {
         const read = () => {
             const root = textRootRef.current;
@@ -64,26 +87,49 @@ export function MoveProposalBar({ textRootRef, startOffset, text, onSave, onCanc
             const anchor = getSelectionAnchor(root, selection);
             setCurrent(anchor);
             setOutside(!anchor);
+            if (anchor) setEdge(isBackward(selection) ? 'start' : 'end');
         };
         read();
         document.addEventListener('selectionchange', read);
         return () => document.removeEventListener('selectionchange', read);
     }, [textRootRef]);
 
+    // A click in the text opens nothing while the words are chosen: the passage's popover, a key passage, a note.
+    useEffect(() => {
+        const root = textRootRef.current;
+        if (!root) return;
+        const swallow = (e: MouseEvent) => e.stopPropagation();
+        root.addEventListener('click', swallow, true);
+        return () => root.removeEventListener('click', swallow, true);
+    }, [textRootRef]);
+
     const valid = current !== null && current.text.length >= MOVE_MIN && current.text.length <= MOVE_MAX;
-    const unchanged = current !== null && current.startOffset === startOffset && current.text === text;
+    const unchanged = current !== null && (
+        (current.startOffset === startOffset && current.text === text)
+        || (opened.current !== null && current.startOffset === opened.current.startOffset && current.text === opened.current.text)
+    );
     const canSave = valid && !unchanged;
+
+    /** The focus back where the passage is: its block's sign (the bar and the card it came from are gone). */
+    const focusPassage = useCallback(() => {
+        requestAnimationFrame(() => {
+            const mark = textRootRef.current?.querySelector(`[data-highlight="${CSS.escape(proposalId)}"]`);
+            mark?.closest('.vlx-b, .vlx-dec-para')?.querySelector<HTMLElement>(':scope > .vlx-sign')?.focus({ preventScroll: true });
+        });
+    }, [textRootRef, proposalId]);
 
     const save = useCallback(() => {
         if (!canSave || !current) return;
         window.getSelection()?.removeAllRanges();
         onSave(current.startOffset, current.text);
-    }, [canSave, current, onSave]);
+        focusPassage();
+    }, [canSave, current, onSave, focusPassage]);
 
     const cancel = useCallback(() => {
         window.getSelection()?.removeAllRanges();
         onCancel();
-    }, [onCancel]);
+        focusPassage();
+    }, [onCancel, focusPassage]);
 
     /** Which edge the keys move: the selection's focus goes to that edge. */
     const chooseEdge = (next: Edge) => {
@@ -95,16 +141,19 @@ export function MoveProposalBar({ textRootRef, startOffset, text, onSave, onCanc
         else selection.setBaseAndExtent(range.startContainer, range.startOffset, range.endContainer, range.endOffset);
     };
 
-    // Maiusc+frecce move the chosen edge wherever the focus is (the bar, the page); Enter saves, Esc leaves.
+    // Maiusc+frecce move the chosen edge, wherever the focus is but in a field; Enter saves, Esc leaves. A key a field,
+    // a dialog or another control took first is theirs.
     useEffect(() => {
         const onKeyDown = (e: KeyboardEvent) => {
+            if (e.defaultPrevented || isEditableTarget(e.target) || isWorkspaceCovered()) return;
             if (e.key === 'Escape') {
                 e.preventDefault();
                 cancel();
                 return;
             }
-            const onControl = e.target instanceof HTMLElement && e.target.closest('button, input, textarea, select');
-            if (e.key === 'Enter' && !onControl) {
+            if (e.key === 'Enter') {
+                const onControl = e.target instanceof Element && e.target.closest('button, a, input, select, textarea, [role="button"], [tabindex]:not([tabindex="-1"])');
+                if (onControl || !canSave) return;
                 e.preventDefault();
                 save();
                 return;
@@ -123,24 +172,28 @@ export function MoveProposalBar({ textRootRef, startOffset, text, onSave, onCanc
             const granularity = step[1] === 'character' && (e.ctrlKey || e.altKey) ? 'word' : step[1];
             selection.modify('extend', step[0], granularity);
         };
-        window.addEventListener('keydown', onKeyDown, true);
-        return () => window.removeEventListener('keydown', onKeyDown, true);
-    }, [cancel, save]);
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [cancel, save, canSave]);
 
     const help = outside
         ? 'Seleziona le parole nel testo di questa voce.'
         : current && current.text.length > MOVE_MAX
             ? `Al massimo ${MOVE_MAX} caratteri.`
             : null;
+    const said = help ?? (current
+        ? `Selezionate: ${current.text.length > SAID_MAX ? `${current.text.slice(0, SAID_MAX)}…` : current.text}`
+        : 'Nessuna parola selezionata.');
 
-    return (
+    // In a portal: a transformed ancestor (an act being dragged) would otherwise place a fixed bar against itself.
+    return createPortal(
         <div
             ref={barRef}
             tabIndex={-1}
             role="group"
             aria-label="Sposta l'evidenziazione"
             className={cn(
-                'fixed inset-x-0 bottom-0 border-t border-slate-200 bg-white px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-lg focus:outline-none md:inset-x-auto md:bottom-4 md:left-1/2 md:w-[min(36rem,calc(100vw-2rem))] md:-translate-x-1/2 md:rounded-xl md:border dark:border-slate-700 dark:bg-slate-900',
+                'fixed inset-x-0 bottom-0 select-none border-t border-slate-200 bg-white px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-lg focus:outline-none md:inset-x-auto md:bottom-4 md:left-1/2 md:w-[min(36rem,calc(100vw-2rem))] md:-translate-x-1/2 md:rounded-xl md:border dark:border-slate-700 dark:bg-slate-900',
                 Z_INDEX.floating,
             )}
         >
@@ -150,11 +203,12 @@ export function MoveProposalBar({ textRootRef, startOffset, text, onSave, onCanc
             </p>
             {/* The keys and the edges are a keyboard's: on a touch screen the system's own handles move the selection. */}
             <p className="mt-0.5 text-xs text-slate-600 [@media(pointer:coarse)]:hidden dark:text-slate-400">
-                Trascina sul testo, oppure Maiusc+frecce (con Ctrl, una parola alla volta). Invio sposta, Esc annulla.
+                Trascina sul testo, oppure Maiusc+frecce (con Ctrl o Alt, una parola alla volta). Invio sposta, Esc annulla.
             </p>
-            <p aria-live="polite" className="mt-2 line-clamp-2 text-sm text-slate-800 [overflow-wrap:anywhere] dark:text-slate-200">
+            <p aria-hidden className="mt-2 line-clamp-2 text-sm text-slate-800 [overflow-wrap:anywhere] dark:text-slate-200">
                 {help ?? (current ? <>&ldquo;{current.text}&rdquo;</> : 'Nessuna parola selezionata.')}
             </p>
+            <span className="sr-only" aria-live="polite">{said}</span>
             <div className="mt-2 flex flex-wrap items-center gap-2">
                 <div role="group" aria-label="Il bordo che si sposta" className="flex gap-1 [@media(pointer:coarse)]:hidden">
                     {(['start', 'end'] as const).map((which) => (
@@ -192,6 +246,7 @@ export function MoveProposalBar({ textRootRef, startOffset, text, onSave, onCanc
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body,
     );
 }

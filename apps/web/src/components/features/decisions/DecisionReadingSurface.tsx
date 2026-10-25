@@ -415,7 +415,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
         selectionPopup={!moving}
       />
       {moving && (
-        <MoveProposalBar key={moving.id} textRootRef={textRootRef} startOffset={moving.startOffset} text={moving.text} onSave={saveMove} onCancel={cancelMove} />
+        <MoveProposalBar key={moving.id} textRootRef={textRootRef} proposalId={moving.id} startOffset={moving.startOffset} text={moving.text} onSave={saveMove} onCancel={cancelMove} />
       )}
       {!discussion.open && (
         <PassageThreadsStatus error={discussion.error} loading={discussion.loading} onRetry={discussion.reload} />

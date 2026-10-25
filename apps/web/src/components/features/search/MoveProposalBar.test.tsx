@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { createRef } from 'react';
 import { MoveProposalBar } from './MoveProposalBar';
 import { rangeFromPlainOffsets } from '../../../utils/selectionOffset';
@@ -15,7 +15,7 @@ function mount(startOffset = TEXT.indexOf('danno ingiusto'), text = 'danno ingiu
   ref.current = root;
   const onSave = vi.fn();
   const onCancel = vi.fn();
-  const utils = render(<MoveProposalBar textRootRef={ref} startOffset={startOffset} text={text} onSave={onSave} onCancel={onCancel} />);
+  const utils = render(<MoveProposalBar textRootRef={ref} proposalId="p1" startOffset={startOffset} text={text} onSave={onSave} onCancel={onCancel} />);
   return { ...utils, root, onSave, onCancel };
 }
 
@@ -33,6 +33,8 @@ function select(root: HTMLElement, start: number, end: number) {
 const moveHere = () => screen.getByRole('button', { name: 'Sposta qui' });
 
 afterEach(() => {
+  // Unmounted first: the bar is portalled into the body this clears.
+  cleanup();
   window.getSelection()?.removeAllRanges();
   document.body.innerHTML = '';
 });
@@ -113,15 +115,51 @@ describe('MoveProposalBar', () => {
       window.getSelection()!.addRange(range);
       document.dispatchEvent(new Event('selectionchange'));
     });
-    expect(screen.getByText('Seleziona le parole nel testo di questa voce.')).toBeInTheDocument();
+    expect(screen.getAllByText('Seleziona le parole nel testo di questa voce.').length).toBeGreaterThan(0);
     expect(moveHere()).toBeDisabled();
     act(() => {
       window.getSelection()!.removeAllRanges();
       document.dispatchEvent(new Event('selectionchange'));
     });
-    expect(screen.getByText('Nessuna parola selezionata.')).toBeInTheDocument();
+    expect(screen.getAllByText('Nessuna parola selezionata.').length).toBeGreaterThan(0);
     expect(moveHere()).toBeDisabled();
     expect(root.textContent).toBe(TEXT);
+  });
+
+  it('selects nothing where the stored words are no longer at their offset (a lost passage), and saves nothing on Enter', () => {
+    const { onSave } = mount(TEXT.indexOf('colposo'), 'parole che non ci sono');
+    expect(window.getSelection()!.isCollapsed || window.getSelection()!.rangeCount === 0).toBe(true);
+    fireEvent.keyDown(document.body, { key: 'Enter' });
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('leaves a field, a dialog and a key already taken alone', () => {
+    const { onCancel, onSave, root } = mount();
+    const field = document.createElement('input');
+    document.body.append(field);
+    fireEvent.keyDown(field, { key: 'Escape' });
+    expect(onCancel).not.toHaveBeenCalled();
+    const taken = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    taken.preventDefault();
+    document.body.dispatchEvent(taken);
+    expect(onCancel).not.toHaveBeenCalled();
+    const dialog = document.createElement('div');
+    dialog.setAttribute('aria-modal', 'true');
+    document.body.append(dialog);
+    select(root, 0, 9);
+    fireEvent.keyDown(document.body, { key: 'Enter' });
+    expect(onSave).not.toHaveBeenCalled();
+    dialog.remove();
+    fireEvent.keyDown(document.body, { key: 'Enter' });
+    expect(onSave).toHaveBeenCalledWith(0, 'Qualunque');
+  });
+
+  it('a click in the text opens nothing while the words are chosen (a drag ends with one, on the passage itself)', () => {
+    const { root } = mount();
+    const opened = vi.fn();
+    root.parentElement!.addEventListener('click', opened);
+    fireEvent.click(root.querySelector('.vlx-b')!);
+    expect(opened).not.toHaveBeenCalled();
   });
 
   it('starts with nothing selected for a passage whose words no longer land', () => {

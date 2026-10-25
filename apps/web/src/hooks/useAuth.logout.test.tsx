@@ -69,7 +69,7 @@ describe('useAuth — logout', () => {
 
     act(() => { result.current.logout(); });
 
-    expect(assistantProposalsStore.getState()).toEqual({ enabled: false, byItem: {}, busy: {} });
+    expect(assistantProposalsStore.getState()).toEqual({ enabled: false, byItem: {}, busy: {}, moving: null });
   });
 
   it('forgets what Gymnasium last drew here: the last reader’s points and level (G-316)', async () => {

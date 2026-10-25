@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo } from 'react';
 import type { Highlight, Proposal } from '../types';
 import { proposalHighlight } from '../utils/aiReview';
 import {
@@ -35,9 +35,14 @@ export function useEntryProposals(itemId: string | undefined, normaKey: string, 
     [proposalsOf, proposals, normaKey, articleId],
   );
 
-  // «Sposta l'evidenziazione»: the passage whose new words the reader is asking for, while it is still there.
-  const [movingId, setMovingId] = useState<string | null>(null);
+  // «Sposta l'evidenziazione»: the passage whose new words this reader is asking for — one on the page at a time —,
+  // while it is still there: binned meanwhile (or the feature off), the move ends.
+  const movingRef = assistantProposalsStore((s) => (itemId && s.moving?.itemId === itemId ? s.moving : null));
+  const movingId = movingRef?.proposalId ?? null;
   const moving: Proposal | null = (movingId && proposalsOf && proposals?.find((p) => p.id === movingId)) || null;
+  useEffect(() => {
+    if (movingId && !moving) assistantProposalsStore.setState({ moving: null });
+  }, [movingId, moving]);
 
   const actions = useMemo<ProposalActions | undefined>(() => {
     if (!proposalsOf || !itemId) return undefined;
@@ -48,16 +53,16 @@ export function useEntryProposals(itemId: string | undefined, normaKey: string, 
       comment: (id, text) => void setProposalState(d, itemId, id, 'review', text),
       editNote: (id, text) => void editProposalNote(d, itemId, id, text),
       remove: (id) => removeProposal(d, itemId, id),
-      move: (id) => setMovingId(id),
+      move: (id) => assistantProposalsStore.setState({ moving: { itemId, proposalId: id } }),
     };
   }, [proposalsOf, itemId]);
 
   /** The new boundaries, from the selection in the reader's text root (`getSelectionAnchor`, the reader's projection). */
   const saveMove = useCallback((startOffset: number, text: string) => {
     if (proposalsOf && itemId && movingId) void moveProposal(proposalsOf, itemId, movingId, startOffset, text);
-    setMovingId(null);
+    assistantProposalsStore.setState({ moving: null });
   }, [proposalsOf, itemId, movingId]);
-  const cancelMove = useCallback(() => setMovingId(null), []);
+  const cancelMove = useCallback(() => assistantProposalsStore.setState({ moving: null }), []);
 
   return { highlights, actions, moving, saveMove, cancelMove };
 }

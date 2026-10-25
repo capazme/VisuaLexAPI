@@ -302,7 +302,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
         />
       )}
       {moving && (
-        <MoveProposalBar key={moving.id} textRootRef={textRootRef} startOffset={moving.startOffset} text={moving.text} onSave={saveMove} onCancel={cancelMove} />
+        <MoveProposalBar key={moving.id} textRootRef={textRootRef} proposalId={moving.id} startOffset={moving.startOffset} text={moving.text} onSave={saveMove} onCancel={cancelMove} />
       )}
       <LooseHighlightsList highlights={looseHighlights} articleId={uniqueArticleId} onRemove={removeHighlight} />
       {proposalActions && <LostProposalsList proposals={lostProposals} actions={proposalActions} />}

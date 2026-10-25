@@ -137,7 +137,7 @@ function PassageBounds({ originalText, onMove }: { originalText?: string; onMove
             <div className="flex flex-wrap items-center gap-x-3">
                 {onMove && (
                     <button type="button" onClick={onMove} className={LINK}>
-                        <MoveHorizontal size={14} aria-hidden /> Sposta l&rsquo;evidenziazione
+                        <MoveHorizontal size={14} aria-hidden /> Sposta l'evidenziazione
                     </button>
                 )}
                 {originalText !== undefined && (
@@ -154,7 +154,7 @@ function PassageBounds({ originalText, onMove }: { originalText?: string; onMove
             </div>
             {showOriginal && originalText !== undefined && (
                 <div id={originalId} className="rounded-md border border-dashed border-slate-300 bg-white px-2 py-1.5 dark:border-slate-600 dark:bg-slate-900">
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">Evidenziazione dell&rsquo;IA</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">Evidenziazione dell'IA</p>
                     <p className="mt-0.5 line-clamp-4 text-sm text-slate-700 [overflow-wrap:anywhere] dark:text-slate-300">&ldquo;{originalText}&rdquo;</p>
                 </div>
             )}

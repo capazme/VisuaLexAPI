@@ -22,7 +22,7 @@ export interface ArticleBodyProps {
     copyOnly?: boolean;
     /** The classes of the text root (typography and structure): `vlx-art` for an article. */
     className?: string;
-    /** Receives the text root (without the selection popup), for «Cerca nel testo». */
+    /** Receives the text root (without the selection popup): «Cerca nel testo», and a passage's new words (D7b). */
     textRootRef?: RefObject<HTMLDivElement | null>;
     /** False while the reader asks for a passage's new words (D7b, `MoveProposalBar`): no popup over the selection. */
     selectionPopup?: boolean;

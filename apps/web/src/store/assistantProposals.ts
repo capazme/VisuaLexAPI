@@ -18,9 +18,11 @@ interface AssistantProposalsState {
   byItem: Record<string, Proposal[]>;
   /** The proposals and note entries with a write out, by id: their checkbox and flag wait for it. */
   busy: Record<string, true>;
+  /** «Sposta l'evidenziazione»: the one passage on the page whose new words a reader is asking for. */
+  moving: { itemId: string; proposalId: string } | null;
 }
 
-export const assistantProposalsStore = create<AssistantProposalsState>()(() => ({ enabled: false, byItem: {}, busy: {} }));
+export const assistantProposalsStore = create<AssistantProposalsState>()(() => ({ enabled: false, byItem: {}, busy: {}, moving: null }));
 
 // What `apiClient` rejects with, once its interceptor has read the answer: `{ status, message, data }`.
 const errorDetail = (error: unknown, fallback: string): string => {
@@ -74,7 +76,7 @@ function endWrite(id: string, mine: number) {
  * (the rows' lights, the note entries' controls) until the server says on again.
  */
 function switchOff() {
-  assistantProposalsStore.setState({ enabled: false, byItem: {}, busy: {} });
+  assistantProposalsStore.setState({ enabled: false, byItem: {}, busy: {}, moving: null });
   clearedByOff = true;
   appStore.setState((s) => {
     for (const d of s.dossiers) {
@@ -94,7 +96,7 @@ export function resetAssistantProposals() {
   pendingRemovals.clear();
   removalsInFlight.clear();
   writeSeq.clear();
-  assistantProposalsStore.setState({ enabled: false, byItem: {}, busy: {} });
+  assistantProposalsStore.setState({ enabled: false, byItem: {}, busy: {}, moving: null });
 }
 
 let featuresInFlight: Promise<void> | null = null;

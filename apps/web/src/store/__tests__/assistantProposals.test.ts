@@ -79,7 +79,7 @@ describe('D7b proposals — the flag', () => {
     expect(assistantProposalsStore.getState().enabled).toBe(true);
     vi.mocked(assistantService.setProposalState).mockRejectedValueOnce(notFound('Non disponibile'));
     await setProposalState('d1', 'a1', 'p1', 'validated');
-    expect(assistantProposalsStore.getState()).toEqual({ enabled: false, byItem: {}, busy: {} });
+    expect(assistantProposalsStore.getState()).toEqual({ enabled: false, byItem: {}, busy: {}, moving: null });
     expect(counts()).toBeNull();
     expect(appStore.getState().dossiers[0].items[1].assistantNote).toBeNull();
   });
@@ -123,7 +123,7 @@ describe('D7b proposals — the flag', () => {
     await loadProposals('d1', 'a1');
     removeProposal('d1', 'a1', 'p1');
     resetAssistantProposals();
-    expect(assistantProposalsStore.getState()).toEqual({ enabled: false, byItem: {}, busy: {} });
+    expect(assistantProposalsStore.getState()).toEqual({ enabled: false, byItem: {}, busy: {}, moving: null });
     window.dispatchEvent(new Event('pagehide'));
     expect(assistantService.removeProposalOnExit).not.toHaveBeenCalled();
   });

@@ -171,17 +171,17 @@ describe('ProposalCard', () => {
   it('«Sposta l\'evidenziazione» asks the reader for new words, on a passage with a note and on a mark with none', () => {
     const onMove = vi.fn();
     const { unmount } = setup({}, { onMove });
-    fireEvent.click(screen.getByRole('button', { name: "Sposta l’evidenziazione" }));
+    fireEvent.click(screen.getByRole('button', { name: "Sposta l'evidenziazione" }));
     expect(onMove).toHaveBeenCalledTimes(1);
     unmount();
     setup({ note: null }, { onMove });
-    fireEvent.click(screen.getByRole('button', { name: "Sposta l’evidenziazione" }));
+    fireEvent.click(screen.getByRole('button', { name: "Sposta l'evidenziazione" }));
     expect(onMove).toHaveBeenCalledTimes(2);
   });
 
   it('offers no move where the reader cannot ask, and no original while the boundaries are the application\'s', () => {
     setup();
-    expect(screen.queryByRole('button', { name: "Sposta l’evidenziazione" })).toBeNull();
+    expect(screen.queryByRole('button', { name: "Sposta l'evidenziazione" })).toBeNull();
     expect(screen.queryByRole('button', { name: "Vedi l'evidenziazione dell'IA" })).toBeNull();
   });
 
