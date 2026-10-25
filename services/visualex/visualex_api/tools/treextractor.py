@@ -525,11 +525,23 @@ _GLUED_HEADING = re.compile(r"[.;:]\s+((?:Articolo|Article)\s+(\d+))$")
 _HEADING_TAGS = ['p', 'div', 'span', 'h1', 'h2', 'h3', 'h4']
 
 
+def _body_follows(elem) -> bool:
+    """Whether the next sibling with text is an article's body, not another heading or nothing."""
+    sibling = elem.find_next_sibling()
+    while sibling is not None:
+        text = sibling.get_text(strip=True)
+        if text:
+            return eurlex_heading_number(text) is None
+        sibling = sibling.find_next_sibling()
+    return False
+
+
 def glued_headings(soup):
     """The article headings glued to the end of a class-less paragraph, as {number: (paragraph,
     where the heading starts in its stripped text)}. Only the article right after the one before
-    it, and never one that an element of its own heads: a sentence ending «… Articolo 11» is
-    otherwise a reference, not a heading."""
+    it, never one that an element of its own heads, and only with a body after it: a sentence
+    ending «… Articolo 11» is otherwise a reference, not a heading. Nor a paragraph quoted in the
+    act or set in a table cell (`is_quoted_heading`): there it is another act's text."""
     own = set()
     for elem in soup.find_all(_HEADING_TAGS):
         number = None if is_quoted_heading(elem) else eurlex_heading_number(elem.get_text(strip=True))
@@ -544,7 +556,8 @@ def glued_headings(soup):
             continue
         match = _GLUED_HEADING.search(text) if elem.name == 'p' and not elem.get('class') else None
         if (match and match.group(2) not in own and previous is not None and previous.isdigit()
-                and int(match.group(2)) == int(previous) + 1):
+                and int(match.group(2)) == int(previous) + 1
+                and not is_quoted_heading(elem) and _body_follows(elem)):
             found[match.group(2)] = (elem, match.start(1))
             previous = match.group(2)
     return found
@@ -818,8 +831,11 @@ def _extract_eurlex_rubriche(soup):
 _EURLEX_DATE_LINE = re.compile(r"^dell?['’\s]\s*\d", re.IGNORECASE)
 # The legacy page's description: "Direttiva 2002/58/CE del Parlamento europeo e del Consiglio, del 12 luglio 2002, relativa al …";
 # an older act's has no commas round the date ("Direttiva 85/374/CEE del Consiglio del 25 luglio 1985 relativa al …").
+# The blanks before "del" are matched only from a run's first one (`(?<!\s)`), or a search restarted
+# at every blank of a long run and scanned the rest of it each time: 0.75 s on 20,000 blanks. Same
+# matches as `(?:,\s*|\s+)del…`.
 _EURLEX_DESCRIPTION_SUBJECT = re.compile(
-    r"(?:,\s*|\s+)dell?['’\s]\s*\d{1,2}[°º]?\s+\S+\s+\d{4}\s*,?\s*(.+)$", re.IGNORECASE | re.DOTALL)
+    r"(?:,|(?<!\s)\s)\s*dell?['’\s]\s*\d{1,2}[°º]?\s+\S+\s+\d{4}\s*,?\s*(.+)$", re.IGNORECASE | re.DOTALL)
 
 
 def _eurlex_subject(lines):
