@@ -4,6 +4,8 @@ import { cn } from '../../../lib/utils';
 import type { DossierItem } from '../../../types';
 import { formatTimestampLong } from './dossierUtils';
 import { ClaudeMark } from '../../ui/ClaudeMark';
+import { AiNoteEntryReview } from './AiNoteEntryReview';
+import { hasAssistantNote } from '../../../utils/aiReview';
 import { FOCUS_RING } from '../studia/progress/tokens';
 import { ROW, ROW_LINE, ROW_REMOVE, ROW_TITLE, SECTION_COUNT, SECTION_HEADING, SECTION_TILE } from './dossierStyles';
 
@@ -21,28 +23,44 @@ const isLong = (text: string) => text.length > FOLD_AT || text.split('\n').lengt
 function NoteRow({ note, onRemove }: { note: NoteItem; onRemove: () => void }) {
   const [open, setOpen] = useState(false);
   const long = isLong(note.data);
+  const words = (
+    <p className={cn(ROW_TITLE, 'whitespace-pre-wrap [overflow-wrap:anywhere]', long && !open && 'line-clamp-3')}>
+      {note.data}
+    </p>
+  );
+  // The grey line: when, and who wrote it when an application did; under the words, never beside them, so a phone's
+  // narrow row keeps the note's width.
+  const meta = (
+    <p className={cn(ROW_LINE, 'mt-1 flex flex-wrap items-center gap-x-2 gap-y-1')}>
+      <span>{formatTimestampLong(note.addedAt)}</span>
+      <ClaudeMark createdBy={note.createdBy ?? null} />
+      {long && (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className={cn('-my-3 min-h-[44px] rounded px-1 font-medium text-amber-800 hover:underline dark:text-amber-300', FOCUS_RING)}
+        >
+          {open ? 'Mostra meno' : 'Mostra tutto'}
+        </button>
+      )}
+    </p>
+  );
+  // A note an application wrote has its state and its own bin among the controls under it (D7b).
+  if (hasAssistantNote(note)) {
+    return (
+      <li className={cn(ROW, 'pl-1 pr-1')}>
+        <div className="min-w-0 py-2.5">
+          <AiNoteEntryReview note={note} meta={meta} onRemove={onRemove}>{words}</AiNoteEntryReview>
+        </div>
+      </li>
+    );
+  }
   return (
     <li className={cn(ROW, 'flex items-start gap-1 pl-1')}>
       <div className="min-w-0 flex-1 py-2.5">
-        <p className={cn(ROW_TITLE, 'whitespace-pre-wrap [overflow-wrap:anywhere]', long && !open && 'line-clamp-3')}>
-          {note.data}
-        </p>
-        {/* The grey line: when, and who wrote it when an application did; under the words, never beside them, so a
-            phone's narrow row keeps the note's width. */}
-        <p className={cn(ROW_LINE, 'mt-1 flex flex-wrap items-center gap-x-2 gap-y-1')}>
-          <span>{formatTimestampLong(note.addedAt)}</span>
-          <ClaudeMark createdBy={note.createdBy ?? null} />
-          {long && (
-            <button
-              type="button"
-              onClick={() => setOpen((v) => !v)}
-              aria-expanded={open}
-              className={cn('-my-3 min-h-[44px] rounded px-1 font-medium text-amber-800 hover:underline dark:text-amber-300', FOCUS_RING)}
-            >
-              {open ? 'Mostra meno' : 'Mostra tutto'}
-            </button>
-          )}
-        </p>
+        {words}
+        {meta}
       </div>
       <button type="button" onClick={onRemove} aria-label="Rimuovi nota" className={ROW_REMOVE}>
         <Trash2 size={15} aria-hidden />

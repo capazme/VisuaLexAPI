@@ -2,7 +2,9 @@ import { create } from 'zustand';
 import { assistantService } from '../services/assistantService';
 import { appStore } from './useAppStore';
 import { notify, UNDO_MS } from '../components/ui/notifications/notifications';
-import type { AiReviewState, Proposal } from '../types';
+import type { AiReviewState, DossierItem, Proposal } from '../types';
+import { dossierItemFromApi } from '../components/features/dossier/dossierUtils';
+import type { DossierItemApi } from '../services/dossierService';
 
 /**
  * What applications proposed on dossier entries (D7b, the server's contract): a store of its own, keyed by entry id,
@@ -147,4 +149,36 @@ export function removeProposal(dossierId: string, itemId: string, proposalId: st
       else if (reason !== 'undo') send();
     },
   });
+}
+
+type NoteItem = Extract<DossierItem, { type: 'note' }>;
+
+/**
+ * A note entry an application wrote (contract §3): the server's answer replaces its text and its state, and the light
+ * of the article it is about moves by one.
+ */
+async function writeNoteEntry(dossierId: string, note: NoteItem, run: () => Promise<DossierItemApi>) {
+  const before = note.assistantNote?.state ?? null;
+  try {
+    const next = dossierItemFromApi(await run());
+    appStore.setState((s) => {
+      const item = s.dossiers.find((d) => d.id === dossierId)?.items.find((i) => i.id === note.id);
+      if (!item || item.type !== 'note' || next.type !== 'note') return;
+      item.data = next.data;
+      item.assistantNote = next.assistantNote ?? null;
+    });
+    if (note.aboutItemId) moveCount(dossierId, note.aboutItemId, before, next.assistantNote?.state ?? null);
+  } catch (error) {
+    if (isNotFound(error) && errorDetail(error, '') === 'Non disponibile') switchOff();
+    notify({ type: 'error', message: errorDetail(error, 'Modifica non salvata'), duration: 5000 });
+  }
+}
+
+export function setNoteEntryState(dossierId: string, note: NoteItem, state: AiReviewState, comment?: string | null) {
+  return writeNoteEntry(dossierId, note, () => assistantService.setNoteEntryState(dossierId, note.id, state, comment));
+}
+
+/** The pencil on a note entry: saving validates it, «Validato, modificato da te». */
+export function editNoteEntryText(dossierId: string, note: NoteItem, text: string) {
+  return writeNoteEntry(dossierId, note, () => assistantService.editNoteEntryText(dossierId, note.id, text));
 }

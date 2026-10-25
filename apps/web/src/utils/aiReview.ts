@@ -1,4 +1,4 @@
-import type { AiReviewState, Highlight, Proposal } from '../types';
+import type { AiReviewState, AssistantNoteEntry, DossierItem, Highlight, Proposal } from '../types';
 
 /** How many of the notes an application wrote on an entry or a block stand in each state (D7b; the server's `assistant_notes`). */
 export interface AiReviewCounts {
@@ -43,3 +43,8 @@ export function proposalHighlight(p: Proposal, normaKey: string, articleId: stri
     proposal: { clientName: p.proposedBy?.clientName ?? null, note: p.note },
   };
 }
+
+type NoteItem = Extract<DossierItem, { type: 'note' }>;
+
+/** A note entry with the state an application's note has (and the feature on: the server sends null otherwise). */
+export const hasAssistantNote = (note: NoteItem): note is NoteItem & { assistantNote: AssistantNoteEntry } => !!note.assistantNote;

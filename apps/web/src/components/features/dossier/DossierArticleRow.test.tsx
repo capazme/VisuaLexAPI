@@ -7,6 +7,7 @@ vi.mock('./DossierItemReader', () => ({
 }));
 
 import { DossierArticleRow, type DossierArticleRowProps } from './DossierArticleRow';
+import { CurrentDossierContext } from './currentDossier';
 
 const normaItem: DossierArticleRowProps['item'] = {
   id: 'i1', type: 'norma', addedAt: '2026-08-01T10:00:00.000Z',
@@ -126,6 +127,25 @@ describe('DossierArticleRow notes', () => {
     renderRow({ ...normaItem, assistantNotes: null }, { notes });
     expect(document.querySelector('[data-ai-review]')).toBeNull();
     expect(screen.getByRole('button', { name: 'Espandi codice civile 262 articolo 2043, 2 note' })).toBeInTheDocument();
+  });
+
+  it('a note an application wrote, open: its state and its own bin, not a second one (D7b)', () => {
+    const onRemoveNote = vi.fn();
+    const appNote = { ...notes[0], assistantNote: { state: 'proposed' as const, stateChangedAt: null, reviewComment: null, originalText: 'Sul danno ingiusto.', edited: false, editedAt: null, editedBy: null } };
+    render(
+      <CurrentDossierContext.Provider value="d1">
+        <DossierArticleRow
+          item={normaItem} rubrica={null} isSelected={false} showCheckbox={false} onToggleSelect={() => {}} onRemove={() => {}}
+          onToggleImportant={() => {}} isExpanded onToggleExpand={() => {}} onOpenOnDashboard={() => {}} showToast={() => {}}
+          notes={[appNote, notes[1]]} onRemoveNote={onRemoveNote}
+        />
+      </CurrentDossierContext.Provider>,
+    );
+    expect(screen.getByRole('checkbox', { name: "Proposto dall'IA, confermi?" })).toBeInTheDocument();
+    const bins = screen.getAllByRole('button', { name: 'Rimuovi nota' });
+    expect(bins).toHaveLength(2);
+    fireEvent.click(bins[0]);
+    expect(onRemoveNote).toHaveBeenCalledWith(appNote);
   });
 
   it('shows its notes above the text when open, and adds and removes one', () => {

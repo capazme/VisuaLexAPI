@@ -1033,7 +1033,9 @@ dossier from `CurrentDossierContext` (`DossierDetailView`), asks nothing on a te
 proposals with the reader's highlights; one whose words no longer land is listed under the text, to be removed. Each
 write takes the server's answer and moves the row's light by one (the old state down, the new up). The bin removes at
 once and offers «Annulla»; the `DELETE` leaves when the notification closes, or at `pagehide`, never after a logout
-drops it.
+drops it. A note entry an application wrote (`assistantNote` on the item, contract §3) has the same controls
+(`AiNoteEntryReview`, in the free notes and under an article; its bin is the row's own removal): its writes replace
+the item's text and state from the answer and move the light of the article it is about.
 
 The "Evidenziazioni" box under
 the article now lists only what no sign can reach (`LooseHighlightsList`,
