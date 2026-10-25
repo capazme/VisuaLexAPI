@@ -8,6 +8,7 @@ vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ devMode: account.devMo
 import { SectionSwitcher } from './SectionSwitcher';
 import { sectionStore } from './useSection';
 import { SECTION_HOME_CODE } from './sections';
+import { HOLD_MAX } from './sectionTransition';
 import { plannerStore } from '../../components/features/planner/plannerStore';
 
 function Where() {
@@ -80,6 +81,23 @@ describe('SectionSwitcher (spec S3)', () => {
     expect(screen.getByTestId('where')).toHaveTextContent('/studia/ripasso');
     expect(onChoose).toHaveBeenCalledOnce();
     expect(trigger()).toHaveAccessibleName('Sezione: Gymnasium, cambia sezione');
+  });
+
+  it('leaves nothing running once it is gone: the wait for the new title stops with it', async () => {
+    const { unmount } = render(
+      <MemoryRouter initialEntries={['/dossier']}>
+        <SectionSwitcher forumCount={0} onChoose={vi.fn()} />
+      </MemoryRouter>,
+    );
+    fireEvent.click(trigger());
+    // No page draws Gymnasium's title here: the change keeps waiting for it (HOLD_MAX, then up to TITLE_WAIT).
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Gymnasium/ }));
+    unmount();
+    const looked = vi.spyOn(document, 'querySelector');
+    await new Promise((resolve) => setTimeout(resolve, HOLD_MAX + 50));
+    // Before: the timer still looked for the title, after a test file's environment was gone too («document is not defined»).
+    expect(looked.mock.calls.filter(([selector]) => String(selector).includes('data-section-title'))).toEqual([]);
+    looked.mockRestore();
   });
 
   it('says the Forum has news outside it: a dot on the icon, the count on its entry (S5)', () => {
