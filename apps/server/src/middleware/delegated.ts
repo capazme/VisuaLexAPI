@@ -18,6 +18,9 @@ export const DELEGATED_COUNTERS: Record<DelegatedCounter, number> = {
   note: 100,
   trash: 20,
   card: 100,
+  // D7b: passages proposed on dossier entries, and pages of an entry's text read.
+  passage: 100,
+  text: 200,
 };
 
 const COUNTER_WORDS: Record<DelegatedCounter, string> = {
@@ -25,6 +28,8 @@ const COUNTER_WORDS: Record<DelegatedCounter, string> = {
   note: 'note scritte',
   trash: 'eliminazioni',
   card: 'schede create',
+  passage: 'passaggi evidenziati',
+  text: 'pagine di testo',
 };
 
 // Created on first use: the Redis client, when enabled, is read then.
@@ -154,7 +159,8 @@ export async function delegatedAuth(req: Request, res: Response, next: NextFunct
 
   const route = findDelegatedRoute(req.method, req.path);
   if (!route) return refuse(res, 403, 'Operazione non consentita alle applicazioni collegate.', 'forbidden');
-  if (!claims.scope.split(' ').includes(route.scope)) {
+  const tokenScopes = claims.scope.split(' ');
+  if (!tokenScopes.includes(route.scope) || (route.alsoScope && !tokenScopes.includes(route.alsoScope))) {
     return refuse(res, 403, 'Il collegamento non autorizza questa operazione.', 'insufficient_scope');
   }
 
@@ -227,11 +233,12 @@ export async function delegatedAuth(req: Request, res: Response, next: NextFunct
     }
   }
   // A call that ends refused (4xx, 5xx) costs nothing; a route may also hand
-  // back part of the charge (the norms route, for references it could not check).
+  // back part of the charge (the norms route, for references it could not check)
+  // and of the counter (the passages route, for passages it refused).
   res.on('finish', () => {
     const back = res.statusCode >= 400 ? charged : Math.min(charged, Number(res.locals.delegatedRefund) || 0);
-    const counterBack = res.statusCode >= 400 ? counted : null;
-    if (back > 0 || counterBack) void refund(user.id, back, counterBack, counterAmount);
+    const counterBack = !counted ? 0 : res.statusCode >= 400 ? counterAmount : Math.min(counterAmount, Number(res.locals.delegatedCounterRefund) || 0);
+    if (back > 0 || counterBack > 0) void refund(user.id, back, counterBack > 0 ? counted : null, counterBack);
   });
 
   req.user = user;

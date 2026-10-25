@@ -7,6 +7,7 @@ import { keyPassages, type KeyPassage } from '../decisionKeyPassages';
 import { DECISION_TEXTS, READER_TEXTS } from '../__fixtures__/decisionTexts';
 import type { Annotation, ArticleDiscussionPassageSummary, Highlight } from '../../types';
 import { openFindOn, wordOf } from '../__fixtures__/openFind';
+import { aiNote } from '../__fixtures__/assistantNote';
 
 function textNodes(html: string): string {
   const root = document.createElement('div');
@@ -51,6 +52,12 @@ function marksOn(testo: Parameters<typeof decisionProjection>[0]) {
   if (special) highlights.push(span(special.index - 2, special.index + special[0].length + 2, 'special'));
   const blocks = decisionStructure(testo).blocks;
   if (blocks.length > 1) highlights.push(span(blocks[0].end - 3, blocks[1].start + 3, 'cross'));
+  // The tail and the crossing one as passages an application proposed (D7b): marks of their own kind, no character.
+  for (const h of highlights) {
+    if (h.id === 'tail' || h.id === 'cross') {
+      h.proposal = { clientName: 'Claude Code', note: aiNote('Rileva.', h.id === 'tail' ? 'proposed' : 'review') };
+    }
+  }
   const mid = whole(plain, Math.floor(n / 2));
   const end = whole(plain, Math.min(n, mid + 5));
   const annotations = n > 0 ? [note(mid, plain.slice(mid, end), 'mid')] : [];
@@ -60,10 +67,11 @@ function marksOn(testo: Parameters<typeof decisionProjection>[0]) {
 describe('renderDecisionHtml', () => {
   for (const [name, testo] of Object.entries(DECISION_TEXTS)) {
     for (const signs of [false, true]) {
-      it(`${name}: the text nodes spell the projection, marks on, signs ${signs ? 'on' : 'off'}`, () => {
+      it(`${name}: the text nodes spell the projection, marks and proposals on, signs ${signs ? 'on' : 'off'}`, () => {
         const { plain, highlights, annotations } = marksOn(testo);
         const html = renderDecisionHtml({ testo, highlights, annotations, signs });
         expect(textNodes(html)).toBe(plain);
+        if (plain.length > 0) expect(html).toContain('data-highlight="tail" data-proposed="proposed"');
         const root = document.createElement('div');
         root.innerHTML = html;
         expect(root.innerHTML).toBe(html.replace(/\u00a0/g, '&nbsp;').replace(/&#13;/g, '\r')); // kept as written (only nbsp is serialised as an entity): well-formed

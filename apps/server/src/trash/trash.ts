@@ -97,6 +97,23 @@ async function lockDossier(tx: Prisma.TransactionClient, userId: string, dossier
 }
 
 /**
+ * The assistant's marks on these entries (D7b), locked and read: a state change or an edit in flight
+ * finishes first and lands in the payload, one that comes after finds no row (404). They belong to the
+ * entry: they go to the trash with it, in every state, and come back with it.
+ */
+async function lockedProposals(tx: Prisma.TransactionClient, userId: string, itemIds: string[]) {
+  if (itemIds.length === 0) return [];
+  await tx.$queryRaw`
+    SELECT id FROM highlights
+    WHERE user_id = ${userId} AND dossier_item_id IN (${Prisma.join(itemIds)}) AND created_by_client_id IS NOT NULL
+    ORDER BY id FOR UPDATE`;
+  return tx.highlight.findMany({
+    where: { userId, dossierItemId: { in: itemIds }, createdByClientId: { not: null } },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  });
+}
+
+/**
  * A database error from a move to the trash or a restore, as it reaches the logs: its kind and code
  * only. The rows travel through these queries (a dossier's name, its tasks' titles: a client's name,
  * possibly), and Prisma's message can quote the arguments of the query it refused. The caller gets
@@ -151,6 +168,8 @@ export async function trashDossier(
     // moved to the trash) is committed first and lands in the payload, and one that comes after
     // waits and then finds no task. Otherwise the payload would keep the task as it was.
     await tx.$queryRaw`SELECT id FROM tasks WHERE dossier_id = ${dossierId} AND user_id = ${userId} ORDER BY id FOR UPDATE`;
+    // Its entries too, for an assistant's note whose state or text changes in flight (D7b).
+    await tx.$queryRaw`SELECT id FROM dossier_items WHERE dossier_id = ${dossierId} ORDER BY id FOR UPDATE`;
     const dossier = await tx.dossier.findFirst({
       where: { id: dossierId, userId },
       include: {
@@ -170,6 +189,7 @@ export async function trashDossier(
       }
     }
     const { items, snapshots, publishedCopy, tasks, ...row } = dossier;
+    const proposals = await lockedProposals(tx, userId, items.map((item) => item.id));
     const now = new Date();
     const entry = await tx.trashEntry.create({
       data: {
@@ -179,7 +199,7 @@ export async function trashDossier(
         label: dossier.name,
         summary: tasks.length > 0 ? { itemCount: items.length, taskCount: tasks.length } : { itemCount: items.length },
         // Its copy in the Forum stays published; the link (cleared with the row) comes back on restore.
-        payload: asJson({ dossier: row, items, snapshots, publishedCopyId: publishedCopy?.id ?? null, tasks }),
+        payload: asJson({ dossier: row, items, snapshots, publishedCopyId: publishedCopy?.id ?? null, tasks, proposals }),
         clientId: by.clientId,
         clientName: by.clientName,
         grantId: by.grantId,
@@ -187,7 +207,8 @@ export async function trashDossier(
         expiresAt: expiry(now),
       },
     });
-    // Items, snapshots and tasks cascade with the dossier.
+    // Items, snapshots and tasks cascade with the dossier; the assistant's marks have no foreign key.
+    if (proposals.length > 0) await tx.highlight.deleteMany({ where: { id: { in: proposals.map((p) => p.id) } } });
     await tx.dossier.delete({ where: { id: dossier.id } });
     return { trashId: entry.id, itemCount: items.length, taskCount: tasks.length };
   }).catch((error: unknown) => quietly('Dossier trash', error));
@@ -210,9 +231,13 @@ export async function trashDossierItems(
     const dossier = await tx.dossier.findFirst({ where: { id: dossierId, userId } });
     if (!dossier) throw new AppError(404, 'Dossier not found');
     const wanted = [...new Set(itemIds)];
+    // The entries are locked before they are read: a state change or an edit of an assistant's note in flight
+    // (D7b, which locks the entry's row alone) lands in the payload, one that comes after finds no entry.
+    await tx.$queryRaw`SELECT id FROM dossier_items WHERE id IN (${Prisma.join(wanted)}) AND dossier_id = ${dossierId} ORDER BY id FOR UPDATE`;
     const items = await tx.dossierItem.findMany({ where: { id: { in: wanted }, dossierId }, orderBy: { position: 'asc' } });
     if (items.length === 0) throw new AppError(404, 'Nessuna delle voci indicate è in questo dossier.');
     const moved = items.map((item) => item.id);
+    const proposals = await lockedProposals(tx, userId, moved);
     const now = new Date();
     const entry = await tx.trashEntry.create({
       data: {
@@ -221,7 +246,7 @@ export async function trashDossierItems(
         dossierId,
         label: dossier.name,
         summary: asJson({ itemCount: items.length, items: items.map(itemSummary) }),
-        payload: asJson({ items }),
+        payload: asJson(proposals.length > 0 ? { items, proposals } : { items }),
         clientId: by.clientId,
         clientName: by.clientName,
         grantId: by.grantId,
@@ -232,6 +257,7 @@ export async function trashDossierItems(
     const deleted = await tx.dossierItem.deleteMany({ where: { id: { in: moved }, dossierId } });
     // An entry moved away by a concurrent request between the read and the delete: undo it all.
     if (deleted.count !== moved.length) throw new AppError(409, 'Il dossier è cambiato nel frattempo: riprova.');
+    if (proposals.length > 0) await tx.highlight.deleteMany({ where: { id: { in: proposals.map((p) => p.id) } } });
     await tx.dossier.update({ where: { id: dossierId }, data: { updatedAt: now } });
     const movedIds = new Set(moved);
     return { trashId: entry.id, moved, notFound: wanted.filter((id) => !movedIds.has(id)) };
@@ -332,7 +358,75 @@ type StoredItem = {
   createdByClientId: string | null;
   createdByClientName: string | null;
   aboutItemId: string | null;
+  // An assistant's note entry's state (D7b); absent from a payload stored before the columns.
+  assistantNote?: string | null;
+  noteState?: Prisma.DossierItemCreateManyInput['noteState'];
+  noteStateChangedAt?: string | null;
+  reviewComment?: string | null;
+  noteEditedAt?: string | null;
+  noteEditedBy?: string | null;
 };
+
+/** An assistant's mark on an entry (D7b), as the payload keeps it; absent from a payload stored before. */
+type StoredProposal = {
+  id: string;
+  normaKey: string;
+  text: string;
+  color: string;
+  startOffset: number;
+  endOffset: number;
+  note: string | null;
+  bookmarkId: string | null;
+  createdAt: string;
+  createdByClientId: string;
+  createdByClientName: string | null;
+  dossierItemId: string;
+  assistantText: string;
+  assistantStartOffset: number;
+  rangeEditedAt: string | null;
+  rangeEditedBy: string | null;
+  assistantNote: string | null;
+  noteState: Prisma.HighlightCreateManyInput['noteState'];
+  noteStateChangedAt: string | null;
+  reviewComment: string | null;
+  noteEditedAt: string | null;
+  noteEditedBy: string | null;
+};
+
+const proposalRow = (p: StoredProposal, userId: string): Prisma.HighlightCreateManyInput => ({
+  id: p.id,
+  userId,
+  normaKey: p.normaKey,
+  text: p.text,
+  color: p.color,
+  startOffset: p.startOffset,
+  endOffset: p.endOffset,
+  note: p.note,
+  // A bookmark is the user's and may be gone; the mark never needed one.
+  bookmarkId: null,
+  createdAt: new Date(p.createdAt),
+  createdByClientId: p.createdByClientId,
+  createdByClientName: p.createdByClientName,
+  dossierItemId: p.dossierItemId,
+  assistantText: p.assistantText,
+  assistantStartOffset: p.assistantStartOffset,
+  rangeEditedAt: dateOrNull(p.rangeEditedAt),
+  rangeEditedBy: p.rangeEditedBy,
+  assistantNote: p.assistantNote,
+  noteState: p.noteState,
+  noteStateChangedAt: dateOrNull(p.noteStateChangedAt),
+  reviewComment: p.reviewComment,
+  noteEditedAt: dateOrNull(p.noteEditedAt),
+  noteEditedBy: p.noteEditedBy,
+});
+
+/** Brings back the assistant's marks of restored entries, with their ids; one live again is left alone. */
+async function restoreProposals(tx: Prisma.TransactionClient, userId: string, proposals: StoredProposal[]): Promise<void> {
+  if (proposals.length === 0) return;
+  const live = new Set((await tx.highlight.findMany({ where: { id: { in: proposals.map((p) => p.id) } }, select: { id: true } })).map((h) => h.id));
+  const back = proposals.filter((p) => !live.has(p.id));
+  if (back.length > 0) await tx.highlight.createMany({ data: back.map((p) => proposalRow(p, userId)) });
+}
 
 /** The id when its row still exists, else null (a foreign key to a deleted row would fail the restore). */
 async function existingId(value: unknown, count: (id: string) => Promise<number>): Promise<string | null> {
@@ -370,6 +464,16 @@ const dateOrNull = (value: string | null) => (value === null ? null : new Date(v
 
 const jsonOrNull = (value: unknown) => (value === null || value === undefined ? Prisma.JsonNull : (value as Prisma.InputJsonValue));
 
+/**
+ * An assistant's note entry trashed before D7b's migration has no `noteState` key in its payload: it comes back
+ * «da validare», with its text as the original, as the migration made every one outside the trash.
+ */
+function noteStateOf(item: StoredItem): Pick<Prisma.DossierItemCreateManyInput, 'assistantNote' | 'noteState'> {
+  if ('noteState' in item) return { assistantNote: item.assistantNote ?? null, noteState: item.noteState ?? null };
+  const before = item.itemType === 'note' && item.createdByClientId && typeof item.content === 'string';
+  return before ? { assistantNote: item.content as string, noteState: 'proposed' } : { assistantNote: null, noteState: null };
+}
+
 const itemRow = (item: StoredItem, dossierId: string, position: number, aboutItemId: string | null): Prisma.DossierItemCreateManyInput => ({
   id: item.id,
   dossierId,
@@ -382,6 +486,11 @@ const itemRow = (item: StoredItem, dossierId: string, position: number, aboutIte
   createdByClientId: item.createdByClientId,
   createdByClientName: item.createdByClientName,
   aboutItemId,
+  ...noteStateOf(item),
+  noteStateChangedAt: dateOrNull(item.noteStateChangedAt ?? null),
+  reviewComment: item.reviewComment ?? null,
+  noteEditedAt: dateOrNull(item.noteEditedAt ?? null),
+  noteEditedBy: item.noteEditedBy ?? null,
 });
 
 /**
@@ -411,10 +520,12 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
 
       if (entry.kind === 'DOSSIER') {
         // `tasks` is absent from an entry trashed before the planner.
-        const { dossier, items, snapshots, publishedCopyId, tasks = [] } = payload as unknown as {
+        // `proposals` is absent from an entry trashed before D7b.
+        const { dossier, items, snapshots, publishedCopyId, tasks = [], proposals = [] } = payload as unknown as {
           dossier: Record<string, unknown> & { id: string; createdAt: string; updatedAt: string };
           publishedCopyId?: string | null;
           tasks?: StoredTask[];
+          proposals?: StoredProposal[];
           items: StoredItem[];
           snapshots: { id: string; dossierId: string; version: number; label: string | null; content: unknown; fingerprint: string | null; createdAt: string }[];
         };
@@ -442,6 +553,7 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
         if (items.length > 0) {
           await tx.dossierItem.createMany({ data: items.map((item) => itemRow(item, dossier.id, item.position, item.aboutItemId)) });
         }
+        await restoreProposals(tx, userId, proposals);
         if (snapshots.length > 0) {
           await tx.dossierSnapshot.createMany({
             data: snapshots.map((s) => ({
@@ -520,7 +632,7 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
       }
 
       if (entry.kind === 'DOSSIER_ITEMS') {
-        const { items } = payload as unknown as { items: StoredItem[] };
+        const { items, proposals = [] } = payload as unknown as { items: StoredItem[]; proposals?: StoredProposal[] };
         const targetId = targetDossierId ?? entry.dossierId;
         // Locked, so a dossier going to the trash meanwhile is waited for and found gone, not half-written to.
         const target = targetId && (await lockDossier(tx, userId, targetId)) ? await tx.dossier.findFirst({ where: { id: targetId, userId } }) : null;
@@ -539,6 +651,8 @@ export async function restoreTrashEntry(userId: string, trashId: string, targetD
         await tx.dossierItem.createMany({
           data: items.map((item, i) => itemRow(item, target.id, start + i, about(item))),
         });
+        // They follow their entries' ids, wherever the entries go back.
+        await restoreProposals(tx, userId, proposals);
         await tx.dossier.update({ where: { id: target.id }, data: { updatedAt: new Date() } });
         return { dossierId: target.id };
       }

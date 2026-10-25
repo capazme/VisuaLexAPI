@@ -9,7 +9,7 @@ from ..tools.sys_op import BaseScraper
 from ..tools.exceptions import DocumentNotFoundError, NetworkError, ValidationError
 from ..tools.cache_manager import get_cache_manager
 from ..tools.selectors import EURLexSelectors
-from ..tools.treextractor import strip_amendment_markers
+from ..tools.treextractor import HEADING_ORDINAL, glued_headings, is_quoted_heading, strip_amendment_markers
 from .akn_parser import normalize_article_key
 from ..tools.article_suffixes import ARTICLE_SUFFIX_ALTERNATION
 
@@ -220,10 +220,10 @@ def _cons_lines(element) -> list[str]:
     return lines
 
 
-# An ordinal right after a heading's number ("Articolo 15 bis", "Articolo 15bis"), a whole
-# word: "Articolo 1 Terzi" is art. 1 with its rubrica run on, not an ordinal.
-_ORDINAL_AFTER_NUMBER = re.compile(
-    rf"[\s\-]*+(?:{ARTICLE_SUFFIX_ALTERNATION})(?![^\W\d_])", re.IGNORECASE)
+# An ordinal right after a heading's number ("Articolo 15 bis", "Articolo 15bis", and glued to the
+# text after it, "Articolo 15 bisTesto"), never the head of a word: "Articolo 1 Terzi" is art. 1
+# with its rubrica run on (`HEADING_ORDINAL`).
+_ORDINAL_AFTER_NUMBER = re.compile(rf"[\s\-]*+{HEADING_ORDINAL}", re.IGNORECASE)
 
 
 def _number_ends_here(rest) -> bool:
@@ -435,9 +435,12 @@ class EurlexScraper(BaseScraper):
 
         article_section = None
 
+        # A heading quoted inside the act (an amending act's replaced or inserted articles, in a
+        # table cell) is another act's article: no strategy takes it (`is_quoted_heading`).
+
         # Strategy 1: Look for <p class="ti-art"> (original selector)
         for pattern in search_patterns:
-            article_section = soup.find(lambda tag: tag.name == 'p' and 'ti-art' in tag.get('class', []) and _heads_article(tag.get_text(strip=True), pattern))
+            article_section = soup.find(lambda tag: tag.name == 'p' and 'ti-art' in tag.get('class', []) and _heads_article(tag.get_text(strip=True), pattern) and not is_quoted_heading(tag))
             if article_section:
                 log.debug(f"Found article with ti-art class using pattern: {pattern}")
                 break
@@ -445,7 +448,7 @@ class EurlexScraper(BaseScraper):
         # Strategy 2: Look for any element with class containing 'art' or 'title'
         if not article_section:
             for pattern in search_patterns:
-                article_section = soup.find(lambda tag: tag.get('class') and any('art' in c.lower() or 'title' in c.lower() for c in tag.get('class', [])) and _heads_article(tag.get_text(strip=True), pattern))
+                article_section = soup.find(lambda tag: tag.get('class') and any('art' in c.lower() or 'title' in c.lower() for c in tag.get('class', [])) and _heads_article(tag.get_text(strip=True), pattern) and not is_quoted_heading(tag))
                 if article_section:
                     log.debug(f"Found article with art/title class using pattern: {pattern}")
                     break
@@ -466,7 +469,7 @@ class EurlexScraper(BaseScraper):
                 match = article_regex.match(text)
                 return bool(match) and _number_ends_here(text[match.end():])
 
-            article_section = soup.find(lambda tag: tag.name in ['p', 'div', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'] and heads_by_regex(tag.get_text(strip=True)))
+            article_section = soup.find(lambda tag: tag.name in ['p', 'div', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'] and heads_by_regex(tag.get_text(strip=True)) and not is_quoted_heading(tag))
             if article_section:
                 log.debug("Found article using regex text match")
 
@@ -474,11 +477,22 @@ class EurlexScraper(BaseScraper):
         if not article_section:
             subdivisions = soup.find_all('div', class_=lambda c: c and 'eli-subdivision' in c)
             for subdiv in subdivisions:
-                title_elem = subdiv.find(['p', 'span', 'div'], string=lambda s: s and any(_heads_article(s.strip(), p) for p in search_patterns))
+                title_elem = subdiv.find(lambda tag: tag.name in ('p', 'span', 'div') and tag.string
+                                         and any(_heads_article(tag.string.strip(), p) for p in search_patterns)
+                                         and not is_quoted_heading(tag))
                 if title_elem:
                     article_section = subdiv
                     log.debug("Found article in eli-subdivision")
                     break
+
+        # Strategy 5: a heading glued to the end of the paragraph before it (`glued_headings`). Only
+        # a class-less page has one, so a page whose heading carries a class is not walked for it.
+        glued = glued_headings(soup) if article_section is None or not article_section.get('class') else {}
+        heading = None
+        if not article_section and str(article).strip() in glued:
+            article_section, start = glued[str(article).strip()]
+            heading = article_section.get_text(strip=True)[start:]
+            log.debug("Found article glued to the end of a paragraph")
 
         if not article_section:
             log.warning(f"Article {article} not found in the document after all strategies")
@@ -488,8 +502,9 @@ class EurlexScraper(BaseScraper):
             )
 
         log.debug("Article found, extracting text")
-        full_text = [article_section.get_text(strip=True)]
+        full_text = [heading or article_section.get_text(strip=True)]
         element = article_section.find_next_sibling()
+        glued_at = {id(elem): start for elem, start in glued.values()}
 
         # Detect end of article by finding next article
         next_article_pattern = re.compile(r'^Articolo\s+\d+|^Article\s+\d+|^Art\.\s+\d+', re.IGNORECASE)
@@ -502,6 +517,12 @@ class EurlexScraper(BaseScraper):
             elem_text = element.get_text(strip=True) if element.name else ''
             if next_article_pattern.match(elem_text):
                 log.debug("Next article section found (text pattern), stopping extraction")
+                break
+            if id(element) in glued_at:
+                # The paragraph is this article's, up to the next one's heading glued to its end.
+                if elem_text[:glued_at[id(element)]].rstrip():
+                    full_text.append(elem_text[:glued_at[id(element)]].rstrip())
+                log.debug("Next article glued to the end of a paragraph, stopping extraction")
                 break
             if element.name in ['p', 'div', 'span']:
                 text = element.get_text(strip=True)

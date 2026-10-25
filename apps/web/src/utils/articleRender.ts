@@ -21,9 +21,11 @@
  */
 import type { Annotation, Highlight } from '../types';
 import { HIGHLIGHT_STYLES } from './highlightColors';
+import { countAiReview } from './aiReview';
 import type { ArticleStructure, DecorationKind, StructureBlock, TextRange } from './articleStructure';
 import {
   groupAnchorsByBlock,
+  isOpenProposal,
   resolveAnchors,
   signAriaLabel,
   signColors,
@@ -125,9 +127,17 @@ function decorationOpen(kind: DecorationKind, noteId?: string): string {
 }
 
 export function highlightOpen(h: Highlight): string {
+  const style = HIGHLIGHT_STYLES[h.color] ?? HIGHLIGHT_STYLES.yellow;
+  // A passage an application proposed, its note not yet validated (D7b): dashed underneath (`.vlx-proposed`).
+  if (isOpenProposal(h)) {
+    const review = h.proposal?.note?.state === 'review';
+    return `<mark style="${style}" data-highlight="${escapeAttr(h.id)}" data-proposed="${review ? 'review' : 'proposed'}" class="highlight-mark vlx-proposed"`
+      + ` title="${review ? "Proposto dall'IA, da rivedere" : "Proposto dall'IA, da validare"}">`;
+  }
+  // A passage it marked with no note: a plain mark, its origin in its title.
+  if (h.proposal) return `<mark style="${style}" data-highlight="${escapeAttr(h.id)}" class="highlight-mark" title="Evidenziato dall'IA">`;
   const author = h.originalAuthor?.username ?? (h.sourceSuggestionId ? 'utente-rimosso' : null);
   const title = author ? ` title="${escapeAttr(`Evidenziato da @${author}`)}"` : '';
-  const style = HIGHLIGHT_STYLES[h.color] ?? HIGHLIGHT_STYLES.yellow;
   return `<mark style="${style}" data-highlight="${escapeAttr(h.id)}" class="highlight-mark"${title}>`;
 }
 
@@ -262,12 +272,28 @@ export function signHtml(index: number, group: BlockAnnotations | undefined): st
   const highlights = group?.highlights.length ?? 0;
   const threads = group?.threads.length ?? 0;
   if (!group || notes + highlights + threads === 0) return '';
+  // The passages with an application's note (D7b) are named apart, by their notes' states, and drawn by the state's own
+  // shape, as on the row's light: a dashed ring to validate, a flag to review, a tick validated, each with its count.
+  // Every other highlight (the reader's, an application's mark with no note) is a dot of its colour. `data-highlights`
+  // still counts them all, so «Nascondi evidenziazioni» hides them with the rest; `data-proposed` counts the open ones.
+  // Only they give the sign a `title`: the shapes alone would not say what they are.
+  const noted = group.highlights.filter((h) => h.proposal?.note);
+  const counts = countAiReview(noted.map((h) => h.proposal!.note!.state));
+  const open = counts.proposed + counts.review;
+  const label = signAriaLabel(notes, highlights - noted.length, threads, counts);
   let html =
     `<span class="vlx-sign" role="button" tabindex="0" aria-haspopup="dialog" data-block="${index}"` +
-    ` data-notes="${notes}" data-highlights="${highlights}" data-threads="${threads}" aria-label="${signAriaLabel(notes, highlights, threads)}">`;
+    ` data-notes="${notes}" data-highlights="${highlights}" data-threads="${threads}"` +
+    (open > 0 ? ` data-proposed="${open}"` : '') +
+    (noted.length > 0 ? ` title="${escapeAttr(label)}"` : '') +
+    ` aria-label="${escapeAttr(label)}">`;
   if (notes > 0) html += `<span class="vlx-sign-notes" data-count="${notes}"></span>`;
-  for (const color of signColors(group.highlights)) html += `<span class="vlx-sign-dot" data-color="${color}"></span>`;
+  for (const color of signColors(group.highlights.filter((h) => !h.proposal?.note))) html += `<span class="vlx-sign-dot" data-color="${color}"></span>`;
   if (threads > 0) html += `<span class="vlx-sign-threads" data-count="${threads}"></span>`;
+  // In the order the label says them («1 da validare · 1 da rivedere · 1 validato»).
+  for (const state of ['proposed', 'review', 'validated'] as const) {
+    if (counts[state] > 0) html += `<span class="vlx-sign-ai" data-state="${state}" data-count="${counts[state]}"></span>`;
+  }
   return `${html}</span>`;
 }
 

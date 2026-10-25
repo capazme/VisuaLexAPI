@@ -3,6 +3,8 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { ParsedCitationData } from '../../../utils/citationMatcher';
 
+// D7b's flag: off here, with no request leaving the test.
+vi.mock('../../../services/assistantService', () => ({ assistantService: { features: vi.fn(async () => ({ assistantPassages: false })) } }));
 vi.mock('./useActDetails', () => ({
   useActDetails: () => ({ title: null, rubricaOf: () => null }),
   resolveBlockUrn: async () => 'urn:act',

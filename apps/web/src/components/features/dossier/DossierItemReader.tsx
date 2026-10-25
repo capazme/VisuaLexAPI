@@ -3,11 +3,12 @@ import { useShallow } from 'zustand/react/shallow';
 import { RefreshCw, Copy, ExternalLink } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { useArticleMarkers } from '../../../hooks/useArticleMarkers';
-import { useArticleTextInteractions } from '../../../hooks/useArticleTextInteractions';
+import { proposedPassageAt, useArticleTextInteractions } from '../../../hooks/useArticleTextInteractions';
 import { ArticleBody } from '../search/ArticleBody';
 import { UpdateNotePopover } from '../search/UpdateNotePopover';
 import { BlockAnnotationsPopover } from '../search/BlockAnnotationsPopover';
 import { LooseHighlightsList } from '../search/LooseHighlightsList';
+import { LostProposalsList } from '../search/LostProposalsList';
 import { InlineNoteComposer } from '../search/InlineNoteComposer';
 import { InlineNotePopover } from '../search/InlineNotePopover';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
@@ -17,9 +18,10 @@ import { describeVersion, historicalItemLabel, isEuropeanAct, requestIsHistorica
 import { VersionBanner } from '../search/VersionBanner';
 import { fetchArticleForNorma } from '../../../utils/articleFetchCache';
 import { getUpdateNoteParagraphs, parseArticleStructure } from '../../../utils/articleStructure';
-import { describeBlock, groupAnnotationsByBlock, hasAnnotations, highlightsWithoutSign } from '../../../utils/articleAnnotations';
+import { describeBlock, groupAnnotationsByBlock, hasAnnotations, highlightsWithoutSign, isProposal as isProposalMark } from '../../../utils/articleAnnotations';
 import type { Annotation, ArticleData, Highlight, NormaVisitata } from '../../../types';
 import { highlightColorName } from '../../../utils/highlightColors';
+import { useEntryProposals } from '../../../hooks/useEntryProposals';
 
 interface Props {
   norma: NormaVisitata;
@@ -27,6 +29,8 @@ interface Props {
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   /** The fetched article, for a row that takes its rubrica from the text when the act's index gave none. */
   onArticle?: (article: ArticleData) => void;
+  /** The dossier entry it reads: what an application proposed on it is drawn here, and only here (D7b). */
+  itemId?: string;
 }
 
 type FetchState =
@@ -48,7 +52,7 @@ const NO_ANNOTATIONS: Annotation[] = [];
  * `buildItemKey` / `uniqueArticleIdFromNorma` pair so notes and highlights
  * created here and on the dashboard land on the same store rows.
  */
-export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArticle }: Props) {
+export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArticle, itemId }: Props) {
   const [result, setResult] = useState<FetchResult | null>(null);
   const [retryTick, setRetryTick] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -138,7 +142,14 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
 
   const rawText = state.phase === 'ready' ? (state.article.article_text || '') : '';
   const structure = useMemo(() => parseArticleStructure(rawText), [rawText]);
-  const shownHighlights = readOnly ? NO_HIGHLIGHTS : articleHighlights;
+
+  // What an application proposed on this entry (D7b): its own route, its own store, never the app's highlights.
+  const { highlights: proposalHighlights, actions: proposalActions } = useEntryProposals(itemId, itemKey, uniqueArticleId, readOnly);
+  const withProposals = useMemo(
+    () => (proposalHighlights.length ? [...articleHighlights, ...proposalHighlights] : articleHighlights),
+    [articleHighlights, proposalHighlights],
+  );
+  const shownHighlights = readOnly ? NO_HIGHLIGHTS : withProposals;
   const shownAnnotations = readOnly ? NO_ANNOTATIONS : itemAnnotations;
   const markedHtml = useArticleMarkers({ rawText, highlights: shownHighlights, annotations: shownAnnotations, structure, signs: !readOnly });
   // What each block's sign counts, for the popover it opens (the renderer
@@ -147,10 +158,15 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
     () => groupAnnotationsByBlock(rawText, structure, shownHighlights, shownAnnotations),
     [rawText, structure, shownHighlights, shownAnnotations],
   );
-  // Highlights no sign can reach (their text changed): still removable.
+  // Highlights no sign can reach (their text changed): still removable. A proposal whose words no longer land has a
+  // list of its own, at every width, with its note and its actions (D7b).
   const looseHighlights = useMemo(
     () => (readOnly ? NO_HIGHLIGHTS : highlightsWithoutSign(articleHighlights, blockGroups)),
     [readOnly, articleHighlights, blockGroups],
+  );
+  const lostProposals = useMemo(
+    () => highlightsWithoutSign(proposalHighlights, blockGroups).filter(isProposalMark),
+    [proposalHighlights, blockGroups],
   );
   // Update-note references, the foldable AGGIORNAMENTO tail and the
   // annotation signs, as on the dashboard. `enabled` waits for the body: it
@@ -173,6 +189,8 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
     const container = contentRef.current;
     if (!container) return;
     const handler = (e: MouseEvent) => {
+      // A passage an application proposed answers with its block's popover instead (D7b).
+      if (proposedPassageAt(e.target)) return;
       const target = (e.target as HTMLElement | null)?.closest('.note-anchor') as HTMLElement | null;
       if (!target) return;
       const noteId = target.getAttribute('data-note-id');
@@ -279,6 +297,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
         />
       )}
       <LooseHighlightsList highlights={looseHighlights} articleId={uniqueArticleId} onRemove={removeHighlight} />
+      {proposalActions && <LostProposalsList proposals={lostProposals} actions={proposalActions} />}
       {openNote && structure.notes[openNote.id] && (
         <UpdateNotePopover
           noteId={openNote.id}
@@ -299,6 +318,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
           onUpdateNote={updateAnnotation}
           onRemoveNote={removeAnnotation}
           onRemoveHighlight={removeHighlight}
+          proposalActions={proposalActions}
         />
       )}
       {composer && (

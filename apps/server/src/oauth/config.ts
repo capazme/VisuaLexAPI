@@ -4,7 +4,9 @@
  * build a router with other values.
  */
 
-export const SCOPES = ['dossier:read', 'dossier:write', 'lingo:cards:read', 'lingo:cards:write', 'content:delete'] as const;
+// `dossier:text` (D7b, G2 and G7 decided by the owners on 25 October 2026): the text of a dossier's norms and
+// decisions leaves through MCP, for one tool only; a grant made before has it only once the user connects again.
+export const SCOPES = ['dossier:read', 'dossier:write', 'dossier:text', 'lingo:cards:read', 'lingo:cards:write', 'content:delete'] as const;
 export type Scope = (typeof SCOPES)[number];
 
 /**
