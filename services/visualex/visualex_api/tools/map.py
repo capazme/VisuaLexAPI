@@ -113,6 +113,53 @@ ANNEXED_ACTS = {
 }
 
 
+# An annex of a code's decree, or an act of the codes table, cited by a sigla of its own
+# (owner, G-369, 22 October 2026: «sì a tutto l'elenco, preleggi come già deciso»). Keyed by
+# the annex's identity, «<decree>:<annex>», as a URN writes it; the heading is the long form.
+# Any other annex of a code's decree is cited by the decree with «(Allegato N)». Mirrored by
+# ANNEX_SIGLE and ANNEX_HEADINGS in the web's and the server's actTypes.ts and in MERL-T's
+# utils/map.py.
+ANNEX_SIGLE = {
+    "regio.decreto:1942-03-16;262:1": "preleggi",
+    "decreto.legislativo:2010-07-02;104:3": "disp. att. c.p.a.",
+    "decreto.legislativo:2010-07-02;104:4": "disp. trans. c.p.a.",
+    "decreto.legislativo:2010-07-02;104:5": "disp. coord. c.p.a.",
+    "decreto.legislativo:2016-08-26;174:2": "disp. att. c.g.c.",
+    "decreto.legislativo:2016-08-26;174:3": "disp. trans. c.g.c.",
+    "regio.decreto:1941-02-20;303:1": "c.p.m.p.",
+    "regio.decreto:1941-02-20;303:2": "c.p.m.g.",
+    "decreto.legislativo:1989-07-28;271:1": "disp. att. c.p.p.",
+    "decreto.del.presidente.della.repubblica:1952-02-15;328:1": "reg. nav. mar.",
+}
+
+ANNEX_HEADINGS = {
+    "regio.decreto:1942-03-16;262:1": "Preleggi",
+    "decreto.legislativo:2010-07-02;104:3": "Norme di attuazione del codice del processo amministrativo",
+    "decreto.legislativo:2010-07-02;104:4": "Norme transitorie del codice del processo amministrativo",
+    "decreto.legislativo:2010-07-02;104:5": "Norme di coordinamento e abrogazioni del codice del processo amministrativo",
+    "decreto.legislativo:2016-08-26;174:2": "Norme di attuazione del codice di giustizia contabile",
+    "decreto.legislativo:2016-08-26;174:3": "Norme transitorie e abrogazioni del codice di giustizia contabile",
+    "regio.decreto:1941-02-20;303:1": "Codice penale militare di pace",
+    "regio.decreto:1941-02-20;303:2": "Codice penale militare di guerra",
+    "decreto.legislativo:1989-07-28;271:1": "Norme di attuazione del codice di procedura penale",
+    "decreto.del.presidente.della.repubblica:1952-02-15;328:1": "Regolamento per l'esecuzione del codice della navigazione (navigazione marittima)",
+}
+
+
+def code_row_of_annex(identity: str) -> "tuple[str, str] | None":
+    """The codes-table row an annex identity («<decree>:<annex>») belongs to, as (name, annex):
+    the row keyed by that very annex, else the row of the same decree (the c.p.a.'s, for its
+    annex 3). None when no code is approved by that decree."""
+    base, _, annex = identity.rpartition(":")
+    same_decree = None
+    for name, urn in NORMATTIVA_URN_CODICI.items():
+        if urn == identity:
+            return name, annex
+        if urn.rpartition(":")[0] == base and re.search(r";\d+:\w+$", urn):
+            same_decree = same_decree or (name, annex)
+    return same_decree
+
+
 def act_default_annex(act: str) -> "str | None":
     """The annex that is the act's text, for an act URN such as
     «regio.decreto:1931-06-18;773» (with or without «urn:nir:stato:» or the resolver
@@ -725,6 +772,8 @@ NORMATTIVA_SEARCH = {
         "cdc": "codice del consumo",
         "cdpc": "codice della protezione civile",
         "cds": "codice della strada",
+        "c.g.c": "codice di giustizia contabile",
+        "c.g.c.": "codice di giustizia contabile",
         "cgco": "codice di giustizia contabile",
         "cn": "codice della navigazione",
         "cnd": "codice della nautica da diporto",
@@ -743,6 +792,7 @@ NORMATTIVA_SEARCH = {
         "cod. ord. mil.": "codice dell'ordinamento militare",
         "cod. pari opp.": "codice delle pari opportunità",
         "cod. pen.": "codice penale",
+        "cod. post.": "codice postale e delle telecomunicazioni",
         "cod. post. telecom.": "codice postale e delle telecomunicazioni",
         "cod. proc. amm.": "codice del processo amministrativo",
         "cod. proc. civ": "codice di procedura civile",
@@ -882,6 +932,8 @@ NORMATTIVA = {
         "cdc": "codice del consumo",
         "cdpc": "codice della protezione civile",
         "cds": "codice della strada",
+        "c.g.c": "codice di giustizia contabile",
+        "c.g.c.": "codice di giustizia contabile",
         "cgco": "codice di giustizia contabile",
         "cn": "codice della navigazione",
         "cnd": "codice della nautica da diporto",
@@ -900,6 +952,7 @@ NORMATTIVA = {
         "cod. ord. mil.": "codice dell'ordinamento militare",
         "cod. pari opp.": "codice delle pari opportunità",
         "cod. pen.": "codice penale",
+        "cod. post.": "codice postale e delle telecomunicazioni",
         "cod. post. telecom.": "codice postale e delle telecomunicazioni",
         "cod. proc. amm.": "codice del processo amministrativo",
         "cod. proc. civ": "codice di procedura civile",
