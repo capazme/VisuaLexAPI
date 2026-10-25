@@ -1036,14 +1036,22 @@ reader: an article's `DossierItemReader` and a decision's `DecisionReadingSurfac
 `DossierDecisionRow`), each given its entry's id, the dossier from `CurrentDossierContext` (`DossierDetailView`). It asks
 nothing outside a dossier entry, with the feature off or on a text shown read-only, and draws the proposals with the
 reader's own highlights (a decision's downloads keep only the reader's); one whose words no longer land is listed under
-the text (`LooseHighlightsList`, `UnmatchedAnchors`), to be removed through its route. Each
+the text at every width, as the application's, with its note and the popover's actions (`LostProposalsList`), never
+in the reader's own boxes (`LooseHighlightsList`, desktop only, and `UnmatchedAnchors`). Each
 write takes the server's answer and moves the row's light by one (the old state down, the new up). The bin removes at
 once and offers «Annulla»; the `DELETE` leaves when the notification closes, when the entry's reader goes (its row
 closed), or at `pagehide` as a `keepalive` fetch (the removal refreshes the token first, since that fetch cannot), never
 after a logout drops it. Sent early, its notification goes too, «Annulla» with it. A reading never draws back a removal
 waiting or out; a refused `DELETE` puts the passage and its count back. Each write reads the state it replaces as the
-answer lands, so two quick clicks move the light once, and one answered after the bin draws nothing. Errors are read
-as `apiClient` rejects them (`{ status, message, data }`): the server's `detail` is what the notification says. A 404 «Non disponibile» also clears the items' `assistantNotes` and
+answer lands, and only the latest action's answer is taken (an earlier one landing after it is dropped); while a write
+is out the checkbox and the flag wait (`busy`, `aria-disabled`, still focusable). An answer landing while the passage
+waits behind «Annulla» is what «Annulla» puts back, the server's state. A 404 «Proposta non trovata», on a write or a
+`DELETE`, is a removal done: no error, nothing put back. Errors are read as `apiClient` rejects them (`{ status,
+message, data }`): the server's `detail` is what the notification says. A state that changes is said in a `status`
+region; the focus comes back to the pencil after editing, and to the popover after a bin; «Cosa non va?» also saves on
+Esc. On a narrow card the three buttons go under the label (`flex-wrap`). The flag is read once as the app starts
+(with the user's data) and as the dossier page mounts; on again after an off, the dossiers are read again for their
+lights. A 404 «Non disponibile» also clears the items' `assistantNotes` and
 `assistantNote`, so no light or control stays; a logout empties the store; a share link or a JSON export carries
 neither field (`shareableDossier`). Trashing a note entry an application wrote takes its count off its article's light
 (`trashDossierItems`, `shiftAiReviewCount`). A note entry an application wrote (`assistantNote` on the item, contract §3) has the same controls
@@ -1863,10 +1871,10 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   through MCP. A note about an article (`aboutItemId`) sits with it: a count on
   the closed row, the notes above the text when open, «Aggiungi una nota
   all'articolo»; a note whose article is no longer in the dossier shows among
-  the free notes. A note an application wrote carries `ClaudeMark` (`components/ui/`,
-  shared with Studia, its sentence `claudeMarkSentence` beside it; «scritta da Claude Code (applicazione collegata)», from `createdBy`).
-  The rows of articles and decisions carry none, in their name neither (D7b): who filed them stays in the database and
-  the account export. An undone removal
+  the free notes. Nothing on the dossier's page draws who wrote an entry (D7b): not the rows of articles and
+  decisions, in their name neither, nor the notes, whose application's ones say it by their validation
+  (`AiNoteEntryReview`). `createdBy` stays in the database, the account export and the PDF, which writes
+  `claudeMarkSentence` («scritta da Claude Code (applicazione collegata)»); `ClaudeMark` is Studia's now. An undone removal
   keeps the ids (question 181): «Annulla» restores the trash entry, so a note stays
   about its article and Claude's mark survives, as in the MCP trash. The note dialog closes only once
   the server has the note, so a refused note keeps its text.

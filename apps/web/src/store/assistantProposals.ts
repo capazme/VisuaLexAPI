@@ -16,31 +16,66 @@ interface AssistantProposalsState {
   /** `GET /api/features`: off until the server says on; a 404 from a route turns it off again. */
   enabled: boolean;
   byItem: Record<string, Proposal[]>;
+  /** The proposals and note entries with a write out, by id: their checkbox and flag wait for it. */
+  busy: Record<string, true>;
 }
 
-export const assistantProposalsStore = create<AssistantProposalsState>()(() => ({ enabled: false, byItem: {} }));
+export const assistantProposalsStore = create<AssistantProposalsState>()(() => ({ enabled: false, byItem: {}, busy: {} }));
 
 // What `apiClient` rejects with, once its interceptor has read the answer: `{ status, message, data }`.
 const errorDetail = (error: unknown, fallback: string): string => {
   const detail = (error as { data?: { detail?: unknown } } | null)?.data?.detail;
   return typeof detail === 'string' && detail ? detail : fallback;
 };
-const isSwitchedOff = (error: unknown) =>
-  (error as { status?: number } | null)?.status === 404 && errorDetail(error, '') === 'Non disponibile';
+const isNotFound = (error: unknown, detail: string) =>
+  (error as { status?: number } | null)?.status === 404 && errorDetail(error, '') === detail;
+const isSwitchedOff = (error: unknown) => isNotFound(error, 'Non disponibile');
+/** The server no longer has it (removed in another tab): as good as removed, no error to show. */
+const isGone = (error: unknown) => isNotFound(error, 'Proposta non trovata');
 
-/** Removals waiting for their notification to close, by proposal: sent at once when their reader or the page goes. */
-const pendingRemovals = new Map<string, { itemId: string; send: (onExit?: boolean) => void }>();
+/**
+ * Removals waiting for their notification to close, by proposal: sent at once when their reader or the page goes.
+ * `update` takes a write's answer that lands meanwhile, so «Annulla» puts back the server's state, not the old one.
+ */
+const pendingRemovals = new Map<string, { itemId: string; send: (onExit?: boolean) => void; update: (p: Proposal) => void }>();
 /** Removals sent and not yet answered: a reading meanwhile does not draw them back. */
 const removalsInFlight = new Set<string>();
 /** Bumped at logout: an answer to a request made before it is not taken. */
 let generation = 0;
+/** Switched off during the session: the items' counts were cleared, and are read again once it is on. */
+let clearedByOff = false;
+
+/**
+ * The writes out, by proposal or note entry: each action numbers itself and only the latest one's answer is taken (an
+ * earlier answer landing after it is dropped), so the last action wins whatever order the answers come in.
+ */
+const writeSeq = new Map<string, number>();
+
+function startWrite(id: string): number {
+  const mine = (writeSeq.get(id) ?? 0) + 1;
+  writeSeq.set(id, mine);
+  assistantProposalsStore.setState((s) => ({ busy: { ...s.busy, [id]: true } }));
+  return mine;
+}
+
+const isLatest = (id: string, mine: number) => writeSeq.get(id) === mine;
+
+function endWrite(id: string, mine: number) {
+  if (!isLatest(id, mine)) return;
+  assistantProposalsStore.setState((s) => {
+    const busy = { ...s.busy };
+    delete busy[id];
+    return { busy };
+  });
+}
 
 /**
  * Off, now or from a route's 404 «Non disponibile»: the proposals go, and so do the states the dossier's items carry
  * (the rows' lights, the note entries' controls) until the server says on again.
  */
 function switchOff() {
-  assistantProposalsStore.setState({ enabled: false, byItem: {} });
+  assistantProposalsStore.setState({ enabled: false, byItem: {}, busy: {} });
+  clearedByOff = true;
   appStore.setState((s) => {
     for (const d of s.dossiers) {
       for (const item of d.items) {
@@ -55,14 +90,16 @@ function switchOff() {
 export function resetAssistantProposals() {
   generation++;
   featuresInFlight = null;
+  clearedByOff = false;
   pendingRemovals.clear();
   removalsInFlight.clear();
-  assistantProposalsStore.setState({ enabled: false, byItem: {} });
+  writeSeq.clear();
+  assistantProposalsStore.setState({ enabled: false, byItem: {}, busy: {} });
 }
 
 let featuresInFlight: Promise<void> | null = null;
 
-/** Read at app start and when the dossier page mounts; no polling. Calls made while one is in flight share it. */
+/** Read as the app starts and as the dossier page mounts; no polling. Calls made while one is in flight share it. */
 export function loadAssistantFeatures(): Promise<void> {
   if (featuresInFlight) return featuresInFlight;
   const asked = generation;
@@ -71,8 +108,14 @@ export function loadAssistantFeatures(): Promise<void> {
     try {
       const { assistantPassages } = await assistantService.features();
       if (asked !== generation) return;
-      if (assistantPassages) assistantProposalsStore.setState({ enabled: true });
-      else if (assistantProposalsStore.getState().enabled) switchOff();
+      if (assistantPassages) {
+        assistantProposalsStore.setState({ enabled: true });
+        // On again after an off cleared the lights: the dossiers' answers carry them again.
+        if (clearedByOff) {
+          clearedByOff = false;
+          void appStore.getState().refreshDossiers();
+        }
+      } else if (assistantProposalsStore.getState().enabled) switchOff();
     } catch {
       if (asked === generation) assistantProposalsStore.setState({ enabled: false });
     } finally {
@@ -111,18 +154,38 @@ function replace(itemId: string, next: Proposal) {
 const stateOf = (itemId: string, proposalId: string): AiReviewState | null =>
   assistantProposalsStore.getState().byItem[itemId]?.find((p) => p.id === proposalId)?.note?.state ?? null;
 
+/** Gone from the server: gone here too, its count off the light, quietly. */
+function dropGone(dossierId: string, itemId: string, proposalId: string) {
+  const gone = assistantProposalsStore.getState().byItem[itemId]?.find((p) => p.id === proposalId);
+  if (!gone) return;
+  assistantProposalsStore.setState((s) => ({ byItem: { ...s.byItem, [itemId]: (s.byItem[itemId] ?? []).filter((p) => p.id !== proposalId) } }));
+  moveCount(dossierId, itemId, gone.note?.state ?? null, null);
+}
+
 async function write(dossierId: string, itemId: string, proposalId: string, run: () => Promise<Proposal>) {
+  const mine = startWrite(proposalId);
   try {
     const next = await run();
-    // Removed meanwhile (the bin pressed while the write was out): nothing to draw or count.
+    if (!isLatest(proposalId, mine)) return;
+    // Binned meanwhile: «Annulla» will put back this state, the server's.
+    const pending = pendingRemovals.get(proposalId);
+    if (pending) {
+      pending.update(next);
+      return;
+    }
+    // Removed for good meanwhile: nothing to draw or count.
     if (!assistantProposalsStore.getState().byItem[itemId]?.some((p) => p.id === proposalId)) return;
-    // The state it had is read as the answer lands, not as the request left: two clicks in a row move the light once.
+    // The state it had is read as the answer lands, not as the request left.
     const before = stateOf(itemId, proposalId);
     replace(itemId, next);
     moveCount(dossierId, itemId, before, next.note?.state ?? null);
   } catch (error) {
+    if (!isLatest(proposalId, mine)) return;
     if (isSwitchedOff(error)) switchOff();
-    notify({ type: 'error', message: errorDetail(error, 'Modifica non salvata'), duration: 5000 });
+    else if (isGone(error)) dropGone(dossierId, itemId, proposalId);
+    else notify({ type: 'error', message: errorDetail(error, 'Modifica non salvata'), duration: 5000 });
+  } finally {
+    endWrite(proposalId, mine);
   }
 }
 
@@ -148,14 +211,14 @@ export function flushRemovals(itemId: string) {
 
 /**
  * The bin: the passage goes at once, the notification offers «Annulla», and the `DELETE` leaves when the notification
- * closes, the entry's reader goes, or the page goes; «Annulla» puts it back where it was. A refused `DELETE` puts it
- * back with an error.
+ * closes, the entry's reader goes, or the page goes; «Annulla» puts it back where it was, in the state the server last
+ * gave. A refused `DELETE` puts it back with an error; one the server no longer has is simply gone.
  */
 export function removeProposal(dossierId: string, itemId: string, proposalId: string) {
   const list = assistantProposalsStore.getState().byItem[itemId] ?? [];
   const index = list.findIndex((p) => p.id === proposalId);
   if (index === -1) return;
-  const removed = list[index];
+  let removed = list[index];
   // The light went down one as it was removed: putting it back always gives that one back.
   const putBack = () => {
     assistantProposalsStore.setState((s) => {
@@ -185,21 +248,24 @@ export function removeProposal(dossierId: string, itemId: string, proposalId: st
       return;
     }
     removalsInFlight.add(proposalId);
+    const gone = () => {
+      removalsInFlight.delete(proposalId);
+      // A reading made before the answer may still have drawn it: it is gone now.
+      assistantProposalsStore.setState((s) => (s.byItem[itemId]?.some((p) => p.id === proposalId)
+        ? { byItem: { ...s.byItem, [itemId]: s.byItem[itemId].filter((p) => p.id !== proposalId) } }
+        : s));
+    };
     assistantService.removeProposal(dossierId, itemId, proposalId)
-      .then(() => {
-        removalsInFlight.delete(proposalId);
-        // A reading made before the answer may still have drawn it: it is gone now.
-        assistantProposalsStore.setState((s) => (s.byItem[itemId]?.some((p) => p.id === proposalId)
-          ? { byItem: { ...s.byItem, [itemId]: s.byItem[itemId].filter((p) => p.id !== proposalId) } }
-          : s));
-      })
+      .then(gone)
       .catch((error) => {
+        // Already gone from the server: what was wanted, no error and nothing put back.
+        if (isGone(error)) return gone();
         removalsInFlight.delete(proposalId);
         putBack();
         notify({ type: 'error', message: errorDetail(error, 'Passaggio non rimosso'), duration: 5000 });
       });
   };
-  pendingRemovals.set(proposalId, { itemId, send });
+  pendingRemovals.set(proposalId, { itemId, send, update: (p) => { removed = p; } });
   notification = notify({
     type: 'info',
     message: 'Passaggio rimosso',
@@ -224,11 +290,13 @@ type NoteItem = Extract<DossierItem, { type: 'note' }>;
 
 /**
  * A note entry an application wrote (contract §3): the server's answer replaces its text and its state, and the light
- * of the article it is about moves by one.
+ * of the article it is about moves by one. The last action wins, as for a passage.
  */
 async function writeNoteEntry(dossierId: string, note: NoteItem, run: () => Promise<DossierItemApi>) {
+  const mine = startWrite(note.id);
   try {
     const next = dossierItemFromApi(await run());
+    if (!isLatest(note.id, mine)) return;
     appStore.setState((s) => {
       const d = s.dossiers.find((x) => x.id === dossierId);
       const item = d?.items.find((i) => i.id === note.id);
@@ -240,8 +308,11 @@ async function writeNoteEntry(dossierId: string, note: NoteItem, run: () => Prom
       if (item.aboutItemId) shiftAiReviewCount(d.items.find((i) => i.id === item.aboutItemId), before, item.assistantNote?.state ?? null);
     });
   } catch (error) {
+    if (!isLatest(note.id, mine)) return;
     if (isSwitchedOff(error)) switchOff();
-    notify({ type: 'error', message: errorDetail(error, 'Modifica non salvata'), duration: 5000 });
+    else notify({ type: 'error', message: errorDetail(error, 'Modifica non salvata'), duration: 5000 });
+  } finally {
+    endWrite(note.id, mine);
   }
 }
 

@@ -53,9 +53,9 @@ export function useAuth() {
         const store = appStore.getState();
         if (!store.isDataLoaded && !store.isLoadingData) {
           store.fetchUserData();
+          // D7b: whether the server proposes passages at all, once as the app starts, not at each use of this hook.
+          void loadAssistantFeatures();
         }
-        // D7b: whether the server proposes passages at all.
-        void loadAssistantFeatures();
       } catch (error) {
         setState({
           user: null,

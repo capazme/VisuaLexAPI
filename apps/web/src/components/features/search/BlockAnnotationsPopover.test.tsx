@@ -134,11 +134,12 @@ describe('BlockAnnotationsPopover', () => {
       expect(proposalActions.comment).toHaveBeenCalledWith('p1', 'Il passo è un altro.');
     });
 
-    it('the last one removed closes the popover, as any last annotation; another stays', async () => {
+    it('the last one removed closes the popover, as any last annotation; another stays, the focus on the popover', async () => {
       const first = setup([h1, p1], [], { proposalActions: actions() });
       let dialog = await screen.findByRole('dialog', { name: TITLE });
       fireEvent.click(within(dialog).getByRole('button', { name: 'Rimuovi il passaggio' }));
       expect(first.props.onClose).not.toHaveBeenCalled();
+      expect(dialog).toHaveFocus();
       first.unmount();
       document.body.innerHTML = '';
       const only = setup([p1], [], { proposalActions: actions() });

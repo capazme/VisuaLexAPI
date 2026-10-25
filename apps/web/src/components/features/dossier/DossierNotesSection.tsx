@@ -3,7 +3,6 @@ import { StickyNote, Trash2 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import type { DossierItem } from '../../../types';
 import { formatTimestampLong } from './dossierUtils';
-import { ClaudeMark } from '../../ui/ClaudeMark';
 import { AiNoteEntryReview } from './AiNoteEntryReview';
 import { hasAssistantNote } from '../../../utils/aiReview';
 import { FOCUS_RING } from '../studia/progress/tokens';
@@ -28,12 +27,11 @@ function NoteRow({ note, onRemove }: { note: NoteItem; onRemove: () => void }) {
       {note.data}
     </p>
   );
-  // The grey line: when, and who wrote it when an application did; under the words, never beside them, so a phone's
-  // narrow row keeps the note's width.
+  // The grey line: when; under the words, never beside them, so a phone's narrow row keeps the note's width. Who wrote
+  // it is not drawn (D7b): an application's note says it by its validation; the data and the PDF keep it.
   const meta = (
     <p className={cn(ROW_LINE, 'mt-1 flex flex-wrap items-center gap-x-2 gap-y-1')}>
       <span>{formatTimestampLong(note.addedAt)}</span>
-      <ClaudeMark createdBy={note.createdBy ?? null} />
       {long && (
         <button
           type="button"

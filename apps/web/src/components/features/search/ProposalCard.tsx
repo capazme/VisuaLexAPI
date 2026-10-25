@@ -4,6 +4,7 @@ import type { Highlight, HighlightProposal } from '../../../types';
 import { getHighlightSwatch } from '../../../utils/highlightColors';
 import { AiReviewControls } from './AiReviewControls';
 import { NoteEditBox } from './NoteEditBox';
+import { assistantProposalsStore } from '../../../store/assistantProposals';
 
 export interface ProposalCardProps {
     highlight: Highlight & { proposal: HighlightProposal };
@@ -27,6 +28,7 @@ export function ProposalCard({ highlight, onValidate, onFlag, onReviewComment, o
     const aiNote = proposal.note;
     const note = aiNote?.text.trim() ?? '';
     const [draft, setDraft] = useState<string | null>(null);
+    const busy = assistantProposalsStore((s) => !!s.busy[highlight.id]);
     const commit = () => {
         const text = draft?.trim() ?? '';
         // As a note's: only a changed, non-empty text is saved.
@@ -81,6 +83,8 @@ export function ProposalCard({ highlight, onValidate, onFlag, onReviewComment, o
                 onRemove={onRemove}
                 editLabel="Modifica la nota del passaggio"
                 removeLabel="Rimuovi il passaggio"
+                busy={busy}
+                editing={draft !== null}
             />
         </div>
     );

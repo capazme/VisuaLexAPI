@@ -78,8 +78,9 @@ describe('DecisionReadingSurface — what an application proposed on its dossier
 
   it('one whose words are not there is listed under the text and removed through its route', async () => {
     renderSurface('s1');
-    const box = await screen.findByRole('region', { name: 'Non ritrovate nel testo attuale (1)' });
-    fireEvent.click(within(box).getByRole('button', { name: 'Rimuovi evidenziazione «parole sparite»' }));
+    const box = await screen.findByRole('region', { name: "Proposte dell'IA non più nel testo (1)" });
+    expect(screen.queryByRole('region', { name: /Non ritrovate/ })).toBeNull();
+    fireEvent.click(within(box).getByRole('button', { name: 'Rimuovi il passaggio' }));
     await waitFor(() => expect(assistantProposalsStore.getState().byItem.s1.map((p) => p.id)).toEqual(['p1']));
     expect(appStore.getState().removeHighlight).not.toHaveBeenCalled();
   });

@@ -19,12 +19,13 @@ import { ArticleDiscussionPanel } from '../search/ArticleDiscussionPanel';
 import { PassageThreadsStatus } from '../search/PassageThreadsStatus';
 import { DecisionReadingToolbar } from './DecisionReadingToolbar';
 import { UnmatchedAnchors } from './UnmatchedAnchors';
+import { LostProposalsList } from '../search/LostProposalsList';
 import { useEntryProposals } from '../../../hooks/useEntryProposals';
 import { useAnnotationActions } from '../../../hooks/useAnnotationActions';
 import { useInlineNoteAnchors } from '../../../hooks/useInlineNoteAnchors';
 import { useArticleTextInteractions } from '../../../hooks/useArticleTextInteractions';
 import { useRegisterFindRoot } from '../../../hooks/useRegisterFindRoot';
-import { describeBlock, groupAnnotationsByBlock, hasAnnotations } from '../../../utils/articleAnnotations';
+import { describeBlock, groupAnnotationsByBlock, hasAnnotations, isProposal as isProposalMark } from '../../../utils/articleAnnotations';
 import { useDiscussionWiring } from '../../../hooks/useDiscussionWiring';
 import type { DecisionAttributes, DecisionIdentity, DecisionText } from '../../../types/decisions';
 import { wrapCitationsInHtml, type ParsedCitationData } from '../../../utils/citationMatcher';
@@ -137,7 +138,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
   );
 
   // What an application proposed on the dossier entry (D7b): drawn with the reader's marks, never in their downloads.
-  const { highlights: proposalHighlights, actions: proposalActions, isProposal } = useEntryProposals(dossierItemId, key, NO_ARTICLE);
+  const { highlights: proposalHighlights, actions: proposalActions } = useEntryProposals(dossierItemId, key, NO_ARTICLE);
   const shownHighlights = useMemo(
     () => (proposalHighlights.length ? [...decisionHighlights, ...proposalHighlights] : decisionHighlights),
     [decisionHighlights, proposalHighlights],
@@ -190,14 +191,15 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
   const openGroup = openBlock === null ? undefined : blockGroups[openBlock];
 
   // What no longer lands is listed under the text (a free note has no anchor: the panel holds it).
+  // An application's proposal that no longer lands has a list of its own, with its note and its actions (D7b).
   const lost = useMemo(
-    () => unmatchedAnchors(testo, shownHighlights, decisionNotes),
-    [testo, shownHighlights, decisionNotes],
+    () => unmatchedAnchors(testo, decisionHighlights, decisionNotes),
+    [testo, decisionHighlights, decisionNotes],
   );
-  const removeListed = (id: string) => {
-    if (proposalActions && isProposal(id)) proposalActions.remove(id);
-    else removeHighlight(id);
-  };
+  const lostProposals = useMemo(
+    () => unmatchedAnchors(testo, proposalHighlights, []).highlights.filter(isProposalMark),
+    [testo, proposalHighlights],
+  );
 
   const [isNotesOpen, setIsNotesOpen] = useState(false);
   const [notesButtonEl, setNotesButtonEl] = useState<HTMLButtonElement | null>(null);
@@ -417,9 +419,10 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
         highlights={lost.highlights}
         annotations={lost.annotations}
         reason="changed"
-        onRemoveHighlight={removeListed}
+        onRemoveHighlight={removeHighlight}
         onRemoveAnnotation={removeAnnotation}
       />
+      {proposalActions && <LostProposalsList proposals={lostProposals} actions={proposalActions} />}
       {openBlock !== null && hasAnnotations(openGroup) && (
         <BlockAnnotationsPopover
           key={openBlock}

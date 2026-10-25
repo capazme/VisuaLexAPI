@@ -8,6 +8,7 @@ import { ArticleBody } from '../search/ArticleBody';
 import { UpdateNotePopover } from '../search/UpdateNotePopover';
 import { BlockAnnotationsPopover } from '../search/BlockAnnotationsPopover';
 import { LooseHighlightsList } from '../search/LooseHighlightsList';
+import { LostProposalsList } from '../search/LostProposalsList';
 import { InlineNoteComposer } from '../search/InlineNoteComposer';
 import { InlineNotePopover } from '../search/InlineNotePopover';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
@@ -17,7 +18,7 @@ import { describeVersion, historicalItemLabel, isEuropeanAct, requestIsHistorica
 import { VersionBanner } from '../search/VersionBanner';
 import { fetchArticleForNorma } from '../../../utils/articleFetchCache';
 import { getUpdateNoteParagraphs, parseArticleStructure } from '../../../utils/articleStructure';
-import { describeBlock, groupAnnotationsByBlock, hasAnnotations, highlightsWithoutSign } from '../../../utils/articleAnnotations';
+import { describeBlock, groupAnnotationsByBlock, hasAnnotations, highlightsWithoutSign, isProposal as isProposalMark } from '../../../utils/articleAnnotations';
 import type { Annotation, ArticleData, Highlight, NormaVisitata } from '../../../types';
 import { highlightColorName } from '../../../utils/highlightColors';
 import { useEntryProposals } from '../../../hooks/useEntryProposals';
@@ -143,7 +144,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
   const structure = useMemo(() => parseArticleStructure(rawText), [rawText]);
 
   // What an application proposed on this entry (D7b): its own route, its own store, never the app's highlights.
-  const { highlights: proposalHighlights, actions: proposalActions, isProposal } = useEntryProposals(itemId, itemKey, uniqueArticleId, readOnly);
+  const { highlights: proposalHighlights, actions: proposalActions } = useEntryProposals(itemId, itemKey, uniqueArticleId, readOnly);
   const withProposals = useMemo(
     () => (proposalHighlights.length ? [...articleHighlights, ...proposalHighlights] : articleHighlights),
     [articleHighlights, proposalHighlights],
@@ -157,16 +158,16 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
     () => groupAnnotationsByBlock(rawText, structure, shownHighlights, shownAnnotations),
     [rawText, structure, shownHighlights, shownAnnotations],
   );
-  // Highlights no sign can reach (their text changed): still removable.
-  // A proposal whose words no longer land is listed there too, to be removed (D7b).
+  // Highlights no sign can reach (their text changed): still removable. A proposal whose words no longer land has a
+  // list of its own, at every width, with its note and its actions (D7b).
   const looseHighlights = useMemo(
-    () => (readOnly ? NO_HIGHLIGHTS : highlightsWithoutSign(withProposals, blockGroups)),
-    [readOnly, withProposals, blockGroups],
+    () => (readOnly ? NO_HIGHLIGHTS : highlightsWithoutSign(articleHighlights, blockGroups)),
+    [readOnly, articleHighlights, blockGroups],
   );
-  const removeLoose = (id: string) => {
-    if (proposalActions && isProposal(id)) proposalActions.remove(id);
-    else removeHighlight(id);
-  };
+  const lostProposals = useMemo(
+    () => highlightsWithoutSign(proposalHighlights, blockGroups).filter(isProposalMark),
+    [proposalHighlights, blockGroups],
+  );
   // Update-note references, the foldable AGGIORNAMENTO tail and the
   // annotation signs, as on the dashboard. `enabled` waits for the body: it
   // exists only once the fetch settles.
@@ -295,7 +296,8 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
           copyOnly={readOnly}
         />
       )}
-      <LooseHighlightsList highlights={looseHighlights} articleId={uniqueArticleId} onRemove={removeLoose} />
+      <LooseHighlightsList highlights={looseHighlights} articleId={uniqueArticleId} onRemove={removeHighlight} />
+      {proposalActions && <LostProposalsList proposals={lostProposals} actions={proposalActions} />}
       {openNote && structure.notes[openNote.id] && (
         <UpdateNotePopover
           noteId={openNote.id}

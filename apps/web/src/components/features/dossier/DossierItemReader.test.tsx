@@ -137,19 +137,33 @@ describe('DossierItemReader — what an application proposed on the entry (D7b)'
     await waitFor(() => expect(within(dialog).getByRole('checkbox', { name: 'Validato' })).toBeChecked());
   });
 
-  it('a proposal whose words are no longer there is listed under the text, to be removed', async () => {
+  it('a proposal whose words are no longer there is listed under the text at every width, said the application\'s, with its bin', async () => {
     renderReader();
-    await screen.findByText('Altre evidenziazioni');
-    fireEvent.click(screen.getByRole('button', { name: 'Rimuovi evidenziazione' }));
+    const list = await screen.findByRole('region', { name: "Proposte dell'IA non più nel testo (1)" });
+    expect(list.className).not.toMatch(/(^| )hidden( |$)/);
+    // Not among the reader's own, the desktop box.
+    expect(screen.queryByText('Altre evidenziazioni')).toBeNull();
+    expect(within(list).getByText(/parole che non ci sono/)).toBeInTheDocument();
+    expect(within(list).getByText("Evidenziato dall'IA")).toBeInTheDocument();
+    fireEvent.click(within(list).getByRole('button', { name: 'Rimuovi il passaggio' }));
     await waitFor(() => expect(assistantProposalsStore.getState().byItem.a1.map((p) => p.id)).toEqual(['p1', 'p2']));
+  });
+
+  it('a lost one with a note keeps its note and its checkbox there', async () => {
+    vi.mocked(assistantService.listProposals).mockResolvedValue([noted, { ...lost, note: aiNote('Era sul comma 2.') }]);
+    renderReader();
+    const list = await screen.findByRole('region', { name: "Proposte dell'IA non più nel testo (1)" });
+    expect(within(list).getByText('Era sul comma 2.')).toBeInTheDocument();
+    fireEvent.click(within(list).getByRole('checkbox', { name: "Proposto dall'IA, confermi?" }));
+    await waitFor(() => expect(assistantService.setProposalState).toHaveBeenCalledWith('d1', 'a1', 'p3', 'validated', undefined));
   });
 
   it('closed while a removal waits behind «Annulla», it sends that removal at once', async () => {
     vi.mocked(assistantService.removeProposal).mockClear();
     vi.mocked(assistantService.removeProposal).mockResolvedValue();
     const { unmount } = renderReader();
-    await screen.findByText('Altre evidenziazioni');
-    fireEvent.click(screen.getByRole('button', { name: 'Rimuovi evidenziazione' }));
+    const list = await screen.findByRole('region', { name: "Proposte dell'IA non più nel testo (1)" });
+    fireEvent.click(within(list).getByRole('button', { name: 'Rimuovi il passaggio' }));
     expect(assistantService.removeProposal).not.toHaveBeenCalled();
     unmount();
     expect(assistantService.removeProposal).toHaveBeenCalledWith('d1', 'a1', 'p3');

@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 
+// D7b's flag, asked as the app starts: off here, with no request leaving the test.
+vi.mock('../services/assistantService', () => ({ assistantService: { features: vi.fn(async () => ({ assistantPassages: false })) } }));
 vi.mock('../services/authService', () => ({
   isAuthenticated: () => false,
   logout: vi.fn(),
@@ -67,7 +69,7 @@ describe('useAuth — logout', () => {
 
     act(() => { result.current.logout(); });
 
-    expect(assistantProposalsStore.getState()).toEqual({ enabled: false, byItem: {} });
+    expect(assistantProposalsStore.getState()).toEqual({ enabled: false, byItem: {}, busy: {} });
   });
 
   it('forgets what Gymnasium last drew here: the last reader’s points and level (G-316)', async () => {

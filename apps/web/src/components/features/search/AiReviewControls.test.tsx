@@ -113,6 +113,58 @@ describe('AiReviewControls', () => {
     expect(document.getElementById(shown.getAttribute('aria-controls')!)).toContainElement(screen.getByText('La versione di Claude.'));
   });
 
+  it('while a write is out, the checkbox and the flag say so and wait; the pencil and the bin do not', () => {
+    const { props } = setup({ busy: true });
+    const box = screen.getByRole('checkbox');
+    const flag = screen.getByRole('button', { name: 'Da rivedere' });
+    expect(box).toHaveAttribute('aria-disabled', 'true');
+    expect(flag).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(box);
+    fireEvent.click(flag);
+    expect(props.onValidate).not.toHaveBeenCalled();
+    expect(props.onFlag).not.toHaveBeenCalled();
+    // Still reachable by the keyboard: never `disabled`, which would drop the focus.
+    expect(box).not.toBeDisabled();
+    expect(flag).not.toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Modifica la nota del passaggio' }));
+    expect(props.onEdit).toHaveBeenCalled();
+  });
+
+  it('tells a screen reader the new state once the answer changes it, not as it first appears', () => {
+    const { props, rerender } = setup();
+    expect(screen.getByRole('status')).toHaveTextContent('');
+    rerender(<AiReviewControls {...props} state="validated" />);
+    expect(screen.getByRole('status')).toHaveTextContent('Validato');
+    rerender(<AiReviewControls {...props} state="review" />);
+    expect(screen.getByRole('status')).toHaveTextContent('Da rivedere');
+    rerender(<AiReviewControls {...props} state="validated" edited />);
+    expect(screen.getByRole('status')).toHaveTextContent('Validato, modificato da te');
+  });
+
+  it('the editing over, the focus goes back to the pencil', () => {
+    const { props, rerender } = setup({ editing: true });
+    rerender(<AiReviewControls {...props} editing={false} />);
+    expect(screen.getByRole('button', { name: 'Modifica la nota del passaggio' })).toHaveFocus();
+  });
+
+  it('Esc in «Cosa non va?» saves the words before the popover closes (no blur reaches a field taken away)', () => {
+    const { props, unmount } = setup({ state: 'review' });
+    const field = screen.getByRole('textbox', { name: 'Cosa non va?' });
+    fireEvent.change(field, { target: { value: 'Il comma è un altro.' } });
+    fireEvent.keyDown(field, { key: 'Escape' });
+    unmount();
+    expect(props.onReviewComment).toHaveBeenCalledWith('Il comma è un altro.');
+  });
+
+  it('Esc then a blur send the words once', () => {
+    const { props } = setup({ state: 'review' });
+    const field = screen.getByRole('textbox', { name: 'Cosa non va?' });
+    fireEvent.change(field, { target: { value: 'Il comma è un altro.' } });
+    fireEvent.keyDown(field, { key: 'Escape' });
+    fireEvent.blur(field);
+    expect(props.onReviewComment).toHaveBeenCalledTimes(1);
+  });
+
   it('every control has a 44 px target at every width', () => {
     setup({ state: 'review', original: 'x' });
     const targets = [

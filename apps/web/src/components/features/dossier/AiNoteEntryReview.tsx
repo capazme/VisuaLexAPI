@@ -3,7 +3,7 @@ import { Trash2 } from 'lucide-react';
 import type { AssistantNoteEntry, DossierItem } from '../../../types';
 import { AiReviewControls } from '../search/AiReviewControls';
 import { NoteEditBox } from '../search/NoteEditBox';
-import { editNoteEntryText, setNoteEntryState } from '../../../store/assistantProposals';
+import { assistantProposalsStore, editNoteEntryText, setNoteEntryState } from '../../../store/assistantProposals';
 import { CurrentDossierContext } from './currentDossier';
 import { ROW_REMOVE } from './dossierStyles';
 
@@ -27,6 +27,7 @@ interface Props {
 export function AiNoteEntryReview({ note, children, meta, onRemove }: Props) {
   const dossierId = useContext(CurrentDossierContext);
   const [draft, setDraft] = useState<string | null>(null);
+  const busy = assistantProposalsStore((s) => !!s.busy[note.id]);
   const review = note.assistantNote;
   // Outside a dossier page nothing can be asked of the server: the words and the bin alone.
   if (!dossierId) {
@@ -64,6 +65,8 @@ export function AiNoteEntryReview({ note, children, meta, onRemove }: Props) {
         onRemove={onRemove}
         editLabel="Modifica la nota"
         removeLabel="Rimuovi nota"
+        busy={busy}
+        editing={draft !== null}
       />
     </>
   );

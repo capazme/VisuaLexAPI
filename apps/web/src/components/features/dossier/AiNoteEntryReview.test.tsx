@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 
-vi.mock('../../../store/assistantProposals', () => ({ setNoteEntryState: vi.fn(), editNoteEntryText: vi.fn() }));
+vi.mock('../../../store/assistantProposals', () => ({
+  setNoteEntryState: vi.fn(),
+  editNoteEntryText: vi.fn(),
+  // No write out: nothing busy.
+  assistantProposalsStore: (select: (s: { busy: Record<string, true> }) => unknown) => select({ busy: {} }),
+}));
 
 import { setNoteEntryState, editNoteEntryText } from '../../../store/assistantProposals';
 import { CurrentDossierContext } from './currentDossier';
@@ -35,6 +40,8 @@ describe('the notes an application wrote in a dossier (D7b)', () => {
     expect(app.getByRole('button', { name: 'Da rivedere' })).toBeInTheDocument();
     expect(app.getByRole('button', { name: 'Modifica la nota' })).toBeInTheDocument();
     expect(app.getAllByRole('button', { name: 'Rimuovi nota' })).toHaveLength(1);
+    // Who wrote it is not drawn: its validation says it (D7b).
+    expect(app.queryByText(/Claude Code/)).toBeNull();
     const own = within(rowOf('Mia nota.'));
     expect(own.queryByRole('checkbox')).toBeNull();
     expect(own.getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['Rimuovi nota']);

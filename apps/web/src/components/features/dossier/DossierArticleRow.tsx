@@ -6,7 +6,6 @@ import { getRubricText, parseArticleStructure } from '../../../utils/articleStru
 import type { ArticleData, DossierItem } from '../../../types';
 import { DossierItemReader } from './DossierItemReader';
 import { shownAnnex } from './dossierLayout';
-import { ClaudeMark } from '../../ui/ClaudeMark';
 import { AiReviewSignal } from '../../ui/AiReviewSignal';
 import { AiNoteEntryReview } from './AiNoteEntryReview';
 import { aiReviewSummary, hasAssistantNote } from '../../../utils/aiReview';
@@ -178,7 +177,6 @@ export function DossierArticleRow({
                 const meta = (
                   <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                     <span>{formatTimestampLong(note.addedAt)}</span>
-                    <ClaudeMark createdBy={note.createdBy ?? null} />
                   </div>
                 );
                 // A note an application wrote: its state, the pencil and its bin under it (D7b).

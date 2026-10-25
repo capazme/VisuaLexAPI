@@ -144,8 +144,10 @@ export function BlockAnnotationsPopover({
     const highlights = proposalActions ? group.highlights.filter((h) => !isProposal(h)) : group.highlights;
     const remove = (run: () => void) => {
         run();
-        // The block's last annotation takes the sign with it.
+        // The block's last annotation takes the sign with it; otherwise the focus, on a card just gone, comes back to
+        // the popover itself rather than fall to the page.
         if (total === 1) close(false);
+        else refs.floating.current?.focus();
     };
     const goTo = (target: AnnotationTarget) => {
         const sign = findSign();

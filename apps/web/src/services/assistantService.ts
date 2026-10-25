@@ -1,21 +1,21 @@
-import { apiClient } from './api';
+import { apiClient, getFreshAccessToken } from './api';
 import { getAccessToken } from './authService';
-import { getFreshAccessToken } from './api';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 import type { AiReviewState, Proposal } from '../types';
 import type { DossierItemApi } from './dossierService';
 
-/**
- * The routes of D7b's first cut (the server's contract, `GET /api/features` and the entry-scoped routes): what an
- * application proposed on a dossier entry, and what the user makes of its notes. Session only; with the feature off
- * every route but the first answers 404.
- */
+// As `apiClient`'s base: the exit's removal is a plain `fetch`.
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+
 const entry = (dossierId: string, itemId: string) =>
   `/dossiers/${encodeURIComponent(dossierId)}/items/${encodeURIComponent(itemId)}`;
 const proposal = (dossierId: string, itemId: string, proposalId: string) =>
   `${entry(dossierId, itemId)}/proposals/${encodeURIComponent(proposalId)}`;
 
+/**
+ * The routes of D7b's first cut (the server's contract): `GET /api/features`, public and cached by the server for a few
+ * seconds, and the entry-scoped routes, the session's only, of what an application proposed on a dossier entry and of
+ * what the user makes of its notes. With the feature off every route but the first answers 404 «Non disponibile».
+ */
 export const assistantService = {
   /** Whether the server has the feature on: answers in every case. */
   async features(): Promise<{ assistantPassages: boolean }> {

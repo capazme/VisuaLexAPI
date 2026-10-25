@@ -47,7 +47,5 @@ export function useEntryProposals(itemId: string | undefined, normaKey: string, 
     };
   }, [proposalsOf, itemId]);
 
-  /** A removal from a list of the text's marks: a proposal's goes through its route, any other to `removeOwn`. */
-  const isProposal = (id: string) => highlights.some((h) => h.id === id);
-  return { highlights, actions, isProposal };
+  return { highlights, actions };
 }

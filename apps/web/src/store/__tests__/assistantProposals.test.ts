@@ -41,7 +41,8 @@ beforeEach(() => {
   vi.mocked(assistantService.features).mockResolvedValue({ assistantPassages: true });
   vi.mocked(assistantService.listProposals).mockResolvedValue([p1, p2]);
   vi.mocked(assistantService.removeProposal).mockResolvedValue();
-  assistantProposalsStore.setState({ enabled: false, byItem: {} });
+  // From nothing, as after a logout: no write, removal or switch-off of an earlier test carries over.
+  resetAssistantProposals();
   appStore.setState({ dossiers: [structuredClone(dossier)] });
 });
 
@@ -78,7 +79,7 @@ describe('D7b proposals — the flag', () => {
     expect(assistantProposalsStore.getState().enabled).toBe(true);
     vi.mocked(assistantService.setProposalState).mockRejectedValueOnce(notFound('Non disponibile'));
     await setProposalState('d1', 'a1', 'p1', 'validated');
-    expect(assistantProposalsStore.getState()).toEqual({ enabled: false, byItem: {} });
+    expect(assistantProposalsStore.getState()).toEqual({ enabled: false, byItem: {}, busy: {} });
     expect(counts()).toBeNull();
     expect(appStore.getState().dossiers[0].items[1].assistantNote).toBeNull();
   });
@@ -101,6 +102,17 @@ describe('D7b proposals — the flag', () => {
     expect(assistantProposalsStore.getState().enabled).toBe(false);
   });
 
+  it('on again after an off cleared the lights, the dossiers are read again for them', async () => {
+    const refreshDossiers = vi.fn(async () => {});
+    appStore.setState({ refreshDossiers });
+    await loadAssistantFeatures();
+    expect(refreshDossiers).not.toHaveBeenCalled();
+    vi.mocked(assistantService.features).mockResolvedValueOnce({ assistantPassages: false });
+    await loadAssistantFeatures();
+    await loadAssistantFeatures();
+    expect(refreshDossiers).toHaveBeenCalledTimes(1);
+  });
+
   it('calls made while one is in flight share it', async () => {
     await Promise.all([loadAssistantFeatures(), loadAssistantFeatures(), loadAssistantFeatures()]);
     expect(assistantService.features).toHaveBeenCalledTimes(1);
@@ -111,7 +123,7 @@ describe('D7b proposals — the flag', () => {
     await loadProposals('d1', 'a1');
     removeProposal('d1', 'a1', 'p1');
     resetAssistantProposals();
-    expect(assistantProposalsStore.getState()).toEqual({ enabled: false, byItem: {} });
+    expect(assistantProposalsStore.getState()).toEqual({ enabled: false, byItem: {}, busy: {} });
     window.dispatchEvent(new Event('pagehide'));
     expect(assistantService.removeProposalOnExit).not.toHaveBeenCalled();
   });
@@ -144,6 +156,39 @@ describe('D7b proposals — the note\'s state', () => {
     vi.mocked(assistantService.setProposalState).mockResolvedValue(validated);
     await Promise.all([setProposalState('d1', 'a1', 'p1', 'validated'), setProposalState('d1', 'a1', 'p1', 'validated')]);
     expect(counts()).toEqual({ proposed: 0, validated: 1, review: 0 });
+  });
+
+  it('marks the passage busy while its write is out, and only then', async () => {
+    let answer: (p: Proposal) => void = () => {};
+    vi.mocked(assistantService.setProposalState).mockReturnValueOnce(new Promise((resolve) => { answer = resolve; }));
+    const writing = setProposalState('d1', 'a1', 'p1', 'validated');
+    expect(assistantProposalsStore.getState().busy).toEqual({ p1: true });
+    answer({ ...p1, note: aiNote('Il creditore.', 'validated') });
+    await writing;
+    expect(assistantProposalsStore.getState().busy).toEqual({});
+  });
+
+  it('the last action wins: an earlier answer landing after it is dropped', async () => {
+    const answers: ((p: Proposal) => void)[] = [];
+    vi.mocked(assistantService.setProposalState).mockImplementation(() => new Promise((resolve) => { answers.push(resolve); }));
+    const first = setProposalState('d1', 'a1', 'p1', 'validated');
+    const second = setProposalState('d1', 'a1', 'p1', 'review', 'No.');
+    // The second answers first, then the first.
+    answers[1]({ ...p1, note: aiNote('Il creditore.', 'review', { reviewComment: 'No.' }) });
+    await second;
+    answers[0]({ ...p1, note: aiNote('Il creditore.', 'validated') });
+    await first;
+    expect(assistantProposalsStore.getState().byItem.a1[0].note?.state).toBe('review');
+    expect(counts()).toEqual({ proposed: 0, validated: 0, review: 1 });
+    expect(assistantProposalsStore.getState().busy).toEqual({});
+  });
+
+  it('one the server no longer has goes quietly, its count with it', async () => {
+    vi.mocked(assistantService.setProposalState).mockRejectedValueOnce(notFound('Proposta non trovata'));
+    await setProposalState('d1', 'a1', 'p1', 'validated');
+    expect(assistantProposalsStore.getState().byItem.a1.map((p) => p.id)).toEqual(['p2']);
+    expect(counts()).toBeNull();
+    expect(notificationStore.getState().entries.some((e) => e.type === 'error')).toBe(false);
   });
 
   it('a refused write changes nothing and says why', async () => {
@@ -186,11 +231,11 @@ describe('D7b proposals — the bin and «Annulla»', () => {
   });
 
   it('a refused DELETE puts it back with an error', async () => {
-    vi.mocked(assistantService.removeProposal).mockRejectedValueOnce(notFound('Proposta non trovata'));
+    vi.mocked(assistantService.removeProposal).mockRejectedValueOnce(refused(500, 'Errore del server'));
     removeProposal('d1', 'a1', 'p1');
     closeNotification(lastNotification().id, 'dismiss');
     await vi.waitFor(() => expect(assistantProposalsStore.getState().byItem.a1.map((p) => p.id)).toEqual(['p1', 'p2']));
-    expect(lastNotification()).toMatchObject({ type: 'error', message: 'Proposta non trovata' });
+    expect(lastNotification()).toMatchObject({ type: 'error', message: 'Errore del server' });
   });
 
   it('the page going sends it at once, by the exit\'s own request, and only once', () => {
@@ -222,10 +267,34 @@ describe('D7b proposals — the bin and «Annulla»', () => {
     flushRemovals('a1');
     await loadProposals('d1', 'a1');
     expect(assistantProposalsStore.getState().byItem.a1.map((p) => p.id)).toEqual(['p2']);
-    refuse(notFound('Proposta non trovata'));
-    await vi.waitFor(() => expect(lastNotification()).toMatchObject({ type: 'error', message: 'Proposta non trovata' }));
+    refuse(refused(500, 'Errore del server'));
+    await vi.waitFor(() => expect(lastNotification()).toMatchObject({ type: 'error', message: 'Errore del server' }));
     expect(assistantProposalsStore.getState().byItem.a1.map((p) => p.id)).toEqual(['p1', 'p2']);
     expect(counts()).toEqual({ proposed: 1, validated: 0, review: 0 });
+  });
+
+  it('ticked, binned before the answer, then «Annulla»: it comes back as the server has it, validated', async () => {
+    let answer: (p: Proposal) => void = () => {};
+    vi.mocked(assistantService.setProposalState).mockReturnValueOnce(new Promise((resolve) => { answer = resolve; }));
+    const writing = setProposalState('d1', 'a1', 'p1', 'validated');
+    removeProposal('d1', 'a1', 'p1');
+    answer({ ...p1, note: aiNote('Il creditore.', 'validated') });
+    await writing;
+    await undoNotification(lastNotification().id);
+    expect(assistantProposalsStore.getState().byItem.a1.find((p) => p.id === 'p1')?.note?.state).toBe('validated');
+    expect(counts()).toEqual({ proposed: 0, validated: 1, review: 0 });
+  });
+
+  it('a DELETE the server answers «Proposta non trovata» is a removal done: no error, nothing put back', async () => {
+    vi.mocked(assistantService.removeProposal).mockRejectedValueOnce(notFound('Proposta non trovata'));
+    removeProposal('d1', 'a1', 'p1');
+    closeNotification(lastNotification().id, 'timeout');
+    await vi.waitFor(() => expect(assistantService.removeProposal).toHaveBeenCalled());
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(assistantProposalsStore.getState().byItem.a1.map((p) => p.id)).toEqual(['p2']);
+    expect(counts()).toBeNull();
+    expect(notificationStore.getState().entries.some((e) => e.type === 'error')).toBe(false);
   });
 
   it('a removal refreshes the token now, for an exit that could not', () => {

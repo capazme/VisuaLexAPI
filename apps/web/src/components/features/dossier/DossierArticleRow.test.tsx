@@ -156,7 +156,8 @@ describe('DossierArticleRow notes', () => {
     renderRow(normaItem, { notes, isExpanded: true, onAddNote, onRemoveNote });
     const text = screen.getByText('Sul danno ingiusto.');
     expect(text.compareDocumentPosition(screen.getByTestId('reader')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByText('scritta da Claude Code (applicazione collegata)')).toBeInTheDocument();
+    // Who wrote a note is not drawn (D7b): its validation says it.
+    expect(screen.queryByText(/Claude Code/)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: "Aggiungi una nota all'articolo" }));
     expect(onAddNote).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getAllByRole('button', { name: 'Rimuovi nota' })[1]);
