@@ -193,6 +193,11 @@ export function setProposalState(dossierId: string, itemId: string, proposalId: 
   return write(dossierId, itemId, proposalId, () => assistantService.setProposalState(dossierId, itemId, proposalId, state, comment));
 }
 
+/** «Sposta l'evidenziazione»: the passage's new boundaries; its note keeps its state. */
+export function moveProposal(dossierId: string, itemId: string, proposalId: string, startOffset: number, text: string) {
+  return write(dossierId, itemId, proposalId, () => assistantService.moveProposal(dossierId, itemId, proposalId, startOffset, text));
+}
+
 /** The pencil: saving the note validates it, «Validato, modificato da te». */
 export function editProposalNote(dossierId: string, itemId: string, proposalId: string, text: string) {
   return write(dossierId, itemId, proposalId, () => assistantService.editProposalNote(dossierId, itemId, proposalId, text));

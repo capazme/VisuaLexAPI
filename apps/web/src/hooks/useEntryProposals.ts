@@ -1,8 +1,8 @@
-import { useContext, useEffect, useMemo } from 'react';
-import type { Highlight } from '../types';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import type { Highlight, Proposal } from '../types';
 import { proposalHighlight } from '../utils/aiReview';
 import {
-  assistantProposalsStore, editProposalNote, flushRemovals, loadProposals, removeProposal, setProposalState,
+  assistantProposalsStore, editProposalNote, flushRemovals, loadProposals, moveProposal, removeProposal, setProposalState,
 } from '../store/assistantProposals';
 import type { ProposalActions } from '../components/features/search/BlockAnnotationsPopover';
 import { CurrentDossierContext } from '../components/features/dossier/currentDossier';
@@ -35,6 +35,10 @@ export function useEntryProposals(itemId: string | undefined, normaKey: string, 
     [proposalsOf, proposals, normaKey, articleId],
   );
 
+  // «Sposta l'evidenziazione»: the passage whose new words the reader is asking for, while it is still there.
+  const [movingId, setMovingId] = useState<string | null>(null);
+  const moving: Proposal | null = (movingId && proposalsOf && proposals?.find((p) => p.id === movingId)) || null;
+
   const actions = useMemo<ProposalActions | undefined>(() => {
     if (!proposalsOf || !itemId) return undefined;
     const d = proposalsOf;
@@ -44,8 +48,16 @@ export function useEntryProposals(itemId: string | undefined, normaKey: string, 
       comment: (id, text) => void setProposalState(d, itemId, id, 'review', text),
       editNote: (id, text) => void editProposalNote(d, itemId, id, text),
       remove: (id) => removeProposal(d, itemId, id),
+      move: (id) => setMovingId(id),
     };
   }, [proposalsOf, itemId]);
 
-  return { highlights, actions };
+  /** The new boundaries, from the selection in the reader's text root (`getSelectionAnchor`, the reader's projection). */
+  const saveMove = useCallback((startOffset: number, text: string) => {
+    if (proposalsOf && itemId && movingId) void moveProposal(proposalsOf, itemId, movingId, startOffset, text);
+    setMovingId(null);
+  }, [proposalsOf, itemId, movingId]);
+  const cancelMove = useCallback(() => setMovingId(null), []);
+
+  return { highlights, actions, moving, saveMove, cancelMove };
 }

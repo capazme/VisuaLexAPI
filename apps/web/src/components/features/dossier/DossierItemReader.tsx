@@ -8,6 +8,7 @@ import { ArticleBody } from '../search/ArticleBody';
 import { UpdateNotePopover } from '../search/UpdateNotePopover';
 import { BlockAnnotationsPopover } from '../search/BlockAnnotationsPopover';
 import { LooseHighlightsList } from '../search/LooseHighlightsList';
+import { MoveProposalBar } from '../search/MoveProposalBar';
 import { LostProposalsList } from '../search/LostProposalsList';
 import { InlineNoteComposer } from '../search/InlineNoteComposer';
 import { InlineNotePopover } from '../search/InlineNotePopover';
@@ -56,6 +57,8 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
   const [result, setResult] = useState<FetchResult | null>(null);
   const [retryTick, setRetryTick] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
+  // The text alone (without the selection popup): a passage's new words are read there (D7b).
+  const textRootRef = useRef<HTMLDivElement>(null);
   const [composer, setComposer] = useState<{
     rect: { x: number; y: number; width: number; height: number };
     anchorText: string; startOffset: number;
@@ -144,7 +147,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
   const structure = useMemo(() => parseArticleStructure(rawText), [rawText]);
 
   // What an application proposed on this entry (D7b): its own route, its own store, never the app's highlights.
-  const { highlights: proposalHighlights, actions: proposalActions } = useEntryProposals(itemId, itemKey, uniqueArticleId, readOnly);
+  const { highlights: proposalHighlights, actions: proposalActions, moving, saveMove, cancelMove } = useEntryProposals(itemId, itemKey, uniqueArticleId, readOnly);
   const withProposals = useMemo(
     () => (proposalHighlights.length ? [...articleHighlights, ...proposalHighlights] : articleHighlights),
     [articleHighlights, proposalHighlights],
@@ -294,7 +297,12 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
           onPopupCopy={handlePopupCopy}
           updatesOpen={updatesOpen}
           copyOnly={readOnly}
+          textRootRef={textRootRef}
+          selectionPopup={!moving}
         />
+      )}
+      {moving && (
+        <MoveProposalBar key={moving.id} textRootRef={textRootRef} startOffset={moving.startOffset} text={moving.text} onSave={saveMove} onCancel={cancelMove} />
       )}
       <LooseHighlightsList highlights={looseHighlights} articleId={uniqueArticleId} onRemove={removeHighlight} />
       {proposalActions && <LostProposalsList proposals={lostProposals} actions={proposalActions} />}

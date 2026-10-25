@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { Sparkles, Trash2 } from 'lucide-react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { MoveHorizontal, Sparkles, Trash2 } from 'lucide-react';
 import type { Highlight, HighlightProposal } from '../../../types';
 import { getHighlightSwatch } from '../../../utils/highlightColors';
 import { AiReviewControls } from './AiReviewControls';
@@ -15,6 +15,8 @@ export interface ProposalCardProps {
     onEditNote: (text: string) => void;
     /** The bin: the caller removes the passage and offers «Annulla» in its notice. */
     onRemove: () => void;
+    /** «Sposta l'evidenziazione»: the reader asks for the new words (absent where it cannot). */
+    onMove?: () => void;
     /** Whether its note is being edited, and changed: the popover then keeps open on an outside press, and asks. */
     onDraftState?: (state: 'none' | 'clean' | 'dirty') => void;
     /** The popover wants to close over a changed draft: the card asks «Scartare la modifica?». */
@@ -30,7 +32,7 @@ export interface ProposalCardProps {
  * dall'IA» and the bin, nothing to validate.
  */
 export function ProposalCard({
-    highlight, onValidate, onFlag, onReviewComment, onEditNote, onRemove, onDraftState, closeRequested = false, onCloseAnswer,
+    highlight, onValidate, onFlag, onReviewComment, onEditNote, onRemove, onMove, onDraftState, closeRequested = false, onCloseAnswer,
 }: ProposalCardProps) {
     const { proposal } = highlight;
     const aiNote = proposal.note;
@@ -55,6 +57,7 @@ export function ProposalCard({
             <div className="relative overflow-hidden rounded-lg border border-slate-200 bg-slate-50 py-1 pl-3.5 pr-1 text-sm dark:border-slate-700 dark:bg-slate-800/50">
                 <span aria-hidden className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: getHighlightSwatch(highlight.color) }} />
                 <p className="line-clamp-3 pr-1.5 pt-1 text-slate-800 dark:text-slate-200">&ldquo;{highlight.text}&rdquo;</p>
+                <PassageBounds originalText={proposal.originalText} onMove={onMove} />
                 <div className="flex items-center gap-1">
                     <p className="flex min-w-0 flex-1 items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400">
                         <Sparkles size={12} aria-hidden className="shrink-0" /> Evidenziato dall'IA
@@ -76,6 +79,7 @@ export function ProposalCard({
         <div className="relative overflow-hidden rounded-lg border border-slate-200 bg-slate-50 py-2 pl-3.5 pr-1 text-sm dark:border-slate-700 dark:bg-slate-800/50">
             <span aria-hidden className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: getHighlightSwatch(highlight.color) }} />
             <p className="line-clamp-3 pr-1.5 text-slate-800 dark:text-slate-200">&ldquo;{highlight.text}&rdquo;</p>
+            <PassageBounds originalText={proposal.originalText} onMove={onMove} />
             {draft !== null ? (
                 <div className="mt-1.5 pr-1.5">
                     <NoteEditBox
@@ -114,6 +118,46 @@ export function ProposalCard({
                 busy={busy}
                 editing={draft !== null}
             />
+        </div>
+    );
+}
+
+const LINK = 'inline-flex min-h-[44px] items-center gap-1.5 rounded px-0.5 text-xs font-medium text-primary-700 hover:text-primary-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-300 dark:hover:text-primary-200';
+
+/**
+ * The passage's boundaries: «Sposta l'evidenziazione», which has the user select its new words in the reader, and, once
+ * they were moved, the words the application had marked (the server keeps them). Moving them changes no state.
+ */
+function PassageBounds({ originalText, onMove }: { originalText?: string; onMove?: () => void }) {
+    const [showOriginal, setShowOriginal] = useState(false);
+    const originalId = useId();
+    if (!onMove && originalText === undefined) return null;
+    return (
+        <div className="pr-1.5">
+            <div className="flex flex-wrap items-center gap-x-3">
+                {onMove && (
+                    <button type="button" onClick={onMove} className={LINK}>
+                        <MoveHorizontal size={14} aria-hidden /> Sposta l&rsquo;evidenziazione
+                    </button>
+                )}
+                {originalText !== undefined && (
+                    <button
+                        type="button"
+                        aria-expanded={showOriginal}
+                        aria-controls={showOriginal ? originalId : undefined}
+                        onClick={() => setShowOriginal((v) => !v)}
+                        className={`${LINK} underline underline-offset-2`}
+                    >
+                        {showOriginal ? "Nascondi l'evidenziazione dell'IA" : "Vedi l'evidenziazione dell'IA"}
+                    </button>
+                )}
+            </div>
+            {showOriginal && originalText !== undefined && (
+                <div id={originalId} className="rounded-md border border-dashed border-slate-300 bg-white px-2 py-1.5 dark:border-slate-600 dark:bg-slate-900">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">Evidenziazione dell&rsquo;IA</p>
+                    <p className="mt-0.5 line-clamp-4 text-sm text-slate-700 [overflow-wrap:anywhere] dark:text-slate-300">&ldquo;{originalText}&rdquo;</p>
+                </div>
+            )}
         </div>
     );
 }

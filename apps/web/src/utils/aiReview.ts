@@ -40,7 +40,11 @@ export function aiReviewSummary(counts: AiReviewCounts): string {
 export function proposalHighlight(p: Proposal, normaKey: string, articleId: string): Highlight {
   return {
     id: p.id, normaKey, articleId, rangeSerialized: '', text: p.text, color: p.color, startOffset: p.startOffset,
-    proposal: { clientName: p.proposedBy?.clientName ?? null, note: p.note },
+    proposal: {
+      clientName: p.proposedBy?.clientName ?? null,
+      note: p.note,
+      ...(p.rangeEdited && p.assistantRange ? { originalText: p.assistantRange.text } : {}),
+    },
   };
 }
 

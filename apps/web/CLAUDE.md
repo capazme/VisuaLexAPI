@@ -1026,7 +1026,17 @@ in place in `NoteEditBox`, shared with `NoteCard`, here `explicit`: «Salva» an
 Shift+Enter a new line, Esc cancels without closing the popover, leaving the box saves nothing; a changed text is
 never dropped without «Scartare la modifica?» — «Continua» or «Scarta» —, asked by «Annulla» or Esc, and by the
 popover's X, Esc or «Vai al passo», which a press outside never closes while a note is edited), the bin, and «Vedi la versione dell'IA» once the note was
-changed. A shape per state, never colour alone. The dossier's rows carry the traffic light (`AiReviewSignal`,
+changed. Every proposal, a bare mark too and one that no longer lands, offers «Sposta l’evidenziazione» (the
+passage's boundaries by hand: Luca, «l'evidenziatura l'IA me la fa, però devo poterla modificare»): the popover closes,
+the reader shows `MoveProposalBar` (fixed at the foot, the page's width on a phone) with the passage's words selected in
+the text and the focus on it, and the selection popup is off meanwhile (`ArticleBody`'s `selectionPopup`). The new words
+are a drag or a touch, or Maiusc+frecce from the keyboard (Ctrl or Alt a word at a time, `Selection.modify`, wherever
+the focus is) with «Sposta l'inizio» / «Sposta la fine» choosing the edge (`setBaseAndExtent`); the help line and those
+two buttons are hidden on a coarse pointer. They are read as a highlight of the user's is (`getSelectionAnchor` over the
+reader's text root, its projection; root rule 23), 1–2000 characters, and «Sposta qui» or Enter sends them
+(`PUT …/proposals/:id/range`, `moveProposal` in the store, the note's state unchanged); Esc leaves. Once moved, the card
+offers «Vedi l'evidenziazione dell'IA» (`HighlightProposal.originalText`, the server's `assistantRange`).
+`rangeFromPlainOffsets` (`utils/selectionOffset.ts`) is `plainOffsetAt`'s inverse. A shape per state, never colour alone. The dossier's rows carry the traffic light (`AiReviewSignal`,
 `utils/aiReview.ts`): a red flag if one item is to review, else a yellow dashed ring if one waits, else a green
 tick, nothing if the application wrote nothing; its words («2 da validare · 1 da rivedere») are its `title` and
 in the row's name, its counts the server's `assistant_notes` on the item (`serverFieldsFromApi`).

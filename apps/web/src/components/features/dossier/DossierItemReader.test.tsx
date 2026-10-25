@@ -4,7 +4,7 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 vi.mock('../../../utils/articleFetchCache', () => ({ fetchArticleForNorma: vi.fn() }));
 vi.mock('../../../services/assistantService', () => ({
   assistantService: {
-    features: vi.fn(), listProposals: vi.fn(), setProposalState: vi.fn(), editProposalNote: vi.fn(), removeProposal: vi.fn(), removeProposalOnExit: vi.fn(), refreshForExit: vi.fn(async () => {}),
+    features: vi.fn(), listProposals: vi.fn(), setProposalState: vi.fn(), editProposalNote: vi.fn(), moveProposal: vi.fn(), removeProposal: vi.fn(), removeProposalOnExit: vi.fn(), refreshForExit: vi.fn(async () => {}),
   },
 }));
 
@@ -135,6 +135,37 @@ describe('DossierItemReader — what an application proposed on the entry (D7b)'
     fireEvent.click(within(dialog).getByRole('checkbox', { name: "Proposto dall'IA, confermi?" }));
     await waitFor(() => expect(assistantService.setProposalState).toHaveBeenCalledWith('d1', 'a1', 'p1', 'validated', undefined));
     await waitFor(() => expect(within(dialog).getByRole('checkbox', { name: 'Validato' })).toBeChecked());
+  });
+
+  it('«Sposta l\'evidenziazione»: the popover closes, the passage\'s words are selected, the new ones saved through the entry\'s route', async () => {
+    const moved = { ...noted, text: 'i contraenti', startOffset: at('i contraenti'), endOffset: at('i contraenti') + 12, rangeEdited: true };
+    vi.mocked(assistantService.moveProposal).mockResolvedValue(moved);
+    const { container } = renderReader();
+    const sign = await waitFor(() => {
+      const found = container.querySelector<HTMLElement>('.vlx-sign[data-block="2"]');
+      if (!found?.dataset.proposed) throw new Error('no sign yet');
+      return found;
+    });
+    fireEvent.click(sign);
+    const dialog = await screen.findByRole('dialog', { name: /Annotazioni · Nei contratti/ });
+    fireEvent.click(within(dialog).getAllByRole('button', { name: 'Sposta l’evidenziazione' })[0]);
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /Annotazioni/ })).toBeNull());
+    const bar = screen.getByRole('group', { name: "Sposta l'evidenziazione" });
+    expect(window.getSelection()!.toString()).toBe('contraenti');
+    // The new words, selected in the text root: read as a highlight of the user's is.
+    const root = container.querySelector<HTMLElement>('.vlx-art')!;
+    const { rangeFromPlainOffsets } = await import('../../../utils/selectionOffset');
+    const range = rangeFromPlainOffsets(root, at('i contraenti'), at('i contraenti') + 12)!;
+    window.getSelection()!.removeAllRanges();
+    window.getSelection()!.addRange(range);
+    fireEvent(document, new Event('selectionchange'));
+    fireEvent.click(within(bar).getByRole('button', { name: 'Sposta qui' }));
+    await waitFor(() => expect(assistantService.moveProposal).toHaveBeenCalledWith('d1', 'a1', 'p1', at('i contraenti'), 'i contraenti'));
+    expect(screen.queryByRole('group', { name: "Sposta l'evidenziazione" })).toBeNull();
+    // The text is the text (root rule 23), and the note kept its state.
+    await waitFor(() => expect(container.querySelector('[data-highlight="p1"]')?.textContent).toBe('i contraenti'));
+    expect(root.textContent).toContain(PLAIN.slice(0, 60));
+    expect(assistantProposalsStore.getState().byItem.a1?.find((p) => p.id === 'p1')?.note?.state).toBe('proposed');
   });
 
   it('a proposal whose words are no longer there is listed under the text at every width, said the application\'s, with its bin', async () => {

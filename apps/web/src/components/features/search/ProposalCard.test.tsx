@@ -5,14 +5,15 @@ import type { AssistantNote } from '../../../types';
 import { aiNote } from '../../../utils/__fixtures__/assistantNote';
 
 /** `note: null`: a mark with no note. */
-function setup(over: Partial<AssistantNote> | { note: null } = {}) {
+function setup(over: Partial<AssistantNote> | { note: null } = {}, extra: Partial<ProposalCardProps> = {}, originalText?: string) {
   const note = 'note' in over && over.note === null ? null : aiNote('Il danno da inadempimento.', 'proposed', over as Partial<AssistantNote>);
   const props: ProposalCardProps = {
     highlight: {
       id: 'p1', normaKey: 'k', articleId: '1', rangeSerialized: '', text: 'risarcimento del danno', color: 'green', startOffset: 10,
-      proposal: { clientName: 'Claude Code', note },
+      proposal: { clientName: 'Claude Code', note, ...(originalText !== undefined ? { originalText } : {}) },
     },
     onValidate: vi.fn(), onFlag: vi.fn(), onReviewComment: vi.fn(), onEditNote: vi.fn(), onRemove: vi.fn(),
+    ...extra,
   };
   const utils = render(<ProposalCard {...props} />);
   return { ...utils, props };
@@ -166,4 +167,31 @@ describe('ProposalCard', () => {
     fireEvent.click(screen.getByRole('button', { name: "Vedi la versione dell'IA" }));
     expect(screen.getByText('Il danno da inadempimento.')).toBeInTheDocument();
   });
+
+  it('«Sposta l\'evidenziazione» asks the reader for new words, on a passage with a note and on a mark with none', () => {
+    const onMove = vi.fn();
+    const { unmount } = setup({}, { onMove });
+    fireEvent.click(screen.getByRole('button', { name: "Sposta l’evidenziazione" }));
+    expect(onMove).toHaveBeenCalledTimes(1);
+    unmount();
+    setup({ note: null }, { onMove });
+    fireEvent.click(screen.getByRole('button', { name: "Sposta l’evidenziazione" }));
+    expect(onMove).toHaveBeenCalledTimes(2);
+  });
+
+  it('offers no move where the reader cannot ask, and no original while the boundaries are the application\'s', () => {
+    setup();
+    expect(screen.queryByRole('button', { name: "Sposta l’evidenziazione" })).toBeNull();
+    expect(screen.queryByRole('button', { name: "Vedi l'evidenziazione dell'IA" })).toBeNull();
+  });
+
+  it('once moved, shows the words the application had marked on request', () => {
+    setup({}, { onMove: vi.fn() }, 'del danno ingiusto');
+    const toggle = screen.getByRole('button', { name: "Vedi l'evidenziazione dell'IA" });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(toggle);
+    expect(screen.getByRole('button', { name: "Nascondi l'evidenziazione dell'IA" })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText(/del danno ingiusto/)).toBeInTheDocument();
+  });
 });
+

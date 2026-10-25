@@ -20,6 +20,7 @@ import { PassageThreadsStatus } from '../search/PassageThreadsStatus';
 import { DecisionReadingToolbar } from './DecisionReadingToolbar';
 import { UnmatchedAnchors } from './UnmatchedAnchors';
 import { LostProposalsList } from '../search/LostProposalsList';
+import { MoveProposalBar } from '../search/MoveProposalBar';
 import { useEntryProposals } from '../../../hooks/useEntryProposals';
 import { useAnnotationActions } from '../../../hooks/useAnnotationActions';
 import { useInlineNoteAnchors } from '../../../hooks/useInlineNoteAnchors';
@@ -138,7 +139,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
   );
 
   // What an application proposed on the dossier entry (D7b): drawn with the reader's marks, never in their downloads.
-  const { highlights: proposalHighlights, actions: proposalActions } = useEntryProposals(dossierItemId, key, NO_ARTICLE);
+  const { highlights: proposalHighlights, actions: proposalActions, moving, saveMove, cancelMove } = useEntryProposals(dossierItemId, key, NO_ARTICLE);
   const shownHighlights = useMemo(
     () => (proposalHighlights.length ? [...decisionHighlights, ...proposalHighlights] : decisionHighlights),
     [decisionHighlights, proposalHighlights],
@@ -411,7 +412,11 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
         onPopupAddNote={handlePopupAddNote}
         onPopupCopy={copySelection}
         onPopupDiscuss={discussion.popupDiscuss}
+        selectionPopup={!moving}
       />
+      {moving && (
+        <MoveProposalBar key={moving.id} textRootRef={textRootRef} startOffset={moving.startOffset} text={moving.text} onSave={saveMove} onCancel={cancelMove} />
+      )}
       {!discussion.open && (
         <PassageThreadsStatus error={discussion.error} loading={discussion.loading} onRetry={discussion.reload} />
       )}
