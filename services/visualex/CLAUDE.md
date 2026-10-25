@@ -137,7 +137,10 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     them and those codici lost their default annex. `ANNEXED_ACTS` (with
     `act_default_annex`) does the same for an act cited by type, date and number whose text
     is its annex: the TULPS is annex 1 of r.d. 773/1931 (G-351), so «r.d. 773/1931, art. 86»
-    is stored and keyed with `allegato: "1"` and its URN is `…;773:1~art86`. A code's
+    is stored and keyed with `allegato: "1"` and its URN is `…;773:1~art86`; so are the legge
+    fallimentare (r.d. 267/1942), the c.p.p. minorile (d.P.R. 448/1988) and the testo unico sulle
+    successioni e donazioni (d.lgs. 346/1990), whose decree's own art. 1 approves the annexed text
+    (found on 25 October 2026; no other act of the codes table or of `ATTI_DENOMINATI` has that shape). A code's
     default annex and such an act's annex are never named in a citation (`sources.py`, and
     the server's, the web's and MERL-T's copies); the TS mirrors and MERL-T's copy of
     `ANNEXED_ACTS` are pinned to this one by their tests. `ANNEX_SIGLE` / `ANNEX_HEADINGS`
@@ -352,11 +355,13 @@ POST unless noted, JSON bodies.
   docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md §2.1
 - `/export_pdf` — PDF via Playwright (rejects non-Normattiva URNs — SSRF guard). An
   undated URN is exported as the text in force today, `!vig=<today>` in Europe/Rome
-  (`export_url`, G-355); a dated one or `@originale` as asked. The file is cached in
-  `download/` under the act's type, date, number, annex and version (`urn_to_filename`;
-  until 21 October 2026 the number and the year alone, so acts and versions shared a file),
-  and the PDFs there older than two days are deleted on the six-hour sweep
-  (`sweep_exported_pdfs`, top-level `.pdf` files only)
+  (`export_url`, G-355); a dated one or `@originale` as asked, and a day after today is a
+  400, as for an article. The file is cached in `download/` under the act's authority, type,
+  date, number, annex and version, each in its place joined by «_», which no part of a URN
+  holds (`urn_to_filename`; until 21 October 2026 the number and the year alone, until 25
+  October without the authority and with «:» and «;» read alike); a name over 150
+  characters is a 400, never cut. The PDFs there older than two days are deleted on the
+  six-hour sweep (`sweep_exported_pdfs`, top-level `.pdf` files only)
 - `GET /history` — server-side search history
 - `GET /health/detailed` — probes Normattiva and EUR-Lex **for
   real**, on the shared client and circuit breakers. One result is cached
@@ -371,10 +376,12 @@ request_in_window}`, dates in ISO form. It is the source's own statement of whic
 version came back; `norma_data.data_versione` is only the date the caller sent (except for
 `upcoming: true`, below, where it is the later text's first day). A
 `version_date` after today (Europe/Rome) is a 400 — Normattiva would answer with the
-current text and say nothing — and so is one that cannot be read as a date.
+current text and say nothing — and so is one that cannot be read as a date, and one with
+`version: "originale"` (a date asks for the text in force that day, G-353; mcp-legal-it refuses the pair too).
 
-A date always asks for the text in force on that day, with or without «vigente» and
-over «originale» (owner, G-353; `append_version_info` writes `!vig=<day>`, and the AKN
+A date always asks for the text in force on that day, with or without «vigente» (owner,
+G-353; a request pairing it with «originale» is refused, above, and inside the API the date
+still wins: `append_version_info` writes `!vig=<day>`, and the AKN
 fallback reads the export at that day, never the original from today's). A request
 with no date is the text in force: Normattiva answers it with its latest version, also
 one not in force yet (art. 3 d.P.R. 131/1986 on 21 October 2026: repealed from 1
@@ -382,7 +389,10 @@ January 2027). When the page's window starts after today (`starts_after_today`),
 handlers read the article at today (`!vig=<today>`) and serve that text, its `url` and
 its `validity`, with the later version in `upcoming` (owner, G-355;
 `NormaController._document_in_force`): `{change: "abrogated" | "amended" | "inserted",
-valid_from, version_number}`, absent otherwise. `norma_data` stays the request's (no
+valid_from, version_number}`, absent otherwise, with `versions_between: n` when the version
+numbers show `n` other versions not in force yet before it: Normattiva's undated page is the
+latest version and a date after today answers today's text, so those cannot be read, and a
+request for a day they cover says so («Non so dire quale versione … sia in vigore il …»). `norma_data` stays the request's (no
 date), so the key notes and highlights are stored under does not move. When nothing is
 in force today (today's page is `not_yet`: an article inserted from a later day) the
 later text is served as before, with `upcoming.change` `"inserted"` and `not_in_force:
