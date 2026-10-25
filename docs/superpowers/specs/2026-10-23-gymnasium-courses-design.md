@@ -3,7 +3,7 @@
 **Status:** draft, 25 October 2026: complete. The flow, the screens and the tools (§1–§9, §11–§15) are the web
 side's; the server (§10) is the server side's; one owner answered the server's questions (§10.14, G-377) on
 25 October, the other's answer is awaited. Design only: no code yet.
-**Target:** release 1.11, **ready by 30 October 2026** (the owners' date, §13).
+**Target:** release 1.11, with no fixed date: the work runs continuously and in order (the owners, 25 October, §13).
 **Decisions it rests on** (codes of the owners' decision register, and the owners' answers in chat):
 - **G-362 (ok, 22 October):** the exception to principle 2 of the Studia specification (no uploads), narrowed:
   only what is saved into a course reaches the server, private to its user, under a declaration that the user
@@ -706,15 +706,14 @@ schema, migrations: `.github/CODEOWNERS`).
 state and the declaration; (b) reading and recall; (c) quiz and end; (d) the final exam and mastery. The
 dossier's groups come with their own spec.
 
-**Ready by 30 October** (the owners, 25 October: the owners meet that evening). Against the estimate of §10.13
-(about 9 days of server and MCP work) this holds only with the work in parallel and a narrower cut, which the
-orchestrator plans:
-- **in the cut:** S1, S2 and M1 of §10.13 and the web's (a)–(d), the web built on the agreed contract while the
-  server is written;
-- **after the date:** the dossier's groups (the course links its dossier as a whole meanwhile), highlights
-  (§14), A1b;
-- **the critical path:** M1 waits for #318's groups (1b): without them no course can be created, since creation
-  is the assistant's. Either 1b lands early in the week, or the owners decide how «Percorsi» ships before it.
+**Order of work, with no fixed date** (the owners, 25 October: «non lavoriamo con delle date prefissate… lavoriamo
+in continuazione. L'importante è lavorare ordinati»). The estimate of §10.13 is a measure of size, not a deadline:
+- **first:** S1, then S2 and M1 in parallel (§10.13), and the web's (a)–(d) built on the agreed contract while
+  the server is written;
+- **after A1:** the dossier's groups (the course links its dossier as a whole meanwhile), highlights (§14), A1b;
+- **the one dependency to settle:** M1 waits for #318's groups (1b), and without M1 no course can be created.
+  The orchestrator proposes that M1 use the single consent of today, with its words rewritten (as G-372 asks),
+  so that it no longer waits for 1b: a choice for the owners.
 
 ## 14. Decisions
 
