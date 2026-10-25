@@ -239,8 +239,14 @@ def test_an_administrative_identity_takes_the_kind_and_section_as_the_convention
 @pytest.mark.parametrize("norm,citation", [
     ({"tipo_atto": "codice del turismo", "allegato": "1", "numero_articolo": "5"},
      "art. 5, d.lgs. 23 maggio 2011, n. 79"),
+    # By its sigla, like the c.c. (owner, G-360: «sì: sigla per c.p.a., c.d.n., codice postale e
+    # codice di giustizia contabile, come c.c. e c.p.c.»; G-366: «sì: c.p.a., cod. nav., cod. post., c.g.c.»).
     ({"tipo_atto": "codice del processo amministrativo", "allegato": "2", "numero_articolo": "29"},
-     "art. 29, d.lgs. 2 luglio 2010, n. 104"),
+     "art. 29 c.p.a."),
+    # Another annex of the code's decree by its own sigla (G-369: «sì a tutto l'elenco, preleggi
+    # come già deciso»), an annex without one by the decree with its annex (the c.p.a.'s index).
+    ({"tipo_atto": "codice del processo amministrativo", "allegato": "3", "numero_articolo": "1"},
+     "art. 1 disp. att. c.p.a."),
     ({"tipo_atto": "codice del processo amministrativo", "allegato": "1", "numero_articolo": "29"},
      "art. 29, d.lgs. 2 luglio 2010, n. 104 (Allegato 1)"),
 ])
