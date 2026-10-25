@@ -11,7 +11,7 @@ import { DELETE_SCOPE } from './config';
  * MCP client the user connected.
  */
 /** The named daily counters a route may also spend (middleware/delegated.ts sets their limits). */
-export type DelegatedCounter = 'dossier_create' | 'note' | 'trash' | 'card';
+export type DelegatedCounter = 'dossier_create' | 'note' | 'trash' | 'card' | 'passage' | 'text';
 
 export interface DelegatedRoute {
   method: 'GET' | 'POST';
@@ -22,6 +22,8 @@ export interface DelegatedRoute {
   weight: number | ((req: Request) => number);
   /** For a deletion: the read scope of what it deletes, which the grant must also hold (spec §4.2). */
   readScope?: string;
+  /** A second scope the token must also carry (proposing passages needs the texts too: D7b, §8.7). */
+  alsoScope?: string;
   /** A named daily counter beside the points, if any. */
   counter?: DelegatedCounter;
   /** How much of the counter a call spends, when not one (cards: one per card). */
@@ -43,6 +45,11 @@ function cardReferencesWeight(req: Request): number {
     if (Array.isArray(anchors)) for (const a of anchors.slice(0, 10)) references.add(String((a as { riferimento?: unknown } | null)?.riferimento ?? ''));
   }
   return Math.max(references.size, cardCount(req)) * 2;
+}
+
+function passageCount(req: Request): number {
+  const passages = (req.body as { passaggi?: unknown } | undefined)?.passaggi;
+  return Array.isArray(passages) ? Math.max(1, Math.min(passages.length, 10)) : 1;
 }
 
 function referencesWeight(req: Request): number {
@@ -72,6 +79,16 @@ export const DELEGATED_ROUTES: DelegatedRoute[] = [
   { method: 'POST', path: '/lingo/cards/trash', scope: DELETE_SCOPE, readScope: 'lingo:cards:read', weight: 1, counter: 'trash' },
   // Reading the quota costs nothing: the MCP server asks it to tell the user what is left.
   { method: 'GET', path: '/oauth/quota', scope: 'dossier:read', weight: 0 },
+  // D7b (spec 2026-10-23 §8, allowed by the owners on 25 October 2026, G2 and G7): an entry's text, a page at a
+  // time, as the dossier's reader reads it; it leaves through MCP for this route only, under its own scope.
+  { method: 'GET', path: '/dossiers/:id/items/:id/text', scope: 'dossier:text', weight: 1, counter: 'text' },
+  // Passages proposed on an entry: it only adds, marked, as a proposal the user validates or removes. It needs
+  // the texts too: «non trovato» and «compare N volte» would otherwise let a connection probe them. Two points
+  // and one of the day's hundred per passage, the refused ones given back.
+  {
+    method: 'POST', path: '/dossiers/:id/items/:id/passages', scope: 'dossier:write', alsoScope: 'dossier:text',
+    weight: (req) => passageCount(req) * 2, counter: 'passage', counterAmount: passageCount,
+  },
 ];
 
 const SEGMENT = /^[A-Za-z0-9_-]{1,64}$/;

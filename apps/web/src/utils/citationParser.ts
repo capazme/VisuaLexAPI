@@ -10,6 +10,7 @@ import { expandTwoDigitYear, parseItalianDate } from './dateUtils';
 import { ARTICLE_SUFFIX_ALTERNATION } from './articleSuffixes';
 import { labelFromParams } from './sources';
 import { ACT_TYPES_REQUIRING_DETAILS } from '../constants/actTypes';
+import { ANNEX_SIGLE, CODES_TABLE } from './sources/actTypes';
 
 export interface ParsedCitation {
   act_type?: string;
@@ -123,6 +124,9 @@ const ABBREVIATION_MAP: Record<string, string> = {
   'cce': 'codice delle comunicazioni elettroniche',
   'cod. com. elet.': 'codice delle comunicazioni elettroniche',
   'codice delle comunicazioni elettroniche': 'codice delle comunicazioni elettroniche',
+  // «c.p.a.» was missing, and «c.p.» read the head of it: «art. 29 c.p.a.» was the codice penale.
+  'c.p.a.': 'codice del processo amministrativo',
+  'c.p.a': 'codice del processo amministrativo',
   'cpa': 'codice del processo amministrativo',
   'cod. proc. amm.': 'codice del processo amministrativo',
   'codice del processo amministrativo': 'codice del processo amministrativo',
@@ -145,6 +149,8 @@ const ABBREVIATION_MAP: Record<string, string> = {
   'ctu': 'codice del turismo',
   'cod. turismo': 'codice del turismo',
   'codice del turismo': 'codice del turismo',
+  'c.g.c.': 'codice di giustizia contabile',
+  'c.g.c': 'codice di giustizia contabile',
   'cgco': 'codice di giustizia contabile',
   'cod. giust. cont.': 'codice di giustizia contabile',
   'codice di giustizia contabile': 'codice di giustizia contabile',
@@ -161,6 +167,7 @@ const ABBREVIATION_MAP: Record<string, string> = {
   'cod. naut. diport.': 'codice della nautica da diporto',
   'codice della nautica da diporto': 'codice della nautica da diporto',
   'cpet': 'codice postale e delle telecomunicazioni',
+  'cod. post.': 'codice postale e delle telecomunicazioni',
   'cod. post. telecom.': 'codice postale e delle telecomunicazioni',
   'codice postale e delle telecomunicazioni': 'codice postale e delle telecomunicazioni',
 
@@ -184,6 +191,25 @@ const ABBREVIATION_MAP: Record<string, string> = {
 
 // Ordinati per lunghezza decrescente per matching greedy
 const SORTED_ABBREVIATIONS = Object.keys(ABBREVIATION_MAP).sort((a, b) => b.length - a.length);
+
+// Le sigle degli allegati (ANNEX_SIGLE, G-369) con il codice della tabella dei codici a cui
+// l'allegato appartiene: la riga di quell'allegato, o quella dello stesso decreto (il c.p.a.
+// per il suo allegato 3). La più lunga per prima; ogni punto può mancare o avere uno spazio dopo
+// di sé («disp att cpa» non è il c.p.a.), e la sigla non si legge mai dentro una parola.
+const ANNEX_ABBREVIATIONS = Object.entries(ANNEX_SIGLE)
+  .filter(([, sigla]) => sigla.includes('.'))
+  .sort((a, b) => b[1].length - a[1].length)
+  .flatMap(([identity, sigla]) => {
+    const cut = identity.lastIndexOf(':');
+    const decree = identity.slice(0, cut);
+    const annex = identity.slice(cut + 1);
+    const rows = Object.entries(CODES_TABLE);
+    const row = rows.find(([, urn]) => urn === identity)
+      ?? rows.find(([, urn]) => /;\d+:\w+$/.test(urn) && urn.slice(0, urn.lastIndexOf(':')) === decree);
+    if (!row) return [];
+    const source = sigla.replace(/\.$/, '').split('.').map((part) => part.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*')).join('\\.?\\s*');
+    return [{ pattern: new RegExp(`(?<![\\w.])${source}\\.?(?![\\w])`, 'i'), actType: row[0], annex }];
+  });
 
 // Atti che senza numero e anno non si aprono: nominati per esteso senza
 // numero ("della legge") non sono un bersaglio, e li leggono i pattern
@@ -346,6 +372,8 @@ function normalizeInput(input: string): string {
  */
 interface ActTypeExtraction {
   actType: string | undefined;
+  /** The annex an annex's sigla names («disp. att. c.p.a.» is the c.p.a.'s decree at annex 3). */
+  annex?: string;
   actNumber?: string;
   date?: string;
   remaining: string;
@@ -389,6 +417,14 @@ function extractActType(normalized: string, customAliases: CustomAlias[] = []): 
   // Poi gli atti UE, che portano con sé numero e anno nel loro ordine
   const eu = extractEuCitation(normalized);
   if (eu) return eu;
+
+  // Poi le sigle di un allegato del decreto di un codice (G-369): il codice e l'allegato insieme,
+  // prima delle abbreviazioni di sistema, che leggerebbero «c.p.a.» dentro «disp. att. c.p.a.»
+  for (const { pattern, actType, annex } of ANNEX_ABBREVIATIONS) {
+    if (pattern.test(normalized)) {
+      return { actType, annex, remaining: normalized.replace(pattern, ' ').replace(/\s+/g, ' ').trim() };
+    }
+  }
 
   // Poi controlla le abbreviazioni di sistema
   for (const abbr of SORTED_ABBREVIATIONS) {
@@ -579,6 +615,7 @@ export function parseLegalCitation(input: string, customAliases: CustomAlias[] =
   // Step 1: Estrai tipo atto (controlla prima alias utente, poi sistema)
   const actTypeResult = extractActType(normalized, customAliases);
   const { actType, remaining: afterActType, fromAlias, aliasId } = actTypeResult;
+  const shownAnnex = annex ?? actTypeResult.annex;
 
   // Step 2: Estrai articolo
   let { article, remaining: afterArticle } = extractArticle(afterActType);
@@ -620,7 +657,7 @@ export function parseLegalCitation(input: string, customAliases: CustomAlias[] =
     act_number: actNumber,
     date: date,
     article: article,
-    ...(annex ? { annex } : {}),
+    ...(shownAnnex ? { annex: shownAnnex } : {}),
     confidence: 0,
     fromAlias,
     aliasId,
