@@ -13,6 +13,9 @@ import bookmarkRoutes from './routes/bookmarks';
 import highlightRoutes from './routes/highlights';
 import annotationRoutes from './routes/annotations';
 import dossierRoutes from './routes/dossiers';
+import assistantProposalRoutes from './routes/assistantProposals';
+import assistantPassageRoutes from './routes/assistantPassages';
+import appSwitchRoutes from './routes/appSwitches';
 import trashRoutes from './routes/trash';
 import feedbackRoutes from './routes/feedback';
 import historyRoutes from './routes/history';
@@ -144,6 +147,9 @@ app.use('/api/lingo/srs', lingoSrsRoutes);
 app.use('/api/tasks', taskRoutes);
 // The consent page and the connected applications (MCP spike), same reason.
 app.use('/api/oauth', oauthAccountRoutes);
+// The runtime switches: GET /features (public) for the web app and the MCP server, /admin/switches for an admin.
+// Before the routers below that authenticate every /api request entering them.
+app.use('/api', appSwitchRoutes);
 app.use('/api', authRoutes);
 app.use('/api', adminRoutes);
 app.use('/api', folderRoutes);
@@ -151,6 +157,10 @@ app.use('/api', bookmarkRoutes);
 app.use('/api', highlightRoutes);
 app.use('/api', annotationRoutes);
 app.use('/api', dossierRoutes);
+// D7b: the web app's routes for the assistant's proposals and notes (behind the `assistant_passages` switch).
+app.use('/api', assistantProposalRoutes);
+// D7b: an entry's text and the passages a connected application proposes on it (delegated, behind the same switch).
+app.use('/api', assistantPassageRoutes);
 app.use('/api', trashRoutes);
 app.use('/api', feedbackRoutes);
 app.use('/api/history', historyRoutes);

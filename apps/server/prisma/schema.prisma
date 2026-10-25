@@ -41,6 +41,7 @@ model User {
   bookmarks     Bookmark[]
   annotations   Annotation[]
   highlights    Highlight[]
+  assistantNoteVersions AssistantNoteVersion[]
   dossiers      Dossier[]
   feedbacks     Feedback[]
   searchHistory SearchHistory[]
@@ -432,6 +433,27 @@ model Highlight {
   sourceSuggestionId String?                @map("source_suggestion_id")
   originalAuthorId   String?                @map("original_author_id")
 
+  // An assistant's mark (D7b: spec 2026-10-23 §8, as its first cut revised it): the connection that
+  // proposed it, set only by provenanceFromRequest, and the dossier entry it was proposed on (no foreign key,
+  // as about_item_id: the trash recreates entries with their ids). A row with a client is the assistant's: it
+  // shows only on that entry, never in GET /highlights. The CHECKs are in the migration.
+  createdByClientId    String?             @map("created_by_client_id")
+  createdByClientName  String?             @map("created_by_client_name")
+  dossierItemId        String?             @map("dossier_item_id")
+  // Where the model put it, never changed; the user's last move of the boundaries (a plain id, no foreign key).
+  assistantText        String?             @map("assistant_text")
+  assistantStartOffset Int?                @map("assistant_start_offset")
+  rangeEditedAt        DateTime?           @map("range_edited_at")
+  rangeEditedBy        String?             @map("range_edited_by")
+  // The assistant's note: the model's original, never changed (`note` is the one shown), its state, the
+  // review comment (kept after the state changes, for the second cut), the user's last edit.
+  assistantNote        String?             @map("assistant_note")
+  noteState            AssistantNoteState? @map("note_state")
+  noteStateChangedAt   DateTime?           @map("note_state_changed_at")
+  reviewComment        String?             @map("review_comment")
+  noteEditedAt         DateTime?           @map("note_edited_at")
+  noteEditedBy         String?             @map("note_edited_by")
+
   // Relationships
   user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   bookmark         Bookmark?              @relation(fields: [bookmarkId], references: [id], onDelete: Cascade)
@@ -441,7 +463,15 @@ model Highlight {
   @@index([userId])
   @@index([bookmarkId])
   @@index([normaKey])
+  @@index([userId, dossierItemId])
   @@map("highlights")
+}
+
+// The state of a note written by an assistant (D7b): yellow, green, red. The user's own notes have none.
+enum AssistantNoteState {
+  proposed
+  validated
+  review
 }
 
 // ============================================
@@ -542,6 +572,15 @@ model DossierItem {
   // never a passage of its text (root rule 23). No foreign key: the entry may
   // be in the trash, and the note must survive it and reattach on restore.
   aboutItemId String? @map("about_item_id")
+  // A note entry written by an assistant has a state (D7b), as an assistant's note on a passage: the model's
+  // original text (never changed; `content` is the one shown), the state, the review comment, the user's last
+  // edit (a plain id). Null on every other entry. The CHECKs are in the migration.
+  assistantNote       String?             @map("assistant_note")
+  noteState           AssistantNoteState? @map("note_state")
+  noteStateChangedAt  DateTime?           @map("note_state_changed_at")
+  reviewComment       String?             @map("review_comment")
+  noteEditedAt        DateTime?           @map("note_edited_at")
+  noteEditedBy        String?             @map("note_edited_by")
 
   // Relationships
   dossier Dossier @relation(fields: [dossierId], references: [id], onDelete: Cascade)
@@ -1525,6 +1564,42 @@ model TrashEntry {
   @@index([userId, deletedAt])
   @@index([expiresAt])
   @@map("trash_entries")
+}
+
+// A version of an assistant's note or mark that the user sent back («da rivedere») and the assistant
+// replaced (D7b, second cut): nothing writes it in the first cut. One of highlight_id (a proposal) and
+// dossier_item_id (a note entry), with no foreign key: both rows go to the trash and come back with their ids.
+model AssistantNoteVersion {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  highlightId   String?  @map("highlight_id")
+  dossierItemId String?  @map("dossier_item_id")
+  // A proposal's words and boundaries and its colour; null for a note entry.
+  text          String?
+  startOffset   Int?     @map("start_offset")
+  color         String?
+  assistantNote String?  @map("assistant_note")
+  note          String?
+  reviewComment String?  @map("review_comment")
+  clientName    String?  @map("client_name")
+  replacedAt    DateTime @default(now()) @map("replaced_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, highlightId])
+  @@index([userId, dossierItemId])
+  @@map("assistant_note_versions")
+}
+
+// A switch an administrator turns on and off at runtime, one row per key (D7b's `assistant_passages`, off
+// by default: a missing row is off). The keys are in src/lib/appSwitches.ts; the author is a plain id.
+model AppSwitch {
+  key       String   @id
+  enabled   Boolean  @default(false)
+  updatedAt DateTime @default(now()) @map("updated_at")
+  updatedBy String?  @map("updated_by")
+
+  @@map("app_switches")
 }
 
 // ============================================

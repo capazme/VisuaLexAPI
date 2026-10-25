@@ -86,9 +86,11 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `insufficient_scope` — to a live grant and an active user, and to the daily
   quota (points by route, `OAUTH_DAILY_POINTS`; and named daily counters,
   `DELEGATED_COUNTERS`: 10 dossiers created, 100 notes, 20 deletions, 100
-  cards). A delegated POST must be JSON (415): the weight is read from the body
+  cards, 100 passages proposed, 200 pages of an entry's text; an entry may also need a second
+  scope, `alsoScope`). A delegated POST must be JSON (415): the weight is read from the body
   before the app's parsers run. A refused call (4xx/5xx) gives back its points
-  and the counter it spent. Then it sets `req.user` and `req.delegation`, and `authenticate` lets
+  and the counter it spent; a route may give back part of both on a 200 (`res.locals.delegatedRefund`,
+  `res.locals.delegatedCounterRefund`). Then it sets `req.user` and `req.delegation`, and `authenticate` lets
   the request through; nothing else sets `req.delegation`. **Adding a route to
   the table is a security decision**: every entry is reachable by any MCP
   client the user connected. None updates or moves, and none deletes for
@@ -120,6 +122,51 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   session only, the route is not in the delegated table). An undone removal on the
   web no longer needs it: the trash restores an entry with its own id (question 181).
   `assertArticleOfDossier` is the one check behind both routes.
+- **D7b: passages and notes an assistant proposes, validated by hand** (spec
+  `docs/superpowers/specs/2026-10-23-mcp-next-tools-design.md` §8, as its first cut revised it on
+  25 October 2026; migration `20261027100000_assistant_proposed_marks`). Behind the runtime switch
+  `assistant_passages` (`assistant/switches.ts`, table `app_switches`, a missing row is off; `GET
+  /api/features` is public and answers `{ assistantPassages }`; an admin switches it with `PUT
+  /api/admin/switches/:key { enabled }`): off, every route below answers 404 and the dossier answers
+  carry no state. **The connected application's side** (`routes/assistantPassages.ts`, in the delegated
+  table): `GET /dossiers/:id/items/:itemId/text?parte=` (`dossier:text`, a point and a page of the
+  counter `text`) gives a norm's or a decision's text in pages of 20,000 characters cut at a line end,
+  `in_vigore`, and the proposals still open as the model wrote them (never the user's marks, a state, a
+  comment, an edit or moved boundaries); `POST /dossiers/:id/items/:itemId/passages { passaggi }`
+  (`dossier:write` **and** `dossier:text`, an exchanged token only; 1–10 passages, two points and one of
+  the counter `passage` each, the refused ones given back) finds each quote in the text the reader
+  reads (`assistant/locateQuote.ts`: whitespace runs match whitespace runs or nothing, every other
+  character as written; `prima`/`dopo` choose among occurrences), stores the projection's own slice at
+  its offset (root rule 23), and answers one outcome per passage. The text is fetched once per call
+  from the Python API as the web fetches it (`assistant/entryText.ts`: ports of `buildItemKey`,
+  `uniqueArticleIdFromNorma`, the body of `fetchArticleForNorma`, `describeVersion`'s `readOnly`,
+  `decisionProjection`, pinned to the web's code by `tests/assistant/entryText.test.ts` and
+  `ruleTwentyThree.test.ts`, which proposes on the web's fixtures and finds the marks in the web's
+  renderer); a text the reader shows read-only is refused (400), a source that cannot answer is a 503.
+  The dossier's row lock holds at most 30 open proposals per entry (a mark with no note, or a note not
+  validated). **A proposal** is a `Highlight` with the connection's mark, its entry
+  (`dossier_item_id`, no foreign key), where the model put it (`assistant_text`,
+  `assistant_start_offset`, never changed) and, with a note, the model's original (`assistant_note`,
+  never changed; `note` is the one shown), its state (`note_state`: `proposed`, `validated`, `review`)
+  and the review comment (kept after the state changes, for the second cut). The state belongs to the
+  note: a mark with no note has none. **An assistant's mark shows only on its entry, in every state**:
+  `GET /highlights` and the generic `PUT`/`DELETE /highlights/:id` leave out every row with a
+  connection, so Study Mode, the Forum, environments and the PDF never receive one. **The web app's
+  side** (`routes/assistantProposals.ts`, session only): `GET …/items/:itemId/proposals`, `PUT
+  …/proposals/:pid/state { state, comment? }` (comment ≤ 500, read only with `review`), `PUT
+  …/proposals/:pid/note { text }` (stamps the edit and validates), `PUT …/proposals/:pid/range {
+  startOffset, text }` (the user's new boundaries, not checked against the source, as the user's own
+  highlights; the state never changes) and `DELETE …/proposals/:pid` (for good: the web delays it behind
+  «Annulla»). A note entry an assistant writes (`POST /dossiers/:id/notes` through an exchanged token)
+  has the same three states on `dossier_items` (`PUT …/items/:itemId/state`, `PUT …/items/:itemId/text`;
+  the generic item `PUT` keeps the original too); the migration made every older one `proposed`. Every
+  item answer of the user's session carries `assistant_notes` (a norm's or decision's counts by state,
+  for the light on its row) and `assistant_note` (a note entry's state), both null for an exchanged token
+  and with the switch off. The trash takes an entry's proposals with it (`proposals` in the payload) and
+  brings them back with their ids and state. `assistant_note_versions` is for the second cut (the
+  versions an assistant replaced); nothing writes it yet. The scope `dossier:text` is worded on the
+  consent page and in «Applicazioni collegate» (`SCOPE_LABELS`); a grant made before it has it only once
+  the user connects again.
 - **Decisions in a dossier**: an item may be `sentenza`: a court decision's
   identity and a label, never its text. The courts are the Cassazione, the Corte costituzionale
   and the two courts of the Union, named by their case (`norms/euCourts.ts`: a number of at most

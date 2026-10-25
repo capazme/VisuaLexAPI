@@ -13,6 +13,7 @@ import { decisionItemContentSchema, parseDecisionItemContent } from '../schemas/
 import { BY_THE_USER, trashDossier, trashDossierItems } from '../trash/trash';
 import { importStudyDossiers, spendStudyImport } from '../services/studyImport';
 import { readableContent } from '../utils/publishedContent';
+import { assistantFieldsOf, assistantViewFor, noteEdit, type AssistantView } from '../assistant/notes';
 
 /** Who created a row: the connected application when the request is delegated, else nobody (the user). */
 export function provenanceFromRequest(req: Request) {
@@ -27,8 +28,11 @@ const createdBy = (row: { createdByClientId: string | null; createdByClientName:
 
 type ItemRow = Prisma.DossierItemGetPayload<object>;
 
-/** A dossier entry as every route answers it. */
-function serializeItem(i: ItemRow) {
+/**
+ * A dossier entry as every route answers it. `view` carries the assistant's notes for the user's session
+ * (`assistantViewFor`): without it (an exchanged token, the switch off) both fields are null.
+ */
+function serializeItem(i: ItemRow, view: AssistantView | null) {
   return {
     id: i.id,
     item_type: i.itemType,
@@ -45,7 +49,21 @@ function serializeItem(i: ItemRow) {
     created_by: createdBy(i),
     // The entry a note is about (an article of the same dossier), or null.
     about_item_id: i.aboutItemId,
+    // D7b: the light of a norm or a decision (its assistant's notes by state) and an assistant's note
+    // entry's own state; null for the user's own rows, for an exchanged token, and with the switch off.
+    ...assistantFieldsOf(i, view),
   };
+}
+
+/** One entry's answer, with its view of the assistant's notes. */
+export async function serializeItemFor(req: Request, item: ItemRow) {
+  return serializeItem(item, await assistantViewFor(req, [item]));
+}
+
+/** Dossiers' answers, with one view of the assistant's notes for all their entries. */
+async function serializeDossiersFor(req: Request, dossiers: Parameters<typeof serializeDossier>[0][]) {
+  const view = await assistantViewFor(req, dossiers.flatMap((d) => d.items));
+  return dossiers.map((d) => serializeDossier(d, view));
 }
 
 /**
@@ -64,6 +82,7 @@ type PublishedCopyRow = { id: string; currentVersion: number; isActive: boolean;
 /** A dossier as every route answers it. */
 function serializeDossier(
   d: Prisma.DossierGetPayload<object> & { items: ItemRow[]; publishedCopy: PublishedCopyRow | null; _count: { tasks: number } },
+  view: AssistantView | null,
 ) {
   return {
     id: d.id,
@@ -88,7 +107,7 @@ function serializeDossier(
     created_at: d.createdAt,
     updated_at: d.updatedAt,
     created_by: createdBy(d),
-    items: d.items.map(serializeItem),
+    items: d.items.map((item) => serializeItem(item, view)),
     // Its planner tasks, done and trashed ones too: all go to the trash with the dossier. A count, never
     // a title: a connected application reads it to tell the user, in the deletion's confirmation.
     task_count: d._count.tasks,
@@ -149,7 +168,7 @@ export const listDossiers = async (req: Request, res: Response) => {
     orderBy: { createdAt: 'desc' },
   });
 
-  res.json(dossiers.map(serializeDossier));
+  res.json(await serializeDossiersFor(req, dossiers));
 };
 
 /**
@@ -167,7 +186,7 @@ export const getDossier = async (req: Request, res: Response) => {
     throw new AppError(404, 'Dossier not found');
   }
 
-  res.json(serializeDossier(dossier));
+  res.json((await serializeDossiersFor(req, [dossier]))[0]);
 };
 
 /**
@@ -189,7 +208,7 @@ export const createDossier = async (req: Request, res: Response) => {
     include: DOSSIER_INCLUDE,
   });
 
-  res.status(201).json(serializeDossier(dossier));
+  res.status(201).json((await serializeDossiersFor(req, [dossier]))[0]);
 };
 
 /**
@@ -221,7 +240,7 @@ export const updateDossier = async (req: Request, res: Response) => {
     include: DOSSIER_INCLUDE,
   });
 
-  res.json(serializeDossier(dossier));
+  res.json((await serializeDossiersFor(req, [dossier]))[0]);
 };
 
 const importStudySchema = z.object({
@@ -301,7 +320,7 @@ export const addDossierItem = async (req: Request, res: Response) => {
     },
   });
 
-  res.status(201).json(serializeItem(item));
+  res.status(201).json(await serializeItemFor(req, item));
 };
 
 /**
@@ -358,11 +377,13 @@ export const addDossierNote = async (req: Request, res: Response) => {
         position: (last._max.position ?? -1) + 1,
         aboutItemId: aboutItemId ?? null,
         ...provenanceFromRequest(req),
+        // D7b: an assistant's note starts «da validare», its text kept as the original.
+        ...(req.delegation ? { assistantNote: text, noteState: 'proposed' as const } : {}),
       },
     });
   });
 
-  res.status(201).json(serializeItem(item));
+  res.status(201).json(await serializeItemFor(req, item));
 };
 
 /**
@@ -389,11 +410,19 @@ export const updateDossierItem = async (req: Request, res: Response) => {
   }
 
   // A decision is checked like a creation, and its title is its label: never set apart from it.
+  let assistantEdit: ReturnType<typeof noteEdit> = null;
   if (data.content !== undefined || data.title !== undefined) {
     const existing = await prisma.dossierItem.findFirst({
       where: { id: itemId, dossierId: id },
-      select: { itemType: true },
+      select: { itemType: true, noteState: true, content: true },
     });
+    // An assistant's note (D7b) stays plain text, and a new text is the user's edit: the original stays in
+    // `assistant_note`, the edit is stamped and the note becomes «validata, modificata da te».
+    if (existing?.noteState && data.content !== undefined) {
+      if (typeof data.content !== 'string' || !data.content.trim()) throw new AppError(400, 'La nota dell’IA si modifica come testo.');
+      const shown = typeof existing.content === 'string' ? existing.content : null;
+      assistantEdit = noteEdit(shown, data.content, req.user!.id, new Date());
+    }
     if (existing?.itemType === 'sentenza') {
       if (data.content !== undefined) {
         const decision = parseDecisionItemContent(data.content);
@@ -419,6 +448,7 @@ export const updateDossierItem = async (req: Request, res: Response) => {
         ...(data.position !== undefined && { position: data.position }),
         ...(data.status !== undefined && { status: data.status }),
         ...(data.aboutItemId !== undefined && { aboutItemId: data.aboutItemId }),
+        ...assistantEdit,
       },
     });
   } catch (err) {
@@ -428,7 +458,7 @@ export const updateDossierItem = async (req: Request, res: Response) => {
     throw err;
   }
 
-  res.json(serializeItem(item));
+  res.json(await serializeItemFor(req, item));
 };
 
 /**
@@ -503,7 +533,7 @@ export const moveDossierItem = async (req: Request, res: Response) => {
       return moved;
     });
 
-    res.json(serializeItem(item));
+    res.json(await serializeItemFor(req, item));
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
       throw new AppError(404, 'Dossier item not found');
