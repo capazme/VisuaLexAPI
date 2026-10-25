@@ -26,11 +26,13 @@ export function normaOfContent(content: unknown): StoredNorma | null {
   if (!content || typeof content !== 'object' || Array.isArray(content)) return null;
   const { _dossierMeta: _meta, ...rest } = content as Record<string, unknown>;
   const norma = rest.articleRef && typeof rest.articleRef === 'object' ? (rest.articleRef as Record<string, unknown>) : rest;
-  if (typeof norma.tipo_atto !== 'string' || typeof norma.numero_articolo !== 'string') return null;
+  // An article number stored as a number (an older client) reads as the web reads it, through `toString()`.
+  const article = typeof norma.numero_articolo === 'number' ? String(norma.numero_articolo) : norma.numero_articolo;
+  if (typeof norma.tipo_atto !== 'string' || typeof article !== 'string') return null;
   const text = (key: string) => (typeof norma[key] === 'string' ? (norma[key] as string) : undefined);
   return {
     tipo_atto: norma.tipo_atto,
-    numero_articolo: norma.numero_articolo,
+    numero_articolo: article,
     data: text('data'),
     numero_atto: text('numero_atto'),
     versione: text('versione'),
@@ -132,9 +134,15 @@ export interface EntryText {
 }
 
 export class EntryHasNoText extends Error {}
+/** A norm entry whose stored content names no act or article: its data are incomplete, not a note. */
+export class EntryUnreadable extends Error {}
 export class TextUnavailable extends Error {}
-/** The source says it has no such decision: asking again will not help. */
+/** The source says it has no such article or decision: asking again will not help. */
 export class SourceHasNoText extends Error {}
+
+// What the Python API's scrapers write for a document or an article that is not there (DocumentNotFoundError,
+// a permanent error): «Document not found …», «Article 999 not found in EUR-Lex …».
+const PERMANENT = /\bnot found\b|does not exist|non esiste|non trovat/i;
 
 /** A budget of 60 seconds for the fetch (§8.5): a cold decision can take minutes at its source. */
 export const TEXT_BUDGET_MS = 60_000;
@@ -155,9 +163,11 @@ export async function readEntryText(item: Entry, signal: AbortSignal = AbortSign
 
 async function readNorm(content: unknown, signal: AbortSignal): Promise<EntryText> {
   const norma = normaOfContent(content);
-  if (!norma) throw new EntryHasNoText();
+  if (!norma) throw new EntryUnreadable();
   const { status, data } = await postLegalApi('/fetch_article_text', articleFetchBody(norma), { signal });
   const first = (Array.isArray(data) ? data[0] : data) as { article_text?: unknown; error?: unknown; validity?: unknown } | undefined;
+  // The request refused as invalid, or a document the source says is not there: asking again will not help.
+  if (status === 400 || (first && typeof first.error === 'string' && PERMANENT.test(first.error))) throw new SourceHasNoText();
   if (status !== 200 || !first || first.error || typeof first.article_text !== 'string' || !first.article_text) {
     throw new TextUnavailable(`fetch_article_text ${status}`);
   }

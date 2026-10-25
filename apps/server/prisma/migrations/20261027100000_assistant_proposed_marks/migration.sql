@@ -55,7 +55,8 @@ ADD CONSTRAINT "dossier_items_review_comment_check" CHECK ("review_comment" IS N
 -- Backfill: the note entries assistants wrote so far, «da validare» (their content is the note's text, a JSON string).
 UPDATE "dossier_items"
 SET "note_state" = 'proposed', "assistant_note" = "content" #>> '{}'
-WHERE "item_type" = 'note' AND "created_by_client_id" IS NOT NULL AND jsonb_typeof("content") = 'string';
+WHERE "item_type" = 'note' AND "created_by_client_id" IS NOT NULL AND jsonb_typeof("content") = 'string' AND "note_state" IS NULL;
+-- The ones in the trash at this moment start «da validare» when they are restored (trash/trash.ts, `itemRow`).
 
 -- CreateTable
 CREATE TABLE "assistant_note_versions" (

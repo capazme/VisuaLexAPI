@@ -464,6 +464,16 @@ const dateOrNull = (value: string | null) => (value === null ? null : new Date(v
 
 const jsonOrNull = (value: unknown) => (value === null || value === undefined ? Prisma.JsonNull : (value as Prisma.InputJsonValue));
 
+/**
+ * An assistant's note entry trashed before D7b's migration has no `noteState` key in its payload: it comes back
+ * «da validare», with its text as the original, as the migration made every one outside the trash.
+ */
+function noteStateOf(item: StoredItem): Pick<Prisma.DossierItemCreateManyInput, 'assistantNote' | 'noteState'> {
+  if ('noteState' in item) return { assistantNote: item.assistantNote ?? null, noteState: item.noteState ?? null };
+  const before = item.itemType === 'note' && item.createdByClientId && typeof item.content === 'string';
+  return before ? { assistantNote: item.content as string, noteState: 'proposed' } : { assistantNote: null, noteState: null };
+}
+
 const itemRow = (item: StoredItem, dossierId: string, position: number, aboutItemId: string | null): Prisma.DossierItemCreateManyInput => ({
   id: item.id,
   dossierId,
@@ -476,8 +486,7 @@ const itemRow = (item: StoredItem, dossierId: string, position: number, aboutIte
   createdByClientId: item.createdByClientId,
   createdByClientName: item.createdByClientName,
   aboutItemId,
-  assistantNote: item.assistantNote ?? null,
-  noteState: item.noteState ?? null,
+  ...noteStateOf(item),
   noteStateChangedAt: dateOrNull(item.noteStateChangedAt ?? null),
   reviewComment: item.reviewComment ?? null,
   noteEditedAt: dateOrNull(item.noteEditedAt ?? null),

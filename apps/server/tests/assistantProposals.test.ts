@@ -345,13 +345,47 @@ describe('D7b — the assistant’s proposals, for the web app', () => {
       expect(edited.body.content).toBe('Sul termine essenziale (art. 1457 c.c.).');
       expect(edited.body.assistant_note).toMatchObject({ state: 'validated', edited: true, original_text: 'Sul termine essenziale.', edited_by: { username: 'd7b-alice' } });
       expect((await request(app).put(`${at}/text`).set(authHeader(alice)).send({ text: '  ' })).status).toBe(400);
-      // The generic update keeps the original and stamps the edit too.
-      const generic = await request(app).put(at).set(authHeader(alice)).send({ content: 'Terza versione.' });
-      expect(generic.body.assistant_note).toMatchObject({ edited: true, original_text: 'Sul termine essenziale.' });
-      expect((await request(app).put(at).set(authHeader(alice)).send({ content: { note: 'oggetto' } })).status).toBe(400);
       // The light of the article follows.
       const read = await request(app).get(`/api/dossiers/${dossierId}`).set(authHeader(alice));
       expect(read.body.items.find((i: { id: string }) => i.id === itemId).assistant_notes).toEqual({ proposed: 0, validated: 1, review: 0 });
+    });
+  });
+
+  describe('the generic item PUT', () => {
+    it('never touches an assistant’s note: its text and state change only through their own routes', async () => {
+      await switchOn();
+      const { apiToken } = await delegatedToken(alice);
+      const created = await request(app).post(`/api/dossiers/${dossierId}/notes`).set({ Authorization: `Bearer ${apiToken}` }).send({ text: 'Nota IA.' });
+      // An older note entry whose text the web reads with spaces at its edges, sent back whole with a star.
+      await prisma.dossierItem.update({ where: { id: created.body.id }, data: { content: '  Nota IA.  ', assistantNote: '  Nota IA.  ' } });
+      const at = `/api/dossiers/${dossierId}/items/${created.body.id}`;
+      const starred = await request(app).put(at).set(authHeader(alice)).send({ content: 'Nota IA.', status: 'important' });
+      expect(starred.status).toBe(200);
+      expect(starred.body).toMatchObject({ content: '  Nota IA.  ', status: 'important' });
+      expect(starred.body.assistant_note).toMatchObject({ state: 'proposed', edited: false });
+      const rewritten = await request(app).put(at).set(authHeader(alice)).send({ content: 'Tutt’altro testo.' });
+      expect(rewritten.body.content).toBe('  Nota IA.  ');
+      // With the switch off too.
+      await switchOn(false);
+      await request(app).put(at).set(authHeader(alice)).send({ content: 'Ancora un altro.' });
+      expect(await prisma.dossierItem.findUniqueOrThrow({ where: { id: created.body.id } })).toMatchObject({ content: '  Nota IA.  ', noteState: 'proposed', noteEditedAt: null });
+    });
+  });
+
+  describe('the cache of GET /features', () => {
+    it('answers from memory for a few seconds, and at once after an admin’s change', async () => {
+      await switchOn(false);
+      await prisma.user.update({ where: { id: alice.id }, data: { isAdmin: true } });
+      await request(app).put('/api/admin/switches/assistant_passages').set(authHeader(alice)).send({ enabled: false });
+      expect((await request(app).get('/api/features')).body.assistantPassages).toBe(false);
+      // Another process switched it: this one still says what it read.
+      await switchOn(true);
+      expect((await request(app).get('/api/features')).body.assistantPassages).toBe(false);
+      // The routes behind it read it live.
+      expect((await request(app).get(`${base()}/proposals`).set(authHeader(alice))).status).toBe(200);
+      await request(app).put('/api/admin/switches/assistant_passages').set(authHeader(alice)).send({ enabled: true });
+      expect((await request(app).get('/api/features')).body.assistantPassages).toBe(true);
+      await request(app).put('/api/admin/switches/assistant_passages').set(authHeader(alice)).send({ enabled: false });
     });
   });
 
@@ -408,6 +442,20 @@ describe('D7b — the assistant’s proposals, for the web app', () => {
       await prisma.trashEntry.update({ where: { id: entry.id }, data: { payload: { items: old } as object } });
       expect((await request(app).post(`/api/trash/${entry.id}/restore`).set(authHeader(alice)).send({})).status).toBe(200);
       expect(await prisma.dossierItem.count({ where: { id: itemId } })).toBe(1);
+    });
+
+    it('brings back an assistant’s note entry trashed before D7b «da validare», a user’s note as it was', async () => {
+      const { apiToken } = await delegatedToken(alice);
+      const theirs = await request(app).post(`/api/dossiers/${dossierId}/notes`).set({ Authorization: `Bearer ${apiToken}` }).send({ text: 'Scritta prima.' });
+      const mine = await request(app).post(`/api/dossiers/${dossierId}/notes`).set(authHeader(alice)).send({ text: 'Mia.' });
+      const trashed = await request(app).post(`/api/dossiers/${dossierId}/trash-items`).set(authHeader(alice)).send({ itemIds: [theirs.body.id, mine.body.id] });
+      const entry = await prisma.trashEntry.findUniqueOrThrow({ where: { id: trashed.body.trashId } });
+      const { items } = entry.payload as { items: Record<string, unknown>[] };
+      const old = items.map(({ assistantNote: _a, noteState: _s, noteStateChangedAt: _c, reviewComment: _r, noteEditedAt: _e, noteEditedBy: _b, ...rest }) => rest);
+      await prisma.trashEntry.update({ where: { id: entry.id }, data: { payload: { items: old } as object } });
+      expect((await request(app).post(`/api/trash/${entry.id}/restore`).set(authHeader(alice)).send({})).status).toBe(200);
+      expect(await prisma.dossierItem.findUniqueOrThrow({ where: { id: theirs.body.id } })).toMatchObject({ noteState: 'proposed', assistantNote: 'Scritta prima.' });
+      expect(await prisma.dossierItem.findUniqueOrThrow({ where: { id: mine.body.id } })).toMatchObject({ noteState: null, assistantNote: null });
     });
   });
 });

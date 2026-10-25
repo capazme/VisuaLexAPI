@@ -126,7 +126,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `docs/superpowers/specs/2026-10-23-mcp-next-tools-design.md` §8, as its first cut revised it on
   25 October 2026; migration `20261027100000_assistant_proposed_marks`). Behind the runtime switch
   `assistant_passages` (`assistant/switches.ts`, table `app_switches`, a missing row is off; `GET
-  /api/features` is public and answers `{ assistantPassages }`; an admin switches it with `PUT
+  /api/features` is public, mounted before every limiter, and answers `{ assistantPassages }` from five
+  seconds' memory, which an admin's change clears; an admin switches it with `PUT
   /api/admin/switches/:key { enabled }`): off, every route below answers 404 and the dossier answers
   carry no state. **The connected application's side** (`routes/assistantPassages.ts`, in the delegated
   table): `GET /dossiers/:id/items/:itemId/text?parte=` (`dossier:text`, a point and a page of the
@@ -142,7 +143,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `uniqueArticleIdFromNorma`, the body of `fetchArticleForNorma`, `describeVersion`'s `readOnly`,
   `decisionProjection`, pinned to the web's code by `tests/assistant/entryText.test.ts` and
   `ruleTwentyThree.test.ts`, which proposes on the web's fixtures and finds the marks in the web's
-  renderer); a text the reader shows read-only is refused (400), a source that cannot answer is a 503.
+  renderer); a text the reader shows read-only is refused (400), an article or a decision the source says is
+  not there is a 400, a source that cannot answer now is a 503, an entry changed while its text was read a 409.
   The dossier's row lock holds at most 30 open proposals per entry (a mark with no note, or a note not
   validated). **A proposal** is a `Highlight` with the connection's mark, its entry
   (`dossier_item_id`, no foreign key), where the model put it (`assistant_text`,
@@ -159,7 +161,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   highlights; the state never changes) and `DELETE …/proposals/:pid` (for good: the web delays it behind
   «Annulla»). A note entry an assistant writes (`POST /dossiers/:id/notes` through an exchanged token)
   has the same three states on `dossier_items` (`PUT …/items/:itemId/state`, `PUT …/items/:itemId/text`;
-  the generic item `PUT` keeps the original too); the migration made every older one `proposed`. Every
+  the generic item `PUT` never changes an assistant's note's text or state: the web sends the content back
+  with a star); the migration made every older one `proposed`, and one in the trash then comes back so. Every
   item answer of the user's session carries `assistant_notes` (a norm's or decision's counts by state,
   for the light on its row) and `assistant_note` (a note entry's state), both null for an exchanged token
   and with the switch off. The trash takes an entry's proposals with it (`proposals` in the payload) and

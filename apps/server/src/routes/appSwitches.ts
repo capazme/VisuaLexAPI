@@ -3,15 +3,15 @@ import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
 import { requireAdmin } from '../middleware/admin';
 import { AppError } from '../middleware/errorHandler';
-import { isAppSwitchKey, isSwitchOn, listSwitches, setSwitch } from '../assistant/switches';
+import { isAppSwitchKey, isSwitchOnCached, listSwitches, setSwitch } from '../assistant/switches';
 
 /**
  * `GET /api/features`, what the web app and the MCP server read: public (it says only which features are
  * on, and the MCP server asks it with no token before a session lists its tools), mounted in `app.ts`
- * before the limiters.
+ * before the limiters, so it answers from a few seconds' memory (`isSwitchOnCached`).
  */
 export async function features(_req: Request, res: Response) {
-  res.json({ assistantPassages: await isSwitchOn('assistant_passages') });
+  res.json({ assistantPassages: await isSwitchOnCached('assistant_passages') });
 }
 
 /** The administrator's side of the runtime switches (`/admin/switches`, none of it delegated). */

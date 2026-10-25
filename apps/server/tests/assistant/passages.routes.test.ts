@@ -156,7 +156,29 @@ describe('D7b — an entry’s text and the passages proposed on it', () => {
       nock(API).post('/fetch_decision').times(5).reply(() => [404, { esito: 'non_trovata', motivo: 'inesistente' }]);
       const response = await text(decisionId);
       expect(response.status).toBe(400);
-      expect(response.body.detail).toBe('La fonte non ha il testo di questa voce.');
+      expect(response.body.detail).toBe('La fonte non ha il testo di questa voce: controlla la norma o la sentenza nel dossier.');
+    });
+
+    it('says plainly when the source has no such article, and when the entry’s data are incomplete', async () => {
+      nock.cleanAll();
+      let answer: [number, unknown] = [200, [{ error: 'Document not found for codice civile art. 1453', norma_data: NORM }]];
+      nock(API).post('/fetch_article_text').times(10).reply(() => answer);
+      const missing = await text();
+      expect(missing.status).toBe(400);
+      expect(missing.body.detail).toBe('La fonte non ha il testo di questa voce: controlla la norma o la sentenza nel dossier.');
+      answer = [400, { error: 'Invalid act type' }];
+      expect((await text()).status).toBe(400);
+      // A failure that is not «not there» stays a 503: asking again may help.
+      answer = [200, [{ error: 'Circuit open for normattiva', norma_data: NORM }]];
+      expect((await text()).status).toBe(503);
+      const broken = await prisma.dossierItem.create({ data: { dossierId, itemType: 'norm', title: 'x', content: { numero_articolo: '1' } } });
+      const incomplete = await text(broken.id);
+      expect(incomplete.status).toBe(400);
+      expect(incomplete.body.detail).toBe('I dati di questa norma nel dossier sono incompleti: aggiungila di nuovo.');
+      // A number stored as a number is read as the web reads it.
+      answer = [200, [{ article_text: RAW, norma_data: NORM, validity }]];
+      const numbered = await prisma.dossierItem.create({ data: { dossierId, itemType: 'norm', title: 'x', content: { ...NORM, numero_articolo: 1453 } } });
+      expect((await text(numbered.id)).status).toBe(200);
     });
 
     it('cuts a long text in pages at a line end', async () => {

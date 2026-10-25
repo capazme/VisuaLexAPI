@@ -13,7 +13,7 @@ import { decisionItemContentSchema, parseDecisionItemContent } from '../schemas/
 import { BY_THE_USER, trashDossier, trashDossierItems } from '../trash/trash';
 import { importStudyDossiers, spendStudyImport } from '../services/studyImport';
 import { readableContent } from '../utils/publishedContent';
-import { assistantFieldsOf, assistantViewFor, noteEdit, type AssistantView } from '../assistant/notes';
+import { assistantFieldsOf, assistantViewFor, type AssistantView } from '../assistant/notes';
 
 /** Who created a row: the connected application when the request is delegated, else nobody (the user). */
 export function provenanceFromRequest(req: Request) {
@@ -410,21 +410,15 @@ export const updateDossierItem = async (req: Request, res: Response) => {
   }
 
   // A decision is checked like a creation, and its title is its label: never set apart from it.
-  let assistantEdit: ReturnType<typeof noteEdit> = null;
   if (data.content !== undefined || data.title !== undefined) {
     const existing = await prisma.dossierItem.findFirst({
       where: { id: itemId, dossierId: id },
       select: { itemType: true, noteState: true, content: true },
     });
-    // An assistant's note (D7b) stays plain text, and a new text is the user's edit: the original stays in
-    // `assistant_note`, the edit is stamped and the note becomes «validata, modificata da te».
-    if (existing?.noteState && data.content !== undefined) {
-      if (typeof data.content !== 'string' || !data.content.trim()) throw new AppError(400, 'La nota dell’IA si modifica come testo.');
-      // Trimmed, as `PUT …/text` stores it.
-      data.content = data.content.trim();
-      const shown = typeof existing.content === 'string' ? existing.content : null;
-      assistantEdit = noteEdit(shown, data.content as string, req.user!.id, new Date());
-    }
+    // An assistant's note (D7b) changes its text only through `PUT …/text`, behind the switch and the row's lock,
+    // which keeps the original and stamps the edit: here its content stays as stored. The web sends the whole
+    // content back with a change of star or position, and that must never make the note «modificata da te».
+    if (existing?.noteState) delete data.content;
     if (existing?.itemType === 'sentenza') {
       if (data.content !== undefined) {
         const decision = parseDecisionItemContent(data.content);
@@ -450,7 +444,6 @@ export const updateDossierItem = async (req: Request, res: Response) => {
         ...(data.position !== undefined && { position: data.position }),
         ...(data.status !== undefined && { status: data.status }),
         ...(data.aboutItemId !== undefined && { aboutItemId: data.aboutItemId }),
-        ...assistantEdit,
       },
     });
   } catch (err) {

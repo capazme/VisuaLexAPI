@@ -23,6 +23,22 @@ export async function isSwitchOn(key: AppSwitchKey, db: Db = prisma): Promise<bo
   return row?.enabled ?? false;
 }
 
+/** How long the public `GET /features` answers from memory: it is called with no token, before every limiter. */
+export const PUBLIC_CACHE_MS = 5_000;
+const publicCache = new Map<AppSwitchKey, { enabled: boolean; at: number }>();
+
+/**
+ * The switch as the public route reads it: from memory for a few seconds. A change made here clears it at
+ * once; one made by another process shows within PUBLIC_CACHE_MS. The routes behind the switch read it live.
+ */
+export async function isSwitchOnCached(key: AppSwitchKey, now: number = Date.now()): Promise<boolean> {
+  const hit = publicCache.get(key);
+  if (hit && now - hit.at < PUBLIC_CACHE_MS) return hit.enabled;
+  const enabled = await isSwitchOn(key);
+  publicCache.set(key, { enabled, at: now });
+  return enabled;
+}
+
 export async function listSwitches(db: Db = prisma) {
   const rows = await db.appSwitch.findMany();
   return (Object.keys(APP_SWITCHES) as AppSwitchKey[]).map((key) => {
@@ -37,5 +53,6 @@ export async function setSwitch(key: AppSwitchKey, enabled: boolean, adminId: st
     create: { key, enabled, updatedBy: adminId },
     update: { enabled, updatedBy: adminId, updatedAt: new Date() },
   });
+  publicCache.delete(key);
   return { key, description: APP_SWITCHES[key], enabled: row.enabled, updatedAt: row.updatedAt };
 }
