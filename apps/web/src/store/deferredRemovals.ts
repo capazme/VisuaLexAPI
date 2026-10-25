@@ -30,6 +30,19 @@ const pending = new Map<string, Pending>();
 const inFlight = new Set<string>();
 /** Items created and not yet answered, by their temporary key: a removal of one waits for the server's id. */
 const saving = new Map<string, ((saved: RemovalTarget<unknown> | null) => void)[]>();
+/** Bumped at logout: an answer to a removal sent before it puts nothing back in the next account's store. */
+let session = 0;
+
+/**
+ * At logout (`clearUserData`): what waits is forgotten (its notifications are dropped too), and an answer still out for
+ * a removal sent before puts nothing back and says nothing.
+ */
+export function forgetRemovals() {
+  session++;
+  pending.clear();
+  inFlight.clear();
+  saving.clear();
+}
 
 /**
  * Sent as the page goes (`pagehide`) or is hidden (`visibilitychange`): a phone's browser often discards a tab in the
@@ -101,10 +114,13 @@ export function removeWithUndo<T>({ message, putBack, onRefused, ...first }: Def
       }).catch(() => {});
       return;
     }
+    const sentIn = session;
     inFlight.add(what.key);
     what.remove()
       .then(() => { inFlight.delete(what.key); })
       .catch((error: unknown) => {
+        // Answered after a logout: the store is the next account's, nothing goes back into it.
+        if (sentIn !== session) return;
         inFlight.delete(what.key);
         // Already gone from the server: what was wanted.
         if ((error as { status?: number } | null)?.status === 404) return;
@@ -121,8 +137,10 @@ export function removeWithUndo<T>({ message, putBack, onRefused, ...first }: Def
     if (!target) return;
     const waiters = saving.get(target.key);
     if (waiters) {
-      // Still being created: removed under the server's id once it answers (none if it fails). An exit cannot wait.
-      if (!onExit) waiters.push((saved) => { if (saved) deleteNow(saved as RemovalTarget<T>, false); });
+      // Still being created: removed under the server's id once it answers (none if it fails). Even when sent by the
+      // tab being hidden (a desktop's change of tab), the page lives on and the answer comes: dropping it would leave
+      // the mark on the server, back at the next reading. A page that really goes never hears the id.
+      waiters.push((saved) => { if (saved) deleteNow(saved as RemovalTarget<T>, false); });
       return;
     }
     deleteNow(target, onExit);

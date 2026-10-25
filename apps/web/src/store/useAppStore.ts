@@ -47,7 +47,7 @@ import {
 } from '../utils/storeApiMappers';
 import { serverFieldsFromApi, dossierFromApi, dossierItemFromApi, itemContentFor, serverItemFor } from '../components/features/dossier/dossierUtils';
 import { shiftAiReviewCount } from '../utils/aiReview';
-import { isRemovalPending, removeWithUndo, savingDone, savingStarted } from './deferredRemovals';
+import { forgetRemovals, isRemovalPending, removeWithUndo, savingDone, savingStarted } from './deferredRemovals';
 
 // ── Environment wire ↔ store converters ───────────────────────────────
 // The server stores the per-slice content (dossiers / quickNorms / aliases /
@@ -1207,6 +1207,8 @@ const appStore = createStore<AppState>()(
             clearUserData: () => {
                 // The notifications on screen go, without carrying out what they held (an import waiting for its «Annulla»).
                 resetNotifications();
+                // A removal's answer still out puts nothing back in the emptied store.
+                forgetRemovals();
                 // The backup of the last user's saved tabs (`backupV0`) goes too: a shared browser keeps nothing of them.
                 removeV0Backup();
                 set((state) => {

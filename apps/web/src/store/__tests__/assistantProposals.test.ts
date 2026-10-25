@@ -281,6 +281,18 @@ describe('D7b proposals — the bin and «Annulla»', () => {
     expect(counts()).toEqual({ proposed: 1, validated: 0, review: 0 });
   });
 
+  it('a DELETE refused after a logout puts nothing back and says nothing', async () => {
+    let refuse: (e: unknown) => void = () => {};
+    vi.mocked(assistantService.removeProposal).mockReturnValueOnce(new Promise((_, reject) => { refuse = reject; }));
+    removeProposal('d1', 'a1', 'p1');
+    flushRemovals('a1');
+    resetAssistantProposals();
+    refuse(refused(500, 'Errore del server'));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(assistantProposalsStore.getState().byItem).toEqual({});
+    expect(notificationStore.getState().entries.some((e) => e.type === 'error')).toBe(false);
+  });
+
   it('ticked, binned before the answer, then «Annulla»: it comes back as the server has it, validated', async () => {
     let answer: (p: Proposal) => void = () => {};
     vi.mocked(assistantService.setProposalState).mockReturnValueOnce(new Promise((resolve) => { answer = resolve; }));

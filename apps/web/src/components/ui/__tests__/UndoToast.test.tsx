@@ -288,6 +288,39 @@ describe('NotificationHost (K1a)', () => {
       expect(undoNew).not.toHaveBeenCalled();
     });
 
+    it('undoes over Study Mode, under the notifications (`data-undo-through`), and writes it there; not under a dialog over it', async () => {
+      platform('Win32');
+      const { undoNew } = await two();
+      const study = document.createElement('div');
+      study.setAttribute('data-find-overlay', '');
+      study.setAttribute('data-undo-through', '');
+      const dialog = document.createElement('div');
+      dialog.setAttribute('aria-modal', 'true');
+      try {
+        await act(async () => { document.body.append(study); await new Promise((r) => setTimeout(r, 20)); });
+        expect(within(cards()[0]).getByRole('button', { name: 'Annulla' })).toHaveTextContent('Ctrl+Z');
+        await act(async () => { study.append(dialog); });
+        await act(async () => { document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true })); });
+        expect(undoNew).not.toHaveBeenCalled();
+        dialog.remove();
+        await act(async () => { document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true })); });
+        expect(undoNew).toHaveBeenCalledOnce();
+      } finally {
+        await act(async () => { study.remove(); });
+      }
+    });
+
+    it('does nothing under another overlay over the workspace (the find overlay of a page, a sheet)', async () => {
+      platform('Win32');
+      const { undoNew } = await two();
+      const overlay = document.createElement('div');
+      overlay.setAttribute('data-find-overlay', '');
+      document.body.append(overlay);
+      await act(async () => { document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true })); });
+      overlay.remove();
+      expect(undoNew).not.toHaveBeenCalled();
+    });
+
     it('hands the focus in the notification it undoes to the next one', async () => {
       platform('Win32');
       await two();

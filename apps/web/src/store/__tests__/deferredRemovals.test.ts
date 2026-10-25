@@ -101,6 +101,18 @@ describe('removing a highlight, behind «Annulla»', () => {
     expect(ids()).toEqual([]);
   });
 
+  it('a DELETE refused after a logout puts nothing back in the emptied store, and says nothing', async () => {
+    let refuse: (e: unknown) => void = () => {};
+    vi.mocked(highlightService.delete).mockReturnValueOnce(new Promise<void>((_, reject) => { refuse = reject; }));
+    appStore.getState().removeHighlight('h2');
+    closeNotification(last().id, 'timeout');
+    appStore.getState().clearUserData();
+    refuse(refused(500));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(ids()).toEqual([]);
+    expect(appStore.getState().lastSyncError).toBeNull();
+  });
+
   it('at logout nothing is sent, now or as the page goes', () => {
     const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
     vi.stubGlobal('fetch', fetchMock);
@@ -151,6 +163,22 @@ describe('removing a highlight: the edges', () => {
       expect(highlightService.delete).not.toHaveBeenCalled();
       answer(created('srv-1'));
       await vi.waitFor(() => expect(highlightService.delete).toHaveBeenCalledWith('srv-1'));
+      expect(ids()).toEqual([]);
+    });
+
+    it('sent by the tab being hidden (a change of tab, the page alive), it is still removed once the server answers', async () => {
+      let answer: (r: never) => void = () => {};
+      vi.mocked(highlightService.create).mockReturnValueOnce(new Promise((resolve) => { answer = resolve; }));
+      vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 204 })));
+      appStore.setState({ highlights: [] });
+      appStore.getState().addHighlight('k', '1453', 'contraenti', '', 'yellow', 30);
+      appStore.getState().removeHighlight(ids()[0]);
+      Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+      document.dispatchEvent(new Event('visibilitychange'));
+      Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+      expect(highlightService.delete).not.toHaveBeenCalled();
+      answer(created('srv-3'));
+      await vi.waitFor(() => expect(highlightService.delete).toHaveBeenCalledWith('srv-3'));
       expect(ids()).toEqual([]);
     });
 
