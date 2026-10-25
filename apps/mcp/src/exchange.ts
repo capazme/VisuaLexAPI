@@ -10,6 +10,8 @@ const QUOTA_WORDS: Record<string, string> = {
   note: 'note scritte',
   trash: 'eliminazioni',
   card: 'schede create',
+  passage: 'passaggi evidenziati',
+  text: 'pagine di testo',
 };
 
 const TOKEN_EXCHANGE = 'urn:ietf:params:oauth:grant-type:token-exchange';
