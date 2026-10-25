@@ -111,9 +111,9 @@ function openMore(row: HTMLElement) {
 const entries = (menu: HTMLElement) => within(menu).getAllByRole('menuitem').map((item) => item.querySelector('span > span')?.textContent ?? item.textContent);
 
 describe('ArticleTabContent variant="beside" — the compact bar (T12)', () => {
-  it('shows exactly notes and highlights in words, and behind «⋯» discussions, the find window and copy', () => {
+  it('shows exactly notes, highlights and their colour in words, and behind «⋯» discussions, the find window and copy', () => {
     const { container } = show('beside');
-    expect(labels(desktopRow(container))).toEqual(['Note', 'Evidenziazioni', 'Altre azioni sull’articolo']);
+    expect(labels(desktopRow(container))).toEqual(['Note', 'Evidenziazioni', 'Colore delle evidenziazioni: giallo', 'Altre azioni sull’articolo']);
     expect(entries(openMore(desktopRow(container)))).toEqual(['Glosse sull’articolo', 'Cerca nel testo', 'Copia']);
   });
 
