@@ -148,7 +148,10 @@ minutes, words and thresholds are inferences.
    tied to scrolling, never a timer that closes the text (reading on screen under time pressure gives the lowest
    comprehension: data). A pause is suggested every 25 minutes or so, as comfort.
 3. **Highlighting** is an aid to attention, for the session only (decided 24 October); reviewing one's own
-   highlights adds nothing (data). It must work from the keyboard and by touch, or leave A1 (§14).
+   highlights adds nothing (data). **The minimal way** (decided 25 October): the user selects words (by mouse,
+   by touch, or from the keyboard with Shift and the arrows) and presses «Evidenzia», a 44 px button that appears
+   beside the selection and is reachable with Tab; «Togli» on a highlight removes it. One colour, no notes,
+   nothing sent (§8).
 4. **Recall after each block, with the text hidden:** a trace («elementi, eccezioni, un caso»), a free text,
    then «Confronta» beside the block; then 2–3 short recall questions (data on retrieval).
 5. **The quiz** at the end: 6–10 questions, at least half of application («qualifica il caso», «quale norma e
@@ -710,7 +713,8 @@ dossier's groups come with their own spec.
 in continuazione. L'importante è lavorare ordinati»). The estimate of §10.13 is a measure of size, not a deadline:
 - **first:** S1, then S2 and M1 in parallel (§10.13), and the web's (a)–(d) built on the agreed contract while
   the server is written;
-- **after A1:** the dossier's groups (the course links its dossier as a whole meanwhile), highlights (§14), A1b;
+- **after A1:** the dossier's groups (the course links its dossier as a whole meanwhile), saved highlights (A2),
+  A1b;
 - **the one dependency to settle:** M1 waits for #318's groups (1b), and without M1 no course can be created.
   The orchestrator proposes that M1 use the single consent of today, with its words rewritten (as G-372 asks),
   so that it no longer waits for 1b: a choice for the owners.
@@ -722,10 +726,8 @@ highlights for the session only. Answered on 25 October («ok», «come raccoman
 at 70% overall and 60% per competence, a new exam from the assistant after three days; «Supera un percorso»
 at 100 XP with the minimums of §11; the dossier kept when its course is deleted; the declaration's text of §12;
 groups in the dossier instead of sections (§7); the server's eight choices of §10.14 (G-377, Q4–Q11, one owner;
-the other's answer awaited); the licence of A3 (G-374) and «Analizza documento» (G-375). Open:
-
-1. **Highlights in A1:** a minimal way from the keyboard and by touch (select, then «Evidenzia»), or out of A1
-   given their low value in the evidence? Recommended: out of A1, back with the author's saved highlights in A2.
+the other's answer awaited); the licence of A3 (G-374) and «Analizza documento» (G-375); highlights kept in A1
+in the minimal way of §5, step 3, for the session only. Nothing else is open on A1's side.
 
 ## 15. Testing
 
@@ -735,7 +737,7 @@ the other's answer awaited); the licence of A3 (G-374) and «Analizza documento�
 - **Web:** «Oggi» with and without a module to suggest; the course page in every state; the session's steps;
   the hybrid open question below 70%; the flag; the exam locked, open, failed and passed; no highlight, free
   recall or open answer in any request body (a test on the bodies); 320 px; keyboard and screen reader on the
-  quiz.
+  quiz; highlighting from the keyboard and, on a real phone, by touch while the lesson scrolls.
 - **Server:** per §10, by the server side; mastery on Rome days around the change of hour; the worked example
   of §4.1 as a test.
 - **A real browser pass** with a course built by an assistant from a long synthetic handout. The owner's own
