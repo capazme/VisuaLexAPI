@@ -108,6 +108,18 @@ export function useArticleTextInteractions(
         });
         return true;
       }
+      // A passage an application proposed, its note still open (D7b): its block's popover, where it is acted on.
+      const proposed = target.closest<HTMLElement>('[data-proposed]');
+      if (proposed && container.contains(proposed)) {
+        const sign = proposed.closest('.vlx-b, .vlx-dec-para')?.querySelector<HTMLElement>(':scope > .vlx-sign');
+        const index = Number(sign?.dataset.block);
+        if (!sign || sign.dataset.block === undefined || !Number.isInteger(index) || index < 0) return false;
+        setState((s) => {
+          const b = base(s);
+          return { ...b, openNote: null, openBlock: index };
+        });
+        return true;
+      }
       const chip = target.closest<HTMLElement>('.vlx-ref');
       if (chip && container.contains(chip)) {
         // A note the reader anchored on the reference itself wins the click:
@@ -135,7 +147,11 @@ export function useArticleTextInteractions(
     };
 
     const onClick = (e: MouseEvent) => {
-      if (e.target instanceof Element && activate(e.target)) e.preventDefault();
+      if (!(e.target instanceof Element) || !activate(e.target)) return;
+      e.preventDefault();
+      // A proposed passage never opens a note's own popover (the reader's handler on the same element, after this one):
+      // a note under it would be edited by half.
+      if (e.target.closest('[data-proposed]')) e.stopImmediatePropagation();
     };
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Enter' && e.key !== ' ') return;

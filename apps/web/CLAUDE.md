@@ -1014,7 +1014,9 @@ passage with no note is a plain mark titled «Evidenziato dall'IA», removable, 
 checkbox (`hasAiNote`). Until its note is validated («da validare» or «Da rivedere», `isOpenProposal`), `highlightOpen` adds
 `data-proposed` and `.vlx-proposed` — a dashed line, red once flagged — and the sign adds the sparkle
 (`.vlx-sign-proposed`) and names them apart («…; 2 passaggi proposti dall'IA: 1 da validare · 1 da rivedere»,
-`signAriaLabel`), as its `title` too; still no text node, and the projection tests run with proposals on. The
+`signAriaLabel`), as its `title` too; still no text node, and the projection tests run with proposals on. A click on
+such a passage opens its block's popover (`useArticleTextInteractions`, in an article's comma or a decision's
+paragraph), never the popover of a note of the reader's under it. The
 popover lists them first, only when given `proposalActions`, as `ProposalCard`s: the passage, its note, then
 `AiReviewControls` — a real checkbox «Proposto dall'IA, confermi?» → «Validato» (or «Validato, modificato da
 te») with the green tick, the flag «Da rivedere» with its optional «Cosa non va?», the pencil (the note edited
