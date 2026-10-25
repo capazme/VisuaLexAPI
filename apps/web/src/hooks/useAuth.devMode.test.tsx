@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 
+// D7b's flag: off here, with no request leaving the test.
+vi.mock('../services/assistantService', () => ({ assistantService: { features: vi.fn(async () => ({ assistantPassages: false })) } }));
 vi.mock('../services/api', () => ({ get: vi.fn(), post: vi.fn(), put: vi.fn() }));
 
 import { get, put } from '../services/api';

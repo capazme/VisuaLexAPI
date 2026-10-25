@@ -89,7 +89,8 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   `docs/superpowers/specs/2026-10-23-mcp-next-tools-design.md` §8) — `omnilex_leggi_testo_voce` (an
   entry's text in parts, as VisuaLex shows it, and the proposals still open; scope `dossier:text`) and
   `omnilex_evidenzia_passaggi_dossier` (1–10 passages quoted verbatim, with an optional note and
-  `prima`/`dopo`; one outcome per passage; one exchanged token with `dossier:write dossier:text`).
+  `prima`/`dopo`; colours `giallo` central point, `verde` condition or premise, `blu` definition or exception,
+  never `rosso`, the user's sign of a note «da rivedere»; one outcome per passage; one exchanged token with `dossier:write dossier:text`).
   Listed only when `apps/server`'s public `GET /features` says `assistantPassages: true`, asked once at
   each session's `initialize` (closed when it cannot say). No tool confirms, validates, edits or removes a
   proposal: the user does, in VisuaLex. A connection made before `dossier:text` existed is asked to sign

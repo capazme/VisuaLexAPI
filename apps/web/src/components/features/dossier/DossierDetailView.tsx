@@ -1,4 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
+import { loadAssistantFeatures } from '../../../store/assistantProposals';
+import { CurrentDossierContext } from './currentDossier';
 import {
   Trash2,
   ArrowLeft,
@@ -123,6 +125,9 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   const [snapshotBusy, setSnapshotBusy] = useState(false);
   const [pdfProgress, setPdfProgress] = useState<{ done: number; total: number } | null>(null);
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
+
+  // D7b: the flag again as the page mounts (it may have been switched since the app started); no polling.
+  useEffect(() => { void loadAssistantFeatures(); }, []);
 
   // Hydrate the snapshot list, or the "• N snapshot" counter reads 0 after a
   // reload even when rows exist. Logged on failure, never hidden (gotcha 18).
@@ -616,6 +621,8 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
   );
 
   return (
+    // The dossier its entries' readers ask the server about (D7b's proposals).
+    <CurrentDossierContext.Provider value={dossier.id}>
     <div className="animate-in slide-in-from-right-10 duration-200">
       {/* The way back, one control at every width (S7c), over the frame. */}
       <button
@@ -882,5 +889,6 @@ export function DossierDetailView({ dossier, onBack, showToast, trash }: Props) 
         </div>
       </PageFrame>
     </div>
+    </CurrentDossierContext.Provider>
   );
 }
