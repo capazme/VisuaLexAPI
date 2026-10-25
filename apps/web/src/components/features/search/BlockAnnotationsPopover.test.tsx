@@ -118,7 +118,7 @@ describe('BlockAnnotationsPopover', () => {
       fireEvent.click(within(dialog).getByRole('button', { name: 'Modifica la nota del passaggio' }));
       const box = within(dialog).getByRole('textbox', { name: 'Nota del passaggio' });
       fireEvent.change(box, { target: { value: 'Il creditore.' } });
-      fireEvent.blur(box);
+      fireEvent.keyDown(box, { key: 'Enter' });
       expect(proposalActions.editNote).toHaveBeenCalledWith('p1', 'Il creditore.');
       fireEvent.click(within(dialog).getByRole('button', { name: 'Rimuovi il passaggio' }));
       expect(proposalActions.remove).toHaveBeenCalledWith('p1');

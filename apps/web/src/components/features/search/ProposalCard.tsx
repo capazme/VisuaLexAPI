@@ -63,7 +63,7 @@ export function ProposalCard({ highlight, onValidate, onFlag, onReviewComment, o
             <p className="line-clamp-3 pr-1.5 text-slate-800 dark:text-slate-200">&ldquo;{highlight.text}&rdquo;</p>
             {draft !== null ? (
                 <div className="mt-1.5 pr-1.5">
-                    <NoteEditBox value={draft} onChange={setDraft} onCommit={commit} onCancel={() => setDraft(null)} label="Nota del passaggio" />
+                    <NoteEditBox value={draft} onChange={setDraft} onCommit={commit} onCancel={() => setDraft(null)} label="Nota del passaggio" explicit />
                 </div>
             ) : note && (
                 <p className="mt-1.5 flex items-start gap-1.5 pr-1.5 text-slate-700 dark:text-slate-300">

@@ -247,6 +247,20 @@ describe('DecisionReadingSurface — notes and highlights', () => {
     expect(addHighlight).toHaveBeenCalledWith(KEY, '', 'ricorso', expect.any(String), 'yellow', 3);
   });
 
+  it('the colour picker suggests what each colour is for, as a hint (D7b)', async () => {
+    const { container } = render(<DecisionReadingSurface identity={IDENTITY} testo={MOTIVAZIONE} attributi={{}} />);
+    await selectText(container, 3, 10);
+    fireEvent.click(await screen.findByTitle('Evidenzia (H)'));
+    const legend = await screen.findByRole('list', { name: 'Uso suggerito dei colori' });
+    expect(within(legend).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+      'giallo: Punto centrale', 'verde: Condizione o presupposto', 'rosso: Da rivedere', 'blu: Definizione o eccezione',
+    ]);
+    // Each swatch says its colour in Italian and what it is suggested for; any may still be chosen for anything.
+    expect(screen.getByRole('button', { name: 'Evidenzia in giallo — Punto centrale' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Evidenzia in rosso — Da rivedere' }));
+    expect(addHighlight).toHaveBeenCalledWith(KEY, '', 'ricorso', expect.any(String), 'red', 3);
+  });
+
   it('anchors a note on the selection, with the composer on the words', async () => {
     const { container } = render(<DecisionReadingSurface identity={IDENTITY} testo={MOTIVAZIONE} attributi={{}} />);
     await selectText(container, 3, 10);

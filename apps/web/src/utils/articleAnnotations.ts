@@ -203,18 +203,18 @@ export const hasAiNote = (h: Highlight): boolean => !!h.proposal?.note;
 export const isOpenProposal = (h: Highlight): boolean => !!h.proposal?.note && h.proposal.note.state !== 'validated';
 
 /**
- * What a screen reader hears on a sign: "2 note e 1 evidenziazione in questo passo". The passages an application
- * proposed and the user has not validated (D7b) come last, apart, in the row's words: "1 nota in questo passo;
- * 2 passaggi proposti dall'IA: 1 da validare · 1 da rivedere". `highlights` leaves them out.
+ * What a screen reader hears on a sign: "2 note e 1 evidenziazione in questo passo". The passages with an
+ * application's note (D7b) come last, apart, in the row's words: "1 nota in questo passo; 3 passaggi proposti
+ * dall'IA: 1 da validare · 1 da rivedere · 1 validato". `highlights` leaves them out.
  */
-export function signAriaLabel(notes: number, highlights: number, threads = 0, proposals: Pick<AiReviewCounts, 'proposed' | 'review'> = { proposed: 0, review: 0 }): string {
+export function signAriaLabel(notes: number, highlights: number, threads = 0, proposals: AiReviewCounts = { proposed: 0, validated: 0, review: 0 }): string {
   const parts: string[] = [];
   if (notes > 0) parts.push(`${notes} ${notes === 1 ? 'nota' : 'note'}`);
   if (highlights > 0) parts.push(`${highlights} ${highlights === 1 ? 'evidenziazione' : 'evidenziazioni'}`);
   if (threads > 0) parts.push(`${threads} ${threads === 1 ? 'glossa' : 'glosse'}`);
-  const open = proposals.proposed + proposals.review;
-  const proposed = open > 0
-    ? `${open} ${open === 1 ? 'passaggio proposto' : 'passaggi proposti'} dall'IA: ${aiReviewSummary({ ...proposals, validated: 0 })}`
+  const all = proposals.proposed + proposals.review + proposals.validated;
+  const proposed = all > 0
+    ? `${all} ${all === 1 ? 'passaggio proposto' : 'passaggi proposti'} dall'IA: ${aiReviewSummary(proposals)}`
     : '';
   if (parts.length === 0) return proposed || 'in questo passo';
   const own = parts.length === 1

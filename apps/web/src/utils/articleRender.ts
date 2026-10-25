@@ -272,21 +272,28 @@ export function signHtml(index: number, group: BlockAnnotations | undefined): st
   const highlights = group?.highlights.length ?? 0;
   const threads = group?.threads.length ?? 0;
   if (!group || notes + highlights + threads === 0) return '';
-  // The passages an application proposed, their notes not yet validated (D7b): the application's sparkle and their
-  // count, named apart; one with no note is a plain mark. `data-highlights` still counts them, so «Nascondi evidenziazioni» hides them with the rest.
-  // Only they give the sign a `title`: the sparkle alone would not say what it is.
-  const counts = countAiReview(group.highlights.flatMap((h) => (h.proposal?.note ? [h.proposal.note.state] : [])));
-  const proposed = counts.proposed + counts.review;
-  const label = signAriaLabel(notes, highlights - proposed, threads, counts);
+  // The passages with an application's note (D7b) are named apart, by their notes' states, and drawn by the state's own
+  // shape, as on the row's light: a dashed ring to validate, a flag to review, a tick validated, each with its count.
+  // Every other highlight (the reader's, an application's mark with no note) is a dot of its colour. `data-highlights`
+  // still counts them all, so «Nascondi evidenziazioni» hides them with the rest; `data-proposed` counts the open ones.
+  // Only they give the sign a `title`: the shapes alone would not say what they are.
+  const noted = group.highlights.filter((h) => h.proposal?.note);
+  const counts = countAiReview(noted.map((h) => h.proposal!.note!.state));
+  const open = counts.proposed + counts.review;
+  const label = signAriaLabel(notes, highlights - noted.length, threads, counts);
   let html =
     `<span class="vlx-sign" role="button" tabindex="0" aria-haspopup="dialog" data-block="${index}"` +
     ` data-notes="${notes}" data-highlights="${highlights}" data-threads="${threads}"` +
-    (proposed > 0 ? ` data-proposed="${proposed}" title="${escapeAttr(label)}"` : '') +
+    (open > 0 ? ` data-proposed="${open}"` : '') +
+    (noted.length > 0 ? ` title="${escapeAttr(label)}"` : '') +
     ` aria-label="${escapeAttr(label)}">`;
   if (notes > 0) html += `<span class="vlx-sign-notes" data-count="${notes}"></span>`;
-  for (const color of signColors(group.highlights)) html += `<span class="vlx-sign-dot" data-color="${color}"></span>`;
+  for (const color of signColors(group.highlights.filter((h) => !h.proposal?.note))) html += `<span class="vlx-sign-dot" data-color="${color}"></span>`;
   if (threads > 0) html += `<span class="vlx-sign-threads" data-count="${threads}"></span>`;
-  if (proposed > 0) html += `<span class="vlx-sign-proposed" data-count="${proposed}"></span>`;
+  // In the order the label says them («1 da validare · 1 da rivedere · 1 validato»).
+  for (const state of ['proposed', 'review', 'validated'] as const) {
+    if (counts[state] > 0) html += `<span class="vlx-sign-ai" data-state="${state}" data-count="${counts[state]}"></span>`;
+  }
   return `${html}</span>`;
 }
 

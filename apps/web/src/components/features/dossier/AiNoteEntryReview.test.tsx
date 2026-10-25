@@ -70,7 +70,10 @@ describe('the notes an application wrote in a dossier (D7b)', () => {
     expect(box).toHaveValue('Sul danno.');
     expect(screen.queryByText('Sul danno.', { selector: 'p' })).toBeNull();
     fireEvent.change(box, { target: { value: 'Sul danno ingiusto.' } });
+    // Leaving the box saves nothing: «Salva» (or Enter) does.
     fireEvent.blur(box);
+    expect(editNoteEntryText).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Salva' }));
     expect(editNoteEntryText).toHaveBeenCalledWith('d1', byApp, 'Sul danno ingiusto.');
   });
 

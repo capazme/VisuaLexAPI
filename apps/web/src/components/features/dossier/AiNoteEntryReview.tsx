@@ -50,7 +50,7 @@ export function AiNoteEntryReview({ note, children, meta, onRemove }: Props) {
   return (
     <>
       {draft !== null
-        ? <NoteEditBox value={draft} onChange={setDraft} onCommit={commit} onCancel={() => setDraft(null)} label="Testo della nota" />
+        ? <NoteEditBox value={draft} onChange={setDraft} onCommit={commit} onCancel={() => setDraft(null)} label="Testo della nota" explicit />
         : children}
       {meta}
       <AiReviewControls

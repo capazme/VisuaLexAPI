@@ -12,6 +12,18 @@ export function highlightColorName(color: string): string {
 }
 
 /**
+ * What each colour is suggested for (D7b): the reader's convention, offered as a hint in the colour picker, never a
+ * rule. Red stands for «Da rivedere», the mark of review; the MCP tool still accepts red from an application, which is
+ * not told these meanings in this cut.
+ */
+export const HIGHLIGHT_COLOR_MEANINGS: Record<HighlightColor, string> = {
+  yellow: 'Punto centrale',
+  green: 'Condizione o presupposto',
+  blue: 'Definizione o eccezione',
+  red: 'Da rivedere',
+};
+
+/**
  * CSS declaration strings ready to inject into `style="..."` attributes
  * when generating HTML from backend/parser output.
  *
