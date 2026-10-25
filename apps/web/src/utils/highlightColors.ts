@@ -13,8 +13,8 @@ export function highlightColorName(color: string): string {
 
 /**
  * What each colour is suggested for (D7b): the reader's convention, offered as a hint in the colour picker, never a
- * rule. Red stands for «Da rivedere», the mark of review; the MCP tool still accepts red from an application, which is
- * not told these meanings in this cut.
+ * rule. The same meanings the MCP tool gives an application; red stands for «Da rivedere», the mark of review, and an
+ * application never proposes in red.
  */
 export const HIGHLIGHT_COLOR_MEANINGS: Record<HighlightColor, string> = {
   yellow: 'Punto centrale',

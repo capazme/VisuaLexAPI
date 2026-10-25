@@ -1035,8 +1035,8 @@ The colour picker (`SelectionPopup`) suggests what each colour is for (`HIGHLIGH
 centrale», green «Condizione o presupposto», blue «Definizione o eccezione», red «Da rivedere»): the reader's convention,
 a hint above the four swatches (so a popup clipped at the top loses the hint, not the controls; sideways the popup
 is moved 8 px inside the window by its measured box, a `marginLeft` set as it is drawn), each swatch named in
-Italian with its meaning, any colour still free for anything. The MCP tool still accepts red from an application and
-does not tell it these meanings in this cut.
+Italian with its meaning, any colour still free for anything. The MCP tool gives an application the same meanings and
+refuses red (`apps/mcp/src/tools/passages.ts`).
 
 The wiring follows the server's contract (`services/assistantService.ts`). `GET /api/features` says whether the
 feature is on, read as the app starts (`useAuth`) and as the dossier page mounts; a 404 «Non disponibile» from a
