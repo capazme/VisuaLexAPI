@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Sparkles, Trash2 } from 'lucide-react';
 import type { Highlight, HighlightProposal } from '../../../types';
 import { getHighlightSwatch } from '../../../utils/highlightColors';
@@ -15,6 +15,12 @@ export interface ProposalCardProps {
     onEditNote: (text: string) => void;
     /** The bin: the caller removes the passage and offers «Annulla» in its notice. */
     onRemove: () => void;
+    /** Whether its note is being edited, and changed: the popover then keeps open on an outside press, and asks. */
+    onDraftState?: (state: 'none' | 'clean' | 'dirty') => void;
+    /** The popover wants to close over a changed draft: the card asks «Scartare la modifica?». */
+    closeRequested?: boolean;
+    /** The answer: discarded (the popover may close) or kept (it stays). */
+    onCloseAnswer?: (discarded: boolean) => void;
 }
 
 /**
@@ -23,11 +29,20 @@ export interface ProposalCardProps {
  * change makes it «Validato, modificato da te». A passage with no note is a mark of known origin: «Evidenziato
  * dall'IA» and the bin, nothing to validate.
  */
-export function ProposalCard({ highlight, onValidate, onFlag, onReviewComment, onEditNote, onRemove }: ProposalCardProps) {
+export function ProposalCard({
+    highlight, onValidate, onFlag, onReviewComment, onEditNote, onRemove, onDraftState, closeRequested = false, onCloseAnswer,
+}: ProposalCardProps) {
     const { proposal } = highlight;
     const aiNote = proposal.note;
     const note = aiNote?.text.trim() ?? '';
     const [draft, setDraft] = useState<string | null>(null);
+    const draftState = draft === null ? 'none' : draft.trim() !== note ? 'dirty' : 'clean';
+    // The latest callback, so a new function each render reports nothing again.
+    const reportRef = useRef(onDraftState);
+    useEffect(() => { reportRef.current = onDraftState; });
+    useEffect(() => { reportRef.current?.(draftState); }, [draftState]);
+    // Gone with its card (removed, the popover closed): no draft left behind in the popover's count.
+    useEffect(() => () => reportRef.current?.('none'), []);
     const busy = assistantProposalsStore((s) => !!s.busy[highlight.id]);
     const commit = () => {
         const text = draft?.trim() ?? '';
@@ -63,7 +78,20 @@ export function ProposalCard({ highlight, onValidate, onFlag, onReviewComment, o
             <p className="line-clamp-3 pr-1.5 text-slate-800 dark:text-slate-200">&ldquo;{highlight.text}&rdquo;</p>
             {draft !== null ? (
                 <div className="mt-1.5 pr-1.5">
-                    <NoteEditBox value={draft} onChange={setDraft} onCommit={commit} onCancel={() => setDraft(null)} label="Nota del passaggio" />
+                    <NoteEditBox
+                        value={draft}
+                        onChange={setDraft}
+                        onCommit={commit}
+                        onCancel={() => {
+                            setDraft(null);
+                            if (closeRequested) onCloseAnswer?.(true);
+                        }}
+                        label="Nota del passaggio"
+                        explicit
+                        dirty={draftState === 'dirty'}
+                        confirmDiscard={closeRequested}
+                        onKeep={() => onCloseAnswer?.(false)}
+                    />
                 </div>
             ) : note && (
                 <p className="mt-1.5 flex items-start gap-1.5 pr-1.5 text-slate-700 dark:text-slate-300">

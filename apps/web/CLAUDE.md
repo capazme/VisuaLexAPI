@@ -1011,21 +1011,32 @@ server's contract for the first cut revises it) are highlights with a `proposal`
 ever given one. The state is the application's note's, not the highlight's: a
 passage with no note is a plain mark titled «Evidenziato dall'IA», removable, outside every count and with no
 checkbox (`hasAiNote`). Until its note is validated («da validare» or «Da rivedere», `isOpenProposal`), `highlightOpen` adds
-`data-proposed` and `.vlx-proposed` — a dashed line, red once flagged — and the sign adds the sparkle
-(`.vlx-sign-proposed`) and names them apart («…; 2 passaggi proposti dall'IA: 1 da validare · 1 da rivedere»,
-`signAriaLabel`), as its `title` too; still no text node, and the projection tests run with proposals on. A click on
+`data-proposed` and `.vlx-proposed` — a dashed line, red once flagged. The sign draws each passage with an
+application's note by its state's own shape, as on the row's light (`.vlx-sign-ai`: a filled red flag, a yellow dashed
+ring, a green tick, each with its count; the other highlights stay dots of their colour) and names them apart
+(«…; 3 passaggi proposti dall'IA: 1 da validare · 1 da rivedere · 1 validato», `signAriaLabel`), as its `title` too; still no text node, and the projection tests run with proposals on. A click on
 such a passage opens its block's popover (`useArticleTextInteractions`, in an article's comma or a decision's
 paragraph), unless it lands on something with a click of its own (a reference, a citation, a link) or the
 highlights are hidden; the readers' note handlers skip what `proposedPassageAt` returns, whatever order the listeners were added in,
 so a note of the reader's under it never opens. The
 popover lists them first, only when given `proposalActions`, as `ProposalCard`s: the passage, its note, then
 `AiReviewControls` — a real checkbox «Proposto dall'IA, confermi?» → «Validato» (or «Validato, modificato da
-te») with the green tick, the flag «Da rivedere» with its optional «Cosa non va?», the pencil (the note edited
-in place in `NoteEditBox`, shared with `NoteCard`), the bin, and «Vedi la versione dell'IA» once the note was
+te») with the green tick, «Da rivedere» while flagged, the flag «Da rivedere» with its optional «Cosa non va?», the pencil (the note edited
+in place in `NoteEditBox`, shared with `NoteCard`, here `explicit`: «Salva» and «Annulla» under it, Enter saves,
+Shift+Enter a new line, Esc cancels without closing the popover, leaving the box saves nothing; a changed text is
+never dropped without «Scartare la modifica?» — «Continua» or «Scarta» —, asked by «Annulla» or Esc, and by the
+popover's X, Esc or «Vai al passo», which a press outside never closes while a note is edited), the bin, and «Vedi la versione dell'IA» once the note was
 changed. A shape per state, never colour alone. The dossier's rows carry the traffic light (`AiReviewSignal`,
 `utils/aiReview.ts`): a red flag if one item is to review, else a yellow dashed ring if one waits, else a green
 tick, nothing if the application wrote nothing; its words («2 da validare · 1 da rivedere») are its `title` and
 in the row's name, its counts the server's `assistant_notes` on the item (`serverFieldsFromApi`).
+
+The colour picker (`SelectionPopup`) suggests what each colour is for (`HIGHLIGHT_COLOR_MEANINGS`: yellow «Punto
+centrale», green «Condizione o presupposto», blue «Definizione o eccezione», red «Da rivedere»): the reader's convention,
+a hint above the four swatches (so a popup clipped at the top loses the hint, not the controls; sideways the popup
+is moved 8 px inside the window by its measured box, a `marginLeft` set as it is drawn), each swatch named in
+Italian with its meaning, any colour still free for anything. The MCP tool gives an application the same meanings and
+refuses red (`apps/mcp/src/tools/passages.ts`).
 
 The wiring follows the server's contract (`services/assistantService.ts`). `GET /api/features` says whether the
 feature is on, read as the app starts (`useAuth`) and as the dossier page mounts; a 404 «Non disponibile» from a

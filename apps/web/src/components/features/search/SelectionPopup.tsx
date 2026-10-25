@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { Highlighter, StickyNote, Copy, Search, Flag, MessageCircle, GraduationCap, X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
-import { HIGHLIGHT_COLORS, getHighlightSwatch, type HighlightColor } from '../../../utils/highlightColors';
+import { HIGHLIGHT_COLORS, HIGHLIGHT_COLOR_MEANINGS, getHighlightSwatch, highlightColorName, type HighlightColor } from '../../../utils/highlightColors';
 import { getSelectionAnchor } from '../../../utils/selectionOffset';
 
 interface SelectionPopupProps {
@@ -129,6 +129,21 @@ export function SelectionPopup({
       });
     }, 10);
   }, [containerRef, textRootRef, hidePopup]);
+
+  // Moved sideways to stay 8 px inside the window, from its measured box, once drawn and again when it changes size or
+  // place: the colour picker with its legend is far wider than the 160 px the position's clamp supposes (D7b), and a
+  // phone's edge cut its close button. A style written on the element, not state: nothing else draws again.
+  useLayoutEffect(() => {
+    const el = popupRef.current;
+    if (!popup.visible || !el) return;
+    el.style.marginLeft = '0px';
+    const box = el.getBoundingClientRect();
+    const margin = 8;
+    let nudge = 0;
+    if (box.left < margin) nudge = margin - box.left;
+    else if (box.right > window.innerWidth - margin) nudge = window.innerWidth - margin - box.right;
+    el.style.marginLeft = `${nudge}px`;
+  }, [popup.visible, popup.x, popup.y, showColorPicker]);
 
   // Handle mousedown outside popup to hide it
   useEffect(() => {
@@ -268,23 +283,43 @@ export function SelectionPopup({
       <div className="bg-slate-900 dark:bg-slate-800 text-white rounded-lg shadow-md border border-slate-700 overflow-hidden">
         {showColorPicker ? (
           /* Color picker view */
-          <div className="p-2 flex items-center gap-1">
-            <button
-              onClick={() => setShowColorPicker(false)}
-              className="p-1.5 rounded hover:bg-slate-700 text-slate-400"
+          <div className="p-2">
+            {/* What each colour is suggested for (D7b): a hint, any colour may be chosen for anything. Above the swatches,
+                so a popup clipped at the top loses the hint, never the controls. One column on a phone, two from sm. */}
+            <ul
+              role="list"
+              aria-label="Uso suggerito dei colori"
+              className="mb-1.5 grid grid-cols-1 gap-x-3 gap-y-0.5 border-b border-slate-700 pb-1.5 text-[11px] text-slate-300 sm:grid-cols-2"
             >
-              <X size={14} />
-            </button>
-            <div className="w-px h-5 bg-slate-700 mx-1" />
-            {HIGHLIGHT_COLORS.map((color) => (
+              {HIGHLIGHT_COLORS.map((color) => (
+                <li key={color} className="flex min-w-0 items-center gap-1.5 sm:whitespace-nowrap">
+                  <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: getHighlightSwatch(color) }} />
+                  <span className="sr-only">{highlightColorName(color)}: </span>
+                  {HIGHLIGHT_COLOR_MEANINGS[color]}
+                </li>
+              ))}
+            </ul>
+            <div className="flex items-center gap-1">
               <button
-                key={color}
-                onClick={() => handleHighlightColor(color)}
-                className="w-7 h-7 rounded-full border-2 border-white/40 transition-transform [@media(hover:hover)_and_(pointer:fine)]:hover:scale-110 hover:ring-2 hover:ring-white/60"
-                style={{ backgroundColor: getHighlightSwatch(color) }}
-                title={`Evidenzia in ${color}`}
-              />
-            ))}
+                onClick={() => setShowColorPicker(false)}
+                aria-label="Chiudi i colori"
+                className="p-1.5 rounded hover:bg-slate-700 text-slate-400"
+              >
+                <X size={14} />
+              </button>
+              <div className="w-px h-5 bg-slate-700 mx-1" />
+              {HIGHLIGHT_COLORS.map((color) => (
+                <button
+                  key={color}
+                  onClick={() => handleHighlightColor(color)}
+                  // Named in Italian with what it is suggested for; 44 px on a touch screen.
+                  aria-label={`Evidenzia in ${highlightColorName(color)} — ${HIGHLIGHT_COLOR_MEANINGS[color]}`}
+                  className="h-11 w-11 rounded-full border-2 border-white/40 transition-transform md:h-7 md:w-7 [@media(hover:hover)_and_(pointer:fine)]:hover:scale-110 hover:ring-2 hover:ring-white/60"
+                  style={{ backgroundColor: getHighlightSwatch(color) }}
+                  title={`Evidenzia in ${color}`}
+                />
+              ))}
+            </div>
           </div>
         ) : (
           /* Main actions */

@@ -44,8 +44,8 @@ const ACTION = 'flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-cen
 
 /**
  * What the user does with an item an application wrote (D7b, its note's three states): a real checkbox, «Proposto dall'IA,
- * confermi?», ticked «Validato» with the green tick (or «Validato, modificato da te»); then the flag «Da rivedere», with
- * its short «Cosa non va?» below; the pencil; the bin. Once the text was changed, «Vedi la versione dell'IA» shows the
+ * confermi?», ticked «Validato» with the green tick (or «Validato, modificato da te»), «Da rivedere» while flagged and
+ * still the way to validate; then the flag «Da rivedere», with its short «Cosa non va?» below; the pencil; the bin. Once the text was changed, «Vedi la versione dell'IA» shows the
  * application's own beside it. Each state has its own shape — the tick, the flag, the empty box — never colour alone.
  */
 export function AiReviewControls({
@@ -99,6 +99,8 @@ export function AiReviewControls({
                     <input
                         type="checkbox"
                         checked={validated}
+                        // Flagged, not the flag's own name: what ticking it does is said too.
+                        aria-label={flagged ? 'Da rivedere, spunta per validare' : undefined}
                         aria-disabled={busy || undefined}
                         onChange={(e) => { if (!busy) onValidate(e.target.checked); }}
                         className="peer sr-only"
@@ -113,8 +115,9 @@ export function AiReviewControls({
                     >
                         {validated && <Check size={14} strokeWidth={3} className="text-emerald-600 dark:text-emerald-400" />}
                     </span>
-                    <span className={cn('text-xs font-medium', validated ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300')}>
-                        {validated ? (edited ? 'Validato, modificato da te' : 'Validato') : "Proposto dall'IA, confermi?"}
+                    {/* On a flagged note it says so, still the checkbox that validates it. */}
+                    <span className={cn('text-xs font-medium', validated ? 'text-emerald-700 dark:text-emerald-400' : flagged ? 'text-red-700 dark:text-red-400' : 'text-slate-700 dark:text-slate-300')}>
+                        {validated ? (edited ? 'Validato, modificato da te' : 'Validato') : flagged ? 'Da rivedere' : "Proposto dall'IA, confermi?"}
                     </span>
                 </label>
                 <div className="ml-auto flex">

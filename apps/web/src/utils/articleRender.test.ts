@@ -346,7 +346,7 @@ describe('annotation signs', () => {
     expect(div.querySelectorAll('.vlx-sign')).toHaveLength(1);
   });
 
-  it('names the passages an application proposed apart on the sign, with its sparkle and a title (D7b)', () => {
+  it('names the passages with an application\'s note apart on the sign, each state by its own shape, with a title (D7b)', () => {
     const as = (state: 'proposed' | 'review' | 'validated') => (h: Highlight): Highlight => ({ ...h, proposal: { clientName: 'Claude Code', note: aiNote('Rileva.', state) } });
     const div = mount(render(raw, {
       signs: true,
@@ -358,12 +358,15 @@ describe('annotation signs', () => {
       ],
     }));
     const sign = signOf(div, 2)!;
-    const label = "1 nota e 1 evidenziazione in questo passo; 2 passaggi proposti dall'IA: 1 da validare · 1 da rivedere";
+    const label = "1 nota in questo passo; 3 passaggi proposti dall'IA: 1 da validare · 1 da rivedere · 1 validato";
     expect(sign.getAttribute('aria-label')).toBe(label);
     expect(sign.getAttribute('title')).toBe(label);
     expect(sign.getAttribute('data-highlights')).toBe('3');
     expect(sign.getAttribute('data-proposed')).toBe('2');
-    expect(sign.querySelector('.vlx-sign-proposed')?.getAttribute('data-count')).toBe('2');
+    // A shape per state, as on the row's light, in the light's order; no colour dot for them.
+    expect(pieces(sign, '.vlx-sign-ai').map((e) => `${e.getAttribute('data-state')}:${e.getAttribute('data-count')}`))
+      .toEqual(['proposed:1', 'review:1', 'validated:1']);
+    expect(sign.querySelectorAll('.vlx-sign-dot')).toHaveLength(0);
     expect(sign.textContent).toBe('');
     // In the text: the open ones dashed and named by their state, the validated one as the user's own.
     for (const [id, state, title] of [['p1', 'proposed', 'da validare'], ['p2', 'review', 'da rivedere']]) {
@@ -388,6 +391,9 @@ describe('annotation signs', () => {
     const sign = signOf(div, 2)!;
     expect(sign.getAttribute('aria-label')).toBe('1 evidenziazione in questo passo');
     expect(sign.hasAttribute('data-proposed')).toBe(false);
+    // A dot of its colour, as the reader's own.
+    expect(pieces(sign, '.vlx-sign-dot').map((d) => d.getAttribute('data-color'))).toEqual(['yellow']);
+    expect(sign.querySelector('.vlx-sign-ai')).toBeNull();
   });
 
   it('a block with proposals only is named by them alone; a sign without any keeps no title', () => {
@@ -397,7 +403,7 @@ describe('annotation signs', () => {
     const plainSign = signOf(mount(render(raw, { signs: true, highlights: [hl('h', 'contraenti', at('contraenti'))] })), 2)!;
     expect(plainSign.hasAttribute('title')).toBe(false);
     expect(plainSign.hasAttribute('data-proposed')).toBe(false);
-    expect(plainSign.querySelector('.vlx-sign-proposed')).toBeNull();
+    expect(plainSign.querySelector('.vlx-sign-ai')).toBeNull();
   });
 
   it('adds no text: the sign is empty and sits after the block\'s text, outside every mark', () => {

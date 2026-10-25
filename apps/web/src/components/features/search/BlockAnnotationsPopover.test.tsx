@@ -118,7 +118,7 @@ describe('BlockAnnotationsPopover', () => {
       fireEvent.click(within(dialog).getByRole('button', { name: 'Modifica la nota del passaggio' }));
       const box = within(dialog).getByRole('textbox', { name: 'Nota del passaggio' });
       fireEvent.change(box, { target: { value: 'Il creditore.' } });
-      fireEvent.blur(box);
+      fireEvent.keyDown(box, { key: 'Enter' });
       expect(proposalActions.editNote).toHaveBeenCalledWith('p1', 'Il creditore.');
       fireEvent.click(within(dialog).getByRole('button', { name: 'Rimuovi il passaggio' }));
       expect(proposalActions.remove).toHaveBeenCalledWith('p1');
@@ -156,6 +156,56 @@ describe('BlockAnnotationsPopover', () => {
       expect(box).toBeChecked();
       fireEvent.click(box);
       expect(proposalActions.validate).toHaveBeenCalledWith('p1', false);
+    });
+
+    describe('a note being edited is never lost', () => {
+      const editIt = async (text?: string) => {
+        const dialog = await screen.findByRole('dialog', { name: TITLE });
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Modifica la nota del passaggio' }));
+        const box = within(dialog).getByRole('textbox', { name: 'Nota del passaggio' });
+        if (text !== undefined) fireEvent.change(box, { target: { value: text } });
+        return { dialog, box };
+      };
+
+      it('a press outside leaves the popover open while it is edited, changed or not', async () => {
+        const { props } = setup([p1], [], { proposalActions: actions() });
+        await editIt();
+        fireEvent.pointerDown(document.body);
+        fireEvent.mouseDown(document.body);
+        fireEvent.click(document.body);
+        expect(props.onClose).not.toHaveBeenCalled();
+      });
+
+      it('changed, the X asks first; «Continua» keeps it open on the text, «Scarta» closes', async () => {
+        const { props } = setup([p1], [], { proposalActions: actions() });
+        const { dialog, box } = await editIt('Il creditore sceglie.');
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Chiudi annotazioni' }));
+        expect(props.onClose).not.toHaveBeenCalled();
+        expect(within(dialog).getByRole('alert')).toHaveTextContent('Scartare la modifica?');
+        expect(within(dialog).getByRole('button', { name: 'Continua' })).toHaveFocus();
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Continua' }));
+        expect(props.onClose).not.toHaveBeenCalled();
+        expect(box).toHaveFocus();
+        expect(box).toHaveValue('Il creditore sceglie.');
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Chiudi annotazioni' }));
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Scarta' }));
+        expect(props.onClose).toHaveBeenCalled();
+      });
+
+      it('changed, Esc outside the box asks too', async () => {
+        const { props } = setup([p1], [], { proposalActions: actions() });
+        const { dialog } = await editIt('Il creditore sceglie.');
+        fireEvent.keyDown(document, { key: 'Escape' });
+        expect(props.onClose).not.toHaveBeenCalled();
+        expect(within(dialog).getByRole('alert')).toHaveTextContent('Scartare la modifica?');
+      });
+
+      it('unchanged, the X closes at once', async () => {
+        const { props } = setup([p1], [], { proposalActions: actions() });
+        const { dialog } = await editIt();
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Chiudi annotazioni' }));
+        expect(props.onClose).toHaveBeenCalled();
+      });
     });
 
     it('a reader that cannot act on them lists none apart', async () => {

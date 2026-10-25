@@ -50,8 +50,13 @@ describe('AiReviewControls', () => {
     const flag = screen.getByRole('button', { name: 'Da rivedere' });
     expect(flag).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByText('Da rivedere', { selector: 'p' })).toBeInTheDocument();
-    // Still unticked: the checkbox validates from here too.
-    expect(screen.getByRole('checkbox', { name: "Proposto dall'IA, confermi?" })).not.toBeChecked();
+    // Still unticked, and it says «Da rivedere»: the checkbox validates from here too.
+    // Not the flag's name: what ticking it does is said too.
+    const box = screen.getByRole('checkbox', { name: 'Da rivedere, spunta per validare' });
+    expect(box.closest('label')).toHaveTextContent(/^Da rivedere$/);
+    expect(box).not.toBeChecked();
+    fireEvent.click(box);
+    expect(props.onValidate).toHaveBeenCalledWith(true);
     fireEvent.click(flag);
     expect(props.onFlag).toHaveBeenLastCalledWith(false);
   });

@@ -154,9 +154,11 @@ describe('signColors and signAriaLabel', () => {
     expect(signAriaLabel(0, 3)).toBe('3 evidenziazioni in questo passo');
     expect(signAriaLabel(0, 0, 1)).toBe('1 glossa in questo passo');
     expect(signAriaLabel(2, 1, 3)).toBe('2 note, 1 evidenziazione e 3 glosse in questo passo');
-    expect(signAriaLabel(0, 0, 0, { proposed: 1, review: 0 })).toBe("1 passaggio proposto dall'IA: 1 da validare");
-    expect(signAriaLabel(1, 0, 0, { proposed: 1, review: 1 })).toBe("1 nota in questo passo; 2 passaggi proposti dall'IA: 1 da validare · 1 da rivedere");
-    expect(signAriaLabel(2, 1, 3, { proposed: 0, review: 1 })).toBe("2 note, 1 evidenziazione e 3 glosse in questo passo; 1 passaggio proposto dall'IA: 1 da rivedere");
+    expect(signAriaLabel(0, 0, 0, { proposed: 1, validated: 0, review: 0 })).toBe("1 passaggio proposto dall'IA: 1 da validare");
+    expect(signAriaLabel(1, 0, 0, { proposed: 1, validated: 0, review: 1 })).toBe("1 nota in questo passo; 2 passaggi proposti dall'IA: 1 da validare · 1 da rivedere");
+    expect(signAriaLabel(2, 1, 3, { proposed: 0, validated: 0, review: 1 })).toBe("2 note, 1 evidenziazione e 3 glosse in questo passo; 1 passaggio proposto dall'IA: 1 da rivedere");
+    // The validated ones too: the sign still shows them, by their tick.
+    expect(signAriaLabel(0, 0, 0, { proposed: 0, validated: 2, review: 0 })).toBe("2 passaggi proposti dall'IA: 2 validati");
   });
 });
 
