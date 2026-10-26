@@ -12,6 +12,26 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.10.4] - 2026-10-26
+
+The web only: undo for removed highlights and notes, the highlight colour
+chosen once, and the touch-ups from a real phone. No migration, no server
+change.
+
+### Reading
+
+- «Annulla» (and Ctrl/Cmd+Z, also over Study Mode) when removing a highlight
+  or a note: the removal reaches the server only when the notification closes.
+- H1: the highlight colour is chosen once in the reading bar and every new
+  highlight uses it; a short legend suggests a meaning for each colour.
+- In Study Mode «H» with text selected no longer moves to the previous article.
+
+### Phone
+
+- 44 px targets in the reader, in Settings and on the group marks in the text
+  (touch area only), contrast fixes, Cronologia at 392 px, the sign-in margin,
+  the 404 bar; the favourites dash in the sidebar removed.
+
 ## [1.10.3] - 2026-10-25
 
 Passages and notes an assistant proposes in a dossier, validated by hand (D7b,
