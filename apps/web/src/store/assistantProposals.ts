@@ -198,9 +198,15 @@ export function editProposalNote(dossierId: string, itemId: string, proposalId: 
   return write(dossierId, itemId, proposalId, () => assistantService.editProposalNote(dossierId, itemId, proposalId, text));
 }
 
+// Sent as the page goes (`pagehide`) or is hidden (`visibilitychange`): a phone's browser often discards a tab in the
+// background without a `pagehide`. The cost: «Annulla» is gone once the tab is hidden (as `deferredRemovals`).
 if (typeof window !== 'undefined') {
-  window.addEventListener('pagehide', () => {
+  const sendAllOnExit = () => {
     for (const { send } of [...pendingRemovals.values()]) send(true);
+  };
+  window.addEventListener('pagehide', sendAllOnExit);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') sendAllOnExit();
   });
 }
 
@@ -248,6 +254,7 @@ export function removeProposal(dossierId: string, itemId: string, proposalId: st
       return;
     }
     removalsInFlight.add(proposalId);
+    const asked = generation;
     const gone = () => {
       removalsInFlight.delete(proposalId);
       // A reading made before the answer may still have drawn it: it is gone now.
@@ -258,6 +265,8 @@ export function removeProposal(dossierId: string, itemId: string, proposalId: st
     assistantService.removeProposal(dossierId, itemId, proposalId)
       .then(gone)
       .catch((error) => {
+        // Answered after a logout: nothing of it goes back into the next account's store.
+        if (asked !== generation) return;
         // Already gone from the server: what was wanted, no error and nothing put back.
         if (isGone(error)) return gone();
         removalsInFlight.delete(proposalId);

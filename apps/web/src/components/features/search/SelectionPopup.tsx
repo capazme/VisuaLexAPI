@@ -137,7 +137,10 @@ export function SelectionPopup({
     const el = popupRef.current;
     if (!popup.visible || !el) return;
     el.style.marginLeft = '0px';
-    const box = el.getBoundingClientRect();
+    // The box drawn. The positioning element is `w-max` (absolute in a narrow container it shrank to the room left
+    // while the box inside kept its width, and its centring took half the shrunk width: 149–398 in a 390 px window);
+    // the box is measured all the same, should anything else ever size that element.
+    const box = (el.firstElementChild ?? el).getBoundingClientRect();
     const margin = 8;
     let nudge = 0;
     if (box.left < margin) nudge = margin - box.left;
@@ -269,7 +272,8 @@ export function SelectionPopup({
     <div
       ref={popupRef}
       className={cn(
-        'absolute transform -translate-x-1/2 -translate-y-full',
+        // As wide as what it holds, not as the room left in its container: centred on the selection as it is.
+        'absolute w-max max-w-[calc(100vw-16px)] transform -translate-x-1/2 -translate-y-full',
         'animate-in fade-in zoom-in-95 duration-150',
         Z_INDEX.floating
       )}

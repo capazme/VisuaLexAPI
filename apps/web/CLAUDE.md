@@ -639,13 +639,15 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   back. Its «Annulla» and ✕ are 44 px at every width. **Ctrl+Z (⌘Z on a Mac)** runs the newest «Annulla» still on screen
   (L-36; `undoShortcut.ts`, the host's `keydown` on `window`): never in a field, a list, an editor or anything
   editable (`isEditableTarget`: there it is the browser's own undo), never with Shift (redo), never when something
-  took the key first, never under a dialog or an overlay (`isWorkspaceCovered`: an undo behind it would go unseen),
+  took the key first, never under a dialog or an overlay (`isUndoCovered`: an undo behind it would go unseen) — but
+  over Study Mode, drawn under the notifications (`data-undo-through`), it undoes, and under a dialog over it it does not —,
   once for a held key (`repeat`), Z read by its place on a keyboard that writes no Latin letter; with no «Annulla» on
   screen the key goes by. «Ripristinato» comes as after a click, and once the undo has run the live region says
   «Ripristinato: <what was undone>» in its place (one message: two in a row on an atomic region, the first is lost);
   the focus in the notification undone goes to the next one, as after Esc. That notification writes the key beside its «Annulla» («Annulla · Ctrl+Z»,
   seen, not in the name; `aria-keyshortcuts`) where the pointer is not coarse and nothing covers the workspace
-  (`useWorkspaceCovered`, watched only while an «Annulla» is on screen: under a dialog the key does nothing); the
+  (`useWorkspaceCovered(…, isUndoCovered)`, watched only while an «Annulla» is on screen: under a dialog the key does
+  nothing); the
   shortcuts' list has it.
   `registerUndoToastListener` hands the newest «Annulla» on screen to a test. `Tooltip` waits 500 ms under a pointer, opens at once and
   without motion within 300 ms of another closing, and at once on keyboard focus.
@@ -1034,7 +1036,8 @@ in the row's name, its counts the server's `assistant_notes` on the item (`serve
 The colour picker (`SelectionPopup`) suggests what each colour is for (`HIGHLIGHT_COLOR_MEANINGS`: yellow «Punto
 centrale», green «Condizione o presupposto», blue «Definizione o eccezione», red «Da rivedere»): the reader's convention,
 a hint above the four swatches (so a popup clipped at the top loses the hint, not the controls; sideways the popup
-is moved 8 px inside the window by its measured box, a `marginLeft` set as it is drawn), each swatch named in
+is moved 8 px inside the window by its drawn box — the positioning element's first child, the positioning element
+being `w-max` — a `marginLeft` set as it is drawn), each swatch named in
 Italian with its meaning, any colour still free for anything. The MCP tool gives an application the same meanings and
 refuses red (`apps/mcp/src/tools/passages.ts`).
 
@@ -2355,7 +2358,18 @@ coherent.
 people (K1a, the owner's L-35): an action whose «Annulla» puts everything back on the
 server (the 30-day trash, or a write held until the notification is gone, as an import
 of more than 100 articles from an act's index) asks nothing and offers «Annulla»
-(`showUndoToast`); browser-only state (the practices) likewise. A held write checks, when it runs, that
+(`showUndoToast`); browser-only state (the practices) likewise. Removing a highlight or a note of the reader's
+(`removeHighlight`, `removeAnnotation`) is held behind «Annulla» too, with its own rules (`store/deferredRemovals.ts`,
+the D7b bin's pattern, no `beforeunload`): off the screen at once, «Evidenziazione rimossa» / «Nota rimossa», the
+`DELETE` sent as the notification closes, or at once as the page goes or is hidden (`pagehide`, `visibilitychange`: a
+phone may discard a tab in the background unannounced; a `keepalive` fetch, the token refreshed as it was removed), so
+«Annulla» is gone once the tab is hidden. «Annulla» puts it back where it was; a refused `DELETE` puts it back with the
+sync error, a 404 is a removal done. One made and removed before the server answered is removed under the id the server
+gives it, or not at all if its creation failed; sent by the tab being hidden it still waits for that id (the page lives
+on: a desktop's change of tab). A reading meanwhile — the reader's, the PDF's, a Forum publication's
+(`loadPdfMarks`) — leaves out what waits or is out (`isRemovalPending`); a logout drops it unsent, and an answer still out for one sent
+before puts nothing back in the emptied store (`forgetRemovals` in `clearUserData`). The D7b bin
+(`assistantProposals`) sends at `visibilitychange` too, and takes no answer after a logout either (`generation`). A held write checks, when it runs, that
 its target is still there (the import does not write into a dossier deleted meanwhile), and while it waits the
 browser asks before the page is left (`beforeunload`). Otherwise never
 `window.confirm`: use `components/ui/ConfirmDialog` with `variant="danger"`, and word
