@@ -1028,7 +1028,8 @@ never dropped without «Scartare la modifica?» — «Continua» or «Scarta» �
 popover's X, Esc or «Vai al passo», which a press outside never closes while a note is edited), the bin, and «Vedi la versione dell'IA» once the note was
 changed. A shape per state, never colour alone. The dossier's rows carry the traffic light (`AiReviewSignal`,
 `utils/aiReview.ts`): a red flag if one item is to review, else a yellow dashed ring if one waits, else a green
-tick, nothing if the application wrote nothing; its words («2 da validare · 1 da rivedere») are its `title` and
+tick, nothing if the application wrote nothing — last in the row's toggle, in a box as tall as the star and the bin
+(`ROW_SIGN`), its sign on their line; its words («2 da validare · 1 da rivedere») are its `title` and
 in the row's name, its counts the server's `assistant_notes` on the item (`serverFieldsFromApi`).
 
 The colour picker (`SelectionPopup`) suggests what each colour is for (`HIGHLIGHT_COLOR_MEANINGS`: yellow «Punto

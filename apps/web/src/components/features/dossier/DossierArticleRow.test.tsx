@@ -124,6 +124,16 @@ describe('DossierArticleRow notes', () => {
     expect(screen.getByRole('button', { name: 'Comprimi codice civile 262 articolo 2043, 2 da validare · 1 da rivedere' })).toBeInTheDocument();
   });
 
+  it('sits its light on the line of the star and the bin: in a box as tall as they are, centred, in the row\'s toggle', () => {
+    renderRow({ ...normaItem, assistantNotes: { proposed: 1, validated: 0, review: 0 } }, { notes });
+    const box = screen.getByTitle('1 da validare').parentElement!;
+    const star = screen.getByRole('button', { name: 'Segna come importante' });
+    // As tall as the buttons (h-11), across the toggle's py-2.5, its sign centred: once 4 px higher than the star.
+    expect(box).toHaveClass('h-11', '-my-2.5', 'items-center');
+    expect(star).toHaveClass('h-11');
+    expect(box.parentElement).toHaveAttribute('role', 'button');
+  });
+
   it('draws no light where the application wrote nothing', () => {
     renderRow({ ...normaItem, assistantNotes: null }, { notes });
     expect(document.querySelector('[data-ai-review]')).toBeNull();

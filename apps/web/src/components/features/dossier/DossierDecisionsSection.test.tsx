@@ -216,6 +216,8 @@ describe('DossierDecisionsSection (D7a)', () => {
     );
     expect(screen.getByRole('button', { name: `Espandi ${CASS}, 1 da validare · 2 validati` })).toBeInTheDocument();
     expect(screen.getByTitle('1 da validare · 2 validati')).toHaveAttribute('data-ai-review', 'proposed');
+    // On the line of the star and the bin, as on an article's row.
+    expect(screen.getByTitle('1 da validare · 2 validati').parentElement).toHaveClass('h-11', '-my-2.5', 'items-center');
   });
 
   it('opened in a dossier, its reader asks what an application proposed on that entry (D7b)', async () => {

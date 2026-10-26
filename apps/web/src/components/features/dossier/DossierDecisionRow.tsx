@@ -8,7 +8,7 @@ import { DossierDecisionReader } from './DossierDecisionReader';
 import { decisionCitationOf, formatTimestampLong } from './dossierUtils';
 import type { SentenzaItem } from './dossierLayout';
 import { FOCUS_RING } from '../studia/progress/tokens';
-import { ROW, ROW_ICON, ROW_LINE, ROW_REMOVE, ROW_TITLE } from './dossierStyles';
+import { ROW, ROW_ICON, ROW_LINE, ROW_REMOVE, ROW_SIGN, ROW_TITLE } from './dossierStyles';
 
 export interface DossierDecisionRowProps {
   item: SentenzaItem;
@@ -86,7 +86,11 @@ export function DossierDecisionRow({
             <span id={citationId} className={cn(ROW_TITLE, 'block font-medium [overflow-wrap:anywhere]')}>{citation}</span>
             {added && <span className={cn(ROW_LINE, 'mt-0.5 block')}>Aggiunta il {added}</span>}
           </span>
-          {aiReview && <AiReviewSignal counts={aiReview} className="pt-1" />}
+          {aiReview && (
+            <span className={ROW_SIGN}>
+              <AiReviewSignal counts={aiReview} />
+            </span>
+          )}
         </div>
         <button
           type="button"

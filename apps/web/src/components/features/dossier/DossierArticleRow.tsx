@@ -11,7 +11,7 @@ import { AiNoteEntryReview } from './AiNoteEntryReview';
 import { aiReviewSummary, hasAssistantNote } from '../../../utils/aiReview';
 import { formatTimestampLong } from './dossierUtils';
 import { FOCUS_RING } from '../studia/progress/tokens';
-import { ROW, ROW_ICON, ROW_LINE, ROW_REMOVE, ROW_TITLE } from './dossierStyles';
+import { ROW, ROW_ICON, ROW_LINE, ROW_REMOVE, ROW_SIGN, ROW_TITLE } from './dossierStyles';
 
 type NormaItem = Extract<DossierItem, { type: 'norma' }>;
 type NoteItem = Extract<DossierItem, { type: 'note' }>;
@@ -144,8 +144,12 @@ export function DossierArticleRow({
                 <span className="sr-only">{notes.length === 1 ? 'nota' : 'note'}</span>
               </span>
             )}
-            {aiReview && <AiReviewSignal counts={aiReview} />}
           </span>
+          {aiReview && (
+            <span className={ROW_SIGN}>
+              <AiReviewSignal counts={aiReview} />
+            </span>
+          )}
         </div>
         <button
           type="button"
