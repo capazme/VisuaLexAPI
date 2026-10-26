@@ -407,7 +407,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   under reduced motion at once); from `md` it stays, and the Focus button sits inside its right end. A sticky row of a page pins under it
   with `top-[var(--phone-bar-offset,0px)]`: `<main>` sets the bar's height below `lg` and 0 once it has slid away
   («Le mie schede»'s filters and its card's column, the Cronologia's dates, «Da validare»'s article; a new sticky row
-  does the same, or it slides under the bar). Focus mode and Gymnasium's lesson draw no bar. During a section change
+  does the same, or it slides under the bar). No ancestor of such a row may be `overflow: hidden` (say `overflow-clip`
+  for rounded corners): it would become the row's scroll container, and the row would pin the bar's height below that
+  box's top instead (the Cronologia's card did, M1, 25 October 2026). Focus mode and Gymnasium's lesson draw no bar. During a section change
   the bar is named (`vlx-phone-bar`, `index.css`), so the page's picture passes under it. The drawer's section switcher
   sits where the bar is; the closed drawer is `inert`, and whatever closes it from inside (an entry, a link, the
   backdrop) gives the focus to the bar's menu button, where a dialog an entry opens gives it back; Esc closes it

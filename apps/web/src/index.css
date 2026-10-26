@@ -980,10 +980,15 @@
     position: relative;
   }
 
+  /* 44 px each way at least, centred on the sign, which stays its 19 px in the text (M1). */
   .vlx-art .vlx-sign::after {
     content: '';
     position: absolute;
-    inset: -12px -8px;
+    left: 50%;
+    top: 50%;
+    width: max(calc(100% + 16px), 44px);
+    height: max(calc(100% + 24px), 44px);
+    transform: translate(-50%, -50%);
   }
 }
 

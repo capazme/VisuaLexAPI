@@ -48,6 +48,12 @@ describe('SearchField — the door to the search menu (R2)', () => {
     expect(document.getElementById('tour-search-field')).toBe(field());
   });
 
+  it('says the shortcut only where a keyboard is likely: not below md, not on a touch screen (M1)', () => {
+    renderField();
+    const hint = [...field().querySelectorAll('kbd')].find((k) => k.textContent === PALETTE_SHORTCUT)!;
+    expect(hint).toHaveClass('hidden', 'md:inline', '[@media(pointer:coarse)]:hidden');
+  });
+
   it('grows into the menu on a click, with its words', async () => {
     const user = userEvent.setup();
     renderField();

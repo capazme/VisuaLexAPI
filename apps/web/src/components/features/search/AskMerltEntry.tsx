@@ -53,7 +53,8 @@ export function AskMerltEntry({
 
     if (qaAskable) {
         return (
-            <div className="mt-4 flex items-center gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+            // 44 px to tap on a phone (M1), the words as they were: the row's padding goes into the button there.
+            <div className="mt-4 flex items-center gap-2 border-t border-slate-100 md:pt-3 dark:border-slate-800">
                 <button
                     type="button"
                     onClick={() =>
@@ -66,7 +67,7 @@ export function AskMerltEntry({
                             },
                         )
                     }
-                    className="inline-flex items-center gap-1.5 text-xs font-medium text-primary-600 transition-colors duration-150 hover:text-primary-700 focus-visible:outline-none focus-visible:underline dark:text-primary-400 dark:hover:text-primary-300"
+                    className="inline-flex min-h-[44px] items-center gap-1.5 text-xs font-medium md:min-h-0 text-primary-600 transition-colors duration-150 hover:text-primary-700 focus-visible:outline-none focus-visible:underline dark:text-primary-400 dark:hover:text-primary-300"
                 >
                     <MessageCircleQuestion size={14} />
                     Chiedi su questo articolo
