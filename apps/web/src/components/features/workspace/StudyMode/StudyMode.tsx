@@ -374,8 +374,10 @@ export function StudyMode({
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
         transition={{ duration: 0.2 }}
-        // Covers the workspace: Cmd/Ctrl+F is left to the browser (`isWorkspaceCovered`).
+        // Covers the workspace: Cmd/Ctrl+F is left to the browser (`isWorkspaceCovered`). Not the notifications, drawn
+        // over it: Ctrl+Z runs their «Annulla» here too (`isUndoCovered`), a highlight removed in it among them.
         data-find-overlay=""
+        data-undo-through=""
         style={isFullscreen ? undefined : windowStyle}
         className={cn(
           "fixed z-[130] flex flex-col shadow-lg overflow-hidden",
