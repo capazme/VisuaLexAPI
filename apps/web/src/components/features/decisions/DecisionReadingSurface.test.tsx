@@ -273,18 +273,22 @@ describe('DecisionReadingSurface — notes and highlights', () => {
   });
 
   it.each([
-    ['past the right edge', { left: 200, right: 450 }, '-138px'],
-    ['past the left edge', { left: -40, right: 210 }, '48px'],
-  ])('the selection\'s popup is kept 8 px inside a narrow window, %s', async (_, at, nudge) => {
+    ['past the right edge', { left: 200, right: 450 }, 250, '-138px'],
+    ['past the left edge', { left: -40, right: 210 }, 250, '48px'],
+    // Absolute in a narrow container, the positioning element can be narrower than the box drawn in it (a 390 px
+    // window: the box at 149–398 while its container stopped short): the box is what is measured (#351).
+    ['past the right edge, its positioning element narrower than its box', { left: 200, right: 450 }, 150, '-138px'],
+  ])('the selection\'s popup is kept 8 px inside a narrow window, %s', async (_, at, positionerWidth, nudge) => {
     const width = window.innerWidth;
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 320 });
-    // The popup's box measures 250 px, its positioning element and the box drawn in it alike.
+    // The box drawn measures 250 px: the positioning element's first child; the element itself `positionerWidth`.
     const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
-      const positioner = this.classList.contains('-translate-x-1/2') ? this
-        : this.parentElement?.classList.contains('-translate-x-1/2') ? this.parentElement : null;
+      const self = this.classList.contains('-translate-x-1/2');
+      const positioner = self ? this : this.parentElement?.classList.contains('-translate-x-1/2') ? this.parentElement : null;
       const shift = parseFloat(positioner?.style.marginLeft || '0');
+      const wide = self ? positionerWidth : 250;
       const box = positioner
-        ? { left: at.left + shift, right: at.right + shift, top: 0, bottom: 0, width: 250, height: 50 }
+        ? { left: at.left + shift, right: at.left + shift + wide, top: 0, bottom: 0, width: wide, height: 50 }
         : { left: 0, right: 0, top: 0, bottom: 0, width: 0, height: 0 };
       return { ...box, x: box.left, y: box.top, toJSON: () => ({}) } as DOMRect;
     });

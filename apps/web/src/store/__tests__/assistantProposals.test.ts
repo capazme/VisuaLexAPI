@@ -249,6 +249,14 @@ describe('D7b proposals — the bin and «Annulla»', () => {
     expect(assistantService.removeProposal).not.toHaveBeenCalled();
   });
 
+  it('the tab hidden (a phone may discard it unannounced) sends it at once, as the page going does', () => {
+    removeProposal('d1', 'a1', 'p1');
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+    expect(assistantService.removeProposalOnExit).toHaveBeenCalledWith('d1', 'a1', 'p1');
+  });
+
   it('its reader going sends it at once, and takes its «Annulla» away; read again meanwhile, it is not drawn back', async () => {
     removeProposal('d1', 'a1', 'p1');
     // Read again while the notification still offers «Annulla»: the server still has it.
@@ -271,6 +279,18 @@ describe('D7b proposals — the bin and «Annulla»', () => {
     await vi.waitFor(() => expect(lastNotification()).toMatchObject({ type: 'error', message: 'Errore del server' }));
     expect(assistantProposalsStore.getState().byItem.a1.map((p) => p.id)).toEqual(['p1', 'p2']);
     expect(counts()).toEqual({ proposed: 1, validated: 0, review: 0 });
+  });
+
+  it('a DELETE refused after a logout puts nothing back and says nothing', async () => {
+    let refuse: (e: unknown) => void = () => {};
+    vi.mocked(assistantService.removeProposal).mockReturnValueOnce(new Promise((_, reject) => { refuse = reject; }));
+    removeProposal('d1', 'a1', 'p1');
+    flushRemovals('a1');
+    resetAssistantProposals();
+    refuse(refused(500, 'Errore del server'));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(assistantProposalsStore.getState().byItem).toEqual({});
+    expect(notificationStore.getState().entries.some((e) => e.type === 'error')).toBe(false);
   });
 
   it('ticked, binned before the answer, then «Annulla»: it comes back as the server has it, validated', async () => {
