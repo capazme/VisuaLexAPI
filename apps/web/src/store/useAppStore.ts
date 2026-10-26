@@ -26,6 +26,7 @@ import { shortAct } from '../utils/sources';
 import { DECISIONS_PRACTICE_LABEL, practiceNoticeText, practicesFromTabs } from '../utils/practiceMigration';
 import { guardedStorage, type StorageFailure } from '../utils/guardedStorage';
 import { isDesktopViewport } from '../hooks/useIsDesktop';
+import { isHighlightColor } from '../utils/highlightColors';
 
 // Services for API sync
 import { bookmarkService } from '../services/bookmarkService';
@@ -560,6 +561,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     focusMode: false,
     splitView: false,
     showKeyPassages: true,
+    highlightColor: 'yellow',
     studyMode: {
         fontSize: 18,
         lineHeight: 1.8,
@@ -2649,6 +2651,8 @@ const appStore = createStore<AppState>()(
                     settings: {
                         ...DEFAULT_SETTINGS,
                         ...(p.settings ?? {}),
+                        // Only a colour this app draws: an older or damaged save gets the default.
+                        highlightColor: isHighlightColor(p.settings?.highlightColor) ? p.settings.highlightColor : DEFAULT_SETTINGS.highlightColor,
                         studyMode: {
                             ...DEFAULT_SETTINGS.studyMode,
                             ...(p.settings?.studyMode ?? {}),
