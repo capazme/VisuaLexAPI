@@ -32,3 +32,13 @@ export function isEditableTarget(target: EventTarget | null): boolean {
   if (target.isContentEditable) return true;
   return target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [role="combobox"], [data-text-field]') !== null;
 }
+
+/**
+ * Where the key would undo unseen: under a modal dialog, or an overlay over the workspace (`data-find-overlay`) — but
+ * not one the notifications are drawn over and where marks are removed (`data-undo-through`: Study Mode), whose
+ * «Annulla» is on screen.
+ */
+export function isUndoCovered(): boolean {
+  if (document.querySelector('[aria-modal="true"]') !== null) return true;
+  return [...document.querySelectorAll('[data-find-overlay]')].some((el) => !el.hasAttribute('data-undo-through'));
+}

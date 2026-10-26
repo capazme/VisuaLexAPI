@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { StudyModeContent } from './StudyModeContent';
 import { fixtureText } from '../../../../utils/__fixtures__/articleTexts';
 import type { ArticleData } from '../../../../types';
+import { appStore } from '../../../../store/useAppStore';
 
 const ARTICLE: ArticleData = {
   article_text: fixtureText('nrm-cc-1284'),
@@ -64,5 +65,32 @@ describe('StudyModeContent — copying the words of the text in force', () => {
     expect(writeText.mock.calls[0][0]).toMatch(
       new RegExp(`^art\\. 1284 c\\.c\\. \\(Normattiva, testo vigente, consultato (?:il |l')[^)]+\\)\\n\\n${WORDS}$`),
     );
+  });
+});
+
+describe('StudyModeContent — the keys 1 to 4 (H1)', () => {
+  afterEach(() => {
+    appStore.setState((s) => ({ settings: { ...s.settings, highlightColor: 'yellow' } }));
+    window.getSelection()?.removeAllRanges();
+  });
+
+  it('highlight the selection in their colour, and make it the one new highlights take', () => {
+    const onAddHighlight = vi.fn();
+    const { container } = render(
+      <StudyModeContent
+        article={ARTICLE}
+        fontSize={18}
+        lineHeight={1.6}
+        theme="light"
+        highlights={[]}
+        annotations={[]}
+        normaKey="k"
+        onAddHighlight={onAddHighlight}
+      />,
+    );
+    select(container, WORDS);
+    fireEvent.keyDown(window, { key: '2' });
+    expect(onAddHighlight).toHaveBeenCalledExactlyOnceWith('k', 'all2:1284', WORDS, '', 'green', expect.any(Number));
+    expect(appStore.getState().settings.highlightColor).toBe('green');
   });
 });

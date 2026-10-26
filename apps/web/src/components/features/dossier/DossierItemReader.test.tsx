@@ -73,6 +73,25 @@ describe('DossierItemReader — annotations on the text', () => {
   });
 });
 
+describe('DossierItemReader — the colour of new highlights (H1)', () => {
+  it('has no bar of its own: the colour is chosen with its actions', async () => {
+    vi.mocked(fetchArticleForNorma).mockResolvedValue({ article_text: RAW, norma_data: norma });
+    appStore.setState({ highlights: [], annotations: [] });
+    render(<DossierItemReader norma={norma} onOpenOnDashboard={() => {}} showToast={() => {}} />);
+    const trigger = await screen.findByRole('button', { name: 'Colore: giallo (nuove evidenziazioni)' });
+    expect(trigger).toHaveTextContent('Colore: giallo');
+  });
+
+  it('offers none on a text read only, which takes no highlight', async () => {
+    // A past text: highlights are keyed by article, not by version (`describeVersion`).
+    vi.mocked(fetchArticleForNorma).mockResolvedValue({ article_text: RAW, norma_data: norma, validity: { state: 'historical' } as never });
+    appStore.setState({ highlights: [], annotations: [] });
+    render(<DossierItemReader norma={norma} onOpenOnDashboard={() => {}} showToast={() => {}} />);
+    await screen.findByRole('button', { name: /Copia citazione/ });
+    expect(screen.queryByRole('button', { name: /^Colore: / })).toBeNull();
+  });
+});
+
 describe('DossierItemReader — onArticle', () => {
   it('hands the fetched article to the row, so a row with no rubrica can take it from the text', async () => {
     vi.mocked(fetchArticleForNorma).mockResolvedValue({ article_text: RAW, norma_data: norma });

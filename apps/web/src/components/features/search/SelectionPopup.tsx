@@ -1,8 +1,9 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
-import { Highlighter, StickyNote, Copy, Search, Flag, MessageCircle, GraduationCap, X } from 'lucide-react';
+import { Highlighter, StickyNote, Copy, Search, Flag, MessageCircle, GraduationCap } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
-import { HIGHLIGHT_COLORS, HIGHLIGHT_COLOR_MEANINGS, getHighlightSwatch, highlightColorName, type HighlightColor } from '../../../utils/highlightColors';
+import { HIGHLIGHT_ICON_ON_DARK, highlightColorName, type HighlightColor } from '../../../utils/highlightColors';
+import { useAppStore } from '../../../store/useAppStore';
 import { getSelectionAnchor } from '../../../utils/selectionOffset';
 
 interface SelectionPopupProps {
@@ -63,13 +64,13 @@ export function SelectionPopup({
   copyOnly = false,
 }: SelectionPopupProps) {
   const [popup, setPopup] = useState<PopupState>({ visible: false, x: 0, y: 0, text: '', startOffset: -1, displayText: '' });
-  const [showColorPicker, setShowColorPicker] = useState(false);
+  // Every new highlight takes the colour chosen once in the reading bar (H1, `HighlightColorMenu`).
+  const highlightColor = useAppStore((s) => s.settings.highlightColor);
   const popupRef = useRef<HTMLDivElement>(null);
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const hidePopup = useCallback(() => {
     setPopup(prev => ({ ...prev, visible: false }));
-    setShowColorPicker(false);
   }, []);
 
   const handleMouseUp = useCallback(() => {
@@ -130,20 +131,23 @@ export function SelectionPopup({
     }, 10);
   }, [containerRef, textRootRef, hidePopup]);
 
-  // Moved sideways to stay 8 px inside the window, from its measured box, once drawn and again when it changes size or
-  // place: the colour picker with its legend is far wider than the 160 px the position's clamp supposes (D7b), and a
-  // phone's edge cut its close button. A style written on the element, not state: nothing else draws again.
+  // Moved sideways to stay 8 px inside the window, from its measured box, once drawn and again when it moves: the
+  // position's clamp counts in the container, not the window, and a phone's edge once cut the popup (D7b). A style
+  // written on the element, not state: nothing else draws again.
   useLayoutEffect(() => {
     const el = popupRef.current;
     if (!popup.visible || !el) return;
     el.style.marginLeft = '0px';
-    const box = el.getBoundingClientRect();
+    // The box drawn. The positioning element is `w-max` (absolute in a narrow container it shrank to the room left
+    // while the box inside kept its width, and its centring took half the shrunk width: 149–398 in a 390 px window);
+    // the box is measured all the same, should anything else ever size that element.
+    const box = (el.firstElementChild ?? el).getBoundingClientRect();
     const margin = 8;
     let nudge = 0;
     if (box.left < margin) nudge = margin - box.left;
     else if (box.right > window.innerWidth - margin) nudge = window.innerWidth - margin - box.right;
     el.style.marginLeft = `${nudge}px`;
-  }, [popup.visible, popup.x, popup.y, showColorPicker]);
+  }, [popup.visible, popup.x, popup.y]);
 
   // Handle mousedown outside popup to hide it
   useEffect(() => {
@@ -184,8 +188,8 @@ export function SelectionPopup({
         hidePopup();
         window.getSelection()?.removeAllRanges();
       } else if (e.key === 'h' && !copyOnly && !e.metaKey && !e.ctrlKey) {
-        // Quick highlight with default color
-        onHighlight(popup.text, 'yellow', popup.startOffset);
+        // Quick highlight, in the colour chosen in the reading bar (H1)
+        onHighlight(popup.text, highlightColor, popup.startOffset);
         hidePopup();
         window.getSelection()?.removeAllRanges();
       } else if (e.key === 'n' && !copyOnly && !e.metaKey && !e.ctrlKey) {
@@ -202,7 +206,7 @@ export function SelectionPopup({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [popup.visible, popup.text, popup.startOffset, popup.x, popup.y, onHighlight, onAddNote, copyOnly, hidePopup]);
+  }, [popup.visible, popup.text, popup.startOffset, popup.x, popup.y, onHighlight, onAddNote, copyOnly, hidePopup, highlightColor]);
 
   // The live selection rect (viewport coords), read BEFORE the popup hides
   // and the selection is cleared (gotcha 16); falls back to the popup anchor.
@@ -214,8 +218,11 @@ export function SelectionPopup({
 
   const handleAction = (action: 'highlight' | 'note' | 'copy' | 'search' | 'report' | 'discuss' | 'card') => {
     switch (action) {
+      // The colour chosen once in the reading bar (H1): never asked here.
       case 'highlight':
-        setShowColorPicker(true);
+        onHighlight(popup.text, highlightColor, popup.startOffset);
+        hidePopup();
+        window.getSelection()?.removeAllRanges();
         break;
       case 'note': {
         // Capture the live selection rect BEFORE hiding / clearing — the
@@ -256,20 +263,14 @@ export function SelectionPopup({
     }
   };
 
-  const handleHighlightColor = (color: HighlightColor) => {
-    onHighlight(popup.text, color, popup.startOffset);
-    hidePopup();
-    setShowColorPicker(false);
-    window.getSelection()?.removeAllRanges();
-  };
-
   if (!popup.visible) return null;
 
   return (
     <div
       ref={popupRef}
       className={cn(
-        'absolute transform -translate-x-1/2 -translate-y-full',
+        // As wide as what it holds, not as the room left in its container: centred on the selection as it is.
+        'absolute w-max max-w-[calc(100vw-16px)] transform -translate-x-1/2 -translate-y-full',
         'animate-in fade-in zoom-in-95 duration-150',
         Z_INDEX.floating
       )}
@@ -281,48 +282,7 @@ export function SelectionPopup({
     >
       {/* Main popup */}
       <div className="bg-slate-900 dark:bg-slate-800 text-white rounded-lg shadow-md border border-slate-700 overflow-hidden">
-        {showColorPicker ? (
-          /* Color picker view */
-          <div className="p-2">
-            {/* What each colour is suggested for (D7b): a hint, any colour may be chosen for anything. Above the swatches,
-                so a popup clipped at the top loses the hint, never the controls. One column on a phone, two from sm. */}
-            <ul
-              role="list"
-              aria-label="Uso suggerito dei colori"
-              className="mb-1.5 grid grid-cols-1 gap-x-3 gap-y-0.5 border-b border-slate-700 pb-1.5 text-[11px] text-slate-300 sm:grid-cols-2"
-            >
-              {HIGHLIGHT_COLORS.map((color) => (
-                <li key={color} className="flex min-w-0 items-center gap-1.5 sm:whitespace-nowrap">
-                  <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: getHighlightSwatch(color) }} />
-                  <span className="sr-only">{highlightColorName(color)}: </span>
-                  {HIGHLIGHT_COLOR_MEANINGS[color]}
-                </li>
-              ))}
-            </ul>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setShowColorPicker(false)}
-                aria-label="Chiudi i colori"
-                className="p-1.5 rounded hover:bg-slate-700 text-slate-400"
-              >
-                <X size={14} />
-              </button>
-              <div className="w-px h-5 bg-slate-700 mx-1" />
-              {HIGHLIGHT_COLORS.map((color) => (
-                <button
-                  key={color}
-                  onClick={() => handleHighlightColor(color)}
-                  // Named in Italian with what it is suggested for; 44 px on a touch screen.
-                  aria-label={`Evidenzia in ${highlightColorName(color)} — ${HIGHLIGHT_COLOR_MEANINGS[color]}`}
-                  className="h-11 w-11 rounded-full border-2 border-white/40 transition-transform md:h-7 md:w-7 [@media(hover:hover)_and_(pointer:fine)]:hover:scale-110 hover:ring-2 hover:ring-white/60"
-                  style={{ backgroundColor: getHighlightSwatch(color) }}
-                  title={`Evidenzia in ${color}`}
-                />
-              ))}
-            </div>
-          </div>
-        ) : (
-          /* Main actions */
+        {/* Main actions */}
           <div className="flex items-center">
             {!copyOnly && (
               <>
@@ -330,8 +290,11 @@ export function SelectionPopup({
                   onClick={() => handleAction('highlight')}
                   className="p-2.5 hover:bg-slate-700 transition-colors flex items-center gap-1.5 text-sm"
                   title="Evidenzia (H)"
+                  aria-label={`Evidenzia in ${highlightColorName(highlightColor)}`}
+                  aria-keyshortcuts="h"
                 >
-                  <Highlighter size={16} className="text-yellow-400" />
+                  {/* In the colour it will take. */}
+                  <Highlighter size={16} aria-hidden className={HIGHLIGHT_ICON_ON_DARK[highlightColor]} />
                 </button>
                 <div className="w-px h-5 bg-slate-700" />
                 <button
@@ -403,7 +366,6 @@ export function SelectionPopup({
               </>
             )}
           </div>
-        )}
       </div>
 
       {/* Arrow pointing down */}

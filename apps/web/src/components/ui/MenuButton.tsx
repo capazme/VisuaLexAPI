@@ -13,6 +13,10 @@ export interface MenuItem {
   danger?: boolean;
   disabled?: boolean;
   separatorBefore?: boolean;
+  /** A section's title drawn over this item, under its separator (a phone's «⋯» holding a setting among actions). */
+  sectionHeading?: string;
+  /** The item's name when its words alone would not say it (a choice under a `sectionHeading`). */
+  ariaLabel?: string;
   /** A line under the label (the section switcher's). */
   description?: string;
   /** Set on a choice among items (the active section): the item becomes a `menuitemradio`. */
@@ -26,6 +30,8 @@ export interface MenuItem {
 export interface MenuButtonProps {
   /** The trigger's accessible name. */
   label: string;
+  /** The trigger's tooltip, for one with no words of its own (a colour's dot). */
+  title?: string;
   items: MenuItem[];
   /** The trigger's content: an icon, or an icon and a word. */
   children: ReactNode;
@@ -50,7 +56,7 @@ export interface MenuButtonProps {
  * and End move, Escape and Tab close, focus returns to the trigger, a click
  * outside closes. Clicks never reach the card it sits in. The dossier's menus.
  */
-export function MenuButton({ label, items, children, triggerClassName, align = 'right', placement = 'below', heading, menuClassName, className, onOpen }: MenuButtonProps) {
+export function MenuButton({ label, title, items, children, triggerClassName, align = 'right', placement = 'below', heading, menuClassName, className, onOpen }: MenuButtonProps) {
   // null = closed; otherwise which item takes the focus once the menu is drawn.
   const [openAt, setOpenAt] = useState<'first' | 'last' | null>(null);
   const open = openAt !== null;
@@ -130,6 +136,7 @@ export function MenuButton({ label, items, children, triggerClassName, align = '
         ref={triggerRef}
         type="button"
         aria-label={label}
+        title={title}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
@@ -165,11 +172,18 @@ export function MenuButton({ label, items, children, triggerClassName, align = '
           {items.map((item, index) => (
             <div key={item.label}>
               {item.separatorBefore && <div className="my-1 border-t border-slate-200 dark:border-slate-700" aria-hidden />}
+              {/* Seen, not read: the items under it carry it in their `ariaLabel`. */}
+              {item.sectionHeading && (
+                <p aria-hidden className="px-3 pb-1 pt-1.5 text-xs font-medium leading-snug text-slate-500 dark:text-slate-400">
+                  {item.sectionHeading}
+                </p>
+              )}
               <button
                 ref={(el) => { itemRefs.current[index] = el; }}
                 type="button"
                 role={item.checked === undefined ? 'menuitem' : 'menuitemradio'}
                 aria-checked={item.checked}
+                aria-label={item.ariaLabel}
                 disabled={item.disabled}
                 tabIndex={-1}
                 onClick={(event) => { close(true); item.onSelect(event); }}
