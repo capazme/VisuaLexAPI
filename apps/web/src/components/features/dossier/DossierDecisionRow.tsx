@@ -1,14 +1,13 @@
 import { useMemo } from 'react';
 import { CheckSquare, ChevronDown, Square, Star, Trash2 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
-import { aiReviewSummary } from '../../../utils/aiReview';
+import { aiReviewSignal, aiReviewSummary } from '../../../utils/aiReview';
 import { AiReviewSignal } from '../../ui/AiReviewSignal';
 import { identityOf } from '../../../utils/decisionLinks';
 import { DossierDecisionReader } from './DossierDecisionReader';
 import { decisionCitationOf, formatTimestampLong } from './dossierUtils';
 import type { SentenzaItem } from './dossierLayout';
-import { FOCUS_RING } from '../studia/progress/tokens';
-import { ROW, ROW_ICON, ROW_LINE, ROW_REMOVE, ROW_SIGN, ROW_TITLE } from './dossierStyles';
+import { ROW, ROW_ICON, ROW_LINE, ROW_REMOVE, ROW_SIGN, ROW_TITLE, ROW_TOGGLE } from './dossierStyles';
 
 export interface DossierDecisionRowProps {
   item: SentenzaItem;
@@ -75,7 +74,7 @@ export function DossierDecisionRow({
               onToggleExpand();
             }
           }}
-          className={cn('flex min-h-[44px] min-w-0 flex-1 cursor-pointer items-start gap-2 rounded-md py-2.5', FOCUS_RING)}
+          className={ROW_TOGGLE}
         >
           <ChevronDown
             size={16}
@@ -86,7 +85,7 @@ export function DossierDecisionRow({
             <span id={citationId} className={cn(ROW_TITLE, 'block font-medium [overflow-wrap:anywhere]')}>{citation}</span>
             {added && <span className={cn(ROW_LINE, 'mt-0.5 block')}>Aggiunta il {added}</span>}
           </span>
-          {aiReview && (
+          {aiReview && aiReviewSignal(aiReview) && (
             <span className={ROW_SIGN}>
               <AiReviewSignal counts={aiReview} />
             </span>

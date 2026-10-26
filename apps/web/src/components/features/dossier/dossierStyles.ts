@@ -49,10 +49,13 @@ export const ROW_LINE = 'text-[13px] leading-snug text-slate-600 dark:text-slate
 /** An icon at a row's right end (the star, the removal): 44 px square at every width. */
 export const ROW_ICON = `inline-grid h-11 w-11 shrink-0 place-items-center rounded-md transition-colors ${FOCUS_RING}`;
 
+/** A row's toggle (`role="button"`), the article's or the decision's: its title, grey line and signs. */
+export const ROW_TOGGLE = `flex min-h-[44px] min-w-0 flex-1 cursor-pointer items-start gap-2 rounded-md py-2.5 ${FOCUS_RING}`;
+
 /**
  * The box of a row's traffic light (D7b, `AiReviewSignal`), last in the row's toggle: as tall as the buttons beside it
- * (`ROW_ICON`) and across the toggle's own padding (`py-2.5`), its sign centred in it, so it sits on the star's and the
- * bin's line. Inline after the title's signs it sat about 4 px higher.
+ * (`ROW_ICON`) and across the toggle's own padding (its `py-2.5`, `ROW_TOGGLE`: the two change together), its sign
+ * centred in it, so it sits on the star's and the bin's line. Inline after the title's signs it sat 1 to 3 px higher.
  */
 export const ROW_SIGN = '-my-2.5 flex h-11 shrink-0 items-center';
 

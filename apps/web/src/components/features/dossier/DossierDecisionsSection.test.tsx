@@ -216,8 +216,12 @@ describe('DossierDecisionsSection (D7a)', () => {
     );
     expect(screen.getByRole('button', { name: `Espandi ${CASS}, 1 da validare · 2 validati` })).toBeInTheDocument();
     expect(screen.getByTitle('1 da validare · 2 validati')).toHaveAttribute('data-ai-review', 'proposed');
-    // On the line of the star and the bin, as on an article's row.
-    expect(screen.getByTitle('1 da validare · 2 validati').parentElement).toHaveClass('h-11', '-my-2.5', 'items-center');
+    // On the line of the star and the bin, as on an article's row: a box as tall as they are, across the toggle's padding.
+    const box = screen.getByTitle('1 da validare · 2 validati').parentElement!;
+    expect(box).toHaveClass('flex', 'h-11', '-my-2.5', 'items-center');
+    expect(screen.getByRole('button', { name: 'Segna come importante' })).toHaveClass('h-11');
+    expect(box.parentElement).toHaveAttribute('role', 'button');
+    expect(box.parentElement).toHaveClass('py-2.5', 'items-start');
   });
 
   it('opened in a dossier, its reader asks what an application proposed on that entry (D7b)', async () => {

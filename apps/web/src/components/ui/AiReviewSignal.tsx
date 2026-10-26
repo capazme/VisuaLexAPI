@@ -8,7 +8,7 @@ import { cn } from '../../lib/utils';
  * else green with a tick; nothing when the application wrote nothing. A shape for each state, never colour alone, and
  * the counts in words on hover and for a screen reader («2 da validare · 1 da rivedere»).
  */
-export function AiReviewSignal({ counts, className }: { counts: AiReviewCounts; className?: string }) {
+export function AiReviewSignal({ counts }: { counts: AiReviewCounts }) {
   const signal = aiReviewSignal(counts);
   if (!signal) return null;
   const summary = aiReviewSummary(counts);
@@ -19,7 +19,6 @@ export function AiReviewSignal({ counts, className }: { counts: AiReviewCounts; 
       title={summary}
       className={cn(
         'inline-flex shrink-0 items-center',
-        className,
         signal === 'review' && 'text-red-600 dark:text-red-400',
         signal === 'proposed' && 'text-amber-600 dark:text-amber-400',
         signal === 'validated' && 'text-emerald-600 dark:text-emerald-400',

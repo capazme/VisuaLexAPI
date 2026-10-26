@@ -128,10 +128,17 @@ describe('DossierArticleRow notes', () => {
     renderRow({ ...normaItem, assistantNotes: { proposed: 1, validated: 0, review: 0 } }, { notes });
     const box = screen.getByTitle('1 da validare').parentElement!;
     const star = screen.getByRole('button', { name: 'Segna come importante' });
-    // As tall as the buttons (h-11), across the toggle's py-2.5, its sign centred: once 4 px higher than the star.
-    expect(box).toHaveClass('h-11', '-my-2.5', 'items-center');
+    // As tall as the buttons (h-11), across the toggle's py-2.5, its sign centred: once 1 to 3 px higher than the star.
+    expect(box).toHaveClass('flex', 'h-11', '-my-2.5', 'items-center');
     expect(star).toHaveClass('h-11');
     expect(box.parentElement).toHaveAttribute('role', 'button');
+    expect(box.parentElement).toHaveClass('py-2.5', 'items-start');
+  });
+
+  it('draws no empty box for counts of nothing', () => {
+    renderRow({ ...normaItem, assistantNotes: { proposed: 0, validated: 0, review: 0 } }, { notes });
+    expect(document.querySelector('[data-ai-review]')).toBeNull();
+    expect(screen.getByRole('button', { name: /^Espandi codice civile 262 articolo 2043/ }).querySelector('.h-11')).toBeNull();
   });
 
   it('draws no light where the application wrote nothing', () => {
