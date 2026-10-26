@@ -147,6 +147,11 @@ export interface AppSettings {
     /** A decision's key passages are drawn (`utils/decisionKeyPassages.ts`); on by default (the owner, 13 Oct 2026). */
     showKeyPassages: boolean;
     /**
+     * The colour every new highlight takes (H1): chosen once in the reading bar, never asked at each highlight. Kept on
+     * this device, as the other reading settings.
+     */
+    highlightColor: 'yellow' | 'green' | 'red' | 'blue';
+    /**
      * Study Mode reading preferences, persisted across sessions. Without
      * this slice the user had to re-pick the font size, line height, and
      * theme every time they reopened Study Mode — the values live in

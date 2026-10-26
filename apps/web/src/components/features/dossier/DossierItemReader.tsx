@@ -17,6 +17,7 @@ import { formatNormCitation, unversionedCitation, withCitation } from '../../../
 import { todayInRome } from '../../../utils/dateUtils';
 import { describeVersion, historicalItemLabel, isEuropeanAct, requestIsHistorical } from '../../../utils/versionDisplay';
 import { VersionBanner } from '../search/VersionBanner';
+import { HighlightColorMenu } from '../search/HighlightColorMenu';
 import { fetchArticleForNorma } from '../../../utils/articleFetchCache';
 import { getUpdateNoteParagraphs, parseArticleStructure } from '../../../utils/articleStructure';
 import { describeBlock, groupAnnotationsByBlock, hasAnnotations, highlightsWithoutSign, isProposal as isProposalMark } from '../../../utils/articleAnnotations';
@@ -352,7 +353,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
           onRemove={removeAnnotation}
         />
       )}
-      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
+      <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
         <button
           type="button"
           onClick={handleCopyCitation}
@@ -368,6 +369,16 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
         >
           <ExternalLink size={13} /> Apri su Dashboard
         </button>
+        {/* The colour of new highlights (H1): the dossier's reader has no bar of its own, so it sits with its actions;
+            not on a text read only, which takes none. */}
+        {!readOnly && (
+          <HighlightColorMenu
+            labelled
+            placement="auto"
+            className="ml-auto"
+            triggerClassName="min-h-[44px] gap-1.5 px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100 md:min-h-0 dark:text-slate-400 dark:hover:bg-slate-700"
+          />
+        )}
       </div>
     </div>
   );

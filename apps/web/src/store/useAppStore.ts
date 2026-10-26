@@ -26,6 +26,7 @@ import { shortAct } from '../utils/sources';
 import { DECISIONS_PRACTICE_LABEL, practiceNoticeText, practicesFromTabs } from '../utils/practiceMigration';
 import { guardedStorage, type StorageFailure } from '../utils/guardedStorage';
 import { isDesktopViewport } from '../hooks/useIsDesktop';
+import { isHighlightColor } from '../utils/highlightColors';
 
 // Services for API sync
 import { bookmarkService } from '../services/bookmarkService';
@@ -47,6 +48,7 @@ import {
 } from '../utils/storeApiMappers';
 import { serverFieldsFromApi, dossierFromApi, dossierItemFromApi, itemContentFor, serverItemFor } from '../components/features/dossier/dossierUtils';
 import { shiftAiReviewCount } from '../utils/aiReview';
+import { forgetRemovals, isRemovalPending, removeWithUndo, savingDone, savingStarted } from './deferredRemovals';
 
 // ── Environment wire ↔ store converters ───────────────────────────────
 // The server stores the per-slice content (dossiers / quickNorms / aliases /
@@ -559,6 +561,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     focusMode: false,
     splitView: false,
     showKeyPassages: true,
+    highlightColor: 'yellow',
     studyMode: {
         fontSize: 18,
         lineHeight: 1.8,
@@ -1206,6 +1209,8 @@ const appStore = createStore<AppState>()(
             clearUserData: () => {
                 // The notifications on screen go, without carrying out what they held (an import waiting for its «Annulla»).
                 resetNotifications();
+                // A removal's answer still out puts nothing back in the emptied store.
+                forgetRemovals();
                 // The backup of the last user's saved tabs (`backupV0`) goes too: a shared browser keeps nothing of them.
                 removeV0Backup();
                 set((state) => {
@@ -2059,6 +2064,8 @@ const appStore = createStore<AppState>()(
                 };
                 set((state) => { state.annotations.push(optimistic); });
 
+                // Removed before the server answers: the removal waits for the server's id (`deferredRemovals`).
+                savingStarted(`annotation:${tempId}`);
                 annotationService
                     .create(annotationStoreToCreate(optimistic))
                     .then((serverAnnotation) => {
@@ -2067,8 +2074,15 @@ const appStore = createStore<AppState>()(
                             const idx = state.annotations.findIndex(a => a.id === tempId);
                             if (idx !== -1) state.annotations[idx] = mapped;
                         });
+                        savingDone(`annotation:${tempId}`, {
+                            key: `annotation:${mapped.id}`,
+                            path: `/annotations/${encodeURIComponent(mapped.id)}`,
+                            remove: () => annotationService.delete(mapped.id),
+                            item: mapped,
+                        });
                     })
                     .catch((err) => {
+                        savingDone(`annotation:${tempId}`, null);
                         console.error('Failed to sync annotation:', err);
                         set((state) => {
                             state.annotations = state.annotations.filter(a => a.id !== tempId);
@@ -2077,19 +2091,29 @@ const appStore = createStore<AppState>()(
                     });
             },
 
+            // Behind «Annulla» (`removeWithUndo`): off the screen at once, sent when its notification closes or the page
+            // goes or is hidden. A 404 is a removal done; one still being created is removed under the server's id.
             removeAnnotation: (id) => {
-                const previous = get().annotations.find(a => a.id === id);
+                const index = get().annotations.findIndex(a => a.id === id);
+                if (index === -1) return;
+                const previous = get().annotations[index];
                 set((state) => {
                     state.annotations = state.annotations.filter(a => a.id !== id);
                 });
-                if (!previous) return;
-                // 404 is fine: entry may have been a local-only optimistic
-                // insert that never reached the server.
-                annotationService.delete(id).catch((err) => {
-                    if (err?.status === 404) return;
-                    console.error('Failed to sync annotation delete:', err);
-                    set((state) => { state.annotations.push(previous); });
-                    get().pushSyncError('Impossibile eliminare la nota. Riprova.');
+                removeWithUndo({
+                    key: `annotation:${id}`,
+                    message: 'Nota rimossa',
+                    path: `/annotations/${encodeURIComponent(id)}`,
+                    remove: () => annotationService.delete(id),
+                    item: previous,
+                    putBack: (item) => set((state) => {
+                        if (state.annotations.some(a => a.id === item.id)) return;
+                        state.annotations.splice(Math.min(index, state.annotations.length), 0, item);
+                    }),
+                    onRefused: (err) => {
+                        console.error('Failed to sync annotation delete:', err);
+                        get().pushSyncError('Impossibile eliminare la nota. Riprova.');
+                    },
                 });
             },
 
@@ -2131,7 +2155,8 @@ const appStore = createStore<AppState>()(
                 try {
                     const wirePrefix = buildWireNormaKeyPrefix(normaKey, articleRoot);
                     const server = await annotationService.getByNormaKeyPrefix(wirePrefix);
-                    const mapped = server.map(annotationApiToStore);
+                    // One waiting behind «Annulla» is not drawn back: the server still has it until then.
+                    const mapped = server.map(annotationApiToStore).filter(a => !isRemovalPending(`annotation:${a.id}`));
                     set((state) => {
                         // Replace every annotation whose articleId sits under
                         // this article root (main body + its sub-sections)
@@ -2173,6 +2198,8 @@ const appStore = createStore<AppState>()(
                     return;
                 }
 
+                // Removed before the server answers: the removal waits for the server's id (`deferredRemovals`).
+                savingStarted(`highlight:${tempId}`);
                 highlightService
                     .create(wirePayload)
                     .then((serverHighlight) => {
@@ -2181,8 +2208,15 @@ const appStore = createStore<AppState>()(
                             const idx = state.highlights.findIndex(h => h.id === tempId);
                             if (idx !== -1) state.highlights[idx] = mapped;
                         });
+                        savingDone(`highlight:${tempId}`, {
+                            key: `highlight:${mapped.id}`,
+                            path: `/highlights/${encodeURIComponent(mapped.id)}`,
+                            remove: () => highlightService.delete(mapped.id),
+                            item: mapped,
+                        });
                     })
                     .catch((err) => {
+                        savingDone(`highlight:${tempId}`, null);
                         console.error('Failed to sync highlight:', err);
                         set((state) => {
                             state.highlights = state.highlights.filter(h => h.id !== tempId);
@@ -2191,17 +2225,28 @@ const appStore = createStore<AppState>()(
                     });
             },
 
+            // As a note's: behind «Annulla», sent when its notification closes or the page goes.
             removeHighlight: (id) => {
-                const previous = get().highlights.find(h => h.id === id);
+                const index = get().highlights.findIndex(h => h.id === id);
+                if (index === -1) return;
+                const previous = get().highlights[index];
                 set((state) => {
                     state.highlights = state.highlights.filter(h => h.id !== id);
                 });
-                if (!previous) return;
-                highlightService.delete(id).catch((err) => {
-                    if (err?.status === 404) return;
-                    console.error('Failed to sync highlight delete:', err);
-                    set((state) => { state.highlights.push(previous); });
-                    get().pushSyncError('Impossibile eliminare l\'evidenziazione. Riprova.');
+                removeWithUndo({
+                    key: `highlight:${id}`,
+                    message: 'Evidenziazione rimossa',
+                    path: `/highlights/${encodeURIComponent(id)}`,
+                    remove: () => highlightService.delete(id),
+                    item: previous,
+                    putBack: (item) => set((state) => {
+                        if (state.highlights.some(h => h.id === item.id)) return;
+                        state.highlights.splice(Math.min(index, state.highlights.length), 0, item);
+                    }),
+                    onRefused: (err) => {
+                        console.error('Failed to sync highlight delete:', err);
+                        get().pushSyncError('Impossibile eliminare l\'evidenziazione. Riprova.');
+                    },
                 });
             },
 
@@ -2218,7 +2263,8 @@ const appStore = createStore<AppState>()(
                 try {
                     const wirePrefix = buildWireNormaKeyPrefix(normaKey, articleRoot);
                     const server = await highlightService.getByNormaKeyPrefix(wirePrefix);
-                    const mapped = server.map(highlightApiToStore);
+                    // One waiting behind «Annulla» is not drawn back: the server still has it until then.
+                    const mapped = server.map(highlightApiToStore).filter(h => !isRemovalPending(`highlight:${h.id}`));
                     set((state) => {
                         state.highlights = state.highlights
                             .filter(h => !(
@@ -2605,6 +2651,8 @@ const appStore = createStore<AppState>()(
                     settings: {
                         ...DEFAULT_SETTINGS,
                         ...(p.settings ?? {}),
+                        // Only a colour this app draws: an older or damaged save gets the default.
+                        highlightColor: isHighlightColor(p.settings?.highlightColor) ? p.settings.highlightColor : DEFAULT_SETTINGS.highlightColor,
                         studyMode: {
                             ...DEFAULT_SETTINGS.studyMode,
                             ...(p.settings?.studyMode ?? {}),

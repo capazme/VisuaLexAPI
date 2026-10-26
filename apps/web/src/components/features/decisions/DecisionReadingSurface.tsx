@@ -100,9 +100,10 @@ export interface DecisionReadingSurfaceProps {
 export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, hostBlockId, findHostId, onLeave, citedNorms, dossierItemId }: DecisionReadingSurfaceProps) {
   const {
     triggerSearch, pushReadingBack, annotations, highlights, removeAnnotation, updateAnnotation,
-    removeHighlight, loadAnnotationsForArticle, loadHighlightsForArticle, showKeyPassages, updateSettings,
+    removeHighlight, loadAnnotationsForArticle, loadHighlightsForArticle, showKeyPassages, updateSettings, highlightColor,
   } = useAppStore(useShallow((s) => ({
     showKeyPassages: s.settings.showKeyPassages,
+    highlightColor: s.settings.highlightColor,
     updateSettings: s.updateSettings,
     triggerSearch: s.triggerSearch,
     pushReadingBack: s.pushReadingBack,
@@ -353,10 +354,10 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
         <KeyPassagePopover
           kind={passages[shownPassage.index].kind}
           anchorEl={shownPassage.el}
-          // the passage becomes a highlight of the reader's, through the ordinary action
+          // the passage becomes a highlight of the reader's, through the ordinary action, in the colour chosen (H1)
           onMakeOwn={() => {
             const p = passages[shownPassage.index];
-            handlePopupHighlight(plain.slice(p.start, p.end), 'yellow', p.start);
+            handlePopupHighlight(plain.slice(p.start, p.end), highlightColor, p.start);
           }}
           onHideAll={hideKeyPassages}
           onClose={() => setOpenPassage(null)}

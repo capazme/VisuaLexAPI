@@ -41,6 +41,8 @@ beforeEach(() => {
     loadHighlightsForArticle: loadHighlights, loadAnnotationsForArticle: loadAnnotations,
     addHighlight, addAnnotation, removeHighlight, removeAnnotation, pushReadingBack,
   });
+  // The colour of new highlights as it starts (H1): a test that chooses another never leaks it.
+  appStore.setState((s) => ({ settings: { ...s.settings, highlightColor: 'yellow' } }));
 });
 
 const H = { id: 'h1', normaKey: KEY, articleId: '', rangeSerialized: '', text: 'ricorso', color: 'green', startOffset: 3 } as Highlight;
@@ -242,49 +244,59 @@ describe('DecisionReadingSurface — notes and highlights', () => {
     expect(loadAnnotations).toHaveBeenCalledWith(KEY, '');
     expect(container.querySelector('mark')?.textContent).toBe('fondato');
     await selectText(container, 3, 10);
-    fireEvent.click(await screen.findByTitle('Evidenzia (H)'));
-    fireEvent.click(await screen.findByTitle('Evidenzia in yellow'));
+    // One click, in the colour chosen in the reading bar (H1): yellow until another is chosen.
+    fireEvent.click(await screen.findByRole('button', { name: 'Evidenzia in giallo' }));
     expect(addHighlight).toHaveBeenCalledWith(KEY, '', 'ricorso', expect.any(String), 'yellow', 3);
   });
 
-  it('the colour picker suggests what each colour is for, as a hint (D7b)', async () => {
+  it('the colour is chosen once in the reading bar, with what each is suggested for, and every new highlight takes it (H1)', async () => {
     const { container } = render(<DecisionReadingSurface identity={IDENTITY} testo={MOTIVAZIONE} attributi={{}} />);
-    await selectText(container, 3, 10);
-    fireEvent.click(await screen.findByTitle('Evidenzia (H)'));
-    const legend = await screen.findByRole('list', { name: 'Uso suggerito dei colori' });
-    expect(within(legend).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
-      'giallo: Punto centrale', 'verde: Condizione o presupposto', 'rosso: Da rivedere', 'blu: Definizione o eccezione',
+    const trigger = screen.getByRole('button', { name: 'Colore: giallo (nuove evidenziazioni)' });
+    // The bar's dot alone: its words in a tooltip.
+    expect(trigger).toHaveAttribute('title', 'Colore delle nuove evidenziazioni: giallo');
+    fireEvent.click(trigger);
+    const menu = screen.getByRole('menu', { name: 'Colore: giallo (nuove evidenziazioni)' });
+    const choices = within(menu).getAllByRole('menuitemradio');
+    expect(choices.map((c) => c.textContent)).toEqual([
+      'GialloPunto centrale', 'VerdeCondizione o presupposto', 'RossoDa rivedere', 'BluDefinizione o eccezione',
     ]);
-    // Each swatch says its colour in Italian and what it is suggested for; any may still be chosen for anything.
-    expect(screen.getByRole('button', { name: 'Evidenzia in giallo — Punto centrale' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Evidenzia in rosso — Da rivedere' }));
+    expect(choices[0]).toHaveAttribute('aria-checked', 'true');
+    // Any colour, whatever it is suggested for.
+    fireEvent.click(choices[2]);
+    expect(appStore.getState().settings.highlightColor).toBe('red');
+    expect(screen.getByRole('button', { name: 'Colore: rosso (nuove evidenziazioni)' })).toBeInTheDocument();
+    await selectText(container, 3, 10);
+    // Never asked again: one click, or H.
+    expect(screen.queryByRole('list', { name: 'Uso suggerito dei colori' })).toBeNull();
+    fireEvent.click(await screen.findByRole('button', { name: 'Evidenzia in rosso' }));
     expect(addHighlight).toHaveBeenCalledWith(KEY, '', 'ricorso', expect.any(String), 'red', 3);
   });
 
-  it('the colour picker is kept inside a narrow window by its measured width, either side (D7b)', async () => {
+  it.each([
+    ['past the right edge', { left: 200, right: 450 }, 250, '-138px'],
+    ['past the left edge', { left: -40, right: 210 }, 250, '48px'],
+    // Absolute in a narrow container, the positioning element can be narrower than the box drawn in it (a 390 px
+    // window: the box at 149–398 while its container stopped short): the box is what is measured (#351).
+    ['past the right edge, its positioning element narrower than its box', { left: 200, right: 450 }, 150, '-138px'],
+  ])('the selection\'s popup is kept 8 px inside a narrow window, %s', async (_, at, positionerWidth, nudge) => {
     const width = window.innerWidth;
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 320 });
-    // The popup measures 250 px; first drawn past the right edge, then past the left.
-    let at = { left: 200, right: 450 };
+    // The box drawn measures 250 px: the positioning element's first child; the element itself `positionerWidth`.
     const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
-      const nudge = parseFloat(this.style.marginLeft || '0');
-      const box = this.classList.contains('-translate-x-1/2')
-        ? { left: at.left + nudge, right: at.right + nudge, top: 0, bottom: 0, width: 250, height: 100 }
+      const self = this.classList.contains('-translate-x-1/2');
+      const positioner = self ? this : this.parentElement?.classList.contains('-translate-x-1/2') ? this.parentElement : null;
+      const shift = parseFloat(positioner?.style.marginLeft || '0');
+      const wide = self ? positionerWidth : 250;
+      const box = positioner
+        ? { left: at.left + shift, right: at.left + shift + wide, top: 0, bottom: 0, width: wide, height: 50 }
         : { left: 0, right: 0, top: 0, bottom: 0, width: 0, height: 0 };
       return { ...box, x: box.left, y: box.top, toJSON: () => ({}) } as DOMRect;
     });
     try {
       const { container } = render(<DecisionReadingSurface identity={IDENTITY} testo={MOTIVAZIONE} attributi={{}} />);
       await selectText(container, 3, 10);
-      fireEvent.click(await screen.findByTitle('Evidenzia (H)'));
-      const popup = (await screen.findByRole('list', { name: 'Uso suggerito dei colori' })).closest<HTMLElement>('.-translate-x-1\\/2')!;
-      // 450 − 312: moved 138 px left, its right edge 8 px inside the window.
-      expect(popup.style.marginLeft).toBe('-138px');
-      fireEvent.click(screen.getByRole('button', { name: 'Chiudi i colori' }));
-      at = { left: -40, right: 210 };
-      fireEvent.click(await screen.findByTitle('Evidenzia (H)'));
-      await screen.findByRole('list', { name: 'Uso suggerito dei colori' });
-      expect(popup.style.marginLeft).toBe('48px');
+      const popup = (await screen.findByTitle('Evidenzia (H)')).closest<HTMLElement>('.-translate-x-1\\/2')!;
+      expect(popup.style.marginLeft).toBe(nudge);
     } finally {
       spy.mockRestore();
       Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
@@ -481,7 +493,11 @@ describe('DecisionReadingSurface — the key passages', () => {
     expect(await screen.findByRole('dialog', { name: 'Principio di diritto, evidenziato automaticamente' })).toBeInTheDocument();
   });
 
-  it('«Fai tua» on a passage makes one highlight of the reader\'s, with its words and offset', async () => {
+  it.each([
+    ['yellow until another is chosen', undefined, 'yellow'],
+    ['in the colour chosen in the bar (H1)', 'blue', 'blue'],
+  ] as const)('«Fai tua» on a passage makes one highlight of the reader\'s, with its words and offset, %s', async (_, chosen, color) => {
+    if (chosen) appStore.setState((s) => ({ settings: { ...s.settings, highlightColor: chosen } }));
     const { container } = mount();
     const plain = decisionProjection(WITH_PASSAGES);
     const piece = container.querySelector<HTMLElement>('[data-key-passage="principio"]')!;
@@ -489,7 +505,7 @@ describe('DecisionReadingSurface — the key passages', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Principio di diritto, evidenziato automaticamente' });
     expect(within(dialog).getByText('Evidenziato automaticamente: non è una tua evidenziazione.')).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Fai tua (evidenzia)' }));
-    expect(addHighlight).toHaveBeenCalledExactlyOnceWith(KEY, '', PRINCIPLE, '', 'yellow', plain.indexOf(PRINCIPLE));
+    expect(addHighlight).toHaveBeenCalledExactlyOnceWith(KEY, '', PRINCIPLE, '', color, plain.indexOf(PRINCIPLE));
     expect(screen.queryByRole('dialog', { name: /evidenziato automaticamente/ })).toBeNull();
   });
 
