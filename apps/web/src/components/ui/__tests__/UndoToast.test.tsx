@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { NotificationHost, Toast } from '../Toast';
 import { showUndoToast } from '../../../hooks/useUndoableAction';
 import { closeNotification, notificationStore, notify, resetNotifications } from '../notifications/notifications';
+import { setFootBarRoom } from '../notifications/footBar';
 
 // jsdom runs no animation to its end on its own: an exit is ended by hand, as the card would at its end.
 const endExits = () => act(() => notificationStore.getState().entries.filter((e) => e.closing).forEach((e) => notificationStore.setState((s) => ({ entries: s.entries.filter((x) => x.id !== e.id) }))));
@@ -20,8 +21,20 @@ describe('NotificationHost (K1a)', () => {
     render(<NotificationHost />);
     await act(async () => { notify({ message: 'Salvato', type: 'success', duration: 3000 }); });
     const stack = list().parentElement as HTMLElement;
-    expect(stack.className).toContain('md:bottom-[5.5rem]');
+    expect(stack.className).toContain('md:bottom-[max(5.5rem,calc(1rem+var(--foot-bar,0px)))]');
     expect(stack.className).not.toContain('md:bottom-8');
+  });
+
+  it('rises over a bar held at the foot of the window (`--foot-bar`, «Sposta l\'evidenziazione»), at every width', async () => {
+    render(<NotificationHost />);
+    await act(async () => { notify({ message: 'Salvato', type: 'success', duration: 3000 }); });
+    const stack = list().parentElement as HTMLElement;
+    expect(stack.className).toContain('bottom-[calc(1rem+var(--foot-bar,0px))]');
+    expect(stack.style.getPropertyValue('--foot-bar')).toBe('');
+    act(() => setFootBarRoom(150));
+    expect(stack.style.getPropertyValue('--foot-bar')).toBe('150px');
+    act(() => setFootBarRoom(0));
+    expect(stack.style.getPropertyValue('--foot-bar')).toBe('');
   });
 
   it('answers «Annulla» while the time runs, then says «Ripristinato» in the same place', async () => {

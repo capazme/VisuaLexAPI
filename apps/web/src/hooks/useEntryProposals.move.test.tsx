@@ -43,4 +43,24 @@ describe('useEntryProposals — «Sposta l\'evidenziazione»', () => {
     act(() => assistantProposalsStore.setState({ byItem: { a1: [proposal('p1', 'a1')] } }));
     expect(reader.result.current.moving).toBeNull();
   });
+
+  it('a reader that goes with its bar open ends the move: opened again, no bar comes back by itself', () => {
+    assistantProposalsStore.setState({ enabled: true, byItem: { a1: [proposal('p1', 'a1')] }, moving: null });
+    const reader = renderHook(() => useEntryProposals('a1', 'k', '1'), { wrapper });
+    act(() => reader.result.current.actions!.move!('p1'));
+    expect(reader.result.current.moving?.id).toBe('p1');
+    reader.unmount();
+    expect(assistantProposalsStore.getState().moving).toBeNull();
+    const again = renderHook(() => useEntryProposals('a1', 'k', '1'), { wrapper });
+    expect(again.result.current.moving).toBeNull();
+  });
+
+  it('a reader of another entry that goes leaves the move alone', () => {
+    assistantProposalsStore.setState({ enabled: true, byItem: { a1: [proposal('p1', 'a1')], a2: [] }, moving: null });
+    const reader = renderHook(() => useEntryProposals('a1', 'k', '1'), { wrapper });
+    const other = renderHook(() => useEntryProposals('a2', 'k', '1'), { wrapper });
+    act(() => reader.result.current.actions!.move!('p1'));
+    other.unmount();
+    expect(assistantProposalsStore.getState().moving).toEqual({ itemId: 'a1', proposalId: 'p1' });
+  });
 });

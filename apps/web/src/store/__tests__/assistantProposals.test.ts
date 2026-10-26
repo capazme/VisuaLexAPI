@@ -160,6 +160,20 @@ describe('D7b proposals — the note\'s state', () => {
     expect(counts()).toEqual({ proposed: 1, validated: 0, review: 0 });
   });
 
+  it('a move on a passage removed elsewhere (another tab) says why nothing moved, and the passage goes', async () => {
+    vi.mocked(assistantService.moveProposal).mockRejectedValueOnce(notFound('Proposta non trovata'));
+    await moveProposal('d1', 'a1', 'p1', 28, 'i contraenti');
+    expect(assistantProposalsStore.getState().byItem.a1.map((p) => p.id)).toEqual(['p2']);
+    expect(lastNotification()).toMatchObject({ type: 'warning', message: 'Evidenziazione non spostata: il passaggio è stato rimosso altrove.' });
+  });
+
+  it('a move answered «Proposta non trovata» for a passage this tab no longer holds says nothing more', async () => {
+    assistantProposalsStore.setState((st) => ({ byItem: { ...st.byItem, a1: st.byItem.a1.filter((p) => p.id !== 'p1') } }));
+    vi.mocked(assistantService.moveProposal).mockRejectedValueOnce(notFound('Proposta non trovata'));
+    await moveProposal('d1', 'a1', 'p1', 28, 'i contraenti');
+    expect(notificationStore.getState().entries.some((e) => e.type === 'warning')).toBe(false);
+  });
+
   it('two clicks in a row move the light once', async () => {
     const validated = { ...p1, note: aiNote('Il creditore.', 'validated') };
     vi.mocked(assistantService.setProposalState).mockResolvedValue(validated);

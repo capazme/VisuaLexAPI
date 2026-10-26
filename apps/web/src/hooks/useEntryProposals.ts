@@ -43,6 +43,14 @@ export function useEntryProposals(itemId: string | undefined, normaKey: string, 
   useEffect(() => {
     if (movingId && !moving) assistantProposalsStore.setState({ moving: null });
   }, [movingId, moving]);
+  // The reader goes with its bar open (its row closed, another page): the move ends with it, or opening the row again
+  // would bring the bar back by itself and take the focus.
+  useEffect(() => {
+    if (!itemId) return;
+    return () => {
+      if (assistantProposalsStore.getState().moving?.itemId === itemId) assistantProposalsStore.setState({ moving: null });
+    };
+  }, [itemId]);
 
   const actions = useMemo<ProposalActions | undefined>(() => {
     if (!proposalsOf || !itemId) return undefined;
