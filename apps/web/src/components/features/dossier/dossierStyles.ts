@@ -53,9 +53,10 @@ export const ROW_ICON = `inline-grid h-11 w-11 shrink-0 place-items-center round
 export const ROW_TOGGLE = `flex min-h-[44px] min-w-0 flex-1 cursor-pointer items-start gap-2 rounded-md py-2.5 ${FOCUS_RING}`;
 
 /**
- * The box of a row's traffic light (D7b, `AiReviewSignal`), last in the row's toggle: as tall as the buttons beside it
- * (`ROW_ICON`) and across the toggle's own padding (its `py-2.5`, `ROW_TOGGLE`: the two change together), its sign
- * centred in it, so it sits on the star's and the bin's line. Inline after the title's signs it sat 1 to 3 px higher.
+ * The box of a row's sign on the star's line — the application's traffic light (D7b, `AiReviewSignal`), and on an
+ * article's closed row the notes' count —, in the row's toggle: as tall as the buttons beside it (`ROW_ICON`) and
+ * across the toggle's own padding (its `py-2.5`, `ROW_TOGGLE`: the two change together), its sign centred in it.
+ * Inline after the title the light sat 1 to 3 px higher, the count 2.
  */
 export const ROW_SIGN = '-my-2.5 flex h-11 shrink-0 items-center';
 

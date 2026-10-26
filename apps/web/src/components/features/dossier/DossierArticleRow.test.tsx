@@ -135,10 +135,27 @@ describe('DossierArticleRow notes', () => {
     expect(box.parentElement).toHaveClass('py-2.5', 'items-start');
   });
 
+  it('sits its notes\' count on the same line, alone or beside the light: each in a box as tall as the star', () => {
+    for (const assistantNotes of [null, { proposed: 1, validated: 0, review: 0 }]) {
+      const { unmount } = renderRow({ ...normaItem, assistantNotes }, { notes });
+      const box = screen.getByTitle('2 note').parentElement!;
+      // Alone after the title it sat 2 px above the star.
+      expect(box).toHaveClass('flex', 'h-11', '-my-2.5', 'items-center');
+      expect(box.parentElement).toHaveAttribute('role', 'button');
+      expect(box.parentElement).toHaveClass('py-2.5', 'items-start');
+      unmount();
+    }
+    // Open, the notes are listed under it: no count.
+    renderRow(normaItem, { notes, isExpanded: true });
+    expect(screen.queryByTitle('2 note')).toBeNull();
+  });
+
   it('draws no empty box for counts of nothing', () => {
     renderRow({ ...normaItem, assistantNotes: { proposed: 0, validated: 0, review: 0 } }, { notes });
     expect(document.querySelector('[data-ai-review]')).toBeNull();
-    expect(screen.getByRole('button', { name: /^Espandi codice civile 262 articolo 2043/ }).querySelector('.h-11')).toBeNull();
+    // The notes' count keeps its box; the light has none.
+    const boxes = [...screen.getByRole('button', { name: /^Espandi codice civile 262 articolo 2043/ }).querySelectorAll('.h-11')];
+    expect(boxes).toEqual([screen.getByTitle('2 note').parentElement]);
   });
 
   it('draws no light where the application wrote nothing', () => {
