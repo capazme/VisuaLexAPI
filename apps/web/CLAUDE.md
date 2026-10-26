@@ -407,7 +407,9 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   under reduced motion at once); from `md` it stays, and the Focus button sits inside its right end. A sticky row of a page pins under it
   with `top-[var(--phone-bar-offset,0px)]`: `<main>` sets the bar's height below `lg` and 0 once it has slid away
   («Le mie schede»'s filters and its card's column, the Cronologia's dates, «Da validare»'s article; a new sticky row
-  does the same, or it slides under the bar). Focus mode and Gymnasium's lesson draw no bar. During a section change
+  does the same, or it slides under the bar). No ancestor of such a row may be `overflow: hidden` (say `overflow-clip`
+  for rounded corners): it would become the row's scroll container, and the row would pin the bar's height below that
+  box's top instead (the Cronologia's card did, M1, 25 October 2026). Focus mode and Gymnasium's lesson draw no bar. During a section change
   the bar is named (`vlx-phone-bar`, `index.css`), so the page's picture passes under it. The drawer's section switcher
   sits where the bar is; the closed drawer is `inert`, and whatever closes it from inside (an entry, a link, the
   backdrop) gives the focus to the bar's menu button, where a dialog an entry opens gives it back; Esc closes it
@@ -881,10 +883,13 @@ HTML with highlight `<mark>`s and wavy note anchors), and the toolbar
 (`ReadingToolbar`; R3, «prima il testo»: one line over the text with a hairline, no box — the status in words,
 `VersionStatusChip`, «In vigore dal 1° gennaio 2005» with the date in full, and «Allegato N» (`shownAnnex`: never a
 code's own); on a computer «Note» and
-«Evidenziazioni» with their counts (`NotesHighlightsButtons labelled`), «Al dossier», then «⋯» («Altre azioni
-sull’articolo»: the quick norm, the glosse, «Cerca nel testo», «Copia», «Condividi link», «Esporta…», «Testo alla
-data…», «Confronta con…»); on a phone «Al dossier» (its icon) and «⋯» on the status's row, «⋯» adding Study Mode and the source (the compact bar of a window and of the phone's
-reader: «Note», «Evidenziazioni» and «⋯» with the glosse, «Cerca nel testo» and «Copia»; on a phone «⋯» alone); quiet
+«Evidenziazioni» with their counts (`NotesHighlightsButtons labelled`), «Colore» (`HighlightColorMenu`, H1, below),
+«Al dossier», then «⋯» («Altre azioni sull’articolo»: the quick norm, the glosse, «Cerca nel testo», «Copia»,
+«Condividi link», «Esporta…», «Testo alla data…», «Confronta con…»); on a phone «Al dossier» (its icon) and «⋯» on the
+status's row, «⋯» adding Study Mode, the source and, last under its own title, the four colours (the compact bar of a
+window and of the phone's reader: «Note», «Evidenziazioni», «Colore» and «⋯» with the glosse, «Cerca nel testo» and
+«Copia»; on a phone «⋯» alone, the colours in it); «Colore» and the colours are not offered on a text that takes no
+highlight (`lockedReason`); quiet
 neutral buttons, 36 px on a computer and 44 on a phone; «Cerca nel testo» says «Chiudi la ricerca nel testo» only while
 the window is pointed at this very text (`useFindWindowScopedTo(…, exact)`), else it points the window here. Nothing of it is inside the text root, root rule 23). Keys are `buildItemKey(norma)` and
 `uniqueArticleIdFromNorma(norma)` from `utils/normaKeys.ts` — the dossier reader
@@ -1034,13 +1039,24 @@ tick, nothing if the application wrote nothing — last in the row's toggle, in 
 (`ROW_SIGN`), its sign on their line; its words («2 da validare · 1 da rivedere») are its `title` and
 in the row's name, its counts the server's `assistant_notes` on the item (`serverFieldsFromApi`).
 
-The colour picker (`SelectionPopup`) suggests what each colour is for (`HIGHLIGHT_COLOR_MEANINGS`: yellow «Punto
-centrale», green «Condizione o presupposto», blue «Definizione o eccezione», red «Da rivedere»): the reader's convention,
-a hint above the four swatches (so a popup clipped at the top loses the hint, not the controls; sideways the popup
-is moved 8 px inside the window by its drawn box — the positioning element's first child, the positioning element
-being `w-max` — a `marginLeft` set as it is drawn), each swatch named in
-Italian with its meaning, any colour still free for anything. The MCP tool gives an application the same meanings and
-refuses red (`apps/mcp/src/tools/passages.ts`).
+The colour of new highlights is chosen once, in the reading bar (H1, the owner's decision; `settings.highlightColor`,
+kept on this device with the other reading settings, yellow until chosen, and yellow again for a save holding
+anything else — the persist `merge` checks it, `isHighlightColor`): `HighlightColorMenu` beside «Evidenziazioni» on a
+computer (`ReadingToolbar`, its compact form too; «Colore: giallo», a dot of the highlight's tint inside its ink, named
+«Colore: giallo (nuove evidenziazioni)» — the name starts with the words shown, WCAG 2.5.3 —; where the dot stands
+alone, the decision's bar and Study Mode's header, its words are its `title`), its four choices closing the «⋯» on a
+phone under their own title («Colore delle nuove evidenziazioni — uso suggerito», each named «Nuove evidenziazioni in
+verde, uso suggerito: …» so it reads as a setting, not as «highlight now»), in the decision's bar, in Study Mode's
+header, and with the dossier reader's actions (it has no bar); never on a text that takes no highlight. The menu, under
+the same title, offers the four as `menuitemradio`, each with what it is suggested for (`HIGHLIGHT_COLOR_MEANINGS`: yellow
+«Punto centrale», green «Condizione o presupposto», blue «Definizione o eccezione», red «Da rivedere»), a hint: any
+colour is free for anything. Every way of highlighting takes it: `SelectionPopup` never asks — «Evidenzia» (named
+«Evidenzia in giallo», `aria-keyshortcuts="h"`) and H highlight at once in it, its icon in the colour bright on the
+popup's dark surface (`HIGHLIGHT_ICON_ON_DARK`, never the highlight's tint, dark in the dark theme and transparent
+while highlights are hidden) —, a key passage's «Fai tua», and Study Mode's keys 1–4, which highlight in their colour
+and make it the one chosen. Sideways the popup is moved 8 px inside the window by its drawn box — the positioning
+element's first child, the positioning element being `w-max` — (a `marginLeft` set as it is drawn). Study Mode's own keys leave alone a key a menu took or one pressed in a menu (Esc there closes the
+menu, not Study Mode), and H and N while text is selected (the popup's). The MCP tool gives an application the same meanings and refuses red (`apps/mcp/src/tools/passages.ts`).
 
 The wiring follows the server's contract (`services/assistantService.ts`). `GET /api/features` says whether the
 feature is on, read as the app starts (`useAuth`) and as the dossier page mounts; a 404 «Non disponibile» from a
@@ -2452,7 +2468,7 @@ other route fails.
 **Inchiostro everywhere** (Y1, `lib/inchiostro.guard.test.ts` reads the sources): an action and the focus are
 `primary-*` (toga), everything else `slate-*` (ink), a section its hue (`--vlx-section-*`); no `blue-*`, `indigo-*`,
 `purple-*` or `violet-*` (the first two were aliases of toga, the others hues of no section) but in the colour keys the
-test lists with their reason (the courts' chips, the kinds of a suggestion's items); no text
+test lists with their reason (the courts' chips, the kinds of a suggestion's items, a highlight's four colours); no text
 under 11 px (px, a length or rem); elevation by kind — cards `shadow-sm` or a border, menus and popovers `shadow-md`,
 windows and dialogs `shadow-lg`, never `xl` or `2xl`; in the dark `index.css` draws `shadow-md` and up as a hairline and a
 drop —; flat paper, no gradient but the skeleton's shimmer and the comparison's hatch (`GapCell`); `index.css`'s

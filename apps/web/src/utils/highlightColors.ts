@@ -7,20 +7,37 @@ export const HIGHLIGHT_COLORS: readonly HighlightColor[] = ['yellow', 'green', '
 /** A colour as the reader is told it («Testo evidenziato in giallo»); an unknown value is shown as is. */
 const HIGHLIGHT_COLOR_NAMES: Record<HighlightColor, string> = { yellow: 'giallo', green: 'verde', red: 'rosso', blue: 'blu' };
 
+/** A colour this app knows: what a saved setting is checked against, since storage may hold anything. */
+export function isHighlightColor(color: unknown): color is HighlightColor {
+  return (HIGHLIGHT_COLORS as readonly unknown[]).includes(color);
+}
+
 export function highlightColorName(color: string): string {
   return (HIGHLIGHT_COLOR_NAMES as Record<string, string>)[color] ?? color;
 }
 
 /**
- * What each colour is suggested for (D7b): the reader's convention, offered as a hint in the colour picker, never a
- * rule. The same meanings the MCP tool gives an application; red stands for «Da rivedere», the mark of review, and an
- * application never proposes in red.
+ * What each colour is suggested for (D7b): the reader's convention, offered as a hint in the menu where the colour of
+ * new highlights is chosen (H1), never a rule. The same meanings the MCP tool gives an application; red stands for
+ * «Da rivedere», the mark of review, and an application never proposes in red.
  */
 export const HIGHLIGHT_COLOR_MEANINGS: Record<HighlightColor, string> = {
   yellow: 'Punto centrale',
   green: 'Condizione o presupposto',
   blue: 'Definizione o eccezione',
   red: 'Da rivedere',
+};
+
+/**
+ * Each colour as an icon on the selection popup's dark surface (`slate-900`/`slate-800` in both themes): bright
+ * enough to keep 3:1, and never the highlight's background, which is a dark tint in the dark theme and transparent
+ * while highlights are hidden (`.highlights-hidden`).
+ */
+export const HIGHLIGHT_ICON_ON_DARK: Record<HighlightColor, string> = {
+  yellow: 'text-yellow-300',
+  green: 'text-green-300',
+  red: 'text-red-300',
+  blue: 'text-blue-300',
 };
 
 /**

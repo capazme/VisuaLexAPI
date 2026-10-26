@@ -133,7 +133,8 @@ describe('App routing', () => {
 
   it('renders the global 404 page inside the layout for unknown paths', async () => {
     renderAt('/percorso-inesistente');
-    expect(await screen.findByText('Pagina non trovata')).toBeInTheDocument();
+    // The page's title: with it in sight, the phone's bar names no section over it (M1).
+    expect(await screen.findByRole('heading', { level: 1, name: 'Pagina non trovata' })).toBeInTheDocument();
     // the layout (sidebar shell) stays mounted around the 404
     expect(screen.getByTestId('layout')).toBeInTheDocument();
     const backLink = screen.getByRole('link', { name: 'Torna alla ricerca' });

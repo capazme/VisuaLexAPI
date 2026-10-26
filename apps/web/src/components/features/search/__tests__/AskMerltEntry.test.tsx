@@ -45,6 +45,11 @@ describe('AskMerltEntry', () => {
       );
     });
 
+    it('is 44 px to tap on a phone, 16 from md (M1)', () => {
+      render(<AskMerltEntry {...BASE} qaAskable />);
+      expect(screen.getByRole('button', { name: /chiedi su questo articolo/i })).toHaveClass('min-h-[44px]', 'md:min-h-0');
+    });
+
     it('navigates to bare /grafo (no ?urn=) when the article has no urn', () => {
       render(<AskMerltEntry {...BASE} articleUrn={undefined} qaAskable />);
       fireEvent.click(screen.getByRole('button', { name: /chiedi su questo articolo/i }));
