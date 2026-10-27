@@ -18,9 +18,11 @@ interface AssistantProposalsState {
   byItem: Record<string, Proposal[]>;
   /** The proposals and note entries with a write out, by id: their checkbox and flag wait for it. */
   busy: Record<string, true>;
+  /** «Sposta l'evidenziazione»: the one passage on the page whose new words a reader is asking for. */
+  moving: { itemId: string; proposalId: string } | null;
 }
 
-export const assistantProposalsStore = create<AssistantProposalsState>()(() => ({ enabled: false, byItem: {}, busy: {} }));
+export const assistantProposalsStore = create<AssistantProposalsState>()(() => ({ enabled: false, byItem: {}, busy: {}, moving: null }));
 
 // What `apiClient` rejects with, once its interceptor has read the answer: `{ status, message, data }`.
 const errorDetail = (error: unknown, fallback: string): string => {
@@ -74,7 +76,7 @@ function endWrite(id: string, mine: number) {
  * (the rows' lights, the note entries' controls) until the server says on again.
  */
 function switchOff() {
-  assistantProposalsStore.setState({ enabled: false, byItem: {}, busy: {} });
+  assistantProposalsStore.setState({ enabled: false, byItem: {}, busy: {}, moving: null });
   clearedByOff = true;
   appStore.setState((s) => {
     for (const d of s.dossiers) {
@@ -94,7 +96,7 @@ export function resetAssistantProposals() {
   pendingRemovals.clear();
   removalsInFlight.clear();
   writeSeq.clear();
-  assistantProposalsStore.setState({ enabled: false, byItem: {}, busy: {} });
+  assistantProposalsStore.setState({ enabled: false, byItem: {}, busy: {}, moving: null });
 }
 
 let featuresInFlight: Promise<void> | null = null;
@@ -155,14 +157,20 @@ const stateOf = (itemId: string, proposalId: string): AiReviewState | null =>
   assistantProposalsStore.getState().byItem[itemId]?.find((p) => p.id === proposalId)?.note?.state ?? null;
 
 /** Gone from the server: gone here too, its count off the light, quietly. */
-function dropGone(dossierId: string, itemId: string, proposalId: string) {
+/** Whether there was one here to take away. */
+function dropGone(dossierId: string, itemId: string, proposalId: string): boolean {
   const gone = assistantProposalsStore.getState().byItem[itemId]?.find((p) => p.id === proposalId);
-  if (!gone) return;
+  if (!gone) return false;
   assistantProposalsStore.setState((s) => ({ byItem: { ...s.byItem, [itemId]: (s.byItem[itemId] ?? []).filter((p) => p.id !== proposalId) } }));
   moveCount(dossierId, itemId, gone.note?.state ?? null, null);
+  return true;
 }
 
-async function write(dossierId: string, itemId: string, proposalId: string, run: () => Promise<Proposal>) {
+/**
+ * `gone`: what to say when the server no longer has the passage (removed in another tab or by the application). A state
+ * or a note written on it goes quietly; a move, which the user has just chosen words for, says why nothing moved.
+ */
+async function write(dossierId: string, itemId: string, proposalId: string, run: () => Promise<Proposal>, gone?: string) {
   const mine = startWrite(proposalId);
   try {
     const next = await run();
@@ -182,8 +190,9 @@ async function write(dossierId: string, itemId: string, proposalId: string, run:
   } catch (error) {
     if (!isLatest(proposalId, mine)) return;
     if (isSwitchedOff(error)) switchOff();
-    else if (isGone(error)) dropGone(dossierId, itemId, proposalId);
-    else notify({ type: 'error', message: errorDetail(error, 'Modifica non salvata'), duration: 5000 });
+    else if (isGone(error)) {
+      if (dropGone(dossierId, itemId, proposalId) && gone) notify({ type: 'warning', message: gone, duration: 5000 });
+    } else notify({ type: 'error', message: errorDetail(error, 'Modifica non salvata'), duration: 5000 });
   } finally {
     endWrite(proposalId, mine);
   }
@@ -191,6 +200,15 @@ async function write(dossierId: string, itemId: string, proposalId: string, run:
 
 export function setProposalState(dossierId: string, itemId: string, proposalId: string, state: AiReviewState, comment?: string | null) {
   return write(dossierId, itemId, proposalId, () => assistantService.setProposalState(dossierId, itemId, proposalId, state, comment));
+}
+
+/** «Sposta l'evidenziazione»: the passage's new boundaries; its note keeps its state. */
+export function moveProposal(dossierId: string, itemId: string, proposalId: string, startOffset: number, text: string) {
+  return write(
+    dossierId, itemId, proposalId,
+    () => assistantService.moveProposal(dossierId, itemId, proposalId, startOffset, text),
+    'Evidenziazione non spostata: il passaggio è stato rimosso altrove.',
+  );
 }
 
 /** The pencil: saving the note validates it, «Validato, modificato da te». */

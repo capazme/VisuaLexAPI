@@ -40,6 +40,16 @@ export const assistantService = {
     return response.data;
   },
 
+  /**
+   * The passage's new boundaries, from the user's selection (contract §2.3): its offset in the reader's projection and
+   * the projection's slice there, 1–2000 characters. The application's own boundaries stay on the server; the note's
+   * state does not change.
+   */
+  async moveProposal(dossierId: string, itemId: string, proposalId: string, startOffset: number, text: string): Promise<Proposal> {
+    const response = await apiClient.put<Proposal>(`${proposal(dossierId, itemId, proposalId)}/range`, { startOffset, text });
+    return response.data;
+  },
+
   async removeProposal(dossierId: string, itemId: string, proposalId: string): Promise<void> {
     await apiClient.delete(proposal(dossierId, itemId, proposalId));
   },

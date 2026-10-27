@@ -12,6 +12,20 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.10.5] - 2026-10-27
+
+The web only: the boundaries of an assistant's passage moved by hand, and the
+signs of a dossier row on one line. No migration, no server change.
+
+### Dossier
+
+- D7b: «Sposta l'evidenziazione» on a proposal's card, in the block's popover
+  and among the proposals no longer in the text: new words chosen by mouse,
+  touch or Shift+arrows, 1–2000 characters inside the entry's text; the note
+  keeps its state and the application's original words stay viewable.
+- The AI light and the notes' count on a dossier row sit on the line of the
+  star and the bin, for articles and decisions.
+
 ## [1.10.4] - 2026-10-26
 
 The web only: undo for removed highlights and notes, the highlight colour

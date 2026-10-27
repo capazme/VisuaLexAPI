@@ -124,6 +124,64 @@ describe('DossierArticleRow notes', () => {
     expect(screen.getByRole('button', { name: 'Comprimi codice civile 262 articolo 2043, 2 da validare · 1 da rivedere' })).toBeInTheDocument();
   });
 
+  /**
+   * A sign on the star's line: in a box as tall as the buttons (h-11) across the toggle's py-2.5, its sign centred (once
+   * 1 to 3 px higher than the star), in the signs' group — up to half the row, no padding of its own — in the toggle.
+   */
+  // A law's annex (a code's own is never shown: `shownAnnex`).
+  const ANNEXED = { tipo_atto: 'legge', numero_atto: '241', data: '1990-08-07', numero_articolo: '1', allegato: 'A' };
+  const onStarLine = (sign: HTMLElement) => {
+    const box = sign.parentElement!;
+    expect(box).toHaveClass('flex', 'h-11', '-my-2.5', 'items-center');
+    const group = box.parentElement!;
+    expect(group).toHaveClass('max-w-[50%]', 'items-start');
+    expect(group.className).not.toMatch(/\b(p|py|pt|pb)-/);
+    expect(group.parentElement).toHaveAttribute('role', 'button');
+    expect(group.parentElement).toHaveClass('py-2.5', 'items-start');
+    expect(screen.getByRole('button', { name: /importante/ })).toHaveClass('h-11');
+  };
+
+  it('sits its light on the line of the star and the bin: in a box as tall as they are, centred, in the row\'s toggle', () => {
+    renderRow({ ...normaItem, assistantNotes: { proposed: 1, validated: 0, review: 0 } }, { notes });
+    onStarLine(screen.getByTitle('1 da validare'));
+  });
+
+  it('sits its notes\' count on the same line, alone, beside the light or after a chip, all in the half-row group', () => {
+    const annexed = { ...normaItem, data: ANNEXED };
+    for (const item of [normaItem, { ...normaItem, assistantNotes: { proposed: 1, validated: 0, review: 0 } }, annexed]) {
+      const { unmount } = renderRow(item, { notes });
+      if (item === annexed) expect(screen.getByText(/^All\. A$/)).toBeInTheDocument();
+      // Alone after the title it sat 2 px above the star.
+      onStarLine(screen.getByTitle('2 note'));
+      unmount();
+    }
+    // Open, the notes are listed under it: no count.
+    renderRow(normaItem, { notes, isExpanded: true });
+    expect(screen.queryByTitle('2 note')).toBeNull();
+  });
+
+  it('keeps the chips in the same group, wrapping, 2 px down to the star\'s line; no group with no sign', () => {
+    const { unmount } = renderRow({ ...normaItem, data: ANNEXED }, { notes });
+    const chips = screen.getByText(/^All\. A$/).parentElement!;
+    expect(chips).toHaveClass('flex-wrap', 'pt-0.5');
+    const group = screen.getByTitle('2 note').parentElement!.parentElement!;
+    expect(chips.parentElement).toBe(group);
+    // Drawn from the right, the chips last: too narrow for all, they wrap under and the count keeps the star's line.
+    expect(group).toHaveClass('flex-row-reverse', 'flex-wrap');
+    expect(group.lastElementChild).toBe(chips);
+    unmount();
+    renderRow({ ...normaItem, assistantNotes: null }, { notes, isExpanded: true });
+    expect(document.querySelector('.max-w-\\[50\\%\\]')).toBeNull();
+  });
+
+  it('draws no empty box for counts of nothing', () => {
+    renderRow({ ...normaItem, assistantNotes: { proposed: 0, validated: 0, review: 0 } }, { notes });
+    expect(document.querySelector('[data-ai-review]')).toBeNull();
+    // The notes' count keeps its box; the light has none.
+    const boxes = [...screen.getByRole('button', { name: /^Espandi codice civile 262 articolo 2043/ }).querySelectorAll('.h-11')];
+    expect(boxes).toEqual([screen.getByTitle('2 note').parentElement]);
+  });
+
   it('draws no light where the application wrote nothing', () => {
     renderRow({ ...normaItem, assistantNotes: null }, { notes });
     expect(document.querySelector('[data-ai-review]')).toBeNull();
