@@ -1033,7 +1033,31 @@ in place in `NoteEditBox`, shared with `NoteCard`, here `explicit`: «Salva» an
 Shift+Enter a new line, Esc cancels without closing the popover, leaving the box saves nothing; a changed text is
 never dropped without «Scartare la modifica?» — «Continua» or «Scarta» —, asked by «Annulla» or Esc, and by the
 popover's X, Esc or «Vai al passo», which a press outside never closes while a note is edited), the bin, and «Vedi la versione dell'IA» once the note was
-changed. A shape per state, never colour alone. The dossier's rows carry the traffic light (`AiReviewSignal`,
+changed. Every proposal, a bare mark too and one that no longer lands, offers «Sposta l’evidenziazione» (the
+passage's boundaries by hand: Luca, «l'evidenziatura l'IA me la fa, però devo poterla modificare»): the popover closes,
+the reader shows `MoveProposalBar` (portalled, fixed at the foot, the page's width on a phone; one on the page at a
+time, `assistantProposalsStore.moving`, which a removal, the feature switched off or its reader going ends) with the passage's words
+selected in the text (only when they are still at their offset) and the focus on it; meanwhile the selection popup is off
+(`ArticleBody`'s `selectionPopup`) and a click in the text opens nothing (a drag ends with one, on the very passage), nor
+Enter or Space on a sign, a reference or the update notes' toggle, and
+a changed note in the popover asks first («Scartare la modifica?»). The new words
+are a drag or a touch, or Maiusc+frecce from the keyboard (Ctrl or Alt a word at a time, `Selection.modify`, wherever
+the focus is but in a field, under a dialog or on a key already taken) with «Sposta l'inizio» / «Sposta la fine»
+choosing the edge (`setBaseAndExtent`; a backward drag makes it the start); on a touch screen with no fine pointer
+(`pointer: coarse` without `any-pointer: fine`: an iPad with a trackpad keeps them) the help says «Tieni premuto su una
+parola, poi trascina le maniglie» and those two buttons go. A press on the bar does not read the selection it empties
+(iOS does, as the finger lands, and sends the click late): it lasts until the bar's click has been handled, or 400 ms
+after the release, then puts back the words selected as it began — never words the user had let go of, and never a
+`preventDefault` on the press. The title and the help are the bar's `aria-describedby`.
+While open the bar says its room at the foot of the window (`ui/notifications/footBar.ts`, 0 as it closes), over which the
+notifications' bottom stack rises (`NotificationHost`, as `--foot-bar` on the stack alone: rewriting the root's style
+while a notification animated crashed headless Chromium's page, one row in four). The focus goes back to the block's sign after a move or «Annulla». They are read as a highlight of the user's is (`getSelectionAnchor` over the
+reader's text root, its projection; root rule 23), 1–2000 characters, and «Sposta qui» or Enter sends them
+(`PUT …/proposals/:id/range`, `moveProposal` in the store, the note's state unchanged); Esc leaves. A passage removed
+meanwhile in another tab (404 «Proposta non trovata») goes, and the move says so («Evidenziazione non spostata: …»),
+where a state or a note written on it goes quietly. Once moved, the card
+offers «Vedi l'evidenziazione dell'IA» (`HighlightProposal.originalText`, the server's `assistantRange`).
+`rangeFromPlainOffsets` (`utils/selectionOffset.ts`) is `plainOffsetAt`'s inverse. A shape per state, never colour alone. The dossier's rows carry the traffic light (`AiReviewSignal`,
 `utils/aiReview.ts`): a red flag if one item is to review, else a yellow dashed ring if one waits, else a green
 tick, nothing if the application wrote nothing — last in the row's toggle, in a box as tall as the star and the bin
 (`ROW_SIGN`), its sign on their line, and so is the closed article row's notes' count beside it; its words

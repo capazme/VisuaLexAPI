@@ -2,14 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../services/assistantService', () => ({
   assistantService: {
-    features: vi.fn(), listProposals: vi.fn(), setProposalState: vi.fn(), editProposalNote: vi.fn(), removeProposal: vi.fn(), removeProposalOnExit: vi.fn(), refreshForExit: vi.fn(async () => {}),
+    features: vi.fn(), listProposals: vi.fn(), setProposalState: vi.fn(), editProposalNote: vi.fn(), moveProposal: vi.fn(), removeProposal: vi.fn(), removeProposalOnExit: vi.fn(), refreshForExit: vi.fn(async () => {}),
     setNoteEntryState: vi.fn(), editNoteEntryText: vi.fn(),
   },
 }));
 
 import { assistantService } from '../../services/assistantService';
 import {
-  assistantProposalsStore, editNoteEntryText, editProposalNote, flushRemovals, loadAssistantFeatures, loadProposals,
+  assistantProposalsStore, editNoteEntryText, editProposalNote, flushRemovals, loadAssistantFeatures, loadProposals, moveProposal,
   removeProposal, resetAssistantProposals, setNoteEntryState, setProposalState,
 } from '../assistantProposals';
 import { appStore } from '../useAppStore';
@@ -79,7 +79,7 @@ describe('D7b proposals — the flag', () => {
     expect(assistantProposalsStore.getState().enabled).toBe(true);
     vi.mocked(assistantService.setProposalState).mockRejectedValueOnce(notFound('Non disponibile'));
     await setProposalState('d1', 'a1', 'p1', 'validated');
-    expect(assistantProposalsStore.getState()).toEqual({ enabled: false, byItem: {}, busy: {} });
+    expect(assistantProposalsStore.getState()).toEqual({ enabled: false, byItem: {}, busy: {}, moving: null });
     expect(counts()).toBeNull();
     expect(appStore.getState().dossiers[0].items[1].assistantNote).toBeNull();
   });
@@ -123,7 +123,7 @@ describe('D7b proposals — the flag', () => {
     await loadProposals('d1', 'a1');
     removeProposal('d1', 'a1', 'p1');
     resetAssistantProposals();
-    expect(assistantProposalsStore.getState()).toEqual({ enabled: false, byItem: {}, busy: {} });
+    expect(assistantProposalsStore.getState()).toEqual({ enabled: false, byItem: {}, busy: {}, moving: null });
     window.dispatchEvent(new Event('pagehide'));
     expect(assistantService.removeProposalOnExit).not.toHaveBeenCalled();
   });
@@ -149,6 +149,29 @@ describe('D7b proposals — the note\'s state', () => {
     expect(assistantService.editProposalNote).toHaveBeenCalledWith('d1', 'a1', 'p1', 'Mia.');
     expect(assistantProposalsStore.getState().byItem.a1[0].note?.text).toBe('Mia.');
     expect(counts()).toEqual({ proposed: 0, validated: 1, review: 0 });
+  });
+
+  it('moving the boundaries takes the server\'s answer and leaves the light alone: the note keeps its state', async () => {
+    const moved = { ...p1, text: 'i contraenti', startOffset: 28, endOffset: 40, rangeEdited: true, assistantRange: { startOffset: 30, text: 'contraenti' } };
+    vi.mocked(assistantService.moveProposal).mockResolvedValueOnce(moved);
+    await moveProposal('d1', 'a1', 'p1', 28, 'i contraenti');
+    expect(assistantService.moveProposal).toHaveBeenCalledWith('d1', 'a1', 'p1', 28, 'i contraenti');
+    expect(assistantProposalsStore.getState().byItem.a1[0]).toMatchObject({ startOffset: 28, text: 'i contraenti', rangeEdited: true });
+    expect(counts()).toEqual({ proposed: 1, validated: 0, review: 0 });
+  });
+
+  it('a move on a passage removed elsewhere (another tab) says why nothing moved, and the passage goes', async () => {
+    vi.mocked(assistantService.moveProposal).mockRejectedValueOnce(notFound('Proposta non trovata'));
+    await moveProposal('d1', 'a1', 'p1', 28, 'i contraenti');
+    expect(assistantProposalsStore.getState().byItem.a1.map((p) => p.id)).toEqual(['p2']);
+    expect(lastNotification()).toMatchObject({ type: 'warning', message: 'Evidenziazione non spostata: il passaggio è stato rimosso altrove.' });
+  });
+
+  it('a move answered «Proposta non trovata» for a passage this tab no longer holds says nothing more', async () => {
+    assistantProposalsStore.setState((st) => ({ byItem: { ...st.byItem, a1: st.byItem.a1.filter((p) => p.id !== 'p1') } }));
+    vi.mocked(assistantService.moveProposal).mockRejectedValueOnce(notFound('Proposta non trovata'));
+    await moveProposal('d1', 'a1', 'p1', 28, 'i contraenti');
+    expect(notificationStore.getState().entries.some((e) => e.type === 'warning')).toBe(false);
   });
 
   it('two clicks in a row move the light once', async () => {

@@ -258,6 +258,8 @@ export interface HighlightProposal {
     /** The application's registered name, unverified. */
     clientName: string | null;
     note: AssistantNote | null;
+    /** The words the application marked, once the user moved the boundaries; absent while they are its own. */
+    originalText?: string;
 }
 
 /** A note entry an application wrote in a dossier (D7b contract §3), its state and its original. */
