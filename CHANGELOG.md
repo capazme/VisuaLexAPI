@@ -12,6 +12,14 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+### Sources
+
+- An EU act's article heading glued to the end of the paragraph before it is now found also when
+  its body sits in the next container or is bare text after the paragraph, and a paragraph that
+  opens on an article it cites («Articolo 5 della direttiva … è sostituito», «Article 5 of
+  Directive …») is no longer read as that article's heading. No real page known today has these
+  shapes; the texts of the 23 acts compared are unchanged.
+
 ## [1.10.5] - 2026-10-27
 
 The web only: the boundaries of an assistant's passage moved by hand, and the

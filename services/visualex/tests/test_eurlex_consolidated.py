@@ -885,6 +885,105 @@ class TestHeadingGluedToTheParagraphBefore:
         assert text == "Articolo 2\nPrimo.\n… misure previste. Articolo 3"
 
 
+class TestGluedHeadingLimits:
+    """Three limits of the glued heading (#346) found by the mcp-legal-it review. No real page
+    known today has them: every page here is **synthetic**, written for the test."""
+
+    URL = "https://eur-lex.europa.eu/eli/dir/1/1/oj/ita"
+
+    @staticmethod
+    def glued(page):
+        from visualex_api.tools.treextractor import glued_headings
+        return sorted(glued_headings(BeautifulSoup(page, "html.parser")))
+
+    async def numbers(self, page):
+        result, _, _ = await _parse_eurlex_tree(BeautifulSoup(page, "html.parser"), self.URL)
+        return [item["numero"] for item in result]
+
+    @staticmethod
+    async def text(page, article):
+        return await EurlexScraper().extract_article_text(BeautifulSoup(page, "html.parser"), article)
+
+    # 1. The body in the next container.
+    NEXT_CONTAINER = ("<div><p>Articolo 1</p><p>Primo.</p><p>Testo. Articolo 2</p></div>"
+                      "<div><p>Corpo del secondo.</p><p>Ancora.</p></div>"
+                      "<div><p>Articolo 3</p><p>Terzo.</p></div>")
+
+    async def test_a_body_in_the_next_container(self):
+        assert self.glued(self.NEXT_CONTAINER) == ["2"]
+        assert await self.numbers(self.NEXT_CONTAINER) == ["1", "2", "3"]
+        assert await self.text(self.NEXT_CONTAINER, "2") == "Articolo 2\nCorpo del secondo.Ancora."
+        assert await self.text(self.NEXT_CONTAINER, "1") == "Articolo 1\nPrimo.\nTesto."
+
+    @pytest.mark.parametrize("page", [
+        # the next container opens with another heading: art. 2 would have no body
+        "<div><p>Articolo 1</p><p>Testo. Articolo 2</p></div><div><p>Articolo 3</p><p>Terzo.</p></div>",
+        # nothing after it, at any level
+        "<div><p>Articolo 1</p><p>Testo. Articolo 2</p></div><div> </div>",
+    ])
+    def test_the_next_container_still_needs_a_body(self, page):
+        assert self.glued(page) == []
+
+    # 2. The body as bare text after the paragraph.
+    BARE_TEXT = "<div><p>Articolo 1</p><p>Testo. Articolo 2</p>Corpo nudo del secondo.<p>Articolo 3</p><p>Terzo.</p></div>"
+
+    async def test_a_body_as_bare_text(self):
+        assert self.glued(self.BARE_TEXT) == ["2"]
+        assert await self.numbers(self.BARE_TEXT) == ["1", "2", "3"]
+        assert await self.text(self.BARE_TEXT, "2") == "Articolo 2\nCorpo nudo del secondo."
+
+    async def test_the_last_article_never_climbs_out_of_its_container(self):
+        # The body sits beside the paragraph: what follows the act's container is not the article's.
+        page = "<div><p>Articolo 1</p><p>Testo. Articolo 2</p><p>Corpo.</p></div><div><p>Avvertenza della pagina.</p></div>"
+        assert await self.text(page, "2") == "Articolo 2\nCorpo."
+
+    # 3. A body that opens on an article it cites.
+    @pytest.mark.parametrize("heading,body,cited", [
+        ("Articolo", "Articolo 5 della direttiva 2002/58/CE è sostituito dal seguente:", "5"),
+        ("Article", "Article 5 of Directive 2002/58/EC is replaced by the following:", "5"),
+        ("Articolo", "Articolo 15 bis della direttiva 2002/58/CE è soppresso.", "15-bis"),
+    ])
+    async def test_a_body_citing_an_article_is_a_body(self, heading, body, cited):
+        page = (f"<p>{heading} 1</p><p>Modifiche. {heading} 2</p><p>{body}</p><p>Altro.</p>"
+                f"<p>{heading} 3</p><p>Terzo.</p>")
+        assert self.glued(page) == ["2"]
+        assert await self.numbers(page) == ["1", "2", "3"]
+        assert await self.text(page, "2") == f"{heading} 2\n{body}\nAltro."
+        with pytest.raises(DocumentNotFoundError):
+            await self.text(page, cited)
+
+    async def test_the_main_path_does_not_count_a_cited_article(self):
+        # Before: art. 5 listed, and art. 1's text cut at the sentence that cites it.
+        page = ("<p>Articolo 1</p><p>Modifiche.</p><p>Articolo 5 della direttiva 2002/58/CE è sostituito dal seguente:</p>"
+                "<p>«Testo nuovo.»</p><p>Articolo 2</p><p>Secondo.</p>")
+        assert await self.numbers(page) == ["1", "2"]
+        assert await self.text(page, "1") == ("Articolo 1\nModifiche.\nArticolo 5 della direttiva 2002/58/CE è "
+                                              "sostituito dal seguente:\n«Testo nuovo.»")
+        with pytest.raises(DocumentNotFoundError):
+            await self.text(page, "5")
+
+    @pytest.mark.parametrize("text,number", [
+        ("Articolo 5 della direttiva 2002/58/CE è sostituito", None),
+        ("Article 5 of Directive 2002/58/EC", None),
+        ("Articolo 13 e articolo 14, paragrafo 1", None),
+        ("Articolo 15 bis della direttiva", None),
+        ("Articolo\xa05\xa0del regolamento", None),
+        ("Articolo 5", "5"),
+        ("Articolo 1 Terzi", "1"),
+        ("Articolo 15 bis", "15-bis"),
+        ("Articolo 15 bisTesto", "15-bis"),
+        ("Articolo 8(ex articolo 3, paragrafo 2, del TCE)", "8"),
+        ("Articolo 4 bis1.   Le disposizioni", "4-bis"),
+    ])
+    def test_a_heading_never_goes_on_as_a_sentence(self, text, number):
+        from visualex_api.tools.treextractor import eurlex_heading_number
+        assert eurlex_heading_number(text) == number
+
+    async def test_the_next_article_with_its_ordinal_still_ends_the_text(self):
+        page = "<p>Articolo 15</p><p>Quindici.</p><p>Articolo 15 bis</p><p>Quindici bis.</p>"
+        assert await self.text(page, "15") == "Articolo 15\nQuindici."
+
+
 class TestDescriptionSubjectIsLinear:
     """`(?:,\\s*|\\s+)dell?…` restarted at every blank of a run and scanned the rest of it each time:
     0.75 s on 20,000 blanks. Matched now only from a run's first blank, with the same result."""
