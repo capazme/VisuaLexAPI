@@ -34,6 +34,7 @@ export function LostProposalsList({ proposals, actions }: LostProposalsListProps
                             onReviewComment={(text) => actions.comment(p.id, text)}
                             onEditNote={(text) => actions.editNote(p.id, text)}
                             onRemove={() => actions.remove(p.id)}
+                            onMove={actions.move && (() => actions.move!(p.id))}
                         />
                     </li>
                 ))}

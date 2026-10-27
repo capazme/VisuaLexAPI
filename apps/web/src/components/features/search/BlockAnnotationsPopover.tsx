@@ -58,6 +58,8 @@ export interface ProposalActions {
     editNote: (id: string, text: string) => void;
     /** The caller's notice offers «Annulla». */
     remove: (id: string) => void;
+    /** «Sposta l'evidenziazione»: the reader asks for the passage's new words (absent where it cannot). */
+    move?: (id: string) => void;
 }
 
 /**
@@ -248,6 +250,13 @@ export function BlockAnnotationsPopover({
                                             onReviewComment={(text) => proposalActions.comment(proposal.id, text)}
                                             onEditNote={(text) => proposalActions.editNote(proposal.id, text)}
                                             onRemove={() => remove(() => proposalActions.remove(proposal.id))}
+                                            onMove={proposalActions.move && (() => {
+                                                // A changed note asks first («Scartare la modifica?»); the bar takes the focus.
+                                                if (requestClose(false)) return;
+                                                returnFocusRef.current = null;
+                                                onClose();
+                                                proposalActions.move!(proposal.id);
+                                            })}
                                             onDraftState={(state) => reportDraft(proposal.id, state)}
                                             closeRequested={closeAsk?.id === proposal.id}
                                             onCloseAnswer={answerClose}
