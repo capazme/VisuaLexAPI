@@ -116,7 +116,7 @@ async def test_the_eurlex_tree_reads_the_scraper_copy(isolated):
     _, eurlex_cache = isolated
     eurlex_cache.data[GDPR_URL] = GDPR
     fetch = AsyncMock(return_value=GDPR)
-    with patch.object(treextractor, "_fetch_with_playwright", fetch):
+    with patch.object(treextractor.eurlex_fetch, "fetch_act_page", fetch):
         _, count, metadata = await treextractor.get_tree(GDPR_URL, details=True, return_metadata=True)
     assert count > 0 and metadata["rubriche"]["1"] == "Oggetto e finalità"
     assert fetch.await_count == 0
@@ -124,15 +124,18 @@ async def test_the_eurlex_tree_reads_the_scraper_copy(isolated):
 
 async def test_the_eurlex_page_a_tree_visited_is_left_for_the_scraper(isolated):
     _, eurlex_cache = isolated
-    with patch.object(treextractor, "_fetch_with_playwright", AsyncMock(return_value=GDPR)):
+    with patch.object(treextractor.eurlex_fetch, "fetch_act_page", AsyncMock(return_value=GDPR)):
         await treextractor.get_tree(GDPR_URL, details=False, return_metadata=True)
     assert eurlex_cache.data[GDPR_URL] == GDPR
 
 
 async def test_a_refused_eurlex_page_is_never_left_for_the_scraper(isolated):
+    # CELLAR does not serve the act and the browser meets EUR-Lex's refusal: no page, no copy.
     _, eurlex_cache = isolated
     refused = "<html><body>" + "Request rejected. " * 100 + "</body></html>"
-    with patch.object(treextractor, "_fetch_with_playwright", AsyncMock(return_value=refused)):
+    with patch.object(treextractor.eurlex_fetch, "fetch_from_cellar",
+                      AsyncMock(side_effect=NetworkError("CELLAR down"))), \
+            patch.object(treextractor.eurlex_fetch, "fetch_with_playwright", AsyncMock(return_value=refused)):
         _, count, _ = await treextractor.get_tree(GDPR_URL, details=False, return_metadata=True)
     assert count == 0 and eurlex_cache.data == {}
 
@@ -141,7 +144,7 @@ async def test_a_scraper_copy_without_articles_is_visited_again(isolated):
     _, eurlex_cache = isolated
     eurlex_cache.data[GDPR_URL] = "<html><body>" + "Request rejected. " * 100 + "</body></html>"
     fetch = AsyncMock(return_value=GDPR)
-    with patch.object(treextractor, "_fetch_with_playwright", fetch):
+    with patch.object(treextractor.eurlex_fetch, "fetch_act_page", fetch):
         _, count, _ = await treextractor.get_tree(GDPR_URL, details=False, return_metadata=True)
     assert count > 0 and fetch.await_count == 1
     assert eurlex_cache.data[GDPR_URL] == GDPR
@@ -173,7 +176,7 @@ async def test_a_page_the_client_could_not_fetch_is_a_failure_kept_nowhere(isola
 ])
 async def test_an_undeclared_host_is_never_visited(isolated, url):
     browser = AsyncMock(return_value=GDPR)
-    with patch.object(treextractor, "_fetch_with_playwright", browser):
+    with patch.object(treextractor.eurlex_fetch, "fetch_act_page", browser):
         answer = await treextractor.get_tree(url, details=True, return_metadata=True)
     assert answer[1] == 0 and answer[0].startswith("Host non consentito")
     assert FakeClient.visits == [] and browser.await_count == 0
@@ -186,7 +189,7 @@ async def test_an_undeclared_host_is_never_visited(isolated, url):
 ])
 async def test_a_declared_host_the_tree_does_not_parse_is_not_visited(isolated, url):
     browser = AsyncMock(return_value=GDPR)
-    with patch.object(treextractor, "_fetch_with_playwright", browser):
+    with patch.object(treextractor.eurlex_fetch, "fetch_act_page", browser):
         answer = await treextractor.get_tree(url, return_metadata=True)
     assert answer == ("Unrecognized norm URN format", 0, {})
     assert FakeClient.visits == [] and browser.await_count == 0

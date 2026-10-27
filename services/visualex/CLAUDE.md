@@ -10,7 +10,12 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
   `reject_future_version_date`, an undated request served as Normattiva answers it (G-355,
   G-357, G-358 are the root app's). Never deploy it as it is; its `/api/export_pdf` follows
   the root app's. Retiring or porting it goes with the move to the mcp-legal-it shell.
-- **`services/`** — `normattiva_scraper.py`, `eurlex_scraper.py`,
+- **`services/`** — `normattiva_scraper.py`, `eurlex_scraper.py`, `eurlex_fetch.py` (where an
+  EU act's page comes from: CELLAR first, by CELEX through the shared client — `source="cellar"`,
+  the 303 followed by hand over https and re-checked against the allow-list — and EUR-Lex's site
+  through Playwright second, since eur-lex.europa.eu answers a server with an AWS WAF challenge,
+  202 plus `x-amzn-waf-action` (`is_waf_challenge`); a page with no act's marker, `is_act_page`, is
+  neither served nor kept; the URL the app holds and the copies' key stay EUR-Lex's),
   `brocardi_scraper.py` (switched off, below), `pdfextractor.py` (Playwright pool),
   `http_client.py` (the shared throttled aiohttp client — TLS verification on;
   `request(..., max_retries=n)` lowers the retry budget for a caller that paces
@@ -178,8 +183,9 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     read as another host than `urlparse` does. `tests/test_egress_allowlist.py` fails the
     build when a URL literal names an undeclared host. The runtime check covers
     every `ThrottledHttpClient` (the shared one and the decision readers' own)
-    and treextractor's check before a browser — `SECURITY.md` lists what it does not
-    cover (the EUR-Lex scraper's and the PDF export's Playwright, redirect targets).
+    and the check before EUR-Lex's browser (`eurlex_fetch.fetch_with_playwright`, for the
+    scraper and the tree alike) — `SECURITY.md` lists what it does not cover (the PDF
+    export's Playwright, what a page then loads, redirect targets except CELLAR's).
   - `tls.py` — the verifying SSL context for Italgiure, which serves an incomplete chain:
     the missing intermediate ships in `tools/certs/` and is trusted only under its SHA-256
     pin. Never "simplify" it into turning verification off (`tests/test_tls_italgiure.py`
@@ -363,8 +369,11 @@ POST unless noted, JSON bodies.
   characters is a 400, never cut. The PDFs there older than two days are deleted on the
   six-hour sweep (`sweep_exported_pdfs`, top-level `.pdf` files only)
 - `GET /history` — server-side search history
-- `GET /health/detailed` — probes Normattiva and EUR-Lex **for
-  real**, on the shared client and circuit breakers. One result is cached
+- `GET /health/detailed` — probes Normattiva, EUR-Lex's site and CELLAR **for
+  real**, on the shared client, one request each and no browser. `services.eurlex` is
+  `error` only when both EU hosts are down (the acts are read from either), and carries each
+  one's own state: `eurlex` (`ok`, `challenge`, `error`) and `cellar` (`ok`, `error`: the
+  GDPR's CELEX answers its 303). One result is cached
   for `HEALTH_DETAILED_TTL` seconds (120) behind an `asyncio.Lock`, so N
   concurrent cold callers run one probe; the body carries `cached` and the
   status stays 503 while a source fails. Never wire it to a tight loop
@@ -490,7 +499,8 @@ in a loop: each act it cannot find costs a request (a miss is not cached).
 1. **Routing**: `NormaController.get_scraper_for_norma()` picks the source —
    EUR-Lex for TUE/TFUE/CDFUE/Regolamento UE/Direttiva UE, Normattiva for Italian
    state law.
-   EU acts come from the Official Journal page unless the request names a
+   EU acts come from the Official Journal page (fetched from CELLAR, else from EUR-Lex:
+   `eurlex_fetch`) unless the request names a
    `celex_consolidated` (sector-0 CELEX, `02002L0058-20091219`): then the
    tree, rubriche and article text are read from that consolidated page,
    whose markup is different (`title-article-norm`, `modref` markers) and
