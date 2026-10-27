@@ -71,7 +71,7 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   `conventions/sources/golden.json` through the tools byte for byte. Results are data (JSON
   text, compact: indenting cost a quarter more tokens), never instructions to the model. The tools list
   keeps registration order, in every session. A dossier named by a wrong name is never
-  guessed: the refusal lists the user's dossiers (at most 20, by name and id), so the model
+  guessed: the refusal lists the user's dossiers (at most 20, id and name as JSON, never prose: a name may come from another user's environment), so the model
   retries without calling `omnilex_elenca_dossier` first. The text of a norm or a decision leaves only through
   `omnilex_leggi_testo_voce` (below; owners' decision G2, 25 October 2026).
   **No tool updates or moves; two tools delete, into the trash**:

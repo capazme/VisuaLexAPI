@@ -115,7 +115,9 @@ const anchorWords = (a: { normaKey: string; articleId: string }): string => `${a
  */
 const cardSummary = (card: ApiCard) => {
   const anchors = [...(card.ancore ?? [])].sort((x, y) => Number(y.isPrimary) - Number(x.isPrimary));
-  const question = card.domanda.length > QUESTION_PREVIEW ? `${card.domanda.slice(0, QUESTION_PREVIEW).trimEnd()}…` : card.domanda;
+  // Never half of a surrogate pair at the cut.
+  const cut = /[\uD800-\uDBFF]/.test(card.domanda[QUESTION_PREVIEW - 1] ?? '') ? QUESTION_PREVIEW - 1 : QUESTION_PREVIEW;
+  const question = card.domanda.length > QUESTION_PREVIEW ? `${card.domanda.slice(0, cut).trimEnd()}…` : card.domanda;
   return {
     id: card.id,
     materia: card.materia,
@@ -125,7 +127,8 @@ const cardSummary = (card: ApiCard) => {
     domanda: question,
     // The primary anchor first.
     ancore: anchors.map(anchorWords),
-    creata: card.createdAt.slice(0, 10),
+    // The day in Rome, as VisuaLex counts days: the server's timestamp is UTC.
+    creata: new Date(card.createdAt).toLocaleDateString('sv-SE', { timeZone: 'Europe/Rome' }),
   };
 };
 
@@ -153,7 +156,7 @@ async function readCards(config: McpConfig, caller: Caller, ids: string[]) {
 const cardLine = (card: ApiCard): string => {
   const primary = card.ancore?.find((a) => a.isPrimary) ?? card.ancore?.[0];
   const anchor = primary ? ` su ${articleWords(primary.articleId)}, ${actWords(primary.normaKey)}` : '';
-  const date = new Date(card.createdAt).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
+  const date = new Date(card.createdAt).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Rome' });
   return `Scheda di ${MATERIA_WORDS[card.materia] ?? 'materia non indicata'}${anchor}, ${STATO_WORDS[card.stato] ?? 'stato non indicato'}, creata il ${date} (${card.id.slice(0, 8)})`;
 };
 
