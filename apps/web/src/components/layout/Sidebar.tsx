@@ -9,7 +9,6 @@ import { isMerltGraphEnabled } from '../../features/merlt/graph/featureFlag';
 import { SectionSwitcher } from '../../features/sections/SectionSwitcher';
 import { useSection } from '../../features/sections/useSection';
 import { useEntriesEntrance } from '../../features/sections/useEntriesEntrance';
-import { useAppStore } from '../../store/useAppStore';
 import { PALETTE_SHORTCUT, focusSearchField } from '../../utils/searchFieldControl';
 import { useAuth } from '../../hooks/useAuth';
 import { useIsDesktop } from '../../hooks/useIsDesktop';
@@ -323,7 +322,6 @@ function WidthToggle({ layout, onToggle }: { layout: SidebarLayout; onToggle: ()
 
 export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings, openKeyboardShortcuts, openFeedback, layout = 'rail', onToggleWide, serviceHealth }: SidebarProps) {
   const navigate = useNavigate();
-  const quickNorms = useAppStore((s) => s.quickNorms);
   const { user, isAdmin, isValidator, logout } = useAuth();
   const { section, active } = useSection();
   const sectionEntries = useEntriesEntrance(section);
@@ -471,9 +469,6 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         className="min-h-0 flex-1 flex flex-col items-start overflow-y-auto overflow-x-hidden overscroll-contain px-2.5 py-4 gap-3 md:gap-2 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1"
       >
         <NavItem to="/" icon={Search} label="Ricerca" hint={PALETTE_SHORTCUT} id="tour-nav-search" onClick={handleSearchClick} layout={layout} />
-        {quickNorms.length > 0 && (
-          <div className="-mt-1 ml-3 w-5 h-1 rounded-full bg-amber-500/60" title={`${quickNorms.length} preferiti`} />
-        )}
         <NavItem to="/documents" icon={FileSearch} label="Analizza documento" onClick={closeMobile} layout={layout} />
         {/* The active section's entries, after the Corpus ones above (sections spec S6); a new section's fade in (T1).
             Each section names its own active dot, so the dot does not slide from the old section's entries. */}

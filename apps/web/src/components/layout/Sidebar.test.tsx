@@ -93,13 +93,10 @@ describe('Sidebar — accessible names', () => {
     expect(screen.getByRole('link', { name: 'Ricerca' })).toHaveAttribute('href', '/');
   });
 
-  it('keeps the quick norms dot, now under «Ricerca»', () => {
+  it('draws no mark for the quick norms under «Ricerca» (M1: an orange dash that said nothing)', () => {
     appStore.setState({ quickNorms: [{ id: 'q1' } as never] });
     renderSidebar();
-    const dot = screen.getByTitle('1 preferiti');
-    const search = screen.getByRole('link', { name: 'Ricerca' });
-    expect(search.compareDocumentPosition(dot) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(document.getElementById('tour-sidebar')).toContainElement(dot);
+    expect(screen.queryByTitle(/preferiti/)).toBeNull();
     appStore.setState({ quickNorms: [] });
   });
 
