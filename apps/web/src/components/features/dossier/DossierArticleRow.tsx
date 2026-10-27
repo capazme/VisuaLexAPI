@@ -8,10 +8,10 @@ import { DossierItemReader } from './DossierItemReader';
 import { shownAnnex } from './dossierLayout';
 import { AiReviewSignal } from '../../ui/AiReviewSignal';
 import { AiNoteEntryReview } from './AiNoteEntryReview';
-import { aiReviewSummary, hasAssistantNote } from '../../../utils/aiReview';
+import { aiReviewSignal, aiReviewSummary, hasAssistantNote } from '../../../utils/aiReview';
 import { formatTimestampLong } from './dossierUtils';
 import { FOCUS_RING } from '../studia/progress/tokens';
-import { ROW, ROW_ICON, ROW_LINE, ROW_REMOVE, ROW_TITLE } from './dossierStyles';
+import { ROW, ROW_ICON, ROW_LINE, ROW_REMOVE, ROW_SIGN, ROW_TITLE, ROW_TOGGLE } from './dossierStyles';
 
 type NormaItem = Extract<DossierItem, { type: 'norma' }>;
 type NoteItem = Extract<DossierItem, { type: 'note' }>;
@@ -72,11 +72,15 @@ export function DossierArticleRow({
   const regionId = `dossier-item-content-${item.id}`;
   // The closed row's note count sits inside the toggle, whose own name replaces
   // it for a screen reader: the name has to say it. No application's mark on the
-  // row (D7b): each note carries its own once the row is open.
-  const notesLabel = notes.length === 0 || isExpanded ? '' : `, ${notes.length === 1 ? '1 nota' : `${notes.length} note`}`;
+  // row (D7b): each note carries its own once the row is open. Counted on the closed row only: open, the notes are
+  // listed under it.
+  const showNotesCount = notes.length > 0 && !isExpanded;
+  const notesLabel = showNotesCount ? `, ${notes.length === 1 ? '1 nota' : `${notes.length} note`}` : '';
   // The traffic light too, open or closed: what is left to check stays said. The server counts the application's
   // notes on this entry (`assistant_notes`, D7b); null with nothing written or the feature off.
   const aiReview = item.assistantNotes ?? null;
+  // Drawn when it says something: none for counts of nothing (`AiReviewSignal` draws nothing then), so no empty box.
+  const light = aiReview && aiReviewSignal(aiReview) ? aiReview : null;
   const reviewSummary = aiReview ? aiReviewSummary(aiReview) : '';
   const reviewLabel = reviewSummary ? `, ${reviewSummary}` : '';
 
@@ -114,7 +118,7 @@ export function DossierArticleRow({
               onToggleExpand();
             }
           }}
-          className={cn('flex min-h-[44px] min-w-0 flex-1 cursor-pointer items-start gap-2 rounded-md py-2.5', FOCUS_RING)}
+          className={ROW_TOGGLE}
         >
           <ChevronDown
             size={16}
@@ -125,27 +129,43 @@ export function DossierArticleRow({
             <span className={cn(ROW_TITLE, 'block font-medium')}>art. {item.data.numero_articolo}</span>
             {greyLine && <span className={cn(ROW_LINE, 'mt-0.5 line-clamp-2 block')}>{greyLine}</span>}
           </span>
-          {/* The signs may shrink, up to half the row: a long application's name wraps instead of squeezing the title. */}
-          <span className="flex min-w-0 max-w-[50%] flex-wrap items-center justify-end gap-1.5 pt-0.5">
-            {annex && (
-              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                All. {annex}
-              </span>
-            )}
-            {historicalLabel && (
-              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-                {historicalLabel}
-              </span>
-            )}
-            {notes.length > 0 && !isExpanded && (
-              <span className="inline-flex items-center gap-1 text-xs text-amber-800 dark:text-amber-300" title={notes.length === 1 ? '1 nota' : `${notes.length} note`}>
-                <StickyNote size={13} aria-hidden />
-                {notes.length}
-                <span className="sr-only">{notes.length === 1 ? 'nota' : 'note'}</span>
-              </span>
-            )}
-            {aiReview && <AiReviewSignal counts={aiReview} />}
-          </span>
+          {/* The signs, up to half the row. The notes' count and the application's light each take a box as tall as
+              the star and the bin (`ROW_SIGN`): alone after the title, the count sat 2 px above them, the light 1 to 3.
+              The chips are 20 px tall under the toggle's padding and `pt-0.5`, on that line too. Drawn from the right
+              (`flex-row-reverse`, so light, count, chips in the source): where the half row is too narrow for all, the
+              chips wrap to the next line, under, and the count and the light keep the star's line. */}
+          {(annex || historicalLabel || showNotesCount || light) && (
+            <span className="flex min-w-0 max-w-[50%] flex-row-reverse flex-wrap items-start gap-1.5">
+              {light && (
+                <span className={ROW_SIGN}>
+                  <AiReviewSignal counts={light} />
+                </span>
+              )}
+              {showNotesCount && (
+                <span className={ROW_SIGN}>
+                  <span className="inline-flex items-center gap-1 text-xs text-amber-800 dark:text-amber-300" title={notes.length === 1 ? '1 nota' : `${notes.length} note`}>
+                    <StickyNote size={13} aria-hidden />
+                    {notes.length}
+                    <span className="sr-only">{notes.length === 1 ? 'nota' : 'note'}</span>
+                  </span>
+                </span>
+              )}
+              {(annex || historicalLabel) && (
+                <span className="flex min-w-0 flex-wrap items-center justify-end gap-1.5 pt-0.5">
+                  {annex && (
+                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                      All. {annex}
+                    </span>
+                  )}
+                  {historicalLabel && (
+                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                      {historicalLabel}
+                    </span>
+                  )}
+                </span>
+              )}
+            </span>
+          )}
         </div>
         <button
           type="button"
