@@ -1,9 +1,8 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { McpConfig } from '../config.js';
 import { callApi } from '../exchange.js';
-import { findDossier, type RunTool } from './dossier.js';
+import { data, findDossier, type RunTool } from './dossier.js';
 
 /**
  * D7b (spec 2026-10-23 §8.4): an entry's text, and passages proposed on it, which the user validates or
@@ -17,8 +16,6 @@ export const PASSAGE_TOOL_SCOPES: Record<string, string[]> = {
 
 export const MAX_PASSAGES = 10;
 const NOT_FOUND = 'Non trovato: il dossier o la voce non esiste, oppure la funzione non è attiva.';
-
-const data = (value: unknown): CallToolResult => ({ content: [{ type: 'text', text: JSON.stringify(value, null, 2) }] });
 
 /** Whether the server has the feature on: false when it cannot say (fail closed). */
 export async function passagesOn(config: McpConfig): Promise<boolean> {

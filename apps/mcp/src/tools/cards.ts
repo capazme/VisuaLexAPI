@@ -1,11 +1,11 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { Caller } from '../auth.js';
 import type { McpConfig } from '../config.js';
 import { ToolError } from '../errors.js';
 import { callApi } from '../exchange.js';
 import { TRASH_DAYS, canAsk, cardDeletionMessage, confirmWithUser } from '../confirm.js';
-import { CANNOT_ASK, DELETE_SCOPE, NO_PERMISSION, NOT_CONFIRMED, restorableUntil, type RunTool } from './dossier.js';
+import { CANNOT_ASK, DELETE_SCOPE, NO_PERMISSION, NOT_CONFIRMED, data, restorableUntil, type RunTool } from './dossier.js';
 
 /**
  * The LingoLex study-card tools (second round, spec §6; the spike plan's Task
@@ -21,6 +21,7 @@ export const CARD_TOOL_SCOPES: Record<string, string[]> = {
   lingolex_schema_card: [],
   lingolex_salva_card: ['lingo:cards:write'],
   lingolex_le_mie_card: ['lingo:cards:read'],
+  lingolex_leggi_card: ['lingo:cards:read'],
   lingolex_elimina_card: ['lingo:cards:read'],
 };
 
@@ -80,12 +81,16 @@ interface ApiCard {
   materia: string;
   stato: string;
   istituto: string;
+  tipo?: string;
   domanda: string;
   createdAt: string;
   ancore?: { normaKey: string; articleId: string; isPrimary: boolean }[];
 }
 
-const data = (value: unknown): CallToolResult => ({ content: [{ type: 'text', text: JSON.stringify(value, null, 2) }] });
+export const CARDS_PER_PAGE = 50;
+/** How much of a card's question the list shows: enough to tell two cards on one article apart. */
+export const QUESTION_PREVIEW = 160;
+const NOT_FOUND = `Scheda non trovata: ${'\u2063'}`;
 
 /** «art_2_bis» → «art. 2-bis»; «all_1_art_3» → «all. 1, art. 3». Derived by the server from a verified reference. */
 const articleWords = (articleId: string): string =>
@@ -99,6 +104,46 @@ const actWords = (normaKey: string): string => {
   if (dated) return `${dated[1].replace(/_/g, ' ')} ${Number(dated[4])}/${Number(dated[3])}/${dated[2]} n. ${dated[5].replace(/_/g, ' ')}`;
   return normaKey.replace(/_/g, ' ');
 };
+
+/** An anchor as a lawyer reads it, from the server's verified keys: «art. 1453, codice civile». */
+const anchorWords = (a: { normaKey: string; articleId: string }): string => `${articleWords(a.articleId)}, ${actWords(a.normaKey)}`;
+
+/**
+ * A card in the list: what a lawyer needs to pick one (subject, institute, kind, state, the start of
+ * the question, the articles, the date), never the answer or the explanation, which
+ * lingolex_leggi_card gives. Fifty whole cards can run to tens of thousands of tokens.
+ */
+const cardSummary = (card: ApiCard) => {
+  const anchors = [...(card.ancore ?? [])].sort((x, y) => Number(y.isPrimary) - Number(x.isPrimary));
+  const question = card.domanda.length > QUESTION_PREVIEW ? `${card.domanda.slice(0, QUESTION_PREVIEW).trimEnd()}…` : card.domanda;
+  return {
+    id: card.id,
+    materia: card.materia,
+    istituto: card.istituto,
+    tipo: card.tipo ?? null,
+    stato: card.stato,
+    domanda: question,
+    // The primary anchor first.
+    ancore: anchors.map(anchorWords),
+    creata: card.createdAt.slice(0, 10),
+  };
+};
+
+/** The user's cards by id, one read each; ids that are not the user's are returned apart, any other refusal stops. */
+async function readCards(config: McpConfig, caller: Caller, ids: string[]) {
+  const found: ApiCard[] = [];
+  const missing: string[] = [];
+  for (const id of ids) {
+    try {
+      found.push(await callApi<ApiCard>(config, caller, 'lingo:cards:read', `/lingo/cards/${encodeURIComponent(id)}`, { notFound: NOT_FOUND }));
+    } catch (error) {
+      // Only a 404 means "not the user's"; any other refusal (revoked, quota) stops the call as it is.
+      if (error instanceof ToolError && error.message === NOT_FOUND) missing.push(id);
+      else throw error;
+    }
+  }
+  return { found, missing };
+}
 
 /**
  * How a card reads in the deletion dialog: its subject, the article of its primary anchor, its state,
@@ -148,7 +193,9 @@ export function registerCardTools(server: McpServer, config: McpConfig, run: Run
     'lingolex_le_mie_card',
     {
       title: 'Le mie schede di VisuaLex Gymnasium',
-      description: 'Le schede di studio dell’utente, le più recenti prima, filtrabili per materia e stato (50 per pagina).',
+      description:
+        `Le schede di studio dell’utente in breve, le più recenti prima, filtrabili per materia e stato (${CARDS_PER_PAGE} per pagina). ` +
+        'Risposta e spiegazione con lingolex_leggi_card.',
       inputSchema: {
         materia: z.enum(MATERIE).optional(),
         stato: z.enum(STATI).optional(),
@@ -158,11 +205,27 @@ export function registerCardTools(server: McpServer, config: McpConfig, run: Run
     },
     ({ materia, stato, pagina }, extra) =>
       run('lingolex_le_mie_card', extra, async (caller) => {
-        const query = new URLSearchParams({ limit: '50', offset: String(((pagina ?? 1) - 1) * 50) });
+        const query = new URLSearchParams({ limit: String(CARDS_PER_PAGE), offset: String(((pagina ?? 1) - 1) * CARDS_PER_PAGE) });
         if (materia) query.set('materia', materia);
         if (stato) query.set('stato', stato);
-        const answer = await callApi<{ cards: unknown[]; nextOffset: number | null }>(config, caller, 'lingo:cards:read', `/lingo/cards?${query}`);
-        return data({ schede: answer.cards, altre: answer.nextOffset !== null });
+        const answer = await callApi<{ cards: ApiCard[]; nextOffset: number | null }>(config, caller, 'lingo:cards:read', `/lingo/cards?${query}`);
+        return data({ schede: answer.cards.map(cardSummary), altre: answer.nextOffset !== null });
+      }),
+  );
+
+  server.registerTool(
+    'lingolex_leggi_card',
+    {
+      title: 'Leggi schede di VisuaLex Gymnasium',
+      description: 'Da 1 a 10 schede dell’utente per intero, con domanda, risposta, spiegazione e ancore (gli id da lingolex_le_mie_card).',
+      inputSchema: { schede: z.array(z.string().min(1).max(64)).min(1).max(10).describe('Gli id delle schede') },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    ({ schede }, extra) =>
+      run('lingolex_leggi_card', extra, async (caller) => {
+        const { found, missing } = await readCards(config, caller, [...new Set(schede)]);
+        if (found.length === 0) throw new ToolError(`Schede non trovate: ${missing.join(', ')}.`);
+        return data({ schede: found, non_trovate: missing });
       }),
   );
 
@@ -180,19 +243,7 @@ export function registerCardTools(server: McpServer, config: McpConfig, run: Run
       run('lingolex_elimina_card', extra, async (caller) => {
         if (!caller.scopes.includes(DELETE_SCOPE)) throw new ToolError(NO_PERMISSION);
         if (!canAsk(server)) throw new ToolError(CANNOT_ASK);
-        const wanted = [...new Set(schede)];
-        const found: ApiCard[] = [];
-        const missing: string[] = [];
-        const NOT_FOUND = `Scheda non trovata: ${'\u2063'}`;
-        for (const id of wanted) {
-          try {
-            found.push(await callApi<ApiCard>(config, caller, 'lingo:cards:read', `/lingo/cards/${encodeURIComponent(id)}`, { notFound: NOT_FOUND }));
-          } catch (error) {
-            // Only a 404 means "not the user's"; any other refusal (revoked, quota) stops the call as it is.
-            if (error instanceof ToolError && error.message === NOT_FOUND) missing.push(id);
-            else throw error;
-          }
-        }
+        const { found, missing } = await readCards(config, caller, [...new Set(schede)]);
         if (missing.length > 0) throw new ToolError(`Schede non trovate: ${missing.join(', ')}. Nulla è stato eliminato.`);
         const community = found.filter((card) => !PERSONAL.has(card.stato));
         if (community.length > 0) {

@@ -117,7 +117,9 @@ const call = async (client, name, args = {}) => {
 let client = await connect(tokens.access_token);
 const { tools } = await client.listTools();
 const destructive = tools.filter((t) => t.annotations?.destructiveHint !== false).map((t) => t.name).sort().join(', ');
-check('twelve tools, only the three deletions destructive', tools.length === 12 && destructive === 'lingolex_elimina_card, omnilex_elimina_dossier, omnilex_elimina_voci_dossier', destructive);
+// Fourteen, and D7b's two more while the server has them on.
+const expected = tools.some((t) => t.name === 'omnilex_leggi_testo_voce') ? 16 : 14;
+check(`${expected} tools, only the three deletions destructive`, tools.length === expected && destructive === 'lingolex_elimina_card, omnilex_elimina_dossier, omnilex_elimina_voci_dossier', destructive);
 const name = `E2E MCP ${new Date().toISOString().slice(0, 19)}`;
 const created = await call(client, 'omnilex_crea_dossier', { nome: name });
 must('omnilex_crea_dossier', !created.isError && created.data?.id, created.isError ? created.text : name);
@@ -170,7 +172,9 @@ const cardId = savedCards.data?.esiti?.[0]?.id;
 check('lingolex_salva_card: a draft anchored on art. 1453 c.c.', savedCards.data?.esiti?.[0]?.outcome === 'created', savedCards.isError ? savedCards.text : savedCards.data?.esiti?.[0]?.outcome);
 const myCards = await call(client, 'lingolex_le_mie_card');
 const listedCard = myCards.data?.schede?.find?.((c) => c.id === cardId);
-check('lingolex_le_mie_card lists it, as a draft with its official URN', listedCard?.stato === 'BOZZA_PERSONALE' && listedCard?.ancore?.[0]?.urn?.startsWith('urn:nir:'), listedCard?.ancore?.[0]?.urn);
+check('lingolex_le_mie_card lists it, as a draft', listedCard?.stato === 'BOZZA_PERSONALE', listedCard?.stato);
+const readCard = (await call(client, 'lingolex_leggi_card', { schede: [cardId] })).data?.schede?.[0];
+check('lingolex_leggi_card reads it whole, with its official URN', readCard?.risposta && readCard?.ancore?.[0]?.urn?.startsWith('urn:nir:'), readCard?.ancore?.[0]?.urn);
 const askedBeforeCard = asked.length;
 const deletedCard = await call(client, 'lingolex_elimina_card', { schede: [cardId] });
 check('lingolex_elimina_card asks, then moves the card to the trash', asked.length === askedBeforeCard + 1 && deletedCard.data?.spostate_nel_cestino === 1, asked.at(-1)?.split('\n')[1]);
