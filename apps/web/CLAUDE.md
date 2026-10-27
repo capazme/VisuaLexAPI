@@ -168,8 +168,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   after move them to it: the Corte costituzionale's PDF (`decisionPdf.ts`: `LICENCE_URIS`, `licenceLine`,
   the footer's «Fonte: … · licenza …»), `DecisionView`'s footer, `EuCaseLawBlock`'s «Fonte: EUR-Lex / …»,
   `CitationPreviewPopup`'s «Fonte: Normattiva», `RassegnaPassage`'s Massimario line and
-  `DOCTRINE_ATTRIBUTION` (`utils/doctrineLabel.ts`, Brocardi, which has no entry); and, once the maxims are
-  shown, the line under them. The `attribution` lines are legal text the owners approved, copied verbatim
+  `DOCTRINE_ATTRIBUTION` (`utils/doctrineLabel.ts`, Brocardi, which has no entry). The first screen to read
+  its entry is the line under the Corte costituzionale's massime (`CorteCostMassimeBlock`). The `attribution` lines are legal text the owners approved, copied verbatim
   (`credits.test.ts` holds each; never restyle one, as for root rule 23); `uses` and `terms` come only
   from the conditions read on each source's page and the owners' table, and a source enters only once
   its conditions are clear (today group A: Normattiva, EUR-Lex, Corte costituzionale, Cassazione,
@@ -962,6 +962,19 @@ count, not for the next one if that fails; the range is clamped to 1900 – this
 that answers «none» without a request). On the Cassazione the reversed order applies once every
 decision is loaded; until then the archive's order (newest first) stands and a line says so. Filters reset
 with the article.
+**A State act's article has the Corte costituzionale's massime** (`CorteCostMassimeBlock`, before the Cassazione's
+block; G-281): the Court's open-data massime that name the article, asked of `/search_corte_cost_massime`
+(`services/corteCostMassimeService.ts`) with `norma_data.urn` when the section opens, 20 at a time with «Mostra altre
+massime», each a `CaseLawRow` (the decision as a `DecisionLink`, its kind, «Norma oggetto» or «Parametro», the
+massima's number, the heading chain, the text verbatim), credited with the `corte-costituzionale` entry of
+`data/credits.ts` linked to `/crediti#corte-costituzionale` in a new tab (G-287: not the route's `attribuzione`,
+which stays for other clients). On an article of the Costituzione (`constitution`, from `tipo_atto`) it shows the
+massime where the article is a parameter (`ruolo: 'parametro'`), and a checkbox «Solo come norma oggetto (N)» narrows
+to those where it is the provision at issue (G-376, which replaced G-289's order: in the whole archive one massima has an
+article of the Costituzione at issue, some 78,000 as a parameter; per article, off again on the next one; not drawn
+when no massima has the article at issue). Any other article shows every massima, with no filter.
+A plain first version: its design is Inchiostro's (Luca), and it does not yet read the section's
+filters (the list is paged by the server, so they would narrow only the page loaded).
 **An act of the Union has the Court of Justice's block** (`EuCaseLawBlock`, in place of the Cassazione's) for a
 regulation or a directive: `utils/euCaseLaw.ts` derives the act's CELEX from the norm
 (`3` + the year + `R`/`L` + the number on four digits, as the API's `sources.eu_identity` does — the norm

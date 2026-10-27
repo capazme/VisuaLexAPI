@@ -7,6 +7,13 @@ import type { NormaVisitata } from '../../../types';
 import type { SearchDecisionsAnswer } from '../../../types/decisions';
 import type { RassegnePasso, RassegneResponse } from '../../../features/merlt/rassegne/types';
 
+vi.mock('../../../services/corteCostMassimeService', () => ({
+  searchCorteCostMassime: vi.fn(async () => ({
+    esito: 'risultati', urn: '', pagina: 1, per_pagina: 20, totale: 0, per_ruolo: { norma: 0, parametro: 0 }, massime: [],
+    fonte: { nome: 'Corte costituzionale — dati aperti', licenza: 'CC BY-SA 3.0', url: 'https://dati.cortecostituzionale.it/' },
+    attribuzione: 'Massime: Corte costituzionale — dati aperti, CC BY-SA 3.0', aggiornato_al: null,
+  })),
+}));
 vi.mock('../../../services/decisionSearchService', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../services/decisionSearchService')>()),
   searchDecisions: vi.fn(),

@@ -6,6 +6,13 @@ import type { NormaVisitata } from '../../../types';
 import type { SearchDecisionsAnswer } from '../../../types/decisions';
 
 const { slotCalls } = vi.hoisted(() => ({ slotCalls: [] as Array<{ slot: string; props: Record<string, unknown> }> }));
+vi.mock('../../../services/corteCostMassimeService', () => ({
+  searchCorteCostMassime: vi.fn(async () => ({
+    esito: 'risultati', urn: '', pagina: 1, per_pagina: 20, totale: 0, per_ruolo: { norma: 0, parametro: 0 }, massime: [],
+    fonte: { nome: 'Corte costituzionale — dati aperti', licenza: 'CC BY-SA 3.0', url: 'https://dati.cortecostituzionale.it/' },
+    attribuzione: 'Massime: Corte costituzionale — dati aperti, CC BY-SA 3.0', aggiornato_al: null,
+  })),
+}));
 vi.mock('../../../services/decisionSearchService', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../services/decisionSearchService')>()),
   searchDecisions: vi.fn(),
@@ -62,7 +69,9 @@ describe('CaseLawSection', () => {
     await userEvent.click(toggle());
     expect(toggle()).toHaveAttribute('aria-expanded', 'true');
     expect(screen.queryByText(/Brocardi/)).toBeNull();
-    expect(screen.queryByText(/[Mm]assime/)).toBeNull();
+    // the only massime are the Corte costituzionale's own (G-281), in their block
+    const corteCost = screen.getByRole('region', { name: 'Corte costituzionale — massime' });
+    for (const text of screen.queryAllByText(/[Mm]assime/)) expect(corteCost).toContainElement(text);
     expect(screen.getByTestId('slot-article_case_law')).toBeInTheDocument();
     expect(slotCalls.at(-1)?.props).toMatchObject({
       articleUrn: NORMA.urn, isHistorical: false, besideId: 'tab-1',
@@ -122,6 +131,35 @@ describe('CaseLawSection', () => {
     expect(screen.queryByRole('heading', { name: 'Cassazione — menzionano l’articolo' })).toBeNull();
     expect(await screen.findByText('Nessuna decisione indicizzata cita questo articolo.')).toBeInTheDocument();
     expect(eu).toHaveBeenCalledExactlyOnceWith({ celex: '32016R0679', articolo: '6' });
+  });
+
+  it('gives a State act\'s article the Corte costituzionale\'s massime, asked for when the section opens', async () => {
+    const { searchCorteCostMassime } = await import('../../../services/corteCostMassimeService');
+    const cc = vi.mocked(searchCorteCostMassime);
+    cc.mockClear();
+    show();
+    expect(cc).not.toHaveBeenCalled();
+    await userEvent.click(toggle());
+    expect(screen.getByRole('heading', { name: 'Corte costituzionale — massime' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Fonte: Corte costituzionale, dati aperti, CC BY-SA 3.0' })).toBeInTheDocument();
+    expect(cc).toHaveBeenCalledExactlyOnceWith(NORMA.urn, 1, undefined);
+  });
+
+  it('asks the Costituzione\'s article for the massime where it is a parameter (G-376)', async () => {
+    const { searchCorteCostMassime } = await import('../../../services/corteCostMassimeService');
+    const cc = vi.mocked(searchCorteCostMassime);
+    cc.mockClear();
+    const urn = 'https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:costituzione~art3';
+    show({ norma: { tipo_atto: 'Costituzione', data: '', numero_atto: '', numero_articolo: '3', urn }, articleUrn: urn });
+    await userEvent.click(toggle());
+    await screen.findByRole('link', { name: 'Fonte: Corte costituzionale, dati aperti, CC BY-SA 3.0' });
+    expect(cc).toHaveBeenCalledExactlyOnceWith(urn, 1, 'parametro');
+  });
+
+  it('gives an act of the Union no Corte costituzionale block', async () => {
+    show({ norma: { tipo_atto: 'regolamento ue', data: '2016', numero_atto: '679', numero_articolo: '6' } });
+    await userEvent.click(toggle());
+    expect(screen.queryByRole('heading', { name: 'Corte costituzionale — massime' })).toBeNull();
   });
 
   it('gives no Court of Justice block to a national act', async () => {

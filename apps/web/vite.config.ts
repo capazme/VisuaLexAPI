@@ -107,6 +107,7 @@ export default defineConfig({
       '/fetch_decision_pdf': 'http://localhost:5000',
       '/search_decisions': 'http://localhost:5000',
       '/search_eu_case_law': 'http://localhost:5000',
+      '/search_corte_cost_massime': 'http://localhost:5000',
       '/parse_query': 'http://localhost:5000',
       '/extract_citations': 'http://localhost:5000',
       '/export_pdf': 'http://localhost:5000',

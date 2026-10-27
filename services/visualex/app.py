@@ -45,6 +45,7 @@ from visualex_api.services.akn_fetch import fetch_act_index
 from visualex_api.services.akn_parser import presentable_title
 from visualex_api.services.decisions.citation import read_decision_citation
 from visualex_api.services.decisions.eu_case_law import search_eu_case_law as search_eu_case_law_route
+from visualex_api.services.decisions.corte_cost_massime import search_massime as search_corte_cost_massime_route
 from visualex_api.services.decisions.model import InvalidReference, parse_reference
 from visualex_api.services.decisions.pdf_route import fetch_decision_pdf as fetch_decision_pdf_route
 from visualex_api.services.decisions.search_route import search_decisions as search_decisions_route
@@ -398,6 +399,7 @@ class NormaController:
         self.app.add_url_rule('/fetch_decision_pdf', view_func=self.fetch_decision_pdf, methods=['POST'])
         self.app.add_url_rule('/search_decisions', view_func=self.search_decisions, methods=['POST'])
         self.app.add_url_rule('/search_eu_case_law', view_func=self.search_eu_case_law, methods=['POST'])
+        self.app.add_url_rule('/search_corte_cost_massime', view_func=self.search_corte_cost_massime, methods=['POST'])
         self.app.add_url_rule('/fetch_alias_catalog', view_func=self.fetch_alias_catalog, methods=['GET'])
         # Internal: MERL-T's MassimarioAdapter only. Not routed by the ingress
         # (infra/ingress/Caddyfile routes an allowlist of prefixes) nor proxied by Vite.
@@ -1350,6 +1352,29 @@ class NormaController:
             answer, status = await search_eu_case_law_route(body.get('celex'), body.get('articolo'))
         except Exception:
             log.exception("EU case law search failed unexpectedly")
+            return jsonify({'esito': 'errore_interno'}), 500
+        return jsonify(answer), status
+
+    async def search_corte_cost_massime(self):
+        """The Corte costituzionale's massime that name an article, from the court's open data
+        (G-281): `{urn, pagina?, ruolo?}`, `urn` the article's identity as `norma_data.urn` gives
+        it, `ruolo` `norma` or `parametro` to keep the massime naming it in that role (G-289).
+        JSON with `esito`: risultati 200 (a page of 20, newest first, the text verbatim, with
+        the source and the licence line), richiesta_non_valida 400, fonte_non_raggiungibile 503
+        (`in_preparazione` while the first index is being built), errore_interno 500 (a bug: a
+        fixed body). The answers this handler does not write are those of /search_eu_case_law."""
+        try:
+            body = await request.get_json(silent=True)
+        except (RecursionError, UnicodeDecodeError):
+            body = None
+        if not isinstance(body, dict):
+            return jsonify({'esito': 'richiesta_non_valida',
+                            'errori': {'body': 'atteso un oggetto JSON'}}), 400
+        try:
+            answer, status = await search_corte_cost_massime_route(
+                body.get('urn'), body.get('pagina'), body.get('ruolo'))
+        except Exception:
+            log.exception("Corte costituzionale massime search failed unexpectedly")
             return jsonify({'esito': 'errore_interno'}), 500
         return jsonify(answer), status
 
