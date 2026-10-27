@@ -912,8 +912,22 @@ class TestGluedHeadingLimits:
     async def test_a_body_in_the_next_container(self):
         assert self.glued(self.NEXT_CONTAINER) == ["2"]
         assert await self.numbers(self.NEXT_CONTAINER) == ["1", "2", "3"]
-        assert await self.text(self.NEXT_CONTAINER, "2") == "Articolo 2\nCorpo del secondo.Ancora."
+        assert await self.text(self.NEXT_CONTAINER, "2") == "Articolo 2\nCorpo del secondo.\nAncora."
         assert await self.text(self.NEXT_CONTAINER, "1") == "Articolo 1\nPrimo.\nTesto."
+
+    async def test_the_next_heading_inside_the_next_container_ends_the_text(self):
+        page = ("<div><p>Articolo 1</p><p>Testo. Articolo 2</p></div>"
+                "<div><p>Corpo.</p><p>Articolo 3</p><p>Terzo.</p></div>")
+        assert await self.numbers(page) == ["1", "2", "3"]
+        assert await self.text(page, "2") == "Articolo 2\nCorpo."
+        assert await self.text(page, "3") == "Articolo 3\nTerzo."
+
+    async def test_a_second_glued_heading_inside_the_next_container_ends_the_text(self):
+        page = ("<div><p>Articolo 1</p><p>Testo. Articolo 2</p></div>"
+                "<div><p>Corpo due. Articolo 3</p><p>Corpo tre.</p></div>")
+        assert self.glued(page) == ["2", "3"]
+        assert await self.text(page, "2") == "Articolo 2\nCorpo due."
+        assert await self.text(page, "3") == "Articolo 3\nCorpo tre."
 
     @pytest.mark.parametrize("page", [
         # the next container opens with another heading: art. 2 would have no body
@@ -974,10 +988,17 @@ class TestGluedHeadingLimits:
         ("Articolo 15 bisTesto", "15-bis"),
         ("Articolo 8(ex articolo 3, paragrafo 2, del TCE)", "8"),
         ("Articolo 4 bis1.   Le disposizioni", "4-bis"),
+        ("Article 6a", "6"),  # a letter glued to the number is no sentence
+        ("Articolo 5, paragrafo 1, della direttiva", "5"),  # a limit kept: still read as a heading
     ])
     def test_a_heading_never_goes_on_as_a_sentence(self, text, number):
         from visualex_api.tools.treextractor import eurlex_heading_number
         assert eurlex_heading_number(text) == number
+
+    async def test_a_heading_with_a_letter_glued_to_its_number_ends_the_text(self):
+        page = ('<p class="oj-ti-art">Article 6</p><p>Six.</p>'
+                '<p class="oj-ti-art">Article 6a</p><p>Six a.</p>')
+        assert await self.text(page, "6") == "Article 6\nSix."
 
     async def test_the_next_article_with_its_ordinal_still_ends_the_text(self):
         page = "<p>Articolo 15</p><p>Quindici.</p><p>Articolo 15 bis</p><p>Quindici bis.</p>"
