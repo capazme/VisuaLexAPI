@@ -25,11 +25,6 @@ logging.basicConfig(level=logging.INFO,
 _tree_cache = PersistentCache("tree", ttl=86400)  # 24 hours
 
 
-# The shortest EUR-Lex page the scraper accepts as an act (EurlexScraper.request_document): a
-# shorter one is an error or a challenge page, never stored where the scraper reads.
-_EURLEX_MIN_PAGE = 1000
-
-
 def _full_key(normurn, link):
     """The persistent key of the widest Normattiva tree: section labels and metadata."""
     return f"{normurn}|link={link}|details=True|metadata=True"
@@ -194,7 +189,7 @@ async def _tree_from_page(normurn, link, details, return_metadata, is_eurlex, eu
     else:
         # No annexes on EUR-Lex, but the parse does yield article titles.
         result, count, metadata = await _parse_eurlex_tree(soup, normurn, link, details)
-        if count > 0 and not from_copy and len(text) >= _EURLEX_MIN_PAGE:
+        if count > 0 and not from_copy and eurlex_fetch.is_act_page(text):
             # A page that parsed into articles is the act's: kept where the scraper reads it.
             await get_cache_manager().get_persistent("eurlex").set(normurn, text)
 

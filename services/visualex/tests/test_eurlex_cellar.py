@@ -160,6 +160,7 @@ async def test_cellar_is_asked_by_celex_and_its_303_followed_over_https():
     assert second.args == ("GET", DOC)  # CELLAR's http:// moved to https
     for call in (first, second):
         assert call.kwargs["source"] == "cellar" and call.kwargs["allow_redirects"] is False
+        assert call.kwargs["max_retries"] == 0 and call.kwargs["timeout"].total == 20
         assert call.kwargs["headers"]["Accept-Language"] == "it"
         assert "application/xhtml+xml" in call.kwargs["headers"]["Accept"]
 
@@ -176,6 +177,7 @@ async def test_a_treaty_celex_is_quoted():
     "http://169.254.169.254/latest/meta-data",
     "https://eur-lex.europa.eu/eli/reg/2016/679/oj/ita",
     "https://publications.europa.eu.evil.com/DOC_1",
+    "http://[x",  # no URL parser reads it: an error, so the browser gets its turn
 ])
 async def test_a_redirect_off_cellar_is_not_followed(location):
     request = _client(_see_other(location))
@@ -315,6 +317,7 @@ async def test_a_probe_that_raises_is_an_error():
     (_see_other(DOC.replace("https://", "http://")), "ok"),
     (HttpResult("not found", 404, {}), "error"),
     (_see_other("https://elsewhere.example/DOC_1"), "error"),
+    (_see_other("http://[x"), "error"),
     (HttpResult(PAGE, 200, XHTML), "error"),  # the probe never downloads the page
 ])
 async def test_the_cellar_probe_reads_only_the_303(answer, state):
@@ -338,3 +341,11 @@ async def test_the_page_checks_stay_linear(page):
     assert not eurlex_fetch.is_act_page(page)
     assert eurlex_fetch._ITALIAN.search(page) is None
     assert time.perf_counter() - start < 0.5
+
+
+@pytest.mark.parametrize("heading", ["Articolo unico", "ARTICOLO 1", "Articolo primo", "Articolo&nbsp;1"])
+async def test_an_italian_page_by_any_first_heading(heading):
+    page = f'<html><body><p class="oj-ti-art">{heading}</p><p>Testo.</p></body></html>'
+    request = _client(_see_other(DOC), HttpResult(page, 200, XHTML))
+    with patch.object(eurlex_fetch.http_client, "request", request):
+        assert await eurlex_fetch.fetch_from_cellar(GDPR_URL) == page

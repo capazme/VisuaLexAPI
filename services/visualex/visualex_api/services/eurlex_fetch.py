@@ -19,6 +19,7 @@ from __future__ import annotations
 import re
 from urllib.parse import parse_qs, quote, urljoin, urlparse
 
+import aiohttp
 import structlog
 from playwright.async_api import async_playwright
 
@@ -55,10 +56,14 @@ _ACT_MARKER = re.compile(
 
 # CELLAR is asked for Italian; an act it held only in other languages must not come back as
 # another language's text. Every Italian page, whatever its markup, names its articles so.
-_ITALIAN = re.compile(r"\bArticolo(?:\s|&nbsp;|&#160;)++\d")
+_ITALIAN = re.compile(r"\bArticolo(?:\s|&nbsp;|&#160;)++(?:\d|unico|primo)", re.IGNORECASE)
 
 _REDIRECTS = {301, 302, 303, 307, 308}
 _MAX_HOPS = 3
+# One attempt per hop, each within its own limit: a CELLAR that does not answer hands over to
+# the browser in seconds, not after the shared client's retries (the largest act measured,
+# 2.4 MB, came in about two).
+_CELLAR_ATTEMPT = aiohttp.ClientTimeout(total=20)
 
 
 def is_waf_challenge(status: int, headers) -> bool:
@@ -112,15 +117,19 @@ async def fetch_from_cellar(url: str) -> str:
     target = CELLAR_CELEX + quote(celex, safe="")
     headers = http_headers({"Accept": "application/xhtml+xml,text/html", "Accept-Language": "it"})
     for _ in range(_MAX_HOPS):
-        result = await http_client.request("GET", target, source="cellar", max_retries=1,
-                                           allow_redirects=False, headers=headers)
+        result = await http_client.request("GET", target, source="cellar", max_retries=0,
+                                           timeout=_CELLAR_ATTEMPT, allow_redirects=False,
+                                           headers=headers)
         if result.status not in _REDIRECTS:
             break
-        location = urlparse(urljoin(target, _header(result.headers, "location")))
-        if location.scheme == "http":
-            location = location._replace(scheme="https")
-        target = location.geturl()
-        if location.hostname != _CELLAR_HOST or not is_allowed(target):
+        try:
+            location = urlparse(urljoin(target, _header(result.headers, "location")))
+            if location.scheme == "http":
+                location = location._replace(scheme="https")
+            target, host = location.geturl(), location.hostname
+        except ValueError as exc:  # a Location no URL parser reads
+            raise NetworkError(f"CELLAR: rinvio illeggibile per {celex}", status_code=result.status) from exc
+        if host != _CELLAR_HOST or not is_allowed(target):
             raise NetworkError(f"CELLAR: rinvio fuori dall'archivio ({target[:80]})", status_code=result.status)
     else:
         raise NetworkError(f"CELLAR: troppi rinvii per {celex}")
@@ -192,5 +201,8 @@ async def probe_cellar() -> str:
             headers=http_headers({"Accept": "application/xhtml+xml,text/html", "Accept-Language": "it"}))
     except Exception:  # noqa: BLE001
         return "error"
-    location = urlparse(urljoin(CELLAR_CELEX, _header(result.headers, "location")))
-    return "ok" if result.status == 303 and location.hostname == _CELLAR_HOST else "error"
+    try:
+        host = urlparse(urljoin(CELLAR_CELEX, _header(result.headers, "location"))).hostname
+    except ValueError:
+        return "error"
+    return "ok" if result.status == 303 and host == _CELLAR_HOST else "error"
