@@ -7,7 +7,7 @@ import { describeBlock, groupAnnotationsByBlock, type LocatedThread } from '../.
 import { sanitizeHTML } from '../../../utils/sanitizeHtml';
 import { fixtureText } from '../../../utils/__fixtures__/articleTexts';
 import { buildPassage } from '../../../utils/threadPassages';
-import type { Annotation, Highlight, ArticleDiscussionPassageSummary } from '../../../types';
+import type { Annotation, Highlight, ArticleDiscussionPassageSummary, Proposal } from '../../../types';
 // The scroll: its own tests (`scrollParent.test.ts`); here, which anchor it is asked for.
 vi.mock('../../../utils/scrollParent', () => ({ scrollToMiddle: vi.fn() }));
 import { scrollToMiddle } from '../../../utils/scrollParent';
@@ -345,5 +345,48 @@ describe('BlockAnnotationsPopover', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: /Rimuovi/ }));
     expect(props.onRemoveHighlight).toHaveBeenCalledWith('h1');
     expect(props.onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe('BlockAnnotationsPopover — an application\'s glosses (D8)', () => {
+  afterEach(() => { document.body.innerHTML = ''; });
+
+  const words = 'contraenti';
+  const gloss: Proposal = {
+    id: 'g1', kind: 'gloss', normaKey: 'k', text: words, color: null, startOffset: PLAIN.indexOf(words), endOffset: PLAIN.indexOf(words) + words.length,
+    createdAt: '2026-10-29T09:00:00Z', dossierItemId: 'a1', proposedBy: { clientName: 'Claude Code' },
+    assistantRange: { startOffset: PLAIN.indexOf(words), text: words }, rangeEdited: false, rangeEditedAt: null, rangeEditedBy: null,
+    note: aiNote('Il rimedio.'),
+  };
+  const proposalActions = { validate: vi.fn(), flag: vi.fn(), comment: vi.fn(), editNote: vi.fn(), remove: vi.fn(), move: vi.fn() };
+  const withGloss = (over: Partial<BlockAnnotationsPopoverProps>) => {
+    const group = groupAnnotationsByBlock(RAW, STRUCTURE, [h1], [n1], [], [{ id: 'g1', startOffset: gloss.startOffset, text: words, state: 'proposed' }])[2];
+    return setup([h1], [n1], { group, glosses: [gloss], proposalActions, ...over });
+  };
+
+  it('narrow: lists the block\'s gloss cards first', async () => {
+    withGloss({});
+    const dialog = await screen.findByRole('dialog', { name: TITLE });
+    expect(within(dialog).getByRole('article', { name: /Da validare/ })).toBeInTheDocument();
+  });
+
+  it('wide: offers the way to the margin, which closes the popover once a card took the focus', async () => {
+    const onGoToGloss = vi.fn(() => true);
+    const { props } = withGloss({ glossesInMargin: true, onGoToGloss });
+    const dialog = await screen.findByRole('dialog', { name: TITLE });
+    expect(within(dialog).queryByRole('article')).toBeNull();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Vai alla glossa a margine' }));
+    expect(onGoToGloss).toHaveBeenCalledWith('g1');
+    expect(props.onClose).toHaveBeenCalled();
+  });
+
+  it('wide, but no card took the focus (the reader narrowed): the popover stays, its cards drawn in it', async () => {
+    const { props } = withGloss({ glossesInMargin: true, onGoToGloss: () => false });
+    const dialog = await screen.findByRole('dialog', { name: TITLE });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Vai alla glossa a margine' }));
+    expect(props.onClose).not.toHaveBeenCalled();
+    expect(await within(dialog).findByRole('article', { name: /Da validare/ })).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Vai alla glossa a margine' })).toBeNull();
+    expect(dialog.contains(document.activeElement)).toBe(true);
   });
 });

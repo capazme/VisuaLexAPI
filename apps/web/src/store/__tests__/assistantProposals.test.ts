@@ -16,6 +16,7 @@ import { appStore } from '../useAppStore';
 import { coursesSwitchStore } from '../../components/features/studia/corsi/coursesSwitch';
 import { notificationStore, closeNotification, undoNotification, resetNotifications } from '../../components/ui/notifications/notifications';
 import { aiNote } from '../../utils/__fixtures__/assistantNote';
+import { GLOSS_WORDS } from '../../constants/glossWords';
 import type { Dossier, Proposal } from '../../types';
 
 const proposal = (id: string, note: Proposal['note']): Proposal => ({
@@ -433,5 +434,29 @@ describe('D7b — a note entry an application wrote', () => {
     await setNoteEntryState('d1', note(), 'validated');
     expect(note().assistantNote?.state).toBe('proposed');
     expect(lastNotification()).toMatchObject({ type: 'error', message: "Questa voce non è una nota dell'IA" });
+  });
+});
+
+describe('D8 glosses — the same routes, their own words', () => {
+  const g1: Proposal = { ...proposal('g1', aiNote('Il rimedio.')), kind: 'gloss', color: null };
+
+  beforeEach(async () => {
+    vi.mocked(assistantService.listProposals).mockResolvedValue([g1, p1]);
+    await loadAssistantFeatures();
+    await loadProposals('d1', 'a1');
+  });
+
+  it('the bin says «Glossa rimossa» and offers «Annulla»; the light goes down one as for a passage', () => {
+    removeProposal('d1', 'a1', 'g1');
+    expect(lastNotification()).toMatchObject({ message: GLOSS_WORDS.removed, undoable: true });
+    expect(assistantProposalsStore.getState().byItem.a1.map((p) => p.id)).toEqual(['p1']);
+    // The fixture's one «da validare» was this gloss: no light left.
+    expect(counts()).toBeNull();
+  });
+
+  it('a move on a gloss removed elsewhere says so in the gloss\'s words', async () => {
+    vi.mocked(assistantService.moveProposal).mockRejectedValueOnce(notFound('Proposta non trovata'));
+    await moveProposal('d1', 'a1', 'g1', 28, 'i contraenti');
+    expect(lastNotification()).toMatchObject({ type: 'warning', message: GLOSS_WORDS.notMoved });
   });
 });

@@ -5,13 +5,15 @@ import { closeNotification, notify, UNDO_MS } from '../components/ui/notificatio
 import type { AiReviewState, DossierItem, Proposal } from '../types';
 import { dossierItemFromApi } from '../components/features/dossier/dossierUtils';
 import type { DossierItemApi } from '../services/dossierService';
-import { shiftAiReviewCount } from '../utils/aiReview';
+import { isGloss, shiftAiReviewCount } from '../utils/aiReview';
+import { GLOSS_WORDS } from '../constants/glossWords';
 import { coursesSwitchStore, resetCoursesSwitch, setCoursesSwitch } from '../components/features/studia/corsi/coursesSwitch';
 
 /**
  * What applications proposed on dossier entries (D7b, the server's contract): a store of its own, keyed by entry id,
- * filled by the entry's reader from `…/proposals`. The marks never enter the app's highlights, so no other reader —
- * Study Mode, the Forum, environments, the PDF — ever receives one.
+ * filled by the entry's reader from `…/proposals`: the coloured passages saved before D8 and the glosses (D8, `kind`),
+ * which share every route. Neither ever enters the app's highlights, so no other reader — Study Mode, the Forum,
+ * environments, the PDF — ever receives one.
  */
 interface AssistantProposalsState {
   /** `GET /api/features`: off until the server says on; a 404 from a route turns it off again. */
@@ -216,12 +218,13 @@ export function setProposalState(dossierId: string, itemId: string, proposalId: 
   return write(dossierId, itemId, proposalId, () => assistantService.setProposalState(dossierId, itemId, proposalId, state, comment));
 }
 
-/** «Sposta l'evidenziazione»: the passage's new boundaries; its note keeps its state. */
+/** «Sposta l'evidenziazione» (or the gloss's «Sposta»): the passage's new boundaries; its note keeps its state. */
 export function moveProposal(dossierId: string, itemId: string, proposalId: string, startOffset: number, text: string) {
+  const moved = assistantProposalsStore.getState().byItem[itemId]?.find((p) => p.id === proposalId);
   return write(
     dossierId, itemId, proposalId,
     () => assistantService.moveProposal(dossierId, itemId, proposalId, startOffset, text),
-    'Evidenziazione non spostata: il passaggio è stato rimosso altrove.',
+    moved && isGloss(moved) ? GLOSS_WORDS.notMoved : 'Evidenziazione non spostata: il passaggio è stato rimosso altrove.',
   );
 }
 
@@ -257,6 +260,7 @@ export function removeProposal(dossierId: string, itemId: string, proposalId: st
   const index = list.findIndex((p) => p.id === proposalId);
   if (index === -1) return;
   let removed = list[index];
+  const gloss = isGloss(removed);
   // The light went down one as it was removed: putting it back always gives that one back.
   const putBack = () => {
     assistantProposalsStore.setState((s) => {
@@ -303,13 +307,13 @@ export function removeProposal(dossierId: string, itemId: string, proposalId: st
         if (isGone(error)) return gone();
         removalsInFlight.delete(proposalId);
         putBack();
-        notify({ type: 'error', message: errorDetail(error, 'Passaggio non rimosso'), duration: 5000 });
+        notify({ type: 'error', message: errorDetail(error, gloss ? GLOSS_WORDS.notRemoved : 'Passaggio non rimosso'), duration: 5000 });
       });
   };
   pendingRemovals.set(proposalId, { itemId, send, update: (p) => { removed = p; } });
   notification = notify({
     type: 'info',
-    message: 'Passaggio rimosso',
+    message: gloss ? GLOSS_WORDS.removed : 'Passaggio rimosso',
     duration: UNDO_MS,
     onUndo: () => {
       if (settled) return;
