@@ -130,7 +130,10 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
 - **An entry's text and the glosses** (`src/tools/glosses.ts`; D7b, spec
   `docs/superpowers/specs/2026-10-23-mcp-next-tools-design.md` §8; D8,
   `docs/superpowers/specs/2026-10-29-d8-glosses-design.md`) — `omnilex_leggi_testo_voce` (an entry's text in parts, as
-  VisuaLex shows it, and the glosses this application proposed still to validate; scope `dossier:text`), **always
+  VisuaLex shows it, and the glosses this application proposed still to validate; for a norm, the server adds
+  Normattiva's update notes after `testo`, on every part, as `note_aggiornamento` (absent when the text already holds
+  them, as for the codes), and `avviso_note` when some could not be read — never inside the text, G-386; `avviso_testo_parziale` when the
+  text is one part of an article Normattiva splits, G-387; scope `dossier:text`), **always
   listed**: it is how an application quotes an entry verbatim (G-372). `omnilex_glossa_voce` (an optional general gloss
   up to 4,000 characters, which becomes a note about the entry through `POST /dossiers/:id/notes`, and 1–10 glosses on
   passages `{ testo 15–2000, nota ≤ 1500, prima?, dopo? }`, no colour; the passages first, so a call refused whole writes

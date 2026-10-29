@@ -26,6 +26,7 @@ const DECISION_TEXT = {
 
 let articleBodies: Record<string, string>[] = [];
 let validity: Record<string, unknown> | undefined;
+let updateNotes: Record<string, unknown> | undefined;
 let articleStatus = 200;
 
 beforeAll(() => nock.activate());
@@ -63,10 +64,11 @@ describe('D7b and D8 — an entry’s text and the glosses proposed on it', () =
     process.env.LEGAL_API_URL = API;
     articleBodies = [];
     validity = { state: 'current', valid_from: '1942-04-21', valid_to: null, request_in_window: null };
+    updateNotes = undefined;
     articleStatus = 200;
     nock(API).post('/fetch_article_text').times(500).reply((_uri: string, body: Record<string, string>) => {
       articleBodies.push(body);
-      return [articleStatus, [{ article_text: RAW, norma_data: NORM, url: 'https://www.normattiva.it/x', ...(validity ? { validity } : {}) }]];
+      return [articleStatus, [{ article_text: RAW, norma_data: NORM, url: 'https://www.normattiva.it/x', ...(validity ? { validity } : {}), ...updateNotes }]];
     });
     nock(API).post('/fetch_decision').times(500).reply(() => [200, { esito: 'trovata', identita: { corte: 'cassazione', archivio: 'penale', numero: 10787, anno: 2024 }, attributi: {}, testo: DECISION_TEXT }]);
     alice = await createTestUser('passages-alice');
@@ -100,6 +102,48 @@ describe('D7b and D8 — an entry’s text and the glosses proposed on it', () =
         glosse: [],
       });
       expect(articleBodies).toEqual([{ act_type: 'codice civile', act_number: '262', date: '1942-03-16', article: '1453', version: 'vigente', version_date: '' }]);
+    });
+
+    it('gives the update notes beside the text, never in it, on every page (G-386)', async () => {
+      const ruling = { numero: '2', testo: 'La Corte costituzionale, con sentenza n. 194 del 2018, …', ordine: 1, corte_costituzionale: true };
+      updateNotes = { note_aggiornamento: [ruling], note_non_lette: false, note_nel_testo: false };
+      const response = await text();
+      expect(response.body.testo).toBe(RAW);
+      expect(response.body.note_aggiornamento).toEqual([ruling]);
+      expect(Object.keys(response.body)).toEqual(['voce', 'in_vigore', 'parte', 'parti', 'testo', 'note_aggiornamento', 'glosse']);
+      expect(response.body).not.toHaveProperty('avviso_note');
+    });
+
+    it('says when the notes could not be read, and leaves out the ones the text already holds', async () => {
+      const note = { numero: '348', testo: 'Il D.M. … ha disposto …', ordine: 1, corte_costituzionale: false };
+      updateNotes = { note_aggiornamento: [note], note_non_lette: false, note_nel_testo: true };
+      expect(await text().then((r) => [r.body.note_aggiornamento, r.body.avviso_note])).toEqual([undefined, undefined]);
+      updateNotes = { note_aggiornamento: null, note_non_lette: true, note_nel_testo: false };
+      expect(await text().then((r) => [r.body.note_aggiornamento, r.body.avviso_note])).toEqual([
+        undefined,
+        'note di aggiornamento non lette: verificare su Normattiva',
+      ]);
+      // A note the server cannot read is a note not read.
+      updateNotes = { note_aggiornamento: [note, { numero: 3 }], note_non_lette: false, note_nel_testo: false };
+      expect(await text().then((r) => [r.body.note_aggiornamento, r.body.avviso_note])).toEqual([
+        [note],
+        'note di aggiornamento non lette: verificare su Normattiva',
+      ]);
+      updateNotes = { note_aggiornamento: [], note_non_lette: false, note_nel_testo: false };
+      expect(Object.keys((await text()).body)).toEqual(['voce', 'in_vigore', 'parte', 'parti', 'testo', 'glosse']);
+    });
+
+    it('says when the text is one part of a split article (G-387)', async () => {
+      const part = (k: number, dal: number, al: number) => ({ progressivo: k, commi_dal: String(dal), commi_al: String(al), url: `https://www.normattiva.it/atto/caricaArticolo?art.progressivo=${k}` });
+      updateNotes = { parti: [part(1, 1, 100), part(2, 101, 200), part(3, 201, 264)], testo_parziale: true };
+      const response = await text();
+      expect(response.body.testo).toBe(RAW);
+      expect(response.body.avviso_testo_parziale).toBe('testo parziale: commi 1-100 di 264 (diviso in 3 parti)');
+      expect(response.body.parti).toBe(1); // the route's own pages, not the article's parts
+      updateNotes = { parti: [], testo_parziale: false };
+      expect((await text()).body).not.toHaveProperty('avviso_testo_parziale');
+      updateNotes = { parti: [{ progressivo: 'x' }], testo_parziale: true };
+      expect((await text()).body.avviso_testo_parziale).toBe('testo parziale: l’articolo è diviso in parti, verificare su Normattiva');
     });
 
     it('gives a decision’s blocks under their names', async () => {

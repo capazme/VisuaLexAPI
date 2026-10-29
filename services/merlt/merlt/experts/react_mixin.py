@@ -1150,10 +1150,16 @@ Rispondi SOLO con JSON valido, senza commenti o testo aggiuntivo.
                 })
 
         elif "text" in data and "urn" in data:
-            # ArticleFetchTool / ExternalSourceTool format - single article payload
+            # ArticleFetchTool / ExternalSourceTool format - single article payload.
+            # What VisuaLex says beside the text (a partial text, G-387; Normattiva's
+            # update notes, G-386) follows it as its own block, never mixed into it.
+            notes = data.get("oltre_il_testo")
+            text = data.get("text", "")
+            if text and isinstance(notes, str) and notes:
+                text = f"{text}\n\n{notes}"
             sources.append({
                 "urn": data.get("urn", ""),
-                "text": data.get("text", ""),
+                "text": text,
                 "type": data.get("tipo_atto", ""),
                 "source": data.get("source", "article_fetch")
             })
