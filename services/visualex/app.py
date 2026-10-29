@@ -40,6 +40,7 @@ from visualex_api.services.normattiva_validity import (
     upcoming_change,
     versions_between,
 )
+from visualex_api.services.normattiva_notes import read_update_notes, update_notes_fields
 from types import SimpleNamespace
 
 from visualex_api.services.akn_fetch import fetch_act_index
@@ -315,6 +316,7 @@ class NormaController:
                     if validity:
                         result['validity'] = validity
                     result.update(extra)
+                    result.update(await self._update_notes_for(scraper, nv, url, article_text))
 
                 except Exception as exc:
                     result = {'error': str(exc), 'norma_data': nv.to_dict()}
@@ -939,6 +941,25 @@ class NormaController:
             return False
 
     @staticmethod
+    async def _update_notes_for(scraper, nv, url, article_text):
+        """The update notes next to a Normattiva article's text (G-386), `{}` for any other source.
+
+        Read from the page `get_document` stored in the scraper's persistent cache under
+        `url` (the served page, today's when a later version was set aside), so no request
+        is made and `article_text` is never touched (gotcha 23). An undated request's page
+        is already back if it had left the cache (`_validity_of_page`); a dated one is never
+        read again for this, so after a restart its notes can come back unread, and say so.
+        The AKN export's text, the last-resort fallback, opens with its markdown heading
+        («### Art. …», which the HTML extractor never writes) and already holds its notes.
+        """
+        if not isinstance(scraper, NormattivaScraper) or not nv.numero_articolo:
+            return {}
+        if isinstance(article_text, str) and article_text.startswith('###'):
+            return update_notes_fields(None, akn_text=True)
+        notes = await read_update_notes(getattr(scraper, 'cache', None), url, article=nv.numero_articolo)
+        return update_notes_fields(notes)
+
+    @staticmethod
     async def _validity_for(scraper, nv, url):
         """The window Normattiva's page states for this text, or None.
 
@@ -1126,6 +1147,7 @@ class NormaController:
                     if validity:
                         result['validity'] = validity
                     result.update(extra)
+                    result.update(await self._update_notes_for(scraper, nv, url, article_text))
                     return result
                 except Exception as exc:
                     log.error("Error fetching article text", error=str(exc))
@@ -1559,6 +1581,7 @@ class NormaController:
                     if validity:
                         result['validity'] = validity
                     result.update(extra)
+                    result.update(await self._update_notes_for(scraper, nv, url, article_text))
                     return result
                 except Exception as exc:
                     log.error("Error fetching all data", error=str(exc))

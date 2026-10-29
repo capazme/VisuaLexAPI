@@ -147,7 +147,10 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   **The connected application's side** (`routes/assistantPassages.ts`, in the delegated
   table): `GET /dossiers/:id/items/:itemId/text?parte=` (`dossier:text`, a point and a page of the
   counter `text`) gives a norm's or a decision's text in pages of 20,000 characters cut at a line end,
-  `in_vigore`, and the glosses this application proposed still `proposed`, as the model wrote them (`glosse: [{ testo,
+  `in_vigore`, for a norm Normattiva's update notes after `testo` on every page (G-386: `note_aggiornamento`, the Python
+  API's list, unless the text already holds them, `note_nel_testo`; `avviso_note` «note di aggiornamento non lette:
+  verificare su Normattiva» when some could not be read; `assistant/entryText.ts` `updateNotesOf`, a malformed note
+  counted as not read), and the glosses this application proposed still `proposed`, as the model wrote them (`glosse: [{ testo,
   nota }]`; never the user's marks, a saved coloured proposal, a state, a comment, an edit or moved boundaries);
   `POST /dossiers/:id/items/:itemId/glosses { glosse }` (`dossier:write` **and** `dossier:text`, an exchanged token only;
   1–10 glosses `{ testo 15–2000, nota 1–1500 UTF-16 units, prima?, dopo? }`, no colour, two points and one of the counter

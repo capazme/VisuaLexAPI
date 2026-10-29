@@ -1150,10 +1150,16 @@ Rispondi SOLO con JSON valido, senza commenti o testo aggiuntivo.
                 })
 
         elif "text" in data and "urn" in data:
-            # ArticleFetchTool / ExternalSourceTool format - single article payload
+            # ArticleFetchTool / ExternalSourceTool format - single article payload.
+            # Normattiva's update notes (G-386) follow the text as their own labelled
+            # block, never mixed into it.
+            notes = data.get("note_aggiornamento")
+            text = data.get("text", "")
+            if text and isinstance(notes, str) and notes:
+                text = f"{text}\n\n{notes}"
             sources.append({
                 "urn": data.get("urn", ""),
-                "text": data.get("text", ""),
+                "text": text,
                 "type": data.get("tipo_atto", ""),
                 "source": data.get("source", "article_fetch")
             })
