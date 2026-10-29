@@ -12,6 +12,18 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.10.6] - 2026-10-29
+
+The Union's acts read again despite EUR-Lex's firewall, and a lighter MCP. Server and MCP only: no
+migration, no change to the web.
+
+### MCP
+
+- Fewer tokens for the same results: compact JSON in every tool result; `lingolex_le_mie_card`
+  returns a light list (`ancore` as words, no URN) and the new read-only `lingolex_leggi_card`
+  gives 1–10 cards whole; server instructions at `initialize`; a dossier named wrongly is refused
+  with the list of the user's dossiers. Clients reconnect to see the new tool.
+
 ### Sources
 
 - The Union's acts are read from CELLAR, the Publications Office's repository, first, and from
