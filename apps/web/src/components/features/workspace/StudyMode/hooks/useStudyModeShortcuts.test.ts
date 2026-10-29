@@ -51,6 +51,36 @@ describe('useStudyModeShortcuts — keys that are not Study Mode\'s (H1)', () =>
     for (const fn of Object.values(h)) expect(fn).not.toHaveBeenCalled();
   });
 
+  it('a dialog over Study Mode keeps its keys: Esc, the arrows and what is typed in it', () => {
+    const h = handlers();
+    renderHook(() => useStudyModeShortcuts(h));
+    const dialog = document.createElement('div');
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-modal', 'true');
+    const heading = document.createElement('h3');
+    heading.tabIndex = -1;
+    const field = document.createElement('input');
+    dialog.append(heading, field);
+    document.body.appendChild(dialog);
+    for (const target of [heading, field]) {
+      for (const key of ['Escape', 'ArrowLeft', 'ArrowRight', 'h', '1', '+']) {
+        target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+      }
+    }
+    // Esc in the dialog's field is the field's: Study Mode does not take the focus out of it.
+    field.focus();
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    expect(document.activeElement).toBe(field);
+    // The focus outside it (a click on its words, the moment before its first focus): still the dialog's keys.
+    field.blur();
+    for (const key of ['Escape', 'ArrowRight', '2']) press(key);
+    dialog.remove();
+    for (const fn of Object.values(h)) expect(fn).not.toHaveBeenCalled();
+    // Gone, the keys are Study Mode's again.
+    press('Escape');
+    expect(h.onClose).toHaveBeenCalledTimes(1);
+  });
+
   it('an Esc another handler already took is left alone', () => {
     const h = handlers();
     renderHook(() => useStudyModeShortcuts(h));
