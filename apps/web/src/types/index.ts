@@ -138,6 +138,9 @@ export interface ArticleTreeResponse {
 
 // --- New Utility Features Types ---
 
+/** A section of Impostazioni that can be opened directly (the reader's gear opens «Significato dei colori»). */
+export type SettingsSection = 'highlightColors';
+
 export interface AppSettings {
     theme: 'light' | 'dark';
     fontSize: 'small' | 'medium' | 'large' | 'xlarge';
@@ -151,6 +154,12 @@ export interface AppSettings {
      * this device, as the other reading settings.
      */
     highlightColor: 'yellow' | 'green' | 'red' | 'blue';
+    /**
+     * What each colour means to this user (D8 §3: only the labels change, the four colours stay), set in
+     * Impostazioni › «Significato dei colori». Only the colours given a meaning of their own: the others follow
+     * `HIGHLIGHT_COLOR_MEANINGS`. Kept on this device, as the other reading settings; never sent to the server.
+     */
+    highlightColorMeanings: Partial<Record<'yellow' | 'green' | 'red' | 'blue', string>>;
     /**
      * Study Mode reading preferences, persisted across sessions. Without
      * this slice the user had to re-pick the font size, line height, and

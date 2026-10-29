@@ -9,6 +9,8 @@ import { Modal } from './Modal';
 import { accountService } from '../../services/accountService';
 import { ConnectedAppsSection } from '../../features/connections/ConnectedAppsSection';
 import { MerltDataSection } from '../../features/merlt/privacy/MerltDataSection';
+import { HighlightMeaningsSection } from '../features/search/HighlightMeaningsSection';
+import type { SettingsSection } from '../../types';
 
 interface CommitInfo {
     hash: string;
@@ -34,11 +36,13 @@ interface VersionInfo {
 
 interface SettingsModalProps {
     isOpen: boolean;
+    /** The section it opens at, its heading focused (the reader's gear: «Significato dei colori»); else «Chiudi». */
+    section?: SettingsSection | null;
     onClose: () => void;
     onRestartTour?: () => void;
 }
 
-export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalProps) {
+export function SettingsModal({ isOpen, section = null, onClose, onRestartTour }: SettingsModalProps) {
     const navigate = useNavigate();
     const { isAdmin, canUseDevMode, devMode, setDevMode } = useAuth();
     const { settings, updateSettings } = useAppStore();
@@ -53,6 +57,7 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
     // Erasing the account is behind its own button (Y1): the password and the confirmation only once it is asked for.
     const [deleteOpen, setDeleteOpen] = useState(false);
     const deleteOpener = useRef<HTMLButtonElement>(null);
+    const meaningsHeading = useRef<HTMLHeadingElement>(null);
     const closeDelete = () => {
         setDeleteOpen(false);
         setDeletePassword('');
@@ -183,6 +188,8 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
             title="Impostazioni"
             icon={<Settings size={20} />}
             size="md"
+            // The focus scrolls the dialog's body to the section asked for.
+            initialFocusRef={section === 'highlightColors' ? meaningsHeading : undefined}
         >
             <div className="space-y-6">
                 {/* Theme - iOS-style Segmented Control */}
@@ -270,6 +277,9 @@ export function SettingsModal({ isOpen, onClose, onRestartTour }: SettingsModalP
                         </div>
                     </div>
                 </div>
+
+                {/* What each highlight colour means to this user (D8 §3), with the other reading settings. */}
+                <HighlightMeaningsSection headingRef={meaningsHeading} />
 
                 {/* Restart Tour */}
                 {onRestartTour && (

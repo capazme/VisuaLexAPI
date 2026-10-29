@@ -106,7 +106,9 @@ describe('ReadingToolbar — three tools in words, the rest behind «⋯» (R3)'
     it('on a computer: «Note», «Evidenziazioni», «Al dossier» and «⋯»', () => {
         const { container } = setup({ notesCount: 2, highlightsCount: 3 });
         const names = within(desktopRow(container)).getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent);
-        expect(names).toEqual(['Note, 2', 'Evidenziazioni, 3', 'Colore: giallo (nuove evidenziazioni)', 'Al dossier', 'Altre azioni sull’articolo']);
+        expect(names).toEqual([
+            'Note, 2', 'Evidenziazioni, 3', 'Colore: giallo (nuove evidenziazioni)', 'Cambia il significato dei colori', 'Al dossier', 'Altre azioni sull’articolo',
+        ]);
         // The count is seen beside the word.
         expect(within(desktopRow(container)).getByRole('button', { name: 'Note, 2' })).toHaveTextContent('Note2');
     });
@@ -142,7 +144,7 @@ describe('ReadingToolbar — three tools in words, the rest behind «⋯» (R3)'
         const { container } = setup({ find: { isOpen: false, onToggle: vi.fn() }, url: 'https://example.org/art' });
         expect(entryNames(openMore(phoneRow(container)))).toEqual([
             'Aggiungi alle norme rapide', 'Glosse sull’articolo', 'Cerca nel testo', 'Copia', 'Modalità studio', 'Apri la fonte',
-            'Condividi link', 'Esporta…', 'Testo alla data…', 'Confronta con…',
+            'Condividi link', 'Esporta…', 'Testo alla data…', 'Confronta con…', 'Cambia il significato dei colori',
         ]);
     });
 
@@ -334,7 +336,7 @@ describe('ReadingToolbar — the compact form of a light window (spec §4.1)', (
         const { container } = setup({ compact: true, find, url: 'https://example.org/x' });
         const row = desktopRow(container);
         expect(within(row).getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent))
-            .toEqual(['Note', 'Evidenziazioni', 'Colore: giallo (nuove evidenziazioni)', 'Altre azioni sull’articolo']);
+            .toEqual(['Note', 'Evidenziazioni', 'Colore: giallo (nuove evidenziazioni)', 'Cambia il significato dei colori', 'Altre azioni sull’articolo']);
         expect(entryNames(openMore(row))).toEqual(['Glosse sull’articolo', 'Cerca nel testo', 'Copia']);
     });
 
@@ -344,7 +346,7 @@ describe('ReadingToolbar — the compact form of a light window (spec §4.1)', (
         // The card's padding is its edge (the full-screen reader): no reach into it, which cut the focus ring (R3b).
         expect(row).not.toHaveClass('-mr-3');
         expect(within(row).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['Altre azioni sull’articolo']);
-        expect(entryNames(openMore(row))).toEqual(['Glosse sull’articolo', 'Cerca nel testo', 'Copia']);
+        expect(entryNames(openMore(row))).toEqual(['Glosse sull’articolo', 'Cerca nel testo', 'Copia', 'Cambia il significato dei colori']);
     });
 
     it('keeps the status and the annex, which say which text this is', () => {
@@ -403,5 +405,50 @@ describe('ReadingToolbar — the colour of new highlights, chosen once (H1)', ()
         expect(choices[0]).toHaveAttribute('aria-checked', 'true');
         fireEvent.click(choices[3]);
         expect(color()).toBe('blue');
+    });});
+
+describe('ReadingToolbar — the colours mean what the user says (D8 §3)', () => {
+    afterEach(() => appStore.setState((st) => ({
+        settings: { ...st.settings, highlightColorMeanings: {} },
+        settingsDialog: { open: false, section: null },
+    })));
+
+    it('the menu words each colour with the user\'s own meaning, the default where none was given', () => {
+        appStore.setState((st) => ({ settings: { ...st.settings, highlightColorMeanings: { green: 'Termini e scadenze', blue: 'GDPR' } } }));
+        const { container } = setup();
+        fireEvent.click(within(desktopRow(container)).getByRole('button', { name: 'Colore: giallo (nuove evidenziazioni)' }));
+        const choices = within(desktopRow(container)).getAllByRole('menuitemradio');
+        expect(choices.map((c) => c.textContent)).toEqual([
+            'GialloPunto centrale', 'VerdeTermini e scadenze', 'RossoDa rivedere', 'BluGDPR',
+        ]);
+        // Inside the name its first letter is lowered, an acronym kept as written.
+        expect(choices[1]).toHaveAccessibleName('Verde, uso suggerito: termini e scadenze');
+        expect(choices[3]).toHaveAccessibleName('Blu, uso suggerito: GDPR');
+    });
+
+    it('one gear beside the colour, never a «?», opens Impostazioni at the colours\' meanings', () => {
+        const { container } = setup();
+        const row = desktopRow(container);
+        const gear = within(row).getByRole('button', { name: 'Cambia il significato dei colori' });
+        expect(gear).toHaveAttribute('title', 'Cambia il significato dei colori');
+        expect(within(row).queryByRole('button', { name: /\?|aiuto|spiega/i })).toBeNull();
+        fireEvent.click(gear);
+        expect(appStore.getState().settingsDialog).toEqual({ open: true, section: 'highlightColors' });
+    });
+
+    it('on a phone the gear is the entry after the four colours in the «⋯»', () => {
+        const { container } = setup();
+        const menu = openMore(phoneRow(container));
+        const items = Array.from(menu.querySelectorAll<HTMLElement>('[role="menuitem"], [role="menuitemradio"]'));
+        expect(items.at(-1)).toHaveAccessibleName('Cambia il significato dei colori');
+        expect(items.at(-2)).toHaveAccessibleName(/^Nuove evidenziazioni in blu/);
+        fireEvent.click(items.at(-1)!);
+        expect(appStore.getState().settingsDialog).toEqual({ open: true, section: 'highlightColors' });
+    });
+
+    it('a text that takes no highlight shows neither the colour nor its gear', () => {
+        const { container } = setup({ lockedReason: READ_ONLY_REASON });
+        expect(within(desktopRow(container)).queryByRole('button', { name: 'Cambia il significato dei colori' })).toBeNull();
+        expect(within(openMore(phoneRow(container))).queryByRole('menuitem', { name: 'Cambia il significato dei colori' })).toBeNull();
     });
 });

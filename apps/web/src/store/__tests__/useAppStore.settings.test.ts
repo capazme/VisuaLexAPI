@@ -24,3 +24,27 @@ describe('persist: the colour of new highlights (H1), as a reload finds it', () 
     },
   );
 });
+
+describe('persist: the colours\' meanings (D8 §3), as a reload finds them', () => {
+  it('keeps the user\'s own', () => {
+    expect(merge({ settings: { highlightColorMeanings: { green: 'Termini e scadenze' } } }).settings.highlightColorMeanings)
+      .toEqual({ green: 'Termini e scadenze' });
+  });
+
+  it('is none for settings saved before it existed', () => {
+    expect(merge({ settings: { theme: 'dark', highlightColor: 'blue' } }).settings.highlightColorMeanings).toEqual({});
+  });
+
+  it('drops what is not a meaning of a colour this app draws', () => {
+    expect(merge({ settings: { highlightColorMeanings: { purple: 'Viola', red: '', blue: 'x'.repeat(41), yellow: ' Tesi ' } } })
+      .settings.highlightColorMeanings).toEqual({ yellow: 'Tesi' });
+    expect(merge({ settings: { highlightColorMeanings: 'giallo' } }).settings.highlightColorMeanings).toEqual({});
+  });
+
+  it('is kept on the device with the other settings, and Impostazioni\'s opening is not', () => {
+    const saved = (appStore.persist.getOptions() as unknown as { partialize: (s: AppState) => Record<string, unknown> })
+      .partialize(appStore.getState());
+    expect(saved.settings).toHaveProperty('highlightColorMeanings');
+    expect(saved).not.toHaveProperty('settingsDialog');
+  });
+});

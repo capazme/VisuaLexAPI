@@ -19,7 +19,8 @@ export function highlightColorName(color: string): string {
 /**
  * What each colour is suggested for (D7b): the reader's convention, offered as a hint in the menu where the colour of
  * new highlights is chosen (H1), never a rule. The same meanings the MCP tool gives an application; red stands for
- * «Da rivedere», the mark of review, and an application never proposes in red.
+ * «Da rivedere», the mark of review, and an application never proposes in red. The default: each user may give a
+ * colour a meaning of their own (D8 §3, `settings.highlightColorMeanings`), which only this device knows.
  */
 export const HIGHLIGHT_COLOR_MEANINGS: Record<HighlightColor, string> = {
   yellow: 'Punto centrale',
@@ -27,6 +28,37 @@ export const HIGHLIGHT_COLOR_MEANINGS: Record<HighlightColor, string> = {
   blue: 'Definizione o eccezione',
   red: 'Da rivedere',
 };
+
+/** The longest meaning a user may give a colour, in characters: it is read on one line of a menu. */
+export const HIGHLIGHT_MEANING_MAX = 40;
+
+/** A meaning as it is kept: trimmed, 1 to `HIGHLIGHT_MEANING_MAX` characters; anything else is no meaning (null). */
+export function normalizeHighlightMeaning(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const meaning = value.trim();
+  const length = Array.from(meaning).length;
+  return length >= 1 && length <= HIGHLIGHT_MEANING_MAX ? meaning : null;
+}
+
+/**
+ * The meanings a user gave, as a save is read back (storage may hold anything): only a known colour with a valid
+ * meaning that differs from its default is kept, so a colour never changed follows the default if it ever moves.
+ */
+export function sanitizeHighlightMeanings(value: unknown): Partial<Record<HighlightColor, string>> {
+  const kept: Partial<Record<HighlightColor, string>> = {};
+  if (!value || typeof value !== 'object') return kept;
+  for (const color of HIGHLIGHT_COLORS) {
+    const meaning = normalizeHighlightMeaning((value as Record<string, unknown>)[color]);
+    if (meaning && meaning !== HIGHLIGHT_COLOR_MEANINGS[color]) kept[color] = meaning;
+  }
+  return kept;
+}
+
+/** Each colour's meaning for this user: their own where they gave one, the default elsewhere. */
+export function resolveHighlightMeanings(own: Partial<Record<HighlightColor, string>> | undefined): Record<HighlightColor, string> {
+  const valid = sanitizeHighlightMeanings(own);
+  return { ...HIGHLIGHT_COLOR_MEANINGS, ...valid };
+}
 
 /**
  * Each colour as an icon on the selection popup's dark surface (`slate-900`/`slate-800` in both themes): bright

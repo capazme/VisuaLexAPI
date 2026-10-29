@@ -79,18 +79,21 @@ function CompareWaiting() {
 }
 
 export function Layout() {
-  const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel, openCommandPalette } = useAppStore(useShallow(s => ({
+  const { settings, updateSettings, sidebarVisible, toggleSidebar, toggleSearchPanel, openCommandPalette, settingsDialog, openSettings, closeSettings } = useAppStore(useShallow(s => ({
     settings: s.settings,
     updateSettings: s.updateSettings,
     sidebarVisible: s.sidebarVisible,
     toggleSidebar: s.toggleSidebar,
     toggleSearchPanel: s.toggleSearchPanel,
     openCommandPalette: s.openCommandPalette,
+    // In the store, not here: a reader's gear opens it at «Significato dei colori» from wherever it is drawn.
+    settingsDialog: s.settingsDialog,
+    openSettings: s.openSettings,
+    closeSettings: s.closeSettings,
   })));
   const { isAuthenticated } = useAuth();
   const compareOpened = useCompareOpened();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   // From `xl` the desktop column shows its words unless the user narrowed it (remembered in the browser).
@@ -297,7 +300,7 @@ export function Layout() {
             layout={desktopSidebar.layout}
             onToggleWide={desktopSidebar.toggle}
             closeMobile={() => { }}
-            openSettings={() => setSettingsOpen(true)}
+            openSettings={() => openSettings()}
             openKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
             openFeedback={isAuthenticated ? () => setFeedbackOpen(true) : undefined}
             serviceHealth={serviceHealth}
@@ -314,7 +317,7 @@ export function Layout() {
             isOpen={sidebarOpen}
             layout="drawer"
             closeMobile={closeDrawer}
-            openSettings={() => setSettingsOpen(true)}
+            openSettings={() => openSettings()}
             openKeyboardShortcuts={() => setKeyboardShortcutsOpen(true)}
             openFeedback={isAuthenticated ? () => setFeedbackOpen(true) : undefined}
             serviceHealth={serviceHealth}
@@ -419,7 +422,7 @@ export function Layout() {
         </div>
       </main>
 
-      <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} onRestartTour={resetAndStartTour} />
+      <SettingsModal isOpen={settingsDialog.open} section={settingsDialog.section} onClose={closeSettings} onRestartTour={resetAndStartTour} />
 
       {/* Keyboard Shortcuts Modal */}
       <KeyboardShortcutsModal isOpen={keyboardShortcutsOpen} onClose={() => setKeyboardShortcutsOpen(false)} />

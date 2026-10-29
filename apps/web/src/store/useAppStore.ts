@@ -4,7 +4,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { v4 as uuidv4 } from 'uuid';
 import { resetNotifications } from '../components/ui/notifications/notifications';
-import type { AppSettings, Bookmark, Dossier, DossierItem, DossierKind, DossierNormaData, DossierSentenzaData, Annotation, Highlight, Norma, NormaVisitata, ArticleData, SearchParams, QuickNorm, CustomAlias, Environment } from '../types';
+import type { AppSettings, SettingsSection, Bookmark, Dossier, DossierItem, DossierKind, DossierNormaData, DossierSentenzaData, Annotation, Highlight, Norma, NormaVisitata, ArticleData, SearchParams, QuickNorm, CustomAlias, Environment } from '../types';
 import { getErrorMessage } from '../utils/errors';
 import {
     appendBackEntry,
@@ -26,7 +26,7 @@ import { shortAct } from '../utils/sources';
 import { DECISIONS_PRACTICE_LABEL, practiceNoticeText, practicesFromTabs } from '../utils/practiceMigration';
 import { guardedStorage, type StorageFailure } from '../utils/guardedStorage';
 import { isDesktopViewport } from '../hooks/useIsDesktop';
-import { isHighlightColor } from '../utils/highlightColors';
+import { isHighlightColor, sanitizeHighlightMeanings } from '../utils/highlightColors';
 
 // Services for API sync
 import { bookmarkService } from '../services/bookmarkService';
@@ -195,6 +195,8 @@ interface AppState {
     commandPaletteQuery: string | null;
     quickNormsManagerOpen: boolean;
     aliasManagerOpen: boolean;
+    /** Impostazioni (`SettingsModal`, mounted by `Layout`), and the section it opens at: session-only, absent from `partialize`. */
+    settingsDialog: { open: boolean; section: SettingsSection | null };
     searchPanelState: SearchPanelState;
 
     /**
@@ -432,6 +434,9 @@ interface AppState {
     closeQuickNormsManager: () => void;
     openAliasManager: () => void;
     closeAliasManager: () => void;
+    /** Opens Impostazioni, at `section` when given (the reader's gear opens it at «Significato dei colori»). */
+    openSettings: (section?: SettingsSection) => void;
+    closeSettings: () => void;
     toggleSearchPanel: () => void;
     setSearchPanelPosition: (position: { x: number; y: number }) => void;
 
@@ -562,6 +567,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     splitView: false,
     showKeyPassages: true,
     highlightColor: 'yellow',
+    highlightColorMeanings: {},
     studyMode: {
         fontSize: 18,
         lineHeight: 1.8,
@@ -638,6 +644,7 @@ const appStore = createStore<AppState>()(
             commandPaletteQuery: null,
             quickNormsManagerOpen: false,
             aliasManagerOpen: false,
+            settingsDialog: { open: false, section: null },
             searchPanelState: {
                 isCollapsed: false,
                 position: { x: window.innerWidth - 420, y: 20 },
@@ -1284,6 +1291,14 @@ const appStore = createStore<AppState>()(
 
             closeAliasManager: () => set((state) => {
                 state.aliasManagerOpen = false;
+            }),
+
+            openSettings: (section) => set((state) => {
+                state.settingsDialog = { open: true, section: section ?? null };
+            }),
+
+            closeSettings: () => set((state) => {
+                state.settingsDialog = { open: false, section: null };
             }),
 
             toggleSearchPanel: () => set((state) => {
@@ -2653,6 +2668,8 @@ const appStore = createStore<AppState>()(
                         ...(p.settings ?? {}),
                         // Only a colour this app draws: an older or damaged save gets the default.
                         highlightColor: isHighlightColor(p.settings?.highlightColor) ? p.settings.highlightColor : DEFAULT_SETTINGS.highlightColor,
+                        // A meaning of the user's only where it is one (trimmed, 1–40 characters); the rest is the default.
+                        highlightColorMeanings: sanitizeHighlightMeanings(p.settings?.highlightColorMeanings),
                         studyMode: {
                             ...DEFAULT_SETTINGS.studyMode,
                             ...(p.settings?.studyMode ?? {}),
