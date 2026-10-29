@@ -8,7 +8,11 @@
 // decisions leaves through MCP, for one tool only; a grant made before has it only once the user connects again.
 // Since G-381 (b), 29 October 2026, the text of the user's dossier notes leaves under it too, but only for a grant
 // approved with the words that name the notes (`TEXT_CONSENT_VERSION`).
-export const SCOPES = ['dossier:read', 'dossier:write', 'dossier:text', 'lingo:cards:read', 'lingo:cards:write', 'content:delete'] as const;
+// `lingo:courses:*` (Percorsi, A1; G-371, G-372, G-379): worded in the one consent, never a consent of their own.
+export const SCOPES = [
+  'dossier:read', 'dossier:write', 'dossier:text', 'lingo:cards:read', 'lingo:cards:write', 'lingo:courses:read', 'lingo:courses:write',
+  'content:delete',
+] as const;
 export type Scope = (typeof SCOPES)[number];
 
 /**

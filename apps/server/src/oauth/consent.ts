@@ -14,6 +14,9 @@ export const SCOPE_LABELS: Record<string, string> = {
     'Leggere il testo delle norme e delle sentenze dei tuoi dossier, per citarlo alla lettera, e le tue note: il testo arriva al fornitore dell’applicazione collegata',
   'lingo:cards:read': 'Leggere le tue schede di studio',
   'lingo:cards:write': 'Creare schede di studio, sempre come tue bozze personali',
+  // Percorsi (A1, spec 2026-10-23 §10.6): they join this one consent (G-372), worded as the spec proposes.
+  'lingo:courses:read': 'Leggere i tuoi percorsi di studio, i tuoi esiti e le tue segnalazioni',
+  'lingo:courses:write': 'Creare percorsi di studio e aggiungervi moduli ed esami (non può modificare né cancellare nulla)',
   [DELETE_SCOPE]: 'Eliminare dossier, voci e schede (finiscono nel cestino per 30 giorni; ogni eliminazione ti chiede conferma)',
 };
 

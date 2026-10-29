@@ -86,7 +86,7 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `insufficient_scope` — to a live grant and an active user, and to the daily
   quota (points by route, `OAUTH_DAILY_POINTS`; and named daily counters,
   `DELEGATED_COUNTERS`: 10 dossiers created, 100 notes, 20 deletions, 100
-  cards, 100 glosses proposed on passages (the counter `passage`), 200 pages of an entry's text; an entry may also need a second
+  cards, 100 glosses proposed on passages (the counter `passage`), 200 pages of an entry's text, 3 courses, 40 modules and exams; an entry may also need a second
   scope, `alsoScope`). A delegated POST must be JSON (415): the weight is read from the body
   before the app's parsers run. A refused call (4xx/5xx) gives back its points
   and the counter it spent; a route may give back part of both on a 200 (`res.locals.delegatedRefund`,
@@ -647,6 +647,48 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `GET /progressi` carries `livello`, `missioni` (never narrowed by `materia`; `convalida` only for a validator,
   `caso` always `in-arrivo`) and `crediti`, the credits that read wrote. The export carries the ledger as
   `data.lingoCreditiXp` without the events' ids. No MCP tool reads or writes XP.
+- **Gymnasium's courses, «Percorsi»** (A1; spec `docs/superpowers/specs/2026-10-23-gymnasium-courses-design.md`
+  §10; migrations `20261029100000_lingo_courses`, the thirteen tables, the two columns on `lingo_cards` and the
+  CHECKs, and `20261029100001_lingo_courses_declaration`, the ledger's `periodo` CHECK for `MODULO` (`M:<uuid>`)
+  and `PERCORSO` (`C:<uuid>`) and version 1 of `MATERIALE_STUDIO`). The first server pull request (S1) holds the
+  content side; studying, mastery, the exam's attempts, the missions, the course page and `/oggi` are S2. Content
+  (`LingoCorso` and the tables under it, the author's) is apart from progress (`LingoCorsoIscrizione` and under
+  it, one person's): content rows are never updated but for a course's title and `moduliPrevisti`, and a
+  correction is a new module naming the one it supersedes (`sostituisceId`). Behind the switch `lingo_courses`
+  (`app_switches`; `GET /api/features` answers `lingoCourses`): off, every `/api/lingo/corsi` route and `POST
+  /api/lingo/testi/MATERIALE_STUDIO/accetta` answer 404, the card route refuses a module, and the trash neither
+  lists, restores nor empties a `LINGO_CORSO` or `LINGO_CORSO_MODULO` entry (404; the sweep still expires it); the
+  rows stay. The admin's texts page still lists `MATERIALE_STUDIO`: admins are the owners. `GET
+  /api/lingo/srs/sessione` is strict until S2 narrows it to a course: `?corso=` is a 400, never ignored.
+  `routes/lingoCorsi.ts` over `lingo/courses.ts`: `POST /` (course, competences C1… in the order given, the
+  author's enrolment with a study dossier of the user's, locked `FOR KEY SHARE`; 409 `{ detail, richiedeTesto,
+  link }` until the current `MATERIALE_STUDIO` is accepted; 30 a user), `POST /:id/moduli` (one module whole, the
+  course locked `FOR NO KEY UPDATE`, so two writes queue and the limits hold; a module past `moduliPrevisti` is a
+  409, a correction never) and `POST /:id/esami` are a connected application's only (the session gets 403;
+  `lingo:courses:write`, counters `corso` 3 and `modulo` 40 a day); `GET /` (session and `lingo:courses:read`)
+  lists the caller's courses; `GET /:id/struttura` (token only) gives the assistant the content with its keys
+  except an exam's not yet handed in, the flags and the judgements; `PATCH /:id { titolo?, moduliPrevisti? }`,
+  `DELETE /:id`, `DELETE /:id/moduli/:moduloId` (a module never opened; 409 once a state row exists) and `GET
+  /:id/export` are the session's. Every read and write is scoped to the author: anything else is 404. The lesson
+  is a closed Markdown subset (`lingo/courseFormat.ts`): HTML, links but `[testo](#cN)`, images, code, other
+  heading levels, nested lists and every control character but `\n` are refused, never stripped; each `#cN`
+  names an entry of the enrolment's dossier, a norm or a decision, stored as a copy of its identity
+  (`rebuildNormEntry`, `rebuildDecisionEntry`) and its citation, with no call to the sources. The body limits are
+  `LIMITS` in `schemas/lingo/corso.ts` (a module's body measured first, 300,000 characters). An item's right key
+  is the column `corretta`, read only by an explicit `select` (`ITEM_SELECT`). `POST /api/lingo/cards` takes a
+  `moduloId` for the call and `competenze` (codes) per card: a token also needs `lingo:courses:write`, the module
+  must be the caller's (the user's row `FOR KEY SHARE`, then the module `FOR NO KEY UPDATE`), at most 20 cards a
+  module; such a card is `daPercorso` for good,
+  `POST /:id/proponi` refuses it (409, G-362), and `reviewScope` leaves every course card out until S2 adds the
+  module's done day. The trash takes a course (`LINGO_CORSO`: content, enrolments, states, outcomes, attempts,
+  cards with their review rows; the dossier stays, answered for the toast) and a module never opened
+  (`LINGO_CORSO_MODULO`, with its corrections' ids); a course card in the card trash keeps its competences and
+  comes back detached when its module is gone; a dossier's trash records the enrolments that pointed at it and
+  links them again; a restore holds the limits again (30 courses, the programme, 40 and 60 modules: 409). The
+  account export carries `data.lingoCorsi` (the user's courses with their own enrolment, the keys of an exam not
+  handed in left out) and each card's `moduloId`, `daPercorso` and codes. Everything cascades from `User`;
+  `deleteUserAccount` locks the person's courses before their cards, the order the course trash takes (course,
+  modules, cards), and `createCourse` takes the user's row `FOR KEY SHARE` first, so neither deadlocks with it.
 - **The read by institute** — `GET /api/lingo/srs/percorso?materia=` (`lingo/percorso.ts`; spec
   `docs/superpowers/specs/2026-10-19-gymnasium-restyle-design.md` §6, G5). Answers `[{ materia, istituto, nuove, apprendimento, consolidate, dovute }]`, sorted by
   subject then institute, over exactly the cards the session may offer (`reviewScope`: one's own

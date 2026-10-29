@@ -34,6 +34,7 @@ import lingoTestiRoutes from './routes/lingoTesti';
 import adminStudiaTestiRoutes from './routes/adminStudiaTesti';
 import adminStudiaSoglieRoutes from './routes/adminStudiaSoglie';
 import lingoSrsRoutes from './routes/lingoSrs';
+import lingoCorsiRoutes from './routes/lingoCorsi';
 import taskRoutes from './routes/tasks';
 import { merltKillSwitch } from './middleware/merlt/featureGate';
 import { prisma } from './lib/prisma';
@@ -148,6 +149,8 @@ app.use('/api/lingo/testi', lingoTestiRoutes);
 app.use('/api/admin/studia/testi', adminStudiaTestiRoutes);
 app.use('/api/admin/studia/soglie', adminStudiaSoglieRoutes);
 app.use('/api/lingo/srs', lingoSrsRoutes);
+// Gymnasium's courses (Percorsi, A1), same reason; behind the switch `lingo_courses`.
+app.use('/api/lingo/corsi', lingoCorsiRoutes);
 // The planner's tasks, same reason.
 app.use('/api/tasks', taskRoutes);
 // The consent page and the connected applications (MCP spike), same reason.

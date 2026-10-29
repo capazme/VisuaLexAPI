@@ -16,6 +16,10 @@ export const APP_SWITCHES = {
   // `assistant_passages`, the web app's side where the user validates them. Switch this on only once the web shows
   // glosses: today's web draws a gloss's missing colour as yellow.
   assistant_glosses: 'Glosse dell’IA sui passaggi, proposte dalle applicazioni collegate (D8).',
+  // Gymnasium's courses («Percorsi», A1, spec 2026-10-23 §10.10). Off: every /api/lingo/corsi route and the
+  // declaration's accept route answer 404, the card route refuses a module, the trash hides a course and a module
+  // (`trash/trash.ts`), the MCP lists none of the tools. Switching off hides, never deletes.
+  lingo_courses: 'Percorsi di studio creati dall’assistente (A1).',
 } as const;
 
 export type AppSwitchKey = keyof typeof APP_SWITCHES;

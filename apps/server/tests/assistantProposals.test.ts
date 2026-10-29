@@ -70,9 +70,9 @@ describe('D7b — the assistant’s proposals, for the web app', () => {
     it('is off by default: GET /features says so and every route answers 404', async () => {
       const features = await request(app).get('/api/features').set(authHeader(alice));
       expect(features.status).toBe(200);
-      expect(features.body).toEqual({ assistantPassages: false, assistantGlosses: false });
+      expect(features.body).toEqual({ assistantPassages: false, assistantGlosses: false, lingoCourses: false });
       // Public: the MCP server asks it with no token before a session lists its tools.
-      expect((await request(app).get('/api/features')).body).toEqual({ assistantPassages: false, assistantGlosses: false });
+      expect((await request(app).get('/api/features')).body).toEqual({ assistantPassages: false, assistantGlosses: false, lingoCourses: false });
       const p = await proposal(alice.id, itemId);
       for (const call of [
         request(app).get(`${base()}/proposals`),
@@ -96,16 +96,17 @@ describe('D7b — the assistant’s proposals, for the web app', () => {
       const on = await request(app).put('/api/admin/switches/assistant_passages').set(authHeader(alice)).send({ enabled: true });
       expect(on.status).toBe(200);
       expect(on.body).toMatchObject({ key: 'assistant_passages', enabled: true });
-      expect((await request(app).get('/api/features').set(authHeader(bob))).body).toEqual({ assistantPassages: true, assistantGlosses: false });
+      expect((await request(app).get('/api/features').set(authHeader(bob))).body).toEqual({ assistantPassages: true, assistantGlosses: false, lingoCourses: false });
       const list = await request(app).get('/api/admin/switches').set(authHeader(alice));
       expect(list.body.switches).toEqual([
         expect.objectContaining({ key: 'assistant_passages', enabled: true }),
         // D8's, off until an admin switches it.
         expect.objectContaining({ key: 'assistant_glosses', enabled: false }),
+        expect.objectContaining({ key: 'lingo_courses', enabled: false }),
       ]);
       const glosses = await request(app).put('/api/admin/switches/assistant_glosses').set(authHeader(alice)).send({ enabled: true });
       expect(glosses.body).toMatchObject({ key: 'assistant_glosses', enabled: true });
-      expect((await request(app).get('/api/features')).body).toEqual({ assistantPassages: true, assistantGlosses: true });
+      expect((await request(app).get('/api/features')).body).toEqual({ assistantPassages: true, assistantGlosses: true, lingoCourses: false });
       expect((await request(app).put('/api/admin/switches/nope').set(authHeader(alice)).send({ enabled: true })).status).toBe(404);
       expect((await request(app).put('/api/admin/switches/assistant_passages').set(authHeader(alice)).send({ enabled: 'yes' })).status).toBe(400);
     });

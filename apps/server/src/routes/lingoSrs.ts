@@ -47,6 +47,9 @@ const sessionSchema = z
       .refine(hasNoNul, { message: 'L’istituto contiene un carattere non valido.' })
       .optional(),
   })
+  // Strict: a parameter it does not know (`?corso=` before S2 of the courses) is a 400, so no client takes the
+  // whole queue for a narrowed one.
+  .strict()
   .refine((query) => query.istituto === undefined || query.materia !== undefined, {
     message: 'L’istituto richiede la materia.',
     path: ['istituto'],
