@@ -1,6 +1,6 @@
-import { Circle } from 'lucide-react';
+import { Circle, Settings } from 'lucide-react';
 import type { MenuItem } from '../../ui/MenuButton';
-import { HIGHLIGHT_COLORS, HIGHLIGHT_COLOR_MEANINGS, highlightColorName, type HighlightColor } from '../../../utils/highlightColors';
+import { HIGHLIGHT_COLORS, highlightColorName, type HighlightColor } from '../../../utils/highlightColors';
 
 /** Each colour's own dot in a menu: its highlight's background, its ink around it. */
 const DOT: Record<HighlightColor, string> = {
@@ -13,26 +13,34 @@ const DOT: Record<HighlightColor, string> = {
 /** The title over the four: their own menu's, and in a menu of actions. Each colour's meaning is a suggestion. */
 export const SECTION_HEADING = 'Colore delle nuove evidenziazioni — uso suggerito';
 
+/** The way to Impostazioni › «Significato dei colori»: the gear's name and title, and the phone's menu entry. */
+export const CHANGE_MEANINGS_LABEL = 'Cambia il significato dei colori';
+
 const capitalised = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+/** A meaning inside a sentence: its first letter lowered, unless it opens an acronym («GDPR», «IVA») the user wrote. */
+const inSentence = (s: string) => (/^\p{Lu}\p{Lu}/u.test(s) ? s : s.charAt(0).toLowerCase() + s.slice(1));
 
 /**
  * The four colours as a menu's choices (H1): the one chosen ticked (`menuitemradio`), each with what it is suggested
- * for under it (`HIGHLIGHT_COLOR_MEANINGS`, a hint: any colour is free for anything), and named «Giallo, uso
- * suggerito: punto centrale». `section`, for a menu that holds actions too (a phone's «⋯»): a separator and a title over the four, so
- * they read as a setting and not as «highlight now», and each one's name says what it sets.
+ * for under it (`meanings`, the user's own or the default: a hint, any colour is free for anything), and named
+ * «Giallo, uso suggerito: punto centrale». `section`, for a menu that holds actions too (a phone's «⋯»): a separator
+ * and a title over the four, so they read as a setting and not as «highlight now», and each one's name says what it
+ * sets. `onChangeMeanings` adds, after the four, the entry that opens Impostazioni where the meanings are changed —
+ * the phone's form of the gear beside the colour.
  */
 export function highlightColorItems(
   current: HighlightColor,
+  meanings: Record<HighlightColor, string>,
   choose: (color: HighlightColor) => void,
-  { section = false }: { section?: boolean } = {},
+  { section = false, onChangeMeanings }: { section?: boolean; onChangeMeanings?: () => void } = {},
 ): MenuItem[] {
-  return HIGHLIGHT_COLORS.map((color, i) => {
+  const colours: MenuItem[] = HIGHLIGHT_COLORS.map((color, i) => {
     const name = highlightColorName(color);
-    const meaning = HIGHLIGHT_COLOR_MEANINGS[color].toLowerCase();
+    const meaning = inSentence(meanings[color]);
     return {
       label: capitalised(name),
       ariaLabel: section ? `Nuove evidenziazioni in ${name}, uso suggerito: ${meaning}` : `${capitalised(name)}, uso suggerito: ${meaning}`,
-      description: HIGHLIGHT_COLOR_MEANINGS[color],
+      description: meanings[color],
       icon: Circle,
       iconClassName: DOT[color],
       checked: color === current,
@@ -41,4 +49,5 @@ export function highlightColorItems(
       onSelect: () => choose(color),
     };
   });
+  return onChangeMeanings ? [...colours, { label: CHANGE_MEANINGS_LABEL, icon: Settings, onSelect: onChangeMeanings }] : colours;
 }

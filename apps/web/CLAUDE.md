@@ -1073,15 +1073,38 @@ alone, the decision's bar and Study Mode's header, its words are its `title`), i
 phone under their own title («Colore delle nuove evidenziazioni — uso suggerito», each named «Nuove evidenziazioni in
 verde, uso suggerito: …» so it reads as a setting, not as «highlight now»), in the decision's bar, in Study Mode's
 header, and with the dossier reader's actions (it has no bar); never on a text that takes no highlight. The menu, under
-the same title, offers the four as `menuitemradio`, each with what it is suggested for (`HIGHLIGHT_COLOR_MEANINGS`: yellow
-«Punto centrale», green «Condizione o presupposto», blue «Definizione o eccezione», red «Da rivedere»), a hint: any
-colour is free for anything. Every way of highlighting takes it: `SelectionPopup` never asks — «Evidenzia» (named
+the same title, offers the four as `menuitemradio`, each with what it is suggested for, a hint: any colour is free for
+anything. **What a colour means is each user's** (the owner, 29 October 2026: «solo etichette» — the four colours stay, no colour
+is added, only the words for them change, so no highlight, colour key or anchor moves, root rule 23): the default is
+`HIGHLIGHT_COLOR_MEANINGS` (yellow «Punto centrale», green «Condizione o presupposto», blue «Definizione o eccezione», red
+«Da rivedere»), and a user's own are `settings.highlightColorMeanings` — only the colours given one, trimmed, 1 to 40
+characters (`normalizeHighlightMeaning`; the persist `merge` drops anything else, `sanitizeHighlightMeanings`, and a
+meaning written back to the default is no meaning of one's own), kept on this device with the other reading settings,
+never sent to the server or to an application (the MCP tool's description gives the defaults). Whatever words a
+colour's meaning reads it through `useHighlightColorMeanings` (`highlightColorItems` takes the meanings; its names lower
+the first letter, not an acronym the user wrote). Beside the colour's trigger one gear and only that (no «?»: the menu
+already explains; the gear says «change it»), named and titled «Cambia il significato dei colori»
+(`CHANGE_MEANINGS_LABEL`), the trigger's look with 44 px of width on a phone — the article's bar, the decision's, the
+dossier reader's; on the phone's «⋯» the same words are the entry after the four colours; in Study Mode, whose header
+has a gear already (its own settings, «Impostazioni (S)»), the entry is the last of that panel, not a second gear
+(`meaningsGear={false}`); and none in the lesson's article sheet on a phone (`ui/Sheet` keeps the focus inside it, a
+dialog over it would fight it: Impostazioni stays the user menu's there). All open Impostazioni at «Significato dei colori» (`openSettings('highlightColors')`):
+the dialog's state is the store's (`settingsDialog`, session-only), so `Layout`'s `SettingsModal` opens from any reader,
+and with that section it gives the section's first field («Giallo») the focus (`initialFocusRef`) — never the heading:
+`useDialogFocus`'s trap sends Shift+Tab from an element outside its Tab order (`tabIndex -1`) to the dialog's last
+control — and that first focus scrolls the dialog's body alone so the section's heading is at its top (`revealOnFocus`,
+`scrollParentOf`).
+`HighlightMeaningsSection`, after «Tipografia»: a field per colour (its dot and name as the label, the default as
+placeholder, `maxLength` 40, 44 px on a phone, `FIELD_TEXT`), saved when left or on Enter, an emptied one keeping the
+meaning it had (said in the section's status line), Esc giving up a change without closing the dialog, and «Ripristina
+predefiniti» (`aria-disabled` while nothing differs). Every way of highlighting takes it: `SelectionPopup` never asks — «Evidenzia» (named
 «Evidenzia in giallo», `aria-keyshortcuts="h"`) and H highlight at once in it, its icon in the colour bright on the
 popup's dark surface (`HIGHLIGHT_ICON_ON_DARK`, never the highlight's tint, dark in the dark theme and transparent
 while highlights are hidden) —, a key passage's «Fai tua», and Study Mode's keys 1–4, which highlight in their colour
 and make it the one chosen. Sideways the popup is moved 8 px inside the window by its drawn box — the positioning
 element's first child, the positioning element being `w-max` — (a `marginLeft` set as it is drawn). Study Mode's own keys leave alone a key a menu took or one pressed in a menu (Esc there closes the
-menu, not Study Mode), and H and N while text is selected (the popup's). The MCP tool gives an application the same meanings and refuses red (`apps/mcp/src/tools/passages.ts`).
+menu, not Study Mode), every key while a dialog is open over it (`[aria-modal="true"]` anywhere in the document, the
+focus inside it or not: Impostazioni opened from its settings — its Esc, arrows and digits are the dialog's), and H and N while text is selected (the popup's). The MCP tool gives an application the same meanings and refuses red (`apps/mcp/src/tools/passages.ts`).
 
 The wiring follows the server's contract (`services/assistantService.ts`). `GET /api/features` says whether the
 feature is on, read as the app starts (`useAuth`) and as the dossier page mounts; a 404 «Non disponibile» from a
