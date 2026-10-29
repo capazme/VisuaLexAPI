@@ -78,6 +78,9 @@ model User {
   lingoPreferenzeStudio LingoPreferenzeStudio?
   lingoGiornateStudio   LingoGiornataStudio[]
   lingoCreditiXp        LingoCreditoXp[]
+  // Gymnasium's courses (Percorsi, A1): the ones this user wrote, and their enrolments.
+  lingoCorsi            LingoCorso[]
+  lingoIscrizioni       LingoCorsoIscrizione[]
 
   // LingoLex validation: set by an administrator; the votes this user cast (kept,
   // anonymous, when the account goes), the notice versions they wrote (same) and
@@ -527,6 +530,8 @@ model Dossier {
   tasks            Task[]
   // Its copy in the Forum, if published: seen by its owner only, never in the public content.
   publishedCopy    SharedEnvironment?     @relation("SharedEnvironmentSourceDossier")
+  // The course enrolments that study it (Percorsi, A1): SetNull when the dossier goes.
+  lingoIscrizioni  LingoCorsoIscrizione[]
   sourceSuggestion EnvironmentSuggestion? @relation("SuggestionSourcedDossiers", fields: [sourceSuggestionId], references: [id], onDelete: SetNull)
   originalAuthor   User?                  @relation("OriginalAuthorOfDossiers", fields: [originalAuthorId], references: [id], onDelete: SetNull)
 
@@ -1160,10 +1165,17 @@ model LingoCard {
   validazioni   LingoValidazioneCard[]
   statiRipasso  LingoStatoRipasso[]
   revisioni     LingoRevisioneSRS[]
+  // A course's card (Percorsi, A1): its module, Cascade (always its author's draft); `daPercorso` is set when it is
+  // created with a module and never cleared, so the card stays out of the community once detached too.
+  moduloId      String?                @map("modulo_id")
+  daPercorso    Boolean                @default(false) @map("da_percorso")
+  modulo        LingoCorsoModulo?      @relation(fields: [moduloId], references: [id], onDelete: Cascade)
+  competenze    LingoCardCompetenza[]
 
   @@index([materia, istituto, stato])
   @@index([stato])
   @@index([autoreId])
+  @@index([moduloId])
   @@map("lingo_cards")
 }
 
@@ -1217,6 +1229,7 @@ model LingoValidazioneCard {
 enum LingoTestoChiave {
   PROPOSTA_SCHEDA
   INFORMATIVA_MERLT
+  MATERIALE_STUDIO
 }
 
 // A text the user must accept (decision 22). Never updated, never deleted: an edit is a new version.
@@ -1235,6 +1248,7 @@ model LingoTestoVersione {
   autore       User?                    @relation(fields: [autoreId], references: [id], onDelete: SetNull)
   accettazioni LingoAccettazioneTesto[]
   carte        LingoCard[]
+  corsi        LingoCorso[]
   merltPreferenze MerltUserPreference[] @relation("MerltPreferenceNotice")
   merltConsensi   MerltConsentAudit[]   @relation("MerltAuditNotice")
 
@@ -1346,6 +1360,8 @@ enum LingoMissione {
   CONVALIDA
   SETTIMANA
   CONSOLIDA
+  MODULO
+  PERCORSO
 }
 
 enum LingoFonteXp {
@@ -1353,6 +1369,8 @@ enum LingoFonteXp {
   PROPOSTA
   VOTO
   LETTURA
+  MODULO
+  ESAME
 }
 
 model LingoCreditoXp {
@@ -1408,6 +1426,297 @@ model LingoImpostazioneLog {
 
   @@index([chiave, createdAt])
   @@map("lingo_impostazioni_log")
+}
+
+// GYMNASIUM'S COURSES («Percorsi», A1; spec docs/superpowers/specs/2026-10-23-gymnasium-courses-design.md §10.2).
+// Content (the author's) apart from progress (one person's), so that A3 can enrol others without copying the
+// content. Content rows are never updated once written, except a course's title and its `moduliPrevisti` (by the
+// user alone): a correction is a new module that names the one it supersedes. Ranges and «exactly one of» are
+// CHECKs in the migrations (20261029100000, 20261029100001), not here.
+
+enum LingoCorsoTipoDomanda {
+  RICHIAMO
+  QUIZ
+  APERTA
+  ESAME
+  ESAME_APERTA
+}
+
+model LingoCorso {
+  id                   String       @id @default(uuid())
+  autoreId             String       @map("autore_id")
+  titolo               String
+  // One of the five subjects (G-363: no new one); the title says what the course is about.
+  materia              LingoMateria
+  descrizione          String?
+  // The programme's count of modules, shown as «8 di 10 moduli»; lowered only by the user («Il programma finisce qui»).
+  moduliPrevisti       Int          @map("moduli_previsti")
+  // The declaration's version accepted when the course was created (the provenance A3 needs).
+  dichiarazioneTestoId String       @map("dichiarazione_testo_id")
+  // The connected application that created it, from the delegation, never from a body.
+  createdByClientId    String?      @map("created_by_client_id")
+  createdByClientName  String?      @map("created_by_client_name")
+  createdAt            DateTime     @default(now()) @map("created_at")
+  updatedAt            DateTime     @updatedAt @map("updated_at")
+
+  autore             User                   @relation(fields: [autoreId], references: [id], onDelete: Cascade)
+  dichiarazioneTesto LingoTestoVersione     @relation(fields: [dichiarazioneTestoId], references: [id], onDelete: Restrict)
+  competenze         LingoCorsoCompetenza[]
+  moduli             LingoCorsoModulo[]
+  esami              LingoCorsoEsame[]
+  iscrizioni         LingoCorsoIscrizione[]
+
+  @@index([autoreId])
+  @@map("lingo_corsi")
+}
+
+model LingoCorsoCompetenza {
+  id      String @id @default(uuid())
+  corsoId String @map("corso_id")
+  // C1, C2…: given by the server in the order the course was created with.
+  codice  String
+  ordine  Int
+  // What the learner will be able to do, as an action.
+  testo   String
+
+  corso   LingoCorso                   @relation(fields: [corsoId], references: [id], onDelete: Cascade)
+  moduli  LingoCorsoModuloCompetenza[]
+  domande LingoCorsoDomandaCompetenza[]
+  carte   LingoCardCompetenza[]
+
+  @@unique([corsoId, codice])
+  @@map("lingo_corsi_competenze")
+}
+
+model LingoCorsoModulo {
+  id                  String   @id @default(uuid())
+  corsoId             String   @map("corso_id")
+  ordine              Int
+  titolo              String
+  // The estimate shown, in minutes.
+  minuti              Int?
+  // 0–3 pre-questions (strings), not graded and never answered to the server.
+  domandePrima        Json     @map("domande_prima")
+  // The module this one corrects; the user withdraws the old one in the web.
+  sostituisceId       String?  @map("sostituisce_id")
+  createdByClientId   String?  @map("created_by_client_id")
+  createdByClientName String?  @map("created_by_client_name")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  corso       LingoCorso                   @relation(fields: [corsoId], references: [id], onDelete: Cascade)
+  sostituisce LingoCorsoModulo?            @relation("LingoCorsoModuloCorrezione", fields: [sostituisceId], references: [id], onDelete: SetNull)
+  correzioni  LingoCorsoModulo[]           @relation("LingoCorsoModuloCorrezione")
+  competenze  LingoCorsoModuloCompetenza[]
+  blocchi     LingoCorsoBlocco[]
+  domande     LingoCorsoDomanda[]
+  stati       LingoCorsoModuloStato[]
+  carte       LingoCard[]
+
+  // Not unique: a correction shares its order with the module it supersedes.
+  @@index([corsoId, ordine])
+  @@index([sostituisceId])
+  @@map("lingo_corsi_moduli")
+}
+
+model LingoCorsoModuloCompetenza {
+  moduloId     String @map("modulo_id")
+  competenzaId String @map("competenza_id")
+
+  modulo     LingoCorsoModulo     @relation(fields: [moduloId], references: [id], onDelete: Cascade)
+  competenza LingoCorsoCompetenza @relation(fields: [competenzaId], references: [id], onDelete: Cascade)
+
+  @@id([moduloId, competenzaId])
+  @@index([competenzaId])
+  @@map("lingo_corsi_moduli_competenze")
+}
+
+model LingoCorsoBlocco {
+  id       String  @id @default(uuid())
+  moduloId String  @map("modulo_id")
+  ordine   Int
+  titolo   String?
+  // The lesson's closed Markdown subset (lingo/courseFormat.ts), stored as the assistant sent it.
+  testo    String  @db.Text
+  // Counted by the server.
+  parole   Int
+  // [{ marcatore, voce, tipo, riferimento, citation }]: copies of the course dossier's entries.
+  citazioni Json
+
+  modulo  LingoCorsoModulo  @relation(fields: [moduloId], references: [id], onDelete: Cascade)
+  domande LingoCorsoDomanda[]
+
+  @@unique([moduloId, ordine])
+  @@map("lingo_corsi_blocchi")
+}
+
+model LingoCorsoEsame {
+  id                  String   @id @default(uuid())
+  corsoId             String   @map("corso_id")
+  // Null: the course's own first exam. Set: written for one enrolment after a failed attempt.
+  iscrizioneId        String?  @map("iscrizione_id")
+  createdByClientId   String?  @map("created_by_client_id")
+  createdByClientName String?  @map("created_by_client_name")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  corso      LingoCorso            @relation(fields: [corsoId], references: [id], onDelete: Cascade)
+  iscrizione LingoCorsoIscrizione? @relation(fields: [iscrizioneId], references: [id], onDelete: Cascade)
+  domande    LingoCorsoDomanda[]
+  tentativi  LingoCorsoTentativo[]
+
+  @@index([corsoId])
+  @@index([iscrizioneId])
+  @@map("lingo_corsi_esami")
+}
+
+model LingoCorsoDomanda {
+  id              String                @id @default(uuid())
+  // Exactly one of the two (a CHECK).
+  moduloId        String?               @map("modulo_id")
+  esameId         String?               @map("esame_id")
+  // A recall question's block, of the same module.
+  bloccoId        String?               @map("blocco_id")
+  tipo            LingoCorsoTipoDomanda
+  applicazione    Boolean               @default(false)
+  ordine          Int
+  testo           String                @db.Text
+  // 2–6 { chiave: 'a'…'f', testo, spiegazione }; for APERTA the hybrid's options.
+  opzioni         Json?
+  // The right key: a column of its own, so that every read selects it explicitly (never by default).
+  corretta        String?
+  rispostaModello String?               @map("risposta_modello") @db.Text
+  // 3–5 criteria, the open kinds only.
+  rubrica         Json?
+  createdAt       DateTime              @default(now()) @map("created_at")
+
+  modulo     LingoCorsoModulo?             @relation(fields: [moduloId], references: [id], onDelete: Cascade)
+  esame      LingoCorsoEsame?              @relation(fields: [esameId], references: [id], onDelete: Cascade)
+  blocco     LingoCorsoBlocco?             @relation(fields: [bloccoId], references: [id], onDelete: Cascade)
+  competenze LingoCorsoDomandaCompetenza[]
+  esiti      LingoCorsoEsito[]
+
+  @@index([moduloId])
+  @@index([esameId])
+  @@index([bloccoId])
+  @@map("lingo_corsi_domande")
+}
+
+model LingoCorsoDomandaCompetenza {
+  domandaId    String @map("domanda_id")
+  competenzaId String @map("competenza_id")
+
+  domanda    LingoCorsoDomanda    @relation(fields: [domandaId], references: [id], onDelete: Cascade)
+  competenza LingoCorsoCompetenza @relation(fields: [competenzaId], references: [id], onDelete: Cascade)
+
+  @@id([domandaId, competenzaId])
+  @@index([competenzaId])
+  @@map("lingo_corsi_domande_competenze")
+}
+
+model LingoCorsoIscrizione {
+  id         String    @id @default(uuid())
+  corsoId    String    @map("corso_id")
+  utenteId   String    @map("utente_id")
+  // The course's study dossier, linked from the enrolment (each learner's own in A3); SetNull when it goes.
+  dossierId  String?   @map("dossier_id")
+  // The Rome day the course was passed: written once, never cleared.
+  superatoIl DateTime? @map("superato_il") @db.Date
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  corso     LingoCorso              @relation(fields: [corsoId], references: [id], onDelete: Cascade)
+  utente    User                    @relation(fields: [utenteId], references: [id], onDelete: Cascade)
+  dossier   Dossier?                @relation(fields: [dossierId], references: [id], onDelete: SetNull)
+  stati     LingoCorsoModuloStato[]
+  esiti     LingoCorsoEsito[]
+  tentativi LingoCorsoTentativo[]
+  esami     LingoCorsoEsame[]
+
+  @@unique([corsoId, utenteId])
+  @@index([utenteId])
+  @@index([dossierId])
+  @@map("lingo_corsi_iscrizioni")
+}
+
+model LingoCorsoModuloStato {
+  // Also the XP event's id («Completa un modulo»).
+  id               String    @id @default(uuid())
+  iscrizioneId     String    @map("iscrizione_id")
+  moduloId         String    @map("modulo_id")
+  apertoIl         DateTime  @default(now()) @map("aperto_il")
+  fattoIl          DateTime? @map("fatto_il")
+  fattoGiorno      DateTime? @map("fatto_giorno") @db.Date
+  quizPercentuale  Int?      @map("quiz_percentuale")
+  giudizio         Int?
+  giudizioNota     String?   @map("giudizio_nota")
+  ritiratoIl       DateTime? @map("ritirato_il")
+
+  iscrizione LingoCorsoIscrizione @relation(fields: [iscrizioneId], references: [id], onDelete: Cascade)
+  modulo     LingoCorsoModulo     @relation(fields: [moduloId], references: [id], onDelete: Cascade)
+
+  @@unique([iscrizioneId, moduloId])
+  @@index([moduloId])
+  @@map("lingo_corsi_moduli_stati")
+}
+
+model LingoCorsoEsito {
+  id           String    @id @default(uuid())
+  iscrizioneId String    @map("iscrizione_id")
+  domandaId    String    @map("domanda_id")
+  tentativoId  String?   @map("tentativo_id")
+  scelta       String?
+  // Null when no choice was graded (an open question answered by the rubric alone).
+  corretto     Boolean?
+  // The rubric's criteria ticked (open kinds); empty otherwise. Never scored.
+  spuntate     Int[]     @default([])
+  // The server's Rome day.
+  giorno       DateTime  @db.Date
+  createdAt    DateTime  @default(now()) @map("created_at")
+  segnalatoIl  DateTime? @map("segnalato_il")
+  segnalazione String?
+
+  iscrizione LingoCorsoIscrizione @relation(fields: [iscrizioneId], references: [id], onDelete: Cascade)
+  domanda    LingoCorsoDomanda    @relation(fields: [domandaId], references: [id], onDelete: Cascade)
+  tentativo  LingoCorsoTentativo? @relation(fields: [tentativoId], references: [id], onDelete: Cascade)
+
+  @@unique([iscrizioneId, domandaId])
+  @@index([iscrizioneId, giorno])
+  @@index([domandaId])
+  @@index([tentativoId])
+  @@map("lingo_corsi_esiti")
+}
+
+model LingoCorsoTentativo {
+  id            String    @id @default(uuid())
+  iscrizioneId  String    @map("iscrizione_id")
+  esameId       String    @map("esame_id")
+  apertoIl      DateTime  @default(now()) @map("aperto_il")
+  consegnatoIl  DateTime? @map("consegnato_il")
+  giorno        DateTime? @db.Date
+  percentuale   Int?
+  superato      Boolean?
+  // { codice: percentuale } as graded.
+  perCompetenza Json?     @map("per_competenza")
+
+  iscrizione LingoCorsoIscrizione @relation(fields: [iscrizioneId], references: [id], onDelete: Cascade)
+  esame      LingoCorsoEsame      @relation(fields: [esameId], references: [id], onDelete: Cascade)
+  esiti      LingoCorsoEsito[]
+
+  // An exam is never shown twice.
+  @@unique([iscrizioneId, esameId])
+  @@index([esameId])
+  @@map("lingo_corsi_tentativi")
+}
+
+// A course card's competences (codes of its module's course).
+model LingoCardCompetenza {
+  cardId       String @map("card_id")
+  competenzaId String @map("competenza_id")
+
+  card       LingoCard            @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  competenza LingoCorsoCompetenza @relation(fields: [competenzaId], references: [id], onDelete: Cascade)
+
+  @@id([cardId, competenzaId])
+  @@index([competenzaId])
+  @@map("lingo_card_competenze")
 }
 
 // ─── OAuth 2.1 authorization server (MCP spike) ─────────────────────────────
@@ -1499,7 +1808,8 @@ model OAuthGrant {
   lastUsedAt DateTime? @map("last_used_at")
   revokedAt  DateTime? @map("revoked_at")
   // The words of `dossier:text` the user last approved (`TEXT_CONSENT_VERSION` in oauth/config.ts); null for a grant
-  // approved before the words named the user's notes (G-381 (b)): it never receives a note's text until reconnected.
+  // without the texts. A lower version never receives a note's text until reconnected (G-381 (b); the grants that held
+  // `dossier:text` when the column came were given 1, G-385).
   textConsentVersion Int? @map("text_consent_version")
 
   user   User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1552,6 +1862,8 @@ enum TrashKind {
   DOSSIER
   DOSSIER_ITEMS
   LINGO_CARDS
+  LINGO_CORSO
+  LINGO_CORSO_MODULO
 }
 
 model TrashEntry {

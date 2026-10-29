@@ -21,6 +21,10 @@ ADD CONSTRAINT "highlights_gloss_note_check" CHECK (
 );
 
 -- G-381 (b): the text of the user's notes leaves under `dossier:text` only for a grant approved with the words that name
--- them («… e le tue note»). Every existing grant has none (null): it keeps today's behaviour until the user connects again.
+-- them («… e le tue note», version 1). The column serves the next change of those words.
 -- AlterTable
 ALTER TABLE "oauth_grants" ADD COLUMN     "text_consent_version" INTEGER;
+
+-- G-385 (owners, 29 October 2026): there are no active users yet, so the grants that already hold `dossier:text` are
+-- given version 1 and read the notes without connecting again. Only the new column is written.
+UPDATE "oauth_grants" SET "text_consent_version" = 1 WHERE 'dossier:text' = ANY("scopes");

@@ -68,8 +68,8 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   note's text (`testo`), its first 500 characters with `troncata: true` when cut (never inside a surrogate pair), and one
   note whole with `nota_intera` (refused without the scope, or for an id that is not a note of the dossier). The
   server is the gate: the dossier is then read with a token exchanged for `dossier:read dossier:text`, and the server
-  answers a note's content null to a grant approved before the words named the notes (`apps/server`'s
-  `text_consent_version`); such a note gets no `testo`, and `nota_intera` on it asks the user to connect again. A norm or a decision is named by the
+  answers a note's content null to a grant whose consent version is older than the words' (`apps/server`'s
+  `text_consent_version`; the grants that held `dossier:text` when it came were given the current one); such a note gets no `testo`, and `nota_intera` on it asks the user to connect again. A norm or a decision is named by the
   server's citation (`citation` on dossier items, `display` on the norms
   route's results, `citation` on the decisions route's: «art. 3, l. 31 dicembre 2012, n. 247», «Cass. civ., sez. un., sent. 6
   dicembre 2024, n. 31310»), never rebuilt here, so two acts of the same type always read

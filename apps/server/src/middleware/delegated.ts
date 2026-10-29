@@ -21,6 +21,9 @@ export const DELEGATED_COUNTERS: Record<DelegatedCounter, number> = {
   // D7b and D8: glosses proposed on the passages of dossier entries, and pages of an entry's text read.
   passage: 100,
   text: 200,
+  // Percorsi (A1, spec 2026-10-23 §10.6): courses created, and modules and exams added.
+  corso: 3,
+  modulo: 40,
 };
 
 const COUNTER_WORDS: Record<DelegatedCounter, string> = {
@@ -30,6 +33,8 @@ const COUNTER_WORDS: Record<DelegatedCounter, string> = {
   card: 'schede create',
   passage: 'glosse proposte',
   text: 'pagine di testo',
+  corso: 'percorsi creati',
+  modulo: 'moduli ed esami aggiunti',
 };
 
 // Created on first use: the Redis client, when enabled, is read then.
