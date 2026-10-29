@@ -60,14 +60,14 @@ describe('settleMissions', () => {
   });
 
   it('writes no credit that takes the day past the ceiling', async () => {
-    // 290 already today: «dovute» (20) would reach 310, «obiettivo» (10) exactly 300.
-    await creditByHand(alice, 'CONSOLIDA', 'U', TODAY, 275);
+    // 440 already today: «dovute» (20) would reach 460, «obiettivo» (10) exactly 450.
+    await creditByHand(alice, 'CONSOLIDA', 'U', TODAY, 425);
     await creditByHand(alice, 'SCRIVI', `G:${TODAY}`, TODAY, 15, 'PROPOSTA', 'card-x');
     await fulfilledDay();
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const result = await read();
     expect(result.crediti).toEqual([{ missione: 'obiettivo', punti: 10 }]);
-    expect(result.livello.oggi).toBe(300);
+    expect(result.livello.oggi).toBe(450);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('ceiling'));
     warn.mockRestore();
   });

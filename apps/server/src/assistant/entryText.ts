@@ -120,6 +120,81 @@ export function decisionProjection(testo: DecisionText): string {
     .replace(/\n/g, '');
 }
 
+/** One update note («AGGIORNAMENTO (N)») of a Normattiva article, as the Python API sends it (G-386). */
+export interface UpdateNote {
+  numero: string;
+  testo: string;
+  ordine: number;
+  corte_costituzionale: boolean;
+}
+
+/**
+ * The update notes next to a norm's text (G-386): never part of it. `notes` is null when the page could not be read,
+ * or when the text already holds them (`inText`: the codes' format, the AKN export), so they are shown once.
+ */
+export interface UpdateNotes {
+  notes: UpdateNote[] | null;
+  unread: boolean;
+  inText: boolean;
+}
+
+const isUpdateNote = (value: unknown): value is UpdateNote => {
+  const note = value as Partial<UpdateNote> | null;
+  return (
+    !!note &&
+    typeof note === 'object' &&
+    typeof note.numero === 'string' &&
+    typeof note.testo === 'string' &&
+    Number.isInteger(note.ordine) &&
+    typeof note.corte_costituzionale === 'boolean'
+  );
+};
+
+/** The three fields of an article answer, or undefined when it has none (not a Normattiva text, an older API). */
+export function updateNotesOf(answer: { note_aggiornamento?: unknown; note_non_lette?: unknown; note_nel_testo?: unknown }): UpdateNotes | undefined {
+  if (!('note_aggiornamento' in answer)) return undefined;
+  const list = Array.isArray(answer.note_aggiornamento) ? answer.note_aggiornamento : null;
+  const notes = list ? list.filter(isUpdateNote).map(({ numero, testo, ordine, corte_costituzionale }) => ({ numero, testo, ordine, corte_costituzionale })) : null;
+  return {
+    notes,
+    // A note dropped here as malformed is a note not read.
+    unread: answer.note_non_lette === true || (list !== null && notes!.length < list.length),
+    inText: answer.note_nel_testo === true,
+  };
+}
+
+/** One part of an article Normattiva splits (G-387), as the Python API sends it. */
+export interface ArticlePart {
+  progressivo: number;
+  commi_dal: string;
+  commi_al: string;
+  url: string;
+}
+
+const isArticlePart = (value: unknown): value is ArticlePart => {
+  const part = value as Partial<ArticlePart> | null;
+  return (
+    !!part &&
+    typeof part === 'object' &&
+    Number.isInteger(part.progressivo) &&
+    typeof part.commi_dal === 'string' &&
+    typeof part.commi_al === 'string' &&
+    typeof part.url === 'string'
+  );
+};
+
+/**
+ * «testo parziale: commi 1-100 di 1364 (diviso in 14 parti)» for a text that is one part of a split article (G-387),
+ * the notice agreed for mcp-legal-it 3.0.x; undefined otherwise. The article's URN serves its first part.
+ */
+export function partialNoticeOf(answer: { parti?: unknown; testo_parziale?: unknown }): string | undefined {
+  if (answer.testo_parziale !== true || !Array.isArray(answer.parti)) return undefined;
+  const parts = answer.parti.filter(isArticlePart);
+  if (parts.length === 0) return 'testo parziale: l’articolo è diviso in parti, verificare su Normattiva';
+  const [first, last] = [parts[0], parts[parts.length - 1]];
+  return `testo parziale: commi ${first.commi_dal}-${first.commi_al} di ${last.commi_al} (diviso in ${parts.length} parti)`;
+}
+
 /** What the server reads of an entry: the projection it searches, the text it shows the model, the key it stores under. */
 export interface EntryText {
   kind: 'norm' | 'sentenza';
@@ -131,6 +206,10 @@ export interface EntryText {
   wireKey: string;
   /** False for a text the reader shows read-only (P13). */
   inForce: boolean;
+  /** A norm's update notes, beside the text (G-386); absent for a decision and for a text with none to tell. */
+  updateNotes?: UpdateNotes;
+  /** For a norm that is one part of a split article, the notice that says so (G-387). */
+  partialNotice?: string;
 }
 
 export class EntryHasNoText extends Error {}
@@ -165,7 +244,9 @@ async function readNorm(content: unknown, signal: AbortSignal): Promise<EntryTex
   const norma = normaOfContent(content);
   if (!norma) throw new EntryUnreadable();
   const { status, data } = await postLegalApi('/fetch_article_text', articleFetchBody(norma), { signal });
-  const first = (Array.isArray(data) ? data[0] : data) as { article_text?: unknown; error?: unknown; validity?: unknown } | undefined;
+  const first = (Array.isArray(data) ? data[0] : data) as
+    | { article_text?: unknown; error?: unknown; validity?: unknown; note_aggiornamento?: unknown; note_non_lette?: unknown; note_nel_testo?: unknown; parti?: unknown; testo_parziale?: unknown }
+    | undefined;
   // The request refused as invalid, or a document the source says is not there: asking again will not help.
   if (status === 400 || (first && typeof first.error === 'string' && PERMANENT.test(first.error))) throw new SourceHasNoText();
   if (status !== 200 || !first || first.error || typeof first.article_text !== 'string' || !first.article_text) {
@@ -177,6 +258,8 @@ async function readNorm(content: unknown, signal: AbortSignal): Promise<EntryTex
     display: first.article_text,
     wireKey: wireNormaKey(buildItemKey(norma), uniqueArticleIdFromNorma(norma)),
     inForce: !isReadOnly(first.validity, norma),
+    updateNotes: updateNotesOf(first),
+    partialNotice: partialNoticeOf(first),
   };
 }
 

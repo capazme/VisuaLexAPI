@@ -61,10 +61,16 @@ describe('an exchanged token', () => {
     const settling = (path: string) => path.startsWith('/lingo/srs') || path.startsWith('/lingo/validazione') || path.endsWith('/proponi');
     expect(DELEGATED_ROUTES.filter((route) => settling(route.path))).toEqual([]);
   });
+
+  it('reaches none of the courses’ study routes: only the assistant’s five rows are delegated (Percorsi §10.6)', () => {
+    expect(DELEGATED_ROUTES.filter((route) => route.path.startsWith('/lingo/corsi')).map((route) => `${route.method} ${route.path}`).sort()).toEqual([
+      'GET /lingo/corsi', 'GET /lingo/corsi/:id/struttura', 'POST /lingo/corsi', 'POST /lingo/corsi/:id/esami', 'POST /lingo/corsi/:id/moduli',
+    ]);
+  });
 });
 
 describe('who calls settleMissions', () => {
-  it('is only the session’s grade, proposal, vote and reads', () => {
+  it('is only the session’s grade, proposal, vote and reads, and the courses’ study routes and course page', () => {
     const root = join(__dirname, '../src');
     const files: string[] = [];
     const walk = (dir: string) => {
@@ -76,6 +82,6 @@ describe('who calls settleMissions', () => {
     };
     walk(root);
     const callers = files.filter((f) => !f.endsWith('lingo/missions.ts') && /import\s*{[^}]*\bsettleMissions\b[^}]*}\s*from/.test(readFileSync(f, 'utf8'))).map((f) => relative(root, f)).sort();
-    expect(callers).toEqual(['lingo/progress.ts', 'routes/lingoCards.ts', 'routes/lingoSrs.ts', 'routes/lingoValidazione.ts']);
+    expect(callers).toEqual(['lingo/coursePage.ts', 'lingo/courseStudy.ts', 'lingo/progress.ts', 'routes/lingoCards.ts', 'routes/lingoSrs.ts', 'routes/lingoValidazione.ts']);
   });
 });
