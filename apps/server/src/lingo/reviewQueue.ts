@@ -26,7 +26,9 @@ export const REVIEWABLE_OWN_STATES: LingoCardStato[] = ['BOZZA_PERSONALE', 'PROP
 export function reviewScope(userId: string, materieComunita: LingoMateria[], materia?: LingoMateria, istituto?: string): Prisma.LingoCardWhereInput {
   const scope: Prisma.LingoCardWhereInput = {
     OR: [
-      { autoreId: userId, stato: { in: REVIEWABLE_OWN_STATES } },
+      // A course's card stays out until its module is done (Percorsi, spec 2026-10-23 §10.7): S2 adds that condition;
+      // until then no course card is reviewed.
+      { autoreId: userId, stato: { in: REVIEWABLE_OWN_STATES }, moduloId: null },
       { stato: 'VALIDATA', materia: { in: materieComunita } },
     ],
   };

@@ -6,6 +6,7 @@ import { atLeastUnits } from '../utils/utf16Length';
 import { hashPassword, verifyPassword } from '../utils/password';
 import { generateAccessToken, generateRefreshToken, verifyToken, verifyTokenType } from '../utils/jwt';
 import { AppError } from '../middleware/errorHandler';
+import { exportUserCourses } from '../lingo/courses';
 import { deleteUserAccount } from '../lingo/deleteUserAccount';
 import { dateToDay } from '../lingo/studyDays';
 
@@ -438,7 +439,7 @@ async function othersIn(contents: unknown[], own: { id: string; email: string })
  */
 export const exportAccountData = async (req: Request, res: Response) => {
   const userId = req.user!.id;
-  const [user, folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments, lingoCards, lingoValidazioni, lingoAccettazioni, lingoRipassi, lingoPreferenze, lingoGiornate, lingoCreditiXp, merltConsenso, merltConsensoStorico, tasks] = await Promise.all([
+  const [user, folders, bookmarks, annotations, highlights, dossiers, history, environments, quickNorms, customAliases, threads, comments, lingoCards, lingoValidazioni, lingoAccettazioni, lingoRipassi, lingoPreferenze, lingoGiornate, lingoCreditiXp, merltConsenso, merltConsensoStorico, tasks, lingoCorsi] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, username: true, createdAt: true, updatedAt: true } }),
     prisma.folder.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
     prisma.bookmark.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
@@ -456,7 +457,12 @@ export const exportAccountData = async (req: Request, res: Response) => {
       orderBy: { createdAt: 'asc' },
     }),
     prisma.articleComment.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } }),
-    prisma.lingoCard.findMany({ where: { autoreId: userId }, include: { ancore: true }, orderBy: { createdAt: 'asc' } }),
+    // A course's card carries its module and the codes of its competences (Percorsi, A1).
+    prisma.lingoCard.findMany({
+      where: { autoreId: userId },
+      include: { ancore: true, competenze: { select: { competenza: { select: { codice: true } } } } },
+      orderBy: { createdAt: 'asc' },
+    }),
     prisma.lingoValidazioneCard.findMany({
       where: { utenteId: userId },
       select: { cardId: true, giudizio: true, motivazione: true, createdAt: true },
@@ -506,6 +512,9 @@ export const exportAccountData = async (req: Request, res: Response) => {
       },
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     }),
+    // Gymnasium's courses the user wrote, whole but for the keys of an exam not yet handed in, with the user's own
+    // enrolment (spec 2026-10-23 §10.9): never another learner's.
+    exportUserCourses(userId),
   ]);
   // A quick norm's or an alias's search, taken from a proposal, is the proposer's JSON too.
   const others = await othersIn([
@@ -545,7 +554,9 @@ export const exportAccountData = async (req: Request, res: Response) => {
       customAliases: customAliases.map((alias) => withoutOriginalAuthor({ ...alias, searchParams: withoutAuthors(alias.searchParams, own, false) })),
       // The release time is the author's; the releasing admin's id is another person's identifier.
       threads: threads.map(({ passageReleasedById: _releasedBy, _count, ...thread }) => ({ ...thread, repliesFromOthers: _count.comments })),
-      comments, lingoCards, lingoValidazioni,
+      comments,
+      lingoCards: lingoCards.map(({ competenze, ...card }) => ({ ...card, competenze: competenze.map((c) => c.competenza.codice) })),
+      lingoValidazioni,
       lingoAccettazioni: lingoAccettazioni.map(({ testo, acceptedAt }) => ({ chiave: testo.chiave, versione: testo.versione, acceptedAt })),
       // The review log (the scheduling state is derived from it and not exported), the daily goals, and the
       // stored study days ('YYYY-MM-DD', Rome days: a DATE travels as UTC midnight).
@@ -553,6 +564,7 @@ export const exportAccountData = async (req: Request, res: Response) => {
       lingoGiornate: lingoGiornate.map(({ giorno, ...day }) => ({ giorno: dateToDay(giorno), ...day })),
       lingoCreditiXp: lingoCreditiXp.map(({ giorno, ...credit }) => ({ ...credit, giorno: dateToDay(giorno) })),
       merltConsenso, merltConsensoStorico,
+      lingoCorsi,
       // Rome civil days as 'YYYY-MM-DD' and times as 'HH:MM' (a DATE or a TIME travels as a UTC instant).
       tasks: tasks.map(({ plannedDate, plannedTime, dueDate, dueTime, ...task }) => ({
         ...task,

@@ -6,7 +6,8 @@ describe('reviewScope', () => {
   it('is the user’s own cards in draft, proposed or validated, or the community’s validated ones in the chosen subjects', () => {
     expect(reviewScope('u1', ['DIRITTO_CIVILE', 'DIRITTO_PENALE'])).toEqual({
       OR: [
-        { autoreId: 'u1', stato: { in: ['BOZZA_PERSONALE', 'PROPOSTA_COMMUNITY', 'VALIDATA'] } },
+        // A course's card waits for its module (Percorsi; until S2, every course card).
+        { autoreId: 'u1', stato: { in: ['BOZZA_PERSONALE', 'PROPOSTA_COMMUNITY', 'VALIDATA'] }, moduloId: null },
         { stato: 'VALIDATA', materia: { in: ['DIRITTO_CIVILE', 'DIRITTO_PENALE'] } },
       ],
     });

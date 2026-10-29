@@ -11,7 +11,7 @@ import { DELETE_SCOPE } from './config';
  * MCP client the user connected.
  */
 /** The named daily counters a route may also spend (middleware/delegated.ts sets their limits). */
-export type DelegatedCounter = 'dossier_create' | 'note' | 'trash' | 'card' | 'passage' | 'text';
+export type DelegatedCounter = 'dossier_create' | 'note' | 'trash' | 'card' | 'passage' | 'text' | 'corso' | 'modulo';
 
 export interface DelegatedRoute {
   method: 'GET' | 'POST';
@@ -89,6 +89,15 @@ export const DELEGATED_ROUTES: DelegatedRoute[] = [
     method: 'POST', path: '/dossiers/:id/items/:id/passages', scope: 'dossier:write', alsoScope: 'dossier:text',
     weight: (req) => passageCount(req) * 2, counter: 'passage', counterAmount: passageCount,
   },
+  // Gymnasium's courses (Percorsi, A1; spec 2026-10-23 §10.6, Q4 answered in G-377): the assistant reads the
+  // user's courses and creates a course, a module (lesson and verification together) or a final exam. Nothing
+  // here updates or deletes: a correction is a new module, which the user withdraws in the web. The study routes
+  // (open, answer, end, flag, exam) are the session's only, so XP is never settled by a token.
+  { method: 'GET', path: '/lingo/corsi', scope: 'lingo:courses:read', weight: 1 },
+  { method: 'GET', path: '/lingo/corsi/:id/struttura', scope: 'lingo:courses:read', weight: 1 },
+  { method: 'POST', path: '/lingo/corsi', scope: 'lingo:courses:write', weight: 2, counter: 'corso' },
+  { method: 'POST', path: '/lingo/corsi/:id/moduli', scope: 'lingo:courses:write', weight: 3, counter: 'modulo' },
+  { method: 'POST', path: '/lingo/corsi/:id/esami', scope: 'lingo:courses:write', weight: 3, counter: 'modulo' },
 ];
 
 const SEGMENT = /^[A-Za-z0-9_-]{1,64}$/;
