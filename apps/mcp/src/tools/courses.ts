@@ -29,6 +29,10 @@ export const COURSE_TOOL_SCOPES: Record<string, string[]> = {
 };
 
 const NOT_FOUND = 'Percorso non trovato: l’id non è di un percorso dell’utente (vedi lingolex_percorsi), oppure i percorsi non sono attivi.';
+/** A write that got no answer may have happened: a retry would make a second course or module. */
+const UNREACHABLE = 'VisuaLex non ha risposto e non so se è stato scritto: controlla con lingolex_percorsi prima di riprovare.';
+/** S1's 409s are rules of the course's state (a programme complete, an exam open, too few cards), never «Riprova». */
+const WRITE = { method: 'POST' as const, notFound: NOT_FOUND, unreachable: UNREACHABLE, conflictIsState: true };
 
 /** The rules of a course, appended to `lingolex_schema_card`'s text while the courses are on (§3, §4, §5). */
 export const COURSE_SCHEMA_TEXT = [
@@ -145,7 +149,7 @@ export function registerCourseTools(server: McpServer, config: McpConfig, run: R
       run('lingolex_crea_percorso', extra, async (caller) => {
         const found = await findDossier(config, caller, dossier);
         const created = await callApi<Record<string, unknown>>(config, caller, 'lingo:courses:write', '/lingo/corsi', {
-          method: 'POST',
+          ...WRITE,
           body: { ...course, competenze: competenze.map((testo) => ({ testo })), dossierId: found.id },
           notFound: 'Dossier non trovato, oppure i percorsi non sono attivi.',
         });
@@ -187,9 +191,8 @@ export function registerCourseTools(server: McpServer, config: McpConfig, run: R
       run('lingolex_aggiungi_modulo', extra, async (caller) =>
         data(
           await callApi<Record<string, unknown>>(config, caller, 'lingo:courses:write', `/lingo/corsi/${encodeURIComponent(percorso)}/moduli`, {
-            method: 'POST',
+            ...WRITE,
             body: module,
-            notFound: NOT_FOUND,
           }),
         ),
       ),
@@ -211,9 +214,8 @@ export function registerCourseTools(server: McpServer, config: McpConfig, run: R
       run('lingolex_aggiungi_esame', extra, async (caller) =>
         data(
           await callApi<Record<string, unknown>>(config, caller, 'lingo:courses:write', `/lingo/corsi/${encodeURIComponent(percorso)}/esami`, {
-            method: 'POST',
+            ...WRITE,
             body: exam,
-            notFound: NOT_FOUND,
           }),
         ),
       ),
@@ -236,7 +238,7 @@ export function registerCourseTools(server: McpServer, config: McpConfig, run: R
       run('lingolex_percorsi', extra, async (caller) => {
         if (percorso === undefined) {
           if (modulo !== undefined) throw new ToolError('Indica anche il percorso del modulo.');
-          return data({ percorsi: await callApi<unknown[]>(config, caller, 'lingo:courses:read', '/lingo/corsi', { notFound: NOT_FOUND }) });
+          return data({ percorsi: await callApi<unknown[]>(config, caller, 'lingo:courses:read', '/lingo/corsi', { notFound: 'I percorsi non sono attivi in VisuaLex.' }) });
         }
         const structure = await callApi<ApiStructure>(config, caller, 'lingo:courses:read', `/lingo/corsi/${encodeURIComponent(percorso)}/struttura`, {
           notFound: NOT_FOUND,

@@ -198,7 +198,8 @@ export function registerCardTools(server: McpServer, config: McpConfig, run: Run
       // A card tied to a module writes into the course too: the server's card route asks for both.
       modulo === undefined ? 'lingo:cards:write' : `lingo:cards:write ${COURSE_CARD_SCOPE}`,
       '/lingo/cards',
-      { method: 'POST', body: { cards: schede, moduloId: modulo }, notFound: 'Modulo non trovato, oppure i percorsi non sono attivi.' },
+      // With a module, a 409 is the module's card limit: a rule, not a change under the call.
+      { method: 'POST', body: { cards: schede, moduloId: modulo }, notFound: 'Modulo non trovato, oppure i percorsi non sono attivi.', conflictIsState: modulo !== undefined },
     );
   if (!courseRules) {
     server.registerTool(

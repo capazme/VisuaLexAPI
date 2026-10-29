@@ -163,9 +163,8 @@ describe('lingolex_crea_percorso', () => {
       arguments: { titolo: 'PI', materia: 'DIRITTO_CIVILE', moduliPrevisti: 1, competenze: ['qualificare un segno'], dossier: 'd1' },
     });
     expect(result.isError).toBe(true);
-    expect(text(result)).toContain('accettare la dichiarazione');
-    expect(text(result)).toContain('/studia/percorsi');
-    expect(text(result)).not.toMatch(/\. Riprova\.$/);
+    expect(text(result)).toContain('accettare la dichiarazione sul materiale di studio, in VisuaLex › Percorsi.');
+    expect(text(result)).toMatch(/Riprova dopo che l’utente l’ha fatto\.$/);
     expect(env.stub.courses).toHaveLength(1);
     await client.close();
   });
@@ -198,6 +197,31 @@ describe('lingolex_aggiungi_modulo and lingolex_aggiungi_esame', () => {
     expect(text(refused)).toBe('Richiesta non valida: Blocco 1: contiene tag HTML.');
     const missing = await client.callTool({ name: 'lingolex_aggiungi_modulo', arguments: { percorso: 'altrui', ...MODULE } });
     expect(text(missing)).toMatch(/^Percorso non trovato/);
+    await client.close();
+  });
+
+  it('passes a rule of the course’s state on as the server says it, never with «Riprova»', async () => {
+    env.stub.apiOverride = (method, path) =>
+      method === 'POST' && path.startsWith('/lingo/corsi/p1/')
+        ? [409, { detail: path.endsWith('esami') ? 'C’è già un esame finale non ancora svolto.' : 'Il programma ha 2 moduli e sono già tutti presenti.' }]
+        : method === 'POST' && path === '/lingo/cards'
+          ? [409, { detail: 'Un modulo ha al massimo 20 schede.' }]
+          : undefined;
+    const client = await connect();
+    expect(text(await client.callTool({ name: 'lingolex_aggiungi_esame', arguments: { percorso: 'p1', ...EXAM } }))).toBe('C’è già un esame finale non ancora svolto.');
+    expect(text(await client.callTool({ name: 'lingolex_aggiungi_modulo', arguments: { percorso: 'p1', ...MODULE } }))).toBe('Il programma ha 2 moduli e sono già tutti presenti.');
+    expect(text(await client.callTool({ name: 'lingolex_salva_card', arguments: { modulo: 'm1', schede: [{ ...CARD, competenze: ['C1'] }] } }))).toBe('Un modulo ha al massimo 20 schede.');
+    await client.close();
+  });
+
+  it('names the courses’ daily counters, and says to check before writing again when no answer came', async () => {
+    env.stub.apiOverride = (method, path) =>
+      method === 'POST' && path === '/lingo/corsi' ? [429, { quota: 'corso', resetsAt: '2026-10-30T10:00:00.000Z' }] : method === 'POST' && path === '/lingo/corsi/p1/moduli' ? 'drop' : undefined;
+    const client = await connect();
+    const quota = await client.callTool({ name: 'lingolex_crea_percorso', arguments: { titolo: 'PI', materia: 'DIRITTO_CIVILE', moduliPrevisti: 1, competenze: ['qualificare un segno'], dossier: 'd1' } });
+    expect(text(quota)).toContain('limite giornaliero di percorsi creati');
+    const dropped = await client.callTool({ name: 'lingolex_aggiungi_modulo', arguments: { percorso: 'p1', ...MODULE } });
+    expect(text(dropped)).toBe('VisuaLex non ha risposto e non so se è stato scritto: controlla con lingolex_percorsi prima di riprovare.');
     await client.close();
   });
 

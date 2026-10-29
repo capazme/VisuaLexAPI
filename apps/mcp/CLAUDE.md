@@ -166,8 +166,11 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   Scopes `lingo:courses:read` and `lingo:courses:write` on the one consent (G-379: no group of their own until
   #318's groups). `lingolex_crea_percorso` (title, subject, planned modules, competences as plain strings — the server
   gives C1, C2… —, the study dossier by id or exact name; until the user accepts the declaration `MATERIALE_STUDIO`
-  the server's 409 carries a `link`, which the error passes on instead of «Riprova»), `lingolex_aggiungi_modulo`
-  (a module whole, lesson and verification, the body S1 takes) and `lingolex_aggiungi_esame` write; `lingolex_percorsi`
+  the server's 409 names the page in words, and the error says to retry once the user has), `lingolex_aggiungi_modulo`
+  (a module whole, lesson and verification, the body S1 takes) and `lingolex_aggiungi_esame` write. Their other 409s,
+  and a course card's past its module's limit, are rules of the course's state, passed on as the server words them,
+  never with «Riprova» (`conflictIsState` in `callApi`); a write that got no answer says to check with
+  `lingolex_percorsi` before writing again, since a retry could make a second course or module; `lingolex_percorsi`
   reads: the list, or one course without its lessons and items (`GET /struttura`, outlined here: a course of 40
   modules runs to millions of characters), each flag with its module and question, or with `modulo` that module
   whole with its flags and judgement. The input schemas carry the shape only: the limits and the rules (the
