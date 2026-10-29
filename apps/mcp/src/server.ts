@@ -28,12 +28,12 @@ const ALL_SCOPES = ['dossier:read', 'dossier:write', 'dossier:text', 'lingo:card
 
 /**
  * What the server is for, sent once at `initialize` (MCP `instructions`): a client that also has a
- * sources server should not bounce between the two to file an article.
+ * sources server should not bounce between the two to file an article, and a dossier is one call (D8 S1).
  */
 export const SERVER_INSTRUCTIONS =
   'VisuaLex: i dossier dell’utente (pratiche e temi di studio, con norme, sentenze e note) e le sue schede di studio di Gymnasium. ' +
-  'Qui si leggono e si arricchiscono. Per aggiungere norme o sentenze basta il riferimento a parole («art. 2043 c.c.», «Cass. civ., n. 31310/2024»): ' +
-  'VisuaLex lo verifica sulle fonti, non serve cercarlo prima altrove. ' +
+  'Qui si leggono e si arricchiscono. Per un dossier basta una chiamata: omnilex_crea_dossier con l’elenco delle norme e delle sentenze a parole ' +
+  '(«art. 2043 c.c.», «Cass. civ., n. 31310/2024») e le note. Non verificare prima i riferimenti con altri strumenti: VisuaLex li verifica alla fonte. ' +
   'Cercare o studiare il testo di norme e sentenze fuori da un dossier si fa con altri strumenti.';
 
 /** The protected resource metadata URL for the endpoint (RFC 9728 §3.1). */
@@ -55,7 +55,9 @@ const runner: RunTool = async (tool, extra, body) => {
     const caller = callerOf(extra);
     try {
       const result = await body(caller);
-      console.info(`[mcp] user=${caller.userId} client=${caller.clientId} tool=${tool} outcome=ok`);
+      // A call the client cancelled ran its last step and stopped: its answer goes nowhere.
+      const outcome = extra.signal?.aborted ? 'cancelled' : 'ok';
+      console.info(`[mcp] user=${caller.userId} client=${caller.clientId} tool=${tool} outcome=${outcome}`);
       return result;
     } catch (error) {
       const known = error instanceof ToolError;

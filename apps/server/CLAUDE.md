@@ -283,7 +283,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   30-second timeout. Outcomes: `added`, `already_present` (by the decision's key, against the
   dossier's `sentenza` items and earlier references: `POST /items` itself checks none),
   `not_recognised`, `court_not_supported` (with the `court` the words name), `ambiguous` (the
-  candidates' citations in `detail`, and what to add: the archive, a TAR's seat or the kind), `does_not_exist` (`non_trovata` with motivo `inesistente`;
+  candidates' citations in `detail`, and what to add: the archive, a TAR's seat or the kind; the same citations
+  as a list in `candidates`, which the MCP's one-call dossier names, D8 S1), `does_not_exist` (`non_trovata` with motivo `inesistente`;
   a penal suggestion in `detail`), `unavailable` (the source down, a timeout, and `fuori_archivio`
   or `anno_parziale`, which the source cannot verify). Each stored decision is what the item
   schema admits, labelled by the server; `citation` names it in the answer, and a TAR read at a

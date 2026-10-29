@@ -4,7 +4,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 import type { Caller } from '../auth.js';
 import type { McpConfig } from '../config.js';
-import { ToolError } from '../errors.js';
+import { NoAnswer, ToolError } from '../errors.js';
 import { callApi } from '../exchange.js';
 import { TRASH_DAYS, canAsk, confirmWithUser, deletionMessage, type Confirmation } from '../confirm.js';
 
@@ -70,6 +70,16 @@ export const MAX_REFERENCES = 50;
 export const MAX_DECISIONS = 10;
 export const MAX_DOSSIER_NAME = 100;
 export const MAX_NOTE_LENGTH = 4000;
+/** Notes in one call, to `omnilex_crea_dossier` or `omnilex_aggiungi_nota_dossier`. */
+export const MAX_NOTES = 10;
+/**
+ * How often `omnilex_crea_dossier` tells a client that asked for progress that a step is still running: the SDK's
+ * client waits 60 s by default and a decisions step can last 100 s; a client that restarts its wait on progress then
+ * does not give up (and retry, creating a second dossier). Mutable for the tests only.
+ */
+export const PROGRESS = { heartbeatMs: 15_000 };
+/** How many candidates an ambiguous row names. */
+const MAX_CANDIDATES = 3;
 /** How much of each note `omnilex_leggi_dossier` gives, with `dossier:text` (G-381); `nota_intera` gives one whole. */
 export const NOTE_EXCERPT = 500;
 /** The scope under which the text of the user's notes leaves (G-381 (b), owners, 29 October 2026). */
@@ -119,6 +129,58 @@ function noteText(item: ApiDossierItem, whole: boolean): { testo: string | null;
   const cut = /[\uD800-\uDBFF]/.test(item.content[NOTE_EXCERPT - 1]) ? NOTE_EXCERPT - 1 : NOTE_EXCERPT;
   return { testo: `${item.content.slice(0, cut)}…`, troncata: true };
 }
+
+// `.max` gives the schema's maxLength, in code points under zod 4; the refinement keeps the server's count,
+// UTF-16 units, so a note too long for the server is refused here, as with zod 3.
+const noteSchema = () =>
+  z
+    .string()
+    .trim()
+    .min(1)
+    .max(MAX_NOTE_LENGTH)
+    .refine((text) => text.length <= MAX_NOTE_LENGTH, `Too big: expected string to have <=${MAX_NOTE_LENGTH} characters`)
+    .describe('Il testo della nota');
+
+/**
+ * A reference as the model wrote it: never trimmed or rewritten, since a row that did not enter is answered
+ * with these very characters and another server subtracts it from its own list (D8 S1). Blank is refused.
+ */
+const reference = (max: number) =>
+  z
+    .string()
+    .min(1)
+    .max(max)
+    .refine((text) => text.trim().length > 0, 'Riferimento vuoto');
+
+/** Why a row did not enter, in the words the answer uses (D8 S1). */
+type Reason = 'non riconosciuto' | 'inesistente' | 'ambiguo' | 'non verificabile' | 'già presente';
+const REASONS: Record<string, Reason> = {
+  not_recognised: 'non riconosciuto',
+  does_not_exist: 'inesistente',
+  ambiguous: 'ambiguo',
+  unavailable: 'non verificabile',
+  // VisuaLex has no reader for that court: it cannot check the decision at a source.
+  court_not_supported: 'non verificabile',
+  already_present: 'già presente',
+};
+/** One outcome of the norms or the decisions route. */
+interface ApiOutcome {
+  outcome: string;
+  itemId?: string;
+  display?: string;
+  citation?: string;
+  candidates?: string[];
+}
+interface RowNotEntered {
+  riga: string;
+  motivo: Reason;
+  candidati?: string[];
+}
+const notEntered = (riga: string, result: ApiOutcome | undefined): RowNotEntered => {
+  const motivo = (result && REASONS[result.outcome]) ?? 'non verificabile';
+  const candidati = motivo === 'ambiguo' ? result?.candidates?.slice(0, MAX_CANDIDATES) : undefined;
+  return { riga, motivo, ...(candidati?.length ? { candidati } : {}) };
+};
 
 /** A dossier's kind as the tools say it: `lavoro` unless the server says `studio`. */
 const kindOf = (d: ApiDossier): 'lavoro' | 'studio' => (d.kind === 'studio' ? 'studio' : 'lavoro');
@@ -219,7 +281,12 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
     'omnilex_crea_dossier',
     {
       title: 'Crea un dossier',
-      description: `Crea un dossier vuoto (nome fino a ${MAX_DOSSIER_NAME} caratteri; al massimo 10 al giorno tramite applicazioni collegate). Un dossier è «di lavoro» (una pratica, il tipo predefinito) o «di studio» (un tema da studiare).`,
+      description:
+        `Crea un dossier (nome fino a ${MAX_DOSSIER_NAME} caratteri; al massimo 10 al giorno tramite applicazioni collegate), «di lavoro» (una pratica, predefinito) o «di studio» (un tema), ` +
+        `e nella stessa chiamata vi aggiunge fino a ${MAX_REFERENCES} norme e ${MAX_DECISIONS} sentenze a parole, verificate sulle fonti, e ${MAX_NOTES} note. ` +
+        'Per ogni riga non entrata (com’è stata scritta) dice il motivo: non riconosciuto, inesistente, ambiguo (atto intero o più articoli; sentenza: i candidati), ' +
+        'non verificabile (fonte assente o corte non ancora letta), già presente. Nessun testo. Una nota non dia per verificata una riga non entrata. ' +
+        'Se la chiamata resta senza risposta, cerca il dossier con omnilex_elenca_dossier prima di ripeterla.',
       inputSchema: {
         nome: z.string().trim().min(1).max(MAX_DOSSIER_NAME).describe('Il nome del dossier'),
         descrizione: z.string().trim().max(500).optional().describe('Una descrizione facoltativa'),
@@ -227,17 +294,164 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
           .enum(['lavoro', 'studio'])
           .optional()
           .describe('«lavoro» per una pratica (predefinito), «studio» per un tema da studiare'),
+        riferimenti: z
+          .array(reference(200))
+          .max(MAX_REFERENCES)
+          .optional()
+          .describe('Un articolo per riferimento («art. 2043 c.c.»)'),
+        sentenze: z
+          .array(reference(300))
+          .max(MAX_DECISIONS)
+          .optional()
+          .describe('Corte, numero e anno («Cass. civ., n. 31310/2024»)'),
+        note: z
+          .array(
+            z.object({
+              testo: noteSchema(),
+              voce: z.string().min(1).max(200).optional().describe('Una delle norme di riferimenti, scritta uguale: la nota è su quell’articolo; senza, sul dossier'),
+            }),
+          )
+          .max(MAX_NOTES)
+          .optional(),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
-    ({ nome, descrizione, tipo }, extra) =>
+    ({ nome, descrizione, tipo, riferimenti = [], sentenze = [], note = [] }, extra) =>
       run('omnilex_crea_dossier', extra, async (caller) => {
+        // Before anything is created: a note's voce names one of the norms of this call (a note is about an
+        // article, never a decision: apps/server's assertArticleOfDossier).
+        const stray = note.findIndex((n) => n.voce !== undefined && !riferimenti.includes(n.voce));
+        if (stray >= 0) {
+          throw new ToolError(`La voce della nota ${stray + 1} non è uno dei riferimenti di questa chiamata, scritto uguale. Nulla è stato creato.`);
+        }
         const created = await callApi<ApiDossier>(config, caller, 'dossier:write', '/dossiers', {
           method: 'POST',
           body: { name: nome, ...(descrizione ? { description: descrizione } : {}), kind: tipo ?? 'lavoro' },
         });
-        // What the server stored; an older server that knows no kind keeps what was asked.
-        return data({ id: created.id, nome: created.name, tipo: created.kind ? kindOf(created) : (tipo ?? 'lavoro') });
+        const id = encodeURIComponent(created.id);
+        // The steps can take minutes (a decision's lookup up to 100 s): a client that asked for progress hears before
+        // and after each step and every PROGRESS.heartbeatMs while one runs; one that gave up stops the steps not yet
+        // begun. Its answer is lost either way, hence the description's advice. No total: the beats are not counted.
+        const progressToken = extra._meta?.progressToken;
+        let progress = 0;
+        const notify = async (message: string) => {
+          if (progressToken === undefined) return;
+          progress += 1;
+          await extra
+            .sendNotification({ method: 'notifications/progress', params: { progressToken, progress, message } })
+            .catch(() => undefined);
+        };
+        const step = async <T>(label: string, body: () => Promise<T>): Promise<T> => {
+          await notify(label);
+          const beat = progressToken === undefined ? undefined : setInterval(() => void notify(label), PROGRESS.heartbeatMs);
+          try {
+            return await body();
+          } finally {
+            clearInterval(beat);
+            await notify(`${label}: fatto`);
+          }
+        };
+        const goneAway = () => extra.signal.aborted;
+        await notify('dossier creato');
+        const entrate = { norme: 0, sentenze: 0, note: 0 };
+        const nonEntrate: RowNotEntered[] = [];
+        const notesNotEntered: { nota: number; motivo: string }[] = [];
+        // Once the dossier exists nothing is thrown, so its id always reaches the model: a step refused whole leaves
+        // the others to run, and the answer says what entered.
+        const errors = new Set<string>();
+        // A route that gave no answer may still be writing its entries: its rows are never reported as refused (the
+        // model would create the dossier again, and a client subtracting them would count them as absent).
+        const STILL_LANDING =
+          `VisuaLex non ha risposto in tempo: il dossier ${created.id} esiste e le sue voci potrebbero essere ancora in arrivo. ` +
+          'Controllalo con omnilex_leggi_dossier; non crearlo di nuovo.';
+        const reasonOf = (error: unknown): string => {
+          if (error instanceof ToolError) return error.message;
+          console.error('[mcp] omnilex_crea_dossier step failed:', error instanceof Error ? error.message : 'unknown error');
+          return 'VisuaLex ha avuto un problema in un passo: il dossier è creato, controlla cosa contiene.';
+        };
+        /**
+         * The norms' or the decisions' route, the existing one: the same checks, points and refunds as their own tools.
+         * The route's outcomes, or null when it gave no answer and may have added some of them.
+         */
+        const addAll = async (rows: string[], route: 'norms' | 'decisions'): Promise<ApiOutcome[] | null> => {
+          if (rows.length === 0 || goneAway()) return [];
+          return step(route === 'norms' ? 'norme' : 'sentenze', async () => {
+            try {
+              const answer = await callApi<{ results?: ApiOutcome[] }>(config, caller, 'dossier:write', `/dossiers/${id}/${route}`, {
+                method: 'POST',
+                body: { references: rows },
+              });
+              return Array.isArray(answer.results) ? answer.results : [];
+            } catch (error) {
+              if (error instanceof NoAnswer) {
+                errors.add(STILL_LANDING);
+                return null;
+              }
+              errors.add(reasonOf(error));
+              return [];
+            }
+          });
+        };
+        // One outcome per row, in order; a row the route did not answer did not enter. A row written exactly as one that
+        // entered is not reported «già presente»: its string did enter, and a client subtracting it would lose both.
+        const tally = (rows: string[], results: ApiOutcome[] | null, kind: 'norme' | 'sentenze') => {
+          if (results === null) return;
+          const entered = new Set<string>();
+          rows.forEach((riga, i) => {
+            if (results[i]?.outcome === 'added') {
+              entrate[kind] += 1;
+              entered.add(riga);
+            } else if (!(results[i]?.outcome === 'already_present' && entered.has(riga))) {
+              nonEntrate.push(notEntered(riga, results[i]));
+            }
+          });
+        };
+
+        const answered = await addAll(riferimenti, 'norms');
+        tally(riferimenti, answered, 'norme');
+        const normsUncertain = answered === null;
+        const norms = answered ?? [];
+        // The article each reference names: its own entry, or the one an earlier row of the call added (the first).
+        const byCitation = new Map<string, string>();
+        for (const r of norms) if (r.outcome === 'added' && r.itemId && r.display && !byCitation.has(r.display)) byCitation.set(r.display, r.itemId);
+        const articleOf = (voce: string): string | undefined => {
+          const result = norms[riferimenti.indexOf(voce)];
+          if (result?.outcome === 'added') return result.itemId;
+          if (result?.outcome === 'already_present' && result.display) return byCitation.get(result.display);
+          return undefined;
+        };
+        tally(sentenze, await addAll(sentenze, 'decisions'), 'sentenze');
+
+        for (const [i, { testo, voce }] of note.entries()) {
+          if (goneAway()) break;
+          const about = voce === undefined ? undefined : articleOf(voce);
+          if (voce !== undefined && !about) {
+            notesNotEntered.push({ nota: i + 1, motivo: normsUncertain ? STILL_LANDING : 'la sua voce non è entrata' });
+            await notify(`nota ${i + 1}: saltata`);
+            continue;
+          }
+          await step(`nota ${i + 1}`, async () => {
+            try {
+              await callApi(config, caller, 'dossier:write', `/dossiers/${id}/notes`, {
+                method: 'POST',
+                body: { text: testo, ...(about ? { aboutItemId: about } : {}) },
+              });
+              entrate.note += 1;
+            } catch (error) {
+              // Without an answer the note may be there: never told to write it again.
+              const motivo = error instanceof NoAnswer ? 'VisuaLex non ha risposto: controlla con omnilex_leggi_dossier se la nota c’è prima di riscriverla.' : reasonOf(error);
+              notesNotEntered.push({ nota: i + 1, motivo });
+            }
+          });
+        }
+        return data({
+          // What the server stored; an older server that knows no kind keeps what was asked.
+          dossier: { id: created.id, nome: created.name, tipo: created.kind ? kindOf(created) : (tipo ?? 'lavoro') },
+          entrate,
+          non_entrate: nonEntrate,
+          ...(notesNotEntered.length ? { note_non_entrate: notesNotEntered } : {}),
+          ...(errors.size ? { errore: [...errors].join(' ') } : {}),
+        });
       }),
   );
 
@@ -294,50 +508,64 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
     ({ dossier, sentenze }, extra) =>
       run('omnilex_aggiungi_sentenze_dossier', extra, async (caller) => {
         const found = await findDossier(config, caller, dossier);
-        const answer = await callApi<{ results: Record<string, unknown>[] }>(
+        const answer = await callApi<{ results: (Record<string, unknown> & { candidates?: unknown })[] }>(
           config,
           caller,
           'dossier:write',
           `/dossiers/${encodeURIComponent(found.id)}/decisions`,
           { method: 'POST', body: { references: sentenze } },
         );
-        return data({ dossier: { id: found.id, nome: found.name }, esiti: answer.results });
+        // `candidates` repeats what `detail` already says in words (it is there for omnilex_crea_dossier's answer).
+        return data({ dossier: { id: found.id, nome: found.name }, esiti: answer.results.map(({ candidates: _, ...rest }) => rest) });
       }),
   );
 
   server.registerTool(
     'omnilex_aggiungi_nota_dossier',
     {
-      title: 'Aggiungi una nota a un dossier',
+      title: 'Aggiungi note a un dossier',
       description:
-        `Aggiunge una nota (testo semplice, fino a ${MAX_NOTE_LENGTH} caratteri) a un dossier, o a un suo articolo indicato con voce (l’id della voce, da omnilex_leggi_dossier). ` +
-        'La nota resta segnata come scritta da questa applicazione. Aggiunge soltanto: non modifica né cancella note.',
+        `Aggiunge da 1 a ${MAX_NOTES} note (testo semplice, fino a ${MAX_NOTE_LENGTH} caratteri ciascuna) a un dossier, o a un suo articolo indicato con voce (l’id della voce, da omnilex_leggi_dossier). ` +
+        'Le note restano segnate come scritte da questa applicazione. Aggiunge soltanto: non modifica né cancella note.',
       inputSchema: {
         dossier: z.string().min(1).max(200).describe('Id del dossier, o il suo nome esatto'),
-        // `.max` gives the schema's maxLength, in code points under zod 4; the refinement keeps the server's count,
-        // UTF-16 units, so a note too long for the server is refused here, as with zod 3.
-        testo: z
-          .string()
-          .trim()
+        note: z
+          .array(
+            z.object({
+              testo: noteSchema(),
+              voce: z.string().min(1).max(64).optional().describe('L’id dell’articolo del dossier a cui si riferisce la nota'),
+            }),
+          )
           .min(1)
-          .max(MAX_NOTE_LENGTH)
-          .refine((text) => text.length <= MAX_NOTE_LENGTH, `Too big: expected string to have <=${MAX_NOTE_LENGTH} characters`)
-          .describe('Il testo della nota'),
-        voce: z.string().min(1).max(64).optional().describe('L’id dell’articolo del dossier a cui si riferisce la nota'),
+          .max(MAX_NOTES),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    ({ dossier, testo, voce }, extra) =>
+    ({ dossier, note }, extra) =>
       run('omnilex_aggiungi_nota_dossier', extra, async (caller) => {
         const found = await findDossier(config, caller, dossier);
-        const created = await callApi<ApiDossierItem>(
-          config,
-          caller,
-          'dossier:write',
-          `/dossiers/${encodeURIComponent(found.id)}/notes`,
-          { method: 'POST', body: { text: testo, ...(voce ? { aboutItemId: voce } : {}) } },
-        );
-        return data({ dossier: { id: found.id, nome: found.name }, nota: { id: created.id, nota_su: created.about_item_id ?? null } });
+        const entrate: { nota: number; id: string; nota_su: string | null }[] = [];
+        const nonEntrate: { nota: number; motivo: string }[] = [];
+        // One note per request to the server's route (its checks and its daily count of notes); one refused, the rest go on.
+        for (const [i, { testo, voce }] of note.entries()) {
+          try {
+            const created = await callApi<ApiDossierItem>(
+              config,
+              caller,
+              'dossier:write',
+              `/dossiers/${encodeURIComponent(found.id)}/notes`,
+              { method: 'POST', body: { text: testo, ...(voce ? { aboutItemId: voce } : {}) } },
+            );
+            entrate.push({ nota: i + 1, id: created.id, nota_su: created.about_item_id ?? null });
+          } catch (error) {
+            if (!(error instanceof ToolError)) throw error;
+            nonEntrate.push({ nota: i + 1, motivo: error.message });
+          }
+        }
+        // Every note refused for the same reason (the daily limit, a revoked connection): an error, said once.
+        const reasons = new Set(nonEntrate.map((n) => n.motivo));
+        if (entrate.length === 0 && reasons.size === 1) throw new ToolError([...reasons][0]);
+        return data({ dossier: { id: found.id, nome: found.name }, entrate, ...(nonEntrate.length ? { non_entrate: nonEntrate } : {}) });
       }),
   );
 
@@ -444,6 +672,6 @@ export function registerDossierTools(server: McpServer, config: McpConfig, run: 
 /** Runs a tool for the caller of this request (from the SDK's `extra`), logging the outcome. */
 export type RunTool = (
   tool: string,
-  extra: { authInfo?: AuthInfo },
+  extra: { authInfo?: AuthInfo; signal?: AbortSignal },
   body: (caller: Caller) => Promise<CallToolResult>,
 ) => Promise<CallToolResult>;
