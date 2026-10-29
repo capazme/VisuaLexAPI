@@ -19,6 +19,12 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
   October 2026 eur-lex.europa.eu answers a server with a firewall challenge. Same page, same
   texts (23 acts compared, 1534 articles identical). `/health/detailed` probes both hosts and
   reports the source down only when both are.
+- An EU act's article heading glued to the end of the paragraph before it is now found also when
+  its body sits in the next container or is bare text after the paragraph. A paragraph that
+  opens on an article it cites («Articolo 5 della direttiva … è sostituito», «Article 5 of
+  Directive …») is no longer read as that article's heading, and, on every page, no longer ends
+  the article it sits in. No real page known today has these shapes; the texts of the 23 acts
+  compared are unchanged.
 
 ## [1.10.5] - 2026-10-27
 

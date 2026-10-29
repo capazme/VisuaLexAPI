@@ -9,7 +9,8 @@ from ..tools.sys_op import BaseScraper
 from ..tools.exceptions import DocumentNotFoundError, NetworkError, ValidationError
 from ..tools.cache_manager import get_cache_manager
 from ..tools.selectors import EURLexSelectors
-from ..tools.treextractor import HEADING_ORDINAL, glued_headings, is_quoted_heading, strip_amendment_markers
+from ..tools.treextractor import (HEADING_ORDINAL, cites_an_article, following_nodes, glued_headings,
+                                 is_quoted_heading, node_text, strip_amendment_markers)
 from .akn_parser import normalize_article_key
 from ..tools.article_suffixes import ARTICLE_SUFFIX_ALTERNATION
 
@@ -227,8 +228,24 @@ _ORDINAL_AFTER_NUMBER = re.compile(rf"[\s\-]*+{HEADING_ORDINAL}", re.IGNORECASE)
 
 
 def _number_ends_here(rest) -> bool:
-    """True when the heading's number ends where `rest` starts: no digit and no ordinal follow."""
-    return not rest[:1].isdigit() and not _ORDINAL_AFTER_NUMBER.match(rest)
+    """True when the heading's number ends where `rest` starts: no digit and no ordinal follow, and
+    no sentence goes on («Articolo 5 della direttiva …» cites art. 5, it does not head it)."""
+    return (not rest[:1].isdigit() and not _ORDINAL_AFTER_NUMBER.match(rest)
+            and not cites_an_article(rest))
+
+
+# The start of the next article while an article's text is read: «Articolo 12», «Article 12»,
+# «Art. 12», with its ordinal or rubrica, never a paragraph that opens on an article it cites.
+_NEXT_ARTICLE = re.compile(r'^Articolo\s+\d+|^Article\s+\d+|^Art\.\s+\d+', re.IGNORECASE)
+
+
+def _starts_next_article(text) -> bool:
+    heads = _NEXT_ARTICLE.match(text)
+    if not heads:
+        return False
+    rest = text[heads.end():]
+    ordinal = _ORDINAL_AFTER_NUMBER.match(rest)
+    return not cites_an_article(rest[ordinal.end():] if ordinal else rest)
 
 
 def _heads_article(text, pattern) -> bool:
@@ -482,19 +499,22 @@ class EurlexScraper(BaseScraper):
 
         log.debug("Article found, extracting text")
         full_text = [heading or article_section.get_text(strip=True)]
-        element = article_section.find_next_sibling()
         glued_at = {id(elem): start for elem, start in glued.values()}
-
-        # Detect end of article by finding next article
-        next_article_pattern = re.compile(r'^Articolo\s+\d+|^Article\s+\d+|^Art\.\s+\d+', re.IGNORECASE)
+        if heading is None:
+            element = article_section.find_next_sibling()
+        else:
+            # A glued heading's body is read where `glued_headings` found it: the paragraph's later
+            # siblings, or, when it has none, the next container or bare text after it.
+            following = following_nodes(article_section)
+            element = next(following, None)
 
         while element:
             # Check if we've reached the next article
             if element.name == 'p' and 'ti-art' in element.get('class', []):
                 log.debug("Next article section found (ti-art class), stopping extraction")
                 break
-            elem_text = element.get_text(strip=True) if element.name else ''
-            if next_article_pattern.match(elem_text):
+            elem_text = node_text(element)
+            if _starts_next_article(elem_text):
                 log.debug("Next article section found (text pattern), stopping extraction")
                 break
             if id(element) in glued_at:
@@ -509,7 +529,9 @@ class EurlexScraper(BaseScraper):
                     full_text.append(text)
             elif element.name == 'table':
                 full_text.extend(self.extract_table_text(element))
-            element = element.find_next_sibling()
+            elif element.name is None and elem_text:
+                full_text.append(elem_text)  # bare text after a glued heading
+            element = element.find_next_sibling() if heading is None else next(following, None)
 
         log.info(f"Article {article} text extracted successfully")
         return "\n".join(full_text)

@@ -1,5 +1,5 @@
 import asyncio
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString, Tag
 import logging
 import re
 from urllib.parse import urlparse
@@ -496,14 +496,56 @@ _GLUED_HEADING = re.compile(r"[.;:]\s+((?:Articolo|Article)\s+(\d+))$")
 _HEADING_TAGS = ['p', 'div', 'span', 'h1', 'h2', 'h3', 'h4']
 
 
+_BLOCKS = ("p", "div", "table")
+
+
+def _paragraphs(tag):
+    """`tag` as the paragraphs a reader meets in it: the tag itself when it holds no block, else its
+    blocks and bare text in order, each container opened the same way."""
+    if tag.name in ("p", "table") or tag.find(_BLOCKS) is None:
+        yield tag
+        return
+    for child in tag.children:
+        if isinstance(child, Tag):
+            yield from _paragraphs(child)
+        elif type(child) is NavigableString and child.strip():
+            yield child
+
+
+def following_nodes(elem):
+    """What a reader meets after `elem`, as elements and bare text: its later siblings and, only
+    when none of them holds text, its parent's, and so up until a level holds text or the page
+    ends. A glued heading's body can sit in the next container
+    (`<div><p>Testo. Articolo 3</p></div><div><p>Corpo.</p></div>`) or be bare text after the
+    paragraph; same-parent elements alone see neither. Above the paragraph's own level a container
+    is opened into its paragraphs (`_paragraphs`), so each one is a line and the next article's
+    heading among them ends the text. Blank text, comments and the like are skipped."""
+    node, climbed = elem, False
+    while node is not None and node.name not in ("body", "[document]"):
+        met_text = False
+        for sibling in node.next_siblings:
+            if isinstance(sibling, Tag):
+                met_text = met_text or bool(sibling.get_text(strip=True))
+                yield from (_paragraphs(sibling) if climbed else (sibling,))
+            elif type(sibling) is NavigableString and sibling.strip():
+                met_text = True
+                yield sibling
+        if met_text:
+            return
+        node, climbed = node.parent, True
+
+
+def node_text(node) -> str:
+    """A node's text as the extractor reads it: an element's stripped text, a bare string stripped."""
+    return node.get_text(strip=True) if isinstance(node, Tag) else str(node).strip()
+
+
 def _body_follows(elem) -> bool:
-    """Whether the next sibling with text is an article's body, not another heading or nothing."""
-    sibling = elem.find_next_sibling()
-    while sibling is not None:
-        text = sibling.get_text(strip=True)
+    """Whether the next text after `elem` is an article's body, not another heading or nothing."""
+    for node in following_nodes(elem):
+        text = node_text(node)
         if text:
             return eurlex_heading_number(text) is None
-        sibling = sibling.find_next_sibling()
     return False
 
 
@@ -546,10 +588,27 @@ _EURLEX_HEADING_NUMBER = re.compile(
     rf"^(?:Articolo|Article)\s+(\d+)(?:[\s\-]*+({HEADING_ORDINAL}))?", re.IGNORECASE)
 
 
+# A word after the number, past a blank: «Articolo 5 della …». A letter glued to the number
+# («Article 6a») is the number's own.
+_CITING_WORD = re.compile(r"\s++([^\W\d_])")
+
+
+def cites_an_article(rest) -> bool:
+    """Whether the text after a heading's number goes on as a sentence: «Articolo 5 della direttiva
+    … è sostituito», «Article 5 of Directive …», «Articolo 13 e articolo 14». A heading's number is
+    alone, or followed by its rubrica, which opens with a capital («Articolo 1 Terzi»), a bracket,
+    a stop or a figure: on 23 real pages (1962-2024, the Treaties, two consolidations) no heading
+    goes on with a lower-case word, and only references do. A reference that goes on with a comma
+    («Articolo 5, paragrafo 1, della direttiva …») is still read as a heading, as before."""
+    word = _CITING_WORD.match(rest)
+    return word is not None and word.group(1).islower()
+
+
 def eurlex_heading_number(text):
-    """The article an OJ heading names («15», «15-bis»), or None when it names none."""
+    """The article an OJ heading names («15», «15-bis»), or None when it names none: a paragraph
+    that opens on an article it cites (`cites_an_article`) names none."""
     match = _EURLEX_HEADING_NUMBER.match(text)
-    if not match:
+    if not match or cites_an_article(text[match.end():]):
         return None
     return f"{match.group(1)}-{match.group(2).lower()}" if match.group(2) else match.group(1)
 
