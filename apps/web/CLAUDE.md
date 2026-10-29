@@ -86,7 +86,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   read, forgotten at logout) — off, the sidebar's «Percorsi» (second in «Studia») and «Oggi»'s row are not drawn,
   nothing is read, and the pages go back to Oggi (`CoursesGate`, which reads the features again as it mounts and
   redirects only on an «off» that read confirms; a switch it could not read says so with «Riprova»; a 404 on the list
-  turns the switch off). A review session with `?corso=` waits behind the same gate.
+  turns the switch off; the server's trash then hides a course and a module too). A review session with `?corso=` waits
+  behind the same gate (the server refuses `?corso=` with a 400 until S2 narrows the session to a course).
   Nothing of a course is created in the web: the assistant creates it (§3), and an empty «Percorsi» says how, with the
   sentence to copy (`CREATE_SENTENCE`) and, for a connection without `lingo:courses:write`, where permissions are chosen and that a connection made before the
   courses lacks it (no promise of what a new one brings: the MCP asks for the scope from M1).
