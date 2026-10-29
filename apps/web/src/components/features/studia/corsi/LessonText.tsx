@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Highlighter, X } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
-import { FOCUS_RING, INK_BG, ON_INK } from '../progress/tokens';
+import { FOCUS_RING, INK_BG, INK_TEXT, ON_INK } from '../progress/tokens';
 import { addSpan, numberLeaves, parseLesson, removeSpan, splitLeaf, type Inline, type LessonNode, type Span } from './lessonFormat';
 
 /** The lesson's reading type: the reader's serif at a reading measure (as a card, a step larger: it is read at length). */
@@ -77,7 +77,11 @@ function placeUnder(rect: DOMRect, box: HTMLElement): { top: number; left: numbe
   return { top: rect.bottom - frame.top + 6, left };
 }
 
-type Floating = { kind: 'add'; span: Span; top: number; left: number } | { kind: 'remove'; start: number; top: number; left: number } | null;
+/** «Evidenzia» for words selected; «Togli» for a highlight pressed (which takes the focus) or selected inside (which does not). */
+type Floating =
+  | { kind: 'add'; span: Span; top: number; left: number }
+  | { kind: 'remove'; start: number; top: number; left: number; focus: boolean }
+  | null;
 
 /**
  * A block's text in the lesson's format (§10.3), drawn by the web's own parser: every character React text, never HTML.
@@ -86,7 +90,9 @@ type Floating = { kind: 'add'; span: Span; top: number; left: number } | { kind:
  * with the arrows extends a selection from its start, a word at a time with Ctrl or Alt — `Selection.modify`, since a
  * text that is not editable has no caret of its own) bring «Evidenzia», a 44 px button under the selection, which Tab
  * from the text reaches next; a highlight pressed (a click, or Enter on it: each highlight is one Tab stop) brings
- * «Togli». One colour, no notes, nothing sent.
+ * «Togli», and so do words selected inside a highlight. Inside a citation's button a highlight is drawn but takes no
+ * press (nothing interactive in a button): its pieces outside the citation carry the Tab stop, and one lying wholly in
+ * a citation is taken away by selecting its words. One colour, no notes, nothing sent.
  */
 export function LessonText({ text, spans, onSpans, onCite, citations, headingLevel = 3 }: LessonTextProps) {
   const nodes = useMemo(() => numberLeaves(parseLesson(text)), [text]);
@@ -116,6 +122,11 @@ export function LessonText({ text, spans, onSpans, onCite, citations, headingLev
   }, []);
   const hintId = useId();
   const keysId = useId();
+  // The selection's listener reads the highlights as they are now.
+  const spansRef = useRef(spans);
+  useEffect(() => {
+    spansRef.current = spans;
+  }, [spans]);
   const highlighting = spans !== undefined && onSpans !== undefined;
 
   // The selection's words, read as it changes; a selection that leaves the block (or collapses) takes the button away,
@@ -138,14 +149,18 @@ export function LessonText({ text, spans, onSpans, onCite, citations, headingLev
         setFloating((f) => (f?.kind === 'add' ? null : f));
         return;
       }
-      setFloating({ kind: 'add', span: [start, end], ...placeUnder(range.getBoundingClientRect(), frame) });
+      // Words already highlighted, all of them inside one highlight: «Togli» in place of «Evidenzia».
+      const inside = (spansRef.current ?? []).find(([s, e]) => s <= start && end <= e);
+      const place = placeUnder(range.getBoundingClientRect(), frame);
+      setFloating(inside ? { kind: 'remove', start: inside[0], focus: false, ...place } : { kind: 'add', span: [start, end], ...place });
     };
     document.addEventListener('selectionchange', onSelection);
     return () => document.removeEventListener('selectionchange', onSelection);
   }, [highlighting]);
 
-  // «Togli» takes the focus as it appears, so Enter on a highlight and Enter again removes it.
-  const removing = floating?.kind === 'remove' ? floating.start : null;
+  // «Togli» from a highlight pressed takes the focus as it appears, so Enter on a highlight and Enter again removes it;
+  // from a selection it does not (the focus would move under the hand that is still selecting).
+  const removing = floating?.kind === 'remove' && floating.focus ? floating.start : null;
   useEffect(() => {
     if (removing !== null) removeButton.current?.focus({ preventScroll: true });
   }, [removing]);
@@ -162,9 +177,9 @@ export function LessonText({ text, spans, onSpans, onCite, citations, headingLev
   const onTextKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     const el = root.current;
     if (!highlighting || !el) return;
-    if (event.key === 'Tab' && !event.shiftKey && floating?.kind === 'add' && event.target === el) {
+    if (event.key === 'Tab' && !event.shiftKey && floating && event.target === el) {
       event.preventDefault();
-      addButton.current?.focus({ preventScroll: true });
+      (floating.kind === 'add' ? addButton : removeButton).current?.focus({ preventScroll: true });
       return;
     }
     const by = extendBy(event);
@@ -189,12 +204,12 @@ export function LessonText({ text, spans, onSpans, onCite, citations, headingLev
   const offerRemoval = (start: number, target: HTMLElement) => {
     const frame = box.current;
     if (!frame) return;
-    setFloating({ kind: 'remove', start, ...placeUnder(target.getBoundingClientRect(), frame) });
+    setFloating({ kind: 'remove', start, focus: true, ...placeUnder(target.getBoundingClientRect(), frame) });
   };
 
   // Each leaf carries its offset in the plain text (`numberLeaves`); a highlight's first piece is its one Tab stop.
   const firstPiece = new Set<number>();
-  const leaf = (value: string, from: number, key: string): ReactNode =>
+  const leaf = (value: string, from: number, key: string, inButton: boolean): ReactNode =>
     splitLeaf(value, from, spans ?? []).map((piece) => {
       if (piece.highlight === null) {
         return (
@@ -203,10 +218,18 @@ export function LessonText({ text, spans, onSpans, onCite, citations, headingLev
           </span>
         );
       }
-      // One Tab stop per highlight, on its first piece; every piece answers a click.
-      const first = !firstPiece.has(piece.highlight);
-      firstPiece.add(piece.highlight);
+      // One Tab stop per highlight, on its first piece outside a citation; every such piece answers a click. Inside a
+      // citation's button a piece is only drawn: nothing interactive may sit in a button.
       const start = piece.highlight;
+      if (inButton) {
+        return (
+          <mark key={`${key}-${piece.at}`} data-o={piece.at} data-highlight={start} className={MARK}>
+            {piece.text}
+          </mark>
+        );
+      }
+      const first = !firstPiece.has(start);
+      firstPiece.add(start);
       return (
         <mark
           key={`${key}-${piece.at}`}
@@ -230,16 +253,16 @@ export function LessonText({ text, spans, onSpans, onCite, citations, headingLev
         </mark>
       );
     });
-  const inline = (items: Inline[], key: string): ReactNode =>
+  const inline = (items: Inline[], key: string, inButton = false): ReactNode =>
     items.map((item, i) => {
       const k = `${key}.${i}`;
       switch (item.kind) {
         case 'text':
-          return <Fragment key={k}>{leaf(item.text, item.at ?? 0, k)}</Fragment>;
+          return <Fragment key={k}>{leaf(item.text, item.at ?? 0, k, inButton)}</Fragment>;
         case 'strong':
-          return <strong key={k} className="font-semibold">{inline(item.children, k)}</strong>;
+          return <strong key={k} className="font-semibold">{inline(item.children, k, inButton)}</strong>;
         case 'em':
-          return <em key={k}>{inline(item.children, k)}</em>;
+          return <em key={k}>{inline(item.children, k, inButton)}</em>;
         case 'cite': {
           const label = citations?.get(item.marker);
           if (!onCite || label === undefined) return <Fragment key={k}>{inline(item.children, k)}</Fragment>;
@@ -249,12 +272,10 @@ export function LessonText({ text, spans, onSpans, onCite, citations, headingLev
               type="button"
               onClick={(event) => onCite(item.marker, event.currentTarget)}
               title={label}
-              className={cn(
-                'rounded-sm text-left text-primary-800 underline decoration-primary-400 decoration-1 underline-offset-[3px] hover:decoration-2 dark:text-primary-200',
-                FOCUS_RING,
-              )}
+              // Its words can be selected like the rest of the text, so a highlight inside it can be taken away.
+              className={cn('select-text rounded-sm text-left underline decoration-current/50 decoration-1 underline-offset-[3px] hover:decoration-2', INK_TEXT, FOCUS_RING)}
             >
-              {inline(item.children, k)}
+              {inline(item.children, k, true)}
               <span className="sr-only"> (apri {label})</span>
             </button>
           );

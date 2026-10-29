@@ -110,10 +110,11 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   **A module's session** (pull request b; §5 steps 1–4, §6.5, §10.3) is `/studia/percorsi/:id/moduli/:moduloId` — by the
   module's id, since a correction shares its order — `ModuleSession`, in `LessonFrame` as the review (`StudiaPage`'s
   `isLesson`; `LessonLoading` goes back to the course): the header says «Passo 4 di 11 · Richiamo» (`moduleSteps.ts`:
-  the start, each block's reading and recall, then the quiz, which until pull request c is a holding screen), the step
-  in the middle (keyed by step and by the recall's phase, its heading focused in the commit), the one action in
-  `LessonBar`; while the switch is read, `LessonLoading` keeps the close button and Esc around `CoursesGate`. `GET
-  …/moduli/:moduloId` is read once (the content is frozen once opened). The start says what the module is
+  the start, each block's reading and recall, then a waiting screen until pull request c brings the quiz, which counts as
+  no step and says «Fine della lettura»), the step in the middle (keyed by step and by the recall's phase, its heading
+  focused in the commit), the one action in `LessonBar`; while the switch is read, `LessonLoading` keeps the close
+  button and Esc around `CoursesGate`. `GET …/moduli/:moduloId` is read once (the content is frozen once opened); its
+  404 reads the features again before «Questo modulo non c’è più» is said, so a switch turned off goes back to Oggi. The start says what the module is
   for (its competences with their words), its pre-questions and, not yet started, that starting keeps it in the course:
   «Inizia il modulo» posts `apri`, «Leggi senza iniziare» shows every block in one page and opens nothing. A block is read
   with an indicative time (`blockMinutes`: its share of the module's minutes by words, else 100 words a minute), a line
@@ -122,21 +123,28 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   Markdown subset, everything else React text; `corsi.guard.test.ts` refuses HTML written from a string); a citation
   `[testo](#c1)` is a button that opens the copy the block stored (`lessonCitations.ts`: a norm in `DossierItemReader`, a
   decision in `DossierDecisionReader`) beside the text on a computer (its heading takes the focus, which goes back to the
-  citation as it closes), in a `Sheet` on a phone (`CitationPanel`); Esc closes it first, and a link or «Apri su
-  Dashboard» inside it leaves through the same question as the close button. A `###` is one level under the step's
+  citation as it closes), in a `Sheet` on a phone (`CitationPanel`); it belongs to the view it was opened in (a recall's
+  next phase closes it, the phase's heading taking the focus); Esc closes it first, and a link or «Apri su Dashboard»
+  inside it leaves through the same question as the close button. A citation's words are `INK_TEXT`. A `###` is one level under the step's
   heading (`headingLevel`). Highlights are the session's (`Span`s over the block's plain text, `numberLeaves` giving
   each leaf its offset; emphasis is read around a citation held by a placeholder): a selection brings «Evidenzia» (44
   px, under it; a press on it holds it until its click, or 400 ms after the release); the text is a Tab stop where
   Shift and the arrows select from its start (`Selection.modify`, a word with Ctrl or Alt: a text not editable has no
-  caret) and Tab goes to «Evidenzia»; a highlight pressed or Enter on it (one Tab stop each) brings «Togli». The recall (`RecallStep`) hides the text while the reader writes (the trace «gli
+  caret) and Tab goes to «Evidenzia»; a highlight pressed or Enter on it (one Tab stop each, never inside a citation's
+  button, where its pieces are only drawn: nothing interactive sits in a button), or words selected inside a highlight,
+  bring «Togli». The recall (`RecallStep`) hides the text while the reader writes (the trace «gli
   elementi, le eccezioni, un caso»), «Confronta con il testo» sets what was written beside the block, then the block's
   questions as real radio buttons (`RecallQuestion`: the server grades, `POST …/risposte { domandaId, scelta }` and
   nothing else; the explanations, the right one and the reader's marked in words, the outcome in a live region; «Non
   registrato: riprova», or the server's words on a 4xx; once graded the focus moves to the question, «Rispondi» gone). Nothing written, highlighted or reached leaves the browser (§8;
-  the test reads every body); the step reached is kept on this device (`visualex.studia.percorsi.passo`, forgotten with
-  `seenProgress` at sign-in, sign-up and sign-out) and an opened module resumes there. Closing or Esc leaves at once
-  with nothing written or highlighted, else asks «Interrompere il modulo?» (`WireConfirm`, «Continua il modulo»
-  evident). `GET /:id`, `GET /oggi`, `GET …/moduli/:moduloId`, `apri` and `risposte` are S2's (#375, «What S2
+  the test reads every body); the step reached is kept on this device (`visualex.studia.percorsi.passo`) and an opened
+  module resumes there, and each block's recall, highlights and phase are kept in this tab (`sessionStorage`,
+  `visualex.studia.percorsi.lavoro`, `readWork`/`saveWork`), so a reload, the browser's back or a swipe back lose
+  nothing (there is no navigation block: the app's `BrowserRouter` is not a data router, so `useBlocker` is not there);
+  both forgotten with `seenProgress` at sign-in, sign-up and sign-out (`forgetModuleSessions`). While something is written
+  or highlighted the browser asks before the tab closes (`beforeunload`). Closing or Esc leaves at once with nothing
+  written or highlighted, else asks «Interrompi il modulo?» (`WireConfirm`, «Continua il modulo» evident), whose
+  «Interrompi» forgets the module's work. `GET /:id`, `GET /oggi`, `GET …/moduli/:moduloId`, `apri` and `risposte` are S2's (#375, «What S2
   exposes», the user's session only: a token gets 403), typed in `types/corsi.ts` as #375 answers them: the course page's
   competences carry `sessioni: { contate, servono }` and `ultima: { giorno, percentuale }`, its modules `stato` with
   «ritirato», `eliminabile` and `ritirabile` (the page offers the trash and «Ritira» from them, never deciding itself) and
