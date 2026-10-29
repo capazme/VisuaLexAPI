@@ -367,12 +367,15 @@ type StoredItem = {
   noteEditedBy?: string | null;
 };
 
-/** An assistant's mark on an entry (D7b), as the payload keeps it; absent from a payload stored before. */
+/** An assistant's mark or gloss on an entry (D7b, D8), as the payload keeps it; absent from a payload stored before. */
 type StoredProposal = {
   id: string;
+  /** Absent from a payload stored before D8: a mark. */
+  kind?: 'mark' | 'gloss';
   normaKey: string;
   text: string;
-  color: string;
+  /** Null for a gloss. */
+  color: string | null;
   startOffset: number;
   endOffset: number;
   note: string | null;
@@ -396,6 +399,7 @@ type StoredProposal = {
 const proposalRow = (p: StoredProposal, userId: string): Prisma.HighlightCreateManyInput => ({
   id: p.id,
   userId,
+  kind: p.kind ?? 'mark',
   normaKey: p.normaKey,
   text: p.text,
   color: p.color,

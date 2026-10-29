@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { request, app, prisma, createTestUser, authHeader, type TestUser } from './helpers';
 import { delegatedToken } from './oauth/oauthHelpers';
 
-// D7b, first cut: the web app's routes for the assistant's marks and notes, the switch that hides them,
-// what the other readers never receive, the light on each entry, and the trash.
+// D7b, first cut, and D8's glosses: the web app's routes for the assistant's marks, glosses and notes, the switch
+// that hides them, what the other readers never receive, the light on each entry, and the trash.
 
 const NORM = { tipo_atto: 'codice civile', numero_articolo: '1453', data: '1942-03-16', numero_atto: '262' };
 const KEY = 'codice-civile--262--1942-03-16--1453::art::1453';
@@ -38,6 +38,20 @@ function proposal(userId: string, itemId: string, over: Partial<{ id: string; no
   });
 }
 
+/** An assistant's gloss as the delegated route stores it (D8: no colour, always a note with a state). */
+function glossRow(userId: string, itemId: string, over: Partial<{ startOffset: number; text: string; note: string }> = {}) {
+  const text = over.text ?? 'il risarcimento del danno';
+  const startOffset = over.startOffset ?? 120;
+  const note = over.note ?? 'Il danno si aggiunge alla risoluzione.';
+  return prisma.highlight.create({
+    data: {
+      userId, normaKey: KEY, kind: 'gloss', color: null, text, startOffset, endOffset: startOffset + text.length, note,
+      createdByClientId: 'client-1', createdByClientName: 'Claude Code', dossierItemId: itemId,
+      assistantText: text, assistantStartOffset: startOffset, assistantNote: note, noteState: 'proposed',
+    },
+  });
+}
+
 describe('D7b — the assistant’s proposals, for the web app', () => {
   let alice: TestUser;
   let bob: TestUser;
@@ -56,9 +70,9 @@ describe('D7b — the assistant’s proposals, for the web app', () => {
     it('is off by default: GET /features says so and every route answers 404', async () => {
       const features = await request(app).get('/api/features').set(authHeader(alice));
       expect(features.status).toBe(200);
-      expect(features.body).toEqual({ assistantPassages: false });
+      expect(features.body).toEqual({ assistantPassages: false, assistantGlosses: false });
       // Public: the MCP server asks it with no token before a session lists its tools.
-      expect((await request(app).get('/api/features')).body).toEqual({ assistantPassages: false });
+      expect((await request(app).get('/api/features')).body).toEqual({ assistantPassages: false, assistantGlosses: false });
       const p = await proposal(alice.id, itemId);
       for (const call of [
         request(app).get(`${base()}/proposals`),
@@ -82,9 +96,16 @@ describe('D7b — the assistant’s proposals, for the web app', () => {
       const on = await request(app).put('/api/admin/switches/assistant_passages').set(authHeader(alice)).send({ enabled: true });
       expect(on.status).toBe(200);
       expect(on.body).toMatchObject({ key: 'assistant_passages', enabled: true });
-      expect((await request(app).get('/api/features').set(authHeader(bob))).body).toEqual({ assistantPassages: true });
+      expect((await request(app).get('/api/features').set(authHeader(bob))).body).toEqual({ assistantPassages: true, assistantGlosses: false });
       const list = await request(app).get('/api/admin/switches').set(authHeader(alice));
-      expect(list.body.switches).toEqual([expect.objectContaining({ key: 'assistant_passages', enabled: true })]);
+      expect(list.body.switches).toEqual([
+        expect.objectContaining({ key: 'assistant_passages', enabled: true }),
+        // D8's, off until an admin switches it.
+        expect.objectContaining({ key: 'assistant_glosses', enabled: false }),
+      ]);
+      const glosses = await request(app).put('/api/admin/switches/assistant_glosses').set(authHeader(alice)).send({ enabled: true });
+      expect(glosses.body).toMatchObject({ key: 'assistant_glosses', enabled: true });
+      expect((await request(app).get('/api/features')).body).toEqual({ assistantPassages: true, assistantGlosses: true });
       expect((await request(app).put('/api/admin/switches/nope').set(authHeader(alice)).send({ enabled: true })).status).toBe(404);
       expect((await request(app).put('/api/admin/switches/assistant_passages').set(authHeader(alice)).send({ enabled: 'yes' })).status).toBe(400);
     });
@@ -101,6 +122,7 @@ describe('D7b — the assistant’s proposals, for the web app', () => {
       expect(response.body.proposals).toHaveLength(2);
       const [first, second] = response.body.proposals;
       expect(first).toMatchObject({
+        kind: 'mark',
         normaKey: KEY,
         text: 'la risoluzione del contratto',
         color: 'yellow',
@@ -238,6 +260,38 @@ describe('D7b — the assistant’s proposals, for the web app', () => {
       expect(await prisma.highlight.count({ where: { id: p.id } })).toBe(0);
       expect((await request(app).delete(`${base()}/proposals/${p.id}`).set(authHeader(alice))).status).toBe(404);
     });
+
+    it('lists a gloss beside the marks, with no colour and its note', async () => {
+      await proposal(alice.id, itemId);
+      const g = await glossRow(alice.id, itemId);
+      const response = await request(app).get(`${base()}/proposals`).set(authHeader(alice));
+      expect(response.body.proposals.map((x: { kind: string }) => x.kind)).toEqual(['mark', 'gloss']);
+      expect(response.body.proposals[1]).toMatchObject({
+        id: g.id,
+        kind: 'gloss',
+        color: null,
+        text: 'il risarcimento del danno',
+        assistantRange: { startOffset: 120, text: 'il risarcimento del danno' },
+        note: { text: 'Il danno si aggiunge alla risoluzione.', assistantText: 'Il danno si aggiunge alla risoluzione.', state: 'proposed', edited: false },
+      });
+    });
+
+    it('validates, flags, edits, moves and removes a gloss as a proposal, and never empties it', async () => {
+      const g = await glossRow(alice.id, itemId);
+      const at = `${base()}/proposals/${g.id}`;
+      expect((await request(app).put(`${at}/state`).set(authHeader(alice)).send({ state: 'review', comment: 'Imprecisa.' })).body.note).toMatchObject({ state: 'review', reviewComment: 'Imprecisa.' });
+      const emptied = await request(app).put(`${at}/note`).set(authHeader(alice)).send({ text: '   ' });
+      expect(emptied.status).toBe(400);
+      expect(emptied.body.detail).toBe('Una glossa non può restare vuota: per toglierla, eliminala.');
+      const edited = await request(app).put(`${at}/note`).set(authHeader(alice)).send({ text: 'La mia glossa.' });
+      expect(edited.body).toMatchObject({ kind: 'gloss', color: null, note: { text: 'La mia glossa.', state: 'validated', edited: true, assistantText: 'Il danno si aggiunge alla risoluzione.' } });
+      const moved = await request(app).put(`${at}/range`).set(authHeader(alice)).send({ startOffset: 123, text: 'risarcimento' });
+      expect(moved.body).toMatchObject({ startOffset: 123, text: 'risarcimento', rangeEdited: true, assistantRange: { startOffset: 120, text: 'il risarcimento del danno' } });
+      const row = await prisma.highlight.findUniqueOrThrow({ where: { id: g.id } });
+      expect(row).toMatchObject({ kind: 'gloss', color: null, assistantText: 'il risarcimento del danno', assistantStartOffset: 120 });
+      expect((await request(app).delete(at).set(authHeader(alice))).status).toBe(204);
+      expect(await prisma.highlight.count()).toBe(0);
+    });
   });
 
   describe('what the other readers never receive', () => {
@@ -246,6 +300,7 @@ describe('D7b — the assistant’s proposals, for the web app', () => {
       const mine = await request(app).post('/api/highlights').set(authHeader(alice)).send({ normaKey: KEY, text: 'contratto', color: 'green', startOffset: 60, endOffset: 69 });
       const p = await proposal(alice.id, itemId);
       const bare = await proposal(alice.id, itemId, { note: null, startOffset: 100 });
+      const g = await glossRow(alice.id, itemId);
       await request(app).put(`${base()}/proposals/${p.id}/state`).set(authHeader(alice)).send({ state: 'validated' });
       for (const query of [{ normaKey: KEY }, { normaKeyPrefix: 'codice-civile--262--1942-03-16--1453::art::' }]) {
         const list = await request(app).get('/api/highlights').query(query).set(authHeader(alice));
@@ -253,7 +308,8 @@ describe('D7b — the assistant’s proposals, for the web app', () => {
       }
       expect((await request(app).put(`/api/highlights/${p.id}`).set(authHeader(alice)).send({ note: 'altro' })).status).toBe(404);
       expect((await request(app).delete(`/api/highlights/${bare.id}`).set(authHeader(alice))).status).toBe(404);
-      expect(await prisma.highlight.count()).toBe(3);
+      expect((await request(app).delete(`/api/highlights/${g.id}`).set(authHeader(alice))).status).toBe(404);
+      expect(await prisma.highlight.count()).toBe(4);
     });
   });
 
@@ -407,6 +463,27 @@ describe('D7b — the assistant’s proposals, for the web app', () => {
       const after = await prisma.highlight.findUniqueOrThrow({ where: { id: p.id } });
       expect(after).toEqual(before);
       expect(await prisma.highlight.count({ where: { id: bare.id } })).toBe(1);
+    });
+
+    it('brings a gloss back as a gloss, with no colour', async () => {
+      const g = await glossRow(alice.id, itemId);
+      const before = await prisma.highlight.findUniqueOrThrow({ where: { id: g.id } });
+      const trashed = await request(app).delete(`/api/dossiers/${dossierId}/items/${itemId}`).set(authHeader(alice));
+      expect(await prisma.highlight.count()).toBe(0);
+      expect((await request(app).post(`/api/trash/${trashed.body.trashId}/restore`).set(authHeader(alice)).send({})).status).toBe(200);
+      expect(await prisma.highlight.findUniqueOrThrow({ where: { id: g.id } })).toEqual(before);
+    });
+
+    it('brings back a mark trashed before D8, whose payload has no kind, as a mark', async () => {
+      const p = await proposal(alice.id, itemId);
+      const before = await prisma.highlight.findUniqueOrThrow({ where: { id: p.id } });
+      const trashed = await request(app).delete(`/api/dossiers/${dossierId}/items/${itemId}`).set(authHeader(alice));
+      const entry = await prisma.trashEntry.findUniqueOrThrow({ where: { id: trashed.body.trashId } });
+      const payload = entry.payload as { proposals: Record<string, unknown>[] };
+      for (const stored of payload.proposals) delete stored.kind;
+      await prisma.trashEntry.update({ where: { id: entry.id }, data: { payload } });
+      expect((await request(app).post(`/api/trash/${trashed.body.trashId}/restore`).set(authHeader(alice)).send({})).status).toBe(200);
+      expect(await prisma.highlight.findUniqueOrThrow({ where: { id: p.id } })).toEqual(before);
     });
 
     it('does the same for a whole dossier', async () => {

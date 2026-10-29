@@ -7,9 +7,14 @@ import { prisma } from '../lib/prisma';
  * reset empties the table. Read at each request that needs it: one row by its key.
  */
 export const APP_SWITCHES = {
-  // D7b: passages and notes an assistant proposes, validated by hand. Off: the web's proposal routes
-  // answer 404, dossier answers carry no state, the MCP lists neither tool, the delegated routes 404.
-  assistant_passages: 'Passaggi e note proposti dall’IA, da validare a mano (D7b).',
+  // D7b: the web app's side of what an assistant proposed (its saved passages, its glosses, its notes), validated
+  // by hand. Off: the web's proposal routes answer 404 and dossier answers carry no state. Since D8 no application
+  // proposes coloured passages any more: the saved ones stay, readable here.
+  assistant_passages: 'Proposte e note dell’IA nel dossier, da validare a mano (D7b).',
+  // D8: the connected application's side of glosses. Off: the delegated route that proposes them answers 404 and
+  // the MCP does not list `omnilex_glossa_voce` (an entry's text is behind no switch). The user validates glosses on
+  // the web app's side, under `assistant_passages`: switch this on only once the web shows glosses.
+  assistant_glosses: 'Glosse dell’IA sui passaggi, proposte dalle applicazioni collegate (D8).',
 } as const;
 
 export type AppSwitchKey = keyof typeof APP_SWITCHES;

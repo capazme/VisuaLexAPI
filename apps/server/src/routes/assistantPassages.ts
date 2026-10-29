@@ -8,38 +8,38 @@ import { citeStoredItem } from '../norms/decisionCitation';
 import { isSwitchOn } from '../assistant/switches';
 import { EntryHasNoText, EntryUnreadable, SourceHasNoText, TextUnavailable, readEntryText, type EntryText } from '../assistant/entryText';
 import { CONTEXT_MAX, QUOTE_MAX, QUOTE_MIN, locateQuote } from '../assistant/locateQuote';
-import { ASSISTANT_NOTE_MAX } from '../assistant/notes';
 
 /**
- * D7b, the connected application's side (spec 2026-10-23 §8.4–8.7): an entry's text, as the dossier's reader
- * reads it, and passages proposed on it. In the delegated table: the text under `dossier:text`, the passages
- * under `dossier:write` and `dossier:text`. Nothing here confirms, edits or removes: the user does, from the
- * web app. Behind the `assistant_passages` switch: off, both answer 404.
+ * The connected application's side of an entry's text (D7b, spec 2026-10-23 §8.4–8.7) and of the glosses on its
+ * passages (D8): the text as the dossier's reader reads it, and glosses proposed on it, which the user validates,
+ * edits, moves or removes from the web app. In the delegated table: the text under `dossier:text`, the glosses
+ * under `dossier:write` and `dossier:text`. The text is behind no switch: it is how an application quotes an entry
+ * verbatim (G-372), whatever it then writes. The glosses are behind `assistant_glosses`: off, that route answers 404.
+ * Coloured passages are no longer proposed (D8, the owners on 29 October 2026): that route answers 410, and the
+ * proposals already saved stay as they are, on the web app's side (`assistantProposals.ts`).
  */
 const router = Router();
 router.use('/dossiers/:id/items/:itemId', authenticate);
 
 /** Pages of the text for the model: about this many characters, cut at a line end. */
 export const PAGE_SIZE = 20_000;
-export const PASSAGES_PER_CALL = 10;
-/** Open proposals on one entry: marks with no note, or a note not validated. */
+export const GLOSSES_PER_CALL = 10;
+/** A gloss's note, as the model writes it (the user may edit it up to ASSISTANT_NOTE_MAX). */
+export const GLOSS_NOTE_MAX = 1500;
+/** Open proposals on one entry, glosses and saved marks together: a mark with no note, or a note not validated. */
 export const OPEN_PER_ENTRY = 30;
 
 const NO_TEXT = 'Questa voce non ha un testo: è una nota.';
 const NOT_YET = 'Il testo non è ancora disponibile, riprova tra poco.';
-const NOT_IN_FORCE = 'Questa voce mostra un testo non in vigore: le evidenziazioni non si vedrebbero.';
-
-// What each colour means (owner, 25 October 2026): yellow the central point, green a condition or a premise, blue a
-// definition or an exception. Red is not the assistant's to choose: it is the sign of a note «da rivedere».
-const COLOURS = { giallo: 'yellow', verde: 'green', blu: 'blue' } as const;
-const COLOUR_WORDS: Record<string, string> = { yellow: 'giallo', green: 'verde', red: 'rosso', blue: 'blu' };
-const NO_RED = 'Il rosso non si sceglie: è il segno di una nota «da rivedere». Usa giallo (punto centrale), verde (condizione o presupposto) o blu (definizione o eccezione).';
+const NOT_IN_FORCE = 'Questa voce mostra un testo non in vigore: le glosse non si vedrebbero.';
+export const NO_MORE_PASSAGES =
+  'Le evidenziazioni proposte dall’IA non ci sono più: evidenziare è un gesto dell’utente. Per spiegare un passaggio proponi una glossa.';
 
 // Plain text, as notes: new lines and tabs, nothing else below U+0020.
 const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
 
 async function requireSwitch() {
-  if (!(await isSwitchOn('assistant_passages'))) throw new AppError(404, 'Non disponibile');
+  if (!(await isSwitchOn('assistant_glosses'))) throw new AppError(404, 'Non disponibile');
 }
 
 async function entryOf(req: Request) {
@@ -83,7 +83,6 @@ export function pages(text: string): string[] {
 const partSchema = z.object({ parte: z.coerce.number().int().min(1).max(1000).default(1) });
 
 router.get('/dossiers/:id/items/:itemId/text', async (req, res) => {
-  await requireSwitch();
   // For a connected application only: the web reads the text through the Python API, under its own quota.
   if (!req.delegation) throw new AppError(403, 'Solo un’applicazione collegata legge il testo da qui.');
   const { parte } = partSchema.parse({ parte: req.query.parte ?? req.query.part });
@@ -91,12 +90,13 @@ router.get('/dossiers/:id/items/:itemId/text', async (req, res) => {
   const text = await textOf(item);
   const all = pages(text.display);
   if (parte > all.length) throw new AppError(400, `Il testo ha ${all.length} ${all.length === 1 ? 'parte' : 'parti'}.`);
-  // Only what this application proposed and the user has not taken up: never another application's, the
-  // user's own marks, a validated or a flagged note, an edit, a comment, or boundaries the user moved (§8.9).
+  // Only the glosses this application proposed and the user has not taken up: never another application's, the
+  // user's own marks, a saved coloured proposal, a validated or a flagged note, an edit, a comment, or boundaries
+  // the user moved (§8.9).
   const open = await prisma.highlight.findMany({
-    where: { userId: req.user!.id, dossierItemId: item.id, createdByClientId: req.delegation.clientId, OR: [{ noteState: null }, { noteState: 'proposed' }] },
+    where: { userId: req.user!.id, dossierItemId: item.id, createdByClientId: req.delegation.clientId, kind: 'gloss', noteState: 'proposed' },
     orderBy: [{ assistantStartOffset: 'asc' }, { createdAt: 'asc' }],
-    select: { assistantText: true, color: true, assistantNote: true },
+    select: { assistantText: true, assistantNote: true },
   });
   res.json({
     voce: { id: item.id, tipo: item.itemType, riferimento: citeStoredItem(item.itemType, item.content) },
@@ -104,54 +104,53 @@ router.get('/dossiers/:id/items/:itemId/text', async (req, res) => {
     parte,
     parti: all.length,
     testo: all[parte - 1],
-    proposte: open.map((p) => ({ testo: p.assistantText, colore: COLOUR_WORDS[p.color] ?? p.color, nota: p.assistantNote })),
+    glosse: open.map((g) => ({ testo: g.assistantText, nota: g.assistantNote })),
   });
 });
 
+// Gone (D8): said in words to an application that still proposes coloured passages. Nothing is read or stored.
+router.post('/dossiers/:id/items/:itemId/passages', () => {
+  throw new AppError(410, NO_MORE_PASSAGES);
+});
+
 const contextSchema = z.string().max(CONTEXT_MAX).optional();
-const passagesSchema = z
+const glossesSchema = z
   .object({
-    passaggi: z
+    glosse: z
       .array(
         z
           .object({
             testo: z.string().min(QUOTE_MIN).max(QUOTE_MAX),
-            colore: z.enum(['giallo', 'verde', 'blu']).default('giallo'),
             nota: z
               .string()
               .trim()
               .min(1)
-              .refine(...atMostUnits(ASSISTANT_NOTE_MAX))
-              .refine((text) => !CONTROL.test(text), 'Caratteri di controllo non ammessi.')
-              .optional(),
+              .refine(...atMostUnits(GLOSS_NOTE_MAX))
+              .refine((text) => !CONTROL.test(text), 'Caratteri di controllo non ammessi.'),
             prima: contextSchema,
             dopo: contextSchema,
           })
           .strict(),
       )
       .min(1)
-      .max(PASSAGES_PER_CALL),
+      .max(GLOSSES_PER_CALL),
   })
   .strict();
 
-type Outcome = { esito: 'proposto'; id: string; colore: string; nota: boolean } | { esito: 'rifiutato'; motivo: string };
+type Outcome = { esito: 'proposta'; id: string } | { esito: 'rifiutata'; motivo: string };
 
 const REFUSED = {
   too_short: 'troppo corto',
   not_found: 'non trovato alla lettera nel testo',
-  duplicate: 'già proposto in questo punto',
+  duplicate: 'già glossato in questo punto',
   full: 'limite di proposte aperte su questa voce raggiunto',
 };
 
-router.post('/dossiers/:id/items/:itemId/passages', async (req, res) => {
+router.post('/dossiers/:id/items/:itemId/glosses', async (req, res) => {
   await requireSwitch();
-  // Said in words before the schema's own refusal, which would only name the field.
-  const asked = (req.body as { passaggi?: unknown } | undefined)?.passaggi;
-  const isRed = (colour: unknown) => typeof colour === 'string' && colour.trim().toLowerCase() === 'rosso';
-  if (Array.isArray(asked) && asked.some((p) => isRed((p as { colore?: unknown } | null)?.colore))) throw new AppError(400, NO_RED);
-  const { passaggi } = passagesSchema.parse(req.body);
-  // A proposal is the assistant's by definition: the user's session highlights by itself.
-  if (!req.delegation) throw new AppError(403, 'Solo un’applicazione collegata propone passaggi.');
+  const { glosse } = glossesSchema.parse(req.body);
+  // A gloss here is the assistant's by definition, validated by the user in the web app.
+  if (!req.delegation) throw new AppError(403, 'Solo un’applicazione collegata propone glosse.');
   const item = await entryOf(req);
   const text = await textOf(item);
   // A 400, not a 409: nothing changed under the call, and asking again would not help (P13).
@@ -166,67 +165,69 @@ router.post('/dossiers/:id/items/:itemId/passages', async (req, res) => {
     if (!now) throw new AppError(404, 'Voce non trovata');
     // The entry changed while its text was read (another version, say): the offsets would point into the old text.
     if (JSON.stringify(now.content) !== JSON.stringify(item.content)) throw new AppError(409, 'La voce è cambiata mentre ne leggevo il testo.');
-    // The entry's own marks only: the user's highlights are never consulted, so the answer never tells the
+    // The entry's assistant rows only: the user's highlights are never consulted, so the answer never tells the
     // model what the user marked (§8.9).
     const existing = await tx.highlight.findMany({
       where: { userId: req.user!.id, dossierItemId: item.id, createdByClientId: { not: null } },
-      select: { assistantStartOffset: true, assistantText: true, noteState: true },
+      select: { kind: true, assistantStartOffset: true, assistantText: true, noteState: true },
     });
-    // Where the model put them, never where the user moved them: the answer must not tell a move.
-    const taken = new Set(existing.map((h) => `${h.assistantStartOffset}:${h.assistantText}`));
+    // A gloss repeats only a gloss, where the model put it, never where the user moved it: the answer must not
+    // tell a move. A saved coloured proposal on the same words is another thing, and stays beside it.
+    const taken = new Set(existing.filter((h) => h.kind === 'gloss').map((h) => `${h.assistantStartOffset}:${h.assistantText}`));
     let open = existing.filter((h) => h.noteState !== 'validated').length;
     const result: Outcome[] = [];
-    for (const passage of passaggi) {
-      const located = locateQuote(text.projection, passage);
+    for (const gloss of glosse) {
+      const located = locateQuote(text.projection, gloss);
       if (!located.found) {
         result.push({
-          esito: 'rifiutato',
+          esito: 'rifiutata',
           motivo: located.reason === 'ambiguous' ? `compare ${located.count} volte: aggiungi "prima" o "dopo"` : REFUSED[located.reason],
         });
         continue;
       }
       const spot = `${located.start}:${located.text}`;
       if (taken.has(spot)) {
-        result.push({ esito: 'rifiutato', motivo: REFUSED.duplicate });
+        result.push({ esito: 'rifiutata', motivo: REFUSED.duplicate });
         continue;
       }
       if (open >= OPEN_PER_ENTRY) {
-        result.push({ esito: 'rifiutato', motivo: REFUSED.full });
+        result.push({ esito: 'rifiutata', motivo: REFUSED.full });
         continue;
       }
-      const color = COLOURS[passage.colore];
       const row = await tx.highlight.create({
         data: {
           userId: req.user!.id,
           normaKey: text.wireKey,
+          kind: 'gloss',
+          // A gloss has no colour: the coloured mark is the user's gesture.
+          color: null,
           // The projection's own slice, never the model's quote (root rule 23).
           text: located.text,
-          color,
           startOffset: located.start,
           endOffset: located.start + located.text.length,
-          note: passage.nota ?? null,
+          note: gloss.nota,
           createdByClientId: clientId,
           createdByClientName: clientName,
           dossierItemId: item.id,
           assistantText: located.text,
           assistantStartOffset: located.start,
-          assistantNote: passage.nota ?? null,
-          noteState: passage.nota ? 'proposed' : null,
+          assistantNote: gloss.nota,
+          noteState: 'proposed',
         },
         select: { id: true },
       });
       taken.add(spot);
       open += 1;
-      result.push({ esito: 'proposto', id: row.id, colore: passage.colore, nota: Boolean(passage.nota) });
+      result.push({ esito: 'proposta', id: row.id });
     }
     return result;
   });
 
-  // Refused passages cost nothing: two points and one of the day's passages each, given back.
-  const refused = outcomes.filter((o) => o.esito === 'rifiutato').length;
+  // Refused glosses cost nothing: two points and one of the day's passages each, given back.
+  const refused = outcomes.filter((o) => o.esito === 'rifiutata').length;
   res.locals.delegatedRefund = refused * 2;
   res.locals.delegatedCounterRefund = refused;
-  res.json({ voce: { id: item.id, riferimento: citeStoredItem(item.itemType, item.content) }, passaggi: outcomes });
+  res.json({ voce: { id: item.id, riferimento: citeStoredItem(item.itemType, item.content) }, glosse: outcomes });
 });
 
 export default router;

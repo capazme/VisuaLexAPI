@@ -18,7 +18,7 @@ export const DELEGATED_COUNTERS: Record<DelegatedCounter, number> = {
   note: 100,
   trash: 20,
   card: 100,
-  // D7b: passages proposed on dossier entries, and pages of an entry's text read.
+  // D7b and D8: glosses proposed on the passages of dossier entries, and pages of an entry's text read.
   passage: 100,
   text: 200,
 };
@@ -28,7 +28,7 @@ const COUNTER_WORDS: Record<DelegatedCounter, string> = {
   note: 'note scritte',
   trash: 'eliminazioni',
   card: 'schede create',
-  passage: 'passaggi evidenziati',
+  passage: 'glosse sui passaggi',
   text: 'pagine di testo',
 };
 

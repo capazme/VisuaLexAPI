@@ -163,7 +163,7 @@ app.use('/api', annotationRoutes);
 app.use('/api', dossierRoutes);
 // D7b: the web app's routes for the assistant's proposals and notes (behind the `assistant_passages` switch).
 app.use('/api', assistantProposalRoutes);
-// D7b: an entry's text and the passages a connected application proposes on it (delegated, behind the same switch).
+// D7b and D8: an entry's text and the glosses a connected application proposes on it (delegated; the glosses behind `assistant_glosses`).
 app.use('/api', assistantPassageRoutes);
 app.use('/api', trashRoutes);
 app.use('/api', feedbackRoutes);

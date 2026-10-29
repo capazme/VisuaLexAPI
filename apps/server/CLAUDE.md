@@ -86,7 +86,7 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   `insufficient_scope` — to a live grant and an active user, and to the daily
   quota (points by route, `OAUTH_DAILY_POINTS`; and named daily counters,
   `DELEGATED_COUNTERS`: 10 dossiers created, 100 notes, 20 deletions, 100
-  cards, 100 passages proposed, 200 pages of an entry's text; an entry may also need a second
+  cards, 100 glosses proposed on passages (the counter `passage`), 200 pages of an entry's text; an entry may also need a second
   scope, `alsoScope`). A delegated POST must be JSON (415): the weight is read from the body
   before the app's parsers run. A refused call (4xx/5xx) gives back its points
   and the counter it spent; a route may give back part of both on a 200 (`res.locals.delegatedRefund`,
@@ -122,57 +122,75 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   session only, the route is not in the delegated table). An undone removal on the
   web no longer needs it: the trash restores an entry with its own id (question 181).
   `assertArticleOfDossier` is the one check behind both routes.
-- **D7b: passages and notes an assistant proposes, validated by hand** (spec
+- **D7b: passages and notes an assistant proposes, validated by hand; D8: glosses in place of the passages** (spec
   `docs/superpowers/specs/2026-10-23-mcp-next-tools-design.md` §8, as its first cut revised it on
-  25 October 2026; migration `20261027100000_assistant_proposed_marks`). The colours of the assistant's passages
-  mean (owner, 25 October 2026): `giallo` the central point, `verde` a condition or a premise, `blu` a definition
-  or an exception; `rosso` is not the assistant's to choose, being the sign of a note «da rivedere». Behind the runtime switch
-  `assistant_passages` (`assistant/switches.ts`, table `app_switches`, a missing row is off; `GET
-  /api/features` is public, mounted before every limiter, and answers `{ assistantPassages }` from five
-  seconds' memory, which an admin's change clears; an admin switches it with `PUT
-  /api/admin/switches/:key { enabled }`): off, every route below answers 404 and the dossier answers
-  carry no state. **The connected application's side** (`routes/assistantPassages.ts`, in the delegated
+  25 October 2026; migration `20261027100000_assistant_proposed_marks`; D8: `docs/superpowers/specs/2026-10-29-d8-glosses-design.md`,
+  migration `20261030100000_assistant_glosses`). **Since D8 no application proposes coloured passages**: highlighting is
+  the user's gesture (owners, 29 October 2026). `POST /dossiers/:id/items/:itemId/passages` answers **410** with the reason
+  in Italian, whatever it is sent and with either switch, and reads and stores nothing (kept in the delegated table at one
+  point, given back, so an application is told in words rather than with a bare 403). The coloured proposals saved before
+  stay as they are: readable, validatable, movable and removable through the web app's routes below, never converted. Their
+  colours meant (owner, 25 October 2026) `giallo` the central point, `verde` a condition or a premise, `blu` a definition or
+  an exception. **A gloss** is a `Highlight` of `kind` `gloss` (every other row is a `mark`): an assistant's note on a
+  passage, with **no colour** (`color` null; the migration's CHECKs: a mark has a colour and a gloss none; a gloss has a
+  connection, a state and a shown note that is not empty), anchored by `(startOffset, text)` as every highlight (root rule
+  23), with the same original position, boundary move and note states as a proposal. The general gloss on a norm is the
+  dossier note about the whole article (`POST /dossiers/:id/notes` with `aboutItemId`), unchanged. Two runtime switches
+  (`assistant/switches.ts`, table `app_switches`, a missing row is off; `GET /api/features` is public, mounted before every
+  limiter, and answers `{ assistantPassages, assistantGlosses }` from five seconds' memory, which an admin's change clears;
+  an admin switches them with `PUT /api/admin/switches/:key { enabled }`): `assistant_passages` is the web app's side (off,
+  its routes below answer 404 and the dossier answers carry no state); `assistant_glosses` is the connected application's
+  side of glosses (off, the glosses route answers 404 and the MCP does not list `omnilex_glossa_voce`). An entry's text is
+  behind no switch: it is how an application quotes it verbatim (G-372). A gloss needs both, and
+  `assistant_glosses` is switched on only once the web shows glosses: today's web draws an unknown colour as yellow.
+  **The connected application's side** (`routes/assistantPassages.ts`, in the delegated
   table): `GET /dossiers/:id/items/:itemId/text?parte=` (`dossier:text`, a point and a page of the
   counter `text`) gives a norm's or a decision's text in pages of 20,000 characters cut at a line end,
-  `in_vigore`, and the proposals still open as the model wrote them (never the user's marks, a state, a
-  comment, an edit or moved boundaries); `POST /dossiers/:id/items/:itemId/passages { passaggi }`
-  (`dossier:write` **and** `dossier:text`, an exchanged token only; 1–10 passages, two points and one of
-  the counter `passage` each, the refused ones given back) finds each quote in the text the reader
+  `in_vigore`, and the glosses this application proposed still `proposed`, as the model wrote them (`glosse: [{ testo,
+  nota }]`; never the user's marks, a saved coloured proposal, a state, a comment, an edit or moved boundaries);
+  `POST /dossiers/:id/items/:itemId/glosses { glosse }` (`dossier:write` **and** `dossier:text`, an exchanged token only;
+  1–10 glosses `{ testo 15–2000, nota 1–1500 UTF-16 units, prima?, dopo? }`, no colour, two points and one of the counter
+  `passage` each, the refused ones given back) finds each quote in the text the reader
   reads (`assistant/locateQuote.ts`: whitespace runs match whitespace runs or nothing, every other
-  character as written; `prima`/`dopo` choose among occurrences; the colour is `giallo`, `verde` or `blu`, and
-  `rosso` is refused with its reason), stores the projection's own slice at
-  its offset (root rule 23), and answers one outcome per passage. The text is fetched once per call
+  character as written; `prima`/`dopo` choose among occurrences), stores the projection's own slice at
+  its offset (root rule 23), and answers one outcome per gloss (`proposta` with its id, or `rifiutata` with the reason; no
+  text). A gloss repeats only a gloss where the model put one; a user's mark or a saved coloured proposal on the same words
+  stays beside it, unread. The text is fetched once per call
   from the Python API as the web fetches it (`assistant/entryText.ts`: ports of `buildItemKey`,
   `uniqueArticleIdFromNorma`, the body of `fetchArticleForNorma`, `describeVersion`'s `readOnly`,
   `decisionProjection`, pinned to the web's code by `tests/assistant/entryText.test.ts` and
   `ruleTwentyThree.test.ts`, which proposes on the web's fixtures and finds the marks in the web's
   renderer); a text the reader shows read-only is refused (400), an article or a decision the source says is
   not there is a 400, a source that cannot answer now is a 503, an entry changed while its text was read a 409.
-  The dossier's row lock holds at most 30 open proposals per entry (a mark with no note, or a note not
-  validated). **A proposal** is a `Highlight` with the connection's mark, its entry
-  (`dossier_item_id`, no foreign key), where the model put it (`assistant_text`,
+  The dossier's row lock holds at most 30 open proposals per entry, glosses and saved marks together (a mark with no note,
+  or a note not validated). **A proposal** (a saved coloured mark or a gloss) is a `Highlight` with the connection's mark,
+  its entry (`dossier_item_id`, no foreign key), where the model put it (`assistant_text`,
   `assistant_start_offset`, never changed) and, with a note, the model's original (`assistant_note`,
   never changed; `note` is the one shown), its state (`note_state`: `proposed`, `validated`, `review`)
   and the review comment (kept after the state changes, for the second cut). The state belongs to the
-  note: a mark with no note has none. **An assistant's mark shows only on its entry, in every state**:
+  note: a mark with no note has none. **An assistant's row shows only on its entry, in every state**:
   `GET /highlights` and the generic `PUT`/`DELETE /highlights/:id` leave out every row with a
   connection, so Study Mode, the Forum, environments and the PDF never receive one. **The web app's
-  side** (`routes/assistantProposals.ts`, session only): `GET …/items/:itemId/proposals`, `PUT
+  side** (`routes/assistantProposals.ts`, session only): `GET …/items/:itemId/proposals` (each with its `kind`; a gloss's
+  `color` is null), `PUT
   …/proposals/:pid/state { state, comment? }` (comment ≤ 500, read only with `review`), `PUT
-  …/proposals/:pid/note { text }` (stamps the edit and validates), `PUT …/proposals/:pid/range {
+  …/proposals/:pid/note { text }` (stamps the edit and validates; a mark's note may be emptied, a gloss's may not: 400),
+  `PUT …/proposals/:pid/range {
   startOffset, text }` (the user's new boundaries, not checked against the source, as the user's own
   highlights; the state never changes) and `DELETE …/proposals/:pid` (for good: the web delays it behind
   «Annulla»). A note entry an assistant writes (`POST /dossiers/:id/notes` through an exchanged token)
   has the same three states on `dossier_items` (`PUT …/items/:itemId/state`, `PUT …/items/:itemId/text`;
   the generic item `PUT` never changes an assistant's note's text or state: the web sends the content back
   with a star); the migration made every older one `proposed`, and one in the trash then comes back so. Every
-  item answer of the user's session carries `assistant_notes` (a norm's or decision's counts by state,
+  item answer of the user's session carries `assistant_notes` (a norm's or decision's counts by state, glosses included,
   for the light on its row) and `assistant_note` (a note entry's state), both null for an exchanged token
-  and with the switch off. The trash takes an entry's proposals with it (`proposals` in the payload) and
-  brings them back with their ids and state. `assistant_note_versions` is for the second cut (the
+  and with `assistant_passages` off. The trash takes an entry's proposals and glosses with it (`proposals` in the payload)
+  and brings them back with their ids, kind and state (a payload stored before D8 has no kind: a mark).
+  `assistant_note_versions` is for the second cut (the
   versions an assistant replaced); nothing writes it yet. The scope `dossier:text` is worded on the
-  consent page and in «Applicazioni collegate» (`SCOPE_LABELS`); a grant made before it has it only once
-  the user connects again.
+  consent page and in «Applicazioni collegate» (`SCOPE_LABELS`): the texts of norms and decisions and, since G-381 (b)
+  (owners, 29 October 2026), the user's notes, which `apps/mcp`'s `omnilex_leggi_dossier` gives only under it. A grant made
+  before it has it only once the user connects again.
 - **Decisions in a dossier**: an item may be `sentenza`: a court decision's
   identity and a label, never its text. The courts are the Cassazione, the Corte costituzionale
   and the two courts of the Union, named by their case (`norms/euCourts.ts`: a number of at most
