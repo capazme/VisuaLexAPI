@@ -137,9 +137,12 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
 
   const written = Object.values(work).some((w) => w.scritto.trim() !== '');
   const highlighted = Object.values(work).some((w) => w.spans.length > 0);
-  const asksToStop = written || highlighted;
-  // Closing the tab loses what this tab keeps: the browser asks first (as a large import does, `DossierDetailView`).
-  // A reload, the browser's back or a swipe back lose nothing: the work is read back with the module.
+  // At the end of the reading the work has done its part: leaving asks nothing and forgets it.
+  const atEnd = !preview && passo?.tipo === 'attesa';
+  const asksToStop = !atEnd && (written || highlighted);
+  // Closing the tab loses what this tab keeps: the browser asks first (as a large import does, `DossierDetailView`). It
+  // asks before a reload too, which it cannot tell apart; the browser's back or a swipe back ask nothing, and neither a
+  // reload nor they lose anything: the work is read back with the module.
   useEffect(() => {
     if (!asksToStop) return;
     const warn = (event: BeforeUnloadEvent) => event.preventDefault();
@@ -147,6 +150,7 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
     return () => window.removeEventListener('beforeunload', warn);
   }, [asksToStop]);
   const leaveThen = (go: () => void) => {
+    if (atEnd) forgetWork(moduloId);
     if (!asksToStop) return go();
     setOnStop(() => go);
     setConfirmStop(true);
@@ -164,9 +168,11 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
     heading.current = el;
   }, []);
   // In the commit: a key pressed as soon as the step is drawn must find the focus already there.
+  // A 404 waits for the features read again: «non c’è più» is said only while the switch is still on.
+  const checkingSwitch = read.status === 'error' && read.notFound && featuresRead !== reads;
   useLayoutEffect(() => {
-    if (read.status !== 'loading') heading.current?.focus({ preventScroll: true });
-  }, [viewKey, read.status]);
+    if (read.status !== 'loading' && !checkingSwitch) heading.current?.focus({ preventScroll: true });
+  }, [viewKey, read.status, checkingSwitch]);
 
   const goTo = (next: number) => {
     setPanel(null);
@@ -193,7 +199,10 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
     } catch (error) {
       console.warn('[Percorsi] module open failed', error);
       setOpening('failed');
-      if (isNotFound(error)) setRead({ status: 'error', notFound: true, offline: false });
+      if (isNotFound(error)) {
+        setRead({ status: 'error', notFound: true, offline: false });
+        void loadAssistantFeatures().finally(() => setFeaturesRead(reads));
+      }
     }
   };
 
@@ -283,8 +292,6 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
   let bar: React.ReactNode;
   let status: React.ReactNode = pauseLine;
 
-  // A 404 waits for the features read again: «non c’è più» is said only while the switch is still on.
-  const checkingSwitch = read.status === 'error' && read.notFound && featuresRead !== reads;
   if (read.status === 'loading' || checkingSwitch) {
     middle = (
       <div className={cn(COLUMN, 'px-4 py-6')}>
@@ -441,7 +448,7 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
       </div>
     );
     bar = (
-      <button type="button" onClick={back} className={LESSON_PRIMARY}>
+      <button type="button" onClick={leave} className={LESSON_PRIMARY}>
         Torna al percorso
       </button>
     );

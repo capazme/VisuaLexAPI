@@ -82,6 +82,8 @@ type Floating =
   | { kind: 'add'; span: Span; top: number; left: number }
   | { kind: 'remove'; start: number; top: number; left: number; focus: boolean }
   | null;
+/** A button the selection brought goes with the selection; «Togli» from a highlight pressed goes with its own focus. */
+const fromSelection = (f: NonNullable<Floating>) => f.kind === 'add' || !f.focus;
 
 /**
  * A block's text in the lesson's format (§10.3), drawn by the web's own parser: every character React text, never HTML.
@@ -139,14 +141,15 @@ export function LessonText({ text, spans, onSpans, onCite, citations, headingLev
       const selection = document.getSelection();
       if (!el || !frame || !selection || selection.rangeCount === 0 || selection.isCollapsed) {
         if (pressing.current) return;
-        setFloating((f) => (f?.kind === 'add' && !frame?.contains(document.activeElement) ? null : f));
+        const onButton = document.activeElement !== null && [addButton.current, removeButton.current].includes(document.activeElement as HTMLButtonElement);
+        setFloating((f) => (f && fromSelection(f) && !onButton ? null : f));
         return;
       }
       const range = selection.getRangeAt(0);
       const start = offsetAt(el, range.startContainer, range.startOffset);
       const end = offsetAt(el, range.endContainer, range.endOffset);
       if (start === null || end === null || end <= start) {
-        setFloating((f) => (f?.kind === 'add' ? null : f));
+        setFloating((f) => (f && fromSelection(f) ? null : f));
         return;
       }
       // Words already highlighted, all of them inside one highlight: «Togli» in place of «Evidenzia».
@@ -197,6 +200,7 @@ export function LessonText({ text, spans, onSpans, onCite, citations, headingLev
 
   const remove = (start: number) => {
     if (!spans || !onSpans) return;
+    pressing.current = false;
     onSpans(removeSpan(spans, start));
     setFloating(null);
     root.current?.focus({ preventScroll: true });
@@ -379,6 +383,9 @@ export function LessonText({ text, spans, onSpans, onCite, citations, headingLev
         <button
           type="button"
           ref={removeButton}
+          onPointerDown={() => {
+            pressing.current = true;
+          }}
           onClick={() => remove(floating.start)}
           onBlur={(event) => {
             if (!box.current?.contains(event.relatedTarget as Node | null)) setFloating(null);

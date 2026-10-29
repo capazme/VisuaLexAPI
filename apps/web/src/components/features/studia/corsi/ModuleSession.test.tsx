@@ -33,7 +33,7 @@ import { apiClient } from '../../../../services/api';
 import { loadAssistantFeatures } from '../../../../store/assistantProposals';
 import { coursesSwitchStore, setCoursesSwitch } from './coursesSwitch';
 import { ModuleSession } from './ModuleSession';
-import { forgetModuleSessions, saveStepReached } from './moduleSteps';
+import { forgetModuleSessions, readWork, saveStepReached } from './moduleSteps';
 import { lesson } from './__fixtures__/corsi';
 import type { EsitoRisposta, ModuloLezione } from '../../../../types/corsi';
 
@@ -369,6 +369,51 @@ describe('the review of #374', () => {
     expect(await screen.findByTestId('where')).toHaveTextContent('/studia/ripasso');
     expect(screen.queryByText(/non c’è più/)).toBeNull();
     vi.mocked(loadAssistantFeatures).mockImplementation(async () => {});
+  });
+
+  it('reads the features again on a 404 from `apri` too, then says the module is gone with the focus on it', async () => {
+    post.mockRejectedValueOnce({ status: 404, data: { detail: 'Modulo non trovato.' } });
+    const user = userEvent.setup();
+    renderSession();
+    await user.click(await screen.findByRole('button', { name: 'Inizia il modulo' }));
+    const gone = await screen.findByRole('alert');
+    expect(gone).toHaveTextContent('Questo modulo non c’è più');
+    expect(gone).toHaveFocus();
+    expect(loadAssistantFeatures).toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Torna al percorso' })).toBeInTheDocument();
+  });
+
+  it('leaves the end of the reading without a question, and forgets the work there', async () => {
+    saveStepReached('m-3', 4);
+    const user = userEvent.setup();
+    renderSession(lesson({ stato: 'in-corso' }));
+    await user.type(await screen.findByLabelText(/gli elementi, le eccezioni, un caso/), 'Un segno');
+    await user.click(screen.getByRole('button', { name: 'Confronta con il testo' }));
+    await user.click(screen.getByRole('button', { name: 'Avanti' }));
+    expect(screen.getByText('Fine della lettura')).toBeInTheDocument();
+    const closing = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(closing);
+    expect(closing.defaultPrevented).toBe(false);
+    await user.click(screen.getByRole('button', { name: 'Torna al percorso' }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(screen.getByTestId('where')).toHaveTextContent('/studia/percorsi/corso-1');
+    expect(readWork('m-3')).toEqual({});
+  });
+
+  it('takes «Togli» away with the selection that brought it', async () => {
+    const user = userEvent.setup();
+    renderSession(lesson({ stato: 'in-corso' }));
+    await user.click(await screen.findByRole('button', { name: 'Comincia a leggere' }));
+    const words = await screen.findByText(/distingue i prodotti/);
+    select(words.firstChild!, 0, words.firstChild!, 8);
+    await user.click(await screen.findByRole('button', { name: 'Evidenzia' }));
+    const mark = document.querySelector('mark')!;
+    select(mark.firstChild!, 1, mark.firstChild!, 4);
+    expect(await screen.findByRole('button', { name: 'Togli' })).not.toHaveFocus();
+    document.getSelection()!.removeAllRanges();
+    fireEvent(document, new Event('selectionchange'));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Togli' })).toBeNull());
+    expect(document.querySelector('mark')).not.toBeNull();
   });
 });
 

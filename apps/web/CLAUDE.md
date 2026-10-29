@@ -132,7 +132,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   Shift and the arrows select from its start (`Selection.modify`, a word with Ctrl or Alt: a text not editable has no
   caret) and Tab goes to «Evidenzia»; a highlight pressed or Enter on it (one Tab stop each, never inside a citation's
   button, where its pieces are only drawn: nothing interactive sits in a button), or words selected inside a highlight,
-  bring «Togli». The recall (`RecallStep`) hides the text while the reader writes (the trace «gli
+  bring «Togli» (from a selection it goes with the selection, unless the focus is on it). The recall (`RecallStep`) hides the text while the reader writes (the trace «gli
   elementi, le eccezioni, un caso»), «Confronta con il testo» sets what was written beside the block, then the block's
   questions as real radio buttons (`RecallQuestion`: the server grades, `POST …/risposte { domandaId, scelta }` and
   nothing else; the explanations, the right one and the reader's marked in words, the outcome in a live region; «Non
@@ -142,9 +142,10 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `visualex.studia.percorsi.lavoro`, `readWork`/`saveWork`), so a reload, the browser's back or a swipe back lose
   nothing (there is no navigation block: the app's `BrowserRouter` is not a data router, so `useBlocker` is not there);
   both forgotten with `seenProgress` at sign-in, sign-up and sign-out (`forgetModuleSessions`). While something is written
-  or highlighted the browser asks before the tab closes (`beforeunload`). Closing or Esc leaves at once with nothing
-  written or highlighted, else asks «Interrompi il modulo?» (`WireConfirm`, «Continua il modulo» evident), whose
-  «Interrompi» forgets the module's work. `GET /:id`, `GET /oggi`, `GET …/moduli/:moduloId`, `apri` and `risposte` are S2's (#375, «What S2
+  or highlighted the browser asks before the tab closes or reloads (`beforeunload`, which cannot tell the two apart).
+  Closing or Esc leaves at once with nothing written or highlighted, else asks «Interrompi il modulo?» (`WireConfirm`,
+  «Continua il modulo» evident), whose «Interrompi» forgets the module's work; at the end of the reading leaving asks
+  nothing and forgets it. A 404 from `apri` reads the features again too. `GET /:id`, `GET /oggi`, `GET …/moduli/:moduloId`, `apri` and `risposte` are S2's (#375, «What S2
   exposes», the user's session only: a token gets 403), typed in `types/corsi.ts` as #375 answers them: the course page's
   competences carry `sessioni: { contate, servono }` and `ultima: { giorno, percentuale }`, its modules `stato` with
   «ritirato», `eliminabile` and `ritirabile` (the page offers the trash and «Ritira» from them, never deciding itself) and
