@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('../../../../services/corsiService', async (importOriginal) => {
@@ -46,19 +46,24 @@ describe('«Oggi»\'s row of the courses (§6.2)', () => {
     const row = await screen.findByRole('link', { name: /Ripassa 5 schede di «Segni distintivi»/ });
     expect(row).toHaveAttribute('href', '/studia/ripasso/sessione?corso=corso-1');
     expect(row).toHaveTextContent('Prima del modulo del giorno: Il marchio di fatto');
+    // One row a course: the module is named after the cards, not offered as a second link before them.
     expect(screen.getAllByRole('link')).toHaveLength(1);
+    expect(screen.queryByRole('link', { name: /^Modulo del giorno/ })).toBeNull();
   });
 
   it('draws nothing for a course with nothing today, and nothing when the read fails', async () => {
     today.mockResolvedValue([{ corsoId: 'corso-1', titolo: 'Segni distintivi', modulo: null, schedeDovute: 0 }]);
     const { container, unmount } = renderRow();
-    await vi.waitFor(() => expect(today).toHaveBeenCalled());
+    // The read answered and drawn: what is empty is what the answer gave.
+    await act(async () => {});
+    expect(today).toHaveBeenCalled();
     expect(container).toBeEmptyDOMElement();
     unmount();
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     today.mockRejectedValue({ status: 500 });
     const failed = renderRow();
-    await vi.waitFor(() => expect(warn).toHaveBeenCalled());
+    await act(async () => {});
+    expect(warn).toHaveBeenCalled();
     expect(failed.container).toBeEmptyDOMElement();
     warn.mockRestore();
   });

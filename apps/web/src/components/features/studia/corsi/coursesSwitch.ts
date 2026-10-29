@@ -2,9 +2,10 @@ import { create } from 'zustand';
 
 /**
  * The switch `lingo_courses` (spec 2026-10-23 §10.10), as `GET /api/features` says it (`lingoCourses`): read with
- * `assistantPassages` in the one features read (`loadAssistantFeatures`), as the app starts, at login and as «Percorsi»
- * mounts. `unknown` until the first answer, so a page never says «not available» before the server has; off, nothing
- * of the courses is drawn (the sidebar's entry, «Oggi»'s row, the pages), and a course route's 404 turns it off again.
+ * `assistantPassages` in the one features read (`loadAssistantFeatures`), as the app starts, at login, as «Percorsi»
+ * mounts and when the browser is back online with it never read. `unknown` until the first answer, so a page never says
+ * «not available» before the server has; a failed read keeps what was known. Off, nothing of the courses is drawn (the
+ * sidebar's entry, «Oggi»'s row, the pages), and a 404 on the list turns it off.
  */
 export type CoursesSwitch = 'unknown' | 'on' | 'off';
 

@@ -16,6 +16,7 @@ vi.mock('../../../../features/connections/connectionsService', () => ({
 vi.mock('../../../../store/assistantProposals', () => ({ loadAssistantFeatures: vi.fn(async () => {}) }));
 
 import { corsiService } from '../../../../services/corsiService';
+import { loadAssistantFeatures } from '../../../../store/assistantProposals';
 import { connectionsService, type ConnectedApp } from '../../../../features/connections/connectionsService';
 import { coursesSwitchStore } from './coursesSwitch';
 import { CoursesView } from './CoursesView';
@@ -75,6 +76,24 @@ describe('«Percorsi», the list', () => {
     renderView();
     expect(screen.getByRole('status')).toHaveTextContent('Caricamento…');
     expect(list).not.toHaveBeenCalled();
+  });
+
+  it('a switch the features read could not tell says so, with «Riprova», and goes on once it is on', async () => {
+    coursesSwitchStore.setState({ state: 'unknown' });
+    renderView();
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Non è stato possibile sapere se i percorsi sono disponibili');
+    vi.mocked(loadAssistantFeatures).mockImplementationOnce(async () => coursesSwitchStore.setState({ state: 'on' }));
+    await userEvent.setup().click(within(alert).getByRole('button', { name: 'Riprova' }));
+    expect(await screen.findByRole('link', { name: /Proprietà intellettuale/ })).toBeInTheDocument();
+  });
+
+  it('an «off» known from before waits for the features read: switched on meanwhile, the page is drawn', async () => {
+    coursesSwitchStore.setState({ state: 'off' });
+    vi.mocked(loadAssistantFeatures).mockImplementationOnce(async () => coursesSwitchStore.setState({ state: 'on' }));
+    renderView();
+    expect(await screen.findByRole('link', { name: /Proprietà intellettuale/ })).toBeInTheDocument();
+    expect(screen.queryByTestId('where')).toBeNull();
   });
 
   it('lists each course with its title, subject, competences, state and next step, the row opening the course', async () => {
@@ -171,6 +190,16 @@ describe('«Percorsi», the declaration (§12)', () => {
     await user.click(button);
     expect(accept).toHaveBeenCalledWith('testo-1');
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.queryByRole('button', { name: 'Leggi e accetta' })).toBeNull();
+  });
+
+  it('says nothing of a «changed» declaration while the list is still being read', async () => {
+    list.mockReturnValue(new Promise(() => {}));
+    readDeclaration.mockResolvedValue(declaration(false));
+    renderView();
+    await waitFor(() => expect(readDeclaration).toHaveBeenCalled());
+    await act(async () => {});
+    expect(screen.queryByText(/è cambiata/)).toBeNull();
     expect(screen.queryByRole('button', { name: 'Leggi e accetta' })).toBeNull();
   });
 

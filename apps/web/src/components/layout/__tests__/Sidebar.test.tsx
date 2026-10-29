@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -110,6 +110,7 @@ describe('Sidebar navigation (MERL-T single entry)', () => {
 
 // «Percorsi», second in «Studia», behind the switch `lingo_courses` (courses spec §6.1, §10.10).
 describe('Sidebar — Gymnasium\'s «Percorsi»', () => {
+  afterEach(() => coursesSwitchStore.setState({ state: 'unknown' }));
   const studia = () => navHrefs().filter((h) => h.startsWith('/studia') || h === '/dossier');
 
   it('is absent while the switch is off or not yet read', () => {
@@ -126,6 +127,5 @@ describe('Sidebar — Gymnasium\'s «Percorsi»', () => {
     renderSidebar('/studia/ripasso');
     expect(studia()).toEqual(['/studia/ripasso', '/studia/percorsi', '/studia/progressi', '/dossier', '/studia/schede']);
     expect(screen.getByRole('link', { name: 'Percorsi' })).toBeInTheDocument();
-    coursesSwitchStore.setState({ state: 'unknown' });
   });
 });

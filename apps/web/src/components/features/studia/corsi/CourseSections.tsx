@@ -1,3 +1,4 @@
+import type { RefObject } from 'react';
 import { Link } from 'react-router-dom';
 import { FolderOpen } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
@@ -5,7 +6,7 @@ import { CopyableCode } from '../../../../features/connections/CopyableCode';
 import type { CompetenzaPagina, CorsoPagina, EsamePagina, Mancanze, ModuloPagina } from '../../../../types/corsi';
 import { BLOCK_HEADING, FOCUS_RING, MUTED_TEXT, QUIET_BUTTON, SECONDARY_BUTTON, TILE } from '../progress/tokens';
 import { MasteryChip, ModuleStateChip } from './CourseChips';
-import { competenceNumbers, completeSentence, longDay, missingLines, newExamSentence } from './corsiLabels';
+import { competenceNumbers, completeSentence, fromDay, missingLines, newExamSentence, onDay, thePercent } from './corsiLabels';
 
 /** The course page's parts (courses spec §6.4), drawn from `GET /lingo/corsi/:id`. */
 
@@ -20,9 +21,9 @@ export function PreparationPanel({ titolo, missing, onEndProgramme, busy }: {
   const lines = missingLines(missing);
   return (
     <section aria-labelledby="corso-preparazione" className={cn(TILE, 'grid grid-cols-1 gap-3 border-amber-300 p-5 dark:border-amber-800')}>
-      <h2 id="corso-preparazione" className={BLOCK_HEADING}>
+      <h3 id="corso-preparazione" className={BLOCK_HEADING}>
         In preparazione
-      </h2>
+      </h3>
       {lines.length > 0 && (
         <ul className="grid grid-cols-1 gap-1 text-sm text-slate-800 dark:text-slate-100">
           {lines.map((line) => (
@@ -42,7 +43,8 @@ export function PreparationPanel({ titolo, missing, onEndProgramme, busy }: {
       {onEndProgramme && (
         <div className="grid grid-cols-1 gap-1.5 border-t border-slate-200 pt-3 dark:border-slate-800">
           <p className="max-w-[65ch] text-sm text-slate-700 dark:text-slate-300">
-            Hai tolto un modulo e non ne vuoi altri? Chiudi il programma con i {missing.moduli.contati} che ci sono, così l’esame
+            Non vuoi altri moduli? Chiudi il programma con{' '}
+            {missing.moduli.contati === 1 ? 'l’unico modulo che c’è' : `i ${missing.moduli.contati} moduli che ci sono`}, così l’esame
             potrà aprirsi.
           </p>
           <button type="button" onClick={onEndProgramme} disabled={busy} className={cn(SECONDARY_BUTTON, 'justify-self-start disabled:opacity-60')}>
@@ -57,9 +59,9 @@ export function PreparationPanel({ titolo, missing, onEndProgramme, busy }: {
 export function CompetencesSection({ competenze }: { competenze: CompetenzaPagina[] }) {
   return (
     <section aria-labelledby="corso-competenze" className="grid grid-cols-1 gap-3">
-      <h2 id="corso-competenze" className={BLOCK_HEADING}>
+      <h3 id="corso-competenze" className={BLOCK_HEADING}>
         Competenze
-      </h2>
+      </h3>
       <ul className={cn(TILE, 'grid grid-cols-1 divide-y divide-slate-200 dark:divide-slate-800')}>
         {competenze.map((c) => (
           <li key={c.codice} className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 p-4">
@@ -81,8 +83,8 @@ export interface ModuleActions {
   onDelete: (modulo: ModuloPagina) => void;
   /** An opened module superseded by a live correction. */
   onWithdraw: (modulo: ModuloPagina) => void;
-  /** The module whose write is out: its buttons wait. */
-  busyId: string | null;
+  /** The modules with a write out: their buttons wait. */
+  busy: ReadonlySet<string>;
 }
 
 /** Whether a module can go to the trash: never opened, never withdrawn. */
@@ -90,27 +92,27 @@ const deletable = (m: ModuloPagina) => m.stato === 'da-iniziare' && !m.ritirato;
 /** Whether «Ritira questo modulo» is offered: opened, superseded by a live correction, not yet withdrawn. */
 const withdrawable = (m: ModuloPagina) => m.stato !== 'da-iniziare' && m.sostituitoDa !== null && !m.ritirato;
 
-export function ModulesSection({ moduli, actions }: { moduli: ModuloPagina[]; actions: ModuleActions }) {
+export function ModulesSection({ moduli, actions, headingRef }: { moduli: ModuloPagina[]; actions: ModuleActions; headingRef?: RefObject<HTMLHeadingElement | null> }) {
   const byId = new Map(moduli.map((m) => [m.id, m]));
   return (
     <section aria-labelledby="corso-moduli" className="grid grid-cols-1 gap-3">
-      <h2 id="corso-moduli" className={BLOCK_HEADING}>
+      <h3 id="corso-moduli" ref={headingRef} tabIndex={-1} className={cn(BLOCK_HEADING, 'focus:outline-none')}>
         Moduli
-      </h2>
+      </h3>
       {moduli.length === 0 ? (
         <p className={cn('text-sm', MUTED_TEXT)}>Ancora nessun modulo: il tuo assistente li aggiunge uno alla volta.</p>
       ) : (
         <ol className={cn(TILE, 'grid grid-cols-1 divide-y divide-slate-200 dark:divide-slate-800')}>
           {moduli.map((m) => {
             const corrects = m.sostituisceId ? byId.get(m.sostituisceId) : undefined;
-            const busy = actions.busyId === m.id;
+            const busy = actions.busy.has(m.id);
             return (
               <li key={m.id} className={cn('grid grid-cols-1 gap-2 p-4', m.ritirato && 'opacity-70')}>
                 <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
-                  <h3 className="min-w-0 flex-1 basis-64 break-words text-base font-medium text-slate-900 dark:text-slate-50">
+                  <h4 className="min-w-0 flex-1 basis-64 break-words text-base font-medium text-slate-900 dark:text-slate-50">
                     <span className={cn('mr-2 text-sm font-semibold', MUTED_TEXT)}>Modulo {m.ordine}</span>
                     {m.titolo}
-                  </h3>
+                  </h4>
                   <ModuleStateChip stato={m.stato} ritirato={m.ritirato} />
                 </div>
                 <p className={cn('flex flex-wrap gap-x-3 gap-y-1 text-sm', MUTED_TEXT)}>
@@ -158,9 +160,9 @@ export function ModulesSection({ moduli, actions }: { moduli: ModuloPagina[]; ac
 export function ExamSection({ titolo, esame, inPreparazione }: { titolo: string; esame: EsamePagina | null; inPreparazione: boolean }) {
   return (
     <section aria-labelledby="corso-esame" className={cn(TILE, 'grid grid-cols-1 gap-2 p-5')}>
-      <h2 id="corso-esame" className={BLOCK_HEADING}>
+      <h3 id="corso-esame" className={BLOCK_HEADING}>
         Esame finale
-      </h2>
+      </h3>
       <ExamState titolo={titolo} esame={esame} inPreparazione={inPreparazione} />
     </section>
   );
@@ -179,7 +181,7 @@ function ExamState({ titolo, esame, inPreparazione }: { titolo: string; esame: E
     case 'superato':
       return (
         <p className={text}>
-          Superato il {longDay(esame.giorno)}, con il {esame.percentuale}%.
+          Superato {onDay(esame.giorno)}, con {thePercent(esame.percentuale)}.
         </p>
       );
     case 'non-superato':
@@ -187,7 +189,7 @@ function ExamState({ titolo, esame, inPreparazione }: { titolo: string; esame: E
         <div className="grid grid-cols-1 gap-2">
           <p className={text}>
             Non superato ({esame.percentuale}%).
-            {esame.sotto60.length > 0 && ` Sotto il 60%: ${esame.sotto60.join(', ')}; il ripasso te le propone.`}
+            {esame.sotto60.length > 0 && ` Sotto il 60%: ${esame.sotto60.join(', ')}; il ripasso ${esame.sotto60.length === 1 ? 'te la propone' : 'te le propone'}.`}
           </p>
           {esame.nuovoPossibile ? (
             <>
@@ -197,7 +199,7 @@ function ExamState({ titolo, esame, inPreparazione }: { titolo: string; esame: E
               </div>
             </>
           ) : (
-            <p className={text}>Un nuovo esame si può chiedere dal {longDay(esame.nuovoDal)}.</p>
+            <p className={text}>Un nuovo esame si può chiedere {fromDay(esame.nuovoDal)}.</p>
           )}
         </div>
       );

@@ -53,7 +53,7 @@ afterEach(() => {
 });
 
 describe('the courses\' switch, from the same features read', () => {
-  it('is unknown until the server answers, then on or off as it says; a failed read is off; logout forgets it', async () => {
+  it('is unknown until the server answers, then on or off as it says; a failed read keeps it; logout forgets it', async () => {
     expect(coursesSwitchStore.getState().state).toBe('unknown');
     vi.mocked(assistantService.features).mockResolvedValueOnce({ assistantPassages: false, lingoCourses: true });
     await loadAssistantFeatures();
@@ -65,9 +65,16 @@ describe('the courses\' switch, from the same features read', () => {
     await loadAssistantFeatures();
     vi.mocked(assistantService.features).mockRejectedValueOnce(new Error('rete'));
     await loadAssistantFeatures();
-    expect(coursesSwitchStore.getState().state).toBe('off');
+    expect(coursesSwitchStore.getState().state).toBe('on');
     resetAssistantProposals();
     expect(coursesSwitchStore.getState().state).toBe('unknown');
+    vi.mocked(assistantService.features).mockRejectedValueOnce(new Error('rete'));
+    await loadAssistantFeatures();
+    expect(coursesSwitchStore.getState().state).toBe('unknown');
+    // Back online with it never read: asked again.
+    vi.mocked(assistantService.features).mockResolvedValueOnce({ assistantPassages: false, lingoCourses: true });
+    window.dispatchEvent(new Event('online'));
+    await vi.waitFor(() => expect(coursesSwitchStore.getState().state).toBe('on'));
   });
 });
 

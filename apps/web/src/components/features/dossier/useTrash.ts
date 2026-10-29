@@ -11,6 +11,8 @@ export type RestoreOutcome =
 
 const statusOf = (err: unknown) => (err as { status?: number } | null)?.status;
 const messageOf = (err: unknown) => (err as { message?: string } | null)?.message;
+/** A course of «Percorsi» or a module of one (courses spec §10.9). */
+const isCourseKind = (kind: TrashEntry['kind']) => kind === 'LINGO_CORSO' || kind === 'LINGO_CORSO_MODULO';
 
 export const GONE_FROM_TRASH = 'Non è più nel cestino: forse è già stato ripristinato o è scaduto.';
 const TARGET_GONE = 'Il dossier scelto non esiste più: scegline un altro.';
@@ -72,12 +74,16 @@ export function useTrash() {
     try {
       const { dossierId } = await trashService.restore(entry.id, targetDossierId);
       drop(entry.id);
-      // The cards are back under their articles.
-      if (entry.kind === 'LINGO_CARDS') invalidateArticleCards();
+      // The cards are back under their articles (a course's and a module's come back with them).
+      if (entry.kind === 'LINGO_CARDS' || isCourseKind(entry.kind)) invalidateArticleCards();
       if (dossierId) await refreshDossier(dossierId);
       return { kind: 'restored' };
     } catch (err) {
       const status = statusOf(err);
+      // A course's module whose course is gone answers 404 too, while the entry stays: the server's words, kept.
+      if (status === 404 && isCourseKind(entry.kind) && !(await goneFromTrash(entry.id))) {
+        return { kind: 'failed', message: messageOf(err) || 'Impossibile ripristinare. Riprova.' };
+      }
       if (status === 404 && (!targetDossierId || (await goneFromTrash(entry.id)))) {
         drop(entry.id);
         return { kind: 'failed', message: GONE_FROM_TRASH };

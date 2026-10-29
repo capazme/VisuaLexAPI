@@ -6,7 +6,7 @@ import type { AiReviewState, DossierItem, Proposal } from '../types';
 import { dossierItemFromApi } from '../components/features/dossier/dossierUtils';
 import type { DossierItemApi } from '../services/dossierService';
 import { shiftAiReviewCount } from '../utils/aiReview';
-import { resetCoursesSwitch, setCoursesSwitch } from '../components/features/studia/corsi/coursesSwitch';
+import { coursesSwitchStore, resetCoursesSwitch, setCoursesSwitch } from '../components/features/studia/corsi/coursesSwitch';
 
 /**
  * What applications proposed on dossier entries (D7b, the server's contract): a store of its own, keyed by entry id,
@@ -125,16 +125,21 @@ export function loadAssistantFeatures(): Promise<void> {
         }
       } else if (assistantProposalsStore.getState().enabled) switchOff();
     } catch {
-      if (asked === generation) {
-        assistantProposalsStore.setState({ enabled: false });
-        setCoursesSwitch(false);
-      }
+      // The courses' switch keeps what it knew: one failed read must not hide «Percorsi» for the whole session.
+      if (asked === generation) assistantProposalsStore.setState({ enabled: false });
     } finally {
       if (featuresInFlight === request) featuresInFlight = null;
     }
   })();
   featuresInFlight = request;
   return request;
+}
+
+// Back online with the courses' switch never read (the app started offline): ask again.
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    if (coursesSwitchStore.getState().state === 'unknown') void loadAssistantFeatures();
+  });
 }
 
 export async function loadProposals(dossierId: string, itemId: string): Promise<void> {

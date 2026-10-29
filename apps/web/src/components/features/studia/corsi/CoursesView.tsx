@@ -48,11 +48,12 @@ function CoursesList() {
 
   return (
     <div className="grid grid-cols-1 gap-6 pb-8">
-      {text && !accepted && (
+      {/* Once the list says whether this is the first course: its words depend on it. */}
+      {text && !accepted && courses !== null && (
         <DeclarationNotice firstCourse={firstCourse} onOpen={() => setDialog('open')} />
       )}
       {declaration.state.status === 'error' && (
-        <ReadFailure what="la dichiarazione sul materiale di studio" offline={false} onRetry={declaration.reload} />
+        <ReadFailure what="la dichiarazione sul materiale di studio" offline={declaration.state.offline} onRetry={declaration.reload} />
       )}
 
       {list.status === 'error' && !switchedOff && (

@@ -27,6 +27,22 @@ export const MODULE_STATE_LABEL: Record<StatoModulo, string> = {
 /** The valid sessions «acquisita» needs, 7 Rome days apart (§4). */
 export const SESSIONS_NEEDED = 2;
 
+/**
+ * Whether a number read aloud starts with a vowel (uno, otto, undici, ottanta…), so that the article before it elides:
+ * «l’85%», «l’8 novembre», «dall’11/11».
+ */
+const elides = (n: number) => n === 1 || n === 8 || n === 11 || (n >= 80 && n <= 89);
+const dayOfMonth = (day: string) => Number(day.split('-')[2]);
+
+/** «il 70%», «l’85%». */
+export const thePercent = (n: number) => `${elides(n) ? 'l’' : 'il '}${n}%`;
+/** «il 3 novembre 2026», «l’8 novembre 2026». */
+export const onDay = (day: string) => `${elides(dayOfMonth(day)) ? 'l’' : 'il '}${longDay(day)}`;
+/** «dal 3 novembre 2026», «dall’8 novembre 2026». */
+export const fromDay = (day: string) => `${elides(dayOfMonth(day)) ? 'dall’' : 'dal '}${longDay(day)}`;
+/** «dal 3/11», «dall’11/11». */
+const fromShortDay = (day: string) => `${elides(dayOfMonth(day)) ? 'dall’' : 'dal '}${shortDay(day)}`;
+
 /** A Rome day (`YYYY-MM-DD`) as the course page writes it (§4), «3/11». */
 export function shortDay(day: string): string {
   const [year, month, date] = day.split('-').map(Number);
@@ -47,7 +63,7 @@ export function longDay(day: string): string {
 export function competenceNumbers(c: CompetenzaPagina): string {
   if (c.stato === 'da-iniziare') return 'Ancora nessuna sessione valida';
   const parts = [c.stato === 'da-riprendere' ? `${c.sessioni} di ${SESSIONS_NEEDED} sessioni per riprenderla` : `${c.sessioni} di ${SESSIONS_NEEDED} sessioni`];
-  if (c.prossimaDal && c.stato !== 'acquisita') parts.push(`la prossima vale dal ${shortDay(c.prossimaDal)}`);
+  if (c.prossimaDal && c.stato !== 'acquisita') parts.push(`la prossima vale ${fromShortDay(c.prossimaDal)}`);
   if (c.ultima !== null) parts.push(`ultima ${c.ultima}%`);
   return parts.join(' · ');
 }

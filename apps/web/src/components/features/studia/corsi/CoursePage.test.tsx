@@ -75,7 +75,7 @@ describe('the course page', () => {
     renderPage();
     const modules = await screen.findByRole('region', { name: 'Moduli' });
     const rows = within(modules).getAllByRole('listitem');
-    expect(rows.map((r) => within(r).getByRole('heading', { level: 3 }).textContent)).toEqual([
+    expect(rows.map((r) => within(r).getByRole('heading', { level: 4 }).textContent)).toEqual([
       'Modulo 1Titolo del modulo 1', 'Modulo 2Titolo del modulo 2', 'Modulo 3Titolo del modulo 3',
     ]);
     expect(rows[0]).toHaveTextContent('Fatto');
@@ -160,9 +160,10 @@ describe('the course page', () => {
   it.each([
     [{ stato: 'bloccato', id: 'e' } as const, 'Si apre quando hai fatto tutti i moduli.'],
     [{ stato: 'aperto', id: 'e' } as const, 'Aperto: hai fatto tutti i moduli.'],
-    [{ stato: 'superato', id: 'e', percentuale: 82, giorno: '2026-11-20' } as const, 'Superato il 20 novembre 2026, con il 82%.'],
-    [{ stato: 'non-superato', id: 'e', percentuale: 55, nuovoDal: '2026-11-23', nuovoPossibile: false, sotto60: ['C2'] } as const, 'Un nuovo esame si può chiedere dal 23 novembre 2026.'],
-  ])('draws the final exam %#', async (esame, words) => {
+    [{ stato: 'superato', id: 'e', percentuale: 82, giorno: '2026-11-20' } as const, 'Superato il 20 novembre 2026, con l’82%.'],
+    [{ stato: 'non-superato', id: 'e', percentuale: 55, nuovoDal: '2026-11-23', nuovoPossibile: false, sotto60: ['C2'] as string[] } as const, 'Un nuovo esame si può chiedere dal 23 novembre 2026.'],
+    [{ stato: 'non-superato', id: 'e', percentuale: 55, nuovoDal: '2026-11-11', nuovoPossibile: false, sotto60: ['C2'] as string[] } as const, /il ripasso te la propone\..*Un nuovo esame si può chiedere dall’11 novembre 2026\./],
+  ])('draws the final exam %#', async (esame, words: string | RegExp) => {
     get.mockResolvedValue(page({ esame }));
     renderPage();
     expect(await screen.findByRole('region', { name: 'Esame finale' })).toHaveTextContent(words);
@@ -241,6 +242,35 @@ describe('the course page', () => {
     renderPage('altro');
     expect(await screen.findByText('Questo percorso non c’è: forse è stato eliminato.')).toBeInTheDocument();
     expect(loadAssistantFeatures).toHaveBeenCalled();
+  });
+
+  it('a course trashed elsewhere, read again, is no longer kept on screen', async () => {
+    renderPage();
+    await screen.findByRole('region', { name: 'Competenze' });
+    get.mockRejectedValue({ status: 404, data: { detail: 'Percorso non trovato.' } });
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(await screen.findByText('Questo percorso non c’è: forse è stato eliminato.')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Competenze' })).toBeNull();
+  });
+
+  it('writes «l’85%», «l’8 novembre» and «dall’11 novembre», and one module in the singular', async () => {
+    get.mockResolvedValue(page({
+      superatoIl: '2026-11-08',
+      esame: { stato: 'superato', id: 'e', percentuale: 85, giorno: '2026-11-08' },
+      stato: 'in-preparazione',
+      inPreparazione: { moduli: { contati: 1, previsti: 2 }, esame: false, schede: [] },
+    }));
+    renderPage();
+    expect(await screen.findByRole('region', { name: 'Esame finale' })).toHaveTextContent('Superato l’8 novembre 2026, con l’85%.');
+    expect(screen.getByText('Percorso superato l’8 novembre 2026')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'In preparazione' })).toHaveTextContent('Chiudi il programma con l’unico modulo che c’è');
+  });
+
+  it('after a module goes to the trash the focus is on the modules\' heading', async () => {
+    vi.mocked(corsiService.trashModule).mockResolvedValue({ trashId: 'trash-m3' });
+    renderPage();
+    await userEvent.setup().click(await screen.findByRole('button', { name: /Elimina il modulo 3/ }));
+    await waitFor(() => expect(screen.getByRole('heading', { level: 3, name: 'Moduli' })).toHaveFocus());
   });
 
   it('a failed read says so, offline apart, with «Riprova»', async () => {

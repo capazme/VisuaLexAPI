@@ -84,6 +84,7 @@ beforeEach(() => {
   vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
 });
 afterEach(() => {
+  coursesSwitchStore.setState({ state: 'unknown' });
   localStorage.removeItem(STORAGE_KEY);
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -110,8 +111,9 @@ function windowOf(width: number) {
 }
 
 describe('ReviewHome', () => {
-  it('shows the day\'s module of a course under the day block once «Percorsi» is on, and reads no course while off (§6.2)', async () => {
+  it('shows the day\'s module of a course under the day block once «Percorsi» is on, and reads no course before (§6.2)', async () => {
     progress.mockResolvedValue(answer(18, 20));
+    coursesSwitchStore.setState({ state: 'off' });
     renderHome();
     expect(await screen.findByText('18 da ripassare, 20 nuove')).toBeInTheDocument();
     expect(corsiService.today).not.toHaveBeenCalled();
@@ -119,7 +121,6 @@ describe('ReviewHome', () => {
     act(() => coursesSwitchStore.setState({ state: 'on' }));
     const row = await screen.findByRole('link', { name: /Modulo del giorno: Il marchio/ });
     expect(follows(screen.getByRole('button', { name: START }), row)).toBe(true);
-    act(() => coursesSwitchStore.setState({ state: 'unknown' }));
   });
 
   it('says what is on today, how far the goal is, and offers to start', async () => {

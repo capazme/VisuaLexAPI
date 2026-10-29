@@ -81,9 +81,12 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `docs/superpowers/specs/2026-10-23-gymnasium-courses-design.md` §6, the web's pull request (a); the views under
   `components/features/studia/corsi/`, the routes in `services/corsiService.ts`, the shapes in `types/corsi.ts`): behind
   the server's switch `lingo_courses`, read with `assistantPassages` from the one `GET /api/features`
-  (`loadAssistantFeatures` sets `coursesSwitch`: `unknown` until it answers, off on a failure, forgotten at logout) —
-  off, the sidebar's «Percorsi» (second in «Studia») and «Oggi»'s row are not drawn, nothing is read, and the pages go
-  back to Oggi (`CoursesGate`, which reads the features again as it mounts; a 404 on the list turns the switch off).
+  (`loadAssistantFeatures` sets `coursesSwitch`: `unknown` until it answers, a failed read keeps what was known — one
+  network error must not hide «Percorsi» for the session —, read again when the browser is back online with it never
+  read, forgotten at logout) — off, the sidebar's «Percorsi» (second in «Studia») and «Oggi»'s row are not drawn,
+  nothing is read, and the pages go back to Oggi (`CoursesGate`, which reads the features again as it mounts and
+  redirects only on an «off» that read confirms; a switch it could not read says so with «Riprova»; a 404 on the list
+  turns the switch off). A review session with `?corso=` waits behind the same gate.
   Nothing of a course is created in the web: the assistant creates it (§3), and an empty «Percorsi» says how, with the
   sentence to copy (`CREATE_SENTENCE`) and, for a connection without `lingo:courses:write`, «collegala di nuovo».
   Before the first course the declaration `MATERIALE_STUDIO` opens by itself in `AcceptTextDialog` (every word the
@@ -2013,7 +2016,8 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   one `useTrash` in `DossierPage` feeds «Cestino (n)» on the list (shown only
   when there is something), the page `?trash=1` (`TrashPage`: dossiers, entries
   «Da «dossier»», «Schede di studio» by their first questions, «Percorso «…»» with its modules and cards and
-  «Modulo «modulo · percorso»» for the courses of «Percorsi», `LINGO_CORSO` and `LINGO_CORSO_MODULO`) and a dossier's
+  «Modulo «modulo · percorso»» for the courses of «Percorsi», `LINGO_CORSO` and `LINGO_CORSO_MODULO`, whose 404 on a
+  restore — a module whose course is gone — keeps the entry with the server's words when the trash still has it) and a dossier's
   own «Rimossi di recente (n)» at its bottom (`DossierRecentlyRemoved`). Each
   entry (`TrashEntryRow`, `trashSummary.ts`) is restored whole — a 409 asks
   which dossier to restore into; a 404 drops an entry the server no longer has, and with a dossier

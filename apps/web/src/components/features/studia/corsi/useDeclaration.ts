@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { notify } from '../../../ui/notifications/notifications';
-import { corsiErrorDetail, corsiService } from '../../../../services/corsiService';
+import { corsiErrorDetail, corsiService, isUnreachable } from '../../../../services/corsiService';
 import type { TestoCorrente } from '../../../../types/studia';
 
 export type DeclarationState =
   | { status: 'loading' }
-  | { status: 'error' }
+  | { status: 'error'; offline: boolean }
   | { status: 'ready'; text: TestoCorrente };
 
 /**
@@ -26,7 +26,7 @@ export function useDeclaration() {
       (error: unknown) => {
         if (!live) return;
         console.warn('[Percorsi] declaration read failed', error);
-        setState((previous) => (previous.status === 'ready' ? previous : { status: 'error' }));
+        setState((previous) => (previous.status === 'ready' ? previous : { status: 'error', offline: isUnreachable(error) }));
       },
     );
     return () => {
@@ -45,7 +45,8 @@ export function useDeclaration() {
         setState({ status: 'ready', text: { ...outcome.accettata, accettata: true } });
         return true;
       }
-      setState({ status: 'ready', text: { ...outcome.richiedeTesto, accettata: false } });
+      // Unaccepted unless the server says otherwise (accepted meanwhile in another tab).
+      setState({ status: 'ready', text: { accettata: false, ...outcome.richiedeTesto } });
       return false;
     } catch (error) {
       notify({ type: 'error', message: corsiErrorDetail(error, 'Dichiarazione non registrata: riprova.'), duration: 5000 });

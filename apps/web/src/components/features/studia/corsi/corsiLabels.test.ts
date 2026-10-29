@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { competenceNumbers, competencesLine, completeSentence, longDay, missingLines, nextStepLabel, shortDay } from './corsiLabels';
+import { competenceNumbers, competencesLine, completeSentence, fromDay, longDay, missingLines, nextStepLabel, onDay, shortDay, thePercent } from './corsiLabels';
 import { listed } from './__fixtures__/corsi';
 
 describe('«Percorsi»\'s words', () => {
@@ -7,6 +7,7 @@ describe('«Percorsi»\'s words', () => {
     const base = { codice: 'C3', testo: 'x' };
     expect(competenceNumbers({ ...base, stato: 'da-iniziare', sessioni: 0, prossimaDal: null, ultima: null })).toBe('Ancora nessuna sessione valida');
     expect(competenceNumbers({ ...base, stato: 'in-corso', sessioni: 1, prossimaDal: '2026-11-03', ultima: 85 })).toBe('1 di 2 sessioni · la prossima vale dal 3/11 · ultima 85%');
+    expect(competenceNumbers({ ...base, stato: 'in-corso', sessioni: 1, prossimaDal: '2026-11-11', ultima: 80 })).toBe('1 di 2 sessioni · la prossima vale dall’11/11 · ultima 80%');
     expect(competenceNumbers({ ...base, stato: 'acquisita', sessioni: 2, prossimaDal: '2026-11-10', ultima: 80 })).toBe('2 di 2 sessioni · ultima 80%');
     expect(competenceNumbers({ ...base, stato: 'da-riprendere', sessioni: 0, prossimaDal: '2026-11-20', ultima: 40 })).toBe('0 di 2 sessioni per riprenderla · la prossima vale dal 20/11 · ultima 40%');
   });
@@ -25,6 +26,14 @@ describe('«Percorsi»\'s words', () => {
     expect(nextStepLabel(listed({ prossimo: null, moduli: { contati: 0, previsti: 5 } }))).toMatch(/^Nessun modulo ancora/);
     expect(nextStepLabel(listed({ prossimo: null }))).toBe('In attesa del tuo assistente');
     expect(competencesLine({ acquisite: 3, totale: 8 })).toBe('3 di 8 competenze');
+  });
+
+  it('elides the article before a number read with a vowel', () => {
+    expect([1, 8, 11, 70, 85, 100].map(thePercent)).toEqual(['l’1%', 'l’8%', 'l’11%', 'il 70%', 'l’85%', 'il 100%']);
+    expect(onDay('2026-11-01')).toBe('l’1 novembre 2026');
+    expect(onDay('2026-11-03')).toBe('il 3 novembre 2026');
+    expect(fromDay('2026-11-08')).toBe('dall’8 novembre 2026');
+    expect(fromDay('2026-11-20')).toBe('dal 20 novembre 2026');
   });
 
   it('writes Rome days as the page does', () => {

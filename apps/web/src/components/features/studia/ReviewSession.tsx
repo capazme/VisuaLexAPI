@@ -26,6 +26,8 @@ import { useCelebratedToday } from './progress/useCelebratedToday';
 import { useProgress } from './progress/useProgress';
 import { useGradeNote } from './useGradeNote';
 import { useReviewSession, type ReviewSummary } from './useReviewSession';
+import { CoursesGate } from './corsi/CoursesGate';
+import { useCoursesSwitch } from './corsi/coursesSwitch';
 
 const HOME_PATH = '/studia/ripasso';
 
@@ -229,6 +231,21 @@ function EndScreen({ summary, day, more, onHome, onContinue }: EndScreenProps) {
  * draws it in `LessonFrame`, over the shell.
  */
 export function ReviewSession() {
+  const [params] = useSearchParams();
+  const coursesOn = useCoursesSwitch() === 'on';
+  // A course's session (`?corso=`, «Percorsi») only with the courses' switch on: until then nothing is read, and an off
+  // the server confirms goes back to Oggi (`CoursesGate`).
+  if (!params.get('materia') && params.get('corso') && !coursesOn) {
+    return (
+      <div className="px-4 py-8">
+        <CoursesGate>{null}</CoursesGate>
+      </div>
+    );
+  }
+  return <ReviewSessionBody />;
+}
+
+function ReviewSessionBody() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const desktop = useIsDesktop();

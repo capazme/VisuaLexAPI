@@ -15,12 +15,12 @@ import { MenuButton } from '../../../ui/MenuButton';
 import { Modal } from '../../../ui/Modal';
 import { notify } from '../../../ui/notifications/notifications';
 import { MATERIA_LABEL } from '../studiaLabels';
-import { FOCUS_RING, MUTED_TEXT, QUIET_BUTTON, subjectHue } from '../progress/tokens';
+import { BLOCK_HEADING, FOCUS_RING, MUTED_TEXT, QUIET_BUTTON, subjectHue } from '../progress/tokens';
 import { CourseStateChip } from './CourseChips';
 import { CoursesGate } from './CoursesGate';
 import { CompetencesSection, DossierLink, ExamSection, ModulesSection, PreparationPanel } from './CourseSections';
 import { ReadFailure } from './ReadFailure';
-import { COURSES_PATH, longDay } from './corsiLabels';
+import { COURSES_PATH, onDay } from './corsiLabels';
 import { coursesChanged, useCourseRead } from './useCourseRead';
 
 /** The longest title the server takes (`PATCH /lingo/corsi/:id`). */
@@ -52,10 +52,23 @@ function Course({ id }: { id: string }) {
 
   const [renaming, setRenaming] = useState(false);
   const [confirming, setConfirming] = useState<Confirming>(null);
-  const [busyModule, setBusyModule] = useState<string | null>(null);
+  // The modules with a write out: each one's buttons wait for its own.
+  const [busyModules, setBusyModules] = useState<ReadonlySet<string>>(new Set());
+  const markBusy = (moduloId: string, busy: boolean) =>
+    setBusyModules((before) => {
+      const next = new Set(before);
+      if (busy) next.add(moduloId);
+      else next.delete(moduloId);
+      return next;
+    });
+  // After a module's button goes (deleted, withdrawn), the focus goes to the modules' heading, not to the page's body.
+  const modulesHeading = useRef<HTMLHeadingElement>(null);
+  const focusModules = () => requestAnimationFrame(() => modulesHeading.current?.focus({ preventScroll: true }));
   const [busy, setBusy] = useState(false);
 
   const data = course.data;
+  // Gone on a later read too (trashed in another tab): the old course is not kept on screen with buttons that 404.
+  if (notFound) return <CourseNotFound />;
   if (data === null) {
     if (course.status === 'loading') {
       return (
@@ -64,7 +77,6 @@ function Course({ id }: { id: string }) {
         </p>
       );
     }
-    if (notFound) return <CourseNotFound />;
     return <ReadFailure what="il percorso" offline={course.status === 'error' && course.offline} onRetry={course.reload} />;
   }
 
@@ -99,18 +111,19 @@ function Course({ id }: { id: string }) {
   };
 
   const trashModule = (modulo: ModuloPagina) => {
-    setBusyModule(modulo.id);
+    markBusy(modulo.id, true);
     showUndoToast({
       action: async () => {
         try {
           const { trashId } = await corsiService.trashModule(data.id, modulo.id);
           course.reload();
+          focusModules();
           return trashId;
         } catch (error) {
           fail(error, 'Modulo non eliminato.');
           throw error;
         } finally {
-          setBusyModule(null);
+          markBusy(modulo.id, false);
         }
       },
       undo: async (trashId) => {
@@ -128,15 +141,16 @@ function Course({ id }: { id: string }) {
 
   const withdraw = async (modulo: ModuloPagina) => {
     setConfirming(null);
-    setBusyModule(modulo.id);
+    markBusy(modulo.id, true);
     try {
       await corsiService.withdrawModule(data.id, modulo.id);
       notify({ type: 'success', message: `Modulo «${modulo.titolo}» ritirato.`, duration: 4000 });
       course.reload();
+      focusModules();
     } catch (error) {
       fail(error, 'Modulo non ritirato.');
     } finally {
-      setBusyModule(null);
+      markBusy(modulo.id, false);
     }
   };
 
@@ -188,14 +202,15 @@ function Course({ id }: { id: string }) {
       <CompetencesSection competenze={data.competenze} />
       <ModulesSection
         moduli={data.moduli}
-        actions={{ onDelete: trashModule, onWithdraw: (modulo) => setConfirming({ kind: 'withdraw', modulo }), busyId: busyModule }}
+        headingRef={modulesHeading}
+        actions={{ onDelete: trashModule, onWithdraw: (modulo) => setConfirming({ kind: 'withdraw', modulo }), busy: busyModules }}
       />
       <ExamSection titolo={data.titolo} esame={data.esame} inPreparazione={data.inPreparazione !== null} />
 
       <section aria-labelledby="corso-dossier" className="grid grid-cols-1 gap-3">
-        <h2 id="corso-dossier" className="font-serif text-xl font-medium tracking-tight text-slate-900 dark:text-slate-50">
+        <h3 id="corso-dossier" className={BLOCK_HEADING}>
           Dossier del percorso
-        </h2>
+        </h3>
         <DossierLink dossier={data.dossier} />
         <p className={cn('text-sm', MUTED_TEXT)}>
           Schede del percorso: {data.schede.dovute} da ripassare oggi · {data.schede.nuove} nuove · {data.schede.inAttesa} in attesa del loro modulo
@@ -269,7 +284,7 @@ function CourseHeader({ data, onRename, onExport, onTrash }: { data: CorsoPagina
           {MATERIA_LABEL[data.materia]}
         </span>
         <CourseStateChip stato={data.stato} />
-        {data.superatoIl && <span>Percorso superato il {longDay(data.superatoIl)}</span>}
+        {data.superatoIl && <span>Percorso superato {onDay(data.superatoIl)}</span>}
       </p>
       {data.descrizione && <p className="max-w-[70ch] break-words text-sm leading-relaxed text-slate-700 dark:text-slate-300">{data.descrizione}</p>}
     </header>

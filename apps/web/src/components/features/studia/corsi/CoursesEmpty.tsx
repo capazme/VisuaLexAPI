@@ -83,10 +83,13 @@ function ConnectionLine({ connections }: { connections: Connections }) {
       </div>
     );
   }
-  if (apps.some((app) => app.scopes.includes(COURSES_WRITE_SCOPE))) {
+  const able = apps.filter((app) => app.scopes.includes(COURSES_WRITE_SCOPE)).length;
+  if (able > 0) {
     return (
       <p className={cn('text-sm', MUTED_TEXT)}>
-        La tua app collegata può creare percorsi.{' '}
+        {able === apps.length
+          ? apps.length === 1 ? 'La tua app collegata può creare percorsi.' : 'Le tue app collegate possono creare percorsi.'
+          : able === 1 ? 'Una delle tue app collegate può creare percorsi.' : `${able} delle tue app collegate possono creare percorsi.`}{' '}
         <Link to="/collega-app" className={cn('-my-3 inline-block py-3 font-medium underline underline-offset-2', FOCUS_RING)}>
           Gestisci le app collegate
         </Link>
@@ -97,7 +100,8 @@ function ConnectionLine({ connections }: { connections: Connections }) {
     <div role="note" className="grid grid-cols-1 gap-2 rounded-xl bg-amber-50 p-4 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
       <p>
         {apps.length === 1 ? 'La tua app collegata non ha' : 'Le tue app collegate non hanno'} ancora il permesso di creare
-        percorsi. {apps.length === 1 ? 'Collegala' : 'Collegale'} di nuovo da «Collega un’app AI» e conferma i permessi: tra questi c’è «Creare percorsi di studio».
+        percorsi. {apps.length === 1 ? 'Collegala' : 'Collegale'} di nuovo da «Collega un’app AI» e conferma i permessi:
+        tra questi c’è quello di creare percorsi di studio.
       </p>
       {link}
     </div>
