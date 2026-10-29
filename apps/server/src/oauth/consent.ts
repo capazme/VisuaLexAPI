@@ -9,9 +9,9 @@ export const AUTHORIZATION_CODE_LIFETIME_MS = 60 * 1000;
 export const SCOPE_LABELS: Record<string, string> = {
   'dossier:read': 'Leggere i tuoi dossier: i nomi e le norme che contengono',
   'dossier:write':
-    'Creare dossier, aggiungervi norme e note ed evidenziarne passaggi come proposte che validi tu (non può modificare nulla; per eliminare serve il permesso qui sotto)',
+    'Creare dossier, aggiungervi norme e note e glossarne i passaggi come proposte che validi tu (non può modificare nulla; per eliminare serve il permesso qui sotto)',
   'dossier:text':
-    'Leggere il testo delle norme e delle sentenze dei tuoi dossier, per citarlo alla lettera: il testo arriva al fornitore dell’applicazione collegata',
+    'Leggere il testo delle norme e delle sentenze dei tuoi dossier, per citarlo alla lettera, e le tue note: il testo arriva al fornitore dell’applicazione collegata',
   'lingo:cards:read': 'Leggere le tue schede di studio',
   'lingo:cards:write': 'Creare schede di studio, sempre come tue bozze personali',
   [DELETE_SCOPE]: 'Eliminare dossier, voci e schede (finiscono nel cestino per 30 giorni; ogni eliminazione ti chiede conferma)',
