@@ -177,7 +177,7 @@ export function AiReviewControls({
  * «Cosa non va?»: a few words, up to the server's 500, saved when changed as the field is left, on Enter, or on Esc
  * (which also closes the popover, so it saves first rather than lose them).
  */
-function ReviewComment({ saved, onSave }: { saved: string | null; onSave: (text: string) => void }) {
+export function ReviewComment({ saved, onSave }: { saved: string | null; onSave: (text: string) => void }) {
     const [comment, setComment] = useState(saved ?? '');
     // What was last sent: Esc then the blur of a closing popover send it once.
     const sent = useRef(saved ?? '');

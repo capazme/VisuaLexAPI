@@ -30,6 +30,8 @@ export interface MoveProposalBarProps {
     /** The new boundaries: the offset in the same projection, and the projection's own slice there (root rule 23). */
     onSave: (startOffset: number, text: string) => void;
     onCancel: () => void;
+    /** The bar's name: «Sposta l'evidenziazione» for a coloured passage, the gloss's own words for a gloss (D8). */
+    label?: string;
 }
 
 const sameWords = (a: string, b: string) => a.replace(/\s+/g, ' ').trim().toLowerCase() === b.replace(/\s+/g, ' ').trim().toLowerCase();
@@ -50,7 +52,7 @@ function isBackward(selection: Selection): boolean {
  * (a drag ends with one, on the very passage being moved), and the selection popup is off (`ArticleBody`'s
  * `selectionPopup`). One bar on the page at a time (`assistantProposalsStore.moving`).
  */
-export function MoveProposalBar({ textRootRef, proposalId, startOffset, text, onSave, onCancel }: MoveProposalBarProps) {
+export function MoveProposalBar({ textRootRef, proposalId, startOffset, text, onSave, onCancel, label = "Sposta l'evidenziazione" }: MoveProposalBarProps) {
     const barRef = useRef<HTMLDivElement>(null);
     const titleId = useId();
     const helpId = useId();
@@ -289,7 +291,7 @@ export function MoveProposalBar({ textRootRef, proposalId, startOffset, text, on
             ref={barRef}
             tabIndex={-1}
             role="group"
-            aria-label="Sposta l'evidenziazione"
+            aria-label={label}
             aria-describedby={`${titleId} ${helpId}`}
             className={cn(
                 'fixed inset-x-0 bottom-0 select-none border-t border-slate-200 bg-white px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-lg focus:outline-none md:inset-x-auto md:bottom-4 md:left-1/2 md:w-[min(36rem,calc(100vw-2rem))] md:-translate-x-1/2 md:rounded-xl md:border dark:border-slate-700 dark:bg-slate-900',

@@ -1,6 +1,8 @@
-import type { Highlight, HighlightProposal } from '../../../types';
+import type { Highlight, HighlightProposal, Proposal } from '../../../types';
 import type { ProposalActions } from './BlockAnnotationsPopover';
 import { ProposalCard } from './ProposalCard';
+import { GlossCard } from './GlossCard';
+import { GLOSS_WORDS } from '../../../constants/glossWords';
 
 export interface LostProposalsListProps {
     /** The proposals no block's sign shows: their words are no longer in the text on screen. */
@@ -36,6 +38,30 @@ export function LostProposalsList({ proposals, actions }: LostProposalsListProps
                             onRemove={() => actions.remove(p.id)}
                             onMove={actions.move && (() => actions.move!(p.id))}
                         />
+                    </li>
+                ))}
+            </ul>
+        </section>
+    );
+}
+
+/**
+ * The glosses an application wrote on a dossier entry whose words are no longer in the text shown (D8): under the text
+ * at every width, as the passages' list, each card with its actions («Sposta» puts it on new words).
+ */
+export function LostGlossesList({ glosses, actions }: { glosses: readonly Proposal[]; actions: ProposalActions }) {
+    if (glosses.length === 0) return null;
+    return (
+        <section
+            aria-label={`${GLOSS_WORDS.lostTitle} (${glosses.length})`}
+            className="mt-6 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm dark:border-amber-900/40 dark:bg-amber-950/20"
+        >
+            <h5 className="font-semibold text-slate-700 dark:text-slate-200">{GLOSS_WORDS.lostTitle}</h5>
+            <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-400">{GLOSS_WORDS.lostHelp}</p>
+            <ul className="mt-2 space-y-2">
+                {glosses.map((g) => (
+                    <li key={g.id}>
+                        <GlossCard gloss={g} actions={actions} />
                     </li>
                 ))}
             </ul>

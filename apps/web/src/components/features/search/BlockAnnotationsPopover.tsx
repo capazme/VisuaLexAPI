@@ -11,8 +11,8 @@ import {
     useInteractions,
     useRole,
 } from '@floating-ui/react';
-import { LocateFixed, MessageCircle, Trash2, X } from 'lucide-react';
-import type { ArticleDiscussionPassageSummary, Highlight } from '../../../types';
+import { LocateFixed, MessageCircle, MessageSquareText, Trash2, X } from 'lucide-react';
+import type { ArticleDiscussionPassageSummary, Highlight, Proposal } from '../../../types';
 import { isProposal, type BlockAnnotations } from '../../../utils/articleAnnotations';
 import { getHighlightSwatch } from '../../../utils/highlightColors';
 import { getTransformOrigin } from '../../../utils/floatingOrigin';
@@ -24,6 +24,8 @@ import { Z_INDEX } from '../../../constants/zIndex';
 import { AttributionChip } from '../bulletin/AttributionChip';
 import { NoteCard } from './NoteCard';
 import { ProposalCard } from './ProposalCard';
+import { GlossCard } from './GlossCard';
+import { GLOSS_WORDS } from '../../../constants/glossWords';
 
 export interface BlockAnnotationsPopoverProps {
     /** The element holding the article text (ArticleBody's contentRef). */
@@ -48,6 +50,17 @@ export interface BlockAnnotationsPopoverProps {
     textHash?: string | null;
     /** What the user does with a passage an application proposed (D7b); only a dossier entry's reader has proposals. */
     proposalActions?: ProposalActions;
+    /**
+     * The entry's glosses (D8), of which the block's (`group.glosses`) are listed first as `GlossCard`s, with
+     * `proposalActions` — unless they are in the column beside the text (`glossesInMargin`), where the popover only
+     * offers the way to them (`onGoToGloss`).
+     */
+    glosses?: readonly Proposal[];
+    glossesInMargin?: boolean;
+    onGoToGloss?: (id: string) => void;
+    /** A gloss's card hovered or focused: the reader shows its words (`useGlossPassage`). */
+    shownGlossId?: string | null;
+    onShowGlossPassage?: (id: string, show: boolean) => void;
 }
 
 /** A proposed passage's actions, by its id (`ProposalCard`). */
@@ -83,6 +96,11 @@ export function BlockAnnotationsPopover({
     onOpenThread,
     textHash,
     proposalActions,
+    glosses: entryGlosses,
+    glossesInMargin = false,
+    onGoToGloss,
+    shownGlossId = null,
+    onShowGlossPassage,
 }: BlockAnnotationsPopoverProps) {
     const titleId = useId();
     // Where focus goes on close: the sign after Esc, the close button or "Vai
@@ -170,7 +188,12 @@ export function BlockAnnotationsPopover({
     const role = useRole(context, { role: 'dialog' });
     const { getFloatingProps } = useInteractions([dismiss, role]);
 
-    const total = group.notes.length + group.highlights.length + group.threads.length;
+    // The block's glosses (D8), as the entry holds them: listed here, or in the column beside the text.
+    const blockGlosses = proposalActions && entryGlosses
+        ? group.glosses.flatMap((g) => entryGlosses.find((e) => e.id === g.id) ?? [])
+        : [];
+    const listedGlosses = glossesInMargin ? [] : blockGlosses;
+    const total = group.notes.length + group.highlights.length + group.threads.length + listedGlosses.length;
     // Only a reader that can act on them lists proposals apart; none other is ever given one.
     const proposals = proposalActions ? group.highlights.filter(isProposal) : [];
     const highlights = proposalActions ? group.highlights.filter((h) => !isProposal(h)) : group.highlights;
@@ -238,6 +261,45 @@ export function BlockAnnotationsPopover({
                             </button>
                         </div>
                         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+                            {glossesInMargin && blockGlosses.length > 0 && onGoToGloss && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (requestClose(false)) return;
+                                        returnFocusRef.current = null;
+                                        onClose();
+                                        onGoToGloss(blockGlosses[0].id);
+                                    }}
+                                    className="inline-flex min-h-[44px] items-center gap-1.5 rounded px-1 text-xs font-medium text-primary-700 hover:text-primary-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0 md:py-1 dark:text-primary-300 dark:hover:text-primary-200"
+                                >
+                                    <MessageSquareText size={13} aria-hidden /> {GLOSS_WORDS.goTo(blockGlosses.length)}
+                                </button>
+                            )}
+                            {listedGlosses.length > 0 && proposalActions && (
+                                <section className="space-y-2">
+                                    <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">{GLOSS_WORDS.column}</h4>
+                                    {listedGlosses.map((gloss) => (
+                                        <GlossCard
+                                            key={gloss.id}
+                                            gloss={gloss}
+                                            actions={proposalActions}
+                                            active={shownGlossId === gloss.id}
+                                            onShowPassage={(show) => onShowGlossPassage?.(gloss.id, show)}
+                                            onRemove={() => remove(() => proposalActions.remove(gloss.id))}
+                                            onMove={proposalActions.move && (() => {
+                                                if (requestClose(false)) return;
+                                                returnFocusRef.current = null;
+                                                onClose();
+                                                proposalActions.move!(gloss.id);
+                                            })}
+                                            onDraftState={(state) => reportDraft(gloss.id, state)}
+                                            closeRequested={closeAsk?.id === gloss.id}
+                                            onCloseAnswer={answerClose}
+                                            className="shadow-none"
+                                        />
+                                    ))}
+                                </section>
+                            )}
                             {proposals.length > 0 && (
                                 <section className="space-y-2">
                                     <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Proposte dell'IA</h4>
