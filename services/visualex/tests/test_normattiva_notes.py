@@ -181,7 +181,7 @@ class TestFields:
 class TestOnTheWire:
     @pytest.mark.parametrize("endpoint", ARTICLE_ENDPOINTS)
     async def test_a_reader_that_fails_never_costs_the_article(self, controller, brocardi, endpoint):
-        with patch("visualex_api.services.normattiva_notes.extract_update_notes", side_effect=RuntimeError("boom")):
+        with patch("app.extract_update_notes", side_effect=RuntimeError("boom")):
             [result] = await ask(controller, endpoint, requested(), scraper=normattiva_serving(DLGS23_ART3))
         assert result["article_text"] == TEXT
         assert (result["note_aggiornamento"], result["note_non_lette"]) == (None, True)
