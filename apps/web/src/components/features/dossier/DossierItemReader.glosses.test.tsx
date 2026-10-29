@@ -155,6 +155,45 @@ describe('DossierItemReader — an application\'s glosses (D8)', () => {
     await waitFor(() => expect(document.activeElement?.getAttribute('data-gloss')).toBe('g3'));
   });
 
+  it('wide: «Rimuovi» on the last card hands the focus to the block\'s sign as the text drew it again', async () => {
+    vi.mocked(assistantService.listProposals).mockResolvedValue([gloss, mark]);
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains('vlx-gloss-column') ? 280 : 0;
+    });
+    const { container } = renderReader();
+    const column = await screen.findByRole('complementary', { name: GLOSS_WORDS.column });
+    const card = await waitFor(() => within(column).getByRole('article', { name: /Da validare/ }));
+    await waitFor(() => expect(card.classList.contains('invisible')).toBe(false));
+    const before = await signOf(container, 2);
+    fireEvent.click(within(card).getByRole('button', { name: 'Rimuovi' }));
+    await waitFor(() => {
+      const now = container.querySelector('.vlx-sign[data-block="2"]');
+      // The sign was drawn again (the gloss left its count): the new one has the focus, not the page.
+      expect(now).not.toBe(before);
+      expect(document.activeElement).toBe(now);
+    });
+  });
+
+  it('wide: Esc on a card gives the focus back to its block\'s sign; Esc in its text box only cancels the editing', async () => {
+    vi.mocked(assistantService.listProposals).mockResolvedValue([gloss]);
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains('vlx-gloss-column') ? 280 : 0;
+    });
+    const { container } = renderReader();
+    const column = await screen.findByRole('complementary', { name: GLOSS_WORDS.column });
+    const card = await waitFor(() => within(column).getByRole('article', { name: /Da validare/ }));
+    await waitFor(() => expect(card.classList.contains('invisible')).toBe(false));
+    fireEvent.click(within(card).getByRole('button', { name: 'Modifica' }));
+    const box = within(card).getByRole('textbox', { name: GLOSS_WORDS.noteLabel });
+    fireEvent.keyDown(box, { key: 'Escape' });
+    await waitFor(() => expect(within(card).queryByRole('textbox')).toBeNull());
+    expect(document.activeElement).not.toBe(container.querySelector('.vlx-sign[data-block="2"]'));
+    const validate = within(card).getByRole('button', { name: 'Valida' });
+    validate.focus();
+    fireEvent.keyDown(validate, { key: 'Escape' });
+    expect(document.activeElement).toBe(container.querySelector('.vlx-sign[data-block="2"]'));
+  });
+
   it('wide: «Sposta» from a card, then «Annulla», gives the focus back to that card', async () => {
     vi.mocked(assistantService.listProposals).mockResolvedValue([gloss]);
     vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (this: HTMLElement) {

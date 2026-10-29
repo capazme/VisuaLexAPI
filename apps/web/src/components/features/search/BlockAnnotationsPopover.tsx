@@ -57,7 +57,8 @@ export interface BlockAnnotationsPopoverProps {
      */
     glosses?: readonly Proposal[];
     glossesInMargin?: boolean;
-    onGoToGloss?: (id: string) => void;
+    /** Focuses the gloss's card in the column: false when it could not (the column gone meanwhile). */
+    onGoToGloss?: (id: string) => boolean;
     /** A gloss's card hovered or focused: the reader shows its words (`useGlossPassage`). */
     shownGlossId?: string | null;
     onShowGlossPassage?: (id: string, show: boolean) => void;
@@ -192,7 +193,10 @@ export function BlockAnnotationsPopover({
     const blockGlosses = proposalActions && entryGlosses
         ? group.glosses.flatMap((g) => entryGlosses.find((e) => e.id === g.id) ?? [])
         : [];
-    const listedGlosses = glossesInMargin ? [] : blockGlosses;
+    // The column could not take the focus (the reader narrowed meanwhile): the cards are listed here after all.
+    const [marginFailed, setMarginFailed] = useState(false);
+    const inMargin = glossesInMargin && !marginFailed;
+    const listedGlosses = inMargin ? [] : blockGlosses;
     const total = group.notes.length + group.highlights.length + group.threads.length + listedGlosses.length;
     // Only a reader that can act on them lists proposals apart; none other is ever given one.
     const proposals = proposalActions ? group.highlights.filter(isProposal) : [];
@@ -261,16 +265,22 @@ export function BlockAnnotationsPopover({
                             </button>
                         </div>
                         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
-                            {glossesInMargin && blockGlosses.length > 0 && onGoToGloss && (
+                            {inMargin && blockGlosses.length > 0 && onGoToGloss && (
                                 <button
                                     type="button"
                                     onClick={() => {
                                         if (requestClose(false)) return;
+                                        if (!onGoToGloss(blockGlosses[0].id)) {
+                                            // No card took it: the popover stays, its cards drawn in it, the focus on it.
+                                            setMarginFailed(true);
+                                            refs.floating.current?.focus();
+                                            return;
+                                        }
                                         returnFocusRef.current = null;
                                         onClose();
-                                        onGoToGloss(blockGlosses[0].id);
                                     }}
-                                    className="inline-flex min-h-[44px] items-center gap-1.5 rounded px-1 text-xs font-medium text-primary-700 hover:text-primary-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:min-h-0 md:py-1 dark:text-primary-300 dark:hover:text-primary-200"
+                                    // 44 px on a touch screen (a tablet's wide reader too), compact for a fine pointer, as the cards.
+                                    className="inline-flex min-h-[44px] items-center gap-1.5 rounded px-1 text-xs font-medium text-primary-700 hover:text-primary-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 [@media(pointer:fine)]:min-h-8 dark:text-primary-300 dark:hover:text-primary-200"
                                 >
                                     <MessageSquareText size={13} aria-hidden /> {GLOSS_WORDS.goTo(blockGlosses.length)}
                                 </button>

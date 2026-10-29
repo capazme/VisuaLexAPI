@@ -1082,11 +1082,13 @@ text (`placeGlossCards`, `utils/glossLayout.ts`, pure; words with no box, in the
 before), placed by a `transform` (160 ms after its first place, which is taken at once; none under reduced motion) and
 measured again on every redraw, reflow or card that grows (`ResizeObserver`s); only glosses whose words land make a
 column. Once the cards are placed (`onWideChange`), a sign whose block holds only glosses focuses the first card and
-opens nothing, one that holds more opens the popover with «Vai alla glossa a margine» (`glossesInMargin`); the reader
-keeps the mode a block was opened in while its popover is open, so a resize never drops a gloss's text half edited.
-«Rimuovi» in the column hands the focus to the next card, else the one before, else the block's sign; «Sposta» gives
-it back to the card (`MoveProposalBar`'s `focusAfter`), or, narrow, to the sign found by the gloss's words (it has no
-mark). With less room — a phone, and the norms' column of a dossier that has decisions too — the column
+opens nothing, one that holds more opens the popover with «Vai alla glossa a margine» (`glossesInMargin`); a popover
+opened narrow keeps its cards when the reader widens (one may be half edited), one opened wide lists them as soon as it
+narrows, and if no card takes the focus («Vai alla glossa» answers false) the popover stays and lists them.
+«Rimuovi» in the column hands the focus to the next card, else the one before, else the block's sign found again after
+the text redrew (`signAt`: a sign taken before the removal is no longer in the page), else the nearest sign; Esc on a
+card (not a field's own Esc) goes back to its block's sign; «Sposta» gives it back to the card (`MoveProposalBar`'s
+`focusAfter`), or, narrow, to the sign found by the gloss's words (it has no mark). With less room — a phone, and the norms' column of a dossier that has decisions too — the column
 is not drawn (`display: none`, read by its width: `onWideChange`) and the sign's popover lists the block's `GlossCard`s
 first (44 px on a touch screen). A card (`GlossCard`, its passage's words its `aria-describedby`): the state in words and shape (feminine, as the word:
 «Validata»), the passage's words on one line,

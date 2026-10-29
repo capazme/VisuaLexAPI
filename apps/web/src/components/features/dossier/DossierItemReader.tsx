@@ -214,7 +214,9 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
   // popover is open (a gloss's text half edited in it) keeps the popover as it is.
   const [openedWide, setOpenedWide] = useState<{ block: number | null; wide: boolean }>({ block: null, wide: false });
   if (openedWide.block !== openBlock) setOpenedWide({ block: openBlock, wide: glossesWide });
-  const inMargin = openedWide.block === openBlock ? openedWide.wide : glossesWide;
+  // Narrowed meanwhile, the cards are listed in the popover (the column is gone, «Vai alla glossa» would go nowhere);
+  // widened, they stay there (one may be half edited).
+  const inMargin = glossesWide && (openedWide.block === openBlock ? openedWide.wide : true);
   // With the glosses beside the text, a sign whose block holds only glosses focuses the first one's card (D8, as a
   // word processor's comment); one that holds more opens the popover, which offers the way to them.
   const onlyGlosses = !!openGroup && openGroup.glosses.length > 0
@@ -398,7 +400,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
           proposalActions={proposalActions}
           glosses={glosses}
           glossesInMargin={inMargin}
-          onGoToGloss={(id) => marginRef.current?.focus(id)}
+          onGoToGloss={(id) => marginRef.current?.focus(id) ?? false}
           shownGlossId={shownGlossId}
           onShowGlossPassage={showGlossPassage}
         />

@@ -38,6 +38,16 @@ export interface GlossMarginProps {
 type Landed = Extract<ResolvedAnchor, { kind: 'gloss' }>;
 
 /**
+ * The sign of the block holding these words, found again from the offsets: every redraw of the text (a removal, a state
+ * changed) replaces the signs, so one found before it is no longer in the page.
+ */
+function signAt(root: HTMLElement | null, start: number, end: number): HTMLElement | null {
+    if (!root) return null;
+    return rangeFromPlainOffsets(root, start, end)?.startContainer.parentElement
+        ?.closest('.vlx-b, .vlx-dec-para')?.querySelector<HTMLElement>(':scope > .vlx-sign') ?? null;
+}
+
+/**
  * The glosses beside the text (D8), as a word processor's comments: the text keeps the left, a column of cards
  * (`GlossCard`) on the right, each at the height of its passage — the top of the first line of its words in the text
  * root, read from a DOM range, so no element is added to the text (root rule 23) — and pushed down under the one above
@@ -138,24 +148,30 @@ export function GlossMargin({
 
     /**
      * «Rimuovi» from the column: the card goes at once, and the focus with it would fall to the page — so it goes to the
-     * next card, else the one before, else the block's sign of the words it was on.
+     * next card, else the one before, else the block's sign of the words it was on — found again once the text has been
+     * redrawn without it (`signAt`); a block left with nothing has no sign, and the focus goes to the nearest sign after
+     * it, else before it.
      */
     const removeFrom = (id: string) => {
         if (!actions) return;
         const index = landed.findIndex((a) => a.gloss.id === id);
         const neighbour = landed[index + 1]?.gloss.id ?? landed[index - 1]?.gloss.id ?? null;
         const anchor = landed[index];
-        const root = textRootRef.current;
-        const sign = anchor && root
-            ? rangeFromPlainOffsets(root, anchor.start, anchor.end)?.startContainer.parentElement
-                ?.closest('.vlx-b, .vlx-dec-para')?.querySelector<HTMLElement>(':scope > .vlx-sign') ?? null
-            : null;
         actions.remove(id);
         requestAnimationFrame(() => {
             if (neighbour && focusCard(neighbour)) return;
-            (sign?.isConnected ? sign : null)?.focus({ preventScroll: true });
+            const root = textRootRef.current;
+            if (!anchor || !root) return;
+            const sign = signAt(root, anchor.start, anchor.end);
+            if (sign) return sign.focus({ preventScroll: true });
+            const block = rangeFromPlainOffsets(root, anchor.start, anchor.end)?.startContainer.parentElement?.closest('.vlx-b, .vlx-dec-para');
+            const signs = [...root.querySelectorAll<HTMLElement>('.vlx-sign')];
+            const after = block ? signs.find((s) => block.compareDocumentPosition(s) & Node.DOCUMENT_POSITION_FOLLOWING) : undefined;
+            (after ?? signs.at(-1))?.focus({ preventScroll: true });
         });
     };
+    /** Esc on a card: back to its block's sign, the way it came (the sign focuses the card). */
+    const escapeFrom = (anchor: Landed) => signAt(textRootRef.current, anchor.start, anchor.end)?.focus({ preventScroll: true });
 
     return (
         <div ref={wrapperRef} className={cn(active && 'vlx-glossed')}>
@@ -168,7 +184,8 @@ export function GlossMargin({
                         className="vlx-gloss-column"
                         style={layout ? { height: layout.height } : undefined}
                     >
-                        {landed.map(({ gloss: anchor }) => {
+                        {landed.map((landing) => {
+                            const anchor = landing.gloss;
                             const gloss = byId.get(anchor.id);
                             if (!gloss || !actions) return null;
                             const top = layout?.tops[anchor.id];
@@ -184,6 +201,7 @@ export function GlossMargin({
                                     active={shownId === anchor.id}
                                     onShowPassage={(show) => onShowPassage?.(anchor.id, show)}
                                     onRemove={() => removeFrom(anchor.id)}
+                                    onEscape={() => escapeFrom(landing)}
                                     className={cn('vlx-gloss-card', top === undefined && 'invisible', !settled.has(anchor.id) && 'vlx-gloss-card-fresh')}
                                     style={top === undefined ? undefined : { transform: `translateY(${top}px)` }}
                                 />

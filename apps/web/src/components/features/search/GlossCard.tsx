@@ -19,6 +19,8 @@ export interface GlossCardProps {
     onMove?: () => void;
     /** «Rimuovi», when the caller has to do something after (the popover's focus); else `actions.remove`. */
     onRemove?: () => void;
+    /** Esc on the card, beside the text: the focus goes back to its block's sign (a field's own Esc is the field's). */
+    onEscape?: () => void;
     /** Whether its note is being edited, and changed: a popover then keeps open on an outside press, and asks. */
     onDraftState?: (state: 'none' | 'clean' | 'dirty') => void;
     /** A popover wants to close over a changed draft: the card asks «Scartare la modifica?». */
@@ -61,7 +63,7 @@ const LINK = 'inline-flex min-h-[44px] items-center rounded px-0.5 text-xs font-
  * and in the block's popover on a narrow one.
  */
 export function GlossCard({
-    gloss, actions, active = false, onShowPassage, onMove, onRemove, onDraftState, closeRequested = false, onCloseAnswer, ref, className, style,
+    gloss, actions, active = false, onShowPassage, onMove, onRemove, onEscape, onDraftState, closeRequested = false, onCloseAnswer, ref, className, style,
 }: GlossCardProps) {
     const titleId = useId();
     const originalId = useId();
@@ -125,6 +127,12 @@ export function GlossCard({
             onMouseLeave={() => setHovered(false)}
             onFocus={() => setFocused(true)}
             onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false); }}
+            onKeyDown={(e) => {
+                // The text box's Esc cancels its editing and marks the key taken: only a free Esc leaves the card.
+                if (e.key !== 'Escape' || e.defaultPrevented || !onEscape) return;
+                e.preventDefault();
+                onEscape();
+            }}
             className={cn(
                 'rounded-lg border bg-white px-3 py-2 font-sans text-sm shadow-sm outline-none transition-[border-color,box-shadow] motion-reduce:transition-none dark:bg-slate-900',
                 active ? 'border-primary-500 ring-1 ring-primary-500 dark:border-primary-400 dark:ring-primary-400' : 'border-slate-200 dark:border-slate-700',
