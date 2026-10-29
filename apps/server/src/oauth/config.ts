@@ -13,8 +13,9 @@ export type Scope = (typeof SCOPES)[number];
 
 /**
  * The version of the words of `dossier:text` on the consent page (`SCOPE_LABELS`), stored on a grant when the user
- * approves a request for that scope (`oauth_grants.text_consent_version`). 1: «… e le tue note» (G-381 (b)). A grant
- * with an older version, or none, does not receive the text of the user's notes until the user connects again.
+ * approves a request for that scope (`oauth_grants.text_consent_version`). 1: «… e le tue note» (G-381 (b)); the
+ * migration gave 1 to the grants that already held the scope (G-385: no active users yet). A grant with an older
+ * version, or none, does not receive the text of the user's notes until the user connects again.
  * Change the words in a way that widens what leaves, and this number goes up with them.
  */
 export const TEXT_SCOPE = 'dossier:text';

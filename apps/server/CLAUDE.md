@@ -195,8 +195,9 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   with `dossier:text` whose grant was approved with those words: approving a request for `dossier:text` stores
   `TEXT_CONSENT_VERSION` (`oauth/config.ts`, now 1) on the grant (`oauth_grants.text_consent_version`), `delegatedAuth`
   reads it live into `req.delegation.readsNotes`, and `serializeItem` answers a note's `content` null otherwise (a
-  norm's or a decision's never). Every grant older than the column has none and keeps today's behaviour until the user
-  connects again; widening the words means raising the version. A grant made before `dossier:text` existed has it only
+  norm's or a decision's never). The migration gave version 1 to the grants that already held `dossier:text` (G-385,
+  owners, 29 October 2026: no active users yet); widening the words means raising the version, and a grant with a lower
+  one reads no note until the user connects again. A grant made before `dossier:text` existed has it only
   once the user connects again.
 - **Decisions in a dossier**: an item may be `sentenza`: a court decision's
   identity and a label, never its text. The courts are the Cassazione, the Corte costituzionale

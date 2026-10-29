@@ -20,8 +20,9 @@ Status: decided by the owners on 29 October 2026 (G-383, with G-381 (b)). Scope 
 - **The text of the user's notes** leaves through the MCP only under `dossier:text` («Leggere i testi»), whose
   consent words, and the «Dati personali» notice, now say «e le tue note», and only for a grant approved with those
   words: the grant stores the version of the words it was approved with (`oauth_grants.text_consent_version`), and
-  the server answers a note's content null to any other connected application. Grants approved before keep today's
-  behaviour until the user connects again.
+  the server answers a note's content null to any other connected application. The grants that already hold
+  `dossier:text` are given version 1 by the migration (G-385, owners, 29 October 2026: there are no active users yet,
+  so the change may apply retroactively); the version serves the next change of the words.
 
 ## Why a `Highlight` row and not an anchored note
 
@@ -45,8 +46,9 @@ the trash in a second place.
   becomes a mark and keeps its colour.
 - `highlights.color` nullable; `CHECK ((kind = 'gloss') = (color IS NULL))`.
 - `CHECK (kind <> 'gloss' OR (created_by_client_id, note_state, note present and note not blank))`.
-- `oauth_grants.text_consent_version INTEGER` (null for every existing grant; set to `TEXT_CONSENT_VERSION`, 1, when
-  the user approves a request for `dossier:text`).
+- `oauth_grants.text_consent_version INTEGER` (set to `TEXT_CONSENT_VERSION`, 1, when the user approves a request for
+  `dossier:text`; the migration sets it to 1 on the grants that already hold `dossier:text`, G-385: no active users
+  yet, so no one is asked to connect again).
 
 ## Routes
 
