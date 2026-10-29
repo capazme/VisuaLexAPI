@@ -24,7 +24,8 @@ export interface Stub {
   exchanges: { subject: string; scope: string; audience: string }[];
   /** Override an API answer: return [status, body] or undefined for the default. */
   /** 'drop' closes the connection without an answer (a network failure). */
-  apiOverride?: (method: string, path: string, body: unknown) => [number, unknown] | 'drop' | undefined;
+  /** A promise delays the answer (a slow route). */
+  apiOverride?: (method: string, path: string, body: unknown) => [number, unknown] | 'drop' | undefined | Promise<[number, unknown] | 'drop' | undefined>;
   dossiers: {
     id: string;
     name: string;
@@ -82,10 +83,10 @@ export async function startStubs() {
     if (stub.features === 'down') return void res.status(500).end();
     res.json(stub.features ?? { assistantPassages: false, assistantGlosses: false });
   });
-  as.all(/^\/api\/.*/, (req, res) => {
+  as.all(/^\/api\/.*/, async (req, res) => {
     const path = req.path.slice(4);
     stub.apiCalls.push({ method: req.method, path, bearer: req.headers.authorization?.slice(7), body: req.body });
-    const override = stub.apiOverride?.(req.method, path, req.body);
+    const override = await stub.apiOverride?.(req.method, path, req.body);
     if (override === 'drop') return void req.socket.destroy();
     if (override) return void res.status(override[0]).json(override[1]);
     if (req.method === 'GET' && path === '/dossiers') return void res.json(stub.dossiers);

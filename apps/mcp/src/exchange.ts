@@ -1,7 +1,7 @@
 import type { Caller } from './auth.js';
 import { basicAuthorization } from './auth.js';
 import type { McpConfig } from './config.js';
-import { ToolError, formatRenewal } from './errors.js';
+import { NoAnswer, ToolError, formatRenewal } from './errors.js';
 
 /** What each daily counter of the API counts, as the 429 message names it (apps/server, middleware/delegated.ts). */
 const QUOTA_WORDS: Record<string, string> = {
@@ -79,7 +79,7 @@ export async function callApi<T>(
       signal: AbortSignal.timeout(120_000),
     });
   } catch {
-    throw new ToolError(init.unreachable ?? 'VisuaLex non è raggiungibile in questo momento: riprova tra poco.');
+    throw new NoAnswer(init.unreachable ?? 'VisuaLex non è raggiungibile in questo momento: riprova tra poco.');
   }
   const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   if (response.ok) return body as T;
@@ -110,6 +110,10 @@ export async function callApi<T>(
       const detail = typeof body.detail === 'string' ? body.detail.replace(/\.$/, '') : 'controlla i dati inviati';
       throw new ToolError(`Richiesta non valida: ${detail}.`);
     }
+    case 502:
+    case 504:
+      // A gateway in front of the server gave up: the server may still be at it.
+      throw new NoAnswer(init.unreachable ?? 'VisuaLex non ha risposto in tempo: riprova tra poco.');
     default:
       console.error(`[mcp] API answered ${response.status} on ${init.method ?? 'GET'} ${path.split('?')[0]}`);
       throw new ToolError('VisuaLex ha avuto un problema: riprova tra poco.');
