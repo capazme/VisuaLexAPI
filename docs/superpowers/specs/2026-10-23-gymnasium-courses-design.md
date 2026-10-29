@@ -1,8 +1,7 @@
 # Gymnasium — study courses built by the user's assistant (A1)
 
-**Status:** draft, 25 October 2026: complete. The flow, the screens and the tools (§1–§9, §11–§15) are the web
-side's; the server (§10) is the server side's; one owner answered the server's questions (§10.14, G-377) on
-25 October, the other's answer is awaited. Design only: no code yet.
+**Status:** approved, 26 October 2026: both owners (G-377, G-379, and the answers of §14). The flow, the
+screens and the tools (§1–§9, §11–§15) are the web side's; the server (§10) is the server side's.
 **Target:** release 1.11, with no fixed date: the work runs continuously and in order (the owners, 25 October, §13).
 **Decisions it rests on** (codes of the owners' decision register, and the owners' answers in chat):
 - **G-362 (ok, 22 October):** the exception to principle 2 of the Studia specification (no uploads), narrowed:
