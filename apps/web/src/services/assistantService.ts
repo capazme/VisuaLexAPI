@@ -17,10 +17,13 @@ const proposal = (dossierId: string, itemId: string, proposalId: string) =>
  * what the user makes of its notes. With the feature off every route but the first answers 404 «Non disponibile».
  */
 export const assistantService = {
-  /** Whether the server has the feature on: answers in every case. */
-  async features(): Promise<{ assistantPassages: boolean }> {
-    const response = await apiClient.get<{ assistantPassages?: boolean }>('/features');
-    return { assistantPassages: response.data?.assistantPassages === true };
+  /**
+   * Whether the server has the features on: answers in every case. `lingoCourses` is Gymnasium's «Percorsi» (spec
+   * 2026-10-23 §10.10), read here so that the app asks once.
+   */
+  async features(): Promise<{ assistantPassages: boolean; lingoCourses: boolean }> {
+    const response = await apiClient.get<{ assistantPassages?: boolean; lingoCourses?: boolean }>('/features');
+    return { assistantPassages: response.data?.assistantPassages === true, lingoCourses: response.data?.lingoCourses === true };
   },
 
   async listProposals(dossierId: string, itemId: string): Promise<Proposal[]> {

@@ -143,6 +143,15 @@ export const studiaService = {
     return response.data;
   },
 
+  /**
+   * One course's review (`GET /lingo/srs/sessione?corso=`, courses spec §10.5): its due and new cards and its check
+   * cards (§10.7). Like a subject's, it never marks the day's queue finished.
+   */
+  async courseSession(corso: string): Promise<SessioneRipasso> {
+    const response = await apiClient.get('/lingo/srs/sessione', { params: { corso } });
+    return response.data;
+  },
+
   /** Records a grade; `registrata: false` means the card was already graded today. */
   async review(input: RevisioneInput): Promise<EsitoRevisione> {
     const response = await apiClient.post('/lingo/srs/revisioni', input);

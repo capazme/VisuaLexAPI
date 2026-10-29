@@ -60,8 +60,11 @@ export interface SchedaDellArticolo extends Scheda {
  */
 export interface TestoDaAccettare {
   id: string;
-  /** The card proposal's notice, or the MERL-T notice (answered through the consent screen). */
-  chiave: 'PROPOSTA_SCHEDA' | 'INFORMATIVA_MERLT';
+  /**
+   * The card proposal's notice, the MERL-T notice (answered through the consent screen), or the declaration on one's
+   * study material, accepted in «Percorsi» before the first course.
+   */
+  chiave: 'PROPOSTA_SCHEDA' | 'INFORMATIVA_MERLT' | 'MATERIALE_STUDIO';
   versione: number;
   titolo: string;
   corpo: string;

@@ -7,6 +7,7 @@ import { dossierItemFromApi } from '../components/features/dossier/dossierUtils'
 import type { DossierItemApi } from '../services/dossierService';
 import { isGloss, shiftAiReviewCount } from '../utils/aiReview';
 import { GLOSS_WORDS } from '../constants/glossWords';
+import { coursesSwitchStore, resetCoursesSwitch, setCoursesSwitch } from '../components/features/studia/corsi/coursesSwitch';
 
 /**
  * What applications proposed on dossier entries (D7b, the server's contract): a store of its own, keyed by entry id,
@@ -99,19 +100,24 @@ export function resetAssistantProposals() {
   removalsInFlight.clear();
   writeSeq.clear();
   assistantProposalsStore.setState({ enabled: false, byItem: {}, busy: {}, moving: null });
+  resetCoursesSwitch();
 }
 
 let featuresInFlight: Promise<void> | null = null;
 
-/** Read as the app starts and as the dossier page mounts; no polling. Calls made while one is in flight share it. */
+/**
+ * Read as the app starts, as the dossier page mounts and as «Percorsi» mounts; no polling. Calls made while one is in
+ * flight share it. The same answer says whether Gymnasium's courses are on (`coursesSwitch`).
+ */
 export function loadAssistantFeatures(): Promise<void> {
   if (featuresInFlight) return featuresInFlight;
   const asked = generation;
   let request: Promise<void> | null = null;
   request = (async () => {
     try {
-      const { assistantPassages } = await assistantService.features();
+      const { assistantPassages, lingoCourses } = await assistantService.features();
       if (asked !== generation) return;
+      setCoursesSwitch(lingoCourses);
       if (assistantPassages) {
         assistantProposalsStore.setState({ enabled: true });
         // On again after an off cleared the lights: the dossiers' answers carry them again.
@@ -121,6 +127,7 @@ export function loadAssistantFeatures(): Promise<void> {
         }
       } else if (assistantProposalsStore.getState().enabled) switchOff();
     } catch {
+      // The courses' switch keeps what it knew: one failed read must not hide «Percorsi» for the whole session.
       if (asked === generation) assistantProposalsStore.setState({ enabled: false });
     } finally {
       if (featuresInFlight === request) featuresInFlight = null;
@@ -128,6 +135,13 @@ export function loadAssistantFeatures(): Promise<void> {
   })();
   featuresInFlight = request;
   return request;
+}
+
+// Back online with the courses' switch never read (the app started offline): ask again.
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => {
+    if (coursesSwitchStore.getState().state === 'unknown') void loadAssistantFeatures();
+  });
 }
 
 export async function loadProposals(dossierId: string, itemId: string): Promise<void> {

@@ -4,7 +4,12 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
 vi.mock('../../../services/studiaService', () => ({
-  studiaService: { session: vi.fn(), review: vi.fn(), progress: vi.fn(), percorso: vi.fn() },
+  studiaService: { session: vi.fn(), courseSession: vi.fn(), review: vi.fn(), progress: vi.fn(), percorso: vi.fn() },
+}));
+
+// The courses' switch, when the gate asks: off.
+vi.mock('../../../services/assistantService', () => ({
+  assistantService: { features: vi.fn(async () => ({ assistantPassages: false, lingoCourses: false })) },
 }));
 
 // The reader is tested with the dossier; here it is a stand-in that shows which article it was given.
@@ -25,6 +30,7 @@ import { SESSION_NOTICE_MS } from './progress/Celebration';
 import { GRADE_NOTE_MS } from './useGradeNote';
 import { LESSON_PRIMARY } from './lessonStyles';
 import { ReviewSession } from './ReviewSession';
+import { coursesSwitchStore } from './corsi/coursesSwitch';
 import { xpFields } from './__fixtures__/xp';
 
 const session = vi.mocked(studiaService.session);
@@ -93,6 +99,7 @@ const gradeFirst = async (next: string) => {
 beforeEach(() => {
   setDesktop(true);
   session.mockReset();
+  vi.mocked(studiaService.courseSession).mockReset();
   review.mockReset();
   review.mockResolvedValue({ registrata: true, prossimoRipasso: '2026-10-12', scheduledDays: 1 });
   progress.mockReset();
@@ -103,7 +110,10 @@ beforeEach(() => {
   appStore.setState({ searchTrigger: null });
 });
 
-afterEach(() => setDesktop(false));
+afterEach(() => {
+  setDesktop(false);
+  coursesSwitchStore.setState({ state: 'unknown' });
+});
 
 describe('the review session', () => {
   it('asks for the session of the subject in the address', async () => {
@@ -117,6 +127,36 @@ describe('the review session', () => {
     renderSession([card('a')], `/studia/ripasso/sessione?${new URLSearchParams({ materia: 'DIRITTO_CIVILE', istituto })}`);
     await screen.findByText('Domanda a?');
     expect(session).toHaveBeenCalledWith('DIRITTO_CIVILE', istituto);
+  });
+
+  it('asks for one course\'s session from «Oggi»\'s row, and ends on «Torna a Oggi» alone (courses spec §10.5)', async () => {
+    coursesSwitchStore.setState({ state: 'on' });
+    const courseSession = vi.mocked(studiaService.courseSession);
+    courseSession.mockResolvedValue({ conteggi: { dovute: 1, nuove: 0 }, cards: [card('a')] });
+    renderSession([], '/studia/ripasso/sessione?corso=corso-1');
+    await screen.findByText('Domanda a?');
+    expect(courseSession).toHaveBeenCalledWith('corso-1');
+    expect(session).not.toHaveBeenCalled();
+    await show();
+    await userEvent.setup().click(screen.getByRole('button', { name: /Bene/ }));
+    const end = await screen.findByTestId('lesson-end');
+    expect(within(end).getByRole('button', { name: 'Torna a Oggi' })).toBeInTheDocument();
+    expect(within(end).queryByRole('button', { name: 'Continua' })).toBeNull();
+  });
+
+  it('reads no course while the courses\' switch is off, and goes back to Oggi', async () => {
+    coursesSwitchStore.setState({ state: 'off' });
+    renderSession([card('a')], '/studia/ripasso/sessione?corso=corso-1');
+    expect(await screen.findByText('Landing')).toBeInTheDocument();
+    expect(studiaService.courseSession).not.toHaveBeenCalled();
+    expect(session).not.toHaveBeenCalled();
+  });
+
+  it('never reads a course together with a subject', async () => {
+    renderSession([card('a')], '/studia/ripasso/sessione?materia=DIRITTO_PENALE&corso=corso-1');
+    await screen.findByText('Domanda a?');
+    expect(session).toHaveBeenCalledWith('DIRITTO_PENALE');
+    expect(studiaService.courseSession).not.toHaveBeenCalled();
   });
 
   it('ignores an institute without its subject, which the server would refuse', async () => {

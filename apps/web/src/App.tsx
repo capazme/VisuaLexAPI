@@ -59,6 +59,12 @@ const ValidationQueueView = lazy(() =>
 const ReviewHome = lazy(() =>
   import('./components/features/studia/ReviewHome').then(m => ({ default: m.ReviewHome })),
 );
+const CoursesView = lazy(() =>
+  import('./components/features/studia/corsi/CoursesView').then(m => ({ default: m.CoursesView })),
+);
+const CoursePage = lazy(() =>
+  import('./components/features/studia/corsi/CoursePage').then(m => ({ default: m.CoursePage })),
+);
 const ProgressPage = lazy(() =>
   import('./components/features/studia/progress/ProgressPage').then(m => ({ default: m.ProgressPage })),
 );
@@ -194,7 +200,7 @@ function App() {
               </DevRoute>
             }
           />
-          {/* VisuaLex Studia: behind VITE_FEATURE_STUDIA; /studia opens the review; progressi the data; valida is the validators' queue. */}
+          {/* VisuaLex Studia: behind VITE_FEATURE_STUDIA; /studia opens the review; percorsi the courses; progressi the data; valida is the validators' queue. */}
           {isStudiaEnabled() && (
             <Route
               path="studia"
@@ -207,6 +213,9 @@ function App() {
               <Route index element={<Navigate to="ripasso" replace />} />
               <Route path="ripasso" element={<Suspense fallback={null}><ReviewHome /></Suspense>} />
               <Route path="ripasso/sessione" element={<Suspense fallback={<LessonLoading />}><ReviewSession /></Suspense>} />
+              {/* «Percorsi» (courses spec §6): drawn only while the switch `lingo_courses` is on, else back to Oggi. */}
+              <Route path="percorsi" element={<Suspense fallback={null}><CoursesView /></Suspense>} />
+              <Route path="percorsi/:id" element={<Suspense fallback={null}><CoursePage /></Suspense>} />
               <Route path="progressi" element={<Suspense fallback={null}><ProgressPage /></Suspense>} />
               <Route path="schede" element={<Suspense fallback={null}><MyCardsView /></Suspense>} />
               <Route path="schede/:id" element={<Suspense fallback={null}><MyCardsView /></Suspense>} />

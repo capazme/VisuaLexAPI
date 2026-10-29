@@ -16,6 +16,7 @@ import { rememberedMateria, rememberMateria } from './progress/rememberedSubject
 import { useCelebratedToday } from './progress/useCelebratedToday';
 import { usePercorso } from './progress/usePercorso';
 import { useProgress } from './progress/useProgress';
+import { TodayCourses } from './corsi/TodayCourses';
 
 /**
  * «Oggi», Gymnasium's home (Gymnasium spec §5.1), in the sections' full-width frame, in the order the owner fixed — the
@@ -159,7 +160,8 @@ export function ReviewHome() {
     // owner fixed — missions, statistics, list — on every width; the grid places the right column.
     // One column of `minmax(0, 1fr)` below `xl` (two from it, `SPLIT`): an implicit track grows to its widest content.
     <section className={cn('relative grid grid-cols-1 gap-6 pb-8', split && SPLIT, lonely && LONELY_ROWS)}>
-      <div className={cn('min-w-0', split && LEFT)}>
+      {/* The day block and, under it, the courses' row (courses spec §6.2): one cell, so the grid keeps its rows. */}
+      <div className={cn('grid min-w-0 grid-cols-1 gap-4', split && LEFT)}>
         <DayBlock
           day={data}
           dayFailed={day.status === 'error'}
@@ -176,6 +178,7 @@ export function ReviewHome() {
           drawGoal={celebrate}
           goalRef={goalRef}
         />
+        <TodayCourses />
       </div>
       <div className={cn('min-w-0 empty:hidden', split && LEFT)}>
         <TodayMissions

@@ -13,6 +13,7 @@ import {
   removeProposal, resetAssistantProposals, setNoteEntryState, setProposalState,
 } from '../assistantProposals';
 import { appStore } from '../useAppStore';
+import { coursesSwitchStore } from '../../components/features/studia/corsi/coursesSwitch';
 import { notificationStore, closeNotification, undoNotification, resetNotifications } from '../../components/ui/notifications/notifications';
 import { aiNote } from '../../utils/__fixtures__/assistantNote';
 import { GLOSS_WORDS } from '../../constants/glossWords';
@@ -39,7 +40,7 @@ const notFound = (detail: string) => refused(404, detail);
 const lastNotification = () => notificationStore.getState().entries.at(-1)!;
 
 beforeEach(() => {
-  vi.mocked(assistantService.features).mockResolvedValue({ assistantPassages: true });
+  vi.mocked(assistantService.features).mockResolvedValue({ assistantPassages: true, lingoCourses: false });
   vi.mocked(assistantService.listProposals).mockResolvedValue([p1, p2]);
   vi.mocked(assistantService.removeProposal).mockResolvedValue();
   // From nothing, as after a logout: no write, removal or switch-off of an earlier test carries over.
@@ -50,6 +51,32 @@ beforeEach(() => {
 afterEach(() => {
   resetNotifications();
   vi.clearAllMocks();
+});
+
+describe('the courses\' switch, from the same features read', () => {
+  it('is unknown until the server answers, then on or off as it says; a failed read keeps it; logout forgets it', async () => {
+    expect(coursesSwitchStore.getState().state).toBe('unknown');
+    vi.mocked(assistantService.features).mockResolvedValueOnce({ assistantPassages: false, lingoCourses: true });
+    await loadAssistantFeatures();
+    expect(coursesSwitchStore.getState().state).toBe('on');
+    vi.mocked(assistantService.features).mockResolvedValueOnce({ assistantPassages: true, lingoCourses: false });
+    await loadAssistantFeatures();
+    expect(coursesSwitchStore.getState().state).toBe('off');
+    vi.mocked(assistantService.features).mockResolvedValueOnce({ assistantPassages: true, lingoCourses: true });
+    await loadAssistantFeatures();
+    vi.mocked(assistantService.features).mockRejectedValueOnce(new Error('rete'));
+    await loadAssistantFeatures();
+    expect(coursesSwitchStore.getState().state).toBe('on');
+    resetAssistantProposals();
+    expect(coursesSwitchStore.getState().state).toBe('unknown');
+    vi.mocked(assistantService.features).mockRejectedValueOnce(new Error('rete'));
+    await loadAssistantFeatures();
+    expect(coursesSwitchStore.getState().state).toBe('unknown');
+    // Back online with it never read: asked again.
+    vi.mocked(assistantService.features).mockResolvedValueOnce({ assistantPassages: false, lingoCourses: true });
+    window.dispatchEvent(new Event('online'));
+    await vi.waitFor(() => expect(coursesSwitchStore.getState().state).toBe('on'));
+  });
 });
 
 describe('D7b proposals — the flag', () => {
@@ -64,7 +91,7 @@ describe('D7b proposals — the flag', () => {
   });
 
   it('a server that says off, or cannot be asked, leaves it off', async () => {
-    vi.mocked(assistantService.features).mockResolvedValueOnce({ assistantPassages: false });
+    vi.mocked(assistantService.features).mockResolvedValueOnce({ assistantPassages: false, lingoCourses: false });
     await loadAssistantFeatures();
     expect(assistantProposalsStore.getState().enabled).toBe(false);
     vi.mocked(assistantService.features).mockRejectedValueOnce(new Error('rete'));
@@ -87,20 +114,21 @@ describe('D7b proposals — the flag', () => {
 
   it('the server saying off, once on, switches off the same way', async () => {
     await loadAssistantFeatures();
-    vi.mocked(assistantService.features).mockResolvedValueOnce({ assistantPassages: false });
+    vi.mocked(assistantService.features).mockResolvedValueOnce({ assistantPassages: false, lingoCourses: false });
     await loadAssistantFeatures();
     expect(assistantProposalsStore.getState().enabled).toBe(false);
     expect(counts()).toBeNull();
   });
 
   it('an answer to a request made before a logout is not taken', async () => {
-    let answer: (v: { assistantPassages: boolean }) => void = () => {};
+    let answer: (v: { assistantPassages: boolean; lingoCourses: boolean }) => void = () => {};
     vi.mocked(assistantService.features).mockReturnValueOnce(new Promise((resolve) => { answer = resolve; }));
     const asking = loadAssistantFeatures();
     resetAssistantProposals();
-    answer({ assistantPassages: true });
+    answer({ assistantPassages: true, lingoCourses: true });
     await asking;
     expect(assistantProposalsStore.getState().enabled).toBe(false);
+    expect(coursesSwitchStore.getState().state).toBe('unknown');
   });
 
   it('on again after an off cleared the lights, the dossiers are read again for them', async () => {
@@ -108,7 +136,7 @@ describe('D7b proposals — the flag', () => {
     appStore.setState({ refreshDossiers });
     await loadAssistantFeatures();
     expect(refreshDossiers).not.toHaveBeenCalled();
-    vi.mocked(assistantService.features).mockResolvedValueOnce({ assistantPassages: false });
+    vi.mocked(assistantService.features).mockResolvedValueOnce({ assistantPassages: false, lingoCourses: false });
     await loadAssistantFeatures();
     await loadAssistantFeatures();
     expect(refreshDossiers).toHaveBeenCalledTimes(1);

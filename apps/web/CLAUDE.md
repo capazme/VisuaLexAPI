@@ -76,7 +76,38 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   change only marks its card handled, and a 403 stops the queue with «Non sei più tra i validatori»; the queue is
   read only once the outlet's `validator` is `true` — while the account loads it waits, for someone the account
   says is not a validator it shows «Questa sezione è riservata…» with no request, which the server would refuse with
-  403, and when `/auth/me` failed (`validator` null, never taken for «not a validator») it reads and the server decides),
+  403, and when `/auth/me` failed (`validator` null, never taken for «not a validator») it reads and the server decides);
+  «Percorsi» is `/studia/percorsi` and a course `/studia/percorsi/:id` (courses spec
+  `docs/superpowers/specs/2026-10-23-gymnasium-courses-design.md` §6, the web's pull request (a); the views under
+  `components/features/studia/corsi/`, the routes in `services/corsiService.ts`, the shapes in `types/corsi.ts`): behind
+  the server's switch `lingo_courses`, read with `assistantPassages` from the one `GET /api/features`
+  (`loadAssistantFeatures` sets `coursesSwitch`: `unknown` until it answers, a failed read keeps what was known — one
+  network error must not hide «Percorsi» for the session —, read again when the browser is back online with it never
+  read, forgotten at logout) — off, the sidebar's «Percorsi» (second in «Studia») and «Oggi»'s row are not drawn,
+  nothing is read, and the pages go back to Oggi (`CoursesGate`, which reads the features again as it mounts and
+  redirects only on an «off» that read confirms; a switch it could not read says so with «Riprova»; a 404 on the list
+  turns the switch off; the server's trash then hides a course and a module too). A review session with `?corso=` waits
+  behind the same gate (the server refuses `?corso=` with a 400 until S2 narrows the session to a course).
+  Nothing of a course is created in the web: the assistant creates it (§3), and an empty «Percorsi» says how, with the
+  sentence to copy (`CREATE_SENTENCE`) and, for a connection without `lingo:courses:write`, where permissions are chosen and that a connection made before the
+  courses lacks it (no promise of what a new one brings: the MCP asks for the scope from M1).
+  Before the first course the declaration `MATERIALE_STUDIO` opens by itself in `AcceptTextDialog` (every word the
+  server's; a newer version answered by `POST …/accetta` comes back unticked); with courses already there a new
+  version waits behind «Leggi e accetta». Every read (`useCourseRead`) is read again when the page is visible again,
+  when the browser is back online and after `coursesChanged()` (a restore, a rename), the last answer kept on screen
+  meanwhile. The course page draws the competences with their numbers («1 di 2 sessioni · la prossima vale dal 3/11 ·
+  ultima 85%», `competenceNumbers`), the modules (a module never opened goes to the trash with «Annulla»; an opened
+  one superseded by a live correction offers «Ritira questo modulo»), «In preparazione» with what is missing and the
+  sentence for the assistant, «Il programma finisce qui» beside a module's deletion (Q11, G-377: offered under the
+  modules' heading once a module was deleted on the page and fewer count than planned, gone with «Annulla»;
+  `PATCH { moduliPrevisti }` to the modules that count, confirmed; «così l’esame potrà aprirsi» only when modules are
+  all the course lacks, `closingOpensExam`), the exam's state (taking it is pull request d), the dossier's link and the menu (rename, export as
+  JSON, the trash with the toast «Il dossier «X» resta in Dossier»). «Oggi»'s row (`TodayCourses`, in the day block's
+  cell so the grid keeps its rows) offers a course's due cards first (`/studia/ripasso/sessione?corso=`, never with a
+  subject; its end has «Torna a Oggi» alone) and then «Modulo del giorno: <titolo> · <percorso>», which opens the
+  course page until the module session (pull request b) exists. `GET /:id` and `GET /oggi` are S2's: their shapes in
+  `types/corsi.ts` are the web's reading of §10.5, to be checked against S2. `corsi.guard.test.ts` keeps the folder's
+  targets at 44 px and its text at 11 px or more,
   `/history`, `/forum` («Dossier pubblici»; `/environments`, the page «Ambienti» was, redirects there keeping an old
   share link's `?import=`), `/forum/community` («Community», `ForumCommunityPage`: an honest placeholder — titled
   «Community» under the Forum's phrase (L-37), an empty state composed for the page, «Le discussioni arrivano presto»
@@ -84,7 +115,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `features/connections/ConnectAiAppPage`: the MCP address from `GET /api/oauth/connection` with
   «Copia», one card per client that connects today — `aiClients.ts`, the survey of 13 Oct 2026, with
   the clients our server refuses listed apart and why —, the personal-data notice (what a connected app reads: dossier
-  names, entry titles and citations, study cards; no clients' personal data there, or only trusted AI apps — the owner,
+  names, entry titles and citations, notes, study cards and courses; no clients' personal data there, or only trusted AI apps — the owner,
   13 Oct 2026, in place of pseudonymisation; the consent page `/connect` carries the same notice), what a connected app can do, and
   `ConnectedAppsSection`, the same list Impostazioni shows; reached from the user menu. The page has two parts, named
   by two anchors at its top: «VisuaLex» (`#visualex`, all of the above) and «mcp-legal-it» (`#mcp-legal-it`, a
@@ -2025,7 +2056,9 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
 - **The trash** (what a connected application deleted, and the dossiers, the entries removed from a dossier and the study cards the user deleted, 30 days; spec §10-11):
   one `useTrash` in `DossierPage` feeds «Cestino (n)» on the list (shown only
   when there is something), the page `?trash=1` (`TrashPage`: dossiers, entries
-  «Da «dossier»», «Schede di studio» by their first questions) and a dossier's
+  «Da «dossier»», «Schede di studio» by their first questions, «Percorso «…»» with its modules and cards and
+  «Modulo «modulo» · percorso» (the server's label split at its first « · ») for the courses of «Percorsi», `LINGO_CORSO` and `LINGO_CORSO_MODULO`, whose 404 on a
+  restore — a module whose course is gone — keeps the entry with the server's words when the trash still has it) and a dossier's
   own «Rimossi di recente (n)» at its bottom (`DossierRecentlyRemoved`). Each
   entry (`TrashEntryRow`, `trashSummary.ts`) is restored whole — a 409 asks
   which dossier to restore into; a 404 drops an entry the server no longer has, and with a dossier
