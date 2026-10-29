@@ -103,7 +103,7 @@ describe('groupAnnotationsByBlock', () => {
     expect(ids(groups[2].highlights)).toEqual(['h1', 'h2']);
     expect(ids(groups[2].notes)).toEqual(['n0']);
     expect(ids(groups[3].notes)).toEqual(['n1']);
-    expect(groups[4]).toEqual({ notes: [], highlights: [], threads: [] });
+    expect(groups[4]).toEqual({ notes: [], highlights: [], threads: [], glosses: [] });
   });
 
   it('lists a highlight dragged across two commi under both', () => {
