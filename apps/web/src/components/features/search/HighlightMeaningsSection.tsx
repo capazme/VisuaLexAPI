@@ -16,7 +16,7 @@ import { FIELD_TEXT, FOCUS_RING } from '../../../constants/interactions';
 const capitalised = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /**
- * Impostazioni › «Significato dei colori» (D8 §3, the owner: «solo etichette»): what each of the four colours means to
+ * Impostazioni › «Significato dei colori» (the owner, 29 October 2026: «solo etichette»): what each of the four colours means to
  * this user. The colours stay the four they are and no highlight changes (root rule 23: a highlight keeps its colour
  * key, only the words for it change); what is written here is what the colour menu says beside each colour. A field
  * saves when it is left or on Enter, trimmed, 1 to `HIGHLIGHT_MEANING_MAX` characters; an empty one keeps the meaning
@@ -25,7 +25,7 @@ const capitalised = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
  * when Impostazioni is opened here (the reader's gear): `headingRef`.
  */
 export function HighlightMeaningsSection({ headingRef }: { headingRef?: Ref<HTMLHeadingElement> }) {
-  const own = useAppStore((s) => s.settings.highlightColorMeanings);
+  const own = useAppStore((s) => s.settings.highlightColorMeanings) ?? {};
   const updateSettings = useAppStore((s) => s.updateSettings);
   const meanings = useHighlightColorMeanings();
   // What is being typed, per colour, until it is saved or given up.

@@ -33,6 +33,11 @@ interface Props {
   onArticle?: (article: ArticleData) => void;
   /** The dossier entry it reads: what an application proposed on it is drawn here, and only here (D7b). */
   itemId?: string;
+  /**
+   * The gear beside the colour, to the colours' meanings in Impostazioni (default). Left out inside a phone's sheet (the
+   * lesson's article), which keeps the focus inside it: a dialog opened over it would have to fight it for the focus.
+   */
+  meaningsGear?: boolean;
 }
 
 type FetchState =
@@ -54,7 +59,7 @@ const NO_ANNOTATIONS: Annotation[] = [];
  * `buildItemKey` / `uniqueArticleIdFromNorma` pair so notes and highlights
  * created here and on the dashboard land on the same store rows.
  */
-export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArticle, itemId }: Props) {
+export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArticle, itemId, meaningsGear = true }: Props) {
   const [result, setResult] = useState<FetchResult | null>(null);
   const [retryTick, setRetryTick] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -374,6 +379,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
         {!readOnly && (
           <HighlightColorMenu
             labelled
+            meaningsGear={meaningsGear}
             placement="auto"
             className="ml-auto"
             triggerClassName="min-h-[44px] gap-1.5 px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100 md:min-h-0 dark:text-slate-400 dark:hover:bg-slate-700"

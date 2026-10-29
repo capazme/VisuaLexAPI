@@ -25,7 +25,7 @@ describe('persist: the colour of new highlights (H1), as a reload finds it', () 
   );
 });
 
-describe('persist: the colours\' meanings (D8 §3), as a reload finds them', () => {
+describe('persist: the colours\' meanings, as a reload finds them', () => {
   it('keeps the user\'s own', () => {
     expect(merge({ settings: { highlightColorMeanings: { green: 'Termini e scadenze' } } }).settings.highlightColorMeanings)
       .toEqual({ green: 'Termini e scadenze' });

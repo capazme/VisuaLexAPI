@@ -32,7 +32,7 @@ const at = (path: string) => render(<MemoryRouter initialEntries={[path]}><Layou
 
 afterEach(() => appStore.getState().closeSettings());
 
-describe('Layout — Impostazioni, opened from anywhere (D8 §3)', () => {
+describe('Layout — Impostazioni, opened from anywhere', () => {
   it('the user menu opens it at its top, «Chiudi» closes it', () => {
     at('/dossier');
     fireEvent.click(screen.getAllByRole('button', { name: 'Impostazioni' })[0]);

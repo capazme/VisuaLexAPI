@@ -13,7 +13,7 @@ const DOT: Record<HighlightColor, string> = {
 /** The title over the four: their own menu's, and in a menu of actions. Each colour's meaning is a suggestion. */
 export const SECTION_HEADING = 'Colore delle nuove evidenziazioni — uso suggerito';
 
-/** The way to Impostazioni › «Significato dei colori» (D8 §3): the gear's name and title, and the phone's menu entry. */
+/** The way to Impostazioni › «Significato dei colori»: the gear's name and title, and the phone's menu entry. */
 export const CHANGE_MEANINGS_LABEL = 'Cambia il significato dei colori';
 
 const capitalised = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);

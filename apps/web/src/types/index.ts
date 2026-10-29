@@ -155,7 +155,7 @@ export interface AppSettings {
      */
     highlightColor: 'yellow' | 'green' | 'red' | 'blue';
     /**
-     * What each colour means to this user (D8 §3: only the labels change, the four colours stay), set in
+     * What each colour means to this user (only the labels change, the four colours stay), set in
      * Impostazioni › «Significato dei colori». Only the colours given a meaning of their own: the others follow
      * `HIGHLIGHT_COLOR_MEANINGS`. Kept on this device, as the other reading settings; never sent to the server.
      */

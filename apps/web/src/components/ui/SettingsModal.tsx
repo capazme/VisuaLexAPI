@@ -278,7 +278,7 @@ export function SettingsModal({ isOpen, section = null, onClose, onRestartTour }
                     </div>
                 </div>
 
-                {/* What each highlight colour means to this user (D8 §3), with the other reading settings. */}
+                {/* What each highlight colour means to this user, with the other reading settings. */}
                 <HighlightMeaningsSection headingRef={meaningsHeading} />
 
                 {/* Restart Tour */}

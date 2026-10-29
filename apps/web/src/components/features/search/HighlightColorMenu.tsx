@@ -14,23 +14,28 @@ export interface HighlightColorMenuProps {
   className?: string;
   /** Where the list opens (`MenuButton`). */
   placement?: 'below' | 'above' | 'auto';
+  /**
+   * The gear beside it (default). Study Mode's header leaves it out: it has a gear already, its own settings, which
+   * hold the same way to the colours' meanings — two identical gears side by side would lead to two places.
+   */
+  meaningsGear?: boolean;
 }
 
 /**
  * The colour of new highlights, chosen once in the reading bar (H1, the owner's decision): every highlight made after
  * takes it, never asking. The trigger shows the colour; its menu offers the four, each with what it means to this user
- * (D8 §3: their own meaning, else the default), a hint and no rule. Kept on this device with the other reading settings
+ * (their own meaning, else the default), a hint and no rule. Kept on this device with the other reading settings
  * (`settings.highlightColor`). Beside it one gear, and only that, opens Impostazioni at «Significato dei colori»: the
  * gear says «change it», where a «?» would say «explain it», and the menu already explains the four.
  */
-export function HighlightColorMenu({ labelled = false, triggerClassName, className, placement }: HighlightColorMenuProps) {
+export function HighlightColorMenu({ labelled = false, triggerClassName, className, placement, meaningsGear = true }: HighlightColorMenuProps) {
   const color = useAppStore((s) => s.settings.highlightColor);
   const updateSettings = useAppStore((s) => s.updateSettings);
   const openSettings = useAppStore((s) => s.openSettings);
   const meanings = useHighlightColorMeanings();
   const name = highlightColorName(color);
   return (
-    <div className={cn('flex items-center', className)}>
+    <div className={cn('flex items-center gap-1', className)}>
       <MenuButton
         // The name starts with the words shown («Colore: giallo», WCAG 2.5.3); a dot alone says them in its tooltip.
         label={`Colore: ${name} (nuove evidenziazioni)`}
@@ -50,7 +55,7 @@ export function HighlightColorMenu({ labelled = false, triggerClassName, classNa
         {labelled && <span>Colore: {name}</span>}
       </MenuButton>
       {/* The trigger's own look, as an icon: 44 px wide on a phone whatever the trigger's padding. */}
-      <button
+      {meaningsGear && <button
         type="button"
         // As the menu's clicks, it never reaches the card it sits in (a dossier's row).
         onClick={(event) => { event.stopPropagation(); openSettings('highlightColors'); }}
@@ -63,7 +68,7 @@ export function HighlightColorMenu({ labelled = false, triggerClassName, classNa
         )}
       >
         <Settings size={16} aria-hidden />
-      </button>
+      </button>}
     </div>
   );
 }

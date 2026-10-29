@@ -145,8 +145,9 @@ export function StudyModeContent({
 
       const target = e.target as Node | null;
       if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
-      // A dialog over Study Mode (Impostazioni) keeps its keys, a selection left in the text behind it included.
-      if (target instanceof Element && target.closest('[aria-modal="true"]')) return;
+      // While a dialog is open over Study Mode (Impostazioni) the keys are its own: a selection left in the text behind
+      // it is not highlighted.
+      if (document.querySelector('[aria-modal="true"]')) return;
 
       const selection = window.getSelection();
       if (!selection?.toString().trim()) return;

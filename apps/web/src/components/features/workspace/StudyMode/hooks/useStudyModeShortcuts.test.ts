@@ -71,8 +71,14 @@ describe('useStudyModeShortcuts — keys that are not Study Mode\'s (H1)', () =>
     field.focus();
     field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
     expect(document.activeElement).toBe(field);
+    // The focus outside it (a click on its words, the moment before its first focus): still the dialog's keys.
+    field.blur();
+    for (const key of ['Escape', 'ArrowRight', '2']) press(key);
     dialog.remove();
     for (const fn of Object.values(h)) expect(fn).not.toHaveBeenCalled();
+    // Gone, the keys are Study Mode's again.
+    press('Escape');
+    expect(h.onClose).toHaveBeenCalledTimes(1);
   });
 
   it('an Esc another handler already took is left alone', () => {

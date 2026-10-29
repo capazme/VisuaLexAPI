@@ -33,7 +33,7 @@ beforeEach(() => {
 });
 afterEach(() => setOwn({}));
 
-describe('Impostazioni › «Significato dei colori» (D8 §3)', () => {
+describe('Impostazioni › «Significato dei colori»', () => {
   it('lists the four colours, each with its meaning: VisuaLex\'s by default', () => {
     const { region } = open();
     expect(within(region).getAllByRole('textbox').map((f) => [f.closest('div')?.textContent, (f as HTMLInputElement).value]))

@@ -20,7 +20,7 @@ export function highlightColorName(color: string): string {
  * What each colour is suggested for (D7b): the reader's convention, offered as a hint in the menu where the colour of
  * new highlights is chosen (H1), never a rule. The same meanings the MCP tool gives an application; red stands for
  * «Da rivedere», the mark of review, and an application never proposes in red. The default: each user may give a
- * colour a meaning of their own (D8 §3, `settings.highlightColorMeanings`), which only this device knows.
+ * colour a meaning of their own (`settings.highlightColorMeanings`), which only this device knows.
  */
 export const HIGHLIGHT_COLOR_MEANINGS: Record<HighlightColor, string> = {
   yellow: 'Punto centrale',

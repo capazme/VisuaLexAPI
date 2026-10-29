@@ -24,9 +24,10 @@ export function useStudyModeShortcuts(
   const { enabled = true } = options;
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    // A dialog over Study Mode (Impostazioni, opened by the colour's gear) keeps its keys: its Esc, its arrows and what
-    // is typed in it are never Study Mode's too, which would close it or turn the article under the dialog.
-    if (e.target instanceof Element && e.target.closest('[aria-modal="true"]')) return;
+    // While a dialog is open over Study Mode (Impostazioni, opened from its settings) the keys are the dialog's: its Esc,
+    // its arrows and what is typed in it never close Study Mode or turn the article under it — the focus inside the
+    // dialog or not (a click on its words, the 50 ms before its first focus, Safari's click that focuses nothing).
+    if (document.querySelector('[aria-modal="true"]')) return;
     // Ignore if typing in input or textarea
     if (
       e.target instanceof HTMLInputElement ||

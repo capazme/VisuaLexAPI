@@ -6,7 +6,7 @@ import {
   sanitizeHighlightMeanings,
 } from '../highlightColors';
 
-describe('a colour\'s meaning, as the user writes it (D8 §3)', () => {
+describe('a colour\'s meaning, as the user writes it', () => {
   it('is trimmed, and 1 to 40 characters', () => {
     expect(normalizeHighlightMeaning('  Termini e scadenze ')).toBe('Termini e scadenze');
     expect(normalizeHighlightMeaning('x')).toBe('x');

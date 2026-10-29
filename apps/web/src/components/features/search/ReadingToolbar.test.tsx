@@ -405,9 +405,10 @@ describe('ReadingToolbar — the colour of new highlights, chosen once (H1)', ()
         expect(choices[0]).toHaveAttribute('aria-checked', 'true');
         fireEvent.click(choices[3]);
         expect(color()).toBe('blue');
-    });});
+    });
+});
 
-describe('ReadingToolbar — the colours mean what the user says (D8 §3)', () => {
+describe('ReadingToolbar — the colours mean what the user says', () => {
     afterEach(() => appStore.setState((st) => ({
         settings: { ...st.settings, highlightColorMeanings: {} },
         settingsDialog: { open: false, section: null },
