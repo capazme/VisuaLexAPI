@@ -5,8 +5,9 @@ import { delegatedToken } from '../oauth/oauthHelpers';
 import { delegatedQuotaStatus } from '../../src/middleware/delegated';
 import { ARTICLE_FIXTURES } from '../../../web/src/utils/__fixtures__/articleTexts';
 
-// D7b, the connected application's side (spec §8.4, §8.7): an entry's text, and passages proposed on it,
-// found in the text the reader reads, stored as the assistant's marks.
+// D7b and D8, the connected application's side (spec §8.4, §8.7): an entry's text, and glosses proposed on its
+// passages, found in the text the reader reads, stored as the assistant's notes with no colour. Coloured passages
+// are no longer proposed: 410.
 
 const API = 'http://legal-api.test';
 const originalLegalApiUrl = process.env.LEGAL_API_URL;
@@ -30,11 +31,23 @@ let articleStatus = 200;
 beforeAll(() => nock.activate());
 afterAll(() => nock.restore());
 
-async function switchOn(enabled = true) {
-  await prisma.appSwitch.upsert({ where: { key: 'assistant_passages' }, create: { key: 'assistant_passages', enabled }, update: { enabled } });
+async function switchOn(enabled = true, key = 'assistant_glosses') {
+  await prisma.appSwitch.upsert({ where: { key }, create: { key, enabled }, update: { enabled } });
 }
 
-describe('D7b — an entry’s text and the passages proposed on it', () => {
+/** A coloured passage an application proposed before D8, as the old route stored it. */
+function savedMark(userId: string, itemId: string, text: string, startOffset: number, over: { note?: string | null; clientId?: string } = {}) {
+  const note = over.note === undefined ? null : over.note;
+  return prisma.highlight.create({
+    data: {
+      userId, normaKey: KEY, text, color: 'green', startOffset, endOffset: startOffset + text.length, note,
+      createdByClientId: over.clientId ?? 'client-1', createdByClientName: 'Claude Code', dossierItemId: itemId,
+      assistantText: text, assistantStartOffset: startOffset, assistantNote: note, noteState: note === null ? null : 'proposed',
+    },
+  });
+}
+
+describe('D7b and D8 — an entry’s text and the glosses proposed on it', () => {
   let alice: TestUser;
   let dossierId: string;
   let normId: string;
@@ -43,8 +56,8 @@ describe('D7b — an entry’s text and the passages proposed on it', () => {
   let token: string;
   const as = () => ({ Authorization: `Bearer ${token}` });
   const text = (itemId = normId, query = '') => request(app).get(`/api/dossiers/${dossierId}/items/${itemId}/text${query}`).set(as());
-  const propose = (passaggi: unknown, itemId = normId, who = as()) =>
-    request(app).post(`/api/dossiers/${dossierId}/items/${itemId}/passages`).set(who).send({ passaggi });
+  const gloss = (glosse: unknown, itemId = normId, who = as()) =>
+    request(app).post(`/api/dossiers/${dossierId}/items/${itemId}/glosses`).set(who).send({ glosse });
 
   beforeEach(async () => {
     process.env.LEGAL_API_URL = API;
@@ -63,7 +76,9 @@ describe('D7b — an entry’s text and the passages proposed on it', () => {
     decisionId = (await add({ itemType: 'sentenza', title: 'x', content: SENTENZA })).body.id;
     noteId = (await add({ itemType: 'note', title: 'Nota', content: 'Mia nota.' })).body.id;
     token = (await delegatedToken(alice, 'dossier:read dossier:write dossier:text')).apiToken;
+    // Glosses need both: the applications' side and the web app's, where the user validates them.
     await switchOn();
+    await switchOn(true, 'assistant_passages');
   });
 
   afterEach(() => {
@@ -82,7 +97,7 @@ describe('D7b — an entry’s text and the passages proposed on it', () => {
         parte: 1,
         parti: 1,
         testo: RAW,
-        proposte: [],
+        glosse: [],
       });
       expect(articleBodies).toEqual([{ act_type: 'codice civile', act_number: '262', date: '1942-03-16', article: '1453', version: 'vigente', version_date: '' }]);
     });
@@ -103,16 +118,13 @@ describe('D7b — an entry’s text and the passages proposed on it', () => {
       expect(response.body.testo).toBe(RAW);
     });
 
-    it('refuses a note, a source that cannot answer, another user’s dossier, and the switch off', async () => {
+    it('refuses a note, a source that cannot answer, and another user’s dossier', async () => {
       expect((await text(noteId)).body.detail).toBe('Questa voce non ha un testo: è una nota.');
       articleStatus = 502;
       expect((await text()).status).toBe(503);
       const bob = await createTestUser('passages-bob');
       const bobToken = (await delegatedToken(bob, 'dossier:read dossier:text')).apiToken;
       expect((await request(app).get(`/api/dossiers/${dossierId}/items/${normId}/text`).set({ Authorization: `Bearer ${bobToken}` })).status).toBe(404);
-      await switchOn(false);
-      articleStatus = 200;
-      expect((await text()).status).toBe(404);
     });
 
     it('needs dossier:text', async () => {
@@ -122,33 +134,43 @@ describe('D7b — an entry’s text and the passages proposed on it', () => {
       expect(response.body.error).toBe('insufficient_scope');
     });
 
-    it('lists only the assistant’s proposals the user has not taken up, as the model wrote them', async () => {
-      await propose([
+    it('lists only the glosses the user has not taken up, as the model wrote them', async () => {
+      await gloss([
         { testo: 'il risarcimento del danno', nota: 'Danno.' },
-        { testo: 'la risoluzione del contratto', colore: 'verde' },
+        { testo: 'la risoluzione del contratto', nota: 'Rimedio.' },
         { testo: "Dalla data della domanda di risoluzione l'inadempiente", nota: 'Termine.' },
       ]);
       const rows = await prisma.highlight.findMany({ where: { dossierItemId: normId }, orderBy: { startOffset: 'asc' } });
-      // The user validates one note, and moves the boundaries of the bare mark.
-      await prisma.highlight.update({ where: { id: rows[2].id }, data: { noteState: 'validated' } });
-      await prisma.highlight.update({ where: { id: rows[0].id }, data: { startOffset: 1, text: 'x' } });
-      // A highlight of the user's own is never listed.
+      // The user validates one gloss, flags another, and moves the boundaries of the third.
+      const projection = RAW.replace(/\n/g, '');
+      const byText = (t: string) => rows.find((r) => r.text === t)!;
+      await prisma.highlight.update({ where: { id: byText("Dalla data della domanda di risoluzione l'inadempiente").id }, data: { noteState: 'validated' } });
+      await prisma.highlight.update({ where: { id: byText('la risoluzione del contratto').id }, data: { noteState: 'review' } });
+      await prisma.highlight.update({ where: { id: byText('il risarcimento del danno').id }, data: { startOffset: 1, text: projection.slice(1, 5) } });
+      // A coloured passage saved before D8, and a highlight of the user's own, are never listed.
+      await savedMark(alice.id, normId, 'la risoluzione del contratto', projection.indexOf('la risoluzione del contratto'), { note: 'Vecchia.' });
       await request(app).post('/api/highlights').set(authHeader(alice)).send({ normaKey: KEY, text: 'contratti', color: 'red', startOffset: 50, endOffset: 59 });
       const response = await text();
-      expect(response.body.proposte).toEqual([
-        { testo: 'la risoluzione del contratto', colore: 'verde', nota: null },
-        { testo: 'il risarcimento del danno', colore: 'giallo', nota: 'Danno.' },
-      ]);
+      expect(response.body.glosse).toEqual([{ testo: 'il risarcimento del danno', nota: 'Danno.' }]);
+      expect(response.body).not.toHaveProperty('proposte');
     });
 
-    it('lists another application’s proposals to no one but it, and reads nothing for a session', async () => {
-      await propose([{ testo: 'il risarcimento del danno', nota: 'Fatti della pratica.' }]);
+    it('lists another application’s glosses to no one but it, and reads nothing for a session', async () => {
+      await gloss([{ testo: 'il risarcimento del danno', nota: 'Fatti della pratica.' }]);
       const other = (await delegatedToken(alice, 'dossier:read dossier:write dossier:text')).apiToken;
       const seen = await request(app).get(`/api/dossiers/${dossierId}/items/${normId}/text`).set({ Authorization: `Bearer ${other}` });
-      expect(seen.body.proposte).toEqual([]);
-      expect((await text()).body.proposte).toHaveLength(1);
+      expect(seen.body.glosse).toEqual([]);
+      expect((await text()).body.glosse).toHaveLength(1);
       const session = await request(app).get(`/api/dossiers/${dossierId}/items/${normId}/text`).set(authHeader(alice));
       expect(session.status).toBe(403);
+    });
+
+    it('reads with every switch off: quoting an entry verbatim is behind none (G-372)', async () => {
+      await switchOn(false);
+      await switchOn(false, 'assistant_passages');
+      const response = await text();
+      expect(response.status).toBe(200);
+      expect(response.body.testo).toBe(RAW);
     });
 
     it('says a decision the source does not know has no text to read, not «try again»', async () => {
@@ -196,33 +218,62 @@ describe('D7b — an entry’s text and the passages proposed on it', () => {
     });
   });
 
-  describe('POST …/passages', () => {
-    it('stores what it finds, as the text’s own slice, under the reader’s key, one outcome per passage', async () => {
-      const response = await propose([
-        { testo: 'la risoluzione\ndel contratto,   salvo', colore: 'blu', nota: '  Il rimedio.  ' },
-        { testo: 'non compare in questo testo' },
-        { testo: 'breve' },
+  describe('POST …/passages, gone', () => {
+    it('answers 410 in words, whatever it is sent, reads no text and stores nothing; the saved ones stay', async () => {
+      const saved = await savedMark(alice.id, normId, 'il risarcimento del danno', 10, { note: 'Vecchia.' });
+      for (const body of [{ passaggi: [{ testo: 'il risarcimento del danno', colore: 'verde' }] }, { passaggi: [{ testo: 'x', colore: 'rosso' }] }, {}]) {
+        const response = await request(app).post(`/api/dossiers/${dossierId}/items/${normId}/passages`).set(as()).send(body);
+        expect(response.status).toBe(410);
+        expect(response.body.detail).toBe('Le evidenziazioni proposte dall’IA non ci sono più: evidenziare è un gesto dell’utente. Un passaggio si spiega con una glossa, dove è attiva.');
+      }
+      // Also with the switches off, and for the user's session.
+      await switchOn(false);
+      expect((await request(app).post(`/api/dossiers/${dossierId}/items/${normId}/passages`).set(authHeader(alice)).send({ passaggi: [] })).status).toBe(410);
+      expect(articleBodies).toEqual([]);
+      expect(await prisma.highlight.findMany()).toEqual([saved]);
+    });
+
+    it('costs nothing', async () => {
+      const before = await delegatedQuotaStatus(alice.id);
+      await request(app).post(`/api/dossiers/${dossierId}/items/${normId}/passages`).set(as()).send({ passaggi: [{ testo: 'il risarcimento del danno' }] });
+      await new Promise((r) => setTimeout(r, 50));
+      const after = await delegatedQuotaStatus(alice.id);
+      expect(after.points.remaining).toBe(before.points.remaining);
+      expect(after.counters.passage.remaining).toBe(before.counters.passage.remaining);
+    });
+  });
+
+  describe('POST …/glosses', () => {
+    it('stores what it finds, as the text’s own slice, under the reader’s key, with no colour, one outcome per gloss', async () => {
+      const response = await gloss([
+        { testo: 'la risoluzione\ndel contratto,   salvo', nota: '  Il rimedio.  ' },
+        { testo: 'non compare in questo testo', nota: 'x' },
+        { testo: 'breve', nota: 'x' },
       ]);
       expect(response.status).toBe(400); // «breve» is under 15 characters: the call is malformed
-      const ok = await propose([
-        { testo: 'la risoluzione\ndel contratto,   salvo', colore: 'blu', nota: '  Il rimedio.  ' },
-        { testo: 'non compare in questo testo affatto' },
+      const ok = await gloss([
+        { testo: 'la risoluzione\ndel contratto,   salvo', nota: '  Il rimedio.  ' },
+        { testo: 'non compare in questo testo affatto', nota: 'x' },
         // Fifteen characters, but only eight of them words.
-        { testo: 'a b c d e f g h' },
+        { testo: 'a b c d e f g h', nota: 'x' },
       ]);
       expect(ok.status).toBe(200);
-      expect(ok.body.passaggi).toEqual([
-        { esito: 'proposto', id: expect.any(String), colore: 'blu', nota: true },
-        { esito: 'rifiutato', motivo: 'non trovato alla lettera nel testo' },
-        { esito: 'rifiutato', motivo: 'troppo corto' },
-      ]);
-      const row = await prisma.highlight.findUniqueOrThrow({ where: { id: ok.body.passaggi[0].id } });
+      expect(ok.body).toEqual({
+        voce: { id: normId, riferimento: 'art. 1453 c.c.' },
+        glosse: [
+          { esito: 'proposta', id: expect.any(String) },
+          { esito: 'rifiutata', motivo: 'non trovato alla lettera nel testo' },
+          { esito: 'rifiutata', motivo: 'troppo corto' },
+        ],
+      });
+      const row = await prisma.highlight.findUniqueOrThrow({ where: { id: ok.body.glosse[0].id } });
       const projection = RAW.replace(/\n/g, '');
       expect(row).toMatchObject({
         userId: alice.id,
+        kind: 'gloss',
+        color: null,
         normaKey: KEY,
         text: 'la risoluzione del contratto, salvo',
-        color: 'blue',
         note: 'Il rimedio.',
         assistantNote: 'Il rimedio.',
         noteState: 'proposed',
@@ -242,14 +293,14 @@ describe('D7b — an entry’s text and the passages proposed on it', () => {
 
     it('chooses among repeated words with «prima» or «dopo», and gives the count otherwise', async () => {
       serve(`${RAW}\n\n Ancora: il risarcimento del danno è dovuto.`);
-      const response = await propose([
-        { testo: 'il risarcimento del danno' },
-        { testo: 'il risarcimento del danno', dopo: 'è dovuto' },
-        { testo: 'il risarcimento del danno', prima: 'in ogni caso,' },
-        { testo: 'il risarcimento del danno', prima: 'nessuna di queste parole' },
+      const response = await gloss([
+        { testo: 'il risarcimento del danno', nota: 'a' },
+        { testo: 'il risarcimento del danno', nota: 'b', dopo: 'è dovuto' },
+        { testo: 'il risarcimento del danno', nota: 'c', prima: 'in ogni caso,' },
+        { testo: 'il risarcimento del danno', nota: 'd', prima: 'nessuna di queste parole' },
       ]);
-      const [counted, after, before, wrong] = response.body.passaggi;
-      expect(counted).toEqual({ esito: 'rifiutato', motivo: 'compare 2 volte: aggiungi "prima" o "dopo"' });
+      const [counted, after, before, wrong] = response.body.glosse;
+      expect(counted).toEqual({ esito: 'rifiutata', motivo: 'compare 2 volte: aggiungi "prima" o "dopo"' });
       expect(wrong).toEqual(counted);
       const rows = await prisma.highlight.findMany({ where: { id: { in: [after.id, before.id] } } });
       const projection = `${RAW}\n\n Ancora: il risarcimento del danno è dovuto.`.replace(/\n/g, '');
@@ -259,84 +310,101 @@ describe('D7b — an entry’s text and the passages proposed on it', () => {
       ]);
     });
 
-    it('refuses the same words in the same place twice, and leaves the user’s own marks unread', async () => {
+    it('refuses a gloss in the same place twice, beside the user’s own marks and a saved coloured passage, unread', async () => {
       const at = RAW.replace(/\n/g, '').indexOf('il risarcimento del danno');
-      // The user marked the same words: the model is never told, and its proposal is stored beside it.
+      // The user marked the same words, and an application proposed them in colour before D8: the model is never
+      // told, and its gloss is stored beside them.
       await request(app).post('/api/highlights').set(authHeader(alice)).send({ normaKey: KEY, text: 'il risarcimento del danno', color: 'red', startOffset: at, endOffset: at + 25 });
-      const first = await propose([{ testo: 'il risarcimento del danno' }, { testo: 'il risarcimento del danno' }]);
-      expect(first.body.passaggi.map((p: { esito: string; motivo?: string }) => p.motivo ?? p.esito)).toEqual(['proposto', 'già proposto in questo punto']);
+      await savedMark(alice.id, normId, 'il risarcimento del danno', at, { clientId: 'irrelevant' });
+      const first = await gloss([{ testo: 'il risarcimento del danno', nota: 'a' }, { testo: 'il risarcimento del danno', nota: 'b' }]);
+      expect(first.body.glosse.map((p: { esito: string; motivo?: string }) => p.motivo ?? p.esito)).toEqual(['proposta', 'già glossato in questo punto']);
     });
 
-    it('judges a repeat by where the model put a mark, never by where the user moved it', async () => {
-      const first = await propose([{ testo: 'il risarcimento del danno' }]);
+    it('never tells an application what another one glossed: the same words are its own gloss', async () => {
+      await gloss([{ testo: 'il risarcimento del danno', nota: 'a' }]);
+      const other = (await delegatedToken(alice, 'dossier:read dossier:write dossier:text')).apiToken;
+      const second = await gloss([{ testo: 'il risarcimento del danno', nota: 'b' }], normId, { Authorization: `Bearer ${other}` });
+      expect(second.body.glosse[0].esito).toBe('proposta');
+      expect(await prisma.highlight.count({ where: { kind: 'gloss' } })).toBe(2);
+    });
+
+    it('judges a repeat by where the model put a gloss, never by where the user moved it', async () => {
+      const first = await gloss([{ testo: 'il risarcimento del danno', nota: 'a' }]);
       const projection = RAW.replace(/\n/g, '');
       const moved = projection.indexOf('la risoluzione del contratto');
-      await prisma.highlight.update({ where: { id: first.body.passaggi[0].id }, data: { startOffset: moved, text: 'la risoluzione del contratto', endOffset: moved + 28 } });
-      const again = await propose([{ testo: 'il risarcimento del danno' }, { testo: 'la risoluzione del contratto' }]);
-      expect(again.body.passaggi.map((p: { esito: string; motivo?: string }) => p.motivo ?? p.esito)).toEqual(['già proposto in questo punto', 'proposto']);
+      await prisma.highlight.update({ where: { id: first.body.glosse[0].id }, data: { startOffset: moved, text: 'la risoluzione del contratto', endOffset: moved + 28 } });
+      const again = await gloss([{ testo: 'il risarcimento del danno', nota: 'a' }, { testo: 'la risoluzione del contratto', nota: 'b' }]);
+      expect(again.body.glosse.map((p: { esito: string; motivo?: string }) => p.motivo ?? p.esito)).toEqual(['già glossato in questo punto', 'proposta']);
     });
 
-    it('proposes on a decision, in its projection, under its key with no article', async () => {
-      const response = await propose([{ testo: 'la violazione dell’art. 640 c.p.', nota: 'Il motivo.' }], decisionId);
-      expect(response.body.passaggi[0].esito).toBe('proposto');
-      const row = await prisma.highlight.findUniqueOrThrow({ where: { id: response.body.passaggi[0].id } });
+    it('glosses a decision, in its projection, under its key with no article', async () => {
+      const response = await gloss([{ testo: 'la violazione dell’art. 640 c.p.', nota: 'Il motivo.' }], decisionId);
+      expect(response.body.glosse[0].esito).toBe('proposta');
+      const row = await prisma.highlight.findUniqueOrThrow({ where: { id: response.body.glosse[0].id } });
       expect(row.normaKey).toBe('cassazione:penale:10787:2024::art::');
       const projection = ['REPUBBLICA ITALIANA\nLA CORTE SUPREMA DI CASSAZIONE', DECISION_TEXT.motivazione, DECISION_TEXT.dispositivo].join('').replace(/\n/g, '');
       expect(projection.slice(row.startOffset, row.endOffset)).toBe('la violazionedell’art. 640 c.p.');
     });
 
     it('refuses the whole call on a note, a text not in force, a source down, the switch off', async () => {
-      expect((await propose([{ testo: 'il risarcimento del danno' }], noteId)).status).toBe(400);
+      const one = [{ testo: 'il risarcimento del danno', nota: 'a' }];
+      expect((await gloss(one, noteId)).status).toBe(400);
       validity = { state: 'historical' };
-      const past = await propose([{ testo: 'il risarcimento del danno' }]);
+      const past = await gloss(one);
       expect(past.status).toBe(400);
-      expect(past.body.detail).toBe('Questa voce mostra un testo non in vigore: le evidenziazioni non si vedrebbero.');
+      expect(past.body.detail).toBe('Questa voce mostra un testo non in vigore: le glosse non si vedrebbero.');
       validity = undefined;
       articleStatus = 500;
-      expect((await propose([{ testo: 'il risarcimento del danno' }])).status).toBe(503);
+      expect((await gloss(one)).status).toBe(503);
       articleStatus = 200;
       await switchOn(false);
-      expect((await propose([{ testo: 'il risarcimento del danno' }])).status).toBe(404);
+      // The passages' switch alone does not open it.
+      const off = await gloss(one);
+      expect(off.status).toBe(404);
+      expect(off.body.detail).toBe('Non disponibile');
+      // Nor the glosses' alone: the user could neither see nor remove what it wrote.
+      await switchOn(true);
+      await switchOn(false, 'assistant_passages');
+      expect((await gloss(one)).status).toBe(404);
       expect(await prisma.highlight.count()).toBe(0);
     });
 
-    it('needs dossier:write and dossier:text, and an application', async () => {
+    it('needs dossier:write and dossier:text, an application, and the user’s own dossier', async () => {
+      const one = [{ testo: 'il risarcimento del danno', nota: 'a' }];
       const writeOnly = (await delegatedToken(alice, 'dossier:read dossier:write')).apiToken;
       const textOnly = (await delegatedToken(alice, 'dossier:read dossier:text')).apiToken;
-      expect((await propose([{ testo: 'il risarcimento del danno' }], normId, { Authorization: `Bearer ${writeOnly}` })).status).toBe(403);
-      expect((await propose([{ testo: 'il risarcimento del danno' }], normId, { Authorization: `Bearer ${textOnly}` })).status).toBe(403);
-      expect((await propose([{ testo: 'il risarcimento del danno' }], normId, authHeader(alice))).status).toBe(403);
-    });
-
-    it('refuses more than ten passages, unknown keys, a long context, a note with control characters', async () => {
-      const ten = Array.from({ length: 11 }, () => ({ testo: 'il risarcimento del danno' }));
-      expect((await propose(ten)).status).toBe(400);
-      expect((await propose([{ testo: 'il risarcimento del danno', pagina: 1 }])).status).toBe(400);
-      expect((await propose([{ testo: 'il risarcimento del danno', prima: 'a'.repeat(201) }])).status).toBe(400);
-      expect((await propose([{ testo: 'il risarcimento del danno', nota: 'a\u0007b' }])).status).toBe(400);
-      expect((await propose([{ testo: 'il risarcimento del danno', colore: 'viola' }])).status).toBe(400);
+      expect((await gloss(one, normId, { Authorization: `Bearer ${writeOnly}` })).status).toBe(403);
+      expect((await gloss(one, normId, { Authorization: `Bearer ${textOnly}` })).status).toBe(403);
+      expect((await gloss(one, normId, authHeader(alice))).status).toBe(403);
+      const bob = await createTestUser('glosses-bob');
+      const bobToken = (await delegatedToken(bob, 'dossier:read dossier:write dossier:text')).apiToken;
+      expect((await gloss(one, normId, { Authorization: `Bearer ${bobToken}` })).status).toBe(404);
       expect(await prisma.highlight.count()).toBe(0);
     });
 
-    it('refuses red, the sign of a note «da rivedere», in words, and keeps the three colours the assistant chooses', async () => {
-      const red = await propose([{ testo: 'il risarcimento del danno' }, { testo: 'la risoluzione del contratto', colore: 'rosso' }]);
-      expect(red.status).toBe(400);
-      expect(red.body.detail).toBe('Il rosso non si sceglie: è il segno di una nota «da rivedere». Usa giallo (punto centrale), verde (condizione o presupposto) o blu (definizione o eccezione).');
+    it('refuses more than ten glosses, none, a missing or empty note, a long one, unknown keys, a colour, a long context, control characters', async () => {
+      const ok = { testo: 'il risarcimento del danno', nota: 'a' };
+      expect((await gloss(Array.from({ length: 11 }, () => ok))).status).toBe(400);
+      expect((await gloss([])).status).toBe(400);
+      expect((await gloss([{ testo: ok.testo }])).status).toBe(400);
+      expect((await gloss([{ ...ok, nota: '   ' }])).status).toBe(400);
+      expect((await gloss([{ ...ok, nota: 'a'.repeat(1501) }])).status).toBe(400);
+      expect((await gloss([{ ...ok, pagina: 1 }])).status).toBe(400);
+      expect((await gloss([{ ...ok, colore: 'giallo' }])).status).toBe(400);
+      expect((await gloss([{ ...ok, prima: 'a'.repeat(201) }])).status).toBe(400);
+      expect((await gloss([{ ...ok, nota: 'a\u0007b' }])).status).toBe(400);
       expect(await prisma.highlight.count()).toBe(0);
-      expect((await propose([{ testo: 'il risarcimento del danno', colore: ' Rosso ' }])).body.detail).toMatch(/^Il rosso non si sceglie/);
-      const ok = await propose([
-        { testo: 'il risarcimento del danno', colore: 'giallo' },
-        { testo: 'la risoluzione del contratto', colore: 'verde' },
-        { testo: "Dalla data della domanda di risoluzione l'inadempiente", colore: 'blu' },
-      ]);
-      expect(ok.body.passaggi.map((p: { colore: string }) => p.colore)).toEqual(['giallo', 'verde', 'blu']);
-      const stored = await prisma.highlight.findMany({ orderBy: { startOffset: 'asc' }, select: { color: true } });
-      expect(stored.map((h) => h.color).sort()).toEqual(['blue', 'green', 'yellow']);
+      // Exactly 1500, counted as the server counts (UTF-16 units).
+      expect((await gloss([{ ...ok, nota: 'a'.repeat(1500) }])).body.glosse[0].esito).toBe('proposta');
     });
 
     it('charges two points and one passage each, and gives back the refused ones', async () => {
       const before = await delegatedQuotaStatus(alice.id);
-      await propose([{ testo: 'il risarcimento del danno' }, { testo: 'non compare in questo testo affatto' }, { testo: 'non compare neanche questo testo' }]);
+      await gloss([
+        { testo: 'il risarcimento del danno', nota: 'a' },
+        { testo: 'non compare in questo testo affatto', nota: 'b' },
+        { testo: 'non compare neanche questo testo', nota: 'c' },
+      ]);
       // The refund runs when the answer is sent.
       await new Promise((r) => setTimeout(r, 50));
       const after = await delegatedQuotaStatus(alice.id);
@@ -345,20 +413,45 @@ describe('D7b — an entry’s text and the passages proposed on it', () => {
       expect(after.counters.passage.limit).toBe(100);
     });
 
-    it('stops at thirty open proposals on an entry, under four calls at once', async () => {
+    it('stops at thirty open proposals on an entry, saved marks included, under four calls at once', async () => {
       const sentences = Array.from({ length: 40 }, (_, n) => `Frase numero ${String(n).padStart(2, '0')} del testo di prova.`);
       serve(sentences.join('\n'));
-      const calls = [0, 1, 2, 3].map((k) => sentences.slice(k * 10, k * 10 + 10).map((testo) => ({ testo })));
-      const answers = await Promise.all(calls.map((passaggi) => propose(passaggi)));
-      const outcomes = answers.flatMap((a) => a.body.passaggi as { esito: string; motivo?: string }[]);
-      expect(outcomes.filter((o) => o.esito === 'proposto')).toHaveLength(30);
-      expect(outcomes.filter((o) => o.motivo === 'limite di proposte aperte su questa voce raggiunto')).toHaveLength(10);
-      expect(await prisma.highlight.count({ where: { dossierItemId: normId } })).toBe(30);
-      // A validated note no longer counts as open.
-      await prisma.highlight.updateMany({ where: { dossierItemId: normId }, data: { note: 'n', assistantNote: 'n', noteState: 'validated' } });
-      const stored = new Set((await prisma.highlight.findMany({ where: { dossierItemId: normId }, select: { text: true } })).map((h) => h.text));
+      // Two coloured passages saved before D8, one with no note (open for good until removed) and one validated.
+      await savedMark(alice.id, normId, 'Frase numero 39', 0);
+      await savedMark(alice.id, normId, 'Frase numero 38', 0, { note: 'n' }).then((h) => prisma.highlight.update({ where: { id: h.id }, data: { noteState: 'validated' } }));
+      const calls = [0, 1, 2, 3].map((k) => sentences.slice(k * 10, k * 10 + 10).map((testo) => ({ testo, nota: 'n' })));
+      const answers = await Promise.all(calls.map((glosse) => gloss(glosse)));
+      const outcomes = answers.flatMap((a) => a.body.glosse as { esito: string; motivo?: string }[]);
+      expect(outcomes.filter((o) => o.esito === 'proposta')).toHaveLength(29);
+      expect(outcomes.filter((o) => o.motivo === 'limite di proposte aperte su questa voce raggiunto')).toHaveLength(11);
+      expect(await prisma.highlight.count({ where: { dossierItemId: normId, kind: 'gloss' } })).toBe(29);
+      // A validated gloss no longer counts as open.
+      await prisma.highlight.updateMany({ where: { dossierItemId: normId, kind: 'gloss' }, data: { noteState: 'validated' } });
+      const stored = new Set((await prisma.highlight.findMany({ where: { dossierItemId: normId, kind: 'gloss' }, select: { text: true } })).map((h) => h.text));
       const left = sentences.find((sentence) => !stored.has(sentence))!;
-      expect((await propose([{ testo: left }])).body.passaggi[0].esito).toBe('proposto');
+      expect((await gloss([{ testo: left, nota: 'n' }])).body.glosse[0].esito).toBe('proposta');
+    });
+  });
+
+  describe('the table', () => {
+    it('keeps a gloss without a colour and with a note, and a mark with a colour', async () => {
+      const base = {
+        userId: alice.id, normaKey: KEY, text: 'il risarcimento del danno', startOffset: 10, endOffset: 35,
+        createdByClientId: 'c', dossierItemId: normId, assistantText: 'il risarcimento del danno', assistantStartOffset: 10,
+      };
+      // A gloss with a colour, or with no note, no state, an empty note, or none from an application.
+      await expect(prisma.highlight.create({ data: { ...base, kind: 'gloss', color: 'yellow', note: 'n', assistantNote: 'n', noteState: 'proposed' } })).rejects.toThrow();
+      await expect(prisma.highlight.create({ data: { ...base, kind: 'gloss', color: null } })).rejects.toThrow();
+      await expect(prisma.highlight.create({ data: { ...base, kind: 'gloss', color: null, note: ' ', assistantNote: 'n', noteState: 'proposed' } })).rejects.toThrow();
+      await expect(
+        prisma.highlight.create({ data: { userId: alice.id, normaKey: KEY, text: 'x', startOffset: 0, endOffset: 1, kind: 'gloss', color: null, note: 'n' } }),
+      ).rejects.toThrow();
+      // A mark with no colour.
+      await expect(prisma.highlight.create({ data: { userId: alice.id, normaKey: KEY, text: 'x', startOffset: 0, endOffset: 1, color: null } })).rejects.toThrow();
+      // A highlight of the user's own is a mark, yellow unless said.
+      const own = await prisma.highlight.create({ data: { userId: alice.id, normaKey: KEY, text: 'x', startOffset: 0, endOffset: 1 } });
+      expect(own).toMatchObject({ kind: 'mark', color: 'yellow' });
+      expect(await prisma.highlight.count()).toBe(1);
     });
   });
 });

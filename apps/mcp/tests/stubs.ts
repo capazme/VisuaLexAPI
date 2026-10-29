@@ -42,7 +42,7 @@ export interface Stub {
   }[];
   introspectionDown?: boolean;
   /** What GET /api/features answers (public, asked at each session's start; not recorded in apiCalls). */
-  features?: { assistantPassages: boolean } | 'down';
+  features?: { assistantPassages?: boolean; assistantGlosses?: boolean } | 'down';
   /** The user's study cards, as GET /api/lingo/cards answers them. */
   cards: {
     id: string;
@@ -80,7 +80,7 @@ export async function startStubs() {
   });
   as.get('/api/features', (_req, res) => {
     if (stub.features === 'down') return void res.status(500).end();
-    res.json(stub.features ?? { assistantPassages: false });
+    res.json(stub.features ?? { assistantPassages: false, assistantGlosses: false });
   });
   as.all(/^\/api\/.*/, (req, res) => {
     const path = req.path.slice(4);
