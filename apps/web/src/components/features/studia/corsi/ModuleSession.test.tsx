@@ -70,6 +70,8 @@ function select(startNode: Node, startOffset: number, endNode: Node, endOffset: 
 
 const graded: EsitoRisposta = {
   registrata: true,
+  domandaId: 'd-1',
+  xp: { crediti: [], livello: { livello: 1, totale: 0, nelLivello: 0, perIlProssimo: 100, oggi: 0 }, nuovoLivello: false },
   scelta: 'b',
   corretto: false,
   corretta: 'a',
@@ -123,7 +125,7 @@ describe('a module\'s start (§5, step 1; §6.4)', () => {
     const user = userEvent.setup();
     renderSession();
     await user.click(await screen.findByRole('button', { name: 'Inizia il modulo' }));
-    expect(post).toHaveBeenCalledWith('/lingo/corsi/corso-1/moduli/m-3/apri');
+    expect(post).toHaveBeenCalledWith('/lingo/corsi/corso-1/moduli/m-3/apri', {});
     expect(await screen.findByRole('heading', { level: 1, name: 'Il segno distintivo' })).toHaveFocus();
     expect(stepLine()).toHaveTextContent('Passo 2 di 6 · Lettura');
     expect(screen.getByText('Blocco 1 di 2 · circa 15 minuti di lettura')).toBeInTheDocument();
@@ -359,6 +361,32 @@ describe('the recall (§5, step 4)', () => {
   });
 });
 
+describe('a module as S2 reads it back (#375)', () => {
+  it('draws a recall question answered before with its outcome and explanations, and no «Rispondi»', async () => {
+    saveStepReached('m-3', 2);
+    const base = lesson({ stato: 'in-corso' });
+    const answered = {
+      ...base.blocchi[0].richiamo[0],
+      opzioni: graded.opzioni,
+      risposta: { scelta: 'a' as const, corretto: true, corretta: 'a' as const, giorno: '2026-10-28', segnalata: false },
+    };
+    const user = userEvent.setup();
+    renderSession({ ...base, blocchi: [{ ...base.blocchi[0], richiamo: [answered] }, base.blocchi[1]] });
+    await user.click(await screen.findByRole('button', { name: 'Confronta con il testo' }));
+    await user.click(screen.getByRole('button', { name: 'Alle domande' }));
+    expect(screen.getByText('La tua risposta, giusta')).toBeInTheDocument();
+    expect(screen.getByText('Il brevetto protegge un’invenzione, non distingue.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Rispondi' })).toBeNull();
+    expect(screen.getByRole('radio', { name: /I prodotti/ })).toBeChecked();
+  });
+
+  it('says a withdrawn module is withdrawn, and still reads it', async () => {
+    renderSession(lesson({ stato: 'ritirato', ritirato: true }));
+    expect(await screen.findByText(/Hai ritirato questo modulo/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Comincia a leggere' })).toBeInTheDocument();
+  });
+});
+
 describe('leaving (§6.5) and what reaches the server (§8)', () => {
   it('leaves at once when nothing was written', async () => {
     const user = userEvent.setup();
@@ -417,7 +445,7 @@ describe('leaving (§6.5) and what reaches the server (§8)', () => {
     await user.click(screen.getByRole('button', { name: 'Rispondi' }));
     await screen.findByText(/Non è giusto/);
     expect(post.mock.calls).toEqual([
-      ['/lingo/corsi/corso-1/moduli/m-3/apri'],
+      ['/lingo/corsi/corso-1/moduli/m-3/apri', {}],
       ['/lingo/corsi/corso-1/moduli/m-3/risposte', { domandaId: 'd-1', scelta: 'b' }],
     ]);
     expect(JSON.stringify([...post.mock.calls, ...get.mock.calls])).not.toMatch(/RICORDO-PRIVATO|distingu/);

@@ -224,6 +224,7 @@ function Course({ id }: { id: string }) {
         <DossierLink dossier={data.dossier} />
         <p className={cn('text-sm', MUTED_TEXT)}>
           Schede del percorso: {data.schede.dovute} da ripassare oggi · {data.schede.nuove} nuove · {data.schede.inAttesa} in attesa del loro modulo
+          {data.schede.verifica > 0 && ` · ${data.schede.verifica} di verifica oggi`}
         </p>
       </section>
 

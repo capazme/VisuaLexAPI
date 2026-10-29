@@ -117,7 +117,7 @@ describe('ReviewHome', () => {
     renderHome();
     expect(await screen.findByText('18 da ripassare, 20 nuove')).toBeInTheDocument();
     expect(corsiService.today).not.toHaveBeenCalled();
-    vi.mocked(corsiService.today).mockResolvedValue([{ corsoId: 'c1', titolo: 'Segni distintivi', modulo: { id: 'm', ordine: 2, titolo: 'Il marchio' }, schedeDovute: 0 }]);
+    vi.mocked(corsiService.today).mockResolvedValue([{ corso: { id: 'c1', titolo: 'Segni distintivi', materia: 'DIRITTO_CIVILE' }, modulo: { id: 'm', ordine: 2, titolo: 'Il marchio' }, schede: { dovute: 0, verifica: 0 } }]);
     act(() => coursesSwitchStore.setState({ state: 'on' }));
     const row = await screen.findByRole('link', { name: /Modulo del giorno: Il marchio/ });
     expect(follows(screen.getByRole('button', { name: START }), row)).toBe(true);

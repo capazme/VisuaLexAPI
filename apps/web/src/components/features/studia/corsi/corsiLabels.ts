@@ -29,10 +29,8 @@ export const MODULE_STATE_LABEL: Record<StatoModulo, string> = {
   'da-iniziare': 'Da iniziare',
   'in-corso': 'In corso',
   fatto: 'Fatto',
+  ritirato: 'Ritirato',
 };
-
-/** The valid sessions «acquisita» needs, 7 Rome days apart (§4). */
-export const SESSIONS_NEEDED = 2;
 
 /**
  * Whether a number read aloud starts with a vowel (uno, otto, undici, ottanta…), so that the article before it elides:
@@ -69,9 +67,10 @@ export function longDay(day: string): string {
  */
 export function competenceNumbers(c: CompetenzaPagina): string {
   if (c.stato === 'da-iniziare') return 'Ancora nessuna sessione valida';
-  const parts = [c.stato === 'da-riprendere' ? `${c.sessioni} di ${SESSIONS_NEEDED} sessioni per riprenderla` : `${c.sessioni} di ${SESSIONS_NEEDED} sessioni`];
+  const { contate, servono } = c.sessioni;
+  const parts = [c.stato === 'da-riprendere' ? `${contate} di ${servono} sessioni per riprenderla` : `${contate} di ${servono} sessioni`];
   if (c.prossimaDal && c.stato !== 'acquisita') parts.push(`la prossima vale ${fromShortDay(c.prossimaDal)}`);
-  if (c.ultima !== null) parts.push(`ultima ${c.ultima}%`);
+  if (c.ultima !== null) parts.push(`ultima ${c.ultima.percentuale}%`);
   return parts.join(' · ');
 }
 
@@ -90,20 +89,24 @@ export function nextStepLabel(course: CorsoInLista): string {
   return 'In attesa del tuo assistente';
 }
 
-/** What a course «in preparazione» lacks, one line each (§6.4): «9 di 10 moduli», «manca l'esame», «C4 ha 3 schede su 5». */
+/**
+ * What a course «in preparazione» lacks, one line each (§6.4): «9 di 10 moduli», «manca l'esame finale», «C2 senza un
+ * modulo», «C4 ha 3 schede su 5».
+ */
 export function missingLines(m: Mancanze): string[] {
   const lines: string[] = [];
   if (m.moduli.contati < m.moduli.previsti) lines.push(`${m.moduli.contati} di ${m.moduli.previsti} moduli`);
-  if (m.esame) lines.push('manca l’esame finale');
-  for (const s of m.schede) lines.push(`${s.codice} ha ${s.schede} ${s.schede === 1 ? 'scheda' : 'schede'} su ${s.minimo}`);
+  if (m.manca.esame) lines.push('manca l’esame finale');
+  for (const codice of m.competenzeSenzaModulo) lines.push(`${codice} senza un modulo`);
+  for (const s of m.schede) lines.push(`${s.codice} ha ${s.schede} ${s.schede === 1 ? 'scheda' : 'schede'} su ${s.servono}`);
   return lines;
 }
 
 /**
  * Whether closing the programme («Il programma finisce qui») is what opens the exam: modules are the only thing the
- * course lacks (an exam written, every competence with its cards).
+ * course lacks (an exam written, every competence served by a module and with its cards).
  */
-export const closingOpensExam = (missing: Mancanze) => !missing.esame && missing.schede.length === 0;
+export const closingOpensExam = (missing: Mancanze) => !missing.manca.esame && missing.competenzeSenzaModulo.length === 0 && missing.schede.length === 0;
 
 /** The sentence to copy into the assistant to create a course (§6.3), with the goal left for the user to write. */
 export const CREATE_SENTENCE =

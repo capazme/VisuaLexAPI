@@ -1,5 +1,5 @@
 import { apiClient } from './api';
-import type { Chiave, CorsoCestinato, CorsoDiOggi, CorsoInLista, CorsoPagina, EsitoRisposta, ModuloLezione } from '../types/corsi';
+import type { AvanzamentoModulo, Chiave, CorsoCestinato, CorsoDiOggi, CorsoInLista, CorsoPagina, EsitoRisposta, ModuloLezione } from '../types/corsi';
 import type { TestoCorrente, TestoDaAccettare } from '../types/studia';
 
 /**
@@ -91,9 +91,10 @@ export const corsiService = {
     return response.data;
   },
 
-  /** Starts a module: from now it is frozen, never trashed, only withdrawn (§10.5). Idempotent. */
-  async openModule(id: string, moduloId: string): Promise<void> {
-    await apiClient.post(`${courseModule(id, moduloId)}/apri`);
+  /** Starts a module: from now it is frozen, never trashed, only withdrawn (§10.5). Idempotent; answers its state row. */
+  async openModule(id: string, moduloId: string): Promise<AvanzamentoModulo> {
+    const response = await apiClient.post(`${courseModule(id, moduloId)}/apri`, {});
+    return response.data;
   },
 
   /**

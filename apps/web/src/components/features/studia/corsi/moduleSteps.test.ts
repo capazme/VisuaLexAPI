@@ -34,6 +34,8 @@ describe('an answer merged into the module', () => {
   it('writes the outcome and the explanations on its item alone, and opens a module not started', () => {
     const merged = withOutcome(lesson(), 'd-1', {
       registrata: true,
+      domandaId: 'd-1',
+      xp: null,
       scelta: 'a',
       corretto: true,
       corretta: 'a',
@@ -44,7 +46,7 @@ describe('an answer merged into the module', () => {
     });
     expect(merged.stato).toBe('in-corso');
     const item = merged.blocchi[0].richiamo[0];
-    expect(item.risposta).toEqual({ scelta: 'a', corretto: true, corretta: 'a' });
+    expect(item.risposta).toEqual({ scelta: 'a', corretto: true, corretta: 'a', segnalata: false });
     expect(item.opzioni.map((o) => o.spiegazione)).toEqual(['Perché sì.', 'Perché no.']);
     expect(item.opzioni[0].testo).toBe('I prodotti o i servizi di un’impresa');
     expect(merged.blocchi[1]).toEqual(lesson().blocchi[1]);

@@ -87,7 +87,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   nothing is read, and the pages go back to Oggi (`CoursesGate`, which reads the features again as it mounts and
   redirects only on an «off» that read confirms; a switch it could not read says so with «Riprova»; a 404 on the list
   turns the switch off; the server's trash then hides a course and a module too). A review session with `?corso=` waits
-  behind the same gate (the server refuses `?corso=` with a 400 until S2 narrows the session to a course).
+  behind the same gate (S2, #375, narrows the session to the course and adds its check cards after the due and new ones,
+  `verifica: true`, counted in `conteggi.verifica`; before S2 the server refuses `?corso=` with a 400).
   Nothing of a course is created in the web: the assistant creates it (§3), and an empty «Percorsi» says how, with the
   sentence to copy (`CREATE_SENTENCE`) and, for a connection without `lingo:courses:write`, where permissions are chosen and that a connection made before the
   courses lacks it (no promise of what a new one brings: the MCP asks for the scope from M1).
@@ -135,8 +136,14 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   the test reads every body); the step reached is kept on this device (`visualex.studia.percorsi.passo`, forgotten with
   `seenProgress` at sign-in, sign-up and sign-out) and an opened module resumes there. Closing or Esc leaves at once
   with nothing written or highlighted, else asks «Interrompere il modulo?» (`WireConfirm`, «Continua il modulo»
-  evident). `GET /:id`, `GET /oggi`, `GET …/moduli/:moduloId`, `apri` and `risposte` are S2's: their shapes in
-  `types/corsi.ts` are the web's reading of §10.5, to be checked against S2. `corsi.guard.test.ts` keeps the folder's
+  evident). `GET /:id`, `GET /oggi`, `GET …/moduli/:moduloId`, `apri` and `risposte` are S2's (#375, «What S2
+  exposes», the user's session only: a token gets 403), typed in `types/corsi.ts` as #375 answers them: the course page's
+  competences carry `sessioni: { contate, servono }` and `ultima: { giorno, percentuale }`, its modules `stato` with
+  «ritirato», `eliminabile` and `ritirabile` (the page offers the trash and «Ritira» from them, never deciding itself) and
+  `sostituitoDa` as the live corrections' ids, «in preparazione» `manca.esame`, `competenzeSenzaModulo` and `schede[].servono`,
+  the exam a state always there (`assente`, `bloccato`, `aperto`, `in-corso`, `non-superato`, `superato`) with its
+  attempt, `nuovoEsameDal` and `chiediNuovoEsame`; «Oggi»'s row is `{ corso, modulo, schede: { dovute, verifica } }`, the
+  due and check cards offered as one count. `corsi.guard.test.ts` keeps the folder's
   targets at 44 px and its text at 11 px or more,
   `/history`, `/forum` («Dossier pubblici»; `/environments`, the page «Ambienti» was, redirects there keeping an old
   share link's `?import=`), `/forum/community` («Community», `ForumCommunityPage`: an honest placeholder — titled

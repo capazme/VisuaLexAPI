@@ -99,7 +99,8 @@ export function withOutcome(modulo: ModuloLezione, domandaId: string, esito: Esi
           : {
               ...domanda,
               opzioni: domanda.opzioni.map((o) => ({ ...o, spiegazione: explained.get(o.chiave) ?? o.spiegazione })),
-              risposta: { scelta: esito.scelta, corretto: esito.corretto, corretta: esito.corretta },
+              // A first answer is never flagged yet; the answer does not carry the day it was graded.
+              risposta: { scelta: esito.scelta, corretto: esito.corretto, corretta: esito.corretta, segnalata: domanda.risposta?.segnalata ?? false },
             },
       ),
     })),

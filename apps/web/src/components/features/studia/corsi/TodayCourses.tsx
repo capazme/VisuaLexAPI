@@ -18,7 +18,8 @@ export function TodayCourses() {
   const on = useCoursesSwitch() === 'on';
   const today = useCourseRead(corsiService.today, 'corsi-oggi', on);
   if (!on || today.data === null) return null;
-  const rows = today.data.filter((c) => c.modulo !== null || c.schedeDovute > 0);
+  // The server lists only courses with something to do; a row with neither is left out all the same.
+  const rows = today.data.filter((c) => c.modulo !== null || c.schede.dovute + c.schede.verifica > 0);
   if (rows.length === 0) return null;
   return (
     <section aria-labelledby="oggi-percorsi" className="grid grid-cols-1 gap-2">
@@ -27,7 +28,7 @@ export function TodayCourses() {
       </h2>
       <ul className="grid grid-cols-1 gap-2">
         {rows.map((course) => (
-          <li key={course.corsoId}>
+          <li key={course.corso.id}>
             <CourseToday course={course} />
           </li>
         ))}
@@ -43,16 +44,17 @@ const ROW = cn(
 );
 
 function CourseToday({ course }: { course: CorsoDiOggi }) {
-  const cards = course.schedeDovute;
+  // The due cards and the check cards are one session (`?corso=`): offered as one count.
+  const cards = course.schede.dovute + course.schede.verifica;
   const icon = <Route aria-hidden size={18} className={cn('shrink-0', INK_TEXT)} />;
   const chevron = <ChevronRight aria-hidden size={18} className="shrink-0 text-slate-400" />;
   if (cards > 0) {
     return (
-      <Link to={`/studia/ripasso/sessione?corso=${encodeURIComponent(course.corsoId)}`} className={ROW}>
+      <Link to={`/studia/ripasso/sessione?corso=${encodeURIComponent(course.corso.id)}`} className={ROW}>
         {icon}
         <span className="grid min-w-0 grid-cols-1 gap-0.5">
           <span className="break-words text-sm font-semibold text-slate-900 dark:text-slate-50">
-            Ripassa {cards} {cards === 1 ? 'scheda' : 'schede'} di «{course.titolo}»
+            Ripassa {cards} {cards === 1 ? 'scheda' : 'schede'} di «{course.corso.titolo}»
           </span>
           <span className={cn('break-words text-sm', MUTED_TEXT)}>
             {course.modulo ? `Prima del modulo del giorno: ${course.modulo.titolo}` : 'Le schede del percorso dovute oggi'}
@@ -63,11 +65,11 @@ function CourseToday({ course }: { course: CorsoDiOggi }) {
     );
   }
   return (
-    <Link to={modulePath(course.corsoId, course.modulo!.id)} className={ROW}>
+    <Link to={modulePath(course.corso.id, course.modulo!.id)} className={ROW}>
       {icon}
       <span className="min-w-0 break-words text-sm text-slate-900 dark:text-slate-50">
         <span className="font-semibold">Modulo del giorno: {course.modulo!.titolo}</span>
-        <span className={MUTED_TEXT}> · {course.titolo}</span>
+        <span className={MUTED_TEXT}> · {course.corso.titolo}</span>
       </span>
       {chevron}
     </Link>

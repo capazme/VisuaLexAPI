@@ -158,8 +158,8 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
     }
     setOpening('busy');
     try {
-      await corsiService.openModule(id, moduloId);
-      setModulo({ ...modulo, stato: 'in-corso' });
+      const avanzamento = await corsiService.openModule(id, moduloId);
+      setModulo({ ...modulo, stato: 'in-corso', avanzamento });
       setOpening('idle');
       setPreview(false);
       setPanel(null);

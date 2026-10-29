@@ -1,9 +1,9 @@
-import type { CorsoInLista, CorsoPagina, ModuloLezione, ModuloPagina } from '../../../../../types/corsi';
+import type { CorsoInLista, CorsoPagina, EsamePagina, Mancanze, ModuloLezione, ModuloPagina } from '../../../../../types/corsi';
 import type { TestoCorrente } from '../../../../../types/studia';
 
 /**
- * Answers shaped as the courses' routes answer them: the list as S1 exposes it (PR «What S1 exposes»), the course page
- * as `types/corsi.ts` reads S2's `GET /lingo/corsi/:id`. Synthetic: no real handout or course.
+ * Answers shaped as the courses' routes answer them: the list as S1 exposes it (PR «What S1 exposes»), the course page,
+ * «Oggi» and a module as S2 does (#375, «What S2 exposes»). Synthetic: no real handout or course.
  */
 
 export function listed(over: Partial<CorsoInLista> = {}): CorsoInLista {
@@ -20,20 +20,37 @@ export function listed(over: Partial<CorsoInLista> = {}): CorsoInLista {
   };
 }
 
+/** A module of the course page; `eliminabile` follows the state unless given (the server's rule: never opened). */
 export function moduleOf(ordine: number, over: Partial<ModuloPagina> = {}): ModuloPagina {
+  const stato = over.stato ?? 'fatto';
   return {
     id: `m-${ordine}`,
     ordine,
     titolo: `Titolo del modulo ${ordine}`,
     minuti: 25,
     competenze: ['C1'],
-    stato: 'fatto',
-    creatoDa: 'Claude Code',
+    stato,
+    fattoGiorno: stato === 'fatto' ? '2026-10-27' : null,
+    quizPercentuale: stato === 'fatto' ? 80 : null,
+    conta: stato !== 'ritirato',
     sostituisceId: null,
-    sostituitoDa: null,
-    ritirato: false,
+    sostituitoDa: [],
+    eliminabile: stato === 'da-iniziare',
+    ritirabile: false,
+    creatoDa: { clientName: 'Claude Code' },
+    createdAt: '2026-10-29T09:00:00.000Z',
     ...over,
   };
+}
+
+/** The final exam's state on the course page, as S2 answers it. */
+export function examOf(over: Partial<EsamePagina> = {}): EsamePagina {
+  return { stato: 'bloccato', esameId: 'e-1', tentativo: null, nuovoEsameDal: null, chiediNuovoEsame: false, competenzeSotto: [], ...over };
+}
+
+/** What a course «in preparazione» lacks, as S2 answers it. */
+export function missingOf(over: Partial<Mancanze> = {}): Mancanze {
+  return { moduli: { contati: 3, previsti: 3 }, manca: { esame: false }, competenzeSenzaModulo: [], schede: [], ...over };
 }
 
 export function page(over: Partial<CorsoPagina> = {}): CorsoPagina {
@@ -46,14 +63,25 @@ export function page(over: Partial<CorsoPagina> = {}): CorsoPagina {
     moduliPrevisti: 3,
     superatoIl: null,
     competenze: [
-      { codice: 'C1', testo: 'Qualificare un segno distintivo e indicare gli impedimenti assoluti', stato: 'in-corso', sessioni: 1, prossimaDal: '2026-11-03', ultima: 85 },
-      { codice: 'C2', testo: 'Distinguere il marchio registrato dal marchio di fatto', stato: 'da-iniziare', sessioni: 0, prossimaDal: null, ultima: null },
+      {
+        codice: 'C1',
+        ordine: 1,
+        testo: 'Qualificare un segno distintivo e indicare gli impedimenti assoluti',
+        stato: 'in-corso',
+        sessioni: { contate: 1, servono: 2 },
+        prossimaDal: '2026-11-03',
+        ultima: { giorno: '2026-10-27', percentuale: 85 },
+      },
+      { codice: 'C2', ordine: 2, testo: 'Distinguere il marchio registrato dal marchio di fatto', stato: 'da-iniziare', sessioni: { contate: 0, servono: 2 }, prossimaDal: null, ultima: null },
     ],
     moduli: [moduleOf(1), moduleOf(2, { stato: 'in-corso', competenze: ['C1', 'C2'] }), moduleOf(3, { stato: 'da-iniziare' })],
     inPreparazione: null,
-    esame: { stato: 'bloccato', id: 'e-1' },
+    esame: examOf(),
     dossier: { id: 'dossier-1', name: 'Segni distintivi' },
-    schede: { dovute: 4, nuove: 2, inAttesa: 6 },
+    schede: { dovute: 4, nuove: 2, inAttesa: 6, verifica: 0 },
+    creatoDa: { clientName: 'Claude Code' },
+    createdAt: '2026-10-20T09:00:00.000Z',
+    xp: { crediti: [] },
     ...over,
   };
 }
@@ -86,6 +114,10 @@ export function lesson(over: Partial<ModuloLezione> = {}): ModuloLezione {
     competenze: [{ codice: 'C1', testo: 'Qualificare un segno distintivo e indicare gli impedimenti assoluti' }],
     stato: 'da-iniziare',
     ritirato: false,
+    avanzamento: null,
+    sostituisceId: null,
+    sostituitoDa: [],
+    creatoDa: { clientName: 'Claude Code' },
     domandePrima: ['Che cosa rende un segno distintivo?', 'Quando un segno non si può registrare?'],
     blocchi: [
       {
@@ -100,6 +132,9 @@ export function lesson(over: Partial<ModuloLezione> = {}): ModuloLezione {
         richiamo: [
           {
             id: 'd-1',
+            tipo: 'RICHIAMO',
+            ordine: 1,
+            applicazione: false,
             testo: 'Che cosa distingue il marchio?',
             competenze: ['C1'],
             opzioni: [
@@ -128,6 +163,10 @@ export function lesson(over: Partial<ModuloLezione> = {}): ModuloLezione {
         richiamo: [],
       },
     ],
+    quiz: [],
+    quizStato: { totale: 6, risposte: 0, giuste: 0, percentuale: 0 },
+    domandaAperta: null,
+    rispostaModello: null,
     ...over,
   };
 }
