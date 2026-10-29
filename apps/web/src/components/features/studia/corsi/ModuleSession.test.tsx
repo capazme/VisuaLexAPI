@@ -6,13 +6,19 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 // The real service over a mocked `apiClient`: the test reads every body the session sends (§8, §15).
 vi.mock('../../../../services/api', () => ({ apiClient: { get: vi.fn(), post: vi.fn() } }));
 vi.mock('../../../../store/assistantProposals', () => ({ loadAssistantFeatures: vi.fn(async () => {}) }));
-vi.mock('../../../../hooks/useIsDesktop', () => ({ useIsDesktop: () => true }));
+const view = vi.hoisted(() => ({ desktop: true }));
+vi.mock('../../../../hooks/useIsDesktop', () => ({ useIsDesktop: () => view.desktop }));
 // The readers a citation opens are the dossier's, tested there: here, what they are given.
 vi.mock('../../dossier/DossierItemReader', () => ({
-  DossierItemReader: ({ norma }: { norma: { tipo_atto: string; numero_articolo: string } }) => (
-    <p data-testid="norm-reader">
-      {norma.tipo_atto} art. {norma.numero_articolo}
-    </p>
+  DossierItemReader: ({ norma, onOpenOnDashboard }: { norma: { tipo_atto: string; numero_articolo: string }; onOpenOnDashboard: () => void }) => (
+    <div>
+      <p data-testid="norm-reader">
+        {norma.tipo_atto} art. {norma.numero_articolo}
+      </p>
+      <button type="button" onClick={onOpenOnDashboard}>
+        Apri su Dashboard
+      </button>
+    </div>
   ),
 }));
 vi.mock('../../dossier/DossierDecisionReader', () => ({
@@ -45,9 +51,21 @@ function renderSession(modulo: ModuloLezione = lesson()) {
       <Routes>
         <Route path="/studia/percorsi/:id/moduli/:moduloId" element={<ModuleSession />} />
         <Route path="/studia/percorsi/:id" element={<Where />} />
+        <Route path="/" element={<Where />} />
       </Routes>
     </MemoryRouter>,
   );
+}
+
+/** Selects from (node, offset) to (node, offset) and tells the page, as a browser does. */
+function select(startNode: Node, startOffset: number, endNode: Node, endOffset: number) {
+  const range = document.createRange();
+  range.setStart(startNode, startOffset);
+  range.setEnd(endNode, endOffset);
+  range.getBoundingClientRect = () => new DOMRect(0, 0, 10, 10);
+  document.getSelection()!.removeAllRanges();
+  document.getSelection()!.addRange(range);
+  fireEvent(document, new Event('selectionchange'));
 }
 
 const graded: EsitoRisposta = {
@@ -65,6 +83,7 @@ const stepLine = () => screen.getByText(/^Passo \d+ di \d+ · /);
 
 beforeEach(() => {
   coursesSwitchStore.setState({ state: 'on' });
+  view.desktop = true;
   forgetStepsReached();
   post.mockResolvedValue({ data: {} });
 });
@@ -156,7 +175,8 @@ describe('reading a block (§5, step 2; §10.3)', () => {
 
   it('draws the lesson\'s format as text: headings, bold, lists, and HTML left as words', async () => {
     await atReading();
-    expect(screen.getByRole('heading', { level: 3, name: 'Che cos’è' })).toBeInTheDocument();
+    // The lesson's `###` one level under the step's heading.
+    expect(screen.getByRole('heading', { level: 2, name: 'Che cos’è' })).toBeInTheDocument();
     expect(screen.getByText('marchio').tagName).toBe('SPAN');
     expect(screen.getByText('marchio').closest('strong')).not.toBeNull();
     expect(screen.getAllByRole('listitem').map((li) => li.textContent)).toEqual(expect.arrayContaining(['primo requisito', 'secondo requisito']));
@@ -206,6 +226,70 @@ describe('reading a block (§5, step 2; §10.3)', () => {
   });
 });
 
+describe('highlights and citations, further (§5 step 3, §6.5)', () => {
+  async function atReading() {
+    const user = userEvent.setup();
+    renderSession(lesson({ stato: 'in-corso' }));
+    await user.click(await screen.findByRole('button', { name: 'Comincia a leggere' }));
+    await screen.findByRole('heading', { level: 1, name: 'Il segno distintivo' });
+    return user;
+  }
+
+  it('maps a selection across a bold word, its edges on elements, to the plain text\'s offsets', async () => {
+    const user = await atReading();
+    const paragraph = screen.getByText('marchio').closest('p')!;
+    // From before «Il» (an element edge) to after «marchio» (the end of the <strong>).
+    select(paragraph, 0, screen.getByText('marchio').closest('strong')!, 1);
+    await user.click(await screen.findByRole('button', { name: 'Evidenzia' }));
+    expect([...document.querySelectorAll('mark')].map((m) => m.textContent).join('')).toBe('Il marchio');
+    expect(document.querySelectorAll('mark[tabindex="0"]')).toHaveLength(1);
+  });
+
+  it('goes from the text to «Evidenzia» with Tab while words are selected', async () => {
+    await atReading();
+    const word = screen.getByText(/distingue i prodotti/);
+    select(word.firstChild!, 1, word.firstChild!, 9);
+    const text = document.querySelector<HTMLElement>('[data-lesson-text]')!;
+    text.focus();
+    fireEvent.keyDown(text, { key: 'Tab' });
+    expect(await screen.findByRole('button', { name: 'Evidenzia' })).toHaveFocus();
+  });
+
+  it('gives the focus back to the citation when its panel closes', async () => {
+    const user = await atReading();
+    const citation = screen.getByRole('button', { name: /l’art\. 7 c\.p\.i\./ });
+    await user.click(citation);
+    expect(screen.getByRole('heading', { level: 2, name: 'art. 7, d.lgs. 10 febbraio 2005, n. 30' })).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Chiudi la citazione' }));
+    await waitFor(() => expect(citation).toHaveFocus());
+  });
+
+  it('opens a citation in a sheet on a phone, which keeps its own Esc', async () => {
+    view.desktop = false;
+    const user = await atReading();
+    await user.click(screen.getByRole('button', { name: /l’art\. 7 c\.p\.i\./ }));
+    expect(screen.getByRole('dialog', { name: 'art. 7, d.lgs. 10 febbraio 2005, n. 30' })).toBeInTheDocument();
+    expect(screen.queryByRole('complementary')).toBeNull();
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.queryByTestId('where')).toBeNull();
+  });
+
+  it('asks before a reader\'s «Apri su Dashboard» takes the reader away from what was highlighted', async () => {
+    const user = await atReading();
+    const word = screen.getByText(/distingue i prodotti/);
+    select(word.firstChild!, 1, word.firstChild!, 9);
+    await user.click(await screen.findByRole('button', { name: 'Evidenzia' }));
+    await user.click(screen.getByRole('button', { name: /l’art\. 7 c\.p\.i\./ }));
+    await user.click(screen.getByRole('button', { name: 'Apri su Dashboard' }));
+    const dialog = await screen.findByRole('alertdialog', { name: 'Interrompere il modulo?' });
+    expect(dialog).toHaveTextContent('Le evidenziazioni si perdono.');
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Interrompi' }).closest('[data-ready]')).not.toBeNull(), { timeout: 2000 });
+    await user.click(within(dialog).getByRole('button', { name: 'Interrompi' }));
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent(/^\/$/));
+  });
+});
+
 describe('the recall (§5, step 4)', () => {
   async function atRecall() {
     saveStepReached('m-3', 2);
@@ -242,6 +326,8 @@ describe('the recall (§5, step 4)', () => {
     expect(screen.getByText('La risposta giusta')).toBeInTheDocument();
     expect(screen.getByText('La tua risposta')).toBeInTheDocument();
     for (const radio of screen.getAllByRole('radio')) expect(radio).toBeDisabled();
+    // «Rispondi» is gone: the focus is on the question, not lost to the page.
+    await waitFor(() => expect(screen.getByRole('group', { name: /Domanda 1 di 1/ })).toHaveFocus());
   });
 
   it('keeps the choice and says «Non registrato: riprova» when it does not arrive; a refusal says the server\'s words', async () => {
@@ -293,6 +379,19 @@ describe('leaving (§6.5) and what reaches the server (§8)', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Continua il modulo' }));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     expect(screen.queryByTestId('where')).toBeNull();
+  });
+
+  it('lets Esc cancel the question, and stays', async () => {
+    saveStepReached('m-3', 2);
+    const user = userEvent.setup();
+    renderSession(lesson({ stato: 'in-corso' }));
+    await user.type(await screen.findByLabelText(/gli elementi, le eccezioni, un caso/), 'qualcosa');
+    await user.keyboard('{Escape}');
+    await screen.findByRole('alertdialog', { name: 'Interrompere il modulo?' });
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(screen.queryByTestId('where')).toBeNull();
+    expect(screen.getByLabelText(/gli elementi, le eccezioni, un caso/)).toHaveValue('qualcosa');
   });
 
   it('sends no free recall, highlight or step: only `apri` and the item with its key', async () => {

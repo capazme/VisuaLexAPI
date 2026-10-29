@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { Check, X } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import { FIELD_TEXT } from '../../../../constants/interactions';
@@ -23,7 +23,7 @@ interface RecallStepProps {
   spans: readonly Span[];
   onSpans: (spans: Span[]) => void;
   citations: ReadonlyMap<string, string>;
-  onCite: (marker: string) => void;
+  onCite: (marker: string, opener: HTMLElement) => void;
   onAnswer: (domandaId: string, scelta: Chiave) => Promise<void>;
   headingRef: (el: HTMLHeadingElement | null) => void;
 }
@@ -120,6 +120,9 @@ export function RecallQuestion({ domanda, numero, totale, onAnswer }: RecallQues
   const name = useId();
   const [scelta, setScelta] = useState<Chiave | null>(domanda.risposta?.scelta ?? null);
   const [sending, setSending] = useState(false);
+  // «Rispondi» goes once the answer is graded: the focus moves to the question, not to the page's body, so Tab goes on
+  // from here and a screen reader keeps its place (the outcome itself is read by the live region).
+  const fieldset = useRef<HTMLFieldSetElement>(null);
   /** Why the last choice was not recorded, after «Non registrato: »; null when nothing failed. */
   const [failed, setFailed] = useState<string | null>(null);
   const risposta = domanda.risposta;
@@ -132,6 +135,7 @@ export function RecallQuestion({ domanda, numero, totale, onAnswer }: RecallQues
     setFailed(null);
     try {
       await onAnswer(scelta);
+      requestAnimationFrame(() => fieldset.current?.focus({ preventScroll: true }));
     } catch (error) {
       setFailed(error instanceof Error && error.message ? error.message : 'riprova.');
     } finally {
@@ -140,7 +144,7 @@ export function RecallQuestion({ domanda, numero, totale, onAnswer }: RecallQues
   };
 
   return (
-    <fieldset className={cn(TILE, 'grid min-w-0 grid-cols-1 gap-3 p-4 md:p-5')}>
+    <fieldset ref={fieldset} tabIndex={-1} className={cn(TILE, 'grid min-w-0 grid-cols-1 gap-3 p-4 focus:outline-none md:p-5')}>
       <legend className="sr-only">
         Domanda {numero} di {totale}: {domanda.testo}
       </legend>

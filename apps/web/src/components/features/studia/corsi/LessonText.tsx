@@ -23,10 +23,30 @@ interface LessonTextProps {
   /** The session's highlights on this block; absent, the text takes none (the recall's comparison takes them, the preview too). */
   spans?: readonly Span[];
   onSpans?: (spans: Span[]) => void;
-  /** A citation pressed: its marker (`c1`); absent, citations are plain text. */
-  onCite?: (marker: string) => void;
+  /** A citation pressed: its marker (`c1`) and its button, which the focus goes back to; absent, citations are plain text. */
+  onCite?: (marker: string, opener: HTMLElement) => void;
   /** The citations the block can open, by marker, with their labels; a marker missing here stays text. */
   citations?: ReadonlyMap<string, string>;
+  /** The level of the lesson's `###`: one under the heading the text sits under (2 under the step's `h1`). */
+  headingLevel?: 2 | 3;
+}
+
+/** Shift and an arrow: what `Selection.modify` extends by (a word with Ctrl or Alt, as the reader's move bar does). */
+function extendBy(event: React.KeyboardEvent): { direction: 'forward' | 'backward'; granularity: 'character' | 'word' | 'line' } | null {
+  if (!event.shiftKey || event.metaKey) return null;
+  const word = event.ctrlKey || event.altKey;
+  switch (event.key) {
+    case 'ArrowRight':
+      return { direction: 'forward', granularity: word ? 'word' : 'character' };
+    case 'ArrowLeft':
+      return { direction: 'backward', granularity: word ? 'word' : 'character' };
+    case 'ArrowDown':
+      return { direction: 'forward', granularity: 'line' };
+    case 'ArrowUp':
+      return { direction: 'backward', granularity: 'line' };
+    default:
+      return null;
+  }
 }
 
 /** Where a selection's edge falls in the block's plain text: a text node's own place, or the text after an element edge. */
@@ -62,20 +82,40 @@ type Floating = { kind: 'add'; span: Span; top: number; left: number } | { kind:
 /**
  * A block's text in the lesson's format (§10.3), drawn by the web's own parser: every character React text, never HTML.
  * A citation is a button that opens the cited norm or decision beside the text. With `spans`, the reader highlights for
- * the session (§5, step 3): words selected (by mouse, by touch, or Shift and the arrows where the browser lets the caret
- * move) bring «Evidenzia», a 44 px button under the selection, next in the Tab order after the text; a highlight
- * pressed (a click, or Enter on it: each highlight is one Tab stop) brings «Togli». One colour, no notes, nothing sent.
+ * the session (§5, step 3): words selected (by mouse, by touch, or from the keyboard: the text is a Tab stop, and Shift
+ * with the arrows extends a selection from its start, a word at a time with Ctrl or Alt — `Selection.modify`, since a
+ * text that is not editable has no caret of its own) bring «Evidenzia», a 44 px button under the selection, which Tab
+ * from the text reaches next; a highlight pressed (a click, or Enter on it: each highlight is one Tab stop) brings
+ * «Togli». One colour, no notes, nothing sent.
  */
-export function LessonText({ text, spans, onSpans, onCite, citations }: LessonTextProps) {
+export function LessonText({ text, spans, onSpans, onCite, citations, headingLevel = 3 }: LessonTextProps) {
   const nodes = useMemo(() => numberLeaves(parseLesson(text)), [text]);
   const root = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const [floating, setFloating] = useState<Floating>(null);
   const removeButton = useRef<HTMLButtonElement>(null);
+  const addButton = useRef<HTMLButtonElement>(null);
   // A finger on «Evidenzia»: a tap outside a selection collapses it on a phone before the click arrives, so the button
-  // stays for the press it is under.
+  // stays for the press it is under — until its click has been handled, or 400 ms after the release (a press dragged off
+  // the button brings no click, and must not leave the button stuck on words no longer selected).
   const pressing = useRef(false);
+  useEffect(() => {
+    let timer = 0;
+    const onUp = () => {
+      if (!pressing.current) return;
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        pressing.current = false;
+      }, 400);
+    };
+    document.addEventListener('pointerup', onUp);
+    return () => {
+      document.removeEventListener('pointerup', onUp);
+      window.clearTimeout(timer);
+    };
+  }, []);
   const hintId = useId();
+  const keysId = useId();
   const highlighting = spans !== undefined && onSpans !== undefined;
 
   // The selection's words, read as it changes; a selection that leaves the block (or collapses) takes the button away,
@@ -118,6 +158,28 @@ export function LessonText({ text, spans, onSpans, onCite, citations }: LessonTe
     setFloating(null);
     root.current?.focus({ preventScroll: true });
   };
+  // From the keyboard: Shift and an arrow start a selection at the text's start when none is in it, then extend it.
+  const onTextKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const el = root.current;
+    if (!highlighting || !el) return;
+    if (event.key === 'Tab' && !event.shiftKey && floating?.kind === 'add' && event.target === el) {
+      event.preventDefault();
+      addButton.current?.focus({ preventScroll: true });
+      return;
+    }
+    const by = extendBy(event);
+    const selection = document.getSelection();
+    if (!by || event.target !== el || !selection || typeof selection.modify !== 'function') return;
+    event.preventDefault();
+    const inside = selection.rangeCount > 0 && el.contains(selection.getRangeAt(0).commonAncestorContainer);
+    if (!inside) {
+      const first = document.createTreeWalker(el, NodeFilter.SHOW_TEXT).nextNode();
+      if (!first) return;
+      selection.collapse(first, 0);
+    }
+    selection.modify('extend', by.direction, by.granularity);
+  };
+
   const remove = (start: number) => {
     if (!spans || !onSpans) return;
     onSpans(removeSpan(spans, start));
@@ -185,7 +247,7 @@ export function LessonText({ text, spans, onSpans, onCite, citations }: LessonTe
             <button
               key={k}
               type="button"
-              onClick={() => onCite(item.marker)}
+              onClick={(event) => onCite(item.marker, event.currentTarget)}
               title={label}
               className={cn(
                 'rounded-sm text-left text-primary-800 underline decoration-primary-400 decoration-1 underline-offset-[3px] hover:decoration-2 dark:text-primary-200',
@@ -204,12 +266,14 @@ export function LessonText({ text, spans, onSpans, onCite, citations }: LessonTe
     switch (node.kind) {
       case 'p':
         return <p key={k}>{inline(node.inline, k)}</p>;
-      case 'h3':
+      case 'h3': {
+        const Heading = headingLevel === 2 ? 'h2' : 'h3';
         return (
-          <h3 key={k} className="pt-2 font-serif text-xl font-medium tracking-tight">
+          <Heading key={k} className="pt-2 font-serif text-xl font-medium tracking-tight">
             {inline(node.inline, k)}
-          </h3>
+          </Heading>
         );
+      }
       case 'ul':
         return (
           <ul key={k} className="list-disc space-y-1 pl-6 marker:text-slate-400">
@@ -250,16 +314,29 @@ export function LessonText({ text, spans, onSpans, onCite, citations }: LessonTe
         }
       }}
     >
-      <div ref={root} tabIndex={highlighting ? -1 : undefined} data-lesson-text className={cn(LESSON_TEXT, 'space-y-4 focus:outline-none')}>
+      <div
+        ref={root}
+        tabIndex={highlighting ? 0 : undefined}
+        aria-describedby={highlighting ? keysId : undefined}
+        data-lesson-text
+        onKeyDown={onTextKeyDown}
+        className={cn(LESSON_TEXT, 'space-y-4 rounded-sm', highlighting ? FOCUS_RING : 'focus:outline-none')}
+      >
         {nodes.map(block)}
       </div>
       {highlighting && (
-        <p id={hintId} className="sr-only">
-          Evidenziato. Premi Invio per toglierlo.
-        </p>
+        <>
+          <p id={hintId} className="sr-only">
+            Evidenziato. Premi Invio per toglierlo.
+          </p>
+          <p id={keysId} className="sr-only">
+            Per evidenziare, seleziona con Maiusc e le frecce, poi premi Tab per «Evidenzia».
+          </p>
+        </>
       )}
       {floating?.kind === 'add' && (
         <button
+          ref={addButton}
           type="button"
           // A press must not take the selection away before the click reads it.
           onMouseDown={(event) => event.preventDefault()}

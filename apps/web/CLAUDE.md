@@ -111,7 +111,8 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `isLesson`; `LessonLoading` goes back to the course): the header says «Passo 4 di 11 · Richiamo» (`moduleSteps.ts`:
   the start, each block's reading and recall, then the quiz, which until pull request c is a holding screen), the step
   in the middle (keyed by step and by the recall's phase, its heading focused in the commit), the one action in
-  `LessonBar`. `GET …/moduli/:moduloId` is read once (the content is frozen once opened). The start says what the module is
+  `LessonBar`; while the switch is read, `LessonLoading` keeps the close button and Esc around `CoursesGate`. `GET
+  …/moduli/:moduloId` is read once (the content is frozen once opened). The start says what the module is
   for (its competences with their words), its pre-questions and, not yet started, that starting keeps it in the course:
   «Inizia il modulo» posts `apri`, «Leggi senza iniziare» shows every block in one page and opens nothing. A block is read
   with an indicative time (`blockMinutes`: its share of the module's minutes by words, else 100 words a minute), a line
@@ -119,14 +120,18 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   every 25 minutes in the bar. The lesson is drawn by the web's own parser (`lessonFormat.ts`, `LessonText`: the closed
   Markdown subset, everything else React text; `corsi.guard.test.ts` refuses HTML written from a string); a citation
   `[testo](#c1)` is a button that opens the copy the block stored (`lessonCitations.ts`: a norm in `DossierItemReader`, a
-  decision in `DossierDecisionReader`) beside the text on a computer, in a `Sheet` on a phone (`CitationPanel`); Esc
-  closes it first. Highlights are the session's (`Span`s over the block's plain text, `numberLeaves` giving each leaf its
-  offset): a selection brings «Evidenzia» (44 px, under it, next in the Tab order), a highlight pressed or Enter on it
-  (one Tab stop each) brings «Togli». The recall (`RecallStep`) hides the text while the reader writes (the trace «gli
+  decision in `DossierDecisionReader`) beside the text on a computer (its heading takes the focus, which goes back to the
+  citation as it closes), in a `Sheet` on a phone (`CitationPanel`); Esc closes it first, and a link or «Apri su
+  Dashboard» inside it leaves through the same question as the close button. A `###` is one level under the step's
+  heading (`headingLevel`). Highlights are the session's (`Span`s over the block's plain text, `numberLeaves` giving
+  each leaf its offset; emphasis is read around a citation held by a placeholder): a selection brings «Evidenzia» (44
+  px, under it; a press on it holds it until its click, or 400 ms after the release); the text is a Tab stop where
+  Shift and the arrows select from its start (`Selection.modify`, a word with Ctrl or Alt: a text not editable has no
+  caret) and Tab goes to «Evidenzia»; a highlight pressed or Enter on it (one Tab stop each) brings «Togli». The recall (`RecallStep`) hides the text while the reader writes (the trace «gli
   elementi, le eccezioni, un caso»), «Confronta con il testo» sets what was written beside the block, then the block's
   questions as real radio buttons (`RecallQuestion`: the server grades, `POST …/risposte { domandaId, scelta }` and
   nothing else; the explanations, the right one and the reader's marked in words, the outcome in a live region; «Non
-  registrato: riprova», or the server's words on a 4xx). Nothing written, highlighted or reached leaves the browser (§8;
+  registrato: riprova», or the server's words on a 4xx; once graded the focus moves to the question, «Rispondi» gone). Nothing written, highlighted or reached leaves the browser (§8;
   the test reads every body); the step reached is kept on this device (`visualex.studia.percorsi.passo`, forgotten with
   `seenProgress` at sign-in, sign-up and sign-out) and an opened module resumes there. Closing or Esc leaves at once
   with nothing written or highlighted, else asks «Interrompere il modulo?» (`WireConfirm`, «Continua il modulo»

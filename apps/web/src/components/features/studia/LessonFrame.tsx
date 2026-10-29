@@ -70,9 +70,10 @@ function lessonHome(pathname: string): string {
 
 /**
  * What the frame shows while the session's code loads (the route is lazy): the close button and the card's
- * place, so the screen is never blank with no way out. Esc leaves too.
+ * place, so the screen is never blank with no way out. Esc leaves too. `children` take the card's place: a module's
+ * session waiting for the courses' switch says so there.
  */
-export function LessonLoading() {
+export function LessonLoading({ children }: { children?: ReactNode }) {
   const navigate = useNavigate();
   const home = lessonHome(useLocation().pathname);
   useEffect(() => {
@@ -95,6 +96,7 @@ export function LessonLoading() {
         </button>
         <div aria-hidden className="h-3 flex-1 rounded-full bg-slate-200 dark:bg-slate-800" />
       </div>
+      {children && <div className="mx-auto w-full max-w-3xl px-4 py-6">{children}</div>}
       <p className="sr-only">{home === '/studia/ripasso' ? 'Carico il ripasso…' : 'Carico il modulo…'}</p>
     </div>
   );

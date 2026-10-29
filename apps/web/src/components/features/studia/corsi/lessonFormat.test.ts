@@ -26,6 +26,14 @@ describe('the lesson format (courses spec §10.3)', () => {
     ]);
   });
 
+  it('reads emphasis around a citation, the citation kept whole inside it', () => {
+    expect(parseInline('**Si veda [l’art. 7](#c1).** E *poi [qui](#c2)*')).toEqual([
+      { kind: 'strong', children: [{ kind: 'text', text: 'Si veda ' }, { kind: 'cite', marker: 'c1', children: [{ kind: 'text', text: 'l’art. 7' }] }, { kind: 'text', text: '.' }] },
+      { kind: 'text', text: ' E ' },
+      { kind: 'em', children: [{ kind: 'text', text: 'poi ' }, { kind: 'cite', marker: 'c2', children: [{ kind: 'text', text: 'qui' }] }] },
+    ]);
+  });
+
   it('keeps as text whatever is not the subset: HTML, other links, unclosed marks', () => {
     const text = '<img src=x onerror=alert(1)> [qui](https://esempio.it) e 2 * 3 = 6, **aperto';
     expect(parseInline(text)).toEqual([{ kind: 'text', text }]);

@@ -9,6 +9,7 @@ import type { BloccoLezione, Chiave, CitazioneLezione, ModuloLezione } from '../
 import { Toast } from '../../../ui/Toast';
 import { WireConfirm } from '../../../ui/wireConfirm/WireConfirm';
 import { LessonBar } from '../GradeBar';
+import { LessonLoading } from '../LessonFrame';
 import { LESSON_PRIMARY } from '../lessonStyles';
 import { BLOCK_HEADING, FOCUS_RING, MUTED_TEXT, QUIET_BUTTON, TILE } from '../progress/tokens';
 import { CitationPanel } from './CitationPanel';
@@ -40,10 +41,11 @@ export function ModuleSession() {
   const { id = '', moduloId = '' } = useParams();
   const on = useCoursesSwitch() === 'on';
   if (!on) {
+    // The frame covers the shell: the close button and Esc stay while the switch is read (or could not be).
     return (
-      <div className="px-4 py-8">
+      <LessonLoading>
         <CoursesGate>{null}</CoursesGate>
-      </div>
+      </LessonLoading>
     );
   }
   return <Session key={`${id}/${moduloId}`} id={id} moduloId={moduloId} />;
@@ -68,7 +70,10 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
   const [step, setStep] = useState(0);
   const [preview, setPreview] = useState(false);
   const [work, setWork] = useState<Record<string, BlockWork>>({});
-  const [panel, setPanel] = useState<{ key: string; citation: CitazioneLezione } | null>(null);
+  /** The citation open beside the text, the view it belongs to, and the button that opened it (the focus goes back). */
+  const [panel, setPanel] = useState<{ key: string; citation: CitazioneLezione; opener: HTMLElement } | null>(null);
+  /** What «Interrompi» does once confirmed: leave to the course, or where a reader's link was going. */
+  const [onStop, setOnStop] = useState<(() => void) | null>(null);
   const [opening, setOpening] = useState<'idle' | 'busy' | 'failed'>('idle');
   const [confirmStop, setConfirmStop] = useState(false);
   const [closeButton, setCloseButton] = useState<HTMLButtonElement | null>(null);
@@ -104,12 +109,28 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
   // What is on screen: the step, and within a recall its phase. Each starts at its top with its heading focused.
   const stepKey = preview ? 'anteprima' : `passo-${step}`;
   const viewKey = !preview && passo?.tipo === 'richiamo' && blockOf ? `${stepKey}-${workOf(blockOf).fase}` : stepKey;
+  const openCitation = panel && panel.key === stepKey ? panel.citation : null;
+  // Closed by its button or Esc, the focus goes back to the citation that opened it, if it is still drawn.
+  const closePanel = () => {
+    const opener = panel?.opener;
+    setPanel(null);
+    if (opener?.isConnected) requestAnimationFrame(() => opener.focus({ preventScroll: true }));
+  };
   const setWorkOf = (blocco: BloccoLezione, patch: Partial<BlockWork>) => setWork((w) => ({ ...w, [blocco.id]: { ...(w[blocco.id] ?? EMPTY_WORK), ...patch } }));
 
   const written = Object.values(work).some((w) => w.scritto.trim() !== '');
   const highlighted = Object.values(work).some((w) => w.spans.length > 0);
   const asksToStop = written || highlighted;
-  const leave = () => (asksToStop ? setConfirmStop(true) : back());
+  const leaveThen = (go: () => void) => {
+    if (!asksToStop) return go();
+    setOnStop(() => go);
+    setConfirmStop(true);
+  };
+  const leave = () => leaveThen(back);
+  const showPreview = (on: boolean) => {
+    setPanel(null);
+    setPreview(on);
+  };
 
   // The step's heading takes the focus as the step changes, so a screen reader hears where it is; the scroll is keyed by
   // step, so each starts at its top.
@@ -168,9 +189,9 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
   const panelOpen = useRef(false);
   const escape = useRef<() => void>(() => {});
   useLayoutEffect(() => {
-    panelOpen.current = panel !== null && desktop;
+    panelOpen.current = openCitation !== null && desktop;
     escape.current = () => {
-      if (panelOpen.current) setPanel(null);
+      if (panelOpen.current) closePanel();
       else leave();
     };
   });
@@ -178,6 +199,8 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return;
       if (document.querySelector('[aria-modal="true"], [data-find-overlay]')) return;
+      // A sheet that closed itself on this very key is gone by now: its key is still not the lesson's.
+      if (event.target instanceof Element && event.target.closest('[role="dialog"], [role="alertdialog"], [data-find-overlay]')) return;
       event.preventDefault();
       escape.current();
     };
@@ -205,9 +228,16 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
   }, []);
   const pauseLine = pause && pause.step === stepKey ? `Studi da ${pause.minutes} minuti: se vuoi, fai una pausa.` : null;
 
-  // The reading's progress, tied to scrolling (§5, step 2): never a timer.
+  // The reading's progress, tied to scrolling (§5, step 2): never a timer. A view that fits the screen is read whole.
   const [scroll, setScroll] = useState({ key: viewKey, share: 0 });
   const scrolled = scroll.key === viewKey ? scroll.share : 0;
+  const measured = scroll.key === viewKey;
+  const measure = useCallback(
+    (el: HTMLDivElement | null) => {
+      if (el && !measured && el.scrollHeight <= el.clientHeight) setScroll({ key: viewKey, share: 1 });
+    },
+    [measured, viewKey],
+  );
   const onScroll = (event: React.UIEvent<HTMLDivElement>) => {
     const el = event.currentTarget;
     const room = el.scrollHeight - el.clientHeight;
@@ -217,17 +247,16 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => setToast({ message, type });
   const citeIn = (blocco: BloccoLezione) => {
     const labels = new Map(blocco.citazioni.map((c) => [c.marcatore, citationLabel(c)]));
-    const open = (marker: string) => {
+    const open = (marker: string, opener: HTMLElement) => {
       const citation = blocco.citazioni.find((c) => c.marcatore === marker);
-      if (citation) setPanel({ key: stepKey, citation });
+      if (citation) setPanel({ key: stepKey, citation, opener });
     };
     return { labels, open };
   };
-  const openCitation = panel && panel.key === stepKey ? panel.citation : null;
 
   let middle: React.ReactNode;
   let bar: React.ReactNode;
-  let status: React.ReactNode = pauseLine ? <span aria-live="polite">{pauseLine}</span> : null;
+  let status: React.ReactNode = pauseLine;
 
   if (read.status === 'loading') {
     middle = (
@@ -278,7 +307,7 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
         })}
       </div>
     );
-    bar = <StartActions modulo={modulo} opening={opening} onStart={() => void start()} onPreview={() => setPreview(false)} previewLabel="Torna all’inizio" />;
+    bar = <StartActions modulo={modulo} opening={opening} onStart={() => void start()} onPreview={() => showPreview(false)} previewLabel="Torna all’inizio" />;
     if (opening === 'failed') status = <FailedOpen />;
   } else if (passo.tipo === 'inizio') {
     middle = <ModuleStart modulo={modulo} headingRef={setHeading} />;
@@ -287,7 +316,7 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
         modulo={modulo}
         opening={opening}
         onStart={() => void start()}
-        onPreview={() => setPreview(true)}
+        onPreview={() => showPreview(true)}
         previewLabel="Leggi senza iniziare"
       />
     );
@@ -317,6 +346,7 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
         )}
         <LessonText
           text={blockOf.testo}
+          headingLevel={2}
           spans={workOf(blockOf).spans}
           onSpans={(spans) => setWorkOf(blockOf, { spans })}
           citations={cites.labels}
@@ -393,6 +423,10 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
   const reading = !preview && passo?.tipo === 'lettura';
   return (
     <section aria-label={modulo ? `Modulo ${modulo.ordine}: ${modulo.titolo}` : 'Modulo'} className="flex h-full min-h-0 flex-1 flex-col">
+      {/* A live region of its own, there from the first draw, so the pause's line is read when it comes. */}
+      <p aria-live="polite" className="sr-only">
+        {pauseLine ?? ''}
+      </p>
       <header className="relative shrink-0 px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
         <div className={cn(COLUMN, 'flex items-center gap-3')}>
           <button
@@ -420,11 +454,11 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
         </div>
       </header>
       <div className="flex min-h-0 flex-1">
-        <div key={viewKey} onScroll={onScroll} className="min-w-0 flex-1 overflow-y-auto">
+        <div key={viewKey} ref={measure} onScroll={onScroll} className="min-w-0 flex-1 overflow-y-auto">
           {middle}
         </div>
         {openCitation && (
-          <CitationPanel citation={openCitation} desktop={desktop} onClose={() => setPanel(null)} showToast={showToast} />
+          <CitationPanel citation={openCitation} desktop={desktop} onClose={closePanel} leaveThen={leaveThen} showToast={showToast} />
         )}
       </div>
       <LessonBar status={status}>{bar}</LessonBar>
@@ -437,8 +471,11 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
         emphasis="cancel"
         origin={closeButton}
         focusBack={() => heading.current}
-        onConfirm={back}
-        onCancel={() => setConfirmStop(false)}
+        onConfirm={() => (onStop ?? back)()}
+        onCancel={() => {
+          setConfirmStop(false);
+          setOnStop(null);
+        }}
       />
       <div className={cn('fixed left-0 top-0', Z_INDEX.toast)}>
         <Toast position="top" message={toast?.message ?? ''} type={toast?.type ?? 'info'} isVisible={toast !== null} onClose={() => setToast(null)} />

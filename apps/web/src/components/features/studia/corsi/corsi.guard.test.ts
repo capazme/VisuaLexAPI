@@ -14,6 +14,8 @@ const SOURCES = [
   ...readdirSync(DIR).filter((f) => f.endsWith('.tsx') && !f.endsWith('.test.tsx')),
   '../AcceptTextDialog.tsx',
 ];
+/** Every source of the folder, the parser's `.ts` too, for the rule on HTML. */
+const ALL_SOURCES = readdirSync(DIR).filter((f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f));
 
 describe('the targets and the type of «Percorsi»', () => {
   it('finds the folder\'s components', () => {
@@ -29,7 +31,11 @@ describe('the targets and the type of «Percorsi»', () => {
     for (const tag of buttons.filter((t) => /size="sm"/.test(t))) expect(tag).toMatch(/md:min-h-\[44px\]/);
   });
 
-  it.each(SOURCES)('%s writes no HTML from a string', (file) => {
+  it('reads the parser among the sources checked for HTML', () => {
+    expect(ALL_SOURCES).toEqual(expect.arrayContaining(['lessonFormat.ts', 'LessonText.tsx', 'lessonCitations.ts']));
+  });
+
+  it.each(ALL_SOURCES)('%s writes no HTML from a string', (file) => {
     expect(readFileSync(join(DIR, file), 'utf8')).not.toMatch(/dangerouslySetInnerHTML|innerHTML\s*=|insertAdjacentHTML/);
   });
 

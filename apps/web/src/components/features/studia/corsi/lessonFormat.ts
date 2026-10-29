@@ -3,7 +3,7 @@
  * `###` headings, one level of `-` and `1.` lists, `>` quotes, `**bold**`, `*italic*`, and citation links `[testo](#c1)`.
  * The server refuses anything else on the way in (`apps/server/src/lingo/courseFormat.ts`); here whatever is not the
  * subset stays text, which React escapes: the lesson is written from material the user did not write, so nothing of it
- * is ever HTML (no `dangerouslySetInnerHTML`, stored XSS). Root rule 23 does not apply: a lesson is not `article_text`,
+ * is ever HTML written from a string (stored XSS). Root rule 23 does not apply: a lesson is not `article_text`,
  * and its highlights stay in the session.
  *
  * A highlight counts characters in the block's plain text: every text leaf in reading order, nothing between them
@@ -51,21 +51,44 @@ function emphasis(text: string): Inline[] {
   return out;
 }
 
-/** A line's inline content: citations first (their text may be bold or italic), then emphasis around them. */
+/** Where a citation stood while emphasis is read around it: two private-use characters around its index. */
+const HOLD = /\uE000(\d+)\uE001/;
+
+/**
+ * A line's inline content. Citations are taken out first (their text may be bold or italic, `[**art. 7**](#c1)`), held
+ * by a placeholder while emphasis is read over the whole line (so `**si veda [l'art. 7](#c1).**` is bold around the
+ * citation), then put back in the text leaves. A line that already holds the placeholders' characters is read with
+ * citations and emphasis apart, its emphasis never across a citation.
+ */
 export function parseInline(text: string): Inline[] {
-  const out: Inline[] = [];
-  let rest = text;
-  while (rest.length > 0) {
-    const cite = CITE.exec(rest);
-    if (!cite) {
-      out.push(...emphasis(rest));
-      break;
+  const clean = (nodes: Inline[]) => nodes.filter((node) => node.kind !== 'text' || node.text !== '');
+  const cites: { marker: string; label: string }[] = [];
+  const global = new RegExp(CITE.source, 'g');
+  if (/[\uE000\uE001]/.test(text)) {
+    const out: Inline[] = [];
+    let last = 0;
+    for (const m of text.matchAll(global)) {
+      out.push(...emphasis(text.slice(last, m.index)), { kind: 'cite', marker: m[2], children: emphasis(m[1]) });
+      last = m.index + m[0].length;
     }
-    if (cite.index > 0) out.push(...emphasis(rest.slice(0, cite.index)));
-    out.push({ kind: 'cite', marker: cite[2], children: emphasis(cite[1]) });
-    rest = rest.slice(cite.index + cite[0].length);
+    out.push(...emphasis(text.slice(last)));
+    return clean(out);
   }
-  return out.filter((node) => node.kind !== 'text' || node.text !== '');
+  const held = text.replace(global, (_, label: string, marker: string) => `\uE000${cites.push({ marker, label }) - 1}\uE001`);
+  const restore = (nodes: Inline[]): Inline[] =>
+    nodes.flatMap((node): Inline[] => {
+      if (node.kind !== 'text') return [{ ...node, children: restore(node.children) }];
+      const out: Inline[] = [];
+      let rest = node.text;
+      for (let m = HOLD.exec(rest); m; m = HOLD.exec(rest)) {
+        const cite = cites[Number(m[1])];
+        out.push({ kind: 'text', text: rest.slice(0, m.index) }, { kind: 'cite', marker: cite.marker, children: emphasis(cite.label) });
+        rest = rest.slice(m.index + m[0].length);
+      }
+      out.push({ kind: 'text', text: rest });
+      return clean(out);
+    });
+  return restore(emphasis(held));
 }
 
 /** A block's text as nodes. Lines of one paragraph are joined by a space, as Markdown reads a soft break. */
