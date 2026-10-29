@@ -335,6 +335,15 @@ that stack's own database, and the tests write rows. The Dockerfile copies
   contract test fails on `labels(x)[0]` in Cypher.
 - Do not change the authority algorithm or the synthesizer's contract without
   the owner's approval.
+- Normattiva's update notes («AGGIORNAMENTO (N)», G-386) are never part of an
+  article's text. VisuaLex answers them beside it (`note_aggiornamento`,
+  `note_non_lette`, `note_nel_testo`); `clients/visualex_client.py` carries them in
+  `ArticleResult` (`get_article`) and `update_notes_block` labels them for a model.
+  `get_document` still gives the text alone, which is what ingestion stores. Only
+  `tools/search.ArticleFetchTool` puts the block after the text it hands an expert
+  (`react_mixin._extract_sources_from_result`), and that tool is **not wired**
+  (`api/engine_bootstrap.py`): the experts read articles through mcp-legal-it's
+  `fetch_law_article`, whose notes come with the submodule at 3.0.x.
 - Brocardi is no longer a source (D-078). MERL-T does not fetch from it: the
   VisuaLex client's `fetch_brocardi_info` returns nothing without a call,
   `include_brocardi` defaults to False, no expert is granted `cerca_brocardi`

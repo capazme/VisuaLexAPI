@@ -855,9 +855,17 @@ class ArticleFetchTool(BaseTool):
                 numero_articolo=numero_articolo
             )
 
-            # Recupera documento
+            # Recupera documento. The update notes (G-386) come as their own labelled
+            # block, never inside the text: a scraper that cannot give them gives none.
             scraper = await self._get_scraper()
-            text, urn = await scraper.get_document(norma_visitata)
+            notes = ""
+            if hasattr(scraper, "get_article"):
+                from merlt.clients.visualex_client import update_notes_block
+
+                article = await scraper.get_article(norma_visitata)
+                text, urn, notes = article.text, article.url, update_notes_block(article)
+            else:
+                text, urn = await scraper.get_document(norma_visitata)
 
             log.info(
                 f"article_fetch completed - "
@@ -870,7 +878,8 @@ class ArticleFetchTool(BaseTool):
                     "urn": urn,
                     "tipo_atto": tipo_atto,
                     "numero_articolo": numero_articolo,
-                    "source": "normattiva"
+                    "source": "normattiva",
+                    "note_aggiornamento": notes,
                 },
                 tool_name=self.name,
                 tipo_atto=tipo_atto,

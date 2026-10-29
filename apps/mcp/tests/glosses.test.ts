@@ -19,6 +19,9 @@ const TEXT_ANSWER = {
   parte: 1,
   parti: 1,
   testo: 'Qualunque fatto doloso o colposo, che cagiona ad altri un danno ingiusto, obbliga colui che ha commesso il fatto a risarcire il danno.',
+  // Normattiva's update notes beside the text, never in it (G-386): passed on as the server gives them.
+  note_aggiornamento: [{ numero: '2', testo: 'La Corte costituzionale, con sentenza …', ordine: 1, corte_costituzionale: true }],
+  avviso_note: 'note di aggiornamento non lette: verificare su Normattiva',
   glosse: [],
 };
 
