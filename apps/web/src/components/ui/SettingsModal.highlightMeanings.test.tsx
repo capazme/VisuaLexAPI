@@ -6,6 +6,9 @@ vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ isAdmin: false, canUse
 vi.mock('../../features/connections/ConnectedAppsSection', () => ({ ConnectedAppsSection: () => null }));
 vi.mock('../../features/merlt/privacy/MerltDataSection', () => ({ MerltDataSection: () => null }));
 vi.mock('../../services/accountService', () => ({ accountService: {} }));
+// The dialog's body is the scroller in a browser; jsdom computes no overflow from the classes.
+const scrollParent = vi.hoisted(() => vi.fn());
+vi.mock('../../utils/scrollParent', () => ({ scrollParentOf: scrollParent }));
 
 import { SettingsModal } from './SettingsModal';
 import { appStore } from '../../store/useAppStore';
@@ -31,7 +34,10 @@ beforeEach(() => {
   // The version box asks /version when the modal opens; it is not under test.
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
 });
-afterEach(() => setOwn({}));
+afterEach(() => {
+  setOwn({});
+  scrollParent.mockReset();
+});
 
 describe('Impostazioni › «Significato dei colori»', () => {
   it('lists the four colours, each with its meaning: VisuaLex\'s by default', () => {
@@ -116,9 +122,44 @@ describe('Impostazioni › «Significato dei colori»', () => {
     expect(within(region).getByRole('button', { name: 'Ripristina predefiniti' })).toHaveClass('min-h-[44px]');
   });
 
-  it('opened by the reader\'s gear, it gives the section\'s heading the focus', async () => {
-    open('highlightColors');
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Significato dei colori' })));
+  it('opened by the reader\'s gear, it focuses the first field, «Giallo», a control of the dialog\'s Tab order', async () => {
+    const { region } = open('highlightColors');
+    const yellow = field(region, 'Giallo');
+    await waitFor(() => expect(document.activeElement).toBe(yellow));
+    // A control of the dialog's Tab order, so its trap leaves Shift+Tab to the browser (the control before it): from
+    // an element outside that order (a heading with tabIndex -1) it jumped to the dialog's last control. (jsdom lays
+    // nothing out, so the trap itself is not run here: `offsetParent` is always null.)
+    expect(yellow.tabIndex).toBe(0);
+    expect(yellow).not.toHaveAttribute('tabindex');
+    expect(screen.getByRole('heading', { name: 'Significato dei colori' })).not.toHaveAttribute('tabindex');
+  });
+
+  it('and scrolls the dialog\'s body to the section, its heading at the top, once', async () => {
+    const scroller = document.createElement('div');
+    scroller.scrollTop = 40;
+    scrollParent.mockReturnValue(scroller);
+    const rect = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+      return { top: this.tagName === 'SECTION' ? 500 : 100 } as DOMRect;
+    });
+    try {
+      const { region } = open('highlightColors');
+      await waitFor(() => expect(document.activeElement).toBe(field(region, 'Giallo')));
+      // From the field's place to the section's top: 500 − 100 more.
+      expect(scroller.scrollTop).toBe(440);
+      field(region, 'Verde').focus();
+      field(region, 'Giallo').focus();
+      expect(scroller.scrollTop).toBe(440);
+    } finally {
+      rect.mockRestore();
+    }
+  });
+
+  it('opened from the user menu, a focus in its fields scrolls nothing', () => {
+    const scroller = document.createElement('div');
+    scrollParent.mockReturnValue(scroller);
+    const { region } = open();
+    field(region, 'Giallo').focus();
+    expect(scrollParent).not.toHaveBeenCalled();
   });
 
   it('opened from the user menu, the focus goes to «Chiudi» as before', async () => {

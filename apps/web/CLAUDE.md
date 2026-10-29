@@ -1090,7 +1090,10 @@ has a gear already (its own settings, «Impostazioni (S)»), the entry is the la
 (`meaningsGear={false}`); and none in the lesson's article sheet on a phone (`ui/Sheet` keeps the focus inside it, a
 dialog over it would fight it: Impostazioni stays the user menu's there). All open Impostazioni at «Significato dei colori» (`openSettings('highlightColors')`):
 the dialog's state is the store's (`settingsDialog`, session-only), so `Layout`'s `SettingsModal` opens from any reader,
-and with that section it gives the section's heading the focus (`initialFocusRef`), which scrolls the dialog to it.
+and with that section it gives the section's first field («Giallo») the focus (`initialFocusRef`) — never the heading:
+`useDialogFocus`'s trap sends Shift+Tab from an element outside its Tab order (`tabIndex -1`) to the dialog's last
+control — and that first focus scrolls the dialog's body alone so the section's heading is at its top (`revealOnFocus`,
+`scrollParentOf`).
 `HighlightMeaningsSection`, after «Tipografia»: a field per colour (its dot and name as the label, the default as
 placeholder, `maxLength` 40, 44 px on a phone, `FIELD_TEXT`), saved when left or on Enter, an emptied one keeping the
 meaning it had (said in the section's status line), Esc giving up a change without closing the dialog, and «Ripristina

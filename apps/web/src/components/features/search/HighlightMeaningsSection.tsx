@@ -1,4 +1,4 @@
-import { useId, useState, type KeyboardEvent, type Ref } from 'react';
+import { useId, useRef, useState, type KeyboardEvent, type Ref } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { useHighlightColorMeanings } from '../../../hooks/useHighlightColorMeanings';
@@ -11,7 +11,8 @@ import {
   type HighlightColor,
 } from '../../../utils/highlightColors';
 import { cn } from '../../../lib/utils';
-import { FIELD_TEXT, FOCUS_RING } from '../../../constants/interactions';
+import { FIELD_TEXT } from '../../../constants/interactions';
+import { scrollParentOf } from '../../../utils/scrollParent';
 
 const capitalised = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -21,16 +22,33 @@ const capitalised = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
  * key, only the words for it change); what is written here is what the colour menu says beside each colour. A field
  * saves when it is left or on Enter, trimmed, 1 to `HIGHLIGHT_MEANING_MAX` characters; an empty one keeps the meaning
  * it had, Esc gives up the change. «Ripristina predefiniti» brings back VisuaLex's four. Kept on this device with the
- * other reading settings (`settings.highlightColorMeanings`), never sent to the server. The heading takes the focus
- * when Impostazioni is opened here (the reader's gear): `headingRef`.
+ * other reading settings (`settings.highlightColorMeanings`), never sent to the server. Opened here (the reader's
+ * gear), Impostazioni gives the first field the focus (`firstFieldRef`: a control in the dialog's Tab order, so
+ * Shift+Tab goes back from it as from any other), and that first focus brings the whole section in sight, its heading
+ * at the top of the dialog's body (`revealOnFocus`).
  */
-export function HighlightMeaningsSection({ headingRef }: { headingRef?: Ref<HTMLHeadingElement> }) {
+export function HighlightMeaningsSection({ firstFieldRef, revealOnFocus = false }: {
+  firstFieldRef?: Ref<HTMLInputElement>;
+  revealOnFocus?: boolean;
+}) {
   const own = useAppStore((s) => s.settings.highlightColorMeanings) ?? {};
   const updateSettings = useAppStore((s) => s.updateSettings);
   const meanings = useHighlightColorMeanings();
   // What is being typed, per colour, until it is saved or given up.
   const [drafts, setDrafts] = useState<Partial<Record<HighlightColor, string>>>({});
   const [status, setStatus] = useState('');
+  const sectionRef = useRef<HTMLElement>(null);
+  const revealed = useRef(false);
+  // The focus brought the field in sight; the heading and the line under it come too, once: the dialog's body alone
+  // scrolls (`scrollParentOf`, never `scrollIntoView`, gotcha 34).
+  const reveal = () => {
+    const section = sectionRef.current;
+    if (!revealOnFocus || revealed.current || !section) return;
+    revealed.current = true;
+    const scroller = scrollParentOf(section);
+    if (!scroller) return;
+    scroller.scrollTop += section.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+  };
   const id = useId();
   const headingId = `${id}-heading`;
   const hintId = `${id}-hint`;
@@ -81,13 +99,8 @@ export function HighlightMeaningsSection({ headingRef }: { headingRef?: Ref<HTML
   };
 
   return (
-    <section aria-labelledby={headingId}>
-      <h3
-        ref={headingRef}
-        id={headingId}
-        tabIndex={-1}
-        className={cn('mb-1 rounded text-sm font-semibold text-slate-700 dark:text-slate-300', FOCUS_RING)}
-      >
+    <section ref={sectionRef} aria-labelledby={headingId}>
+      <h3 id={headingId} className="mb-1 text-sm font-semibold text-slate-700 dark:text-slate-300">
         Significato dei colori
       </h3>
       <p id={hintId} className="mb-3 text-xs text-slate-500 dark:text-slate-400">
@@ -95,7 +108,7 @@ export function HighlightMeaningsSection({ headingRef }: { headingRef?: Ref<HTML
         colore quando lo scegli. Le evidenziazioni non cambiano. Resta su questo dispositivo.
       </p>
       <div className="space-y-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
-        {HIGHLIGHT_COLORS.map((color) => {
+        {HIGHLIGHT_COLORS.map((color, i) => {
           const inputId = `${id}-${color}`;
           return (
             // Under `sm` the colour over its field, as the rows of «Tipografia».
@@ -110,6 +123,7 @@ export function HighlightMeaningsSection({ headingRef }: { headingRef?: Ref<HTML
                 {capitalised(highlightColorName(color))}
               </label>
               <input
+                ref={i === 0 ? firstFieldRef : undefined}
                 id={inputId}
                 type="text"
                 value={drafts[color] ?? meanings[color]}
@@ -121,6 +135,7 @@ export function HighlightMeaningsSection({ headingRef }: { headingRef?: Ref<HTML
                   const value = event.target.value;
                   setDrafts((current) => ({ ...current, [color]: value }));
                 }}
+                onFocus={i === 0 ? reveal : undefined}
                 onBlur={() => commit(color)}
                 onKeyDown={(event) => onKeyDown(color, event)}
                 className={cn(

@@ -36,7 +36,7 @@ interface VersionInfo {
 
 interface SettingsModalProps {
     isOpen: boolean;
-    /** The section it opens at, its heading focused (the reader's gear: «Significato dei colori»); else «Chiudi». */
+    /** The section it opens at, scrolled to with its first field focused (the reader's gear: «Significato dei colori»); else «Chiudi». */
     section?: SettingsSection | null;
     onClose: () => void;
     onRestartTour?: () => void;
@@ -57,7 +57,7 @@ export function SettingsModal({ isOpen, section = null, onClose, onRestartTour }
     // Erasing the account is behind its own button (Y1): the password and the confirmation only once it is asked for.
     const [deleteOpen, setDeleteOpen] = useState(false);
     const deleteOpener = useRef<HTMLButtonElement>(null);
-    const meaningsHeading = useRef<HTMLHeadingElement>(null);
+    const meaningsField = useRef<HTMLInputElement>(null);
     const closeDelete = () => {
         setDeleteOpen(false);
         setDeletePassword('');
@@ -188,8 +188,8 @@ export function SettingsModal({ isOpen, section = null, onClose, onRestartTour }
             title="Impostazioni"
             icon={<Settings size={20} />}
             size="md"
-            // The focus scrolls the dialog's body to the section asked for.
-            initialFocusRef={section === 'highlightColors' ? meaningsHeading : undefined}
+            // The section's first field takes the focus, and the dialog's body scrolls to the section.
+            initialFocusRef={section === 'highlightColors' ? meaningsField : undefined}
         >
             <div className="space-y-6">
                 {/* Theme - iOS-style Segmented Control */}
@@ -279,7 +279,7 @@ export function SettingsModal({ isOpen, section = null, onClose, onRestartTour }
                 </div>
 
                 {/* What each highlight colour means to this user, with the other reading settings. */}
-                <HighlightMeaningsSection headingRef={meaningsHeading} />
+                <HighlightMeaningsSection firstFieldRef={meaningsField} revealOnFocus={section === 'highlightColors'} />
 
                 {/* Restart Tour */}
                 {onRestartTour && (
