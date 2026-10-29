@@ -130,6 +130,46 @@ describe('DossierItemReader — an application\'s glosses (D8)', () => {
     expect(document.activeElement).toBe(card);
   });
 
+  it('narrow: «Sposta» then «Annulla» gives the focus back to the block\'s sign, found by the gloss\'s words', async () => {
+    const { container } = renderReader();
+    const sign = await signOf(container, 2);
+    fireEvent.click(sign);
+    const dialog = await screen.findByRole('dialog', { name: /Annotazioni · Nei contratti/ });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Sposta' }));
+    const bar = await screen.findByRole('group', { name: GLOSS_WORDS.moveTitle });
+    fireEvent.click(within(bar).getByRole('button', { name: 'Annulla' }));
+    await waitFor(() => expect(document.activeElement).toBe(container.querySelector('.vlx-sign[data-block="2"]')));
+  });
+
+  it('wide: «Rimuovi» in the column hands the focus to the next card', async () => {
+    const second = proposal('g3', 'risarcimento del danno');
+    vi.mocked(assistantService.listProposals).mockResolvedValue([gloss, second]);
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains('vlx-gloss-column') ? 280 : 0;
+    });
+    renderReader();
+    const column = await screen.findByRole('complementary', { name: GLOSS_WORDS.column });
+    await waitFor(() => expect(column.querySelectorAll('article:not(.invisible)')).toHaveLength(2));
+    const [first] = within(column).getAllByRole('article');
+    fireEvent.click(within(first).getByRole('button', { name: 'Rimuovi' }));
+    await waitFor(() => expect(document.activeElement?.getAttribute('data-gloss')).toBe('g3'));
+  });
+
+  it('wide: «Sposta» from a card, then «Annulla», gives the focus back to that card', async () => {
+    vi.mocked(assistantService.listProposals).mockResolvedValue([gloss]);
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains('vlx-gloss-column') ? 280 : 0;
+    });
+    renderReader();
+    const column = await screen.findByRole('complementary', { name: GLOSS_WORDS.column });
+    const card = await waitFor(() => within(column).getByRole('article', { name: /Da validare/ }));
+    await waitFor(() => expect(card.classList.contains('invisible')).toBe(false));
+    fireEvent.click(within(card).getByRole('button', { name: 'Sposta' }));
+    const bar = await screen.findByRole('group', { name: GLOSS_WORDS.moveTitle });
+    fireEvent.click(within(bar).getByRole('button', { name: 'Annulla' }));
+    await waitFor(() => expect(document.activeElement).toBe(within(column).getByRole('article')));
+  });
+
   it('wide, a block with glosses only: its sign focuses the card and opens nothing', async () => {
     vi.mocked(assistantService.listProposals).mockResolvedValue([gloss]);
     vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (this: HTMLElement) {

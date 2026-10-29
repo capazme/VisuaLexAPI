@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { Check, Flag, Pencil, Trash2 } from 'lucide-react';
 import type { AiReviewState } from '../../../types';
 import { cn } from '../../../lib/utils';
+import { FIELD_TEXT } from '../../../constants/interactions';
 
 export interface AiReviewControlsProps {
     state: AiReviewState;
@@ -203,7 +204,8 @@ export function ReviewComment({ saved, onSave }: { saved: string | null; onSave:
                     if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); }
                     if (e.key === 'Escape') commit();
                 }}
-                className="mt-0.5 block min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500/40 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                // 16 px on a phone (`FIELD_TEXT`): iOS zooms the page into a smaller field as it takes the focus.
+                className={cn('mt-0.5 block min-h-[44px] w-full rounded-md border border-slate-300 bg-white px-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500/40 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100', FIELD_TEXT)}
             />
         </label>
     );

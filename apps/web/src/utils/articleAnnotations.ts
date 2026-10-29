@@ -239,7 +239,7 @@ export const isOpenProposal = (h: Highlight): boolean => !!h.proposal?.note && h
  * What a screen reader hears on a sign: "2 note e 1 evidenziazione in questo passo". The passages with an
  * application's note (D7b) come last, apart, in the row's words: "1 nota in questo passo; 3 passaggi proposti
  * dall'IA: 1 da validare · 1 da rivedere · 1 validato". `highlights` leaves them out. An application's glosses (D8)
- * after them, the same way: "…; 2 glosse dell'IA: 1 da validare · 1 validato".
+ * after them, the same way, in the gloss's own words: "…; 2 glosse dell'IA: 1 da validare · 1 validata".
  */
 export function signAriaLabel(
   notes: number,
@@ -256,7 +256,7 @@ export function signAriaLabel(
   const glossed = glosses.proposed + glosses.review + glosses.validated;
   const assistant = [
     all > 0 ? `${all} ${all === 1 ? 'passaggio proposto' : 'passaggi proposti'} dall'IA: ${aiReviewSummary(proposals)}` : '',
-    glossed > 0 ? `${GLOSS_WORDS.count(glossed)}: ${aiReviewSummary(glosses)}` : '',
+    glossed > 0 ? `${GLOSS_WORDS.count(glossed)}: ${GLOSS_WORDS.summary(glosses)}` : '',
   ].filter(Boolean).join('; ');
   if (parts.length === 0) return assistant || 'in questo passo';
   const own = parts.length === 1

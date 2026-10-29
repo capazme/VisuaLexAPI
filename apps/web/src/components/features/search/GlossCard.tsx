@@ -31,12 +31,6 @@ export interface GlossCardProps {
     style?: CSSProperties;
 }
 
-/** What the state is called, on the card and to a screen reader as it changes. */
-function stateWords(state: AiReviewState, edited: boolean): string {
-    if (state === 'validated') return edited ? 'Validato, modificato da te' : 'Validato';
-    return state === 'review' ? 'Da rivedere' : 'Da validare';
-}
-
 /** The state's own shape (never colour alone), as on the block's sign and the row's light. */
 function StateMark({ state }: { state: AiReviewState }) {
     if (state === 'validated') return <Check size={13} strokeWidth={3} aria-hidden className="shrink-0" />;
@@ -72,6 +66,7 @@ export function GlossCard({
     const titleId = useId();
     const originalId = useId();
     const passageId = useId();
+    const quoteId = useId();
     const note = gloss.note;
     const state: AiReviewState = note?.state ?? 'proposed';
     const edited = note?.edited ?? false;
@@ -90,7 +85,7 @@ export function GlossCard({
     useEffect(() => () => reportRef.current?.('none'), []);
 
     // Said once the server's answer changes the state, never as the card first appears.
-    const words = stateWords(state, edited);
+    const words = GLOSS_WORDS.state(state, edited);
     const [said, setSaid] = useState({ words, announce: '' });
     if (said.words !== words) setSaid({ words, announce: words });
 
@@ -123,6 +118,7 @@ export function GlossCard({
             ref={ref as Ref<HTMLElement>}
             tabIndex={-1}
             aria-labelledby={titleId}
+            aria-describedby={quoteId}
             data-gloss={gloss.id}
             style={style}
             onMouseEnter={() => setHovered(true)}
@@ -143,7 +139,7 @@ export function GlossCard({
             </h4>
             <span className="sr-only" role="status">{said.announce}</span>
             {/* The words it is on, one line: enough to tell two cards apart where one was pushed down. */}
-            <p className="mt-1 truncate font-serif text-[13px] italic text-slate-600 dark:text-slate-400" title={gloss.text}>
+            <p id={quoteId} className="mt-1 truncate font-serif text-[13px] italic text-slate-600 dark:text-slate-400" title={gloss.text}>
                 &ldquo;{gloss.text}&rdquo;
             </p>
             {draft !== null ? (

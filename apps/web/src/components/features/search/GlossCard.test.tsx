@@ -37,7 +37,7 @@ describe('GlossCard — an application\'s gloss, as a word processor\'s comment 
   it('validated, «Valida» is pressed and gives it back to «da validare»; edited, the application\'s version is one press away', () => {
     const a = actions();
     render(<GlossCard gloss={gloss({ note: aiNote('Il mio testo.', 'validated', { edited: true, assistantText: 'Il rimedio della risoluzione.' }) })} actions={a} />);
-    expect(screen.getByRole('article', { name: 'Glossa: Validato, modificato da te' })).toBeInTheDocument();
+    expect(screen.getByRole('article', { name: 'Glossa: Validata, modificata da te' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Valida' }));
     expect(a.validate).toHaveBeenCalledWith('g1', false);
     fireEvent.click(screen.getByRole('button', { name: "Vedi la versione dell'IA" }));

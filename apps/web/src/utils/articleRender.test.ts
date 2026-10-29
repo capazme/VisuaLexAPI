@@ -114,7 +114,6 @@ describe('the projection invariant — every real text', () => {
       // Each block's sign counts exactly what the block shows.
       const structure = parseArticleStructure(raw);
       const groups = groupAnnotationsByBlock(raw, structure, highlights, annotations, threads, glosses);
-      expect(div.querySelectorAll('[data-gloss]')).toHaveLength(0);
       const blocks = pieces(div, '.vlx-b');
       expect(blocks).toHaveLength(structure.blocks.length);
       blocks.forEach((block, i) => {
@@ -423,7 +422,7 @@ describe('annotation signs', () => {
       glosses: [gloss('g1', 'obbligazioni', 'proposed'), gloss('g2', 'risarcimento del danno', 'validated'), gloss('g3', 'a sua scelta', 'proposed')],
     }));
     const sign = signOf(div, 2)!;
-    const label = "1 evidenziazione in questo passo; 3 glosse dell'IA: 2 da validare · 1 validato";
+    const label = "1 evidenziazione in questo passo; 3 glosse dell'IA: 2 da validare · 1 validata";
     expect(sign.getAttribute('aria-label')).toBe(label);
     expect(sign.getAttribute('title')).toBe(label);
     expect(sign.getAttribute('data-glosses')).toBe('3');

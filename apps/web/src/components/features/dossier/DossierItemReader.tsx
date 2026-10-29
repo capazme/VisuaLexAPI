@@ -210,16 +210,22 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
     updatesOpenByDefault: display?.updateNotesOpen ?? false,
   });
   const openGroup = openBlock === null ? undefined : blockGroups[openBlock];
+  // Whether the glosses are beside the text, as it was when the block was opened: a reader widened or narrowed while its
+  // popover is open (a gloss's text half edited in it) keeps the popover as it is.
+  const [openedWide, setOpenedWide] = useState<{ block: number | null; wide: boolean }>({ block: null, wide: false });
+  if (openedWide.block !== openBlock) setOpenedWide({ block: openBlock, wide: glossesWide });
+  const inMargin = openedWide.block === openBlock ? openedWide.wide : glossesWide;
   // With the glosses beside the text, a sign whose block holds only glosses focuses the first one's card (D8, as a
   // word processor's comment); one that holds more opens the popover, which offers the way to them.
   const onlyGlosses = !!openGroup && openGroup.glosses.length > 0
     && openGroup.notes.length + openGroup.highlights.length + openGroup.threads.length === 0;
-  const focusCard = glossesWide && onlyGlosses ? openGroup.glosses[0].id : null;
+  const focusCard = inMargin && onlyGlosses ? openGroup.glosses[0].id : null;
   useEffect(() => {
     if (!focusCard) return;
-    // The column took the click: the focus goes to the card (a DOM write), and the block is closed again so the next
+    // The column took the press: the focus goes to the card (a DOM write), and the block is closed again so the next
     // press on the sign does the same.
-    if (marginRef.current?.focus(focusCard)) closeBlock();
+    marginRef.current?.focus(focusCard);
+    closeBlock();
   }, [focusCard, closeBlock]);
 
   // Delegated click on the article body: tapping a wavy `.note-anchor`
@@ -363,6 +369,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
           onSave={saveMove}
           onCancel={cancelMove}
           label={isGloss(moving) ? GLOSS_WORDS.moveTitle : undefined}
+          focusAfter={isGloss(moving) ? () => marginRef.current?.focus(moving.id) ?? false : undefined}
         />
       )}
       <LooseHighlightsList highlights={looseHighlights} articleId={uniqueArticleId} onRemove={removeHighlight} />
@@ -390,7 +397,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
           onRemoveHighlight={removeHighlight}
           proposalActions={proposalActions}
           glosses={glosses}
-          glossesInMargin={glossesWide}
+          glossesInMargin={inMargin}
           onGoToGloss={(id) => marginRef.current?.focus(id)}
           shownGlossId={shownGlossId}
           onShowGlossPassage={showGlossPassage}

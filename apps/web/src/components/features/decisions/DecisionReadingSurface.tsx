@@ -206,14 +206,19 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
   }, [glosses, blockGroups]);
   const marginRef = useRef<GlossMarginHandle>(null);
   const [glossesWide, setGlossesWide] = useState(false);
+  // As it was when the paragraph was opened: a popover open while the reader is resized keeps its cards.
+  const [openedWide, setOpenedWide] = useState<{ block: number | null; wide: boolean }>({ block: null, wide: false });
+  if (openedWide.block !== openBlock) setOpenedWide({ block: openBlock, wide: glossesWide });
+  const inMargin = openedWide.block === openBlock ? openedWide.wide : glossesWide;
   // With the glosses beside the text, a sign whose paragraph holds only glosses focuses the first one's card (D8).
   const onlyGlosses = !!openGroup && openGroup.glosses.length > 0
     && openGroup.notes.length + openGroup.highlights.length + openGroup.threads.length === 0;
-  const focusCard = glossesWide && onlyGlosses ? openGroup.glosses[0].id : null;
+  const focusCard = inMargin && onlyGlosses ? openGroup.glosses[0].id : null;
   useEffect(() => {
     if (!focusCard) return;
-    // The column took the click: the focus goes to the card (a DOM write), and the paragraph is closed again.
-    if (marginRef.current?.focus(focusCard)) closeBlock();
+    // The column took the press: the focus goes to the card (a DOM write), and the paragraph is closed again.
+    marginRef.current?.focus(focusCard);
+    closeBlock();
   }, [focusCard, closeBlock]);
 
   // What no longer lands is listed under the text (a free note has no anchor: the panel holds it).
@@ -466,6 +471,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
           onSave={saveMove}
           onCancel={cancelMove}
           label={isGloss(moving) ? GLOSS_WORDS.moveTitle : undefined}
+          focusAfter={isGloss(moving) ? () => marginRef.current?.focus(moving.id) ?? false : undefined}
         />
       )}
       {!discussion.open && (
@@ -496,7 +502,7 @@ export function DecisionReadingSurface({ identity, testo, attributi, hostTabId, 
           onRemoveHighlight={removeHighlight}
           proposalActions={proposalActions}
           glosses={glosses}
-          glossesInMargin={glossesWide}
+          glossesInMargin={inMargin}
           onGoToGloss={(id) => marginRef.current?.focus(id)}
           shownGlossId={shownGlossId}
           onShowGlossPassage={showGlossPassage}

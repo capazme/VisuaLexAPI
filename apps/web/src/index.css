@@ -1086,6 +1086,11 @@
   transition: transform 160ms var(--ease-out), border-color 150ms ease, box-shadow 150ms ease;
 }
 
+/* Its first place is taken at once: from no transform it would slide down from the column's top. */
+.vlx-gloss-card.vlx-gloss-card-fresh {
+  transition: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .vlx-gloss-card {
     transition: none;

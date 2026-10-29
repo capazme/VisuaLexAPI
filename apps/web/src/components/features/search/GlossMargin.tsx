@@ -49,19 +49,17 @@ type Landed = Extract<ResolvedAnchor, { kind: 'gloss' }>;
 export function GlossMargin({
     glosses, plain, actions, textRootRef, contentKey, shownId = null, onShowPassage, onWideChange, children, ref,
 }: GlossMarginProps) {
-    const active = !!actions && glosses.length > 0;
     const wrapperRef = useRef<HTMLDivElement>(null);
     const columnRef = useRef<HTMLElement>(null);
     const cards = useRef(new Map<string, HTMLElement>());
 
-    // The glosses whose words land, in the order of the text.
+    // The glosses whose words land, in the order of the text: only they make a column (one of lost glosses alone
+    // would narrow the text for nothing; they are listed under it).
     const landed = useMemo<Landed[]>(() => {
-        if (!active) return [];
-        const byId = new Map(glosses.map((g) => [g.id, g]));
-        return (resolveGlosses(plain, glosses.map(glossAnchor)) as Landed[])
-            .filter((a) => byId.has(a.gloss.id))
-            .sort((x, y) => x.start - y.start || x.end - y.end);
-    }, [active, glosses, plain]);
+        if (!actions || glosses.length === 0) return [];
+        return (resolveGlosses(plain, glosses.map(glossAnchor)) as Landed[]).sort((x, y) => x.start - y.start || x.end - y.end);
+    }, [actions, glosses, plain]);
+    const active = landed.length > 0;
     const byId = useMemo(() => new Map(glosses.map((g) => [g.id, g])), [glosses]);
 
     const [wide, setWide] = useState(false);
@@ -74,10 +72,14 @@ export function GlossMargin({
         setWide(isWide);
         if (!isWide || !column || !root) return;
         const origin = column.getBoundingClientRect().top;
+        let previous = 0;
         const slots = landed.map((a) => {
             const range = rangeFromPlainOffsets(root, a.start, a.end);
-            const rect = range?.getClientRects?.()[0] ?? range?.getBoundingClientRect?.();
-            return { id: a.gloss.id, want: rect ? rect.top - origin : 0, height: cards.current.get(a.gloss.id)?.offsetHeight ?? 0 };
+            const rect = range?.getClientRects?.()[0];
+            // Words with no box (the update notes folded away): under the card before it, never at the column's top.
+            const want = rect ? rect.top - origin : previous;
+            previous = want;
+            return { id: a.gloss.id, want, height: cards.current.get(a.gloss.id)?.offsetHeight ?? 0 };
         });
         const next = placeGlossCards(slots);
         setLayout((prev) => (prev && prev.height === next.height && slots.every((s) => prev.tops[s.id] === next.tops[s.id]) ? prev : next));
@@ -104,20 +106,56 @@ export function GlossMargin({
         return () => observer.disconnect();
     }, [active, schedule, textRootRef, landed, contentKey]);
 
+    // The cards placed once take their moves smoothly; a card's first place is taken at once (it would slide down from
+    // the column's top). Marked a frame after it was drawn there.
+    const [settled, setSettled] = useState<ReadonlySet<string>>(() => new Set());
+    useEffect(() => {
+        if (!layout) return;
+        const placed = Object.keys(layout.tops);
+        if (placed.every((id) => settled.has(id))) return;
+        const handle = requestAnimationFrame(() => setSettled(new Set(placed)));
+        return () => cancelAnimationFrame(handle);
+    }, [layout, settled]);
+
     const reportWide = useRef(onWideChange);
     useEffect(() => { reportWide.current = onWideChange; });
-    const shownWide = active && wide;
+    // Wide once the cards are placed: before that a sign's press would focus a card not yet drawn.
+    const shownWide = active && wide && layout !== null;
     useEffect(() => { reportWide.current?.(shownWide); }, [shownWide]);
 
+    const focusCard = useCallback((id: string): boolean => {
+        const card = cards.current.get(id);
+        if (!card) return false;
+        card.focus({ preventScroll: true });
+        if (document.activeElement !== card) return false;
+        scrollToMiddle(card);
+        return true;
+    }, []);
+
     useImperativeHandle(ref, () => ({
-        focus: (id) => {
-            const card = cards.current.get(id);
-            if (!shownWide || !card) return false;
-            card.focus({ preventScroll: true });
-            scrollToMiddle(card);
-            return true;
-        },
-    }), [shownWide]);
+        focus: (id) => shownWide && focusCard(id),
+    }), [shownWide, focusCard]);
+
+    /**
+     * «Rimuovi» from the column: the card goes at once, and the focus with it would fall to the page — so it goes to the
+     * next card, else the one before, else the block's sign of the words it was on.
+     */
+    const removeFrom = (id: string) => {
+        if (!actions) return;
+        const index = landed.findIndex((a) => a.gloss.id === id);
+        const neighbour = landed[index + 1]?.gloss.id ?? landed[index - 1]?.gloss.id ?? null;
+        const anchor = landed[index];
+        const root = textRootRef.current;
+        const sign = anchor && root
+            ? rangeFromPlainOffsets(root, anchor.start, anchor.end)?.startContainer.parentElement
+                ?.closest('.vlx-b, .vlx-dec-para')?.querySelector<HTMLElement>(':scope > .vlx-sign') ?? null
+            : null;
+        actions.remove(id);
+        requestAnimationFrame(() => {
+            if (neighbour && focusCard(neighbour)) return;
+            (sign?.isConnected ? sign : null)?.focus({ preventScroll: true });
+        });
+    };
 
     return (
         <div ref={wrapperRef} className={cn(active && 'vlx-glossed')}>
@@ -145,7 +183,8 @@ export function GlossMargin({
                                     actions={actions}
                                     active={shownId === anchor.id}
                                     onShowPassage={(show) => onShowPassage?.(anchor.id, show)}
-                                    className={cn('vlx-gloss-card', top === undefined && 'invisible')}
+                                    onRemove={() => removeFrom(anchor.id)}
+                                    className={cn('vlx-gloss-card', top === undefined && 'invisible', !settled.has(anchor.id) && 'vlx-gloss-card-fresh')}
                                     style={top === undefined ? undefined : { transform: `translateY(${top}px)` }}
                                 />
                             );

@@ -1073,17 +1073,23 @@ the offset, the words and the state) and never makes a `Highlight` of one, so it
 Study Mode or practice, and no element of it enters the text (root rule 23): `renderArticleHtml` and
 `renderDecisionHtml` take `glosses` and only count them on the block's sign (`BlockAnnotations.glosses`,
 `data-glosses`, `.vlx-sign-gloss` with the state's shape, named apart by `signAriaLabel`: «…; 2 glosse dell'IA: 1 da
-validare · 1 validato»); «Nascondi evidenziazioni» leaves them, a gloss is a note. The projection tests run with glosses
+validare · 1 validata»); «Nascondi evidenziazioni» leaves them, a gloss is a note. The projection tests run with glosses
 on. Where the reader has room (`.vlx-glossed`, a container query at 52 rem on the wrapper `GlossMargin` puts around
 `ArticleBody`, in the article's and the decision's dossier reader alike) the cards stand in a column on the right, as a
 word processor's comments (`GlossMargin`): each at the height of the first line of its words, read from a DOM range of
 the text root (`rangeFromPlainOffsets`), pushed down under the card above when they would overlap, in the order of the
-text (`placeGlossCards`, `utils/glossLayout.ts`, pure), placed by a `transform` (160 ms, none under reduced motion) and
-measured again on every redraw, reflow or card that grows (`ResizeObserver`s); a sign whose block holds only glosses
-then focuses the first card and opens nothing, one that holds more opens the popover with «Vai alla glossa a margine»
-(`glossesInMargin`). With less room — a phone, and the norms' column of a dossier that has decisions too — the column
+text (`placeGlossCards`, `utils/glossLayout.ts`, pure; words with no box, in the folded update notes, under the card
+before), placed by a `transform` (160 ms after its first place, which is taken at once; none under reduced motion) and
+measured again on every redraw, reflow or card that grows (`ResizeObserver`s); only glosses whose words land make a
+column. Once the cards are placed (`onWideChange`), a sign whose block holds only glosses focuses the first card and
+opens nothing, one that holds more opens the popover with «Vai alla glossa a margine» (`glossesInMargin`); the reader
+keeps the mode a block was opened in while its popover is open, so a resize never drops a gloss's text half edited.
+«Rimuovi» in the column hands the focus to the next card, else the one before, else the block's sign; «Sposta» gives
+it back to the card (`MoveProposalBar`'s `focusAfter`), or, narrow, to the sign found by the gloss's words (it has no
+mark). With less room — a phone, and the norms' column of a dossier that has decisions too — the column
 is not drawn (`display: none`, read by its width: `onWideChange`) and the sign's popover lists the block's `GlossCard`s
-first (44 px on a touch screen). A card (`GlossCard`): the state in words and shape, the passage's words on one line,
+first (44 px on a touch screen). A card (`GlossCard`, its passage's words its `aria-describedby`): the state in words and shape (feminine, as the word:
+«Validata»), the passage's words on one line,
 the text, then «Valida» and «Da rivedere» (toggles, `aria-pressed`, waiting while a write is out), «Modifica»
 (`NoteEditBox explicit`; an emptied text is not sent), «Sposta» (`MoveProposalBar`, named «Sposta la glossa») and
 «Rimuovi» (the bin's «Annulla», «Glossa rimossa»); «Cosa non va?» while flagged (`ReviewComment`), «Vedi la versione

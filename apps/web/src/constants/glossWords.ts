@@ -7,10 +7,17 @@
 export const GLOSS_WORDS = {
   /** A heading or a label: «Glossa». */
   one: 'Glossa',
-  /** «Glosse». */
-  many: 'Glosse',
   /** On the sign, before the states: «1 glossa dell'IA», «2 glosse dell'IA». */
   count: (n: number) => `${n} ${n === 1 ? 'glossa' : 'glosse'} dell'IA`,
+  /** The states, agreeing with the word: on the card and to a screen reader as they change. */
+  state: (state: 'proposed' | 'review' | 'validated', edited = false) =>
+    state === 'validated' ? (edited ? 'Validata, modificata da te' : 'Validata') : state === 'review' ? 'Da rivedere' : 'Da validare',
+  /** On the sign, after the count: «2 da validare · 1 da rivedere · 1 validata». */
+  summary: ({ proposed, review, validated }: { proposed: number; review: number; validated: number }) => [
+    proposed > 0 ? `${proposed} da validare` : '',
+    review > 0 ? `${review} da rivedere` : '',
+    validated > 0 ? `${validated} ${validated === 1 ? 'validata' : 'validate'}` : '',
+  ].filter(Boolean).join(' · '),
   /** The column beside the text and the popover's section. */
   column: "Glosse dell'IA",
   /** The notification of the bin, which offers «Annulla». */
