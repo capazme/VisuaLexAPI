@@ -88,7 +88,10 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     «C. cost.», and «sentenza»), never a legal reading. A block with no heading or number, or a «((n))» marker
     with no note n on a page that has notes, sets `note_non_lette` (a plain «(n)» does not: the text has those for
     other reasons; the portal also brackets amended words, «entro ((30)) giorni», so the notice can be a cautious
-    one, never a lost note). The page must be the article asked, as for `validity`. Normattiva's editorial `note-akn`
+    one, never a lost note; «((2)).» opening a line is a renumbered comma, art. 117 TUB, and «((2027))» a year: neither
+    counts, as in mcp-legal-it's reader), and so does an «AGGIORNAMENTO (n)» heading the reader did not take as a
+    note (more headings on the page than notes read). A reader that raises gives `note_aggiornamento: null` and
+    `note_non_lette: true`, never an error for the article. The page must be the article asked, as for `validity`. Normattiva's editorial `note-akn`
     notes are out of scope.
   - `normattiva_parts.py` — the parts of an article Normattiva splits (G-387): art. 1 l. 296/2006 is 14 entries
     of the page's tree, «1 (commi 1-100)» … «1 (commi 1301-1364)», linked with `art.progressivo=k`, and its URN
