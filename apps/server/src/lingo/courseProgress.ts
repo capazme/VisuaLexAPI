@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { isSwitchOn } from '../assistant/switches';
 import { courseMastery, type CompetenceMastery, type MasteryAnswer } from './courseMastery';
 import { dayToDate, dateToDay } from './studyDays';
 
@@ -93,9 +94,11 @@ export async function masteryFor(db: Db, userId: string, enrolments: { id: strin
 
 /**
  * «Percorso superato» (§4, §10.4): every competence «acquisita» and a final exam passed. Written once, with the Rome
- * day, never cleared. The caller holds the enrolment's row lock. Returns whether it was written now.
+ * day, never cleared, and never while the switch `lingo_courses` is off (off hides, §10.10). The caller holds the
+ * enrolment's row lock. Returns whether it was written now.
  */
 export async function evaluatePassed(tx: Db, userId: string, enrolment: { id: string; corsoId: string }, today: string): Promise<boolean> {
+  if (!(await isSwitchOn('lingo_courses', tx))) return false;
   const row = await tx.lingoCorsoIscrizione.findUnique({ where: { id: enrolment.id }, select: { superatoIl: true } });
   if (!row || row.superatoIl) return false;
   const passed = await tx.lingoCorsoTentativo.findFirst({ where: { iscrizioneId: enrolment.id, superato: true }, select: { id: true } });

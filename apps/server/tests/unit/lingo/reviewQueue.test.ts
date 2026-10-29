@@ -20,6 +20,15 @@ describe('reviewScope', () => {
     });
   });
 
+  it('leaves every course card out while the courses are switched off (courseDay null)', () => {
+    expect(reviewScope('u1', ['DIRITTO_CIVILE'], null)).toEqual({
+      OR: [
+        { autoreId: 'u1', stato: { in: ['BOZZA_PERSONALE', 'PROPOSTA_COMMUNITY', 'VALIDATA'] }, moduloId: null },
+        { stato: 'VALIDATA', materia: { in: ['DIRITTO_CIVILE'] } },
+      ],
+    });
+  });
+
   it('never excludes by author: an anonymous card (no author) is still the community’s', () => {
     expect(JSON.stringify(reviewScope('u1', ['DIRITTO_CIVILE'], '2026-11-02'))).not.toContain('not');
   });

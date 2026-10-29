@@ -1,4 +1,5 @@
 import type { LingoCardStato, LingoMateria, Prisma } from '@prisma/client';
+import { isSwitchOn } from '../assistant/switches';
 import { review, type Rating, type SrsState } from '../srs/fsrsEngine';
 import { dayToDate } from './studyDays';
 
@@ -18,23 +19,33 @@ export const REVIEWABLE_OWN_STATES: LingoCardStato[] = ['BOZZA_PERSONALE', 'PROP
  * proposed or validated, and the community's validated ones in the subjects
  * they switched on, optionally narrowed to one subject and, within it, to one institute. Never «da rivedere»
  * or archived. A course's card (Percorsi, spec 2026-10-23 §10.7) is in scope from the Rome day after its module
- * was done by the caller's enrolment, never before, and leaves it when that module is withdrawn: so `today`.
+ * was done by the caller's enrolment, never before, and leaves it when that module is withdrawn: so `courseDay`,
+ * today's Rome day — or null while the switch `lingo_courses` is off, when no course card is in scope at all (off
+ * hides, never deletes; `courseDayFor` reads it).
  *
  * The community branch does not say `autoreId != me`: in SQL that drops a card
  * with no author (its author's account is gone), which is still the community's.
  * A card of one's own that is validated is matched by the first branch already.
  * With no subjects on, `in: []` matches nothing.
  */
-export function reviewScope(userId: string, materieComunita: LingoMateria[], today: string, materia?: LingoMateria, istituto?: string): Prisma.LingoCardWhereInput {
+export function reviewScope(userId: string, materieComunita: LingoMateria[], courseDay: string | null, materia?: LingoMateria, istituto?: string): Prisma.LingoCardWhereInput {
+  const own: Prisma.LingoCardWhereInput = courseDay === null
+    ? { moduloId: null }
+    : { OR: [{ moduloId: null }, { modulo: courseCardModuleDone(userId, courseDay) }] };
   const scope: Prisma.LingoCardWhereInput = {
     OR: [
-      { autoreId: userId, stato: { in: REVIEWABLE_OWN_STATES }, OR: [{ moduloId: null }, { modulo: courseCardModuleDone(userId, today) }] },
+      { autoreId: userId, stato: { in: REVIEWABLE_OWN_STATES }, ...own },
       { stato: 'VALIDATA', materia: { in: materieComunita } },
     ],
   };
   if (!materia) return scope;
   // An institute only exists within a subject, and is matched exactly as `/percorso` returns it.
   return { AND: [scope, { materia }, ...(istituto === undefined ? [] : [{ istituto }])] };
+}
+
+/** `reviewScope`'s `courseDay`: today while the courses are switched on, null while off. */
+export async function courseDayFor(db: Prisma.TransactionClient, today: string): Promise<string | null> {
+  return (await isSwitchOn('lingo_courses', db)) ? today : null;
 }
 
 /** A course card's module, done by the user's enrolment before `today` and not withdrawn (A3 adds other authors'). */

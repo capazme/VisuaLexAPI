@@ -3,7 +3,8 @@ import { createTestUser, type TestUser } from './helpers';
 import { CORSI, acceptDeclaration, app, course, courseCards, delegatedAs, examBody, moduleBody, prisma, request, switchCourses, type Headers } from './corsiHelpers';
 import { cardsOf, courseCredits, gradeByHand, studyModule } from './corsiStudyHelpers';
 import { GRADE, SESSION, card, grade, session, setClock } from './xpHelpers';
-import { masteryFor } from '../src/lingo/courseProgress';
+import { evaluatePassed, masteryFor } from '../src/lingo/courseProgress';
+import { settleMissions } from '../src/lingo/missions';
 import { deleteUserAccount } from '../src/lingo/deleteUserAccount';
 
 // Percorsi, S2 (spec 2026-10-23 §10.4, §10.5, §10.7): a course's cards in the review from the Rome day after their
@@ -74,6 +75,60 @@ describe('reviewScope with the day (§10.7)', () => {
     expect((await request(app).post(`${CORSI}/${id}/moduli/${moduleIds[0]}/ritira`).set(a).send({})).status).toBe(200);
     expect((await sessionCards()).cards).toEqual([]);
     expect((await grade(a, first.id)).status).toBe(404);
+  });
+});
+
+describe('the switch lingo_courses and the review (off hides)', () => {
+  it('off: a done module’s cards leave the session, the counts, the road and the progress, and cannot be graded; on: back', async () => {
+    const { id, moduleIds } = await withCards();
+    const own = await card(alice);
+    await studyModule(a, id, moduleIds[0]);
+    setClock(`${TOMORROW}T09:00:00Z`);
+    expect((await sessionCards()).cards).toHaveLength(16);
+    const [courseCard] = await cardsOf(id, 'C1');
+    await switchCourses(false);
+    expect((await sessionCards()).cards.map((c) => c.id)).toEqual([own.id]);
+    expect((await request(app).get('/api/lingo/srs/conteggi').set(a)).body).toMatchObject({ nuove: 1 });
+    expect(((await request(app).get('/api/lingo/srs/percorso').set(a)).body as { istituto: string }[]).some((s) => s.istituto.startsWith('Ditta'))).toBe(false);
+    expect((await request(app).get('/api/lingo/srs/progressi').set(a)).body.stati).toMatchObject({ nuove: 1 });
+    expect((await grade(a, courseCard.id)).status).toBe(404);
+    // Hidden, never deleted.
+    expect(await prisma.lingoCard.count({ where: { moduloId: moduleIds[0] } })).toBe(15);
+    await switchCourses(true);
+    expect((await sessionCards()).cards).toHaveLength(16);
+    expect((await grade(a, courseCard.id)).status).toBe(200);
+  });
+
+  it('off: no «superato» and no course mission is credited, whatever the path; on: the course page settles them', async () => {
+    const { id, moduleIds } = await course(alice, token, 3, { moduliPrevisti: 3 });
+    await courseCards(alice, id, moduleIds[0]);
+    const exam = await request(app).post(`${CORSI}/${id}/esami`).set(token).send(examBody());
+    setClock(`${TODAY}T09:00:00Z`);
+    for (const m of moduleIds) await studyModule(a, id, m);
+    await prisma.lingoCreditoXp.deleteMany({ where: { missione: 'MODULO' } });
+    const enrolment = await prisma.lingoCorsoIscrizione.findFirstOrThrow();
+    await prisma.lingoCorsoTentativo.create({
+      data: { iscrizioneId: enrolment.id, esameId: exam.body.id, consegnatoIl: new Date(), giorno: new Date(`${TODAY}T00:00:00Z`), percentuale: 100, superato: true, perCompetenza: {} },
+    });
+    for (const code of ['C1', 'C2', 'C3']) {
+      await gradeByHand(alice, await cardsOf(id, code), '2026-10-20T10:00:00Z', [true, true, true, true, true]);
+      await gradeByHand(alice, await cardsOf(id, code), '2026-10-27T10:00:00Z', [true, true, true, true, true]);
+    }
+    await switchCourses(false);
+    // Every writer of a course credit, called as the routes would, with the switch off.
+    const settled = await prisma.$transaction(async (tx) => {
+      const passed = await evaluatePassed(tx, alice.id, enrolment, TODAY);
+      const xp = await settleMissions(tx, alice.id, TODAY, { tipo: 'corso', iscrizioneId: enrolment.id });
+      const graded = await settleMissions(tx, alice.id, TODAY, { tipo: 'esame', iscrizioneId: enrolment.id });
+      return { passed, crediti: [...xp.crediti, ...graded.crediti] };
+    });
+    expect(settled).toEqual({ passed: false, crediti: [] });
+    expect((await prisma.lingoCorsoIscrizione.findFirstOrThrow()).superatoIl).toBeNull();
+    expect(await courseCredits(alice)).toEqual([]);
+    await switchCourses(true);
+    const page = (await request(app).get(`${CORSI}/${id}`).set(a)).body;
+    expect(page).toMatchObject({ stato: 'superato', superatoIl: TODAY });
+    expect(page.xp.crediti).toEqual([{ missione: 'modulo', punti: 30 }, { missione: 'modulo', punti: 30 }, { missione: 'percorso', punti: 100 }]);
   });
 });
 

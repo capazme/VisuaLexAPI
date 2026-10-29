@@ -11,7 +11,7 @@ import { hasNoNul } from '../lingo/noNul';
 import { settleMissions } from '../lingo/missions';
 import { readProgress } from '../lingo/progress';
 import { readPercorso } from '../lingo/percorso';
-import { previewIntervals, reviewScope } from '../lingo/reviewQueue';
+import { courseDayFor, previewIntervals, reviewScope } from '../lingo/reviewQueue';
 import { serialize } from '../lingo/serializeCard';
 import { computeStreak } from '../lingo/streak';
 import { countedDays, markQueueFinished, recordGradeDay, recountToday } from '../lingo/studyDays';
@@ -95,7 +95,9 @@ router.get('/sessione', async (req, res) => {
     enrolment = await prisma.lingoCorsoIscrizione.findFirst({ where: { corsoId: corso, utenteId: userId, corso: { autoreId: userId } }, select: { id: true, corsoId: true } });
     if (!enrolment) throw new AppError(404, 'Percorso non trovato.');
   }
-  const scope = enrolment ? courseScope(userId, materieComunita, today, enrolment.corsoId) : reviewScope(userId, materieComunita, today, materia, istituto);
+  const scope = enrolment
+    ? courseScope(userId, materieComunita, today, enrolment.corsoId)
+    : reviewScope(userId, materieComunita, await courseDayFor(prisma, today), materia, istituto);
 
   const due = dueWhere(userId, scope, today);
   const [dovute, dueStates, introduced] = await Promise.all([
@@ -180,7 +182,7 @@ router.get('/conteggi', async (req, res) => {
   const today = romeDay(new Date());
 
   const { nuoveAlGiorno, materieComunita } = await readPreferences(prisma, userId);
-  const scope = reviewScope(userId, materieComunita, today);
+  const scope = reviewScope(userId, materieComunita, await courseDayFor(prisma, today));
   const [dovute, introduced, available] = await Promise.all([
     prisma.lingoStatoRipasso.count({ where: dueWhere(userId, scope, today) }),
     introducedToday(prisma, userId, today),
@@ -208,8 +210,10 @@ router.post('/revisioni', async (req, res) => {
 
     // The scope is read with the user's current preferences: a card that left the pool since the session was fetched is refused.
     const { materieComunita } = await readPreferences(tx, userId);
+    // Off, no course card is in scope (so none is graded, and nothing of a course is credited).
+    const courseDay = await courseDayFor(tx, today);
     const inScope = await tx.lingoCard.findFirst({
-      where: { AND: [{ id: cardId }, reviewScope(userId, materieComunita, today)] },
+      where: { AND: [{ id: cardId }, reviewScope(userId, materieComunita, courseDay)] },
       select: { id: true, materia: true, modulo: { select: { corsoId: true } } },
     });
     if (!inScope) throw cardNotFound();
@@ -249,7 +253,7 @@ router.post('/revisioni', async (req, res) => {
     // A course card's grade counts for mastery (Percorsi §10.4): «superato» is checked under the enrolment's lock,
     // after the cards and today's day row, before the XP lock — the study writes' order.
     let iscrizioneId: string | undefined;
-    if (inScope.modulo) {
+    if (inScope.modulo && courseDay !== null) {
       const enrolment = await tx.$queryRaw<{ id: string }[]>`
         SELECT id FROM lingo_corsi_iscrizioni WHERE corso_id = ${inScope.modulo.corsoId} AND utente_id = ${userId} FOR NO KEY UPDATE`;
       if (enrolment.length === 1) {

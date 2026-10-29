@@ -1,9 +1,10 @@
 import { Prisma, type LingoFonteXp, type LingoMateria, type LingoMissione } from '@prisma/client';
 import { CONSOLIDATED_DAYS, maturity } from './cardMaturity';
 import { levelOf } from './levels';
-import { reviewScope } from './reviewQueue';
+import { courseDayFor, reviewScope } from './reviewQueue';
 import { computeStreak } from './streak';
 import { addDays } from './studyDay';
+import { isSwitchOn } from '../assistant/switches';
 import { countingModules } from './courses';
 import { countedDays, dayToDate, romeDayStartSql } from './studyDays';
 import { readPreferences } from './studyPreferences';
@@ -159,7 +160,8 @@ function lazy<T, A extends unknown[] = []>(compute: (...args: A) => Promise<T>):
 /** The stored facts the missions read, for one user and one Rome day. */
 function factsFor(db: Prisma.TransactionClient, userId: string, today: string) {
   const prefs = lazy(() => readPreferences(db, userId));
-  const scope = lazy(async () => reviewScope(userId, (await prefs()).materieComunita, today));
+  const courseDay = lazy(() => courseDayFor(db, today));
+  const scope = lazy(async () => reviewScope(userId, (await prefs()).materieComunita, await courseDay()));
   const day = lazy(async () => {
     const row = await db.lingoGiornataStudio.findUnique({ where: { utenteId_giorno: { utenteId: userId, giorno: dayToDate(today) } } });
     return { ripassi: row?.ripassi ?? 0, ripassiDovuti: row?.ripassiDovuti ?? 0, nuove: row?.nuove ?? 0, valido: row?.valido ?? false, voti: row?.voti ?? 0 };
@@ -187,7 +189,7 @@ function factsFor(db: Prisma.TransactionClient, userId: string, today: string) {
     return rows;
   });
   const votable = lazy(async () => (await db.lingoCard.findFirst({ where: votableWhere(userId), select: { id: true } })) !== null);
-  return { prefs, scope, day, due, newLeft, streak, consolidated, subjects, votable };
+  return { prefs, courseDay, scope, day, due, newLeft, streak, consolidated, subjects, votable };
 }
 
 type Facts = ReturnType<typeof factsFor>;
@@ -275,7 +277,7 @@ async function evaluateStaleSubject(facts: Facts, today: string, event: Catalogu
     const newSlots = Math.max(0, nuoveAlGiorno - (await introducedToday(db, userId, today)));
     const reachable: SubjectStat[] = [];
     for (const stat of stats) {
-      const scope = reviewScope(userId, materieComunita, today, stat.materia);
+      const scope = reviewScope(userId, materieComunita, await facts.courseDay(), stat.materia);
       const [due, fresh] = await Promise.all([
         db.lingoStatoRipasso.count({ where: dueWhere(userId, scope, today) }),
         db.lingoCard.count({ where: newCardsWhere(userId, scope) }),
@@ -378,7 +380,8 @@ async function settleCourseMissions(
   tx: Prisma.TransactionClient, userId: string, today: string, event: XpEvent, crediti: XpCredito[], dayTotal: number,
 ): Promise<number> {
   const iscrizioneId = 'iscrizioneId' in event ? event.iscrizioneId : undefined;
-  if (!iscrizioneId) return dayTotal;
+  // Off hides: no course mission is credited while the switch is off, whatever the path (§10.10).
+  if (!iscrizioneId || !(await isSwitchOn('lingo_courses', tx))) return dayTotal;
   const enrolment = await tx.lingoCorsoIscrizione.findFirst({
     where: { id: iscrizioneId, utenteId: userId },
     select: {

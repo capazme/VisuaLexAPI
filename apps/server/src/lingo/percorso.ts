@@ -1,7 +1,7 @@
 import type { LingoMateria } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { maturity } from './cardMaturity';
-import { reviewedCardsQuery, reviewScope } from './reviewQueue';
+import { courseDayFor, reviewedCardsQuery, reviewScope } from './reviewQueue';
 import { readPreferences } from './studyPreferences';
 import { newCardsWhere } from './todayQueue';
 import { romeDay, startOfRomeDay } from './studyDay';
@@ -35,7 +35,7 @@ export async function readPercorso(userId: string, materia?: LingoMateria): Prom
   const today = romeDay(new Date());
   const endOfToday = startOfRomeDay(today, 1);
   const { materieComunita } = await readPreferences(prisma, userId);
-  const scope = reviewScope(userId, materieComunita, today, materia);
+  const scope = reviewScope(userId, materieComunita, await courseDayFor(prisma, today), materia);
   // New cards are counted in the database (the community's corpus can be large); only the cards the user
   // has reviewed come into memory, as in the progress read.
   const [fresh, reviewed] = await Promise.all([

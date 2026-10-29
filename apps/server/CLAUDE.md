@@ -575,9 +575,10 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   the goal holds across devices, and across subjects: a session narrowed to one subject
   still counts the day's new cards of every subject; each card carries `nuova`, `comunita` and `anteprima`
   (the days each grade would give, `previewIntervals`). `lingo/reviewQueue.ts`
-  `reviewScope(userId, materieComunita, today, materia?, istituto?)` is decision 8: the user's own drafts, proposals
+  `reviewScope(userId, materieComunita, courseDay, materia?, istituto?)` is decision 8: the user's own drafts, proposals
   and validated cards (a course card only from the Rome day after its module was done by the user's enrolment, and
-  not once withdrawn: `courseCardModuleDone`), and the community's validated cards in the subjects switched on —
+  not once withdrawn: `courseCardModuleDone`; none at all while `lingo_courses` is off, `courseDay` null — read it
+  with `courseDayFor`), and the community's validated cards in the subjects switched on —
   never `autoreId != me`, which in SQL would drop the cards whose author is gone. `POST /revisioni { cardId,
   rating, durataMs? }`: one transaction serialised on the pair by
   `pg_advisory_xact_lock` (a first review has no state row to lock), the card row held
@@ -664,7 +665,8 @@ Express + Prisma. Auth, and the persistence for every user-owned slice.
   lists, restores nor empties a `LINGO_CORSO` or `LINGO_CORSO_MODULO` entry (404; the sweep still expires it); the
   rows stay. The admin's texts page still lists `MATERIALE_STUDIO`: admins are the owners. `GET
   /api/lingo/srs/sessione` is strict: `?corso=` with a subject is a 400, with the switch off or a course not the
-  caller's a 404.
+  caller's a 404. Off also hides the course cards from the review (`reviewScope`), and nothing of a course is
+  credited: `evaluatePassed` and the courses' missions in `settleMissions` read the switch themselves.
   `routes/lingoCorsi.ts` over `lingo/courses.ts`: `POST /` (course, competences C1… in the order given, the
   author's enrolment with a study dossier of the user's, locked `FOR KEY SHARE`; 409 `{ detail, richiedeTesto,
   link }` until the current `MATERIALE_STUDIO` is accepted; 30 a user), `POST /:id/moduli` (one module whole, the
