@@ -33,6 +33,8 @@ export const OPEN_PER_ENTRY = 30;
 const NO_TEXT = 'Questa voce non ha un testo: è una nota.';
 const NOT_YET = 'Il testo non è ancora disponibile, riprova tra poco.';
 const NOT_IN_FORCE = 'Questa voce mostra un testo non in vigore: le glosse non si vedrebbero.';
+/** The notice agreed for mcp-legal-it 3.0.x (G-386). */
+export const UPDATE_NOTES_UNREAD = 'note di aggiornamento non lette: verificare su Normattiva';
 export const NO_MORE_PASSAGES =
   'Le evidenziazioni proposte dall’IA non ci sono più: evidenziare è un gesto dell’utente. Un passaggio si spiega con una glossa, dove è attiva.';
 
@@ -83,6 +85,15 @@ export function pages(text: string): string[] {
   return out.length ? out : [''];
 }
 
+/** `note_aggiornamento` when there are notes the text does not hold, and `avviso_note` when some could not be read. */
+function updateNotesAnswer(notes: EntryText['updateNotes']) {
+  if (!notes) return {};
+  return {
+    ...(notes.notes?.length && !notes.inText ? { note_aggiornamento: notes.notes } : {}),
+    ...(notes.unread ? { avviso_note: UPDATE_NOTES_UNREAD } : {}),
+  };
+}
+
 const partSchema = z.object({ parte: z.coerce.number().int().min(1).max(1000).default(1) });
 
 router.get('/dossiers/:id/items/:itemId/text', async (req, res) => {
@@ -107,6 +118,10 @@ router.get('/dossiers/:id/items/:itemId/text', async (req, res) => {
     parte,
     parti: all.length,
     testo: all[parte - 1],
+    // The update notes are not the text (G-386): beside it, on every page, unless the text already holds them.
+    ...updateNotesAnswer(text.updateNotes),
+    // One part of a split article (G-387): said on every page, so the model does not take it for the whole.
+    ...(text.partialNotice ? { avviso_testo_parziale: text.partialNotice } : {}),
     glosse: open.map((g) => ({ testo: g.assistantText, nota: g.assistantNote })),
   });
 });
