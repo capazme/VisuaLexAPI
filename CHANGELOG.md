@@ -12,6 +12,45 @@ carries, beside it, a short note in Italian for the people who use VisuaLex.
 
 ## [Unreleased]
 
+## [1.10.7] - 2026-10-29
+
+The D8 request: the highlight colours' meanings set by each user, a dossier created in one call
+through the MCP, and the assistant's glosses in place of its coloured highlights; the readers' update
+notes and partial texts; the Gymnasium courses (A1) server, MCP and first web screens. Glosses and
+courses ship switched off. Three migrations. MCP clients reconnect.
+
+### Reading
+
+- Each user sets what the four highlight colours mean (Impostazioni › «Significato dei colori»,
+  reached from the gear beside «Colore»); labels only, kept on the device.
+
+### Dossier and MCP
+
+- `omnilex_crea_dossier` creates a dossier and adds up to 50 norms, 10 decisions and 10 notes in one
+  call, verified at the source, with one compact outcome per row not entered (`non_entrate[].riga`
+  as written); `in_sospeso` names a step left without an answer. On the fixed AgID case: 10 calls
+  to 1. `omnilex_aggiungi_nota_dossier` takes `note[1..10]`; the single form is gone.
+- Glosses (switch `assistant_glosses`, with `assistant_passages`): an assistant's note anchored to a
+  passage by position, validated by the user, shown beside the text as a word processor's comments
+  and in a sheet on the phone. `omnilex_glossa_voce` replaces `omnilex_evidenzia_passaggi_dossier`;
+  applications proposing coloured passages get 410; saved proposals stay. `omnilex_leggi_testo_voce`
+  no longer depends on a switch.
+- The text of the user's dossier notes leaves through the MCP under «Leggere i testi», whose words
+  now name the notes.
+
+### Sources
+
+- Normattiva: an article's update notes («AGGIORNAMENTO») in their own field beside the text
+  (`note_aggiornamento`), and an article Normattiva splits into parts says it is partial
+  (`testo_parziale`, `parti`). The article's text is unchanged.
+
+### Gymnasium
+
+- Courses created by the assistant (A1, switch `lingo_courses`): the model, the declaration, the
+  creating routes, studying, mastery and the final exam on the server; the MCP's course tools on the
+  one consent; in the web the list, the course page, «Oggi»'s row, the declaration, and a module's
+  reading and recall.
+
 ## [1.10.6] - 2026-10-29
 
 The Union's acts read again despite EUR-Lex's firewall, and a lighter MCP. Server and MCP only: no
