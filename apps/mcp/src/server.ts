@@ -11,8 +11,10 @@ import type { McpConfig } from './config.js';
 import { ToolError } from './errors.js';
 import { SessionStore } from './sessions.js';
 import { TOOL_SCOPES, registerDossierTools, type RunTool } from './tools/dossier.js';
-import { CARD_TOOL_SCOPES, registerCardTools } from './tools/cards.js';
-import { GLOSS_TOOL_SCOPES, glossesOn, registerGlossTools, registerTextTool } from './tools/glosses.js';
+import { CARD_TOOL_SCOPES, COURSE_CARD_SCOPE, registerCardTools } from './tools/cards.js';
+import { COURSE_SCHEMA_TEXT, COURSE_TOOL_SCOPES, registerCourseTools } from './tools/courses.js';
+import { GLOSS_TOOL_SCOPES, registerGlossTools, registerTextTool } from './tools/glosses.js';
+import { readFeatures } from './features.js';
 
 /** Hostnames always accepted besides the endpoint's: the health check calls the loopback. */
 const LOOPBACK_NAMES = ['localhost', '127.0.0.1', '[::1]'];
@@ -24,7 +26,9 @@ const LOOPBACK_NAMES = ['localhost', '127.0.0.1', '[::1]'];
  */
 export const REQUESTS_PER_MINUTE = 300;
 // What a client asks for at sign-in; deletion (content:delete) is never asked: the user switches it on in VisuaLex.
-const ALL_SCOPES = ['dossier:read', 'dossier:write', 'dossier:text', 'lingo:cards:read', 'lingo:cards:write'];
+// The courses' two join the one consent (G-379), asked whether or not the server has the courses on: a connection
+// made while they are off needs no new sign-in when they come.
+const ALL_SCOPES = ['dossier:read', 'dossier:write', 'dossier:text', 'lingo:cards:read', 'lingo:cards:write', 'lingo:courses:read', 'lingo:courses:write'];
 
 /**
  * What the server is for, sent once at `initialize` (MCP `instructions`): a client that also has a
@@ -71,9 +75,12 @@ const runner: RunTool = async (tool, extra, body) => {
 /** The scopes a JSON-RPC message needs before it reaches the tools: only `tools/call` needs any. */
 function scopesNeeded(message: unknown): string[] {
   if (!message || typeof message !== 'object') return [];
-  const { method, params } = message as { method?: unknown; params?: { name?: unknown } };
+  const { method, params } = message as { method?: unknown; params?: { name?: unknown; arguments?: { modulo?: unknown } } };
   if (method !== 'tools/call' || typeof params?.name !== 'string') return [];
-  return TOOL_SCOPES[params.name] ?? CARD_TOOL_SCOPES[params.name] ?? GLOSS_TOOL_SCOPES[params.name] ?? [];
+  const scopes = TOOL_SCOPES[params.name] ?? CARD_TOOL_SCOPES[params.name] ?? GLOSS_TOOL_SCOPES[params.name] ?? COURSE_TOOL_SCOPES[params.name] ?? [];
+  // Cards tied to a course's module write into the course: a token without its scope is asked to step up here.
+  if (params.name === 'lingolex_salva_card' && params.arguments?.modulo !== undefined) return [...scopes, COURSE_CARD_SCOPE];
+  return scopes;
 }
 
 type AuthedRequest = Request & { auth?: AuthInfo };
@@ -204,12 +211,15 @@ export function createApp(config: McpConfig, options: { store?: SessionStore; re
       let transport: StreamableHTTPServerTransport | undefined;
       try {
         server = new McpServer({ name: 'visualex', version: '0.1.0' }, { capabilities: { tools: {} }, instructions: SERVER_INSTRUCTIONS });
+        // What the server has on, asked once per session (closed when it cannot say): the glosses (D8) and the
+        // courses (Percorsi, M1), whose tools and card parameters are listed only then.
+        const features = await readFeatures(config);
         registerDossierTools(server, config, runner);
-        registerCardTools(server, config, runner);
-        // An entry's text, always (G-372); the glosses (D8) only while the server has them on (asked once per
-        // session, closed when it cannot say).
+        registerCardTools(server, config, runner, features.courses ? COURSE_SCHEMA_TEXT : undefined);
+        // An entry's text, always (G-372).
         registerTextTool(server, config, runner);
-        if (await glossesOn(config)) registerGlossTools(server, config, runner);
+        if (features.glosses) registerGlossTools(server, config, runner);
+        if (features.courses) registerCourseTools(server, config, runner);
         const opened = server;
         // No JSON responses: a tool that asks the user to confirm sends that
         // request back on the call's own SSE stream.

@@ -117,8 +117,9 @@ const call = async (client, name, args = {}) => {
 let client = await connect(tokens.access_token);
 const { tools } = await client.listTools();
 const destructive = tools.filter((t) => t.annotations?.destructiveHint !== false).map((t) => t.name).sort().join(', ');
-// Fourteen, and D7b's two more while the server has them on.
-const expected = tools.some((t) => t.name === 'omnilex_leggi_testo_voce') ? 16 : 14;
+// Fifteen (the entry's text always), one more with the glosses on, four more with the courses (Percorsi) on.
+const has = (name) => tools.some((t) => t.name === name);
+const expected = 15 + (has('omnilex_glossa_voce') ? 1 : 0) + (has('lingolex_percorsi') ? 4 : 0);
 check(`${expected} tools, only the three deletions destructive`, tools.length === expected && destructive === 'lingolex_elimina_card, omnilex_elimina_dossier, omnilex_elimina_voci_dossier', destructive);
 const name = `E2E MCP ${new Date().toISOString().slice(0, 19)}`;
 const created = await call(client, 'omnilex_crea_dossier', { nome: name });

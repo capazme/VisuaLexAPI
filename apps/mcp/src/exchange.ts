@@ -104,6 +104,8 @@ export async function callApi<T>(
       // The data changed under the call (a dossier edited while the user confirmed): the server says what.
       {
         const detail = typeof body.detail === 'string' ? body.detail : 'I dati sono cambiati nel frattempo.';
+        // Something only the user can do in VisuaLex first (a declaration to accept, Percorsi §3): where, not «Riprova».
+        if (typeof body.link === 'string') throw new ToolError(`${detail} Pagina di VisuaLex: ${body.link}. Riprova dopo che l’utente l’ha fatto.`);
         throw new ToolError(/riprova/i.test(detail) ? detail : `${detail} Riprova.`);
       }
     case 400: {
