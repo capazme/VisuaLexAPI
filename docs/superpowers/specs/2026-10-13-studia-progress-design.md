@@ -106,6 +106,7 @@ Who writes a row:
 - **a recorded grade**, in its transaction, after the log row: the counters go up by one (`nuove` when there was no state row, `sbagliate` on rating 1); then whether the queue is finished (nothing in scope due before tomorrow, and no new slot left or no new card left in scope); then `valido = ripassi ≥ N or coda_finita`, with the user's current N. A second grade of the day writes nothing, as now;
 - **a read of today's session (not narrowed to a subject) or of the progress**, when today's queue is finished: today's row gets `coda_finita` and `valido`, created with zero counts when the user had nothing to do (decision 7's empty day). An upsert, so it cannot double. Someone who never reviewed a card in scope has no queue to finish, so an empty account never makes a day count;
 - **a change of the goal** (`PUT /preferenze` with `ripassiAlGiorno`): today's `valido` is recounted with the new N; past days are not;
+- **a validation vote** (since the Gymnasium XP spec, `2026-10-20-gymnasium-xp-levels-design.md` §5.2): today's `voti` goes up by one, the row created with zero reviews if missing; `valido` and the streak are untouched, and the calendar leaves out a row with no review that did not count;
 - nothing else. The trash does not touch it, a restore does not add to it, an account deletion removes it by cascade, and `GET /auth/export` carries it as `data.lingoGiornate` (day, counts, the two flags). It is not in the delegated table.
 
 Today is never read from its stored `valido` alone: the progress route recomputes it with the current N, so raising N in the evening shows the ring as it now stands. Past days are read as stored.
@@ -196,7 +197,7 @@ States: while reading, a skeleton of the band and the panels at their final size
 
 ### 6.4 The session
 
-- When a grade's answer says `appenaRaggiunto` and this browser has not celebrated today, the celebration plays in a notice placed in the page over the session's header row («Restano N · Interrompi»), so it scrolls away with that row and never covers the card or the grade bar; 1.5 s (decision 6); no focus, no pointer, the keys keep working. A screen reader hears «Obiettivo di oggi raggiunto · serie di 13 giorni». Under reduced motion the same notice, still: the words and the stamp, no confetti.
+- When a grade's answer says `appenaRaggiunto` and this browser has not celebrated today, the celebration plays in a notice placed over the session's header row (*since G2 of the Gymnasium restyle, 19 October:* the lesson's close button and progress bar), and never covers the card or the grade bar; 1.5 s (decision 6); no focus, no pointer, the keys keep working. A screen reader hears «Obiettivo di oggi raggiunto · serie di 13 giorni». Under reduced motion the same notice, still: the words and the stamp, no confetti.
 - The day is marked celebrated when the celebration starts, not when it ends, so leaving the page halfway or a new read of the dashboard never plays it a second time.
 - The end screen keeps its sentence and adds the ring and the streak as they are now.
 - Back on the home after a celebration, the stamp is there at rest; the home plays the celebration itself only when the goal was met today and this browser has not celebrated today (a `localStorage` key per day: a per-browser convenience, never the source of the streak).

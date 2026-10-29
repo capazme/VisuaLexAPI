@@ -22,7 +22,6 @@ vi.mock('../../../../features/merlt/useMerltFeatures', () => ({
 vi.mock('../../../../features/devMode/useDevMode', () => ({ useDevMode: () => devMode() }));
 // The slots are named, so the test sees which are drawn.
 vi.mock('../../../../plugins/PluginSlot', () => ({ PluginSlot: ({ slot }: { slot: string }) => <div data-testid={`slot-${slot}`} /> }));
-vi.mock('../BrocardiDisplay', () => ({ BrocardiDisplay: () => <div data-testid="brocardi">Nemo iudex sine actore</div> }));
 
 import { ArticleTabContent } from '../ArticleTabContent';
 import { FindWindow } from '../FindWindow';
@@ -37,11 +36,14 @@ const NORMA: NormaVisitata = {
   tipo_atto: 'codice civile', data: '1942-03-16', numero_atto: '262', numero_articolo: '1284', allegato: '2',
   urn: 'urn:nir:stato:regio.decreto:1942-03-16;262:2~art1284',
 };
-const BROCARDI = { position: null, link: null, Brocardi: ['Nemo iudex sine actore'], Ratio: null, Spiegazione: null, Massime: null };
 let PRACTICE = '';
 const WINDOW = 'article:act-1:key';
 
-const article = (over: Partial<ArticleData> = {}): ArticleData => ({ article_text: TEXT, norma_data: NORMA, brocardi_info: BROCARDI, ...over });
+const article = (over: Partial<ArticleData> = {}): ArticleData => ({ article_text: TEXT, norma_data: NORMA, ...over });
+// An answer from before D-078, as a practice saved in the browser may still hand it over (no Brocardi text here)
+const BROCARDI = { position: null, link: null, Brocardi: ['Nemo iudex sine actore'], Ratio: 'La ratio.', Spiegazione: 'La spiegazione.', Massime: ['Una massima.'] };
+const legacy = (over: Partial<ArticleData> = {}) => ({ ...article(over), brocardi_info: BROCARDI }) as unknown as ArticleData;
+const brocardiLeft = () => screen.queryByText(/Brocardi|Nemo iudex|La ratio|La spiegazione|Una massima|Massime/);
 
 function show(variant: 'row' | 'beside', data: ArticleData = article(), onOpenStudyMode?: () => void) {
   // The article is on the practice's table: that is where the find window's targets come from.
@@ -89,6 +91,8 @@ beforeEach(() => {
 
 afterEach(() => {
   act(() => closeFindWindow());
+  // «Giurisprudenza» remembers it was opened, per host, for the session
+  window.sessionStorage.clear();
   window.matchMedia = savedMatchMedia;
   vi.unstubAllEnvs();
   delete g.CSS;
@@ -97,53 +101,53 @@ afterEach(() => {
 
 /** The desktop row of the toolbar: the one with the notes button. */
 const desktopRow = (container: HTMLElement) => container.querySelector('div.hidden.md\\:flex') as HTMLElement;
-const labels = (row: HTMLElement) => [...row.querySelectorAll('button, a')].map((b) => b.getAttribute('aria-label') ?? b.getAttribute('title'));
+const labels = (row: HTMLElement) => [...row.querySelectorAll('button, a')].map((b) => b.getAttribute('aria-label') ?? b.textContent);
+/** Opens a row's «⋯» (R3) and returns its menu. */
+function openMore(row: HTMLElement) {
+  const trigger = within(row).getByRole('button', { name: 'Altre azioni sull’articolo' });
+  fireEvent.click(trigger);
+  return document.getElementById(trigger.getAttribute('aria-controls')!)!;
+}
+const entries = (menu: HTMLElement) => within(menu).getAllByRole('menuitem').map((item) => item.querySelector('span > span')?.textContent ?? item.textContent);
 
 describe('ArticleTabContent variant="beside" — the compact bar (T12)', () => {
-  it('shows exactly notes, highlights, discussions, the magnifier and copy, and no «⋯»', () => {
+  it('shows exactly notes, highlights and their colour in words, and behind «⋯» discussions, the find window and copy', () => {
     const { container } = show('beside');
-    expect(labels(desktopRow(container))).toEqual(['Apri note', 'Gestisci evidenziazioni', 'Glosse sull’articolo', 'Cerca nel testo', 'Copia']);
-    expect(screen.queryByTitle('Altre azioni')).not.toBeInTheDocument();
+    expect(labels(desktopRow(container))).toEqual([
+      'Note', 'Evidenziazioni', 'Colore: giallo (nuove evidenziazioni)', 'Cambia il significato dei colori', 'Altre azioni sull’articolo',
+    ]);
+    expect(entries(openMore(desktopRow(container)))).toEqual(['Glosse sull’articolo', 'Cerca nel testo', 'Copia']);
   });
 
-  it('the magnifier opens the find window on that text, scoped to the window\'s practice', async () => {
+  it('«Cerca nel testo» opens the find window on that text, scoped to the window\'s practice', async () => {
     const { container } = show('beside');
-    const magnifier = () => within(desktopRow(container)).getByRole('button', { name: 'Cerca nel testo' });
-    expect(magnifier()).toHaveAttribute('aria-pressed', 'false');
-    fireEvent.click(magnifier());
+    fireEvent.click(within(openMore(desktopRow(container))).getByRole('menuitem', { name: 'Cerca nel testo' }));
     expect(screen.getByRole('search')).toBeInTheDocument();
-    expect(magnifier()).toHaveAttribute('aria-pressed', 'true');
+    expect(entries(openMore(desktopRow(container)))).toContain('Chiudi la ricerca nel testo');
     expect(screen.getByRole('button', { name: 'Questa pratica' })).toHaveAttribute('aria-pressed', 'true');
     // Registered under the practice, not under the window's own id.
     expect(findRootsFor(PRACTICE)).toHaveLength(1);
     expect(findRootsFor(WINDOW)).toHaveLength(0);
   });
 
-  it('a past text keeps the rules of describeVersion: discussions off, no Brocardi', () => {
+  it('a past text keeps the rules of describeVersion: discussions off', () => {
     const past: ArticleValidity = { state: 'historical', valid_from: '2003-12-25', valid_to: '2007-12-29', version_number: 3, act_updated: null, request_in_window: true };
-    show('beside', article({ validity: past, norma_data: { ...NORMA, data_versione: '2005-06-01', versione: 'originale' } }));
-    expect(screen.queryByText('Brocardi')).not.toBeInTheDocument();
-    for (const button of screen.getAllByTitle(/Glosse sull’articolo — /)) expect(button).toBeDisabled();
+    const { container } = show('beside', article({ validity: past, norma_data: { ...NORMA, data_versione: '2005-06-01', versione: 'originale' } }));
+    expect(within(openMore(desktopRow(container))).getByRole('menuitem', { name: /^Glosse sull’articolo/ })).toBeDisabled();
   });
 });
 
 describe('ArticleTabContent variant="beside" — what is folded and what is left out (§4.1)', () => {
-  it('Brocardi is a closed section, opened by its heading', () => {
-    show('beside');
-    const toggle = screen.getByRole('button', { name: 'Brocardi' });
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByTestId('brocardi')).not.toBeInTheDocument();
-    fireEvent.click(toggle);
-    expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByTestId('brocardi')).toBeInTheDocument();
+  it('folds nothing of Brocardi, even from an answer that still carries it (D-078)', () => {
+    show('beside', legacy());
+    expect(screen.queryByRole('button', { name: 'Brocardi' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Giurisprudenza' }));
+    expect(brocardiLeft()).toBeNull();
   });
 
-  it('«Giurisprudenza» is closed, and comes after Brocardi', () => {
+  it('«Giurisprudenza» is closed', () => {
     show('beside');
-    const caseLaw = screen.getByRole('button', { name: 'Giurisprudenza' });
-    expect(caseLaw).toHaveAttribute('aria-expanded', 'false');
-    const brocardi = screen.getByRole('button', { name: 'Brocardi' });
-    expect(brocardi.compareDocumentPosition(caseLaw) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Giurisprudenza' })).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('draws no Studio, no Studia row, no «Chiedi a MERL-T», no graph rail; the viewing tracker stays', () => {
@@ -160,14 +164,15 @@ describe('ArticleTabContent variant="beside" — what is folded and what is left
 });
 
 describe('ArticleTabContent variant="row" — everything as today', () => {
-  it('keeps the whole bar, Brocardi open under the text, Studio, the Studia row, the MERL-T entry and the rail, in the development mode', async () => {
+  it('keeps the whole bar, Studio, the Studia row, the MERL-T entry and the rail, in the development mode', async () => {
     devMode.mockReturnValue(true);
     const { container } = show('row', article(), vi.fn());
     const desktop = labels(desktopRow(container));
-    expect(desktop).toEqual(expect.arrayContaining(['Aggiungi a norme rapide', 'Apri note', 'Aggiungi a dossier', 'Altre azioni']));
-    expect(screen.getByTestId('brocardi')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Brocardi' })).not.toBeInTheDocument();
-    expect(screen.getByTitle('Modalità studio')).toBeInTheDocument();
+    expect(desktop).toEqual(expect.arrayContaining(['Note', 'Al dossier', 'Altre azioni sull’articolo']));
+    expect(entries(openMore(desktopRow(container)))).toEqual(expect.arrayContaining(['Aggiungi alle norme rapide', 'Esporta…', 'Testo alla data…']));
+    // Study Mode: the act's «Studio» on a computer; the phone's «⋯» has it too.
+    const phone = container.querySelector('div.flex.md\\:hidden') as HTMLElement;
+    expect(entries(openMore(phone))).toContain('Modalità studio');
     await waitFor(() => expect(screen.getByText(/scheda su questo articolo/i)).toBeInTheDocument());
     expect(screen.getByText(/Chiedi su questo articolo/)).toBeInTheDocument();
     expect(screen.getByTestId('slot-article_sidebar')).toBeInTheDocument();
@@ -184,6 +189,12 @@ describe('ArticleTabContent variant="row" — without the development mode', () 
     expect(screen.queryByTestId('slot-article_sidebar')).not.toBeInTheDocument();
   });
 
+  it('shows nothing of Brocardi under the text, even from an answer that still carries it (D-078)', () => {
+    show('row', legacy(), vi.fn());
+    fireEvent.click(screen.getByRole('button', { name: /Giurisprudenza/ }));
+    expect(brocardiLeft()).toBeNull();
+  });
+
   it('still draws the tracker, «Giurisprudenza» and the Massimario\'s slot', () => {
     show('row', article(), vi.fn());
     expect(screen.getByTestId('slot-article_content_after')).toBeInTheDocument();
@@ -197,8 +208,8 @@ describe('ArticleTabContent variant="beside" — root rule 23, with the find win
     '%s: the text root\'s text nodes spell article_text minus \\n, with matches drawn',
     async (_id, raw) => {
       const plain = raw.replace(/\n/g, '');
-      const { container, unmount } = show('beside', article({ article_text: raw, brocardi_info: undefined }));
-      fireEvent.click(within(desktopRow(container)).getByRole('button', { name: 'Cerca nel testo' }));
+      const { container, unmount } = show('beside', article({ article_text: raw }));
+      fireEvent.click(within(openMore(desktopRow(container))).getByRole('menuitem', { name: 'Cerca nel testo' }));
       fireEvent.change(screen.getByRole('searchbox', { name: 'Cerca nel testo' }), { target: { value: wordOf(plain) } });
       await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/^1 di \d+$/));
       const [root] = findRootsFor(PRACTICE);

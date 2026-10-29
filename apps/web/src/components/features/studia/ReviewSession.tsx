@@ -1,28 +1,38 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
 import { useAppStore } from '../../../store/useAppStore';
-import type { AncoraScheda, Materia } from '../../../types/studia';
-import { ConfirmDialog } from '../../ui/ConfirmDialog';
+import type { AncoraScheda, Materia, Progressi } from '../../../types/studia';
+import { WireConfirm } from '../../ui/wireConfirm/WireConfirm';
+import { stopMessage } from './reviewStop';
 import { Toast } from '../../ui/Toast';
 import { DossierItemReader } from '../dossier/DossierItemReader';
 import { formatInterval } from './formatInterval';
-import { GradeBar } from './GradeBar';
+import { GradeBar, LessonBar } from './GradeBar';
+import { LESSON_PRIMARY } from './lessonStyles';
 import { ReviewCard } from './ReviewCard';
 import { Sheet } from '../../ui/Sheet';
 import { MATERIA_LABEL, anchorLabel, normaFromAnchor, searchParamsFromAnchor } from './studiaLabels';
 import { SessionCelebration } from './progress/Celebration';
+import { XpGain } from './progress/XpGain';
 import { SessionEndProgress } from './progress/SessionEndProgress';
+import { cardsLeft, instituteCardsLeft } from './progress/today';
+import { usePercorso } from './progress/usePercorso';
+import { FOCUS_RING, QUIET_BUTTON, TILE } from './progress/tokens';
 import { useCelebratedToday } from './progress/useCelebratedToday';
+import { useProgress } from './progress/useProgress';
+import { useGradeNote } from './useGradeNote';
 import { useReviewSession, type ReviewSummary } from './useReviewSession';
+import { CoursesGate } from './corsi/CoursesGate';
+import { useCoursesSwitch } from './corsi/coursesSwitch';
 
 const HOME_PATH = '/studia/ripasso';
 
-const BUTTON =
-  'inline-flex min-h-[44px] items-center justify-center rounded-lg border px-3 text-sm font-medium transition-colors md:min-h-0 md:py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
+/** The lesson's column: the card and the header's row share its width (the bar's actions sit in a narrower one). */
+const COLUMN = 'mx-auto w-full max-w-3xl';
 
 type ToastState = { message: string; type: 'success' | 'error' | 'info' } | null;
 
@@ -34,6 +44,50 @@ function endSentence({ reviewed, again, nextDue }: ReviewSummary): string {
   const redo = again === 0 ? 'nessuna da rifare' : `${again} da rifare`;
   const next = nextDue === null ? '' : ` Le prossime: ${formatInterval(nextDue)}.`;
   return `Hai ripassato ${schede(reviewed)}, ${redo}.${next}`;
+}
+
+/** The bar's tremble when the ink arrives: a pixel down and back, as the ink settles (under 400 ms in all). */
+const PLUCK: Keyframe[] = [{ translate: '0 0' }, { translate: '0 1px' }, { translate: '0 -0.5px' }, { translate: '0 0' }];
+
+/**
+ * The lesson's progress (Gymnasium spec §5.4): `done / (done + remaining)`, where done are the cards out of the
+ * queue — a «Di nuovo» stays in it, so the bar holds still and the note says «Torna in coda». At each grade that
+ * moves it the head runs ahead in the section's hue, the ink catches up a moment later on a spring and the bar
+ * trembles by a pixel (S2; inspired by Animorio's «I passi con la linea che avanza», written from scratch): 370 ms,
+ * taking no key and no focus. Under reduced motion it jumps (`motion-safe:` only, no tremble). Before the queue is
+ * read it is an empty track.
+ */
+function LessonProgress({ done, total }: { done: number; total: number }) {
+  const share = total > 0 ? done / total : 0;
+  const track = useRef<HTMLDivElement>(null);
+  const lastDone = useRef(done);
+  useEffect(() => {
+    const grew = done > lastDone.current;
+    lastDone.current = done;
+    const el = track.current;
+    if (!grew || !el || typeof el.animate !== 'function' || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    el.animate(PLUCK, { duration: 110, delay: 260, easing: 'ease-out' });
+  }, [done]);
+  const width = { width: `${share * 100}%` };
+  return (
+    <div
+      ref={track}
+      {...(total > 0
+        ? { role: 'progressbar', 'aria-label': 'Avanzamento del ripasso', 'aria-valuemin': 0, 'aria-valuemax': total, 'aria-valuenow': done, 'aria-valuetext': `${done} di ${schede(total)}` }
+        : { 'aria-hidden': true })}
+      className="relative h-3 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800"
+    >
+      <div aria-hidden className="vlx-lesson-head absolute inset-y-0 left-0 rounded-full motion-safe:transition-[width] motion-safe:duration-150 motion-safe:ease-out" style={width} />
+      <div
+        data-testid="lesson-progress-fill"
+        className={cn(
+          // The section's hue, not the ink's near-grey (G8): `vlx-lesson-ink` in `index.css`.
+          'vlx-lesson-ink absolute inset-y-0 left-0 rounded-full motion-safe:transition-[width] motion-safe:delay-[70ms] motion-safe:duration-300 motion-safe:ease-(--ease-catch)',
+        )}
+        style={width}
+      />
+    </div>
+  );
 }
 
 interface ArticlePanelProps {
@@ -49,7 +103,8 @@ function ArticlePanel({ anchor, desktop, onClose, onOpenInReader, showToast }: A
   const norma = useMemo(() => normaFromAnchor(anchor), [anchor]);
   const label = anchorLabel(anchor) ?? 'Articolo';
   if (!norma) return null;
-  const reader = <DossierItemReader norma={norma} onOpenOnDashboard={onOpenInReader} showToast={showToast} />;
+  // In the phone's sheet no gear to Impostazioni: the sheet keeps the focus, a dialog over it would fight it.
+  const reader = <DossierItemReader norma={norma} onOpenOnDashboard={onOpenInReader} showToast={showToast} meaningsGear={desktop} />;
 
   if (!desktop) {
     return (
@@ -58,20 +113,21 @@ function ArticlePanel({ anchor, desktop, onClose, onOpenInReader, showToast }: A
       </Sheet>
     );
   }
+  // Beside the card, as tall as the lesson's middle, scrolling on its own.
   return (
     <aside
       aria-label="Articolo"
-      className="min-w-0 rounded-lg border border-slate-200 p-4 md:sticky md:top-0 md:max-h-dvh md:overflow-y-auto dark:border-slate-800"
+      className="w-[min(28rem,45%)] min-w-0 shrink-0 overflow-y-auto border-l border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
     >
       <div className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">{label}</h2>
+        <h2 className="min-w-0 break-words text-sm font-semibold text-slate-700 dark:text-slate-200">{label}</h2>
         <button
           type="button"
           onClick={onClose}
           aria-label="Chiudi l’articolo"
-          className="inline-flex h-8 w-8 items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+          className={cn('inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200', FOCUS_RING)}
         >
-          <X size={16} aria-hidden />
+          <X size={18} aria-hidden />
         </button>
       </div>
       {reader}
@@ -79,12 +135,117 @@ function ArticlePanel({ anchor, desktop, onClose, onOpenInReader, showToast }: A
   );
 }
 
+interface SessionEndProps {
+  summary: ReviewSummary;
+  materia: Materia | undefined;
+  /** One institute of `materia` (G5): what is left is counted in it, not in the whole subject. */
+  istituto: string | undefined;
+  /** One course of «Percorsi»: no count of its own is read here, so the end offers «Torna a Oggi» alone. */
+  corso: string | undefined;
+  onHome: () => void;
+  onContinue: () => void;
+}
+
 /**
- * A review session (`/studia/ripasso/sessione?materia=`): one card at a time, the answer on
- * request, four grades. The queue lives in `useReviewSession`, so opening and closing an anchor's
- * article leaves it as it was. Esc asks before leaving; what was graded is already recorded.
+ * The lesson's end (Gymnasium spec §5.4): the sentence, the ring and the streak as they now stand, and in the bar
+ * «Torna a Oggi» and — when the read of the session's scope still counts cards for today — «Continua», a new
+ * session of the same scope. The scope is the day, the subject, or one institute of it (G5), whose count comes from
+ * the road's read (`usePercorso`). Focus goes to the sentence, so a screen reader hears how it went.
+ */
+function SessionEnd({ summary, materia, istituto, corso, onHome, onContinue }: SessionEndProps) {
+  const day = useProgress(undefined);
+  const subject = useProgress(materia, materia !== undefined);
+  const dayData = day.status === 'ready' ? day.data : null;
+  if (corso !== undefined) return <EndScreen summary={summary} day={dayData} more={false} onHome={onHome} onContinue={onContinue} />;
+  if (materia !== undefined && istituto !== undefined) {
+    return <InstituteEnd summary={summary} materia={materia} istituto={istituto} subject={subject.status === 'ready' ? subject.data : null} day={dayData} onHome={onHome} onContinue={onContinue} />;
+  }
+  const scope = materia === undefined ? day : subject;
+  const more = scope.status === 'ready' && cardsLeft(scope.data) > 0;
+  return <EndScreen summary={summary} day={dayData} more={more} onHome={onHome} onContinue={onContinue} />;
+}
+
+interface InstituteEndProps {
+  summary: ReviewSummary;
+  materia: Materia;
+  istituto: string;
+  subject: Progressi | null;
+  day: Progressi | null;
+  onHome: () => void;
+  onContinue: () => void;
+}
+
+/** The end of a session narrowed to one institute: «Continua» from the institute's own count. */
+function InstituteEnd({ summary, materia, istituto, subject, day, onHome, onContinue }: InstituteEndProps) {
+  const percorso = usePercorso();
+  const more = percorso.status === 'ready' && subject !== null && instituteCardsLeft(percorso.data, materia, istituto, subject) > 0;
+  return <EndScreen summary={summary} day={day} more={more} onHome={onHome} onContinue={onContinue} />;
+}
+
+interface EndScreenProps {
+  summary: ReviewSummary;
+  day: Progressi | null;
+  more: boolean;
+  onHome: () => void;
+  onContinue: () => void;
+}
+
+function EndScreen({ summary, day, more, onHome, onContinue }: EndScreenProps) {
+  const sentence = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    sentence.current?.focus({ preventScroll: true });
+  }, []);
+
+  // One card, centred, with one primary action (G8): «Continua» while the scope still has cards today, else «Torna a
+  // Oggi»; with «Continua», «Torna a Oggi» is a quiet link under it, never a second button alike.
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className={cn(COLUMN, 'grid px-4 py-8 md:py-14')}>
+        <section data-testid="lesson-end" aria-label="Fine del ripasso" className={cn(TILE, 'mx-auto grid w-full max-w-xl justify-items-center gap-6 p-6 text-center md:p-8')}>
+          <p ref={sentence} tabIndex={-1} className="max-w-[60ch] font-serif text-2xl leading-snug text-slate-900 focus:outline-none md:text-3xl dark:text-slate-50">
+            {endSentence(summary)}
+          </p>
+          <SessionEndProgress data={day} />
+          <div className="grid w-full justify-items-center gap-1 md:w-auto">
+            <button type="button" onClick={more ? onContinue : onHome} className={cn(LESSON_PRIMARY, 'md:min-w-64')}>
+              {more ? 'Continua' : 'Torna a Oggi'}
+            </button>
+            {more && (
+              <button type="button" onClick={onHome} className={cn(QUIET_BUTTON, 'mx-0 justify-self-center text-center')}>
+                Torna a Oggi
+              </button>
+            )}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A review session (`/studia/ripasso/sessione?materia=&istituto=`, or `?corso=` for one course of «Percorsi»), drawn as the lesson (Gymnasium spec §5.4): at the top the
+ * close button and the progress bar, in the middle the card, at the foot the bar with the one action available. The
+ * queue lives in `useReviewSession`, so opening and closing an anchor's article leaves it as it was. While a card is
+ * on screen, closing (the button or Esc) asks before leaving — what was graded is already recorded; with no card
+ * (the end, a failed read, the read on its way) there is nothing to interrupt, and it goes back to Oggi. `StudiaPage`
+ * draws it in `LessonFrame`, over the shell.
  */
 export function ReviewSession() {
+  const [params] = useSearchParams();
+  const coursesOn = useCoursesSwitch() === 'on';
+  // A course's session (`?corso=`, «Percorsi») only with the courses' switch on: until then nothing is read, and an off
+  // the server confirms goes back to Oggi (`CoursesGate`).
+  if (!params.get('materia') && params.get('corso') && !coursesOn) {
+    return (
+      <div className="px-4 py-8">
+        <CoursesGate>{null}</CoursesGate>
+      </div>
+    );
+  }
+  return <ReviewSessionBody />;
+}
+
+function ReviewSessionBody() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const desktop = useIsDesktop();
@@ -92,31 +253,62 @@ export function ReviewSession() {
 
   const requested = params.get('materia');
   const materia = requested && Object.keys(MATERIA_LABEL).includes(requested) ? (requested as Materia) : undefined;
+  // An institute only within a subject (the server refuses one alone), passed back as the road spelt it.
+  const istituto = (materia && params.get('istituto')) || undefined;
+  // One course of «Percorsi» (courses spec §10.5), from «Oggi»'s row; never with a subject.
+  const corso = (!materia && params.get('corso')) || undefined;
 
   const [confirmStop, setConfirmStop] = useState(false);
+  // «Interrompi» in the header: the confirmation is drawn from it, whether it was pressed or Esc asked (U1c). Kept in
+  // state (a callback ref), as the confirmation reads it while rendering.
+  const [stopButton, setStopButton] = useState<HTMLButtonElement | null>(null);
+  // Going on, the focus goes back to the card (its answer once shown, else its question): on «Interrompi», Space
+  // — the answer's key, which the session leaves to a focused button — would press it again.
+  const cardColumn = useRef<HTMLDivElement>(null);
+  const backToCard = () => {
+    const places = cardColumn.current?.querySelectorAll<HTMLElement>('[tabindex="-1"]');
+    return places && places.length > 0 ? places[places.length - 1] : null;
+  };
   const [panel, setPanel] = useState<{ step: number; anchor: AncoraScheda } | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
 
-  // Esc closes the article beside the card first (on a phone the sheet closes itself); a second one asks to stop.
+  // Esc closes the article beside the card first (on a phone the sheet closes itself); a second one asks to stop,
+  // or leaves when there is nothing to interrupt: no card, or none graded yet (U1c: stopping then loses nothing).
   const panelOpen = useRef(false);
+  const askToStop = useRef(false);
   const handleEscape = useCallback(() => {
     if (panelOpen.current) setPanel(null);
-    else setConfirmStop(true);
-  }, []);
+    else if (askToStop.current) setConfirmStop(true);
+    else navigate(HOME_PATH);
+  }, [navigate]);
 
-  const { current, revealed, reveal, grade, remaining, done, summary, practice, step, loading, loadError, saveError, skipped, saving, reload, goalMet } =
-    useReviewSession(materia, { paused: confirmStop, onEscape: handleEscape });
+  const { current, revealed, reveal, grade, remaining, done, summary, practice, step, loading, loadError, saveError, skipped, saving, reload, goalMet, xpGain } =
+    useReviewSession(materia, { istituto, corso, paused: confirmStop, onEscape: handleEscape });
+  const { note, noteKey, recordGrade } = useGradeNote({ step, current, revealed, practice, saving, skipped, paused: confirmStop });
   // The grade that made the day count plays the celebration, once a day for this browser (spec decision 10).
   const { celebratedBefore, markCelebrated } = useCelebratedToday();
   // The day whose notice has run its course here: the notice goes, and a later closing grade (the goal raised) does not bring it back.
   const [noticeDone, setNoticeDone] = useState<string | null>(null);
   const celebrating = goalMet !== null && !celebratedBefore(goalMet.giorno) && noticeDone !== goalMet.giorno;
 
+  // The queue as it was read: it only shrinks (a «Di nuovo» goes to the back), so its largest length since the
+  // read is the lesson's total. A new read (Riprova, Continua) starts it again.
+  const [total, setTotal] = useState(0);
+  if (loading && total !== 0) setTotal(0);
+  else if (!loading && remaining > total) setTotal(remaining);
+
+  const showCard = !loadError && !loading && !done && current !== null;
+  // The confirmation only once a card is graded (U1c, Bill's choice): with none, «Interrompi» leaves at once. A grade
+  // still on its way is not waited for: its post goes on after the session has gone.
+  const asksToStop = showCard && summary.reviewed > 0;
   // An article belongs to the step it was opened at: a card that comes back is a new step.
   const openAnchor = panel && current && panel.step === step ? panel.anchor : null;
-  useEffect(() => {
+  // In the commit, not after it: an Esc pressed as soon as a card is drawn must already find it there, or it would
+  // leave without asking.
+  useLayoutEffect(() => {
     panelOpen.current = openAnchor !== null && desktop;
-  }, [openAnchor, desktop]);
+    askToStop.current = asksToStop;
+  }, [openAnchor, desktop, asksToStop]);
 
   const openInReader = (anchor: AncoraScheda) => {
     const searchParams = searchParamsFromAnchor(anchor);
@@ -125,90 +317,156 @@ export function ReviewSession() {
     triggerSearch(searchParams);
   };
 
-  let body;
+  const leave = () => (asksToStop ? setConfirmStop(true) : navigate(HOME_PATH));
+
+  const skippedLine = skipped && (
+    <p role="status" className="mb-4 text-sm text-slate-600 dark:text-slate-300">
+      Questa scheda non è più da ripassare.
+    </p>
+  );
+
+  let middle;
   if (loadError) {
-    body = (
-      <div role="alert" className="space-y-3 text-sm text-red-600 dark:text-red-400">
-        <p>Non riesco a leggere le schede da ripassare.</p>
-        <button type="button" onClick={() => void reload()} className={cn(BUTTON, 'border-slate-300 text-slate-700 dark:border-slate-600 dark:text-slate-200')}>
-          Riprova
-        </button>
-      </div>
+    middle = (
+      <>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className={cn(COLUMN, 'px-4 py-8')}>
+            <p role="alert" className="font-serif text-xl leading-snug text-red-700 dark:text-red-400">
+              Non riesco a leggere le schede da ripassare.
+            </p>
+          </div>
+        </div>
+        <LessonBar>
+          <button type="button" onClick={() => void reload()} className={LESSON_PRIMARY}>
+            Riprova
+          </button>
+        </LessonBar>
+      </>
     );
   } else if (loading) {
-    body = <p className="text-sm text-slate-500 dark:text-slate-400">Carico le schede…</p>;
-  } else if (done || !current) {
-    body = (
-      <div className="space-y-4">
-        <p className="max-w-[60ch] font-serif text-xl leading-[1.7] text-slate-900 dark:text-slate-50">{endSentence(summary)}</p>
-        <SessionEndProgress />
-        <button type="button" onClick={() => navigate(HOME_PATH)} className={cn(BUTTON, 'border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800')}>
-          Torna al ripasso
-        </button>
-      </div>
+    middle = (
+      <>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className={cn(COLUMN, 'px-4 py-6')}>
+            <p className="sr-only">Carico le schede…</p>
+            <div aria-hidden className="h-56 rounded-2xl border border-slate-200 bg-white motion-safe:animate-pulse dark:border-slate-800 dark:bg-slate-900" />
+          </div>
+        </div>
+        <LessonBar>
+          <div aria-hidden className="h-12 rounded-xl bg-slate-100 motion-safe:animate-pulse dark:bg-slate-800" />
+        </LessonBar>
+      </>
+    );
+  } else if (!showCard) {
+    middle = (
+      <>
+        {skipped && <div className={cn(COLUMN, 'px-4 pt-4')}>{skippedLine}</div>}
+        <SessionEnd summary={summary} materia={materia} istituto={istituto} corso={corso} onHome={() => navigate(HOME_PATH)} onContinue={() => void reload()} />
+      </>
     );
   } else {
-    body = (
-      <div className={cn(openAnchor && desktop && 'md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,28rem)] md:items-start md:gap-8')}>
-        <div className="min-w-0">
-          <div className="mb-6 flex items-center justify-between gap-3">
-            <p className="text-sm text-slate-500 dark:text-slate-400">{remaining === 1 ? 'Resta 1' : `Restano ${remaining}`}</p>
-            <button
-              type="button"
-              onClick={() => setConfirmStop(true)}
-              className={cn(BUTTON, 'border-transparent text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800')}
-            >
-              Interrompi
-            </button>
+    middle = (
+      <>
+        <div className="flex min-h-0 flex-1">
+          {/* Keyed by step, so each card starts at the top of its own scroll, however far the last answer was read. */}
+          <div key={step} className="min-w-0 flex-1 overflow-y-auto">
+            <div ref={cardColumn} className={cn(COLUMN, 'px-4 pb-8 pt-2 md:pt-8')}>
+              {skippedLine}
+              <ReviewCard card={current} revealed={revealed} focusKey={step} onOpenAnchor={(anchor) => setPanel({ step, anchor })} />
+            </div>
           </div>
-          <ReviewCard card={current} revealed={revealed} focusKey={step} onOpenAnchor={(anchor) => setPanel({ step, anchor })} />
-          <GradeBar revealed={revealed} anteprima={current.anteprima} practice={practice} onReveal={reveal} onGrade={(rating) => void grade(rating)} disabled={saving} saveError={saveError} />
+          {openAnchor && (
+            <ArticlePanel
+              anchor={openAnchor}
+              desktop={desktop}
+              onClose={() => setPanel(null)}
+              onOpenInReader={() => openInReader(openAnchor)}
+              showToast={(message, type = 'info') => setToast({ message, type })}
+            />
+          )}
         </div>
-        {openAnchor && (
-          <ArticlePanel
-            anchor={openAnchor}
-            desktop={desktop}
-            onClose={() => setPanel(null)}
-            onOpenInReader={() => openInReader(openAnchor)}
-            showToast={(message, type = 'info') => setToast({ message, type })}
-          />
-        )}
-      </div>
+        <GradeBar
+          revealed={revealed}
+          anteprima={current.anteprima}
+          practice={practice}
+          onReveal={reveal}
+          onGrade={(rating) => {
+            recordGrade(rating);
+            void grade(rating);
+          }}
+          disabled={saving}
+          saveError={saveError}
+          note={note}
+          noteKey={noteKey}
+        />
+      </>
     );
   }
 
   return (
-    // Room for the bar pinned at the bottom of a phone.
-    <section aria-label="Ripasso" className="relative pb-28 md:pb-0">
+    <section aria-label="Ripasso" className="flex h-full min-h-0 flex-1 flex-col">
       {/* A live region of its own, not a second «status»: the screen's status line is the skipped card's. */}
       <p aria-live="polite" className="sr-only">
         {goalMet ? `Obiettivo di oggi raggiunto · serie di ${goalMet.serie} ${goalMet.serie === 1 ? 'giorno' : 'giorni'}` : ''}
       </p>
-      {celebrating && (
-        <SessionCelebration
-          giorno={goalMet.giorno}
-          serie={goalMet.serie}
-          onStart={() => markCelebrated(goalMet.giorno)}
-          onDone={() => setNoticeDone(goalMet.giorno)}
-        />
-      )}
-      {skipped && (
-        <p role="status" className="mb-4 text-sm text-slate-600 dark:text-slate-300">
-          Questa scheda non è più da ripassare.
-        </p>
-      )}
-      {body}
-      <ConfirmDialog
+      <header className="relative shrink-0 px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))]">
+        <div className={cn(COLUMN, 'relative flex items-center gap-3')}>
+          <button
+            ref={setStopButton}
+            type="button"
+            onClick={leave}
+            aria-label={showCard ? 'Interrompi' : 'Chiudi'}
+            className={cn(
+              'inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center gap-1.5 rounded-lg px-2 text-sm font-medium text-slate-600 hover:bg-slate-200/60 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-50',
+              FOCUS_RING,
+            )}
+          >
+            <X size={20} aria-hidden />
+            <span aria-hidden className="hidden md:inline">
+              {showCard ? 'Interrompi' : 'Chiudi'}
+            </span>
+          </button>
+          <LessonProgress done={total - remaining} total={total} />
+          {showCard && <p className="sr-only">{remaining === 1 ? 'Resta 1' : `Restano ${remaining}`}</p>}
+          {/* «+20 XP» sits over the bar's end, inside the header's row and out of the flow: the bar never shrinks for it,
+              it never reaches the card, and the card never waits. While the goal's notice covers the row it waits, and
+              comes once the notice has gone (a gain already shown is never shown again). */}
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center">
+            <XpGain gain={celebrating ? null : xpGain} />
+          </div>
+        </div>
+        {/* Over the header's row, as on the old page: beside the card, never on it. */}
+        {celebrating && (
+          <SessionCelebration
+            serie={goalMet.serie}
+            mark={goalMet.missione}
+            // The day is celebrated for this browser only with the mark: otherwise «Oggi» writes it, the first time, once
+            // the mission is done (G9).
+            onStart={() => {
+              if (goalMet.missione) markCelebrated(goalMet.giorno);
+            }}
+            onDone={() => setNoticeDone(goalMet.giorno)}
+          />
+        )}
+      </header>
+      {middle}
+      {/* K1b's confirmation, drawn from «Interrompi» (U1c): what happens, said with the session's count; going on is
+          the evident action (filled, the focus on it, Esc), stopping the outlined one; nothing destructive, no red. */}
+      <WireConfirm
         open={confirmStop}
         title="Interrompere il ripasso?"
-        message="Le schede già valutate restano registrate."
+        message={stopMessage(summary.reviewed, remaining)}
         confirmLabel="Interrompi"
-        cancelLabel="Continua"
+        cancelLabel="Continua il ripasso"
+        emphasis="cancel"
+        origin={stopButton}
+        focusBack={backToCard}
         onConfirm={() => navigate(HOME_PATH)}
         onCancel={() => setConfirmStop(false)}
       />
       <div className={cn('fixed left-0 top-0', Z_INDEX.toast)}>
-        <Toast message={toast?.message ?? ''} type={toast?.type ?? 'info'} isVisible={toast !== null} onClose={() => setToast(null)} />
+        {/* At the top: the bar at the foot holds the grades on every width. */}
+        <Toast position="top" message={toast?.message ?? ''} type={toast?.type ?? 'info'} isVisible={toast !== null} onClose={() => setToast(null)} />
       </div>
     </section>
   );

@@ -1,9 +1,10 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ChevronLeft, ChevronRight, Settings, Zap, Sun, Moon, BookOpen, Maximize2, Minimize2, GripHorizontal, StickyNote, Lightbulb, Download } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Settings, Zap, Sun, Moon, BookOpen, Maximize2, Minimize2, GripHorizontal, StickyNote, Download } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
 import type { ArticleData } from '../../../../types';
 import type { StudyModeTheme } from './StudyMode';
 import { spring } from '../../../../lib/motion';
+import { HighlightColorMenu } from '../../search/HighlightColorMenu';
 
 interface StudyModeHeaderProps {
   visible: boolean;
@@ -24,8 +25,6 @@ interface StudyModeHeaderProps {
   isDragging?: boolean;
   showToolsPanel?: boolean;
   onToggleTools?: () => void;
-  showBrocardi?: boolean;
-  onToggleBrocardi?: () => void;
   onExport?: () => void;
 }
 
@@ -66,8 +65,6 @@ export function StudyModeHeader({
   isDragging,
   showToolsPanel,
   onToggleTools,
-  showBrocardi,
-  onToggleBrocardi,
   onExport
 }: StudyModeHeaderProps) {
   const styles = THEME_HEADER_STYLES[theme];
@@ -178,19 +175,9 @@ export function StudyModeHeader({
                 </button>
               )}
 
-              {onToggleBrocardi && (
-                <button
-                  id="tour-study-brocardi"
-                  onClick={onToggleBrocardi}
-                  className={cn(
-                    "p-1.5 sm:p-2 rounded-md transition-colors",
-                    showBrocardi ? 'text-amber-600 bg-amber-50 dark:bg-amber-900/30 dark:text-amber-400' : styles.button
-                  )}
-                  title="Approfondimenti (B)"
-                >
-                  <Lightbulb size={14} className="sm:w-4 sm:h-4" />
-                </button>
-              )}
+              {/* The colour of new highlights (H1), as in the reading bar; the way to their meanings is in Study Mode's own
+                  settings (the gear «Impostazioni (S)»), not a second gear beside this one. */}
+              <HighlightColorMenu meaningsGear={false} triggerClassName={cn('min-h-[44px] min-w-[44px] justify-center rounded-md p-1.5 sm:p-2 md:min-h-0 md:min-w-0', styles.button)} />
 
               <div className="hidden sm:block w-px h-5 bg-slate-200 dark:bg-slate-700 mx-1" />
 
@@ -223,7 +210,7 @@ export function StudyModeHeader({
                   onClick={() => onThemeChange('dark')}
                   className={cn(
                     "p-1 rounded-md transition-[color,background-color,border-color,box-shadow]",
-                    theme === 'dark' ? 'bg-slate-700 shadow-sm text-blue-400' : 'text-slate-400 hover:text-slate-500'
+                    theme === 'dark' ? 'bg-slate-700 shadow-sm text-primary-400' : 'text-slate-400 hover:text-slate-500'
                   )}
                   title="Tema scuro (3)"
                 >

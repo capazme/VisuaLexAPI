@@ -1,33 +1,37 @@
 import { Link } from 'react-router-dom';
-import { FolderOpen, MessagesSquare } from 'lucide-react';
-import { SECTION_TITLES } from '../../../features/sections/sections';
+import { FolderOpen } from 'lucide-react';
+import { COMMUNITY_PAGE } from '../../../features/sections/pageNames';
+import { PageFrame } from '../../layout/PageFrame';
+import { CommunityMark } from './CommunityMark';
 
 /**
- * The Forum's «Community» (`/forum/community`), beside «Dossier pubblici» (`/forum`): an honest placeholder.
- * Questions and discussions between colleagues come later and need the server; until then the page says
- * so, with no sample posts and no counts, and points to what the Forum already holds.
+ * The Forum's «Community» (`/forum/community`), beside «Dossier pubblici» (`/forum`): an honest placeholder, drawn as
+ * an empty state composed for the page (S7a), centred in the column — line art in the manner of the section's mark, «Le
+ * discussioni arrivano presto», two lines on what it will be, and one way on, «Esplora i dossier pubblici». Questions and
+ * discussions between colleagues come later and need the server; until then the page shows no sample posts and no
+ * counts. In the sections' frame (`PageFrame`, W2).
  */
 export function ForumCommunityPage() {
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
-      <header className="border-b border-slate-200 pb-3 dark:border-slate-800">
-        <h1 className="font-serif text-3xl font-medium tracking-tight text-slate-900 dark:text-slate-50">{SECTION_TITLES.forum}</h1>
-      </header>
-      <section aria-labelledby="forum-community-heading" className="max-w-prose">
-        <h2 id="forum-community-heading" className="flex items-center gap-2 text-xl font-semibold text-slate-900 dark:text-slate-50">
-          <MessagesSquare size={22} aria-hidden className="shrink-0 text-primary-600 dark:text-primary-400" />
-          Community
+    // The page's name, from the one list of the pages' names, the Forum's phrase over it (L-37).
+    <PageFrame title={COMMUNITY_PAGE} kicker="forum">
+      <section aria-labelledby="forum-community-heading" className="mx-auto flex w-full max-w-md flex-col items-center px-2 py-10 text-center md:py-16">
+        <CommunityMark />
+        <h2 id="forum-community-heading" className="mt-6 font-serif text-2xl font-medium tracking-tight text-slate-900 dark:text-slate-50">
+          Le discussioni arrivano presto
         </h2>
-        <p className="mt-2 text-slate-700 dark:text-slate-300">Domande e discussioni tra colleghi, in arrivo.</p>
-        <p className="mt-1 text-slate-600 dark:text-slate-400">Per ora il Forum raccoglie i dossier pubblicati dalla comunità.</p>
+        <p className="mt-3 text-slate-700 dark:text-slate-300">
+          Qui farai domande ai colleghi e discuterai le glosse sui passi di norme e sentenze, aperte a tutta la comunità.
+        </p>
+        <p className="mt-2 text-slate-600 dark:text-slate-400">Per ora il Forum raccoglie i dossier pubblicati dalla comunità.</p>
         <Link
           to="/forum"
-          className="mt-3 inline-flex min-h-[44px] items-center gap-2 rounded-lg px-3 -mx-3 font-medium text-primary-700 hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+          className="mt-8 inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-primary-600 px-5 py-2.5 font-medium text-white transition-colors hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950"
         >
           <FolderOpen size={18} aria-hidden />
-          Apri i dossier pubblici
+          Esplora i dossier pubblici
         </Link>
       </section>
-    </div>
+    </PageFrame>
   );
 }

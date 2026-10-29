@@ -6,11 +6,14 @@ import * as authService from '../services/authService';
 import { subscribeToUser } from '../services/authEvents';
 import type { UserResponse } from '../types/api';
 import { appStore } from '../store/useAppStore';
+import { loadAssistantFeatures, resetAssistantProposals } from '../store/assistantProposals';
 import { getErrorMessage } from '../utils/errors';
 import { clearDecisionCache } from '../utils/decisionFetchCache';
 import { clearDecisionSearchCache } from '../utils/decisionSearchCache';
 import { clearEuCaseLawCache } from '../utils/euCaseLawCache';
 import { clearArticleCardsCache } from '../utils/articleCardsCache';
+import { clearConsentRead } from '../features/merlt/consent/consentRead';
+import { forgetSeenProgress } from '../components/features/studia/progress/seenProgress';
 
 interface AuthState {
   user: UserResponse | null;
@@ -50,6 +53,8 @@ export function useAuth() {
         const store = appStore.getState();
         if (!store.isDataLoaded && !store.isLoadingData) {
           store.fetchUserData();
+          // D7b: whether the server proposes passages at all, once as the app starts, not at each use of this hook.
+          void loadAssistantFeatures();
         }
       } catch (error) {
         setState({
@@ -87,6 +92,8 @@ export function useAuth() {
 
       // Auto-login after registration
       await authService.login({ email, password });
+      // What this browser drew of Gymnasium was the last person's (their points, their level).
+      forgetSeenProgress();
       const currentUser = await authService.getCurrentUser();
 
       setState({
@@ -115,6 +122,8 @@ export function useAuth() {
 
     try {
       await authService.login({ email, password });
+      // What this browser drew of Gymnasium was the last person's (their points, their level).
+      forgetSeenProgress();
       const user = await authService.getCurrentUser();
 
       setState({
@@ -126,6 +135,7 @@ export function useAuth() {
 
       // Fetch user data from API after successful login
       appStore.getState().fetchUserData();
+      void loadAssistantFeatures();
 
       return user;
     } catch (error) {
@@ -149,6 +159,9 @@ export function useAuth() {
     clearDecisionSearchCache();
     clearEuCaseLawCache();
     clearArticleCardsCache();
+    clearConsentRead();
+    forgetSeenProgress();
+    resetAssistantProposals();
     setState({
       user: null,
       loading: false,

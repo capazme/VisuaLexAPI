@@ -3,10 +3,12 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 
 // The reader fetches the article; the row's own behaviour is what is under test.
 vi.mock('./DossierItemReader', () => ({
-  DossierItemReader: () => <div data-testid="reader">testo</div>,
+  // The entry it reads: what an application proposed on it is drawn there (D7b).
+  DossierItemReader: ({ itemId }: { itemId?: string }) => <div data-testid="reader" data-item={itemId}>testo</div>,
 }));
 
 import { DossierArticleRow, type DossierArticleRowProps } from './DossierArticleRow';
+import { CurrentDossierContext } from './currentDossier';
 
 const normaItem: DossierArticleRowProps['item'] = {
   id: 'i1', type: 'norma', addedAt: '2026-08-01T10:00:00.000Z',
@@ -105,20 +107,115 @@ describe('DossierArticleRow notes', () => {
     { id: 'n1', type: 'note' as const, data: 'Sul danno ingiusto.', addedAt: '2026-10-04T10:00:00Z', createdBy: { clientName: 'Claude Code' } },
     { id: 'n2', type: 'note' as const, data: 'Mia nota.', addedAt: '2026-10-04T11:00:00Z', createdBy: null },
   ];
-  it('counts its notes on the closed row, with the mark of the application that wrote one', () => {
+  it('counts its notes on the closed row, without the mark of the application that wrote one (D7b)', () => {
     renderRow(normaItem, { notes });
     expect(screen.getByTitle('2 note')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Espandi codice civile 262 articolo 2043, 2 note, una scritta da Claude Code (applicazione collegata)' })).toBeInTheDocument();
-    expect(screen.getByText('Claude Code')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Espandi codice civile 262 articolo 2043, 2 note' })).toBeInTheDocument();
+    expect(screen.queryByText(/Claude Code/)).toBeNull();
     expect(screen.queryByText('Sul danno ingiusto.')).toBeNull();
   });
+  it('shows the traffic light of what an application wrote, and says it in the row\'s name, open or closed (D7b)', () => {
+    const reviewed = { ...normaItem, assistantNotes: { proposed: 2, validated: 0, review: 1 } };
+    const { unmount } = renderRow(reviewed, { notes });
+    expect(screen.getByRole('button', { name: 'Espandi codice civile 262 articolo 2043, 2 note, 2 da validare · 1 da rivedere' })).toBeInTheDocument();
+    expect(screen.getByTitle('2 da validare · 1 da rivedere')).toHaveAttribute('data-ai-review', 'review');
+    unmount();
+    renderRow(reviewed, { notes, isExpanded: true });
+    expect(screen.getByRole('button', { name: 'Comprimi codice civile 262 articolo 2043, 2 da validare · 1 da rivedere' })).toBeInTheDocument();
+  });
+
+  /**
+   * A sign on the star's line: in a box as tall as the buttons (h-11) across the toggle's py-2.5, its sign centred (once
+   * 1 to 3 px higher than the star), in the signs' group — up to half the row, no padding of its own — in the toggle.
+   */
+  // A law's annex (a code's own is never shown: `shownAnnex`).
+  const ANNEXED = { tipo_atto: 'legge', numero_atto: '241', data: '1990-08-07', numero_articolo: '1', allegato: 'A' };
+  const onStarLine = (sign: HTMLElement) => {
+    const box = sign.parentElement!;
+    expect(box).toHaveClass('flex', 'h-11', '-my-2.5', 'items-center');
+    const group = box.parentElement!;
+    expect(group).toHaveClass('max-w-[50%]', 'items-start');
+    expect(group.className).not.toMatch(/\b(p|py|pt|pb)-/);
+    expect(group.parentElement).toHaveAttribute('role', 'button');
+    expect(group.parentElement).toHaveClass('py-2.5', 'items-start');
+    expect(screen.getByRole('button', { name: /importante/ })).toHaveClass('h-11');
+  };
+
+  it('sits its light on the line of the star and the bin: in a box as tall as they are, centred, in the row\'s toggle', () => {
+    renderRow({ ...normaItem, assistantNotes: { proposed: 1, validated: 0, review: 0 } }, { notes });
+    onStarLine(screen.getByTitle('1 da validare'));
+  });
+
+  it('sits its notes\' count on the same line, alone, beside the light or after a chip, all in the half-row group', () => {
+    const annexed = { ...normaItem, data: ANNEXED };
+    for (const item of [normaItem, { ...normaItem, assistantNotes: { proposed: 1, validated: 0, review: 0 } }, annexed]) {
+      const { unmount } = renderRow(item, { notes });
+      if (item === annexed) expect(screen.getByText(/^All\. A$/)).toBeInTheDocument();
+      // Alone after the title it sat 2 px above the star.
+      onStarLine(screen.getByTitle('2 note'));
+      unmount();
+    }
+    // Open, the notes are listed under it: no count.
+    renderRow(normaItem, { notes, isExpanded: true });
+    expect(screen.queryByTitle('2 note')).toBeNull();
+  });
+
+  it('keeps the chips in the same group, wrapping, 2 px down to the star\'s line; no group with no sign', () => {
+    const { unmount } = renderRow({ ...normaItem, data: ANNEXED }, { notes });
+    const chips = screen.getByText(/^All\. A$/).parentElement!;
+    expect(chips).toHaveClass('flex-wrap', 'pt-0.5');
+    const group = screen.getByTitle('2 note').parentElement!.parentElement!;
+    expect(chips.parentElement).toBe(group);
+    // Drawn from the right, the chips last: too narrow for all, they wrap under and the count keeps the star's line.
+    expect(group).toHaveClass('flex-row-reverse', 'flex-wrap');
+    expect(group.lastElementChild).toBe(chips);
+    unmount();
+    renderRow({ ...normaItem, assistantNotes: null }, { notes, isExpanded: true });
+    expect(document.querySelector('.max-w-\\[50\\%\\]')).toBeNull();
+  });
+
+  it('draws no empty box for counts of nothing', () => {
+    renderRow({ ...normaItem, assistantNotes: { proposed: 0, validated: 0, review: 0 } }, { notes });
+    expect(document.querySelector('[data-ai-review]')).toBeNull();
+    // The notes' count keeps its box; the light has none.
+    const boxes = [...screen.getByRole('button', { name: /^Espandi codice civile 262 articolo 2043/ }).querySelectorAll('.h-11')];
+    expect(boxes).toEqual([screen.getByTitle('2 note').parentElement]);
+  });
+
+  it('draws no light where the application wrote nothing', () => {
+    renderRow({ ...normaItem, assistantNotes: null }, { notes });
+    expect(document.querySelector('[data-ai-review]')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Espandi codice civile 262 articolo 2043, 2 note' })).toBeInTheDocument();
+  });
+
+  it('a note an application wrote, open: its state and its own bin, not a second one (D7b)', () => {
+    const onRemoveNote = vi.fn();
+    const appNote = { ...notes[0], assistantNote: { state: 'proposed' as const, stateChangedAt: null, reviewComment: null, originalText: 'Sul danno ingiusto.', edited: false, editedAt: null, editedBy: null } };
+    render(
+      <CurrentDossierContext.Provider value="d1">
+        <DossierArticleRow
+          item={normaItem} rubrica={null} isSelected={false} showCheckbox={false} onToggleSelect={() => {}} onRemove={() => {}}
+          onToggleImportant={() => {}} isExpanded onToggleExpand={() => {}} onOpenOnDashboard={() => {}} showToast={() => {}}
+          notes={[appNote, notes[1]]} onRemoveNote={onRemoveNote}
+        />
+      </CurrentDossierContext.Provider>,
+    );
+    expect(screen.getByRole('checkbox', { name: "Proposto dall'IA, confermi?" })).toBeInTheDocument();
+    expect(screen.getByTestId('reader')).toHaveAttribute('data-item', 'i1');
+    const bins = screen.getAllByRole('button', { name: 'Rimuovi nota' });
+    expect(bins).toHaveLength(2);
+    fireEvent.click(bins[0]);
+    expect(onRemoveNote).toHaveBeenCalledWith(appNote);
+  });
+
   it('shows its notes above the text when open, and adds and removes one', () => {
     const onAddNote = vi.fn();
     const onRemoveNote = vi.fn();
     renderRow(normaItem, { notes, isExpanded: true, onAddNote, onRemoveNote });
     const text = screen.getByText('Sul danno ingiusto.');
     expect(text.compareDocumentPosition(screen.getByTestId('reader')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByText('scritta da Claude Code (applicazione collegata)')).toBeInTheDocument();
+    // Who wrote a note is not drawn (D7b): its validation says it.
+    expect(screen.queryByText(/Claude Code/)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: "Aggiungi una nota all'articolo" }));
     expect(onAddNote).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getAllByRole('button', { name: 'Rimuovi nota' })[1]);

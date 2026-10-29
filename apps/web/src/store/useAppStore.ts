@@ -3,7 +3,8 @@ import { createStore } from 'zustand/vanilla';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { v4 as uuidv4 } from 'uuid';
-import type { AppSettings, Bookmark, Dossier, DossierItem, DossierKind, DossierNormaData, DossierSentenzaData, Annotation, Highlight, Norma, NormaVisitata, ArticleData, SearchParams, QuickNorm, CustomAlias, Environment } from '../types';
+import { resetNotifications } from '../components/ui/notifications/notifications';
+import type { AppSettings, SettingsSection, Bookmark, Dossier, DossierItem, DossierKind, DossierNormaData, DossierSentenzaData, Annotation, Highlight, Norma, NormaVisitata, ArticleData, SearchParams, QuickNorm, CustomAlias, Environment } from '../types';
 import { getErrorMessage } from '../utils/errors';
 import {
     appendBackEntry,
@@ -17,14 +18,15 @@ import type { DecisionIdentity, DecisionReference, DecisionSearchQuery } from '.
 import { decisionPath, formatDecisionShort, identityOf } from '../utils/decisionLinks';
 import {
     addArticles, articleRowKey, besideAfterOpen, besideRefFor, DEFAULT_PRACTICE_LABEL, DEFAULT_SEARCH_LABEL, decisionRowKey,
-    findPracticeArticle, holdsSubject, labelOr, mergeDecisionEntries, practiceArticleKey,
+    findPracticeArticle, holdsSubject, labelOr, MAX_BESIDE, mergeDecisionEntries, practiceArticleKey,
     practiceLabel, sameBesideSubject, sameDecision, sanitizePractices, subjectOfRef, type BesideRef, type Practice,
-    type PracticeDecision, type PracticeSubject,
+    type PracticeAct, type PracticeDecision, type PracticeSubject,
 } from '../utils/practice';
 import { shortAct } from '../utils/sources';
 import { DECISIONS_PRACTICE_LABEL, practiceNoticeText, practicesFromTabs } from '../utils/practiceMigration';
 import { guardedStorage, type StorageFailure } from '../utils/guardedStorage';
 import { isDesktopViewport } from '../hooks/useIsDesktop';
+import { isHighlightColor, sanitizeHighlightMeanings } from '../utils/highlightColors';
 
 // Services for API sync
 import { bookmarkService } from '../services/bookmarkService';
@@ -45,6 +47,8 @@ import {
     highlightStoreToCreate,
 } from '../utils/storeApiMappers';
 import { serverFieldsFromApi, dossierFromApi, dossierItemFromApi, itemContentFor, serverItemFor } from '../components/features/dossier/dossierUtils';
+import { shiftAiReviewCount } from '../utils/aiReview';
+import { forgetRemovals, isRemovalPending, removeWithUndo, savingDone, savingStarted } from './deferredRemovals';
 
 // ── Environment wire ↔ store converters ───────────────────────────────
 // The server stores the per-slice content (dossiers / quickNorms / aliases /
@@ -191,6 +195,8 @@ interface AppState {
     commandPaletteQuery: string | null;
     quickNormsManagerOpen: boolean;
     aliasManagerOpen: boolean;
+    /** Impostazioni (`SettingsModal`, mounted by `Layout`), and the section it opens at: session-only, absent from `partialize`. */
+    settingsDialog: { open: boolean; section: SettingsSection | null };
     searchPanelState: SearchPanelState;
 
     /**
@@ -226,6 +232,12 @@ interface AppState {
     closePractice: (id: string) => void;
     /** Empties the table; a reload shows no practice (§5). */
     closeAllPractices: () => void;
+    /**
+     * «Annulla» after closing practices (K1a): puts back those that are not open, each at the index it had (or the end),
+     * with their open rows; `activeId` becomes active again if it is among them. What was opened meanwhile stays.
+     * False when there was nothing to put back: «Annulla» then says so, never «Ripristinato».
+     */
+    reopenPractices: (closed: { practice: Practice; index: number }[], rows: Record<string, true>, activeId: string | null) => boolean;
     /** Ignored for an id that names no practice. */
     setActivePractice: (id: string) => void;
     reorderPractices: (fromIndex: number, toIndex: number) => void;
@@ -262,6 +274,13 @@ interface AppState {
     removePracticeArticle: (practiceId: string, actId: string, articleKey: string) => void;
     /** Takes the act off the table with its rows, its reveal, its windows and the structure window it owned. */
     removePracticeAct: (practiceId: string, actId: string) => void;
+    /**
+     * «Annulla» after `removePracticeAct` (K1a): the act back at `index` in its practice with its open rows, and the
+     * windows it had beside back at their places while the row has room (two). The same act added again meanwhile
+     * (under a new id) takes the removed articles instead of a second copy of the act. False when the practice is gone
+     * (closed meanwhile): nothing to put the act back into, and «Annulla» says so.
+     */
+    restorePracticeAct: (practiceId: string, act: PracticeAct, index: number, beside: { ref: BesideRef; index: number }[], rows: Record<string, true>) => boolean;
     /**
      * «Sposta in un'altra pratica» (T13): the act keeps its id, its articles and its open rows. Into
      * a practice that already holds the act (`actKeyOf`) it joins that act, whose id it takes, and
@@ -415,6 +434,9 @@ interface AppState {
     closeQuickNormsManager: () => void;
     openAliasManager: () => void;
     closeAliasManager: () => void;
+    /** Opens Impostazioni, at `section` when given (the reader's gear opens it at «Significato dei colori»). */
+    openSettings: (section?: SettingsSection) => void;
+    closeSettings: () => void;
     toggleSearchPanel: () => void;
     setSearchPanelPosition: (position: { x: number; y: number }) => void;
 
@@ -544,6 +566,8 @@ const DEFAULT_SETTINGS: AppSettings = {
     focusMode: false,
     splitView: false,
     showKeyPassages: true,
+    highlightColor: 'yellow',
+    highlightColorMeanings: {},
     studyMode: {
         fontSize: 18,
         lineHeight: 1.8,
@@ -620,6 +644,7 @@ const appStore = createStore<AppState>()(
             commandPaletteQuery: null,
             quickNormsManagerOpen: false,
             aliasManagerOpen: false,
+            settingsDialog: { open: false, section: null },
             searchPanelState: {
                 isCollapsed: false,
                 position: { x: window.innerWidth - 420, y: 20 },
@@ -685,6 +710,23 @@ const appStore = createStore<AppState>()(
                 state.pendingReveal = null;
                 state.phoneReader = null;
             }),
+
+            reopenPractices: (closed, rows, activeId) => {
+                const openNow = new Set(get().practices.map((p) => p.id));
+                if (closed.every(({ practice }) => openNow.has(practice.id))) return false;
+                set((state) => {
+                const open = new Set(state.practices.map((p) => p.id));
+                const back = closed.filter(({ practice }) => !open.has(practice.id)).sort((a, b) => a.index - b.index);
+                if (back.length === 0) return;
+                for (const { practice, index } of back) state.practices.splice(Math.min(index, state.practices.length), 0, practice);
+                for (const [key, on] of Object.entries(rows)) {
+                    if (back.some(({ practice }) => key.startsWith(`${practice.id}/`))) state.practiceRows[key] = on;
+                }
+                if (activeId && back.some(({ practice }) => practice.id === activeId)) activate(state, activeId);
+                else if (state.activePracticeId === null) state.activePracticeId = back[0].practice.id;
+                });
+                return true;
+            },
 
             setActivePractice: (id) => {
                 const { practices, activePracticeId } = get();
@@ -794,6 +836,30 @@ const appStore = createStore<AppState>()(
                 if (state.structureWindow.blockId === actId) state.structureWindow.blockId = null;
                 dropRows(state, `${practiceId}/${actId}/`);
                 });
+            },
+
+            restorePracticeAct: (practiceId, act, index, beside, rows) => {
+                const before = get().practices.find((p) => p.id === practiceId);
+                if (!before) return false;
+                if (before.acts.some((a) => a.id === act.id)) return true;
+                set((state) => {
+                const practice = state.practices.find((p) => p.id === practiceId);
+                if (!practice) return;
+                const again = practice.acts.find((a) => a.key === act.key);
+                if (again) {
+                    // Added again meanwhile: the removed articles join it; its own windows and rows stay as they are.
+                    practice.acts = addArticles(practice.acts, act.norma, act.articles, () => again.id).acts;
+                    return;
+                }
+                practice.acts.splice(Math.min(index, practice.acts.length), 0, act);
+                for (const { ref, index: at } of [...beside].sort((a, b) => a.index - b.index)) {
+                    if (practice.beside.length >= MAX_BESIDE) break;
+                    if (practice.beside.some((b) => b.id === ref.id || sameBesideSubject(b, ref))) continue;
+                    practice.beside.splice(Math.min(at, practice.beside.length), 0, ref);
+                }
+                Object.assign(state.practiceRows, rows);
+                });
+                return true;
             },
 
             moveActToPractice: (actId, fromPracticeId, to) => {
@@ -1148,6 +1214,10 @@ const appStore = createStore<AppState>()(
             },
 
             clearUserData: () => {
+                // The notifications on screen go, without carrying out what they held (an import waiting for its «Annulla»).
+                resetNotifications();
+                // A removal's answer still out puts nothing back in the emptied store.
+                forgetRemovals();
                 // The backup of the last user's saved tabs (`backupV0`) goes too: a shared browser keeps nothing of them.
                 removeV0Backup();
                 set((state) => {
@@ -1221,6 +1291,14 @@ const appStore = createStore<AppState>()(
 
             closeAliasManager: () => set((state) => {
                 state.aliasManagerOpen = false;
+            }),
+
+            openSettings: (section) => set((state) => {
+                state.settingsDialog = { open: true, section: section ?? null };
+            }),
+
+            closeSettings: () => set((state) => {
+                state.settingsDialog = { open: false, section: null };
             }),
 
             toggleSearchPanel: () => set((state) => {
@@ -1636,10 +1714,28 @@ const appStore = createStore<AppState>()(
                     return null;
                 }
 
+                // An application's note leaving takes its count off the light of the article it is about (D7b);
+                // a rollback gives it back.
+                // Only the articles still in the dossier are shifted, and only those are shifted back (an article trashed
+                // with its note comes back with its count as it was).
+                const shifted = new Set<string>();
+                const shiftNoteCounts = (d: Dossier, back: boolean) => {
+                    for (const { item } of removed) {
+                        if (item.type !== 'note' || !item.assistantNote || !item.aboutItemId) continue;
+                        if (back && !shifted.has(item.id)) continue;
+                        const about = d.items.find(i => i.id === item.aboutItemId);
+                        if (!about) continue;
+                        if (!back) shifted.add(item.id);
+                        shiftAiReviewCount(about, back ? null : item.assistantNote.state, back ? item.assistantNote.state : null);
+                    }
+                };
                 // Optimistic update
                 set((state) => {
                     const d = state.dossiers.find(x => x.id === dossierId);
-                    if (d) d.items = d.items.filter(i => !wanted.has(i.id));
+                    if (d) {
+                        d.items = d.items.filter(i => !wanted.has(i.id));
+                        shiftNoteCounts(d, false);
+                    }
                 });
 
                 try {
@@ -1659,6 +1755,7 @@ const appStore = createStore<AppState>()(
                         for (const { item, index } of removed) {
                             if (!d.items.some(i => i.id === item.id)) d.items.splice(Math.min(index, d.items.length), 0, item);
                         }
+                        shiftNoteCounts(d, true);
                     });
                     get().pushSyncError('Impossibile rimuovere dal dossier. Riprova.');
                     return null;
@@ -1982,6 +2079,8 @@ const appStore = createStore<AppState>()(
                 };
                 set((state) => { state.annotations.push(optimistic); });
 
+                // Removed before the server answers: the removal waits for the server's id (`deferredRemovals`).
+                savingStarted(`annotation:${tempId}`);
                 annotationService
                     .create(annotationStoreToCreate(optimistic))
                     .then((serverAnnotation) => {
@@ -1990,8 +2089,15 @@ const appStore = createStore<AppState>()(
                             const idx = state.annotations.findIndex(a => a.id === tempId);
                             if (idx !== -1) state.annotations[idx] = mapped;
                         });
+                        savingDone(`annotation:${tempId}`, {
+                            key: `annotation:${mapped.id}`,
+                            path: `/annotations/${encodeURIComponent(mapped.id)}`,
+                            remove: () => annotationService.delete(mapped.id),
+                            item: mapped,
+                        });
                     })
                     .catch((err) => {
+                        savingDone(`annotation:${tempId}`, null);
                         console.error('Failed to sync annotation:', err);
                         set((state) => {
                             state.annotations = state.annotations.filter(a => a.id !== tempId);
@@ -2000,19 +2106,29 @@ const appStore = createStore<AppState>()(
                     });
             },
 
+            // Behind «Annulla» (`removeWithUndo`): off the screen at once, sent when its notification closes or the page
+            // goes or is hidden. A 404 is a removal done; one still being created is removed under the server's id.
             removeAnnotation: (id) => {
-                const previous = get().annotations.find(a => a.id === id);
+                const index = get().annotations.findIndex(a => a.id === id);
+                if (index === -1) return;
+                const previous = get().annotations[index];
                 set((state) => {
                     state.annotations = state.annotations.filter(a => a.id !== id);
                 });
-                if (!previous) return;
-                // 404 is fine: entry may have been a local-only optimistic
-                // insert that never reached the server.
-                annotationService.delete(id).catch((err) => {
-                    if (err?.status === 404) return;
-                    console.error('Failed to sync annotation delete:', err);
-                    set((state) => { state.annotations.push(previous); });
-                    get().pushSyncError('Impossibile eliminare la nota. Riprova.');
+                removeWithUndo({
+                    key: `annotation:${id}`,
+                    message: 'Nota rimossa',
+                    path: `/annotations/${encodeURIComponent(id)}`,
+                    remove: () => annotationService.delete(id),
+                    item: previous,
+                    putBack: (item) => set((state) => {
+                        if (state.annotations.some(a => a.id === item.id)) return;
+                        state.annotations.splice(Math.min(index, state.annotations.length), 0, item);
+                    }),
+                    onRefused: (err) => {
+                        console.error('Failed to sync annotation delete:', err);
+                        get().pushSyncError('Impossibile eliminare la nota. Riprova.');
+                    },
                 });
             },
 
@@ -2041,23 +2157,24 @@ const appStore = createStore<AppState>()(
                 // always 401 and only burn rate-limit points — skip it.
                 if (!isAuthenticated()) return;
                 // Batch: cache by the article root (suffix-free) so the
-                // article body + every brocardi sub-section share a single
+                // article body + every sub-section (the old /brocardi/ ones) share a single
                 // round trip via normaKeyPrefix.
                 const articleRoot = articleRootOf(articleId);
                 const cacheKey = `${normaKey}::${articleRoot}`;
                 if (get().loadedAnnotationKeys[cacheKey]) return;
                 // Mark BEFORE awaiting so concurrent mounts (StrictMode,
-                // rapid article switches, MarkableBrocardiSection siblings)
+                // rapid article switches)
                 // coalesce onto the first in-flight request. Cleared on
                 // error so retries on the next mount still work.
                 set((state) => { state.loadedAnnotationKeys[cacheKey] = true; });
                 try {
                     const wirePrefix = buildWireNormaKeyPrefix(normaKey, articleRoot);
                     const server = await annotationService.getByNormaKeyPrefix(wirePrefix);
-                    const mapped = server.map(annotationApiToStore);
+                    // One waiting behind «Annulla» is not drawn back: the server still has it until then.
+                    const mapped = server.map(annotationApiToStore).filter(a => !isRemovalPending(`annotation:${a.id}`));
                     set((state) => {
                         // Replace every annotation whose articleId sits under
-                        // this article root (main body + /brocardi/* sections)
+                        // this article root (main body + its sub-sections)
                         // so server state wins over stale local entries.
                         state.annotations = state.annotations
                             .filter(a => !(
@@ -2096,6 +2213,8 @@ const appStore = createStore<AppState>()(
                     return;
                 }
 
+                // Removed before the server answers: the removal waits for the server's id (`deferredRemovals`).
+                savingStarted(`highlight:${tempId}`);
                 highlightService
                     .create(wirePayload)
                     .then((serverHighlight) => {
@@ -2104,8 +2223,15 @@ const appStore = createStore<AppState>()(
                             const idx = state.highlights.findIndex(h => h.id === tempId);
                             if (idx !== -1) state.highlights[idx] = mapped;
                         });
+                        savingDone(`highlight:${tempId}`, {
+                            key: `highlight:${mapped.id}`,
+                            path: `/highlights/${encodeURIComponent(mapped.id)}`,
+                            remove: () => highlightService.delete(mapped.id),
+                            item: mapped,
+                        });
                     })
                     .catch((err) => {
+                        savingDone(`highlight:${tempId}`, null);
                         console.error('Failed to sync highlight:', err);
                         set((state) => {
                             state.highlights = state.highlights.filter(h => h.id !== tempId);
@@ -2114,17 +2240,28 @@ const appStore = createStore<AppState>()(
                     });
             },
 
+            // As a note's: behind «Annulla», sent when its notification closes or the page goes.
             removeHighlight: (id) => {
-                const previous = get().highlights.find(h => h.id === id);
+                const index = get().highlights.findIndex(h => h.id === id);
+                if (index === -1) return;
+                const previous = get().highlights[index];
                 set((state) => {
                     state.highlights = state.highlights.filter(h => h.id !== id);
                 });
-                if (!previous) return;
-                highlightService.delete(id).catch((err) => {
-                    if (err?.status === 404) return;
-                    console.error('Failed to sync highlight delete:', err);
-                    set((state) => { state.highlights.push(previous); });
-                    get().pushSyncError('Impossibile eliminare l\'evidenziazione. Riprova.');
+                removeWithUndo({
+                    key: `highlight:${id}`,
+                    message: 'Evidenziazione rimossa',
+                    path: `/highlights/${encodeURIComponent(id)}`,
+                    remove: () => highlightService.delete(id),
+                    item: previous,
+                    putBack: (item) => set((state) => {
+                        if (state.highlights.some(h => h.id === item.id)) return;
+                        state.highlights.splice(Math.min(index, state.highlights.length), 0, item);
+                    }),
+                    onRefused: (err) => {
+                        console.error('Failed to sync highlight delete:', err);
+                        get().pushSyncError('Impossibile eliminare l\'evidenziazione. Riprova.');
+                    },
                 });
             },
 
@@ -2141,7 +2278,8 @@ const appStore = createStore<AppState>()(
                 try {
                     const wirePrefix = buildWireNormaKeyPrefix(normaKey, articleRoot);
                     const server = await highlightService.getByNormaKeyPrefix(wirePrefix);
-                    const mapped = server.map(highlightApiToStore);
+                    // One waiting behind «Annulla» is not drawn back: the server still has it until then.
+                    const mapped = server.map(highlightApiToStore).filter(h => !isRemovalPending(`highlight:${h.id}`));
                     set((state) => {
                         state.highlights = state.highlights
                             .filter(h => !(
@@ -2528,6 +2666,10 @@ const appStore = createStore<AppState>()(
                     settings: {
                         ...DEFAULT_SETTINGS,
                         ...(p.settings ?? {}),
+                        // Only a colour this app draws: an older or damaged save gets the default.
+                        highlightColor: isHighlightColor(p.settings?.highlightColor) ? p.settings.highlightColor : DEFAULT_SETTINGS.highlightColor,
+                        // A meaning of the user's only where it is one (trimmed, 1–40 characters); the rest is the default.
+                        highlightColorMeanings: sanitizeHighlightMeanings(p.settings?.highlightColorMeanings),
                         studyMode: {
                             ...DEFAULT_SETTINGS.studyMode,
                             ...(p.settings?.studyMode ?? {}),

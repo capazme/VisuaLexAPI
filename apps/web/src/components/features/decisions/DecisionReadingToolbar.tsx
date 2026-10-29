@@ -2,6 +2,7 @@ import type { ReactNode, Ref } from 'react';
 import { cn } from '../../../lib/utils';
 import { Z_INDEX } from '../../../constants/zIndex';
 import { NotesHighlightsButtons } from '../search/NotesHighlightsButtons';
+import { HighlightColorMenu } from '../search/HighlightColorMenu';
 import { DiscussionButton } from '../search/DiscussionButton';
 import { FindInTextButton } from '../search/FindInTextButton';
 
@@ -17,10 +18,11 @@ export interface DecisionReadingToolbarProps {
   /** The discussion button's toggle: the toolbar is drawn for a found decision, which always takes discussions. */
   onToggleDiscussion: () => void;
   isDiscussionOpen?: boolean;
-  /** «Cerca nel testo»: the toolbar is drawn over a decision with text, so the button is always there. `isFindOpen`: the
-   *  floating find window is open and scoped to this tab. */
-  isFindOpen: boolean;
-  onToggleFind: (wasPressed: boolean) => void;
+  /** «Cerca nel testo», over a decision with text read in the workspace. `isFindOpen`: the floating find window is open
+   *  and scoped to this tab. Without `onToggleFind` (a reading place with no tab, the dossier: the find window has no
+   *  text of it to search) no button is drawn. */
+  isFindOpen?: boolean;
+  onToggleFind?: (wasPressed: boolean) => void;
   findButtonRef?: Ref<HTMLButtonElement>;
   /** «Passaggi chiave» (`KeyPassagesMenu`), first in the bar when the decision has any. */
   keyPassages?: ReactNode;
@@ -34,7 +36,7 @@ export interface DecisionReadingToolbarProps {
  */
 export function DecisionReadingToolbar({
   notesCount, highlightsCount, isNotesOpen, isHighlightsOpen, notesButtonRef, highlightsButtonRef, onToggleNotes, onToggleHighlights, onToggleDiscussion, isDiscussionOpen = false,
-  isFindOpen, onToggleFind, findButtonRef, keyPassages,
+  isFindOpen = false, onToggleFind, findButtonRef, keyPassages,
 }: DecisionReadingToolbarProps) {
   return (
     <div data-pinned-head className={cn('glass-toolbar sticky top-0 mb-4 flex flex-wrap items-center justify-end gap-1 rounded-t-xl border border-b-2 border-slate-200/50 bg-white/80 p-2 backdrop-blur-md dark:border-slate-800/50 dark:bg-slate-900/80', Z_INDEX.sticky)}>
@@ -49,8 +51,10 @@ export function DecisionReadingToolbar({
         onToggleNotes={onToggleNotes}
         onToggleHighlights={onToggleHighlights}
       />
+      {/* The colour of new highlights (H1), as in the article's bar. */}
+      <HighlightColorMenu triggerClassName="min-h-[44px] min-w-[44px] justify-center p-2.5 hover:bg-slate-100 md:min-h-0 md:min-w-0 md:p-1.5 dark:hover:bg-slate-800" />
       <DiscussionButton isOpen={isDiscussionOpen} onToggle={onToggleDiscussion} name="Glosse sulla decisione" />
-      <FindInTextButton ref={findButtonRef} isOpen={isFindOpen} onToggle={onToggleFind} />
+      {onToggleFind && <FindInTextButton ref={findButtonRef} isOpen={isFindOpen} onToggle={onToggleFind} />}
     </div>
   );
 }

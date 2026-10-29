@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Search, SlidersHorizontal } from 'lucide-react';
 import { cn } from '../../../lib/utils';
+import { FIELD_TEXT } from '../../../constants/interactions';
+import { useMediaQuery } from '../../../hooks/useIsDesktop';
 import { Z_INDEX } from '../../../constants/zIndex';
 import type { Materia, StatoScheda, TipoScheda } from '../../../types/studia';
 import type { ActOption, FilterState } from './useMyCards';
+import { FOCUS_RING } from './progress/tokens';
 import { MATERIA_LABEL, STATO_LABEL, TIPO_LABEL } from './studiaLabels';
 
 export interface CardFiltersProps {
@@ -14,10 +17,20 @@ export interface CardFiltersProps {
   onSearchChange: (text: string) => void;
   /** The acts the user's cards rest on, labelled by the source convention. */
   acts: ActOption[];
+  /**
+   * One row from `lg` (G8): the list has the page's width. Beside an open card the list is a narrow column, where the
+   * row would squeeze the search: there the search keeps the column's width and the rest wraps under it from `md`.
+   */
+  row?: boolean;
 }
 
-const CONTROL =
-  'min-h-[44px] rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 md:min-h-0 md:py-1.5 dark:border-slate-600 dark:bg-slate-800 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
+// 44 px at every width (Gymnasium spec §3): the row is short enough to afford it on a computer too.
+const CONTROL = cn(
+  'min-h-[44px] rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-900 transition-colors dark:border-slate-600 dark:bg-slate-900 dark:text-slate-50',
+  FOCUS_RING,
+);
+/** A pressed toggle: an ink edge and a tint, and `aria-pressed`, so the state is not told by colour alone. */
+const PRESSED = 'border-primary-900 bg-primary-50 font-medium text-primary-900 dark:border-primary-300 dark:bg-primary-900/30 dark:text-primary-200';
 
 interface FilterSelectProps<T extends string> {
   label: string;
@@ -35,7 +48,7 @@ function FilterSelect<T extends string>({ label, all, value, options, disabled, 
       value={value ?? ''}
       disabled={disabled}
       onChange={(e) => onChange((e.target.value || undefined) as T | undefined)}
-      className={cn(CONTROL, 'min-w-0 disabled:opacity-60')}
+      className={cn(CONTROL, FIELD_TEXT, 'min-w-0 disabled:opacity-60')}
     >
       <option value="">{all}</option>
       {options.map(([optionValue, text]) => (
@@ -46,44 +59,70 @@ function FilterSelect<T extends string>({ label, all, value, options, disabled, 
 }
 
 /**
- * The sticky filter row of «Le mie schede»: search, subject, state, kind, act, «Scritte da
- * Claude, da rileggere» and «Da ripassare oggi». On a phone the selects fold behind «Filtri», so the row does not take the screen.
+ * The sticky filter row of «Le mie schede»: search, subject, state, kind, act, «Scritte da Claude» (to read again) and
+ * «Da ripassare oggi». On a computer one row (G8): the search a third of it, then the selects and the two switches,
+ * wrapping only where the window is too narrow for them; under 1024 px the selects fold behind «Filtri», so the row
+ * does not take the screen.
  */
-export function CardFilters({ value, onChange, search, onSearchChange, acts }: CardFiltersProps) {
+export function CardFilters({ value, onChange, search, onSearchChange, acts, row = true }: CardFiltersProps) {
   const [open, setOpen] = useState(false);
+  // `sm`, 640 px, and 360 px: the placeholder is markup, not a class.
+  const wide = useMediaQuery('(min-width: 640px)');
+  const narrow = !useMediaQuery('(min-width: 360px)');
+  const hintId = useId();
   const active = [value.materia, value.stato, value.tipo, value.normaKey].filter(Boolean).length + (value.daRileggere ? 1 : 0) + (value.dovuteOggi ? 1 : 0);
 
   return (
     <div
       role="group"
       aria-label="Filtri"
-      // Opaque, bled over the layout's page padding (p-4 md:p-8) so cards scrolling under it do not show.
-      className={cn('sticky top-0 -mx-4 space-y-2 border-b border-current/10 bg-slate-50 px-4 pb-2 pt-2 md:-mx-2 md:px-2 dark:bg-slate-950', Z_INDEX.sticky)}
+      // Opaque, bled over the layout's page padding (p-4 md:p-8) so cards scrolling under it do not show. On a phone it pins
+      // under the bar at the top (`--phone-bar-offset`, set by `Layout`), and moves up with it when the bar slides away.
+      className={cn(
+        'sticky top-[var(--phone-bar-offset,0px)] transition-[top] duration-200 ease-out motion-reduce:transition-none -mx-4 space-y-2 border-b border-current/10 bg-slate-50 px-4 pb-2 pt-2 md:-mx-2 md:px-2 dark:bg-slate-950',
+        row && 'lg:flex lg:items-start lg:gap-2 lg:space-y-0',
+        Z_INDEX.sticky,
+      )}
     >
-      <div className="flex gap-2">
+      <div className={cn('flex gap-2', row && 'lg:w-1/3 lg:shrink-0')}>
         <div className="relative min-w-0 flex-1">
-          <Search size={16} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search size={16} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
           <input
             type="search"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
             aria-label="Cerca nelle schede"
-            placeholder="Cerca per istituto o domanda"
+            aria-describedby={wide ? undefined : hintId}
+            // Below `sm` the long hint was cut («Cerca per istituto o domanc…», Q1): the field's own name instead (under
+            // 360 px, beside «Filtri», only «Cerca» fits), and what it searches told to a screen reader there (from
+            // `sm` the hint says it).
+            placeholder={wide ? 'Cerca per istituto o domanda' : narrow ? 'Cerca' : 'Cerca nelle schede'}
             maxLength={100}
-            className={cn(CONTROL, 'w-full pl-9')}
+            className={cn(CONTROL, FIELD_TEXT, 'w-full pl-9')}
           />
+          {!wide && (
+            <span id={hintId} className="sr-only">
+              Per istituto o domanda
+            </span>
+          )}
         </div>
         <button
           type="button"
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
-          className={cn(CONTROL, 'inline-flex shrink-0 items-center gap-2 md:hidden')}
+          className={cn(CONTROL, 'inline-flex shrink-0 items-center gap-2', row ? 'lg:hidden' : 'md:hidden')}
         >
           <SlidersHorizontal size={16} aria-hidden />
           {active > 0 ? `Filtri (${active})` : 'Filtri'}
         </button>
       </div>
-      <div className={cn('grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center', open ? 'grid' : 'hidden md:flex')}>
+      <div
+        className={cn(
+          'grid-cols-2 gap-2',
+          row ? 'lg:flex lg:min-w-0 lg:flex-1 lg:flex-wrap lg:items-center' : 'md:flex md:flex-wrap md:items-center',
+          open ? 'grid' : cn('hidden', row ? 'lg:flex' : 'md:flex'),
+        )}
+      >
         <FilterSelect
           label="Materia"
           all="Tutte le materie"
@@ -118,14 +157,17 @@ export function CardFilters({ value, onChange, search, onSearchChange, acts }: C
         <button
           type="button"
           aria-pressed={value.daRileggere}
+          // The visible words start the name (label in name); the rest says what the switch keeps.
+          aria-label="Scritte da Claude, da rileggere"
           onClick={() => onChange({ ...value, daRileggere: !value.daRileggere })}
           className={cn(
             CONTROL,
-            'col-span-2 text-left md:col-span-1 md:text-center',
-            value.daRileggere && 'border-primary-500 bg-primary-50 text-primary-700 dark:border-primary-400 dark:bg-primary-900/30 dark:text-primary-300',
+            'col-span-2 text-left',
+            row ? 'lg:col-span-1 lg:whitespace-nowrap lg:text-center' : 'md:col-span-1 md:text-center',
+            value.daRileggere && PRESSED,
           )}
         >
-          Scritte da Claude, da rileggere
+          Scritte da Claude
         </button>
         <button
           type="button"
@@ -133,8 +175,9 @@ export function CardFilters({ value, onChange, search, onSearchChange, acts }: C
           onClick={() => onChange({ ...value, dovuteOggi: !value.dovuteOggi })}
           className={cn(
             CONTROL,
-            'col-span-2 text-left md:col-span-1 md:text-center',
-            value.dovuteOggi && 'border-primary-500 bg-primary-50 text-primary-700 dark:border-primary-400 dark:bg-primary-900/30 dark:text-primary-300',
+            'col-span-2 text-left',
+            row ? 'lg:col-span-1 lg:whitespace-nowrap lg:text-center' : 'md:col-span-1 md:text-center',
+            value.dovuteOggi && PRESSED,
           )}
         >
           Da ripassare oggi

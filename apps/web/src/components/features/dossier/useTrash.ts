@@ -11,8 +11,23 @@ export type RestoreOutcome =
 
 const statusOf = (err: unknown) => (err as { status?: number } | null)?.status;
 const messageOf = (err: unknown) => (err as { message?: string } | null)?.message;
+/** A course of «Percorsi» or a module of one (courses spec §10.9). */
+const isCourseKind = (kind: TrashEntry['kind']) => kind === 'LINGO_CORSO' || kind === 'LINGO_CORSO_MODULO';
 
 export const GONE_FROM_TRASH = 'Non è più nel cestino: forse è già stato ripristinato o è scaduto.';
+const TARGET_GONE = 'Il dossier scelto non esiste più: scegline un altro.';
+
+/**
+ * With a dossier chosen, a 404 is the entry gone or that dossier gone: the trash, read again, tells
+ * which. When it cannot be read, the entry stays.
+ */
+async function goneFromTrash(id: string): Promise<boolean> {
+  try {
+    return !(await trashService.list()).some((e) => e.id === id);
+  } catch {
+    return false;
+  }
+}
 
 /**
  * The trash for the dossier screens: one instance per page (`DossierPage`), read
@@ -59,18 +74,24 @@ export function useTrash() {
     try {
       const { dossierId } = await trashService.restore(entry.id, targetDossierId);
       drop(entry.id);
-      // The cards are back under their articles.
-      if (entry.kind === 'LINGO_CARDS') invalidateArticleCards();
+      // The cards are back under their articles (a course's and a module's come back with them).
+      if (entry.kind === 'LINGO_CARDS' || isCourseKind(entry.kind)) invalidateArticleCards();
       if (dossierId) await refreshDossier(dossierId);
       return { kind: 'restored' };
     } catch (err) {
       const status = statusOf(err);
-      if (status === 404 && !targetDossierId) {
+      // A course's module whose course is gone answers 404 too, while the entry stays: the server's words, kept.
+      if (status === 404 && isCourseKind(entry.kind) && !(await goneFromTrash(entry.id))) {
+        return { kind: 'failed', message: messageOf(err) || 'Impossibile ripristinare. Riprova.' };
+      }
+      if (status === 404 && (!targetDossierId || (await goneFromTrash(entry.id)))) {
         drop(entry.id);
         return { kind: 'failed', message: GONE_FROM_TRASH };
       }
+      if (status === 404) return { kind: 'needs-target', message: TARGET_GONE };
       // Only when the entry's own dossier is really gone: the server answers 409
-      // for an entry restored meanwhile too, and that is no reason to ask.
+      // for ids taken again too (an entry restored meanwhile is a 404), and that
+      // is no reason to ask.
       const ownGone = entry.kind === 'DOSSIER_ITEMS' && !appStore.getState().dossiers.some((d) => d.id === entry.dossierId);
       if (status === 409 && !targetDossierId && ownGone) {
         return { kind: 'needs-target', message: messageOf(err) || 'Il dossier non esiste più: scegli dove ripristinare.' };

@@ -41,6 +41,8 @@ beforeEach(() => {
     loadHighlightsForArticle: loadHighlights, loadAnnotationsForArticle: loadAnnotations,
     addHighlight, addAnnotation, removeHighlight, removeAnnotation, pushReadingBack,
   });
+  // The colour of new highlights as it starts (H1): a test that chooses another never leaks it.
+  appStore.setState((s) => ({ settings: { ...s.settings, highlightColor: 'yellow' } }));
 });
 
 const H = { id: 'h1', normaKey: KEY, articleId: '', rangeSerialized: '', text: 'ricorso', color: 'green', startOffset: 3 } as Highlight;
@@ -95,7 +97,7 @@ describe('DecisionReadingSurface', () => {
     fireEvent.click(container.querySelector('.citation-hover')!);
     expect(appStore.getState().searchTrigger).toEqual({
       act_type: 'codice civile', act_number: '', date: '', article: '2043',
-      version: 'vigente', show_brocardi_info: true, besideId: 'dec-tab',
+      version: 'vigente', besideId: 'dec-tab',
     });
     expect(pushReadingBack).toHaveBeenCalledExactlyOnceWith(
       { tabId: 'dec-tab', blockId: 'dec-tab', articleId: '', label: 'Cass. civ., sez. III, n. 99999/2024' },
@@ -119,6 +121,20 @@ describe('DecisionReadingSurface', () => {
     expect(appStore.getState().searchTrigger).toMatchObject({ act_type: 'codice civile', article: '2043' });
     expect(appStore.getState().searchTrigger).not.toHaveProperty('besideId');
     expect(appStore.getState().readingBackStack).toEqual([]);
+  });
+
+  it('hands a cited norm to a host that holds norms (the dossier, D7d), with the link: no search, nothing left, the text as it was', () => {
+    const open = vi.fn();
+    const onLeave = vi.fn();
+    const { container } = render(
+      <DecisionReadingSurface identity={IDENTITY} testo={TESTO} attributi={{}} onLeave={onLeave} citedNorms={{ holds: () => true, open }} />,
+    );
+    const link = container.querySelector<HTMLElement>('.citation-hover')!;
+    fireEvent.click(link);
+    expect(open).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ act_type: 'codice civile', article: '2043' }), link);
+    expect(appStore.getState().searchTrigger).toBeNull();
+    expect(onLeave).not.toHaveBeenCalled();
+    expect(textOf(container.querySelector('.vlx-decision')!)).toBe(decisionProjection(TESTO));
   });
 
   // The real mount (ArticleBody -> SafeHTML -> DOMPurify), over every fixture. The carriage-return
@@ -228,9 +244,63 @@ describe('DecisionReadingSurface — notes and highlights', () => {
     expect(loadAnnotations).toHaveBeenCalledWith(KEY, '');
     expect(container.querySelector('mark')?.textContent).toBe('fondato');
     await selectText(container, 3, 10);
-    fireEvent.click(await screen.findByTitle('Evidenzia (H)'));
-    fireEvent.click(await screen.findByTitle('Evidenzia in yellow'));
+    // One click, in the colour chosen in the reading bar (H1): yellow until another is chosen.
+    fireEvent.click(await screen.findByRole('button', { name: 'Evidenzia in giallo' }));
     expect(addHighlight).toHaveBeenCalledWith(KEY, '', 'ricorso', expect.any(String), 'yellow', 3);
+  });
+
+  it('the colour is chosen once in the reading bar, with what each is suggested for, and every new highlight takes it (H1)', async () => {
+    const { container } = render(<DecisionReadingSurface identity={IDENTITY} testo={MOTIVAZIONE} attributi={{}} />);
+    const trigger = screen.getByRole('button', { name: 'Colore: giallo (nuove evidenziazioni)' });
+    // The bar's dot alone: its words in a tooltip.
+    expect(trigger).toHaveAttribute('title', 'Colore delle nuove evidenziazioni: giallo');
+    fireEvent.click(trigger);
+    const menu = screen.getByRole('menu', { name: 'Colore: giallo (nuove evidenziazioni)' });
+    const choices = within(menu).getAllByRole('menuitemradio');
+    expect(choices.map((c) => c.textContent)).toEqual([
+      'GialloPunto centrale', 'VerdeCondizione o presupposto', 'RossoDa rivedere', 'BluDefinizione o eccezione',
+    ]);
+    expect(choices[0]).toHaveAttribute('aria-checked', 'true');
+    // Any colour, whatever it is suggested for.
+    fireEvent.click(choices[2]);
+    expect(appStore.getState().settings.highlightColor).toBe('red');
+    expect(screen.getByRole('button', { name: 'Colore: rosso (nuove evidenziazioni)' })).toBeInTheDocument();
+    await selectText(container, 3, 10);
+    // Never asked again: one click, or H.
+    expect(screen.queryByRole('list', { name: 'Uso suggerito dei colori' })).toBeNull();
+    fireEvent.click(await screen.findByRole('button', { name: 'Evidenzia in rosso' }));
+    expect(addHighlight).toHaveBeenCalledWith(KEY, '', 'ricorso', expect.any(String), 'red', 3);
+  });
+
+  it.each([
+    ['past the right edge', { left: 200, right: 450 }, 250, '-138px'],
+    ['past the left edge', { left: -40, right: 210 }, 250, '48px'],
+    // Absolute in a narrow container, the positioning element can be narrower than the box drawn in it (a 390 px
+    // window: the box at 149–398 while its container stopped short): the box is what is measured (#351).
+    ['past the right edge, its positioning element narrower than its box', { left: 200, right: 450 }, 150, '-138px'],
+  ])('the selection\'s popup is kept 8 px inside a narrow window, %s', async (_, at, positionerWidth, nudge) => {
+    const width = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 320 });
+    // The box drawn measures 250 px: the positioning element's first child; the element itself `positionerWidth`.
+    const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const self = this.classList.contains('-translate-x-1/2');
+      const positioner = self ? this : this.parentElement?.classList.contains('-translate-x-1/2') ? this.parentElement : null;
+      const shift = parseFloat(positioner?.style.marginLeft || '0');
+      const wide = self ? positionerWidth : 250;
+      const box = positioner
+        ? { left: at.left + shift, right: at.left + shift + wide, top: 0, bottom: 0, width: wide, height: 50 }
+        : { left: 0, right: 0, top: 0, bottom: 0, width: 0, height: 0 };
+      return { ...box, x: box.left, y: box.top, toJSON: () => ({}) } as DOMRect;
+    });
+    try {
+      const { container } = render(<DecisionReadingSurface identity={IDENTITY} testo={MOTIVAZIONE} attributi={{}} />);
+      await selectText(container, 3, 10);
+      const popup = (await screen.findByTitle('Evidenzia (H)')).closest<HTMLElement>('.-translate-x-1\\/2')!;
+      expect(popup.style.marginLeft).toBe(nudge);
+    } finally {
+      spy.mockRestore();
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
+    }
   });
 
   it('anchors a note on the selection, with the composer on the words', async () => {
@@ -399,10 +469,17 @@ describe('DecisionReadingSurface — the key passages', () => {
     expect(container.querySelector('.key-passages-hidden')).toBeNull();
   });
 
-  it('lists them under «Passaggi chiave» with the legend, and takes the reader to one', async () => {
+  it('lists them under «Passaggi chiave» with the legend, and takes the reader to one, moving its scroller alone', async () => {
+    const intoView = vi.fn();
+    Element.prototype.scrollIntoView = intoView;
+    // the text in a column that scrolls on its own, as the dossier's (D7d)
+    render(<div data-testid="column" style={{ overflowY: 'auto' }}><DecisionReadingSurface identity={IDENTITY} testo={WITH_PASSAGES} attributi={{}} /></div>);
     const scroll = vi.fn();
-    Element.prototype.scrollIntoView = scroll;
-    mount();
+    const column = screen.getByTestId('column');
+    column.scrollTo = scroll as unknown as HTMLElement['scrollTo'];
+    // its text taller than it (jsdom lays nothing out)
+    Object.defineProperty(column, 'clientHeight', { value: 600 });
+    Object.defineProperty(column, 'scrollHeight', { value: 3000 });
     fireEvent.click(screen.getByRole('button', { name: 'Passaggi chiave (2), evidenziati automaticamente' }));
     const menu = screen.getByRole('menu');
     expect(menu).toHaveAccessibleDescription('Evidenziati automaticamente: non sono le tue evidenziazioni.');
@@ -411,11 +488,16 @@ describe('DecisionReadingSurface — the key passages', () => {
     expect(entries[1]).toBe('Dispositivo — «La Corte accoglie il ricorso»');
     expect(entries[2]).toBe('Nascondi i passaggi chiave');
     await act(async () => { fireEvent.click(within(menu).getAllByRole('menuitem')[0]); });
-    expect(scroll).toHaveBeenCalled();
+    expect(scroll).toHaveBeenCalledOnce();
+    expect(intoView).not.toHaveBeenCalled();
     expect(await screen.findByRole('dialog', { name: 'Principio di diritto, evidenziato automaticamente' })).toBeInTheDocument();
   });
 
-  it('«Fai tua» on a passage makes one highlight of the reader\'s, with its words and offset', async () => {
+  it.each([
+    ['yellow until another is chosen', undefined, 'yellow'],
+    ['in the colour chosen in the bar (H1)', 'blue', 'blue'],
+  ] as const)('«Fai tua» on a passage makes one highlight of the reader\'s, with its words and offset, %s', async (_, chosen, color) => {
+    if (chosen) appStore.setState((s) => ({ settings: { ...s.settings, highlightColor: chosen } }));
     const { container } = mount();
     const plain = decisionProjection(WITH_PASSAGES);
     const piece = container.querySelector<HTMLElement>('[data-key-passage="principio"]')!;
@@ -423,7 +505,7 @@ describe('DecisionReadingSurface — the key passages', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Principio di diritto, evidenziato automaticamente' });
     expect(within(dialog).getByText('Evidenziato automaticamente: non è una tua evidenziazione.')).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Fai tua (evidenzia)' }));
-    expect(addHighlight).toHaveBeenCalledExactlyOnceWith(KEY, '', PRINCIPLE, '', 'yellow', plain.indexOf(PRINCIPLE));
+    expect(addHighlight).toHaveBeenCalledExactlyOnceWith(KEY, '', PRINCIPLE, '', color, plain.indexOf(PRINCIPLE));
     expect(screen.queryByRole('dialog', { name: /evidenziato automaticamente/ })).toBeNull();
   });
 

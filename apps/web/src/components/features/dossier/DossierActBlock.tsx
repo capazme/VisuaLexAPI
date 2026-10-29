@@ -7,6 +7,8 @@ import type { DossierItem } from '../../../types';
 import { DossierArticleRow } from './DossierArticleRow';
 import { foldedArticleList, type ActBlock } from './dossierLayout';
 import { useActDetails } from './useActDetails';
+import { FOCUS_RING } from '../studia/progress/tokens';
+import { ROW_LINE, SECTION_COUNT, SECTION_HEADING, SECTION_TILE } from './dossierStyles';
 
 export interface DossierActBlockProps {
   /** What is shown: the act's articles the dossier's search left. */
@@ -36,34 +38,44 @@ export interface DossierActBlockProps {
   attachedNotes?: Map<string, Extract<DossierItem, { type: 'note' }>[]>;
   onAddNote?: (item: DossierItem) => void;
   onRemoveNote?: (note: DossierItem) => void;
+  /** The article a decision's citation has just opened, ringed for a moment (D7d). */
+  flashedId?: string | null;
+  /** 3 under the page's «Norme» (D7a, the decisions beside the acts), else 2. */
+  headingLevel?: 2 | 3;
 }
 
-const ACTION_BUTTON =
-  'flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-lg px-2 text-sm text-slate-600 transition-colors hover:bg-slate-100 md:min-h-0 md:min-w-0 md:py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-slate-300 dark:hover:bg-slate-700';
+/** An act's action: 44 px at every width, as the planner's controls (S7c). */
+const ACTION_BUTTON = cn(
+  'flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-lg px-2 text-sm text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
+  FOCUS_RING,
+);
 
-/** One act, named once, with its articles beneath it (spec §4). */
+/** One act, named once in the reader's serif, with its articles beneath it as rows of two levels (spec §4, S7c). */
 export function DossierActBlock(props: DossierActBlockProps) {
   const { block, dragDisabled, isFolded, onToggleFold } = props;
   const { title, rubricaOf } = useActDetails(props.act ?? block);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: block.key, disabled: dragDisabled });
   const count = block.articles.length;
+  const Heading = props.headingLevel === 3 ? 'h3' : 'h2';
+  const countLabel = count === 1 ? '1 articolo' : `${count} articoli`;
 
   return (
     <section
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.6 : 1 }}
       aria-label={block.heading}
-      className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800"
+      // A container: in the dossier's left column (D7a) the actions keep their words only where the act is wide.
+      className={cn(SECTION_TILE, '@container')}
     >
-      <header className="flex items-start gap-1 border-b border-slate-100 px-2 py-2 md:gap-2 md:px-3 dark:border-slate-700">
+      <header className="flex items-start gap-1 border-b border-slate-200 px-2 py-1 md:gap-2 md:px-3 dark:border-slate-800">
         {!dragDisabled && (
           <button
             type="button"
             {...attributes}
             {...listeners}
             aria-label={`Sposta ${block.heading}`}
-            className="mt-1.5 hidden cursor-grab rounded text-slate-300 hover:text-slate-500 md:block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-slate-600"
+            className={cn('-ml-1 hidden h-11 w-11 cursor-grab place-items-center rounded text-slate-500 hover:bg-slate-100 hover:text-slate-700 md:grid dark:text-slate-400 dark:hover:bg-slate-800', FOCUS_RING)}
           >
             <GripVertical size={18} />
           </button>
@@ -71,7 +83,10 @@ export function DossierActBlock(props: DossierActBlockProps) {
         <div className="min-w-0 flex-1 px-1 py-1">
           {/* The accordion pattern: the heading holds the toggle, so the act is a
               heading to a screen reader and its name is the act's own words. */}
-          <h3 className="flex min-w-0 flex-wrap items-center gap-x-2 md:flex-nowrap">
+          {/* On one line, the name cut, while the act is 42 rem wide (672 px at the default text size); narrower — a phone, a tablet's narrow window, the
+              left column of two (D7a) — it wraps: a cut act name says nothing. Its count then follows the name's last
+              words, on its line, not on a line of its own under a name of two (the left column at 1024 px). */}
+          <Heading className="flex min-w-0 flex-wrap items-center gap-x-2 @2xl:flex-nowrap">
             <div
               role="button"
               tabIndex={0}
@@ -85,28 +100,30 @@ export function DossierActBlock(props: DossierActBlockProps) {
                 }
               }}
               className={cn(
-                'flex min-h-[44px] min-w-0 cursor-pointer items-center gap-2 rounded-md text-base font-semibold md:min-h-0',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
-                block.headingIsFallback ? 'text-slate-500 dark:text-slate-400' : 'text-slate-900 dark:text-white',
+                'flex min-h-[44px] min-w-0 cursor-pointer items-center gap-2 rounded-md',
+                SECTION_HEADING,
+                FOCUS_RING,
+                block.headingIsFallback && 'text-slate-500 dark:text-slate-400',
               )}
             >
               <ChevronDown
                 size={16}
                 aria-hidden
-                className={cn('flex-shrink-0 text-slate-400 transition-transform', isFolded && '-rotate-90')}
+                className={cn('flex-shrink-0 text-slate-500 transition-transform motion-reduce:transition-none dark:text-slate-400', isFolded && '-rotate-90')}
               />
-              {/* A cut act name says nothing: on a phone it wraps. */}
-              <span className="break-words md:truncate">{block.heading}</span>
+              <span className="break-words @2xl:truncate">
+                {block.heading}
+                {/* Shown in the name's flow while narrow; the heading's own count, below, says it to a screen reader. */}
+                <span aria-hidden className={cn(SECTION_COUNT, 'ml-2 whitespace-nowrap @2xl:hidden')}>{countLabel}</span>
+              </span>
             </div>
-            <span className="flex-shrink-0 text-xs font-normal text-slate-400">
-              {count === 1 ? '1 articolo' : `${count} articoli`}
-            </span>
-          </h3>
+            <span className={cn('flex-shrink-0 sr-only @2xl:not-sr-only', SECTION_COUNT)}>{countLabel}</span>
+          </Heading>
           {title && (
-            <p className="ml-6 line-clamp-2 text-sm text-slate-500 md:line-clamp-none md:truncate dark:text-slate-400" title={title}>{title}</p>
+            <p className={cn(ROW_LINE, 'ml-6 line-clamp-2 @2xl:line-clamp-none @2xl:truncate')} title={title}>{title}</p>
           )}
           {isFolded && (
-            <p className="ml-6 truncate text-sm text-slate-500 dark:text-slate-400">{foldedArticleList(block)}</p>
+            <p className={cn(ROW_LINE, 'mb-1 ml-6 truncate')}>{foldedArticleList(block)}</p>
           )}
         </div>
         <div className="flex flex-shrink-0 items-center">
@@ -118,7 +135,8 @@ export function DossierActBlock(props: DossierActBlockProps) {
             className={ACTION_BUTTON}
           >
             <ExternalLink size={15} aria-hidden />
-            <span className="hidden lg:inline">Apri tutto</span>
+            {/* From lg, and while the act is 42 rem wide: in the left column of two its name takes the room. */}
+            <span className="hidden lg:@2xl:inline">Apri tutto</span>
           </button>
           <button
             type="button"
@@ -128,11 +146,13 @@ export function DossierActBlock(props: DossierActBlockProps) {
             className={ACTION_BUTTON}
           >
             <Plus size={15} aria-hidden />
-            <span className="hidden lg:inline">Articoli</span>
+            <span className="hidden lg:@2xl:inline">Articoli</span>
           </button>
           <MenuButton
             label={`Azioni su ${block.heading}`}
             triggerClassName={cn(ACTION_BUTTON, 'text-slate-500')}
+            // In the left column of two, which scrolls on its own (D7d), the last act's menu opens upwards.
+            placement="auto"
             items={[{ label: "Rimuovi l'atto dal dossier", icon: Trash2, danger: true, onSelect: props.onRemoveAct }]}
           >
             <MoreHorizontal size={18} />
@@ -140,7 +160,7 @@ export function DossierActBlock(props: DossierActBlockProps) {
         </div>
       </header>
       {!isFolded && (
-        <div className="px-1 py-1 md:px-2">
+        <div className="px-1 md:px-2">
           {block.articles.map((item) => (
             <DossierArticleRow
               key={item.id}
@@ -158,6 +178,7 @@ export function DossierActBlock(props: DossierActBlockProps) {
               notes={props.attachedNotes?.get(item.id)}
               onAddNote={props.onAddNote ? () => props.onAddNote?.(item) : undefined}
               onRemoveNote={props.onRemoveNote}
+              isFlashing={props.flashedId === item.id}
             />
           ))}
         </div>

@@ -12,6 +12,7 @@ import { ToolError } from './errors.js';
 import { SessionStore } from './sessions.js';
 import { TOOL_SCOPES, registerDossierTools, type RunTool } from './tools/dossier.js';
 import { CARD_TOOL_SCOPES, registerCardTools } from './tools/cards.js';
+import { GLOSS_TOOL_SCOPES, glossesOn, registerGlossTools, registerTextTool } from './tools/glosses.js';
 
 /** Hostnames always accepted besides the endpoint's: the health check calls the loopback. */
 const LOOPBACK_NAMES = ['localhost', '127.0.0.1', '[::1]'];
@@ -23,7 +24,17 @@ const LOOPBACK_NAMES = ['localhost', '127.0.0.1', '[::1]'];
  */
 export const REQUESTS_PER_MINUTE = 300;
 // What a client asks for at sign-in; deletion (content:delete) is never asked: the user switches it on in VisuaLex.
-const ALL_SCOPES = ['dossier:read', 'dossier:write', 'lingo:cards:read', 'lingo:cards:write'];
+const ALL_SCOPES = ['dossier:read', 'dossier:write', 'dossier:text', 'lingo:cards:read', 'lingo:cards:write'];
+
+/**
+ * What the server is for, sent once at `initialize` (MCP `instructions`): a client that also has a
+ * sources server should not bounce between the two to file an article, and a dossier is one call (D8 S1).
+ */
+export const SERVER_INSTRUCTIONS =
+  'VisuaLex: i dossier dell’utente (pratiche e temi di studio, con norme, sentenze e note) e le sue schede di studio di Gymnasium. ' +
+  'Qui si leggono e si arricchiscono. Per un dossier basta una chiamata: omnilex_crea_dossier con l’elenco delle norme e delle sentenze a parole ' +
+  '(«art. 2043 c.c.», «Cass. civ., n. 31310/2024») e le note. Non verificare prima i riferimenti con altri strumenti: VisuaLex li verifica alla fonte. ' +
+  'Cercare o studiare il testo di norme e sentenze fuori da un dossier si fa con altri strumenti.';
 
 /** The protected resource metadata URL for the endpoint (RFC 9728 §3.1). */
 export function resourceMetadataUrl(config: McpConfig): string {
@@ -44,7 +55,9 @@ const runner: RunTool = async (tool, extra, body) => {
     const caller = callerOf(extra);
     try {
       const result = await body(caller);
-      console.info(`[mcp] user=${caller.userId} client=${caller.clientId} tool=${tool} outcome=ok`);
+      // A call the client cancelled ran its last step and stopped: its answer goes nowhere.
+      const outcome = extra.signal?.aborted ? 'cancelled' : 'ok';
+      console.info(`[mcp] user=${caller.userId} client=${caller.clientId} tool=${tool} outcome=${outcome}`);
       return result;
     } catch (error) {
       const known = error instanceof ToolError;
@@ -60,7 +73,7 @@ function scopesNeeded(message: unknown): string[] {
   if (!message || typeof message !== 'object') return [];
   const { method, params } = message as { method?: unknown; params?: { name?: unknown } };
   if (method !== 'tools/call' || typeof params?.name !== 'string') return [];
-  return TOOL_SCOPES[params.name] ?? CARD_TOOL_SCOPES[params.name] ?? [];
+  return TOOL_SCOPES[params.name] ?? CARD_TOOL_SCOPES[params.name] ?? GLOSS_TOOL_SCOPES[params.name] ?? [];
 }
 
 type AuthedRequest = Request & { auth?: AuthInfo };
@@ -190,9 +203,13 @@ export function createApp(config: McpConfig, options: { store?: SessionStore; re
       let server: McpServer | undefined;
       let transport: StreamableHTTPServerTransport | undefined;
       try {
-        server = new McpServer({ name: 'visualex', version: '0.1.0' }, { capabilities: { tools: {} } });
+        server = new McpServer({ name: 'visualex', version: '0.1.0' }, { capabilities: { tools: {} }, instructions: SERVER_INSTRUCTIONS });
         registerDossierTools(server, config, runner);
         registerCardTools(server, config, runner);
+        // An entry's text, always (G-372); the glosses (D8) only while the server has them on (asked once per
+        // session, closed when it cannot say).
+        registerTextTool(server, config, runner);
+        if (await glossesOn(config)) registerGlossTools(server, config, runner);
         const opened = server;
         // No JSON responses: a tool that asks the user to confirm sends that
         // request back on the call's own SSE stream.

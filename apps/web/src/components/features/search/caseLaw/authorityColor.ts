@@ -11,7 +11,7 @@ export function authorityColor(autorita: string | null | undefined): string {
     return 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300';
   }
   if (auth.includes('cass')) {
-    return 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300';
+    return 'bg-primary-100 text-primary-800 dark:bg-primary-900/50 dark:text-primary-300';
   }
   if (auth.includes('cons') && auth.includes('st')) {
     return 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300';
@@ -26,7 +26,7 @@ export function authorityColor(autorita: string | null | undefined): string {
     return 'bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-300';
   }
   if (auth.includes('cgue') || auth.includes('giust')) {
-    return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300';
+    return 'bg-primary-100 text-primary-800 dark:bg-primary-900/50 dark:text-primary-300';
   }
   if (auth.includes('cedu') || auth.includes('edu')) {
     return 'bg-pink-100 text-pink-800 dark:bg-pink-900/50 dark:text-pink-300';

@@ -1,5 +1,4 @@
-import { flushSync } from 'react-dom';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
@@ -8,6 +7,7 @@ import { useDevMode } from '../devMode/useDevMode';
 import { isStudiaEnabled } from '../studia/featureFlag';
 import type { DossierKind } from '../../types';
 import { SECTIONS, sectionForPath, type Section, type SectionId } from './sections';
+import { playSectionTransition } from './sectionTransition';
 
 /**
  * The last section the user was in, kept in the browser (spec S1): no migration, and a new device
@@ -47,15 +47,27 @@ export function useDossierKind(): DossierKind | null {
   return isStudiaEnabled() ? kind : null;
 }
 
+/**
+ * The section a kind of dossier lives in (S7): the study dossiers in Gymnasium, the work ones in Opus — and every one
+ * in Opus without Gymnasium (`VITE_FEATURE_STUDIA` off), which the user could not reach. The one place that decides
+ * it: the dossier pages' kicker and hue read it.
+ */
+export function sectionOfDossierKind(kind: DossierKind | null | undefined): 'opus' | 'gymnasium' {
+  return kind === 'studio' && isStudiaEnabled() ? 'gymnasium' : 'opus';
+}
+
 /** A dossier opened by its address takes the user to its kind's section (S7). */
 export function showSectionOfDossier(kind: DossierKind | undefined) {
-  if (isStudiaEnabled()) sectionStore.getState().setSection(kind === 'studio' ? 'gymnasium' : 'opus');
+  if (isStudiaEnabled()) sectionStore.getState().setSection(sectionOfDossierKind(kind));
 }
 
 /** The sections this user can enter: Academia with the development mode (S12), Gymnasium with its flag. */
 function availableSections(devMode: boolean): Section[] {
   return SECTIONS.filter((s) => (s.id !== 'academia' || devMode) && (s.id !== 'gymnasium' || isStudiaEnabled()));
 }
+
+/** The section change on screen, if one is: a second choice brings it to its end first. */
+let finishRunning: (() => void) | null = null;
 
 export function useSection() {
   const { pathname } = useLocation();
@@ -70,19 +82,44 @@ export function useSection() {
     if (fromPath) setSection(fromPath);
   }, [fromPath, setSection]);
 
+  // The change this instance started stops when it goes: its wait for the new title (two timers and an observer)
+  // would otherwise outlive it, and in a test outlive the page itself. The phone's drawer stays mounted when it
+  // closes, so a change chosen there keeps its focus on the new title (T1).
+  const startedHere = useRef<(() => void) | null>(null);
+  useEffect(
+    () => () => {
+      if (startedHere.current && finishRunning === startedHere.current) {
+        finishRunning();
+        finishRunning = null;
+      }
+    },
+    [],
+  );
+
   const sections = availableSections(devMode);
   const wanted = fromPath ?? stored;
   const section = sections.some((s) => s.id === wanted) ? wanted : 'opus';
 
-  const chooseSection = (id: SectionId) => {
-    setSection(id);
-    const go = () => navigate(SECTIONS.find((s) => s.id === id)!.home);
-    // A View Transition where the browser has one (index.css animates `vlx-page`, spec §6.3.2). By hand:
-    // the app's BrowserRouter ignores navigate's `viewTransition` option, which needs a data router.
-    const doc = document as Document & { startViewTransition?: (cb: () => void) => unknown };
-    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    if (doc.startViewTransition && !reduce) doc.startViewTransition(() => flushSync(go));
-    else go();
+  /**
+   * `still`: chosen in the phone's drawer, whose closing is the change; `byPointer`: chosen with a pointer, so the new
+   * title takes the focus without its ring (`playSectionTransition`).
+   */
+  const chooseSection = (id: SectionId, { still = false, byPointer = false }: { still?: boolean; byPointer?: boolean } = {}) => {
+    finishRunning?.();
+    finishRunning = null;
+    const go = () => {
+      setSection(id);
+      navigate(SECTIONS.find((s) => s.id === id)!.home);
+    };
+    // The section's own home again: no change of section to show.
+    if (id === section) {
+      go();
+      return;
+    }
+    // By hand: the app's BrowserRouter ignores navigate's `viewTransition` option, which needs a data router. The
+    // router renders the new page in a transition: the old page's picture holds until its title is there.
+    finishRunning = playSectionTransition({ section: id, swap: go, still, byPointer });
+    startedHere.current = finishRunning;
   };
 
   return { section, active: SECTIONS.find((s) => s.id === section)!, sections, chooseSection };

@@ -80,9 +80,56 @@ its `<title>` exactly as served (the only part the reader looks at), wrapped in
   n. 127» first).
 - `resolver_l241_1990_title_trimmed.html` — `…:legge:1990;241`: "LEGGE 7 agosto 1990, n. 241".
 
+Trimmed capture of 2026-10-21, for the annex positions of the article tree
+(`treextractor._parse_normattiva_tree`, `tests/test_tree_annex_positions.py`):
+
+- `dlgs36_2023_tree_trimmed.html` — `urn:nir:stato:decreto.legislativo:2023-03-31;36`
+  (codice dei contratti pubblici), the `div#albero` block only, wrapped in
+  `<html><body>`; the dispositivo cut to its first entries and each annex to its first
+  few (its tables kept). Normattiva's positional annex `;36:k` is the entry's place among
+  the tree's annex headings, the «Allegati» index first: Allegato I.7 is `:8`, I.11 is
+  `:12`. A part after a dash is not an entry («Allegato I.4-Tabella A» sits inside I.4,
+  «Allegato II.2 bis art. 1» inside II.2). Every link's `flagTipoArticolo` carries the
+  portal's own number for its annex (0 in the dispositivo), which the test reads as the
+  truth. Allegato I.4 (`:5`) writes its articles «art 1», without the dot.
+
+Trimmed captures of 2026-10-21, for a request with no date that Normattiva answers
+with a version not in force yet (G-355, `tests/test_text_in_force.py`), in the
+format above (div.vigore, the update link, the act line, div.bodyTesto):
+
+- `dpr131_1986_art3_undated_abrogato_2027_trimmed.html` — art. 3 d.P.R. 131/1986 asked
+  with no date (`…;131~art3`): «Testo in vigore dal: 1-1-2027», version 2, repealed.
+- `dpr131_1986_art3_at_2026-10-21_in_force_trimmed.html` — the same article at the day
+  (`…~art3!vig=2026-10-21`): in force from 1-7-1986 to 31-12-2026, version 1, «Contratti
+  verbali».
+
 The portal prints the end of the window as `<span class="indent">al: <span id="artFine" class="rosso">29-12-2007</span></span>`
 when the window has a start (the start is `<span id="artInizio" class="rosso">`, preceded by `&nbsp;`),
 and as the bare text `<span>Testo in vigore al: 12-9-2014</span>`, with no `id` and no `class`, when it has none.
+
+Trimmed captures of 2026-10-29, for the update notes (`normattiva_notes.py`, G-386,
+`tests/test_normattiva_notes.py`): the `div.bodyTesto` block byte for byte as served, wrapped in
+`<html><body>`. One request each, serial, through the shared client:
+
+- `dlgs23_2015_art3_update_notes_trimmed.html` — art. 3 d.lgs. 23/2015 in force
+  (`urn:nir:stato:decreto.legislativo:2015-03-04;23~art3`): comma format, four notes
+  (1, 2, 3, 10), two on rulings of the Corte costituzionale (194/2018, 128/2024), markers «(1) (2) (3)»
+  and «((10))». The extractor leaves all four out of the text.
+- `art1284_cc_in_force_update_notes_trimmed.html` — art. 1284 c.c. in force
+  (`urn:nir:stato:regio.decreto:1942-03-16;262:2~art1284`): the codes' format, 22 notes from «129a» to
+  «348», which the extractor appends to the text.
+- `art2043_cc_in_force_no_notes_trimmed.html` — art. 2043 c.c. in force (`…;262:2~art2043`): no note.
+
+Trimmed captures of 2026-10-29, for the parts of a split article (`normattiva_parts.py`, G-387,
+`tests/test_normattiva_parts.py`): the `div#albero` tree, byte for byte as served, wrapped in
+`<html><body>`:
+
+- `l296_2006_art1_parts_tree_trimmed.html` — art. 1 l. 296/2006 in force
+  (`urn:nir:stato:legge:2006-12-27;296~art1`), the tree cut to its first 40 entries: the 14 parts of art. 1,
+  «1 (commi 1-100)» … «1 (commi 1301-1364)», `art.progressivo` 1 … 14, then the same parts of two earlier
+  versions («agg.149 (commi …)», «agg.148 (commi …)»). CRLF kept.
+- `dlgs23_2015_tree_trimmed.html` — the whole tree of d.lgs. 23/2015 as art. 3's page serves it: every article
+  whole, `art.progressivo=0`.
 
 The extractor's output for every file here is frozen (CLAUDE.md gotcha 23:
 `article_text` is the offset space of every stored highlight and note).

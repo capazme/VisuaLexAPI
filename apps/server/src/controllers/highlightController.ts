@@ -11,7 +11,7 @@ const createHighlightSchema = z.object({
   startOffset: z.number().int().min(0),
   endOffset: z.number().int().min(0),
   note: z.string().optional(),
-  bookmarkId: z.string().uuid().optional().nullable(),
+  bookmarkId: z.string().guid().optional().nullable(),
 });
 
 const updateHighlightSchema = z.object({
@@ -80,6 +80,10 @@ export const getHighlights = async (req: Request, res: Response) => {
   const highlights = await prisma.highlight.findMany({
     where: {
       userId: req.user.id,
+      // An assistant's mark (D7b) shows only on the dossier entry it was proposed on, in every state of its
+      // note: never here, so the general reader, Study Mode, review, the Forum's publication, environments
+      // and the PDF never receive one. Its own routes are under /dossiers/:id/items/:itemId/proposals.
+      createdByClientId: null,
       ...(normaKeyPrefix
         ? { normaKey: { startsWith: normaKeyPrefix } }
         : { normaKey: normaKey! }),
@@ -103,10 +107,13 @@ export const updateHighlight = async (req: Request, res: Response) => {
   const data = updateHighlightSchema.parse(req.body);
 
   // Check if highlight exists and belongs to user
+  // The user's own highlights only: an assistant's mark changes through its entry's routes, which keep
+  // the model's original and stamp the edit (D7b).
   const existingHighlight = await prisma.highlight.findFirst({
     where: {
       id,
       userId: req.user.id,
+      createdByClientId: null,
     },
   });
 
@@ -134,10 +141,13 @@ export const deleteHighlight = async (req: Request, res: Response) => {
   const { id } = req.params;
 
   // Check if highlight exists and belongs to user
+  // The user's own highlights only: an assistant's mark changes through its entry's routes, which keep
+  // the model's original and stamp the edit (D7b).
   const existingHighlight = await prisma.highlight.findFirst({
     where: {
       id,
       userId: req.user.id,
+      createdByClientId: null,
     },
   });
 

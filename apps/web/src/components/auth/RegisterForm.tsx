@@ -1,24 +1,68 @@
 /**
- * Registration form component - Glassmorphism style with pending approval flow
+ * The sign-up form, the «Registrati» tab of `AuthPage`, and what follows it: the account waits for an
+ * administrator's approval (spec 2026-10-18-redesign-inchiostro §5.3.4, as the sign-in form).
  */
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useLayoutEffect, useRef, useState } from 'react';
+import { BookOpen, Check, CheckCircle2, X } from 'lucide-react';
 import { register } from '../../services/authService';
-import { UserPlus, Mail, Lock, User, Eye, EyeOff, AlertCircle, ArrowLeft, CheckCircle, Check, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { getErrorMessage } from '../../utils/errors';
+import { FIELD, LABEL, PRIMARY_BUTTON, SWITCH_LINK, focusField } from './authForm';
+import { FormError, PasswordToggle } from './AuthFormParts';
+import { FOCUS_RING } from '../../constants/interactions';
 
-export function RegisterForm() {
+const ERROR_ID = 'register-error';
+
+type Field = 'email' | 'username' | 'password' | 'confirmPassword';
+
+// The four steps of the strength bar, in words for a screen reader (the bar shows them as segments).
+const STRENGTH_WORDS = ['', 'molto debole', 'debole', 'buona', 'forte'];
+const STRENGTH_FILL = ['', 'bg-red-500', 'bg-amber-500', 'bg-emerald-500', 'bg-emerald-600'];
+
+interface RegisterFormProps {
+  /** A request in flight, or none: the page holds the tabs still meanwhile. */
+  onBusy: (busy: boolean) => void;
+  /** The account is created: the page mounts the form again empty when «Registrati» comes back. */
+  onRegistered: () => void;
+  /** «Accedi» and «Torna ad Accedi»: the other tab. */
+  onSwitch: () => void;
+}
+
+export function RegisterForm({ onBusy, onRegistered, onSwitch }: RegisterFormProps) {
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState('');
+  const [invalid, setInvalid] = useState<Field | null>(null);
   const [loading, setLoading] = useState(false);
   const [registrationComplete, setRegistrationComplete] = useState(false);
 
-  const [focusedField, setFocusedField] = useState<string | null>(null);
+  const refs = {
+    email: useRef<HTMLInputElement>(null),
+    username: useRef<HTMLInputElement>(null),
+    password: useRef<HTMLInputElement>(null),
+    confirmPassword: useRef<HTMLInputElement>(null),
+  };
+  const pendingFocus = useRef<HTMLInputElement | null>(null);
+  const doneHeading = useRef<HTMLHeadingElement>(null);
+
+  // A field the error points at while the request still disabled it takes the focus once enabled. In the layout
+  // phase, as below: an update that comes after the request (outside any event) would otherwise leave the focus
+  // on the body until the passive effects run, a frame later or more under load.
+  useLayoutEffect(() => {
+    if (pendingFocus.current && !pendingFocus.current.disabled) {
+      pendingFocus.current.focus();
+      pendingFocus.current = null;
+    }
+  });
+
+  // The submit button that had the focus is gone: the confirmation takes it, in the same commit that shows it,
+  // never after (a passive effect ran once the page already showed the confirmation with the focus on the body).
+  useLayoutEffect(() => {
+    if (registrationComplete) doneHeading.current?.focus();
+  }, [registrationComplete]);
 
   // Password strength calculation
   const getPasswordStrength = () => {
@@ -36,359 +80,238 @@ export function RegisterForm() {
   const isUsernameValid = username.length >= 3 && /^[a-zA-Z0-9_]+$/.test(username);
   const showUsernameValidation = username.length > 0;
 
+  const fail = (message: string, field: Field) => {
+    setFormError(message);
+    setInvalid(field);
+    focusField(refs[field].current, pendingFocus);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
+    setInvalid(null);
 
     // Client-side validation
     if (!email || !username || !password || !confirmPassword) {
-      setFormError('Tutti i campi sono obbligatori');
+      const empty: Field = !email ? 'email' : !username ? 'username' : !password ? 'password' : 'confirmPassword';
+      fail('Tutti i campi sono obbligatori', empty);
       return;
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setFormError('Formato email non valido');
+      fail('Formato email non valido', 'email');
       return;
     }
 
     if (username.length < 3) {
-      setFormError('Username deve essere almeno 3 caratteri');
+      fail('Username deve essere almeno 3 caratteri', 'username');
       return;
     }
 
     if (!isUsernameValid) {
-      setFormError('Username può contenere solo lettere, numeri e underscore');
+      fail('Username può contenere solo lettere, numeri e underscore', 'username');
       return;
     }
 
     if (password.length < 3) {
-      setFormError('Password deve essere almeno 3 caratteri');
+      fail('Password deve essere almeno 3 caratteri', 'password');
       return;
     }
 
     if (password !== confirmPassword) {
-      setFormError('Le password non coincidono');
+      fail('Le password non coincidono', 'confirmPassword');
       return;
     }
 
     try {
       setLoading(true);
+      onBusy(true);
       await register({ email, username, password });
       setRegistrationComplete(true);
+      onRegistered();
     } catch (error) {
-      setFormError(getErrorMessage(error) || 'Errore durante la registrazione. Riprova.');
+      // The server does not say which field it refused («email or username already exists»).
+      fail(getErrorMessage(error) || 'Errore durante la registrazione. Riprova.', 'email');
     } finally {
       setLoading(false);
+      onBusy(false);
     }
   };
 
-  // Success state - registration complete, pending approval
+  // Registration complete, pending approval: in the same card, in place of the form.
   if (registrationComplete) {
     return (
-      <div className="min-h-svh flex items-center justify-center bg-slate-100 dark:bg-slate-900 relative overflow-hidden px-4">
-        {/* Background Decorative Elements */}
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-green-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="max-w-[420px] w-full relative z-10 p-6">
-          {/* Success Card */}
-          <div className="bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl rounded-2xl shadow-2xl ring-1 ring-slate-900/5 dark:ring-white/10 p-8 text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-tr from-green-500 to-emerald-500 text-white rounded-2xl shadow-lg shadow-green-500/20 mb-6">
-              <CheckCircle size={32} strokeWidth={2} />
-            </div>
-
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">
-              Registrazione Completata!
-            </h1>
-
-            <p className="text-slate-600 dark:text-slate-400 mb-6">
-              Il tuo account è stato creato con successo.
-              <br />
-              <strong className="text-slate-800 dark:text-slate-200">
-                È in attesa di approvazione da parte di un amministratore.
-              </strong>
-            </p>
-
-            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 mb-6">
-              <p className="text-sm text-amber-700 dark:text-amber-400">
-                Riceverai l'accesso quando un amministratore approverà il tuo account.
-                Nel frattempo, puoi tornare alla pagina di login.
-              </p>
-            </div>
-
-            <Link
-              to="/login"
-              className="inline-flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-            >
-              <ArrowLeft size={18} />
-              Torna al Login
-            </Link>
-          </div>
-        </div>
+      <div className="space-y-5">
+        <CheckCircle2 aria-hidden="true" size={32} strokeWidth={1.5} className="text-primary-600 dark:text-primary-400" />
+        <h2
+          ref={doneHeading}
+          tabIndex={-1}
+          className="font-serif text-2xl font-medium text-slate-900 outline-none dark:text-slate-50"
+        >
+          Registrazione completata
+        </h2>
+        <p className="text-slate-600 dark:text-slate-300">
+          Il tuo account è stato creato con successo.{' '}
+          <strong className="font-semibold text-slate-900 dark:text-slate-100">
+            È in attesa di approvazione da parte di un amministratore.
+          </strong>
+        </p>
+        <p className="rounded-md border border-amber-200 bg-amber-50 p-3.5 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
+          Riceverai l'accesso quando un amministratore approverà il tuo account. Nel frattempo, puoi tornare ad Accedi.
+        </p>
+        <button
+          type="button"
+          onClick={onSwitch}
+          className={`flex h-11 w-full items-center justify-center rounded-md border border-slate-200 bg-white px-4 font-semibold text-slate-900 transition-[background-color,transform,scale] hover:bg-slate-50 active:scale-[0.97] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 ${FOCUS_RING}`}
+        >
+          Torna ad Accedi
+        </button>
       </div>
     );
   }
 
-  return (
-    <div className="min-h-svh flex items-center justify-center bg-slate-100 dark:bg-slate-900 relative overflow-hidden px-4">
-      {/* Background Decorative Elements */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+  const describedBy = (field: Field, own?: string) =>
+    [formError && invalid === field ? ERROR_ID : undefined, own].filter(Boolean).join(' ') || undefined;
+  const usernameHint = showUsernameValidation && !isUsernameValid;
 
-      <div className="max-w-[420px] w-full relative z-10 p-6">
-        {/* Logo/Header */}
-        <div className="text-center mb-8 space-y-3">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-tr from-blue-600 to-indigo-600 text-white rounded-2xl shadow-lg shadow-blue-500/20 mb-2 transform transition-transform hover:scale-105 duration-300">
-            <UserPlus size={28} strokeWidth={2.5} />
-          </div>
-          <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-            Visua<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">Lex</span>
-          </h1>
-          <p className="text-slate-500 dark:text-slate-400 font-medium">
-            Crea il tuo account
-          </p>
+  return (
+    <>
+      {/* The tab says it on screen; the heading lets a screen reader's list of headings reach the form. */}
+      <h2 className="sr-only">Registrati</h2>
+      {formError && <FormError id={ERROR_ID} message={formError} />}
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-1.5">
+          <label htmlFor="register-email" className={LABEL}>
+            Email
+          </label>
+          <input
+            ref={refs.email}
+            id="register-email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={FIELD}
+            placeholder="nome@studio.it"
+            disabled={loading}
+            autoComplete="email"
+            aria-invalid={invalid === 'email' || undefined}
+            aria-describedby={describedBy('email')}
+          />
         </div>
 
-        {/* Registration Card with Glass Effect */}
-        <div className="bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl rounded-2xl shadow-2xl ring-1 ring-slate-900/5 dark:ring-white/10 p-8">
-          {/* Error Message */}
-          {formError && (
-            <div className="mb-6 p-4 bg-red-50/50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
-              <AlertCircle size={20} className="text-red-500 shrink-0 mt-0.5" />
-              <p className="text-sm font-medium text-red-600 dark:text-red-400">{formError}</p>
+        <div className="space-y-1.5">
+          <label htmlFor="register-username" className={LABEL}>
+            Username
+          </label>
+          <div className="relative">
+            <input
+              ref={refs.username}
+              id="register-username"
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className={`${FIELD} pr-11`}
+              placeholder="mario_rossi"
+              disabled={loading}
+              autoComplete="username"
+              aria-invalid={invalid === 'username' || usernameHint || undefined}
+              aria-describedby={describedBy('username', usernameHint ? 'register-username-hint' : undefined)}
+            />
+            {showUsernameValidation && (
+              <span aria-hidden="true" className="pointer-events-none absolute right-0 top-0 grid h-11 w-11 place-items-center">
+                {isUsernameValid ? (
+                  <Check size={16} className="text-emerald-600 dark:text-emerald-400" />
+                ) : (
+                  <X size={16} className="text-red-600 dark:text-red-400" />
+                )}
+              </span>
+            )}
+          </div>
+          {usernameHint && (
+            <p id="register-username-hint" className="text-xs text-red-700 dark:text-red-300">
+              Solo lettere, numeri e underscore (min 3 caratteri)
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-1.5">
+          <label htmlFor="register-password" className={LABEL}>
+            Password
+          </label>
+          <div className="relative">
+            <input
+              ref={refs.password}
+              id="register-password"
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className={`${FIELD} pr-12`}
+              placeholder="••••••••"
+              disabled={loading}
+              autoComplete="new-password"
+              aria-invalid={invalid === 'password' || undefined}
+              aria-describedby={describedBy('password')}
+            />
+            <PasswordToggle shown={showPassword} onToggle={() => setShowPassword(!showPassword)} />
+          </div>
+
+          {password.length > 0 && (
+            <div role="img" aria-label={`Sicurezza della password: ${STRENGTH_WORDS[passwordStrength]}`} className="flex h-1 gap-1">
+              {[1, 2, 3, 4].map((step) => (
+                <div
+                  key={step}
+                  className={cn(
+                    'flex-1 rounded-full transition-colors',
+                    passwordStrength >= step ? STRENGTH_FILL[step] : 'bg-slate-200 dark:bg-slate-700',
+                  )}
+                />
+              ))}
             </div>
           )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Email Field */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 ml-1">
-                Email
-              </label>
-              <div
-                className={cn(
-                  'relative group transition-transform duration-300',
-                  focusedField === 'email' ? 'transform scale-[1.02]' : ''
-                )}
-              >
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail
-                    size={18}
-                    className={cn(
-                      'transition-colors',
-                      focusedField === 'email' ? 'text-blue-500' : 'text-slate-400'
-                    )}
-                  />
-                </div>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  onFocus={() => setFocusedField('email')}
-                  onBlur={() => setFocusedField(null)}
-                  className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-400/70"
-                  placeholder="nome@email.com"
-                  disabled={loading}
-                  autoComplete="email"
-                />
-              </div>
-            </div>
-
-            {/* Username Field */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 ml-1">
-                Username
-              </label>
-              <div
-                className={cn(
-                  'relative group transition-transform duration-300',
-                  focusedField === 'username' ? 'transform scale-[1.02]' : ''
-                )}
-              >
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <User
-                    size={18}
-                    className={cn(
-                      'transition-colors',
-                      focusedField === 'username' ? 'text-blue-500' : 'text-slate-400'
-                    )}
-                  />
-                </div>
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  onFocus={() => setFocusedField('username')}
-                  onBlur={() => setFocusedField(null)}
-                  className="w-full pl-10 pr-10 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-400/70"
-                  placeholder="mario_rossi"
-                  disabled={loading}
-                  autoComplete="username"
-                />
-                {/* Validation Icon */}
-                {showUsernameValidation && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    {isUsernameValid ? (
-                      <Check size={18} className="text-green-500" />
-                    ) : (
-                      <X size={18} className="text-red-500" />
-                    )}
-                  </div>
-                )}
-              </div>
-              {showUsernameValidation && !isUsernameValid && (
-                <p className="text-xs text-red-500 ml-1">Solo lettere, numeri e underscore (min 3 caratteri)</p>
-              )}
-            </div>
-
-            {/* Password Field */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 ml-1">
-                Password
-              </label>
-              <div
-                className={cn(
-                  'relative group transition-transform duration-300',
-                  focusedField === 'password' ? 'transform scale-[1.02]' : ''
-                )}
-              >
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock
-                    size={18}
-                    className={cn(
-                      'transition-colors',
-                      focusedField === 'password' ? 'text-blue-500' : 'text-slate-400'
-                    )}
-                  />
-                </div>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onFocus={() => setFocusedField('password')}
-                  onBlur={() => setFocusedField(null)}
-                  className="w-full pl-10 pr-12 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-400/70"
-                  placeholder="••••••••"
-                  disabled={loading}
-                  autoComplete="new-password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-white/5"
-                  tabIndex={-1}
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-
-              {/* Password Strength Indicator */}
-              {password.length > 0 && (
-                <div className="flex gap-1 h-1 mt-2">
-                  <div
-                    className={cn(
-                      'flex-1 rounded-full transition-colors',
-                      passwordStrength >= 1 ? 'bg-red-400' : 'bg-slate-200 dark:bg-slate-700'
-                    )}
-                  />
-                  <div
-                    className={cn(
-                      'flex-1 rounded-full transition-colors',
-                      passwordStrength >= 2 ? 'bg-yellow-400' : 'bg-slate-200 dark:bg-slate-700'
-                    )}
-                  />
-                  <div
-                    className={cn(
-                      'flex-1 rounded-full transition-colors',
-                      passwordStrength >= 3 ? 'bg-green-400' : 'bg-slate-200 dark:bg-slate-700'
-                    )}
-                  />
-                  <div
-                    className={cn(
-                      'flex-1 rounded-full transition-colors',
-                      passwordStrength >= 4 ? 'bg-green-500' : 'bg-slate-200 dark:bg-slate-700'
-                    )}
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Confirm Password Field */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 ml-1">
-                Conferma Password
-              </label>
-              <div
-                className={cn(
-                  'relative group transition-transform duration-300',
-                  focusedField === 'confirmPassword' ? 'transform scale-[1.02]' : ''
-                )}
-              >
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock
-                    size={18}
-                    className={cn(
-                      'transition-colors',
-                      focusedField === 'confirmPassword' ? 'text-blue-500' : 'text-slate-400'
-                    )}
-                  />
-                </div>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  onFocus={() => setFocusedField('confirmPassword')}
-                  onBlur={() => setFocusedField(null)}
-                  className="w-full pl-10 pr-10 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-400/70"
-                  placeholder="••••••••"
-                  disabled={loading}
-                  autoComplete="new-password"
-                />
-                {/* Match indicator */}
-                {confirmPassword.length > 0 && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    {password === confirmPassword ? (
-                      <Check size={18} className="text-green-500" />
-                    ) : (
-                      <X size={18} className="text-red-500" />
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3.5 px-4 rounded-xl font-semibold shadow-lg shadow-blue-500/25 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white transform active:scale-[0.98] transition-[color,background-color,--tw-gradient-from,--tw-gradient-to,opacity,scale] duration-200 flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 mt-6"
-            >
-              {loading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <>
-                  Crea Account
-                  <UserPlus size={18} className="group-hover:scale-110 transition-transform" />
-                </>
-              )}
-            </button>
-          </form>
-
-          {/* Login Link */}
-          <p className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
-            Hai già un account?{' '}
-            <Link to="/login" className="text-blue-600 hover:underline font-medium">
-              Accedi
-            </Link>
-          </p>
         </div>
 
-        {/* Footer */}
-        <p className="text-center text-sm text-slate-500 dark:text-slate-400 mt-6">
-          © 2025 VisuaLex. All rights reserved.
-        </p>
-      </div>
-    </div>
+        <div className="space-y-1.5">
+          <label htmlFor="register-confirm-password" className={LABEL}>
+            Conferma password
+          </label>
+          <div className="relative">
+            <input
+              ref={refs.confirmPassword}
+              id="register-confirm-password"
+              type={showPassword ? 'text' : 'password'}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className={`${FIELD} pr-11`}
+              placeholder="••••••••"
+              disabled={loading}
+              autoComplete="new-password"
+              aria-invalid={invalid === 'confirmPassword' || undefined}
+              aria-describedby={describedBy('confirmPassword')}
+            />
+            {confirmPassword.length > 0 && (
+              <span aria-hidden="true" className="pointer-events-none absolute right-0 top-0 grid h-11 w-11 place-items-center">
+                {password === confirmPassword ? (
+                  <Check size={16} className="text-emerald-600 dark:text-emerald-400" />
+                ) : (
+                  <X size={16} className="text-red-600 dark:text-red-400" />
+                )}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <button type="submit" disabled={loading} className={PRIMARY_BUTTON}>
+          {loading ? <BookOpen aria-label="Registrazione in corso" size={18} className="animate-pulse" /> : 'Crea account'}
+        </button>
+      </form>
+
+      <p className="mt-2 flex flex-wrap items-center gap-x-1 text-sm text-slate-600 dark:text-slate-400">
+        Hai già un account?
+        <button type="button" onClick={onSwitch} className={SWITCH_LINK}>
+          Accedi
+        </button>
+      </p>
+    </>
   );
 }
-

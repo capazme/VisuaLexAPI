@@ -6,6 +6,7 @@ import { cn } from '../../../lib/utils';
 import type { AnnexMetadata } from '../../../types';
 import { useTour } from '../../../hooks/useTour';
 import { useIsDesktop } from '../../../hooks/useIsDesktop';
+import { normalizeArticleId } from '../../../utils/treeUtils';
 import { useAppStore } from '../../../store/useAppStore';
 import type { RubrichePart } from '../../../hooks/useAnnexNavigation';
 import { Z_INDEX } from '../../../constants/zIndex';
@@ -25,12 +26,6 @@ function clampToViewport(position: { x: number; y: number }) {
     x: Math.min(Math.max(0, position.x), maxX),
     y: Math.min(Math.max(0, position.y), maxY),
   };
-}
-
-// Normalize article ID for comparison (handles "3 bis" vs "3-bis")
-function normalizeArticleId(id: string): string {
-  if (!id) return id;
-  return id.trim().toLowerCase().replace(/\s+/g, '-');
 }
 
 /**
@@ -476,7 +471,7 @@ export function TreeViewPanel({
             {rubrica}
           </span>
         ) : abrogato ? (
-          <span className="flex-1 min-w-0 truncate text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+          <span className="flex-1 min-w-0 truncate text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">
             Abrogato
           </span>
         ) : null}
@@ -516,7 +511,7 @@ export function TreeViewPanel({
                   </div>
                   <div>
                     <h3 className="font-bold text-lg text-slate-900 dark:text-white leading-tight uppercase tracking-tight">{title}</h3>
-                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">Indice Strutturale</p>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-400 font-bold uppercase tracking-widest mt-0.5">Indice Strutturale</p>
                   </div>
                 </div>
                 <button
@@ -533,13 +528,13 @@ export function TreeViewPanel({
                   <div className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center gap-2">
                     <FileText size={14} className="text-slate-500" />
                     <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                      {stats.total} <span className="opacity-60 font-medium">Articoli totali</span>
+                      {stats.total} <span className="font-medium text-slate-600 dark:text-slate-400">Articoli totali</span>
                     </span>
                   </div>
                   <div className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg flex items-center gap-2 border border-emerald-100/50 dark:border-emerald-800/30">
                     <Check size={14} className="text-emerald-500" />
                     <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
-                      {stats.loaded} <span className="opacity-60 font-medium uppercase text-[10px]">Caricati</span>
+                      {stats.loaded} <span className="font-medium uppercase text-[11px] text-emerald-800 dark:text-emerald-300">Caricati</span>
                     </span>
                   </div>
                 </div>
@@ -548,7 +543,7 @@ export function TreeViewPanel({
 
             {/* Annex Tabs - Show when multiple annexes exist */}
             {showAnnexes && (
-              <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-gradient-to-b from-slate-50/80 to-white dark:from-slate-800/50 dark:to-slate-900">
+              <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900">
                 <div className="flex items-center gap-2 mb-3">
                   <Layers size={14} className="text-primary-500" />
                   <span className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
@@ -578,22 +573,14 @@ export function TreeViewPanel({
                         className={cn(
                           "relative px-3 py-2 text-xs font-semibold rounded-xl transition-colors border overflow-hidden",
                           isActive
-                            ? "bg-gradient-to-br from-primary-500 to-primary-600 text-white border-primary-500 shadow-lg shadow-primary-500/25"
-                            : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-primary-300 dark:hover:border-primary-600 hover:text-primary-600 dark:hover:text-primary-400 hover:shadow-md"
+                            ? "bg-primary-600 text-white border-primary-600"
+                            : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-primary-300 dark:hover:border-primary-600 hover:text-primary-600 dark:hover:text-primary-400"
                         )}
                       >
-                        {/* Active indicator glow */}
-                        {isActive && (
-                          <motion.div
-                            layoutId="annexActiveGlow"
-                            className="absolute inset-0 bg-gradient-to-br from-primary-400/20 to-transparent"
-                            transition={spring.snappy}
-                          />
-                        )}
                         <span className="relative block truncate max-w-[140px]">{annex.label}</span>
                         <span className={cn(
-                          "relative text-[10px] block mt-0.5 font-medium",
-                          isActive ? "text-primary-100" : "text-slate-400 dark:text-slate-500"
+                          "relative text-[11px] block mt-0.5 font-medium",
+                          isActive ? "text-primary-100" : "text-slate-600 dark:text-slate-400"
                         )}>
                           {annex.article_count} articoli
                         </span>
@@ -632,7 +619,7 @@ export function TreeViewPanel({
                       />
                     </div>
                     {isFiltering && (
-                      <p className="mt-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 tabular-nums">
+                      <p className="mt-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 tabular-nums">
                         {matchedArticleCount} di {totalArticleCount}
                       </p>
                     )}
@@ -684,7 +671,7 @@ export function TreeViewPanel({
                               <span className="flex-1 min-w-0 truncate text-[11px] font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">
                                 {cleanSectionTitle(section.title)}
                               </span>
-                              <span className="shrink-0 text-[10px] font-semibold text-slate-400 tabular-nums">
+                              <span className="shrink-0 text-[11px] font-semibold text-slate-600 dark:text-slate-400 tabular-nums">
                                 {section.articles.length}
                               </span>
                             </div>
@@ -714,8 +701,6 @@ export function TreeViewPanel({
               )}
             </div>
 
-            {/* Footer shadow fade */}
-            <div className="h-10 bg-gradient-to-t from-white dark:from-slate-900 to-transparent pointer-events-none sticky bottom-0" />
     </>
   );
 
@@ -754,7 +739,7 @@ export function TreeViewPanel({
             data-floating-tool
             className={cn(
               "fixed top-0 left-0 max-h-[76vh] rounded-2xl overflow-hidden",
-              "bg-white dark:bg-slate-900 shadow-2xl flex flex-col",
+              "bg-white dark:bg-slate-900 shadow-lg flex flex-col",
               "border border-slate-200 dark:border-slate-800",
               Z_INDEX.structure,
             )}
@@ -786,7 +771,7 @@ export function TreeViewPanel({
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: '100%', opacity: 0.9 }}
             transition={spring.snappy}
-            className="fixed right-0 top-0 bottom-0 w-full sm:w-[450px] bg-white dark:bg-slate-900 shadow-2xl z-[100] flex flex-col border-l border-slate-200 dark:border-slate-800"
+            className="fixed right-0 top-0 bottom-0 w-full sm:w-[450px] bg-white dark:bg-slate-900 shadow-lg z-[100] flex flex-col border-l border-slate-200 dark:border-slate-800"
           >
             {panelBody}
           </motion.aside>

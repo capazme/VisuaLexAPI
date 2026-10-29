@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { Annotation, Highlight } from '../types';
 import type { ArticleStructure } from '../utils/articleStructure';
-import type { LocatedThread } from '../utils/articleAnnotations';
+import type { GlossAnchor, LocatedThread } from '../utils/articleAnnotations';
 import { renderArticleHtml } from '../utils/articleRender';
 
 interface UseArticleMarkersInput {
@@ -10,8 +10,7 @@ interface UseArticleMarkersInput {
   annotations: Annotation[];
   /**
    * The parsed structure of `rawText` (`parseArticleStructure`, memoised by
-   * the caller). Omitted or null renders flat — the Brocardi sections, which
-   * have no commi to divide.
+   * the caller). Omitted or null renders flat, with no commi to divide.
    */
   structure?: ArticleStructure | null;
   /** The annotation signs of the practice's row and the dossier reader; see RenderArticleInput. */
@@ -20,6 +19,8 @@ interface UseArticleMarkersInput {
   threads?: readonly LocatedThread[];
   /** The discussion open in the panel: its words light up (`.vlx-thread-focus`). */
   focusedThreadId?: string | null;
+  /** An application's glosses (D8): counted on the signs, never drawn in the text. */
+  glosses?: readonly GlossAnchor[];
 }
 
 /**
@@ -40,6 +41,7 @@ export function useArticleMarkers({
   signs = false,
   threads,
   focusedThreadId,
+  glosses,
 }: UseArticleMarkersInput): string {
   return useMemo(
     () =>
@@ -51,7 +53,8 @@ export function useArticleMarkers({
         signs,
         threads,
         focusedThreadId,
+        glosses,
       }),
-    [rawText, structure, highlights, annotations, signs, threads, focusedThreadId],
+    [rawText, structure, highlights, annotations, signs, threads, focusedThreadId, glosses],
   );
 }

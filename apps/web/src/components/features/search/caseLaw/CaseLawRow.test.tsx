@@ -13,9 +13,9 @@ const CASS = { corte: 'cassazione', archivio: 'civile', numero: 31191, anno: 202
 
 describe('CaseLawRow', () => {
   it('names the decision by its short label, as a link to its address', () => {
-    show(<CaseLawRow decision={CASS} source="Brocardi" />);
+    show(<CaseLawRow decision={CASS} source="Massimario" />);
     expect(screen.getByText('Cass. civ., n. 31191/2025').closest('a')).toHaveAttribute('href', '/sentenze/cassazione-civile/31191/2025');
-    expect(screen.getByText('Brocardi')).toBeInTheDocument();
+    expect(screen.getByText('Massimario')).toBeInTheDocument();
   });
 
   it('previews the decision, then opens it beside the article and records the way back', async () => {
@@ -64,7 +64,7 @@ describe('CaseLawRow', () => {
   it('colours the chip by court, one key for every source', () => {
     show(<CaseLawRow label="Cass. civ." /> );
     show(<CaseLawRow label="Corte cost." />);
-    expect(screen.getByText('Cass. civ.')).toHaveClass('bg-blue-100');
+    expect(screen.getByText('Cass. civ.')).toHaveClass('bg-primary-100');
     expect(screen.getByText('Corte cost.')).toHaveClass('bg-purple-100');
   });
 });

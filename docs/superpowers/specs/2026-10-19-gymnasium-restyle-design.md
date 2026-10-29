@@ -95,7 +95,7 @@ views do not move.
 | Group | Entry | Route | What it is |
 | --- | --- | --- | --- |
 | Studia | **Oggi** | `/studia/ripasso` (as today) | the home: one action and the road (§5.1) |
-| Studia | **Progressi** | `/studia/progressi` (new, web only, with G3; no entry until then) | calendar, cards by state, coming days, progress by subject (§5.3) |
+| Studia | **Progressi** | `/studia/progressi` (new, web only, built with G3) | calendar, cards by state, coming days, progress by subject (§5.3) |
 | Contribuisci | **Le mie schede** | `/studia/schede` (as today) | write and manage your cards |
 | Contribuisci | **Da validare** | `/studia/valida` (as today), validators only | the validation queue |
 
@@ -110,6 +110,13 @@ default. The accessible names, the tours' ids and the badges stay. In Gymnasium 
 
 «Impostazioni di studio» (`StudyPreferences`, unchanged in content) leave the bottom of the home and open
 from a gear in the header of **Oggi** — since G1b, in its statistics band (§5.1) — in a `ui/Sheet`.
+*Corrected on 21 October (G6, the owner: «si estende il tab»).* On Oggi the gear opens them **inside** the band «I
+tuoi progressi», under its heading: the card grows downward (about 200 ms; at once under reduced motion), no window
+and no veil; the gear again or Esc closes them and the focus goes back to the gear. The two numbers save when their
+field is left (or on Enter) with a discreet «Salvato», no «Salva» each; the community's subjects sit one level down,
+closed, «Schede della comunità · N di 5». The missions' «Cambia…» buttons (since G8, the one line under the missions) open the same panel and take the focus there
+(«Accendi le schede della comunità» with the subjects open). The strip over «Le mie schede» and «Da validare» keeps
+the sheet.
 
 ## 5. The screens
 
@@ -118,10 +125,54 @@ brief to copy. The look is Inchiostro (paper, ink, toga) with the Gymnasium hue.
 
 ### 5.1 Oggi (`ReviewHome`)
 
+*Corrected on 22 October (G8, the owner: «va migliorato parecchio ancora, indaga su come presentarlo meglio»).* Every
+piece was cared for; the whole was not: the page had no entry, said its numbers twice and showed many things switched
+off. The order of L-24 stays — the day's missions, then the numbers, then the list — with the day first:
+
+- **The title** (L-37) is the page's name, «Oggi» (and «Progressi», «Le mie schede», «Da validare»), with
+  «Gymnasium · la tua palestra giuridica» small over it; Opus and the Forum the same. One place in the code (the
+  sections' phrases and `PageFrame`'s line over the title). On a phone the bar at the top does as iOS's large titles:
+  no name in its middle while the page's title is in sight, only the menu and the magnifier; the page's name, faded in
+  over 150 ms, once the title has scrolled out (at once under reduced motion), so no name is written twice one under
+  the other.
+- **The day block**, first in the left column (on a phone the first thing, «Inizia il ripasso» within the first 400 px
+  under the bar): a tile with the section's hue down its left edge; the day small, «mercoledì 22 ottobre» (the title says «Oggi»); «12 da
+  ripassare, 8 nuove» in Newsreader, 36 px; «circa 7 minuti · Diritto civile, Diritto penale e altre 2» (the subjects
+  with cards due, from the read by institute, then those with new cards while today allows some); and «Inizia il
+  ripasso», the page's one primary button, wide. Done: «Hai finito per oggi.» and «Domani: 9 da ripassare.», with a
+  secondary «Impara altre schede nuove» (it opens the settings) while new cards wait — the brief's «Ripassa ancora» would
+  open an empty lesson, since the server keeps no practice session. No card: the sentence of item 1 below, and
+  «Accendi le schede della comunità» as the block's button. It enters with the sidebar's light cascade; nothing under
+  reduced motion.
+- **Today's missions** under it, three compact rows (mark, title, «4 di 16», points, a bar of 4 px), no action of
+  their own; «Cambia le nuove al giorno» and «Cambia l'obiettivo» are gone — the targets are settings, reached from one
+  line under the rows, «Obiettivo e nuove al giorno: nelle impostazioni ⚙».
+- **The right column**, sticky under the title while it fits the window: «I tuoi progressi» (the streak, the week,
+  the level, the three states in one line with their bar, «Tutti i progressi →» as a text link; no ring of the goal,
+  which its mission says) and **«Le tue materie»**, which takes the place of «Cosa ripassi» and of the road (§5.2):
+  «Tutte le materie» on top, then one row a subject — its hue's dot, its name, «3 oggi», a small bar of its
+  consolidated share, «Ripassa» — that narrows the day block when pressed; the chosen subject's institutes under the
+  list. On a phone one row of subjects that scrolls sideways.
+- **«Tutte le missioni»** lists only the missions that can be done; those still to come are one line in slate 500 at
+  the foot, «In arrivo: caso breve, una settimana di serie», with no dotted rings.
+
+The numbers no longer said twice: the goal (the mission alone, no ring beside it), the streak (the band alone, not
+over «Le mie schede»), the subjects (one list), the reviews of 30 days (on «Progressi» alone).
+
+*Corrected on 21 October (G6).* G1 drew Oggi as one column of 768 px, centred, at every width (L-22). The
+owner then asked for Gymnasium to use the width as Opus and the Forum do: Oggi and Progressi sit in the
+sections' frame (`PageFrame`, the layout's own 1280 px frame and its 1216 px column, the heading at its left
+edge), and from `xl` (1280 px) Oggi has two columns — on the left, seven twelfths, the missions with
+«Inizia», «Tutte le missioni» and the road; on the right, five twelfths, the statistics (item 2) and under
+them «Cosa ripassi» (item 4), together `sticky` under the heading while the page scrolls. Below `xl`, and in Focus mode (896 px), it is one column, in the order
+below. The document keeps that order on every width — missions, statistics, list — so a screen reader and
+the keyboard meet the statistics second; the grid places them. Inside the tiles a sentence wraps at about
+65 characters (`max-w-prose`) rather than widen with the column.
+
 *Rewritten on 19 October for G1b.* G1 built Oggi as a strip, one action card, the chips, the road and the
 progress panels at the bottom. The front-end owner then fixed the order of the page — «1. prossime
 missioni; 2. Stats; 3. elenco completo delle missioni» — and asked for the progress to be drawn again from
-scratch, in one type language with the rest of Inchiostro. From top to bottom, one column at every width:
+scratch, in one type language with the rest of Inchiostro. From top to bottom, in this reading order:
 
 0. **The heading** of the area: «Gymnasium: la tua palestra giuridica» (the short name «Gymnasium» stays
    in the section switcher).
@@ -143,15 +194,17 @@ scratch, in one type language with the rest of Inchiostro. From top to bottom, o
 
    A mission with nothing to do today (no card due, no new card) says so and leaves the summary. The
    missions are the whole day's, whatever subject is chosen below: the subject narrows only the action of
-   the first («Oggi in Diritto penale: …»), the session it starts and «Il tuo mese». A count past its target
+   the first («Oggi in Diritto penale: …») and the session it starts (and, since G3, the subject «Progressi» opens on). A count past its target
    stops at it («5 di 5»).
 2. **The statistics**, one band under the heading «I tuoi progressi»: the streak (the § badge, the count,
    the record), the goal (a small ring, «5 di 10»), the gear of the study settings, **the current week**
    (seven boxes, Monday to Sunday, each with its letter: done, a rest, missed, today, or still to come),
    and under them three large numbers in Newsreader — new, in learning, consolidated — with their bar.
-   The long calendar and «Prossimi 14 giorni» leave the page: a button «Il tuo mese» opens them in a
-   sheet (until G3 gives them `/studia/progressi`).
-3. **The full list of missions**, «Tutte le missioni»: daily, weekly and long-term. Those the web can count
+   The long calendar and «Prossimi 14 giorni» leave the page. *Corrected for G3:* G1b opened them in a sheet,
+   «Il tuo mese»; G3 replaced it with a link, «Tutti i progressi», to `/studia/progressi`, so the data are in one
+   place and no chart is drawn twice.
+3. **The full list of missions**, «Tutte le missioni»: daily, weekly and long-term. *Since G6* it leaves out
+   today's three, which item 1 shows just above, and says so («Le tre di oggi sono qui sopra»). Those the web can count
    show their state; those that need the server to record them (a subject left for seven days, writing a
    card, validating, a case, a week of streak) are listed with «In arrivo» and cannot be ticked. **No experience points and no level**
    are shown until the server keeps them: a count in the browser would be lost on another device and could
@@ -165,6 +218,10 @@ article; a failed read says «Non riesco a leggere i tuoi progressi.» with «Ri
 usable; while the first read travels everything holds its final size.
 
 ### 5.2 The road
+
+*Corrected on 22 October (G8).* The road is no longer drawn on Oggi: its subjects are the rows of «Le tue materie»
+(§5.1), in the same order, with the cards due today from the read by institute, and the chosen subject's institutes
+(G5) show under that list, with the same stops, order and sessions. What follows records how the road came about.
 
 **Stops are free: no locks, no unlocking.** Every stop can be opened at any time; no order of subjects or
 institutes is imposed (that would be a decision about content, not about layout).
@@ -180,6 +237,10 @@ institutes is imposed (that would be a decision about content, not about layout)
 - **Later, with the server read of G5:** «N da ripassare» per subject and per institute; inside a subject,
   one stop per **institute** («Risoluzione per inadempimento»), with the same bar and «N da ripassare»,
   sorted by the cards due first.
+  *Built on 19 October (G5):* the subjects keep their order (by cards open, then name) when the read by
+  institute answers, so the stops do not move under the reader's hand; a subject's institutes open in place
+  under it, from a disclosure «Istituti (N)», the first eight shown and the rest on request; a tap on an
+  institute starts the session narrowed to it (`GET /lingo/srs/sessione?materia=&istituto=`).
 
 The road is drawn as a vertical path of stops joined by a line in the section hue; on a computer it may
 sit beside the action card. Stops are buttons (`aria-pressed` where they filter), the state is also
@@ -188,10 +249,60 @@ written in words, never by colour alone.
 ### 5.3 Progressi
 
 A page of its own, `/studia/progressi`, holding what the home no longer shows: the activity calendar and the
-coming days (in the «Il tuo mese» sheet until then), the cards by state in full (the home keeps three numbers),
-and the full progress by subject. The components exist
+coming days, the cards by state in full (the home keeps three numbers), and the full progress by subject. The components exist
 (`ActivityCalendar`, `CardStatesBar`, `DueForecast`, `SubjectProgress`) and keep their behaviour,
 interaction and accessibility (progress spec §6.3, §6.5); they are restyled, not rewritten.
+
+*Corrected on 21 October (G6).* The page is in the sections' full-width frame, as Oggi: the calendar spans it,
+«Le schede per stato» and «I prossimi 14 giorni» stand side by side from `lg`, «Per materia» is a grid of two
+columns from `lg`; one column below. The calendar still shows 26 weeks: the server keeps no more
+(`CALENDAR_WEEKS`), so a wider page does not show more weeks; from `lg` its legend and the day's line sit in a
+column beside the drawing, which takes three quarters of the width, so the cells do not swell.
+
+*Corrected on 21 October (G7, the owner: «la gente è più abituata a interpretare questo tipo di grafici»).* The
+calendar is gone (`ActivityCalendar` and its helpers): «Il tuo andamento» (`ReviewTrend`) draws the reviews as a line
+in the same full-width card, over three periods — 7 days, 30 days (the one it opens on, on a computer; a phone opens on 7) and 6 months, the server's 26
+weeks summed by week. Above it the period's total, large in Newsreader, and its change on the period before of the
+same length («+18% sui 30 giorni prima»), green when it rises and ink when it falls, never red; nothing when that
+period had no reviews, and nothing for six months, the server keeps no more. The line is smooth but honest (a
+monotone curve: no peak between two days, never under zero), its area a wash of its colour; the goal is a dashed line
+named «obiettivo» (seven times the day's for a week); the days not done are small ticks under the axis, so the
+calendar's information is not lost, and the streak stays in the summary. A cursor follows the pointer or the finger
+with a spring and says «mar 14 ott · 12 ripassi · obiettivo raggiunto» or «… · giorno di riposo»; the line is full
+up to it and lighter after. One tab stop: the arrows move by day (by week on six months), Home and End to the ends; a
+hidden line says the day as before; «Vedi i numeri» opens the period's table; the periods are tabs, moved with the
+arrows. The drawing is as wide as the card, in pixels, its words the interface's text at 12 px. On opening the line
+draws from the left in 900 ms while the total counts up; another period bends the curve in 500 ms (each curve has the
+same number of points) while the pill slides under it; the numbers fade. Under reduced motion all is drawn at once. A
+subject chosen draws that subject's counts in its hue. A newcomer reads «Il primo giorno comincia oggi: qui si
+disegnano i ripassi di ogni giorno.» in place of the chart.
+
+*Built on 19 October (G3).* The sidebar's «Progressi» sits in «Studia» after Oggi; the page reads what Oggi reads
+(`GET /lingo/srs/progressi`, no new route). Under the area's heading and the page heading «I tuoi progressi», in
+this order:
+
+1. **The summary**: the streak (the «§», the count, the record) and today's goal (the ring). *Corrected for G7:*
+   the reviews of the last 30 days left it for the trend's total, so the page says one count, not two. The pieces are Oggi's (`StreakBadge`, `GoalRing`),
+   drawn once.
+2. **The subject chips**, as on Oggi and sharing its remembered choice. A subject narrows the trend (G7), the cards by
+   state and the coming days; the summary stays the whole day's (the streak and the goal are, on the server) and «Per
+   materia» lists all five.
+3. **«Il tuo calendario»** (until G7, see above; now «Il tuo andamento»): 26 weeks on a computer, 12 on a phone, the month over the column it starts in. A shape for
+   each state: a dot on a day that counted, a dashed outline on a rest, a dash on a past day that did not count, a ring
+   on today, the rest of the week dotted, and no mark before the first day studied, so a newcomer's calendar says
+   nothing is missed. The legend under it names them in words; the line under it reads a day as a screen reader hears
+   it («lunedì 12 ottobre: 14 ripassi, obiettivo raggiunto»); one tab stop and the arrows, as before. On a subject's
+   calendar the counts are the subject's and the states the whole day's, as the server sends them.
+4. **«Le schede per stato»**: the stacked bar, and the three states by name, count and share.
+5. **«I prossimi 14 giorni»**: the scale in a column beside the drawing and the days in a row under it, both the
+   interface's text at 12 px; today's column set apart; a day with nothing due a hollow mark on the base.
+6. **«Per materia»**: the five subjects in the road's order (cards still open, then name), each with its three states
+   (a bar and words) and its reviews of 30 days, a button that narrows the page. No «N da ripassare» by subject: the
+   progress read does not carry it, and the road counts it from the read by institute.
+
+States: the first read holds every block at its final size; a failed read says «Non riesco a leggere i tuoi
+progressi.» with «Riprova» (44 px, no alert); a new read leaves the last answer on screen, dimmed. No points and no
+level, as on Oggi.
 
 ### 5.4 Lezione (`ReviewSession`)
 
@@ -211,12 +322,24 @@ The session becomes a screen of its own:
 - **The lesson frame**: the area's sidebar and its floating buttons are out of the way while the lesson
   runs. The executor uses what the shell already offers (the focus mode) if it does that; otherwise a
   page-level frame inside `StudiaPage`. `Layout.tsx` is not touched without reserving it in the register,
-  and the PR says which way was taken.
+  and the PR says which way was taken. *Taken in G2:* the frame inside `StudiaPage` (`LessonFrame`, portalled
+  over the shell in a band of its own, Tab kept inside it); Focus mode is a saved setting that leaves its own
+  button and the feedback button on screen, and `Layout.tsx` is untouched.
 - **The end**: the sentence («Hai ripassato 23 schede, 4 da rifare. Le prossime: domani.»), the ring and
-  the streak as now, and two buttons: «Torna a Oggi» and, if cards are left, «Continua».
+  the streak as now, and two buttons: «Torna a Oggi» and, if cards are left, «Continua». *Corrected on 22 October
+  (G8):* one card, centred, holds the sentence, the ring and the streak — whose strip of the last seven days is the week, so no second row of it —, and one primary action — «Continua»
+  when cards are left, else «Torna a Oggi» —, with «Torna a Oggi» a quiet link under «Continua»; no bar under it. The
+  progress bar's ink takes the section's hue, not the ink's near-grey.
 - The celebration (progress spec §6.4) is kept as it is: once a day, 1.5 s, beside the card, never on top.
 
 ### 5.5 Contribuisci: Le mie schede, Da validare, the reader's row
+
+*Corrected on 22 October (G8).* «Le mie schede» uses the frame's whole width: with no card open the cards are tiles
+in a grid (two columns from `lg`, three from `2xl`), each with its front in Newsreader, its subject with its dot, its
+state and its next review; with one open, the list is a column beside it. The filters are one row on a computer —
+the search a third of it, the subject, the state, the kind (and the act), «Scritte da Claude» and «Da ripassare oggi»
+— and below 1024 px the search and «Filtri». The strip «§ 5 · 6 di 10» is gone from this page; «+ Nuova scheda» sits
+beside the page's title.
 
 Same logic, same routes, restyled with the shared tokens and the Gymnasium hue; their copy and states do
 not change, except one addition and one correction. **Addition:** a «+ Nuova scheda» in the page header of
@@ -233,9 +356,9 @@ branch from `develop` side by side; G2–G4 follow in this order; G5 waits for a
 | # | Phase | Main files |
 | --- | --- | --- |
 | G0 | The sidebar's words (§4): the wide bar from `xl`, the rail between `lg` and `xl`, the drawer's rows, the narrow/widen control; Gymnasium's two groups | `Sidebar.tsx`, `Layout.tsx`, `SectionSwitcher.tsx` |
-| G1 | **Oggi** (strip, action card, subject chips, subject stops by the three states — no «N da ripassare» per subject until G5); the settings in a sheet; the empty and failed states; the progress panels kept at the bottom under «I tuoi progressi» until G3 gives them their page. **G1b**, stacked on G1, sets the order the owner fixed (§5.1): the heading with its phrase; today's missions, computed in the web, «Inizia» on the first; the statistics band (streak, goal, the current week, three numbers) with «Il tuo mese» in a sheet; the full list, «In arrivo» where the server must record; then the chips and the road; no points or levels until the server keeps them | `ReviewHome.tsx`, `missions/*`, `progress/StatsBand.tsx`, `progress/MonthSheet.tsx`, `progress/SubjectChips.tsx`, `progress/SubjectRoad.tsx`, `StudyPreferences.tsx`, `StudiaPage.tsx` |
+| G1 | **Oggi** (strip, action card, subject chips, subject stops by the three states — no «N da ripassare» per subject until G5); the settings in a sheet; the empty and failed states; the progress panels kept at the bottom under «I tuoi progressi» until G3 gave them their page. **G1b**, stacked on G1, sets the order the owner fixed (§5.1): the heading with its phrase; today's missions, computed in the web, «Inizia» on the first; the statistics band (streak, goal, the current week, three numbers) with «Il tuo mese» in a sheet (a link to `/studia/progressi` since G3); the full list, «In arrivo» where the server must record; then the chips and the road; no points or levels until the server keeps them | `ReviewHome.tsx`, `missions/*`, `progress/StatsBand.tsx`, `progress/MonthSheet.tsx`, `progress/SubjectChips.tsx`, `progress/SubjectRoad.tsx`, `StudyPreferences.tsx`, `StudiaPage.tsx` |
 | G2 | **Lezione**: the frame, the progress bar, the bottom bar, the note after a grade, the end screen; the same PR rewrites §6 of the Studia screens spec and the review-card sentence of `apps/web/CLAUDE.md` | `ReviewSession.tsx`, `ReviewCard.tsx`, `GradeBar.tsx`, `progress/SessionEndProgress.tsx`, `useReviewSession.ts` (read only unless a test says otherwise) |
-| G3 | **Progressi**: the page and the restyle of its four components | `progress/*` |
+| G3 | **Progressi**: the page and the restyle of its four components; «Il tuo mese» on Oggi becomes a link to it | `progress/*`, `StudiaPage.tsx`, `Sidebar.tsx`, `App.tsx` |
 | G4 | **Contribuisci**: Le mie schede, Da validare, the reader's row; a «+ Nuova scheda» inside Le mie schede and in its empty state (§5.5) | `MyCardsView.tsx`, `CardGroups.tsx`, `CardFilters.tsx`, `CardDetail.tsx`, `ValidationQueueView.tsx`, `VoteBar.tsx`, `ArticleCardsRow.tsx`, `ArticleCardsPeek.tsx` |
 | G5 | **Institute stops** (needs a server read, below) | `ReviewHome.tsx`, a new `progress/InstituteStops.tsx`, the server |
 
@@ -270,6 +393,10 @@ subject.
    typed anchor needs the server to accept a card whose only anchor was typed (the form's «+ Ancora»
    suggests it does); the executor checks that the route allows it before building the button, and says so
    in the PR. If it does not, the empty state says how to start from an article and nothing else changes.
+   *Checked for G4, 19 October:* `POST /lingo/cards` takes the anchors as references and resolves each against
+   Normattiva (the route Claude's cards use), so a card whose only anchors were typed is accepted; it refuses
+   the Union's acts and answers 503 when no reference could be checked. Per the front-end owner's choice, the
+   button shows only while the sources answer (Normattiva «ok» in the Python probe).
 
 ## 9. What was verified, and what was not
 

@@ -1,20 +1,27 @@
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { Command } from 'cmdk';
-import { Search, X, Check, Star, Zap, Lightbulb, ArrowRight, Book, Tag, List, Plus, Settings2, Sparkles, SlidersHorizontal, Gavel } from 'lucide-react';
+import { createContext, useContext, useEffect, useEffectEvent, useLayoutEffect, useState, useSyncExternalStore, useCallback, useMemo, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref } from 'react';
+import { Command, useCommandState } from 'cmdk';
+import { autoUpdate, FloatingFocusManager, FloatingPortal, offset, size, useFloating, useInteractions, useRole } from '@floating-ui/react';
+import { motion, AnimatePresence, useIsPresent, usePresence, useReducedMotion } from 'framer-motion';
+import { ChevronDown, ChevronRight, Gavel, List, Search, Settings2, SlidersHorizontal, Sparkles, Tag, X, Zap } from 'lucide-react';
 import type { SearchParams, CustomAlias, SearchFilters } from '../../../types';
 import { cn } from '../../../lib/utils';
+import { dur, ease, spring } from '../../../lib/motion';
 import { parseItalianDate } from '../../../utils/dateUtils';
 import { useAppStore } from '../../../store/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useTour } from '../../../hooks/useTour';
-import { ACT_TYPES, ACT_TYPES_REQUIRING_DETAILS, getActTypesByGroup } from '../../../constants/actTypes';
+import { useIsDesktop } from '../../../hooks/useIsDesktop';
+import { ACT_TYPES_REQUIRING_DETAILS } from '../../../constants/actTypes';
 import { useAliasCatalog, foldAlias } from '../../../hooks/useAliasCatalog';
 import { Z_INDEX } from '../../../constants/zIndex';
-import { motion, AnimatePresence } from 'framer-motion';
-import { defaultSearchFilters } from '../../../utils/searchFilters';
+import { FIELD_TEXT, FOCUS_RING, TOUCH_TARGET_RESPONSIVE } from '../../../constants/interactions';
+import { activeFiltersLabel, countActiveFilters, defaultSearchFilters } from '../../../utils/searchFilters';
+import { SEARCH_FIELD_FORM_ID, returnWordsToSearchField } from '../../../utils/searchFieldControl';
 import { citationSearchParams, useSearchQuery } from '../../../hooks/useSearchQuery';
 import { formatDecisionShort } from '../../../utils/decisionLinks';
-import { spring } from '../../../lib/motion';
+import { Button } from '../../ui/Button';
+import { isTopmostDialog, openDialog } from '../../ui/dialogStack';
+import { filterPaletteActs, paletteActName, queryMatches, matchRanges } from './paletteActs';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -32,15 +39,291 @@ interface CommandPaletteProps {
 
 type PaletteStep = 'select_act' | 'input_article' | 'input_details';
 
-/** Case-insensitive, for the reason given on `selectedActLabel`: an act named
+const STEP_ORDER: Record<PaletteStep, number> = { select_act: 0, input_details: 1, input_article: 2 };
+
+/** How many favourites and aliases «A portata di mano» shows before the box is typed in. */
+const AT_HAND_ROWS = 6;
+
+/** The panel's height on a computer, at most (40 rem). */
+const PANEL_MAX_HEIGHT = 640;
+
+/** Case-insensitive, for the reason given on `paletteActName`: an act named
  *  by the server ("regolamento ue") must reach the same branch as the same act
- *  picked from the grid ("Regolamento UE"), or the palette skips the step that
+ *  picked from the list ("Regolamento UE"), or the palette skips the step that
  *  collects its number and date. */
 function requiresDetails(actValue: string): boolean {
   const wanted = (actValue || '').toLowerCase();
   return ACT_TYPES_REQUIRING_DETAILS.some(v => v.toLowerCase() === wanted);
 }
 
+// One row of the lists: 44 px, a colour change when chosen, never a lift (UI conventions).
+const ROW = 'relative isolate flex min-h-[44px] w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-ink-800 dark:text-ink-100';
+const ROW_ICON = 'shrink-0 text-ink-500 dark:text-ink-400';
+const SUBTLE = 'text-ink-600 dark:text-ink-400';
+// A group's heading, drawn by cmdk (`heading`), which also names the group for a screen reader.
+const GROUP_WITH_HEADING = '[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:pt-3 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-ink-600 dark:[&_[cmdk-group-heading]]:text-ink-400';
+const COLUMN_TITLE = 'px-3 pt-3 font-serif text-base font-medium text-ink-900 dark:text-ink-50';
+const QUIET_LINE = 'px-3 py-2 text-sm text-ink-600 dark:text-ink-400';
+const FIELD_INPUT = cn(
+  'h-11 w-full min-w-0 rounded-lg border border-ink-200 bg-white px-3 text-ink-900 placeholder:text-ink-500',
+  FIELD_TEXT,
+  'dark:border-ink-700 dark:bg-ink-950 dark:text-ink-50 dark:placeholder:text-ink-400',
+  FOCUS_RING,
+);
+const SMALL_INPUT = cn(
+  'min-h-[44px] rounded-lg border border-ink-200 bg-white px-3 text-ink-900 md:min-h-9',
+  FIELD_TEXT,
+  'dark:border-ink-700 dark:bg-ink-950 dark:text-ink-50',
+  FOCUS_RING,
+);
+
+/**
+ * The keys cmdk takes for its list wherever they are pressed inside it: Enter (it picks the chosen row
+ * and prevents the key), the arrows, Home and End. A control of the palette that is not the box keeps
+ * them, or Enter on «Filtri avanzati» would open the first act and the arrows of «Fonte» would move the
+ * list.
+ */
+const LIST_KEYS = new Set(['Enter', 'ArrowUp', 'ArrowDown', 'Home', 'End']);
+function keepKeys(event: ReactKeyboardEvent) {
+  if (LIST_KEYS.has(event.key) && !(event.target as HTMLElement).hasAttribute('cmdk-input')) event.stopPropagation();
+}
+
+/** What the box holds: the chosen row's tint slides only between rows of one list, never from a row a
+ *  letter typed has just filtered away. */
+const ChosenRowScope = createContext('');
+
+/**
+ * The tint under the row the keyboard (or the pointer) has chosen. One element, carried from row to row
+ * (`layoutId`), so the choice slides instead of jumping; under reduced motion it is drawn in place.
+ */
+function RowHighlight({ value, still }: { value: string; still: boolean }) {
+  const chosen = useCommandState((state) => state.value?.toLowerCase() === value.toLowerCase());
+  const scope = useContext(ChosenRowScope);
+  if (!chosen) return null;
+  // A tint and an edge in toga: the tint alone is too faint a mark for the row in use.
+  const tint = cn(
+    'absolute inset-0 -z-10 rounded-lg bg-ink-100 dark:bg-ink-800',
+    'before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-toga-600 dark:before:bg-toga-300',
+  );
+  return still
+    ? <span aria-hidden className={tint} />
+    : <motion.span aria-hidden layoutId={`command-palette-chosen-row:${scope}`} transition={spring.snappy} className={tint} />;
+}
+
+/**
+ * A row of the menu (R2): while the box filters, the rows left slide to their places (`layout`) and those filtered out
+ * fade away, popped out of the list (`AnimatePresence mode="popLayout"` around a list's rows) — and a row leaving is
+ * `disabled` for cmdk, so Enter never picks a row no longer there. Under reduced motion nothing moves.
+ */
+function PaletteRow({ ref, value, onSelect, still, entering = false, className, children }: {
+  ref?: Ref<HTMLDivElement>;
+  value: string;
+  onSelect: () => void;
+  still: boolean;
+  /** In a list that filters: it fades in when a letter brings it back. */
+  entering?: boolean;
+  className?: string;
+  children: ReactNode;
+}) {
+  const present = useIsPresent();
+  return (
+    // Leaving, it is not an option any more: not for Enter (`disabled`), not for a screen reader (`aria-hidden`).
+    <Command.Item asChild value={value} onSelect={onSelect} disabled={!present} aria-hidden={!present || undefined}>
+      <motion.div
+        ref={ref}
+        layout={still ? false : 'position'}
+        initial={entering && !still ? { opacity: 0 } : false}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0, transition: { duration: dur.press } }}
+        transition={{ layout: spring.snappy, opacity: { duration: dur.press } }}
+        className={cn(ROW, className)}
+      >
+        <RowHighlight value={value} still={still} />
+        {children}
+      </motion.div>
+    </Command.Item>
+  );
+}
+
+/** A row's words with the letters the box matched drawn in the app's ink (R2). */
+function Matched({ text, query }: { text: string; query: string }) {
+  const ranges = matchRanges(text, query);
+  if (ranges.length === 0) return <>{text}</>;
+  const parts: ReactNode[] = [];
+  let at = 0;
+  ranges.forEach(([start, end]) => {
+    if (start > at) parts.push(text.slice(at, start));
+    parts.push(<span key={start} className="font-semibold text-toga-700 dark:text-toga-300">{text.slice(start, end)}</span>);
+    at = end;
+  });
+  if (at < text.length) parts.push(text.slice(at));
+  return <>{parts}</>;
+}
+
+/** The search field's corner radius (`rounded-xl`) and the panel's (`rounded-2xl`): the growth goes from one to the other. */
+const FIELD_RADIUS = 12;
+const PANEL_RADIUS = 16;
+/** The growth: about 280 ms opening, 200 ms closing (the brief's), on the app's curves; no bounce. */
+const GROW_S = 0.28;
+const SHRINK_S = 0.2;
+/** The groups entering: the first four, 30 ms apart, from when the panel is half grown. */
+const GROUPS_ENTERING = 4;
+const GROUP_STAGGER_MS = 30;
+const GROUPS_AT_MS = 140;
+
+/** The visual viewport's height (a phone's keyboard shortens it, `100dvh` does not on iOS); null where it is unknown. */
+const subscribeViewport = (change: () => void) => {
+  window.visualViewport?.addEventListener('resize', change);
+  return () => window.visualViewport?.removeEventListener('resize', change);
+};
+const viewportHeight = () => window.visualViewport?.height ?? null;
+/** Closed, or on a computer: nothing watched. */
+const subscribeNothing = () => () => {};
+const noHeight = () => null;
+
+/**
+ * The panel growing out of the search page's field (R2), inspired by Animorio's «menu dei comandi», written from
+ * scratch with Web Animations and Framer Motion: the same place and width, the height uncovered from the field's down
+ * to the panel's (`clip-path`, the corners from the field's to a card's), then the clip goes and the card's shadow
+ * shows; the content fades in as it grows. Closing, the same way back (`usePresence`); opened again meanwhile, it grows
+ * back from where the closing was. Under reduced motion it only fades.
+ */
+function PanelGrowth({ still, fromHeight, className, children }: { still: boolean; fromHeight: number; className: string; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [isPresent, safeToRemove] = usePresence();
+  // `safeToRemove` is a new function at every render: kept here, it does not start the closing again (one closing,
+  // one animation).
+  const remove = useRef(safeToRemove);
+  useEffect(() => {
+    remove.current = safeToRemove;
+  });
+  // The closing on its way (or just finished, its end held), for a new opening to take over from where it is.
+  const closing = useRef<Animation | null>(null);
+  // An opening whose growth has not started yet (a close or StrictMode's second run before its first frames): when
+  // the panel comes back it is still an opening, with its groups' entrance, though a clip is already set.
+  const opening = useRef(false);
+  // The part hidden at the bottom, as a share of the panel and a length: the panel's own height is set by floating-ui
+  // after it mounts, so it is never measured here. One template, so the two ends interpolate.
+  const clipFor = (share: number, px: number, radius: number) => `inset(0px 0px calc(${share}% - ${px}px) 0px round ${radius}px)`;
+  const asField = clipFor(100, fromHeight, FIELD_RADIUS);
+  const asPanel = clipFor(0, 0, PANEL_RADIUS);
+  const curve = `cubic-bezier(${ease.out.join(', ')})`;
+  // Web Animations with no fill: once over, nothing holds the clip (the shadow outside it shows), and a closing
+  // interrupted by a new opening starts from where it was. (A DOM without them, a test's, draws the panel at once.)
+  const canAnimate = (el: HTMLElement) => typeof el.animate === 'function';
+
+  // Growing: from the field on an opening; from where a closing was, when the panel comes back before it went.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || !isPresent) return;
+    el.style.pointerEvents = '';
+    // Coming back before it went (the layout effects run before the closing's cleanup), or before its removal once
+    // it ended: from where the closing is.
+    let left: { clipPath: string; opacity: string } | null = null;
+    if (closing.current) {
+      const now = getComputedStyle(el);
+      left = { clipPath: now.clipPath, opacity: now.opacity };
+      closing.current.onfinish = null;
+      closing.current.cancel();
+      closing.current = null;
+    }
+    if (still) {
+      el.style.clipPath = '';
+      opening.current = false;
+      const fade = canAnimate(el)
+        ? el.animate([{ opacity: left ? Number(left.opacity) : 0 }, { opacity: 1 }], { duration: dur.pop * 1000, easing: curve })
+        : null;
+      return () => fade?.cancel();
+    }
+    if (left && left.clipPath && left.clipPath !== 'none') el.style.clipPath = left.clipPath;
+    // An opening (nothing left by a closing or a growth cut short): set before the first paint, or the panel would
+    // flash open meanwhile.
+    const held = el.style.clipPath && el.style.clipPath !== 'none' ? el.style.clipPath : '';
+    const isOpening = opening.current || !held;
+    const from = held || asField;
+    if (!canAnimate(el)) {
+      el.style.clipPath = '';
+      return;
+    }
+    el.style.clipPath = from;
+    opening.current = isOpening;
+    // Started once the first frame is drawn: mounting the menu's rows is a long frame, and an animation started before
+    // it would run its time out unseen, the panel appearing whole — and so is the render that brings it back during a
+    // closing: started there, it was nine tenths over by the first frame drawn.
+    let grow: Animation | null = null;
+    let groups: Animation[] = [];
+    const start = () => {
+      // The groups come one after the other as it grows: the first four, 30 ms apart, rising 4 px — on an opening only.
+      opening.current = false;
+      groups = isOpening
+        ? [...el.querySelectorAll<HTMLElement>('[cmdk-group]')].slice(0, GROUPS_ENTERING).map((group, i) =>
+          group.animate(
+            [{ opacity: 0, transform: 'translateY(4px)' }, { opacity: 1, transform: 'none' }],
+            { duration: dur.pop * 1000, delay: GROUPS_AT_MS + i * GROUP_STAGGER_MS, easing: curve, fill: 'backwards' },
+          ))
+        : [];
+      grow = el.animate([{ clipPath: from }, { clipPath: asPanel }], { duration: GROW_S * 1000, easing: curve });
+      // Grown, the clip goes: the card's own shadow shows.
+      grow.onfinish = () => {
+        el.style.clipPath = '';
+      };
+    };
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(start);
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      // Cut short (a closing, mid-growth): the closing starts from here, not from the field or the full panel.
+      if (grow?.playState === 'running') el.style.clipPath = getComputedStyle(el).clipPath;
+      if (grow) {
+        grow.onfinish = null;
+        grow.cancel();
+      }
+      groups.forEach((animation) => animation.cancel());
+    };
+    // Once per opening (or coming back): the panel's own re-renders do not grow it again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the field's height is read as it opens
+  }, [still, isPresent]);
+
+  // Closing: the same way back, from where it is (a growth cut short included); it takes no pointer meanwhile.
+  useEffect(() => {
+    if (isPresent) return;
+    const el = ref.current;
+    if (!el || !canAnimate(el)) {
+      remove.current?.();
+      return;
+    }
+    el.style.pointerEvents = 'none';
+    const now = getComputedStyle(el).clipPath;
+    const run = still
+      ? el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: dur.press * 1000, fill: 'forwards' })
+      : el.animate([{ clipPath: now && now !== 'none' ? now : asPanel }, { clipPath: asField }], { duration: SHRINK_S * 1000, easing: `cubic-bezier(${ease.inOut.join(', ')})`, fill: 'forwards' });
+    // Its end is held (`forwards`) until the panel goes: kept in the ref, so a panel brought back before its removal
+    // drops it (a finished closing left on it would clip the panel to the field once the new growth is over).
+    run.onfinish = () => remove.current?.();
+    closing.current = run;
+    return () => {
+      // Taken over by a new opening already (see the growth: a second cancel does nothing), or gone with the panel.
+      run.onfinish = null;
+      run.cancel();
+      if (closing.current === run) closing.current = null;
+    };
+    // Once per closing: the field's height and the curves are read as it starts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `asField`/`asPanel` are strings rebuilt each render
+  }, [isPresent, still]);
+
+  return (
+    <div ref={ref} className={cn('rounded-2xl shadow-lg', className)}>
+      <motion.div
+        className="flex min-h-0 flex-1 flex-col"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1, transition: { duration: dur.press, delay: still ? 0 : 0.04, ease: ease.out } }}
+      >
+        {children}
+      </motion.div>
+    </div>
+  );
+}
 
 export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, onShowSearch }: CommandPaletteProps) {
   const {
@@ -63,6 +346,7 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   // can take that focus, so when the tour ends the box gets it back. Only if the box is still there:
   // the ref is empty once the palette has closed or moved on to another step.
   const boxRef = useRef<HTMLInputElement>(null);
+  const numberRef = useRef<HTMLInputElement>(null);
   const { tryStartTour } = useTour({
     theme: settings.theme as 'light' | 'dark',
     onComplete: (tour) => {
@@ -71,13 +355,34 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   });
   const [step, setStep] = useState<PaletteStep>('select_act');
   const [selectedAct, setSelectedAct] = useState('');
-  const [article, setArticle] = useState('1');
+  // Empty, its placeholder saying what it takes: a «1» standing there took Backspace's first press (Bill).
+  const [article, setArticle] = useState('');
   const [actNumber, setActNumber] = useState('');
   const [actDate, setActDate] = useState('');
   const [inputValue, setInputValue] = useState('');
-  const [includeBrocardi, setIncludeBrocardi] = useState(true);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  // Enter pressed while the server was still naming the act: the words it was pressed on (the field's rule, R2).
+  const [waitingFor, setWaitingFor] = useState<string | null>(null);
+  // The arrows moved the chosen row since the words last changed: Enter is then cmdk's, for the row chosen.
+  const [moved, setMoved] = useState(false);
+  // A choice made in this opening: closed after it, the search page's field is emptied; closed without one (Esc, a
+  // click outside, ✕), the words go back to it — one field (R2).
+  const [chose, setChose] = useState(false);
   const [filters, setFilters] = useState<SearchFilters>(defaultSearchFilters);
+  const isDesktop = useIsDesktop();
+  const still = Boolean(useReducedMotion());
+
+  // Which way the step moved, for its slide: forward slides in from the right, back from the left.
+  // Adjusted during render (own state, no effect). A step changed while the palette is closed (the reset)
+  // does not slide the next opening.
+  const [shownStep, setShownStep] = useState<PaletteStep>(step);
+  const [direction, setDirection] = useState<-1 | 0 | 1>(0);
+  if (step !== shownStep) {
+    setShownStep(step);
+    setDirection(isOpen ? (STEP_ORDER[step] > STEP_ORDER[shownStep] ? 1 : -1) : 0);
+  } else if (!isOpen && direction !== 0) {
+    setDirection(0);
+  }
 
   // A citation handed over as the palette opens goes into the box (a decision that was not found).
   // Adjusted during render (own state, no effect); the store's copy is then taken in an effect.
@@ -92,12 +397,14 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     if (isOpen && commandPaletteQuery !== null) takeCommandPaletteQuery();
   }, [isOpen, commandPaletteQuery, takeCommandPaletteQuery]);
 
-  // Trigger Command Palette tour on first open
+  // The palette's tour on its first opening — an empty one: opened with words or a key typed on the search page's
+  // field (R2), the tour would take the focus and the letters that follow.
+  const startTourIfEmpty = useEffectEvent(() => {
+    if (!inputValue.trim()) tryStartTour('commandPalette');
+  });
   useEffect(() => {
-    if (isOpen) {
-      tryStartTour('commandPalette');
-    }
-  }, [isOpen, tryStartTour]);
+    if (isOpen) startTourIfEmpty();
+  }, [isOpen]);
 
   // Sorted custom aliases for display (by usage, then alphabetically)
   const sortedAliases = useMemo(() => {
@@ -116,10 +423,10 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     const mine = new Set(customAliases.map(a => foldAlias(a.trigger)));
     return Object.entries(catalog.presets)
       // 21 of the 80 presets only rename an act type — "codice appalti" IS the
-      // "Codice Contratti Pubblici" tile that already sits in the grid below,
+      // "Codice dei contratti pubblici" row that already sits in the list of acts,
       // so listing them duplicated the act list without adding anything. The
       // 59 kept here carry a number and a date ("gdpr" -> Reg. UE 679/2016),
-      // which is work the grid cannot save you.
+      // which is work the list cannot save you.
       .filter(([, preset]) => Boolean(preset.act_number))
       // A custom alias with the same trigger wins at resolution time, so
       // showing the preset too would advertise a shortcut that no longer runs.
@@ -128,12 +435,6 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
       // it replaces.
       .sort(([a], [b]) => a.length - b.length || a.localeCompare(b));
   }, [catalog.presets, customAliases]);
-
-  // Nothing at rest. The header line says they exist; that is the whole point
-  // of not drawing them. They materialise once the user types, and cmdk does
-  // the matching, so the full set stays reachable without ever weighing on the
-  // idle palette.
-  const visiblePresets = inputValue.trim() ? presetEntries : [];
 
   // Four, not three: the three shortest are all Testi Unici (tub, tuf, tus) and
   // read as cryptic on their own. The fourth is gdpr, which makes the whole
@@ -146,27 +447,52 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   // What the box names (a decision, a norm, a topic): one reading, shared with the search page's field.
   const { decisionRef, parsedCitation, citationReady, citationPreview, resolvingRemotely, topic } = useSearchQuery(inputValue);
 
+  // The box filters every list while it is typed (`paletteActs.ts`: each typed word begins a word of the
+  // row). cmdk's own filter is off: it reorders the rows by score, across the two columns.
+  const typed = inputValue.trim();
+  const actGroups = useMemo(() => filterPaletteActs(inputValue), [inputValue]);
+  const visibleQuickNorms = typed
+    ? quickNorms.filter((qn) => queryMatches(inputValue, qn.label, qn.searchParams.act_type))
+    : quickNorms.slice(0, AT_HAND_ROWS);
+  const visibleAliases = typed
+    ? sortedAliases.filter((a) => queryMatches(inputValue, a.trigger, a.expandTo))
+    : sortedAliases.slice(0, AT_HAND_ROWS);
+  // Nothing at rest: the alias heading's line says they exist; that is the whole point of not drawing them.
+  // They appear once the user types, so the full set stays reachable without weighing on the idle palette.
+  const visiblePresets = typed
+    ? presetEntries.filter(([trigger, preset]) => queryMatches(inputValue, trigger, preset.act_type))
+    : [];
+  // The door to the manager, found by typing «alias» too.
+  const showAliasDoor = !typed || queryMatches(inputValue, 'alias gestisci crea scorciatoie');
+
   // Reset on close
   useEffect(() => {
     if (!isOpen) {
       const timer = setTimeout(() => {
         setStep('select_act');
         setSelectedAct('');
-        setArticle('1');
+        setArticle('');
         setActNumber('');
         setActDate('');
         setInputValue('');
+        setWaitingFor(null);
       }, 200);
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
 
+  // On the dialogs' stack while open: opened over one (⌘K over the comparison), it keeps Tab and Esc, which that dialog's
+  // trap would otherwise take back, its box being portalled to the body, outside the dialog. Its own focus is floating-ui's.
+  const [stackToken] = useState(() => Symbol('palette'));
+  useEffect(() => (isOpen ? openDialog(stackToken) : undefined), [isOpen, stackToken]);
+
   // Handle Escape key. Only while open: a closed palette that took every Escape and called
-  // `preventDefault` on it would hide it from whoever honours `defaultPrevented` (the rail's overlay).
+  // `preventDefault` on it would hide it from whoever honours `defaultPrevented` (the rail's overlay). Only while it is the
+  // top-most dialog: one opened over it takes its own Esc.
   useEffect(() => {
     if (!isOpen) return undefined;
     const down = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && isTopmostDialog(stackToken)) {
         e.preventDefault();
         onClose();
       }
@@ -174,7 +500,13 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
 
     document.addEventListener('keydown', down);
     return () => document.removeEventListener('keydown', down);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, stackToken]);
+
+  /** A choice made: the menu closes and the field is left empty. */
+  const done = useCallback(() => {
+    setChose(true);
+    onClose();
+  }, [onClose]);
 
   const handleSelectAct = useCallback((actValue: string) => {
     setSelectedAct(actValue);
@@ -191,20 +523,20 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     const qn = selectQuickNorm(id);
     if (qn) {
       onSearch(qn.searchParams);
-      onClose();
+      done();
     }
-  }, [selectQuickNorm, onSearch, onClose]);
+  }, [selectQuickNorm, onSearch, done]);
 
   const handleOpenQuickNormsManager = useCallback(() => {
-    onClose();
+    done();
     // Small delay to let the palette close before opening manager
     setTimeout(() => openQuickNormsManager(), 100);
-  }, [onClose, openQuickNormsManager]);
+  }, [done, openQuickNormsManager]);
 
   const handleOpenAliasManager = useCallback(() => {
-    onClose();
+    done();
     setTimeout(() => openAliasManager(), 100);
-  }, [onClose, openAliasManager]);
+  }, [done, openAliasManager]);
 
   const handleSelectAlias = useCallback((alias: CustomAlias) => {
     trackAliasUsage(alias.id);
@@ -218,12 +550,11 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
         article: alias.searchParams.article || '1',
         version: 'vigente',
         version_date: '',
-        show_brocardi_info: includeBrocardi,
         filters,
       });
-      onClose();
+      done();
     }
-  }, [trackAliasUsage, onSearch, onClose, includeBrocardi, filters]);
+  }, [trackAliasUsage, onSearch, done, filters]);
 
   const handleSelectPreset = useCallback((trigger: string) => {
     const preset = catalog.presets[trigger];
@@ -245,16 +576,16 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
   const handleSearchTopic = useCallback(() => {
     if (!topic) return;
     openTopicSearch({ tema: topic }, `Tema: ${topic}`);
-    onClose();
+    done();
     onShowSearch?.();
-  }, [topic, openTopicSearch, onClose, onShowSearch]);
+  }, [topic, openTopicSearch, done, onShowSearch]);
 
   const handleOpenDecision = useCallback(() => {
     if (!decisionRef) return;
     openDecision(decisionRef, { fromLink: true });
-    onClose();
+    done();
     onShowSearch?.();
-  }, [decisionRef, openDecision, onClose, onShowSearch]);
+  }, [decisionRef, openDecision, done, onShowSearch]);
 
   const handleCitationSearch = useCallback(() => {
     if (!parsedCitation) return;
@@ -265,8 +596,8 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
     }
 
     if (citationReady) {
-      onSearch(citationSearchParams(parsedCitation, { showBrocardi: includeBrocardi, filters }));
-      onClose();
+      onSearch(citationSearchParams(parsedCitation, { filters }));
+      done();
     } else if (parsedCitation.act_type) {
       setSelectedAct(parsedCitation.act_type);
       if (parsedCitation.article) setArticle(parsedCitation.article);
@@ -284,7 +615,34 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
         setStep('input_article');
       }
     }
-  }, [parsedCitation, citationReady, onSearch, onClose, includeBrocardi, filters, trackAliasUsage]);
+  }, [parsedCitation, citationReady, onSearch, done, filters, trackAliasUsage]);
+
+  // The answer Enter was waiting for has come: run it, once.
+  const runWhenAnswered = useEffectEvent(() => {
+    setWaitingFor(null);
+    if (decisionRef) handleOpenDecision();
+    else if (parsedCitation) handleCitationSearch();
+    else if (topic) handleSearchTopic();
+  });
+  useEffect(() => {
+    // Not once closed: Esc during the wait drops it (the reset clears it 200 ms later).
+    if (isOpen && waitingFor !== null && waitingFor === inputValue && !resolvingRemotely) runWhenAnswered();
+  }, [isOpen, waitingFor, inputValue, resolvingRemotely]);
+  const waiting = waitingFor !== null && waitingFor === inputValue;
+
+  /** One step back: the article to the details (when the act has them) or to the act, the details to the act. */
+  const stepBack = useCallback(() => {
+    if (step === 'input_article' && requiresDetails(selectedAct)) setStep('input_details');
+    else if (step !== 'select_act') setStep('select_act');
+  }, [step, selectedAct]);
+  /** Backspace on an empty field goes back a step, as in the field's crumb (R2). */
+  const backOnEmpty = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    // A held key does not run through the steps: it empties the field and stops there.
+    if (event.key === 'Backspace' && event.currentTarget.value === '' && !event.repeat) {
+      event.preventDefault();
+      stepBack();
+    }
+  };
 
   const handleSubmitArticle = useCallback(() => {
     if (!selectedAct || !article) return;
@@ -296,11 +654,10 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
       date: actDate ? parseItalianDate(actDate) : '',
       version: 'vigente',
       version_date: '',
-      show_brocardi_info: includeBrocardi,
       filters,
     });
-    onClose();
-  }, [selectedAct, article, actNumber, actDate, onSearch, onClose, includeBrocardi, filters]);
+    done();
+  }, [selectedAct, article, actNumber, actDate, onSearch, done, filters]);
 
   const handleSubmitDetails = useCallback(() => {
     if (!selectedAct || !actNumber || !actDate) return;
@@ -322,657 +679,702 @@ export function CommandPalette({ isOpen, onClose, onSearch, onBrowseStructure, o
       date: actDate ? parseItalianDate(actDate) : '',
       version: 'vigente',
       version_date: '',
-      show_brocardi_info: includeBrocardi,
       filters,
     });
 
-    onClose();
-  }, [selectedAct, actNumber, actDate, includeBrocardi, filters, onBrowseStructure, onClose]);
+    done();
+  }, [selectedAct, actNumber, actDate, filters, onBrowseStructure, done]);
 
-  /**
-   * The act as a human would name it.
-   *
-   * Matched case-insensitively, and falling back to the raw value, because the
-   * two vocabularies disagree: ACT_TYPES carries `Regolamento UE` while the
-   * server resolver answers `regolamento ue`. A `===` lookup missed, and the
-   * header rendered " n. 1689 del 2024" with no act name at all while
-   * "Stai consultando:" trailed off into nothing. Same trap as `codice_urn`
-   * on the backend.
-   */
-  const selectedActLabel = useMemo(() => {
-    if (!selectedAct) return '';
-    const match = ACT_TYPES.find(
-      act => act.value.toLowerCase() === selectedAct.toLowerCase()
-    );
-    return match?.label ?? selectedAct;
-  }, [selectedAct]);
+  /** The act as a lawyer names it (`paletteActName`: case-insensitive, the raw value when unknown). */
+  const selectedActLabel = useMemo(() => paletteActName(selectedAct), [selectedAct]);
+  /** The crumb in the field, and its name: the act, with its number and year on the article's step. */
+  const crumbText = `${selectedActLabel}${step === 'input_article' && actNumber ? ` ${actNumber}${actDate ? `/${actDate.slice(-4)}` : ''}` : ''}`;
 
-  if (!isOpen) return null;
+  // On a computer the palette drops from the search page's field, as wide as the field, over it;
+  // where no field is on screen (another page, Focus mode) it hangs at the top, centred. The form is
+  // looked up at every render while open, so a field that mounts later (the address /sentenze) or goes
+  // is followed, and passed at render time (gotcha 13).
+  const field = isOpen && isDesktop ? document.getElementById(SEARCH_FIELD_FORM_ID) : null;
+  const anchor = field?.isConnected ? field : null;
+  // The height the panel grows from: the field's, where it grows out of it; a field's height elsewhere (a phone's bar).
+  const growFrom = anchor?.offsetHeight || 44;
+  // A phone: the panel as tall as what the keyboard leaves, and the page under it holds still (the sheet it replaced
+  // did both).
+  const watchViewport = isOpen && !isDesktop;
+  const shownHeight = useSyncExternalStore(
+    watchViewport ? subscribeViewport : subscribeNothing,
+    watchViewport ? viewportHeight : noHeight,
+    noHeight,
+  );
+  useEffect(() => {
+    if (!isOpen || isDesktop) return;
+    const before = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = before;
+    };
+  }, [isOpen, isDesktop]);
+  // A dialog on a computer too: the focus stays inside while it is open and goes back where it was
+  // (the field) when it closes. Placed only when the field is there.
+  const { refs, floatingStyles, context } = useFloating({
+    open: isOpen,
+    elements: { reference: anchor },
+    placement: 'bottom-start',
+    strategy: 'fixed',
+    middleware: [
+      // Its top on the field's: the panel's own box takes the field's place.
+      offset(({ rects }) => -rects.reference.height),
+      // As wide as the field; as tall as what it holds, up to the height it always had (Bill: one row is not a
+      // 640 px panel), the window allowing.
+      size({
+        padding: 16,
+        apply({ rects, availableHeight, elements }) {
+          elements.floating.style.width = `${rects.reference.width}px`;
+          elements.floating.style.setProperty('--palette-max-h', `${Math.min(PANEL_MAX_HEIGHT, Math.max(320, availableHeight))}px`);
+        },
+      }),
+    ],
+    whileElementsMounted: autoUpdate,
+  });
+  // The field gone while the menu is open (another page, Focus mode): what `size` wrote on the box goes with it, or
+  // the panel hung at the top would keep the field's width and height.
+  useLayoutEffect(() => {
+    if (anchor || !isDesktop) return;
+    const box = refs.floating.current;
+    box?.style.removeProperty('width');
+    box?.style.removeProperty('--palette-max-h');
+  }, [anchor, isDesktop, refs]);
+  const role = useRole(context, { role: 'dialog' });
+  // What had the focus as the palette opened (the field, a button elsewhere): it gets it back.
+  // Taken during render as the palette opens (own state, no effect), before the box takes the focus.
+  const [wasOpen, setWasOpen] = useState(false);
+  const [opener, setOpener] = useState<HTMLElement | null>(null);
+  if (isOpen !== wasOpen) {
+    setWasOpen(isOpen);
+    if (isOpen) {
+      setOpener(document.activeElement instanceof HTMLElement ? document.activeElement : null);
+      setChose(false);
+      // Opened again before the reset after a close (200 ms): it starts at its first step all the same, with no
+      // words but those handed over.
+      setStep('select_act');
+      setSelectedAct('');
+      setArticle('');
+      setActNumber('');
+      setActDate('');
+      setWaitingFor(null);
+      setMoved(false);
+      if (commandPaletteQuery === null) setInputValue('');
+    }
+  }
+  const { getFloatingProps } = useInteractions([role]);
 
-  return (
-    // Covers the workspace: Cmd/Ctrl+F is left to the browser (`isWorkspaceCovered`).
-    <div data-find-overlay="" className={cn('fixed inset-0 p-4 sm:p-6 md:p-20 overflow-y-auto custom-scrollbar', Z_INDEX.commandPalette)}>
-      {/* No open or close animation: ⌘K is opened dozens of times a day, and motion on a keyboard
-          action makes it feel slow (spec 2026-10-18-redesign-inchiostro §6.1). */}
-      <div
-        className="fixed inset-0 bg-slate-950/40 backdrop-blur-md"
+  // Closed: its words go back to the search page's field when no choice was made (R2: one field), the field is
+  // emptied after a choice. Only on a closing, not on the first draw.
+  const wordsNow = useRef('');
+  const stepNow = useRef<PaletteStep>(step);
+  const choseNow = useRef(chose);
+  useEffect(() => {
+    wordsNow.current = inputValue;
+    stepNow.current = step;
+    choseNow.current = chose;
+  });
+  const closedOnce = useRef(isOpen);
+  useEffect(() => {
+    if (isOpen) {
+      closedOnce.current = true;
+      return;
+    }
+    if (!closedOnce.current) return;
+    closedOnce.current = false;
+    returnWordsToSearchField(!choseNow.current && stepNow.current === 'select_act' ? wordsNow.current.trim() : '');
+  }, [isOpen]);
+
+  // The step's content slides in from the side it moved to; the first step of an opening does not move.
+  const stepMotion = direction === 0
+    ? { initial: false as const }
+    : {
+        initial: still ? { opacity: 0 } : { opacity: 0, x: direction * 12 },
+        animate: still ? { opacity: 1 } : { opacity: 1, x: 0 },
+        transition: { duration: dur.pop, ease: ease.out },
+      };
+
+  const activeFilters = countActiveFilters(filters);
+
+  // ── The field: the one strong thing of the panel ────────────────────────────────────────────────
+  const waitingLine = { icon: Search, tone: 'animate-pulse text-ink-500 dark:text-ink-400', text: 'Cerco l’atto… la ricerca parte appena lo trovo', action: '' };
+  const preview = decisionRef
+    ? { icon: Gavel, tone: 'text-emerald-700 dark:text-emerald-400', text: `Sentenza → ${formatDecisionShort(decisionRef)}`, action: 'Invio apre' }
+    : waiting ? waitingLine
+    : parsedCitation && citationPreview
+      ? {
+          icon: parsedCitation.fromAlias ? Tag : Zap,
+          tone: parsedCitation.fromAlias
+            ? 'text-toga-700 dark:text-toga-300'
+            : citationReady ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400',
+          text: `${parsedCitation.fromAlias ? 'tramite alias → ' : ''}${citationPreview}`,
+          action: citationReady ? 'Invio cerca' : 'Invio completa',
+        }
+      : resolvingRemotely
+        ? { ...waitingLine, text: 'Cerco l’atto…' }
+        : topic
+          ? { icon: Gavel, tone: 'text-emerald-700 dark:text-emerald-400', text: `Cerca «${topic}» nelle sentenze della Cassazione`, action: 'Invio cerca' }
+          : null;
+
+  const helpLine = step === 'select_act'
+    ? 'Scrivi una citazione: art. 2043 c.c., l. 241/1990, Cass. civ. 10787/2024'
+    : step === 'input_details'
+      ? "Scrivi il numero e l'anno (o la data) dell'atto: 241 e 1990"
+      : "Scrivi il numero dell'articolo: 2043, 1-bis";
+
+  const fieldRow = (
+    <div className="flex items-center gap-2 px-3 pt-2" onKeyDown={keepKeys}>
+      <motion.div key={step} {...stepMotion} className="flex min-w-0 flex-1 items-center gap-3">
+        {step === 'select_act' && (
+          // The field's border carries the focus ring (`focus-within`); the box inside draws none, or the
+          // global `input:focus-visible` ring would stand out around it, over the icon.
+          <div className={cn(
+            'flex h-12 min-w-0 flex-1 items-center gap-3 rounded-lg border border-ink-200 bg-white px-3',
+            'focus-within:border-toga-500 focus-within:ring-2 focus-within:ring-toga-500/30',
+            'dark:border-ink-700 dark:bg-ink-950 dark:focus-within:border-toga-400',
+          )}>
+            <Search size={20} aria-hidden className="shrink-0 text-ink-500 dark:text-ink-400" />
+            <Command.Input
+              ref={boxRef}
+              autoFocus
+              value={inputValue}
+              onValueChange={(value) => {
+                // A change of the words drops a wait: a new Enter is needed, even back on the same words.
+                setWaitingFor(null);
+                setMoved(false);
+                setInputValue(value);
+              }}
+              enterKeyHint="search"
+              aria-describedby="command-palette-help"
+              placeholder="Atto o citazione, es. art 2043 cc"
+              // 18 px, and never under 16 px: with the text size «piccolo» `text-lg` was 15.75 px, and Safari on an
+              // iPhone zooms into a field under 16 px (`FIELD_TEXT`).
+              className="h-full w-full min-w-0 bg-transparent text-[length:max(1.125rem,16px)] font-medium text-ink-900 outline-none placeholder:font-normal placeholder:text-ink-500 focus-visible:ring-0 focus-visible:ring-offset-0 dark:text-ink-50 dark:placeholder:text-ink-400"
+              onKeyDown={(e) => {
+                // The field's order (R2): a decision, then the server still naming the act (the search runs when it
+                // answers), then a norm — unless the arrows chose another row, which Enter then picks.
+                if (['ArrowDown', 'ArrowUp', 'Home', 'End', 'PageDown', 'PageUp'].includes(e.key)) setMoved(true);
+                // An Enter that ends an IME composition chooses the composed word, it searches nothing.
+                if (e.key !== 'Enter' || moved || e.nativeEvent.isComposing) return;
+                if (decisionRef) {
+                  e.preventDefault();
+                  handleOpenDecision();
+                } else if (resolvingRemotely) {
+                  e.preventDefault();
+                  setWaitingFor(inputValue);
+                } else if (parsedCitation) {
+                  e.preventDefault();
+                  handleCitationSearch();
+                }
+              }}
+            />
+          </div>
+        )}
+
+        {step !== 'select_act' && (
+          // The crumb in the field (R2): the act chosen, which takes you back a step; Backspace on an empty field too.
+          <button
+            type="button"
+            onClick={stepBack}
+            aria-label={`Torna indietro: ${crumbText}`}
+            className={cn('inline-flex min-h-[44px] max-w-[45%] shrink-0 items-center gap-1 rounded-md bg-ink-100 px-2 text-sm font-medium text-ink-800 hover:bg-ink-200 md:min-h-9 dark:bg-ink-800 dark:text-ink-100 dark:hover:bg-ink-700', FOCUS_RING)}
+          >
+            <span className="truncate">{crumbText}</span>
+            <ChevronRight size={14} aria-hidden className="shrink-0" />
+          </button>
+        )}
+        {step === 'input_details' && (
+          <div className="flex min-w-0 flex-1 gap-2 py-1">
+            <input
+              type="text"
+              ref={numberRef}
+              aria-label="Numero dell'atto"
+              placeholder="Numero, es. 241"
+              value={actNumber}
+              onChange={(e) => setActNumber(e.target.value)}
+              className={cn(FIELD_INPUT, 'flex-[1.5]')}
+              autoFocus
+              onKeyDown={(e) => (e.key === 'Enter' ? handleSubmitDetails() : backOnEmpty(e))}
+            />
+            <input
+              type="text"
+              aria-label="Anno o data dell'atto"
+              value={actDate}
+              onChange={(e) => setActDate(e.target.value)}
+              placeholder="Anno o data"
+              className={cn(FIELD_INPUT, 'flex-1')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSubmitDetails();
+                // Backspace on an empty date goes back to the number first, while it holds one.
+                else if (e.key === 'Backspace' && e.currentTarget.value === '' && actNumber && !e.repeat) {
+                  e.preventDefault();
+                  numberRef.current?.focus();
+                } else backOnEmpty(e);
+              }}
+            />
+          </div>
+        )}
+
+        {step === 'input_article' && (
+          <div className="min-w-0 flex-1 py-1">
+            <input
+              type="text"
+              aria-label="Numero dell'articolo"
+              placeholder="Articolo, es. 12"
+              value={article}
+              onChange={(e) => setArticle(e.target.value)}
+              className={FIELD_INPUT}
+              autoFocus
+              onKeyDown={(e) => (e.key === 'Enter' ? handleSubmitArticle() : backOnEmpty(e))}
+            />
+          </div>
+        )}
+      </motion.div>
+
+      {/* «Chiudi», on a phone too: the panel has no other (R2). */}
+      <button
+        type="button"
         onClick={onClose}
-      />
-
-      <div
-        className="relative mx-auto w-full max-w-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl rounded-3xl shadow-glass border border-white dark:border-slate-800 overflow-hidden"
+        aria-label="Chiudi"
+        className={cn('inline-flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-800 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-ink-100', FOCUS_RING)}
       >
-        <Command
-          id="command-menu-root"
-          className="flex flex-col h-full"
-          label="Menu di Ricerca"
+        <X size={18} aria-hidden />
+      </button>
+    </div>
+  );
+
+  // The help line, or what the box was read as, 10 px under the field and on the line of its text: the
+  // field's edge (12 px of row, 1 of border, 12 of padding), then on the first step the icon's 20 px and
+  // the gap's 12. The visible line is aria-hidden: the status region says it.
+  // The line under the box says what no row says: the wait for the server. A decision, a norm or a topic read in the
+  // box is its row, the chosen one, with «↵» — a second line saying the same was one too many (Bill).
+  const lineSays = step === 'select_act' && preview && (waiting || resolvingRemotely) ? preview : null;
+  const fieldLine = (
+    <div aria-hidden className="flex min-h-5 items-center gap-3 pb-3 pl-[25px] pr-4 pt-2.5 text-xs">
+      {step === 'select_act' && (
+        <span className="flex w-5 shrink-0 justify-center">
+          {lineSays && <lineSays.icon size={14} className={lineSays.tone} />}
+        </span>
+      )}
+      {lineSays ? (
+        <>
+          <span id="command-palette-help" className="sr-only">{helpLine}</span>
+          <span className={cn('min-w-0 flex-1 truncate font-medium', lineSays.tone)}>{lineSays.text}</span>
+          <span className={cn('shrink-0', SUBTLE)}>{lineSays.action}</span>
+        </>
+      ) : (
+        <span id="command-palette-help" className={SUBTLE}>{helpLine}</span>
+      )}
+    </div>
+  );
+
+  // ── What the box was read as: one strong row, the chosen one, in place of two columns with nothing
+  // to choose. Enter in the box runs the same thing.
+  const readAs = step !== 'select_act' ? null
+    : decisionRef
+      ? { icon: Gavel, text: formatDecisionShort(decisionRef), action: 'Apri la sentenza', run: handleOpenDecision }
+      : parsedCitation && citationPreview
+        ? {
+            icon: parsedCitation.fromAlias ? Tag : Zap,
+            text: `${parsedCitation.fromAlias ? 'tramite alias → ' : ''}${citationPreview}`,
+            action: citationReady ? "Apri l'articolo" : 'Completa',
+            run: handleCitationSearch,
+          }
+        : null;
+  const readAsRow = readAs && (
+    <Command.Group className="shrink-0 pt-2">
+      <PaletteRow value="lettura del campo" onSelect={readAs.run} still={still} className="min-h-[56px] gap-3 text-base">
+        <readAs.icon size={18} aria-hidden className="shrink-0 text-toga-700 dark:text-toga-300" />
+        <span className="min-w-0 flex-1 truncate">
+          <span className="font-medium text-ink-900 dark:text-ink-50">{readAs.text}</span>
+          <span className="font-medium text-toga-700 dark:text-toga-300"> · {readAs.action} ↵</span>
+        </span>
+      </PaletteRow>
+    </Command.Group>
+  );
+
+  // ── «Scegli l'atto» ─────────────────────────────────────────────────────────────────────────────
+  // A decision or a norm read in the box is `readAs`'s row, which takes the columns' place.
+  const noActLine = resolvingRemotely
+    ? "Cerco l'atto… riconosco i nomi per esteso, non solo le sigle"
+    : 'Nessun atto con questo nome';
+
+  // The tour's second step points here (`#command-palette-results`): an id given to `Command.List` is
+  // replaced by cmdk's own, so it lives on a container of ours.
+  const actColumn = (
+    <div id="command-palette-results">
+      <div aria-hidden className={COLUMN_TITLE}>Scegli l'atto</div>
+      {actGroups.length === 0 && <p className={QUIET_LINE}>{noActLine}</p>}
+      {actGroups.map((group) => (
+        <Command.Group
+          key={group.heading}
+          heading={group.heading}
+          className={GROUP_WITH_HEADING}
         >
-          {/* Header with Glass-style search area */}
-          <div className="border-b border-slate-200 dark:border-slate-800">
-            {/* Navigation / Step Breadcrumbs */}
-            <div className="flex items-center gap-2 px-6 pt-5 pb-3">
-              <button
-                type="button"
-                onClick={() => setStep('select_act')}
-                className={cn(
-                  "group flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-[color,background-color,border-color,box-shadow] cursor-pointer",
-                  step === 'select_act'
-                    ? "bg-primary-500 text-white shadow-lg shadow-primary-500/20"
-                    : selectedAct
-                      ? "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"
-                      : "bg-slate-100 dark:bg-slate-800 text-slate-400"
-                )}
-              >
-                {selectedAct && step !== 'select_act' ? <Check size={12} strokeWidth={3} /> : <Book size={12} strokeWidth={3} />}
-                <span>Atto</span>
-              </button>
+          <AnimatePresence initial={false} mode="popLayout">
+            {group.acts.map((act) => (
+              <PaletteRow key={act.value} value={`atto ${act.value}`} onSelect={() => handleSelectAct(act.value)} still={still} entering>
+                <span className="min-w-0 flex-1 line-clamp-2">
+                  <span className="text-ink-900 dark:text-ink-50"><Matched text={act.name} query={inputValue} /></span>
+                  {act.abbreviation && <span className={SUBTLE}> · <Matched text={act.abbreviation} query={inputValue} /></span>}
+                </span>
+              </PaletteRow>
+            ))}
+          </AnimatePresence>
+        </Command.Group>
+      ))}
+    </div>
+  );
 
-              {requiresDetails(selectedAct) && (
-                <button
-                  type="button"
-                  onClick={() => selectedAct && setStep('input_details')}
-                  className={cn(
-                    "group flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-[color,background-color,border-color,box-shadow] cursor-pointer",
-                    step === 'input_details'
-                      ? "bg-primary-500 text-white shadow-lg shadow-primary-500/20"
-                      : (actNumber && actDate)
-                        ? "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"
-                        : "bg-slate-100 dark:bg-slate-800 text-slate-400"
-                  )}
-                >
-                  {(actNumber && actDate) && step !== 'input_details' ? <Check size={12} strokeWidth={3} /> : <Zap size={12} strokeWidth={3} />}
-                  <span>Dettagli</span>
-                </button>
-              )}
+  // ── «A portata di mano» ─────────────────────────────────────────────────────────────────────────
+  const hiddenQuickNorms = typed ? 0 : quickNorms.length - visibleQuickNorms.length;
+  const hiddenAliases = typed ? 0 : sortedAliases.length - visibleAliases.length;
+  const atHandColumn = (
+    <div>
+      <div aria-hidden className={COLUMN_TITLE}>A portata di mano</div>
 
-              <div className={cn(
-                "flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-[color,background-color,border-color,box-shadow]",
-                step === 'input_article'
-                  ? "bg-primary-500 text-white shadow-lg shadow-primary-500/20"
-                  : "bg-slate-100 dark:bg-slate-800 text-slate-400"
-              )}>
-                <Star size={12} strokeWidth={3} />
-                <span>Articolo</span>
-              </div>
-            </div>
+      {(!typed || visibleQuickNorms.length > 0) && (
+        <Command.Group
+          id="command-palette-quick-norms"
+          heading="Preferiti"
+          // The heading is as tall as «Gestisci» (44 px on a phone), which sits in it and covers no row.
+          className={cn('relative', GROUP_WITH_HEADING, '[&_[cmdk-group-heading]]:flex [&_[cmdk-group-heading]]:min-h-[44px] [&_[cmdk-group-heading]]:items-end md:[&_[cmdk-group-heading]]:min-h-0')}
+        >
+          <button
+            type="button"
+            onClick={handleOpenQuickNormsManager}
+            onKeyDown={keepKeys}
+            className={cn('absolute right-1 top-0 inline-flex items-center rounded px-2 text-xs font-medium text-toga-700 hover:underline md:top-2 dark:text-toga-300', TOUCH_TARGET_RESPONSIVE, FOCUS_RING)}
+          >
+            Gestisci
+          </button>
+          {quickNorms.length === 0 ? (
+            <p className={QUIET_LINE}>Nessun preferito: il fulmine su un articolo lo aggiunge qui</p>
+          ) : (
+            <AnimatePresence initial={false} mode="popLayout">
+              {visibleQuickNorms.map((qn) => (
+                <PaletteRow key={qn.id} value={`preferito ${qn.id}`} onSelect={() => handleSelectQuickNorm(qn.id)} still={still} entering>
+                  <Zap size={14} aria-hidden className="shrink-0 fill-amber-500 text-amber-600 dark:text-amber-400" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-ink-900 dark:text-ink-50"><Matched text={qn.label} query={inputValue} /></span>
+                    <span className={cn('block truncate text-xs', SUBTLE)}>{paletteActName(qn.searchParams.act_type)}</span>
+                  </span>
+                </PaletteRow>
+              ))}
+            </AnimatePresence>
+          )}
+          {hiddenQuickNorms > 0 && (
+            <PaletteRow value="preferiti tutti" onSelect={handleOpenQuickNormsManager} still={still} className="text-toga-700 dark:text-toga-300">
+              Tutti i preferiti ({quickNorms.length})
+            </PaletteRow>
+          )}
+        </Command.Group>
+      )}
 
-            {/* One live region for the whole life of the palette, its text changing: a region that
-                appears already holding its text is often not announced. The visible line is aria-hidden. */}
-            <p role="status" className="sr-only">
-              {decisionRef
-                ? `Sentenza: ${formatDecisionShort(decisionRef)}. Invio per aprire.`
-                : topic ? `Cerca "${topic}" nelle sentenze della Cassazione.` : ''}
+      {(!typed || visibleAliases.length > 0 || showAliasDoor) && (
+        <Command.Group heading="I tuoi alias" className={GROUP_WITH_HEADING}>
+          {/* At rest this line is the only trace the presets leave. */}
+          {presetEntries.length > 0 && (
+            <p className={cn('truncate px-3 pb-1 text-xs', SUBTLE)}>
+              +{presetEntries.length} già pronti{presetHint && `: ${presetHint}…`}
             </p>
+          )}
+          <AnimatePresence initial={false} mode="popLayout">
+          {visibleAliases.map((alias) => (
+            <PaletteRow key={alias.id} value={`alias ${alias.id}`} onSelect={() => handleSelectAlias(alias)} still={still} entering>
+              <Tag size={14} aria-hidden className={ROW_ICON} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium text-ink-900 dark:text-ink-50"><Matched text={alias.trigger} query={inputValue} /></span>
+                <span className={cn('block truncate text-xs', SUBTLE)}>→ {alias.expandTo}</span>
+              </span>
+            </PaletteRow>
+          ))}
+          </AnimatePresence>
+          {/* The door to the manager. Rendered whatever the user owns, on purpose: gated on owning an
+              alias, it hid the only way to make the first one. A row of the list, so typing «alias»
+              finds it. */}
+          {showAliasDoor && (
+            <PaletteRow value="alias gestisci crea scorciatoie" onSelect={handleOpenAliasManager} still={still} className="text-toga-700 dark:text-toga-300">
+              {hasAliases ? <Settings2 size={14} aria-hidden className="shrink-0" /> : null}
+              <span className="min-w-0 flex-1 truncate underline-offset-2 hover:underline">
+                {hasAliases ? `Gestisci alias${hiddenAliases > 0 ? ` (${sortedAliases.length})` : ''}` : 'Crea un alias'}
+              </span>
+            </PaletteRow>
+          )}
+        </Command.Group>
+      )}
 
-            {/* Main Interactive Input Area */}
-            <div className="flex items-center gap-4 px-6 pb-6">
-              <div className="w-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400">
-                <Search size={24} strokeWidth={1.5} />
-              </div>
+      {/* Presets — only while the user is typing, under their own heading. */}
+      {visiblePresets.length > 0 && (
+        <Command.Group heading="In dotazione · non devi crearli" className={GROUP_WITH_HEADING}>
+          <AnimatePresence initial={false} mode="popLayout">
+          {visiblePresets.map(([trigger, preset]) => (
+            <PaletteRow key={trigger} value={`preset ${trigger}`} onSelect={() => handleSelectPreset(trigger)} still={still} entering>
+              <Sparkles size={14} aria-hidden className={ROW_ICON} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium text-ink-900 dark:text-ink-50"><Matched text={trigger} query={inputValue} /></span>
+                <span className={cn('block truncate text-xs', SUBTLE)}>
+                  → {[paletteActName(preset.act_type), preset.act_number && `n. ${preset.act_number}`, preset.date]
+                    .filter(Boolean)
+                    .join(' ')}
+                </span>
+              </span>
+            </PaletteRow>
+          ))}
+          </AnimatePresence>
+        </Command.Group>
+      )}
+    </div>
+  );
 
-              {step === 'select_act' && (
-                <div className="flex-1">
-                  <Command.Input
-                    ref={boxRef}
-                    autoFocus
-                    value={inputValue}
-                    onValueChange={setInputValue}
-                    placeholder="Es. 'art 2043 cc' o 'Cass. civ. 10787/2024'"
-                    className="w-full bg-transparent text-slate-900 dark:text-white placeholder-slate-400 outline-none text-xl font-bold tracking-tight"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && decisionRef) {
-                        e.preventDefault();
-                        handleOpenDecision();
-                      } else if (e.key === 'Enter' && parsedCitation) {
-                        e.preventDefault();
-                        handleCitationSearch();
-                      }
-                    }}
-                  />
-                  <AnimatePresence>
-                    {/* A decision named in the box: Enter opens its tab */}
-                    {decisionRef && (
-                      <motion.div
-                        aria-hidden
-                        initial={{ opacity: 0, y: 5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="mt-2 flex items-center gap-2.5"
-                      >
-                        <div className="w-5 h-5 rounded-md flex items-center justify-center bg-emerald-500 text-white">
-                          <Gavel size={10} strokeWidth={3} />
-                        </div>
-                        <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                          Sentenza → {formatDecisionShort(decisionRef)}
-                        </span>
-                        <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                          Invio apre
-                        </span>
-                      </motion.div>
-                    )}
-                    {/* Citation Match Indicator (shows alias badge if from alias) */}
-                    {parsedCitation && citationPreview && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="mt-2 flex items-center gap-2.5"
-                      >
-                        <div className={cn(
-                          "w-5 h-5 rounded-md flex items-center justify-center",
-                          parsedCitation.fromAlias
-                            ? "bg-indigo-500 text-white"
-                            : citationReady ? "bg-emerald-500 text-white" : "bg-amber-500 text-white"
-                        )}>
-                          {parsedCitation.fromAlias
-                            ? <Tag size={10} strokeWidth={3} />
-                            : <Zap size={10} fill="currentColor" strokeWidth={3} />
-                          }
-                        </div>
-                        <span className={cn(
-                          "text-xs font-bold uppercase tracking-wider",
-                          parsedCitation.fromAlias
-                            ? "text-indigo-600 dark:text-indigo-400"
-                            : citationReady ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
-                        )}>
-                          {parsedCitation.fromAlias && <span className="opacity-60 mr-1">tramite alias →</span>}
-                          {citationPreview}
-                        </span>
-                        <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                          {citationReady ? "Invio Ricerca" : "Invio Completa"}
-                        </span>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              )}
+  // ── The body of each step ───────────────────────────────────────────────────────────────────────
+  // `relative`: a row filtered out pops out of the list (`popLayout`, absolute) against its own column, which clips it.
+  const scrollColumn = isDesktop ? 'relative min-h-0 overflow-y-auto overscroll-contain custom-scrollbar pb-2' : 'relative pb-2';
+  // «A portata di mano» has rows: something saved at rest, or a match while typing.
+  const atHandHasRows = typed
+    ? visibleQuickNorms.length > 0 || visibleAliases.length > 0 || showAliasDoor || visiblePresets.length > 0
+    : quickNorms.length > 0 || hasAliases;
+  const selectBody = (
+    <Command.List
+      // `min-h-0`: in a panel as tall as its content, up to its maximum, the list may shrink below its rows — the
+      // columns then scroll — instead of holding the panel at its full length. A flex column all the way down (a percentage height finds nothing definite in a panel sized by its content).
+      className={cn('px-2', isDesktop && 'flex min-h-0 flex-1 flex-col [&>[cmdk-list-sizer]]:flex [&>[cmdk-list-sizer]]:min-h-0 [&>[cmdk-list-sizer]]:flex-1 [&>[cmdk-list-sizer]]:flex-col')}
+    >
+      {/* A topic, not a decision or a norm: its own line, over the two columns */}
+      {topic && (
+        <Command.Group className="shrink-0 pt-2">
+          <PaletteRow value={`cerca-sentenze ${topic}`} onSelect={handleSearchTopic} still={still}>
+            <Gavel size={14} aria-hidden className="shrink-0 text-emerald-700 dark:text-emerald-400" />
+            <span className="min-w-0 flex-1 truncate font-medium">
+              Cerca "{topic}" nelle sentenze della Cassazione
+            </span>
+          </PaletteRow>
+        </Command.Group>
+      )}
+      {readAs ? (
+        <>
+          {readAsRow}
+          {/* Under it, only what still matches (a favourite «Art. 2043 c.c.», an alias, an act), in one column. */}
+          <motion.div layoutScroll className={cn(scrollColumn, isDesktop && 'flex-1')}>
+            {atHandHasRows && atHandColumn}
+            {actGroups.length > 0 && actColumn}
+          </motion.div>
+        </>
+      ) : (
+        <div className={cn(isDesktop ? 'grid min-h-0 flex-1 grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] gap-2' : 'flex flex-col')}>
+          {/* The order drawn is the keyboard's. On a computer the acts come first: the row chosen as the menu
+              opens is the first act. On a phone «A portata di mano» comes first when it holds something, so a
+              favourite is not under forty acts. */}
+          {!isDesktop && atHandHasRows && <motion.div layoutScroll className={scrollColumn}>{atHandColumn}</motion.div>}
+          <motion.div layoutScroll className={scrollColumn}>{actColumn}</motion.div>
+          {(isDesktop || !atHandHasRows) && (
+            <motion.div layoutScroll className={cn(scrollColumn, isDesktop && 'border-l border-ink-100 pl-2 dark:border-ink-800')}>{atHandColumn}</motion.div>
+          )}
+        </div>
+      )}
+    </Command.List>
+  );
 
-              {step === 'input_details' && (
-                <div className="flex-1 flex gap-3">
-                  <input
-                    type="text"
-                    placeholder="N. Atto (es. 241)"
-                    value={actNumber}
-                    onChange={(e) => setActNumber(e.target.value)}
-                    className="flex-[1.5] bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white px-4 py-3 rounded-2xl text-base font-bold border border-slate-200 dark:border-slate-700 outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 placeholder:text-slate-400"
-                    autoFocus
-                    onKeyDown={(e) => e.key === 'Enter' && handleSubmitDetails()}
-                  />
-                  <input
-                    type="text"
-                    value={actDate}
-                    onChange={(e) => setActDate(e.target.value)}
-                    placeholder="Anno/Data"
-                    className="flex-1 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white px-4 py-3 rounded-2xl text-base font-bold border border-slate-200 dark:border-slate-700 outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 placeholder:text-slate-400"
-                    onKeyDown={(e) => e.key === 'Enter' && handleSubmitDetails()}
-                  />
-                </div>
-              )}
-
-              {step === 'input_article' && (
-                <div className="flex-1 flex items-end gap-3">
-                  {/* The context line sits in the flow. It used to be
-                      `absolute -top-6`, which lifted it 24px into the
-                      breadcrumb row above and printed it straight over the
-                      ATTO / ARTICOLO chips. */}
-                  <div className="flex-1 min-w-0">
-                    {actNumber && actDate && (
-                      <span className="block mb-1.5 px-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">
-                        {selectedActLabel} n. {actNumber} del {actDate}
-                      </span>
-                    )}
-                    <input
-                      type="text"
-                      placeholder="N. Articolo (es. 12)"
-                      value={article}
-                      onChange={(e) => setArticle(e.target.value)}
-                      className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white px-4 py-3 rounded-2xl text-base font-bold border border-slate-200 dark:border-slate-700 outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 placeholder:text-slate-400"
-                      autoFocus
-                      onKeyDown={(e) => e.key === 'Enter' && handleSubmitArticle()}
-                    />
-                  </div>
-                  <button
-                    onClick={handleSubmitArticle}
-                    className="aspect-square w-12 h-12 bg-primary-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-primary-500/20 active:scale-90 transition-[color,background-color,border-color,scale]"
-                  >
-                    <ArrowRight size={20} strokeWidth={3} />
-                  </button>
-                </div>
-              )}
-
-              <button
-                onClick={onClose}
-                className="p-2 sm:hidden text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl"
-              >
-                <X size={20} />
-              </button>
-            </div>
-          </div>
-
-          {/* Results List / Content */}
-          <div className="flex-1 overflow-y-auto max-h-[60vh] custom-scrollbar bg-slate-50/30 dark:bg-slate-950/20">
-            {step === 'select_act' && (
-              <Command.List id="command-palette-results" className="p-3">
-                <Command.Empty className="px-6 py-12 text-center text-slate-400">
-                  {decisionRef ? (
-                    <>
-                      <div className="w-16 h-16 rounded-3xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-4">
-                        <Gavel size={24} className="text-emerald-600 dark:text-emerald-400" />
-                      </div>
-                      <p className="font-bold text-slate-600 dark:text-slate-300">{formatDecisionShort(decisionRef)}</p>
-                      <p className="text-xs font-medium opacity-60 mt-1">Premi Enter per aprire la sentenza</p>
-                    </>
-                  ) : citationReady ? (
-                    <>
-                      {/* The act resolved, so Enter will search. Saying "nessun
-                          risultato" here describes the local suggestion list,
-                          not the query, and reads as a dead end. */}
-                      <div className="w-16 h-16 rounded-3xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-4">
-                        <Check size={24} className="text-emerald-600 dark:text-emerald-400" />
-                      </div>
-                      <p className="font-bold text-slate-600 dark:text-slate-300">{citationPreview}</p>
-                      <p className="text-xs font-medium opacity-60 mt-1">Premi Enter per cercare</p>
-                    </>
-                  ) : resolvingRemotely ? (
-                    <>
-                      {/* The local list has nothing, but the backend resolver —
-                          387 act names against the client's ~40 — has not
-                          answered yet. Saying "nessun risultato" here would be
-                          wrong for the two hundred milliseconds it takes. */}
-                      <div className="w-16 h-16 rounded-3xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-4">
-                        <Search size={24} className="animate-pulse" />
-                      </div>
-                      <p className="font-bold">Cerco l'atto…</p>
-                      <p className="text-xs font-medium opacity-60 mt-1">Riconosco i nomi per esteso, non solo le sigle</p>
-                    </>
-                  ) : (
-                    <>
-                      <div className="w-16 h-16 rounded-3xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-4">
-                        <X size={24} />
-                      </div>
-                      <p className="font-bold">Nessun risultato trovato</p>
-                      <p className="text-xs font-medium opacity-60 mt-1">Prova a cambiare i criteri di ricerca</p>
-                    </>
-                  )}
-                </Command.Empty>
-
-                {/* A topic, not a decision or a norm: its own line, after those */}
-                {topic && (
-                  <Command.Group className="mb-4">
-                    <Command.Item
-                      value={`cerca-sentenze ${topic}`}
-                      onSelect={handleSearchTopic}
-                      className={cn(
-                        "group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-colors",
-                        "bg-white dark:bg-slate-900 border border-transparent",
-                        "aria-selected:bg-emerald-50 dark:aria-selected:bg-emerald-900/10 aria-selected:border-emerald-200/50 dark:aria-selected:border-emerald-800/30"
-                      )}
-                    >
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-500">
-                        <Gavel size={18} />
-                      </div>
-                      <span className="flex-1 min-w-0 text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
-                        Cerca "{topic}" nelle sentenze della Cassazione
-                      </span>
-                    </Command.Item>
-                  </Command.Group>
-                )}
-
-                {/* QuickNorms Section */}
-                <Command.Group id="command-palette-quick-norms" className="mb-4">
-                  <div className="flex items-center justify-between px-3 mb-3">
-                    <div className="flex items-center gap-2 text-[10px] font-black text-amber-500 uppercase tracking-widest">
-                      <Star size={12} fill="currentColor" strokeWidth={3} />
-                      Preferiti
-                    </div>
-                    <button
-                      onClick={handleOpenQuickNormsManager}
-                      className="p-1 px-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                    >
-                      Gestisci
-                    </button>
-                  </div>
-
-                  {quickNorms.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {quickNorms.slice(0, 6).map((qn) => (
-                        <Command.Item
-                          key={qn.id}
-                          value={`preferito ${qn.label}`}
-                          onSelect={() => handleSelectQuickNorm(qn.id)}
-                          className={cn(
-                            "group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-colors",
-                            "bg-white dark:bg-slate-900 border border-transparent",
-                            "aria-selected:bg-primary-50 dark:aria-selected:bg-primary-900/10 aria-selected:border-primary-200/50 dark:aria-selected:border-primary-800/30"
-                          )}
-                        >
-                          <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-900/20 text-amber-500 flex items-center justify-center group-aria-selected:scale-110 transition-transform">
-                            <Star size={18} fill="currentColor" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <span className="block text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{qn.label}</span>
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-tight line-clamp-1">{qn.searchParams.act_type}</span>
-                          </div>
-                        </Command.Item>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-slate-400 text-center py-2">Nessun preferito salvato</p>
-                  )}
-                </Command.Group>
-
-                {/* Aliases.
-                    Rendered unconditionally, on purpose. This group used to be
-                    gated on `sortedAliases.length > 0`, which hid the only route
-                    to the alias manager behind already owning an alias — you
-                    could not discover how to make your first one. The manager is
-                    reached from the tile below, which is a Command.Item so that
-                    typing "alias" finds it even when the group is scrolled away. */}
-                <Command.Group className="mb-4">
-                  <div className="flex items-center justify-between gap-3 px-3 mb-3">
-                    <div className="flex items-center gap-2 text-[10px] font-black text-indigo-500 uppercase tracking-widest">
-                      <Tag size={12} strokeWidth={3} />
-                      I tuoi alias
-                    </div>
-                    {/* At rest this line is the only trace the presets leave.
-                        A second grid of tiles for them duplicated the act list
-                        below it. */}
-                    {presetEntries.length > 0 && (
-                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest truncate">
-                        +{presetEntries.length} già pronti{presetHint && `: ${presetHint}…`}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {sortedAliases.slice(0, 8).map((alias) => (
-                      <Command.Item
-                        key={alias.id}
-                        value={`alias ${alias.trigger} ${alias.expandTo}`}
-                        onSelect={() => handleSelectAlias(alias)}
-                        className={cn(
-                          "group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-colors",
-                          "bg-white dark:bg-slate-900 border border-transparent",
-                          "aria-selected:bg-indigo-50 dark:aria-selected:bg-indigo-900/10 aria-selected:border-indigo-200/50 dark:aria-selected:border-indigo-800/30"
-                        )}
-                      >
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center group-aria-selected:scale-110 transition-transform bg-indigo-50 dark:bg-indigo-900/20 text-indigo-500">
-                          <Tag size={18} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <span className="block text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
-                            {alias.trigger}
-                          </span>
-                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-tight line-clamp-1">
-                            → {alias.expandTo}
-                          </span>
-                        </div>
-                      </Command.Item>
-                    ))}
-
-                    {/* The door to the manager. Spans the grid when it is the
-                        only tile, so an empty alias list reads as an invitation
-                        rather than as an empty section. */}
-                    <Command.Item
-                      value="alias gestisci crea scorciatoie"
-                      onSelect={handleOpenAliasManager}
-                      className={cn(
-                        "group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-colors",
-                        "border border-dashed border-indigo-300 dark:border-indigo-800",
-                        "aria-selected:bg-indigo-50 dark:aria-selected:bg-indigo-900/10 aria-selected:border-indigo-500",
-                        !hasAliases && "sm:col-span-2"
-                      )}
-                    >
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center group-aria-selected:scale-110 transition-transform bg-indigo-50 dark:bg-indigo-900/20 text-indigo-500">
-                        {hasAliases ? <Settings2 size={18} /> : <Plus size={18} strokeWidth={3} />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <span className="block text-sm font-bold text-indigo-600 dark:text-indigo-400 truncate">
-                          {hasAliases ? 'Gestisci alias' : 'Crea il tuo primo alias'}
-                        </span>
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-tight line-clamp-1">
-                          {hasAliases
-                            ? 'I tuoi, più quelli già riconosciuti'
-                            : 'Una sigla tua per una norma che apri spesso'}
-                        </span>
-                      </div>
-                    </Command.Item>
-                  </div>
-                </Command.Group>
-
-                {/* Presets — only while the user is typing. Its own
-                    Command.Group so cmdk hides the heading along with the
-                    items when a query filters them all out. */}
-                {visiblePresets.length > 0 && (
-                  <Command.Group className="mb-4">
-                    <div className="flex items-center justify-between px-3 mb-3">
-                      <div className="flex items-center gap-2 text-[10px] font-black text-emerald-600 dark:text-emerald-500 uppercase tracking-widest">
-                        <Sparkles size={12} strokeWidth={3} />
-                        In dotazione
-                      </div>
-                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                        Non devi crearli
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {visiblePresets.map(([trigger, preset]) => (
-                        <Command.Item
-                          key={trigger}
-                          value={`preset ${trigger} ${preset.act_type}`}
-                          onSelect={() => handleSelectPreset(trigger)}
-                          className={cn(
-                            "group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-colors",
-                            "bg-white dark:bg-slate-900 border border-transparent",
-                            "aria-selected:bg-emerald-50 dark:aria-selected:bg-emerald-900/10 aria-selected:border-emerald-200/50 dark:aria-selected:border-emerald-800/30"
-                          )}
-                        >
-                          <div className="w-10 h-10 rounded-xl flex items-center justify-center group-aria-selected:scale-110 transition-transform bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-500">
-                            <Sparkles size={18} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <span className="block text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
-                              {trigger}
-                            </span>
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-tight line-clamp-1">
-                              → {[preset.act_type, preset.act_number && `n. ${preset.act_number}`, preset.date]
-                                  .filter(Boolean)
-                                  .join(' ')}
-                            </span>
-                          </div>
-                        </Command.Item>
-                      ))}
-                    </div>
-                  </Command.Group>
-                )}
-
-                {/* Unified Act Types Section */}
-                <div className="space-y-4">
-                  {Object.entries(getActTypesByGroup()).map(([group, acts]) => (
-                    <Command.Group key={group} className="space-y-1">
-                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-3 mb-2">
-                        {group}
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 px-1 pb-1">
-                        {acts.map((act) => {
-                          const Icon = act.icon;
-                          const isSelected = selectedAct === act.value;
-                          return (
-                            <Command.Item
-                              key={act.value}
-                              value={act.value}
-                              onSelect={() => handleSelectAct(act.value)}
-                              className={cn(
-                                "group flex items-center gap-3 p-3 rounded-2xl cursor-pointer transition-[color,background-color,border-color,box-shadow]",
-                                "bg-white dark:bg-slate-900 border border-slate-100/50 dark:border-slate-800/50",
-                                "aria-selected:bg-primary-500 aria-selected:border-primary-600 aria-selected:shadow-lg aria-selected:shadow-primary-500/20",
-                                isSelected && !step.includes('select_act') && "border-emerald-500 ring-2 ring-emerald-500/5"
-                              )}
-                            >
-                              <div className={cn(
-                                "w-10 h-10 rounded-xl flex items-center justify-center transition-colors",
-                                "bg-slate-50 dark:bg-slate-800 group-aria-selected:bg-primary-600 text-slate-400 group-aria-selected:text-white"
-                              )}>
-                                <Icon size={20} />
-                              </div>
-                              <span className="text-sm font-bold text-slate-700 dark:text-slate-200 group-aria-selected:text-white">{act.label}</span>
-                            </Command.Item>
-                          );
-                        })}
-                      </div>
-                    </Command.Group>
-                  ))}
-                </div>
-              </Command.List>
-            )}
-
-            {(step === 'input_details' || step === 'input_article') && (
-              <div className="p-8">
-                <div className="w-20 h-20 rounded-3xl bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-600 dark:text-primary-400 mx-auto mb-6">
-                  <Zap size={40} strokeWidth={1} />
-                </div>
-                <div className="text-center mb-8">
-                  <h4 className="text-xl font-black text-slate-900 dark:text-white mb-2 uppercase tracking-tight">Inserisci {step === 'input_details' ? 'i Dettagli' : 'Articolo'}</h4>
-                  <p className="text-sm font-medium text-slate-500 dark:text-slate-400 max-w-xs mx-auto">
-                    Stai consultando: <span className="text-primary-600 dark:text-primary-400 font-bold">{selectedActLabel}</span>
-                  </p>
-                </div>
-
-                <button
-                  onClick={step === 'input_details' ? handleSubmitDetails : handleSubmitArticle}
-                  disabled={step === 'input_details' ? (!actNumber || !actDate) : !article}
-                  className="w-full flex items-center justify-center gap-3 h-14 bg-primary-600 hover:bg-primary-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 text-white font-black uppercase tracking-widest rounded-2xl transition-[color,background-color,border-color,scale] shadow-xl shadow-primary-500/20 disabled:shadow-none active:scale-[0.98]"
-                >
-                  <span>Continua</span>
-                  <ArrowRight size={20} strokeWidth={3} />
-                </button>
-
-                {/* The other door: leave with the act's index instead of one
-                    article. Offered on the article step, where the act (and its
-                    details, when required) is already settled. */}
-                {step === 'input_article' && onBrowseStructure && (
-                  <button
-                    onClick={handleBrowse}
-                    className="mt-3 w-full flex items-center justify-center gap-3 h-12 rounded-2xl border border-emerald-200 dark:border-emerald-800/40 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 font-bold transition-[color,background-color,border-color,scale] hover:bg-emerald-100 dark:hover:bg-emerald-900/30 active:scale-[0.98]"
-                  >
-                    <List size={18} strokeWidth={2.5} />
-                    <span>Apri l'indice e sfoglia</span>
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Premium Footer */}
-          <div className="px-6 py-5 border-t border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl">
-            {/* Quick Settings - Brocardi Toggle */}
-            <div id="command-palette-brocardi-toggle" className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-4">
-                <div className={cn(
-                  "p-2 rounded-xl border transition-[color,background-color,border-color,box-shadow]",
-                  includeBrocardi
-                    ? "bg-purple-500 text-white border-purple-600 shadow-md shadow-purple-500/20"
-                    : "bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700"
-                )}>
-                  <Lightbulb size={16} fill={includeBrocardi ? "currentColor" : "none"} />
-                </div>
-                <div>
-                  <span className="block text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">Includi dottrina</span>
-                  <span className="text-[10px] font-bold text-slate-400">Ratio legis, spiegazioni e massime correlate</span>
-                </div>
-              </div>
-
-              <div
-                onClick={() => setIncludeBrocardi(!includeBrocardi)}
-                className={cn(
-                  "w-12 h-6 rounded-full relative transition-colors p-1 cursor-pointer",
-                  includeBrocardi ? "bg-purple-500" : "bg-slate-200 dark:bg-slate-700"
-                )}
-              >
-                <motion.div
-                  className="w-4 h-4 rounded-full bg-white shadow-sm"
-                  animate={{ x: includeBrocardi ? 24 : 0 }}
-                  transition={spring.snappy}
-                />
-              </div>
-            </div>
-
-            {/* Advanced legal filters */}
-            <div className="border-t border-slate-200 dark:border-slate-800 pt-4 mb-4">
-              <button
-                type="button"
-                onClick={() => setShowAdvancedFilters(value => !value)}
-                className="w-full flex items-center justify-between text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400"
-                aria-expanded={showAdvancedFilters}
-              >
-                <span className="flex items-center gap-2"><SlidersHorizontal size={14} /> Filtri avanzati</span>
-                <span>{showAdvancedFilters ? 'Nascondi' : 'Mostra'}</span>
-              </button>
-              {showAdvancedFilters && (
-                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <label className="flex flex-col gap-1 text-slate-500 dark:text-slate-400">
-                    Fonte
-                    <select
-                      value={filters.source}
-                      onChange={(event) => setFilters(previous => ({ ...previous, source: event.target.value as SearchFilters['source'] }))}
-                      className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-slate-800 dark:text-slate-200"
-                    >
-                      <option value="all">Tutte le fonti</option>
-                      <option value="normattiva">Normattiva</option>
-                      <option value="eurlex">EUR-Lex</option>
-                    </select>
-                  </label>
-                  <label className="flex items-center gap-2 self-end rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2 text-slate-600 dark:text-slate-300">
-                    <input type="checkbox" checked={filters.hasBrocardi} onChange={(event) => setFilters(previous => ({ ...previous, hasBrocardi: event.target.checked }))} />
-                    Solo articoli con dottrina
-                  </label>
-                  <label className="flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2 text-slate-600 dark:text-slate-300">
-                    <input type="checkbox" checked={filters.onlyHistorical} onChange={(event) => setFilters(previous => ({ ...previous, onlyHistorical: event.target.checked }))} />
-                    Solo versioni storiche
-                  </label>
-                  <div className="flex gap-2">
-                    <input aria-label="Anno iniziale" type="number" placeholder="Dal" value={filters.yearFrom ?? ''} onChange={(event) => setFilters(previous => ({ ...previous, yearFrom: event.target.value ? Number(event.target.value) : undefined }))} className="w-1/2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2" />
-                    <input aria-label="Anno finale" type="number" placeholder="Al" value={filters.yearTo ?? ''} onChange={(event) => setFilters(previous => ({ ...previous, yearTo: event.target.value ? Number(event.target.value) : undefined }))} className="w-1/2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2" />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Hint Badges */}
-            <div className="flex flex-wrap gap-2 justify-center pt-2">
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100/50 dark:bg-slate-800/50 text-[10px] font-black text-slate-400 uppercase tracking-widest border border-slate-200/50 dark:border-slate-700/50">
-                <span className="bg-white dark:bg-slate-900 px-1 rounded shadow-sm border border-slate-200 dark:border-slate-700">↑↓</span> Naviga
-              </div>
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100/50 dark:bg-slate-800/50 text-[10px] font-black text-slate-400 uppercase tracking-widest border border-slate-200/50 dark:border-slate-700/50">
-                <span className="bg-white dark:bg-slate-900 px-1 rounded shadow-sm border border-slate-200 dark:border-slate-700">↵</span> Seleziona
-              </div>
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100/50 dark:bg-slate-800/50 text-[10px] font-black text-slate-400 uppercase tracking-widest border border-slate-200/50 dark:border-slate-700/50">
-                <span className="bg-white dark:bg-slate-900 px-1 rounded shadow-sm border border-slate-200 dark:border-slate-700">ESC</span> Chiudi
-              </div>
-            </div>
-          </div>
-        </Command>
+  const detailsBody = (
+    <div className="space-y-3 px-4 py-4" onKeyDown={keepKeys}>
+      <p className="text-sm text-ink-700 dark:text-ink-200">
+        Stai consultando: <span className="font-medium text-ink-900 dark:text-ink-50">{selectedActLabel}</span>
+      </p>
+      {step === 'input_article' && actNumber && actDate && (
+        <p className={cn('text-xs', SUBTLE)}>{selectedActLabel} n. {actNumber} del {actDate}</p>
+      )}
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant="primary"
+          onClick={step === 'input_details' ? handleSubmitDetails : handleSubmitArticle}
+          disabled={step === 'input_details' ? (!actNumber || !actDate) : !article}
+        >
+          {step === 'input_details' ? 'Continua' : "Apri l'articolo"}
+        </Button>
+        {/* The other door: leave with the act's index instead of one article. Offered on the
+            article step, where the act (and its details, when required) is already settled. */}
+        {step === 'input_article' && onBrowseStructure && (
+          <Button type="button" variant="secondary" icon={<List size={16} aria-hidden />} onClick={handleBrowse}>
+            Apri l'indice e sfoglia
+          </Button>
+        )}
       </div>
     </div>
+  );
+
+  const body = (
+    <motion.div
+      key={step}
+      {...stepMotion}
+      className={cn(isDesktop ? 'flex min-h-0 flex-1 flex-col' : 'flex-1')}
+    >
+      {step === 'select_act' ? selectBody : detailsBody}
+    </motion.div>
+  );
+
+  // ── «Filtri avanzati» and the keys ──────────────────────────────────────────────────────────────
+  const filtersBlock = (
+    <div className="shrink-0 border-t border-ink-100 dark:border-ink-800" onKeyDown={keepKeys}>
+      <button
+        type="button"
+        onClick={() => setShowAdvancedFilters(value => !value)}
+        aria-expanded={showAdvancedFilters}
+        aria-controls={showAdvancedFilters ? 'command-palette-filters' : undefined}
+        className={cn('flex w-full items-center justify-between gap-3 px-4 text-sm', 'min-h-[44px] md:min-h-10', FOCUS_RING)}
+      >
+        <span className="flex items-center gap-2 font-medium text-ink-800 dark:text-ink-100">
+          <SlidersHorizontal size={14} aria-hidden />
+          Filtri avanzati
+        </span>
+        <span className={cn('flex items-center gap-1 text-xs', activeFilters > 0 ? 'font-medium text-toga-700 dark:text-toga-300' : SUBTLE)}>
+          {activeFiltersLabel(filters)}
+          <ChevronDown size={14} aria-hidden className={cn('transition-[rotate] duration-150 motion-reduce:transition-none', showAdvancedFilters && 'rotate-180')} />
+        </span>
+      </button>
+      {showAdvancedFilters && (
+        <div id="command-palette-filters" className="flex flex-wrap items-end gap-x-4 gap-y-3 px-4 pb-3 text-xs">
+          <label className={cn('flex flex-col gap-1', SUBTLE)}>
+            Fonte
+            <select
+              value={filters.source}
+              onChange={(event) => setFilters(previous => ({ ...previous, source: event.target.value as SearchFilters['source'] }))}
+              className={SMALL_INPUT}
+            >
+              <option value="all">Tutte le fonti</option>
+              <option value="normattiva">Normattiva</option>
+              <option value="eurlex">EUR-Lex</option>
+            </select>
+          </label>
+          <label className={cn('flex flex-col gap-1', SUBTLE)}>
+            Dall'anno
+            <input type="number" inputMode="numeric" placeholder="1990" value={filters.yearFrom ?? ''} onChange={(event) => setFilters(previous => ({ ...previous, yearFrom: event.target.value ? Number(event.target.value) : undefined }))} className={cn(SMALL_INPUT, 'w-24')} />
+          </label>
+          <label className={cn('flex flex-col gap-1', SUBTLE)}>
+            All'anno
+            <input type="number" inputMode="numeric" placeholder="2024" value={filters.yearTo ?? ''} onChange={(event) => setFilters(previous => ({ ...previous, yearTo: event.target.value ? Number(event.target.value) : undefined }))} className={cn(SMALL_INPUT, 'w-24')} />
+          </label>
+          <label className="flex min-h-[44px] items-center gap-2 text-sm text-ink-800 md:min-h-9 dark:text-ink-100">
+            <input type="checkbox" className="size-4 accent-toga-600" checked={filters.onlyHistorical} onChange={(event) => setFilters(previous => ({ ...previous, onlyHistorical: event.target.checked }))} />
+            Solo versioni storiche
+          </label>
+        </div>
+      )}
+    </div>
+  );
+
+  // The keys, on a computer only: a phone has none of them.
+  const keysRow = isDesktop && (
+    <div className={cn('flex shrink-0 items-center gap-4 border-t border-ink-100 px-4 py-2 text-xs dark:border-ink-800', SUBTLE)}>
+      <span><kbd className="font-sans font-medium text-ink-800 dark:text-ink-100">↑↓</kbd> Naviga</span>
+      <span><kbd className="font-sans font-medium text-ink-800 dark:text-ink-100">↵</kbd> Seleziona</span>
+      <span><kbd className="font-sans font-medium text-ink-800 dark:text-ink-100">Esc</kbd> Chiudi</span>
+    </div>
+  );
+
+  const content = (
+    <ChosenRowScope.Provider value={inputValue}>
+    <Command
+      id="command-menu-root"
+      label="Menu di ricerca"
+      shouldFilter={false}
+      className="flex min-h-0 flex-1 flex-col"
+    >
+      <div className="shrink-0">
+        {/* One live region for the whole life of the palette, its text changing: a region that
+            appears already holding its text is often not announced. */}
+        <p role="status" className="sr-only">
+          {decisionRef
+            ? `Sentenza: ${formatDecisionShort(decisionRef)}. Invio per aprire.`
+            : waiting ? 'Cerco l’atto… la ricerca parte appena lo trovo.'
+            : parsedCitation && citationPreview
+              ? `${preview!.text}${preview!.text.endsWith('.') ? '' : '.'} ${citationReady ? 'Premi Invio per cercare.' : 'Premi Invio per completare.'}`
+              : resolvingRemotely
+                ? 'Cerco l’atto…'
+                : topic ? `Cerca "${topic}" nelle sentenze della Cassazione.` : ''}
+        </p>
+        {fieldRow}
+        {fieldLine}
+      </div>
+      {isDesktop ? (
+        <>
+          {body}
+          {filtersBlock}
+          {keysRow}
+        </>
+      ) : (
+        // On a phone the field stays at the top and the rest scrolls under it.
+        <motion.div layoutScroll className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          {body}
+          {filtersBlock}
+        </motion.div>
+      )}
+    </Command>
+    </ChosenRowScope.Provider>
+  );
+
+  return (
+    <FloatingPortal>
+      {/* Covers the workspace: Cmd/Ctrl+F is left to the browser (`isWorkspaceCovered`). Drawn only while
+          open, so the mark goes with the click that closes, not with the panel's fade. */}
+      {isOpen && (
+        <div
+          data-find-overlay=""
+          aria-hidden
+          // `touch-none`: a drag on it does not scroll the page under it (iOS).
+          className={cn('fixed inset-0 touch-none bg-ink-950/20 dark:bg-ink-950/50', Z_INDEX.commandPalette)}
+          onClick={onClose}
+        />
+      )}
+      {/* Outside the presence, so the focus goes back as the palette closes, not once its fade is over. */}
+      <FloatingFocusManager
+        context={context}
+        modal
+        disabled={!isOpen}
+        initialFocus={step === 'select_act' ? boxRef : 0}
+        // Nothing had it (⌘K on the page): the field when it is there, else nowhere — never the page's first control.
+        returnFocus={opener && opener !== document.body ? { current: opener } : anchor !== null}
+      >
+      <AnimatePresence>
+        {isOpen && (
+          // Two elements: the outer is placed by floating-ui, the inner moves (gotcha 10).
+          <div
+            key="command-palette"
+            // eslint-disable-next-line react-hooks/refs -- floating-ui exposes a stable setter, not a ref.current read
+            ref={refs.setFloating}
+            {...getFloatingProps()}
+            aria-label="Menu di ricerca"
+            style={anchor
+              ? floatingStyles
+              : !isDesktop && shownHeight
+                ? { ['--palette-max-h' as string]: `min(40rem, calc(${shownHeight}px - 1rem - env(safe-area-inset-top)))` }
+                : undefined}
+            className={cn(
+              // The box holds the panel's height; only the panel takes the pointer (a shorter step
+              // leaves the rest of the box to the backdrop's click).
+              'pointer-events-none flex flex-col',
+              anchor
+                ? 'fixed'
+                : isDesktop
+                  ? 'fixed inset-x-4 top-16 mx-auto max-w-3xl [--palette-max-h:min(40rem,calc(100dvh-6rem))]'
+                  // A phone: the page's width less 16 px each side, dropping from the bar at the top (R2).
+                  : 'fixed inset-x-4 top-[calc(env(safe-area-inset-top)+0.5rem)] [--palette-max-h:min(40rem,calc(100dvh-1rem-env(safe-area-inset-top)))]',
+              Z_INDEX.commandPalette,
+            )}
+          >
+            {/* The field grows into the panel (R2): `PanelGrowth`. As tall as its content, up to `--palette-max-h`: the
+                lists scroll inside it past that. */}
+            <PanelGrowth still={still} fromHeight={growFrom} className="pointer-events-auto flex min-h-0 max-h-[var(--palette-max-h,40rem)] flex-col overflow-hidden border border-ink-200 bg-white dark:border-ink-700 dark:bg-ink-900">
+              {content}
+            </PanelGrowth>
+          </div>
+        )}
+      </AnimatePresence>
+      </FloatingFocusManager>
+    </FloatingPortal>
   );
 }

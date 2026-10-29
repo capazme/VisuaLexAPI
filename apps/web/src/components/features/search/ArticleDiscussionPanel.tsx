@@ -312,7 +312,7 @@ export function ArticleDiscussionPanel({
       role="dialog"
       aria-modal="true"
       aria-labelledby="article-discussions-title"
-      className={cn('fixed right-4 top-20 flex w-[min(36rem,calc(100vw-2rem))] max-h-[75vh] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900', Z_INDEX.structure)}
+      className={cn('fixed right-4 top-20 flex w-[min(36rem,calc(100vw-2rem))] max-h-[75vh] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900', Z_INDEX.structure)}
     >
       <div className="flex-1 overflow-y-auto p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">

@@ -30,6 +30,8 @@ class HttpResult:
 
 class ThrottledHttpClient:
     RATE_LIMIT_STATUSES = {429, 503}
+    # The longest pause a request waits out; past it the request is refused at once.
+    MAX_PAUSE_WAIT = 30.0
 
     def __init__(self) -> None:
         self._semaphore = asyncio.Semaphore(HTTP_MAX_CONCURRENCY)
@@ -37,6 +39,11 @@ class ThrottledHttpClient:
         self._session_lock = asyncio.Lock()
         self._request_lock = asyncio.Lock()
         self._last_request_at = 0.0
+        # source → the monotonic time before which no request goes to it: the last
+        # Retry-After a rate-limit answer stated, honoured by the next request even when the
+        # call that received it had no attempt left to spend it on. Our own backoff stays
+        # with the call: a page that always fails must not slow every other page down.
+        self._not_before: Dict[str, float] = {}
 
     async def _get_session(self) -> aiohttp.ClientSession:
         async with self._session_lock:
@@ -76,8 +83,12 @@ class ThrottledHttpClient:
 
         attempt = 0
         last_status: Optional[int] = None
+        retry_after: Optional[float] = None
+        # Wait out a pause before taking a slot, so a paused source does not hold one.
+        await self._respect_source_pause(source)
         async with self._semaphore:
             while attempt <= retries:
+                await self._respect_source_pause(source)
                 await self._respect_min_interval()
                 session = await self._get_session()
                 try:
@@ -106,8 +117,11 @@ class ThrottledHttpClient:
                                     "retry_after": wait_time,
                                 },
                             )
-                            await asyncio.sleep(wait_time)
                             attempt += 1
+                            retry_after = wait_time
+                            if self._stated_retry_after(headers) is not None:
+                                self._pause_source(source, wait_time)
+                            await self._wait_before(attempt, retries, wait_time)
                             continue
 
                         response.raise_for_status()
@@ -115,25 +129,58 @@ class ThrottledHttpClient:
                 except aiohttp.ClientError as exc:
                     if isinstance(exc, aiohttp.ClientResponseError):
                         last_status = exc.status
+                    retry_after = None
                     wait_time = self._retry_delay(attempt)
                     log.warning(
                         "HTTP request failed; retrying",
                         extra={"source": source, "url": url, "attempt": attempt, "error": str(exc)},
                     )
-                    await asyncio.sleep(wait_time)
                     attempt += 1
+                    await self._wait_before(attempt, retries, wait_time)
                 except asyncio.TimeoutError:
+                    retry_after = None
                     wait_time = self._retry_delay(attempt)
                     log.warning(
                         "HTTP request timeout; retrying",
                         extra={"source": source, "url": url, "attempt": attempt},
                     )
-                    await asyncio.sleep(wait_time)
                     attempt += 1
+                    await self._wait_before(attempt, retries, wait_time)
             raise NetworkError(
                 f"Exceeded retry budget for {url} after {retries + 1} attempts",
                 status_code=last_status,
+                retry_after=retry_after,
             )
+
+    @staticmethod
+    async def _wait_before(attempt: int, retries: int, wait_time: float) -> None:
+        """The wait before attempt number `attempt` (0 is the first). None when the budget is
+        spent: the caller gives up at once instead of after a Retry-After it will not use.
+        A rate-limit wait is not lost: `_pause_source` holds the source's next request."""
+        if attempt <= retries:
+            await asyncio.sleep(wait_time)
+
+    def _pause_source(self, source: str, wait_time: float) -> None:
+        until = time.monotonic() + wait_time
+        if until > self._not_before.get(source, 0.0):
+            self._not_before[source] = until
+
+    async def _respect_source_pause(self, source: str) -> None:
+        """Wait out the source's pause; refuse at once (429) when it is longer than
+        MAX_PAUSE_WAIT, instead of holding the caller's request for minutes."""
+        remaining = self._not_before.get(source, 0.0) - time.monotonic()
+        if remaining > self.MAX_PAUSE_WAIT:
+            raise NetworkError(
+                f"La fonte ha chiesto di attendere {round(remaining)} s",
+                status_code=429,
+                retry_after=remaining,
+            )
+        if remaining > 0:
+            log.info(
+                "Waiting out a rate-limit pause",
+                extra={"source": source, "seconds": round(remaining, 2)},
+            )
+            await asyncio.sleep(remaining)
 
     async def _respect_min_interval(self) -> None:
         async with self._request_lock:
@@ -142,15 +189,19 @@ class ThrottledHttpClient:
                 await asyncio.sleep(HTTP_MIN_INTERVAL - elapsed)
             self._last_request_at = time.monotonic()
 
+    @staticmethod
+    def _stated_retry_after(headers: Optional[Dict[str, str]]) -> Optional[float]:
+        """The Retry-After the answer states in seconds; None when absent or not a number."""
+        retry_header = (headers or {}).get("Retry-After")
+        if not retry_header:
+            return None
+        try:
+            return float(retry_header)
+        except ValueError:
+            return None
+
     def _retry_delay(self, attempt: int, headers: Optional[Dict[str, str]] = None) -> float:
-        retry_after = 0.0
-        if headers:
-            retry_header = headers.get("Retry-After")
-            if retry_header:
-                try:
-                    retry_after = float(retry_header)
-                except ValueError:
-                    retry_after = 0.0
+        retry_after = self._stated_retry_after(headers) or 0.0
         base = HTTP_INITIAL_BACKOFF * (HTTP_BACKOFF_FACTOR ** attempt)
         jitter = random.uniform(0, HTTP_JITTER)
         return max(retry_after, base + jitter)

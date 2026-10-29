@@ -206,7 +206,7 @@ salted hash, which is still personal data for whoever holds the salt.
 | `storage/graph/entity_writer.py`, `relation_endpoints.py` | what consensus writes into FalkorDB; the `user_document` placeholder must never become a node |
 | `pipeline/provisional_writer.py`, `promotion.py`, `hygiene.py` | the graph co-evolution; match nodes by `URN OR node_id OR source_url` |
 | `utils/urn_labels.py` | URN → label, the article-suffix regex (longest-first) |
-| `utils/sources.py` | the source convention as MERL-T holds it: the URN normaliser, a node's `estremi` (`short_norm`, `short_from_urn`), an act's `titolo` (`act_heading`) and `autorita_emanante`, a decision's `estremi` (`decision_short`). A copy of the API's `visualex_api/tools/sources.py` (MERL-T does not import it), pinned by `tests/unit/test_sources_golden.py` to `conventions/sources/golden.json`, as are the copies of `NORMATTIVA_URN_CODICI` (`utils/map.py`) and of the ordinal table (`utils/article_suffixes.py`). `scripts/backfill_source_labels.py` rewrites the graph's labels (dry run by default) |
+| `utils/sources.py` | the source convention as MERL-T holds it: the URN normaliser, a node's `estremi` (`short_norm`, `short_from_urn`), an act's `titolo` (`act_heading`) and `autorita_emanante`, a decision's `estremi` (`decision_short`). A copy of the API's `visualex_api/tools/sources.py` (MERL-T does not import it), pinned by `tests/unit/test_sources_golden.py` to `conventions/sources/golden.json`, as are the copies of `NORMATTIVA_URN_CODICI`, `ANNEXED_ACTS`, `ANNEX_SIGLE` and `ANNEX_HEADINGS` (`utils/map.py`; an annex of a code's decree cited by its own sigla, G-369; an act whose text is its annex, the TULPS, is keyed by it and never named, G-351) and of the ordinal table (`utils/article_suffixes.py`). `scripts/backfill_source_labels.py` rewrites the graph's labels (dry run by default) |
 | `api/experts_router.py`, `api/enrichment_router.py`, `api/graph_router.py` | the BFF-facing contract; see `docs/merlt/contract-matrix.md` |
 
 ## Running
@@ -335,6 +335,19 @@ that stack's own database, and the tests write rows. The Dockerfile copies
   contract test fails on `labels(x)[0]` in Cypher.
 - Do not change the authority algorithm or the synthesizer's contract without
   the owner's approval.
+- Normattiva's update notes («AGGIORNAMENTO (N)», G-386) are never part of an
+  article's text. VisuaLex answers them beside it (`note_aggiornamento`,
+  `note_non_lette`, `note_nel_testo`); `clients/visualex_client.py` carries them in
+  `ArticleResult` (`get_article`) and `update_notes_block` labels them for a model;
+  likewise `parti` / `testo_parziale` for an article Normattiva splits into parts
+  (G-387), whose notice `partial_text_notice` writes («testo parziale: commi 1-100
+  di 1364 (diviso in 14 parti)»).
+  `get_document` still gives the text alone, which is what ingestion stores. Only
+  `tools/search.ArticleFetchTool` puts the notice and the block after the text it
+  hands an expert (its `oltre_il_testo`, read by
+  `react_mixin._extract_sources_from_result`), and that tool is **not wired**
+  (`api/engine_bootstrap.py`): the experts read articles through mcp-legal-it's
+  `fetch_law_article`, whose notes come with the submodule at 3.0.x.
 - Brocardi is no longer a source (D-078). MERL-T does not fetch from it: the
   VisuaLex client's `fetch_brocardi_info` returns nothing without a call,
   `include_brocardi` defaults to False, no expert is granted `cerca_brocardi`

@@ -3,6 +3,8 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { MemoryRouter } from 'react-router-dom';
 
 const fetchDecision = vi.hoisted(() => vi.fn());
+// D7b's flag: off here, with no request leaving the test.
+vi.mock('../../../services/assistantService', () => ({ assistantService: { features: vi.fn(async () => ({ assistantPassages: false })) } }));
 vi.mock('./useActDetails', () => ({ useActDetails: () => ({ title: null, rubricaOf: () => null }) }));
 vi.mock('./DossierItemReader', () => ({ DossierItemReader: () => null }));
 vi.mock('../../../services/dossierService', () => ({ dossierService: { getSnapshots: vi.fn(async () => []) } }));
@@ -110,8 +112,20 @@ describe('the dossier\'s «Apri tutto» with the practices (spec §5.1, gotcha 1
     expect(searches().map((q) => q.targetPracticeId)).toEqual([s().practices[0].id]);
   });
 
-  it('a dossier with no article opens nothing', () => {
-    renderDetail(dossierOf([decision('s1', 28994)]));
+  // D7a: the decisions count too. Before, a dossier of decisions alone had «Apri tutto» disabled.
+  it('a dossier of decisions alone opens them in one practice, with no search to run', () => {
+    renderDetail(dossierOf([decision('s1', 28994), decision('s2', 577)]));
+    const button = screen.getByRole('button', { name: 'Apri tutto su Dashboard' });
+    expect(button).toBeEnabled();
+    fireEvent.click(button);
+    expect(s().practices).toHaveLength(1);
+    expect(s().practices[0].decisions.map((d) => d.reference.numero).sort((a, b) => a - b)).toEqual([577, 28994]);
+    expect(s().activePracticeId).toBe(s().practices[0].id);
+    expect(searches()).toEqual([]);
+  });
+
+  it('a dossier with neither an article nor a decision opens nothing', () => {
+    renderDetail(dossierOf([{ id: 'n1', type: 'note', addedAt: '', data: 'Solo una nota' }]));
     const button = screen.getByRole('button', { name: 'Apri tutto su Dashboard' });
     expect(button).toBeDisabled();
     fireEvent.click(button);

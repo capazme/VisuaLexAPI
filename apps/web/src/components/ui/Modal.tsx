@@ -4,6 +4,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Z_INDEX } from '../../constants/zIndex';
+import { useDialogFocus } from './useDialogFocus';
 import { dur, ease } from '../../lib/motion';
 
 export type ModalVariant = 'default' | 'danger' | 'info' | 'success';
@@ -24,6 +25,10 @@ export interface ModalProps {
   showCloseButton?: boolean;
   className?: string;
   contentClassName?: string;
+  /** The id of the element that names the dialog, for one that draws its own header (no `title`). */
+  labelledBy?: string;
+  /** Below `sm` the panel takes the whole screen, with no margin or rounding (the planner's task sheet). */
+  phoneFullScreen?: boolean;
   children?: ReactNode;
 }
 
@@ -42,10 +47,6 @@ const variantIconStyles: Record<ModalVariant, string> = {
   success: 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400',
 };
 
-// Open modals, oldest first. Each one registers its Tab trap and Esc handler on
-// `document`; with a dialog opened from another dialog, only the last one opened
-// may act, or the parent would pull the focus back from its child.
-const openModals: symbol[] = [];
 
 export function Modal({
   isOpen,
@@ -63,31 +64,21 @@ export function Modal({
   showCloseButton = true,
   className,
   contentClassName,
+  labelledBy,
+  phoneFullScreen = false,
   children,
 }: ModalProps) {
   const reactId = useId();
   const titleId = title ? `modal-title-${reactId}` : undefined;
   const descriptionId = description ? `modal-desc-${reactId}` : undefined;
-  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
-  const tokenRef = useRef<symbol>(Symbol('modal'));
   // Spec §6.2: 240 ms on the drawer curve, growing from 0.97 where it stands; under reduced motion a fade.
   const still = useReducedMotion();
   const hidden = still ? { opacity: 0 } : { opacity: 0, scale: 0.97 };
   const panel = { duration: dur.panel, ease: ease.drawer };
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const token = tokenRef.current;
-    openModals.push(token);
-    return () => {
-      const at = openModals.indexOf(token);
-      if (at !== -1) openModals.splice(at, 1);
-    };
-  }, [isOpen]);
-
-  const isTopmost = () => openModals[openModals.length - 1] === tokenRef.current;
+  const isTopmost = useDialogFocus(isOpen, dialogRef, () => initialFocusRef?.current ?? closeButtonRef.current);
 
   useEffect(() => {
     if (!isOpen || !closeOnEscape) return;
@@ -97,36 +88,7 @@ export function Modal({
     };
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [isOpen, onClose, closeOnEscape]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleTab = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab' || !isTopmost()) return;
-      const dialog = dialogRef.current;
-      if (!dialog) return;
-      const focusable = Array.from(
-        dialog.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
-        )
-      ).filter((el) => el.offsetParent !== null || el === document.activeElement);
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      const active = document.activeElement;
-      if (e.shiftKey) {
-        if (active === first || !dialog.contains(active)) {
-          e.preventDefault();
-          last.focus();
-        }
-      } else if (active === last || !dialog.contains(active)) {
-        e.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener('keydown', handleTab);
-    return () => document.removeEventListener('keydown', handleTab);
-  }, [isOpen]);
+  }, [isOpen, onClose, closeOnEscape, isTopmost]);
 
   useEffect(() => {
     if (isOpen) {
@@ -138,19 +100,6 @@ export function Modal({
       document.body.style.overflow = '';
     };
   }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
-    const timer = window.setTimeout(() => {
-      const target = initialFocusRef?.current ?? closeButtonRef.current;
-      target?.focus();
-    }, 50);
-    return () => {
-      window.clearTimeout(timer);
-      previouslyFocusedRef.current?.focus?.();
-    };
-  }, [isOpen, initialFocusRef]);
 
   const hasHeader = Boolean(title || icon || showCloseButton);
 
@@ -170,12 +119,12 @@ export function Modal({
             aria-hidden="true"
           />
 
-          <div className={cn('fixed inset-0 flex items-center justify-center p-4 pointer-events-none', Z_INDEX.modal)}>
+          <div className={cn('fixed inset-0 flex items-center justify-center p-4 pointer-events-none', phoneFullScreen && 'max-sm:p-0', Z_INDEX.modal)}>
             <motion.div
               ref={dialogRef}
               role={role}
               aria-modal="true"
-              aria-labelledby={titleId}
+              aria-labelledby={titleId ?? labelledBy}
               aria-describedby={descriptionId}
               initial={hidden}
               animate={{ opacity: 1, scale: 1 }}
@@ -185,10 +134,11 @@ export function Modal({
               className={cn(
                 'w-full pointer-events-auto',
                 'bg-white dark:bg-slate-900',
-                'rounded-2xl shadow-2xl',
+                'rounded-2xl shadow-lg',
                 'border border-slate-200 dark:border-slate-800',
                 'max-h-[90vh] flex flex-col',
                 sizeStyles[size],
+                phoneFullScreen && 'max-sm:h-full max-sm:max-h-none max-sm:max-w-none max-sm:rounded-none max-sm:border-0',
                 className
               )}
             >

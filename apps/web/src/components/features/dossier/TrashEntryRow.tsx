@@ -20,12 +20,25 @@ interface Props {
 function titleOf(entry: TrashEntry, showSource: boolean): string {
   if (entry.kind === 'DOSSIER') return `Dossier «${entry.label}»`;
   if (entry.kind === 'LINGO_CARDS') return entry.itemCount === 1 ? 'Scheda di studio' : `Schede di studio (${entry.itemCount})`;
+  if (entry.kind === 'LINGO_CORSO') return `Percorso «${entry.label}»`;
+  if (entry.kind === 'LINGO_CORSO_MODULO') {
+    // The server's label is «module · course»: the quotes take the module's name only (split at the first « · »,
+    // so a course title holding one stays whole).
+    const at = entry.label.indexOf(' · ');
+    return at === -1 ? `Modulo «${entry.label}»` : `Modulo «${entry.label.slice(0, at)}» · ${entry.label.slice(at + 3)}`;
+  }
   return showSource ? `Da «${entry.label}»` : (entry.itemCount === 1 ? '1 elemento' : `${entry.itemCount} elementi`);
 }
 
 function whatOf(entry: TrashEntry): string {
   if (entry.kind === 'DOSSIER') return entry.itemCount === 1 ? '1 elemento' : `${entry.itemCount} elementi`;
   if (entry.kind === 'LINGO_CARDS') return trashCardsSummary(entry.cards ?? []);
+  if (entry.kind === 'LINGO_CORSO' || entry.kind === 'LINGO_CORSO_MODULO') {
+    const cards = entry.cardCount ?? 0;
+    const cardsLine = cards === 0 ? 'nessuna scheda' : cards === 1 ? '1 scheda' : `${cards} schede`;
+    if (entry.kind === 'LINGO_CORSO_MODULO') return cards === 0 ? 'Senza schede' : `Con ${cardsLine}`;
+    return `${entry.itemCount === 1 ? '1 modulo' : `${entry.itemCount} moduli`} · ${cardsLine}`;
+  }
   return trashItemsSummary(entry.items ?? []);
 }
 
@@ -68,7 +81,7 @@ export function TrashEntryRow({ entry, showSource, dossiers, onRestore, onPurge,
             onClick={() => void restore()}
             disabled={busy}
             aria-label={`Ripristina ${title}`}
-            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-slate-300 px-3 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 md:min-h-0 md:py-1.5 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-slate-300 px-3 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50 md:min-h-0 md:py-1.5 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
           >
             <RotateCcw size={14} aria-hidden /> Ripristina
           </button>
@@ -100,7 +113,7 @@ export function TrashEntryRow({ entry, showSource, dossiers, onRestore, onPurge,
             type="button"
             onClick={() => void restore(target)}
             disabled={!target || busy}
-            className="min-h-[44px] rounded-lg bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 md:min-h-0 md:py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+            className="min-h-[44px] rounded-lg bg-primary-600 px-3 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50 md:min-h-0 md:py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
           >
             Ripristina qui
           </button>

@@ -23,7 +23,6 @@ vi.mock('../../../features/merlt/useMerltFeatures', () => ({
   useMerltFeatures: () => ({ canContribute: false, qaAskable: false, consentLevel: 'none', merltEnabled: false }),
 }));
 vi.mock('../../../plugins/PluginSlot', () => ({ PluginSlot: () => null }));
-vi.mock('../search/BrocardiDisplay', () => ({ BrocardiDisplay: () => null }));
 vi.mock('../dossier/AddToDossierPopover', () => ({ AddToDossierPopover: () => null }));
 vi.mock('../decisions/DecisionResultList', () => ({
   DecisionResultList: ({ besideId }: { besideId?: string }) => <div data-testid="topic-list" data-beside={besideId} />,
@@ -104,6 +103,12 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
+/** «Cerca nel testo» is an entry of the article's «⋯» (R3): open the first row's menu and pick it. */
+function findEntry(win: HTMLElement, name: string) {
+  fireEvent.click(within(win).getAllByRole('button', { name: 'Altre azioni sull’articolo' })[0]);
+  fireEvent.click(within(win).getByRole('menuitem', { name }));
+}
+
 describe('ReadingWindow (spec §4.1)', () => {
   it('an article window: the citation as title, the reader in its body, and «Chiudi» leaving the article on the table', () => {
     const { practiceId, articleRef } = practiceWithTwoWindows();
@@ -126,8 +131,11 @@ describe('ReadingWindow (spec §4.1)', () => {
     const { practiceId, articleRef } = practiceWithTwoWindows();
     draw(practiceId, [articleRef]);
     const window_ = windowOf(articleRef);
-    expect(within(window_).queryByTitle('Altre azioni')).not.toBeInTheDocument();
-    expect(within(window_).queryByTitle(/Modalità studio/)).not.toBeInTheDocument();
+    // The compact bar: notes and highlights, «⋯» with discussions, the find window and copy; no dossier.
+    expect(within(window_).queryByRole('button', { name: 'Al dossier' })).not.toBeInTheDocument();
+    fireEvent.click(within(window_).getAllByRole('button', { name: 'Altre azioni sull’articolo' })[0]);
+    expect(within(window_).queryByRole('menuitem', { name: /Modalità studio/ })).not.toBeInTheDocument();
+    expect(within(window_).getByRole('menuitem', { name: 'Copia' })).toBeInTheDocument();
     expect(within(window_).queryByText(/Nuova scheda/)).not.toBeInTheDocument();
     expect(within(window_).getByRole('button', { name: 'Giurisprudenza' })).toHaveAttribute('aria-expanded', 'false');
   });
@@ -196,7 +204,7 @@ describe('ReadingWindow — what the find window sees (spec §6.6)', () => {
     draw(practiceId, [articleRef, decisionRef]);
     await waitFor(() => expect(findRootsFor(practiceId)).toHaveLength(2));
 
-    fireEvent.click(within(windowOf(articleRef)).getAllByRole('button', { name: 'Cerca nel testo' })[0]);
+    findEntry(windowOf(articleRef), 'Cerca nel testo');
     expect(s().activePracticeId).toBe(practiceId);
     expect(screen.getByRole('button', { name: 'Questa pratica' })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.change(screen.getByRole('searchbox', { name: 'Cerca nel testo' }), { target: { value: 'danno' } });
@@ -209,15 +217,12 @@ describe('ReadingWindow — what the find window sees (spec §6.6)', () => {
     expect(ranges.filter((r) => windowOf(decisionRef).contains(r.commonAncestorContainer))).toHaveLength(1);
   });
 
-  it('the magnifier of a window is pressed while the window is open on that text, and closes it again', async () => {
+  it('a window\'s «Cerca nel testo» says it closes the find window while it is open on that text, and closes it', async () => {
     const { practiceId, articleRef } = practiceWithTwoWindows();
     draw(practiceId, [articleRef]);
-    const magnifier = () => within(windowOf(articleRef)).getAllByRole('button', { name: 'Cerca nel testo' })[0];
-    expect(magnifier()).toHaveAttribute('aria-pressed', 'false');
-    fireEvent.click(magnifier());
-    expect(magnifier()).toHaveAttribute('aria-pressed', 'true');
-    fireEvent.pointerDown(magnifier());
-    fireEvent.click(magnifier());
+    findEntry(windowOf(articleRef), 'Cerca nel testo');
+    expect(screen.getByRole('search')).toBeInTheDocument();
+    findEntry(windowOf(articleRef), 'Chiudi la ricerca nel testo');
     expect(screen.queryByRole('search')).not.toBeInTheDocument();
   });
 });

@@ -24,7 +24,8 @@ export interface Stub {
   exchanges: { subject: string; scope: string; audience: string }[];
   /** Override an API answer: return [status, body] or undefined for the default. */
   /** 'drop' closes the connection without an answer (a network failure). */
-  apiOverride?: (method: string, path: string, body: unknown) => [number, unknown] | 'drop' | undefined;
+  /** A promise delays the answer (a slow route). */
+  apiOverride?: (method: string, path: string, body: unknown) => [number, unknown] | 'drop' | undefined | Promise<[number, unknown] | 'drop' | undefined>;
   dossiers: {
     id: string;
     name: string;
@@ -38,14 +39,18 @@ export interface Stub {
       created_by?: { clientName: string | null } | null;
       about_item_id?: string | null;
     }[];
+    task_count?: number;
   }[];
   introspectionDown?: boolean;
+  /** What GET /api/features answers (public, asked at each session's start; not recorded in apiCalls). */
+  features?: { assistantPassages?: boolean; assistantGlosses?: boolean } | 'down';
   /** The user's study cards, as GET /api/lingo/cards answers them. */
   cards: {
     id: string;
     materia: string;
     stato: string;
     istituto: string;
+    tipo?: string;
     domanda: string;
     createdAt: string;
     ancore?: { normaKey: string; articleId: string; urn: string; isPrimary: boolean }[];
@@ -74,10 +79,14 @@ export async function startStubs() {
     stub.exchanges.push({ subject: req.body.subject_token, scope: req.body.scope, audience: req.body.audience });
     res.json({ access_token: `api-token-for-${req.body.scope}`, token_type: 'Bearer', expires_in: 120 });
   });
-  as.all(/^\/api\/.*/, (req, res) => {
+  as.get('/api/features', (_req, res) => {
+    if (stub.features === 'down') return void res.status(500).end();
+    res.json(stub.features ?? { assistantPassages: false, assistantGlosses: false });
+  });
+  as.all(/^\/api\/.*/, async (req, res) => {
     const path = req.path.slice(4);
     stub.apiCalls.push({ method: req.method, path, bearer: req.headers.authorization?.slice(7), body: req.body });
-    const override = stub.apiOverride?.(req.method, path, req.body);
+    const override = await stub.apiOverride?.(req.method, path, req.body);
     if (override === 'drop') return void req.socket.destroy();
     if (override) return void res.status(override[0]).json(override[1]);
     if (req.method === 'GET' && path === '/dossiers') return void res.json(stub.dossiers);
@@ -127,7 +136,7 @@ export async function startStubs() {
     if (req.method === 'POST' && trashDossier) {
       const dossier = stub.dossiers.find((d) => d.id === trashDossier[1]);
       stub.dossiers = stub.dossiers.filter((d) => d.id !== trashDossier[1]);
-      return void res.json({ trashId: 't2', itemCount: dossier?.items.length ?? 0 });
+      return void res.json({ trashId: 't2', itemCount: dossier?.items.length ?? 0, taskCount: dossier?.task_count ?? 0 });
     }
     const notes = path.match(/^\/dossiers\/([^/]+)\/notes$/);
     if (req.method === 'POST' && notes) {

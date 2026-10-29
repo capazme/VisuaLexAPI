@@ -22,8 +22,10 @@ export interface ArticleBodyProps {
     copyOnly?: boolean;
     /** The classes of the text root (typography and structure): `vlx-art` for an article. */
     className?: string;
-    /** Receives the text root (without the selection popup), for «Cerca nel testo». */
+    /** Receives the text root (without the selection popup): «Cerca nel testo», and a passage's new words (D7b). */
     textRootRef?: RefObject<HTMLDivElement | null>;
+    /** False while the reader asks for a passage's new words (D7b, `MoveProposalBar`): no popup over the selection. */
+    selectionPopup?: boolean;
 }
 
 export function ArticleBody({
@@ -40,6 +42,7 @@ export function ArticleBody({
     copyOnly = false,
     className = 'vlx-art',
     textRootRef,
+    selectionPopup = true,
 }: ArticleBodyProps) {
     // The text alone, without the selection popup: stored offsets are measured
     // from here (see SelectionPopup's textRootRef).
@@ -48,7 +51,7 @@ export function ArticleBody({
     // Article text — typography and structure from `.vlx-art` (index.css, READING SURFACE)
     return (
         <div className="relative group/content" ref={contentRef}>
-            <SelectionPopup
+            {selectionPopup && <SelectionPopup
                 containerRef={contentRef}
                 textRootRef={textRef}
                 onHighlight={onPopupHighlight}
@@ -58,11 +61,11 @@ export function ArticleBody({
                 onReportCitation={onPopupReportCitation}
                 onCreateCard={onPopupCreateCard}
                 copyOnly={copyOnly}
-            />
+            />}
             {/* A size container: with room beside the 68ch column, each
                 block's annotation sign moves to the right margin (index.css). */}
             <div className="vlx-frame">
-                <div ref={textRef} className={cn(className, 'px-2 sm:px-4', updatesOpen && 'vlx-updates-open')} id={`article-content-${itemKey}`}>
+                <div ref={textRef} className={cn(className, 'md:px-4', updatesOpen && 'vlx-updates-open')} id={`article-content-${itemKey}`}>
                     {processedContent && <SafeHTML html={processedContent} />}
                 </div>
                 {/* Outside the text root: the placeholder is not text of the article, so a search never finds it. */}

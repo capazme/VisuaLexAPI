@@ -13,6 +13,9 @@ import bookmarkRoutes from './routes/bookmarks';
 import highlightRoutes from './routes/highlights';
 import annotationRoutes from './routes/annotations';
 import dossierRoutes from './routes/dossiers';
+import assistantProposalRoutes from './routes/assistantProposals';
+import assistantPassageRoutes from './routes/assistantPassages';
+import appSwitchRoutes, { features } from './routes/appSwitches';
 import trashRoutes from './routes/trash';
 import feedbackRoutes from './routes/feedback';
 import historyRoutes from './routes/history';
@@ -31,6 +34,8 @@ import lingoTestiRoutes from './routes/lingoTesti';
 import adminStudiaTestiRoutes from './routes/adminStudiaTesti';
 import adminStudiaSoglieRoutes from './routes/adminStudiaSoglie';
 import lingoSrsRoutes from './routes/lingoSrs';
+import lingoCorsiRoutes from './routes/lingoCorsi';
+import taskRoutes from './routes/tasks';
 import { merltKillSwitch } from './middleware/merlt/featureGate';
 import { prisma } from './lib/prisma';
 import { createOAuthRouter } from './routes/oauth';
@@ -72,6 +77,11 @@ app.get('/api/auth/verify', ...createScrapeGate(config.scrape));
 // exchanges for all its users from one address, which the anonymous tier
 // (100 a minute per address) would throttle.
 app.use(createOAuthRouter(oauthConfig));
+
+// Which features are on (D7b): public, and before every limiter, like the OAuth endpoints above: the MCP
+// server asks it with no token at each session's start, for all its users from one address, and a 429 would
+// leave a session without its tools for its whole life.
+app.get('/api/features', features);
 
 // An exchanged token from the MCP server (spec section 5): verified, held to its
 // table of routes, scopes and daily quota, before the general limiter so that
@@ -139,8 +149,14 @@ app.use('/api/lingo/testi', lingoTestiRoutes);
 app.use('/api/admin/studia/testi', adminStudiaTestiRoutes);
 app.use('/api/admin/studia/soglie', adminStudiaSoglieRoutes);
 app.use('/api/lingo/srs', lingoSrsRoutes);
+// Gymnasium's courses (Percorsi, A1), same reason; behind the switch `lingo_courses`.
+app.use('/api/lingo/corsi', lingoCorsiRoutes);
+// The planner's tasks, same reason.
+app.use('/api/tasks', taskRoutes);
 // The consent page and the connected applications (MCP spike), same reason.
 app.use('/api/oauth', oauthAccountRoutes);
+// The runtime switches' administration (GET /features is mounted above, before the limiters).
+app.use('/api', appSwitchRoutes);
 app.use('/api', authRoutes);
 app.use('/api', adminRoutes);
 app.use('/api', folderRoutes);
@@ -148,6 +164,10 @@ app.use('/api', bookmarkRoutes);
 app.use('/api', highlightRoutes);
 app.use('/api', annotationRoutes);
 app.use('/api', dossierRoutes);
+// D7b: the web app's routes for the assistant's proposals and notes (behind the `assistant_passages` switch).
+app.use('/api', assistantProposalRoutes);
+// D7b and D8: an entry's text and the glosses a connected application proposes on it (delegated; the glosses behind `assistant_glosses`).
+app.use('/api', assistantPassageRoutes);
 app.use('/api', trashRoutes);
 app.use('/api', feedbackRoutes);
 app.use('/api/history', historyRoutes);

@@ -41,6 +41,7 @@ model User {
   bookmarks     Bookmark[]
   annotations   Annotation[]
   highlights    Highlight[]
+  assistantNoteVersions AssistantNoteVersion[]
   dossiers      Dossier[]
   feedbacks     Feedback[]
   searchHistory SearchHistory[]
@@ -76,6 +77,10 @@ model User {
   lingoRevisioni        LingoRevisioneSRS[]
   lingoPreferenzeStudio LingoPreferenzeStudio?
   lingoGiornateStudio   LingoGiornataStudio[]
+  lingoCreditiXp        LingoCreditoXp[]
+  // Gymnasium's courses (Percorsi, A1): the ones this user wrote, and their enrolments.
+  lingoCorsi            LingoCorso[]
+  lingoIscrizioni       LingoCorsoIscrizione[]
 
   // LingoLex validation: set by an administrator; the votes this user cast (kept,
   // anonymous, when the account goes), the notice versions they wrote (same) and
@@ -99,6 +104,10 @@ model User {
 
   // What connected applications deleted for this user (MCP second round)
   trashEntries TrashEntry[]
+
+  // The planner's tasks (wave 1): the ones the user owns, and the ones assigned to them (empty until wave 4)
+  tasks         Task[] @relation("TaskOwner")
+  assignedTasks Task[] @relation("TaskAssignee")
 
   @@map("users")
 }
@@ -269,7 +278,7 @@ model MerltQaJob {
   // rather than age-since-submit. A heavy ReAct deliberation legitimately
   // runs up to ~11min; sweeping on createdAt alone would flip a live,
   // still-progressing query to `timeout` (see jobWatchdog.ts qaStaleAfterMs).
-  updatedAt    DateTime       @updatedAt @map("updated_at")
+  updatedAt    DateTime       @default(now()) @updatedAt @map("updated_at") // the migration gives it a default
   startedAt    DateTime?      @map("started_at")
   completedAt  DateTime?      @map("completed_at")
 
@@ -416,7 +425,8 @@ model Highlight {
   id          String   @id @default(uuid())
   normaKey    String   @map("norma_key")
   text        String // Highlighted text
-  color       String   @default("yellow") // yellow, green, red, blue
+  // yellow, green, red, blue; null only for a gloss (a CHECK in the migration)
+  color       String?  @default("yellow")
   startOffset Int      @map("start_offset")
   endOffset   Int      @map("end_offset")
   note        String? // Optional note
@@ -427,6 +437,30 @@ model Highlight {
   sourceSuggestionId String?                @map("source_suggestion_id")
   originalAuthorId   String?                @map("original_author_id")
 
+  // An assistant's mark (D7b: spec 2026-10-23 §8, as its first cut revised it): the connection that
+  // proposed it, set only by provenanceFromRequest, and the dossier entry it was proposed on (no foreign key,
+  // as about_item_id: the trash recreates entries with their ids). A row with a client is the assistant's: it
+  // shows only on that entry, never in GET /highlights. The CHECKs are in the migration.
+  createdByClientId    String?             @map("created_by_client_id")
+  createdByClientName  String?             @map("created_by_client_name")
+  dossierItemId        String?             @map("dossier_item_id")
+  // Where the model put it, never changed; the user's last move of the boundaries (a plain id, no foreign key).
+  assistantText        String?             @map("assistant_text")
+  assistantStartOffset Int?                @map("assistant_start_offset")
+  rangeEditedAt        DateTime?           @map("range_edited_at")
+  rangeEditedBy        String?             @map("range_edited_by")
+  // The assistant's note: the model's original, never changed (`note` is the one shown), its state, the
+  // review comment (kept after the state changes, for the second cut), the user's last edit.
+  assistantNote        String?             @map("assistant_note")
+  noteState            AssistantNoteState? @map("note_state")
+  noteStateChangedAt   DateTime?           @map("note_state_changed_at")
+  reviewComment        String?             @map("review_comment")
+  noteEditedAt         DateTime?           @map("note_edited_at")
+  noteEditedBy         String?             @map("note_edited_by")
+  // D8: a `gloss` is an assistant's note on a passage with no colour (a coloured mark is the user's gesture);
+  // every other row is a `mark`. A gloss always has a state and a note that is not empty (CHECKs in the migration).
+  kind                 HighlightKind       @default(mark)
+
   // Relationships
   user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   bookmark         Bookmark?              @relation(fields: [bookmarkId], references: [id], onDelete: Cascade)
@@ -436,7 +470,21 @@ model Highlight {
   @@index([userId])
   @@index([bookmarkId])
   @@index([normaKey])
+  @@index([userId, dossierItemId])
   @@map("highlights")
+}
+
+// What a highlight row is (D8): a coloured mark, the user's or a D7b proposal, or an assistant's gloss on a passage.
+enum HighlightKind {
+  mark
+  gloss
+}
+
+// The state of a note written by an assistant (D7b): yellow, green, red. The user's own notes have none.
+enum AssistantNoteState {
+  proposed
+  validated
+  review
 }
 
 // ============================================
@@ -478,8 +526,12 @@ model Dossier {
   user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   items            DossierItem[]
   snapshots        DossierSnapshot[]
+  // The planner's tasks filed under this dossier (the dossier is the project, answer 1).
+  tasks            Task[]
   // Its copy in the Forum, if published: seen by its owner only, never in the public content.
   publishedCopy    SharedEnvironment?     @relation("SharedEnvironmentSourceDossier")
+  // The course enrolments that study it (Percorsi, A1): SetNull when the dossier goes.
+  lingoIscrizioni  LingoCorsoIscrizione[]
   sourceSuggestion EnvironmentSuggestion? @relation("SuggestionSourcedDossiers", fields: [sourceSuggestionId], references: [id], onDelete: SetNull)
   originalAuthor   User?                  @relation("OriginalAuthorOfDossiers", fields: [originalAuthorId], references: [id], onDelete: SetNull)
 
@@ -535,9 +587,20 @@ model DossierItem {
   // never a passage of its text (root rule 23). No foreign key: the entry may
   // be in the trash, and the note must survive it and reattach on restore.
   aboutItemId String? @map("about_item_id")
+  // A note entry written by an assistant has a state (D7b), as an assistant's note on a passage: the model's
+  // original text (never changed; `content` is the one shown), the state, the review comment, the user's last
+  // edit (a plain id). Null on every other entry. The CHECKs are in the migration.
+  assistantNote       String?             @map("assistant_note")
+  noteState           AssistantNoteState? @map("note_state")
+  noteStateChangedAt  DateTime?           @map("note_state_changed_at")
+  reviewComment       String?             @map("review_comment")
+  noteEditedAt        DateTime?           @map("note_edited_at")
+  noteEditedBy        String?             @map("note_edited_by")
 
   // Relationships
   dossier Dossier @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+  // Tasks hooked to this entry: they lose the hook (SET NULL) when the entry goes.
+  tasks   Task[]
 
   @@index([dossierId])
   @@map("dossier_items")
@@ -1102,10 +1165,17 @@ model LingoCard {
   validazioni   LingoValidazioneCard[]
   statiRipasso  LingoStatoRipasso[]
   revisioni     LingoRevisioneSRS[]
+  // A course's card (Percorsi, A1): its module, Cascade (always its author's draft); `daPercorso` is set when it is
+  // created with a module and never cleared, so the card stays out of the community once detached too.
+  moduloId      String?                @map("modulo_id")
+  daPercorso    Boolean                @default(false) @map("da_percorso")
+  modulo        LingoCorsoModulo?      @relation(fields: [moduloId], references: [id], onDelete: Cascade)
+  competenze    LingoCardCompetenza[]
 
   @@index([materia, istituto, stato])
   @@index([stato])
   @@index([autoreId])
+  @@index([moduloId])
   @@map("lingo_cards")
 }
 
@@ -1159,6 +1229,7 @@ model LingoValidazioneCard {
 enum LingoTestoChiave {
   PROPOSTA_SCHEDA
   INFORMATIVA_MERLT
+  MATERIALE_STUDIO
 }
 
 // A text the user must accept (decision 22). Never updated, never deleted: an edit is a new version.
@@ -1177,6 +1248,7 @@ model LingoTestoVersione {
   autore       User?                    @relation(fields: [autoreId], references: [id], onDelete: SetNull)
   accettazioni LingoAccettazioneTesto[]
   carte        LingoCard[]
+  corsi        LingoCorso[]
   merltPreferenze MerltUserPreference[] @relation("MerltPreferenceNotice")
   merltConsensi   MerltConsentAudit[]   @relation("MerltAuditNotice")
 
@@ -1260,16 +1332,65 @@ model LingoGiornataStudio {
   utenteId   String   @map("utente_id")
   giorno     DateTime @db.Date
   ripassi    Int      @default(0)
+  // Of `ripassi`, the grades of a card that was due by the end of that day (Gymnasium XP spec §3.1, G-334).
+  ripassiDovuti Int @default(0) @map("ripassi_dovuti")
   nuove      Int      @default(0)
   sbagliate  Int      @default(0)
   codaFinita Boolean  @default(false) @map("coda_finita")
   valido     Boolean  @default(false)
+  // Validation votes cast that day (Gymnasium XP spec §3.5), written only by the vote route; never decreased.
+  voti       Int      @default(0)
   updatedAt  DateTime @updatedAt @map("updated_at")
 
   utente User @relation(fields: [utenteId], references: [id], onDelete: Cascade)
 
   @@id([utenteId, giorno])
   @@map("lingo_giornate_studio")
+}
+
+// Gymnasium's experience points (spec 2026-10-20-gymnasium-xp-levels §5.2): one row per mission credited per
+// period, append-only (only an account deletion's cascade removes rows). `punti` is the value at the time.
+// The CHECKs on `punti`, on the shape of `periodo` and on the event's id are in the migration, not here.
+enum LingoMissione {
+  DOVUTE
+  NUOVE
+  OBIETTIVO
+  MATERIA_FERMA
+  SCRIVI
+  CONVALIDA
+  SETTIMANA
+  CONSOLIDA
+  MODULO
+  PERCORSO
+}
+
+enum LingoFonteXp {
+  REVISIONE
+  PROPOSTA
+  VOTO
+  LETTURA
+  MODULO
+  ESAME
+}
+
+model LingoCreditoXp {
+  id        String        @id @default(uuid())
+  utenteId  String        @map("utente_id")
+  missione  LingoMissione
+  periodo   String        // G:YYYY-MM-DD (a day), S:YYYY-MM-DD (the Monday of a week), U (once)
+  giorno    DateTime      @db.Date
+  punti     Int
+  fonte     LingoFonteXp
+  fonteId   String?       @map("fonte_id") // the review log row, the card, the vote; no foreign key
+  materia   LingoMateria?
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  utente User @relation(fields: [utenteId], references: [id], onDelete: Cascade)
+
+  @@unique([utenteId, missione, periodo])
+  @@unique([missione, fonteId])
+  @@index([utenteId, giorno])
+  @@map("lingo_crediti_xp")
 }
 
 // The thresholds of the community's validation (Studia, spec 2026-10-18). One row per key; the
@@ -1305,6 +1426,297 @@ model LingoImpostazioneLog {
 
   @@index([chiave, createdAt])
   @@map("lingo_impostazioni_log")
+}
+
+// GYMNASIUM'S COURSES («Percorsi», A1; spec docs/superpowers/specs/2026-10-23-gymnasium-courses-design.md §10.2).
+// Content (the author's) apart from progress (one person's), so that A3 can enrol others without copying the
+// content. Content rows are never updated once written, except a course's title and its `moduliPrevisti` (by the
+// user alone): a correction is a new module that names the one it supersedes. Ranges and «exactly one of» are
+// CHECKs in the migrations (20261029100000, 20261029100001), not here.
+
+enum LingoCorsoTipoDomanda {
+  RICHIAMO
+  QUIZ
+  APERTA
+  ESAME
+  ESAME_APERTA
+}
+
+model LingoCorso {
+  id                   String       @id @default(uuid())
+  autoreId             String       @map("autore_id")
+  titolo               String
+  // One of the five subjects (G-363: no new one); the title says what the course is about.
+  materia              LingoMateria
+  descrizione          String?
+  // The programme's count of modules, shown as «8 di 10 moduli»; lowered only by the user («Il programma finisce qui»).
+  moduliPrevisti       Int          @map("moduli_previsti")
+  // The declaration's version accepted when the course was created (the provenance A3 needs).
+  dichiarazioneTestoId String       @map("dichiarazione_testo_id")
+  // The connected application that created it, from the delegation, never from a body.
+  createdByClientId    String?      @map("created_by_client_id")
+  createdByClientName  String?      @map("created_by_client_name")
+  createdAt            DateTime     @default(now()) @map("created_at")
+  updatedAt            DateTime     @updatedAt @map("updated_at")
+
+  autore             User                   @relation(fields: [autoreId], references: [id], onDelete: Cascade)
+  dichiarazioneTesto LingoTestoVersione     @relation(fields: [dichiarazioneTestoId], references: [id], onDelete: Restrict)
+  competenze         LingoCorsoCompetenza[]
+  moduli             LingoCorsoModulo[]
+  esami              LingoCorsoEsame[]
+  iscrizioni         LingoCorsoIscrizione[]
+
+  @@index([autoreId])
+  @@map("lingo_corsi")
+}
+
+model LingoCorsoCompetenza {
+  id      String @id @default(uuid())
+  corsoId String @map("corso_id")
+  // C1, C2…: given by the server in the order the course was created with.
+  codice  String
+  ordine  Int
+  // What the learner will be able to do, as an action.
+  testo   String
+
+  corso   LingoCorso                   @relation(fields: [corsoId], references: [id], onDelete: Cascade)
+  moduli  LingoCorsoModuloCompetenza[]
+  domande LingoCorsoDomandaCompetenza[]
+  carte   LingoCardCompetenza[]
+
+  @@unique([corsoId, codice])
+  @@map("lingo_corsi_competenze")
+}
+
+model LingoCorsoModulo {
+  id                  String   @id @default(uuid())
+  corsoId             String   @map("corso_id")
+  ordine              Int
+  titolo              String
+  // The estimate shown, in minutes.
+  minuti              Int?
+  // 0–3 pre-questions (strings), not graded and never answered to the server.
+  domandePrima        Json     @map("domande_prima")
+  // The module this one corrects; the user withdraws the old one in the web.
+  sostituisceId       String?  @map("sostituisce_id")
+  createdByClientId   String?  @map("created_by_client_id")
+  createdByClientName String?  @map("created_by_client_name")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  corso       LingoCorso                   @relation(fields: [corsoId], references: [id], onDelete: Cascade)
+  sostituisce LingoCorsoModulo?            @relation("LingoCorsoModuloCorrezione", fields: [sostituisceId], references: [id], onDelete: SetNull)
+  correzioni  LingoCorsoModulo[]           @relation("LingoCorsoModuloCorrezione")
+  competenze  LingoCorsoModuloCompetenza[]
+  blocchi     LingoCorsoBlocco[]
+  domande     LingoCorsoDomanda[]
+  stati       LingoCorsoModuloStato[]
+  carte       LingoCard[]
+
+  // Not unique: a correction shares its order with the module it supersedes.
+  @@index([corsoId, ordine])
+  @@index([sostituisceId])
+  @@map("lingo_corsi_moduli")
+}
+
+model LingoCorsoModuloCompetenza {
+  moduloId     String @map("modulo_id")
+  competenzaId String @map("competenza_id")
+
+  modulo     LingoCorsoModulo     @relation(fields: [moduloId], references: [id], onDelete: Cascade)
+  competenza LingoCorsoCompetenza @relation(fields: [competenzaId], references: [id], onDelete: Cascade)
+
+  @@id([moduloId, competenzaId])
+  @@index([competenzaId])
+  @@map("lingo_corsi_moduli_competenze")
+}
+
+model LingoCorsoBlocco {
+  id       String  @id @default(uuid())
+  moduloId String  @map("modulo_id")
+  ordine   Int
+  titolo   String?
+  // The lesson's closed Markdown subset (lingo/courseFormat.ts), stored as the assistant sent it.
+  testo    String  @db.Text
+  // Counted by the server.
+  parole   Int
+  // [{ marcatore, voce, tipo, riferimento, citation }]: copies of the course dossier's entries.
+  citazioni Json
+
+  modulo  LingoCorsoModulo  @relation(fields: [moduloId], references: [id], onDelete: Cascade)
+  domande LingoCorsoDomanda[]
+
+  @@unique([moduloId, ordine])
+  @@map("lingo_corsi_blocchi")
+}
+
+model LingoCorsoEsame {
+  id                  String   @id @default(uuid())
+  corsoId             String   @map("corso_id")
+  // Null: the course's own first exam. Set: written for one enrolment after a failed attempt.
+  iscrizioneId        String?  @map("iscrizione_id")
+  createdByClientId   String?  @map("created_by_client_id")
+  createdByClientName String?  @map("created_by_client_name")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  corso      LingoCorso            @relation(fields: [corsoId], references: [id], onDelete: Cascade)
+  iscrizione LingoCorsoIscrizione? @relation(fields: [iscrizioneId], references: [id], onDelete: Cascade)
+  domande    LingoCorsoDomanda[]
+  tentativi  LingoCorsoTentativo[]
+
+  @@index([corsoId])
+  @@index([iscrizioneId])
+  @@map("lingo_corsi_esami")
+}
+
+model LingoCorsoDomanda {
+  id              String                @id @default(uuid())
+  // Exactly one of the two (a CHECK).
+  moduloId        String?               @map("modulo_id")
+  esameId         String?               @map("esame_id")
+  // A recall question's block, of the same module.
+  bloccoId        String?               @map("blocco_id")
+  tipo            LingoCorsoTipoDomanda
+  applicazione    Boolean               @default(false)
+  ordine          Int
+  testo           String                @db.Text
+  // 2–6 { chiave: 'a'…'f', testo, spiegazione }; for APERTA the hybrid's options.
+  opzioni         Json?
+  // The right key: a column of its own, so that every read selects it explicitly (never by default).
+  corretta        String?
+  rispostaModello String?               @map("risposta_modello") @db.Text
+  // 3–5 criteria, the open kinds only.
+  rubrica         Json?
+  createdAt       DateTime              @default(now()) @map("created_at")
+
+  modulo     LingoCorsoModulo?             @relation(fields: [moduloId], references: [id], onDelete: Cascade)
+  esame      LingoCorsoEsame?              @relation(fields: [esameId], references: [id], onDelete: Cascade)
+  blocco     LingoCorsoBlocco?             @relation(fields: [bloccoId], references: [id], onDelete: Cascade)
+  competenze LingoCorsoDomandaCompetenza[]
+  esiti      LingoCorsoEsito[]
+
+  @@index([moduloId])
+  @@index([esameId])
+  @@index([bloccoId])
+  @@map("lingo_corsi_domande")
+}
+
+model LingoCorsoDomandaCompetenza {
+  domandaId    String @map("domanda_id")
+  competenzaId String @map("competenza_id")
+
+  domanda    LingoCorsoDomanda    @relation(fields: [domandaId], references: [id], onDelete: Cascade)
+  competenza LingoCorsoCompetenza @relation(fields: [competenzaId], references: [id], onDelete: Cascade)
+
+  @@id([domandaId, competenzaId])
+  @@index([competenzaId])
+  @@map("lingo_corsi_domande_competenze")
+}
+
+model LingoCorsoIscrizione {
+  id         String    @id @default(uuid())
+  corsoId    String    @map("corso_id")
+  utenteId   String    @map("utente_id")
+  // The course's study dossier, linked from the enrolment (each learner's own in A3); SetNull when it goes.
+  dossierId  String?   @map("dossier_id")
+  // The Rome day the course was passed: written once, never cleared.
+  superatoIl DateTime? @map("superato_il") @db.Date
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  corso     LingoCorso              @relation(fields: [corsoId], references: [id], onDelete: Cascade)
+  utente    User                    @relation(fields: [utenteId], references: [id], onDelete: Cascade)
+  dossier   Dossier?                @relation(fields: [dossierId], references: [id], onDelete: SetNull)
+  stati     LingoCorsoModuloStato[]
+  esiti     LingoCorsoEsito[]
+  tentativi LingoCorsoTentativo[]
+  esami     LingoCorsoEsame[]
+
+  @@unique([corsoId, utenteId])
+  @@index([utenteId])
+  @@index([dossierId])
+  @@map("lingo_corsi_iscrizioni")
+}
+
+model LingoCorsoModuloStato {
+  // Also the XP event's id («Completa un modulo»).
+  id               String    @id @default(uuid())
+  iscrizioneId     String    @map("iscrizione_id")
+  moduloId         String    @map("modulo_id")
+  apertoIl         DateTime  @default(now()) @map("aperto_il")
+  fattoIl          DateTime? @map("fatto_il")
+  fattoGiorno      DateTime? @map("fatto_giorno") @db.Date
+  quizPercentuale  Int?      @map("quiz_percentuale")
+  giudizio         Int?
+  giudizioNota     String?   @map("giudizio_nota")
+  ritiratoIl       DateTime? @map("ritirato_il")
+
+  iscrizione LingoCorsoIscrizione @relation(fields: [iscrizioneId], references: [id], onDelete: Cascade)
+  modulo     LingoCorsoModulo     @relation(fields: [moduloId], references: [id], onDelete: Cascade)
+
+  @@unique([iscrizioneId, moduloId])
+  @@index([moduloId])
+  @@map("lingo_corsi_moduli_stati")
+}
+
+model LingoCorsoEsito {
+  id           String    @id @default(uuid())
+  iscrizioneId String    @map("iscrizione_id")
+  domandaId    String    @map("domanda_id")
+  tentativoId  String?   @map("tentativo_id")
+  scelta       String?
+  // Null when no choice was graded (an open question answered by the rubric alone).
+  corretto     Boolean?
+  // The rubric's criteria ticked (open kinds); empty otherwise. Never scored.
+  spuntate     Int[]     @default([])
+  // The server's Rome day.
+  giorno       DateTime  @db.Date
+  createdAt    DateTime  @default(now()) @map("created_at")
+  segnalatoIl  DateTime? @map("segnalato_il")
+  segnalazione String?
+
+  iscrizione LingoCorsoIscrizione @relation(fields: [iscrizioneId], references: [id], onDelete: Cascade)
+  domanda    LingoCorsoDomanda    @relation(fields: [domandaId], references: [id], onDelete: Cascade)
+  tentativo  LingoCorsoTentativo? @relation(fields: [tentativoId], references: [id], onDelete: Cascade)
+
+  @@unique([iscrizioneId, domandaId])
+  @@index([iscrizioneId, giorno])
+  @@index([domandaId])
+  @@index([tentativoId])
+  @@map("lingo_corsi_esiti")
+}
+
+model LingoCorsoTentativo {
+  id            String    @id @default(uuid())
+  iscrizioneId  String    @map("iscrizione_id")
+  esameId       String    @map("esame_id")
+  apertoIl      DateTime  @default(now()) @map("aperto_il")
+  consegnatoIl  DateTime? @map("consegnato_il")
+  giorno        DateTime? @db.Date
+  percentuale   Int?
+  superato      Boolean?
+  // { codice: percentuale } as graded.
+  perCompetenza Json?     @map("per_competenza")
+
+  iscrizione LingoCorsoIscrizione @relation(fields: [iscrizioneId], references: [id], onDelete: Cascade)
+  esame      LingoCorsoEsame      @relation(fields: [esameId], references: [id], onDelete: Cascade)
+  esiti      LingoCorsoEsito[]
+
+  // An exam is never shown twice.
+  @@unique([iscrizioneId, esameId])
+  @@index([esameId])
+  @@map("lingo_corsi_tentativi")
+}
+
+// A course card's competences (codes of its module's course).
+model LingoCardCompetenza {
+  cardId       String @map("card_id")
+  competenzaId String @map("competenza_id")
+
+  card       LingoCard            @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  competenza LingoCorsoCompetenza @relation(fields: [competenzaId], references: [id], onDelete: Cascade)
+
+  @@id([cardId, competenzaId])
+  @@index([competenzaId])
+  @@map("lingo_card_competenze")
 }
 
 // ─── OAuth 2.1 authorization server (MCP spike) ─────────────────────────────
@@ -1395,6 +1807,10 @@ model OAuthGrant {
   createdAt  DateTime  @default(now()) @map("created_at")
   lastUsedAt DateTime? @map("last_used_at")
   revokedAt  DateTime? @map("revoked_at")
+  // The words of `dossier:text` the user last approved (`TEXT_CONSENT_VERSION` in oauth/config.ts); null for a grant
+  // without the texts. A lower version never receives a note's text until reconnected (G-381 (b); the grants that held
+  // `dossier:text` when the column came were given 1, G-385).
+  textConsentVersion Int? @map("text_consent_version")
 
   user   User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
   client OAuthClient              @relation(fields: [clientId], references: [id], onDelete: Cascade)
@@ -1446,6 +1862,8 @@ enum TrashKind {
   DOSSIER
   DOSSIER_ITEMS
   LINGO_CARDS
+  LINGO_CORSO
+  LINGO_CORSO_MODULO
 }
 
 model TrashEntry {
@@ -1471,4 +1889,116 @@ model TrashEntry {
   @@index([userId, deletedAt])
   @@index([expiresAt])
   @@map("trash_entries")
+}
+
+// A version of an assistant's note or mark that the user sent back («da rivedere») and the assistant
+// replaced (D7b, second cut): nothing writes it in the first cut. One of highlight_id (a proposal) and
+// dossier_item_id (a note entry), with no foreign key: both rows go to the trash and come back with their ids.
+model AssistantNoteVersion {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  highlightId   String?  @map("highlight_id")
+  dossierItemId String?  @map("dossier_item_id")
+  // A proposal's words and boundaries and its colour; null for a note entry.
+  text          String?
+  startOffset   Int?     @map("start_offset")
+  color         String?
+  assistantNote String?  @map("assistant_note")
+  note          String?
+  reviewComment String?  @map("review_comment")
+  clientName    String?  @map("client_name")
+  replacedAt    DateTime @default(now()) @map("replaced_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, highlightId])
+  @@index([userId, dossierItemId])
+  @@map("assistant_note_versions")
+}
+
+// A switch an administrator turns on and off at runtime, one row per key (D7b's `assistant_passages`, off
+// by default: a missing row is off). The keys are in src/assistant/switches.ts; the author is a plain id.
+model AppSwitch {
+  key       String   @id
+  enabled   Boolean  @default(false)
+  updatedAt DateTime @default(now()) @map("updated_at")
+  updatedBy String?  @map("updated_by")
+
+  @@map("app_switches")
+}
+
+// ============================================
+// PLANNER (Opus): personal tasks, wave 1
+// ============================================
+
+// Where a task comes from (answer 9): the lawyer's work, study, the Forum.
+enum TaskOrigin {
+  lavoro
+  studio
+  forum
+}
+
+// What a repeating task counts from: its planned date («ogni») or the day it was completed («ogni!»).
+enum TaskRecurrenceFrom {
+  pianificata
+  completamento
+}
+
+// A task of the planner (answers 2–4 and 7 on the task model). The owner's alone: `assigneeId`
+// stays null until sharing (wave 4). Dates are Europe/Rome civil days (DATE) with an optional
+// time (TIME); the planned date and the deadline are two different things, and the deadline never
+// moves or repeats. The ranges and pairings are CHECKs in the migration
+// `20261025100001_planner_tasks`, not in this model.
+model Task {
+  id            String  @id @default(uuid())
+  userId        String  @map("user_id")
+  // The dossier the task is filed under; none = the user's inbox. Goes to the trash with the dossier.
+  dossierId     String? @map("dossier_id")
+  // An entry of that dossier the task is about; null again when the entry goes.
+  dossierItemId String? @map("dossier_item_id")
+  // A subtask's parent: the schema takes any depth, the web shows one level. Same dossier as the parent.
+  parentId      String? @map("parent_id")
+  position      Int     @default(0)
+  title         String
+  description   String?
+  // 1 the most urgent, 4 the default.
+  priority      Int      @default(4)
+  labels        String[] @default([])
+
+  plannedDate DateTime? @map("planned_date") @db.Date
+  plannedTime DateTime? @map("planned_time") @db.Time(0)
+  dueDate     DateTime? @map("due_date") @db.Date
+  dueTime     DateTime? @map("due_time") @db.Time(0)
+
+  // An RRULE (RFC 5545) of the closed subset in `tasks/recurrence.ts`; the server computes the next date.
+  recurrence      String?
+  recurrenceFrom  TaskRecurrenceFrom @default(pianificata) @map("recurrence_from")
+  // The day of the month a monthly or yearly repetition keeps (the planned date's when the rule or
+  // the date was set), so a month without it shortens that occurrence only.
+  recurrenceDay   Int?               @map("recurrence_day") @db.SmallInt
+  durationMinutes Int?               @map("duration_minutes")
+  assigneeId      String?            @map("assignee_id")
+  origin          TaskOrigin         @default(lavoro)
+
+  completedAt DateTime? @map("completed_at")
+  // In the trash since then; swept after 30 days.
+  deletedAt   DateTime? @map("deleted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  user        User         @relation("TaskOwner", fields: [userId], references: [id], onDelete: Cascade)
+  dossier     Dossier?     @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+  dossierItem DossierItem? @relation(fields: [dossierItemId], references: [id], onDelete: SetNull)
+  parent      Task?        @relation("TaskSubtasks", fields: [parentId], references: [id], onDelete: Cascade)
+  subtasks    Task[]       @relation("TaskSubtasks")
+  assignee    User?        @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  @@index([userId, plannedDate])
+  @@index([userId, dueDate])
+  @@index([dossierId])
+  @@index([dossierItemId])
+  @@index([parentId])
+  @@index([assigneeId])
+  @@index([deletedAt])
+  @@map("tasks")
 }

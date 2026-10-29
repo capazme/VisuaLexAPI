@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 // ---- mocks (hoisted) ----
@@ -28,7 +28,15 @@ vi.mock('../../../store/useAppStore', () => ({
     selector({ quickNorms: [] }),
 }));
 
+// The pages loaded with their route: what the entries ask to fetch ahead.
+const prepared = vi.hoisted(() => ({ paths: [] as string[] }));
+vi.mock('../../../pageCode', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../pageCode')>()),
+  preparePage: (path: string) => { prepared.paths.push(path); },
+}));
+
 import { Sidebar } from '../Sidebar';
+import { coursesSwitchStore } from '../../features/studia/corsi/coursesSwitch';
 
 function renderSidebar(path = '/merlt') {
   return render(
@@ -40,6 +48,7 @@ function renderSidebar(path = '/merlt') {
         closeMobile={vi.fn()}
         openSettings={vi.fn()}
         openKeyboardShortcuts={vi.fn()}
+        serviceHealth={{ snapshot: { overall: 'online', services: [], checkedAt: '' }, refresh: vi.fn() }}
       />
     </MemoryRouter>,
   );
@@ -55,6 +64,20 @@ function navHrefs(): string[] {
 beforeEach(() => {
   isMerltEnabledMock.mockReturnValue(true);
   account.devMode = false;
+  prepared.paths = [];
+});
+
+describe('Sidebar — a page loaded with its route is fetched ahead (P1)', () => {
+  it('as its entry is pointed at, touched or focused', () => {
+    renderSidebar('/');
+    const dossier = screen.getAllByRole('link', { name: 'Dossier' })[0];
+    fireEvent.pointerEnter(dossier, { pointerType: 'mouse' });
+    expect(prepared.paths).toEqual(['/dossier']);
+    fireEvent.pointerDown(screen.getByRole('link', { name: 'Analizza documento' }));
+    expect(prepared.paths).toEqual(['/dossier', '/documents']);
+    fireEvent.focus(screen.getByRole('link', { name: /Ricerca/ }));
+    expect(prepared.paths).toEqual(['/dossier', '/documents', '/']);
+  });
 });
 
 // The MERL-T entries are Academia's, a section offered only in the development mode (sections spec S6, S12).
@@ -72,7 +95,7 @@ describe('Sidebar navigation (MERL-T single entry)', () => {
 
   it('development mode off → no MERL-T entry at all, flag on or not', () => {
     renderSidebar('/');
-    expect(navHrefs()).toEqual(['/', '/documents', '/dossier']);
+    expect(navHrefs()).toEqual(['/', '/documents', '/opus/oggi', '/opus/prossimi', '/opus/ingresso', '/dossier']);
   });
 
   it('flag off → no MERL-T entry at all, even in the development mode', () => {
@@ -82,5 +105,27 @@ describe('Sidebar navigation (MERL-T single entry)', () => {
     const hrefs = navHrefs();
     expect(hrefs).toEqual(['/', '/documents']);
     expect(hrefs.some((h) => h.startsWith('/merlt'))).toBe(false);
+  });
+});
+
+// «Percorsi», second in «Studia», behind the switch `lingo_courses` (courses spec §6.1, §10.10).
+describe('Sidebar — Gymnasium\'s «Percorsi»', () => {
+  afterEach(() => coursesSwitchStore.setState({ state: 'unknown' }));
+  const studia = () => navHrefs().filter((h) => h.startsWith('/studia') || h === '/dossier');
+
+  it('is absent while the switch is off or not yet read', () => {
+    for (const state of ['unknown', 'off'] as const) {
+      coursesSwitchStore.setState({ state });
+      const { unmount } = renderSidebar('/studia/ripasso');
+      expect(studia()).toEqual(['/studia/ripasso', '/studia/progressi', '/dossier', '/studia/schede']);
+      unmount();
+    }
+  });
+
+  it('comes second, Oggi · Percorsi · Progressi · Dossier, once the switch is on', () => {
+    coursesSwitchStore.setState({ state: 'on' });
+    renderSidebar('/studia/ripasso');
+    expect(studia()).toEqual(['/studia/ripasso', '/studia/percorsi', '/studia/progressi', '/dossier', '/studia/schede']);
+    expect(screen.getByRole('link', { name: 'Percorsi' })).toBeInTheDocument();
   });
 });

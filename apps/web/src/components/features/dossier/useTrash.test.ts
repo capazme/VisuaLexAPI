@@ -12,7 +12,7 @@ vi.mock('../../../utils/articleCardsCache', () => ({ invalidateArticleCards: vi.
 
 import { appStore } from '../../../store/useAppStore';
 import { invalidateArticleCards } from '../../../utils/articleCardsCache';
-import { useTrash } from './useTrash';
+import { GONE_FROM_TRASH, useTrash } from './useTrash';
 import type { TrashEntry } from '../../../services/trashService';
 
 const entry = (over: Partial<TrashEntry> = {}): TrashEntry => ({
@@ -79,6 +79,34 @@ describe('useTrash', () => {
   });
 });
 
+describe('useTrash — courses of «Percorsi»', () => {
+  const module = entry({ id: 'tm', kind: 'LINGO_CORSO_MODULO', dossierId: null, label: 'Modulo · Corso', cardCount: 2 });
+
+  it('a module whose course is gone stays in the trash, with the server\'s reason', async () => {
+    list.mockResolvedValue([module]);
+    restoreCall.mockRejectedValue({ status: 404, message: 'Il percorso di questo modulo non c’è più.' });
+    const { result } = renderHook(() => useTrash());
+    await waitFor(() => expect(result.current.entries).toHaveLength(1));
+    let outcome;
+    await act(async () => { outcome = await result.current.restore(module); });
+    expect(outcome).toEqual({ kind: 'failed', message: 'Il percorso di questo modulo non c’è più.' });
+    expect(result.current.entries).toHaveLength(1);
+  });
+
+  it('a course\'s entry the trash no longer has is dropped, and a restored course has the cards read again', async () => {
+    list.mockResolvedValueOnce([module]).mockResolvedValueOnce([]);
+    restoreCall.mockRejectedValueOnce({ status: 404, message: 'Elemento del cestino non trovato.' });
+    const { result } = renderHook(() => useTrash());
+    await waitFor(() => expect(result.current.entries).toHaveLength(1));
+    let outcome;
+    await act(async () => { outcome = await result.current.restore(module); });
+    expect(outcome).toEqual({ kind: 'failed', message: GONE_FROM_TRASH });
+    restoreCall.mockResolvedValueOnce({ dossierId: null });
+    await act(async () => { await result.current.restore(entry({ id: 'tc', kind: 'LINGO_CORSO', dossierId: null })); });
+    expect(invalidateArticleCards).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('useTrash — what can go wrong', () => {
   it('drops an entry the server no longer has, and says why', async () => {
     list.mockResolvedValue([entry()]);
@@ -91,7 +119,29 @@ describe('useTrash — what can go wrong', () => {
     expect(result.current.entries).toEqual([]);
   });
 
-  it("does not ask for a dossier when the entry's own is still here (restored meanwhile)", async () => {
+  it('with a dossier chosen, a 404 drops the entry when the trash no longer has it', async () => {
+    list.mockResolvedValueOnce([entry()]).mockResolvedValueOnce([]);
+    restoreCall.mockRejectedValue({ status: 404, message: 'Elemento del cestino non trovato.' });
+    const { result } = renderHook(() => useTrash());
+    await waitFor(() => expect(result.current.entries).toHaveLength(1));
+    let outcome;
+    await act(async () => { outcome = await result.current.restore(entry(), 'd2'); });
+    expect(outcome).toEqual({ kind: 'failed', message: GONE_FROM_TRASH });
+    expect(result.current.entries).toEqual([]);
+  });
+
+  it('with a dossier chosen, a 404 while the entry is still there asks for another dossier', async () => {
+    list.mockResolvedValue([entry()]);
+    restoreCall.mockRejectedValue({ status: 404, message: 'Dossier not found' });
+    const { result } = renderHook(() => useTrash());
+    await waitFor(() => expect(result.current.entries).toHaveLength(1));
+    let outcome;
+    await act(async () => { outcome = await result.current.restore(entry(), 'd2'); });
+    expect(outcome).toEqual({ kind: 'needs-target', message: 'Il dossier scelto non esiste più: scegline un altro.' });
+    expect(result.current.entries).toHaveLength(1);
+  });
+
+  it("does not ask for a dossier when the entry's own is still here (its ids taken again)", async () => {
     appStore.setState({ dossiers: [{ id: 'd1', title: 'P', createdAt: '', items: [], tags: [] }] });
     list.mockResolvedValue([entry()]);
     restoreCall.mockRejectedValue({ status: 409, message: 'Questi elementi sono già stati ripristinati.' });

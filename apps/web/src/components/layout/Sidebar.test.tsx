@@ -15,6 +15,24 @@ import { Sidebar, SIDEBAR_SMALL_TEXT, SIDEBAR_TOGGLE_TEXT } from './Sidebar';
 import { appStore } from '../../store/useAppStore';
 import { subscribeSearchField } from '../../utils/searchFieldControl';
 import { sectionStore } from '../../features/sections/useSection';
+import { plannerStore } from '../features/planner/plannerStore';
+
+/** Opus's entries: the planner's three views, then the dossiers. */
+const OPUS_HREFS = ['/', '/documents', '/opus/oggi', '/opus/prossimi', '/opus/ingresso', '/dossier'];
+import type { ServiceHealthState } from '../../services/healthService';
+
+/** `Layout`'s one probe of the services, handed to the sidebar (S1). */
+const serviceHealth = {
+  snapshot: {
+    overall: 'online' as ServiceHealthState,
+    services: [
+      { name: 'Backend dati utente', state: 'online' as ServiceHealthState, latencyMs: 12 },
+      { name: 'API normativa e fonti', state: 'degraded' as ServiceHealthState, latencyMs: 340 },
+    ],
+    checkedAt: '',
+  },
+  refresh: vi.fn(() => Promise.resolve()),
+};
 
 /**
  * Every control in the sidebar is an icon. `label` reached the eye only: the
@@ -32,7 +50,7 @@ function renderSidebar(initialPath = '/', props: { theme?: string; isOpen?: bool
   render(
     <MemoryRouter initialEntries={[initialPath]}>
       <Where />
-      <Sidebar theme={props.theme ?? 'light'} isOpen={props.isOpen ?? true} {...handlers} />
+      <Sidebar theme={props.theme ?? 'light'} isOpen={props.isOpen ?? true} serviceHealth={serviceHealth} {...handlers} />
     </MemoryRouter>,
   );
 }
@@ -51,6 +69,8 @@ beforeEach(() => {
   account.isValidator = false;
   sectionStore.setState({ section: 'opus' });
   notices.normaChanges = 0;
+  serviceHealth.snapshot.overall = 'online';
+  serviceHealth.refresh.mockClear();
   Object.values(handlers).forEach((fn) => fn.mockClear());
 });
 
@@ -73,13 +93,10 @@ describe('Sidebar — accessible names', () => {
     expect(screen.getByRole('link', { name: 'Ricerca' })).toHaveAttribute('href', '/');
   });
 
-  it('keeps the quick norms dot, now under «Ricerca»', () => {
+  it('draws no mark for the quick norms under «Ricerca» (M1: an orange dash that said nothing)', () => {
     appStore.setState({ quickNorms: [{ id: 'q1' } as never] });
     renderSidebar();
-    const dot = screen.getByTitle('1 preferiti');
-    const search = screen.getByRole('link', { name: 'Ricerca' });
-    expect(search.compareDocumentPosition(dot) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(document.getElementById('tour-sidebar')).toContainElement(dot);
+    expect(screen.queryByTitle(/preferiti/)).toBeNull();
     appStore.setState({ quickNorms: [] });
   });
 
@@ -89,7 +106,7 @@ describe('Sidebar — accessible names', () => {
     renderSidebar('/dossier');
     fireEvent.click(screen.getByRole('link', { name: 'Ricerca' }));
     expect(screen.getByTestId('where')).toHaveTextContent(/^\/$/);
-    expect(field).toHaveBeenCalledWith({});
+    expect(field).toHaveBeenCalledWith({ focus: true });
     expect(appStore.getState().commandPaletteOpen).toBe(false);
     unsubscribe();
   });
@@ -127,7 +144,7 @@ describe('Sidebar — accessible names', () => {
     renderSidebar();
     openUserMenu();
     const entries = screen.getAllByRole('menuitem');
-    expect(entries.map((e) => e.textContent?.trim())).toEqual(['Impostazioni', 'Cronologia', "Collega un'app AI", 'Tema scuro', 'Scorciatoie (?)', 'Esci']);
+    expect(entries.map((e) => e.textContent?.trim())).toEqual(['Impostazioni', 'Cronologia', "Collega un'app AI", 'Crediti', 'Stato dei servizi: Servizi operativi', 'Tema scuro', 'Scorciatoie', 'Esci']);
     for (const entry of entries) expect(entry).toHaveAccessibleName();
   });
 
@@ -151,7 +168,7 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     for (const path of ['/', '/studia/ripasso', '/forum']) {
       const { unmount } = render(
         <MemoryRouter initialEntries={[path]}>
-          <Sidebar theme="light" isOpen {...handlers} />
+          <Sidebar theme="light" isOpen serviceHealth={serviceHealth} {...handlers} />
         </MemoryRouter>,
       );
       expect(hrefs().slice(0, 2)).toEqual(['/', '/documents']);
@@ -159,21 +176,36 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     }
   });
 
-  it('Opus: the dossiers', () => {
+  it("Opus: the planner's views, then the dossiers", () => {
     renderSidebar('/');
-    expect(hrefs()).toEqual(['/', '/documents', '/dossier']);
-    expect(screen.getByRole('group', { name: 'Opus' })).toContainElement(screen.getByRole('link', { name: 'Dossier' }));
+    expect(hrefs()).toEqual(OPUS_HREFS);
+    const opus = screen.getByRole('group', { name: 'Opus' });
+    expect(within(opus).getAllByRole('link').map((a) => a.getAttribute('aria-label'))).toEqual(['Oggi', 'Prossimi giorni', "Lista d'ingresso", 'Dossier']);
   });
 
-  it('Gymnasium: «Studia» holds Oggi and the dossiers, «Contribuisci» Le mie schede and, for a validator only, «Da validare» (Gymnasium spec §4)', () => {
+  it('counts the overdue and today\'s tasks beside «Oggi», and says it in words (row 16)', () => {
+    plannerStore.setState({ todayCount: 3 });
+    try {
+      renderSidebar('/opus/oggi');
+      const today = screen.getByRole('link', { name: 'Oggi, 3 compiti per oggi o scaduti' });
+      expect(today).toHaveAttribute('aria-current', 'page');
+      expect(today).toHaveTextContent('3');
+      cleanupAndRender('/opus/oggi', () => plannerStore.setState({ todayCount: 0 }));
+      expect(screen.getByRole('link', { name: 'Oggi' })).not.toHaveTextContent(/\d/);
+    } finally {
+      plannerStore.setState({ todayCount: null });
+    }
+  });
+
+  it('Gymnasium: «Studia» holds Oggi, Progressi and the dossiers, «Contribuisci» Le mie schede and, for a validator only, «Da validare» (Gymnasium spec §4)', () => {
     renderSidebar('/studia/schede');
-    expect(hrefs()).toEqual(['/', '/documents', '/studia/ripasso', '/dossier', '/studia/schede']);
+    expect(hrefs()).toEqual(['/', '/documents', '/studia/ripasso', '/studia/progressi', '/dossier', '/studia/schede']);
     expect(screen.getByRole('link', { name: 'Le mie schede' })).toHaveAttribute('aria-current', 'page');
     const study = screen.getByRole('group', { name: 'Studia' });
-    expect(within(study).getAllByRole('link').map((a) => a.getAttribute('aria-label'))).toEqual(['Oggi', 'Dossier']);
+    expect(within(study).getAllByRole('link').map((a) => a.getAttribute('aria-label'))).toEqual(['Oggi', 'Progressi', 'Dossier']);
     expect(screen.getByRole('group', { name: 'Gymnasium' })).toContainElement(study);
     cleanupAndRender('/studia/schede', () => { account.isValidator = true; });
-    expect(hrefs()).toEqual(['/', '/documents', '/studia/ripasso', '/dossier', '/studia/schede', '/studia/valida']);
+    expect(hrefs()).toEqual(['/', '/documents', '/studia/ripasso', '/studia/progressi', '/dossier', '/studia/schede', '/studia/valida']);
     const contribute = screen.getByRole('group', { name: 'Contribuisci' });
     expect(within(contribute).getAllByRole('link').map((a) => a.getAttribute('aria-label'))).toEqual(['Le mie schede', 'Da validare']);
     // The tours still find the dossiers.
@@ -209,7 +241,7 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     expect(hrefs()).toEqual(['/', '/documents', '/merlt', '/grafo']);
     // Without the mode the section is not offered: a stored Academia falls back to Opus.
     cleanupAndRender('/', () => { account.devMode = false; sectionStore.setState({ section: 'academia' }); });
-    expect(hrefs()).toEqual(['/', '/documents', '/dossier']);
+    expect(hrefs()).toEqual(OPUS_HREFS);
     expect(screen.queryByRole('link', { name: /Grafo|Assistente/ })).toBeNull();
   });
 
@@ -226,12 +258,12 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     vi.stubEnv('VITE_FEATURE_STUDIA', 'false');
     sectionStore.setState({ section: 'gymnasium' });
     renderSidebar('/');
-    expect(hrefs()).toEqual(['/', '/documents', '/dossier']);
+    expect(hrefs()).toEqual(OPUS_HREFS);
   });
 
   it("is the same list in the phone's copy, closed off-canvas or open (spec D8)", () => {
     renderSidebar('/', { isOpen: false });
-    expect(hrefs()).toEqual(['/', '/documents', '/dossier']);
+    expect(hrefs()).toEqual(OPUS_HREFS);
     openUserMenu();
     expect(screen.getByRole('menuitem', { name: /Impostazioni/ })).toBeInTheDocument();
   });
@@ -243,6 +275,27 @@ describe('Sidebar — the entries of each section (sections spec S6)', () => {
     expect(screen.getByTestId('where')).toHaveTextContent('/forum');
     expect(handlers.closeMobile).toHaveBeenCalled();
     expect(hrefs()).toEqual(['/', '/documents', '/forum', '/forum/community']);
+  });
+
+  it('fades in the new section\'s entries only, never the Corpus ones above them (T1)', () => {
+    // jsdom has no Web Animations: the spy records which elements fade in.
+    const animate = vi.fn();
+    Element.prototype.animate = animate as unknown as typeof Element.prototype.animate;
+    try {
+      renderSidebar('/');
+      expect(animate).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole('button', { name: /^Sezione:/ }));
+      fireEvent.click(screen.getByRole('menuitemradio', { name: /Forum/ }));
+      // The switcher's own menu moves too (S6); the navigation's entries are what this counts.
+      const nav = document.getElementById('tour-sidebar')!;
+      const faded = (animate.mock.contexts as HTMLElement[]).filter((el) => nav.contains(el));
+      expect(faded.length).toBeGreaterThan(0);
+      const forum = screen.getByRole('group', { name: 'Forum' });
+      for (const entry of faded) expect(forum).toContainElement(entry);
+      expect(faded).toContain(screen.getByRole('link', { name: 'Community' }));
+    } finally {
+      delete (Element.prototype as Partial<Element>).animate;
+    }
   });
 });
 
@@ -282,11 +335,11 @@ describe('Sidebar — Cronologia in the user menu (the owner, 13 Oct 2026)', () 
 });
 
 describe('Sidebar — the user menu (spec D2)', () => {
-  it("holds Impostazioni, Cronologia, «Collega un'app AI», the theme, Scorciatoie and Esci; «Pannello Admin» only for an admin", () => {
+  it("holds Impostazioni, Cronologia, «Collega un'app AI», «Crediti», the services' status, the theme, Scorciatoie (no «(?)»: the key still opens it) and Esci; «Pannello Admin» only for an admin", () => {
     renderSidebar();
     openUserMenu();
     expect(screen.getByRole('menu', { name: 'Menu utente' })).toBeInTheDocument();
-    expect(screen.getAllByRole('menuitem').map((e) => e.textContent?.trim())).toEqual(['Impostazioni', 'Cronologia', "Collega un'app AI", 'Tema scuro', 'Scorciatoie (?)', 'Esci']);
+    expect(screen.getAllByRole('menuitem').map((e) => e.textContent?.trim())).toEqual(['Impostazioni', 'Cronologia', "Collega un'app AI", 'Crediti', 'Stato dei servizi: Servizi operativi', 'Tema scuro', 'Scorciatoie', 'Esci']);
     expect(screen.queryByRole('menuitem', { name: /Pannello Admin/ })).toBeNull();
   });
 
@@ -323,6 +376,68 @@ describe('Sidebar — the user menu (spec D2)', () => {
     expect(screen.queryByRole('menu', { name: 'Menu utente' })).toBeNull();
   });
 
+  it('opens «Crediti», the public page of the sources, and closes the menu (and the phone\'s menu)', () => {
+    renderSidebar();
+    openUserMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Crediti' }));
+    expect(screen.getByTestId('where')).toHaveTextContent('/crediti');
+    expect(handlers.closeMobile).toHaveBeenCalled();
+    expect(screen.queryByRole('menu', { name: 'Menu utente' })).toBeNull();
+  });
+
+  it('holds «Invia un commento» on a phone, after «Crediti», and opens the form from it (M1)', () => {
+    const openFeedback = vi.fn();
+    render(
+      <MemoryRouter>
+        <Sidebar theme="light" isOpen serviceHealth={serviceHealth} {...handlers} openFeedback={openFeedback} layout="drawer" />
+      </MemoryRouter>,
+    );
+    openUserMenu();
+    const names = screen.getAllByRole('menuitem').map((e) => e.textContent?.trim());
+    expect(names.indexOf('Invia un commento')).toBe(names.indexOf('Crediti') + 1);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Invia un commento' }));
+    expect(openFeedback).toHaveBeenCalledTimes(1);
+    expect(handlers.closeMobile).toHaveBeenCalled();
+    expect(screen.queryByRole('menu', { name: 'Menu utente' })).toBeNull();
+  });
+
+  it('takes the closed drawer out of reach (inert), and only the drawer', () => {
+    const { container, rerender } = render(
+      <MemoryRouter>
+        <Sidebar theme="light" isOpen={false} serviceHealth={serviceHealth} {...handlers} layout="drawer" />
+      </MemoryRouter>,
+    );
+    expect(container.querySelector('aside')).toHaveAttribute('inert');
+    rerender(
+      <MemoryRouter>
+        <Sidebar theme="light" isOpen serviceHealth={serviceHealth} {...handlers} layout="drawer" />
+      </MemoryRouter>,
+    );
+    expect(container.querySelector('aside')).not.toHaveAttribute('inert');
+    rerender(
+      <MemoryRouter>
+        <Sidebar theme="light" isOpen={false} serviceHealth={serviceHealth} {...handlers} layout="rail" />
+      </MemoryRouter>,
+    );
+    expect(container.querySelector('aside')).not.toHaveAttribute('inert');
+  });
+
+  it('leaves «Invia un commento» to the floating button from md', () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({ ...original(query), matches: query === '(min-width: 768px)' })) as typeof window.matchMedia;
+    try {
+      render(
+        <MemoryRouter>
+          <Sidebar theme="light" isOpen serviceHealth={serviceHealth} {...handlers} openFeedback={vi.fn()} />
+        </MemoryRouter>,
+      );
+      openUserMenu();
+      expect(screen.queryByRole('menuitem', { name: 'Invia un commento' })).toBeNull();
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
   it('opens the shortcuts', () => {
     renderSidebar();
     openUserMenu();
@@ -336,6 +451,112 @@ describe('Sidebar — the user menu (spec D2)', () => {
     openUserMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: /Tema scuro/ }));
     expect(handlers.toggleTheme).toHaveBeenCalledTimes(1);
+  });
+});
+
+// The services' status was a pill fixed at the bottom left, over the foot of the page on a phone (S1): it is an
+// entry of the user menu, and a fault is a dot on the user button.
+describe('Sidebar — the services\' status in the user menu (S1)', () => {
+  const dot = () => document.querySelector('[data-service-health-dot]');
+
+  it.each([
+    ['online', 'Servizi operativi'],
+    ['degraded', 'Alcune fonti non disponibili'],
+    ['offline', 'Servizio non raggiungibile'],
+    ['checking', 'Controllo servizi…'],
+  ] as const)('writes the phrase of the state (%s), after «Crediti» and before the theme', (state, phrase) => {
+    serviceHealth.snapshot.overall = state;
+    renderSidebar();
+    openUserMenu();
+    const entry = screen.getByRole('menuitem', { name: `Stato dei servizi: ${phrase}` });
+    expect(entry).toHaveTextContent(phrase);
+    const entries = screen.getAllByRole('menuitem');
+    expect(entries.indexOf(entry)).toBe(entries.indexOf(screen.getByRole('menuitem', { name: 'Crediti' })) + 1);
+    expect(entries[entries.indexOf(entry) + 1]).toHaveTextContent('Tema scuro');
+  });
+
+  it('opens inside the menu with a tap, the services and their latency, and «Ricontrolla» probes again with the menu open', () => {
+    renderSidebar();
+    openUserMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Stato dei servizi: Servizi operativi' }));
+    const list = within(screen.getByRole('menu', { name: 'Menu utente' })).getByRole('group', { name: 'Stato dei servizi' });
+    expect(list).toHaveTextContent('Backend dati utenteOK · 12 ms');
+    expect(list).toHaveTextContent('API normativa e fontiDegradato · 340 ms');
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Ricontrolla' }));
+    expect(serviceHealth.refresh).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('menu', { name: 'Menu utente' })).toBeInTheDocument();
+    expect(handlers.closeMobile).not.toHaveBeenCalled();
+  });
+
+  it('is reached with the arrows, and so are its rows once open; Esc closes the menu, back to the avatar', () => {
+    renderSidebar();
+    openUserMenu();
+    const menu = screen.getByRole('menu');
+    for (let i = 0; i < 4; i++) fireEvent.keyDown(menu, { key: 'ArrowDown' });
+    const entry = screen.getByRole('menuitem', { name: 'Stato dei servizi: Servizi operativi' });
+    expect(entry).toHaveFocus();
+    // Enter on a focused button is its click: the focus stays on the entry.
+    fireEvent.click(entry);
+    expect(entry).toHaveFocus();
+    fireEvent.keyDown(menu, { key: 'ArrowDown' });
+    expect(screen.getByRole('menuitem', { name: /Backend dati utente/ })).toHaveFocus();
+    fireEvent.keyDown(menu, { key: 'ArrowDown' });
+    fireEvent.keyDown(menu, { key: 'ArrowDown' });
+    expect(screen.getByRole('menuitem', { name: 'Ricontrolla' })).toHaveFocus();
+    fireEvent.keyDown(menu, { key: 'ArrowDown' });
+    expect(screen.getByRole('menuitem', { name: 'Tema scuro' })).toHaveFocus();
+    fireEvent.keyDown(menu, { key: 'Escape' });
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(screen.getByRole('button', { name: /Menu utente/ })).toHaveFocus();
+  });
+
+  it('opens folded every time', () => {
+    renderSidebar();
+    openUserMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Stato dei servizi: Servizi operativi' }));
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+    openUserMenu();
+    expect(screen.getByRole('menuitem', { name: 'Stato dei servizi: Servizi operativi' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('group', { name: 'Stato dei servizi' })).toBeNull();
+  });
+
+  it.each(['rail', 'wide', 'drawer'] as const)('puts a dot on the user button (%s) when a source or a service is down, and says it in its name', (layout) => {
+    const named = layout === 'rail' ? 'Menu utente' : 'Menu utente di tester';
+    for (const [state, words] of [['degraded', 'alcune fonti non disponibili'], ['offline', 'servizio non raggiungibile']] as const) {
+      cleanup();
+      serviceHealth.snapshot.overall = state;
+      render(<MemoryRouter><Sidebar theme="light" isOpen layout={layout} serviceHealth={serviceHealth} {...handlers} /></MemoryRouter>);
+      const button = screen.getByRole('button', { name: `${named}, ${words}` });
+      expect(button).toContainElement(dot() as HTMLElement);
+    }
+    for (const state of ['online', 'checking'] as const) {
+      cleanup();
+      serviceHealth.snapshot.overall = state;
+      render(<MemoryRouter><Sidebar theme="light" isOpen layout={layout} serviceHealth={serviceHealth} {...handlers} /></MemoryRouter>);
+      expect(screen.getByRole('button', { name: named })).toBeInTheDocument();
+      expect(dot()).toBeNull();
+    }
+  });
+
+  it('says the changed norms and the fault together, and keeps the dot clear of their count', () => {
+    notices.normaChanges = 2;
+    serviceHealth.snapshot.overall = 'degraded';
+    renderSidebar();
+    const button = screen.getByRole('button', { name: 'Menu utente, 2 norme salvate cambiate, alcune fonti non disponibili' });
+    expect(within(button).getByText('2')).toBeInTheDocument();
+    expect(dot()).toHaveClass('-bottom-0.5', '-right-0.5');
+    expect(button.textContent?.trim()).toBe('T2');
+  });
+
+  it('lets the menu scroll rather than leave the top of a low window', () => {
+    renderSidebar();
+    const button = screen.getByRole('button', { name: /Menu utente/ });
+    vi.spyOn(button, 'getBoundingClientRect').mockReturnValue({ top: 300, bottom: 344, left: 10, right: 54 } as DOMRect);
+    openUserMenu();
+    const menu = screen.getByRole('menu', { name: 'Menu utente' });
+    expect(menu).toHaveClass('overflow-y-auto');
+    // The rail's menu is aligned to the avatar's foot.
+    expect(menu.style.maxHeight).toBe('336px');
   });
 });
 
@@ -512,7 +733,7 @@ describe('Sidebar — the words', () => {
   function renderLayout(layout: 'rail' | 'wide' | 'drawer', path = '/', onToggleWide?: () => void) {
     render(
       <MemoryRouter initialEntries={[path]}>
-        <Sidebar theme="light" isOpen layout={layout} onToggleWide={onToggleWide} {...handlers} />
+        <Sidebar theme="light" isOpen layout={layout} onToggleWide={onToggleWide} serviceHealth={serviceHealth} {...handlers} />
       </MemoryRouter>,
     );
   }
@@ -527,8 +748,9 @@ describe('Sidebar — the words', () => {
     const forum = screen.getByRole('link', { name: 'Dossier pubblici, 3 notifiche' });
     expect(forum).toHaveTextContent(/^Dossier pubblici3$/);
     expect(screen.getByRole('link', { name: 'Community' })).toHaveTextContent(/^Community$/);
-    // The section is named beside its mark; the button keeps its name.
-    expect(screen.getByRole('button', { name: /^Sezione: Forum/ })).toHaveTextContent('Forum');
+    // The section is named beside its mark, on the split button's left part, which goes to its home (S6).
+    expect(screen.getByRole('button', { name: 'Vai a Forum: Dossier pubblici' })).toHaveTextContent('Forum');
+    expect(screen.getByRole('button', { name: 'Cambia sezione' })).toHaveAttribute('aria-haspopup', 'menu');
     // The username is shown, so the name carries it (label in name).
     expect(screen.getByRole('button', { name: 'Menu utente di tester' })).toHaveTextContent('tester');
   });

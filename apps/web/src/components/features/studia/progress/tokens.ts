@@ -2,15 +2,16 @@ import type { ConteggiStati, Materia, StatoGiorno } from '../../../../types/stud
 
 /**
  * Direction D, «Registro vivo» (Studia progress spec §6.1): the app's own tokens, light and dark. Ink is the
- * deep end of the primary scale; the stamp is the one red; each subject takes a hue of the category palette.
+ * deep end of the primary scale; the goal's mark is the ink too (G9: the red stamp is gone); each subject takes a hue
+ * of the category palette.
  */
 export const INK_TEXT = 'text-primary-900 dark:text-primary-300';
 export const INK_BG = 'bg-primary-900 dark:bg-primary-300';
 export const INK_BORDER = 'border-primary-900 dark:border-primary-300';
 /** Text on an ink fill. */
 export const ON_INK = 'text-white dark:text-slate-950';
-export const STAMP = 'border-red-700 text-red-700 dark:border-red-400 dark:text-red-400';
-export const SUCCESS_TEXT = 'text-green-600 dark:text-green-400';
+// green-700 in light: 600 was 3,2:1 on white for the goal's count (M1).
+export const SUCCESS_TEXT = 'text-green-700 dark:text-green-400';
 export const MUTED_TEXT = 'text-slate-500 dark:text-slate-400';
 
 /** A tile of the dashboard: the missions, the statistics, a stop of the road. */
@@ -25,6 +26,8 @@ export const FOCUS_RING = 'focus-visible:outline-none focus-visible:ring-2 focus
 
 /** A secondary button: an ink outline, 44 px, a press that gives a little. */
 export const SECONDARY_BUTTON = `min-h-[44px] rounded-xl border px-4 text-sm font-semibold transition-[background-color,scale] active:scale-[0.97] ${INK_BORDER} text-primary-900 hover:bg-primary-50 dark:text-primary-200 dark:hover:bg-primary-900/30 ${FOCUS_RING}`;
+/** A solid ink button, 44 px: the one action of a block («+ Nuova scheda» in an empty list, «Proponi alla comunità», «Invia»). */
+export const INK_BUTTON = `inline-flex min-h-[44px] items-center justify-center rounded-xl px-4 text-sm font-semibold transition-[background-color,opacity,scale] active:scale-[0.97] disabled:opacity-60 hover:bg-primary-800 dark:hover:bg-primary-200 ${INK_BG} ${ON_INK} ${FOCUS_RING}`;
 /** A quiet action under a mission: words in ink, 44 px tall, underlined on hover. */
 export const QUIET_BUTTON = `-mx-2 min-h-[44px] justify-self-start rounded-lg px-2 text-left text-sm font-medium text-primary-900 underline-offset-4 hover:underline dark:text-primary-200 ${FOCUS_RING}`;
 
@@ -33,22 +36,13 @@ const SUBJECT_TOKEN: Record<Materia, string> = {
   DIRITTO_PENALE: '--category-penal',
   DIRITTO_AMMINISTRATIVO: '--category-administrative',
   DIRITTO_PROCESSUALE_CIVILE: '--category-compliance',
-  DIRITTO_PROCESSUALE_PENALE: '--brocardi',
+  DIRITTO_PROCESSUALE_PENALE: '--category-penal-procedure',
 };
 
 /** The subject's hue as a CSS colour, for an inline style: it follows the theme through the variable. */
 export function subjectHue(materia: Materia): string {
   return `hsl(var(${SUBJECT_TOKEN[materia]}))`;
 }
-
-/** The calendar's scale, 0 (nothing) to 4 (the busiest day), as fill classes. */
-export const HEAT_FILL = [
-  'fill-slate-100 dark:fill-slate-800',
-  'fill-primary-200 dark:fill-primary-900',
-  'fill-primary-400 dark:fill-primary-700',
-  'fill-primary-600 dark:fill-primary-500',
-  'fill-primary-900 dark:fill-primary-300',
-] as const;
 
 /** The three states, their names and their swatches: the bar here and the road's stops (Gymnasium spec §5.2). */
 export const CARD_STATES: { key: keyof ConteggiStati; label: string; swatch: string }[] = [

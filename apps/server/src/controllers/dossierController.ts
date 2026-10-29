@@ -3,6 +3,7 @@ import { Prisma, DossierItemType } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
+import { atMostUnits } from '../utils/utf16Length';
 import { AppError } from '../middleware/errorHandler';
 import { resolveReferences } from '../norms/resolveReference';
 import { decisionKeyOf, resolveDecisionReferences, type DecisionOutcome } from '../norms/resolveDecisions';
@@ -12,6 +13,7 @@ import { decisionItemContentSchema, parseDecisionItemContent } from '../schemas/
 import { BY_THE_USER, trashDossier, trashDossierItems } from '../trash/trash';
 import { importStudyDossiers, spendStudyImport } from '../services/studyImport';
 import { readableContent } from '../utils/publishedContent';
+import { assistantFieldsOf, assistantViewFor, type AssistantView } from '../assistant/notes';
 
 /** Who created a row: the connected application when the request is delegated, else nobody (the user). */
 export function provenanceFromRequest(req: Request) {
@@ -26,8 +28,19 @@ const createdBy = (row: { createdByClientId: string | null; createdByClientName:
 
 type ItemRow = Prisma.DossierItemGetPayload<object>;
 
-/** A dossier entry as every route answers it. */
-function serializeItem(i: ItemRow) {
+/**
+ * Whether a note's text stays out of this answer (G-381 (b)): for a connected application whose token lacks
+ * `dossier:text`, or whose grant was approved before the words of that permission named the notes. The server is
+ * the gate; `apps/mcp` filters too.
+ */
+const hidesNoteText = (req: Request): boolean => Boolean(req.delegation && !req.delegation.readsNotes);
+
+/**
+ * A dossier entry as every route answers it. `view` carries the assistant's notes for the user's session
+ * (`assistantViewFor`): without it (an exchanged token, the switch off) both fields are null. `hideNotes` drops a
+ * note's content (null), never a norm's or a decision's identity.
+ */
+function serializeItem(i: ItemRow, view: AssistantView | null, hideNotes = false) {
   return {
     id: i.id,
     item_type: i.itemType,
@@ -37,29 +50,50 @@ function serializeItem(i: ItemRow) {
     citation: citeStoredItem(i.itemType, i.content),
     // The act alone ("l. 31 dicembre 2012, n. 247"), for a reader that names an act once above its articles.
     act_citation: citeStoredAct(i.itemType, i.content),
-    content: i.content,
+    content: hideNotes && i.itemType === 'note' ? null : i.content,
     position: i.position,
     status: i.status,
     created_at: i.createdAt,
     created_by: createdBy(i),
     // The entry a note is about (an article of the same dossier), or null.
     about_item_id: i.aboutItemId,
+    // D7b: the light of a norm or a decision (its assistant's notes by state) and an assistant's note
+    // entry's own state; null for the user's own rows, for an exchanged token, and with the switch off.
+    ...assistantFieldsOf(i, view),
   };
 }
 
+/** One entry's answer, with its view of the assistant's notes. */
+export async function serializeItemFor(req: Request, item: ItemRow) {
+  return serializeItem(item, await assistantViewFor(req, [item]), hidesNoteText(req));
+}
+
+/** Dossiers' answers, with one view of the assistant's notes for all their entries. */
+async function serializeDossiersFor(req: Request, dossiers: Parameters<typeof serializeDossier>[0][]) {
+  const view = await assistantViewFor(req, dossiers.flatMap((d) => d.items));
+  const hideNotes = hidesNoteText(req);
+  return dossiers.map((d) => serializeDossier(d, view, hideNotes));
+}
+
 /**
- * What a dossier route includes besides the row: the entries in order, and the
- * dossier's copy in the Forum (owner-only: every dossier route is scoped to its owner).
+ * What a dossier route includes besides the row: the entries in order, the
+ * dossier's copy in the Forum (owner-only: every dossier route is scoped to its owner),
+ * and how many planner tasks it holds.
  */
 const DOSSIER_INCLUDE = {
   items: { orderBy: { position: 'asc' } },
   publishedCopy: { select: { id: true, currentVersion: true, isActive: true, updatedAt: true } },
+  _count: { select: { tasks: true } },
 } satisfies Prisma.DossierInclude;
 
 type PublishedCopyRow = { id: string; currentVersion: number; isActive: boolean; updatedAt: Date };
 
 /** A dossier as every route answers it. */
-function serializeDossier(d: Prisma.DossierGetPayload<object> & { items: ItemRow[]; publishedCopy: PublishedCopyRow | null }) {
+function serializeDossier(
+  d: Prisma.DossierGetPayload<object> & { items: ItemRow[]; publishedCopy: PublishedCopyRow | null; _count: { tasks: number } },
+  view: AssistantView | null,
+  hideNotes = false,
+) {
   return {
     id: d.id,
     name: d.name,
@@ -83,7 +117,10 @@ function serializeDossier(d: Prisma.DossierGetPayload<object> & { items: ItemRow
     created_at: d.createdAt,
     updated_at: d.updatedAt,
     created_by: createdBy(d),
-    items: d.items.map(serializeItem),
+    items: d.items.map((item) => serializeItem(item, view, hideNotes)),
+    // Its planner tasks, done and trashed ones too: all go to the trash with the dossier. A count, never
+    // a title: a connected application reads it to tell the user, in the deletion's confirmation.
+    task_count: d._count.tasks,
   };
 }
 
@@ -91,7 +128,8 @@ function serializeDossier(d: Prisma.DossierGetPayload<object> & { items: ItemRow
 const dossierKindSchema = z.enum(['lavoro', 'studio']);
 
 const createDossierSchema = z.object({
-  name: z.string().min(1).max(200),
+  // In UTF-16 units, as the Forum counts a published dossier's title (`LIMITS.title`).
+  name: z.string().min(1).refine(...atMostUnits(200)),
   description: z.string().optional(),
   color: z.string().optional(),
   tags: z.array(z.string()).optional(),
@@ -99,7 +137,7 @@ const createDossierSchema = z.object({
 });
 
 const updateDossierSchema = z.object({
-  name: z.string().min(1).max(200).optional(),
+  name: z.string().min(1).refine(...atMostUnits(200)).optional(),
   description: z.string().optional().nullable(),
   color: z.string().optional().nullable(),
   tags: z.array(z.string()).optional(),
@@ -140,7 +178,7 @@ export const listDossiers = async (req: Request, res: Response) => {
     orderBy: { createdAt: 'desc' },
   });
 
-  res.json(dossiers.map(serializeDossier));
+  res.json(await serializeDossiersFor(req, dossiers));
 };
 
 /**
@@ -158,7 +196,7 @@ export const getDossier = async (req: Request, res: Response) => {
     throw new AppError(404, 'Dossier not found');
   }
 
-  res.json(serializeDossier(dossier));
+  res.json((await serializeDossiersFor(req, [dossier]))[0]);
 };
 
 /**
@@ -180,7 +218,7 @@ export const createDossier = async (req: Request, res: Response) => {
     include: DOSSIER_INCLUDE,
   });
 
-  res.status(201).json(serializeDossier(dossier));
+  res.status(201).json((await serializeDossiersFor(req, [dossier]))[0]);
 };
 
 /**
@@ -212,11 +250,11 @@ export const updateDossier = async (req: Request, res: Response) => {
     include: DOSSIER_INCLUDE,
   });
 
-  res.json(serializeDossier(dossier));
+  res.json((await serializeDossiersFor(req, [dossier]))[0]);
 };
 
 const importStudySchema = z.object({
-  content: z.unknown(),
+  content: z.unknown().optional(),
   addNotes: z.boolean().default(true),
   addHighlights: z.boolean().default(true),
 });
@@ -292,7 +330,7 @@ export const addDossierItem = async (req: Request, res: Response) => {
     },
   });
 
-  res.status(201).json(serializeItem(item));
+  res.status(201).json(await serializeItemFor(req, item));
 };
 
 /**
@@ -314,7 +352,8 @@ const noteSchema = z
       .string()
       .trim()
       .min(1)
-      .max(MAX_NOTE_LENGTH)
+      // In UTF-16 units, as the Forum's and the proposals' checks count a note.
+      .refine(...atMostUnits(MAX_NOTE_LENGTH))
       .refine((text) => !CONTROL.test(text), 'Caratteri di controllo non ammessi.'),
     // Not `.uuid()`: any id that is not a norm of this dossier gets the same answer below.
     aboutItemId: z.string().min(1).max(64).optional(),
@@ -348,11 +387,13 @@ export const addDossierNote = async (req: Request, res: Response) => {
         position: (last._max.position ?? -1) + 1,
         aboutItemId: aboutItemId ?? null,
         ...provenanceFromRequest(req),
+        // D7b: an assistant's note starts «da validare», its text kept as the original.
+        ...(req.delegation ? { assistantNote: text, noteState: 'proposed' as const } : {}),
       },
     });
   });
 
-  res.status(201).json(serializeItem(item));
+  res.status(201).json(await serializeItemFor(req, item));
 };
 
 /**
@@ -382,8 +423,12 @@ export const updateDossierItem = async (req: Request, res: Response) => {
   if (data.content !== undefined || data.title !== undefined) {
     const existing = await prisma.dossierItem.findFirst({
       where: { id: itemId, dossierId: id },
-      select: { itemType: true },
+      select: { itemType: true, noteState: true, content: true },
     });
+    // An assistant's note (D7b) changes its text only through `PUT …/text`, behind the switch and the row's lock,
+    // which keeps the original and stamps the edit: here its content stays as stored. The web sends the whole
+    // content back with a change of star or position, and that must never make the note «modificata da te».
+    if (existing?.noteState) delete data.content;
     if (existing?.itemType === 'sentenza') {
       if (data.content !== undefined) {
         const decision = parseDecisionItemContent(data.content);
@@ -418,7 +463,7 @@ export const updateDossierItem = async (req: Request, res: Response) => {
     throw err;
   }
 
-  res.json(serializeItem(item));
+  res.json(await serializeItemFor(req, item));
 };
 
 /**
@@ -477,7 +522,7 @@ export const moveDossierItem = async (req: Request, res: Response) => {
         _max: { position: true },
       });
 
-      return tx.dossierItem.update({
+      const moved = await tx.dossierItem.update({
         // Scoped by dossierId: the ownership check above proves the source
         // dossier is ours, not that the item belongs to it.
         where: { id: itemId, dossierId: source.id },
@@ -488,9 +533,12 @@ export const moveDossierItem = async (req: Request, res: Response) => {
           aboutItemId: null,
         },
       });
+      // A task is about an entry of its own dossier too: the tasks stay in the source, without the entry.
+      await tx.task.updateMany({ where: { dossierItemId: moved.id }, data: { dossierItemId: null } });
+      return moved;
     });
 
-    res.json(serializeItem(item));
+    res.json(await serializeItemFor(req, item));
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
       throw new AppError(404, 'Dossier item not found');
@@ -709,13 +757,17 @@ export const addDossierDecisions = async (req: Request, res: Response) => {
   );
 
   type DecisionResult = {
-    reference: string; outcome: DecisionResultOutcome; citation?: string; court?: string; detail?: string; itemId?: string;
+    reference: string; outcome: DecisionResultOutcome; citation?: string; court?: string; candidates?: string[]; detail?: string; itemId?: string;
   };
   const toCreate: number[] = [];
   const results: DecisionResult[] = resolutions.map((resolution, index): DecisionResult => {
     const base = { reference: references[index], ...(resolution.detail ? { detail: resolution.detail } : {}) };
     if (resolution.outcome !== 'resolved') {
-      return { ...base, outcome: resolution.outcome, ...(resolution.court ? { court: resolution.court } : {}) };
+      return {
+        ...base, outcome: resolution.outcome,
+        ...(resolution.court ? { court: resolution.court } : {}),
+        ...(resolution.candidates ? { candidates: resolution.candidates } : {}),
+      };
     }
     const decision = resolution.decision!;
     const citation = citeDecision(decision);

@@ -51,7 +51,7 @@ export function StudyModeFooter({ visible, theme }: StudyModeFooterProps) {
             {STUDY_MODE_SHORTCUTS.map(({ key, label }) => (
               <span key={key} className={cn("text-xs flex items-center gap-1.5 font-medium", styles.text)}>
                 <kbd className={cn(
-                  "px-1.5 py-0.5 rounded font-mono text-[10px]",
+                  "px-1.5 py-0.5 rounded font-mono text-[11px]",
                   styles.kbd
                 )}>
                   {key}

@@ -72,8 +72,7 @@ export function computeNormaGroups(items: DossierItem[]): NormaGroup[] {
   return Array.from(groups.values());
 }
 
-// The search that opens a group on the dashboard: the version the group holds,
-// and Brocardi only for the text in force (its commentary carries no date).
+// The search that opens a group on the dashboard: the version the group holds.
 export function searchParamsFromGroup(group: NormaGroup): SearchParams {
   return {
     act_type: group.tipo_atto,
@@ -82,7 +81,6 @@ export function searchParamsFromGroup(group: NormaGroup): SearchParams {
     article: group.articles.join(','),
     version: (group.versione as SearchParams['version']) || 'vigente',
     version_date: group.data_versione || '',
-    show_brocardi_info: !requestIsHistorical({ versione: group.versione, data_versione: group.data_versione }),
     ...(group.allegato ? { annex: group.allegato } : {}),
   };
 }
@@ -130,8 +128,6 @@ export function searchParamsFromNorma(norma: NormaVisitata): SearchParams {
     article: norma.numero_articolo?.toString() || '',
     version: (norma.versione as SearchParams['version']) || 'vigente',
     version_date: norma.data_versione || '',
-    // Brocardi's commentary carries no date: a past text is read without it.
-    show_brocardi_info: !requestIsHistorical(norma),
     ...(norma.allegato ? { annex: norma.allegato } : {}),
   };
 }
@@ -174,19 +170,33 @@ export function unpackItemContent(content: unknown): { data: unknown; status?: '
   return _dossierMeta?.important ? { data: rest, status: 'important' } : { data: rest };
 }
 
-type ServerFields = Pick<DossierItem, 'citation' | 'actCitation' | 'aboutItemId' | 'createdBy'>;
+type ServerFields = Pick<DossierItem, 'citation' | 'actCitation' | 'aboutItemId' | 'createdBy' | 'assistantNotes' | 'assistantNote'>;
 
 // What only the server says about an item (its names, the article a note is
-// about, who wrote it), copied only when it said it: an answer from an older
-// server leaves the fields absent, and the page falls back.
+// about, who wrote it, how its application's notes stand — D7b), copied only
+// when it said it: an answer from an older server leaves the fields absent,
+// and the page falls back.
 export function serverFieldsFromApi(
-  api: Pick<DossierItemApi, 'citation' | 'act_citation' | 'about_item_id' | 'created_by'>,
+  api: Pick<DossierItemApi, 'citation' | 'act_citation' | 'about_item_id' | 'created_by' | 'assistant_notes' | 'assistant_note'>,
 ): ServerFields {
+  const note = api.assistant_note;
   return {
     ...(api.citation !== undefined ? { citation: api.citation } : {}),
     ...(api.act_citation !== undefined ? { actCitation: api.act_citation } : {}),
     ...(api.about_item_id !== undefined ? { aboutItemId: api.about_item_id } : {}),
     ...(api.created_by !== undefined ? { createdBy: api.created_by } : {}),
+    ...(api.assistant_notes !== undefined ? { assistantNotes: api.assistant_notes } : {}),
+    ...(note !== undefined ? {
+      assistantNote: note && {
+        state: note.state,
+        stateChangedAt: note.state_changed_at,
+        reviewComment: note.review_comment,
+        originalText: note.original_text,
+        edited: note.edited,
+        editedAt: note.edited_at,
+        editedBy: note.edited_by,
+      },
+    } : {}),
   };
 }
 
@@ -342,11 +352,20 @@ export function dossierItemFromApi(api: DossierItemApi): DossierItem {
 const SHARE_PREFIX = 'u8.';
 
 /** A dossier as it leaves the account (a share link, a JSON file): without its copy in the Forum or the
- *  admin's block, which are its owner's alone. */
+ *  admin's block, which are its owner's alone, nor how its owner reviewed what an application wrote (D7b: the
+ *  states, «Cosa non va?», who edited, the application's own words), which stays in the dossier. */
 export function shareableDossier(dossier: Dossier): Omit<Dossier, 'published' | 'forumBlocked'> {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- left out on purpose
   const { published, forumBlocked, ...shareable } = dossier;
-  return shareable;
+  return {
+    ...shareable,
+    items: shareable.items.map((item) => {
+      if (item.assistantNotes === undefined && item.assistantNote === undefined) return item;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars -- left out on purpose
+      const { assistantNotes, assistantNote, ...rest } = item;
+      return rest as DossierItem;
+    }),
+  };
 }
 
 export function encodeDossierShare(dossier: Dossier): string {

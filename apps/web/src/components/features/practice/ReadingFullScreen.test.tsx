@@ -23,7 +23,6 @@ vi.mock('../../../features/merlt/useMerltFeatures', () => ({
   useMerltFeatures: () => ({ canContribute: false, qaAskable: false, consentLevel: 'none', merltEnabled: false }),
 }));
 vi.mock('../../../plugins/PluginSlot', () => ({ PluginSlot: () => null }));
-vi.mock('../search/BrocardiDisplay', () => ({ BrocardiDisplay: () => null }));
 vi.mock('../dossier/AddToDossierPopover', () => ({ AddToDossierPopover: () => null }));
 vi.mock('../decisions/DecisionResultList', () => ({
   DecisionResultList: ({ besideId }: { besideId?: string }) => <div data-testid="topic-list" data-beside={besideId} />,
@@ -170,7 +169,7 @@ describe('ReadingFullScreen (spec §8, T19)', () => {
     expect(s().phoneReader).toBeNull();
   });
 
-  it('the body keeps clear of the back control and the services pill at the bottom, and scrolls itself', () => {
+  it('the body keeps clear of the back control and the feedback button at the bottom, and scrolls itself', () => {
     const { practiceId, articleRef } = practiceWithTwoWindows();
     s().openPhoneReader(practiceId, articleRef);
     draw();

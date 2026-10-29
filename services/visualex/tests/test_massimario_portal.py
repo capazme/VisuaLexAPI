@@ -128,6 +128,20 @@ class TestFetchElement:
                 await mp.fetch_element("index", "1")
         assert slept == [2.0, 4.0, 6.0]
 
+    async def test_a_longer_retry_after_is_waited_out(self, monkeypatch):
+        monkeypatch.setattr(mp, "INVALID_PAUSE", 2.0)
+        slept = []
+
+        async def fake_sleep(seconds):
+            slept.append(seconds)
+
+        monkeypatch.setattr(mp.asyncio, "sleep", fake_sleep)
+        request = AsyncMock(side_effect=NetworkError("busy", status_code=503, retry_after=5.0))
+        with patch.object(mp.http_client, "request", new=request):
+            with pytest.raises(NetworkError):
+                await mp.fetch_element("index", "1")
+        assert slept == [5.0, 5.0, 6.0]
+
     async def test_a_missing_page_after_a_retry_is_still_not_found(self):
         request = AsyncMock(side_effect=[NetworkError("boom", status_code=503), DocumentNotFoundError("404")])
         with patch.object(mp.http_client, "request", new=request):

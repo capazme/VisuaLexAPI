@@ -4,6 +4,10 @@ import { resolve } from 'node:path';
 import postcss from 'postcss';
 import tailwind from '@tailwindcss/postcss';
 import { ACTIVE, FOCUS_RING, HIDDEN_SCROLLBAR, HOVER_LIFT, TRANSITION } from './constants/interactions';
+import { subjectHue } from './components/features/studia/progress/tokens';
+import { MATERIA_LABEL } from './components/features/studia/studiaLabels';
+import type { Materia } from './types/studia';
+import { FOCUS_BUTTON_CLEARANCE } from './components/layout/PageFrame';
 
 /**
  * Tailwind failures are silent: a class whose token the theme never declares
@@ -38,6 +42,14 @@ describe('the primary colour scale', () => {
     expect(css).toContain('.bg-primary');
     expect(css).toContain('.ring-ring');
     expect(css).toContain('.bg-background');
+  }, 30000);
+});
+
+describe('the page frame (W2)', () => {
+  it('compiles the room a header leaves for the Focus button, from `lg`', async () => {
+    const css = await compile([FOCUS_BUTTON_CLEARANCE]);
+    expect(css).toMatch(/padding-right:\s*clamp\(0px,\s*calc\(2\.75rem - \(100vw - var\(--sidebar-width,\s*0px\) - 80rem\) \/ 2\),\s*2\.75rem\)/);
+    expect(css).toContain('@media (width >= 64rem)');
   }, 30000);
 });
 
@@ -92,6 +104,7 @@ describe('the practice row\'s columns', () => {
 
 describe('the Inchiostro palette', () => {
   it('aliases the Tailwind scales the app writes to ink and toga', async () => {
+    // The aliases stay in the theme (an old class still renders in toga); the guard test keeps them out of the sources.
     const css = await compile(['bg-ink-500', 'bg-toga-600', 'text-slate-500', 'bg-blue-600', 'ring-indigo-500', 'bg-primary-600']);
     expect(css).toContain('.bg-ink-500');
     expect(css).toContain('.bg-toga-600');
@@ -131,6 +144,9 @@ describe('the Inchiostro palette', () => {
     expect(ratio(white, rgb('toga-600'))).toBeGreaterThanOrEqual(6);
     expect(ratio(rgb('ink-400'), rgb('ink-950'))).toBeGreaterThanOrEqual(7);
     expect(ratio(rgb('toga-400'), rgb('ink-950'))).toBeGreaterThanOrEqual(6.5);
+    // A mission done (S2, `.vlx-mission-done`): ink 600 on the white tile, ink 300 on the dark one (ink 900).
+    expect(ratio(rgb('ink-600'), white)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(rgb('ink-300'), rgb('ink-900'))).toBeGreaterThanOrEqual(4.5);
   });
 
   it('keeps the sidebar\'s 11 px texts at AA on its glass, over the page and over the phone\'s backdrop', () => {
@@ -169,11 +185,198 @@ describe('the Inchiostro palette', () => {
     expect(ratio(linear('ink-700'), light[0])).toBeGreaterThanOrEqual(7);
     expect(ratio(linear('ink-300'), dark[0])).toBeGreaterThanOrEqual(7);
   });
+
+  it('keeps the user menu\'s services status at AA, and its dot at 3:1 on the bar (ServiceHealthMenuEntry)', () => {
+    // Amber and emerald are Tailwind's own scales, read from its theme; the menu is white (dark: slate 800), the
+    // bar white/80 over the page (dark: slate-900/80 over slate-950). The dot's white (dark: slate 900) ring
+    // keeps it apart from the avatar.
+    const source = readFileSync(CSS_PATH, 'utf8') + readFileSync(resolve(process.cwd(), 'node_modules/tailwindcss/theme.css'), 'utf8');
+    const linear = (name: string): number[] => {
+      const m = source.match(new RegExp(`--color-${name}:\\s*oklch\\(([\\d.]+)%\\s+([\\d.]+)\\s+([\\d.]+)\\)`));
+      if (!m) throw new Error(`--color-${name} not found`);
+      const [L, C, H] = [Number(m[1]) / 100, Number(m[2]), (Number(m[3]) * Math.PI) / 180];
+      const a = C * Math.cos(H), b = C * Math.sin(H);
+      const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+      const mm = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+      const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+      return [
+        4.0767416621 * l - 3.3077115913 * mm + 0.2309699292 * s,
+        -1.2684380046 * l + 2.6097574011 * mm - 0.3413193965 * s,
+        -0.0041960863 * l - 0.7034186147 * mm + 1.707614701 * s,
+      ].map((v) => Math.min(1, Math.max(0, v)));
+    };
+    const gamma = (v: number) => (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
+    const unGamma = (v: number) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+    const over = (fg: number[], alpha: number, bg: number[]) => fg.map((c, i) => unGamma(alpha * gamma(c) + (1 - alpha) * gamma(bg[i])));
+    const lum = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    const ratio = (x: number[], y: number[]) => {
+      const [hi, lo] = [lum(x), lum(y)].sort((p, q) => q - p);
+      return (hi + 0.05) / (lo + 0.05);
+    };
+    const white = [1, 1, 1];
+    const menuDark = linear('ink-800');
+    // A service's state: OK, Degradato or Offline, Controllo; its name; «Ricontrolla».
+    for (const fg of ['emerald-700', 'amber-700', 'ink-500', 'ink-600', 'toga-700']) expect(ratio(linear(fg), white), fg).toBeGreaterThanOrEqual(4.5);
+    for (const fg of ['emerald-400', 'amber-400', 'ink-400', 'ink-300', 'toga-300']) expect(ratio(linear(fg), menuDark), fg).toBeGreaterThanOrEqual(4.5);
+    // The entry's icon beside its phrase, and the dot on the user button.
+    for (const fg of ['emerald-600', 'amber-600']) expect(ratio(linear(fg), white), fg).toBeGreaterThanOrEqual(3);
+    expect(ratio(linear('amber-600'), over(white, 0.8, linear('ink-50')))).toBeGreaterThanOrEqual(3);
+    expect(ratio(linear('amber-400'), over(linear('ink-900'), 0.8, linear('ink-950')))).toBeGreaterThanOrEqual(3);
+  });
+
+  it('keeps the command palette\'s 11 px texts and the tour\'s small ones at AA (CommandPalette, the driver.js popover)', () => {
+    // The palette is white/90 (dark: slate-900/90) over its backdrop, slate-950/40 over the page; its results
+    // add slate-50/30 (dark: slate-950/20), its steps sit on slate 100 (dark: slate 800). The tour's popover is
+    // white (dark: slate 900). Amber and emerald are Tailwind's own scales, read from its theme.
+    const source = readFileSync(CSS_PATH, 'utf8') + readFileSync(resolve(process.cwd(), 'node_modules/tailwindcss/theme.css'), 'utf8');
+    const linear = (name: string): number[] => {
+      const m = source.match(new RegExp(`--color-${name}:\\s*oklch\\(([\\d.]+)%\\s+([\\d.]+)\\s+([\\d.]+)\\)`));
+      if (!m) throw new Error(`--color-${name} not found`);
+      const [L, C, H] = [Number(m[1]) / 100, Number(m[2]), (Number(m[3]) * Math.PI) / 180];
+      const a = C * Math.cos(H), b = C * Math.sin(H);
+      const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+      const mm = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+      const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+      return [
+        4.0767416621 * l - 3.3077115913 * mm + 0.2309699292 * s,
+        -1.2684380046 * l + 2.6097574011 * mm - 0.3413193965 * s,
+        -0.0041960863 * l - 0.7034186147 * mm + 1.707614701 * s,
+      ].map((v) => Math.min(1, Math.max(0, v)));
+    };
+    const gamma = (v: number) => (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
+    const unGamma = (v: number) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+    const over = (fg: number[], alpha: number, bg: number[]) => fg.map((c, i) => unGamma(alpha * gamma(c) + (1 - alpha) * gamma(bg[i])));
+    const lum = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    const ratio = (x: number[], y: number[]) => {
+      const [hi, lo] = [lum(x), lum(y)].sort((p, q) => q - p);
+      return (hi + 0.05) / (lo + 0.05);
+    };
+    const white = [1, 1, 1];
+    const panel = over(white, 0.9, over(linear('ink-950'), 0.4, linear('ink-50')));
+    const panelDark = over(linear('ink-900'), 0.9, over(linear('ink-950'), 0.4, linear('ink-950')));
+    const light = [panel, over(linear('ink-50'), 0.3, panel)];
+    const dark = [panelDark, over(linear('ink-950'), 0.2, panelDark)];
+    // The grey lines, the headings «Preferiti», «I tuoi alias», «In dotazione», the recognised citation.
+    for (const bg of light) for (const fg of ['ink-600', 'amber-700', 'toga-700', 'emerald-700']) expect(ratio(linear(fg), bg), fg).toBeGreaterThanOrEqual(4.5);
+    for (const bg of dark) for (const fg of ['ink-400', 'amber-400', 'toga-300', 'emerald-400']) expect(ratio(linear(fg), bg), fg).toBeGreaterThanOrEqual(4.5);
+    // The steps «Atto», «Dettagli», «Articolo»: to do, done, the one in use.
+    expect(ratio(linear('ink-600'), linear('ink-100'))).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(linear('ink-300'), linear('ink-800'))).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(linear('emerald-800'), over(linear('emerald-500'), 0.1, panel))).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(linear('emerald-400'), over(linear('emerald-500'), 0.1, panelDark))).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(white, linear('toga-600'))).toBeGreaterThanOrEqual(4.5);
+    // The tour's «1 di 6» and its close button.
+    expect(ratio(linear('ink-500'), white)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(linear('ink-400'), linear('ink-900'))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('keeps the marks and labels of Gymnasium\'s «Progressi» apart from what they sit on (ReviewTrend, DueForecast)', () => {
+    const source = readFileSync(CSS_PATH, 'utf8') + readFileSync(resolve(process.cwd(), 'node_modules/tailwindcss/theme.css'), 'utf8');
+    // `primary-*` and `slate-*` are aliases (`var(--color-toga-*)`, `var(--color-ink-*)`): followed to the value.
+    const linear = (name: string): number[] => {
+      const alias = source.match(new RegExp(`--color-${name}:\\s*var\\(--color-([a-z0-9-]+)\\)`));
+      if (alias) return linear(alias[1]);
+      const m = source.match(new RegExp(`--color-${name}:\\s*oklch\\(([\\d.]+)%\\s+([\\d.]+)\\s+([\\d.]+)\\)`));
+      if (!m) throw new Error(`--color-${name} not found`);
+      const [L, C, H] = [Number(m[1]) / 100, Number(m[2]), (Number(m[3]) * Math.PI) / 180];
+      const a = C * Math.cos(H), b = C * Math.sin(H);
+      const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+      const mm = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+      const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+      return [
+        4.0767416621 * l - 3.3077115913 * mm + 0.2309699292 * s,
+        -1.2684380046 * l + 2.6097574011 * mm - 0.3413193965 * s,
+        -0.0041960863 * l - 0.7034186147 * mm + 1.707614701 * s,
+      ].map((v) => Math.min(1, Math.max(0, v)));
+    };
+    const lum = (c: number[]) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    const ratio = (x: number[], y: number[]) => {
+      const [hi, lo] = [lum(x), lum(y)].sort((p, q) => q - p);
+      return (hi + 0.05) / (lo + 0.05);
+    };
+    const white = [1, 1, 1];
+    // The trend's rise, words at 14 px (G7): AA, 4.5:1, on the tile in both themes.
+    expect(ratio(linear('green-700'), white)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(linear('green-400'), linear('ink-900'))).toBeGreaterThanOrEqual(4.5);
+    // The trend's line and its cursor's dot on the tile (white; dark: slate 900): 3:1, a graphic (WCAG 1.4.11) (G7).
+    expect(ratio(linear('primary-600'), white)).toBeGreaterThanOrEqual(3);
+    expect(ratio(linear('primary-400'), linear('ink-900'))).toBeGreaterThanOrEqual(3);
+    // The goal's dashed line, the ticks of the days not done, and a day with nothing due, on the tile.
+    expect(ratio(linear('ink-500'), white)).toBeGreaterThanOrEqual(3);
+    expect(ratio(linear('ink-400'), linear('ink-900'))).toBeGreaterThanOrEqual(3);
+    // The bars of the coming days, ink on the tile.
+    expect(ratio(linear('primary-900'), white)).toBeGreaterThanOrEqual(3);
+    expect(ratio(linear('primary-300'), linear('ink-900'))).toBeGreaterThanOrEqual(3);
+    // A subject's line (G7): its hue mixed in OKLab with `--vlx-trend-shade` (black 20% on the light card, none on the
+    // dark), 3:1 on the tile, for each of the subjects' hues.
+    const css = readFileSync(CSS_PATH, 'utf8');
+    const hsl = (h: number, s: number, l: number): number[] => {
+      const [S, L] = [s / 100, l / 100];
+      const k = (n: number) => (n + h / 30) % 12;
+      const a = S * Math.min(L, 1 - L);
+      return [0, 8, 4].map((n) => L - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1)));
+    };
+    const toLinear = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+    const oklab = (rgb: number[]) => {
+      const [r, g, b] = rgb.map(toLinear);
+      const [l, m, q] = [0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b, 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b, 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b].map(Math.cbrt);
+      return [0.2104542553 * l + 0.793617785 * m - 0.0040720468 * q, 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * q, 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * q];
+    };
+    const fromOklab = ([L, A, B]: number[]) => {
+      const [l, m, q] = [L + 0.3963377774 * A + 0.2158037573 * B, L - 0.1055613458 * A - 0.0638541728 * B, L - 0.0894841775 * A - 1.291485548 * B].map((v) => v ** 3);
+      return [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * q, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * q, -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * q].map((v) => Math.min(1, Math.max(0, v)));
+    };
+    const shade = (block: string) => {
+      const m = block.match(/--vlx-trend-shade:\s*(black|transparent)\s+(\d+)%/);
+      if (!m) throw new Error('--vlx-trend-shade not found');
+      return Number(m[2]) / 100;
+    };
+    // The light block and the dark one, each from its first subject's hue (kept in the block, so it is checked too).
+    const blocks = css.split(/(?=--category-compliance:)/).slice(1, 3);
+    const tiles = [white, linear('ink-900')];
+    let checked = 0;
+    blocks.forEach((block, mode) => {
+      const p = shade(block);
+      for (const m of block.matchAll(/--category-(compliance|civil|penal|administrative|eu|penal-procedure):\s*([\d.]+)\s+([\d.]+)%\s+([\d.]+)%/g)) {
+        const lab = oklab(hsl(Number(m[2]), Number(m[3]), Number(m[4])));
+        // Black is (0, 0, 0) in OKLab: mixing in `p` of it scales the colour by 1 − p.
+        const mixed = fromOklab(lab.map((v) => v * (1 - p)));
+        checked += 1;
+        expect(ratio(mixed, tiles[mode]), `${mode ? 'dark' : 'light'} ${m[1]}`).toBeGreaterThanOrEqual(3);
+      }
+    });
+    expect(checked).toBe(12);
+    // Today's bar on its tinted column (amber 50; dark: amber 400 at 10% over slate 900, far apart).
+    expect(ratio(linear('amber-600'), linear('amber-50'))).toBeGreaterThanOrEqual(3);
+    // «oggi» under the coming days, at 12 px: AA.
+    expect(ratio(linear('amber-800'), white)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(linear('amber-300'), linear('ink-900'))).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+describe('the tours (driver.js)', () => {
+  it('make every button of the popover a 44 px target with a focus ring', () => {
+    const css = readFileSync(CSS_PATH, 'utf8');
+    const rule = (selector: string) => {
+      const at = css.indexOf(`${selector} {`);
+      expect(at, selector).toBeGreaterThan(-1);
+      return css.slice(at, css.indexOf('}', at));
+    };
+    const footer = rule('.driver-popover.visualex-tour-popover .driver-popover-footer button');
+    expect(footer).toMatch(/min-height:\s*44px/);
+    // driver.js sets `display` inline on these buttons: the label is centred by its line height.
+    expect(footer).toMatch(/font:\s*500 13px\/42px/);
+    expect(footer).not.toMatch(/display:/);
+    const close = rule('.driver-popover.visualex-tour-popover .driver-popover-close-btn');
+    expect(close).toMatch(/width:\s*44px/);
+    expect(close).toMatch(/height:\s*44px/);
+    expect(css).toMatch(/\.driver-popover-close-btn:focus-visible:not\(\[data-pointer-focus\]\)\s*\{\s*outline:\s*2px solid/);
+  });
 });
 
 describe('the entrance utilities', () => {
   it('turn animate-in, fade-in, zoom-in-N and slide-in-from-* into real rules', async () => {
-    const css = await compile(['animate-in', 'fade-in', 'fade-in-0', 'zoom-in-95', 'slide-in-from-bottom', 'slide-in-from-top-2', 'slide-in-from-right-10']);
+    const css = await compile(['animate-in', 'fade-in', 'fade-in-0', 'zoom-in-95', 'slide-in-from-bottom', 'slide-in-from-top-2', 'slide-in-from-right-10', 'slide-in-from-left-2']);
     expect(css).toMatch(/\.animate-in\s*\{[^}]*animation-name:/);
     // A finished entrance leaves nothing applied (gotcha 22): no «both» fill.
     expect(css).toMatch(/\.animate-in\s*\{[^}]*animation-fill-mode:\s*backwards/);
@@ -182,12 +385,52 @@ describe('the entrance utilities', () => {
     expect(css).toContain('.slide-in-from-bottom');
     expect(css).toContain('.slide-in-from-top-2');
     expect(css).toContain('.slide-in-from-right-10');
+    expect(css).toMatch(/\.slide-in-from-left-2\s*\{[^}]*--vlx-enter-x:\s*calc\(2 \* var\(--spacing\) \* -1\)/);
+    // Both axes, so a slide nested in another does not inherit the outer one's axis.
+    expect(css).toMatch(/\.slide-in-from-top-2\s*\{[^}]*--vlx-enter-x:\s*0/);
   }, 30000);
 
   it('never last past 200 ms, whatever duration the class writes', async () => {
     const css = await compile(['animate-in', 'duration-300']);
     expect(css).toMatch(/\.animate-in\s*\{[^}]*animation-duration:\s*min\(var\(--tw-duration,\s*180ms\),\s*200ms\)/);
   }, 30000);
+});
+
+describe('the lesson of Gymnasium (Gymnasium spec §5.4)', () => {
+  it('draws the note after a grade, the bar\'s safe edge, the side panel and the band its classes name', async () => {
+    const candidates = [
+      'motion-safe:animate-vlx-note',
+      'motion-safe:transition-[width]',
+      'pb-[max(0.75rem,env(safe-area-inset-bottom))]',
+      'pt-[max(0.5rem,env(safe-area-inset-top))]',
+      'w-[min(28rem,45%)]',
+      'min-h-8',
+      'border-current/40',
+      'z-[70]',
+    ];
+    const css = await compile(candidates);
+    expect(css).toMatch(/\.motion-safe\\:animate-vlx-note\s*\{\s*@media \(prefers-reduced-motion: no-preference\)\s*\{\s*animation: var\(--animate-vlx-note\)/);
+    expect(css).toMatch(/--animate-vlx-note:\s*vlx-note 1000ms/);
+    expect(css).toMatch(/@keyframes vlx-note/);
+    expect(css).toContain('env(safe-area-inset-bottom)');
+    expect(css).toContain('env(safe-area-inset-top)');
+    expect(css).toMatch(/width:\s*min\(28rem,\s*45%\)/);
+    expect(css).toMatch(/\.min-h-8\s*\{/);
+    expect(css).toMatch(/\.border-current\\\/40\s*\{/);
+    expect(css).toMatch(/z-index:\s*70/);
+  }, 30000);
+});
+
+describe('the hues of Gymnasium\'s subjects', () => {
+  it('each names a variable the stylesheet declares in the light theme and in the dark one', () => {
+    // An undeclared variable leaves `hsl(var(--x))` invalid: the chip and the bar draw no colour, silently.
+    const source = readFileSync(CSS_PATH, 'utf8');
+    for (const materia of Object.keys(MATERIA_LABEL) as Materia[]) {
+      const name = /var\((--[\w-]+)\)/.exec(subjectHue(materia))?.[1];
+      expect(name, materia).toBeDefined();
+      expect(source.match(new RegExp(`${name}:`, 'g')) ?? [], `${materia}: ${name}`).toHaveLength(2);
+    }
+  });
 });
 
 describe('the interaction constants', () => {
@@ -211,7 +454,8 @@ describe('the interaction constants', () => {
   }, 30000);
 });
 
-describe('the services pill beside the sidebar', () => {
+// The services pill, which started after the sidebar, went into the user menu (S1); `Layout` still sets the width.
+describe('what would float beside the sidebar', () => {
   it('reads the sidebar\'s drawn width from `--sidebar-width`, 64 px by default', async () => {
     const css = await compile(['lg:left-[calc(var(--sidebar-width,64px)+2rem)]']);
     expect(css).toMatch(/left:\s*calc\(var\(--sidebar-width,\s*64px\) \+ 2rem\)/);
@@ -231,5 +475,112 @@ describe('the scrollbars in dark mode', () => {
     const css = await compile(HIDDEN_SCROLLBAR.split(' '));
     expect(css).toMatch(/\.\\\[scrollbar-width\\:none\\\]\s*\{\s*scrollbar-width:\s*none/);
     expect(css).toMatch(/\.\\\[\\&\\:\\:-webkit-scrollbar\\\]\\:hidden\s*\{\s*&::-webkit-scrollbar\s*\{\s*display:\s*none/);
+  }, 30000);
+});
+
+describe('Gymnasium\'s small motions (S2)', () => {
+  it('declares every section\'s hue, the wash and the mission inks in the light theme and in the dark one', () => {
+    // The switcher's mark and Gymnasium's motions read `--vlx-section-<id>` by name: an undeclared one draws nothing.
+    const source = readFileSync(CSS_PATH, 'utf8');
+    for (const name of ['opus', 'gymnasium', 'academia', 'forum'].map((id) => `--vlx-section-${id}`).concat('--vlx-gymnasium-wash', '--vlx-todo-ink', '--vlx-done-ink')) {
+      expect(source.match(new RegExp(`${name}:`, 'g')) ?? [], name).toHaveLength(2);
+    }
+  });
+
+  it('compiles the lesson bar\'s spring, its delay and the head', async () => {
+    const css = await compile([
+      'motion-safe:ease-(--ease-catch)',
+      'motion-safe:delay-[70ms]',
+      'motion-safe:duration-150',
+      'motion-safe:duration-300',
+      'vlx-lesson-head',
+    ]);
+    expect(css).toMatch(/transition-timing-function:\s*var\(--ease-catch\)/);
+    expect(css).toMatch(/--ease-catch:\s*linear\(0,/);
+    expect(css).toMatch(/transition-delay:\s*70ms/);
+    expect(css).toMatch(/\.vlx-lesson-head\s*\{\s*background:\s*var\(--vlx-gymnasium-wash\)/);
+  }, 30000);
+
+  it('draws the inked mission and the landing digit, and stills them under reduced motion', async () => {
+    const css = await compile([]);
+    for (const name of ['vlx-ink-through', 'vlx-digit-land']) expect(css).toMatch(new RegExp(`@keyframes ${name}`));
+    const reduced = css.split('@media (prefers-reduced-motion: reduce)').slice(1).join(' ');
+    for (const rule of ['.vlx-mission-inking', '.vlx-digit-land']) expect(reduced).toContain(rule);
+  }, 30000);
+});
+
+describe('the section change (T1)', () => {
+  const ms = (css: string, rule: RegExp) => {
+    const match = css.match(rule);
+    expect(match, String(rule)).not.toBeNull();
+    return match!.slice(1).map(Number);
+  };
+
+  it('fades the page out, then in rising by a few pixels, in under 250 ms, with no overlap and nothing else moving', async () => {
+    const css = await compile([]);
+    const [out] = ms(css, /::view-transition-old\(vlx-page\)\s*\{\s*animation:\s*vlx-page-out\s+(\d+)ms/);
+    const [into, delay] = ms(css, /::view-transition-new\(vlx-page\)\s*\{\s*animation:\s*vlx-page-in\s+(\d+)ms\s+var\(--ease-out\)\s+(\d+)ms/);
+    expect(delay).toBeGreaterThanOrEqual(out);
+    expect(delay + into).toBeLessThan(250);
+    const [rise] = ms(css, /@keyframes vlx-page-in\s*\{\s*from\s*\{\s*opacity:\s*0;\s*translate:\s*0\s+(\d+)px/);
+    expect(rise).toBeGreaterThanOrEqual(4);
+    expect(rise).toBeLessThanOrEqual(6);
+    // The groups' default animation lasts 250 ms: it must not, or the change would outlast its budget.
+    expect(css).toMatch(/::view-transition-group\(root\),\s*::view-transition-group\(vlx-page\)\s*\{\s*animation:\s*none/);
+    // The root's two pictures are not added (the default `plus-lighter`): the new one covers the old.
+    expect(css).toMatch(/::view-transition-old\(root\),\s*::view-transition-new\(root\)\s*\{\s*mix-blend-mode:\s*normal/);
+    // Named only while a transition runs: at rest the content area is no stacking context (gotcha 22).
+    expect(css).toMatch(/\.vlx-page-changing \.vlx-page\s*\{\s*view-transition-name:\s*vlx-page/);
+    expect(css).not.toMatch(/(^|\})\s*\.vlx-page\s*\{/);
+    // A tap goes through to the page; from the sign-in page, with no old page, the new one does not wait.
+    expect(css).toMatch(/::view-transition\s*\{\s*pointer-events:\s*none/);
+    expect(css).toMatch(/::view-transition-new\(vlx-page\):only-child\s*\{\s*animation-delay:\s*0ms/);
+    const reduced = css.split('@media (prefers-reduced-motion: reduce)').slice(1).join(' ');
+    expect(reduced).toMatch(/::view-transition-new\(\*\)\s*\{\s*animation:\s*none\s*!important/);
+  }, 30000);
+
+  it('draws the tour\'s focus ring only for a focus not given with no key pressed (Y1)', () => {
+    const css = readFileSync(CSS_PATH, 'utf8');
+    const rule = css.match(/([^{}]*)\{\s*outline:\s*2px solid var\(--color-toga-500\);\s*outline-offset:\s*2px;\s*\}/)![1];
+    for (const selector of rule.replace(/\/\*[\s\S]*?\*\//g, '').split(',').map((part) => part.trim())) {
+      expect(selector).toMatch(/:focus-visible:not\(\[data-pointer-focus\]\)$/);
+    }
+  });
+
+  it('gives a menu or a popover a hairline and a drop in the dark, as the floating surfaces (Y1)', async () => {
+    const css = await compile(['shadow-md', 'shadow-lg']);
+    expect(css).toMatch(/\.dark \.shadow-md\s*\{\s*--tw-shadow:\s*0 0 0 1px var\(--color-ink-700\)/);
+    expect(css).toMatch(/\.dark :is\(\.shadow-lg, \.shadow-xl, \.shadow-2xl\)\s*\{\s*--tw-shadow:/);
+  }, 30000);
+
+  it('keeps a focus ring over a shadow in the dark: the dark rules set `--tw-shadow`, never `box-shadow` (Y1)', async () => {
+    const css = await compile(['shadow-md', 'shadow-lg', 'focus-visible:ring-2']);
+    // Outside the layers a `box-shadow` on `.dark .shadow-*` replaced the ring of `focus-visible:ring-2` (WCAG 2.4.7).
+    expect(css).not.toMatch(/\.dark[^{}]*\.shadow-[^{}]*\{[^}]*box-shadow:/);
+    // The utility composes the rings before the shadow, so the dark `--tw-shadow` keeps the ring.
+    expect(css).toMatch(/\.shadow-md\s*\{[^}]*box-shadow:[^;]*var\(--tw-ring-shadow\)[^;]*var\(--tw-shadow\)/);
+  }, 30000);
+
+  it('draws no ring on a title focused after a choice made with a pointer, over the utilities\' ring', async () => {
+    const css = await compile(FOCUS_RING.split(' '));
+    expect(css).toMatch(/\[data-pointer-focus\]:focus\s*\{\s*outline:\s*none;\s*box-shadow:\s*none/);
+    // Outside every layer, so it wins over `focus-visible:ring-2` (in the utilities layer) whatever the order.
+    const rule = css.indexOf('[data-pointer-focus]:focus');
+    const layers = [...css.matchAll(/@layer [\w-]+\s*\{/g)];
+    for (const layer of layers) {
+      let depth = 0;
+      let at = layer.index! + layer[0].length - 1;
+      for (; at < css.length; at += 1) {
+        if (css[at] === '{') depth += 1;
+        else if (css[at] === '}' && (depth -= 1) === 0) break;
+      }
+      expect(rule < layer.index! || rule > at, layer[0]).toBe(true);
+    }
+  }, 30000);
+
+  it('compiles the mark\'s colour change, 200 ms, and stills it under reduced motion', async () => {
+    const css = await compile(['transition-colors', 'duration-200', 'ease-out', 'motion-reduce:transition-none']);
+    expect(css).toMatch(/\.duration-200\s*\{[^}]*transition-duration:\s*200ms/);
+    expect(css).toMatch(/\.motion-reduce\\:transition-none\s*\{\s*@media \(prefers-reduced-motion: reduce\)\s*\{\s*transition-property:\s*none/);
   }, 30000);
 });

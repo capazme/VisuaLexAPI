@@ -41,7 +41,6 @@ import { appStore } from '../../../store/useAppStore';
 import { PracticePhoneView } from './PracticePhoneView';
 import { L24, L241, article } from '../../../utils/__fixtures__/savedWorkspaces';
 import { besideRefFor, practiceArticleKey } from '../../../utils/practice';
-import { CLOSE_PRACTICE_MESSAGE } from './practiceView';
 
 const REF = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 12345, anno: 2020 };
 
@@ -64,7 +63,7 @@ afterEach(() => {
 });
 
 describe('PracticePhoneView (spec §8, P3)', () => {
-  it('the header switches practices by its chevrons and its dots, and the column follows', () => {
+  it('the header names the practice, its name opens the list, and the column follows a switch (R3: no carousel)', async () => {
     const first = s().createPractice('Prima');
     s().addArticlesToPractice(first, L24, [article(L24, '5')]);
     const second = s().createPractice('Seconda');
@@ -72,18 +71,16 @@ describe('PracticePhoneView (spec §8, P3)', () => {
     s().setActivePractice(first);
     render(view());
     expect(title()).toBe('Prima');
-    expect(screen.getByRole('button', { name: 'Pratica precedente' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Pratica precedente' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Pratica \d: / })).toBeNull();
     expect(screen.getByRole('region', { name: 'l. 8 marzo 2017, n. 24' })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Pratica successiva' }));
+    fireEvent.click(screen.getByTitle('Elenco delle pratiche'));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Le tue pratiche' })).getByRole('button', { name: /^Seconda/ }));
     expect(s().activePracticeId).toBe(second);
-    expect(title()).toBe('Seconda');
-    expect(screen.getByRole('button', { name: 'Pratica successiva' })).toBeDisabled();
     expect(screen.queryByRole('region', { name: 'l. 8 marzo 2017, n. 24' })).toBeNull();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Pratica 1: Prima' }));
-    expect(s().activePracticeId).toBe(first);
-    expect(screen.getByRole('button', { name: 'Pratica 1: Prima' })).toHaveAttribute('aria-current', 'true');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(title()).toBe('Seconda');
   });
 
   it('rows open in place: a reveal from the store opens the row on the phone too', () => {
@@ -103,17 +100,22 @@ describe('PracticePhoneView (spec §8, P3)', () => {
     expect(s().practiceNotice).toBe(notice);
   });
 
-  it('the header\'s controls are 44 px targets: the chevrons, and each dot a button around a small dot naming its practice', () => {
+  it('sits at the layout\'s edge, no step of its own, and writes a short name whole (R3b)', () => {
+    s().createPractice('c.c.');
+    const { container } = render(view());
+    // The column and the head add no side padding: the text starts 16 px from the screen's edges.
+    expect(container.querySelector('.space-y-4')!.className).not.toMatch(/\bpx-/);
+    expect(screen.getByRole('heading', { level: 2 }).parentElement!.parentElement!.className).not.toMatch(/\bpx-/);
+    // `-ml-1` and a cap of 100 % cut «c.c.» to «c…» beside free room: the cap gives the margin back.
+    expect(screen.getByTitle('Elenco delle pratiche')).toHaveClass('-ml-1', 'max-w-[calc(100%+0.25rem)]');
+  });
+
+  it('the header\'s controls are 44 px targets: the name, «Salva come dossier» and «⋯»', () => {
     s().createPractice('Prima');
-    s().createPractice('Seconda');
     render(view());
-    for (const name of ['Pratica precedente', 'Pratica successiva', 'Pratica 1: Prima', 'Pratica 2: Seconda']) {
-      expect(screen.getByRole('button', { name })).toHaveClass('min-h-[44px]', 'min-w-[44px]');
-    }
-    const dot = screen.getByRole('button', { name: 'Pratica 2: Seconda' });
-    expect(dot).toHaveAttribute('aria-current', 'true');
-    expect(dot.querySelector('span')).toHaveClass('h-1.5', 'w-6');
-    expect(screen.getByRole('button', { name: 'Pratica 1: Prima' }).querySelector('span')).toHaveClass('h-1.5', 'w-1.5');
+    expect(screen.getByTitle('Elenco delle pratiche')).toHaveClass('min-h-[44px]');
+    expect(screen.getByRole('button', { name: 'Salva come dossier' })).toHaveClass('min-h-[44px]', 'min-w-[44px]');
+    expect(screen.getByRole('button', { name: /^Altre azioni per la pratica/ })).toHaveClass('min-h-[44px]', 'min-w-[44px]');
   });
 });
 
@@ -158,7 +160,7 @@ describe('PracticePhoneView: the full-screen reader and the practice list (spec 
     render(view());
     const column = screen.getByTestId('practice-column');
     expect(screen.getByRole('region', { name: 'l. 8 marzo 2017, n. 24' })).toBeInTheDocument();
-    const decisions = screen.getByText(/Giurisprudenza \(1\)/);
+    const decisions = screen.getByRole('heading', { name: 'Giurisprudenza (1)' });
     expect(column.lastElementChild).toContainElement(decisions);
     expect(screen.queryByTestId('reading-full-screen')).toBeNull();
   });
@@ -257,13 +259,16 @@ describe('PracticePhoneView: the full-screen reader and the practice list (spec 
     expect(open.querySelector('span')).toHaveClass('hidden', 'md:inline');
   });
 
-  it('the count line has its own line, above the buttons: never cut by them', () => {
+  it('the count sits after the name, on its row, in the part that gives way to the buttons (R3)', () => {
     withArticleAndDecision();
     render(view());
     const count = screen.getByText(/1 atto · 1 articolo · 1 sentenza/);
-    expect(count.tagName).toBe('P');
-    expect(count).not.toHaveClass('truncate');
-    expect(screen.getByRole('button', { name: 'Salva come dossier' }).parentElement).not.toContainElement(count);
+    expect(count.parentElement).toContainElement(screen.getByRole('heading', { level: 2 }));
+    expect(count.parentElement).not.toContainElement(screen.getByRole('button', { name: 'Salva come dossier' }));
+    expect(count.parentElement).toHaveClass('min-w-0', 'flex-1');
+    // The name keeps its room; the count gives way, its words in its title.
+    expect(screen.getByRole('heading', { level: 2 })).toHaveClass('shrink-0');
+    expect(count).toHaveAttribute('title', '1 atto · 1 articolo · 1 sentenza');
   });
 
   it('Esc on the list\'s open «⋯» menu closes the menu and leaves «Le tue pratiche» visible', async () => {
@@ -449,8 +454,8 @@ describe('PracticePhoneView: the full-screen reader and the practice list (spec 
     await waitFor(() => expect(within(dialog).getByRole('button', { name: /^Rossi c\. Bianchi/ })).toBeInTheDocument());
   });
 
-  it('«Chiudi la pratica» in the list asks first (the danger confirmation), then closes it with its reader if it had one', async () => {
-    const { practiceId, articleKey, actId } = withArticleAndDecision();
+  it('«Chiudi la pratica» in the list closes it at once, with no confirmation, and the other becomes active (K1a)', () => {
+    const { practiceId } = withArticleAndDecision();
     const keep = s().createPractice('Resta');
     s().setActivePractice(practiceId);
     render(view());
@@ -458,25 +463,9 @@ describe('PracticePhoneView: the full-screen reader and the practice list (spec 
     const label = s().practices.find((p) => p.id === practiceId)?.label ?? '';
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Le tue pratiche' })).getByRole('button', { name: `Altre azioni per la pratica ${label}` }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Chiudi la pratica' }));
-    const confirm = await screen.findByRole('alertdialog');
-    expect(confirm).toHaveTextContent(CLOSE_PRACTICE_MESSAGE);
-    expect(s().practices).toHaveLength(2); // nothing closed yet
-    fireEvent.click(within(confirm).getByRole('button', { name: 'Chiudi la pratica' }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
     expect(s().practices.map((p) => p.id)).toEqual([keep]);
     expect(s().activePracticeId).toBe(keep);
-    void articleKey; void actId;
-  });
-
-  it('declining the confirmation closes nothing', async () => {
-    withArticleAndDecision();
-    render(view());
-    fireEvent.click(screen.getByTitle('Elenco delle pratiche'));
-    const label = s().practices[0].label;
-    fireEvent.click(within(screen.getByRole('dialog', { name: 'Le tue pratiche' })).getByRole('button', { name: `Altre azioni per la pratica ${label}` }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Chiudi la pratica' }));
-    const confirm = await screen.findByRole('alertdialog');
-    fireEvent.click(within(confirm).getByRole('button', { name: 'Annulla' }));
-    expect(s().practices).toHaveLength(1);
   });
 
   it('no extracted article is drawn, and no topic band: a practice with only a desktop window is empty here', () => {
@@ -508,7 +497,8 @@ describe('PracticePhoneView: the full-screen reader and the practice list (spec 
     h.legalFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([article(L24, '9')]) });
     const { actId } = s().addArticlesToPractice(null, { ...L24, urn: 'urn:nir:stato:legge:2017-03-08;24' }, [article(L24, '5')]);
     render(view());
-    fireEvent.click(screen.getByRole('button', { name: 'Struttura della norma' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Azioni su/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Struttura della norma' }));
     const tree = () => h.trees.at(-1) as { variant: string; isOpen: boolean; onArticleSelect: (n: string, a: string | null) => void };
     await waitFor(() => expect(tree()).toEqual(expect.objectContaining({ variant: 'drawer', isOpen: true })));
     await act(async () => { tree().onArticleSelect('9', null); });

@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode, type RefObject } from 'react';
+import { useEffect, useState, type ReactNode, type RefObject } from 'react';
 import { FloatingFocusManager, FloatingPortal, useFloating, useInteractions, useRole } from '@floating-ui/react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { X } from 'lucide-react';
@@ -33,6 +33,13 @@ export function Sheet({ title, onClose, initialFocusRef, closeOnEscape = false, 
   // `Modal`'s timing (spec §6.2), rising from the edge it lives on; under reduced motion a fade.
   const still = useReducedMotion();
   const panel = { duration: dur.panel, ease: ease.drawer };
+  // What had the focus as the sheet opened (the bar's magnifier, a row's button) gets it back as it closes. Taken
+  // while the sheet is first drawn: a field inside with `autoFocus` (the palette's box) takes the focus in the commit,
+  // before the focus manager records what had it, which then returned the focus to a field already gone — the body.
+  const [opener] = useState(() => {
+    const active = document.activeElement;
+    return active instanceof HTMLElement && active !== document.body ? active : null;
+  });
 
   // The page behind does not scroll under the sheet, as under `Modal`.
   useEffect(() => {
@@ -62,7 +69,7 @@ export function Sheet({ title, onClose, initialFocusRef, closeOnEscape = false, 
         aria-hidden
         onClick={closeOnBackdrop ? onClose : undefined}
       />
-      <FloatingFocusManager context={context} modal initialFocus={initialFocusRef ?? 0}>
+      <FloatingFocusManager context={context} modal initialFocus={initialFocusRef ?? 0} returnFocus={opener ? { current: opener } : true}>
         <motion.div
           // eslint-disable-next-line react-hooks/refs -- floating-ui exposes a stable setter, not a ref.current read
           ref={refs.setFloating}
@@ -85,7 +92,8 @@ export function Sheet({ title, onClose, initialFocusRef, closeOnEscape = false, 
               type="button"
               onClick={onClose}
               aria-label="Chiudi"
-              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+              // ink-500 on white (4.7:1), ink-400 on ink-900: over 3:1, since it is often the one way out.
+              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
             >
               <X size={20} aria-hidden="true" />
             </button>

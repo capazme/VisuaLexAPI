@@ -2,15 +2,17 @@ import copy
 import os
 import re
 import structlog
-from playwright.async_api import async_playwright
 
+from . import eurlex_fetch
 from ..tools.map import EURLEX
 from ..tools.sys_op import BaseScraper
 from ..tools.exceptions import DocumentNotFoundError, NetworkError, ValidationError
 from ..tools.cache_manager import get_cache_manager
 from ..tools.selectors import EURLexSelectors
-from ..tools.treextractor import strip_amendment_markers
+from ..tools.treextractor import (HEADING_ORDINAL, cites_an_article, following_nodes, glued_headings,
+                                 is_quoted_heading, node_text, strip_amendment_markers)
 from .akn_parser import normalize_article_key
+from ..tools.article_suffixes import ARTICLE_SUFFIX_ALTERNATION
 
 # Configure structured logger
 log = structlog.get_logger()
@@ -128,6 +130,11 @@ def _element_classes(element) -> set:
     return set(element.get("class", []) or [])
 
 
+# Blanks before closing punctuation, matched only from the run's first blank (see
+# `_AMENDMENT_MARK` in treextractor): `\s+([.,;:)])` restarted at every blank of a long run.
+_SPACE_BEFORE_PUNCTUATION = re.compile(r"(?<!\s)\s++([.,;:)])")
+
+
 def _cons_text(element) -> str:
     # A `modref` marker ("▼M2", or "▼M2 —————" for a deleted point) is a
     # sibling of the article title only on older pages; a recent consolidation
@@ -144,7 +151,7 @@ def _cons_text(element) -> str:
     # read "1 quater ." while "1 bis." elsewhere keeps the period inside the
     # span, and "lettera a )" / "articolo 14 bis , paragrafo 2" likewise.
     # Consolidated path only: the OJ extractor never comes through here.
-    text = re.sub(r"\s+([.,;:)])", r"\1", text)
+    text = _SPACE_BEFORE_PUNCTUATION.sub(r"\1", text)
     # The same separator lands after an opening bracket: a footnote reference
     # is literal parens around a superscript link, (<a><span>1</span></a>),
     # and read "( 1 )" — the page shows "(1)".
@@ -214,6 +221,41 @@ def _cons_lines(element) -> list[str]:
     return lines
 
 
+# An ordinal right after a heading's number ("Articolo 15 bis", "Articolo 15bis", and glued to the
+# text after it, "Articolo 15 bisTesto"), never the head of a word: "Articolo 1 Terzi" is art. 1
+# with its rubrica run on (`HEADING_ORDINAL`).
+_ORDINAL_AFTER_NUMBER = re.compile(rf"[\s\-]*+{HEADING_ORDINAL}", re.IGNORECASE)
+
+
+def _number_ends_here(rest) -> bool:
+    """True when the heading's number ends where `rest` starts: no digit and no ordinal follow, and
+    no sentence goes on («Articolo 5 della direttiva …» cites art. 5, it does not head it)."""
+    return (not rest[:1].isdigit() and not _ORDINAL_AFTER_NUMBER.match(rest)
+            and not cites_an_article(rest))
+
+
+# The start of the next article while an article's text is read: «Articolo 12», «Article 12»,
+# «Art. 12», with its ordinal or rubrica, never a paragraph that opens on an article it cites.
+_NEXT_ARTICLE = re.compile(r'^Articolo\s+\d+|^Article\s+\d+|^Art\.\s+\d+', re.IGNORECASE)
+
+
+def _starts_next_article(text) -> bool:
+    heads = _NEXT_ARTICLE.match(text)
+    if not heads:
+        return False
+    rest = text[heads.end():]
+    ordinal = _ORDINAL_AFTER_NUMBER.match(rest)
+    return not cites_an_article(rest[ordinal.end():] if ordinal else rest)
+
+
+def _heads_article(text, pattern) -> bool:
+    """True when `text` opens with the heading `pattern` ("Articolo 1") and the
+    number ends there: "Articolo 17" does not head article 1, or a request for a
+    missing art. 1 would be served art. 17; nor does "Articolo 15 bis" head
+    article 15 (the suffix served must be the one asked, none for none)."""
+    return text.startswith(pattern) and _number_ends_here(text[len(pattern):])
+
+
 def _cons_find_title(soup, article):
     wanted = normalize_article_key(str(article))
     for marker in soup.find_all("p", class_=_CONS_ARTICLE_CLASS):
@@ -265,38 +307,16 @@ class EurlexScraper(BaseScraper):
         self.base_url = 'https://eur-lex.europa.eu/eli'
         self.cache = get_cache_manager().get_persistent("eurlex")
         self.selectors = EURLexSelectors()
-        log.info("EUR-Lex scraper initialized with Playwright")
-
-    async def _fetch_with_playwright(self, url: str) -> str:
-        """Fetch URL using Playwright to bypass CloudFront WAF protection."""
-        log.info(f"Consulting EUR-Lex with Playwright - URL: {url}")
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=True,
-                args=['--no-sandbox', '--disable-dev-shm-usage']
-            )
-            try:
-                context = await browser.new_context(
-                    viewport={'width': 1920, 'height': 1080},
-                    user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                )
-                page = await context.new_page()
-                await page.goto(url, wait_until='networkidle', timeout=30000)
-                html = await page.content()
-                await context.close()
-                return html
-            finally:
-                await browser.close()
+        log.info("EUR-Lex scraper initialized (CELLAR first, Playwright second)")
 
     async def request_document(self, url, *, source: str = "eurlex"):
-        """Override base request_document to use Playwright for WAF bypass."""
+        """The act's page: CELLAR's, else EUR-Lex's through the browser (`eurlex_fetch`). A page
+        that is no act's — a challenge, an empty answer — is an error, never a document."""
         try:
-            html = await self._fetch_with_playwright(url)
-            if not html or len(html) < 1000:
-                raise DocumentNotFoundError(f"Document not found or empty at {url}", urn=url)
-            log.debug("EUR-Lex document fetched successfully with Playwright")
+            html = await eurlex_fetch.fetch_act_page(url)
+            log.debug("EUR-Lex document fetched", url=url)
             return html
-        except DocumentNotFoundError:
+        except (DocumentNotFoundError, NetworkError):
             raise
         except Exception as e:
             log.error(f"Error during EUR-Lex consultation: {e}")
@@ -333,10 +353,11 @@ class EurlexScraper(BaseScraper):
         """The parsed page for ``url``, from the persistent cache when it has it.
 
         One page carries the whole act — tree, articles, rubriche and recitals
-        — so every extractor goes through here and the WAF is crossed once.
+        — so every extractor goes through here and the source is asked once a day.
         """
         cached_html = await self.cache.get(url)
-        if cached_html:
+        # A copy kept before pages were checked can be a challenge's: it is fetched again.
+        if eurlex_fetch.is_act_page(cached_html):
             log.info("Cache hit", source="eurlex_persistent")
             return self.parse_document(cached_html)
         html_content = await self.request_document(url)
@@ -410,9 +431,12 @@ class EurlexScraper(BaseScraper):
 
         article_section = None
 
+        # A heading quoted inside the act (an amending act's replaced or inserted articles, in a
+        # table cell) is another act's article: no strategy takes it (`is_quoted_heading`).
+
         # Strategy 1: Look for <p class="ti-art"> (original selector)
         for pattern in search_patterns:
-            article_section = soup.find(lambda tag: tag.name == 'p' and 'ti-art' in tag.get('class', []) and tag.get_text(strip=True).startswith(pattern))
+            article_section = soup.find(lambda tag: tag.name == 'p' and 'ti-art' in tag.get('class', []) and _heads_article(tag.get_text(strip=True), pattern) and not is_quoted_heading(tag))
             if article_section:
                 log.debug(f"Found article with ti-art class using pattern: {pattern}")
                 break
@@ -420,15 +444,28 @@ class EurlexScraper(BaseScraper):
         # Strategy 2: Look for any element with class containing 'art' or 'title'
         if not article_section:
             for pattern in search_patterns:
-                article_section = soup.find(lambda tag: tag.get('class') and any('art' in c.lower() or 'title' in c.lower() for c in tag.get('class', [])) and tag.get_text(strip=True).startswith(pattern))
+                article_section = soup.find(lambda tag: tag.get('class') and any('art' in c.lower() or 'title' in c.lower() for c in tag.get('class', [])) and _heads_article(tag.get_text(strip=True), pattern) and not is_quoted_heading(tag))
                 if article_section:
                     log.debug(f"Found article with art/title class using pattern: {pattern}")
                     break
 
-        # Strategy 3: Look for any element whose text matches article pattern exactly
+        # Strategy 3: Look for any element whose text matches article pattern exactly. The modern
+        # OJ page writes "Articolo\xa0N", which only this one reads; the number must end there,
+        # as in `_heads_article`, or art. 15 asked would be served "Articolo 15 bis". An article
+        # asked with its suffix («15 bis», «15-bis», «15bis») reads "Articolo\xa015\xa0bis" too.
         if not article_section:
-            article_regex = re.compile(rf'^Articolo\s+{re.escape(str(article))}\b', re.IGNORECASE)
-            article_section = soup.find(lambda tag: tag.name in ['p', 'div', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'] and article_regex.match(tag.get_text(strip=True)))
+            asked = re.fullmatch(rf'(\d+)[\s\-]*({ARTICLE_SUFFIX_ALTERNATION})?', str(article).strip(), re.IGNORECASE)
+            if asked:
+                spelled = asked.group(1) + (rf'[\s\-]*{asked.group(2)}' if asked.group(2) else '')
+            else:
+                spelled = re.escape(str(article))
+            article_regex = re.compile(rf'^Articolo\s+{spelled}\b', re.IGNORECASE)
+
+            def heads_by_regex(text):
+                match = article_regex.match(text)
+                return bool(match) and _number_ends_here(text[match.end():])
+
+            article_section = soup.find(lambda tag: tag.name in ['p', 'div', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'] and heads_by_regex(tag.get_text(strip=True)) and not is_quoted_heading(tag))
             if article_section:
                 log.debug("Found article using regex text match")
 
@@ -436,11 +473,22 @@ class EurlexScraper(BaseScraper):
         if not article_section:
             subdivisions = soup.find_all('div', class_=lambda c: c and 'eli-subdivision' in c)
             for subdiv in subdivisions:
-                title_elem = subdiv.find(['p', 'span', 'div'], string=lambda s: s and any(s.strip().startswith(p) for p in search_patterns))
+                title_elem = subdiv.find(lambda tag: tag.name in ('p', 'span', 'div') and tag.string
+                                         and any(_heads_article(tag.string.strip(), p) for p in search_patterns)
+                                         and not is_quoted_heading(tag))
                 if title_elem:
                     article_section = subdiv
                     log.debug("Found article in eli-subdivision")
                     break
+
+        # Strategy 5: a heading glued to the end of the paragraph before it (`glued_headings`). Only
+        # a class-less page has one, so a page whose heading carries a class is not walked for it.
+        glued = glued_headings(soup) if article_section is None or not article_section.get('class') else {}
+        heading = None
+        if not article_section and str(article).strip() in glued:
+            article_section, start = glued[str(article).strip()]
+            heading = article_section.get_text(strip=True)[start:]
+            log.debug("Found article glued to the end of a paragraph")
 
         if not article_section:
             log.warning(f"Article {article} not found in the document after all strategies")
@@ -450,20 +498,30 @@ class EurlexScraper(BaseScraper):
             )
 
         log.debug("Article found, extracting text")
-        full_text = [article_section.get_text(strip=True)]
-        element = article_section.find_next_sibling()
-
-        # Detect end of article by finding next article
-        next_article_pattern = re.compile(r'^Articolo\s+\d+|^Article\s+\d+|^Art\.\s+\d+', re.IGNORECASE)
+        full_text = [heading or article_section.get_text(strip=True)]
+        glued_at = {id(elem): start for elem, start in glued.values()}
+        if heading is None:
+            element = article_section.find_next_sibling()
+        else:
+            # A glued heading's body is read where `glued_headings` found it: the paragraph's later
+            # siblings, or, when it has none, the next container or bare text after it.
+            following = following_nodes(article_section)
+            element = next(following, None)
 
         while element:
             # Check if we've reached the next article
             if element.name == 'p' and 'ti-art' in element.get('class', []):
                 log.debug("Next article section found (ti-art class), stopping extraction")
                 break
-            elem_text = element.get_text(strip=True) if element.name else ''
-            if next_article_pattern.match(elem_text):
+            elem_text = node_text(element)
+            if _starts_next_article(elem_text):
                 log.debug("Next article section found (text pattern), stopping extraction")
+                break
+            if id(element) in glued_at:
+                # The paragraph is this article's, up to the next one's heading glued to its end.
+                if elem_text[:glued_at[id(element)]].rstrip():
+                    full_text.append(elem_text[:glued_at[id(element)]].rstrip())
+                log.debug("Next article glued to the end of a paragraph, stopping extraction")
                 break
             if element.name in ['p', 'div', 'span']:
                 text = element.get_text(strip=True)
@@ -471,7 +529,9 @@ class EurlexScraper(BaseScraper):
                     full_text.append(text)
             elif element.name == 'table':
                 full_text.extend(self.extract_table_text(element))
-            element = element.find_next_sibling()
+            elif element.name is None and elem_text:
+                full_text.append(elem_text)  # bare text after a glued heading
+            element = element.find_next_sibling() if heading is None else next(following, None)
 
         log.info(f"Article {article} text extracted successfully")
         return "\n".join(full_text)

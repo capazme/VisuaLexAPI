@@ -7,6 +7,7 @@ import {
   resolveAnchors,
   signAriaLabel,
   signColors,
+  retiredSectionLabel,
 } from './articleAnnotations';
 import { parseArticleStructure } from './articleStructure';
 import { fixtureText } from './__fixtures__/articleTexts';
@@ -102,7 +103,7 @@ describe('groupAnnotationsByBlock', () => {
     expect(ids(groups[2].highlights)).toEqual(['h1', 'h2']);
     expect(ids(groups[2].notes)).toEqual(['n0']);
     expect(ids(groups[3].notes)).toEqual(['n1']);
-    expect(groups[4]).toEqual({ notes: [], highlights: [], threads: [] });
+    expect(groups[4]).toEqual({ notes: [], highlights: [], threads: [], glosses: [] });
   });
 
   it('lists a highlight dragged across two commi under both', () => {
@@ -153,6 +154,11 @@ describe('signColors and signAriaLabel', () => {
     expect(signAriaLabel(0, 3)).toBe('3 evidenziazioni in questo passo');
     expect(signAriaLabel(0, 0, 1)).toBe('1 glossa in questo passo');
     expect(signAriaLabel(2, 1, 3)).toBe('2 note, 1 evidenziazione e 3 glosse in questo passo');
+    expect(signAriaLabel(0, 0, 0, { proposed: 1, validated: 0, review: 0 })).toBe("1 passaggio proposto dall'IA: 1 da validare");
+    expect(signAriaLabel(1, 0, 0, { proposed: 1, validated: 0, review: 1 })).toBe("1 nota in questo passo; 2 passaggi proposti dall'IA: 1 da validare · 1 da rivedere");
+    expect(signAriaLabel(2, 1, 3, { proposed: 0, validated: 0, review: 1 })).toBe("2 note, 1 evidenziazione e 3 glosse in questo passo; 1 passaggio proposto dall'IA: 1 da rivedere");
+    // The validated ones too: the sign still shows them, by their tick.
+    expect(signAriaLabel(0, 0, 0, { proposed: 0, validated: 2, review: 0 })).toBe("2 passaggi proposti dall'IA: 2 validati");
   });
 });
 
@@ -171,6 +177,16 @@ describe('describeBlock', () => {
     expect(describeBlock(RAW, STRUCTURE.blocks[0])).toBe('Art. 1453.');
     expect(describeBlock(RAW, STRUCTURE.blocks[1])).toBe('(Risolubilità del contratto per inadempimento).');
     expect(describeBlock(RAW, STRUCTURE.blocks[2])).toBe('Nei contratti con prestazioni corrispettive…');
+  });
+});
+
+describe('retiredSectionLabel', () => {
+  it('names a mark on a section no longer shown by the section, and none on the article\'s own text', () => {
+    expect(retiredSectionLabel('2043/brocardi/ratio')).toBe('Sezione non più disponibile · Ratio');
+    expect(retiredSectionLabel('all2:1284/brocardi/spiegazione')).toBe('Sezione non più disponibile · Spiegazione');
+    expect(retiredSectionLabel('2043/')).toBe('Sezione non più disponibile');
+    expect(retiredSectionLabel('2043')).toBeNull();
+    expect(retiredSectionLabel('all2:1284')).toBeNull();
   });
 });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { citeAct, citeArticle, citeStoredAct, citeStoredNorm } from '../../src/norms/citation';
+import { citeAct, citeArticle, citeStoredAct, citeStoredNorm, shortNorm } from '../../src/norms/citation';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
@@ -117,5 +117,49 @@ describe('citeStoredAct', () => {
     expect(citeStoredAct('norm', realTypeNotText)).toBe('l. 31 dicembre 2012, n. 247');
     expect(citeStoredNorm('norm', realTypeNotText)).toBe('art. 3, l. 31 dicembre 2012, n. 247');
     expect(citeStoredNorm('norm', { tipo_atto: 'legge', numero_articolo: 3 })).toBeNull();
+  });
+});
+
+// A code's annex is the code itself: never named, also for a code cited by its decree (G-350, G-351).
+describe('a code’s default annex', () => {
+  it('is never named', () => {
+    expect(citeArticle({ tipo_atto: 'codice del turismo', allegato: '1', numero_articolo: '5' }))
+      .toBe('art. 5, d.lgs. 23 maggio 2011, n. 79');
+  });
+
+  it('nor for the four codes cited by their sigla (G-360, G-366)', () => {
+    expect(citeArticle({ tipo_atto: 'codice del processo amministrativo', allegato: '2', numero_articolo: '29' })).toBe('art. 29 c.p.a.');
+    expect(citeArticle({ tipo_atto: 'codice della navigazione', allegato: '1', numero_articolo: '69' })).toBe('art. 69 cod. nav.');
+    expect(citeArticle({ tipo_atto: 'codice postale e delle telecomunicazioni', allegato: '1', numero_articolo: '20' }))
+      .toBe('art. 20 cod. post.');
+    expect(citeArticle({ tipo_atto: 'codice di giustizia contabile', allegato: '1', numero_articolo: '52' })).toBe('art. 52 c.g.c.');
+  });
+
+  it('another annex, or an act that is not a code, is named', () => {
+    expect(citeArticle({ tipo_atto: 'codice del turismo', allegato: '2', numero_articolo: '5' }))
+      .toBe('art. 5, d.lgs. 23 maggio 2011, n. 79 (Allegato 2)');
+    // Another annex of a code's decree is not the code (the c.p.a.'s annex 3): its own sigla (G-369),
+    // also for a norm stored by its decree and annex; an annex without one, the decree with its annex.
+    expect(citeArticle({ tipo_atto: 'codice del processo amministrativo', allegato: '3', numero_articolo: '1' }))
+      .toBe('art. 1 disp. att. c.p.a.');
+    expect(citeArticle({ tipo_atto: 'decreto legislativo', numero_atto: '104', data: '2010-07-02', allegato: '3', numero_articolo: '1' }))
+      .toBe('art. 1 disp. att. c.p.a.');
+    expect(citeArticle({ tipo_atto: 'codice civile', allegato: '1', numero_articolo: '12' })).toBe('art. 12 preleggi');
+    expect(citeArticle({ tipo_atto: 'codici penali militari di pace e di guerra', allegato: '2', numero_articolo: '1' })).toBe('art. 1 c.p.m.g.');
+    expect(citeArticle({ tipo_atto: 'codice del processo amministrativo', allegato: '1', numero_articolo: '1' }))
+      .toBe('art. 1, d.lgs. 2 luglio 2010, n. 104 (Allegato 1)');
+    expect(shortNorm({ tipo_atto: 'codice del processo amministrativo', allegato: '1', numero_articolo: '1' }))
+      .toBe('art. 1 d.lgs. 104/2010 (All. 1)');
+    expect(citeArticle({ tipo_atto: 'decreto legislativo', numero_atto: '81', data: '2008-04-09', allegato: 'A', numero_articolo: '1' }))
+      .toBe('art. 1, d.lgs. 9 aprile 2008, n. 81 (Allegato A)');
+  });
+});
+
+// The TULPS is annex 1 of r.d. 773/1931 (G-351): keyed by it, never named.
+describe('an act whose text is its annex', () => {
+  const tulps = { tipo_atto: 'regio decreto', numero_atto: '773', data: '1931-06-18', allegato: '1', numero_articolo: '86' };
+  it('names no annex, and names another', () => {
+    expect(citeArticle(tulps)).toBe('art. 86, r.d. 18 giugno 1931, n. 773');
+    expect(citeArticle({ ...tulps, allegato: '2' })).toBe('art. 86, r.d. 18 giugno 1931, n. 773 (Allegato 2)');
   });
 });

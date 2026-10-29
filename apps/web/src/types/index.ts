@@ -26,106 +26,19 @@ export interface NormaVisitata {
     urn?: string; // The specific URN for this article/version
 }
 
-// Structured massima from jurisprudence
-export interface MassimaStructured {
-    autorita: string | null;  // "Cass. civ.", "Corte cost.", etc.
-    numero: string | null;    // "123"
-    anno: string | null;      // "2021"
-    massima: string;          // Cleaned text content
-}
-
-// Article cited in relazioni
-export interface ArticoloCitato {
-    numero: string;
-    titolo: string;
-    url: string;
-}
-
-// Historical relazione (Guardasigilli)
-export interface RelazioneContent {
-    tipo: string;             // "libro_obbligazioni" | "codice_civile"
-    titolo: string;
-    numero_paragrafo: string | null;
-    testo: string;
-    articoli_citati: ArticoloCitato[];
-}
-
-// Relazione for Constitution
-export interface RelazioneCostituzione {
-    titolo: string;
-    autore: string;
-    anno: number;
-    testo: string;
-}
-
-// Footnote (nota a piè di pagina)
-export interface Footnote {
-    numero: number;
-    testo: string;
-    tipo: 'nota' | 'riferimento' | 'footnote';
-}
-
-// Related Article (articolo precedente/successivo)
-export interface RelatedArticle {
-    numero: string;
-    url: string;
-    titolo?: string;
-}
-
-export interface RelatedArticles {
-    previous?: RelatedArticle;
-    next?: RelatedArticle;
-}
-
-// Glossary entry (voce del dizionario giuridico Brocardi)
-export interface GlossaryEntry {
-    termine: string;
-    url: string;
-    dizionario_id: string;
-}
-
-// Cross Reference (riferimento incrociato)
-export interface CrossReference {
-    articolo: string;
-    tipo_atto?: string;
-    url: string;
-    sezione: 'brocardi' | 'ratio' | 'spiegazione' | 'massime';
-    testo?: string;
-}
-
-export interface BrocardiInfo {
-    position: string | null;
-    link: string | null;
-    Brocardi: string[] | null;
-    Ratio: string | null;
-    Spiegazione: string | null;
-    // Massime: supports both legacy string[] and new structured format
-    Massime: (string | MassimaStructured)[] | null;
-    // Historical relations (Guardasigilli)
-    Relazioni?: RelazioneContent[] | null;
-    // Constitution relation (Meuccio Ruini)
-    RelazioneCostituzione?: RelazioneCostituzione | null;
-    // Footnotes (note a piè di pagina)
-    Footnotes?: Footnote[] | null;
-    // Related Articles (articoli correlati)
-    RelatedArticles?: RelatedArticles | null;
-    // Cross References (riferimenti incrociati)
-    CrossReferences?: CrossReference[] | null;
-    // Brocardi legal-dictionary links for terms used in the article
-    Glossario?: GlossaryEntry[] | null;
-}
-
 export interface ArticleData {
     article_text?: string;
     url?: string;
     norma_data: NormaVisitata;
-    brocardi_info?: BrocardiInfo | null;
-    /** Set by the server when Brocardi was asked and did not answer (no `brocardi_info` then). */
-    brocardi_error?: string;
     error?: string;
     queue_position?: number;
     /** What the source's own page says about the text it served; absent when it cannot be read. */
     validity?: ArticleValidity;
+    /**
+     * A later text the source has already published for an article served as today's (G-355): absent when there is
+     * none. The text served stays today's, its `validity.valid_to` the day before.
+     */
+    upcoming?: ArticleUpcoming;
     /**
      * What was ASKED for, not what came back: `isHistorical` is true for a date or for the
      * original text, even when the answer turns out to be the text in force. What came back is
@@ -138,6 +51,16 @@ export interface ArticleData {
 }
 
 export type ValidityState = 'current' | 'historical' | 'not_yet' | 'abrogated';
+
+/**
+ * What a later text does to the article, and from which day (ISO): the server's `upcoming` (G-355). The web reads
+ * `abrogated` and `amended`; any other value (G-357 adds more) or none says nothing.
+ */
+export interface ArticleUpcoming {
+    change: string | null;
+    valid_from: string;
+    version_number: number | null;
+}
 
 /**
  * The window of days a Normattiva page states for the text it served (dates in
@@ -160,7 +83,6 @@ export interface ArticleValidity {
 
 export interface SearchFilters {
     source: 'all' | 'normattiva' | 'eurlex';
-    hasBrocardi: boolean;
     onlyHistorical: boolean;
     yearFrom?: number;
     yearTo?: number;
@@ -173,7 +95,6 @@ export interface SearchParams {
     article: string;
     version: 'vigente' | 'originale';
     version_date?: string;
-    show_brocardi_info: boolean;
     filters?: SearchFilters;
     annex?: string; // Optional annex number/letter (e.g., "1", "2", "A", "B")
     tabLabel?: string; // Optional custom label for the practice a search creates
@@ -217,6 +138,9 @@ export interface ArticleTreeResponse {
 
 // --- New Utility Features Types ---
 
+/** A section of Impostazioni that can be opened directly (the reader's gear opens «Significato dei colori»). */
+export type SettingsSection = 'highlightColors';
+
 export interface AppSettings {
     theme: 'light' | 'dark';
     fontSize: 'small' | 'medium' | 'large' | 'xlarge';
@@ -225,6 +149,17 @@ export interface AppSettings {
     splitView: boolean;
     /** A decision's key passages are drawn (`utils/decisionKeyPassages.ts`); on by default (the owner, 13 Oct 2026). */
     showKeyPassages: boolean;
+    /**
+     * The colour every new highlight takes (H1): chosen once in the reading bar, never asked at each highlight. Kept on
+     * this device, as the other reading settings.
+     */
+    highlightColor: 'yellow' | 'green' | 'red' | 'blue';
+    /**
+     * What each colour means to this user (only the labels change, the four colours stay), set in
+     * Impostazioni › «Significato dei colori». Only the colours given a meaning of their own: the others follow
+     * `HIGHLIGHT_COLOR_MEANINGS`. Kept on this device, as the other reading settings; never sent to the server.
+     */
+    highlightColorMeanings: Partial<Record<'yellow' | 'green' | 'red' | 'blue', string>>;
     /**
      * Study Mode reading preferences, persisted across sessions. Without
      * this slice the user had to re-pick the font size, line height, and
@@ -279,6 +214,78 @@ export interface Highlight {
     startOffset?: number;
     sourceSuggestionId?: string | null;
     originalAuthor?: OriginalAuthor | null;
+    /**
+     * A passage a connected application proposed on one dossier entry (D7b): drawn only on that entry, never in the
+     * app's own highlights. Absent on the user's own highlights.
+     */
+    proposal?: HighlightProposal | null;
+}
+
+/**
+ * Where the user stands on a note an application wrote (D7b, the contract's `NoteState`): «da validare» until they act,
+ * «Validato» once they tick it (or change it), «Da rivedere» when they flag it. The note has the state, never the mark.
+ */
+export type AiReviewState = 'proposed' | 'validated' | 'review';
+
+/** An application's note on a passage it proposed (D7b contract §5). */
+export interface AssistantNote {
+    /** The note shown now ('' if the user emptied it). */
+    text: string;
+    /** The application's own, never changed: «Vedi la versione dell'IA». */
+    assistantText: string;
+    state: AiReviewState;
+    stateChangedAt: string | null;
+    /** «Cosa non va?», given only while the state is `review`. */
+    reviewComment: string | null;
+    /** The user changed the text: «Validato, modificato da te». */
+    edited: boolean;
+    editedAt: string | null;
+    editedBy: { username: string } | null;
+}
+
+/** A passage an application proposed on one dossier entry, as `GET /api/dossiers/:id/items/:itemId/proposals` gives it. */
+export interface Proposal {
+    id: string;
+    /**
+     * D8: `gloss`, a note on the passage with no colour (`color` null, the note never empty), shown beside the text and
+     * never drawn as a mark; `mark`, a coloured passage saved before D8. Absent from a server before D8: a mark.
+     */
+    kind?: 'mark' | 'gloss';
+    normaKey: string;
+    text: string;
+    /** null on a gloss only. */
+    color: 'yellow' | 'green' | 'red' | 'blue' | null;
+    startOffset: number;
+    endOffset: number;
+    createdAt: string;
+    dossierItemId: string;
+    proposedBy: { clientName: string | null };
+    assistantRange: { startOffset: number; text: string };
+    rangeEdited: boolean;
+    rangeEditedAt: string | null;
+    rangeEditedBy: { username: string } | null;
+    /** null: a mark with no note, of known origin, with no state. */
+    note: AssistantNote | null;
+}
+
+/** On a highlight drawn from a `Proposal`: who proposed it and its note, the one thing with a state. */
+export interface HighlightProposal {
+    /** The application's registered name, unverified. */
+    clientName: string | null;
+    note: AssistantNote | null;
+    /** The words the application marked, once the user moved the boundaries; absent while they are its own. */
+    originalText?: string;
+}
+
+/** A note entry an application wrote in a dossier (D7b contract §3), its state and its original. */
+export interface AssistantNoteEntry {
+    state: AiReviewState;
+    stateChangedAt: string | null;
+    reviewComment: string | null;
+    originalText: string;
+    edited: boolean;
+    editedAt: string | null;
+    editedBy: { username: string } | null;
 }
 
 /** A dossier di lavoro holds a practice (it may carry a client's data); a dossier di studio a topic studied. */
@@ -325,6 +332,10 @@ interface DossierItemBase {
     aboutItemId?: string | null;
     // The connected application that wrote it (through MCP); null for the user.
     createdBy?: { clientName: string | null } | null;
+    // D7b: how the application's notes on a norm or a decision stand (the row's light), and the state of a note entry
+    // an application wrote; null with the feature off or nothing written, absent before the server said.
+    assistantNotes?: { proposed: number; validated: number; review: number } | null;
+    assistantNote?: AssistantNoteEntry | null;
 }
 
 export type DossierItem =

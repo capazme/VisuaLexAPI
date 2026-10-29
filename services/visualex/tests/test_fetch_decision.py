@@ -124,23 +124,33 @@ class _Log:
         return lambda event, **fields: self.events.append((level, event))
 
 
-async def test_the_decision_caches_are_swept_at_start_and_the_sweep_stops(monkeypatch):
+async def test_the_caches_are_swept_and_pruned_at_start_and_the_sweep_stops(monkeypatch):
     sweeps = []
 
     async def sweep():
         sweeps.append("swept")
         return 0
 
+    async def prune():
+        sweeps.append("pruned")
+        return 0
+
+    def sweep_pdfs(directory):
+        sweeps.append("pdfs")
+        return 0
+
     monkeypatch.setattr("app.sweep_decision_caches", sweep)
+    monkeypatch.setattr("app.prune_normattiva_cache", prune)
+    monkeypatch.setattr("app.sweep_exported_pdfs", sweep_pdfs)
     controller = NormaController()
     await controller.start_background_services()
-    task = controller._decision_sweep
+    task = controller._cache_sweep
     async with asyncio.timeout(2):
-        while not sweeps:  # at once, not after the first six hours
+        while len(sweeps) < 3:  # at once, not after the first six hours
             await asyncio.sleep(0)
     await controller.stop_background_services()
-    assert sweeps == ["swept"]
-    assert task.cancelled() and controller._decision_sweep is None
+    assert sweeps == ["swept", "pruned", "pdfs"]
+    assert task.cancelled() and controller._cache_sweep is None
 
 
 async def test_a_failed_sweep_is_logged_and_the_next_one_still_runs(monkeypatch):
@@ -152,8 +162,16 @@ async def test_a_failed_sweep_is_logged_and_the_next_one_still_runs(monkeypatch)
             raise OSError("disk full")
         return 0
 
+    async def prune():
+        raise OSError("read-only")
+
+    def sweep_pdfs(directory):
+        raise OSError("permission denied")
+
     log = _Log()
     monkeypatch.setattr("app.sweep_decision_caches", sweep)
+    monkeypatch.setattr("app.prune_normattiva_cache", prune)
+    monkeypatch.setattr("app.sweep_exported_pdfs", sweep_pdfs)
     monkeypatch.setattr("app.DECISION_CACHE_SWEEP_SECONDS", 0)
     monkeypatch.setattr("app.log", log)
     controller = NormaController()
@@ -163,3 +181,5 @@ async def test_a_failed_sweep_is_logged_and_the_next_one_still_runs(monkeypatch)
             await asyncio.sleep(0)
     await controller.stop_background_services()
     assert ("exception", "Decision cache sweep failed") in log.events
+    assert ("exception", "Normattiva cache prune failed") in log.events
+    assert ("exception", "Exported PDF sweep failed") in log.events

@@ -1,20 +1,28 @@
 import { useState, useRef, useEffect, useCallback, type FocusEvent, type KeyboardEvent, type PointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import { Search, Folder, FolderOpen, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Scale, Network, Bot, Repeat, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, type LucideIcon } from 'lucide-react';
+import { motion, AnimatePresence, LayoutGroup, useReducedMotion } from 'framer-motion';
+import { Search, Folder, FolderOpen, CalendarCheck, CalendarDays, Inbox, MessagesSquare, Clock, Moon, Sun, Settings, LogOut, Shield, Keyboard, FileSearch, Scale, Network, Bot, ScrollText, MessageSquarePlus, Repeat, ChartColumn, Layers, ClipboardCheck, PanelLeftClose, PanelLeftOpen, Route, type LucideIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { isMerltEnabled } from '../../features/merlt/featureFlag';
 import { isMerltGraphEnabled } from '../../features/merlt/graph/featureFlag';
 import { SectionSwitcher } from '../../features/sections/SectionSwitcher';
 import { useSection } from '../../features/sections/useSection';
-import { useAppStore } from '../../store/useAppStore';
-import { focusSearchField } from '../../utils/searchFieldControl';
+import { useEntriesEntrance } from '../../features/sections/useEntriesEntrance';
+import { PALETTE_SHORTCUT, focusSearchField } from '../../utils/searchFieldControl';
 import { useAuth } from '../../hooks/useAuth';
+import { useIsDesktop } from '../../hooks/useIsDesktop';
 import { useForumNotifications } from '../../hooks/useForumNotifications';
+import type { ServiceHealthReading } from '../../hooks/useServiceHealth';
+import { ServiceHealthDot, ServiceHealthMenuEntry } from '../ui/ServiceHealthMenuEntry';
+import { serviceHealthLabel, serviceHealthNeedsNotice } from '../../utils/serviceHealth';
 import { Z_INDEX } from '../../constants/zIndex';
+import { preparePage } from '../../pageCode';
 import { spring } from '../../lib/motion';
 import type { SidebarLayout } from './sidebarWidth';
+import { plannerStore } from '../features/planner/plannerStore';
+import { todayCountLabel } from '../features/planner/taskDates';
+import { useCoursesSwitch } from '../features/studia/corsi/coursesSwitch';
 
 interface SidebarProps {
   theme: string;
@@ -23,11 +31,16 @@ interface SidebarProps {
   closeMobile: () => void;
   openSettings: () => void;
   openKeyboardShortcuts: () => void;
+  /** Opens the feedback form: on a phone an entry of the user menu, «Invia un commento» (M1); from `md` the floating
+   *  button does it. Not given, no entry. */
+  openFeedback?: () => void;
   /** Icons only (the desktop between `lg` and `xl`, or narrowed), icons and words (from `xl`), or the
    *  phone's drawer (icons and words, rows of 44 px). */
   layout?: SidebarLayout;
   /** Narrows or widens the desktop bar; given only where the words fit (`xl`). */
   onToggleWide?: () => void;
+  /** `Layout`'s one probe of the services: the user menu's «Stato dei servizi» and the dot on the user button. */
+  serviceHealth: ServiceHealthReading;
 }
 
 interface NavItemProps {
@@ -37,6 +50,8 @@ interface NavItemProps {
   onClick?: () => void;
   id?: string;
   badgeCount?: number;
+  /** What the count counts, for the name: «Oggi, 3 compiti per oggi o scaduti». Without it, «N notifiche». */
+  badgeLabel?: string;
   /** Active on its own address only, not under it: «Dossier pubblici» (`/forum`) beside «Community» (`/forum/community`). */
   end?: boolean;
   /** The keyboard shortcut that does the same, shown in the hover label (not part of the name). */
@@ -58,9 +73,6 @@ export const SIDEBAR_SMALL_TEXT = 'text-slate-600 dark:text-slate-400';
  */
 export const SIDEBAR_TOGGLE_TEXT = 'text-slate-700 dark:text-slate-300';
 
-/** The palette's shortcut as this keyboard writes it. */
-const PALETTE_SHORTCUT = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform) ? '⌘K' : 'Ctrl K';
-
 const menuItemClass = "w-full flex items-center gap-3 px-4 py-2.5 min-h-[44px] md:min-h-0 text-sm focus-visible:outline-none focus-visible:bg-slate-100 dark:focus-visible:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer";
 
 /** The unread "a saved norm changed" notifications, as words: the avatar's name and the menu's entry carry them. */
@@ -68,13 +80,13 @@ function normaChangesLabel(count: number): string {
   return count === 1 ? '1 norma salvata cambiata' : `${count} norme salvate cambiate`;
 }
 
-/** A count drawn on a control; the control's name says what it counts. */
+/** A count drawn on a control; the control's name says what it counts. 11 px on red 600: no smaller, and AA. */
 function CountBadge({ count, className }: { count: number; className?: string }) {
   return (
     <span
       aria-hidden
       className={cn(
-        'min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-semibold leading-none',
+        'min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-600 text-white text-[11px] font-semibold leading-none',
         className,
       )}
     >
@@ -155,7 +167,7 @@ function useSidebarLabel() {
   return { shown, hide, handlers };
 }
 
-function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint, layout, end }: NavItemProps) {
+function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, badgeLabel, hint, layout, end }: NavItemProps) {
   const { shown: showTooltip, hide, handlers } = useSidebarLabel();
   // State, not a ref object: the tooltip reads the element while rendering (gotcha 13).
   const [linkEl, setLinkEl] = useState<HTMLAnchorElement | null>(null);
@@ -168,7 +180,7 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint, layout,
   // tooltip is `hidden md:block` and shows on hover, so a screen reader and a
   // keyboard user got an unnamed link. The count rides the name because a badge
   // announced on its own arrives without saying what it counts.
-  const accessibleName = showBadge ? `${label}, ${badgeCount} notifiche` : label;
+  const accessibleName = showBadge ? `${label}, ${badgeLabel ?? `${badgeCount} notifiche`}` : label;
 
   return (
     <NavLink
@@ -190,6 +202,10 @@ function NavItem({ to, icon: Icon, label, onClick, id, badgeCount, hint, layout,
       }}
       // With its words written, the row needs no label of its own.
       {...(words ? {} : handlers)}
+      // A page loaded with its route (`pageCode.ts`) is fetched as its entry is pointed at, focused or touched.
+      onPointerEnter={(e: PointerEvent<HTMLAnchorElement>) => { preparePage(to); if (!words) handlers.onPointerEnter(e); }}
+      onPointerDown={() => preparePage(to)}
+      onFocus={(e: FocusEvent<HTMLAnchorElement>) => { preparePage(to); if (!words) handlers.onFocus(e); }}
     >
       {({ isActive }) => (
         <>
@@ -305,38 +321,47 @@ function WidthToggle({ layout, onToggle }: { layout: SidebarLayout; onToggle: ()
   );
 }
 
-export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings, openKeyboardShortcuts, layout = 'rail', onToggleWide }: SidebarProps) {
+export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings, openKeyboardShortcuts, openFeedback, layout = 'rail', onToggleWide, serviceHealth }: SidebarProps) {
   const navigate = useNavigate();
-  const quickNorms = useAppStore((s) => s.quickNorms);
   const { user, isAdmin, isValidator, logout } = useAuth();
+  const coursesOn = useCoursesSwitch() === 'on';
   const { section, active } = useSection();
+  const sectionEntries = useEntriesEntrance(section);
   const { count: forumNotifications } = useForumNotifications(!!user);
+  // Overdue plus today's tasks (`PlannerHost` reads them): beside «Oggi» in Opus.
+  const todayCount = plannerStore((s) => s.todayCount) ?? 0;
   // Cronologia lives in the user menu (the owner, 13 Oct 2026); the saved norms that changed are
   // counted on the avatar and beside the entry («ok come raccomandi»).
   const normaChanges = forumNotifications.normaChanges ?? 0;
+  // The services pill is gone (S1): a fault shows as a dot on the user button, and its name says it.
+  const servicesNotice = serviceHealthNeedsNotice(serviceHealth.snapshot.overall);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userButtonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const [menuPosition, setMenuPosition] = useState({ bottom: 0, left: 0 });
+  const [menuPosition, setMenuPosition] = useState({ bottom: 0, left: 0, maxHeight: 0 });
 
   const words = layout !== 'rail';
+  // The floating feedback button covered the foot of every page on a phone: there it is this menu's entry (M1).
+  const feedbackInMenu = !useIsDesktop() && openFeedback !== undefined;
 
-  // Calculate menu position when showing
-  useEffect(() => {
-    if (showUserMenu && userButtonRef.current) {
-      const rect = userButtonRef.current.getBoundingClientRect();
-      // Beside the rail's avatar, aligned to its bottom; over the wider button of the bar with words
-      // (on a phone a menu beside it would leave the screen).
-      setMenuPosition(words
-        ? { bottom: window.innerHeight - rect.top + 8, left: rect.left }
-        : { bottom: window.innerHeight - rect.bottom, left: rect.right + 8 });
-    }
-  }, [showUserMenu, words]);
+  // Placed when it opens, in the same update, so its first paint has its height bounded before an entry takes
+  // focus (opened on «Esci» in a low window, the focused entry would otherwise end up out of view).
+  const placeMenu = () => {
+    if (!userButtonRef.current) return;
+    const rect = userButtonRef.current.getBoundingClientRect();
+    // Beside the rail's avatar, aligned to its bottom; over the wider button of the bar with words
+    // (on a phone a menu beside it would leave the screen). It grows upwards, «Stato dei servizi» open
+    // included, and scrolls rather than leave the top of a low window.
+    setMenuPosition(words
+      ? { bottom: window.innerHeight - rect.top + 8, left: rect.left, maxHeight: rect.top - 16 }
+      : { bottom: window.innerHeight - rect.bottom, left: rect.right + 8, maxHeight: rect.bottom - 8 });
+  };
 
   // «Ricerca» is the search page with the cursor in its field, no window over it (the owner, 13 Oct
-  // 2026: «ok come raccomandi»); ⌘K is the palette. The link itself navigates.
+  // 2026: «ok come raccomandi»); the first key typed opens the search menu (R2), as ⌘K does. The link itself
+  // navigates.
   const handleSearchClick = () => {
-    focusSearchField({}, { wait: true });
+    focusSearchField({ focus: true }, { wait: true });
     closeMobile();
   };
 
@@ -353,6 +378,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
   const [openAt, setOpenAt] = useState<'first' | 'last'>('first');
   const menuItems = () => [...(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])];
   const openMenu = (at: 'first' | 'last') => {
+    placeMenu();
     setOpenAt(at);
     setShowUserMenu(true);
   };
@@ -394,7 +420,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
   };
 
   // A menu entry closes the menu (and the phone's off-canvas copy), gives focus back to the avatar (where a
-  // dialog it opens returns it) and then acts.
+  // dialog it opens returns it; in the drawer, closing, `Layout` moves it on to the bar's menu button) and then acts.
   const fromMenu = (action: () => void) => () => {
     closeMenu(true);
     closeMobile();
@@ -403,6 +429,8 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
 
   return (
     <aside
+      // The closed drawer is only slid off the screen: out of reach of Tab and of a screen reader too (M1).
+      inert={layout === 'drawer' && !isOpen ? true : undefined}
       className={cn(
         // Base layout
         "fixed inset-y-0 left-0 z-50 flex flex-col",
@@ -425,11 +453,11 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         isOpen ? "translate-x-0" : "-translate-x-full"
       )}
     >
-      {/* The section switcher, where the open book was (sections spec S3). Below `lg` the layout's floating
-          menu button sits at the top left, over this place: the switcher goes under it. Every column keeps
-          10 px of side padding, so a 44 px control in the 64 px rail sits where it sits in the wide bar. */}
-      <div id="tour-section-switcher" className="flex items-center px-2.5 pt-[4.5rem] pb-2 lg:p-0 lg:px-2.5 lg:h-16 border-b border-slate-100 dark:border-slate-800/50">
-        <SectionSwitcher forumCount={forumNotifications.total} onChoose={closeMobile} withName={words} />
+      {/* The section switcher, where the open book was (sections spec S3). Below `lg`, in the drawer, it sits where
+          the phone's bar is (M1), clear of the iPhone's top edge. Every column keeps 10 px of side padding, so a 44 px
+          control in the 64 px rail sits where it sits in the wide bar. */}
+      <div id="tour-section-switcher" className="flex items-center px-2.5 pt-[calc(0.375rem+env(safe-area-inset-top))] pb-2 lg:p-0 lg:px-2.5 lg:h-16 border-b border-slate-100 dark:border-slate-800/50">
+        <SectionSwitcher forumCount={forumNotifications.total} onChoose={closeMobile} withName={words} inDrawer={layout === 'drawer'} />
       </div>
 
       {/* Navigation */}
@@ -443,49 +471,58 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         className="min-h-0 flex-1 flex flex-col items-start overflow-y-auto overflow-x-hidden overscroll-contain px-2.5 py-4 gap-3 md:gap-2 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1"
       >
         <NavItem to="/" icon={Search} label="Ricerca" hint={PALETTE_SHORTCUT} id="tour-nav-search" onClick={handleSearchClick} layout={layout} />
-        {quickNorms.length > 0 && (
-          <div className="-mt-1 ml-3 w-5 h-1 rounded-full bg-amber-500/60" title={`${quickNorms.length} preferiti`} />
-        )}
         <NavItem to="/documents" icon={FileSearch} label="Analizza documento" onClick={closeMobile} layout={layout} />
-        {/* The active section's entries, after the Corpus ones above (sections spec S6). */}
-        <div role="group" aria-label={active.name} className="mt-1 flex w-full flex-col items-start gap-3 md:gap-2 border-t border-slate-100 dark:border-slate-800/50 pt-3 md:pt-2">
-          {section === 'gymnasium' && (
-            <>
-              {/* Studying, then writing and validating (Gymnasium spec §4). */}
-              <NavGroup name="Studia" heading layout={layout}>
-                <NavItem to="/studia/ripasso" icon={Repeat} label="Oggi" onClick={closeMobile} layout={layout} />
+        {/* The active section's entries, after the Corpus ones above (sections spec S6); a new section's fade in (T1).
+            Each section names its own active dot, so the dot does not slide from the old section's entries. */}
+        <LayoutGroup id={section}>
+          <div ref={sectionEntries} role="group" aria-label={active.name} className="mt-1 flex w-full flex-col items-start gap-3 md:gap-2 border-t border-slate-100 dark:border-slate-800/50 pt-3 md:pt-2">
+            {section === 'gymnasium' && (
+              <>
+                {/* Studying, then writing and validating (Gymnasium spec §4). */}
+                <NavGroup name="Studia" heading layout={layout}>
+                  <NavItem to="/studia/ripasso" icon={Repeat} label="Oggi" onClick={closeMobile} layout={layout} />
+                  {/* Second, behind the switch `lingo_courses` (courses spec §6.1). */}
+                  {coursesOn && <NavItem to="/studia/percorsi" icon={Route} label="Percorsi" onClick={closeMobile} layout={layout} />}
+                  <NavItem to="/studia/progressi" icon={ChartColumn} label="Progressi" onClick={closeMobile} layout={layout} />
+                  <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" layout={layout} />
+                </NavGroup>
+                {layout === 'rail' && <div aria-hidden className="mx-auto h-px w-6 bg-slate-200 dark:bg-slate-700" />}
+                <NavGroup name="Contribuisci" heading layout={layout}>
+                  <NavItem to="/studia/schede" icon={Layers} label="Le mie schede" onClick={closeMobile} layout={layout} />
+                  {isValidator && <NavItem to="/studia/valida" icon={ClipboardCheck} label="Da validare" onClick={closeMobile} layout={layout} />}
+                </NavGroup>
+              </>
+            )}
+            {(section === 'opus' || section === 'forum' || (section === 'academia' && showAssistant)) && words && (
+              <p aria-hidden className={cn("w-full truncate whitespace-nowrap px-3 pt-1 text-[11px] font-semibold uppercase tracking-[0.08em]", SIDEBAR_SMALL_TEXT)}>
+                {active.name}
+              </p>
+            )}
+            {section === 'opus' && (
+              <>
+                {/* The planner's views, then the dossiers (the planner, wave 1). */}
+                <NavItem to="/opus/oggi" icon={CalendarCheck} label="Oggi" onClick={closeMobile} badgeCount={todayCount} badgeLabel={todayCountLabel(todayCount)} layout={layout} />
+                <NavItem to="/opus/prossimi" icon={CalendarDays} label="Prossimi giorni" onClick={closeMobile} layout={layout} />
+                <NavItem to="/opus/ingresso" icon={Inbox} label="Lista d'ingresso" onClick={closeMobile} layout={layout} />
                 <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" layout={layout} />
-              </NavGroup>
-              {layout === 'rail' && <div aria-hidden className="mx-auto h-px w-6 bg-slate-200 dark:bg-slate-700" />}
-              <NavGroup name="Contribuisci" heading layout={layout}>
-                <NavItem to="/studia/schede" icon={Layers} label="Le mie schede" onClick={closeMobile} layout={layout} />
-                {isValidator && <NavItem to="/studia/valida" icon={ClipboardCheck} label="Da validare" onClick={closeMobile} layout={layout} />}
-              </NavGroup>
-            </>
-          )}
-          {(section === 'opus' || section === 'forum' || (section === 'academia' && showAssistant)) && words && (
-            <p aria-hidden className={cn("w-full truncate whitespace-nowrap px-3 pt-1 text-[11px] font-semibold uppercase tracking-[0.08em]", SIDEBAR_SMALL_TEXT)}>
-              {active.name}
-            </p>
-          )}
-          {section === 'opus' && (
-            <NavItem to="/dossier" icon={Folder} label="Dossier" onClick={closeMobile} id="tour-nav-dossier" layout={layout} />
-          )}
-          {section === 'academia' && showAssistant && (
-            <>
-              <NavItem to="/merlt" icon={Scale} label="Assistente" onClick={closeMobile} layout={layout} />
-              {/* Slice 4 Decision A: /grafo is the Q&A surface; the hub stays at /merlt. */}
-              {showGraph && <NavItem to="/grafo" icon={Network} label="Grafo" onClick={closeMobile} layout={layout} />}
-            </>
-          )}
-          {/* The section keeps its name; its areas are named apart, so «Forum» is not written twice. */}
-          {section === 'forum' && (
-            <>
-              <NavItem to="/forum" end icon={FolderOpen} label="Dossier pubblici" onClick={closeMobile} badgeCount={forumNotifications.total} layout={layout} />
-              <NavItem to="/forum/community" icon={MessagesSquare} label="Community" onClick={closeMobile} layout={layout} />
-            </>
-          )}
-        </div>
+              </>
+            )}
+            {section === 'academia' && showAssistant && (
+              <>
+                <NavItem to="/merlt" icon={Scale} label="Assistente" onClick={closeMobile} layout={layout} />
+                {/* Slice 4 Decision A: /grafo is the Q&A surface; the hub stays at /merlt. */}
+                {showGraph && <NavItem to="/grafo" icon={Network} label="Grafo" onClick={closeMobile} layout={layout} />}
+              </>
+            )}
+            {/* The section keeps its name; its areas are named apart, so «Forum» is not written twice. */}
+            {section === 'forum' && (
+              <>
+                <NavItem to="/forum" end icon={FolderOpen} label="Dossier pubblici" onClick={closeMobile} badgeCount={forumNotifications.total} layout={layout} />
+                <NavItem to="/forum/community" icon={MessagesSquare} label="Community" onClick={closeMobile} layout={layout} />
+              </>
+            )}
+          </div>
+        </LayoutGroup>
       </motion.nav>
 
       {/* User Menu, and on the desktop from `xl` the control that narrows or widens the bar. On a phone the
@@ -497,7 +534,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
         <button
           ref={userButtonRef}
           // With words the button shows the username, so its name says it too (label in name, WCAG 2.5.3).
-          aria-label={`Menu utente${words && user?.username ? ` di ${user.username}` : ''}${normaChanges > 0 ? `, ${normaChangesLabel(normaChanges)}` : ''}`}
+          aria-label={`Menu utente${words && user?.username ? ` di ${user.username}` : ''}${normaChanges > 0 ? `, ${normaChangesLabel(normaChanges)}` : ''}${servicesNotice ? `, ${serviceHealthLabel(serviceHealth.snapshot.overall).toLowerCase()}` : ''}`}
           aria-haspopup="menu"
           aria-expanded={showUserMenu}
           onClick={() => (showUserMenu ? closeMenu(false) : openMenu('first'))}
@@ -515,7 +552,7 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
             whileTap={{ scale: 0.95 }}
             transition={spring.snappy}
             className={cn(
-              "shrink-0 rounded-lg flex items-center justify-center text-sm font-semibold",
+              "relative shrink-0 rounded-lg flex items-center justify-center text-sm font-semibold",
               "w-9 h-9 md:w-8 md:h-8",
               isAdmin
                 ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
@@ -523,6 +560,8 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
             )}
           >
             {user?.username?.charAt(0).toUpperCase() || 'U'}
+            {/* At the avatar's foot, clear of the count of changed norms (its top corner in the rail). */}
+            {servicesNotice && <ServiceHealthDot className="absolute -bottom-0.5 -right-0.5" />}
           </motion.div>
           {words && (
             <span aria-hidden className="min-w-0 flex-1 truncate whitespace-nowrap text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -549,8 +588,8 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
               role="menu"
               aria-label="Menu utente"
               onKeyDown={onMenuKeyDown}
-              style={{ bottom: menuPosition.bottom, left: menuPosition.left }}
-              className={cn("fixed w-56 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 py-2 animate-in fade-in zoom-in-95 duration-150", Z_INDEX.menuPanel)}
+              style={{ bottom: menuPosition.bottom, left: menuPosition.left, maxHeight: menuPosition.maxHeight > 0 ? menuPosition.maxHeight : undefined }}
+              className={cn("fixed w-56 overflow-y-auto overscroll-contain bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 py-2 animate-in fade-in zoom-in-95 duration-150", Z_INDEX.menuPanel)}
             >
               {/* User Info */}
               <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
@@ -588,13 +627,24 @@ export function Sidebar({ theme, toggleTheme, isOpen, closeMobile, openSettings,
                   <Bot size={16} />
                   Collega un'app AI
                 </button>
+                <button type="button" role="menuitem" tabIndex={-1} onClick={fromMenu(() => navigate('/crediti'))} className={menuItemClass}>
+                  <ScrollText size={16} />
+                  Crediti
+                </button>
+                {feedbackInMenu && (
+                  <button type="button" role="menuitem" tabIndex={-1} onClick={fromMenu(openFeedback)} className={menuItemClass}>
+                    <MessageSquarePlus size={16} />
+                    Invia un commento
+                  </button>
+                )}
+                <ServiceHealthMenuEntry health={serviceHealth} itemClassName={menuItemClass} />
                 <button type="button" role="menuitem" tabIndex={-1} onClick={fromMenu(toggleTheme)} className={menuItemClass}>
                   {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
                   {theme === 'dark' ? 'Tema chiaro' : 'Tema scuro'}
                 </button>
                 <button type="button" role="menuitem" tabIndex={-1} onClick={fromMenu(openKeyboardShortcuts)} className={menuItemClass}>
                   <Keyboard size={16} />
-                  Scorciatoie (?)
+                  Scorciatoie
                 </button>
                 {isAdmin && (
                   <button

@@ -4,6 +4,8 @@ import { MemoryRouter } from 'react-router-dom';
 
 // What each act block asks its title and rubriche for.
 const actDetailsAskedFor = vi.hoisted(() => [] as { key: string; articles: unknown[] }[]);
+// D7b's flag: asked as the dossier page mounts and as the app starts; off here, with no request leaving the test.
+vi.mock('../../../services/assistantService', () => ({ assistantService: { features: vi.fn(async () => ({ assistantPassages: false })) } }));
 vi.mock('./useActDetails', () => ({
   useActDetails: (block: { key: string; articles: unknown[] }) => {
     actDetailsAskedFor.push(block);
@@ -28,12 +30,27 @@ vi.mock('./dossierPdf', async (importOriginal) => {
     loadDossierTexts: pdf.loadDossierTexts,
     loadDossierDecisions: pdf.loadDossierDecisions,
     buildPdfBlocks: (...args: Parameters<typeof real.buildPdfBlocks>) => { pdf.built.push(args); return real.buildPdfBlocks(...args); },
-    writeDossierPdf: (...args: unknown[]) => { pdf.written.push(args); return { save: pdf.save }; },
+    writeDossierPdf: async (...args: unknown[]) => { pdf.written.push(args); return { save: pdf.save }; },
   };
 });
 vi.mock('./dossierPdfMarks', () => ({ loadPdfMarks: pdf.loadPdfMarks }));
 vi.mock('../../../utils/actStructureCache', () => ({ fetchActRubriche: async () => ({ title: 'Titolo' }) }));
 vi.mock('./DossierItemReader', () => ({ DossierItemReader: () => null }));
+// A decision's reader asks its court: what is tested here is the page (its own tests: `DossierDecisionsSection.test.tsx`).
+vi.mock('./DossierDecisionReader', () => ({ DossierDecisionReader: () => null }));
+// The act's index, reduced to what it hands over: this many articles of a law.
+const tree = vi.hoisted(() => ({ count: 0 }));
+vi.mock('./TreeNavigatorModal', () => ({
+  TreeNavigatorModal: ({ onImport, onClose }: { onImport: (a: { numero: string }[], act: { tipo_atto: string; data: string; numero_atto: string }) => void; onClose: () => void }) => (
+    <button type="button" onClick={() => { onImport(Array.from({ length: tree.count }, (_, i) => ({ numero: String(i + 1) })), { tipo_atto: 'legge', data: '2012-12-31', numero_atto: '247' }); onClose(); }}>
+      importa dall'indice
+    </button>
+  ),
+}));
+// The dossier's tasks panel reads its tasks from the server: an empty list here (its own tests: `planner/`).
+vi.mock('../../../services/taskService', () => ({
+  taskService: { list: async () => ({ today: '2026-10-20', tasks: [], truncated: false }) },
+}));
 vi.mock('../../../services/dossierService', () => ({
   dossierService: {
     getSnapshots: vi.fn(async () => []),
@@ -108,10 +125,16 @@ describe('DossierDetailView — the page by act', () => {
   it('names each act once, in the order the acts entered, with its articles by number', () => {
     renderView();
     expect(screen.getAllByRole('heading', { name: `${L247} 2 articoli` })).toHaveLength(1);
-    const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent ?? '');
-    expect(headings.filter((h) => h.startsWith('l. '))).toEqual([`${L247}2 articoli`, `${L49}1 articolo`]);
+    const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent ?? '');
+    // The count twice in the text: in the name's flow while narrow (hidden from a screen reader), and the heading's own.
+    expect(headings.filter((h) => h.startsWith('l. '))).toEqual([`${L247}2 articoli2 articoli`, `${L49}1 articolo1 articolo`]);
     const block = screen.getByRole('region', { name: L247 });
     expect(within(block).getAllByText(/^art\. \d+$/).map((el) => el.textContent)).toEqual(['art. 1', 'art. 3']);
+  });
+
+  it('takes the dossier\'s title as the page\'s h1', () => {
+    renderView();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(dossier.title);
   });
 
   it('puts the notes above the acts', () => {
@@ -198,16 +221,13 @@ describe('DossierDetailView — the page by act', () => {
     expect(reload).toHaveBeenCalledTimes(2);
   });
 
-  it('a multiple selection is one call and one trash entry; its confirmation says where the entries go', async () => {
+  it('a multiple selection is one call and one trash entry, with no confirmation: «Annulla» puts it back (K1a)', async () => {
     renderView();
     fireEvent.click(screen.getByRole('button', { name: 'Altre azioni' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Seleziona elementi' }));
     fireEvent.click(screen.getByRole('button', { name: 'Seleziona tutti' }));
     fireEvent.click(screen.getByRole('button', { name: 'Elimina' }));
-    const dialog = screen.getByRole('alertdialog');
-    expect(dialog).toHaveTextContent('andranno nel cestino, dove restano 30 giorni e si possono ripristinare');
-    expect(dialog).toHaveTextContent('Gli articoli originali salvati nei segnalibri o in altri dossier non saranno toccati');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Elimina' }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
     await waitFor(() => expect(toast?.message).toBe('3 elementi rimossi'));
     expect(dossierService.trashItems).toHaveBeenCalledTimes(1);
     expect([...vi.mocked(dossierService.trashItems).mock.calls[0][1]].sort()).toEqual(['a1', 'a3', 'b1']);
@@ -255,12 +275,86 @@ describe('DossierDetailView — decisions', () => {
   it('lists a decision under «Giurisprudenza», after the acts, never among the notes', () => {
     renderView(withDecision);
     const decisions = screen.getByRole('region', { name: 'Giurisprudenza (1)' });
-    expect(within(decisions).getByRole('link', { name: CITATION })).toHaveAttribute('href', '/sentenze/corte-costituzionale/1/2014');
+    // A row opened in place, as an article's (D7a), no more a link to a preview.
+    expect(within(decisions).getByRole('button', { name: `Espandi ${CITATION}` })).toHaveAttribute('aria-expanded', 'false');
     expect(within(screen.getByRole('region', { name: /Note \(1\)/ })).queryByText(CITATION)).toBeNull();
     const lastAct = screen.getByRole('region', { name: L49 });
     expect(lastAct.compareDocumentPosition(decisions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // Not a note: the header's count of decisions comes with the dossier-by-act round's PR 3.
     expect(screen.getByText(/2 atti · 3 articoli · 1 nota/)).toBeInTheDocument();
+  });
+
+  it('sets the acts and the decisions in two columns from lg, «Norme» | «Giurisprudenza», the norms first below it (D7a)', () => {
+    renderView(withDecision);
+    const norms = screen.getByRole('region', { name: 'Norme' });
+    const decisions = screen.getByRole('region', { name: 'Giurisprudenza (1)' });
+    expect(within(norms).getByRole('region', { name: L247 })).toBeInTheDocument();
+    expect(within(norms).getByRole('region', { name: L49 })).toBeInTheDocument();
+    expect(norms).not.toContainElement(decisions);
+    expect(norms.compareDocumentPosition(decisions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const grid = norms.parentElement!;
+    expect(grid).toHaveClass('flex', 'flex-col', 'lg:grid', 'lg:grid-cols-2');
+    // The acts under «Norme», a level down.
+    expect(within(norms).getByRole('heading', { level: 3, name: `${L247} 2 articoli` })).toBeInTheDocument();
+    // The rule between the columns, from lg only.
+    expect(decisions.parentElement).toHaveClass('lg:border-l', 'lg:pl-5');
+    expect(grid).toContainElement(decisions);
+  });
+
+  it('keeps one column, with no «Norme» title, when the dossier holds no decision', () => {
+    renderView();
+    expect(screen.queryByRole('region', { name: 'Norme' })).toBeNull();
+    expect(screen.queryByRole('region', { name: /^Giurisprudenza/ })).toBeNull();
+    expect(screen.getByRole('region', { name: L247 })).toBeInTheDocument();
+  });
+
+  it('gives the decisions alone the whole width', () => {
+    renderView({ ...withDecision, items: withDecision.items.filter((i) => i.type === 'sentenza') });
+    const decisions = screen.getByRole('region', { name: 'Giurisprudenza (1)' });
+    expect(screen.queryByRole('region', { name: 'Norme' })).toBeNull();
+    expect(decisions.parentElement?.className ?? '').not.toMatch(/lg:border-l/);
+  });
+
+  it('selects the decisions with the articles, «Seleziona tutti» taking both', () => {
+    renderView(withDecision);
+    fireEvent.click(screen.getByRole('button', { name: 'Altre azioni' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Seleziona elementi' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Seleziona tutti' }));
+    expect(screen.getByText('4 selezionati')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Giurisprudenza (1)' })).getByRole('button', { name: 'Deseleziona elemento' })).toBeInTheDocument();
+  });
+
+  it('keeps the acts mounted while a search leaves one kind on screen', () => {
+    renderView(withDecision);
+    const act247 = screen.getByRole('region', { name: L247 });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Cerca negli elementi del dossier' }), { target: { value: '247' } });
+    expect(screen.queryByRole('region', { name: /^Giurisprudenza/ })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Norme' })).toBeNull();
+    expect(screen.getByRole('region', { name: L247 })).toBe(act247);
+  });
+
+  it('«Espandi tutto» opens the articles and leaves an open decision open', () => {
+    renderView(withDecision);
+    fireEvent.click(screen.getByRole('button', { name: `Espandi ${CITATION}` }));
+    fireEvent.click(screen.getByRole('button', { name: 'Espandi tutto' }));
+    expect(screen.getByRole('button', { name: `Comprimi ${CITATION}` })).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Comprimi tutto' }));
+    expect(screen.getByRole('button', { name: `Espandi ${CITATION}` })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('in a dossier of decisions alone, opens nothing with «Espandi tutto» but closes an open decision with «Comprimi tutto»', () => {
+    renderView({ ...withDecision, items: withDecision.items.filter((i) => i.type === 'sentenza') });
+    expect(screen.getByRole('button', { name: 'Espandi tutto' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: `Espandi ${CITATION}` }));
+    fireEvent.click(screen.getByRole('button', { name: 'Comprimi tutto' }));
+    expect(screen.getByRole('button', { name: `Espandi ${CITATION}` })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('button', { name: 'Espandi tutto' })).toBeDisabled();
+  });
+
+  it('draws no empty block of acts over the decisions alone', () => {
+    renderView({ ...withDecision, items: withDecision.items.filter((i) => i.type === 'sentenza') });
+    const column = screen.getByRole('region', { name: 'Giurisprudenza (1)' }).parentElement!;
+    expect(column.previousElementSibling).toHaveClass('hidden');
   });
 
   it('finds a decision by its citation', () => {
@@ -433,5 +527,150 @@ describe('DossierDetailView — «Esporta → PDF»', () => {
     expect(screen.getByRole('dialog', { name: 'Esporta in PDF' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Scarica PDF/ })).toBeEnabled();
     error.mockRestore();
+  });
+});
+
+describe('DossierDetailView — an import from the act\'s index (K1a)', () => {
+  const importing = async (count: number) => {
+    tree.count = count;
+    const addToDossier = vi.fn();
+    appStore.setState({ addToDossier });
+    renderView();
+    fireEvent.click(screen.getByRole('button', { name: 'Aggiungi' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Articoli da una norma' }));
+    fireEvent.click(screen.getByRole('button', { name: "importa dall'indice" }));
+    return addToDossier;
+  };
+
+  it('a few articles go in at once', async () => {
+    const addToDossier = await importing(3);
+    expect(addToDossier).toHaveBeenCalledTimes(3);
+    expect(toast).toBeNull();
+  });
+
+  it('more than a hundred ask no question, and write nothing until the notification is gone', async () => {
+    const addToDossier = await importing(150);
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    await waitFor(() => expect(toast?.message).toBe('150 articoli verranno importati nel dossier'));
+    expect(addToDossier).not.toHaveBeenCalled();
+    await act(async () => { toast?.onDismiss(); });
+    await waitFor(() => expect(addToDossier).toHaveBeenCalledTimes(150));
+  });
+
+  it('«Annulla» leaves the dossier as it was: nothing was written', async () => {
+    const addToDossier = await importing(150);
+    await waitFor(() => expect(toast).not.toBeNull());
+    await act(async () => { await toast?.onUndo(); });
+    expect(addToDossier).not.toHaveBeenCalled();
+  });
+
+  it('writes nothing into a dossier deleted while it waited, and says so', async () => {
+    const addToDossier = await importing(150);
+    await waitFor(() => expect(toast).not.toBeNull());
+    appStore.setState({ dossiers: [] });
+    await act(async () => { toast?.onDismiss(); });
+    expect(addToDossier).not.toHaveBeenCalled();
+    expect(appStore.getState().lastSyncError?.message).toBe('Nessun articolo importato: il dossier «Ricorso Rossi» non c’è più.');
+  });
+
+  it('asks before leaving the page while an import waits, and no more once it is written', async () => {
+    await importing(150);
+    await waitFor(() => expect(toast).not.toBeNull());
+    const leaving = () => {
+      const event = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    expect(leaving()).toBe(true);
+    await act(async () => { toast?.onDismiss(); });
+    expect(leaving()).toBe(false);
+  });
+});
+
+// A dossier's page in the planner's shape (S7c).
+describe('DossierDetailView — in the frame, in the planner\'s shape (S7c)', () => {
+  it('titles the page with the dossier\'s name in the reader\'s serif, no icon, its section\'s phrase over it', () => {
+    renderView({ ...dossier, kind: 'studio', description: 'Ricorso in appello' });
+    const title = screen.getByRole('heading', { level: 1, name: dossier.title });
+    expect(title).toHaveClass('font-serif');
+    expect(title.querySelector('svg')).toBeNull();
+    // A name of one long word wraps rather than widening the page.
+    expect(title.firstElementChild).toHaveClass('[overflow-wrap:anywhere]');
+    expect(title).toHaveAccessibleDescription('Gymnasium · la tua palestra giuridica');
+    expect(screen.getByText('Ricorso in appello')).toBeInTheDocument();
+  });
+
+  it('draws the header\'s actions in one row under the title, every one 44 px', () => {
+    renderView();
+    const open = screen.getByRole('button', { name: 'Apri tutto su Dashboard' });
+    const row = open.parentElement!;
+    for (const name of ['Aggiungi', 'Esporta', 'Altre azioni']) expect(row).toContainElement(screen.getByRole('button', { name }));
+    // Under the title, not beside it: a long name would be squeezed.
+    expect(screen.getByRole('heading', { level: 1 }).closest('header')).not.toContainElement(open);
+    expect(open).toHaveClass('min-h-[44px]');
+    expect(screen.getByRole('button', { name: 'Aggiungi' })).toHaveClass('min-h-[44px]', 'min-w-[44px]');
+    expect(screen.getByRole('button', { name: 'Altre azioni' })).toHaveClass('h-11', 'w-11');
+    for (const button of within(row).getAllByRole('button')) expect(button.className).not.toMatch(/md:min-h-0/);
+  });
+
+  it('keeps a long title clear of the actions: they come after the description and the facts, each label on one line (D3b)', () => {
+    const title = 'Ransomware EVST – pagamento del riscatto e fondi pubblici, profili di responsabilità';
+    renderView({ ...dossier, title, description: 'Richiesta di riscatto ricevuta il 3 ottobre' });
+    const heading = screen.getByRole('heading', { level: 1, name: title });
+    const open = screen.getByRole('button', { name: 'Apri tutto su Dashboard' });
+    const row = open.parentElement!;
+    // Nothing beside the title: the header holds only the section's phrase, the title and the description.
+    expect(heading.closest('header')!.querySelector('button')).toBeNull();
+    // After the line of the facts.
+    expect(screen.getByText(/creato il/).compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The row wraps as a row when the window is narrow, never a label inside its button.
+    expect(row).toHaveClass('flex-wrap');
+    const buttons = ['Apri tutto su Dashboard', 'Aggiungi', 'Esporta', 'Pubblica nel Forum'].map((name) => screen.getByRole('button', { name }));
+    for (const button of buttons) expect(button).toHaveClass('whitespace-nowrap');
+    expect(row.lastElementChild).toContainElement(screen.getByRole('button', { name: 'Altre azioni' }));
+  });
+
+  it('keeps the Forum\'s label on one line once the dossier is published (D3b)', () => {
+    renderView({ ...dossier, published: { sharedEnvironmentId: 'e1', version: 3, isActive: true, updatedAt: '' } });
+    expect(screen.getByRole('button', { name: 'Forum: Nel Forum · v3' })).toHaveClass('whitespace-nowrap', 'min-h-[44px]');
+  });
+
+  it('draws an article as a row of two levels — the article, a grey line, the signs — with 44 px controls', () => {
+    renderView({
+      ...dossier,
+      items: [{ id: 'a3', type: 'norma', addedAt: '2026-10-12T08:00:00Z', actCitation: L247, data: { tipo_atto: 'legge', numero_atto: '247', data: '2012-12-31', numero_articolo: '3' } }],
+    });
+    const block = screen.getByRole('region', { name: L247 });
+    const title = within(block).getByText('art. 3');
+    // No rubric read (the act's index is mocked empty): the grey line says when it was added.
+    expect(within(block).getByText('Aggiunto il 12 ottobre 2026')).toHaveClass('text-[13px]');
+    expect(title).toHaveClass('text-[15px]');
+    expect(within(block).getByRole('button', { name: 'Segna come importante' })).toHaveClass('h-11', 'w-11');
+    expect(within(block).getByRole('button', { name: 'Rimuovi articolo dal dossier' })).toHaveClass('h-11', 'w-11');
+  });
+
+  it('writes no grey line it cannot fill: no «Aggiunto il» without a date', () => {
+    renderView();
+    expect(screen.queryByText(/^Aggiunto il\s*$/)).toBeNull();
+  });
+
+  it('draws the free notes as rows: the words, then a grey line with the date, the removal at the right', () => {
+    renderView();
+    const notes = screen.getByRole('region', { name: /Note \(1\)/ });
+    expect(within(notes).getByRole('heading', { level: 2 })).toHaveClass('font-serif');
+    expect(within(notes).getByRole('heading', { level: 2 }).className).not.toMatch(/uppercase/);
+    const words = within(notes).getByText('Verificare la decorrenza');
+    const date = within(notes).getByText('4 ottobre 2026');
+    // The date under the words, never beside them, so a phone's row keeps the note's width.
+    expect(words.compareDocumentPosition(date) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(words.parentElement).toContainElement(date);
+    expect(within(notes).getByRole('button', { name: 'Rimuovi nota' })).toHaveClass('h-11', 'w-11');
+  });
+
+  it('writes the search at 16 px at least on a phone, whatever the text size (Safari zooms under it)', () => {
+    renderView(dossier);
+    const search = screen.getByRole('textbox', { name: 'Cerca negli elementi del dossier' });
+    expect(search).toHaveClass('text-[length:max(1rem,16px)]', 'md:text-sm');
+    expect(search).not.toHaveClass('text-base');
   });
 });

@@ -1,13 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { RefreshCw, Copy, ExternalLink } from 'lucide-react';
 import { useAppStore } from '../../../store/useAppStore';
 import { useArticleMarkers } from '../../../hooks/useArticleMarkers';
-import { useArticleTextInteractions } from '../../../hooks/useArticleTextInteractions';
+import { proposedPassageAt, useArticleTextInteractions } from '../../../hooks/useArticleTextInteractions';
 import { ArticleBody } from '../search/ArticleBody';
 import { UpdateNotePopover } from '../search/UpdateNotePopover';
 import { BlockAnnotationsPopover } from '../search/BlockAnnotationsPopover';
 import { LooseHighlightsList } from '../search/LooseHighlightsList';
+import { MoveProposalBar } from '../search/MoveProposalBar';
+import { LostGlossesList, LostProposalsList } from '../search/LostProposalsList';
+import { GlossMargin, type GlossMarginHandle } from '../search/GlossMargin';
 import { InlineNoteComposer } from '../search/InlineNoteComposer';
 import { InlineNotePopover } from '../search/InlineNotePopover';
 import { buildItemKey, uniqueArticleIdFromNorma } from '../../../utils/normaKeys';
@@ -15,11 +18,16 @@ import { formatNormCitation, unversionedCitation, withCitation } from '../../../
 import { todayInRome } from '../../../utils/dateUtils';
 import { describeVersion, historicalItemLabel, isEuropeanAct, requestIsHistorical } from '../../../utils/versionDisplay';
 import { VersionBanner } from '../search/VersionBanner';
+import { HighlightColorMenu } from '../search/HighlightColorMenu';
 import { fetchArticleForNorma } from '../../../utils/articleFetchCache';
 import { getUpdateNoteParagraphs, parseArticleStructure } from '../../../utils/articleStructure';
-import { describeBlock, groupAnnotationsByBlock, hasAnnotations, highlightsWithoutSign } from '../../../utils/articleAnnotations';
+import { describeBlock, groupAnnotationsByBlock, hasAnnotations, highlightsWithoutSign, isProposal as isProposalMark } from '../../../utils/articleAnnotations';
 import type { Annotation, ArticleData, Highlight, NormaVisitata } from '../../../types';
 import { highlightColorName } from '../../../utils/highlightColors';
+import { useEntryProposals } from '../../../hooks/useEntryProposals';
+import { useGlossPassage } from '../../../hooks/useGlossPassage';
+import { isGloss } from '../../../utils/aiReview';
+import { GLOSS_WORDS } from '../../../constants/glossWords';
 
 interface Props {
   norma: NormaVisitata;
@@ -27,6 +35,13 @@ interface Props {
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   /** The fetched article, for a row that takes its rubrica from the text when the act's index gave none. */
   onArticle?: (article: ArticleData) => void;
+  /** The dossier entry it reads: what an application proposed on it is drawn here, and only here (D7b). */
+  itemId?: string;
+  /**
+   * The gear beside the colour, to the colours' meanings in Impostazioni (default). Left out inside a phone's sheet (the
+   * lesson's article), which keeps the focus inside it: a dialog opened over it would have to fight it for the focus.
+   */
+  meaningsGear?: boolean;
 }
 
 type FetchState =
@@ -48,10 +63,12 @@ const NO_ANNOTATIONS: Annotation[] = [];
  * `buildItemKey` / `uniqueArticleIdFromNorma` pair so notes and highlights
  * created here and on the dashboard land on the same store rows.
  */
-export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArticle }: Props) {
+export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArticle, itemId, meaningsGear = true }: Props) {
   const [result, setResult] = useState<FetchResult | null>(null);
   const [retryTick, setRetryTick] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
+  // The text alone (without the selection popup): a passage's new words are read there (D7b).
+  const textRootRef = useRef<HTMLDivElement>(null);
   const [composer, setComposer] = useState<{
     rect: { x: number; y: number; width: number; height: number };
     anchorText: string; startOffset: number;
@@ -108,14 +125,14 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
   useEffect(() => {
     if (article) onArticle?.(article);
   }, [article, onArticle]);
-  const display = article ? describeVersion(article.validity, norma) : null;
+  const display = article ? describeVersion(article.validity, norma, article.upcoming) : null;
   const readOnly = display?.readOnly ?? false;
   const historical = requestIsHistorical(norma);
   const citeLocked = historical && !display?.canCite;
   const citationNow = () => (display?.canCite
     ? formatNormCitation({
       norma,
-      validity: article?.validity,
+      validity: display?.citeAs ?? article?.validity,
       requestedDate: norma.data_versione?.trim() || undefined,
       original: !norma.data_versione?.trim() && requestIsHistorical(norma),
       consultedAt: todayInRome(),
@@ -138,19 +155,50 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
 
   const rawText = state.phase === 'ready' ? (state.article.article_text || '') : '';
   const structure = useMemo(() => parseArticleStructure(rawText), [rawText]);
-  const shownHighlights = readOnly ? NO_HIGHLIGHTS : articleHighlights;
+
+  // What an application proposed on this entry (D7b): its own route, its own store, never the app's highlights. Its
+  // glosses (D8) are counted on the signs and shown beside the text, never drawn in it.
+  const {
+    highlights: proposalHighlights, glosses, glossAnchors, actions: proposalActions, moving, saveMove, cancelMove,
+  } = useEntryProposals(itemId, itemKey, uniqueArticleId, readOnly);
+  const withProposals = useMemo(
+    () => (proposalHighlights.length ? [...articleHighlights, ...proposalHighlights] : articleHighlights),
+    [articleHighlights, proposalHighlights],
+  );
+  const shownHighlights = readOnly ? NO_HIGHLIGHTS : withProposals;
   const shownAnnotations = readOnly ? NO_ANNOTATIONS : itemAnnotations;
-  const markedHtml = useArticleMarkers({ rawText, highlights: shownHighlights, annotations: shownAnnotations, structure, signs: !readOnly });
+  const markedHtml = useArticleMarkers({
+    rawText, highlights: shownHighlights, annotations: shownAnnotations, structure, signs: !readOnly, glosses: glossAnchors,
+  });
   // What each block's sign counts, for the popover it opens (the renderer
   // derives the signs from the same inputs, through the same module).
   const blockGroups = useMemo(
-    () => groupAnnotationsByBlock(rawText, structure, shownHighlights, shownAnnotations),
-    [rawText, structure, shownHighlights, shownAnnotations],
+    () => groupAnnotationsByBlock(rawText, structure, shownHighlights, shownAnnotations, [], glossAnchors),
+    [rawText, structure, shownHighlights, shownAnnotations, glossAnchors],
   );
-  // Highlights no sign can reach (their text changed): still removable.
+  const plain = useMemo(() => rawText.replace(/\n/g, ''), [rawText]);
+  // A gloss whose words are in no block (they changed): listed under the text with its actions, as a lost proposal.
+  const lostGlosses = useMemo(() => {
+    if (glosses.length === 0) return glosses;
+    const shown = new Set(blockGroups.flatMap((g) => g.glosses.map((a) => a.id)));
+    return glosses.filter((g) => !shown.has(g.id));
+  }, [glosses, blockGroups]);
+  const { shownId: shownGlossId, show: showGloss, hide: hideGloss } = useGlossPassage(textRootRef, plain, glossAnchors, markedHtml);
+  const showGlossPassage = useCallback(
+    (id: string, show: boolean) => (show ? showGloss(id) : hideGloss(id)),
+    [showGloss, hideGloss],
+  );
+  const marginRef = useRef<GlossMarginHandle>(null);
+  const [glossesWide, setGlossesWide] = useState(false);
+  // Highlights no sign can reach (their text changed): still removable. A proposal whose words no longer land has a
+  // list of its own, at every width, with its note and its actions (D7b).
   const looseHighlights = useMemo(
     () => (readOnly ? NO_HIGHLIGHTS : highlightsWithoutSign(articleHighlights, blockGroups)),
     [readOnly, articleHighlights, blockGroups],
+  );
+  const lostProposals = useMemo(
+    () => highlightsWithoutSign(proposalHighlights, blockGroups).filter(isProposalMark),
+    [proposalHighlights, blockGroups],
   );
   // Update-note references, the foldable AGGIORNAMENTO tail and the
   // annotation signs, as on the dashboard. `enabled` waits for the body: it
@@ -162,6 +210,25 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
     updatesOpenByDefault: display?.updateNotesOpen ?? false,
   });
   const openGroup = openBlock === null ? undefined : blockGroups[openBlock];
+  // Whether the glosses are beside the text, as it was when the block was opened: a reader widened or narrowed while its
+  // popover is open (a gloss's text half edited in it) keeps the popover as it is.
+  const [openedWide, setOpenedWide] = useState<{ block: number | null; wide: boolean }>({ block: null, wide: false });
+  if (openedWide.block !== openBlock) setOpenedWide({ block: openBlock, wide: glossesWide });
+  // Narrowed meanwhile, the cards are listed in the popover (the column is gone, «Vai alla glossa» would go nowhere);
+  // widened, they stay there (one may be half edited).
+  const inMargin = glossesWide && (openedWide.block === openBlock ? openedWide.wide : true);
+  // With the glosses beside the text, a sign whose block holds only glosses focuses the first one's card (D8, as a
+  // word processor's comment); one that holds more opens the popover, which offers the way to them.
+  const onlyGlosses = !!openGroup && openGroup.glosses.length > 0
+    && openGroup.notes.length + openGroup.highlights.length + openGroup.threads.length === 0;
+  const focusCard = inMargin && onlyGlosses ? openGroup.glosses[0].id : null;
+  useEffect(() => {
+    if (!focusCard) return;
+    // The column took the press: the focus goes to the card (a DOM write), and the block is closed again so the next
+    // press on the sign does the same.
+    marginRef.current?.focus(focusCard);
+    closeBlock();
+  }, [focusCard, closeBlock]);
 
   // Delegated click on the article body: tapping a wavy `.note-anchor`
   // opens the compact InlineNotePopover for that single note, exactly as
@@ -173,6 +240,8 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
     const container = contentRef.current;
     if (!container) return;
     const handler = (e: MouseEvent) => {
+      // A passage an application proposed answers with its block's popover instead (D7b).
+      if (proposedPassageAt(e.target)) return;
       const target = (e.target as HTMLElement | null)?.closest('.note-anchor') as HTMLElement | null;
       if (!target) return;
       const noteId = target.getAttribute('data-note-id');
@@ -264,21 +333,50 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
         <p className="mb-2 text-xs font-medium text-amber-700 dark:text-amber-300">{historicalItemLabel(norma)}</p>
       )}
       {(display?.textVisible ?? true) && (
-        <ArticleBody
-          contentRef={contentRef}
-          itemKey={itemKey}
-          processedContent={markedHtml}
-          onPopupHighlight={handlePopupHighlight}
-          onPopupAddNote={(text, startOffset, rect) => {
-            if (readOnly) return;
-            setComposer({ rect, anchorText: text, startOffset });
-          }}
-          onPopupCopy={handlePopupCopy}
-          updatesOpen={updatesOpen}
-          copyOnly={readOnly}
+        <GlossMargin
+          ref={marginRef}
+          glosses={glosses}
+          plain={plain}
+          actions={proposalActions}
+          textRootRef={textRootRef}
+          contentKey={markedHtml}
+          shownId={shownGlossId}
+          onShowPassage={showGlossPassage}
+          onWideChange={setGlossesWide}
+        >
+          <ArticleBody
+            contentRef={contentRef}
+            itemKey={itemKey}
+            processedContent={markedHtml}
+            onPopupHighlight={handlePopupHighlight}
+            onPopupAddNote={(text, startOffset, rect) => {
+              if (readOnly) return;
+              setComposer({ rect, anchorText: text, startOffset });
+            }}
+            onPopupCopy={handlePopupCopy}
+            updatesOpen={updatesOpen}
+            copyOnly={readOnly}
+            textRootRef={textRootRef}
+            selectionPopup={!moving}
+          />
+        </GlossMargin>
+      )}
+      {moving && (
+        <MoveProposalBar
+          key={moving.id}
+          textRootRef={textRootRef}
+          proposalId={moving.id}
+          startOffset={moving.startOffset}
+          text={moving.text}
+          onSave={saveMove}
+          onCancel={cancelMove}
+          label={isGloss(moving) ? GLOSS_WORDS.moveTitle : undefined}
+          focusAfter={isGloss(moving) ? () => marginRef.current?.focus(moving.id) ?? false : undefined}
         />
       )}
       <LooseHighlightsList highlights={looseHighlights} articleId={uniqueArticleId} onRemove={removeHighlight} />
+      {proposalActions && <LostProposalsList proposals={lostProposals} actions={proposalActions} />}
+      {proposalActions && <LostGlossesList glosses={lostGlosses} actions={proposalActions} />}
       {openNote && structure.notes[openNote.id] && (
         <UpdateNotePopover
           noteId={openNote.id}
@@ -287,7 +385,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
           onClose={closeNote}
         />
       )}
-      {openBlock !== null && hasAnnotations(openGroup) && (
+      {openBlock !== null && hasAnnotations(openGroup) && !focusCard && (
         <BlockAnnotationsPopover
           key={openBlock}
           containerRef={contentRef}
@@ -299,6 +397,12 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
           onUpdateNote={updateAnnotation}
           onRemoveNote={removeAnnotation}
           onRemoveHighlight={removeHighlight}
+          proposalActions={proposalActions}
+          glosses={glosses}
+          glossesInMargin={inMargin}
+          onGoToGloss={(id) => marginRef.current?.focus(id) ?? false}
+          shownGlossId={shownGlossId}
+          onShowGlossPassage={showGlossPassage}
         />
       )}
       {composer && (
@@ -324,7 +428,7 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
           onRemove={removeAnnotation}
         />
       )}
-      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
+      <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
         <button
           type="button"
           onClick={handleCopyCitation}
@@ -336,10 +440,21 @@ export function DossierItemReader({ norma, onOpenOnDashboard, showToast, onArtic
         <button
           type="button"
           onClick={onOpenOnDashboard}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 px-2 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 px-2 py-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
         >
           <ExternalLink size={13} /> Apri su Dashboard
         </button>
+        {/* The colour of new highlights (H1): the dossier's reader has no bar of its own, so it sits with its actions;
+            not on a text read only, which takes none. */}
+        {!readOnly && (
+          <HighlightColorMenu
+            labelled
+            meaningsGear={meaningsGear}
+            placement="auto"
+            className="ml-auto"
+            triggerClassName="min-h-[44px] gap-1.5 px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100 md:min-h-0 dark:text-slate-400 dark:hover:bg-slate-700"
+          />
+        )}
       </div>
     </div>
   );

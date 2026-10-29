@@ -1,20 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 
+// D7b's flag, asked as the app starts: off here, with no request leaving the test.
+vi.mock('../services/assistantService', () => ({ assistantService: { features: vi.fn(async () => ({ assistantPassages: false })) } }));
 vi.mock('../services/authService', () => ({
   isAuthenticated: () => false,
   logout: vi.fn(),
+  login: vi.fn(),
+  register: vi.fn(),
   getCurrentUser: vi.fn(),
 }));
 vi.mock('../services/decisionService', () => ({ fetchDecision: vi.fn() }));
 vi.mock('../services/studiaService', () => ({ studiaService: { forArticle: vi.fn() } }));
 
+import * as authService from '../services/authService';
 import { fetchDecision } from '../services/decisionService';
 import { studiaService } from '../services/studiaService';
 import { useArticleCards } from '../components/features/studia/useArticleCards';
 import { fetchDecisionCached } from '../utils/decisionFetchCache';
 import { appStore } from '../store/useAppStore';
 import { useAuth } from './useAuth';
+import { assistantProposalsStore } from '../store/assistantProposals';
 
 const REF = { corte: 'cassazione' as const, archivio: 'civile' as const, numero: 99999, anno: 2024 };
 
@@ -54,5 +60,38 @@ describe('useAuth — logout', () => {
     expect(next.result.current.status).toBe('loading');
     await waitFor(() => expect(next.result.current.status).toBe('ready'));
     expect(studiaService.forArticle).toHaveBeenCalledTimes(2);
+  });
+
+  it('forgets what applications proposed on the last reader\'s dossiers (D7b)', async () => {
+    assistantProposalsStore.setState({ enabled: true, byItem: { a1: [] } });
+    const { result } = renderHook(() => useAuth());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    act(() => { result.current.logout(); });
+
+    expect(assistantProposalsStore.getState()).toEqual({ enabled: false, byItem: {}, busy: {}, moving: null });
+  });
+
+  it('forgets what Gymnasium last drew here: the last reader’s points and level (G-316)', async () => {
+    localStorage.setItem('visualex.studia.visto', JSON.stringify({ xp: 900, livello: 7 }));
+    const { result } = renderHook(() => useAuth());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    act(() => { result.current.logout(); });
+
+    expect(localStorage.getItem('visualex.studia.visto')).toBeNull();
+  });
+
+  it('forgets it too at a sign-in and a sign-up: a new person on this browser', async () => {
+    vi.mocked(authService.getCurrentUser).mockResolvedValue({ id: 'u2' } as never);
+    vi.spyOn(appStore.getState(), 'fetchUserData').mockResolvedValue(undefined as never);
+    const { result } = renderHook(() => useAuth());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    localStorage.setItem('visualex.studia.visto', JSON.stringify({ xp: 900, livello: 7 }));
+    await act(async () => { await result.current.login('b@example.test', 'pw'); });
+    expect(localStorage.getItem('visualex.studia.visto')).toBeNull();
+    localStorage.setItem('visualex.studia.visto', JSON.stringify({ xp: 900, livello: 7 }));
+    await act(async () => { await result.current.register('c@example.test', 'c', 'pw'); });
+    expect(localStorage.getItem('visualex.studia.visto')).toBeNull();
   });
 });

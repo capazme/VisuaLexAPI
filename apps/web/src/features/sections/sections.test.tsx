@@ -7,7 +7,7 @@ const account = vi.hoisted(() => ({ devMode: false }));
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ devMode: account.devMode }) }));
 
 import { sectionForPath } from './sections';
-import { sectionStore, useSection } from './useSection';
+import { sectionOfDossierKind, sectionStore, useSection } from './useSection';
 
 function render(path: string) {
   const wrapper = ({ children }: { children: ReactNode }) => <MemoryRouter initialEntries={[path]}>{children}</MemoryRouter>;
@@ -29,9 +29,12 @@ describe('sectionForPath (spec S1)', () => {
     ['/merlt', 'academia'],
     ['/merlt/valida', 'academia'],
     ['/grafo', 'academia'],
+    ['/opus', 'opus'],
+    ['/opus/oggi', 'opus'],
+    ['/opus/cestino', 'opus'],
   ])('%s belongs to %s', (path, section) => expect(sectionForPath(path)).toBe(section));
 
-  it.each(['/', '/dossier', '/documents', '/history', '/collega-app', '/sentenze/cass/1/2024', '/studiare', '/forums'])(
+  it.each(['/', '/dossier', '/documents', '/history', '/collega-app', '/sentenze/cass/1/2024', '/studiare', '/forums', '/opuscolo'])(
     '%s is a Corpus page, of no section',
     (path) => expect(sectionForPath(path)).toBeNull(),
   );
@@ -67,6 +70,12 @@ describe('useSection', () => {
     expect(result.current.section).toBe('opus');
   });
 
+  it('puts a dossier in its kind\'s section, and every one in Opus with Gymnasium off', () => {
+    expect([sectionOfDossierKind('studio'), sectionOfDossierKind('lavoro'), sectionOfDossierKind(null)]).toEqual(['gymnasium', 'opus', 'opus']);
+    vi.stubEnv('VITE_FEATURE_STUDIA', 'false');
+    expect(sectionOfDossierKind('studio')).toBe('opus');
+  });
+
   it('switches section when the browser refuses to save it (full or blocked storage)', () => {
     const setItem = vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => {
       throw new DOMException('quota', 'QuotaExceededError');
@@ -99,6 +108,7 @@ describe('useSection', () => {
     expect(sectionStore.getState().section).toBe('gymnasium');
     expect(result.current.pathname).toBe('/studia/ripasso');
     act(() => result.current.chooseSection('opus'));
-    expect(result.current.pathname).toBe('/dossier');
+    // Opus opens on its planner's «Oggi» (P1b); the dossiers stay a Corpus page at /dossier.
+    expect(result.current.pathname).toBe('/opus/oggi');
   });
 });

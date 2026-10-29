@@ -60,8 +60,11 @@ export interface SchedaDellArticolo extends Scheda {
  */
 export interface TestoDaAccettare {
   id: string;
-  /** The card proposal's notice, or the MERL-T notice (answered through the consent screen). */
-  chiave: 'PROPOSTA_SCHEDA' | 'INFORMATIVA_MERLT';
+  /**
+   * The card proposal's notice, the MERL-T notice (answered through the consent screen), or the declaration on one's
+   * study material, accepted in «Percorsi» before the first course.
+   */
+  chiave: 'PROPOSTA_SCHEDA' | 'INFORMATIVA_MERLT' | 'MATERIALE_STUDIO';
   versione: number;
   titolo: string;
   corpo: string;
@@ -79,8 +82,11 @@ export interface TestoCorrente extends TestoDaAccettare {
 /** What a validator can say about a card. */
 export type Giudizio = 'APPROVATA' | 'MIGLIORABILE' | 'ERRATA';
 
-/** Proposing a card answers the card, or the notice to accept first. */
-export type EsitoProposta = Scheda | { richiedeTesto: TestoDaAccettare };
+/**
+ * Proposing a card answers the card, with the points it earned (`xp`, Gymnasium XP spec §5.3), or the notice to
+ * accept first, which carries none (the 409).
+ */
+export type EsitoProposta = (Scheda & { xp?: XpEsito }) | { richiedeTesto: TestoDaAccettare };
 
 /** What the form sends: anchors as references («art. 1453 c.c.»), which the server resolves and checks. */
 export interface SchedaInput {
@@ -172,6 +178,8 @@ export interface EsitoRevisione {
   prossimoRipasso: string;
   scheduledDays: number;
   oggi?: OggiDelVoto;
+  /** The points the grade earned; only on a recorded grade. */
+  xp?: XpEsito;
 }
 
 export interface PreferenzeStudio {
@@ -202,6 +210,56 @@ export interface GiornoAttivita {
   riposo: boolean;
 }
 
+/**
+ * Gymnasium's level (Gymnasium XP spec §4, §5.3), computed by the server from its ledger on every read: never
+ * stored, never computed here. Seen by its owner only (G-316).
+ */
+export interface XpLivello {
+  /** From 1, no ceiling. */
+  livello: number;
+  /** Every point earned. */
+  totale: number;
+  /** The points earned inside the current level. */
+  nelLivello: number;
+  /** What the next level costs in all: `nelLivello` of `perIlProssimo`. */
+  perIlProssimo: number;
+  /** The points earned on today's Rome day. */
+  oggi: number;
+}
+
+/** The missions' ids, the server's catalogue in its order (Gymnasium XP spec §3.1). */
+export type MissioneId = 'dovute' | 'nuove' | 'obiettivo' | 'materia-ferma' | 'scrivi' | 'convalida' | 'caso' | 'settimana' | 'consolida';
+
+/** A credit just written: a mission done, and what it was worth. */
+export interface XpCredito {
+  missione: MissioneId;
+  punti: number;
+}
+
+/** What a grade, a proposal or a vote earned (`crediti` may be empty); `nuovoLivello` on the event that crossed a level. */
+export interface XpEsito {
+  crediti: XpCredito[];
+  livello: XpLivello;
+  nuovoLivello: boolean;
+}
+
+/**
+ * A mission as the server decides it (Gymnasium XP spec §5.3): `fatta` if and only if its credit exists. `progresso`
+ * is absent for «scrivi», «caso» and a `vuota` with nothing to count; `motivo` only on «nuove» not done (the daily
+ * quota stops it); `materia` only on «materia-ferma».
+ */
+export interface MissioneServer {
+  id: MissioneId;
+  gruppo: 'giornaliera' | 'settimanale' | 'lungo';
+  /** One of «Le missioni di oggi». */
+  principale: boolean;
+  punti: number;
+  stato: 'fatta' | 'aperta' | 'vuota' | 'in-arrivo';
+  progresso?: { fatte: number; di: number };
+  motivo?: 'quota';
+  materia?: Materia;
+}
+
 /** Everything the dashboard draws (`GET /lingo/srs/progressi`, Studia progress spec §5.2). Days are Rome days, 'YYYY-MM-DD'. */
 export interface Progressi {
   oggi: { giorno: string; ripassi: number; obiettivo: number; raggiunto: boolean; dovute: number; nuove: number };
@@ -210,4 +268,24 @@ export interface Progressi {
   materie: (ConteggiStati & { materia: Materia; ripassi30: number })[];
   calendario: GiornoAttivita[];
   prossimi: { giorno: string; schede: number }[];
+  /**
+   * The level, the missions and the credits this read wrote: the whole day's, never narrowed by `materia`. Absent
+   * from a server without the points (#253): the page draws no level bar and no mission, and the rest stays.
+   */
+  livello?: XpLivello;
+  /** In catalogue order; «convalida» only for a validator. */
+  missioni?: MissioneServer[];
+  crediti?: XpCredito[];
+}
+
+/**
+ * An institute's stop on the road (`GET /lingo/srs/percorso`, Gymnasium restyle spec §6, G5): the cards of the
+ * user's review scope in one institute, by the same three states as `Progressi.materie`. `dovute` is no fourth
+ * state: the cards studied and due by the end of today in Rome, a subset of `apprendimento + consolidate`.
+ * `istituto` is the card's own label, passed back verbatim to narrow the session.
+ */
+export interface TappaIstituto extends ConteggiStati {
+  materia: Materia;
+  istituto: string;
+  dovute: number;
 }

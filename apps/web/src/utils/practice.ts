@@ -163,8 +163,9 @@ export function findPracticeArticle(act: PracticeAct, articleId: string): Articl
 /**
  * Adds `articles` of `norma` to the act they belong to (`actKeyOf`), appending the act when the
  * practice has none. A copy whose `practiceArticleKey` is already there is one row: it fills the
- * Brocardi the stored row lacks and the act's URN, never the stored `norma_data` (T2). The input
- * is not changed; untouched acts keep their identity.
+ * act's URN when the stored act lacks it, never the stored row nor its `norma_data` (T2). An article
+ * enters without what Brocardi gave it (`withoutBrocardi`, D-078). The input is not changed; untouched
+ * acts keep their identity.
  */
 export function addArticles(
   acts: PracticeAct[],
@@ -182,18 +183,9 @@ export function addArticles(
   const added: string[] = [];
   for (const incoming of articles) {
     const articleKey = practiceArticleKey(incoming);
-    const at = act.articles.findIndex((a) => practiceArticleKey(a) === articleKey);
-    if (at < 0) {
-      act.articles.push(incoming);
-      added.push(articleKey);
-      continue;
-    }
-    const stored = act.articles[at];
-    if (incoming.brocardi_info && !stored.brocardi_info) {
-      const filled: ArticleData = { ...stored, brocardi_info: incoming.brocardi_info };
-      delete filled.brocardi_error;
-      act.articles[at] = filled;
-    }
+    if (act.articles.some((a) => practiceArticleKey(a) === articleKey)) continue;
+    act.articles.push(withoutBrocardi(incoming));
+    added.push(articleKey);
   }
   // Array.prototype.sort is stable: copies that rank alike keep their order of arrival.
   act.articles.sort((a, b) => compareArticles(a.norma_data, b.norma_data));
@@ -388,6 +380,23 @@ export function storedReference(value: unknown): DecisionReference | null {
   return reference;
 }
 
+/**
+ * A stored article without what Brocardi gave it (D-078): a browser that saved its practices before
+ * would otherwise keep showing the old commentary and massime until the article is fetched again, and
+ * while the release is staggered an API not yet updated may still send them with a new article, which
+ * would sit in `localStorage` until the next reload. So it runs on the way in (`addArticles`) and on
+ * load (`sanitizePractices`). Nothing is logged: it is not a loss of the reader's own. The other fields stay as saved, the old
+ * `show_brocardi_info` and `hasBrocardi` of saved searches included: no code reads them, and the API
+ * ignores the flag when a saved search still sends it.
+ */
+function withoutBrocardi(article: ArticleData): ArticleData {
+  if (!('brocardi_info' in article) && !('brocardi_error' in article)) return article;
+  const rest: Record<string, unknown> = { ...article };
+  delete rest.brocardi_info;
+  delete rest.brocardi_error;
+  return rest as unknown as ArticleData;
+}
+
 function sanitizeAct(raw: unknown, where: string, dropped: string[]): PracticeAct | null {
   if (!isObject(raw) || !isText(raw.id) || raw.id === '') {
     dropped.push(`${where}: an act without an id (${shapeOf(raw)})`);
@@ -411,7 +420,7 @@ function sanitizeAct(raw: unknown, where: string, dropped: string[]): PracticeAc
       return;
     }
     keys.add(key);
-    articles.push(article);
+    articles.push(withoutBrocardi(article));
   });
   return { id: raw.id, key: actKeyOf(norma), norma, articles, isCollapsed: raw.isCollapsed === true };
 }

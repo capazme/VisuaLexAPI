@@ -9,7 +9,8 @@ export interface SubjectChipsProps {
   onSelect: (materia: Materia | undefined) => void;
 }
 
-const CHIP = 'inline-flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap rounded-md border px-3 text-sm md:min-h-0 md:py-1.5';
+/** 44 px at every width: on a computer too, where the chips used to drop to 34 px. */
+const CHIP = 'inline-flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap rounded-md border px-3 text-sm';
 
 /**
  * The subject filter of the dashboard and of the session it starts (Studia progress spec §6.2):
@@ -26,7 +27,7 @@ export function SubjectChips({ selected, onSelect }: SubjectChipsProps) {
     );
   return (
     // One scrolling row on a phone, where six chips would take four lines, its bar not drawn; wrapped from `md`.
-    <div role="group" aria-label="Materia" className={cn('-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 md:mx-0 md:flex-wrap md:overflow-visible md:px-0 md:pb-0', HIDDEN_SCROLLBAR)}>
+    <div role="group" aria-label="Materia" className={cn('relative -mx-1 flex gap-2 overflow-x-auto px-1 pb-1 md:mx-0 md:flex-wrap md:overflow-visible md:px-0 md:pb-0', HIDDEN_SCROLLBAR)}>
       <button type="button" aria-pressed={selected === undefined} onClick={() => onSelect(undefined)} className={chip(selected === undefined)}>
         Tutte le materie
       </button>

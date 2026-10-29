@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { alignOffsetToTrimmedText, getSelectionAnchor, plainOffsetAt } from './selectionOffset';
+import { alignOffsetToTrimmedText, getSelectionAnchor, plainOffsetAt, rangeFromPlainOffsets } from './selectionOffset';
 
 describe('alignOffsetToTrimmedText', () => {
   it('shifts the offset past leading whitespace', () => {
@@ -105,5 +105,37 @@ describe('getSelectionAnchor', () => {
     expect(plainOffsetAt(root, other.firstChild!.firstChild!, 0)).toBe(-1);
     root.remove();
     other.remove();
+  });
+});
+
+describe('rangeFromPlainOffsets (D7b: a stored anchor selected again)', () => {
+  const root = () => {
+    const div = document.createElement('div');
+    // Two blocks and a sign with no text, as the renderer draws them: the projection is «Primo comma.Secondo comma.».
+    div.innerHTML = '<div class="vlx-b">Primo <mark>comma</mark>.</div><span class="vlx-sign"></span><div class="vlx-b">Secondo comma.</div>';
+    document.body.append(div);
+    return div;
+  };
+
+  it('is the inverse of plainOffsetAt, across marks and blocks', () => {
+    const r = root();
+    for (const [start, end] of [[0, 5], [6, 11], [6, 20], [12, 26], [3, 4]]) {
+      const range = rangeFromPlainOffsets(r, start, end)!;
+      expect(range.toString()).toBe('Primo comma.Secondo comma.'.slice(start, end));
+      expect(plainOffsetAt(r, range.startContainer, range.startOffset)).toBe(start);
+      const selection = window.getSelection()!;
+      selection.removeAllRanges();
+      selection.addRange(range);
+      expect(getSelectionAnchor(r, selection)).toEqual({ startOffset: start, text: 'Primo comma.Secondo comma.'.slice(start, end).trim() });
+    }
+    r.remove();
+  });
+
+  it('is null for a span that does not fit the text', () => {
+    const r = root();
+    expect(rangeFromPlainOffsets(r, 20, 40)).toBeNull();
+    expect(rangeFromPlainOffsets(r, 5, 5)).toBeNull();
+    expect(rangeFromPlainOffsets(r, -1, 3)).toBeNull();
+    r.remove();
   });
 });

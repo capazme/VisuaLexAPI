@@ -2,6 +2,8 @@ import { LocateFixed, Trash2 } from 'lucide-react';
 import type { Annotation } from '../../../types';
 import { cn } from '../../../lib/utils';
 import { AttributionChip } from '../bulletin/AttributionChip';
+import { retiredSectionLabel } from '../../../utils/articleAnnotations';
+import { NoteEditBox } from './NoteEditBox';
 
 export interface NoteCardProps {
     note: Annotation;
@@ -20,11 +22,16 @@ export interface NoteCardProps {
  * One note, read or edited in place — the Notes panel's cards and the block
  * popover's. A click on the text edits it; blur or Cmd/Ctrl+Enter saves, Esc
  * cancels. The delete button appears on hover from `md` up and is always
- * there, at a 44 px target, below it: a touch screen has no hover.
+ * there, at a 44 px target, below it: a touch screen has no hover. A note on a section no longer shown
+ * (the old Brocardi Ratio and Spiegazione) says so above its quote, which is not the article's text.
  */
 export function NoteCard({ note, isEditing, editingText, onStartEdit, onChangeEdit, onCommitEdit, onCancelEdit, onRemove, onGoTo }: NoteCardProps) {
+    const retired = retiredSectionLabel(note.articleId);
     return (
         <div className="group relative rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-2.5 text-sm">
+            {retired && (
+                <div className="text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1 md:pr-6">{retired}</div>
+            )}
             {note.anchorText && (
                 <div className="text-[11px] italic text-amber-700 dark:text-amber-400 mb-1 line-clamp-1 md:pr-6">
                     &ldquo;{note.anchorText}&rdquo;
@@ -32,18 +39,7 @@ export function NoteCard({ note, isEditing, editingText, onStartEdit, onChangeEd
             )}
 
             {isEditing ? (
-                <textarea
-                    autoFocus
-                    value={editingText}
-                    onChange={(e) => onChangeEdit(e.target.value)}
-                    onBlur={onCommitEdit}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Escape') { e.preventDefault(); onCancelEdit(); }
-                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); onCommitEdit(); }
-                    }}
-                    rows={Math.max(2, editingText.split('\n').length)}
-                    className="w-full resize-none rounded-md border border-amber-500/50 bg-white dark:bg-slate-900 px-2 py-1 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
-                />
+                <NoteEditBox value={editingText} onChange={onChangeEdit} onCommit={onCommitEdit} onCancel={onCancelEdit} />
             ) : (
                 <>
                     <button

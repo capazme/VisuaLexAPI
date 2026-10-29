@@ -20,7 +20,7 @@ from __future__ import annotations
 import re
 from typing import Any, Mapping, Optional
 
-from merlt.utils.map import NORMATTIVA_URN_CODICI
+from merlt.utils.map import ANNEX_HEADINGS, ANNEX_SIGLE, ANNEXED_ACTS, NORMATTIVA_URN_CODICI
 from merlt.utils.urn_labels import article_number_from_urn
 
 NORMATTIVA_RESOLVER = "https://www.normattiva.it/uri-res/N2Ls?"
@@ -127,6 +127,11 @@ _NAMED = {
     "preleggi": "preleggi",
     "disposizioni per l'attuazione del codice civile e disposizioni transitorie": "disp. att. c.c.",
     "disposizioni per l'attuazione del codice di procedura civile e disposizioni transitorie": "disp. att. c.p.c.",
+    # By their sigla, like the c.c. and the c.p.c. (owner, G-360 and G-366, 22 October 2026).
+    "codice del processo amministrativo": "c.p.a.",
+    "codice della navigazione": "cod. nav.",
+    "codice postale e delle telecomunicazioni": "cod. post.",
+    "codice di giustizia contabile": "c.g.c.",
     "tue": "TUE",
     "tfue": "TFUE",
     "cdfue": "CDFUE",
@@ -146,6 +151,10 @@ _HEADINGS = {
         "Disposizioni di attuazione del codice civile",
     "disposizioni per l'attuazione del codice di procedura civile e disposizioni transitorie":
         "Disposizioni di attuazione del codice di procedura civile",
+    "codice del processo amministrativo": "Codice del processo amministrativo",
+    "codice della navigazione": "Codice della navigazione",
+    "codice postale e delle telecomunicazioni": "Codice postale e delle telecomunicazioni",
+    "codice di giustizia contabile": "Codice di giustizia contabile",
     "tue": "Trattato sull'Unione europea",
     "tfue": "Trattato sul funzionamento dell'Unione europea",
     "cdfue": "Carta dei diritti fondamentali dell'Unione europea",
@@ -212,10 +221,55 @@ def _real_type(norm: Mapping[str, Any]) -> tuple[str, str, str]:
     return real or _key(_text(norm, "tipo_atto")), date, number
 
 
+# The sigla and the heading of an annex by its identity («<decree>:<annex>»): the codes named
+# above, at the annex the codes table keys them by, and ANNEX_SIGLE / ANNEX_HEADINGS (G-369).
+# The API's `sources._SIGLA_BY_ANNEX`.
+_ANNEXED_CODES = {urn: _key(name) for name, urn in NORMATTIVA_URN_CODICI.items() if re.search(r";\d+:\w+$", urn)}
+_SIGLA_BY_ANNEX = {**{urn: _NAMED[kind] for urn, kind in _ANNEXED_CODES.items() if kind in _NAMED}, **ANNEX_SIGLE}
+_HEADING_BY_ANNEX = {**{urn: _HEADINGS[kind] for urn, kind in _ANNEXED_CODES.items() if kind in _HEADINGS},
+                     **ANNEX_HEADINGS}
+
+
+def _annex_identity(norm: Mapping[str, Any]) -> Optional[str]:
+    """«<decree>:<annex>» of the annex the norm sits in: a code's (its stored annex, or the one
+    the codes table keys it by), or an act's cited by type, date and number with an annex."""
+    annex = _text(norm, "allegato")
+    row = _CODES_BY_NAME.get(_key(_text(norm, "tipo_atto"))) or ""
+    if re.search(r";\d+:\w+$", row):
+        base, _, default = row.rpartition(":")
+        return f"{base}:{annex or default}"
+    kind = _key(_text(norm, "tipo_atto_reale") or _text(norm, "tipo_atto")).replace(" ", ".")
+    date, number = _text(norm, "data"), _text(norm, "numero_atto")
+    if annex and _ISO_DAY.fullmatch(date) and number:
+        return f"{kind}:{date};{number}:{annex}"
+    return None
+
+
+def _named(norm: Mapping[str, Any]) -> Optional[str]:
+    """The act's own name («c.c.», «c.p.a.», «disp. att. c.p.a.»): by the annex it sits in, so
+    another annex of a code's decree is not the code; else by its name, for an act the codes
+    table keys by no annex. None for anything else (cited by the decree with its annex). The
+    API's `sources._named`."""
+    identity = _annex_identity(norm)
+    if identity in _SIGLA_BY_ANNEX:
+        return _SIGLA_BY_ANNEX[identity]
+    if re.search(r";\d+:\w+$", _CODES_BY_NAME.get(_key(_text(norm, "tipo_atto"))) or ""):
+        return None
+    return _NAMED.get(_key(_text(norm, "tipo_atto")))
+
+
+def _heading(norm: Mapping[str, Any]) -> Optional[str]:
+    """The long name of an act cited by its own name, by the same rule as `_named`."""
+    if not _named(norm):
+        return None
+    return _HEADING_BY_ANNEX.get(_annex_identity(norm) or "") or _HEADINGS.get(_key(_text(norm, "tipo_atto")))
+
+
 def _act(norm: Mapping[str, Any], short: bool) -> tuple[str, str]:
     kind = _key(_text(norm, "tipo_atto"))
-    if kind in _NAMED:
-        return _NAMED[kind], " "
+    name = _named(norm)
+    if name:
+        return name, " "
     if kind in _EU:
         number, year = _text(norm, "numero_atto"), _text(norm, "data")[:4]
         return (f"{_EU[kind]} {year}/{number}" if number and year.isdigit() else _EU[kind]), (" " if short else ", ")
@@ -239,7 +293,14 @@ def _act(norm: Mapping[str, Any], short: bool) -> tuple[str, str]:
 
 def _annex(norm: Mapping[str, Any], joined: str, short: bool) -> str:
     annex = _text(norm, "allegato")
-    if not annex or _key(_text(norm, "tipo_atto")) in _NAMED or _key(_text(norm, "tipo_atto")) in _EU:
+    if not annex or _named(norm) or _key(_text(norm, "tipo_atto")) in _EU:
+        return ""
+    # A code's annex is the code itself, also for a code cited by its decree (the codice
+    # del turismo is «d.lgs. 23 maggio 2011, n. 79», never «… (Allegato 1)»).
+    if (_CODES_BY_NAME.get(_key(_text(norm, "tipo_atto"))) or "").endswith(f":{annex}"):
+        return ""
+    real, date, number = _real_type(norm)
+    if ANNEXED_ACTS.get(f"{real.replace(' ', '.')}:{date};{number}") == annex:
         return ""
     return f" (All. {annex})" if short else f" (Allegato {annex})"
 
@@ -268,7 +329,7 @@ def short_norm(norm: Mapping[str, Any]) -> str:
 
 def act_heading(norm: Mapping[str, Any]) -> str:
     """"Codice civile", "l. 7 agosto 1990, n. 241": an act node's ``titolo``."""
-    return _HEADINGS.get(_key(_text(norm, "tipo_atto"))) or cite_act(norm)
+    return _heading(norm) or cite_act(norm)
 
 
 def authority(norm: Mapping[str, Any]) -> Optional[str]:

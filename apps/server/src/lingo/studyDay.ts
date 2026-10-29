@@ -88,6 +88,12 @@ export function addDays(day: string, plusDays: number): string {
   return new Date(utcMidnight(day) + plusDays * MS_PER_DAY).toISOString().slice(0, 10);
 }
 
+/** The Monday that opens the week (Monday to Sunday) holding `day`: the period of a weekly mission. */
+export function mondayOf(day: string): string {
+  const weekday = (new Date(utcMidnight(day)).getUTCDay() + 6) % 7; // Monday 0 … Sunday 6
+  return addDays(day, -weekday);
+}
+
 /**
  * 00:00 Europe/Rome of the day `plusDays` after `day`, as an instant: what `dueAt` stores.
  *

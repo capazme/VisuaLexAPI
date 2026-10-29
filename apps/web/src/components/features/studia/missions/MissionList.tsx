@@ -2,7 +2,8 @@ import { cn } from '../../../../lib/utils';
 import type { Progressi } from '../../../../types/studia';
 import { BLOCK_HEADING, MUTED_TEXT, TILE } from '../progress/tokens';
 import { MissionRow } from './MissionMark';
-import { allMissions, type MissionGroup } from './missions';
+import { todayState } from '../progress/today';
+import { allMissions, soonLine, todayMissions, type MissionGroup } from './missions';
 
 const GROUPS: { group: MissionGroup; label: string }[] = [
   { group: 'giornaliera', label: 'Giornaliere' },
@@ -10,16 +11,14 @@ const GROUPS: { group: MissionGroup; label: string }[] = [
   { group: 'lungo', label: 'A lungo termine' },
 ];
 
-/** The rows of each group, before the read (the validator's mission is not known yet). */
-const SKELETON_ROWS: Record<MissionGroup, number> = { giornaliera: 6, settimanale: 1, lungo: 1 };
+/** The rows of each group, before the read: the day's without today's three (whether the validator's is listed is the read's). */
+const SKELETON_ROWS: Record<MissionGroup, number> = { giornaliera: 3, settimanale: 1, lungo: 1 };
 
 export interface MissionListProps {
   /** The whole day's answer; null before the first one, or when it could not be read. */
   data: Progressi | null;
   /** The first read is travelling. */
   loading: boolean;
-  /** The validation mission is listed for a validator only. */
-  validator: boolean;
 }
 
 /** A small label at the end of a mission's line, in place of its count. */
@@ -33,18 +32,20 @@ function Tag({ children }: { children: string }) {
 }
 
 /**
- * «Tutte le missioni» (Gymnasium spec §5.1), third on the page: the day's, the week's and the long run's. Those the
- * web counts show their state; those the server must record first are listed with «In arrivo», never ticked. No
- * points and no level until the server keeps them. A failed read leaves the list out: the missions say so above.
+ * «Tutte le missioni» (Gymnasium spec §5.1), after the statistics: the day's, the week's and the long run's, without the
+ * day's three, which «Le missioni di oggi» shows above (G6: drawn twice, they made the page long). Each as the server
+ * decides it (G1c), with its state, its count where it has one, its line and its points. Only the missions that can be
+ * done (G8: half the rows were dotted rings «In arrivo»): those announced and not yet recorded are named in one quiet
+ * line at the foot, with no ring and nothing to tick. «convalida» is listed when the server lists it (a validator's
+ * only). A failed read leaves the list out: the day block says so above.
  */
-export function MissionList({ data, loading, validator }: MissionListProps) {
+export function MissionList({ data, loading }: MissionListProps) {
   if (!data) {
     // The list's shape is known before the read: its places at their final size, so nothing below jumps.
     return loading ? (
       <div aria-hidden className="space-y-3">
         <div className="h-7 w-48 rounded bg-slate-100 dark:bg-slate-800/60" />
-        <div className="h-5 w-72 max-w-full rounded bg-slate-100 dark:bg-slate-800/60" />
-        <div className={cn(TILE, 'divide-y divide-slate-100 px-5 dark:divide-slate-800 md:px-6')}>
+        <div className={cn(TILE, 'divide-y divide-slate-100 px-4 dark:divide-slate-800 md:px-6')}>
           {GROUPS.map(({ group }) => (
             <div key={group} className="space-y-4 py-4">
               <div className="h-5 w-28 rounded bg-slate-100 dark:bg-slate-800/60" />
@@ -57,36 +58,55 @@ export function MissionList({ data, loading, validator }: MissionListProps) {
       </div>
     ) : null;
   }
-  const missions = allMissions(data, { validator });
+  // A server without the points (#253) sends no missions: no list, rather than three empty groups.
+  if (!data.missioni?.length) return null;
+  const missions = allMissions(data).filter((mission) => !mission.main);
+  const active = missions.filter((mission) => mission.status !== 'in-arrivo');
+  const groups = GROUPS.filter(({ group }) => active.some((mission) => mission.group === group));
+  const soon = soonLine(missions);
+  // «Le missioni di oggi» is drawn only with cards to work on (no card at all: the day block alone, G8): only then is
+  // there anything «qui sopra» to point to. The same rule as `TodayMissions`'.
+  const state = todayState(data, false, false);
+  const todayAbove = (state === 'todo' || state === 'done') && todayMissions(data).length > 0;
   return (
     <section aria-labelledby="studia-tutte" className="space-y-3">
       <div className="space-y-1">
-        <h3 id="studia-tutte" className={BLOCK_HEADING}>
+        <h2 id="studia-tutte" className={BLOCK_HEADING}>
           Tutte le missioni
-        </h3>
-        <p className={cn('text-sm', MUTED_TEXT)}>Le missioni «In arrivo» non si possono ancora compiere.</p>
+        </h2>
+        {todayAbove && <p className={cn('max-w-prose text-sm', MUTED_TEXT)}>Le tre di oggi sono qui sopra.</p>}
       </div>
-      <div className={cn(TILE, 'divide-y divide-slate-100 px-5 dark:divide-slate-800 md:px-6')}>
-        {GROUPS.map(({ group, label }) => (
-          <section key={group} aria-labelledby={`studia-missioni-${group}`} className="py-4">
-            <h4 id={`studia-missioni-${group}`} className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-              {label}
-            </h4>
-            <ul aria-labelledby={`studia-missioni-${group}`}>
-              {missions
-                .filter((mission) => mission.group === group)
-                .map((mission) => (
-                  <MissionRow
-                    key={mission.id}
-                    // The notes are today's missions' (above): here the title, the state and the count.
-                    mission={{ ...mission, note: undefined }}
-                    aside={mission.status === 'in-arrivo' ? <Tag>In arrivo</Tag> : mission.status === 'vuota' ? <Tag>Niente oggi</Tag> : undefined}
-                  />
-                ))}
-            </ul>
-          </section>
-        ))}
-      </div>
+      {groups.length > 0 && (
+        <div className={cn(TILE, 'divide-y divide-slate-100 px-4 dark:divide-slate-800 md:px-6')}>
+          {groups.map(({ group, label }) => (
+            <section key={group} aria-labelledby={`studia-missioni-${group}`} className="py-4">
+              <h3 id={`studia-missioni-${group}`} className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                {label}
+              </h3>
+              <ul aria-labelledby={`studia-missioni-${group}`}>
+                {active
+                  .filter((mission) => mission.group === group)
+                  .map((mission) => (
+                    <MissionRow
+                      key={mission.id}
+                      mission={mission}
+                      aside={
+                        mission.status === 'vuota' ? (
+                          // A `vuota` keeps what it counted: «convalida» with one vote and nothing left to vote on, «1 di 2».
+                          <>
+                            {mission.progress && <span className="shrink-0 text-sm tabular-nums text-slate-600 dark:text-slate-300">{`${mission.progress.done} di ${mission.progress.of}`}</span>}
+                            <Tag>Niente oggi</Tag>
+                          </>
+                        ) : undefined
+                      }
+                    />
+                  ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+      )}
+      {soon && <p className={cn('max-w-prose text-sm', MUTED_TEXT)}>{soon}</p>}
     </section>
   );
 }

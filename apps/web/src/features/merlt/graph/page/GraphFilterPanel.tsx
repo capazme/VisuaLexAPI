@@ -42,7 +42,7 @@ export function GraphFilterPanel({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="w-full overflow-hidden rounded-lg border border-slate-200 bg-white/95 shadow-lg backdrop-blur dark:border-slate-700 dark:bg-slate-900/95">
+    <div className="w-full overflow-hidden rounded-lg border border-slate-200 bg-white/95 shadow-md backdrop-blur dark:border-slate-700 dark:bg-slate-900/95">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -162,8 +162,8 @@ function Section({
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{title}</span>
-        <span className="flex gap-1 text-[11px]">
+        <span className="text-xs font-medium uppercase tracking-wide text-slate-600 dark:text-slate-400">{title}</span>
+        <span className="flex gap-1 text-xs">
           <button
             type="button"
             onClick={() => onSetAll(false)}

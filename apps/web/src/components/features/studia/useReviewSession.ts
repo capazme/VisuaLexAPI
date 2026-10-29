@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { studiaService } from '../../../services/studiaService';
 import type { Materia, OggiDelVoto, SchedaDiRipasso, Voto } from '../../../types/studia';
+import { recordXpSeen } from './progress/seenProgress';
+import { gainOf, type XpGainValue } from './progress/xpGains';
 
 const MAX_DURATION_MS = 3_600_000;
 
@@ -20,6 +22,10 @@ export interface ReviewSummary {
 }
 
 export interface ReviewSessionOptions {
+  /** One institute of `materia`, spelt as the road lists it: the session narrowed to it (Gymnasium spec §5.2). */
+  istituto?: string;
+  /** One course of «Percorsi» (courses spec §10.5), read instead of a subject: its cards and its check cards. */
+  corso?: string;
   /** The keys are left alone while a dialog of the screen is open. */
   paused?: boolean;
   /** Esc was pressed (and no dialog was open). */
@@ -41,6 +47,9 @@ function isForOtherControl(target: EventTarget | null, key: string): boolean {
   return key === ' ' && target.closest('button, a[href], [role="button"]') !== null;
 }
 
+/** The grade that made the day count, and whether it also did the goal's mission (`missione`: the mark is drawn). */
+export type GoalMet = OggiDelVoto & { missione: boolean };
+
 /**
  * The review queue of a session. It is read once; the head is `current`. Space shows the answer,
  * 1–4 grade it (only once shown). The first grade of a card is sent to the server, with the time
@@ -54,7 +63,7 @@ function isForOtherControl(target: EventTarget | null, key: string): boolean {
  * a post resolving and the screen rendering would otherwise act on the card already graded. Every
  * move of the queue is made from the ref, and checks that the head is still the card it was made for.
  */
-export function useReviewSession(materia?: Materia, { paused = false, onEscape }: ReviewSessionOptions = {}) {
+export function useReviewSession(materia?: Materia, { istituto, corso, paused = false, onEscape }: ReviewSessionOptions = {}) {
   const [queue, setQueueState] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -67,7 +76,10 @@ export function useReviewSession(materia?: Materia, { paused = false, onEscape }
   const [nextDue, setNextDue] = useState<number | null>(null);
   // Today's goal as the last recorded grade left it, and the grade that made the day count (Studia progress spec §5.3).
   const [today, setToday] = useState<OggiDelVoto | null>(null);
-  const [goalMet, setGoalMet] = useState<OggiDelVoto | null>(null);
+  const [goalMet, setGoalMet] = useState<GoalMet | null>(null);
+  // What the last recorded grade earned, numbered so the same points earned twice show twice (G1c).
+  const [xpGain, setXpGain] = useState<XpGainValue | null>(null);
+  const gains = useRef(0);
   // How many times the queue has moved on: a card that comes straight back is a new step.
   const [step, setStep] = useState(0);
 
@@ -92,7 +104,10 @@ export function useReviewSession(materia?: Materia, { paused = false, onEscape }
     setLoading(true);
     setLoadError(false);
     try {
-      const session = await studiaService.session(materia);
+      // One argument when no institute is asked: the call stays exactly what it was before G5.
+      const session = await (corso !== undefined
+        ? studiaService.courseSession(corso)
+        : istituto === undefined ? studiaService.session(materia) : studiaService.session(materia, istituto));
       if (request !== latest.current) return;
       setQueue(session.cards.map((card) => ({ card, posted: false })));
       setRevealed(false);
@@ -110,7 +125,7 @@ export function useReviewSession(materia?: Materia, { paused = false, onEscape }
     } finally {
       if (request === latest.current) setLoading(false);
     }
-  }, [materia, setQueue, setRevealed]);
+  }, [materia, istituto, corso, setQueue, setRevealed]);
 
   useEffect(() => {
     // Leaving (or asking again) makes the answer in flight stale.
@@ -145,7 +160,15 @@ export function useReviewSession(materia?: Materia, { paused = false, onEscape }
           setNextDue((before) => (before === null ? outcome.scheduledDays : Math.min(before, outcome.scheduledDays)));
           if (outcome.oggi) {
             setToday(outcome.oggi);
-            if (outcome.oggi.appenaRaggiunto) setGoalMet(outcome.oggi);
+            // The goal's mission done by the same grade (its credit in the answer): the lesson draws the mark, as «Oggi»
+            // does (G9); a goal of one's own under the mission's 10 reviews, or the queue finished under it, gets words.
+            if (outcome.oggi.appenaRaggiunto) setGoalMet({ ...outcome.oggi, missione: outcome.xp?.crediti.some((credit) => credit.missione === 'obiettivo') ?? false });
+          }
+          if (outcome.xp) {
+            const gain = gainOf(++gains.current, outcome.xp);
+            if (gain) setXpGain(gain);
+            // The lesson shows what it earned: «Oggi» need not show it again.
+            recordXpSeen(outcome.xp);
           }
         }
         // The session may have been read again while the post was on its way.
@@ -225,5 +248,7 @@ export function useReviewSession(materia?: Materia, { paused = false, onEscape }
     today,
     /** The answer of the grade that made the day count, while this session lasts; null until then. */
     goalMet,
+    /** What the last grade that earned points earned («+20 XP»); null until one does. */
+    xpGain,
   };
 }

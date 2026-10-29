@@ -1,6 +1,7 @@
 import os
 import re
 import logging
+from urllib.parse import urlparse
 from .logging_config import log_handlers
 from .text_op import normalize_act_type, parse_date
 from .map import EURLEX, codice_urn
@@ -188,14 +189,18 @@ def append_version_info(urn, version, version_date):
     if isinstance(version, str):
         # Read the word the way is_historical_request does: stripped, lower-cased.
         version = version.strip().lower()
-    if version == "originale":
+    if isinstance(version_date, str) and version_date.strip():
+        # A date always asks for the text in force on that day (owner, G-353), with
+        # or without «vigente», and over «originale», as the web reads a request
+        # (`requestedVersion`). Only «vigente» used to carry it: a date with no
+        # version reached Normattiva without it and came back as today's text,
+        # shown as the past one.
+        urn += "!vig=" + parse_date(version_date)
+    elif version == "originale":
         urn += "@originale"
     elif version == "vigente":
         urn += "!vig="
-        if version_date:
-            formatted_version_date = parse_date(version_date)
-            urn += formatted_version_date
-        logging.info(f"Appended version info to URN: {urn}")
+    logging.info(f"Appended version info to URN: {urn}")
     return urn
 
 _UNSAFE_IN_FILENAME = re.compile(r"[^A-Za-z0-9._-]")
@@ -216,9 +221,92 @@ def _safe_filename(name):
     return safe or "document.pdf"
 
 
+_VERSION_IN_URN = re.compile(r"!vig=\d{4}-\d{2}-\d{2}|@originale")
+
+
+def pdf_urn_in_force(urn, today):
+    """
+    The URN an export reads: an undated one at `today` (ISO, Europe/Rome).
+
+    Normattiva answers an undated URN with its latest version, also one not in force
+    yet, as it does for an article's text (owner, G-355): the export asks for the
+    text in force today instead. A dated URN, or one for the original, is read as asked.
+    """
+    if _VERSION_IN_URN.search(urn):
+        return urn
+    if "!vig=" in urn:
+        return urn.replace("!vig=", f"!vig={today}", 1)
+    return f"{urn}!vig={today}"
+
+
+# A Normattiva URN as generate_urn writes it, and nothing more: authority, type, date,
+# number, annex, article, one version marker. Read whole (fullmatch), ASCII only.
+_EXPORTABLE_URN = re.compile(
+    r"urn:nir:[a-z]+(?:\.[a-z]+)*:[a-z]+(?:\.[a-z]+)*(?::\d{4}(?:-\d{2}-\d{2})?)?"
+    r"(?:;[0-9A-Za-z.-]+)?(?::[0-9A-Za-z]+)?(?:~art[0-9A-Za-z.-]+)?"
+    r"(?:!vig=(?:\d{4}-\d{2}-\d{2})?|@originale)?",
+    re.ASCII,
+)
+_N2LS = "https://www.normattiva.it/uri-res/N2Ls?"
+
+
+def _exported_urn(urn):
+    """
+    The URN a Normattiva address names, from its query alone: `https://www.normattiva.it/
+    uri-res/N2Ls?urn:nir:…`, or a bare `urn:nir:…`, read whole against `_EXPORTABLE_URN`.
+
+    The browser reads the path too, and resolves its `..`: a name read from anywhere in
+    the address let `…/x/stato:legge:1990-08-07;241~/../../uri-res/N2Ls?urn:nir:stato:
+    decreto.legislativo:2001-06-08;231` cache the d.lgs. 231/2001 as the l. 241/1990, for
+    everyone. Any other path, a path parameter, a fragment, or a query with anything more
+    (a second version marker, another parameter) is refused (ValueError).
+    """
+    if not urn.startswith("urn:nir:"):
+        parsed = urlparse(urn)
+        if parsed.path != "/uri-res/N2Ls" or parsed.params or parsed.fragment:
+            raise ValueError("Invalid URN format")
+        urn = parsed.query
+    if not _EXPORTABLE_URN.fullmatch(urn):
+        raise ValueError("Invalid URN format")
+    return urn
+
+
+def export_url(urn, today):
+    """
+    The address an export opens and caches under: Normattiva's, rebuilt from the URN the
+    caller's address names (`_exported_urn`, ValueError otherwise), at `today` when it is
+    undated (`pdf_urn_in_force`). The browser never opens what the caller wrote, so the
+    page it loads and the cache name it is stored under are read from the same URN.
+    """
+    return _N2LS + pdf_urn_in_force(_exported_urn(urn), today)
+
+
+URN_TOO_LONG = "URN too long for a file name"
+
+# The parts of an exportable URN, in their places (the grammar of `_EXPORTABLE_URN`).
+_URN_PARTS = re.compile(
+    r"urn:nir:(?P<authority>[a-z]+(?:\.[a-z]+)*):(?P<kind>[a-z]+(?:\.[a-z]+)*)(?::(?P<date>\d{4}(?:-\d{2}-\d{2})?))?"
+    r"(?:;(?P<number>[0-9A-Za-z.-]+))?(?::(?P<annex>[0-9A-Za-z]+))?(?:~art[0-9A-Za-z.-]+)?"
+    r"(?P<version>!vig=(?:\d{4}-\d{2}-\d{2})?|@originale)?",
+    re.ASCII,
+)
+
+
+def export_version_date(url):
+    """The day an export's address asks for (`!vig=<day>`), or None: the original, or no day."""
+    match = re.search(r"!vig=(\d{4}-\d{2}-\d{2})", url or "")
+    return match.group(1) if match else None
+
+
 def urn_to_filename(urn):
     """
-    Converts a URN to a filename.
+    Converts a URN to a filename: the act (authority, type, date, number, annex) and its version.
+
+    The article is left out: the export is the act's. Each part has its place, joined by «_»,
+    which no part of the grammar holds, so two URNs never share a name: until 21 October 2026
+    the name was the number and the year alone, and until 25 October it dropped the authority
+    and read «:» and «;» alike. A name over the limit is refused (ValueError), never cut: a
+    cut would drop the version.
 
     Arguments:
     urn -- The URN string
@@ -227,21 +315,15 @@ def urn_to_filename(urn):
     str -- The generated filename: always a bare file name, safe to join to a directory
     """
     logging.info(f"Converting URN to filename: {urn}")
-    try:
-        act_type_section = urn.split('stato:')[1].split('~')[0]
-    except IndexError:
-        logging.error("Invalid URN format")
+    parts = _URN_PARTS.fullmatch(_exported_urn(urn))
+    if not parts:
         raise ValueError("Invalid URN format")
-    
-    if ':' in act_type_section and ';' in act_type_section:
-        type_and_date, number = act_type_section.split(';')
-        year = type_and_date.split(':')[1].split('-')[0]
-        filename = _safe_filename(f"{number}_{year}.pdf")
-        logging.info(f"Generated filename: {filename}")
-        return filename
-
-    act_type = act_type_section.split('/')[-1]
-    filename = _safe_filename(f"{act_type.capitalize()}.pdf")
+    version = parts["version"] or ""
+    version = "originale" if version == "@originale" else version.replace("!vig=", "vig") if version else ""
+    name = "_".join(parts[key] or "" for key in ("authority", "kind", "date", "number", "annex")) + f"_{version}.pdf"
+    if len(name) > _MAX_FILENAME:
+        raise ValueError(URN_TOO_LONG)
+    filename = _safe_filename(name)
     logging.info(f"Generated filename: {filename}")
     return filename
 

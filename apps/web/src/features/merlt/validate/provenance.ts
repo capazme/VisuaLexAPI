@@ -1,6 +1,5 @@
 import type { SearchParams } from '../../../types';
 import { parseNormattivaUrl } from '../../../utils/normattivaParser';
-import { DOCTRINE_LABEL, DOCTRINE_SOURCE_NAME } from '../../../utils/doctrineLabel';
 
 /**
  * Non-component helpers for the validation queue (Slice 3 §3.6 / D4): provenance
@@ -15,7 +14,8 @@ import { DOCTRINE_LABEL, DOCTRINE_SOURCE_NAME } from '../../../utils/doctrineLab
  */
 const FONTE_LABELS: Record<string, string> = {
   llm_extraction: 'Estrazione automatica (LLM)',
-  brocardi: `${DOCTRINE_LABEL} (${DOCTRINE_SOURCE_NAME})`,
+  // No longer a source (D-078); proposals made from it may still sit in MERL-T's stores.
+  brocardi: 'Brocardi.it (fonte non più in uso)',
   mechanistic: 'Estrazione strutturata',
   visualex: 'Contributo da VisuaLex',
   manual: 'Inserimento manuale',
@@ -62,7 +62,6 @@ export function normRefToSearchParams(ref?: string): SearchParams | null {
     article: p.article ?? '1',
     version: p.version ?? 'vigente',
     version_date: p.version_date ?? '',
-    show_brocardi_info: p.show_brocardi_info ?? true,
     annex: p.annex,
   };
 }

@@ -1,6 +1,5 @@
-import { useCallback, useRef } from 'react';
-import { driver, type Driver } from 'driver.js';
-import 'driver.js/dist/driver.css';
+import { useCallback, useEffect, useRef } from 'react';
+import type { Driver, driver as makeDriver } from 'driver.js';
 import {
     TOUR_VERSION,
     TOUR_STORAGE_KEY,
@@ -69,8 +68,53 @@ let onScreen: Driver | null = null;
 // meanwhile is not started (it is asked again the next time its surface mounts, unseen).
 let held = false;
 
+/**
+ * The layout a width draws (the phone's, the rail's, the sidebar's): a tour started in one is closed when the window
+ * passes to another (Y1: from 1920 to 390 the veil stayed at its old size, over a page laid out anew). Closed, not
+ * done: it is asked again the next time its surface mounts.
+ */
+const layoutBand = (width: number) => (width < 768 ? 0 : width < 1024 ? 1 : 2);
+
+/** A key was pressed since the tour started, or since the last pointer press: its focus then shows the ring. A tour's
+ *  start forgets it (`startTour`), so the first focus driver.js gives shows none, whatever opened the tour. */
+let keyboardLast = false;
+let watchingInput = false;
+function watchInput(): void {
+    if (watchingInput || typeof window === 'undefined') return;
+    watchingInput = true;
+    window.addEventListener('keydown', () => { keyboardLast = true; }, true);
+    window.addEventListener('pointerdown', () => { keyboardLast = false; }, true);
+}
+
+/** A focus driver.js gives its popover's button with no key pressed shows no ring (`data-pointer-focus`, `index.css`)
+ *  until it leaves: the ✕ drew the focus square after a click (Y1). */
+function quietFocus(target: EventTarget | null): void {
+    if (keyboardLast || !(target instanceof HTMLElement)) return;
+    target.setAttribute('data-pointer-focus', '');
+    target.addEventListener('blur', () => target.removeAttribute('data-pointer-focus'), { once: true });
+}
+
 export function holdTours(hold: boolean): void {
     held = hold;
+}
+
+// ==================== DRIVER.JS, LOADED FOR THE FIRST TOUR ====================
+
+let loading: Promise<typeof makeDriver> | null = null;
+
+/** driver.js and its stylesheet, fetched when a tour first starts and kept for the next: most visits show none, and
+ *  they were in the chunk every page loads. Its stylesheet lands after `index.css`, as before, which overrides it with
+ *  more specific rules. A load that fails is tried again at the next tour: that mends a dropped connection, not a file a
+ *  deploy removed, which stays missing until the page is reloaded. */
+function loadDriver(): Promise<typeof makeDriver> {
+    loading ??= Promise.all([import('driver.js'), import('driver.js/dist/driver.css')]).then(
+        ([module]) => module.driver,
+        (error: unknown) => {
+            loading = null;
+            throw error;
+        },
+    );
+    return loading;
 }
 
 // ==================== HOOK ====================
@@ -84,6 +128,11 @@ interface UseTourOptions {
 export function useTour(options: UseTourOptions = {}) {
     const { disableOnMobile = true } = options;
     const driverRef = useRef<Driver | null>(null);
+    // Each start and each stop takes a new turn: a start still waiting for driver.js gives up when something else was
+    // asked of this hook meanwhile.
+    const turnRef = useRef(0);
+    // A surface that goes away while driver.js loads takes its tour with it.
+    useEffect(() => () => { turnRef.current += 1; }, []);
 
     // Check if a specific tour has been completed
     const hasSeenTour = useCallback((tourType: TourType = 'welcome'): boolean => {
@@ -128,68 +177,105 @@ export function useTour(options: UseTourOptions = {}) {
         const steps = TOUR_STEPS_MAP[tourType];
         if (!steps || steps.length === 0) return;
 
-        // Filter out steps whose elements don't exist in DOM
-        const availableSteps = steps.filter(step => {
-            if (!step.element) return true; // Modal steps always show
-            const el = document.querySelector(step.element as string);
-            return el !== null;
-        });
+        const turn = ++turnRef.current;
+        loadDriver().then((driver) => {
+            // What is on screen is read once driver.js is here, not when the tour was asked for.
+            if (turn !== turnRef.current) return;
 
-        if (availableSteps.length === 0) {
-            console.log(`[Tour] No available steps for ${tourType}`);
-            return;
-        }
+            // Filter out steps whose elements don't exist in DOM
+            const availableSteps = steps.filter(step => {
+                if (!step.element) return true; // Modal steps always show
+                const el = document.querySelector(step.element as string);
+                return el !== null;
+            });
 
-        const isDark = options.theme === 'dark';
-
-        // Another component's tour is on screen, or a screen holds them all: this one is not
-        // started over it (its caller asks again the next time it mounts, a tour not seen stays unseen).
-        if (held) return;
-        if (onScreen?.isActive() && onScreen !== driverRef.current) return;
-
-        // Destroy this hook's own existing tour
-        if (driverRef.current) {
-            driverRef.current.destroy();
-        }
-
-        driverRef.current = driver({
-            animate: true,
-            showProgress: true,
-            showButtons: ['next', 'previous', 'close'],
-            nextBtnText: TOUR_UI.nextBtnText,
-            prevBtnText: TOUR_UI.prevBtnText,
-            doneBtnText: TOUR_UI.doneBtnText,
-            progressText: TOUR_UI.progressText,
-            steps: availableSteps,
-            overlayColor: isDark ? 'rgba(0, 0, 0, 0.85)' : 'rgba(0, 0, 0, 0.7)',
-            stagePadding: 8, // Padding around highlighted element
-            stageRadius: 8, // Border radius of spotlight
-            popoverClass: 'visualex-tour-popover',
-            onDestroyStarted: () => {
-                markTourComplete(tourType);
-                options.onComplete?.(tourType);
-                driverRef.current?.destroy();
-            },
-            onDestroyed: () => {
-                if (onScreen === driverRef.current) onScreen = null;
-                driverRef.current = null;
+            if (availableSteps.length === 0) {
+                console.log(`[Tour] No available steps for ${tourType}`);
+                return;
             }
-        });
 
-        onScreen = driverRef.current;
-        driverRef.current.drive();
+            const isDark = options.theme === 'dark';
+
+            // Another component's tour is on screen, or a screen holds them all: this one is not
+            // started over it (its caller asks again the next time it mounts, a tour not seen stays unseen).
+            if (held) return;
+            if (onScreen?.isActive() && onScreen !== driverRef.current) return;
+
+            // Destroy this hook's own existing tour
+            if (driverRef.current) {
+                driverRef.current.destroy();
+            }
+
+            watchInput();
+            // A tour starts on its own (a surface mounted, a delay): the keys typed before it say nothing of how its first
+            // focus came; a key pressed in the tour shows the ring again.
+            keyboardLast = false;
+            const band = layoutBand(window.innerWidth);
+            // Cheap enough at every resize event (a width and one element's rectangles); driver.js redraws the rest itself.
+            const onResize = () => {
+                const tour = driverRef.current;
+                if (!tour?.isActive()) return;
+                const element = tour.getActiveElement();
+                const gone = element && element.id !== 'driver-dummy-element' && (!element.isConnected || element.getClientRects().length === 0);
+                // `destroy` closes it without `onDestroyStarted`: not marked as seen.
+                if (layoutBand(window.innerWidth) !== band || gone) tour.destroy();
+            };
+            window.addEventListener('resize', onResize);
+            const stopWatchingLayout = () => window.removeEventListener('resize', onResize);
+
+            driverRef.current = driver({
+                animate: true,
+                showProgress: true,
+                showButtons: ['next', 'previous', 'close'],
+                nextBtnText: TOUR_UI.nextBtnText,
+                prevBtnText: TOUR_UI.prevBtnText,
+                doneBtnText: TOUR_UI.doneBtnText,
+                progressText: TOUR_UI.progressText,
+                steps: availableSteps,
+                overlayColor: isDark ? 'rgba(0, 0, 0, 0.85)' : 'rgba(0, 0, 0, 0.7)',
+                stagePadding: 8, // Padding around highlighted element
+                stageRadius: 8, // Border radius of spotlight
+                popoverClass: 'visualex-tour-popover',
+                onPopoverRender: (popover) => {
+                    popover.closeButton.setAttribute('aria-label', TOUR_UI.closeBtnLabel);
+                    popover.wrapper.addEventListener('focusin', (event) => quietFocus(event.target));
+                    if (popover.wrapper.contains(document.activeElement)) quietFocus(document.activeElement);
+                },
+                onDestroyStarted: () => {
+                    markTourComplete(tourType);
+                    options.onComplete?.(tourType);
+                    driverRef.current?.destroy();
+                },
+                onDestroyed: () => {
+                    stopWatchingLayout();
+                    if (onScreen === driverRef.current) onScreen = null;
+                    driverRef.current = null;
+                }
+            });
+
+            onScreen = driverRef.current;
+            driverRef.current.drive();
+        }, (error: unknown) => console.error('[Tour] driver.js could not be loaded', error));
     }, [options, markTourComplete, disableOnMobile]);
 
     // Reset all tours and immediately start the welcome tour.
     // Declared after startTour so it isn't referenced before declaration.
+    // driver.js fetched while a tour waits for its delay, so the download overlaps a wait the tour had anyway; a failure
+    // is told by the start itself, which loads it again.
+    const prepareTour = useCallback((): void => {
+        loadDriver().catch(() => {});
+    }, []);
+
     const resetAndStartTour = useCallback((tourType: TourType = 'welcome'): void => {
+        prepareTour();
         resetTour(tourType);
         // Small delay to ensure state is saved
         setTimeout(() => startTour(tourType), 100);
-    }, [resetTour, startTour]);
+    }, [prepareTour, resetTour, startTour]);
 
     // Stop tour programmatically
     const stopTour = useCallback((): void => {
+        turnRef.current += 1;
         if (driverRef.current) {
             driverRef.current.destroy();
             driverRef.current = null;
@@ -199,12 +285,13 @@ export function useTour(options: UseTourOptions = {}) {
     // Try to start a contextual tour if not seen
     const tryStartTour = useCallback((tourType: TourType): void => {
         if (!hasSeenTour(tourType)) {
+            prepareTour();
             // Small delay to ensure DOM is ready; seen again when it fires, for a tour completed meanwhile
             setTimeout(() => {
                 if (!hasSeenTour(tourType)) startTour(tourType);
             }, 300);
         }
-    }, [hasSeenTour, startTour]);
+    }, [hasSeenTour, prepareTour, startTour]);
 
     // Get current tour version
     const getTourVersion = useCallback((): number => {
@@ -213,6 +300,7 @@ export function useTour(options: UseTourOptions = {}) {
 
     return {
         startTour,
+        prepareTour,
         stopTour,
         resetTour,
         resetAndStartTour,
