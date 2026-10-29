@@ -30,9 +30,10 @@ vi.mock('../../dossier/DossierDecisionReader', () => ({
 }));
 
 import { apiClient } from '../../../../services/api';
-import { coursesSwitchStore } from './coursesSwitch';
+import { loadAssistantFeatures } from '../../../../store/assistantProposals';
+import { coursesSwitchStore, setCoursesSwitch } from './coursesSwitch';
 import { ModuleSession } from './ModuleSession';
-import { forgetStepsReached, saveStepReached } from './moduleSteps';
+import { forgetModuleSessions, readWork, saveStepReached } from './moduleSteps';
 import { lesson } from './__fixtures__/corsi';
 import type { EsitoRisposta, ModuloLezione } from '../../../../types/corsi';
 
@@ -86,7 +87,7 @@ const stepLine = () => screen.getByText(/^Passo \d+ di \d+ · /);
 beforeEach(() => {
   coursesSwitchStore.setState({ state: 'on' });
   view.desktop = true;
-  forgetStepsReached();
+  forgetModuleSessions();
   post.mockResolvedValue({ data: {} });
 });
 
@@ -99,7 +100,7 @@ describe('a module\'s start (§5, step 1; §6.4)', () => {
   it('says what the module is for, its pre-questions, and that starting it keeps it in the course', async () => {
     renderSession();
     expect(await screen.findByRole('heading', { level: 1, name: 'Il marchio e i suoi impedimenti' })).toHaveFocus();
-    expect(stepLine()).toHaveTextContent('Passo 1 di 6 · Prima di leggere');
+    expect(stepLine()).toHaveTextContent('Passo 1 di 5 · Prima di leggere');
     expect(screen.getByText('Modulo 3 · 2 blocchi · circa 30 minuti')).toBeInTheDocument();
     expect(screen.getByText('Qualificare un segno distintivo e indicare gli impedimenti assoluti')).toBeInTheDocument();
     const before = screen.getByRole('region', { name: 'Prima di leggere' });
@@ -118,7 +119,7 @@ describe('a module\'s start (§5, step 1; §6.4)', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Blocco 2 di 2' })).toBeInTheDocument();
     expect(post).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Torna all’inizio' }));
-    expect(stepLine()).toHaveTextContent('Passo 1 di 6');
+    expect(stepLine()).toHaveTextContent('Passo 1 di 5');
   });
 
   it('starts it with `apri`, then reads the first block', async () => {
@@ -127,7 +128,7 @@ describe('a module\'s start (§5, step 1; §6.4)', () => {
     await user.click(await screen.findByRole('button', { name: 'Inizia il modulo' }));
     expect(post).toHaveBeenCalledWith('/lingo/corsi/corso-1/moduli/m-3/apri', {});
     expect(await screen.findByRole('heading', { level: 1, name: 'Il segno distintivo' })).toHaveFocus();
-    expect(stepLine()).toHaveTextContent('Passo 2 di 6 · Lettura');
+    expect(stepLine()).toHaveTextContent('Passo 2 di 5 · Lettura');
     expect(screen.getByText('Blocco 1 di 2 · circa 15 minuti di lettura')).toBeInTheDocument();
   });
 
@@ -137,14 +138,14 @@ describe('a module\'s start (§5, step 1; §6.4)', () => {
     renderSession();
     await user.click(await screen.findByRole('button', { name: 'Inizia il modulo' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Non registrato: riprova.');
-    expect(stepLine()).toHaveTextContent('Passo 1 di 6');
+    expect(stepLine()).toHaveTextContent('Passo 1 di 5');
   });
 
   it('resumes an opened module at the step this device reached, never one not started', async () => {
     saveStepReached('m-3', 2);
     const first = renderSession(lesson({ stato: 'in-corso' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Che cosa ricordi di «Il segno distintivo»?' })).toBeInTheDocument();
-    expect(stepLine()).toHaveTextContent('Passo 3 di 6 · Richiamo');
+    expect(stepLine()).toHaveTextContent('Passo 3 di 5 · Richiamo');
     first.unmount();
     renderSession(lesson({ stato: 'da-iniziare' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Il marchio e i suoi impedimenti' })).toBeInTheDocument();
@@ -284,11 +285,135 @@ describe('highlights and citations, further (§5 step 3, §6.5)', () => {
     await user.click(await screen.findByRole('button', { name: 'Evidenzia' }));
     await user.click(screen.getByRole('button', { name: /l’art\. 7 c\.p\.i\./ }));
     await user.click(screen.getByRole('button', { name: 'Apri su Dashboard' }));
-    const dialog = await screen.findByRole('alertdialog', { name: 'Interrompere il modulo?' });
+    const dialog = await screen.findByRole('alertdialog', { name: 'Interrompi il modulo?' });
     expect(dialog).toHaveTextContent('Le evidenziazioni si perdono.');
     await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Interrompi' }).closest('[data-ready]')).not.toBeNull(), { timeout: 2000 });
     await user.click(within(dialog).getByRole('button', { name: 'Interrompi' }));
     await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent(/^\/$/));
+  });
+});
+
+describe('the review of #374', () => {
+  it('keeps what was written, highlighted and the phase across a reload, and the browser asks before the tab closes', async () => {
+    saveStepReached('m-3', 2);
+    const user = userEvent.setup();
+    const first = renderSession(lesson({ stato: 'in-corso' }));
+    await user.type(await screen.findByLabelText(/gli elementi, le eccezioni, un caso/), 'Un segno');
+    await user.click(screen.getByRole('button', { name: 'Confronta con il testo' }));
+    const closing = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(closing);
+    expect(closing.defaultPrevented).toBe(true);
+    first.unmount();
+    renderSession(lesson({ stato: 'in-corso' }));
+    expect(await screen.findByRole('region', { name: 'Quello che hai scritto' })).toHaveTextContent('Un segno');
+  });
+
+  it('asks nothing of the browser with nothing written, and forgets the work once «Interrompi» is confirmed', async () => {
+    saveStepReached('m-3', 2);
+    const user = userEvent.setup();
+    const first = renderSession(lesson({ stato: 'in-corso' }));
+    const field = await screen.findByLabelText(/gli elementi, le eccezioni, un caso/);
+    const idle = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(idle);
+    expect(idle.defaultPrevented).toBe(false);
+    await user.type(field, 'qualcosa');
+    await user.click(screen.getByRole('button', { name: 'Chiudi il modulo' }));
+    const dialog = await screen.findByRole('alertdialog', { name: 'Interrompi il modulo?' });
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Interrompi' }).closest('[data-ready]')).not.toBeNull(), { timeout: 2000 });
+    await user.click(within(dialog).getByRole('button', { name: 'Interrompi' }));
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/studia/percorsi/corso-1'));
+    first.unmount();
+    renderSession(lesson({ stato: 'in-corso' }));
+    expect(await screen.findByLabelText(/gli elementi, le eccezioni, un caso/)).toHaveValue('');
+  });
+
+  it('closes a citation opened in a recall\'s comparison when the questions come, the focus on their heading', async () => {
+    saveStepReached('m-3', 2);
+    const user = userEvent.setup();
+    renderSession(lesson({ stato: 'in-corso' }));
+    await user.click(await screen.findByRole('button', { name: 'Confronta con il testo' }));
+    await user.click(screen.getByRole('button', { name: /l’art\. 7 c\.p\.i\./ }));
+    expect(screen.getByRole('complementary')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Alle domande' }));
+    expect(screen.queryByRole('complementary')).toBeNull();
+    expect(screen.getByRole('heading', { level: 1, name: 'Domande su «Il segno distintivo»' })).toHaveFocus();
+  });
+
+  it('draws a highlight over a citation with nothing interactive inside its button, and takes it away by selecting its words', async () => {
+    const user = userEvent.setup();
+    renderSession(lesson({ stato: 'in-corso' }));
+    await user.click(await screen.findByRole('button', { name: 'Comincia a leggere' }));
+    const cite = await screen.findByRole('button', { name: /l’art\. 7 c\.p\.i\./ });
+    const words = within(cite).getByText('l’art. 7 c.p.i.');
+    select(words.firstChild!, 0, words.firstChild!, 6);
+    await user.click(await screen.findByRole('button', { name: 'Evidenzia' }));
+    const mark = cite.querySelector('mark')!;
+    expect(mark).toHaveTextContent('l’art.');
+    expect(cite.querySelector('[tabindex], [role="button"]')).toBeNull();
+    select(mark.firstChild!, 1, mark.firstChild!, 4);
+    await user.click(await screen.findByRole('button', { name: 'Togli' }));
+    expect(document.querySelector('mark')).toBeNull();
+  });
+
+  it('reads the features again on a 404, and goes back to Oggi when the switch was turned off', async () => {
+    vi.mocked(loadAssistantFeatures).mockImplementation(async () => setCoursesSwitch(false));
+    get.mockRejectedValue({ status: 404, data: { detail: 'Not found' } });
+    render(
+      <MemoryRouter initialEntries={['/studia/percorsi/corso-1/moduli/m-3']}>
+        <Routes>
+          <Route path="/studia/percorsi/:id/moduli/:moduloId" element={<ModuleSession />} />
+          <Route path="/studia/ripasso" element={<p data-testid="where">/studia/ripasso</p>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByTestId('where')).toHaveTextContent('/studia/ripasso');
+    expect(screen.queryByText(/non c’è più/)).toBeNull();
+    vi.mocked(loadAssistantFeatures).mockImplementation(async () => {});
+  });
+
+  it('reads the features again on a 404 from `apri` too, then says the module is gone with the focus on it', async () => {
+    post.mockRejectedValueOnce({ status: 404, data: { detail: 'Modulo non trovato.' } });
+    const user = userEvent.setup();
+    renderSession();
+    await user.click(await screen.findByRole('button', { name: 'Inizia il modulo' }));
+    const gone = await screen.findByRole('alert');
+    expect(gone).toHaveTextContent('Questo modulo non c’è più');
+    expect(gone).toHaveFocus();
+    expect(loadAssistantFeatures).toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Torna al percorso' })).toBeInTheDocument();
+  });
+
+  it('leaves the end of the reading without a question, and forgets the work there', async () => {
+    saveStepReached('m-3', 4);
+    const user = userEvent.setup();
+    renderSession(lesson({ stato: 'in-corso' }));
+    await user.type(await screen.findByLabelText(/gli elementi, le eccezioni, un caso/), 'Un segno');
+    await user.click(screen.getByRole('button', { name: 'Confronta con il testo' }));
+    await user.click(screen.getByRole('button', { name: 'Avanti' }));
+    expect(screen.getByText('Fine della lettura')).toBeInTheDocument();
+    const closing = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(closing);
+    expect(closing.defaultPrevented).toBe(false);
+    await user.click(screen.getByRole('button', { name: 'Torna al percorso' }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(screen.getByTestId('where')).toHaveTextContent('/studia/percorsi/corso-1');
+    expect(readWork('m-3')).toEqual({});
+  });
+
+  it('takes «Togli» away with the selection that brought it', async () => {
+    const user = userEvent.setup();
+    renderSession(lesson({ stato: 'in-corso' }));
+    await user.click(await screen.findByRole('button', { name: 'Comincia a leggere' }));
+    const words = await screen.findByText(/distingue i prodotti/);
+    select(words.firstChild!, 0, words.firstChild!, 8);
+    await user.click(await screen.findByRole('button', { name: 'Evidenzia' }));
+    const mark = document.querySelector('mark')!;
+    select(mark.firstChild!, 1, mark.firstChild!, 4);
+    expect(await screen.findByRole('button', { name: 'Togli' })).not.toHaveFocus();
+    document.getSelection()!.removeAllRanges();
+    fireEvent(document, new Event('selectionchange'));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Togli' })).toBeNull());
+    expect(document.querySelector('mark')).not.toBeNull();
   });
 });
 
@@ -351,12 +476,12 @@ describe('the recall (§5, step 4)', () => {
     await user.click(screen.getByRole('button', { name: 'Confronta con il testo' }));
     await user.click(screen.getByRole('button', { name: 'Alle domande' }));
     await user.click(screen.getByRole('button', { name: 'Avanti' }));
-    expect(stepLine()).toHaveTextContent('Passo 4 di 6 · Lettura');
+    expect(stepLine()).toHaveTextContent('Passo 4 di 5 · Lettura');
     await user.click(screen.getByRole('button', { name: 'Ho letto: al richiamo' }));
     await user.click(screen.getByRole('button', { name: 'Confronta con il testo' }));
     expect(screen.queryByRole('button', { name: 'Alle domande' })).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Avanti' }));
-    expect(stepLine()).toHaveTextContent('Passo 6 di 6 · Quiz');
+    expect(screen.getByText('Fine della lettura')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Hai finito la lettura del modulo.' })).toBeInTheDocument();
   });
 });
@@ -396,13 +521,13 @@ describe('leaving (§6.5) and what reaches the server (§8)', () => {
     expect(screen.getByTestId('where')).toHaveTextContent('/studia/percorsi/corso-1');
   });
 
-  it('asks «Interrompere il modulo?» once something was written, and goes on when told to', async () => {
+  it('asks «Interrompi il modulo?» once something was written, and goes on when told to', async () => {
     saveStepReached('m-3', 2);
     const user = userEvent.setup();
     renderSession(lesson({ stato: 'in-corso' }));
     await user.type(await screen.findByLabelText(/gli elementi, le eccezioni, un caso/), 'qualcosa');
     await user.click(screen.getByRole('button', { name: 'Chiudi il modulo' }));
-    const dialog = await screen.findByRole('alertdialog', { name: 'Interrompere il modulo?' });
+    const dialog = await screen.findByRole('alertdialog', { name: 'Interrompi il modulo?' });
     expect(dialog).toHaveTextContent('Quello che hai scritto si perde.');
     await user.click(within(dialog).getByRole('button', { name: 'Continua il modulo' }));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
@@ -415,7 +540,7 @@ describe('leaving (§6.5) and what reaches the server (§8)', () => {
     renderSession(lesson({ stato: 'in-corso' }));
     await user.type(await screen.findByLabelText(/gli elementi, le eccezioni, un caso/), 'qualcosa');
     await user.keyboard('{Escape}');
-    await screen.findByRole('alertdialog', { name: 'Interrompere il modulo?' });
+    await screen.findByRole('alertdialog', { name: 'Interrompi il modulo?' });
     await user.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     expect(screen.queryByTestId('where')).toBeNull();

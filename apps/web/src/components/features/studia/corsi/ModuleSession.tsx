@@ -17,10 +17,25 @@ import { CoursesGate } from './CoursesGate';
 import { coursePath } from './corsiLabels';
 import { useCoursesSwitch } from './coursesSwitch';
 import { citationLabel } from './lessonCitations';
-import { blockMinutes, type Span } from './lessonFormat';
+import { blockMinutes } from './lessonFormat';
 import { LessonText } from './LessonText';
-import { PAUSE_EVERY_MS, moduleSteps, readStepReached, saveStepReached, stepLine, stopMessage, withOutcome, type Passo } from './moduleSteps';
-import { RecallStep, type FaseRichiamo } from './RecallStep';
+import {
+  EMPTY_WORK,
+  PAUSE_EVERY_MS,
+  forgetWork,
+  moduleSteps,
+  readStepReached,
+  readWork,
+  saveStepReached,
+  saveWork,
+  stepLine,
+  stopMessage,
+  withOutcome,
+  type BlockWork,
+  type Passo,
+} from './moduleSteps';
+import { RecallStep } from './RecallStep';
+import { loadAssistantFeatures } from '../../../../store/assistantProposals';
 
 /** The lesson's column, as the review's: the text and the header's row share its width. */
 const COLUMN = 'mx-auto w-full max-w-3xl';
@@ -51,25 +66,22 @@ export function ModuleSession() {
   return <Session key={`${id}/${moduloId}`} id={id} moduloId={moduloId} />;
 }
 
-/** Each block's highlights, recall text and recall phase: the session's alone, never sent (§8). */
-interface BlockWork {
-  spans: Span[];
-  scritto: string;
-  fase: FaseRichiamo;
-}
-const EMPTY_WORK: BlockWork = { spans: [], scritto: '', fase: 'scrivi' };
-
 function Session({ id, moduloId }: { id: string; moduloId: string }) {
   const navigate = useNavigate();
   const desktop = useIsDesktop();
   const [reads, setReads] = useState(0);
+  /** The read whose 404 the features were read again for. */
+  const [featuresRead, setFeaturesRead] = useState(-1);
   const [outcome, setOutcome] = useState<Outcome>({ key: -1, read: { status: 'loading' } });
   const read: Read = outcome.key === reads ? outcome.read : { status: 'loading' };
   const setRead = (r: Read) => setOutcome({ key: reads, read: r });
   const [modulo, setModulo] = useState<ModuloLezione | null>(null);
   const [step, setStep] = useState(0);
   const [preview, setPreview] = useState(false);
-  const [work, setWork] = useState<Record<string, BlockWork>>({});
+  // Each block's highlights, free recall and phase: kept in this tab, so a reload, the browser's back or a swipe back
+  // loses none of them (`readWork`); never sent (§8).
+  const [work, setWork] = useState<Record<string, BlockWork>>(() => readWork(moduloId));
+  useEffect(() => saveWork(moduloId, work), [moduloId, work]);
   /** The citation open beside the text, the view it belongs to, and the button that opened it (the focus goes back). */
   const [panel, setPanel] = useState<{ key: string; citation: CitazioneLezione; opener: HTMLElement } | null>(null);
   /** What «Interrompi» does once confirmed: leave to the course, or where a reader's link was going. */
@@ -94,7 +106,11 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
       (error: unknown) => {
         if (!live) return;
         console.warn('[Percorsi] module read failed', error);
-        setOutcome({ key: reads, read: { status: 'error', notFound: isNotFound(error), offline: isUnreachable(error) } });
+        const notFound = isNotFound(error);
+        setOutcome({ key: reads, read: { status: 'error', notFound, offline: isUnreachable(error) } });
+        // A 404 may be the switch turned off meanwhile: the features are read again before «non c’è più» is said, and
+        // an «off» sends the gate back to Oggi.
+        if (notFound) void loadAssistantFeatures().finally(() => live && setFeaturesRead(reads));
       },
     );
     return () => {
@@ -109,7 +125,8 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
   // What is on screen: the step, and within a recall its phase. Each starts at its top with its heading focused.
   const stepKey = preview ? 'anteprima' : `passo-${step}`;
   const viewKey = !preview && passo?.tipo === 'richiamo' && blockOf ? `${stepKey}-${workOf(blockOf).fase}` : stepKey;
-  const openCitation = panel && panel.key === stepKey ? panel.citation : null;
+  // A citation belongs to the view it was opened in: a recall's next phase closes it, and the phase's heading takes the focus.
+  const openCitation = panel && panel.key === viewKey ? panel.citation : null;
   // Closed by its button or Esc, the focus goes back to the citation that opened it, if it is still drawn.
   const closePanel = () => {
     const opener = panel?.opener;
@@ -120,8 +137,20 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
 
   const written = Object.values(work).some((w) => w.scritto.trim() !== '');
   const highlighted = Object.values(work).some((w) => w.spans.length > 0);
-  const asksToStop = written || highlighted;
+  // At the end of the reading the work has done its part: leaving asks nothing and forgets it.
+  const atEnd = !preview && passo?.tipo === 'attesa';
+  const asksToStop = !atEnd && (written || highlighted);
+  // Closing the tab loses what this tab keeps: the browser asks first (as a large import does, `DossierDetailView`). It
+  // asks before a reload too, which it cannot tell apart; the browser's back or a swipe back ask nothing, and neither a
+  // reload nor they lose anything: the work is read back with the module.
+  useEffect(() => {
+    if (!asksToStop) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [asksToStop]);
   const leaveThen = (go: () => void) => {
+    if (atEnd) forgetWork(moduloId);
     if (!asksToStop) return go();
     setOnStop(() => go);
     setConfirmStop(true);
@@ -139,9 +168,11 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
     heading.current = el;
   }, []);
   // In the commit: a key pressed as soon as the step is drawn must find the focus already there.
+  // A 404 waits for the features read again: «non c’è più» is said only while the switch is still on.
+  const checkingSwitch = read.status === 'error' && read.notFound && featuresRead !== reads;
   useLayoutEffect(() => {
-    if (read.status !== 'loading') heading.current?.focus({ preventScroll: true });
-  }, [viewKey, read.status]);
+    if (read.status !== 'loading' && !checkingSwitch) heading.current?.focus({ preventScroll: true });
+  }, [viewKey, read.status, checkingSwitch]);
 
   const goTo = (next: number) => {
     setPanel(null);
@@ -168,7 +199,10 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
     } catch (error) {
       console.warn('[Percorsi] module open failed', error);
       setOpening('failed');
-      if (isNotFound(error)) setRead({ status: 'error', notFound: true, offline: false });
+      if (isNotFound(error)) {
+        setRead({ status: 'error', notFound: true, offline: false });
+        void loadAssistantFeatures().finally(() => setFeaturesRead(reads));
+      }
     }
   };
 
@@ -249,7 +283,7 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
     const labels = new Map(blocco.citazioni.map((c) => [c.marcatore, citationLabel(c)]));
     const open = (marker: string, opener: HTMLElement) => {
       const citation = blocco.citazioni.find((c) => c.marcatore === marker);
-      if (citation) setPanel({ key: stepKey, citation, opener });
+      if (citation) setPanel({ key: viewKey, citation, opener });
     };
     return { labels, open };
   };
@@ -258,7 +292,7 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
   let bar: React.ReactNode;
   let status: React.ReactNode = pauseLine;
 
-  if (read.status === 'loading') {
+  if (read.status === 'loading' || checkingSwitch) {
     middle = (
       <div className={cn(COLUMN, 'px-4 py-6')}>
         <p className="sr-only">Carico il modulo…</p>
@@ -414,7 +448,7 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
       </div>
     );
     bar = (
-      <button type="button" onClick={back} className={LESSON_PRIMARY}>
+      <button type="button" onClick={leave} className={LESSON_PRIMARY}>
         Torna al percorso
       </button>
     );
@@ -464,14 +498,18 @@ function Session({ id, moduloId }: { id: string; moduloId: string }) {
       <LessonBar status={status}>{bar}</LessonBar>
       <WireConfirm
         open={confirmStop}
-        title="Interrompere il modulo?"
+        title="Interrompi il modulo?"
         message={stopMessage(written, highlighted)}
         confirmLabel="Interrompi"
         cancelLabel="Continua il modulo"
         emphasis="cancel"
         origin={closeButton}
         focusBack={() => heading.current}
-        onConfirm={() => (onStop ?? back)()}
+        onConfirm={() => {
+          // Stopping is the user's word: what was written goes now, not only with the tab.
+          forgetWork(moduloId);
+          (onStop ?? back)();
+        }}
         onCancel={() => {
           setConfirmStop(false);
           setOnStop(null);
