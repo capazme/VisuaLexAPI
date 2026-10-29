@@ -120,6 +120,8 @@ router.get('/dossiers/:id/items/:itemId/text', async (req, res) => {
     testo: all[parte - 1],
     // The update notes are not the text (G-386): beside it, on every page, unless the text already holds them.
     ...updateNotesAnswer(text.updateNotes),
+    // One part of a split article (G-387): said on every page, so the model does not take it for the whole.
+    ...(text.partialNotice ? { avviso_testo_parziale: text.partialNotice } : {}),
     glosse: open.map((g) => ({ testo: g.assistantText, nota: g.assistantNote })),
   });
 });

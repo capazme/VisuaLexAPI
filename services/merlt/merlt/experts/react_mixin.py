@@ -1151,9 +1151,9 @@ Rispondi SOLO con JSON valido, senza commenti o testo aggiuntivo.
 
         elif "text" in data and "urn" in data:
             # ArticleFetchTool / ExternalSourceTool format - single article payload.
-            # Normattiva's update notes (G-386) follow the text as their own labelled
-            # block, never mixed into it.
-            notes = data.get("note_aggiornamento")
+            # What VisuaLex says beside the text (a partial text, G-387; Normattiva's
+            # update notes, G-386) follows it as its own block, never mixed into it.
+            notes = data.get("oltre_il_testo")
             text = data.get("text", "")
             if text and isinstance(notes, str) and notes:
                 text = f"{text}\n\n{notes}"

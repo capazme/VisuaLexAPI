@@ -18,9 +18,8 @@ editorial notes (`note-akn`, «Nota all'art. …») are out of scope.
 """
 from __future__ import annotations
 
-import asyncio
 import re
-from typing import Any, List, Optional, TypedDict
+from typing import List, Optional, TypedDict
 
 import structlog
 from bs4 import BeautifulSoup, Tag
@@ -167,24 +166,6 @@ def extract_update_notes(raw_html: str, *, article: Optional[str] = None) -> Opt
 
     log.info("Update notes read", count=len(notes), unread=unread, in_text=in_text)
     return {"notes": notes, "unread": unread, "in_text": in_text}
-
-
-async def read_update_notes(cache: Any, urn: Optional[str], *, article: Optional[str] = None) -> Optional[UpdateNotes]:
-    """The update notes of the page the scraper just fetched for `urn`, or None.
-
-    Reads the raw page from the scraper's own persistent cache (key: the URN
-    `get_document` returned), so no request is made. Never raises.
-    """
-    if cache is None or not urn:
-        return None
-    try:
-        raw = await cache.get(urn)
-        if not isinstance(raw, str) or not raw:
-            return None
-        return await asyncio.to_thread(extract_update_notes, raw, article=article)
-    except Exception as exc:  # noqa: BLE001 - best effort by contract
-        log.warning("Update notes could not be read", error=str(exc), urn=str(urn)[:100])
-        return None
 
 
 def update_notes_fields(notes: Optional[UpdateNotes], *, akn_text: bool = False) -> dict:

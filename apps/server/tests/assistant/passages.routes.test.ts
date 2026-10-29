@@ -133,6 +133,19 @@ describe('D7b and D8 — an entry’s text and the glosses proposed on it', () =
       expect(Object.keys((await text()).body)).toEqual(['voce', 'in_vigore', 'parte', 'parti', 'testo', 'glosse']);
     });
 
+    it('says when the text is one part of a split article (G-387)', async () => {
+      const part = (k: number, dal: number, al: number) => ({ progressivo: k, commi_dal: String(dal), commi_al: String(al), url: `https://www.normattiva.it/atto/caricaArticolo?art.progressivo=${k}` });
+      updateNotes = { parti: [part(1, 1, 100), part(2, 101, 200), part(3, 201, 264)], testo_parziale: true };
+      const response = await text();
+      expect(response.body.testo).toBe(RAW);
+      expect(response.body.avviso_testo_parziale).toBe('testo parziale: commi 1-100 di 264 (diviso in 3 parti)');
+      expect(response.body.parti).toBe(1); // the route's own pages, not the article's parts
+      updateNotes = { parti: [], testo_parziale: false };
+      expect((await text()).body).not.toHaveProperty('avviso_testo_parziale');
+      updateNotes = { parti: [{ progressivo: 'x' }], testo_parziale: true };
+      expect((await text()).body.avviso_testo_parziale).toBe('testo parziale: l’articolo è diviso in parti, verificare su Normattiva');
+    });
+
     it('gives a decision’s blocks under their names', async () => {
       const response = await text(decisionId);
       expect(response.status).toBe(200);

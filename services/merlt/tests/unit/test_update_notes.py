@@ -21,6 +21,7 @@ from merlt.clients.visualex_client import (
     ArticleResult,
     NormattivaScraper,
     VisuaLexClient,
+    partial_text_notice,
     update_notes_block,
 )
 from merlt.experts.react_mixin import ReActMixin
@@ -93,20 +94,47 @@ async def test_the_article_tool_gives_the_block_beside_the_text():
         return_value=_result(note_aggiornamento=[RULING]))))
     result = await ArticleFetchTool(scraper=scraper).execute(tipo_atto="decreto legislativo", numero_articolo="3")
     assert result.data["text"] == TEXT
-    assert result.data["note_aggiornamento"].startswith(UPDATE_NOTES_LABEL)
+    assert result.data["oltre_il_testo"].startswith(UPDATE_NOTES_LABEL)
 
 
 async def test_a_scraper_without_notes_still_serves_the_text():
     scraper = SimpleNamespace(get_document=AsyncMock(return_value=(TEXT, "u")))
     result = await ArticleFetchTool(scraper=scraper).execute(tipo_atto="codice civile", numero_articolo="3")
-    assert (result.data["text"], result.data["note_aggiornamento"]) == (TEXT, "")
+    assert (result.data["text"], result.data["oltre_il_testo"]) == (TEXT, "")
 
 
 def test_the_expert_reads_the_block_after_the_text():
     block = update_notes_block(_result(note_aggiornamento=[RULING]))
     data = {"text": TEXT, "urn": "urn:x", "tipo_atto": "decreto legislativo", "source": "normattiva",
-            "note_aggiornamento": block}
+            "oltre_il_testo": block}
     [source] = ReActMixin._extract_sources_from_result(None, SimpleNamespace(success=True, data=data))
     assert source["text"] == f"{TEXT}\n\n{block}"
-    [plain] = ReActMixin._extract_sources_from_result(None, SimpleNamespace(success=True, data=dict(data, note_aggiornamento="")))
+    [plain] = ReActMixin._extract_sources_from_result(None, SimpleNamespace(success=True, data=dict(data, oltre_il_testo="")))
     assert plain["text"] == TEXT
+
+
+PARTS = [{"progressivo": k, "commi_dal": str(100 * (k - 1) + 1), "commi_al": "264" if k == 3 else str(100 * k),
+          "url": f"https://www.normattiva.it/atto/caricaArticolo?art.progressivo={k}"} for k in (1, 2, 3)]
+
+
+async def test_the_client_carries_the_parts():
+    article = await _client_answering({
+        "article_text": TEXT, "url": "u", "norma_data": {}, "parti": PARTS, "testo_parziale": True,
+    }).get_article(NV)
+    assert (article.parti, article.testo_parziale) == (PARTS, True)
+    assert partial_text_notice(article) == "testo parziale: commi 1-100 di 264 (diviso in 3 parti)"
+
+
+def test_no_notice_for_a_whole_article():
+    assert partial_text_notice(_result(parti=[], testo_parziale=False)) == ""
+    assert partial_text_notice(_result()) == ""
+
+
+async def test_the_article_tool_says_the_text_is_partial_before_the_notes():
+    scraper = NormattivaScraper(client=SimpleNamespace(get_article=AsyncMock(
+        return_value=_result(note_aggiornamento=[RULING], parti=PARTS, testo_parziale=True))))
+    result = await ArticleFetchTool(scraper=scraper).execute(tipo_atto="legge", numero_articolo="1")
+    assert result.data["text"] == TEXT
+    notice, notes = result.data["oltre_il_testo"].split("\n\n")
+    assert notice == "testo parziale: commi 1-100 di 264 (diviso in 3 parti)"
+    assert notes.startswith(UPDATE_NOTES_LABEL)

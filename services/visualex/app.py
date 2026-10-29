@@ -40,7 +40,8 @@ from visualex_api.services.normattiva_validity import (
     upcoming_change,
     versions_between,
 )
-from visualex_api.services.normattiva_notes import read_update_notes, update_notes_fields
+from visualex_api.services.normattiva_notes import extract_update_notes, update_notes_fields
+from visualex_api.services.normattiva_parts import extract_parts, parts_fields
 from types import SimpleNamespace
 
 from visualex_api.services.akn_fetch import fetch_act_index
@@ -213,6 +214,22 @@ def _asks_for_text_in_force(nv) -> bool:
             and not (isinstance(version, str) and version.strip().lower() == 'originale'))
 
 
+def _read_page_extras(raw, article):
+    """(update notes, parts) of one cached Normattiva page, each None when unreadable: one
+    reader's failure never costs the other's answer."""
+    try:
+        notes = extract_update_notes(raw, article=article)
+    except Exception as exc:  # noqa: BLE001 - best effort by contract
+        log.warning("Update notes could not be read", error=str(exc))
+        notes = None
+    try:
+        parts = extract_parts(raw, article=article)
+    except Exception as exc:  # noqa: BLE001 - best effort by contract
+        log.warning("Article parts could not be read", error=str(exc))
+        parts = None
+    return notes, parts
+
+
 class NormaController:
     def __init__(self):
         self.app = Quart(__name__)
@@ -316,7 +333,7 @@ class NormaController:
                     if validity:
                         result['validity'] = validity
                     result.update(extra)
-                    result.update(await self._update_notes_for(scraper, nv, url, article_text))
+                    result.update(await self._page_extras_for(scraper, nv, url, article_text))
 
                 except Exception as exc:
                     result = {'error': str(exc), 'norma_data': nv.to_dict()}
@@ -941,23 +958,32 @@ class NormaController:
             return False
 
     @staticmethod
-    async def _update_notes_for(scraper, nv, url, article_text):
-        """The update notes next to a Normattiva article's text (G-386), `{}` for any other source.
+    async def _page_extras_for(scraper, nv, url, article_text):
+        """What a Normattiva article page says beside its text, `{}` for any other source:
+        its update notes (G-386) and the parts a split article is cut into (G-387).
 
         Read from the page `get_document` stored in the scraper's persistent cache under
-        `url` (the served page, today's when a later version was set aside), so no request
-        is made and `article_text` is never touched (gotcha 23). An undated request's page
-        is already back if it had left the cache (`_validity_of_page`); a dated one is never
-        read again for this, so after a restart its notes can come back unread, and say so.
-        The AKN export's text, the last-resort fallback, opens with its markdown heading
-        («### Art. …», which the HTML extractor never writes) and already holds its notes.
+        `url` (the served page, today's when a later version was set aside), once for both,
+        so no request is made and `article_text` is never touched (gotcha 23). An undated
+        request's page is already back if it had left the cache (`_validity_of_page`); a
+        dated one is never read again for this, so after a restart its notes can come back
+        unread, and say so. The AKN export's text, the last-resort fallback, opens with its
+        markdown heading («### Art. …», which the HTML extractor never writes) and already
+        holds its notes and the whole article.
         """
         if not isinstance(scraper, NormattivaScraper) or not nv.numero_articolo:
             return {}
         if isinstance(article_text, str) and article_text.startswith('###'):
-            return update_notes_fields(None, akn_text=True)
-        notes = await read_update_notes(getattr(scraper, 'cache', None), url, article=nv.numero_articolo)
-        return update_notes_fields(notes)
+            return {**update_notes_fields(None, akn_text=True), **parts_fields(None)}
+        notes = parts = None
+        try:
+            cache = getattr(scraper, 'cache', None)
+            raw = await cache.get(url) if cache is not None and url else None
+            if isinstance(raw, str) and raw:
+                notes, parts = await asyncio.to_thread(_read_page_extras, raw, nv.numero_articolo)
+        except Exception as exc:  # noqa: BLE001 - best effort: the text already read stands
+            log.warning("Page extras could not be read", error=str(exc), url=str(url)[:100])
+        return {**update_notes_fields(notes), **parts_fields(parts)}
 
     @staticmethod
     async def _validity_for(scraper, nv, url):
@@ -1147,7 +1173,7 @@ class NormaController:
                     if validity:
                         result['validity'] = validity
                     result.update(extra)
-                    result.update(await self._update_notes_for(scraper, nv, url, article_text))
+                    result.update(await self._page_extras_for(scraper, nv, url, article_text))
                     return result
                 except Exception as exc:
                     log.error("Error fetching article text", error=str(exc))
@@ -1581,7 +1607,7 @@ class NormaController:
                     if validity:
                         result['validity'] = validity
                     result.update(extra)
-                    result.update(await self._update_notes_for(scraper, nv, url, article_text))
+                    result.update(await self._page_extras_for(scraper, nv, url, article_text))
                     return result
                 except Exception as exc:
                     log.error("Error fetching all data", error=str(exc))

@@ -93,6 +93,14 @@ Loaded when Claude works in this folder; the root `CLAUDE.md` holds the reposito
     note (more headings on the page than notes read). A reader that raises gives `note_aggiornamento: null` and
     `note_non_lette: true`, never an error for the article. The page must be the article asked, as for `validity`. Normattiva's editorial `note-akn`
     notes are out of scope.
+  - `normattiva_parts.py` — the parts of an article Normattiva splits (G-387): art. 1 l. 296/2006 is 14 entries
+    of the page's tree, «1 (commi 1-100)» … «1 (commi 1301-1364)», linked with `art.progressivo=k`, and its URN
+    serves the first only (comma 773 is in part 8). Read from the tree of the cached page, like the notes: no
+    request, the text untouched; only the entries labelled «<article> (commi a-b)» count (the tree lists an
+    article's earlier versions split the same way, «agg.149 (commi 1-100)»), the article compared by
+    `comparable_article_key`. A part is `{progressivo, commi_dal, commi_al, url}` (mcp-legal-it 3.0.x's shape;
+    `url` is the part's `caricaArticolo` page, which opens only in the article page's session). It fetches no part:
+    that is the parts as entries, G-387 (a), the next round
   - `massimario_portal.py` — internal (MERL-T only): one element of the Massimario
     portal, behind a firewall, so paced (≥ 1.5 s, the environment can only slow it
     down), the client's own retries off, a 403 or 429 is a stop (`429` to the caller).
@@ -394,11 +402,19 @@ POST unless noted, JSON bodies.
   status stays 503 while a source fails. Never wire it to a tight loop
 
 The update notes ride next to `article_text` in the same three handlers, for a Normattiva article
-(`_update_notes_for`; an EU act has none of the keys): `note_aggiornamento` (the list, `[]` when the page has none,
+(`_page_extras_for`; an EU act has none of the keys): `note_aggiornamento` (the list, `[]` when the page has none,
 null when the page cannot be read or the text is the AKN export's, which opens with «### » and holds its notes),
 `note_non_lette` (true when some note, or the page, could not be read: «note di aggiornamento non lette: verificare
 su Normattiva») and `note_nel_testo` (true when `article_text` already holds them: the codes, the AKN export). They
 are read from the served page, today's when a later version was set aside.
+
+So are, for an article Normattiva splits into parts (G-387), `parti` (`[{progressivo, commi_dal, commi_al, url}]`
+ordered by `progressivo`, `[]` for an article listed whole, null when the page has no tree, cannot be read (a
+dated request's page after a restart: no notice then, unlike the notes) or the text is the AKN export's, which holds
+the whole article) and `testo_parziale` (true when the text is one part: the first, the one the
+article's URN serves). A client says so: «testo parziale: commi 1-100 di 1364 (diviso in 14 parti)»
+(`normattiva_parts.partial_notice`). The page is read once for both (`_page_extras_for`), and one reader's failure
+leaves the other's answer.
 
 `validity` rides next to `article_text` in `/stream_article_text`,
 `/fetch_article_text` and `/fetch_all_data` (Normattiva only; absent when the page

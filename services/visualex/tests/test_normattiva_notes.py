@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from visualex_api.services.normattiva_notes import extract_update_notes, read_update_notes, update_notes_fields
+from visualex_api.services.normattiva_notes import extract_update_notes, update_notes_fields
 from visualex_api.services.normattiva_scraper import NormattivaScraper
 from visualex_api.tools.selectors import NormattivaSelectors
 from tests.test_validity_wire import (  # noqa: F401 - fixtures
@@ -177,24 +177,11 @@ class TestFields:
             "note_aggiornamento": None, "note_non_lette": False, "note_nel_testo": True,
         }
 
-    async def test_read_from_the_scraper_cache(self):
-        read = await read_update_notes(FakeCache({URN: DLGS23_ART3}), URN, article="3")
-        assert len(read["notes"]) == 4
-
-    async def test_a_cache_miss_or_a_failing_cache_is_none(self):
-        class Broken:
-            async def get(self, key):
-                raise RuntimeError("redis down")
-
-        assert await read_update_notes(FakeCache({}), URN) is None
-        assert await read_update_notes(Broken(), URN) is None
-        assert await read_update_notes(None, URN) is None
-
 
 class TestOnTheWire:
     @pytest.mark.parametrize("endpoint", ARTICLE_ENDPOINTS)
     async def test_a_reader_that_fails_never_costs_the_article(self, controller, brocardi, endpoint):
-        with patch("visualex_api.services.normattiva_notes.extract_update_notes", side_effect=RuntimeError("boom")):
+        with patch("app.extract_update_notes", side_effect=RuntimeError("boom")):
             [result] = await ask(controller, endpoint, requested(), scraper=normattiva_serving(DLGS23_ART3))
         assert result["article_text"] == TEXT
         assert (result["note_aggiornamento"], result["note_non_lette"]) == (None, True)
