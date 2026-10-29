@@ -120,10 +120,13 @@ describe('AcceptTextDialog', () => {
     expect(screen.getByRole('status')).toBeEmptyDOMElement();
   });
 
-  it('gives its buttons a 44 px target on a phone', () => {
+  it('gives its buttons a 44 px target at every width, the small button\'s 32 px from `md` replaced', () => {
     renderDialog();
     for (const name of ['Annulla', 'Vai di prova']) {
-      expect(screen.getByRole('button', { name })).toHaveClass('min-h-[44px]', 'md:min-h-0');
+      const button = screen.getByRole('button', { name });
+      expect(button).toHaveClass('min-h-[44px]', 'md:min-h-[44px]');
+      expect(button).not.toHaveClass('md:min-h-8');
+      expect(button).not.toHaveClass('md:min-h-0');
     }
   });
 

@@ -18,9 +18,9 @@ import { MATERIA_LABEL } from '../studiaLabels';
 import { BLOCK_HEADING, FOCUS_RING, MUTED_TEXT, QUIET_BUTTON, subjectHue } from '../progress/tokens';
 import { CourseStateChip } from './CourseChips';
 import { CoursesGate } from './CoursesGate';
-import { CompetencesSection, DossierLink, ExamSection, ModulesSection, PreparationPanel } from './CourseSections';
+import { CompetencesSection, DossierLink, EndProgrammeOffer, ExamSection, ModulesSection, PreparationPanel } from './CourseSections';
 import { ReadFailure } from './ReadFailure';
-import { COURSES_PATH, onDay } from './corsiLabels';
+import { COURSES_PATH, closingOpensExam, onDay } from './corsiLabels';
 import { coursesChanged, useCourseRead } from './useCourseRead';
 
 /** The longest title the server takes (`PATCH /lingo/corsi/:id`). */
@@ -37,7 +37,7 @@ export function CoursePage() {
 }
 
 type Confirming =
-  | { kind: 'end-programme'; contati: number }
+  | { kind: 'end-programme'; contati: number; opensExam: boolean }
   | { kind: 'withdraw'; modulo: ModuloPagina }
   | null;
 
@@ -65,6 +65,8 @@ function Course({ id }: { id: string }) {
   const modulesHeading = useRef<HTMLHeadingElement>(null);
   const focusModules = () => requestAnimationFrame(() => modulesHeading.current?.focus({ preventScroll: true }));
   const [busy, setBusy] = useState(false);
+  // The module deleted on this page: «Il programma finisce qui» is offered beside its deletion (Q11).
+  const [deleted, setDeleted] = useState<{ id: string; ordine: number; titolo: string } | null>(null);
 
   const data = course.data;
   // Gone on a later read too (trashed in another tab): the old course is not kept on screen with buttons that 404.
@@ -116,6 +118,7 @@ function Course({ id }: { id: string }) {
       action: async () => {
         try {
           const { trashId } = await corsiService.trashModule(data.id, modulo.id);
+          setDeleted({ id: modulo.id, ordine: modulo.ordine, titolo: modulo.titolo });
           course.reload();
           focusModules();
           return trashId;
@@ -129,6 +132,7 @@ function Course({ id }: { id: string }) {
       undo: async (trashId) => {
         try {
           await trashService.restore(trashId);
+          setDeleted((now) => (now?.id === modulo.id ? null : now));
           coursesChanged();
         } catch (error) {
           fail(error, `Impossibile ripristinare il modulo «${modulo.titolo}» ora: è nel Cestino, ripristinalo da lì.`);
@@ -160,6 +164,7 @@ function Course({ id }: { id: string }) {
     try {
       await corsiService.endProgrammeAt(data.id, contati);
       notify({ type: 'success', message: `Il programma finisce con ${contati} ${contati === 1 ? 'modulo' : 'moduli'}.`, duration: 4000 });
+      setDeleted(null);
       coursesChanged();
     } catch (error) {
       fail(error, 'Programma non modificato.');
@@ -177,8 +182,9 @@ function Course({ id }: { id: string }) {
     }
   };
 
-  const contati = data.inPreparazione?.moduli.contati ?? 0;
-  const canEnd = data.inPreparazione !== null && contati >= 1 && contati < data.inPreparazione.moduli.previsti;
+  const missing = data.inPreparazione;
+  const contati = missing?.moduli.contati ?? 0;
+  const canEnd = missing !== null && contati >= 1 && contati < missing.moduli.previsti;
 
   return (
     <div className="grid grid-cols-1 gap-8 pb-8">
@@ -191,18 +197,21 @@ function Course({ id }: { id: string }) {
       />
 
       {data.inPreparazione && (
-        <PreparationPanel
-          titolo={data.titolo}
-          missing={data.inPreparazione}
-          busy={busy}
-          onEndProgramme={canEnd ? () => setConfirming({ kind: 'end-programme', contati }) : null}
-        />
+        <PreparationPanel titolo={data.titolo} missing={data.inPreparazione} />
       )}
 
       <CompetencesSection competenze={data.competenze} />
       <ModulesSection
         moduli={data.moduli}
         headingRef={modulesHeading}
+        offer={deleted && canEnd && missing ? (
+          <EndProgrammeOffer
+            deleted={deleted}
+            missing={missing}
+            busy={busy}
+            onEnd={() => setConfirming({ kind: 'end-programme', contati, opensExam: closingOpensExam(missing) })}
+          />
+        ) : undefined}
         actions={{ onDelete: trashModule, onWithdraw: (modulo) => setConfirming({ kind: 'withdraw', modulo }), busy: busyModules }}
       />
       <ExamSection titolo={data.titolo} esame={data.esame} inPreparazione={data.inPreparazione !== null} />
@@ -237,7 +246,7 @@ function Course({ id }: { id: string }) {
       <ConfirmDialog
         open={confirming?.kind === 'end-programme'}
         title={confirming?.kind === 'end-programme' ? `Il programma finisce con ${confirming.contati} ${confirming.contati === 1 ? 'modulo' : 'moduli'}?` : ''}
-        message="L’esame finale potrà aprirsi con i moduli che ci sono. Il tuo assistente non potrà aggiungerne altri, solo correggerli."
+        message={`${confirming?.kind === 'end-programme' && confirming.opensExam ? 'L’esame finale potrà aprirsi con i moduli che ci sono. ' : ''}Il tuo assistente non potrà aggiungere altri moduli, solo correggere quelli che ci sono.`}
         confirmLabel="Il programma finisce qui"
         onConfirm={() => confirming?.kind === 'end-programme' && void endProgramme(confirming.contati)}
         onCancel={() => setConfirming(null)}
@@ -334,10 +343,10 @@ function RenameDialog({ id, titolo, onClose, onRenamed }: { id: string; titolo: 
       initialFocusRef={input}
       footer={
         <>
-          <Button variant="ghost" size="sm" className="min-h-[44px]" onClick={onClose}>
+          <Button variant="ghost" size="sm" className="min-h-[44px] md:min-h-[44px]" onClick={onClose}>
             Annulla
           </Button>
-          <Button size="sm" className="min-h-[44px]" disabled={!valid || saving} onClick={() => void save()}>
+          <Button size="sm" className="min-h-[44px] md:min-h-[44px]" disabled={!valid || saving} onClick={() => void save()}>
             Salva
           </Button>
         </>

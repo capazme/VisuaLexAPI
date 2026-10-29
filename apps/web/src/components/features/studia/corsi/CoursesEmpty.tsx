@@ -11,8 +11,9 @@ type Connections = { status: 'loading' } | { status: 'error' } | { status: 'read
 /**
  * «Percorsi» with no course (courses spec §6.3): what a course is and how the assistant creates one from the user's
  * material, with a sentence to copy and the way to «Collega un'app AI». No file is uploaded to VisuaLex, and the page
- * says so. A connection made before the courses' permissions existed lacks `lingo:courses:write` (S1: a grant has the
- * new scopes only once the user connects again), and is told to connect again.
+ * says so. A connection without `lingo:courses:write` is told where permissions are chosen and that one made before the
+ * courses existed lacks it, with no promise of what a new connection brings (the MCP asks for the scope from M1; the
+ * switch stays off until then).
  */
 export function CoursesEmpty() {
   const [connections, setConnections] = useState<Connections>({ status: 'loading' });
@@ -99,9 +100,9 @@ function ConnectionLine({ connections }: { connections: Connections }) {
   return (
     <div role="note" className="grid grid-cols-1 gap-2 rounded-xl bg-amber-50 p-4 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
       <p>
-        {apps.length === 1 ? 'La tua app collegata non ha' : 'Le tue app collegate non hanno'} ancora il permesso di creare
-        percorsi. {apps.length === 1 ? 'Collegala' : 'Collegale'} di nuovo da «Collega un’app AI» e conferma i permessi:
-        tra questi c’è quello di creare percorsi di studio.
+        {apps.length === 1 ? 'La tua app collegata non ha' : 'Le tue app collegate non hanno'} il permesso di creare percorsi
+        di studio. I permessi si scelgono quando colleghi un’app, da «Collega un’app AI»: un collegamento fatto prima che
+        esistessero i percorsi non lo comprende.
       </p>
       {link}
     </div>

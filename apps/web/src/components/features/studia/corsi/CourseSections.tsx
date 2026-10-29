@@ -1,4 +1,4 @@
-import type { RefObject } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import { Link } from 'react-router-dom';
 import { FolderOpen } from 'lucide-react';
 import { cn } from '../../../../lib/utils';
@@ -6,18 +6,12 @@ import { CopyableCode } from '../../../../features/connections/CopyableCode';
 import type { CompetenzaPagina, CorsoPagina, EsamePagina, Mancanze, ModuloPagina } from '../../../../types/corsi';
 import { BLOCK_HEADING, FOCUS_RING, MUTED_TEXT, QUIET_BUTTON, SECONDARY_BUTTON, TILE } from '../progress/tokens';
 import { MasteryChip, ModuleStateChip } from './CourseChips';
-import { competenceNumbers, completeSentence, fromDay, missingLines, newExamSentence, onDay, thePercent } from './corsiLabels';
+import { closingOpensExam, competenceNumbers, completeSentence, fromDay, missingLines, newExamSentence, onDay, thePercent } from './corsiLabels';
 
 /** The course page's parts (courses spec §6.4), drawn from `GET /lingo/corsi/:id`. */
 
-/** «In preparazione»: what is missing, the sentence for the assistant and «Il programma finisce qui» (Q11). */
-export function PreparationPanel({ titolo, missing, onEndProgramme, busy }: {
-  titolo: string;
-  missing: Mancanze;
-  /** Offered while fewer modules count than the programme planned, and at least one does. */
-  onEndProgramme: (() => void) | null;
-  busy: boolean;
-}) {
+/** «In preparazione»: what is missing and the sentence for the assistant. */
+export function PreparationPanel({ titolo, missing }: { titolo: string; missing: Mancanze }) {
   const lines = missingLines(missing);
   return (
     <section aria-labelledby="corso-preparazione" className={cn(TILE, 'grid grid-cols-1 gap-3 border-amber-300 p-5 dark:border-amber-800')}>
@@ -40,19 +34,33 @@ export function PreparationPanel({ titolo, missing, onEndProgramme, busy }: {
       <div className="max-w-2xl">
         <CopyableCode code={completeSentence(titolo, missing)} label="la frase per completare il percorso" />
       </div>
-      {onEndProgramme && (
-        <div className="grid grid-cols-1 gap-1.5 border-t border-slate-200 pt-3 dark:border-slate-800">
-          <p className="max-w-[65ch] text-sm text-slate-700 dark:text-slate-300">
-            Non vuoi altri moduli? Chiudi il programma con{' '}
-            {missing.moduli.contati === 1 ? 'l’unico modulo che c’è' : `i ${missing.moduli.contati} moduli che ci sono`}, così l’esame
-            potrà aprirsi.
-          </p>
-          <button type="button" onClick={onEndProgramme} disabled={busy} className={cn(SECONDARY_BUTTON, 'justify-self-start disabled:opacity-60')}>
-            Il programma finisce qui
-          </button>
-        </div>
-      )}
     </section>
+  );
+}
+
+/**
+ * «Il programma finisce qui» beside a module's deletion (Q11, G-377): offered once a module was deleted on this page and
+ * fewer modules count than the programme planned, at least one of them. It says the exam may open only when closing the
+ * programme is what opens it.
+ */
+export function EndProgrammeOffer({ deleted, missing, onEnd, busy }: {
+  deleted: { ordine: number; titolo: string };
+  missing: Mancanze;
+  onEnd: () => void;
+  busy: boolean;
+}) {
+  const count = missing.moduli.contati;
+  const rest = count === 1 ? 'con l’unico modulo che c’è' : `con i ${count} moduli che ci sono`;
+  return (
+    <div className="grid grid-cols-1 gap-2 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+      <p className="max-w-[65ch] break-words">
+        Hai eliminato il modulo {deleted.ordine}, «{deleted.titolo}». Se non vuoi altri moduli, il programma può finire {rest}
+        {closingOpensExam(missing) ? ', così l’esame potrà aprirsi.' : '.'}
+      </p>
+      <button type="button" onClick={onEnd} disabled={busy} className={cn(SECONDARY_BUTTON, 'justify-self-start bg-white disabled:opacity-60 dark:bg-transparent')}>
+        Il programma finisce qui
+      </button>
+    </div>
   );
 }
 
@@ -92,13 +100,20 @@ const deletable = (m: ModuloPagina) => m.stato === 'da-iniziare' && !m.ritirato;
 /** Whether «Ritira questo modulo» is offered: opened, superseded by a live correction, not yet withdrawn. */
 const withdrawable = (m: ModuloPagina) => m.stato !== 'da-iniziare' && m.sostituitoDa !== null && !m.ritirato;
 
-export function ModulesSection({ moduli, actions, headingRef }: { moduli: ModuloPagina[]; actions: ModuleActions; headingRef?: RefObject<HTMLHeadingElement | null> }) {
+export function ModulesSection({ moduli, actions, headingRef, offer }: {
+  moduli: ModuloPagina[];
+  actions: ModuleActions;
+  headingRef?: RefObject<HTMLHeadingElement | null>;
+  /** What follows a module's deletion: «Il programma finisce qui», under the heading, before the list. */
+  offer?: ReactNode;
+}) {
   const byId = new Map(moduli.map((m) => [m.id, m]));
   return (
     <section aria-labelledby="corso-moduli" className="grid grid-cols-1 gap-3">
       <h3 id="corso-moduli" ref={headingRef} tabIndex={-1} className={cn(BLOCK_HEADING, 'focus:outline-none')}>
         Moduli
       </h3>
+      {offer}
       {moduli.length === 0 ? (
         <p className={cn('text-sm', MUTED_TEXT)}>Ancora nessun modulo: il tuo assistente li aggiunge uno alla volta.</p>
       ) : (

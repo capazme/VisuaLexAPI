@@ -65,7 +65,7 @@ describe('TrashEntryRow', () => {
     expect(screen.getByText('10 moduli · 1 scheda')).toBeInTheDocument();
     cleanup();
     renderRow({ ...base, id: 't5', kind: 'LINGO_CORSO_MODULO', dossierId: null, label: 'Il marchio di fatto · Segni distintivi', itemCount: 1, cardCount: 0 });
-    expect(screen.getByText('Modulo «Il marchio di fatto · Segni distintivi»')).toBeInTheDocument();
+    expect(screen.getByText('Modulo «Il marchio di fatto» · Segni distintivi')).toBeInTheDocument();
     expect(screen.getByText('Senza schede')).toBeInTheDocument();
   });
 

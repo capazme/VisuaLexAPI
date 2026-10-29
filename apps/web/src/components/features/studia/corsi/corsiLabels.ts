@@ -92,6 +92,12 @@ export function missingLines(m: Mancanze): string[] {
   return lines;
 }
 
+/**
+ * Whether closing the programme («Il programma finisce qui») is what opens the exam: modules are the only thing the
+ * course lacks (an exam written, every competence with its cards).
+ */
+export const closingOpensExam = (missing: Mancanze) => !missing.esame && missing.schede.length === 0;
+
 /** The sentence to copy into the assistant to create a course (§6.3), with the goal left for the user to write. */
 export const CREATE_SENTENCE =
   'Crea un percorso di studio in VisuaLex da questi materiali. Il mio obiettivo: … Tempo a disposizione: … al giorno.';

@@ -125,12 +125,13 @@ describe('«Percorsi», the list', () => {
     expect(await within(empty).findByText(/La tua app collegata può creare percorsi/)).toBeInTheDocument();
   });
 
-  it('tells a connection made without the courses\' permission to connect again', async () => {
+  it('tells a connection without the courses\' permission where permissions are chosen', async () => {
     list.mockResolvedValue([]);
     apps.mockResolvedValue([app(['dossier:read', 'lingo:cards:write'])]);
     renderView();
     const note = await screen.findByRole('note');
-    expect(note).toHaveTextContent('La tua app collegata non ha ancora il permesso di creare percorsi');
+    expect(note).toHaveTextContent('La tua app collegata non ha il permesso di creare percorsi di studio');
+    expect(note).toHaveTextContent('un collegamento fatto prima che esistessero i percorsi non lo comprende');
     expect(within(note).getByRole('link', { name: 'Collega un’app AI' })).toHaveAttribute('href', '/collega-app');
   });
 

@@ -88,16 +88,19 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   redirects only on an «off» that read confirms; a switch it could not read says so with «Riprova»; a 404 on the list
   turns the switch off). A review session with `?corso=` waits behind the same gate.
   Nothing of a course is created in the web: the assistant creates it (§3), and an empty «Percorsi» says how, with the
-  sentence to copy (`CREATE_SENTENCE`) and, for a connection without `lingo:courses:write`, «collegala di nuovo».
+  sentence to copy (`CREATE_SENTENCE`) and, for a connection without `lingo:courses:write`, where permissions are chosen and that a connection made before the
+  courses lacks it (no promise of what a new one brings: the MCP asks for the scope from M1).
   Before the first course the declaration `MATERIALE_STUDIO` opens by itself in `AcceptTextDialog` (every word the
   server's; a newer version answered by `POST …/accetta` comes back unticked); with courses already there a new
   version waits behind «Leggi e accetta». Every read (`useCourseRead`) is read again when the page is visible again,
   when the browser is back online and after `coursesChanged()` (a restore, a rename), the last answer kept on screen
   meanwhile. The course page draws the competences with their numbers («1 di 2 sessioni · la prossima vale dal 3/11 ·
   ultima 85%», `competenceNumbers`), the modules (a module never opened goes to the trash with «Annulla»; an opened
-  one superseded by a live correction offers «Ritira questo modulo»), «In preparazione» with what is missing, the
-  sentence for the assistant and «Il programma finisce qui» (`PATCH { moduliPrevisti }` to the modules that count,
-  confirmed, Q11), the exam's state (taking it is pull request d), the dossier's link and the menu (rename, export as
+  one superseded by a live correction offers «Ritira questo modulo»), «In preparazione» with what is missing and the
+  sentence for the assistant, «Il programma finisce qui» beside a module's deletion (Q11, G-377: offered under the
+  modules' heading once a module was deleted on the page and fewer count than planned, gone with «Annulla»;
+  `PATCH { moduliPrevisti }` to the modules that count, confirmed; «così l’esame potrà aprirsi» only when modules are
+  all the course lacks, `closingOpensExam`), the exam's state (taking it is pull request d), the dossier's link and the menu (rename, export as
   JSON, the trash with the toast «Il dossier «X» resta in Dossier»). «Oggi»'s row (`TodayCourses`, in the day block's
   cell so the grid keeps its rows) offers a course's due cards first (`/studia/ripasso/sessione?corso=`, never with a
   subject; its end has «Torna a Oggi» alone) and then «Modulo del giorno: <titolo> · <percorso>», which opens the
@@ -2016,7 +2019,7 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
   one `useTrash` in `DossierPage` feeds «Cestino (n)» on the list (shown only
   when there is something), the page `?trash=1` (`TrashPage`: dossiers, entries
   «Da «dossier»», «Schede di studio» by their first questions, «Percorso «…»» with its modules and cards and
-  «Modulo «modulo · percorso»» for the courses of «Percorsi», `LINGO_CORSO` and `LINGO_CORSO_MODULO`, whose 404 on a
+  «Modulo «modulo» · percorso» (the server's label split at its first « · ») for the courses of «Percorsi», `LINGO_CORSO` and `LINGO_CORSO_MODULO`, whose 404 on a
   restore — a module whose course is gone — keeps the entry with the server's words when the trash still has it) and a dossier's
   own «Rimossi di recente (n)» at its bottom (`DossierRecentlyRemoved`). Each
   entry (`TrashEntryRow`, `trashSummary.ts`) is restored whole — a 409 asks

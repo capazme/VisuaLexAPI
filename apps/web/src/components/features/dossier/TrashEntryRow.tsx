@@ -21,7 +21,12 @@ function titleOf(entry: TrashEntry, showSource: boolean): string {
   if (entry.kind === 'DOSSIER') return `Dossier «${entry.label}»`;
   if (entry.kind === 'LINGO_CARDS') return entry.itemCount === 1 ? 'Scheda di studio' : `Schede di studio (${entry.itemCount})`;
   if (entry.kind === 'LINGO_CORSO') return `Percorso «${entry.label}»`;
-  if (entry.kind === 'LINGO_CORSO_MODULO') return `Modulo «${entry.label}»`;
+  if (entry.kind === 'LINGO_CORSO_MODULO') {
+    // The server's label is «module · course»: the quotes take the module's name only (split at the first « · »,
+    // so a course title holding one stays whole).
+    const at = entry.label.indexOf(' · ');
+    return at === -1 ? `Modulo «${entry.label}»` : `Modulo «${entry.label.slice(0, at)}» · ${entry.label.slice(at + 3)}`;
+  }
   return showSource ? `Da «${entry.label}»` : (entry.itemCount === 1 ? '1 elemento' : `${entry.itemCount} elementi`);
 }
 

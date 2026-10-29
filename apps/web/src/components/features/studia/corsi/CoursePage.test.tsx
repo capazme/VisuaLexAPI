@@ -24,6 +24,7 @@ import { notificationStore, resetNotifications, undoNotification } from '../../.
 import { coursesSwitchStore } from './coursesSwitch';
 import { CoursePage } from './CoursePage';
 import { moduleOf, page } from './__fixtures__/corsi';
+import type { Mancanze } from '../../../../types/corsi';
 
 const get = vi.mocked(corsiService.get);
 
@@ -113,26 +114,70 @@ describe('the course page', () => {
     expect(screen.getByRole('region', { name: 'Esame finale' })).toHaveTextContent('Il tuo assistente non ha ancora scritto l’esame.');
   });
 
-  it('«Il programma finisce qui» lowers the planned modules to those that count, once confirmed (Q11)', async () => {
-    get.mockResolvedValue(page({ stato: 'in-preparazione', inPreparazione: { moduli: { contati: 2, previsti: 3 }, esame: false, schede: [] } }));
+  /** A course of three planned modules with three listed; module 3, never opened, deleted: two count. */
+  const trimmed = (over: Partial<Mancanze> = {}) => page({
+    stato: 'in-preparazione',
+    moduli: [moduleOf(1), moduleOf(2, { stato: 'in-corso' })],
+    inPreparazione: { moduli: { contati: 2, previsti: 3 }, esame: false, schede: [], ...over },
+  });
+
+  it('offers no «Il programma finisce qui» while no module was deleted, however short the programme (Q11)', async () => {
+    get.mockResolvedValue(trimmed());
+    renderPage();
+    await screen.findByRole('region', { name: 'In preparazione' });
+    expect(screen.queryByRole('button', { name: 'Il programma finisce qui' })).toBeNull();
+  });
+
+  it('beside a module\'s deletion, «Il programma finisce qui» lowers the planned modules to those that count, confirmed (Q11)', async () => {
+    vi.mocked(corsiService.trashModule).mockResolvedValue({ trashId: 'trash-m3' });
     vi.mocked(corsiService.endProgrammeAt).mockResolvedValue({ id: 'corso-1', titolo: 'x', moduliPrevisti: 2 });
     renderPage();
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Il programma finisce qui' }));
+    get.mockResolvedValue(trimmed());
+    await user.click(await screen.findByRole('button', { name: /Elimina il modulo 3/ }));
+    const modules = screen.getByRole('region', { name: 'Moduli' });
+    const offer = await within(modules).findByText(/Hai eliminato il modulo 3, «Titolo del modulo 3»/);
+    // An exam written and every competence with its cards: closing the programme is what opens the exam.
+    expect(offer).toHaveTextContent('il programma può finire con i 2 moduli che ci sono, così l’esame potrà aprirsi.');
+    await user.click(within(modules).getByRole('button', { name: 'Il programma finisce qui' }));
     const confirm = await screen.findByRole('alertdialog', { name: 'Il programma finisce con 2 moduli?' });
+    expect(confirm).toHaveTextContent('L’esame finale potrà aprirsi con i moduli che ci sono.');
     expect(corsiService.endProgrammeAt).not.toHaveBeenCalled();
     get.mockResolvedValue(page());
     await user.click(within(confirm).getByRole('button', { name: 'Il programma finisce qui' }));
     expect(corsiService.endProgrammeAt).toHaveBeenCalledWith('corso-1', 2);
-    // Read again: the course no longer lacks a module.
     await waitFor(() => expect(screen.queryByRole('region', { name: 'In preparazione' })).toBeNull());
+    expect(screen.queryByText(/Hai eliminato il modulo 3/)).toBeNull();
   });
 
-  it('offers no «Il programma finisce qui» before any module counts', async () => {
-    get.mockResolvedValue(page({ stato: 'in-preparazione', moduli: [], inPreparazione: { moduli: { contati: 0, previsti: 3 }, esame: true, schede: [] } }));
+  it.each([
+    ['the exam is missing', { esame: true }],
+    ['a competence lacks cards', { schede: [{ codice: 'C2', schede: 3, minimo: 5 }] }],
+  ])('promises no exam when %s: closing the programme does not open it', async (_, over) => {
+    vi.mocked(corsiService.trashModule).mockResolvedValue({ trashId: 'trash-m3' });
     renderPage();
-    await screen.findByRole('region', { name: 'In preparazione' });
-    expect(screen.queryByRole('button', { name: 'Il programma finisce qui' })).toBeNull();
+    const user = userEvent.setup();
+    get.mockResolvedValue(trimmed(over));
+    await user.click(await screen.findByRole('button', { name: /Elimina il modulo 3/ }));
+    const offer = await screen.findByText(/Hai eliminato il modulo 3/);
+    expect(offer).toHaveTextContent('il programma può finire con i 2 moduli che ci sono.');
+    expect(offer).not.toHaveTextContent('esame');
+    await user.click(screen.getByRole('button', { name: 'Il programma finisce qui' }));
+    const confirm = await screen.findByRole('alertdialog');
+    expect(confirm).not.toHaveTextContent('esame');
+    expect(confirm).toHaveTextContent('Il tuo assistente non potrà aggiungere altri moduli');
+  });
+
+  it('«Annulla» on the deletion takes the offer back', async () => {
+    vi.mocked(corsiService.trashModule).mockResolvedValue({ trashId: 'trash-m3' });
+    vi.mocked(trashService.restore).mockResolvedValue({ dossierId: null });
+    renderPage();
+    get.mockResolvedValue(trimmed());
+    await userEvent.setup().click(await screen.findByRole('button', { name: /Elimina il modulo 3/ }));
+    await screen.findByText(/Hai eliminato il modulo 3/);
+    get.mockResolvedValue(page());
+    await undoNotification(notificationStore.getState().entries.at(-1)!.id);
+    await waitFor(() => expect(screen.queryByText(/Hai eliminato il modulo 3/)).toBeNull());
   });
 
   it('offers «Ritira questo modulo» on an opened module superseded by a correction, once confirmed', async () => {
@@ -253,17 +298,19 @@ describe('the course page', () => {
     expect(screen.queryByRole('region', { name: 'Competenze' })).toBeNull();
   });
 
-  it('writes «l’85%», «l’8 novembre» and «dall’11 novembre», and one module in the singular', async () => {
-    get.mockResolvedValue(page({
-      superatoIl: '2026-11-08',
-      esame: { stato: 'superato', id: 'e', percentuale: 85, giorno: '2026-11-08' },
-      stato: 'in-preparazione',
-      inPreparazione: { moduli: { contati: 1, previsti: 2 }, esame: false, schede: [] },
-    }));
+  it('writes «l’85%» and «l’8 novembre»', async () => {
+    get.mockResolvedValue(page({ superatoIl: '2026-11-08', esame: { stato: 'superato', id: 'e', percentuale: 85, giorno: '2026-11-08' } }));
     renderPage();
     expect(await screen.findByRole('region', { name: 'Esame finale' })).toHaveTextContent('Superato l’8 novembre 2026, con l’85%.');
     expect(screen.getByText('Percorso superato l’8 novembre 2026')).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'In preparazione' })).toHaveTextContent('Chiudi il programma con l’unico modulo che c’è');
+  });
+
+  it('offers to end the programme with one module in the singular', async () => {
+    vi.mocked(corsiService.trashModule).mockResolvedValue({ trashId: 'trash-m3' });
+    renderPage();
+    get.mockResolvedValue(page({ stato: 'in-preparazione', moduli: [moduleOf(1)], inPreparazione: { moduli: { contati: 1, previsti: 3 }, esame: false, schede: [] } }));
+    await userEvent.setup().click(await screen.findByRole('button', { name: /Elimina il modulo 3/ }));
+    expect(await screen.findByText(/Hai eliminato il modulo 3/)).toHaveTextContent('con l’unico modulo che c’è');
   });
 
   it('after a module goes to the trash the focus is on the modules\' heading', async () => {
