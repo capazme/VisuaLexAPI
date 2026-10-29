@@ -860,10 +860,11 @@ class ArticleFetchTool(BaseTool):
             scraper = await self._get_scraper()
             notes = ""
             if hasattr(scraper, "get_article"):
-                from merlt.clients.visualex_client import update_notes_block
+                from merlt.clients.visualex_client import partial_text_notice, update_notes_block
 
                 article = await scraper.get_article(norma_visitata)
-                text, urn, notes = article.text, article.url, update_notes_block(article)
+                text, urn = article.text, article.url
+                notes = "\n\n".join(b for b in (partial_text_notice(article), update_notes_block(article)) if b)
             else:
                 text, urn = await scraper.get_document(norma_visitata)
 
@@ -879,7 +880,8 @@ class ArticleFetchTool(BaseTool):
                     "tipo_atto": tipo_atto,
                     "numero_articolo": numero_articolo,
                     "source": "normattiva",
-                    "note_aggiornamento": notes,
+                    # What VisuaLex says beside the text: a partial text, the update notes.
+                    "oltre_il_testo": notes,
                 },
                 tool_name=self.name,
                 tipo_atto=tipo_atto,

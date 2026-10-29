@@ -83,10 +83,26 @@ class ArticleResult:
     note_aggiornamento: Optional[List[Dict[str, Any]]] = None
     note_non_lette: bool = False
     note_nel_testo: bool = False
+    # G-387: the parts of an article Normattiva splits (`{progressivo, commi_dal,
+    # commi_al, url}`), and whether the text is one of them (the first).
+    parti: Optional[List[Dict[str, Any]]] = None
+    testo_parziale: bool = False
 
 
 UPDATE_NOTES_LABEL = "NOTE DI AGGIORNAMENTO (Normattiva, non fanno parte del testo dell'articolo)"
 UPDATE_NOTES_UNREAD = "note di aggiornamento non lette: verificare su Normattiva"
+
+
+def partial_text_notice(result: ArticleResult) -> str:
+    """«testo parziale: commi 1-100 di 1364 (diviso in 14 parti)» for one part of a split
+    article (G-387), "" otherwise: the model must not take the part for the whole."""
+    if not result.testo_parziale:
+        return ""
+    parts = [p for p in result.parti or [] if isinstance(p, dict) and p.get("commi_dal") and p.get("commi_al")]
+    if not parts:
+        return "testo parziale: l'articolo è diviso in parti, verificare su Normattiva"
+    return (f"testo parziale: commi {parts[0]['commi_dal']}-{parts[0]['commi_al']} di "
+            f"{parts[-1]['commi_al']} (diviso in {len(parts)} parti)")
 
 
 def update_notes_block(result: ArticleResult) -> str:
@@ -365,6 +381,8 @@ class VisuaLexClient:
                         note_aggiornamento=notes if isinstance(notes, list) else None,
                         note_non_lette=item.get("note_non_lette") is True,
                         note_nel_testo=item.get("note_nel_testo") is True,
+                        parti=item.get("parti") if isinstance(item.get("parti"), list) else None,
+                        testo_parziale=item.get("testo_parziale") is True,
                     ))
             return results
 

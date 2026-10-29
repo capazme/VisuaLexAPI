@@ -120,5 +120,16 @@ Trimmed captures of 2026-10-29, for the update notes (`normattiva_notes.py`, G-3
   «348», which the extractor appends to the text.
 - `art2043_cc_in_force_no_notes_trimmed.html` — art. 2043 c.c. in force (`…;262:2~art2043`): no note.
 
+Trimmed captures of 2026-10-29, for the parts of a split article (`normattiva_parts.py`, G-387,
+`tests/test_normattiva_parts.py`): the `div#albero` tree, byte for byte as served, wrapped in
+`<html><body>`:
+
+- `l296_2006_art1_parts_tree_trimmed.html` — art. 1 l. 296/2006 in force
+  (`urn:nir:stato:legge:2006-12-27;296~art1`), the tree cut to its first 40 entries: the 14 parts of art. 1,
+  «1 (commi 1-100)» … «1 (commi 1301-1364)», `art.progressivo` 1 … 14, then the same parts of two earlier
+  versions («agg.149 (commi …)», «agg.148 (commi …)»). CRLF kept.
+- `dlgs23_2015_tree_trimmed.html` — the whole tree of d.lgs. 23/2015 as art. 3's page serves it: every article
+  whole, `art.progressivo=0`.
+
 The extractor's output for every file here is frozen (CLAUDE.md gotcha 23:
 `article_text` is the offset space of every stored highlight and note).
