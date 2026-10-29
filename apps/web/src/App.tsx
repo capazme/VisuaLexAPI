@@ -65,6 +65,9 @@ const CoursesView = lazy(() =>
 const CoursePage = lazy(() =>
   import('./components/features/studia/corsi/CoursePage').then(m => ({ default: m.CoursePage })),
 );
+const ModuleSession = lazy(() =>
+  import('./components/features/studia/corsi/ModuleSession').then(m => ({ default: m.ModuleSession })),
+);
 const ProgressPage = lazy(() =>
   import('./components/features/studia/progress/ProgressPage').then(m => ({ default: m.ProgressPage })),
 );
@@ -216,6 +219,8 @@ function App() {
               {/* «Percorsi» (courses spec §6): drawn only while the switch `lingo_courses` is on, else back to Oggi. */}
               <Route path="percorsi" element={<Suspense fallback={null}><CoursesView /></Suspense>} />
               <Route path="percorsi/:id" element={<Suspense fallback={null}><CoursePage /></Suspense>} />
+              {/* A module's session (courses spec §6.5), the lesson's frame as the review's. */}
+              <Route path="percorsi/:id/moduli/:moduloId" element={<Suspense fallback={<LessonLoading />}><ModuleSession /></Suspense>} />
               <Route path="progressi" element={<Suspense fallback={null}><ProgressPage /></Suspense>} />
               <Route path="schede" element={<Suspense fallback={null}><MyCardsView /></Suspense>} />
               <Route path="schede/:id" element={<Suspense fallback={null}><MyCardsView /></Suspense>} />

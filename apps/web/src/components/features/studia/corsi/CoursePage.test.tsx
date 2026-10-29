@@ -23,8 +23,19 @@ import { saveBlob } from '../../../../utils/saveBlob';
 import { notificationStore, resetNotifications, undoNotification } from '../../../ui/notifications/notifications';
 import { coursesSwitchStore } from './coursesSwitch';
 import { CoursePage } from './CoursePage';
-import { moduleOf, page } from './__fixtures__/corsi';
-import type { Mancanze } from '../../../../types/corsi';
+import { examOf, missingOf, moduleOf, page } from './__fixtures__/corsi';
+import type { EsamePagina, Mancanze } from '../../../../types/corsi';
+
+/** An attempt as the course page carries it: by default failed at 55%, handed in on 20 November. */
+const attempt = (over: Partial<NonNullable<EsamePagina['tentativo']>> = {}): NonNullable<EsamePagina['tentativo']> => ({
+  id: 't-1',
+  consegnatoIl: '2026-11-20T10:00:00.000Z',
+  giorno: '2026-11-20',
+  percentuale: 55,
+  superato: false,
+  perCompetenza: { C1: 70, C2: 40 },
+  ...over,
+});
 
 const get = vi.mocked(corsiService.get);
 
@@ -88,6 +99,15 @@ describe('the course page', () => {
     expect(within(rows[2]).getByRole('button', { name: 'Elimina il modulo 3, Titolo del modulo 3' })).toBeInTheDocument();
   });
 
+  it('opens each module\'s session from its row: «Rileggi» done, «Riprendi» in progress, «Apri» not yet started (§6.4, §6.5)', async () => {
+    renderPage();
+    const modules = await screen.findByRole('region', { name: 'Moduli' });
+    const rows = within(modules).getAllByRole('listitem');
+    expect(within(rows[0]).getByRole('link', { name: 'Rileggi il modulo 1, Titolo del modulo 1' })).toHaveAttribute('href', '/studia/percorsi/corso-1/moduli/m-1');
+    expect(within(rows[1]).getByRole('link', { name: 'Riprendi il modulo 2, Titolo del modulo 2' })).toHaveAttribute('href', '/studia/percorsi/corso-1/moduli/m-2');
+    expect(within(rows[2]).getByRole('link', { name: 'Apri il modulo 3, Titolo del modulo 3' })).toHaveAttribute('href', '/studia/percorsi/corso-1/moduli/m-3');
+  });
+
   it('deletes a module never opened to the trash, with «Annulla» restoring it', async () => {
     vi.mocked(corsiService.trashModule).mockResolvedValue({ trashId: 'trash-m3' });
     vi.mocked(trashService.restore).mockResolvedValue({ dossierId: null });
@@ -102,8 +122,8 @@ describe('the course page', () => {
   it('«in preparazione» says what is missing and gives the sentence for the assistant', async () => {
     get.mockResolvedValue(page({
       stato: 'in-preparazione',
-      inPreparazione: { moduli: { contati: 9, previsti: 10 }, esame: true, schede: [{ codice: 'C4', schede: 3, minimo: 5 }] },
-      esame: null,
+      inPreparazione: missingOf({ moduli: { contati: 9, previsti: 10 }, manca: { esame: true }, schede: [{ codice: 'C4', schede: 3, servono: 5 }] }),
+      esame: examOf({ stato: 'assente', esameId: null }),
     }));
     renderPage();
     const panel = await screen.findByRole('region', { name: 'In preparazione' });
@@ -118,7 +138,7 @@ describe('the course page', () => {
   const trimmed = (over: Partial<Mancanze> = {}) => page({
     stato: 'in-preparazione',
     moduli: [moduleOf(1), moduleOf(2, { stato: 'in-corso' })],
-    inPreparazione: { moduli: { contati: 2, previsti: 3 }, esame: false, schede: [], ...over },
+    inPreparazione: missingOf({ moduli: { contati: 2, previsti: 3 }, ...over }),
   });
 
   it('offers no «Il programma finisce qui» while no module was deleted, however short the programme (Q11)', async () => {
@@ -151,8 +171,9 @@ describe('the course page', () => {
   });
 
   it.each([
-    ['the exam is missing', { esame: true }],
-    ['a competence lacks cards', { schede: [{ codice: 'C2', schede: 3, minimo: 5 }] }],
+    ['the exam is missing', { manca: { esame: true } }],
+    ['a competence lacks cards', { schede: [{ codice: 'C2', schede: 3, servono: 5 }] }],
+    ['a competence has no module', { competenzeSenzaModulo: ['C2'] }],
   ])('promises no exam when %s: closing the programme does not open it', async (_, over) => {
     vi.mocked(corsiService.trashModule).mockResolvedValue({ trashId: 'trash-m3' });
     renderPage();
@@ -182,7 +203,7 @@ describe('the course page', () => {
 
   it('offers «Ritira questo modulo» on an opened module superseded by a correction, once confirmed', async () => {
     get.mockResolvedValue(page({
-      moduli: [moduleOf(1, { sostituitoDa: 'm-1b' }), moduleOf(1, { id: 'm-1b', stato: 'da-iniziare', sostituisceId: 'm-1', titolo: 'Corretto' })],
+      moduli: [moduleOf(1, { sostituitoDa: ['m-1b'], ritirabile: true }), moduleOf(1, { id: 'm-1b', stato: 'da-iniziare', sostituisceId: 'm-1', titolo: 'Corretto' })],
     }));
     vi.mocked(corsiService.withdrawModule).mockResolvedValue();
     renderPage();
@@ -195,7 +216,7 @@ describe('the course page', () => {
   });
 
   it('shows a withdrawn module as such, with no action', async () => {
-    get.mockResolvedValue(page({ moduli: [moduleOf(1, { sostituitoDa: 'm-1b', ritirato: true })] }));
+    get.mockResolvedValue(page({ moduli: [moduleOf(1, { stato: 'ritirato', sostituitoDa: ['m-1b'] })] }));
     renderPage();
     const modules = await screen.findByRole('region', { name: 'Moduli' });
     expect(within(modules).getByText('Ritirato')).toBeInTheDocument();
@@ -203,11 +224,13 @@ describe('the course page', () => {
   });
 
   it.each([
-    [{ stato: 'bloccato', id: 'e' } as const, 'Si apre quando hai fatto tutti i moduli.'],
-    [{ stato: 'aperto', id: 'e' } as const, 'Aperto: hai fatto tutti i moduli.'],
-    [{ stato: 'superato', id: 'e', percentuale: 82, giorno: '2026-11-20' } as const, 'Superato il 20 novembre 2026, con l’82%.'],
-    [{ stato: 'non-superato', id: 'e', percentuale: 55, nuovoDal: '2026-11-23', nuovoPossibile: false, sotto60: ['C2'] as string[] } as const, 'Un nuovo esame si può chiedere dal 23 novembre 2026.'],
-    [{ stato: 'non-superato', id: 'e', percentuale: 55, nuovoDal: '2026-11-11', nuovoPossibile: false, sotto60: ['C2'] as string[] } as const, /il ripasso te la propone\..*Un nuovo esame si può chiedere dall’11 novembre 2026\./],
+    [examOf({ stato: 'assente', esameId: null }), 'Nessun esame.'],
+    [examOf({ stato: 'bloccato' }), 'Si apre quando hai fatto tutti i moduli.'],
+    [examOf({ stato: 'aperto' }), 'Aperto: hai fatto tutti i moduli.'],
+    [examOf({ stato: 'in-corso', tentativo: attempt({ consegnatoIl: null, giorno: null, percentuale: null, superato: null }) }), 'Iniziato, non ancora consegnato.'],
+    [examOf({ stato: 'superato', tentativo: attempt({ percentuale: 82, giorno: '2026-11-20', superato: true }) }), 'Superato il 20 novembre 2026, con l’82%.'],
+    [examOf({ stato: 'non-superato', tentativo: attempt(), nuovoEsameDal: '2026-11-23', competenzeSotto: ['C2'] }), 'Un nuovo esame si può chiedere dal 23 novembre 2026.'],
+    [examOf({ stato: 'non-superato', tentativo: attempt(), nuovoEsameDal: '2026-11-11', competenzeSotto: ['C2'] }), /Non superato \(55%\)\. Sotto il 60%: C2; il ripasso te la propone\..*Un nuovo esame si può chiedere dall’11 novembre 2026\./],
   ])('draws the final exam %#', async (esame, words: string | RegExp) => {
     get.mockResolvedValue(page({ esame }));
     renderPage();
@@ -215,7 +238,7 @@ describe('the course page', () => {
   });
 
   it('a failed exam, from the third day, says «Chiedi al tuo assistente un nuovo esame» with the competences under 60%', async () => {
-    get.mockResolvedValue(page({ esame: { stato: 'non-superato', id: 'e', percentuale: 55, nuovoDal: '2026-11-23', nuovoPossibile: true, sotto60: ['C2'] } }));
+    get.mockResolvedValue(page({ esame: examOf({ stato: 'non-superato', tentativo: attempt(), nuovoEsameDal: '2026-11-23', chiediNuovoEsame: true, competenzeSotto: ['C2'] }) }));
     renderPage();
     const exam = await screen.findByRole('region', { name: 'Esame finale' });
     expect(exam).toHaveTextContent('Sotto il 60%: C2');
@@ -299,7 +322,7 @@ describe('the course page', () => {
   });
 
   it('writes «l’85%» and «l’8 novembre»', async () => {
-    get.mockResolvedValue(page({ superatoIl: '2026-11-08', esame: { stato: 'superato', id: 'e', percentuale: 85, giorno: '2026-11-08' } }));
+    get.mockResolvedValue(page({ superatoIl: '2026-11-08', esame: examOf({ stato: 'superato', tentativo: attempt({ percentuale: 85, giorno: '2026-11-08', superato: true }) }) }));
     renderPage();
     expect(await screen.findByRole('region', { name: 'Esame finale' })).toHaveTextContent('Superato l’8 novembre 2026, con l’85%.');
     expect(screen.getByText('Percorso superato l’8 novembre 2026')).toBeInTheDocument();
@@ -308,7 +331,7 @@ describe('the course page', () => {
   it('offers to end the programme with one module in the singular', async () => {
     vi.mocked(corsiService.trashModule).mockResolvedValue({ trashId: 'trash-m3' });
     renderPage();
-    get.mockResolvedValue(page({ stato: 'in-preparazione', moduli: [moduleOf(1)], inPreparazione: { moduli: { contati: 1, previsti: 3 }, esame: false, schede: [] } }));
+    get.mockResolvedValue(page({ stato: 'in-preparazione', moduli: [moduleOf(1)], inPreparazione: missingOf({ moduli: { contati: 1, previsti: 3 } }) }));
     await userEvent.setup().click(await screen.findByRole('button', { name: /Elimina il modulo 3/ }));
     expect(await screen.findByText(/Hai eliminato il modulo 3/)).toHaveTextContent('con l’unico modulo che c’è');
   });
