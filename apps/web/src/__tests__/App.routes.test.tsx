@@ -75,6 +75,23 @@ vi.mock('../services/studiaService', () => ({
     preferences: vi.fn().mockRejectedValue({ status: 404 }),
   },
 }));
+// «Percorsi» (courses spec §6): the switch comes from the features read, which says what `features.lingoCourses` holds.
+const features = vi.hoisted(() => ({ lingoCourses: true }));
+vi.mock('../services/assistantService', () => ({
+  assistantService: { features: vi.fn(async () => ({ assistantPassages: false, lingoCourses: features.lingoCourses })) },
+}));
+vi.mock('../services/corsiService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../services/corsiService')>()),
+  corsiService: {
+    list: vi.fn().mockResolvedValue([]),
+    get: vi.fn().mockRejectedValue({ status: 404 }),
+    module: vi.fn().mockRejectedValue({ status: 404 }),
+    declaration: vi.fn().mockResolvedValue({ id: 't', chiave: 'MATERIALE_STUDIO', versione: 1, titolo: 'T', corpo: 'C', conferma: 'c', azione: 'a', accettata: true }),
+  },
+}));
+vi.mock('../features/connections/connectionsService', () => ({
+  connectionsService: { listConnectedApps: vi.fn().mockResolvedValue([]) },
+}));
 vi.mock('../components/features/studia/ReviewHome', () => ({ ReviewHome: () => <h2>Ripasso di oggi</h2> }));
 vi.mock('../components/features/studia/ReviewSession', () => ({ ReviewSession: () => <h2>Sessione di ripasso</h2> }));
 
@@ -245,6 +262,36 @@ describe('App routing — Studia', () => {
     expect(screen.getByText('Gymnasium · la tua palestra giuridica')).toBeInTheDocument();
     // The read is mocked to fail here: the page says so.
     expect(await screen.findByText('Non riesco a leggere i tuoi progressi.')).toBeInTheDocument();
+  });
+
+  it('opens «Percorsi» at /studia/percorsi, inside the area, once the switch is on (courses spec §6.1)', async () => {
+    features.lingoCourses = true;
+    renderAt('/studia/percorsi');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Percorsi' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 2, name: 'Non hai ancora percorsi' })).toBeInTheDocument();
+  });
+
+  it('opens a course at /studia/percorsi/:id under the same heading', async () => {
+    features.lingoCourses = true;
+    renderAt('/studia/percorsi/c1');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Percorsi' })).toBeInTheDocument();
+    expect(await screen.findByText('Questo percorso non c’è: forse è stato eliminato.')).toBeInTheDocument();
+  });
+
+  it('opens a module\'s session at /studia/percorsi/:id/moduli/:moduloId in the lesson\'s frame, over the area (§6.5)', async () => {
+    features.lingoCourses = true;
+    renderAt('/studia/percorsi/c1/moduli/m1');
+    expect(await screen.findByTestId('lesson-frame')).toBeInTheDocument();
+    expect(await screen.findByText('Questo modulo non c’è più: forse è stato eliminato.')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1, name: 'Percorsi' })).toBeNull();
+  });
+
+  it('with the switch off, /studia/percorsi goes back to Oggi', async () => {
+    features.lingoCourses = false;
+    renderAt('/studia/percorsi');
+    expect(await screen.findByRole('heading', { name: 'Ripasso di oggi' })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/studia/ripasso');
+    features.lingoCourses = true;
   });
 
   it('keeps a card’s address inside the Studia area', async () => {

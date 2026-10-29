@@ -62,7 +62,7 @@ describe('ConnectPage', () => {
     getRequest.mockResolvedValue(REQUEST);
     renderAt('/connect?request=req-1');
     const notice = await screen.findByRole('note', { name: 'Dati personali' });
-    expect(notice).toHaveTextContent(/l’app leggerà i nomi dei tuoi dossier, i titoli e i riferimenti delle voci e le tue schede di studio/i);
+    expect(notice).toHaveTextContent(/l’app leggerà i nomi dei tuoi dossier, i titoli e i riferimenti delle voci, le tue note, le tue schede e i tuoi percorsi di studio/i);
     expect(notice).toHaveTextContent(/non scrivere lì dati personali dei clienti, oppure autorizza solo app AI di cui ti fidi/i);
   });
 

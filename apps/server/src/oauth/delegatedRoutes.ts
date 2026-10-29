@@ -11,7 +11,7 @@ import { DELETE_SCOPE } from './config';
  * MCP client the user connected.
  */
 /** The named daily counters a route may also spend (middleware/delegated.ts sets their limits). */
-export type DelegatedCounter = 'dossier_create' | 'note' | 'trash' | 'card' | 'passage' | 'text';
+export type DelegatedCounter = 'dossier_create' | 'note' | 'trash' | 'card' | 'passage' | 'text' | 'corso' | 'modulo';
 
 export interface DelegatedRoute {
   method: 'GET' | 'POST';
@@ -22,7 +22,7 @@ export interface DelegatedRoute {
   weight: number | ((req: Request) => number);
   /** For a deletion: the read scope of what it deletes, which the grant must also hold (spec §4.2). */
   readScope?: string;
-  /** A second scope the token must also carry (proposing passages needs the texts too: D7b, §8.7). */
+  /** A second scope the token must also carry (proposing glosses needs the texts too: D7b, §8.7). */
   alsoScope?: string;
   /** A named daily counter beside the points, if any. */
   counter?: DelegatedCounter;
@@ -47,9 +47,9 @@ function cardReferencesWeight(req: Request): number {
   return Math.max(references.size, cardCount(req)) * 2;
 }
 
-function passageCount(req: Request): number {
-  const passages = (req.body as { passaggi?: unknown } | undefined)?.passaggi;
-  return Array.isArray(passages) ? Math.max(1, Math.min(passages.length, 10)) : 1;
+function glossCount(req: Request): number {
+  const glosses = (req.body as { glosse?: unknown } | undefined)?.glosse;
+  return Array.isArray(glosses) ? Math.max(1, Math.min(glosses.length, 10)) : 1;
 }
 
 function referencesWeight(req: Request): number {
@@ -82,13 +82,25 @@ export const DELEGATED_ROUTES: DelegatedRoute[] = [
   // D7b (spec 2026-10-23 §8, allowed by the owners on 25 October 2026, G2 and G7): an entry's text, a page at a
   // time, as the dossier's reader reads it; it leaves through MCP for this route only, under its own scope.
   { method: 'GET', path: '/dossiers/:id/items/:id/text', scope: 'dossier:text', weight: 1, counter: 'text' },
-  // Passages proposed on an entry: it only adds, marked, as a proposal the user validates or removes. It needs
-  // the texts too: «non trovato» and «compare N volte» would otherwise let a connection probe them. Two points
-  // and one of the day's hundred per passage, the refused ones given back.
+  // D8 (G-383, 29 October 2026): glosses proposed on an entry's passages, which the user validates, edits or
+  // removes. It only adds. It needs the texts too: «non trovato» and «compare N volte» would otherwise let a
+  // connection probe them. Two points and one of the day's hundred passages per gloss, the refused ones given back.
   {
-    method: 'POST', path: '/dossiers/:id/items/:id/passages', scope: 'dossier:write', alsoScope: 'dossier:text',
-    weight: (req) => passageCount(req) * 2, counter: 'passage', counterAmount: passageCount,
+    method: 'POST', path: '/dossiers/:id/items/:id/glosses', scope: 'dossier:write', alsoScope: 'dossier:text',
+    weight: (req) => glossCount(req) * 2, counter: 'passage', counterAmount: glossCount,
   },
+  // Coloured passages are no longer proposed (D8): kept in the table so an application still asking is told so
+  // in words (410, its point given back) rather than with a bare 403.
+  { method: 'POST', path: '/dossiers/:id/items/:id/passages', scope: 'dossier:write', weight: 1 },
+  // Gymnasium's courses (Percorsi, A1; spec 2026-10-23 §10.6, Q4 answered in G-377): the assistant reads the
+  // user's courses and creates a course, a module (lesson and verification together) or a final exam. Nothing
+  // here updates or deletes: a correction is a new module, which the user withdraws in the web. The study routes
+  // (open, answer, end, flag, exam) are the session's only, so XP is never settled by a token.
+  { method: 'GET', path: '/lingo/corsi', scope: 'lingo:courses:read', weight: 1 },
+  { method: 'GET', path: '/lingo/corsi/:id/struttura', scope: 'lingo:courses:read', weight: 1 },
+  { method: 'POST', path: '/lingo/corsi', scope: 'lingo:courses:write', weight: 2, counter: 'corso' },
+  { method: 'POST', path: '/lingo/corsi/:id/moduli', scope: 'lingo:courses:write', weight: 3, counter: 'modulo' },
+  { method: 'POST', path: '/lingo/corsi/:id/esami', scope: 'lingo:courses:write', weight: 3, counter: 'modulo' },
 ];
 
 const SEGMENT = /^[A-Za-z0-9_-]{1,64}$/;

@@ -27,9 +27,11 @@ import {
   groupAnchorsByBlock,
   isOpenProposal,
   resolveAnchors,
+  resolveGlosses,
   signAriaLabel,
   signColors,
   type BlockAnnotations,
+  type GlossAnchor,
   type LocatedThread,
   type ResolvedAnchor,
 } from './articleAnnotations';
@@ -50,6 +52,11 @@ export interface RenderArticleInput {
   threads?: readonly LocatedThread[];
   /** The discussion open in the panel: its words light up (`.vlx-thread-focus`). */
   focusedThreadId?: string | null;
+  /**
+   * An application's glosses (D8): counted on the signs and nothing else — no mark, no element in the text. The reader
+   * shows a gloss's words with the CSS Custom Highlight API (`utils/glossPassage.ts`).
+   */
+  glosses?: readonly GlossAnchor[];
   /**
    * Render only the blocks inside this range of `raw` (the comparison draws a comma at a time).
    * The range is whole blocks; offsets stay the text's own.
@@ -211,7 +218,9 @@ export function renderArticleHtml(input: RenderArticleInput): string {
   }
 
   for (const d of structure.decorations) pushRaw(d.start, d.end, d.kind, decorationOpen(d.kind, d.noteId), '</span>');
-  const groups = input.signs ? groupAnchorsByBlock(raw, structure, [...anchors, ...threadAnchors]) : null;
+  const groups = input.signs
+    ? groupAnchorsByBlock(raw, structure, [...anchors, ...threadAnchors, ...resolveGlosses(plain, input.glosses ?? [])])
+    : null;
   return renderBlocks(raw, structure, marks, groups, input.only);
 }
 
@@ -271,21 +280,25 @@ export function signHtml(index: number, group: BlockAnnotations | undefined): st
   const notes = group?.notes.length ?? 0;
   const highlights = group?.highlights.length ?? 0;
   const threads = group?.threads.length ?? 0;
-  if (!group || notes + highlights + threads === 0) return '';
+  const glossed = group?.glosses.length ?? 0;
+  if (!group || notes + highlights + threads + glossed === 0) return '';
   // The passages with an application's note (D7b) are named apart, by their notes' states, and drawn by the state's own
   // shape, as on the row's light: a dashed ring to validate, a flag to review, a tick validated, each with its count.
   // Every other highlight (the reader's, an application's mark with no note) is a dot of its colour. `data-highlights`
   // still counts them all, so «Nascondi evidenziazioni» hides them with the rest; `data-proposed` counts the open ones.
   // Only they give the sign a `title`: the shapes alone would not say what they are.
+  // An application's glosses (D8) the same way, by their own element (`.vlx-sign-gloss`): not highlights, so «Nascondi
+  // evidenziazioni» leaves them and their sign (`data-glosses`).
   const noted = group.highlights.filter((h) => h.proposal?.note);
   const counts = countAiReview(noted.map((h) => h.proposal!.note!.state));
+  const glosses = countAiReview(group.glosses.map((g) => g.state));
   const open = counts.proposed + counts.review;
-  const label = signAriaLabel(notes, highlights - noted.length, threads, counts);
+  const label = signAriaLabel(notes, highlights - noted.length, threads, counts, glosses);
   let html =
     `<span class="vlx-sign" role="button" tabindex="0" aria-haspopup="dialog" data-block="${index}"` +
-    ` data-notes="${notes}" data-highlights="${highlights}" data-threads="${threads}"` +
+    ` data-notes="${notes}" data-highlights="${highlights}" data-threads="${threads}" data-glosses="${glossed}"` +
     (open > 0 ? ` data-proposed="${open}"` : '') +
-    (noted.length > 0 ? ` title="${escapeAttr(label)}"` : '') +
+    (noted.length + glossed > 0 ? ` title="${escapeAttr(label)}"` : '') +
     ` aria-label="${escapeAttr(label)}">`;
   if (notes > 0) html += `<span class="vlx-sign-notes" data-count="${notes}"></span>`;
   for (const color of signColors(group.highlights.filter((h) => !h.proposal?.note))) html += `<span class="vlx-sign-dot" data-color="${color}"></span>`;
@@ -293,6 +306,9 @@ export function signHtml(index: number, group: BlockAnnotations | undefined): st
   // In the order the label says them («1 da validare · 1 da rivedere · 1 validato»).
   for (const state of ['proposed', 'review', 'validated'] as const) {
     if (counts[state] > 0) html += `<span class="vlx-sign-ai" data-state="${state}" data-count="${counts[state]}"></span>`;
+  }
+  for (const state of ['proposed', 'review', 'validated'] as const) {
+    if (glosses[state] > 0) html += `<span class="vlx-sign-gloss" data-state="${state}" data-count="${glosses[state]}"></span>`;
   }
   return `${html}</span>`;
 }

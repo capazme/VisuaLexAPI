@@ -9,10 +9,11 @@
  * shows. Offsets are plain-text offsets — `article_text` without its
  * newlines (CLAUDE.md gotcha 23).
  */
-import type { Annotation, Highlight, HighlightProposal, ArticleDiscussionPassageSummary } from '../types';
+import type { AiReviewState, Annotation, Highlight, HighlightProposal, ArticleDiscussionPassageSummary } from '../types';
 import type { ArticleStructure, StructureBlock } from './articleStructure';
 import { HIGHLIGHT_COLORS, type HighlightColor } from './highlightColors';
 import { aiReviewSummary, type AiReviewCounts } from './aiReview';
+import { GLOSS_WORDS } from '../constants/glossWords';
 
 /** A passage discussion located in the text on screen (never a detached one). */
 export interface LocatedThread {
@@ -21,15 +22,30 @@ export interface LocatedThread {
   end: number;
 }
 
+/**
+ * An application's gloss on a passage (D8): where it is anchored, as a highlight is (`startOffset`, `text`), and the
+ * state of its note. Never a mark in the text (no element of its own, and no colour): its block's sign counts it, and
+ * the reader shows it beside the text or in the sign's popover.
+ */
+export interface GlossAnchor {
+  id: string;
+  startOffset: number;
+  text: string;
+  state: AiReviewState;
+}
+
 export type ResolvedAnchor =
   | { kind: 'highlight'; highlight: Highlight; start: number; end: number }
   | { kind: 'note'; note: Annotation; start: number; end: number }
-  | { kind: 'thread'; thread: ArticleDiscussionPassageSummary; start: number; end: number };
+  | { kind: 'thread'; thread: ArticleDiscussionPassageSummary; start: number; end: number }
+  | { kind: 'gloss'; gloss: GlossAnchor; start: number; end: number };
 
 export interface BlockAnnotations {
   notes: Annotation[];
   highlights: Highlight[];
   threads: ArticleDiscussionPassageSummary[];
+  /** An application's glosses on the block's words (D8), in the order they appear. */
+  glosses: GlossAnchor[];
 }
 
 /**
@@ -91,6 +107,19 @@ export function resolveAnchors(
 }
 
 /**
+ * Where each gloss lands (D8), by the highlights' own rule (`anchorEnd`): at its offset, or nowhere. One that does not
+ * land is in no block: the reader lists it apart, with its actions.
+ */
+export function resolveGlosses(plain: string, glosses: readonly GlossAnchor[]): ResolvedAnchor[] {
+  const out: ResolvedAnchor[] = [];
+  for (const gloss of glosses) {
+    const end = anchorEnd(plain, gloss.startOffset, gloss.text);
+    if (end !== null) out.push({ kind: 'gloss', gloss, start: gloss.startOffset, end });
+  }
+  return out;
+}
+
+/**
  * The annotations each block holds, aligned with `structure.blocks`. An
  * annotation belongs to every block its text reaches — a highlight dragged
  * across two commi is listed under both — and to none when its anchor does
@@ -104,15 +133,17 @@ export function groupAnnotationsByBlock(
   highlights: readonly Highlight[],
   annotations: readonly Annotation[],
   threads: readonly LocatedThread[] = [],
+  glosses: readonly GlossAnchor[] = [],
 ): BlockAnnotations[] {
-  const anchors = resolveAnchors(raw.replace(/\n/g, ''), highlights, annotations);
+  const plain = raw.replace(/\n/g, '');
+  const anchors = resolveAnchors(plain, highlights, annotations);
   const threadAnchors: ResolvedAnchor[] = threads.map((lt) => ({
     kind: 'thread',
     thread: lt.thread,
     start: lt.start,
     end: lt.end,
   }));
-  return groupAnchorsByBlock(raw, structure, [...anchors, ...threadAnchors]);
+  return groupAnchorsByBlock(raw, structure, [...anchors, ...threadAnchors, ...resolveGlosses(plain, glosses)]);
 }
 
 /** `groupAnnotationsByBlock` over anchors already resolved (the renderer has them). */
@@ -128,7 +159,7 @@ export function groupAnchorsByBlock(
   const plainAt = (rawIndex: number) => plainBefore[Math.min(Math.max(rawIndex, 0), raw.length)];
 
   return structure.blocks.map((block) => {
-    const group: BlockAnnotations = { notes: [], highlights: [], threads: [] };
+    const group: BlockAnnotations = { notes: [], highlights: [], threads: [], glosses: [] };
     if (block.kind === 'update-sep') return group;
     const start = plainAt(block.start);
     const end = plainAt(block.end);
@@ -147,6 +178,8 @@ export function groupAnchorsByBlock(
         if (!group.threads.includes(anchor.thread)) {
           group.threads.push(anchor.thread);
         }
+      } else if (!group.glosses.includes(anchor.gloss)) {
+        group.glosses.push(anchor.gloss);
       }
     }
     return group;
@@ -154,7 +187,7 @@ export function groupAnchorsByBlock(
 }
 
 export const hasAnnotations = (group: BlockAnnotations | undefined): group is BlockAnnotations =>
-  !!group && group.notes.length + group.highlights.length + group.threads.length > 0;
+  !!group && group.notes.length + group.highlights.length + group.threads.length + group.glosses.length > 0;
 
 /**
  * How a mark on a section no longer shown is named: «Sezione non più disponibile · Ratio» for
@@ -205,22 +238,31 @@ export const isOpenProposal = (h: Highlight): boolean => !!h.proposal?.note && h
 /**
  * What a screen reader hears on a sign: "2 note e 1 evidenziazione in questo passo". The passages with an
  * application's note (D7b) come last, apart, in the row's words: "1 nota in questo passo; 3 passaggi proposti
- * dall'IA: 1 da validare · 1 da rivedere · 1 validato". `highlights` leaves them out.
+ * dall'IA: 1 da validare · 1 da rivedere · 1 validato". `highlights` leaves them out. An application's glosses (D8)
+ * after them, the same way, in the gloss's own words: "…; 2 glosse dell'IA: 1 da validare · 1 validata".
  */
-export function signAriaLabel(notes: number, highlights: number, threads = 0, proposals: AiReviewCounts = { proposed: 0, validated: 0, review: 0 }): string {
+export function signAriaLabel(
+  notes: number,
+  highlights: number,
+  threads = 0,
+  proposals: AiReviewCounts = { proposed: 0, validated: 0, review: 0 },
+  glosses: AiReviewCounts = { proposed: 0, validated: 0, review: 0 },
+): string {
   const parts: string[] = [];
   if (notes > 0) parts.push(`${notes} ${notes === 1 ? 'nota' : 'note'}`);
   if (highlights > 0) parts.push(`${highlights} ${highlights === 1 ? 'evidenziazione' : 'evidenziazioni'}`);
   if (threads > 0) parts.push(`${threads} ${threads === 1 ? 'glossa' : 'glosse'}`);
   const all = proposals.proposed + proposals.review + proposals.validated;
-  const proposed = all > 0
-    ? `${all} ${all === 1 ? 'passaggio proposto' : 'passaggi proposti'} dall'IA: ${aiReviewSummary(proposals)}`
-    : '';
-  if (parts.length === 0) return proposed || 'in questo passo';
+  const glossed = glosses.proposed + glosses.review + glosses.validated;
+  const assistant = [
+    all > 0 ? `${all} ${all === 1 ? 'passaggio proposto' : 'passaggi proposti'} dall'IA: ${aiReviewSummary(proposals)}` : '',
+    glossed > 0 ? `${GLOSS_WORDS.count(glossed)}: ${GLOSS_WORDS.summary(glosses)}` : '',
+  ].filter(Boolean).join('; ');
+  if (parts.length === 0) return assistant || 'in questo passo';
   const own = parts.length === 1
     ? `${parts[0]} in questo passo`
     : `${parts.slice(0, -1).join(', ')} e ${parts[parts.length - 1]} in questo passo`;
-  return proposed ? `${own}; ${proposed}` : own;
+  return assistant ? `${own}; ${assistant}` : own;
 }
 
 const OPENING_CHARS = 48;

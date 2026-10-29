@@ -76,7 +76,75 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   change only marks its card handled, and a 403 stops the queue with «Non sei più tra i validatori»; the queue is
   read only once the outlet's `validator` is `true` — while the account loads it waits, for someone the account
   says is not a validator it shows «Questa sezione è riservata…» with no request, which the server would refuse with
-  403, and when `/auth/me` failed (`validator` null, never taken for «not a validator») it reads and the server decides),
+  403, and when `/auth/me` failed (`validator` null, never taken for «not a validator») it reads and the server decides);
+  «Percorsi» is `/studia/percorsi` and a course `/studia/percorsi/:id` (courses spec
+  `docs/superpowers/specs/2026-10-23-gymnasium-courses-design.md` §6, the web's pull request (a); the views under
+  `components/features/studia/corsi/`, the routes in `services/corsiService.ts`, the shapes in `types/corsi.ts`): behind
+  the server's switch `lingo_courses`, read with `assistantPassages` from the one `GET /api/features`
+  (`loadAssistantFeatures` sets `coursesSwitch`: `unknown` until it answers, a failed read keeps what was known — one
+  network error must not hide «Percorsi» for the session —, read again when the browser is back online with it never
+  read, forgotten at logout) — off, the sidebar's «Percorsi» (second in «Studia») and «Oggi»'s row are not drawn,
+  nothing is read, and the pages go back to Oggi (`CoursesGate`, which reads the features again as it mounts and
+  redirects only on an «off» that read confirms; a switch it could not read says so with «Riprova»; a 404 on the list
+  turns the switch off; the server's trash then hides a course and a module too). A review session with `?corso=` waits
+  behind the same gate (S2, #375, narrows the session to the course and adds its check cards after the due and new ones,
+  `verifica: true`, counted in `conteggi.verifica`; before S2 the server refuses `?corso=` with a 400).
+  Nothing of a course is created in the web: the assistant creates it (§3), and an empty «Percorsi» says how, with the
+  sentence to copy (`CREATE_SENTENCE`) and, for a connection without `lingo:courses:write`, where permissions are chosen and that a connection made before the
+  courses lacks it (no promise of what a new one brings: the MCP asks for the scope from M1).
+  Before the first course the declaration `MATERIALE_STUDIO` opens by itself in `AcceptTextDialog` (every word the
+  server's; a newer version answered by `POST …/accetta` comes back unticked); with courses already there a new
+  version waits behind «Leggi e accetta». Every read (`useCourseRead`) is read again when the page is visible again,
+  when the browser is back online and after `coursesChanged()` (a restore, a rename), the last answer kept on screen
+  meanwhile. The course page draws the competences with their numbers («1 di 2 sessioni · la prossima vale dal 3/11 ·
+  ultima 85%», `competenceNumbers`), the modules (a module never opened goes to the trash with «Annulla»; an opened
+  one superseded by a live correction offers «Ritira questo modulo»), «In preparazione» with what is missing and the
+  sentence for the assistant, «Il programma finisce qui» beside a module's deletion (Q11, G-377: offered under the
+  modules' heading once a module was deleted on the page and fewer count than planned, gone with «Annulla»;
+  `PATCH { moduliPrevisti }` to the modules that count, confirmed; «così l’esame potrà aprirsi» only when modules are
+  all the course lacks, `closingOpensExam`), the exam's state (taking it is pull request d), the dossier's link and the menu (rename, export as
+  JSON, the trash with the toast «Il dossier «X» resta in Dossier»). «Oggi»'s row (`TodayCourses`, in the day block's
+  cell so the grid keeps its rows) offers a course's due cards first (`/studia/ripasso/sessione?corso=`, never with a
+  subject; its end has «Torna a Oggi» alone) and then «Modulo del giorno: <titolo> · <percorso>», which opens the
+  module's session, as each module's row does on the course page («Apri» not yet started, «Riprendi», «Rileggi»).
+  **A module's session** (pull request b; §5 steps 1–4, §6.5, §10.3) is `/studia/percorsi/:id/moduli/:moduloId` — by the
+  module's id, since a correction shares its order — `ModuleSession`, in `LessonFrame` as the review (`StudiaPage`'s
+  `isLesson`; `LessonLoading` goes back to the course): the header says «Passo 4 di 11 · Richiamo» (`moduleSteps.ts`:
+  the start, each block's reading and recall, then the quiz, which until pull request c is a holding screen), the step
+  in the middle (keyed by step and by the recall's phase, its heading focused in the commit), the one action in
+  `LessonBar`; while the switch is read, `LessonLoading` keeps the close button and Esc around `CoursesGate`. `GET
+  …/moduli/:moduloId` is read once (the content is frozen once opened). The start says what the module is
+  for (its competences with their words), its pre-questions and, not yet started, that starting keeps it in the course:
+  «Inizia il modulo» posts `apri`, «Leggi senza iniziare» shows every block in one page and opens nothing. A block is read
+  with an indicative time (`blockMinutes`: its share of the module's minutes by words, else 100 words a minute), a line
+  under the header that follows the scroll (never a timer), the pre-questions folded above it, and a pause suggested
+  every 25 minutes in the bar. The lesson is drawn by the web's own parser (`lessonFormat.ts`, `LessonText`: the closed
+  Markdown subset, everything else React text; `corsi.guard.test.ts` refuses HTML written from a string); a citation
+  `[testo](#c1)` is a button that opens the copy the block stored (`lessonCitations.ts`: a norm in `DossierItemReader`, a
+  decision in `DossierDecisionReader`) beside the text on a computer (its heading takes the focus, which goes back to the
+  citation as it closes), in a `Sheet` on a phone (`CitationPanel`); Esc closes it first, and a link or «Apri su
+  Dashboard» inside it leaves through the same question as the close button. A `###` is one level under the step's
+  heading (`headingLevel`). Highlights are the session's (`Span`s over the block's plain text, `numberLeaves` giving
+  each leaf its offset; emphasis is read around a citation held by a placeholder): a selection brings «Evidenzia» (44
+  px, under it; a press on it holds it until its click, or 400 ms after the release); the text is a Tab stop where
+  Shift and the arrows select from its start (`Selection.modify`, a word with Ctrl or Alt: a text not editable has no
+  caret) and Tab goes to «Evidenzia»; a highlight pressed or Enter on it (one Tab stop each) brings «Togli». The recall (`RecallStep`) hides the text while the reader writes (the trace «gli
+  elementi, le eccezioni, un caso»), «Confronta con il testo» sets what was written beside the block, then the block's
+  questions as real radio buttons (`RecallQuestion`: the server grades, `POST …/risposte { domandaId, scelta }` and
+  nothing else; the explanations, the right one and the reader's marked in words, the outcome in a live region; «Non
+  registrato: riprova», or the server's words on a 4xx; once graded the focus moves to the question, «Rispondi» gone). Nothing written, highlighted or reached leaves the browser (§8;
+  the test reads every body); the step reached is kept on this device (`visualex.studia.percorsi.passo`, forgotten with
+  `seenProgress` at sign-in, sign-up and sign-out) and an opened module resumes there. Closing or Esc leaves at once
+  with nothing written or highlighted, else asks «Interrompere il modulo?» (`WireConfirm`, «Continua il modulo»
+  evident). `GET /:id`, `GET /oggi`, `GET …/moduli/:moduloId`, `apri` and `risposte` are S2's (#375, «What S2
+  exposes», the user's session only: a token gets 403), typed in `types/corsi.ts` as #375 answers them: the course page's
+  competences carry `sessioni: { contate, servono }` and `ultima: { giorno, percentuale }`, its modules `stato` with
+  «ritirato», `eliminabile` and `ritirabile` (the page offers the trash and «Ritira» from them, never deciding itself) and
+  `sostituitoDa` as the live corrections' ids, «in preparazione» `manca.esame`, `competenzeSenzaModulo` and `schede[].servono`,
+  the exam a state always there (`assente`, `bloccato`, `aperto`, `in-corso`, `non-superato`, `superato`) with its
+  attempt, `nuovoEsameDal` and `chiediNuovoEsame`; «Oggi»'s row is `{ corso, modulo, schede: { dovute, verifica } }`, the
+  due and check cards offered as one count. `corsi.guard.test.ts` keeps the folder's
+  targets at 44 px and its text at 11 px or more,
   `/history`, `/forum` («Dossier pubblici»; `/environments`, the page «Ambienti» was, redirects there keeping an old
   share link's `?import=`), `/forum/community` («Community», `ForumCommunityPage`: an honest placeholder — titled
   «Community» under the Forum's phrase (L-37), an empty state composed for the page, «Le discussioni arrivano presto»
@@ -84,7 +152,7 @@ MERL-T integration across server and web (routes, gates, guards, surfaces, slice
   `features/connections/ConnectAiAppPage`: the MCP address from `GET /api/oauth/connection` with
   «Copia», one card per client that connects today — `aiClients.ts`, the survey of 13 Oct 2026, with
   the clients our server refuses listed apart and why —, the personal-data notice (what a connected app reads: dossier
-  names, entry titles and citations, study cards; no clients' personal data there, or only trusted AI apps — the owner,
+  names, entry titles and citations, notes, study cards and courses; no clients' personal data there, or only trusted AI apps — the owner,
   13 Oct 2026, in place of pseudonymisation; the consent page `/connect` carries the same notice), what a connected app can do, and
   `ConnectedAppsSection`, the same list Impostazioni shows; reached from the user menu. The page has two parts, named
   by two anchors at its top: «VisuaLex» (`#visualex`, all of the above) and «mcp-legal-it» (`#mcp-legal-it`, a
@@ -1064,6 +1132,43 @@ tick, nothing if the application wrote nothing — last in the row's toggle, in 
 («2 da validare · 1 da rivedere») are its `title` and in the row's name, its counts the server's `assistant_notes` on
 the item (`serverFieldsFromApi`).
 
+**An application's glosses** (D8: the server's side in PR #366, spec `docs/superpowers/specs/2026-10-29-d8-glosses-design.md`) are notes an application wrote on a passage of a dossier entry, validated
+by the user: `Proposal.kind === 'gloss'` (`color` null, the note never empty), on the same routes, store, states,
+boundary move and bin as the D7b passages, behind the same `assistant_passages` switch (the web shows a gloss saved
+while `assistant_glosses` was on even once that switch is off; it never reads `assistantGlosses`). **A gloss is never a
+mark**: `useEntryProposals` splits them out (`glosses`, and `glossAnchors` for the renderer: `GlossAnchor`, the id,
+the offset, the words and the state) and never makes a `Highlight` of one, so it reaches no other reader, PDF, Forum,
+Study Mode or practice, and no element of it enters the text (root rule 23): `renderArticleHtml` and
+`renderDecisionHtml` take `glosses` and only count them on the block's sign (`BlockAnnotations.glosses`,
+`data-glosses`, `.vlx-sign-gloss` with the state's shape, named apart by `signAriaLabel`: «…; 2 glosse dell'IA: 1 da
+validare · 1 validata»); «Nascondi evidenziazioni» leaves them, a gloss is a note. The projection tests run with glosses
+on. Where the reader has room (`.vlx-glossed`, a container query at 52 rem on the wrapper `GlossMargin` puts around
+`ArticleBody`, in the article's and the decision's dossier reader alike) the cards stand in a column on the right, as a
+word processor's comments (`GlossMargin`): each at the height of the first line of its words, read from a DOM range of
+the text root (`rangeFromPlainOffsets`), pushed down under the card above when they would overlap, in the order of the
+text (`placeGlossCards`, `utils/glossLayout.ts`, pure; words with no box, in the folded update notes, under the card
+before), placed by a `transform` (160 ms after its first place, which is taken at once; none under reduced motion) and
+measured again on every redraw, reflow or card that grows (`ResizeObserver`s); only glosses whose words land make a
+column. Once the cards are placed (`onWideChange`), a sign whose block holds only glosses focuses the first card and
+opens nothing, one that holds more opens the popover with «Vai alla glossa a margine» (`glossesInMargin`); a popover
+opened narrow keeps its cards when the reader widens (one may be half edited), one opened wide lists them as soon as it
+narrows, and if no card takes the focus («Vai alla glossa» answers false) the popover stays and lists them.
+«Rimuovi» in the column hands the focus to the next card, else the one before, else the block's sign found again after
+the text redrew (`signAt`: a sign taken before the removal is no longer in the page), else the nearest sign; Esc on a
+card (not a field's own Esc) goes back to its block's sign; «Sposta» gives it back to the card (`MoveProposalBar`'s
+`focusAfter`), or, narrow, to the sign found by the gloss's words (it has no mark). With less room — a phone, and the norms' column of a dossier that has decisions too — the column
+is not drawn (`display: none`, read by its width: `onWideChange`) and the sign's popover lists the block's `GlossCard`s
+first (44 px on a touch screen). A card (`GlossCard`, its passage's words its `aria-describedby`): the state in words and shape (feminine, as the word:
+«Validata»), the passage's words on one line,
+the text, then «Valida» and «Da rivedere» (toggles, `aria-pressed`, waiting while a write is out), «Modifica»
+(`NoteEditBox explicit`; an emptied text is not sent), «Sposta» (`MoveProposalBar`, named «Sposta la glossa») and
+«Rimuovi» (the bin's «Annulla», «Glossa rimossa»); «Cosa non va?» while flagged (`ReviewComment`), «Vedi la versione
+dell'IA» once edited, «Vedi il passaggio dell'IA» once moved. Hovering a card or focusing anything in it shows its
+words with the CSS Custom Highlight API (`useGlossPassage`, `utils/glossPassage.ts`, `::highlight(vlx-gloss)`: the
+discussion's tint, one passage on the page at a time). A gloss whose words no longer land is listed under the text
+(`LostGlossesList`). **Every visible word that names one is in `constants/glossWords.ts`** (`GLOSS_WORDS`), and only
+there: «glossa» is also the Forum's discussion on a passage, and the owners may choose another word.
+
 The colour of new highlights is chosen once, in the reading bar (H1, the owner's decision; `settings.highlightColor`,
 kept on this device with the other reading settings, yellow until chosen, and yellow again for a save holding
 anything else — the persist `merge` checks it, `isHighlightColor`): `HighlightColorMenu` beside «Evidenziazioni» on a
@@ -1073,15 +1178,38 @@ alone, the decision's bar and Study Mode's header, its words are its `title`), i
 phone under their own title («Colore delle nuove evidenziazioni — uso suggerito», each named «Nuove evidenziazioni in
 verde, uso suggerito: …» so it reads as a setting, not as «highlight now»), in the decision's bar, in Study Mode's
 header, and with the dossier reader's actions (it has no bar); never on a text that takes no highlight. The menu, under
-the same title, offers the four as `menuitemradio`, each with what it is suggested for (`HIGHLIGHT_COLOR_MEANINGS`: yellow
-«Punto centrale», green «Condizione o presupposto», blue «Definizione o eccezione», red «Da rivedere»), a hint: any
-colour is free for anything. Every way of highlighting takes it: `SelectionPopup` never asks — «Evidenzia» (named
+the same title, offers the four as `menuitemradio`, each with what it is suggested for, a hint: any colour is free for
+anything. **What a colour means is each user's** (the owner, 29 October 2026: «solo etichette» — the four colours stay, no colour
+is added, only the words for them change, so no highlight, colour key or anchor moves, root rule 23): the default is
+`HIGHLIGHT_COLOR_MEANINGS` (yellow «Punto centrale», green «Condizione o presupposto», blue «Definizione o eccezione», red
+«Da rivedere»), and a user's own are `settings.highlightColorMeanings` — only the colours given one, trimmed, 1 to 40
+characters (`normalizeHighlightMeaning`; the persist `merge` drops anything else, `sanitizeHighlightMeanings`, and a
+meaning written back to the default is no meaning of one's own), kept on this device with the other reading settings,
+never sent to the server or to an application (the MCP tool's description gives the defaults). Whatever words a
+colour's meaning reads it through `useHighlightColorMeanings` (`highlightColorItems` takes the meanings; its names lower
+the first letter, not an acronym the user wrote). Beside the colour's trigger one gear and only that (no «?»: the menu
+already explains; the gear says «change it»), named and titled «Cambia il significato dei colori»
+(`CHANGE_MEANINGS_LABEL`), the trigger's look with 44 px of width on a phone — the article's bar, the decision's, the
+dossier reader's; on the phone's «⋯» the same words are the entry after the four colours; in Study Mode, whose header
+has a gear already (its own settings, «Impostazioni (S)»), the entry is the last of that panel, not a second gear
+(`meaningsGear={false}`); and none in the lesson's article sheet on a phone (`ui/Sheet` keeps the focus inside it, a
+dialog over it would fight it: Impostazioni stays the user menu's there). All open Impostazioni at «Significato dei colori» (`openSettings('highlightColors')`):
+the dialog's state is the store's (`settingsDialog`, session-only), so `Layout`'s `SettingsModal` opens from any reader,
+and with that section it gives the section's first field («Giallo») the focus (`initialFocusRef`) — never the heading:
+`useDialogFocus`'s trap sends Shift+Tab from an element outside its Tab order (`tabIndex -1`) to the dialog's last
+control — and that first focus scrolls the dialog's body alone so the section's heading is at its top (`revealOnFocus`,
+`scrollParentOf`).
+`HighlightMeaningsSection`, after «Tipografia»: a field per colour (its dot and name as the label, the default as
+placeholder, `maxLength` 40, 44 px on a phone, `FIELD_TEXT`), saved when left or on Enter, an emptied one keeping the
+meaning it had (said in the section's status line), Esc giving up a change without closing the dialog, and «Ripristina
+predefiniti» (`aria-disabled` while nothing differs). Every way of highlighting takes it: `SelectionPopup` never asks — «Evidenzia» (named
 «Evidenzia in giallo», `aria-keyshortcuts="h"`) and H highlight at once in it, its icon in the colour bright on the
 popup's dark surface (`HIGHLIGHT_ICON_ON_DARK`, never the highlight's tint, dark in the dark theme and transparent
 while highlights are hidden) —, a key passage's «Fai tua», and Study Mode's keys 1–4, which highlight in their colour
 and make it the one chosen. Sideways the popup is moved 8 px inside the window by its drawn box — the positioning
 element's first child, the positioning element being `w-max` — (a `marginLeft` set as it is drawn). Study Mode's own keys leave alone a key a menu took or one pressed in a menu (Esc there closes the
-menu, not Study Mode), and H and N while text is selected (the popup's). The MCP tool gives an application the same meanings and refuses red (`apps/mcp/src/tools/passages.ts`).
+menu, not Study Mode), every key while a dialog is open over it (`[aria-modal="true"]` anywhere in the document, the
+focus inside it or not: Impostazioni opened from its settings — its Esc, arrows and digits are the dialog's), and H and N while text is selected (the popup's). The MCP tool gives an application the same meanings and refuses red (`apps/mcp/src/tools/passages.ts`).
 
 The wiring follows the server's contract (`services/assistantService.ts`). `GET /api/features` says whether the
 feature is on, read as the app starts (`useAuth`) and as the dossier page mounts; a 404 «Non disponibile» from a
@@ -1965,7 +2093,9 @@ It is **grouped by act** (spec `docs/superpowers/specs/2026-10-04-dossier-per-at
 - **The trash** (what a connected application deleted, and the dossiers, the entries removed from a dossier and the study cards the user deleted, 30 days; spec §10-11):
   one `useTrash` in `DossierPage` feeds «Cestino (n)» on the list (shown only
   when there is something), the page `?trash=1` (`TrashPage`: dossiers, entries
-  «Da «dossier»», «Schede di studio» by their first questions) and a dossier's
+  «Da «dossier»», «Schede di studio» by their first questions, «Percorso «…»» with its modules and cards and
+  «Modulo «modulo» · percorso» (the server's label split at its first « · ») for the courses of «Percorsi», `LINGO_CORSO` and `LINGO_CORSO_MODULO`, whose 404 on a
+  restore — a module whose course is gone — keeps the entry with the server's words when the trash still has it) and a dossier's
   own «Rimossi di recente (n)» at its bottom (`DossierRecentlyRemoved`). Each
   entry (`TrashEntryRow`, `trashSummary.ts`) is restored whole — a 409 asks
   which dossier to restore into; a 404 drops an entry the server no longer has, and with a dossier
@@ -2322,7 +2452,7 @@ Duplicating any of these is a defect, not a shortcut.
 - `hooks/useArticleTextInteractions.ts` — the update-note chips, the
   foldable AGGIORNAMENTO tail and the annotation signs (`openBlock`), for any
   surface that renders structured text.
-- `utils/articleAnnotations.ts` — `resolveAnchors`, `groupAnnotationsByBlock`,
+- `utils/articleAnnotations.ts` — `resolveAnchors`, `resolveGlosses` (D8), `groupAnnotationsByBlock`,
   `highlightsWithoutSign`, `describeBlock` (a block named by its printed enumerator or its opening
   words, never a computed number). The renderer and the block popover both
   read it: never re-derive where an anchor lands anywhere else.

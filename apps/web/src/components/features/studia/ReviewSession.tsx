@@ -26,6 +26,8 @@ import { useCelebratedToday } from './progress/useCelebratedToday';
 import { useProgress } from './progress/useProgress';
 import { useGradeNote } from './useGradeNote';
 import { useReviewSession, type ReviewSummary } from './useReviewSession';
+import { CoursesGate } from './corsi/CoursesGate';
+import { useCoursesSwitch } from './corsi/coursesSwitch';
 
 const HOME_PATH = '/studia/ripasso';
 
@@ -101,7 +103,8 @@ function ArticlePanel({ anchor, desktop, onClose, onOpenInReader, showToast }: A
   const norma = useMemo(() => normaFromAnchor(anchor), [anchor]);
   const label = anchorLabel(anchor) ?? 'Articolo';
   if (!norma) return null;
-  const reader = <DossierItemReader norma={norma} onOpenOnDashboard={onOpenInReader} showToast={showToast} />;
+  // In the phone's sheet no gear to Impostazioni: the sheet keeps the focus, a dialog over it would fight it.
+  const reader = <DossierItemReader norma={norma} onOpenOnDashboard={onOpenInReader} showToast={showToast} meaningsGear={desktop} />;
 
   if (!desktop) {
     return (
@@ -137,6 +140,8 @@ interface SessionEndProps {
   materia: Materia | undefined;
   /** One institute of `materia` (G5): what is left is counted in it, not in the whole subject. */
   istituto: string | undefined;
+  /** One course of «Percorsi»: no count of its own is read here, so the end offers «Torna a Oggi» alone. */
+  corso: string | undefined;
   onHome: () => void;
   onContinue: () => void;
 }
@@ -147,10 +152,11 @@ interface SessionEndProps {
  * session of the same scope. The scope is the day, the subject, or one institute of it (G5), whose count comes from
  * the road's read (`usePercorso`). Focus goes to the sentence, so a screen reader hears how it went.
  */
-function SessionEnd({ summary, materia, istituto, onHome, onContinue }: SessionEndProps) {
+function SessionEnd({ summary, materia, istituto, corso, onHome, onContinue }: SessionEndProps) {
   const day = useProgress(undefined);
   const subject = useProgress(materia, materia !== undefined);
   const dayData = day.status === 'ready' ? day.data : null;
+  if (corso !== undefined) return <EndScreen summary={summary} day={dayData} more={false} onHome={onHome} onContinue={onContinue} />;
   if (materia !== undefined && istituto !== undefined) {
     return <InstituteEnd summary={summary} materia={materia} istituto={istituto} subject={subject.status === 'ready' ? subject.data : null} day={dayData} onHome={onHome} onContinue={onContinue} />;
   }
@@ -217,7 +223,7 @@ function EndScreen({ summary, day, more, onHome, onContinue }: EndScreenProps) {
 }
 
 /**
- * A review session (`/studia/ripasso/sessione?materia=&istituto=`), drawn as the lesson (Gymnasium spec §5.4): at the top the
+ * A review session (`/studia/ripasso/sessione?materia=&istituto=`, or `?corso=` for one course of «Percorsi»), drawn as the lesson (Gymnasium spec §5.4): at the top the
  * close button and the progress bar, in the middle the card, at the foot the bar with the one action available. The
  * queue lives in `useReviewSession`, so opening and closing an anchor's article leaves it as it was. While a card is
  * on screen, closing (the button or Esc) asks before leaving — what was graded is already recorded; with no card
@@ -225,6 +231,21 @@ function EndScreen({ summary, day, more, onHome, onContinue }: EndScreenProps) {
  * draws it in `LessonFrame`, over the shell.
  */
 export function ReviewSession() {
+  const [params] = useSearchParams();
+  const coursesOn = useCoursesSwitch() === 'on';
+  // A course's session (`?corso=`, «Percorsi») only with the courses' switch on: until then nothing is read, and an off
+  // the server confirms goes back to Oggi (`CoursesGate`).
+  if (!params.get('materia') && params.get('corso') && !coursesOn) {
+    return (
+      <div className="px-4 py-8">
+        <CoursesGate>{null}</CoursesGate>
+      </div>
+    );
+  }
+  return <ReviewSessionBody />;
+}
+
+function ReviewSessionBody() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const desktop = useIsDesktop();
@@ -234,6 +255,8 @@ export function ReviewSession() {
   const materia = requested && Object.keys(MATERIA_LABEL).includes(requested) ? (requested as Materia) : undefined;
   // An institute only within a subject (the server refuses one alone), passed back as the road spelt it.
   const istituto = (materia && params.get('istituto')) || undefined;
+  // One course of «Percorsi» (courses spec §10.5), from «Oggi»'s row; never with a subject.
+  const corso = (!materia && params.get('corso')) || undefined;
 
   const [confirmStop, setConfirmStop] = useState(false);
   // «Interrompi» in the header: the confirmation is drawn from it, whether it was pressed or Esc asked (U1c). Kept in
@@ -260,7 +283,7 @@ export function ReviewSession() {
   }, [navigate]);
 
   const { current, revealed, reveal, grade, remaining, done, summary, practice, step, loading, loadError, saveError, skipped, saving, reload, goalMet, xpGain } =
-    useReviewSession(materia, { istituto, paused: confirmStop, onEscape: handleEscape });
+    useReviewSession(materia, { istituto, corso, paused: confirmStop, onEscape: handleEscape });
   const { note, noteKey, recordGrade } = useGradeNote({ step, current, revealed, practice, saving, skipped, paused: confirmStop });
   // The grade that made the day count plays the celebration, once a day for this browser (spec decision 10).
   const { celebratedBefore, markCelebrated } = useCelebratedToday();
@@ -338,7 +361,7 @@ export function ReviewSession() {
     middle = (
       <>
         {skipped && <div className={cn(COLUMN, 'px-4 pt-4')}>{skippedLine}</div>}
-        <SessionEnd summary={summary} materia={materia} istituto={istituto} onHome={() => navigate(HOME_PATH)} onContinue={() => void reload()} />
+        <SessionEnd summary={summary} materia={materia} istituto={istituto} corso={corso} onHome={() => navigate(HOME_PATH)} onContinue={() => void reload()} />
       </>
     );
   } else {

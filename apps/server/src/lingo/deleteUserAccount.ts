@@ -36,6 +36,9 @@ export async function deleteUserAccount(userId: string): Promise<void> {
     // The person's cards are locked first: a validator's vote in flight finishes before the
     // states are read, so a card it has just archived goes with the account instead of
     // staying archived with no author, where nobody could see or delete it.
+    // Their courses first (Percorsi): the course trash locks a course, then its modules, then its cards, so
+    // taking the cards first here would deadlock with it.
+    await tx.$queryRaw`SELECT id FROM lingo_corsi WHERE autore_id = ${userId} ORDER BY id FOR UPDATE`;
     await tx.$queryRaw`SELECT id FROM lingo_cards WHERE autore_id = ${userId} ORDER BY id FOR UPDATE`;
     await tx.lingoCard.deleteMany({ where: { autoreId: userId, stato: { in: PERSONAL_STATES } } });
     await tx.user.delete({ where: { id: userId } });

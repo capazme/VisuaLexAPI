@@ -3,7 +3,7 @@ import { renderArticleHtml, type RenderArticleInput } from './articleRender';
 import { parseArticleStructure } from './articleStructure';
 import { sanitizeHTML } from './sanitizeHtml';
 import { getSelectionAnchor, plainOffsetAt } from './selectionOffset';
-import { groupAnnotationsByBlock, type LocatedThread } from './articleAnnotations';
+import { groupAnnotationsByBlock, type GlossAnchor, type LocatedThread } from './articleAnnotations';
 import { ARTICLE_FIXTURES, fixtureText } from './__fixtures__/articleTexts';
 import { buildPassage } from './threadPassages';
 import type { Annotation, Highlight } from '../types';
@@ -31,7 +31,7 @@ function rng(seed: number) {
 
 describe('the projection invariant — every real text', () => {
   it.each(ARTICLE_FIXTURES.map((f) => [f.id, f.text] as const))(
-    '%s: text nodes spell article_text minus \\n; every mark sits at its offset, proposals on',
+    '%s: text nodes spell article_text minus \\n; every mark sits at its offset, proposals and glosses on',
     (_id, raw) => {
       const plain = raw.replace(/\n/g, '');
       const next = rng(raw.length);
@@ -73,8 +73,15 @@ describe('the projection invariant — every real text', () => {
           end: a + len,
         });
       }
+      // An application's glosses (D8): counted on the signs, never an element in the text.
+      const glosses: GlossAnchor[] = [];
+      for (let i = 0; i < 4; i++) {
+        const a = Math.floor(next() * (plain.length - 1));
+        const len = 1 + Math.floor(next() * Math.min(60, plain.length - a - 1));
+        glosses.push({ id: `g${i}`, startOffset: a, text: plain.slice(a, a + len), state: (['proposed', 'review', 'validated', 'proposed'] as const)[i] });
+      }
       const focusedThreadId = threads[0]?.thread.id ?? null;
-      const html = render(raw, { highlights, annotations, threads, focusedThreadId, signs: true });
+      const html = render(raw, { highlights, annotations, threads, focusedThreadId, signs: true, glosses });
       // Well-formed before the sanitizer gets a chance to repair it.
       const xml = new DOMParser().parseFromString(`<root>${html}</root>`, 'application/xml');
       expect(xml.getElementsByTagName('parsererror')).toHaveLength(0);
@@ -106,7 +113,7 @@ describe('the projection invariant — every real text', () => {
       }
       // Each block's sign counts exactly what the block shows.
       const structure = parseArticleStructure(raw);
-      const groups = groupAnnotationsByBlock(raw, structure, highlights, annotations, threads);
+      const groups = groupAnnotationsByBlock(raw, structure, highlights, annotations, threads, glosses);
       const blocks = pieces(div, '.vlx-b');
       expect(blocks).toHaveLength(structure.blocks.length);
       blocks.forEach((block, i) => {
@@ -115,9 +122,10 @@ describe('the projection invariant — every real text', () => {
         expect(shown('data-note-id'), `block ${i}: notes`).toEqual(new Set(groups[i].notes.map((n) => n.id)));
         expect(shown('data-highlight'), `block ${i}: highlights`).toEqual(new Set(groups[i].highlights.map((h) => h.id)));
         const sign = [...block.children].find((c) => c.classList.contains('vlx-sign'));
-        if (groups[i].notes.length + groups[i].highlights.length + groups[i].threads.length === 0) {
+        if (groups[i].notes.length + groups[i].highlights.length + groups[i].threads.length + groups[i].glosses.length === 0) {
           expect(sign, `block ${i}: sign`).toBeUndefined();
         } else {
+          expect(sign?.getAttribute('data-glosses'), `block ${i}: sign glosses`).toBe(String(groups[i].glosses.length));
           expect(sign?.getAttribute('data-notes'), `block ${i}: sign notes`).toBe(String(groups[i].notes.length));
           expect(sign?.getAttribute('data-highlights'), `block ${i}: sign highlights`).toBe(String(groups[i].highlights.length));
           expect(sign?.getAttribute('data-threads'), `block ${i}: sign threads`).toBe(String(groups[i].threads.length));
@@ -404,6 +412,38 @@ describe('annotation signs', () => {
     expect(plainSign.hasAttribute('title')).toBe(false);
     expect(plainSign.hasAttribute('data-proposed')).toBe(false);
     expect(plainSign.querySelector('.vlx-sign-ai')).toBeNull();
+  });
+
+  it('counts an application\'s glosses on the sign by state, apart, and draws nothing of them in the text (D8)', () => {
+    const gloss = (id: string, words: string, state: GlossAnchor['state']): GlossAnchor => ({ id, startOffset: at(words), text: words, state });
+    const div = mount(render(raw, {
+      signs: true,
+      highlights: [hl('h1', 'contraenti', at('contraenti'))],
+      glosses: [gloss('g1', 'obbligazioni', 'proposed'), gloss('g2', 'risarcimento del danno', 'validated'), gloss('g3', 'a sua scelta', 'proposed')],
+    }));
+    const sign = signOf(div, 2)!;
+    const label = "1 evidenziazione in questo passo; 3 glosse dell'IA: 2 da validare · 1 validata";
+    expect(sign.getAttribute('aria-label')).toBe(label);
+    expect(sign.getAttribute('title')).toBe(label);
+    expect(sign.getAttribute('data-glosses')).toBe('3');
+    expect(sign.getAttribute('data-highlights')).toBe('1');
+    expect(pieces(sign, '.vlx-sign-gloss').map((e) => `${e.getAttribute('data-state')}:${e.getAttribute('data-count')}`))
+      .toEqual(['proposed:2', 'validated:1']);
+    expect(sign.querySelector('.vlx-sign-ai')).toBeNull();
+    expect(sign.textContent).toBe('');
+    // No mark, no element: the words of a gloss are the text's alone.
+    expect(div.querySelectorAll('mark')).toHaveLength(1);
+    expect(div.textContent).toBe(plain);
+  });
+
+  it('a block with glosses only has a sign of its own, named by them; one whose words are not there makes none', () => {
+    const only = mount(render(raw, { signs: true, glosses: [{ id: 'g', startOffset: at('contraenti'), text: 'contraenti', state: 'review' }] }));
+    const sign = signOf(only, 2)!;
+    expect(sign.getAttribute('aria-label')).toBe("1 glossa dell'IA: 1 da rivedere");
+    expect(sign.getAttribute('data-highlights')).toBe('0');
+    expect(sign.getAttribute('data-glosses')).toBe('1');
+    const lost = mount(render(raw, { signs: true, glosses: [{ id: 'g', startOffset: at('contraenti'), text: 'parole che non ci sono', state: 'proposed' }] }));
+    expect(lost.querySelector('.vlx-sign')).toBeNull();
   });
 
   it('adds no text: the sign is empty and sits after the block\'s text, outside every mark', () => {

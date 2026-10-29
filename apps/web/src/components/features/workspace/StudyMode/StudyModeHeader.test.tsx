@@ -31,5 +31,7 @@ describe('StudyModeHeader — the colour of new highlights (H1)', () => {
     fireEvent.click(trigger);
     fireEvent.click(within(screen.getByRole('menu')).getAllByRole('menuitemradio')[2]);
     expect(appStore.getState().settings.highlightColor).toBe('red');
+    // Its header has a gear already (Study Mode's own settings, which hold the way to the meanings): no second one.
+    expect(screen.queryByRole('button', { name: 'Cambia il significato dei colori' })).toBeNull();
   });
 });

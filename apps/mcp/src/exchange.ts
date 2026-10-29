@@ -1,7 +1,7 @@
 import type { Caller } from './auth.js';
 import { basicAuthorization } from './auth.js';
 import type { McpConfig } from './config.js';
-import { ToolError, formatRenewal } from './errors.js';
+import { NoAnswer, ToolError, formatRenewal } from './errors.js';
 
 /** What each daily counter of the API counts, as the 429 message names it (apps/server, middleware/delegated.ts). */
 const QUOTA_WORDS: Record<string, string> = {
@@ -10,8 +10,10 @@ const QUOTA_WORDS: Record<string, string> = {
   note: 'note scritte',
   trash: 'eliminazioni',
   card: 'schede create',
-  passage: 'passaggi evidenziati',
+  passage: 'glosse proposte',
   text: 'pagine di testo',
+  corso: 'percorsi creati',
+  modulo: 'moduli ed esami aggiunti',
 };
 
 const TOKEN_EXCHANGE = 'urn:ietf:params:oauth:grant-type:token-exchange';
@@ -64,6 +66,10 @@ export async function callApi<T>(
   path: string,
   init: { method?: 'GET' | 'POST'; body?: unknown; /** What a 404 means for this call, when not "no such dossier". */ notFound?: string;
     /** What a call that got no answer means, when not "try again" (a deletion that may have happened). */ unreachable?: string;
+    /**
+     * A 409 is a rule of the data's state (an exam already open, a programme complete, a limit reached), not a change
+     * under the call: its reason goes as the server says it, never with «Riprova» (the courses, Percorsi M1).
+     */ conflictIsState?: boolean;
   } = {},
 ): Promise<T> {
   const apiToken = await exchange(config, caller, scope);
@@ -79,7 +85,7 @@ export async function callApi<T>(
       signal: AbortSignal.timeout(120_000),
     });
   } catch {
-    throw new ToolError(init.unreachable ?? 'VisuaLex non è raggiungibile in questo momento: riprova tra poco.');
+    throw new NoAnswer(init.unreachable ?? 'VisuaLex non è raggiungibile in questo momento: riprova tra poco.');
   }
   const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   if (response.ok) return body as T;
@@ -104,12 +110,20 @@ export async function callApi<T>(
       // The data changed under the call (a dossier edited while the user confirmed): the server says what.
       {
         const detail = typeof body.detail === 'string' ? body.detail : 'I dati sono cambiati nel frattempo.';
+        // Something only the user can do in VisuaLex first (a declaration to accept, Percorsi §3): the server's detail
+        // names the page in words; its `link` is a path of the web app, which the MCP cannot make into an address.
+        if (typeof body.link === 'string') throw new ToolError(`${detail} Riprova dopo che l’utente l’ha fatto.`);
+        if (init.conflictIsState) throw new ToolError(detail);
         throw new ToolError(/riprova/i.test(detail) ? detail : `${detail} Riprova.`);
       }
     case 400: {
       const detail = typeof body.detail === 'string' ? body.detail.replace(/\.$/, '') : 'controlla i dati inviati';
       throw new ToolError(`Richiesta non valida: ${detail}.`);
     }
+    case 502:
+    case 504:
+      // A gateway in front of the server gave up: the server may still be at it.
+      throw new NoAnswer(init.unreachable ?? 'VisuaLex non ha risposto in tempo: riprova tra poco.');
     default:
       console.error(`[mcp] API answered ${response.status} on ${init.method ?? 'GET'} ${path.split('?')[0]}`);
       throw new ToolError('VisuaLex ha avuto un problema: riprova tra poco.');

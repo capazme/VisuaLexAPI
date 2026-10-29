@@ -522,6 +522,19 @@
   color: hsl(var(--vlx-find-current-fg));
 }
 
+/* The words of the gloss a card is on (D8: hovered or focused), painted through the CSS Custom Highlight API
+   (utils/glossPassage.ts), so the text nodes are never touched. The discussion's tint and underline
+   (`.vlx-thread-focus`), not a new colour. */
+::highlight(vlx-gloss) {
+  background-color: hsl(var(--primary) / 0.16);
+  text-decoration-line: underline;
+  text-decoration-color: hsl(var(--primary) / 0.7);
+  text-decoration-thickness: 2px;
+}
+:where(.dark) ::highlight(vlx-gloss) {
+  background-color: hsl(var(--primary) / 0.26);
+}
+
 /* Hidden, not removed: hidden text still counts in the offsets. */
 .vlx-hide-header .vlx-heading,
 .vlx-hide-header .vlx-rubrica,
@@ -855,6 +868,43 @@
   cursor: pointer;
 }
 
+/* An application's glosses on the block's sign (D8): the same shapes and counts as `.vlx-sign-ai`, their own element, so
+   «Nascondi evidenziazioni» leaves them (a gloss is a note, not a highlight). */
+.vlx-art .vlx-sign-gloss {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.vlx-art .vlx-sign-gloss::before {
+  content: '';
+  width: 0.8rem;
+  height: 0.8rem;
+  background-color: currentColor;
+  -webkit-mask: var(--vlx-ai-icon) center / contain no-repeat;
+  mask: var(--vlx-ai-icon) center / contain no-repeat;
+}
+
+.vlx-art .vlx-sign-gloss::after {
+  content: attr(data-count);
+  font-variant-numeric: tabular-nums;
+}
+
+.vlx-art .vlx-sign-gloss[data-state="review"] {
+  --vlx-ai-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='black' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528'/%3E%3C/svg%3E");
+  @apply text-red-700 dark:text-red-300;
+}
+
+.vlx-art .vlx-sign-gloss[data-state="proposed"] {
+  --vlx-ai-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10.1 2.182a10 10 0 0 1 3.8 0'/%3E%3Cpath d='M13.9 21.818a10 10 0 0 1-3.8 0'/%3E%3Cpath d='M17.609 3.721a10 10 0 0 1 2.69 2.7'/%3E%3Cpath d='M2.182 13.9a10 10 0 0 1 0-3.8'/%3E%3Cpath d='M20.279 17.609a10 10 0 0 1-2.7 2.69'/%3E%3Cpath d='M21.818 10.1a10 10 0 0 1 0 3.8'/%3E%3Cpath d='M3.721 6.391a10 10 0 0 1 2.7-2.69'/%3E%3Cpath d='M6.391 20.279a10 10 0 0 1-2.69-2.7'/%3E%3C/svg%3E");
+  @apply text-amber-700 dark:text-amber-400;
+}
+
+.vlx-art .vlx-sign-gloss[data-state="validated"] {
+  --vlx-ai-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='m9 12 2 2 4-4'/%3E%3C/svg%3E");
+  @apply text-emerald-700 dark:text-emerald-400;
+}
+
 /* Flagged «Da rivedere»: the dashed line turns red and thicker, not colour alone (the popover's flag says it in words). */
 .vlx-art .vlx-proposed[data-proposed="review"] {
   text-decoration-thickness: 2.5px;
@@ -950,10 +1000,10 @@
 }
 
 /* "Nascondi evidenziazioni" means the plain text: the dots go, and so does a
-   sign that holds only highlights. */
+   sign that holds only highlights (an application's glosses are notes: they stay). */
 .highlights-hidden .vlx-art .vlx-sign-dot,
 .highlights-hidden .vlx-art .vlx-sign-ai,
-.highlights-hidden .vlx-art .vlx-sign[data-notes="0"][data-threads="0"] {
+.highlights-hidden .vlx-art .vlx-sign[data-notes="0"][data-threads="0"][data-glosses="0"] {
   display: none;
 }
 
@@ -1011,6 +1061,58 @@
 
 @media print {
   .vlx-art .vlx-sign {
+    display: none;
+  }
+}
+
+/* ── The glosses beside the text (D8) ─────────────────────────
+   As a word processor's comments: the text on the left, a column of cards on the right, each at the height of its
+   passage (GlossMargin places them with a transform, measured from the words' DOM range: no element in the text,
+   root rule 23). Only where the reader has room for a text still readable (about 32rem) beside the 17.5rem column;
+   below that the column is not drawn and the block's sign opens the cards in its popover, as on a phone. The query
+   is in rem, the root's size: the frame's own 68ch would need the text's font on the container. */
+.vlx-glossed {
+  container: vlx-glossed / inline-size;
+}
+
+.vlx-gloss-column {
+  display: none;
+}
+
+.vlx-gloss-card {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  transition: transform 160ms var(--ease-out), border-color 150ms ease, box-shadow 150ms ease;
+}
+
+/* Its first place is taken at once: from no transform it would slide down from the column's top. */
+.vlx-gloss-card.vlx-gloss-card-fresh {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vlx-gloss-card {
+    transition: none;
+  }
+}
+
+@container vlx-glossed (min-width: 52rem) {
+  .vlx-glossed-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 17.5rem;
+    column-gap: 1.5rem;
+    align-items: start;
+  }
+
+  .vlx-gloss-column {
+    display: block;
+    position: relative;
+  }
+}
+
+@media print {
+  .vlx-gloss-column {
     display: none;
   }
 }

@@ -26,9 +26,11 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   earlier; a client asking for 2026-07-28, as Claude Code does first, is
   negotiated down). Bump it in a task of its own. At `initialize` the server
   sends `instructions` (`SERVER_INSTRUCTIONS` in `src/server.ts`, under 600
-  characters): what it is for, that norms and decisions are added by a reference
-  in words without looking them up first, and that reading sources outside a
-  dossier is another server's job — so a client with both does not bounce.
+  characters): what it is for, that a dossier is one `omnilex_crea_dossier` call
+  with the norms and decisions in words and the notes, without checking the
+  references with other tools first (VisuaLex checks them at the source), and that
+  reading sources outside a dossier is another server's job — so a client with
+  both does not bounce.
 - **Authentication** (`src/auth.ts`) — every request's bearer token is
   introspected at `apps/server`'s `/oauth/introspect` with the server's own
   credential (`mcp-omnilex`, `MCP_CLIENT_SECRET`); it must be active and its
@@ -37,16 +39,42 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   the protected resource metadata (RFC 9728,
   `/.well-known/oauth-protected-resource/mcp`). A tool whose scope the token
   lacks: 403 `insufficient_scope` (`TOOL_SCOPES` in `src/tools/dossier.ts`,
-  `CARD_TOOL_SCOPES` in `src/tools/cards.ts`),
-  decided before the request reaches the tools.
+  `CARD_TOOL_SCOPES` in `src/tools/cards.ts`, `GLOSS_TOOL_SCOPES`, `COURSE_TOOL_SCOPES`; `lingolex_salva_card`
+  with a `modulo` also needs `lingo:courses:write`),
+  decided before the request reaches the tools. A client signing in asks for every scope but `content:delete`
+  (`ALL_SCOPES` in `src/server.ts`), the courses' two included whether or not their switch is on.
 - **Calling the API** (`src/exchange.ts`) — `callApi` exchanges the client's
   token for a two-minute API token for every call (RFC 8693), with the
   narrowest scope, and maps the API's 400/401/403/404/409/429/503 to Italian
   tool errors, passing the server's own Italian reason on where it gives one
-  (the 429 says when the daily quota renews). The client's token never reaches
+  (the 429 says when the daily quota renews). A request that got no answer, or a gateway's 502/504, is a `NoAnswer`
+  (a `ToolError`): the API may have done it. The client's token never reaches
   the API; the exchanged token never reaches the client.
 - **Tools** (`src/tools/dossier.ts`) — `omnilex_elenca_dossier`,
-  `omnilex_leggi_dossier`, `omnilex_crea_dossier`,
+  `omnilex_leggi_dossier`, `omnilex_crea_dossier` (D8 S1, spec
+  `docs/superpowers/specs/2026-10-29-d8-dossier-one-call-design.md`: a dossier and, in the same call, optional
+  `riferimenti` [≤50], `sentenze` [≤10] and `note` [≤10] `{ testo, voce? }`, `voce` being one of the call's
+  `riferimenti` written the same, checked before anything is created; it calls the existing routes in order — `POST
+  /dossiers`, `…/norms`, `…/decisions`, one `…/notes` per note —, so points, counters and refunds are those of the
+  separate tools. It answers `{ dossier: { id, nome, tipo }, entrate: { norme, sentenze, note }, non_entrate: [{ riga,
+  motivo, candidati? }] }`, plus `note_non_entrate: [{ nota, motivo }]` and `errore` when they apply; `riga` is the
+  input string **byte for byte** (never trimmed: mcp-legal-it subtracts it from its list), `motivo` one of non
+  riconosciuto, inesistente, ambiguo (with at most three `candidati`, the decisions route's `candidates`), non
+  verificabile (a court VisuaLex cannot read too), già presente; no text, no citation; a row written exactly as one that
+  entered is not reported. Once the dossier exists nothing is thrown (its id must reach the model, or a retry makes a
+  second dossier): a step refused whole goes in `errore` and the others still run. A route that gave **no answer**
+  (`NoAnswer` in `src/errors.ts`: the request failed or timed out, or a gateway answered 502/504; the norms route has no
+  overall ceiling and may still be writing) has its rows reported neither in nor out: `errore` says the dossier exists,
+  its entries may still be landing, to check it with `omnilex_leggi_dossier` and not to create it again, and a note on
+  one of those norms is left out with the same words. Every answer that carries `errore` also carries `in_sospeso`,
+  the steps left without an answer in the order they ran — `[]`, `["norme"]`, `["sentenze"]` or both —, so that a
+  client reading the answer as data (mcp-legal-it's citation check, which subtracts `non_entrate[].riga` from its list)
+  knows which rows are neither in nor out; an answer without `errore` has no `in_sospeso` (agreed with mcp-legal-it's
+  maintainer, 29 October 2026). To a client that sent a `progressToken`, a
+  progress notification before and after each step and every 15 s while one runs (`PROGRESS.heartbeatMs`; no total):
+  the SDK's client waits 60 s by default, a decisions step up to 100 s, and a client that restarts its wait on progress
+  then does not give up and retry. A cancelled call stops the steps not yet begun, and its log line says
+  `outcome=cancelled`),
   `omnilex_aggiungi_norme_dossier` (1–50 references in free text, resolved and
   checked by `apps/server`), `omnilex_aggiungi_sentenze_dossier` (1–10 court decisions in
   words, read and confirmed at their source by `apps/server`'s `POST /dossiers/:id/decisions`;
@@ -54,16 +82,25 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   Union (by their case), the Consiglio di Stato, the C.G.A.R.S. and the TAR (by kind, and a TAR by
   its seat, design `docs/superpowers/specs/2026-10-12-administrative-courts-design.md`); a court VisuaLex cannot read yet is answered `court_not_supported` with its name, and its
   description tells the model not to fall back to a note; design
-  `docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md` §2), `omnilex_aggiungi_nota_dossier` (one plain-text
-  note up to 4,000 characters, in a dossier or about one of its articles with
-  `voce`; add-only), `omnilex_stato_account`. A dossier has a kind, `tipo` in the tools:
+  `docs/superpowers/specs/2026-10-12-decisions-mcp-and-eu-courts-design.md` §2; the server's `candidates` is left out of
+  its answer, `detail` names them), `omnilex_aggiungi_nota_dossier` (`note`, 1–10
+  plain-text notes up to 4,000 characters each, in a dossier or about one of its articles with
+  `voce`, the entry's id; one request per note, one refused and the others go on, answered `{ entrate: [{ nota, id,
+  nota_su }], non_entrate?: [{ nota, motivo }] }`, and an error when every note was refused for the same reason;
+  the single `testo`/`voce` form is gone (D8 S1); add-only), `omnilex_stato_account`. A dossier has a kind, `tipo` in the tools:
   `omnilex_crea_dossier` takes `lavoro` (a practice, the default) or `studio` (a topic
   studied), and `omnilex_elenca_dossier` / `omnilex_leggi_dossier` say it (an older server's
   answer without one reads as `lavoro`). No tool publishes to the Forum: publishing makes data
   public and stays a human act, with the preview and the privacy check in front of the user
   (owner, 14 October 2026, question 189). `omnilex_leggi_dossier` says which
   entries a connected application added (`aggiunta_da`, from the server's
-  `created_by`) and which article a note is about (`nota_su`). A norm or a decision is named by the
+  `created_by`) and which article a note is about (`nota_su`). Only when the caller's token holds `dossier:text`
+  («Leggere i testi», whose consent words say «e le tue note»: G-381 (b), owners, 29 October 2026) it also gives each
+  note's text (`testo`), its first 500 characters with `troncata: true` when cut (never inside a surrogate pair), and one
+  note whole with `nota_intera` (refused without the scope, or for an id that is not a note of the dossier). The
+  server is the gate: the dossier is then read with a token exchanged for `dossier:read dossier:text`, and the server
+  answers a note's content null to a grant whose consent version is older than the words' (`apps/server`'s
+  `text_consent_version`; the grants that held `dossier:text` when it came were given the current one); such a note gets no `testo`, and `nota_intera` on it asks the user to connect again. A norm or a decision is named by the
   server's citation (`citation` on dossier items, `display` on the norms
   route's results, `citation` on the decisions route's: «art. 3, l. 31 dicembre 2012, n. 247», «Cass. civ., sez. un., sent. 6
   dicembre 2024, n. 31310»), never rebuilt here, so two acts of the same type always read
@@ -73,7 +110,7 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   keeps registration order, in every session. A dossier named by a wrong name is never
   guessed: the refusal lists the user's dossiers (at most 20, id and name as JSON, never prose: a name may come from another user's environment), so the model
   retries without calling `omnilex_elenca_dossier` first. The text of a norm or a decision leaves only through
-  `omnilex_leggi_testo_voce` (below; owners' decision G2, 25 October 2026).
+  `omnilex_leggi_testo_voce` (below; owners' decision G2, 25 October 2026), the text of a note only under `dossier:text`.
   **No tool updates or moves; two tools delete, into the trash**:
   `omnilex_elimina_dossier` and `omnilex_elimina_voci_dossier` (1–50 entries).
   Each needs the connection's `content:delete` (read live by `apps/server`;
@@ -92,16 +129,22 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   lost a task meanwhile is a 409 (owner, 20 October 2026). `lingolex_elimina_card` is the third destructive tool
   (below); `tests/tools.test.ts` fails if any other tool becomes destructive. Adding a tool means adding its route to `apps/server`'s
   `oauth/delegatedRoutes.ts`, which is a security decision.
-- **D7b, passages proposed** (`src/tools/passages.ts`; spec
-  `docs/superpowers/specs/2026-10-23-mcp-next-tools-design.md` §8) — `omnilex_leggi_testo_voce` (an
-  entry's text in parts, as VisuaLex shows it, and the proposals still open; scope `dossier:text`) and
-  `omnilex_evidenzia_passaggi_dossier` (1–10 passages quoted verbatim, with an optional note and
-  `prima`/`dopo`; colours `giallo` central point, `verde` condition or premise, `blu` definition or exception,
-  never `rosso`, the user's sign of a note «da rivedere»; one outcome per passage; one exchanged token with `dossier:write dossier:text`).
-  Listed only when `apps/server`'s public `GET /features` says `assistantPassages: true`, asked once at
-  each session's `initialize` (closed when it cannot say). No tool confirms, validates, edits or removes a
-  proposal: the user does, in VisuaLex. A connection made before `dossier:text` existed is asked to sign
-  in again for it (the step-up challenge).
+- **An entry's text and the glosses** (`src/tools/glosses.ts`; D7b, spec
+  `docs/superpowers/specs/2026-10-23-mcp-next-tools-design.md` §8; D8,
+  `docs/superpowers/specs/2026-10-29-d8-glosses-design.md`) — `omnilex_leggi_testo_voce` (an entry's text in parts, as
+  VisuaLex shows it, and the glosses this application proposed still to validate; for a norm, the server adds
+  Normattiva's update notes after `testo`, on every part, as `note_aggiornamento` (absent when the text already holds
+  them, as for the codes), and `avviso_note` when some could not be read — never inside the text, G-386; `avviso_testo_parziale` when the
+  text is one part of an article Normattiva splits, G-387; scope `dossier:text`), **always
+  listed**: it is how an application quotes an entry verbatim (G-372). `omnilex_glossa_voce` (an optional general gloss
+  up to 4,000 characters, which becomes a note about the entry through `POST /dossiers/:id/notes`, and 1–10 glosses on
+  passages `{ testo 15–2000, nota ≤ 1500, prima?, dopo? }`, no colour; the passages first, so a call refused whole writes
+  no general gloss; one outcome per row, no text; one exchanged token with `dossier:write dossier:text`, then one with
+  `dossier:write` for the general gloss) is listed only when `apps/server`'s public `GET /features` says
+  `assistantGlosses: true` and `assistantPassages: true` (the server's route needs both), asked once at each session's `initialize` (closed when it cannot say). No tool proposes
+  coloured passages any more: `omnilex_evidenzia_passaggi_dossier` is gone (D8, owners, 29 October 2026), highlighting
+  is the user's gesture. No tool confirms, validates, edits or removes a gloss: the user does, in VisuaLex. A
+  connection made before `dossier:text` existed is asked to sign in again for it (the step-up challenge).
 - **LingoLex cards** (`src/tools/cards.ts`; second-round spec §6) —
   `lingolex_schema_card` (the card's shape and the anchoring rules, as text),
   `lingolex_salva_card` (1–10 cards, always the user's drafts; anchors as
@@ -118,6 +161,27 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
   the card dialog a card is named only by what the server set — its subject,
   the article of its primary anchor, its state, its date and the start of its
   id — never by its question or answer, which a model may have written.
+- **Gymnasium's courses, «Percorsi»** (`src/tools/courses.ts`; spec
+  `docs/superpowers/specs/2026-10-23-gymnasium-courses-design.md` §9, M1, over S1's routes `/lingo/corsi`) —
+  listed only while `apps/server`'s `GET /features` says `lingoCourses: true` (the switch `lingo_courses`, asked
+  with the glosses' at each session's start by `src/features.ts`, closed when it cannot say); off, neither the tools
+  nor `lingolex_salva_card`'s `modulo` and `competenze` nor the courses' rules in `lingolex_schema_card` are listed.
+  Scopes `lingo:courses:read` and `lingo:courses:write` on the one consent (G-379: no group of their own until
+  #318's groups). `lingolex_crea_percorso` (title, subject, planned modules, competences as plain strings — the server
+  gives C1, C2… —, the study dossier by id or exact name; until the user accepts the declaration `MATERIALE_STUDIO`
+  the server's 409 names the page in words, and the error says to retry once the user has), `lingolex_aggiungi_modulo`
+  (a module whole, lesson and verification, the body S1 takes) and `lingolex_aggiungi_esame` write. Their other 409s,
+  and a course card's past its module's limit, are rules of the course's state, passed on as the server words them,
+  never with «Riprova» (`conflictIsState` in `callApi`); a write that got no answer says to check with
+  `lingolex_percorsi` before writing again, since a retry could make a second course or module; `lingolex_percorsi`
+  reads: the list, or one course without its lessons and items (`GET /struttura`, outlined here: a course of 40
+  modules runs to millions of characters), each flag with its module and question, or with `modulo` that module
+  whole with its flags and judgement. The input schemas carry the shape only: the limits and the rules (the
+  lesson's Markdown subset, citations as entries of the course's dossier, the shares of application questions)
+  are in `lingolex_schema_card`'s text and the server checks them all, naming the part. Nothing edits, withdraws
+  or deletes a course or a module (G-377, Q9): a correction is a new module with `sostituisceId`. The definitions'
+  size is held by `tests/courses.test.ts`: with the switch on they pass §10.6's 18,000 characters, which the groups
+  of 1b are meant to keep for those who switch the courses on.
 - **Hardening** — binds to `127.0.0.1` by default. On every bind it refuses a
   `Host` other than `MCP_RESOURCE`'s hostname or the loopback names (DNS
   rebinding; the port does not count). It refuses a browser `Origin` not in
@@ -135,7 +199,13 @@ VisuaLex's MCP server: the dossier and LingoLex card tools for an application a 
 npm --prefix apps/mcp run dev      # needs MCP_CLIENT_SECRET (see .env.example)
 npm --prefix apps/mcp test         # against stub servers, no database
 npm --prefix apps/mcp run build    # tsc
+npm --prefix apps/mcp run costo-dossier   # calls and characters of a dossier on the fixed case, before and after D8 S1
 ```
+
+`scripts/costo-dossier.mjs` drives the server as a client does, against the test stubs, through AgID's draft
+guidelines on AI procurement (26 references, eight notes): the path of one call per step and the one-call path.
+`tests/costoDossier.test.ts` holds the one-call path to exactly one call; run the script again after a change that
+touches the tools' definitions or answers, and put the table in the pull request.
 
 In the production stack it is the `mcp` module (`apps/mcp/Dockerfile`,
 `infra/compose.app.yml`, profile `mcp`): started by `./start.sh --prod` when

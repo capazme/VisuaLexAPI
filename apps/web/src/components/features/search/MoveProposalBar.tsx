@@ -30,6 +30,13 @@ export interface MoveProposalBarProps {
     /** The new boundaries: the offset in the same projection, and the projection's own slice there (root rule 23). */
     onSave: (startOffset: number, text: string) => void;
     onCancel: () => void;
+    /** The bar's name: «Sposta l'evidenziazione» for a coloured passage, the gloss's own words for a gloss (D8). */
+    label?: string;
+    /**
+     * Where the focus goes once the bar closes, when the caller has a better place than the block's sign (a gloss's card
+     * beside the text, D8): true when it took it.
+     */
+    focusAfter?: () => boolean;
 }
 
 const sameWords = (a: string, b: string) => a.replace(/\s+/g, ' ').trim().toLowerCase() === b.replace(/\s+/g, ' ').trim().toLowerCase();
@@ -50,7 +57,9 @@ function isBackward(selection: Selection): boolean {
  * (a drag ends with one, on the very passage being moved), and the selection popup is off (`ArticleBody`'s
  * `selectionPopup`). One bar on the page at a time (`assistantProposalsStore.moving`).
  */
-export function MoveProposalBar({ textRootRef, proposalId, startOffset, text, onSave, onCancel }: MoveProposalBarProps) {
+export function MoveProposalBar({
+    textRootRef, proposalId, startOffset, text, onSave, onCancel, label = "Sposta l'evidenziazione", focusAfter,
+}: MoveProposalBarProps) {
     const barRef = useRef<HTMLDivElement>(null);
     const titleId = useId();
     const helpId = useId();
@@ -208,26 +217,32 @@ export function MoveProposalBar({ textRootRef, proposalId, startOffset, text, on
     );
     const canSave = valid && !unchanged;
 
-    /** The focus back where the passage is: its block's sign (the bar and the card it came from are gone). */
-    const focusPassage = useCallback(() => {
+    /**
+     * The focus back where the passage is (the bar and the card it came from are gone): the caller's place if it has
+     * one, else its block's sign — found by the passage's mark, or for a gloss, which has none (D8), by its words.
+     */
+    const focusPassage = useCallback((at: { startOffset: number; text: string }) => {
         requestAnimationFrame(() => {
-            const mark = textRootRef.current?.querySelector(`[data-highlight="${CSS.escape(proposalId)}"]`);
+            if (focusAfter?.()) return;
+            const root = textRootRef.current;
+            const mark = root?.querySelector(`[data-highlight="${CSS.escape(proposalId)}"]`)
+                ?? (root ? rangeFromPlainOffsets(root, at.startOffset, at.startOffset + at.text.length)?.startContainer.parentElement : null);
             mark?.closest('.vlx-b, .vlx-dec-para')?.querySelector<HTMLElement>(':scope > .vlx-sign')?.focus({ preventScroll: true });
         });
-    }, [textRootRef, proposalId]);
+    }, [textRootRef, proposalId, focusAfter]);
 
     const save = useCallback(() => {
         if (!canSave || !current) return;
         window.getSelection()?.removeAllRanges();
         onSave(current.startOffset, current.text);
-        focusPassage();
+        focusPassage(current);
     }, [canSave, current, onSave, focusPassage]);
 
     const cancel = useCallback(() => {
         window.getSelection()?.removeAllRanges();
         onCancel();
-        focusPassage();
-    }, [onCancel, focusPassage]);
+        focusPassage({ startOffset, text });
+    }, [onCancel, focusPassage, startOffset, text]);
 
     /** Which edge the keys move: the selection's focus goes to that edge. */
     const chooseEdge = (next: Edge) => {
@@ -289,7 +304,7 @@ export function MoveProposalBar({ textRootRef, proposalId, startOffset, text, on
             ref={barRef}
             tabIndex={-1}
             role="group"
-            aria-label="Sposta l'evidenziazione"
+            aria-label={label}
             aria-describedby={`${titleId} ${helpId}`}
             className={cn(
                 'fixed inset-x-0 bottom-0 select-none border-t border-slate-200 bg-white px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-lg focus:outline-none md:inset-x-auto md:bottom-4 md:left-1/2 md:w-[min(36rem,calc(100vw-2rem))] md:-translate-x-1/2 md:rounded-xl md:border dark:border-slate-700 dark:bg-slate-900',

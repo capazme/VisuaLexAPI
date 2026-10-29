@@ -29,10 +29,18 @@ const createdBy = (row: { createdByClientId: string | null; createdByClientName:
 type ItemRow = Prisma.DossierItemGetPayload<object>;
 
 /**
- * A dossier entry as every route answers it. `view` carries the assistant's notes for the user's session
- * (`assistantViewFor`): without it (an exchanged token, the switch off) both fields are null.
+ * Whether a note's text stays out of this answer (G-381 (b)): for a connected application whose token lacks
+ * `dossier:text`, or whose grant was approved before the words of that permission named the notes. The server is
+ * the gate; `apps/mcp` filters too.
  */
-function serializeItem(i: ItemRow, view: AssistantView | null) {
+const hidesNoteText = (req: Request): boolean => Boolean(req.delegation && !req.delegation.readsNotes);
+
+/**
+ * A dossier entry as every route answers it. `view` carries the assistant's notes for the user's session
+ * (`assistantViewFor`): without it (an exchanged token, the switch off) both fields are null. `hideNotes` drops a
+ * note's content (null), never a norm's or a decision's identity.
+ */
+function serializeItem(i: ItemRow, view: AssistantView | null, hideNotes = false) {
   return {
     id: i.id,
     item_type: i.itemType,
@@ -42,7 +50,7 @@ function serializeItem(i: ItemRow, view: AssistantView | null) {
     citation: citeStoredItem(i.itemType, i.content),
     // The act alone ("l. 31 dicembre 2012, n. 247"), for a reader that names an act once above its articles.
     act_citation: citeStoredAct(i.itemType, i.content),
-    content: i.content,
+    content: hideNotes && i.itemType === 'note' ? null : i.content,
     position: i.position,
     status: i.status,
     created_at: i.createdAt,
@@ -57,13 +65,14 @@ function serializeItem(i: ItemRow, view: AssistantView | null) {
 
 /** One entry's answer, with its view of the assistant's notes. */
 export async function serializeItemFor(req: Request, item: ItemRow) {
-  return serializeItem(item, await assistantViewFor(req, [item]));
+  return serializeItem(item, await assistantViewFor(req, [item]), hidesNoteText(req));
 }
 
 /** Dossiers' answers, with one view of the assistant's notes for all their entries. */
 async function serializeDossiersFor(req: Request, dossiers: Parameters<typeof serializeDossier>[0][]) {
   const view = await assistantViewFor(req, dossiers.flatMap((d) => d.items));
-  return dossiers.map((d) => serializeDossier(d, view));
+  const hideNotes = hidesNoteText(req);
+  return dossiers.map((d) => serializeDossier(d, view, hideNotes));
 }
 
 /**
@@ -83,6 +92,7 @@ type PublishedCopyRow = { id: string; currentVersion: number; isActive: boolean;
 function serializeDossier(
   d: Prisma.DossierGetPayload<object> & { items: ItemRow[]; publishedCopy: PublishedCopyRow | null; _count: { tasks: number } },
   view: AssistantView | null,
+  hideNotes = false,
 ) {
   return {
     id: d.id,
@@ -107,7 +117,7 @@ function serializeDossier(
     created_at: d.createdAt,
     updated_at: d.updatedAt,
     created_by: createdBy(d),
-    items: d.items.map((item) => serializeItem(item, view)),
+    items: d.items.map((item) => serializeItem(item, view, hideNotes)),
     // Its planner tasks, done and trashed ones too: all go to the trash with the dossier. A count, never
     // a title: a connected application reads it to tell the user, in the deletion's confirmation.
     task_count: d._count.tasks,
@@ -747,13 +757,17 @@ export const addDossierDecisions = async (req: Request, res: Response) => {
   );
 
   type DecisionResult = {
-    reference: string; outcome: DecisionResultOutcome; citation?: string; court?: string; detail?: string; itemId?: string;
+    reference: string; outcome: DecisionResultOutcome; citation?: string; court?: string; candidates?: string[]; detail?: string; itemId?: string;
   };
   const toCreate: number[] = [];
   const results: DecisionResult[] = resolutions.map((resolution, index): DecisionResult => {
     const base = { reference: references[index], ...(resolution.detail ? { detail: resolution.detail } : {}) };
     if (resolution.outcome !== 'resolved') {
-      return { ...base, outcome: resolution.outcome, ...(resolution.court ? { court: resolution.court } : {}) };
+      return {
+        ...base, outcome: resolution.outcome,
+        ...(resolution.court ? { court: resolution.court } : {}),
+        ...(resolution.candidates ? { candidates: resolution.candidates } : {}),
+      };
     }
     const decision = resolution.decision!;
     const citation = citeDecision(decision);

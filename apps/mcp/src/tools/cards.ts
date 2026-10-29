@@ -25,7 +25,7 @@ export const CARD_TOOL_SCOPES: Record<string, string[]> = {
   lingolex_elimina_card: ['lingo:cards:read'],
 };
 
-const MATERIE = ['DIRITTO_CIVILE', 'DIRITTO_PENALE', 'DIRITTO_AMMINISTRATIVO', 'DIRITTO_PROCESSUALE_CIVILE', 'DIRITTO_PROCESSUALE_PENALE'] as const;
+export const MATERIE = ['DIRITTO_CIVILE', 'DIRITTO_PENALE', 'DIRITTO_AMMINISTRATIVO', 'DIRITTO_PROCESSUALE_CIVILE', 'DIRITTO_PROCESSUALE_PENALE'] as const;
 const TIPI = ['ISTITUTO_DEFINIZIONE', 'DISTINZIONE_CONCETTUALE', 'CASO_APPLICATIVO', 'REQUISITO_FORMA_ATTO'] as const;
 const STATI = ['BOZZA_PERSONALE', 'PROPOSTA_COMMUNITY', 'VALIDATA', 'DA_RIVEDERE', 'ARCHIVIATA'] as const;
 const PERSONAL = new Set(['BOZZA_PERSONALE', 'ARCHIVIATA']);
@@ -61,6 +61,14 @@ const SCHEMA_TEXT = [
   'Una scheda con un’ancora non verificabile (articolo inesistente, riferimento ambiguo, fonte non raggiungibile, articolo di un atto UE) non viene creata.',
   'Le schede create da qui sono sempre bozze personali dell’utente; proporle alla community si fa da VisuaLex.',
 ].join('\n');
+
+/** What a card tied to a course's module needs besides `lingo:cards:write` (the server's card route). */
+export const COURSE_CARD_SCOPE = 'lingo:courses:write';
+
+const CARD_COURSE_TEXT = [
+  'Le schede di un percorso: in lingolex_salva_card «modulo» (l’id del modulo) e, per ogni scheda, «competenze» (i codici che serve, tra quelli del percorso). ',
+  'Al massimo 20 schede per modulo; entrano nel ripasso solo dopo che l’utente ha fatto il modulo, e non si propongono alla community.',
+].join('');
 
 const anchorInput = z.object({
   riferimento: z.string().trim().min(1).max(200).describe('L’articolo, a parole: «art. 1453 c.c.»'),
@@ -160,37 +168,64 @@ const cardLine = (card: ApiCard): string => {
   return `Scheda di ${MATERIA_WORDS[card.materia] ?? 'materia non indicata'}${anchor}, ${STATO_WORDS[card.stato] ?? 'stato non indicato'}, creata il ${date} (${card.id.slice(0, 8)})`;
 };
 
-export function registerCardTools(server: McpServer, config: McpConfig, run: RunTool): void {
+/**
+ * `courseRules`: the rules of a course (`COURSE_SCHEMA_TEXT`), while `apps/server` has the courses on. Then the schema
+ * tells them too and a card may name its module and competences (Percorsi, M1); otherwise neither is listed.
+ */
+export function registerCardTools(server: McpServer, config: McpConfig, run: RunTool, courseRules?: string): void {
+  const schemaText = courseRules ? `${SCHEMA_TEXT}\n\n${CARD_COURSE_TEXT}\n\n${courseRules}` : SCHEMA_TEXT;
   server.registerTool(
     'lingolex_schema_card',
     {
       title: 'Come si scrive una scheda di VisuaLex Gymnasium',
-      description: 'La forma di una scheda di studio di VisuaLex Gymnasium e le regole delle ancore, da leggere prima di lingolex_salva_card.',
+      description: courseRules
+        ? 'La forma di una scheda di studio di VisuaLex Gymnasium e di un percorso, e le loro regole: da leggere prima di lingolex_salva_card e degli strumenti dei percorsi.'
+        : 'La forma di una scheda di studio di VisuaLex Gymnasium e le regole delle ancore, da leggere prima di lingolex_salva_card.',
       inputSchema: {},
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    (_args, extra) => run('lingolex_schema_card', extra, async () => ({ content: [{ type: 'text', text: SCHEMA_TEXT }] })),
+    (_args, extra) => run('lingolex_schema_card', extra, async () => ({ content: [{ type: 'text', text: schemaText }] })),
   );
 
-  server.registerTool(
-    'lingolex_salva_card',
-    {
-      title: 'Salva schede di VisuaLex Gymnasium',
-      description:
-        'Salva da 1 a 10 schede di studio come bozze personali dell’utente, con le ancore scritte a parole (vedi lingolex_schema_card). ' +
-        'Ogni scheda ha il suo esito: creata, o rifiutata con il motivo e l’ancora che non si è potuta verificare.',
-      inputSchema: { schede: z.array(cardInput).min(1).max(10).describe('Le schede, da 1 a 10') },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-    },
-    ({ schede }, extra) =>
-      run('lingolex_salva_card', extra, async (caller) => {
-        const answer = await callApi<{ results: Record<string, unknown>[] }>(config, caller, 'lingo:cards:write', '/lingo/cards', {
-          method: 'POST',
-          body: { cards: schede },
-        });
-        return data({ esiti: answer.results });
-      }),
-  );
+  const description =
+    'Salva da 1 a 10 schede di studio come bozze personali dell’utente, con le ancore scritte a parole (vedi lingolex_schema_card). ' +
+    'Ogni scheda ha il suo esito: creata, o rifiutata con il motivo e l’ancora che non si è potuta verificare.';
+  const annotations = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true };
+  const save = (caller: Caller, schede: unknown[], modulo?: string) =>
+    callApi<{ results: Record<string, unknown>[] }>(
+      config,
+      caller,
+      // A card tied to a module writes into the course too: the server's card route asks for both.
+      modulo === undefined ? 'lingo:cards:write' : `lingo:cards:write ${COURSE_CARD_SCOPE}`,
+      '/lingo/cards',
+      // With a module, a 409 is the module's card limit: a rule, not a change under the call.
+      { method: 'POST', body: { cards: schede, moduloId: modulo }, notFound: 'Modulo non trovato, oppure i percorsi non sono attivi.', conflictIsState: modulo !== undefined },
+    );
+  if (!courseRules) {
+    server.registerTool(
+      'lingolex_salva_card',
+      { title: 'Salva schede di VisuaLex Gymnasium', description, inputSchema: { schede: z.array(cardInput).min(1).max(10).describe('Le schede, da 1 a 10') }, annotations },
+      ({ schede }, extra) => run('lingolex_salva_card', extra, async (caller) => data({ esiti: (await save(caller, schede)).results })),
+    );
+  } else {
+    server.registerTool(
+      'lingolex_salva_card',
+      {
+        title: 'Salva schede di VisuaLex Gymnasium',
+        description,
+        inputSchema: {
+          schede: z
+            .array(cardInput.extend({ competenze: z.array(z.string()).min(1).optional().describe('Con modulo: i codici serviti') }))
+            .min(1)
+            .max(10)
+            .describe('Le schede, da 1 a 10'),
+          modulo: z.string().min(1).max(64).optional().describe('Id del modulo di un percorso'),
+        },
+        annotations,
+      },
+      ({ schede, modulo }, extra) => run('lingolex_salva_card', extra, async (caller) => data({ esiti: (await save(caller, schede, modulo)).results })),
+    );
+  }
 
   server.registerTool(
     'lingolex_le_mie_card',
