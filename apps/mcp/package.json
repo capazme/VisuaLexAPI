@@ -12,7 +12,8 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "costo-dossier": "tsx scripts/costo-dossier.mjs"
   },
   "license": "MPL-2.0",
   "dependencies": {

@@ -9,7 +9,7 @@
  *
  * Optional: VISUALEX_URL (default http://localhost:3001), MCP_URL (default
  * http://localhost:3002/mcp). The user must exist and be active. The script
- * creates one dossier, which it deletes at the end, and one connection, which
+ * creates two dossiers, which it moves to the trash at the end, and one connection, which
  * it revokes. Tokens are never printed.
  */
 import { createHash, randomBytes } from 'node:crypto';
@@ -122,20 +122,35 @@ const expected = tools.some((t) => t.name === 'omnilex_leggi_testo_voce') ? 16 :
 check(`${expected} tools, only the three deletions destructive`, tools.length === expected && destructive === 'lingolex_elimina_card, omnilex_elimina_dossier, omnilex_elimina_voci_dossier', destructive);
 const name = `E2E MCP ${new Date().toISOString().slice(0, 19)}`;
 const created = await call(client, 'omnilex_crea_dossier', { nome: name });
-must('omnilex_crea_dossier', !created.isError && created.data?.id, created.isError ? created.text : name);
+must('omnilex_crea_dossier', !created.isError && created.data?.dossier?.id, created.isError ? created.text : name);
+created.data.id = created.data.dossier.id;
 const added = await call(client, 'omnilex_aggiungi_norme_dossier', { dossier: name, riferimenti: ['art. 2043 c.c.', 'art 2059 cc', 'art. 99999 c.c.'] });
 const outcomes = added.data?.esiti?.map((e) => e.outcome) ?? [];
 check('omnilex_aggiungi_norme_dossier: two added, the made-up one refused', JSON.stringify(outcomes) === JSON.stringify(['added', 'added', 'does_not_exist']), added.isError ? added.text : outcomes.join(', '));
 const read = await call(client, 'omnilex_leggi_dossier', { dossier: created.data.id });
 check('omnilex_leggi_dossier: the two articles, no text', read.data?.voci?.length === 2 && !read.text.includes('article_text'), read.data?.voci?.map((v) => v.riferimento).join('; '));
 const article = read.data?.voci?.[0];
-const note = await call(client, 'omnilex_aggiungi_nota_dossier', { dossier: created.data.id, testo: 'Nota di prova sul danno ingiusto.', voce: article?.id });
-check('omnilex_aggiungi_nota_dossier: a note on the first article', !note.isError && note.data?.nota?.nota_su === article?.id, note.isError ? note.text : note.data?.nota?.id);
+const note = await call(client, 'omnilex_aggiungi_nota_dossier', { dossier: created.data.id, note: [{ testo: 'Nota di prova sul danno ingiusto.', voce: article?.id }] });
+check('omnilex_aggiungi_nota_dossier: a note on the first article', !note.isError && note.data?.entrate?.[0]?.nota_su === article?.id, note.isError ? note.text : note.data?.entrate?.[0]?.id);
 const reread = await call(client, 'omnilex_leggi_dossier', { dossier: created.data.id });
 const noteEntry = reread.data?.voci?.find((v) => v.tipo === 'note');
 check('the note reads as written by the application, about that article', noteEntry?.nota_su === article?.id && noteEntry?.aggiunta_da === 'VisuaLex e2e', `aggiunta_da ${noteEntry?.aggiunta_da}`);
 const fifty1 = await client.callTool({ name: 'omnilex_aggiungi_norme_dossier', arguments: { dossier: created.data.id, riferimenti: Array.from({ length: 51 }, (_, i) => `art. ${i + 1} c.c.`) } }).catch((e) => ({ isError: true, content: [{ text: String(e) }] }));
 check('51 references refused', Boolean(fifty1.isError));
+
+// D8 S1: the dossier in one call, the rows that did not enter answered as they were written.
+const oneCall = await call(client, 'omnilex_crea_dossier', {
+  nome: `${name} (una chiamata)`,
+  riferimenti: ['art. 2043 c.c.', 'art. 99999 c.c.'],
+  note: [{ testo: 'Nota sul dossier.' }, { testo: 'Nota sul danno ingiusto.', voce: 'art. 2043 c.c.' }],
+});
+check(
+  'omnilex_crea_dossier in one call: one norm and two notes in, the made-up article out as written',
+  !oneCall.isError && JSON.stringify(oneCall.data?.entrate) === JSON.stringify({ norme: 1, sentenze: 0, note: 2 })
+    && JSON.stringify(oneCall.data?.non_entrate) === JSON.stringify([{ riga: 'art. 99999 c.c.', motivo: 'inesistente' }]),
+  oneCall.text,
+);
+const oneCallId = oneCall.data?.dossier?.id;
 
 // Deletion (second round): off until the user switches it on; then confirmed, into the trash, restorable.
 const grantsNow = await json(await fetch(`${VISUALEX}/api/oauth/grants`, { headers: session }));
@@ -214,8 +229,12 @@ try {
 }
 check('after the revocation the next call fails', afterRevoke.isError, afterRevoke.text.slice(0, 80));
 
-// 9. Clean up: the dossier goes for good through the user session (MCP only moves things to the trash).
+// 9. Clean up: the two dossiers go through the user session (to its trash, as every deletion of the web app does).
 const deleted = await fetch(`${VISUALEX}/api/dossiers/${created.data.id}`, { method: 'DELETE', headers: session });
+if (oneCallId) {
+  const second = await fetch(`${VISUALEX}/api/dossiers/${oneCallId}`, { method: 'DELETE', headers: session });
+  check('cleanup: the one-call dossier deleted through the user session', second.status === 204 || second.status === 200);
+}
 // The e2e card stays a draft of the test user: no route deletes a card for good, and the
 // test user's account deletion removes it (deleteUserAccount removes personal cards).
 check('cleanup: the e2e dossier deleted through the user session', deleted.status === 204 || deleted.status === 200);

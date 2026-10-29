@@ -204,6 +204,9 @@ describe('POST /api/dossiers/:id/decisions', () => {
     expect(seats.detail).toContain('TAR Lombardia, Milano, sent., n. 4000/2020');
     expect(seats.detail).toContain('TAR Lombardia, Brescia');
     expect(seats.detail).toContain('Indica la sede del TAR.');
+    // The same citations as a list, for a client that names the candidates (D8 S1).
+    expect(seats.candidates).toEqual(expect.arrayContaining(['TAR Lombardia, Milano, sent., n. 4000/2020']));
+    expect(seats.candidates.every((c: string) => seats.detail.includes(c))).toBe(true);
     expect(await prisma.dossierItem.count()).toBe(0);
   });
 
@@ -232,6 +235,10 @@ describe('POST /api/dossiers/:id/decisions', () => {
     expect(words.detail).toMatch(/corte, il numero e l'anno/);
     expect(ambiguous.detail).toContain('Cass. civ., sez. III, ord. 22 aprile 2024, n. 10787');
     expect(ambiguous.detail).toContain('Cass. pen., sez. VII, ord. dep. 14 marzo 2024, n. 10787');
+    expect(ambiguous.candidates).toEqual(expect.arrayContaining([
+      'Cass. civ., sez. III, ord. 22 aprile 2024, n. 10787', 'Cass. pen., sez. VII, ord. dep. 14 marzo 2024, n. 10787',
+    ]));
+    expect(court.candidates).toBeUndefined();
     expect(missing.detail).toBe('La fonte non conosce questa decisione.');
     expect(penal.detail).toContain('Cass. pen., n. 1399/2000');
     // Before the archive's start the source cannot say: never "does not exist".

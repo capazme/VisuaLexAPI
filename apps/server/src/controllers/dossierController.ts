@@ -757,13 +757,17 @@ export const addDossierDecisions = async (req: Request, res: Response) => {
   );
 
   type DecisionResult = {
-    reference: string; outcome: DecisionResultOutcome; citation?: string; court?: string; detail?: string; itemId?: string;
+    reference: string; outcome: DecisionResultOutcome; citation?: string; court?: string; candidates?: string[]; detail?: string; itemId?: string;
   };
   const toCreate: number[] = [];
   const results: DecisionResult[] = resolutions.map((resolution, index): DecisionResult => {
     const base = { reference: references[index], ...(resolution.detail ? { detail: resolution.detail } : {}) };
     if (resolution.outcome !== 'resolved') {
-      return { ...base, outcome: resolution.outcome, ...(resolution.court ? { court: resolution.court } : {}) };
+      return {
+        ...base, outcome: resolution.outcome,
+        ...(resolution.court ? { court: resolution.court } : {}),
+        ...(resolution.candidates ? { candidates: resolution.candidates } : {}),
+      };
     }
     const decision = resolution.decision!;
     const citation = citeDecision(decision);
